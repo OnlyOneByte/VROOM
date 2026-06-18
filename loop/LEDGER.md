@@ -34,10 +34,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 46 |
 | guard | 6 | 45 |
 | bug | 3 | 48 |
-| arch | 5 | 43 |
+| arch | 5 | 50 |
 | infra | 6 | 49 |
 
-Current cycle: **49**
+Current cycle: **50**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,31 @@ Current cycle: **49**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C50 (arch)** — **Dedup the split-config vehicleId extraction into ONE exported `splitConfigVehicleIds`
+  (a genuine fresh pick — 3 hand-copies across 2 domains).** arch was the SOLE over-budget category
+  (50−43=7/5, +2). Not a no-churn ceremony — found a real, clean dedup the prior scouts (C4/C6/C12/C36)
+  hadn't covered: the `config.method === 'even' ? config.vehicleIds : config.allocations.map((a) =>
+  a.vehicleId)` extraction was hand-copied at THREE sites — `expenses/routes.ts` (a LOCAL un-exported
+  `splitConfigVehicleIds`, the split-ownership loop), `expenses/repository.ts` `validateVehicleOwnership`,
+  and `reminders/validation.ts` `refineSplitConfig` (the split-vs-vehicleIds match check). FIX: lifted ONE
+  exported `splitConfigVehicleIds(config)` into expenses/validation.ts (where `SplitConfig` lives +
+  reminders/validation already imports splitConfigSchema from it), typed on the MINIMAL structural shape
+  so BOTH `SplitConfig` AND the DB-layer `ReminderSplitConfig` satisfy it with no cross-import; de-dupes
+  via Set (matching the callers' prior `[...new Set(ids)]`). Routed all 3 sites through it (routes drops
+  its local copy; repo + reminder validator drop their inline ternaries). BEHAVIOR-PRESERVING (rule 4):
+  the reminder validator wraps the result in `new Set(...)` exactly as before (helper returns a de-duped
+  array → same set); the existing split-validation + reminder-validation + expense-ownership suites stayed
+  green (142 pass across the affected files). Arch rule 3 (pin the newly-shared helper): +4 direct unit
+  cases (split-config-vehicle-ids.test.ts — even/absolute/percentage extraction + the dedup) since it was
+  a local un-exported helper with no direct net (the C17→C18 / C23 arch-extract→guard-pin pattern, in one
+  cycle). NON-VACUOUS (verified firsthand): breaking the helper's even branch → 3 of 4 RED; reverted →
+  green, validation.ts diff = only the +19-line helper. CAUGHT-MY-OWN: my first test passed bare object
+  literals with `amount`/`percentage` → tsc excess-property error against the minimal param shape; typed
+  the fixtures as `SplitConfig` (how callers actually use it) → green. Verify: backend validate:local GREEN
+  — tsc 0, musl-biome 0 errors (20 pre-existing warnings), 1641 pass / 0 fail (+4), build bundled.
+  Backend-only (no UI → no shot). cov: be ~87.5% / fe 86.35% (~ — behavior-preserving dedup, LOC net down
+  at the 3 sites, +4 pin the shared helper; FE untouched). Arch was NOT at its floor this cycle — a real
+  cross-domain dup existed; keep scouting fresh modules, not the saturated C4/C6/C12 surfaces.
 - **C49 (infra)** — **Branch-hygiene sweep + coverage re-measure (the ~10-cycle cadence; last ran C42).**
   TWO over budget at C49 — infra (49−42=7/6, +1) and arch (49−43=6/5, +1); infra wins the tie on raw
   starvation (7 > 6). Warranted on substance (the C42 projection was ~C52, but the budget forces it now and

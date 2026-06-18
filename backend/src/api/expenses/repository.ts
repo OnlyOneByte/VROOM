@@ -12,7 +12,7 @@ import { clampPagination, type PaginatedResult } from '../../utils/pagination';
 import { BaseRepository } from '../../utils/repository';
 import { assertVehiclesOwned } from '../../utils/vehicle-ownership';
 import { expenseSplitService } from './split-service';
-import type { SplitConfig } from './validation';
+import { type SplitConfig, splitConfigVehicleIds } from './validation';
 export interface ExpenseFilters {
   vehicleId?: string;
   userId?: string;
@@ -601,15 +601,10 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
    * Throws NotFoundError if any vehicle is not found or not owned.
    */
   private async validateVehicleOwnership(splitConfig: SplitConfig, userId: string): Promise<void> {
-    const vehicleIds =
-      splitConfig.method === 'even'
-        ? splitConfig.vehicleIds
-        : splitConfig.allocations.map((a) => a.vehicleId);
-
-    // Delegate the cross-tenant ownership query to the shared assertVehiclesOwned (C376) — ONE source
-    // of truth shared with the insurance term path. This wrapper keeps the split-config field
-    // extraction; the helper owns the `userId AND id IN (ids)` predicate + the NotFoundError throw.
-    await assertVehiclesOwned(this.db, vehicleIds, userId);
+    // splitConfigVehicleIds owns the `even ? vehicleIds : allocations.map(...)` extraction (one source
+    // of truth, C50); assertVehiclesOwned (C376) owns the cross-tenant `userId AND id IN (ids)` query +
+    // NotFoundError throw, shared with the insurance term path.
+    await assertVehiclesOwned(this.db, splitConfigVehicleIds(splitConfig), userId);
   }
 
   /**

@@ -405,6 +405,13 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
    preserving confirmed eyes-on: both picker-path e2e specs (import-mapping-detect + import-manual-units)
    GREEN + Read the editor PNG (pixel-identical). The 3 import e2e specs are the merge-surviving net. The
    C22→C23 "feature copies markup → next arch dedups" lesson again. Don't re-scout this surface.
+5. ~~**`splitConfigVehicleIds` dedup**~~ — **DONE C50.** The `even ? vehicleIds : allocations.map(...)`
+   split-config vehicleId extraction was hand-copied at 3 sites (expenses/routes.ts local helper,
+   expenses/repository.ts `validateVehicleOwnership`, reminders/validation.ts `refineSplitConfig`).
+   Lifted ONE exported `splitConfigVehicleIds(config)` into expenses/validation.ts, typed on the minimal
+   structural shape so both `SplitConfig` + `ReminderSplitConfig` satisfy it; routed all 3 through it.
+   Behavior-preserving (de-dupes via Set as before; 142 affected tests green) + 4 direct unit guards
+   (arch-extract→guard-pin, C17→C18 pattern). Non-vacuous (break the even branch → 3 RED). Don't re-scout.
 
 > **SCOUTED C4 — no churn warranted.** Checked FE date helpers (formatters.ts single-sources
 > toDateInputValue/dateOnlyToISO; expense-filters' local-date parse is INTENTIONALLY a different time

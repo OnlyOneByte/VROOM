@@ -42,6 +42,7 @@ import { expenseRepository } from './repository';
 import {
   createSplitExpenseSchema,
   type SplitConfig,
+  splitConfigVehicleIds,
   tagElementSchema,
   updateSplitSchema,
 } from './validation';
@@ -197,15 +198,6 @@ async function assertFinancingSourceValid(
   if (sourceId !== financing.id) {
     throw new ValidationError('Source ID does not match the active financing record');
   }
-}
-
-/** The distinct vehicleIds a split config touches, across all three split methods. */
-function splitConfigVehicleIds(splitConfig: SplitConfig): string[] {
-  const ids =
-    splitConfig.method === 'even'
-      ? splitConfig.vehicleIds
-      : splitConfig.allocations.map((a) => a.vehicleId);
-  return [...new Set(ids)];
 }
 
 /**
