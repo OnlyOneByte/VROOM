@@ -31,13 +31,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 82 |
-| deep-review | 5 | 81 |
+| deep-review | 5 | 86 |
 | guard | 6 | 80 |
 | bug | 3 | 83 |
 | arch | 5 | 85 |
 | infra | 6 | 84 |
 
-Current cycle: **85**
+Current cycle: **86**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,24 @@ Current cycle: **85**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C86 (deep-review — surfaces SATURATED; 4 candidates verified already-guarded firsthand, recorded + pivot)**
+  — Balance at C86: four AT budget (feature 4/4, deep-review 5/5, guard 6/6, bug 3/3); deep-review has the lowest
+  budget (tips first) → picked. Scouted 4 fresh deep-review candidates; EACH already well-guarded, DON'T
+  re-audit: (1) FE sync-manager RETRY/BACKOFF — sync-manager.test.ts pins retry-count, maxRetries cap,
+  `retryDelay * 2^retries` exponential, no-reschedule-at-cap, #121 retry-conflict-surface, #134
+  orphan-resurrection (the C67/C81 "next vein" pointer is STALE — covered since); (2) determineConflictType
+  (C67 cert, sync-manager.test.ts:562+); (3) computeTCOTotal — the #27/#28 double-count rule directly pinned in
+  per-vehicle.property.test.ts:411 + Property 14 + #33 block; (4) reminder-NOTIFICATION read path — feed order +
+  #142 + mark-read/404 (notifications-feed.test.ts) + per-milestone (reminderId,dueOdometer) dedup incl. re-arm
+  + both-axes no-collision (trigger-mileage.test.ts, C256). Recorded saturated; did NOT manufacture a redundant
+  cert (GUIDE agent-HIGH-often-false + C12 structural-floor discipline). The one still-paying deep-review vein is
+  EYES-ON of a never-shot surface (E2E can't catch never-rendered fields — the C68 lesson); NEXT: the
+  recurring-expenses MaterializedExpensesDialog / ⟳ badge POPULATED (needs a type:expense reminder + trigger to
+  materialize rows first; C5 shot the dashboard card, C27 verified the round-trip via API, the dialog markup is
+  unshot). Doc-only — no source touched. cov: be 87.47% / fe 86.35% (~ — nothing changed). PATTERN NOTE: the
+  C83 (bug) / C85 (arch) / C86 (deep-review) run of dry scouts confirms the codebase is mature — the highest-
+  leverage remaining work is GATED on Angelo (#148/#100/#79/#129 + import defaultCategory); the loop will keep
+  producing solid guards/certs but a steer unblocks a fresh vein.
 - **C85 (arch — no churn warranted; convert family fully deduped, recorded + pivot)** — Balance at C85: arch
   (85−78=7/5, +2) the lone over-budget category → picked. Scouted the #94 convert-helper residue firsthand;
   REJECTED both candidates per arch rule 5 (name a concrete payoff): (1) the 5-arg convertEfficiency

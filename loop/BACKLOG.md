@@ -91,6 +91,24 @@ now — the "Playwright-blocked" tail was a ~200-cycle MISDIAGNOSIS, see GUIDE.m
 re-audit a data-safety write path, certify it CLEAN against source, and leave a merge-surviving guard.
 Don't trust agent "HIGH" findings — verify firsthand (the archive logged many debunked false-positives).)*
 
+> **SCOUTED C86 — deep-review surfaces SATURATED (4 candidates verified already-guarded firsthand; no
+> manufacture).** With the backend correctness surfaces broadly certified, scouted 4 fresh candidates and found
+> EACH already well-guarded — DON'T re-audit: (1) the FE sync-manager RETRY/BACKOFF path — sync-manager.test.ts
+> pins retry-count tracking, the maxRetries hard cap, the `retryDelay * 2^retries` EXPONENTIAL backoff, the
+> no-reschedule-at-cap, #121 retry-conflict-surfacing, #134 orphan-resurrection (the C67/C81 "next vein" pointer
+> is now STALE — that path got covered since); (2) `determineConflictType` (sync-manager.test.ts:562+, the C67
+> cert); (3) `computeTCOTotal` — the #27/#28 double-count-avoidance rule (purchasePrice all-time-only +
+> purchasePrice-counted⇒exclude-financing-payments) is directly pinned in per-vehicle.property.test.ts:411
+> (`#27` block) + Property 14 (bucket-sum) + the #33 mis-bucket block; (4) the reminder-NOTIFICATION read path —
+> feed newest-first + #142 mileage-null-sorts-first + mark-read/unreadOnly/404 (notifications-feed.test.ts) and
+> the per-milestone (reminderId,dueOdometer) dedup incl. re-arm + both-axes no-collision (trigger-mileage.test.ts,
+> C256). Recorded saturated; did NOT manufacture a redundant cert (the GUIDE "agent-HIGH-often-false" + C12
+> "structural-floor, don't force ceremony" discipline). The one deep-review vein that still pays is EYES-ON of a
+> never-shot surface (E2E can't catch never-rendered fields, the C68 lesson) — NEXT: the recurring-expenses
+> MaterializedExpensesDialog / ⟳ badge in a POPULATED state (needs a type:expense reminder + trigger to
+> materialize rows first; C5 shot the dashboard RecurringCostCard, C27 verified the round-trip via API, but the
+> dialog markup itself is unshot).
+>
 > **AUDITED C82 — /financing LOAN render eyes-on sweep, CLEAN.** Shot the Toyota Camry loan vehicle (BoA
 > 4.5% APR, $20k/60mo) FinanceTab desktop + Read the PNG (C68 covered the LEASE path; this is the unshot loan +
 > PaymentMetricsGrid + amortization path). Renders correct: Next Payment $372.86 (Monthly · Loan · 4.5% APR),
