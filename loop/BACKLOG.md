@@ -91,6 +91,15 @@ now — the "Playwright-blocked" tail was a ~200-cycle MISDIAGNOSIS, see GUIDE.m
 re-audit a data-safety write path, certify it CLEAN against source, and leave a merge-surviving guard.
 Don't trust agent "HIGH" findings — verify firsthand (the archive logged many debunked false-positives).)*
 
+> **AUDITED C106 (feature eyes-on) — the FULL POPULATED dashboard CLEAN desktop + mobile (the primary landing
+> surface, only ever partially-shot at C5/C12).** Shot desktop + mobile (Pixel 5) + Read both PNGs. Desktop: 4 KPI
+> cards (Total Vehicles 4 / Total Expenses $21,677.87 / Monthly Average $277.92 / Active Financing 2, subtitle
+> matches the vehicle count = consistent), Your Fleet (3 vehicle cards + Add-Vehicle), Trends + Category charts
+> (canvas blank = C26 IO-gated headless limit, not a defect), Recent Activity (incl. the $900 split payment),
+> Upcoming Reminders, Recurring Costs $460.50/mo. Mobile (393px): NO horizontal overflow (NORTH_STAR #3) — KPIs
+> reflow to a 2×2 grid, "Log Fill-up" mobile CTA present, FAB pins full-width; figures consistent. No defect; DON'T
+> re-audit. The dashboard's populated state now joins the fully-eyes-on set.
+>
 > **AUDITED C96 (feature eyes-on) — /profile CLEAN desktop + mobile → EVERY REAL SURFACE NOW EYES-ON.** The last
 > never-shot real surface (the C93 pointer). Shot desktop + mobile (Pixel 5) + Read both PNGs. Desktop: Identity
 > (avatar, editable Display Name, Email, Member Since "June 2026" = correct), Connected Accounts (Google + unlink +

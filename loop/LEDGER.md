@@ -42,14 +42,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 101 |
+| feature | 4 | 106 |
 | deep-review | 5 | 102 |
 | guard | 6 | 101 |
 | bug | 3 | 103 |
 | arch | 5 | 105 |
 | infra | 6 | 104 |
 
-Current cycle: **105**
+Current cycle: **106**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -368,6 +368,27 @@ Current cycle: **105**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C106 (feature — eyes-on the full POPULATED dashboard, desktop + mobile; CLEAN [the primary landing surface,
+  only ever partially-shot])** — Balance at C106 (HEAD was C105; nudge label lags): feature (106−101=5/4, +1) the
+  lone over-budget category → picked. Import-trackers stays Angelo-gated (defaultCategory), so per the
+  C68/C75/C82/C88/C93/C96 precedent took the shootable eyes-on increment. The shot history had /dashboard only
+  twice (C5 shot just the recurring-cost-card REGION; C12 the app-init trigger) — the FULL populated dashboard (the
+  primary landing surface, NORTH_STAR mobile-first) in a multi-vehicle state was never Read end-to-end. Shot DESKTOP
+  + MOBILE (Pixel 5) + Read both PNGs (+ a zoomed KPI crop). CERTIFIED CLEAN: desktop renders all sections — 4 KPI
+  stat cards (Total Vehicles 4 / Total Expenses $21,677.87 / Monthly Average $277.92 / Active Financing 2, the
+  subtitle "Overview of your 4 vehicles" matching the vehicle count = internally consistent), Your Fleet (3 vehicle
+  cards w/ Financed badges + per-vehicle Last-30/Total/Last-Activity + Add-Expense, a 4th slot + Add-Vehicle FAB),
+  Monthly Expense Trends + Expense by Category (chart canvas blank = the C26 IO-gated-chart headless-capture limit,
+  NOT a defect — frame/legend render), Recent Activity (correct expense rows incl. the $900 split payment),
+  Upcoming Reminders (e2e mileage/recurring w/ due dates), Recurring Costs ($460.50/mo across 4). MOBILE (393px):
+  NO horizontal overflow (NORTH_STAR #3) — the 4 KPI cards reflow desktop-4-across → a clean 2×2 grid (values fit,
+  labels wrap), the "Log Fill-up" mobile-first pump CTA is present, Your Fleet + Add-Vehicle FAB pin full-width;
+  figures consistent with desktop. Zero console errors; no /auth bounce. No defect; no fix (the GUIDE
+  agent-HIGH-findings-often-false discipline). The dashboard is sound — DON'T re-audit. Read-only shots, no fixtures
+  created. Doc-only — no committable source (shot.mjs is gitignored harness). cov: be 87.47% / fe 87.6% (~ — no
+  test/code touched). With this, the dashboard joins the fully-eyes-on set; every real surface + the primary
+  landing in its populated state is now Read. NEXT feature cycle: feature is fully exhausted of self-authorizable
+  work (every surface shot, import-trackers gated) → record parked + pivot UNLESS Angelo steers.
 - **C105 (arch — no churn warranted; the createLoadState scaffold has ZERO adopters but its migration is a
   design-gated multi-page refactor, NOT a self-authorizable increment — surfaced for Angelo, recorded + pivot)** —
   Balance at C105 (HEAD was C104; nudge label lags): arch (105−98=7/5, +2) the most-starved over-budget category →
