@@ -296,8 +296,11 @@ export function getBackupTableKeys(): string[] {
   return Object.keys(TABLE_SCHEMA_MAP);
 }
 
-// Files that may be absent in older backups (pre-migration)
-const OPTIONAL_BACKUP_FILES = new Set([
+// Files that may be absent in older backups (pre-migration). EXPORTED so a drift guard can assert this
+// set is a SUBSET of TABLE_FILENAME_MAP's values — an entry here that drifts from the map (typo, or a map
+// rename) silently makes a genuinely-optional file REQUIRED, so a valid older backup missing it fails
+// restore with "Missing required files" (NORTH_STAR #1: the user can't recover their own backup).
+export const OPTIONAL_BACKUP_FILES = new Set([
   'insurance_terms.csv',
   'insurance_term_vehicles.csv',
   'insurance_claims.csv',

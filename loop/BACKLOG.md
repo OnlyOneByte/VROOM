@@ -103,6 +103,19 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > fixed-FAB capture artifact.) Next eyes-on vein: the /financing populated render, or the recurring-expenses
 > dashboard widget in a populated state.
 >
+> **CERTIFIED C81 — the backup-EXPORT serialization round-trip CLEAN + the OPTIONAL_BACKUP_FILES drift seam
+> guarded.** Audited createBackup → exportAsZip → parseZipBackup firsthand. Already well-guarded (DON'T
+> re-audit): createBackup keys === TABLE_SCHEMA_MAP (C208 part B); SCHEMA_MAP keys === FILENAME_MAP keys +
+> schema-table coverage (C208 part A); export + restore derive columns from the SAME getTableColumns →
+> schema-symmetric; coerceRow numeric (#68/#209) + JSON round-trips covered by the populated round-trip suites.
+> GAP found: getRequiredBackupFiles() = FILENAME_MAP values MINUS the hand-maintained OPTIONAL_BACKUP_FILES set,
+> coupled only by literal strings — an OPTIONAL entry drifting from the map (typo/rename) makes a real backup
+> file REQUIRED → a valid older backup missing it fails restore ("Missing required files"), NORTH_STAR #1.
+> Certified firsthand zero orphans today. GUARD: exported OPTIONAL_BACKUP_FILES + a 3rd test in
+> backup-table-coverage.test.ts (OPTIONAL ⊆ FILENAME_MAP values); non-vacuous (drift a map value → RED). The
+> backup export/restore round-trip is now broadly certified — next deep-review: the FE offline sync-manager
+> retry/backoff path, or an eyes-on /financing populated render.
+>
 > **CERTIFIED C74 — the CSV-import idempotency key `deriveImportClientId` FIELD-SENSITIVE + directly guarded.**
 > The crown-jewel import data-safety contract (re-import = no-op via createIdempotent's (userId, clientId)
 > unique index, yet two genuinely-different rows must get DISTINCT keys so both land) was driven only

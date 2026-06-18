@@ -31,13 +31,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 75 |
-| deep-review | 5 | 74 |
+| deep-review | 5 | 81 |
 | guard | 6 | 80 |
 | bug | 3 | 79 |
 | arch | 5 | 78 |
 | infra | 6 | 77 |
 
-Current cycle: **80**
+Current cycle: **81**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,28 @@ Current cycle: **80**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C81 (deep-review)** — **Certified the backup-EXPORT serialization round-trip CLEAN + pinned the one
+  unguarded invariant: OPTIONAL_BACKUP_FILES ⊆ TABLE_FILENAME_MAP (data-recovery, NORTH_STAR #1).** Balance at
+  C81: deep-review (7/5, +2) most-starved over budget (feature tied on overage +2 but less starved + spec
+  Angelo-gated) → picked. Audited the backup export path (createBackup → exportAsZip → parseZipBackup) firsthand
+  — the C74 next-vein. CERTIFIED CLEAN + already well-guarded (DON'T re-audit): (a) createBackup's 15 BackupData
+  keys === TABLE_SCHEMA_MAP (backup-createbackup-keys.test.ts, C208 part B); (b) SCHEMA_MAP keys === FILENAME_MAP
+  keys + every schema table mapped-or-excluded (backup-table-coverage.test.ts, C208 part A); (c) export +
+  restore BOTH derive columns from the SAME getTableColumns(table) → schema-symmetric, can't drift; (d) coerceRow
+  numeric (#68/#209 thousands-separator) + JSON round-trips covered by the populated claims/maintenance/
+  split-config/csv-special-chars round-trip suites. Found the GENUINE GAP: getRequiredBackupFiles() = FILENAME_MAP
+  values MINUS the hand-maintained OPTIONAL_BACKUP_FILES set — coupled ONLY by literal filename strings. An
+  OPTIONAL entry that drifts from the map (typo / a map rename) filters out NOTHING → a genuinely-optional file
+  becomes REQUIRED → parseZipBackup rejects a valid OLDER backup missing it ("Missing required files"), so the
+  user can't recover their own data (NORTH_STAR #1). Certified firsthand all 11 OPTIONAL entries are in the map
+  today (zero orphans). GUARD: exported OPTIONAL_BACKUP_FILES + a 3rd test in backup-table-coverage.test.ts
+  asserting OPTIONAL ⊆ FILENAME_MAP values. NON-VACUOUS proved firsthand: drifting the map's
+  reminder_vehicles.csv → reminders_vehicles.csv orphans the OPTIONAL entry → RED naming the orphan + the
+  consequence; restored → green. Verify: backend validate:local GREEN — tsc 0, musl-biome clean (20 pre-existing
+  warnings, none new), 1697 pass / 0 fail (+1), build bundled. Backend-only (no UI → no shot). cov: be 87.46% /
+  fe 86.35% (~ — guard/cert add; backup pipeline already well-covered, this pins the last drift seam). The backup
+  export/restore round-trip is now broadly certified — next deep-review: the FE offline sync-manager retry/backoff,
+  or an eyes-on /financing populated render.
 - **C80 (guard)** — **Pinned the CSV export↔import column-name contract (the round-trip crown-jewel, NORTH_STAR
   #1) with a source-scan.** Balance at C80: THREE over budget — feature (5/4, +1), deep-review (6/5, +1), guard
   (7/6, +1); guard most-starved (7) → picked. With #94 fully closed (C79), scouted the convert-before-pool
