@@ -247,13 +247,26 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
    * — so a retried offline POST is a no-op. When clientId is absent this is a plain
    * create. The pre-check + unique index together close the retry race: a concurrent
    * duplicate insert hits the unique constraint, which we recover by re-reading.
+   *
+   * `overwrite` (#98, C51): when the caller is a conflict RESOLUTION choosing keep-local (not a blind
+   * retry), a (userId, clientId) collision must APPLY the local edit, not silently discard it. With the
+   * flag set, an existing row is UPDATED with the new data (preserving its id/userId/clientId/createdAt —
+   * clientId/userId are stripped from the patch so the identity + idempotency key never change) instead
+   * of returned unchanged. Default false keeps the plain-retry path a pure no-op (NORTH_STAR #1: a
+   * resolved offline edit is never lost).
    */
-  async createIdempotent(data: NewExpense): Promise<Expense> {
+  async createIdempotent(data: NewExpense, overwrite = false): Promise<Expense> {
     if (!data.clientId) {
       return this.create(data);
     }
     const existing = await this.findByClientId(data.clientId, data.userId);
-    if (existing) return existing;
+    if (existing) {
+      if (!overwrite) return existing;
+      // Apply the local edit onto the existing row. Strip the identity + idempotency keys so they're
+      // immutable; everything else (amount, mileage, tags, category, …) is replaced by the local version.
+      const { clientId: _clientId, userId: _userId, ...patch } = data;
+      return this.update(existing.id, patch);
+    }
 
     try {
       return await this.create(data);
@@ -261,7 +274,14 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       // Lost the race: another request inserted the same (userId, clientId).
       // Re-read and return the winner rather than surfacing a constraint error.
       const raced = await this.findByClientId(data.clientId, data.userId);
-      if (raced) return raced;
+      if (raced) {
+        // Same overwrite contract on the raced winner so a concurrent keep-local still applies the edit.
+        if (overwrite) {
+          const { clientId: _clientId, userId: _userId, ...patch } = data;
+          return this.update(raced.id, patch);
+        }
+        return raced;
+      }
       throw error;
     }
   }

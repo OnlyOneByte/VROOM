@@ -197,3 +197,69 @@ describe('PUT /api/v1/expenses/:id — vehicle reassignment ownership (#61)', ()
     expect(body.data.vehicleId).toBe(vehicleId);
   });
 });
+
+// #98 (C51): POST /expenses must thread `forceOverwrite` through to createIdempotent so a keep-local
+// conflict resolution APPLIES the local edit on a (userId, clientId) collision. Pre-fix the schema
+// Zod-STRIPPED the flag (an unknown key) → the offline edit was silently lost. This drives the REAL route.
+describe('POST /api/v1/expenses — forceOverwrite keep-local resolution (#98)', () => {
+  async function postExpense(body: Record<string, unknown>) {
+    const res = await ctx.authed('POST', '/api/v1/expenses', body);
+    return { res, body: await json<DataEnvelope<{ id: string; expenseAmount: number }>>(res) };
+  }
+
+  test('a collision WITH forceOverwrite applies the local edit in place (same id, new amount)', async () => {
+    const vehicleId = await seedVehicle();
+    const clientId = 'c51-overwrite';
+    const first = await postExpense({
+      vehicleId,
+      category: 'misc',
+      expenseAmount: 10,
+      date: '2026-04-01T12:00:00.000Z',
+      description: 'orig',
+      clientId,
+    });
+    expect(first.res.status, JSON.stringify(first.body)).toBe(201);
+
+    // The resolved local edit (different amount) re-POSTs with the same clientId + forceOverwrite.
+    const resolved = await postExpense({
+      vehicleId,
+      category: 'misc',
+      expenseAmount: 88,
+      date: '2026-04-01T12:00:00.000Z',
+      description: 'resolved',
+      clientId,
+      forceOverwrite: true,
+    });
+    expect(resolved.res.status, JSON.stringify(resolved.body)).toBeLessThan(300);
+    expect(resolved.body.data.id, 'same row updated in place').toBe(first.body.data.id);
+    expect(resolved.body.data.expenseAmount, 'local edit applied').toBe(88);
+
+    // Exactly one row exists for that clientId (no duplicate).
+    const list = await ctx.authed('GET', `/api/v1/expenses?vehicleId=${vehicleId}`);
+    const listBody = await json<PaginatedEnvelope<ExpenseRow>>(list);
+    expect(listBody.data.length).toBe(1);
+  });
+
+  test('a collision WITHOUT forceOverwrite is the idempotent no-op (original amount kept)', async () => {
+    const vehicleId = await seedVehicle();
+    const clientId = 'c51-noop';
+    const first = await postExpense({
+      vehicleId,
+      category: 'misc',
+      expenseAmount: 10,
+      date: '2026-04-02T12:00:00.000Z',
+      clientId,
+    });
+    expect(first.res.status).toBe(201);
+
+    const retry = await postExpense({
+      vehicleId,
+      category: 'misc',
+      expenseAmount: 999,
+      date: '2026-04-02T12:00:00.000Z',
+      clientId,
+    });
+    expect(retry.body.data.id).toBe(first.body.data.id);
+    expect(retry.body.data.expenseAmount, 'blind retry must NOT overwrite').toBe(10);
+  });
+});

@@ -104,15 +104,24 @@ const createExpenseSchemaBase = baseExpenseSchema.omit({
   splitMethod: true,
 });
 
-const createExpenseSchema = createExpenseSchemaBase.refine(
-  (data) => {
-    // Enforce both-or-neither for source fields
-    const hasType = !!data.sourceType;
-    const hasId = !!data.sourceId;
-    return hasType === hasId;
-  },
-  { message: 'sourceType and sourceId must both be provided or both omitted', path: ['sourceType'] }
-);
+const createExpenseSchema = createExpenseSchemaBase
+  // #98 (C51): conflict-resolution keep-local opt-in. When an offline edit collides with an existing
+  // (userId, clientId) row, this flag tells the idempotent create to APPLY the edit (update the row)
+  // rather than no-op-return the stored version — so a resolved local edit is never silently lost. A
+  // plain retry omits it → the pure idempotent no-op is unchanged. create-only (not on update).
+  .extend({ forceOverwrite: z.boolean().optional() })
+  .refine(
+    (data) => {
+      // Enforce both-or-neither for source fields
+      const hasType = !!data.sourceType;
+      const hasId = !!data.sourceId;
+      return hasType === hasId;
+    },
+    {
+      message: 'sourceType and sourceId must both be provided or both omitted',
+      path: ['sourceType'],
+    }
+  );
 
 // clientId is a create-only idempotency key; it must not be mutable via update.
 // `tags` is overridden to drop the base `.default([])`: a Zod `.default()` SURVIVES `.partial()`, so
@@ -646,9 +655,12 @@ routes.post('/import/detect', zValidator('json', detectSourceSchema), (c) => {
 // POST /api/expenses - Create a new expense
 routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
   const user = c.get('user');
+  // Separate the control flag from the row data: forceOverwrite (#98) governs the idempotent-create
+  // collision behavior, it is NOT a column — keep it out of the inserted/overwritten row.
+  const { forceOverwrite, ...body } = c.req.valid('json');
   // Strip fuel-only fields from a non-fuel create (#76 server-side): a stray mileage would otherwise
   // poison getCurrentOdometer (cross-category UNION). For a fuel expense this is a no-op.
-  const expenseData = clearFuelFieldsIfNotFuel(c.req.valid('json'));
+  const expenseData = clearFuelFieldsIfNotFuel(body);
 
   // Verify vehicle exists and belongs to user
   await validateVehicleOwnership(expenseData.vehicleId, user.id);
@@ -670,10 +682,14 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
 
   // Idempotent create: a retried offline POST with the same clientId returns the
   // original row instead of duplicating it. Plain create when clientId is absent.
-  const createdExpense = await expenseRepository.createIdempotent({
-    ...expenseData,
-    userId: user.id,
-  });
+  // forceOverwrite (#98): a keep-local conflict resolution APPLIES the edit on collision.
+  const createdExpense = await expenseRepository.createIdempotent(
+    {
+      ...expenseData,
+      userId: user.id,
+    },
+    forceOverwrite ?? false
+  );
 
   // D5: a mileaged expense is also a new odometer reading — re-check this vehicle's mileage reminders
   // so a crossed milestone fires immediately. Only when mileage is present (getCurrentOdometer reads

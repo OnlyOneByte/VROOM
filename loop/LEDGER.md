@@ -33,11 +33,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 47 |
 | deep-review | 5 | 46 |
 | guard | 6 | 45 |
-| bug | 3 | 48 |
+| bug | 3 | 51 |
 | arch | 5 | 50 |
 | infra | 6 | 49 |
 
-Current cycle: **50**
+Current cycle: **51**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,34 @@ Current cycle: **50**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C51 (bug #98)** — **Real PUT-on-collision overwrite so sync-manager keep-local applies the offline edit
+  (Angelo-APPROVED Sev-3 data-loss).** NOTHING strictly over budget at C51 (feature/deep-review/guard/bug
+  all tied AT) → took the highest-leverage open item. #94 (Sev-2) is a genuine 6-builder multi-file analytics
+  sweep (better as its own scoped effort, possibly a design pass) → took the contained, single-seam Sev-3
+  #98, a NORTH_STAR #1 data-loss path. CONFIRMED FIRSTHAND: sync-manager `resolveConflict('keep_local')`
+  re-POSTs with `forceOverwrite: true` + the local clientId, but (a) `createExpenseSchema` Zod-STRIPPED the
+  unknown flag and (b) `createIdempotent` returned the existing (userId, clientId) row UNCHANGED — so on a
+  GENUINE clientId collision the user's resolved offline edit was silently discarded. FIX (Angelo's "real
+  PUT-on-collision/upsert"): (1) `createExpenseSchema.extend({ forceOverwrite: z.boolean().optional() })`
+  (create-only, NOT on update); (2) the POST route separates the control flag from the row data (kept out
+  of the insert) + threads it to the repo; (3) `createIdempotent(data, overwrite=false)` — on a collision
+  with overwrite, UPDATEs the existing row with the local data, stripping clientId/userId from the patch so
+  the identity + idempotency keys stay immutable; default false keeps the plain-retry no-op EXACTLY as
+  before (the existing "retry returns original unchanged" test still passes). The race-recovery path honors
+  the same overwrite contract on the re-read winner. GUARD: +4 repo cases (idempotent-create.test.ts:
+  overwrite updates in place / identity immutable / default no-op unchanged / overwrite-on-absent =
+  plain-create) + +2 HTTP-harness cases (expenses-http.test.ts: the REAL route applies the edit WITH the
+  flag, no-ops WITHOUT — proves the schema no longer strips it). NON-VACUOUS (verified firsthand): neutering
+  the overwrite branch → the 3 overwrite-applying tests RED, the no-op cases stay green; reverted → green,
+  repository.ts diff = only my change. Updated the FE sync-manager comment + the stale "#98 not a real
+  overwrite" characterization test to the now-real behavior (the wire contract — POST forceOverwrite +
+  clientId — is unchanged + still asserted). The FE conflict-resolution path is eyes-on/Playwright-blocked
+  (offline + conflict-dialog state); the end-to-end overwrite is covered by the HTTP-harness (the real
+  route) — the right merge-surviving net for this seam, no shot feasible. Verify: backend validate:local
+  GREEN (tsc 0, musl-biome 0 errors / 20 pre-existing warnings, 1647 pass / 0 fail, +6, build bundled) +
+  frontend validate:local GREEN (type-check 0, build OK, 735 tests). cov: be ~87.5% / fe 86.35% (~ — the +6
+  pin the overwrite path; FE comment/test-only). #98 DONE. Next Angelo: Sev-2 #94 (the fleet-unit-pool
+  class, its own cycle) or the Sev-4 hardening (#100/#22/#129/#112/#79).
 - **C50 (arch)** — **Dedup the split-config vehicleId extraction into ONE exported `splitConfigVehicleIds`
   (a genuine fresh pick — 3 hand-copies across 2 domains).** arch was the SOLE over-budget category
   (50−43=7/5, +2). Not a no-churn ceremony — found a real, clean dedup the prior scouts (C4/C6/C12/C36)

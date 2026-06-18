@@ -261,11 +261,16 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 > offline-outbox field-dropout family #66/#101/#111, or analytics split-sibling overcount if any builder
 > was missed by the #56/#108/#113/#146 sweep).
 
+> **CLOSED C51: #98** — sync-manager keep-local now does a real overwrite-on-collision (forceOverwrite
+> honored by createExpenseSchema + createIdempotent; see the Sev-3 block). So the next bug cycle's top
+> Angelo-approved item is **Sev-2 #94** (the 6-member fleet-unit-pooling class — its own dedicated cycle, a
+> multi-builder thread-units-into-builders change, possibly a design pass) or the **Sev-4 hardening** pile
+> (#100 json_patch atomic merge [arch-gated], #22 zip-bomb ratio cap, #129 OAuth email-sync, #112 chart
+> palette [design-gated], #79 stuck-offline-entry hygiene).
+>
 > **CLOSED C48: #88** — a deleted vehicle is now pruned from reminders' `expenseSplitConfig` blob +
 > renormalized (see the Sev-3 block). The #88/#97 vehicle-delete reminder-orphan family is CLOSED (junction
-> C40 + blob C48). So the next bug cycle's top Angelo-approved item is **Sev-2 #94** (the 6-member
-> fleet-unit-pooling class — its own dedicated cycle, a multi-builder thread-units-into-builders change) or
-> **Sev-3 #98** (real PUT-on-collision/upsert so sync-manager `keep_local` actually overwrites).
+> C40 + blob C48).
 >
 > **CLOSED C44: #37** — the Google Sheets backup is now ATOMIC (stage→swap). See the Sev-1 block below for
 > the fix. **The Sheets-backup data-corruption Sev-1 pair (#36 C24 RAW-write + #37 C44 atomic-swap) is now
@@ -345,9 +350,14 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 >   "needs attention" surfacing was NOT added (the deactivation alone removes the silent-orphan footgun;
 >   a needs-attention flag is a separate UX add). Don't re-pick. (#88 — the split-config-blob sibling — is
 >   still OPEN, same family, more involved.)
-> - **#98 (MED) — APPROVED: add a real PUT-on-collision / upsert path so sync-manager `keep_local`
->   actually overwrites.** Today `forceOverwrite` is Zod-stripped → offline edit silently lost on a true
->   clientId collision.
+> - ~~**#98 (MED) — DONE C51.**~~ sync-manager `keep_local` re-POSTs `forceOverwrite:true` + the local
+>   clientId, but the create schema Zod-STRIPPED the flag and `createIdempotent` returned the existing
+>   (userId, clientId) row UNCHANGED → the resolved offline edit was silently lost (NORTH_STAR #1). Fixed:
+>   `createExpenseSchema.extend({ forceOverwrite })` (create-only) + the route threads it (stripped from the
+>   row) + `createIdempotent(data, overwrite=false)` UPDATEs the existing row in place on collision when set
+>   (clientId/userId stripped from the patch → identity immutable); default false keeps the plain-retry
+>   no-op unchanged. +4 repo + +2 HTTP-harness guards; non-vacuous (neuter the branch → 3 RED). FE comment +
+>   stale characterization test updated to the now-real overwrite (wire contract unchanged). Don't re-pick.
 >
 > _Severity 4 — hardening / display (lower urgency):_
 > - **#100 (arch-gated) — APPROVED: SQL-atomic merge via `json_patch` in one UPDATE** for the

@@ -301,14 +301,11 @@ class SyncManager {
 				case 'keep_local': {
 					const backendExpense = offlineExpenseToBackend(conflict.localExpense);
 					try {
-						// NOTE (#98, escalated C324): this POSTs to the CREATE endpoint, whose
-						// idempotency keys on (userId, clientId). `forceOverwrite` is NOT honored by the
-						// backend (Zod strips unknown keys) — so on a GENUINE clientId collision the
-						// create returns the existing row UNCHANGED and the local edit is NOT applied,
-						// while we still markExpenseAsSynced + return true. It only "works" because the
-						// fuzzy pre-check (checkForExistingExpense) flags DISTINCT rows whose clientId is
-						// new (→ a clean insert). A real overwrite path (PUT-on-collision / upsert) is the
-						// product/arch call in #98; the field is left here pending that decision, not relied on.
+						// #98 (FIXED C51): POST to the create endpoint with `forceOverwrite: true` + the local
+						// row's clientId. The backend now HONORS the flag (createExpenseSchema accepts it;
+						// createIdempotent updates the existing (userId, clientId) row in place rather than
+						// no-op-returning it) — so on a GENUINE clientId collision the local edit is APPLIED,
+						// not silently dropped (NORTH_STAR #1). A clean insert (new clientId) is unaffected.
 						await apiClient.post('/api/v1/expenses', {
 							...backendExpense,
 							clientId: conflict.localExpense.clientId,
