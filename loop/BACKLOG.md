@@ -833,15 +833,19 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 filesystem; untracked specs vanish on merge), full regress, coverage re-measure (update the LEDGER cov:
 baseline), refresh `BRANCH_REVIEW.md` grouped by theme so the eventual PR stays reviewable.)*
 
-> **RAN C90 (cadence; last ran C84).** Untracked-test sweep CLEAN (0 stray committed-ext specs; only the
-> intentional `M .gitignore`/`M frontend/.gitignore` overrides). Coverage RE-MEASURED: BE 87.47% line / 87.19%
-> func (1698 pass) — UNCHANGED vs C84 (C85 no-churn / C86 saturated / C87 source-scan guard [line-covers nothing
-> new] / C88 eyes-on / C89 dry scout); FE 86.35% line / 87.68% func / 78.88% branch (735 pass) — line/func flat,
-> branch +0.10 = v8 rounding noise (no FE source touched since C52). Both at the ~87/~86 structural ceiling. Both
-> suites green (BE 1698 / FE 735). Branch = 90 ahead of fresh origin/main, PR-ready (bug 22 / feature 17 / guard
-> 14 / deep-review 14 / infra 12 / arch 10). NEXT cadence ~C100. The 90% goal stays structurally gated (BE tail
-> OAuth/DI-bound, FE tail eyes-on components) — don't chase % directly. NOTE: C83–C89 swept every self-authorizable
-> vein; the highest-leverage work is now GATED on Angelo (#148/#100/#79/#129 + import defaultCategory).
+> **RAN C97 (cadence; last ran C90).** Untracked-test sweep CLEAN (0 stray committed-ext specs; only the intentional
+> `M .gitignore`/`M frontend/.gitignore` overrides). Coverage RE-MEASURED: BE 87.47% line / 87.20% func (1703 pass)
+> — line UNCHANGED vs C90, func +0.01 (the C94 CORS/CSRF guard added a couple covered helper lines); FE 86.35% line
+> / 87.68% func / 78.78% branch (735 pass) — FULLY UNCHANGED (no FE source touched since C52; C93/C96 eyes-on shots,
+> C95 dry; the C90 branch 78.88 was v8 noise, back to 78.78). Both at the ~87/~86 structural ceiling. Both suites
+> green (BE 1703 / FE 735). Branch = 97 ahead of fresh origin/main, PR-ready (bug 23 / feature 19 / guard 15 /
+> deep-review 15 / infra 13 / arch 11). NEXT cadence ~C107. STANDING SIGNAL (C83–C97, 15 cycles): every
+> self-authorizable vein is swept — net production change is 2 guard tests (C87/C94); the highest-leverage work is
+> GATED on Angelo (#148/#100/#79/#129 + import defaultCategory). Don't chase coverage % directly.
+>
+> **RAN C90 (cadence; last ran C84).** Untracked-test sweep CLEAN. Coverage RE-MEASURED: BE 87.47/87.19 (1698 pass),
+> UNCHANGED vs C84; FE 86.35/87.68/78.88 (735 pass), branch +0.10 = v8 rounding noise. Both green (BE 1698 / FE 735),
+> branch 90 ahead. C83–C89 swept every self-authorizable vein; highest-leverage work GATED on Angelo.
 >
 > **RAN C14 (cadence).** Untracked-test sweep CLEAN. Coverage RE-MEASURED: BE 87.22%/86.96% (unchanged vs
 > C7 — sync-test additions hit already-covered modules); FE 86.07% line / 87.19% func / 78.53% branch (UP

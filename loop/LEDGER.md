@@ -14,12 +14,12 @@
 > re-measure this cycle; re-measure (`bun test --coverage` / vitest `--coverage`) on guard/arch/bug
 > cycles that touch a module. Goal 90% both (structural ceiling ~87% BE / ~86% FE — the remaining gap
 > is OAuth/DI-bound BE [auth routes, provider services, backup-orchestrator, db connection] + eyes-on FE
-> components). **RE-MEASURED C90 (infra cadence): BE 87.47% line / 87.19% func (file-mean, 1698 pass); FE
-> 86.35% line / 87.68% func / 78.88% branch (v8, 735 pass) — BE UNCHANGED vs C84 (C85–C89 were doc/test-only on
-> already-covered modules + the C87 prev-period guard, which line-covered nothing new); FE line/func UNCHANGED,
-> branch +0.10 vs C84's 78.78 (no FE source touched since C52 → v8 instrumenter rounding noise, not real movement).**
+> components). **RE-MEASURED C97 (infra cadence): BE 87.47% line / 87.20% func (file-mean, 1703 pass); FE
+> 86.35% line / 87.68% func / 78.78% branch (v8, 735 pass) — BE line UNCHANGED vs C90, func +0.01 (the C94 CORS/CSRF
+> source-scan guard added a couple covered helper lines); FE FULLY UNCHANGED (no FE source touched since C52; C93/C96
+> were eyes-on shots only, C95 a dry scout). The C90 branch 78.88 was v8 rounding noise — back to 78.78.**
 > Both still at the ~87 BE / ~86 FE structural ceiling; treat as the floor.
-> (C84: BE 87.47/87.19, FE 86.35/87.68/78.78. C77: BE 87.46/87.18, FE 86.35/87.68/78.78. C70: BE 87.46/87.18, FE 86.35/87.68/78.78. C63: BE 87.46/87.17, FE 86.35/87.68/78.78. C56: BE 87.46/87.18, FE 86.35/87.68/78.78. C49: BE 87.47/87.17, FE 86.35/87.68/78.88. C42: BE 87.33/86.97, FE 86.35/87.68/78.78. C35: BE 87.29/86.97, FE 86.14/87.31/78.70.
+> (C90: BE 87.47/87.19, FE 86.35/87.68/78.88[noise]. C84: BE 87.47/87.19, FE 86.35/87.68/78.78. C77: BE 87.46/87.18, FE 86.35/87.68/78.78. C70: BE 87.46/87.18, FE 86.35/87.68/78.78. C63: BE 87.46/87.17, FE 86.35/87.68/78.78. C56: BE 87.46/87.18, FE 86.35/87.68/78.78. C49: BE 87.47/87.17, FE 86.35/87.68/78.88. C42: BE 87.33/86.97, FE 86.35/87.68/78.78. C35: BE 87.29/86.97, FE 86.14/87.31/78.70.
 > C28: BE 87.22/86.97, FE 86.14/87.31/78.70. C21: BE 87.22/86.96, FE
 > 86.07/87.19/78.53. C14: BE 87.22/86.96, FE 86.07/87.19/78.53. C7: FE 85.95/87.15/78.38.)
 
@@ -35,9 +35,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 94 |
 | bug | 3 | 95 |
 | arch | 5 | 91 |
-| infra | 6 | 90 |
+| infra | 6 | 97 |
 
-Current cycle: **96**
+Current cycle: **97**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,25 @@ Current cycle: **96**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C97 (infra — branch-hygiene sweep + coverage re-measure, the ~10-cycle cadence; last ran C90)** — Balance at
+  C97 (HEAD was C96; nudge label lags): TWO over budget — infra (97−90=7/6, +1) and arch (97−91=6/5, +1); infra wins
+  on raw starvation (7 > 6, the C84 tie-break) AND is the higher-leverage pick (arch is reliably no-churn at its
+  structural floor, C91; infra's cadence is genuinely non-dry). Ran right in the ~10-cycle window (7 since C90).
+  (1) UNTRACKED-TEST SWEEP: CLEAN — zero untracked `.test`/`.spec.ts`/`.test.svelte` specs (bun/vitest discover by
+  filesystem; an untracked spec vanishes on merge). Only the intentional `M .gitignore` + `M frontend/.gitignore`
+  local overrides remain. (2) COVERAGE RE-MEASURED: **BE 87.47% line / 87.20% func** (file-mean, 1703 pass) — line
+  UNCHANGED vs C90, func +0.01 (the C94 CORS/CSRF source-scan guard added a couple covered helper lines); **FE
+  86.35% line / 87.68% func / 78.78% branch** (v8, 735 pass) — FULLY UNCHANGED (no FE source touched since C52;
+  C93/C96 were eyes-on shots, C95 a dry scout; the C90 branch 78.88 was v8 rounding noise, back to 78.78). Both at
+  the ~87 BE / ~86 FE structural ceiling — the 90% goal stays structurally gated (BE tail OAuth/DI-bound; FE tail
+  eyes-on components now ALL shot but not unit-covered). (3) BOTH-SIDES GREEN: BE 1703 / FE 735, 0 fail. (4) BRANCH
+  STATE: claude-loop-dev = **97 commits ahead** of fresh origin/main, PR-ready (category spread bug 23 / feature 19
+  / guard 15 / deep-review 15 / infra 13 / arch 11; the 97th is the C1 loop-doc reset). Recorded here since
+  BRANCH_REVIEW.md is gitignored. Doc-only — no source touched. cov: be 87.47% / fe 86.35% (MEASURED). NEXT cadence
+  ~C107. STANDING SIGNAL (C83–C97, 15 cycles): every self-authorizable vein is swept — net production change across
+  all 15 is 2 guard tests (C87/C94). The branch is healthy + PR-ready; the highest-leverage remaining work is GATED
+  on Angelo (#148 lease burn bar / import defaultCategory / #100 / #79 / #129) — a steer is the only thing that
+  opens a fresh vein.
 - **C96 (feature — eyes-on the LAST never-shot real surface /profile, desktop + mobile; CLEAN → every real surface
   now eyes-on)** — Balance at C96 (HEAD was C95; nudge label lags): NOTHING strictly over budget; arch (96−91=5/5) +
   infra (96−90=6/6) both AT budget. Arch is reliably no-churn (C91 confirmed, no source changed since C85) and infra
