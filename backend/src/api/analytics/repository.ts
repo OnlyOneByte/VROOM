@@ -49,6 +49,7 @@ import {
   isFillup,
   monthKeysInRange,
   normalizeDate,
+  SEASON_MAP,
   sortByVehicleThenDate,
   toMonthKey,
 } from '../../utils/analytics-charts';
@@ -616,6 +617,62 @@ export class AnalyticsRepository {
         efficiency: data.effCount > 0 ? data.effSum / data.effCount : 0,
         volume: data.volume,
       }));
+  }
+
+  /**
+   * Seasonal gas-MPG (avg efficiency + fillup count per season) with per-vehicle unit conversion — the
+   * #94 twin of buildSeasonalEfficiency (C69). A mixed mi/gal + km/L fleet must convert each gas pair's
+   * efficiency to the user's global units BEFORE pooling into a season, else the seasonal average mixes
+   * mi/gal with km/L (NORTH_STAR #2). The common single-unit fleet keeps the pure builder (skipConversion
+   * at the call site); only a mixed fleet reaches here.
+   *
+   * Mirrors buildSeasonalEfficiency's structure exactly (fillupCount counts only volume-bearing rows via
+   * isFillup — the #108 split-sibling overcount guard, UNITLESS so no conversion; efficiency buckets the
+   * converted gas points by season) — the efficiency limb reuses convertedGasEfficiencyPoints (C64) so the
+   * gas/charge gate + band filter stay identical and un-forgettable.
+   */
+  private buildConvertedSeasonalEfficiency(
+    fuelRows: FuelExpenseRow[],
+    vehicleUnitsMap: Map<string, UnitPreferences>,
+    targetUnits: UnitPreferences
+  ): Array<{ season: string; avgEfficiency: number; fillupCount: number }> {
+    const seasonData = new Map<string, { effSum: number; effCount: number; fillupCount: number }>();
+
+    // fillupCount: only volume-bearing rows (#108, the #56/#108 split-sibling overcount class). Unitless.
+    for (const row of fuelRows) {
+      const d = normalizeDate(row.date);
+      if (!d) continue;
+      if (!isFillup(row)) continue;
+      const season = SEASON_MAP[d.getMonth()] ?? 'Winter';
+      const entry = seasonData.get(season) ?? { effSum: 0, effCount: 0, fillupCount: 0 };
+      entry.fillupCount++;
+      seasonData.set(season, entry);
+    }
+
+    // Efficiency augments only seasons a volume row already seeded (the buildSeasonalEfficiency `if (entry)`
+    // invariant). skipConversion:false → always convert each gas pair to the user's global units.
+    for (const { efficiency, date } of this.convertedGasEfficiencyPoints(
+      fuelRows,
+      vehicleUnitsMap,
+      targetUnits,
+      false
+    )) {
+      const season = SEASON_MAP[new Date(date).getMonth()] ?? 'Winter';
+      const entry = seasonData.get(season);
+      if (entry) {
+        entry.effSum += efficiency;
+        entry.effCount++;
+      }
+    }
+
+    return ['Winter', 'Spring', 'Summer', 'Fall'].map((season) => {
+      const data = seasonData.get(season);
+      return {
+        season,
+        avgEfficiency: data && data.effCount > 0 ? data.effSum / data.effCount : 0,
+        fillupCount: data?.fillupCount ?? 0,
+      };
+    });
   }
 
   /**
@@ -1563,20 +1620,28 @@ export class AnalyticsRepository {
     vehicleId?: string
   ): Promise<FuelAdvancedData> {
     try {
-      const [vehicleNameMap, fuelRows, allExpenses] = await Promise.all([
-        this.queryVehicleNameMap(userId, vehicleId),
-        this.queryFuelExpenses(userId, range, vehicleId),
-        this.queryAllExpenses(userId, range, vehicleId),
-      ]);
+      const [vehicleNameMap, fuelRows, allExpenses, userUnits, vehicleUnitsMap] = await Promise.all(
+        [
+          this.queryVehicleNameMap(userId, vehicleId),
+          this.queryFuelExpenses(userId, range, vehicleId),
+          this.queryAllExpenses(userId, range, vehicleId),
+          this.getUserUnits(userId),
+          this.getAllVehicleUnits(userId),
+        ]
+      );
 
       // Sort by vehicleId then date for functions that need consecutive same-vehicle pairs
       const fuelRowsByVehicle = sortByVehicleThenDate(fuelRows);
+      const skipConversion = this.allVehiclesMatchUnits(vehicleUnitsMap, userUnits);
 
       return this.buildFuelAdvancedFromData(
         fuelRows,
         fuelRowsByVehicle,
         allExpenses,
-        vehicleNameMap
+        vehicleNameMap,
+        userUnits,
+        vehicleUnitsMap,
+        skipConversion
       );
     } catch (error) {
       logger.error('Failed to compute fuel advanced analytics', {
@@ -1594,12 +1659,22 @@ export class AnalyticsRepository {
     fuelRows: FuelExpenseRow[],
     fuelRowsByVehicle: FuelExpenseRow[],
     allExpenses: GeneralExpenseRow[],
-    vehicleNameMap: Map<string, string>
+    vehicleNameMap: Map<string, string>,
+    userUnits: UnitPreferences,
+    vehicleUnitsMap: Map<string, UnitPreferences>,
+    skipConversion: boolean
   ): FuelAdvancedData {
     const maintenanceRows = allExpenses.filter((e) => e.category === 'maintenance');
     return {
       maintenanceTimeline: buildMaintenanceTimeline(maintenanceRows, new Date()),
-      seasonalEfficiency: buildSeasonalEfficiency(fuelRowsByVehicle),
+      // #94 (C69): a MIXED-unit fleet converts each gas pair's efficiency to the user's global units
+      // BEFORE pooling into a season, so mi/gal and km/L are not averaged raw (NORTH_STAR #2). The common
+      // single-unit fleet keeps the pure builder (skipConversion). seasonalEfficiency's fillupCount limb
+      // is unitless; only avgEfficiency needed the convert. The 2 sibling advanced builders
+      // (buildVehicleRadar fuelEfficiency-normalize, buildDayOfWeekPatterns volume) remain raw — own cycles.
+      seasonalEfficiency: skipConversion
+        ? buildSeasonalEfficiency(fuelRowsByVehicle)
+        : this.buildConvertedSeasonalEfficiency(fuelRowsByVehicle, vehicleUnitsMap, userUnits),
       vehicleRadar: buildVehicleRadar(allExpenses, fuelRowsByVehicle, vehicleNameMap),
       dayOfWeekPatterns: buildDayOfWeekPatterns(fuelRows),
       monthlyCostHeatmap: buildMonthlyCostHeatmap(allExpenses),
@@ -2188,7 +2263,10 @@ export class AnalyticsRepository {
         fuelRows,
         fuelRowsByVehicle,
         allExpenses,
-        vehicleNameMap
+        vehicleNameMap,
+        userUnits,
+        vehicleUnitsMap,
+        skipConversion
       );
 
       return { quickStats, fuelStats, fuelAdvanced };

@@ -33,11 +33,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 68 |
 | deep-review | 5 | 67 |
 | guard | 6 | 66 |
-| bug | 3 | 65 |
+| bug | 3 | 69 |
 | arch | 5 | 64 |
 | infra | 6 | 63 |
 
-Current cycle: **68**
+Current cycle: **69**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,29 @@ Current cycle: **68**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C69 (bug #94, seasonalEfficiency member)** — **Convert per-vehicle gas-MPG to user-global units BEFORE
+  pooling the seasonalEfficiency series (Angelo-APPROVED Sev-2, NORTH_STAR #2).** Balance at C69: bug (4/3, +1)
+  the ONLY over-budget category → picked. Took the 4th unit-bearing #94 member (the 1st of the 3 fuel-ADVANCED
+  builders): `buildSeasonalEfficiency` averages each gas pair's RAW efficiency per season across ALL vehicles
+  with no per-vehicle conversion → a mixed mi/gal + km/L fleet mixes the two on the seasonal chart. Unlike the
+  monthlyConsumption member (C65, callable from buildFuelStatsFromData where units were in scope), the advanced
+  builders live in buildFuelAdvancedFromData which fetched NO units — so this needed the QUERY-LAYER thread the
+  C65 note flagged: getFuelAdvanced now fetches getUserUnits + getAllVehicleUnits + computes skipConversion, and
+  buildFuelAdvancedFromData gained a (userUnits, vehicleUnitsMap, skipConversion) signature (its OTHER caller
+  getSummary already had them in scope). FIX (the C58/C62/C65 + getCrossVehicle pattern): added a repository
+  buildConvertedSeasonalEfficiency twin (fillupCount via isFillup — UNITLESS, unchanged; efficiency via the C64
+  convertedGasEfficiencyPoints generator), switched at the call site by skipConversion. Exported SEASON_MAP from
+  analytics-charts.ts for the twin's season bucketing (mirrors the C65 normalizeDate export). The pure builder
+  stays for the common single-unit fleet (zero change). GUARD: +1 mixed mi/gal+km/L test in
+  fuel-stats-fleet-distance-pooling.test.ts driving getFuelAdvanced (Winter avg 62.04 not the raw-pool 35;
+  fillupCount 4 unchanged). NON-VACUOUS proved firsthand: forcing the pure builder on the mixed fleet → 62.04→35
+  RED; restored → green. Verify: backend validate:local GREEN — tsc 0, musl-biome clean (20 pre-existing
+  warnings, none new), 1672 pass / 0 fail (+1), build bundled. Backend-only (no UI → no shot). cov: be 87.46% /
+  fe 86.35% (~ — analytics repo already well-covered; +1 mixed-unit guard). #94 PROGRESS: distance (C58) +
+  volume-headline (C62) + monthlyConsumption (C65) + seasonalEfficiency (C69) DONE; REMAINING = 2 advanced
+  builders (buildVehicleRadar fuelEfficiency-normalize + buildDayOfWeekPatterns volume — both now have units
+  threaded into buildFuelAdvancedFromData, so each is a straightforward twin next bug cycle) + the prev-year
+  SQL-sum sub-member (previousYearGallons).
 - **C68 (feature — eyes-on FinanceTab lease render; #140 CONFIRMED + a NEW defect #148 escalated)** —
   Balance at C68: feature (7/4, +3) the lone most-starved over-budget category → picked. Import-trackers (the
   only open feature SPEC work) stays Angelo-gated (preset defaultCategory), so per the standing rule I took the

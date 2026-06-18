@@ -28,7 +28,7 @@ const DAY_NAMES = [
   'Saturday',
 ] as const;
 
-const SEASON_MAP: Record<number, string> = {
+export const SEASON_MAP: Record<number, string> = {
   0: 'Winter',
   1: 'Winter',
   2: 'Spring',

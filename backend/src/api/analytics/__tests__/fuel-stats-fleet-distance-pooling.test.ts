@@ -250,4 +250,57 @@ describe('#94 — fleet-wide fuel-stats pools per-vehicle distance by raw summat
     expect(stats.averageCost.bestCostPerDistance).toBeCloseTo(0.05, 5);
     expect(stats.averageCost.worstCostPerDistance).toBeCloseTo(0.2, 5);
   });
+
+  // #94 SEASONAL-EFFICIENCY member FIXED (C69, same Angelo-approved convert-before-pool direction): the
+  // getFuelAdvanced seasonalEfficiency series (avg gas-MPG per season) is the 4th unit-bearing #94 limb —
+  // buildSeasonalEfficiency averages each gas pair's RAW efficiency across all vehicles with no per-vehicle
+  // conversion. getFuelAdvanced now threads units + routes a MIXED-unit fleet through
+  // buildConvertedSeasonalEfficiency (the C64 convertedGasEfficiencyPoints generator), so a mi/gal + km/L
+  // fleet no longer averages mi/gal with km/L (NORTH_STAR #2). A same-unit fleet still takes the pure builder.
+  test('seasonal avgEfficiency converts each gas pair to the user unit before pooling on a MIXED mi/gal+km/L fleet', async () => {
+    seedUser(testDb.sqlite, USER); // default MILES / GALLONS_US
+    seedVehicle(testDb.sqlite, VEH_A); // miles/gallons (default)
+    seedVehicle(testDb.sqlite, VEH_B);
+    // VEH_B reports distance in KILOMETRES and volume in LITRES.
+    testDb.sqlite.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
+      JSON.stringify({ distanceUnit: 'kilometers', volumeUnit: 'liters', chargeUnit: 'kwh' }),
+      VEH_B.id,
+    ]);
+
+    // Both vehicles' fillups land in JANUARY (Winter) so they pool into one season bucket. Adjacent pairs
+    // per vehicle. A: 10000→10300 mi on 10 gal = 30 mi/gal. B: 50000→50320 km on 8 L = 40 km/L (in the
+    // [5,100] band so the gas point survives), which converts to 40/1.609344×3.785411784 ≈ 94.07 mi/gal.
+    // Converted seasonal avg = (30 + 94.07)/2 ≈ 62.04; the pre-fix RAW pool would be (30 + 40)/2 = 35.
+    const jan = (day: number) => new Date(2024, 0, day);
+    const fuelOn = (
+      id: string,
+      vid: string,
+      mileage: number,
+      vol: number,
+      day: number
+    ): TestExpense => ({
+      id,
+      vehicleId: vid,
+      category: 'fuel',
+      expenseAmount: 50,
+      date: jan(day),
+      mileage,
+      volume: vol,
+      fuelType: 'Regular',
+      missedFillup: false,
+    });
+    seedExpense(testDb.sqlite, fuelOn('a1', VEH_A.id, 10_000, 10, 5));
+    seedExpense(testDb.sqlite, fuelOn('a2', VEH_A.id, 10_300, 10, 10));
+    seedExpense(testDb.sqlite, fuelOn('b1', VEH_B.id, 50_000, 8, 6));
+    seedExpense(testDb.sqlite, fuelOn('b2', VEH_B.id, 50_320, 8, 11));
+
+    const adv = await repo.getFuelAdvanced(USER.id, rangeAll());
+    const winter = adv.seasonalEfficiency.find((s) => s.season === 'Winter');
+    const expectedConvertedB = (40 / 1.609344) * 3.785411784; // ≈ 94.07 mi/gal
+    const expectedAvg = (30 + expectedConvertedB) / 2; // ≈ 62.04
+
+    expect(winter?.avgEfficiency).toBeCloseTo(expectedAvg, 1);
+    expect(winter?.avgEfficiency).not.toBeCloseTo(35, 0); // NOT the raw (30+40)/2 pool
+    expect(winter?.fillupCount).toBe(4); // unitless — all four volume-bearing rows
+  });
 });
