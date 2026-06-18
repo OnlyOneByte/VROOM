@@ -33,11 +33,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 93 |
 | deep-review | 5 | 92 |
 | guard | 6 | 94 |
-| bug | 3 | 89 |
+| bug | 3 | 95 |
 | arch | 5 | 91 |
 | infra | 6 | 90 |
 
-Current cycle: **94**
+Current cycle: **95**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,24 @@ Current cycle: **94**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C95 (bug — offline-outbox field-dropout scout, DRY [6th consecutive]; recorded + pivot)** — Balance at C95
+  (HEAD was C94; nudge label lags): bug (95−89=6/3, +3) the LONE over-budget category → picked (category discipline
+  forces it). Cold scouts long exhausted (C6/C10/C15/C83/C89) + NO production source changed since C85, but ran one
+  genuine firsthand scout of the freshest un-rechecked vein — the GUIDE-flagged offline-outbox→backend field-dropout
+  family (#66/#101/#111). ALL CLEAN: (1) `api-transformer.ts` toBackendExpense/fromBackendExpense — symmetric +
+  complete: volume/charge routed by isElectricFuelType, the create-vs-edit description null-clear asymmetry is
+  deliberate (isEdit option, documented), every optional field (mileage/fuelType/description/sourceType/sourceId/
+  missedFillup/groupId/groupTotal/splitMethod) round-trips. (2) the CALL-SITE dropout class (the real #66/#101/#111
+  bug — the mapper can't carry a field the call site never put in the object) is pinned by
+  offline-save-carries-fuel-fields.test.ts, which SOURCE-SCANS every `addOfflineExpense({...})` call for
+  `missedFillup` (#101/#111 MPG-pairing) + `fuelType` (#66 electric charge survives sync) — exactly the GUIDE-flagged
+  classes; plus api-transformer.property.test.ts pins the round-trip. The offline mapper + its call sites are
+  SATURATED (10 test files). No fresh defect — recorded DRY, did NOT manufacture (the GUIDE bug-vein discipline + the
+  C89 "record dry immediately + pivot"). The productive bug surface remains ONLY the parked Angelo-gated queue
+  (#148/#100/#79/#129). NEXT bug cycle: with the cold vein 6× dry + no source churning, record dry on the FIRST
+  recheck + pivot — the budget is forcing ceremony, not finding work; real defects now come only from a deep-review/
+  feature cycle surfacing a concrete invariant, or an Angelo steer. Doc-only — no source/test touched (a dry scout).
+  cov: be 87.47% / fe 86.35% (~ — nothing touched).
 - **C94 (guard — pinned the CORS↔CSRF origin-allowlist coupling in app.ts via a source-scan; the C92-flagged
   unaudited surface)** — Balance at C94 (HEAD was C93; nudge label lags): TWO over budget — guard (94−87=7/6, +1)
   and bug (94−89=5/3, +2); guard most-starved (7 > 5) → picked (the C84 tie-break: raw starvation wins, not overage).

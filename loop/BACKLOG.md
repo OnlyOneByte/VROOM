@@ -326,6 +326,17 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **SCOUTED C95 — no fresh defect (offline-outbox field-dropout vein #66/#101/#111; 6th consecutive dry scout).**
+> Scouted the GUIDE-flagged offline-outbox→backend mapper firsthand. CLEAN: (1) api-transformer.ts
+> toBackendExpense/fromBackendExpense is symmetric + complete (volume/charge routed by isElectricFuelType; the
+> create-vs-edit description null-clear is a deliberate isEdit option; every optional field round-trips). (2) the
+> real call-site dropout class (the mapper can't carry a field the call site never set) is pinned by
+> offline-save-carries-fuel-fields.test.ts — source-scans every addOfflineExpense({...}) call for missedFillup
+> (#101/#111) + fuelType (#66) — plus api-transformer.property.test.ts for the round-trip. SATURATED (10 test
+> files). Recorded DRY, did NOT manufacture. With the cold vein now 6× dry (C6/C10/C15/C83/C89/C95) + NO production
+> source changed since C85, NEXT bug cycle: record dry on the FIRST recheck + pivot — the budget is forcing
+> ceremony; real defects now come only from a deep-review/feature-surfaced invariant or an Angelo steer.
+>
 > **SCOUTED C89 — no fresh defect (date/tz + materialization vein; 4 surfaces verified clean firsthand; 5th
 > consecutive dry scout).** With C88 having just exercised the reminder trigger/materialization path, scouted the
 > date-advance + cost + split-materialization surfaces per the GUIDE date/tz seam. ALL CLEAN: (1) reminder
