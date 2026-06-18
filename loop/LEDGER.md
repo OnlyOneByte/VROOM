@@ -31,13 +31,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 96 |
-| deep-review | 5 | 92 |
+| deep-review | 5 | 98 |
 | guard | 6 | 94 |
 | bug | 3 | 95 |
-| arch | 5 | 91 |
+| arch | 5 | 98 |
 | infra | 6 | 97 |
 
-Current cycle: **97**
+Current cycle: **98**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,35 @@ Current cycle: **97**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C98 (arch no-churn [recorded fast per C91] → deep-review: pinned the session-cookie SECURITY-ATTRIBUTE
+  contract via a source-scan)** — Balance at C98 (HEAD was C97; nudge label lags): TWO over budget — arch
+  (98−91=7/5, +2, most-starved) and deep-review (98−92=6/5, +1, co-starved). ARCH: per the C91 standing
+  recommendation, checked the precondition FIRST — `git diff 5766239(C85)..HEAD` over production source is EMPTY
+  (no source threaded since the last arch scout: C86 saturated/C87 test/C88 eyes-on/C89 dry/C90 infra/C92 cert/C93
+  eyes-on/C94 test/C95 dry/C96 eyes-on/C97 infra), so there is structurally nothing to converge → recorded no-churn
+  IMMEDIATELY without re-scouting (the C12/C91 discipline; don't force ceremony). The substantive work PIVOTED to
+  the co-starved deep-review (the C4 arch-scout→pivot precedent). DEEP-REVIEW: the C92/C97 notes flagged the
+  session/cookie lifecycle as unaudited. Scouted Lucia firsthand: the session CONFIG (lucia.ts: secure-gates-prod,
+  sameSite lax, httpOnly default) + the REFRESH chokepoint `validateAndRefreshSession` (utils.ts: validate→
+  fresh-as-is→rotate-create-before-invalidate→fail-open-on-throw) are sound, and the refresh LOGIC is already
+  guarded (validate-and-refresh-session.test.ts pins all 4 branches incl. the NORTH_STAR #1 fail-open). Found the
+  genuine GAP: the session-cookie SECURITY ATTRIBUTES (secure: CONFIG.env==='production' / httpOnly: true /
+  sameSite: 'Lax') are hand-duplicated across 5 manual sites — 2 setCookie (routes.ts login + utils.ts rotation) +
+  3 deleteCookie (logout + 2 callback cleanups) — coupled only by copy-paste, and NO test asserted ANY of them
+  (the refresh test mocks Lucia + checks the return value, never the `c` cookie attrs). A drift on one site (a
+  refactor hardcoding `secure: true` → breaks local-http dev; `secure: false`/dropped httpOnly → ships an insecure
+  / JS-readable session cookie in prod, an XSS-exfil + network-theft regression; a drifted deleteCookie silently
+  fails to clear the cookie → logout doesn't log out) is invisible to every happy-path behavioral test. GUARD: new
+  session-cookie-security-attributes.test.ts (+4) — source-scans both auth files, asserts every
+  set/deleteCookie(c, lucia.sessionCookieName, …) block carries all 3 attributes. NON-VACUOUS proved firsthand:
+  dropped httpOnly from the refresh-path cookie → ONLY the httpOnly test RED (named the utils.ts offender); restored
+  → 4 pass. The one-edit→source-scan pattern (C25/C45/C59/C67/C80/C87/C94) applied to the session-cookie security
+  contract. Verify: backend validate:local GREEN — tsc 0, musl-biome clean (20 pre-existing warnings, none new),
+  1707 pass / 0 fail (+4), build bundled. Backend-only (no UI → no shot). cov: be 87.47% / fe 86.35% (~ —
+  guard-only source-scan; pins a multi-site security contract a happy-path test can't). The auth-security surface
+  (rate-limit/client-IP C92, CORS/CSRF C94, session-cookie attrs C98) + the config-coupling seam
+  (C67/C80/C81/C87/C94/C98) are now broadly fenced. NEXT deep-review: genuinely thin — every audited surface is
+  certified; prefer a feature/bug-surfaced invariant or an Angelo steer over another cold audit.
 - **C97 (infra — branch-hygiene sweep + coverage re-measure, the ~10-cycle cadence; last ran C90)** — Balance at
   C97 (HEAD was C96; nudge label lags): TWO over budget — infra (97−90=7/6, +1) and arch (97−91=6/5, +1); infra wins
   on raw starvation (7 > 6, the C84 tie-break) AND is the higher-leverage pick (arch is reliably no-churn at its

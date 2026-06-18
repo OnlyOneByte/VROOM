@@ -407,6 +407,19 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C98 (deep-review→guard):** the session-cookie SECURITY-ATTRIBUTE contract is now pinned by a
+> source-scan (`session-cookie-security-attributes.test.ts`, +4) — the C92/C97-flagged unaudited session/cookie
+> lifecycle. The attrs `secure: CONFIG.env==='production'` / `httpOnly: true` / `sameSite: 'Lax'` are hand-copied
+> across 5 manual sites (2 setCookie: login + refresh-rotation; 3 deleteCookie: logout + 2 callback cleanups), and
+> NO test asserted ANY of them (validate-and-refresh-session.test.ts mocks Lucia + checks the return value, never
+> the cookie attrs). A drift on one site silently weakens auth on that path — hardcoded `secure:true` breaks
+> local-http dev; `secure:false`/dropped httpOnly ships an insecure / JS-readable session cookie in prod (XSS-exfil
+> + network theft); a drifted deleteCookie fails to clear the cookie (logout doesn't log out) — all invisible to a
+> happy-path login test. Guard source-scans both auth files; non-vacuous (drop httpOnly from the refresh cookie →
+> only the httpOnly test RED, names the offender). The auth-security surface (rate-limit C92, CORS/CSRF C94,
+> session-cookie attrs C98) is now broadly fenced. The refresh LOGIC was already guarded (C-validate-refresh, all 4
+> branches incl. fail-open). Don't re-add. The one-edit→source-scan pattern (C25/C45/C59/C67/C80/C87/C94).
+>
 > **GUARDED C94:** the CORS↔CSRF origin-allowlist coupling in app.ts is now pinned by a source-scan
 > (`src/__tests__/cors-csrf-origin-coupling.test.ts`, +4) — the C92-flagged unaudited surface. app.ts wires
 > `cors({ origin: CONFIG.cors.origins })` AND `csrf({ origin: CONFIG.cors.origins })` from the SAME allowlist,
@@ -771,6 +784,12 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
    bug-threads-idiom → next-arch-converges lesson again (C62/C65/C72 → C78; sibling to C64 generator + C71
    vehicleUnitsFor). Don't re-scout the volume sites — single-sourced.
 
+> **SCOUTED C98 — no churn warranted (recorded FAST per the C91 discipline; still NO source changed since C85).**
+> `git diff C85..HEAD` over production source remains EMPTY (C86–C97 were all docs/tests/eyes-on/dry) — structurally
+> nothing freshly-threaded to converge. Recorded no-churn IMMEDIATELY without re-scouting (the C12/C91 "don't force
+> ceremony"); the cycle's substantive work pivoted to the co-starved deep-review (C98 session-cookie guard). 7th
+> no-churn confirm (C4/C6/C12/C36/C85/C91/C98) — arch is firmly at its structural floor.
+>
 > **SCOUTED C91 — no churn warranted (route/pagination idioms already single-sourced + NO source changed since
 > C85).** KEY FACT: `git diff C85..HEAD` over backend/src (excluding __tests__) is EMPTY — no production source
 > changed since the last arch scout (C86 saturated / C87 test-only / C88 eyes-on / C89 dry / C90 docs), so there's
