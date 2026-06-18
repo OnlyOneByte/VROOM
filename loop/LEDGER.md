@@ -46,10 +46,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 102 |
 | guard | 6 | 101 |
 | bug | 3 | 103 |
-| arch | 5 | 98 |
+| arch | 5 | 105 |
 | infra | 6 | 104 |
 
-Current cycle: **104**
+Current cycle: **105**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -368,6 +368,27 @@ Current cycle: **104**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C105 (arch — no churn warranted; the createLoadState scaffold has ZERO adopters but its migration is a
+  design-gated multi-page refactor, NOT a self-authorizable increment — surfaced for Angelo, recorded + pivot)** —
+  Balance at C105 (HEAD was C104; nudge label lags): arch (105−98=7/5, +2) the most-starved over-budget category →
+  picked. Instead of the reflexive backend no-churn (backend unchanged since C85, confirmed again — no fresh dedup),
+  scouted a genuinely FRESH surface the backend-focused scouts C85/C91/C98 never touched: the FE LOAD TRIAD.
+  FINDING: `createLoadState<T>` (load-state.svelte.ts) was extracted (arch #2) as a migration SCAFFOLD — its
+  docstring says "~14 pages hand-repeat the triad; pages migrate onto it one per later cycle" — but it has ZERO
+  adopters; all 13 load-bearing pages still hand-roll `isLoading`/`loadError`/`load()`. THAT is a real dedup with a
+  concrete payoff (the "load failure masquerades as empty state" bug class the scaffold was built to structurally
+  prevent). BUT verified firsthand it is NOT a behavior-preserving arch increment: every candidate page
+  (reminders/insurance/expenses/vehicle-detail/provider-edit) loads MULTIPLE values via Promise.all into SEPARATE
+  $state vars, while createLoadState holds ONE `data` — so migrating any page is a reactivity REWRITE (composite
+  type or N load-states + every template binding rewired from `isLoading` to `loadState.isLoading`), touching
+  observable render paths + requiring shot-before/after (arch rules 1+2+4). A multi-page migration of this scope is
+  arch-rule-6 DESIGN-GATED (`.kiro/specs/<refactor>/design.md` + Angelo sign-off), NOT a self-authorizable cycle.
+  Recorded no-churn for the cycle + SURFACED the scaffold-adoption gap as a design-gated arch item (filed in
+  BACKLOG). Did NOT force a risky rewrite (the GUIDE "Don't manufacture churn" + arch rule 6 "never self-authorize a
+  big restructure"). 8th no-churn confirm (C4/C6/C12/C36/C85/C91/C98/C105) — but this one is INFORMATIVE: it names a
+  concrete, real, design-gated dedup rather than just "DRY". Doc-only — no source touched. cov: be 87.47% / fe
+  87.6% (~ — nothing changed). NEXT arch: the createLoadState migration needs an Angelo design call; absent that,
+  arch stays at its structural floor — record no-churn fast.
 - **C104 (infra — branch-hygiene sweep + coverage re-measure, the ~10-cycle cadence; last ran C97)** — Balance at
   C104 (HEAD was C103; nudge label lags): TWO over budget — infra (104−97=7/6, +1) and arch (104−98=6/5, +1); infra
   wins on raw starvation (7 > 6, the C84 tie-break) AND is the substantive pick (arch is reliably no-churn at its

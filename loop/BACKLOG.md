@@ -765,6 +765,17 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 ### arch
 *(reliably DRY per the archive. Run a fresh dedup scout; if nothing clean surfaces, record "no churn warranted" + pivot. Obey the arch rules above.)*
 
+> **🚩 DESIGN-GATED (arch rule 6, AWAITING ANGELO) — surfaced C105: adopt `createLoadState<T>` across the 13
+> load-bearing pages.** The scaffold (load-state.svelte.ts, arch #2) was extracted to centralize the page load triad
+> (isLoading/loadError/load) so the error leg is STRUCTURAL not per-page — the "load failure masquerades as empty
+> state" bug class (dashboard/reminders/settings/vehicle-detail C57). It has ZERO adopters; 13 pages still hand-roll
+> it. NOT self-authorizable: every page loads MULTIPLE values via Promise.all into separate $state vars while
+> createLoadState holds ONE `data`, so adoption is a reactivity REWRITE per page (composite type or N load-states +
+> rewire every `isLoading`→`loadState.isLoading` template binding) touching observable render → needs
+> `.kiro/specs/load-state-migration/design.md` + Angelo sign-off + shot-before/after per page (arch rules 1/2/4/6).
+> RECOMMENDED if approved: migrate ONE page per arch cycle (start with a single-load page if one exists, else define
+> the composite-state shape in the design doc). Until Angelo rules, arch records no-churn fast.
+
 1. ~~**MPG-pairing dedup**~~ — **DONE C17.** Extracted `averageConsecutiveMpg(sortedExpenses)` in
    calculations.ts; both `calculateAverageMPG` (calculations.ts) and `calculateAverageMpg`
    (vehicle-stats.ts) now sort (each keeping its own contract) + delegate. Behavior-preserving (pre-sorted
@@ -842,6 +853,18 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
    bug-threads-idiom → next-arch-converges lesson again (C62/C65/C72 → C78; sibling to C64 generator + C71
    vehicleUnitsFor). Don't re-scout the volume sites — single-sourced.
 
+> **SCOUTED C105 — no churn warranted for a SELF-AUTHORIZABLE increment, but surfaced a REAL design-gated dedup.**
+> Scouted a fresh surface the backend scouts (C85/C91/C98) never touched: the FE load triad. FINDING:
+> `createLoadState<T>` (load-state.svelte.ts) was extracted (arch #2) as a migration SCAFFOLD — docstring: "~14 pages
+> hand-repeat the triad; pages migrate one per later cycle" — but it has ZERO adopters; all 13 pages still hand-roll
+> isLoading/loadError/load(). The dedup is real (the payoff is the "load failure masquerades as empty state" bug
+> class the scaffold structurally prevents), BUT every candidate page loads MULTIPLE values via Promise.all into
+> SEPARATE $state vars while createLoadState holds ONE `data` — so migrating any page is a reactivity REWRITE
+> (composite type or N load-states + every template binding rewired), touching observable render + needing
+> shot-before/after. That's arch-rule-6 DESIGN-GATED (`.kiro/specs/<refactor>/design.md` + Angelo), NOT a
+> self-authorizable cycle. See the NEW arch queue item below. Recorded no-churn for the cycle; did NOT force a risky
+> rewrite. 8th no-churn confirm but INFORMATIVE — names a concrete real dedup, not just "DRY".
+>
 > **SCOUTED C98 — no churn warranted (recorded FAST per the C91 discipline; still NO source changed since C85).**
 > `git diff C85..HEAD` over production source remains EMPTY (C86–C97 were all docs/tests/eyes-on/dry) — structurally
 > nothing freshly-threaded to converge. Recorded no-churn IMMEDIATELY without re-scouting (the C12/C91 "don't force
