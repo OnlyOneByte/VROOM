@@ -28,13 +28,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 31 |
-| deep-review | 5 | 26 |
+| deep-review | 5 | 33 |
 | guard | 6 | 32 |
 | bug | 3 | 29 |
 | arch | 5 | 30 |
 | infra | 6 | 28 |
 
-Current cycle: **32**
+Current cycle: **33**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -353,6 +353,26 @@ Current cycle: **32**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C33 (deep-review)** — **Certified the TCO `categorizeTCOExpenses` sourceType-bucketing CLEAN + left a
+  money-facing guard.** deep-review was most-starved (33−26=7/5 > bug 4/3). Per the C19/C26 note
+  (backup/restore/import/analytics swept), audited the highest-stakes UNAUDITED money path: the per-vehicle
+  TCO categorization (NORTH_STAR #1). The #27/#28 financing-vs-purchase-price accounting is well-pinned
+  (per-vehicle.property all-time + year arms), but a subtle seam was UNPINNED: `categorizeTCOExpenses`
+  buckets a `financial` row by sourceType — `'financing'`→financingInterest, `'insurance_term'`→insurance,
+  and ANY OTHER `financial` row (sourceType `'reminder'` from a recurring expense [C27], or null from a
+  manual financial entry) falls through to otherCosts. Recurring-expenses (C27) now materializes exactly
+  `financial`+`'reminder'` rows, so this seam is live. CERTIFIED FIRSTHAND (scratch probe): reminder/null
+  financial → otherCosts (150), NOT financingInterest (200 = only the financing row); insurance 75; total
+  425 = sum. CLEAN. GUARD: +2 cases in per-vehicle.property.test.ts — (1) the 4-way sourceType split
+  (financing/insurance_term/reminder/null → correct buckets); (2) the DANGEROUS case: a PRICED vehicle with
+  a reminder financial row keeps it in otherCosts ($30100 total), because a mis-bucket to financingInterest
+  would make computeTCOTotal EXCLUDE it (#27 principal-retiring) → silently dropping a real recurring cost.
+  NON-VACUOUS: dropping the `sourceType==='financing'` clause (bucket by category alone) turns BOTH RED
+  (the PRICED case shows otherCosts 100→0, the silent-drop). Verify: backend validate:local GREEN — tsc 0,
+  musl-biome clean, 1606 pass / 0 fail (+2), build bundled. Backend-only (no UI → no shot). cov: be 87.22%
+  / fe 86.14% (~ — analytics repo already covered; +2 pin the money-facing bucketing seam). The TCO money
+  path (financing/purchase-price #27/#28 + sourceType bucketing) is now broadly certified — next
+  deep-review should pick a genuinely different surface (an eyes-on /insurance sweep, or the auth path).
 - **C32 (guard)** — **Characterize the C31 import-preset category gap end-to-end (the standing
   bug-finding→next-guard pattern).** Two cats over budget (guard 7/6, deep-review 6/5 — tie on over-by);
   guard wins on raw starvation (7 > 6). The C31 eyes-on surfaced a concrete, unguarded invariant: the

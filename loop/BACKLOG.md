@@ -123,6 +123,15 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > genuinely UNAUDITED area (e.g. the analytics financing/TCO money builders, or an eyes-on sweep of a
 > complex shipped page like /analytics or /insurance) rather than re-scanning backup/restore/import.
 >
+> **CERTIFIED C33 — TCO `categorizeTCOExpenses` sourceType-bucketing CLEAN + guarded.** A `financial` row
+> buckets by sourceType: 'financing'→financingInterest, 'insurance_term'→insurance, ANY OTHER (reminder
+> from C27 recurring / null manual) → otherCosts. Certified firsthand (reminder/null → otherCosts, not
+> financing) + pinned with +2 cases in per-vehicle.property.test.ts (the 4-way split + the PRICED case
+> where a mis-bucket would silently drop a recurring cost via #27). Non-vacuous (drop the financing clause
+> → both RED). The TCO money path (#27/#28 financing/price + this sourceType bucketing) is now broadly
+> certified — don't re-audit it. Next deep-review: a genuinely different surface (eyes-on /insurance sweep,
+> or the auth/OAuth path).
+>
 > **AUDITED C26 — /analytics eyes-on sweep, CLEAN (3 suspected defects debunked firsthand).** Shot empty
 > (clean four-states) + seeded fuel data for the populated state. Debunked: (1) "Avg km/L" on a USD user
 > is correctly unit-DERIVED (`getFuelEfficiencyLabel`), not hardcoded — no efficiency literal in the
