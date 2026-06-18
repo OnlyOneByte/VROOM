@@ -19,6 +19,11 @@
 > source-scan guard added a couple covered helper lines); FE FULLY UNCHANGED (no FE source touched since C52; C93/C96
 > were eyes-on shots only, C95 a dry scout). The C90 branch 78.88 was v8 rounding noise — back to 78.78.**
 > Both still at the ~87 BE / ~86 FE structural ceiling; treat as the floor.
+> **C104 (infra cadence MEASURED): BE 87.47% line / 87.19% func (1707 pass) — UNCHANGED vs C97; FE 87.6% line /
+> 88.56% func / 79.84% branch (739 pass) — +1.25/+0.88/+1.06 vs C97's 86.35/87.68/78.78, the cumulative C100
+> (settings reload) + C101 (theme listener) + C102 (#148 anchor) FE-logic guard arc. FE is now meaningfully off its
+> old plateau; the residual gap is structural (effect/DOM-bound + DI/OAuth-bound). Both still under the 90% goal but
+> the FE structural ceiling proved ~1.25pts higher than the long-assumed ~86% once the store/util logic was pinned.**
 > **C101 (guard): FE moved UP again — 87.6% line / 88.56% func / 79.74% branch (+0.74/+0.59/+0.67 vs C100) from
 > the +1 themeStore.initialize() test (theme.svelte.ts 60.52→92.1% line, 100% func — the C336-skipped one-shot +
 > its live OS-preference listener). BE unchanged 87.47/87.20. The FE store/util layer is the live coverage
@@ -42,9 +47,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 101 |
 | bug | 3 | 103 |
 | arch | 5 | 98 |
-| infra | 6 | 97 |
+| infra | 6 | 104 |
 
-Current cycle: **103**
+Current cycle: **104**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -363,6 +368,26 @@ Current cycle: **103**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C104 (infra — branch-hygiene sweep + coverage re-measure, the ~10-cycle cadence; last ran C97)** — Balance at
+  C104 (HEAD was C103; nudge label lags): TWO over budget — infra (104−97=7/6, +1) and arch (104−98=6/5, +1); infra
+  wins on raw starvation (7 > 6, the C84 tie-break) AND is the substantive pick (arch is reliably no-churn at its
+  structural floor C91/C98; infra's re-measure actually MOVED this time, capturing the C100–C102 FE gains). Ran
+  right in the ~10-cycle window. (1) UNTRACKED-TEST SWEEP: CLEAN — zero untracked `.test`/`.spec.ts`/`.svelte.test.ts`
+  specs (only the intentional `M .gitignore` + `M frontend/.gitignore` overrides). (2) COVERAGE RE-MEASURED: **BE
+  87.47% line / 87.19% func** (1707 pass) — UNCHANGED vs C97 (C98 was the only BE add, a source-scan that line-covers
+  nothing; C99/C103 dry, C100–C102 FE-only); **FE 87.6% line / 88.56% func / 79.84% branch** (739 pass) —
+  **+1.25/+0.88/+1.06 vs C97's 86.35/87.68/78.78**, the cumulative C100 (settings-store reload) + C101 (theme
+  listener) + C102 (#148 lease anchor) FE-logic guard arc. FE is now meaningfully OFF its long-assumed ~86%
+  plateau — the real FE structural ceiling is ~87.6% once the store/util behavioral logic is pinned; the residual
+  gap is structural (effect/DOM-bound FE + DI/OAuth-bound BE, neither a clean unit pick). (3) BOTH-SIDES GREEN: BE
+  1707 / FE 739, 0 fail. (4) BRANCH STATE: claude-loop-dev = **104 commits ahead** of fresh origin/main, PR-ready
+  (category spread bug 25 / feature 19 / guard 17 / deep-review 17 / infra 14 / arch 11; the 104th is the C1
+  loop-doc reset). Recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source touched. cov: be 87.47%
+  / fe 87.6% (MEASURED). NEXT cadence ~C114. STANDING SIGNAL (C83–C104, 22 cycles): every self-authorizable vein is
+  swept — net production change is 3 guard tests (C87/C94/C98) + 3 FE-logic guard/cert tests (C100/C101/C102, which
+  moved FE coverage +1.25). The branch is healthy + PR-ready; the highest-leverage remaining work is GATED on Angelo
+  (#148 READY w/ its C102 red→green anchor, import defaultCategory, #100/#79/#129) — a steer is the only thing that
+  opens a fresh vein.
 - **C103 (bug — recorded dry FAST [8th consecutive]; + confirmed the C100–C102 FE-logic guard frontier is now
   worked out)** — Balance at C103 (HEAD was C102; nudge label lags): bug (103−99=4/3, +1) the LONE over-budget
   category → forced. PRECONDITION (per C99): `git diff 5766239(C85)..HEAD` over production source is EMPTY — nothing
