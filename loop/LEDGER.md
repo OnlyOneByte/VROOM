@@ -30,14 +30,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 54 |
+| feature | 4 | 61 |
 | deep-review | 5 | 60 |
 | guard | 6 | 59 |
 | bug | 3 | 58 |
 | arch | 5 | 57 |
 | infra | 6 | 56 |
 
-Current cycle: **60**
+Current cycle: **61**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,29 @@ Current cycle: **60**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C61 (feature)** — **Import-trackers T6: consolidated manual-fuel round-trip on a same-unit vehicle
+  (eyes-on DONE).** feature was the SOLE over-budget category (61−54=7/4, +3). Import-trackers is the only
+  open feature; its remaining T4 is the parked-Angelo preset `defaultCategory` (stays parked), so the
+  unblocked work is T6 (verify-phase, eyes-on now works). VERIFIED FIRSTHAND that the per-slice eyes-on
+  already covered C31 detect-preview / C37 manual-map (a maintenance row commits; the fuel row errors on
+  missing fields) / C41 manual-units (km→mi conversion) / C47 category-remap — but the COMMON real case was
+  NEVER committed end-to-end: a complete, SAME-UNIT (mi/US-gallons) manual FUEL log. Did that. EYES-ON via
+  `import-t6-manual-fuel-roundtrip.meshclaw.e2e.ts` + shot (Read): a bespoke fuel CSV with all fields mapped
+  (date/amount/category/odometer/volume/fuelType/description) on a Miles vehicle, units left at the
+  vehicle's defaults (Miles/Gallons-US → NO conversion) → "1 ready" → commit → the API confirms a `fuel`
+  expense with EXACT mileage 42000 + volume 11.5 (no conversion drift). CAUGHT-MY-OWN harness bug: first run
+  didn't map Memo→description so the unique tag never persisted + the row wasn't findable (the C41 lesson) →
+  mapped description too → green. T6 MANUAL half is now fully eyes-on (C37/C41/C47/C61). T6 REMAINING is
+  BLOCKED, not deferrable: the AUTO-DETECT PRESET round-trip THROUGH COMMIT can't be exercised — a detected
+  preset maps NO category column → 0-ready "Unknown category" → nothing to commit (the C47 remap doesn't
+  apply: no column = no word to remap). That's the parked `defaultCategory:'fuel'` Angelo decision (#C31);
+  the four-state populated-detect screenshot is likewise gated on it. Verify: frontend validate:local GREEN
+  — type-check 0, build OK, 735 tests. The e2e spec is gitignored-by-design (agent harness, not CI; the C54
+  no-utc source-scan is the merge-surviving net) — this cycle's deliverable is the eyes-on confirmation +
+  the spec tick. cov: be ~87.5% / fe 86.35% (~ — eyes-on capture, no module touched). Feature now has NO
+  unblocked increment left (manual half fully verified; the detect-commit + 4-state shot both wait on
+  Angelo's defaultCategory) — the next feature over-budget cycle should record that + pivot to the
+  co-starved category.
 - **C60 (deep-review)** — **Certified the `createProviderInstance` fake-provider production-safety gate
   CLEAN + pinned (a previously-unguarded layer).** deep-review was most-starved over budget (60−53=7/5 +2;
   feature +2 lost on raw starvation). Per the C53 pointer ("auth/provider path"), verified FIRSTHAND that

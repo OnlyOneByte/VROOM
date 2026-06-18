@@ -104,8 +104,19 @@
             buildLocalDate. Non-vacuous BOTH ways (both antipattern forms → RED; the 2 legit new Date(ms)/
             new Date(s) sites don't false-flag). The behavioral net (import-mapping.test.ts local-time
             discipline across iso/mdy/dmy/epoch) already existed; this is the structural tree-wide net.
-      - [ ] **REMAINING:** the eyes-on round-trip E2E across BOTH paths (auto-detect preset + manual) on a
-            mi AND a km vehicle + the four-state screenshots. The per-slice eyes-on already landed (C31
-            detect, C37 manual-map, C41 manual-units, C47 category-remap each shot + Read); T6 is the
-            consolidated multi-state pass + regress.sh-green capture (gated only by the eyes-on harness,
-            not blocked).
+      - [x] **MANUAL FUEL round-trip (same-unit, mi/gallons) DONE (C61, eyes-on CONFIRMED):** the common
+            real case the per-slice specs hadn't committed — a complete manual fuel log (date/amount/
+            category/odometer/volume/fuelType/description all mapped) on a MILES vehicle with units left at
+            the vehicle's defaults (no conversion) → commits a real `fuel` expense with EXACT mileage 42000
+            + volume 11.5 (verified via API, no conversion drift). `import-t6-manual-fuel-roundtrip
+            .meshclaw.e2e.ts` + shot (Read): the "Map your columns" editor with all fields mapped, units
+            Miles/Gallons (US), "1 ready" → "Import 1 row". Complements C41 (km→mi conversion) + C37 (the
+            maintenance row / the fuel row's missing-field error). FE validate:local GREEN (735).
+      - [ ] **REMAINING (T6, BLOCKED):** the AUTO-DETECT PRESET round-trip THROUGH COMMIT. A detected
+            Fuelly/Fuelio/Drivvo log maps NO category column, so `mapCategory` leaves it blank (D2 "never
+            invent") → the preview is 0-ready ("Unknown category") and there's nothing to commit. The C47
+            remap table does NOT help (a preset maps no category COLUMN, so there's no word to remap). This
+            is the parked `defaultCategory:'fuel'`-per-preset decision (send_message'd Angelo C31) — the
+            detect-path commit can't be exercised until he rules. The manual path (the committable half) is
+            now fully eyes-on (C37/C41/C47/C61). Four-state screenshots are likewise gated on the detect
+            commit for the populated-detect state.
