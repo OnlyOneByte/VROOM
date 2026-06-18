@@ -208,6 +208,125 @@ describe('#97 — a single-vehicle reminder is auto-deactivated when its only ve
   });
 });
 
+// #88 FIXED (C48, Angelo-approved): a reminder's `expenseSplitConfig` is a JSON blob, NOT FK-managed like
+// the reminder_vehicles junction — so when a vehicle is deleted, the junction row cascades but the blob
+// still NAMES the dead vehicleId. On the next trigger createExpenseFromReminder builds a split sibling for
+// that dead id → an FK violation that (the C151 async-tx footgun) leaves the surviving legs half-committed
+// — a partial/inconsistent expense group every trigger. The vehicle-delete route now calls
+// reminderRepository.pruneSplitConfigsForDeletedVehicle(userId, id) BEFORE deactivateVehicleless: it drops
+// the deleted leg + renormalizes (≥2 legs remain) or clears the blob (<2 → single-vehicle fallback).
+describe('#88 — a deleted vehicle is pruned from reminders’ expenseSplitConfig blob', () => {
+  /** Seed an EXPENSE reminder with a split-config blob + matching junction rows. */
+  function seedSplitReminder(id: string, config: object, vehicleIds: string[]): void {
+    ctx.sqlite.run(
+      `INSERT INTO reminders
+         (id, user_id, name, type, action_mode, frequency, trigger_mode, start_date, next_due_date,
+          is_active, expense_category, expense_amount, expense_split_config)
+       VALUES (?, ?, 'Monthly wash', 'expense', 'automatic', 'monthly', 'time', 0, 0, 1, 'misc', 60,
+          ?)`,
+      [id, ctx.user.id, JSON.stringify(config)]
+    );
+    for (const v of vehicleIds) {
+      ctx.sqlite.run(`INSERT INTO reminder_vehicles (reminder_id, vehicle_id) VALUES (?, ?)`, [
+        id,
+        v,
+      ]);
+    }
+  }
+  function splitConfig(
+    id: string
+  ): { method: string; vehicleIds?: string[]; allocations?: unknown[] } | null {
+    const row = ctx.sqlite
+      .query('SELECT expense_split_config AS c FROM reminders WHERE id = ?')
+      .get(id) as { c: string | null } | null;
+    return row?.c ? JSON.parse(row.c) : null;
+  }
+
+  test("an 'even' split drops the deleted vehicle's leg; the surviving legs renormalize", async () => {
+    const v1 = await seedVehicle();
+    const v2 = await seedVehicle();
+    const v3 = await seedVehicle();
+    seedSplitReminder('rm-even', { method: 'even', vehicleIds: [v1, v2, v3] }, [v1, v2, v3]);
+
+    const del = await ctx.authed('DELETE', `/api/v1/vehicles/${v2}`);
+    expect(del.status, await del.text()).toBe(200);
+
+    const cfg = splitConfig('rm-even');
+    expect(cfg?.method).toBe('even');
+    // The dead vehicle is gone from the blob; the other two remain (no FK-violating leg on next trigger).
+    expect(cfg?.vehicleIds?.sort()).toEqual([v1, v3].sort());
+    expect(cfg?.vehicleIds).not.toContain(v2);
+  });
+
+  test("a 'percentage' split drops the leg + RESCALES survivors back to 100%", async () => {
+    const v1 = await seedVehicle();
+    const v2 = await seedVehicle();
+    seedSplitReminder(
+      'rm-pct',
+      {
+        method: 'percentage',
+        allocations: [
+          { vehicleId: v1, percentage: 25 },
+          { vehicleId: v2, percentage: 75 },
+        ],
+      },
+      [v1, v2]
+    );
+
+    // Delete v1 → only v2 would remain (<2 legs) → the blob is CLEARED (single-vehicle fallback).
+    const del = await ctx.authed('DELETE', `/api/v1/vehicles/${v1}`);
+    expect(del.status, await del.text()).toBe(200);
+    expect(
+      splitConfig('rm-pct'),
+      'a <2-leg split collapses to null (junction-driven single path)'
+    ).toBeNull();
+  });
+
+  test('a 3-way percentage split keeps ≥2 legs → rescaled to sum 100, dead leg gone', async () => {
+    const v1 = await seedVehicle();
+    const v2 = await seedVehicle();
+    const v3 = await seedVehicle();
+    seedSplitReminder(
+      'rm-pct3',
+      {
+        method: 'percentage',
+        allocations: [
+          { vehicleId: v1, percentage: 25 },
+          { vehicleId: v2, percentage: 25 },
+          { vehicleId: v3, percentage: 50 },
+        ],
+      },
+      [v1, v2, v3]
+    );
+
+    const del = await ctx.authed('DELETE', `/api/v1/vehicles/${v2}`);
+    expect(del.status, await del.text()).toBe(200);
+
+    const cfg = splitConfig('rm-pct3') as {
+      method: string;
+      allocations: { vehicleId: string; percentage: number }[];
+    } | null;
+    expect(cfg?.method).toBe('percentage');
+    expect(cfg?.allocations.map((a) => a.vehicleId).sort()).toEqual([v1, v3].sort());
+    expect(cfg?.allocations.some((a) => a.vehicleId === v2)).toBe(false);
+    // Survivors (was 25 + 50 = 75) rescale back to 100.
+    expect(cfg?.allocations.reduce((s, a) => s + a.percentage, 0)).toBeCloseTo(100, 5);
+  });
+
+  test('an unrelated split reminder is untouched when a non-member vehicle is deleted', async () => {
+    const v1 = await seedVehicle();
+    const v2 = await seedVehicle();
+    const other = await seedVehicle();
+    seedSplitReminder('rm-keep', { method: 'even', vehicleIds: [v1, v2] }, [v1, v2]);
+
+    const del = await ctx.authed('DELETE', `/api/v1/vehicles/${other}`);
+    expect(del.status, await del.text()).toBe(200);
+
+    const cfg = splitConfig('rm-keep');
+    expect(cfg?.vehicleIds?.sort()).toEqual([v1, v2].sort()); // unchanged
+  });
+});
+
 // C366 deep-review (CERTIFIED CLEAN — pins an unguarded data-safety invariant). insurance_claims.vehicleId
 // is onDelete:'set null' (schema.ts:188), deliberately UNLIKE the cascade FKs above: a claim is a financial/
 // legal record (payoutAmount, claimDate, status) that belongs to its POLICY (policyId cascades), NOT to the

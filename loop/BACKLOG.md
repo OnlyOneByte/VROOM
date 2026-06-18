@@ -261,12 +261,16 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 > offline-outbox field-dropout family #66/#101/#111, or analytics split-sibling overcount if any builder
 > was missed by the #56/#108/#113/#146 sweep).
 
+> **CLOSED C48: #88** — a deleted vehicle is now pruned from reminders' `expenseSplitConfig` blob +
+> renormalized (see the Sev-3 block). The #88/#97 vehicle-delete reminder-orphan family is CLOSED (junction
+> C40 + blob C48). So the next bug cycle's top Angelo-approved item is **Sev-2 #94** (the 6-member
+> fleet-unit-pooling class — its own dedicated cycle, a multi-builder thread-units-into-builders change) or
+> **Sev-3 #98** (real PUT-on-collision/upsert so sync-manager `keep_local` actually overwrites).
+>
 > **CLOSED C44: #37** — the Google Sheets backup is now ATOMIC (stage→swap). See the Sev-1 block below for
 > the fix. **The Sheets-backup data-corruption Sev-1 pair (#36 C24 RAW-write + #37 C44 atomic-swap) is now
 > CLOSED.** The only remaining open Sev-1 is #127 (restore-atomicity), which is arch-rule-6 design-gated
-> (needs `.kiro/specs/<refactor>/design.md` + an authorized arch cycle — NOT a bug pick). So the next bug
-> cycle's top Angelo-approved item is **Sev-2 #94** (the 6-member fleet-unit-pooling class) or **Sev-3 #88**
-> (split-config-blob orphan on vehicle delete).
+> (needs `.kiro/specs/<refactor>/design.md` + an authorized arch cycle — NOT a bug pick).
 
 > **✅ ANGELO-APPROVED 2026-06-17 — these are now ACTIONABLE bug/arch items with a ratified
 > direction (NO further sign-off needed). Angelo approved all the recommended approaches in one pass
@@ -323,9 +327,16 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 >   (non-vacuous: revert → 2 RED). Don't re-pick.
 >
 > _Severity 3 — data-integrity on delete (orphans):_
-> - **#88 (MED) — APPROVED: on vehicle delete, prune the deleted vehicleId from any reminder's
->   `expenseSplitConfig` JSON, and deactivate the reminder if the split becomes invalid.** (junction
->   cascades, the blob doesn't.)
+> - ~~**#88 (MED) — DONE C48.**~~ A reminder's `expenseSplitConfig` is a JSON blob (not FK-managed like the
+>   junction), so a deleted vehicle's leg lingered → the next trigger built a split sibling for the dead
+>   vehicleId → FK violation + half-committed surviving legs (C151 footgun). Fixed via the pure
+>   `pruneVehicleFromSplitConfig` (split-config-helpers.ts — drop the leg + renormalize: even drops from
+>   vehicleIds, absolute keeps remaining amounts, percentage rescales survivors to 100%; returns null when
+>   <2 legs remain → blob cleared → single-vehicle junction fallback) + `reminderRepository.
+>   pruneSplitConfigsForDeletedVehicle(userId, id)`, called in the vehicle-delete route BEFORE
+>   deactivateVehicleless. +8 pure + +4 HTTP-harness guards; non-vacuous (disable the call → 3 of 4 HTTP
+>   cases RED). The #88/#97 vehicle-delete reminder-orphan family is now CLOSED (junction C40 + blob C48).
+>   Don't re-pick.
 > - ~~**#97 (LOW-MED) — DONE C40.**~~ A vehicle delete cascades the reminder_vehicles junction but leaves
 >   the reminder row active with zero vehicles (skipped 'no_vehicles' forever). Fixed via
 >   `reminderRepository.deactivateVehicleless(userId)` (LEFT JOIN + isNull junction → bulk deactivate),

@@ -32,11 +32,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 47 |
 | deep-review | 5 | 46 |
 | guard | 6 | 45 |
-| bug | 3 | 44 |
+| bug | 3 | 48 |
 | arch | 5 | 43 |
 | infra | 6 | 42 |
 
-Current cycle: **47**
+Current cycle: **48**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -355,6 +355,35 @@ Current cycle: **47**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C48 (bug #88)** — **Prune a deleted vehicle from reminders' expenseSplitConfig blob (Angelo-APPROVED
+  Sev-3 data-integrity).** bug was the SOLE over-budget category (48−44=4/3 +1; arch/infra AT). Cold-scout
+  vein exhausted → took the top unfinished Angelo-approved item by severity: #88 (Sev-1 #36/#37 done,
+  #127 arch-rule-6-gated; #94 is a 6-member multi-builder sweep better as its own cycle → took the
+  contained, single-write-path #88). CONFIRMED FIRSTHAND: a reminder's `expenseSplitConfig` is a JSON blob
+  (text mode:'json'), NOT FK-managed like the reminder_vehicles junction (onDelete:cascade). When a vehicle
+  is deleted the junction cascades but the blob still NAMES the dead vehicleId, so the next trigger's
+  `createExpenseFromReminder` builds a split sibling for that dead id (createSiblings inserts by the BLOB's
+  vehicleIds, not the junction) → FK violation that (C151 async-tx footgun) leaves the surviving legs
+  half-committed — a partial/inconsistent expense group every trigger. Same #88/#97 vehicle-delete family;
+  #97 (junction→zero-vehicles) was closed C40, this is the blob sibling. FIX (Angelo's "drop+renormalize /
+  single-vehicle fallback"): new pure `pruneVehicleFromSplitConfig(config, deletedId)` in
+  split-config-helpers.ts — drops the leg (even: from vehicleIds; absolute: keep remaining fixed amounts,
+  total shrinks honestly; percentage: drop + RESCALE survivors back to 100%, even-fallback when survivors
+  sum 0); returns null when <2 legs remain (caller clears the blob → single-vehicle junction path) or the
+  SAME ref when the id was absent (no-op skip). New `reminderRepository.pruneSplitConfigsForDeletedVehicle
+  (userId, deletedId)` loads the user's split-config reminders, prunes each, writes back (clears to null on
+  collapse). Wired into the vehicle-delete route BEFORE deactivateVehicleless (so a collapsed blob's
+  now-vehicleless reminder is still caught by #97/C40). GUARD: +8 pure cases (prune-split-config.test.ts:
+  all 3 methods, the rescale-to-100, the 0-sum even fallback, the <2 collapse, the absent no-op) + +4
+  HTTP-harness cases (vehicle-delete-cascade.test.ts #88 block: even drop, percentage <2 collapse→null,
+  3-way percentage rescale-to-100, unrelated-reminder untouched). NON-VACUOUS (verified firsthand): disabling
+  the route's prune call → 3 of the 4 HTTP #88 tests RED (the no-op case correctly stays green); reverted →
+  12/12 + 8/8 green, routes.ts diff = only my 6-line change. Verify: backend validate:local GREEN — tsc 0,
+  musl-biome 0 errors (20 pre-existing warnings; my 2 new noNonNullAssertion warnings refactored away),
+  1637 pass / 0 fail (+12), build bundled. Backend-only (no UI → no shot). cov: be ~87.3% / fe 86.35% (~ —
+  the +12 pin the new prune helper + route path; FE untouched). #88 DONE — the #88/#97 vehicle-delete
+  reminder-orphan family is now closed (junction C40 + blob C48). Next Angelo Sev-2 = #94 (fleet-unit-pool
+  class, its own cycle) or Sev-3 #98 (PUT-on-collision upsert).
 - **C47 (feature)** — **Import-trackers T4: category-remap table for unrecognized category words (eyes-on
   DONE).** feature was most-starved over budget (47−41=6/4 +2; bug sat AT 3/3, not over). Import-trackers
   is the only open feature; its remaining unblocked T4 piece was the category-remap table (the
