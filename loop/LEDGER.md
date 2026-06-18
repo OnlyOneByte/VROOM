@@ -30,12 +30,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 37 |
 | deep-review | 5 | 33 |
-| guard | 6 | 32 |
+| guard | 6 | 38 |
 | bug | 3 | 36 |
 | arch | 5 | 36 |
 | infra | 6 | 35 |
 
-Current cycle: **37**
+Current cycle: **38**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -354,6 +354,22 @@ Current cycle: **37**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C38 (guard, arch-extract→pin in one cycle)** — **Extract + pin the C37 manual-mapping pure helpers.**
+  Nothing strictly over budget (guard + deep-review tied AT 6/6 + 5/5); took the highest-leverage item via
+  the standing pattern (a feature cycle that adds logic seeds the next guard cycle — C22→C23, C31→C32). C37
+  buried three PURE functions inside ImportExpensesDialog.svelte where vitest can't reach them
+  (`.svelte` <script>): the CSV header split+dequote, the native-export detection that gates the manual
+  editor, and the auto-guess needle map. EXTRACTED them to a new pure `src/lib/utils/import-mapping-helpers
+  .ts` (`parseCsvHeaders` / `isNativeImportHeaders` / `guessManualColumns`, no Svelte/DOM deps) + rewired
+  the dialog to import them (the inline `NATIVE_HEADERS` const + inline `guessManualColumns` removed).
+  BEHAVIOR-PRESERVING (the C37 e2e stays green — extraction moved code, didn't change rendering). GUARD: new
+  import-mapping-helpers.test.ts (+9): header parse (quotes/whitespace/empty), native-superset detection
+  (gates the editor), and the guess needle sets — INCLUDING the C37 eyes-on additions (spent/paid/total→
+  amount, kind→category) a bespoke export needed to preview. NON-VACUOUS: dropping the spent/paid/total
+  needles turns the C37-needles case RED; restored → 9 pass. Verify: frontend validate:local GREEN —
+  type-check 0, build OK, 735 tests pass (+9, 65 files). cov: be 87.29% / fe 86.14% (~→UP — the extracted
+  helpers are now FE-unit-covered where they were unreachable inside the component; re-measure next infra
+  cadence ~C45).
 - **C37 (feature)** — **Import-trackers T4: manual column-mapping path for unrecognized CSVs (eyes-on
   DONE).** feature was the sole over-budget category (37−31=6/4). The Angelo-gated fuel-preset
   `defaultCategory` piece (flagged C31) stays parked, so took the genuinely UNBLOCKED T4 work: the manual

@@ -181,6 +181,13 @@ the now-shootable eyes-on FE + any newly-touched module.)*
 > created. STANDING PATTERN (loop-improvement): whenever an arch cycle extracts a shared helper, the NEXT
 > guard cycle should pin it directly (C6 monthsBetween, C18 averageConsecutiveMpg). Don't re-add.
 >
+> **GUARDED C38:** the C37 manual-mapping pure logic, extracted from ImportExpensesDialog.svelte (vitest
+> can't reach `.svelte` <script> functions) to `src/lib/utils/import-mapping-helpers.ts` + pinned by
+> import-mapping-helpers.test.ts (+9): `parseCsvHeaders` (quotes/whitespace/empty), `isNativeImportHeaders`
+> (the native-superset gate), `guessManualColumns` (the needle map incl. the C37 spent/paid/total→amount,
+> kind→category additions). Behavior-preserving (C37 e2e stays green); non-vacuous (drop a needle → RED).
+> Arch-extract→guard-pin done in ONE cycle (the C17→C18 pattern). Don't re-add.
+>
 > **GUARDED C32:** the C31 import-preset category gap is characterized end-to-end
 > (import-mapping-presets.test.ts, +2): all 3 real `MAPPING_PRESETS` map no category column → driven through
 > presetToMapping → applyMapping → buildImportPlan, each currently yields readyCount 0 / "Unknown category"

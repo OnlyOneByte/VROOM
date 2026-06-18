@@ -7,6 +7,11 @@
 	import { appStore } from '$lib/stores/app.svelte';
 	import { handleErrorWithNotification } from '$lib/utils/error-handling';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
+	import {
+		guessManualColumns,
+		isNativeImportHeaders,
+		parseCsvHeaders
+	} from '$lib/utils/import-mapping-helpers';
 	import type {
 		ImportColumnMapping,
 		ImportDateFormat,
@@ -52,8 +57,6 @@
 	let manualColumns = $state<Partial<Record<NativeImportField, string>>>({});
 	let manualDateFormat = $state<ImportDateFormat>('iso');
 
-	// The native export's own column names — a file already in this shape needs no mapping.
-	const NATIVE_HEADERS = new Set(['date', 'vehicle', 'category', 'amount']);
 	// The VROOM fields the manual editor exposes (the importer-consumed subset; missedFillup is niche).
 	const MAPPABLE_FIELDS: { field: NativeImportField; label: string; required?: boolean }[] = [
 		{ field: 'date', label: 'Date', required: true },
@@ -140,11 +143,8 @@
 		manualMapping = false;
 		manualColumns = {};
 		fileHeaders = [];
-		const firstLine = csvText.split('\n', 1)[0]?.trim();
-		if (!firstLine) return;
-		// csv-parse-free header split: the importer is delimiter-`,`; good enough to identify headers
-		// (the server does the authoritative parse). Strip surrounding quotes per cell.
-		const headers = firstLine.split(',').map((h) => h.trim().replace(/^"|"$/g, ''));
+		const headers = parseCsvHeaders(csvText);
+		if (headers.length === 0) return;
 		fileHeaders = headers;
 		isDetecting = true;
 		try {
@@ -155,14 +155,10 @@
 			}
 			// No preset AND not already a native VROOM export → offer manual column mapping. (A native
 			// file — headers include date/vehicle/category/amount — imports directly, unchanged path.)
-			if (!detectedPreset) {
-				const lower = new Set(headers.map((h) => h.toLowerCase()));
-				const isNative = [...NATIVE_HEADERS].every((h) => lower.has(h));
-				if (!isNative && headers.length > 0) {
-					manualMapping = true;
-					manualColumns = guessManualColumns(headers);
-					if (vehicles.length === 1 && vehicles[0]) targetVehicleId = vehicles[0].id;
-				}
+			if (!detectedPreset && !isNativeImportHeaders(headers)) {
+				manualMapping = true;
+				manualColumns = guessManualColumns(headers);
+				if (vehicles.length === 1 && vehicles[0]) targetVehicleId = vehicles[0].id;
 			}
 		} catch {
 			// Detection is best-effort — a failure just falls back to the native (manual) path.
@@ -170,26 +166,6 @@
 		} finally {
 			isDetecting = false;
 		}
-	}
-
-	/** Best-effort initial guess: map a VROOM field to a header whose name contains it (case-insensitive). */
-	function guessManualColumns(headers: string[]): Partial<Record<NativeImportField, string>> {
-		const guess: Partial<Record<NativeImportField, string>> = {};
-		const find = (...needles: string[]) =>
-			headers.find((h) => needles.some((n) => h.toLowerCase().includes(n)));
-		const set = (field: NativeImportField, ...needles: string[]) => {
-			const m = find(...needles);
-			if (m) guess[field] = m;
-		};
-		set('date', 'date');
-		set('amount', 'amount', 'price', 'cost', 'spent', 'paid', 'total');
-		set('category', 'category', 'type', 'kind');
-		set('vehicle', 'vehicle', 'car');
-		set('mileage', 'odometer', 'mileage', 'odo');
-		set('volume', 'volume', 'gallon', 'litre', 'liter', 'fuel amount', 'fill');
-		set('description', 'note', 'description', 'comment');
-		set('tags', 'tag');
-		return guess;
 	}
 
 	function setManualColumn(field: NativeImportField, header: string): void {
