@@ -18,56 +18,34 @@ describe('Auth routes structural properties', () => {
   /**
    * **Validates: Requirements 16.3**
    *
-   * The login callback (validateLoginState) rejects state entries where
-   * flowType is set — only entries with no flowType are valid for login.
+   * The login callback (validateLoginState) consumes the OAuth state via the shared single-use
+   * `consumeOAuthState` helper with the LOGIN flow (expectedFlow `undefined` → entry must have no
+   * flowType). The single-use + flow-isolation BEHAVIOR is pinned directly in
+   * consume-oauth-state.test.ts (C39); this just guards the wiring (the validator delegates with the
+   * right flow arg, not a re-inlined copy). Updated C39 when the inline body moved into the helper.
    */
-  test('login callback rejects state entries with flowType set', async () => {
+  test('login callback delegates to consumeOAuthState for the login flow (no flowType)', async () => {
     const routesSource = await Bun.file(`${import.meta.dir}/../routes.ts`).text();
 
-    fc.assert(
-      fc.property(fc.constant(null), () => {
-        // validateLoginState must check that flowType is falsy
-        expect(routesSource).toContain('function validateLoginState');
-
-        // Extract the validateLoginState function
-        const fnStart = routesSource.indexOf('function validateLoginState');
-        const fnEnd = routesSource.indexOf(
-          '}',
-          routesSource.indexOf('return { data: storedData }', fnStart)
-        );
-        const fnBody = routesSource.slice(fnStart, fnEnd + 1);
-
-        // Must reject when flowType is set (storedData.flowType is truthy)
-        expect(fnBody).toContain('storedData.flowType');
-      }),
-      { numRuns: 100 }
-    );
+    const fnStart = routesSource.indexOf('function validateLoginState');
+    expect(fnStart).toBeGreaterThan(-1);
+    const fnBody = routesSource.slice(fnStart, routesSource.indexOf('\n}', fnStart) + 2);
+    // Login flow → consumeOAuthState(..., undefined): the entry must carry NO flowType.
+    expect(fnBody).toContain('consumeOAuthState(oauthStateStore, stateParam, undefined)');
   });
 
   /**
    * **Validates: Requirements 5.2, 16.2**
    *
-   * The link callback validates that flowType === 'auth-link'.
+   * The link callback consumes via the shared helper with the 'auth-link' flow.
    */
-  test('link callback validates flowType=auth-link', async () => {
+  test('link callback delegates to consumeOAuthState for the auth-link flow', async () => {
     const routesSource = await Bun.file(`${import.meta.dir}/../routes.ts`).text();
 
-    fc.assert(
-      fc.property(fc.constant(null), () => {
-        // validateLinkState must check flowType === 'auth-link'
-        expect(routesSource).toContain('function validateLinkState');
-
-        const fnStart = routesSource.indexOf('function validateLinkState');
-        const fnEnd = routesSource.indexOf(
-          '}',
-          routesSource.indexOf('return { data: storedData }', fnStart)
-        );
-        const fnBody = routesSource.slice(fnStart, fnEnd + 1);
-
-        expect(fnBody).toContain("'auth-link'");
-      }),
-      { numRuns: 100 }
-    );
+    const fnStart = routesSource.indexOf('function validateLinkState');
+    expect(fnStart).toBeGreaterThan(-1);
+    const fnBody = routesSource.slice(fnStart, routesSource.indexOf('\n}', fnStart) + 2);
+    expect(fnBody).toContain("consumeOAuthState(oauthStateStore, stateParam, 'auth-link')");
   });
 
   /**

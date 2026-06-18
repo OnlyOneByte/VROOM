@@ -124,6 +124,16 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > genuinely UNAUDITED area (e.g. the analytics financing/TCO money builders, or an eyes-on sweep of a
 > complex shipped page like /analytics or /insurance) rather than re-scanning backup/restore/import.
 >
+> **CERTIFIED C39 — OAuth-state CSRF consume CLEAN + behaviorally guarded.** The `oauthStateStore`
+> single-use token is correct across login/link/provider flows: single-use (replay rejected),
+> flow-isolated (login state ≠ link/provider), anti-fixation (mismatched/unknown deleted on lookup),
+> null-safe — certified firsthand. The prior coverage was brittle source-string scans (pinned no
+> behavior); extracted `consumeOAuthState` (auth/utils.ts) + +9 behavioral guards (consume-oauth-state
+> .test.ts) + replaced the 2 scans with wiring checks. The login/link validators delegate; the provider
+> path keeps its inline consume (extra PKCE assertion). Don't re-audit the state lifecycle; it's pinned.
+> #129 (login email-sync) still lives here as an OPEN product call. Next deep-review: a different surface
+> (eyes-on /insurance sweep, or the offline sync-manager conflict path).
+>
 > **CERTIFIED C33 — TCO `categorizeTCOExpenses` sourceType-bucketing CLEAN + guarded.** A `financial` row
 > buckets by sourceType: 'financing'→financingInterest, 'insurance_term'→insurance, ANY OTHER (reminder
 > from C27 recurring / null manual) → otherCosts. Certified firsthand (reminder/null → otherCosts, not

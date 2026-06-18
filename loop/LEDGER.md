@@ -29,13 +29,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 37 |
-| deep-review | 5 | 33 |
+| deep-review | 5 | 39 |
 | guard | 6 | 38 |
 | bug | 3 | 36 |
 | arch | 5 | 36 |
 | infra | 6 | 35 |
 
-Current cycle: **38**
+Current cycle: **39**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -354,6 +354,26 @@ Current cycle: **38**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C39 (deep-review)** — **Certified the OAuth-state CSRF consume CLEAN + replaced brittle source-scans
+  with a behavioral guard.** deep-review was the sole over-budget category (39−33=6/5). Per the C33 note
+  (TCO money path certified), picked the next UNAUDITED surface: the auth/OAuth path. Audited the
+  highest-stakes invariant — the `oauthStateStore` single-use CSRF token across login/link/provider flows.
+  CERTIFIED FIRSTHAND (scratch probe): the state consume is CLEAN — single-use (replay rejected),
+  flow-isolated (a login state ≠ link/provider state), anti-fixation (a mismatched/unknown state is DELETED
+  on the failed lookup), null-safe. BUT the only existing coverage (auth-routes.property.test.ts) was
+  BRITTLE SOURCE-STRING SCANS — it asserts the validator body CONTAINS `storedData.flowType`/`'auth-link'`,
+  which would pass even if the logic were inverted and pins NO actual behavior. GUARD: extracted the
+  single-use+flow-isolation logic into a pure `consumeOAuthState(store, stateParam, expectedFlow)` in
+  auth/utils.ts (the C38 "untestable-in-place → pure module" pattern); routed the two simplest validators
+  (login/link) through it (the provider `resolveProviderState` keeps its own inline consume — it adds a
+  PKCE codeVerifier assertion — same contract, left untouched to bound risk). +9 BEHAVIORAL cases
+  (consume-oauth-state.test.ts: single-use/replay, 3-way flow isolation, anti-fixation delete, null-safe);
+  replaced the 2 obsolete source-scans with thin wiring checks (validator delegates with the right flow
+  arg). Behavior-preserving — the 3 existing auth property suites stay green. Verify: backend validate:local
+  GREEN — tsc 0, musl-biome clean, 1615 pass / 0 fail (+7 net), build bundled. Backend-only (no UI → no
+  shot). cov: be 87.29% / fe 86.14% (~→UP — the CSRF consume logic is now unit-covered where it was only
+  string-scanned). NOTE: #129 (OAuth login email-sync, MED, filed C433) also lives on this path — still a
+  product call (don't sync / sync-if-unset / notify), NOT auto-fixed.
 - **C38 (guard, arch-extract→pin in one cycle)** — **Extract + pin the C37 manual-mapping pure helpers.**
   Nothing strictly over budget (guard + deep-review tied AT 6/6 + 5/5); took the highest-leverage item via
   the standing pattern (a feature cycle that adds logic seeds the next guard cycle — C22→C23, C31→C32). C37
