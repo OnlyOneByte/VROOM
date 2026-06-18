@@ -33,11 +33,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 96 |
 | deep-review | 5 | 98 |
 | guard | 6 | 94 |
-| bug | 3 | 95 |
+| bug | 3 | 99 |
 | arch | 5 | 98 |
 | infra | 6 | 97 |
 
-Current cycle: **98**
+Current cycle: **99**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,21 @@ Current cycle: **98**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C99 (bug — recorded dry FAST per the C89/C95 discipline; no source changed since C85, 7th consecutive dry)** —
+  Balance at C99 (HEAD was C98; nudge label lags): bug (99−95=4/3, +1) the LONE over-budget category → forced by
+  category discipline. KEY STRUCTURAL FACT: `git diff 5766239(C85)..HEAD` over production source is EMPTY — NOTHING
+  has changed since the cold bug vein was last swept (the C6/C10/C15/C83/C89/C95 dry scouts + every surface
+  certified), so a regression is structurally impossible. Per the loop's OWN explicit C89/C95 recommendation
+  ("record dry on the FIRST recheck + pivot — the budget is forcing ceremony, not finding work"), did ONE quick
+  firsthand spot-check to stay non-vacuous rather than re-running the full cold sweep on provably-unchanged code:
+  `buildAmortizationSchedule` (analytics-charts.ts:244, the #92/#117/#139 0%-APR money class) — CLEAN: 0%-APR →
+  interest=0 (the bare `balance * apr/100/12` handles it, no special-case), principal clamped
+  `Math.min(Math.max(0, payment − interest), balance)` (never negative, never over-pays the final month),
+  paid-off loans skipped, no caller-input mutation; pinned by amortization-schedule.test.ts. No fresh defect —
+  recorded DRY. The productive bug surface remains ONLY the parked Angelo-gated queue (#148/#100/#79/#129). NEXT
+  bug cycle: with source unchanged since C85, record dry IMMEDIATELY (a 1-line precondition check: if
+  `git diff C85..HEAD` over src is empty, nothing can have regressed) + pivot — re-scanning is pure ceremony.
+  Doc-only — no source/test touched. cov: be 87.47% / fe 86.35% (~ — nothing touched).
 - **C98 (arch no-churn [recorded fast per C91] → deep-review: pinned the session-cookie SECURITY-ATTRIBUTE
   contract via a source-scan)** — Balance at C98 (HEAD was C97; nudge label lags): TWO over budget — arch
   (98−91=7/5, +2, most-starved) and deep-review (98−92=6/5, +1, co-starved). ARCH: per the C91 standing

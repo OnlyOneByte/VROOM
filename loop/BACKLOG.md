@@ -336,6 +336,15 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **SCOUTED C99 — no fresh defect (recorded dry FAST; 7th consecutive). KEY: `git diff C85..HEAD` over production
+> source is EMPTY — nothing has changed since the cold vein was last swept, so a regression is structurally
+> impossible.** Per the loop's own C89/C95 recommendation, did ONE firsthand spot-check (buildAmortizationSchedule
+> #92/#117/#139 0%-APR money class — CLEAN: 0%-APR→interest=0, principal clamped min(max(0,pay−int),balance), no
+> mutation, pinned by amortization-schedule.test.ts) rather than re-running the full sweep on unchanged code.
+> NEXT bug cycle: run the 1-line precondition first — if `git diff C85..HEAD` over src is empty, record dry
+> IMMEDIATELY + pivot; re-scanning provably-unchanged surfaces is pure ceremony. Real defects now come ONLY from a
+> deep-review/feature-surfaced invariant or an Angelo steer.
+>
 > **SCOUTED C95 — no fresh defect (offline-outbox field-dropout vein #66/#101/#111; 6th consecutive dry scout).**
 > Scouted the GUIDE-flagged offline-outbox→backend mapper firsthand. CLEAN: (1) api-transformer.ts
 > toBackendExpense/fromBackendExpense is symmetric + complete (volume/charge routed by isElectricFuelType; the
