@@ -27,14 +27,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 27 |
+| feature | 4 | 31 |
 | deep-review | 5 | 26 |
 | guard | 6 | 25 |
 | bug | 3 | 29 |
 | arch | 5 | 30 |
 | infra | 6 | 28 |
 
-Current cycle: **30**
+Current cycle: **31**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -353,6 +353,27 @@ Current cycle: **30**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C31 (feature)** — **Import-trackers T4: auto-detect + target-vehicle mapping step (eyes-on DONE;
+  preset gap flagged).** Nothing strictly over budget (guard/deep-review/feature all tied AT); took the
+  highest-leverage open item — import-trackers is the ONLY remaining open feature (the other two DONE), and
+  its mapping step is genuine net-new product UI. Scoped ONE coherent slice (not the whole dialog): the
+  AUTO-DETECT path. Added `vehicles` prop to ImportExpensesDialog (already loaded on /expenses); on
+  file/paste it splits the header row + calls `detectImportSource` → if a Fuelly/Fuelio/Drivvo preset
+  matches, renders a "Detected a <Tracker> fuel log" banner + a target-vehicle picker (KEY firsthand fact:
+  NO preset maps a `vehicle` column — these are single-vehicle fuel logs, so D4 requires picking one;
+  auto-selects the only vehicle), builds the `ImportColumnMapping` from preset+vehicle, and threads it
+  through the EXISTING preview/commit verbatim. A native VROOM export detects null → unchanged path
+  (backward-compatible). EYES-ON via `import-mapping-detect.meshclaw.e2e.ts` + shot (Read
+  `/tmp/c31-import-mapped-preview.png`): banner + picker render, "Daily Driver" auto-selected.
+  EYES-ON CAUGHT A REAL PRESET GAP (firsthand, NOT a UI defect): the fuel presets map no category column +
+  `mapCategory` leaves a blank category blank (the D2 "never invent a category" rule), so a detected fuel
+  log previews **0-ready / "Unknown category"** — the presets are unusable end-to-end. This is a product/
+  data-contract call (default a column-less fuel import to `category:'fuel'` vs the D2 rule) → send_message'd
+  Angelo recommending option (a) defaultCategory:'fuel' per preset (a backend-preset change, a future cycle),
+  did NOT auto-fix. The T4 UI slice stands on its own. Verify: frontend validate:local GREEN — type-check 0,
+  build OK, 726 tests. cov: be 87.22% / fe 86.14% (~ — UI-markup cycle; the detect/map data path is
+  backend-covered T1-T3). T4 REMAINING: the manual per-field column editor + category-remap table + the
+  flagged preset defaultCategory.
 - **C30 (arch)** — **Extract the canonical `SHEET_NAMES` tab roster (a real fresh dedup, not a no-churn
   scout).** arch was the sole over-budget category (30−23=7/5). No pick was pre-seeded, so scouted firsthand
   + found a GENUINE C161-class drift vector: the 15-tab Sheets roster was hand-copied across 4 sites (the

@@ -40,13 +40,28 @@
       `columns`) → rewrote as explicit per-field optionals. backend validate:local EXIT 0 (1038 pass, +9).
 
 ## Phase 3 — frontend
-- [ ] **T4** Import-dialog mapping step: detected-source banner, per-field column dropdowns from the
+- [~] **T4** Import-dialog mapping step: detected-source banner, per-field column dropdowns from the
       file headers, unit/date-format/target-vehicle pickers, category-remap table. Reuse the existing
       preview/commit step. Types + service wiring.
       - [x] **Types + service wiring DONE (C140, non-eyes-on):** `src/lib/types/import-mapping.ts`
             (ImportColumnMapping/ImportMappingPreset/NativeImportField mirroring the backend) +
             `expenseApi.importExpensesCsv(csv, dryRun, mapping?)` (backward-compat) +
-            `detectImportSource(headers)`; +5 tests. REMAINING = the dialog MARKUP (eyes-on).
+            `detectImportSource(headers)`; +5 tests.
+      - [x] **AUTO-DETECT + target-vehicle slice DONE (C31, eyes-on CONFIRMED):** ImportExpensesDialog
+            now (1) auto-detects a Fuelly/Fuelio/Drivvo fuel log from its headers (`detectImportSource`),
+            (2) shows a "Detected a <Tracker> fuel log" banner + a target-vehicle picker (these presets
+            carry no `vehicle` column → D4 requires picking one; auto-selects the only vehicle), (3) builds
+            the `ImportColumnMapping` from the preset + chosen vehicle and reuses the existing preview/commit
+            step verbatim. A native VROOM export (has its own vehicle column) detects null → unchanged path.
+            Eyes-on via `import-mapping-detect.meshclaw.e2e.ts` + shot (`/tmp/c31-import-mapped-preview.png`):
+            banner + picker render, "Daily Driver" auto-selected. FE validate:local GREEN (726).
+      - [ ] **REMAINING (T4 follow-ups):** the per-field column-dropdown editor + category-remap table for
+            a MANUAL (unknown-source) file, and date-format/unit override pickers. **BLOCKER surfaced +
+            flagged to Angelo C31:** the fuel presets map no category column and `mapCategory` leaves a
+            blank category blank (D2 "never invent"), so a detected fuel log currently previews 0-ready
+            ("Unknown category"). Recommended fix (a): give each fuel preset a `defaultCategory:'fuel'`
+            (backend-preset change, awaiting the steer) — until then the auto-detect path detects+maps but
+            commits nothing.
 - [ ] **T5** Four-states + a11y + mobile; compose from the kit.
 
 ## Phase 4 — verify

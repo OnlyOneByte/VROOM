@@ -1,25 +1,59 @@
 <script lang="ts">
 	import * as Dialog from '$lib/components/ui/dialog';
+	import * as Select from '$lib/components/ui/select';
 	import { Button } from '$lib/components/ui/button';
-	import { Upload, LoaderCircle, CircleCheck, CircleAlert, FileText } from '@lucide/svelte';
+	import { Upload, LoaderCircle, CircleCheck, CircleAlert, FileText, Sparkles } from '@lucide/svelte';
 	import { expenseApi, type ExpenseImportResult } from '$lib/services/expense-api';
 	import { appStore } from '$lib/stores/app.svelte';
 	import { handleErrorWithNotification } from '$lib/utils/error-handling';
+	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
+	import type { ImportColumnMapping, ImportMappingPreset, Vehicle } from '$lib/types';
 
 	interface Props {
 		open: boolean;
+		/** The user's vehicles — needed for the target-vehicle picker on a foreign (mapped) import. */
+		vehicles: Vehicle[];
 		/** Called after a successful commit so the parent can refetch the list. */
 		onImported: () => void;
 	}
 
-	let { open = $bindable(), onImported }: Props = $props();
+	let { open = $bindable(), vehicles, onImported }: Props = $props();
 
-	// Workflow: pick/paste CSV → auto preview (dryRun) → review → commit (dryRun:false).
+	// Workflow: pick/paste CSV → detect a known tracker from its headers → (if foreign) pick the target
+	// vehicle → auto preview (dryRun) → review → commit (dryRun:false). A native VROOM export carries its
+	// own `vehicle` column, so detection returns null and the mapping step is skipped (unchanged path).
 	let csvText = $state('');
 	let fileName = $state<string | null>(null);
 	let preview = $state<ExpenseImportResult | null>(null);
 	let isPreviewing = $state(false);
 	let isImporting = $state(false);
+
+	// Foreign-tracker mapping step (T4). `detectedPreset` is the auto-matched tracker (Fuelly/Fuelio/
+	// Drivvo) or null for a native/unknown file. The built-in presets are all single-vehicle fuel logs
+	// (no `vehicle` column), so when one is detected the user MUST choose the target vehicle (D4) or every
+	// row errors "vehicle not found".
+	let isDetecting = $state(false);
+	let detectedPreset = $state<ImportMappingPreset | null>(null);
+	let targetVehicleId = $state('');
+
+	let targetVehicle = $derived(vehicles.find((v) => v.id === targetVehicleId));
+	// The mapping sent to the server: the detected preset's field map + the chosen target vehicle's name
+	// (the preset has no vehicle column). Null until both a preset is detected AND a vehicle is chosen.
+	let mapping = $derived<ImportColumnMapping | null>(
+		detectedPreset && targetVehicle
+			? {
+					source: detectedPreset.id,
+					columns: detectedPreset.columns,
+					targetVehicle: getVehicleDisplayName(targetVehicle),
+					dateFormat: detectedPreset.dateFormat,
+					distanceUnit: detectedPreset.distanceUnit,
+					volumeUnit: detectedPreset.volumeUnit,
+					categoryMap: detectedPreset.categoryMap
+				}
+			: null
+	);
+	// A foreign file is detected but the user hasn't picked a vehicle yet — block preview/commit until they do.
+	let needsTargetVehicle = $derived(!!detectedPreset && !targetVehicle);
 
 	// Only the rows that errored — surfaced so the user can fix + re-import just those.
 	let errorRows = $derived(preview?.rows.filter((r) => r.status === 'error') ?? []);
@@ -32,18 +66,50 @@
 			preview = null;
 			isPreviewing = false;
 			isImporting = false;
+			isDetecting = false;
+			detectedPreset = null;
+			targetVehicleId = '';
 		}
 	});
+
+	/** Parse the header row (first line) and ask the server to match a known tracker preset. */
+	async function detectSource() {
+		detectedPreset = null;
+		targetVehicleId = '';
+		const firstLine = csvText.split('\n', 1)[0]?.trim();
+		if (!firstLine) return;
+		// csv-parse-free header split: the importer is delimiter-`,`; good enough to identify headers
+		// (the server does the authoritative parse). Strip surrounding quotes per cell.
+		const headers = firstLine.split(',').map((h) => h.trim().replace(/^"|"$/g, ''));
+		isDetecting = true;
+		try {
+			detectedPreset = await expenseApi.detectImportSource(headers);
+			// Auto-select the only vehicle so a single-car garage skips the picker.
+			if (detectedPreset && vehicles.length === 1 && vehicles[0]) {
+				targetVehicleId = vehicles[0].id;
+			}
+		} catch {
+			// Detection is best-effort — a failure just falls back to the native (manual) path.
+			detectedPreset = null;
+		} finally {
+			isDetecting = false;
+		}
+	}
 
 	async function runPreview() {
 		if (!csvText.trim()) {
 			preview = null;
 			return;
 		}
+		// A detected foreign file can't preview until the target vehicle is chosen.
+		if (needsTargetVehicle) {
+			preview = null;
+			return;
+		}
 		isPreviewing = true;
 		preview = null;
 		try {
-			preview = await expenseApi.importExpensesCsv(csvText, true);
+			preview = await expenseApi.importExpensesCsv(csvText, true, mapping ?? undefined);
 		} catch (err) {
 			handleErrorWithNotification(err, 'Could not read that CSV');
 		} finally {
@@ -57,14 +123,21 @@
 		if (!file) return;
 		fileName = file.name;
 		csvText = await file.text();
+		await detectSource();
 		await runPreview();
+	}
+
+	/** After the target vehicle is chosen, (re)run the preview now that a mapping exists. */
+	function handleTargetVehicleChange(id: string) {
+		targetVehicleId = id;
+		runPreview();
 	}
 
 	async function handleCommit() {
 		if (!preview || preview.readyCount === 0) return;
 		isImporting = true;
 		try {
-			const result = await expenseApi.importExpensesCsv(csvText, false);
+			const result = await expenseApi.importExpensesCsv(csvText, false, mapping ?? undefined);
 			appStore.addNotification({
 				type: 'success',
 				message: `Imported ${result.imported} expense${result.imported === 1 ? '' : 's'}`
@@ -84,8 +157,8 @@
 		<Dialog.Header>
 			<Dialog.Title>Import expenses from CSV</Dialog.Title>
 			<Dialog.Description>
-				Upload a VROOM CSV export (or paste its contents). Each row's vehicle is matched by name
-				to one in your garage. You'll see a preview before anything is saved.
+				Upload a VROOM CSV export, or a fuel log from Fuelly, Fuelio, or Drivvo — we'll detect the
+				format automatically. You'll see a preview before anything is saved.
 			</Dialog.Description>
 		</Dialog.Header>
 
@@ -114,12 +187,59 @@
 				<textarea
 					id="import-csv-text"
 					bind:value={csvText}
-					onblur={runPreview}
+					onblur={async () => {
+						await detectSource();
+						await runPreview();
+					}}
 					rows="4"
 					placeholder="date,vehicle,category,amount,..."
 					class="w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 				></textarea>
 			</div>
+
+			<!-- Detected-source banner + target-vehicle picker (foreign tracker file, T4) -->
+			{#if isDetecting}
+				<div class="flex items-center gap-2 py-1 text-sm text-muted-foreground">
+					<LoaderCircle class="h-4 w-4 animate-spin" />
+					Detecting format…
+				</div>
+			{:else if detectedPreset}
+				<div class="space-y-3 rounded-lg border border-chart-2/40 bg-chart-2/5 p-4">
+					<div class="flex items-center gap-2 text-sm font-medium text-foreground">
+						<Sparkles class="h-4 w-4 text-chart-2" />
+						Detected a <span class="font-semibold">{detectedPreset.label}</span> fuel log
+					</div>
+					<p class="text-xs text-muted-foreground">
+						Columns, units, and date format are mapped automatically. This file has no vehicle
+						column, so choose which vehicle these entries belong to.
+					</p>
+					<div class="space-y-1.5">
+						<label for="import-target-vehicle" class="text-xs font-medium text-foreground">
+							Import into vehicle *
+						</label>
+						{#if vehicles.length === 0}
+							<p class="text-sm text-muted-foreground">Add a vehicle first to import a fuel log.</p>
+						{:else}
+							<Select.Root
+								type="single"
+								value={targetVehicleId}
+								onValueChange={handleTargetVehicleChange}
+							>
+								<Select.Trigger id="import-target-vehicle" class="w-full">
+									{targetVehicle ? getVehicleDisplayName(targetVehicle) : 'Select a vehicle'}
+								</Select.Trigger>
+								<Select.Content>
+									{#each vehicles as v (v.id)}
+										<Select.Item value={v.id} label={getVehicleDisplayName(v)}>
+											{getVehicleDisplayName(v)}
+										</Select.Item>
+									{/each}
+								</Select.Content>
+							</Select.Root>
+						{/if}
+					</div>
+				</div>
+			{/if}
 
 			<!-- Preview -->
 			{#if isPreviewing}
@@ -161,6 +281,11 @@
 						</p>
 					{/if}
 				</div>
+			{:else if needsTargetVehicle}
+				<p class="flex items-center gap-2 text-sm text-muted-foreground">
+					<FileText class="h-4 w-4" />
+					Choose a vehicle above to preview the import.
+				</p>
 			{:else if csvText.trim()}
 				<p class="flex items-center gap-2 text-sm text-muted-foreground">
 					<FileText class="h-4 w-4" />

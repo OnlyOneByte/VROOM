@@ -48,11 +48,16 @@ now — the "Playwright-blocked" tail was a ~200-cycle MISDIAGNOSIS, see GUIDE.m
    the C157 all-time landing); "Current Mileage" card display-semantics direction call.* (NOTE: the
    `.meshclaw.e2e.ts` spec is gitignored-by-design — the committed regression net is the backend
    mileage/mark-serviced unit + HTTP-harness tests, per GUIDE "source-scan > untracked e2e".)
-2. **Import from other trackers** — backend complete (T1 applyMapping, T2 presets+detectSource, T3
-   `POST /import` optional mapping + `/import/detect`) + FE client methods (importExpensesCsv mapping arg +
-   detectImportSource). **REMAINING: T4/T5 mapping-step dialog MARKUP** (detected-source banner, per-field
-   column dropdowns, unit/date-format/target-vehicle pickers, category-remap table; reuse the preview/commit
-   step) **+ T6 round-trip e2e** (incl. real-export signature validation). Spec: `.kiro/specs/import-trackers/`.
+1. **Import from other trackers** — backend complete (T1 applyMapping, T2 presets+detectSource, T3
+   `POST /import` optional mapping + `/import/detect`) + FE client methods. **T4 AUTO-DETECT SLICE DONE
+   (C31, eyes-on):** ImportExpensesDialog auto-detects a Fuelly/Fuelio/Drivvo fuel log → "Detected a
+   <Tracker>" banner + target-vehicle picker (presets have no vehicle column → D4) → builds the mapping →
+   reuses the existing preview/commit. **REMAINING:** (a) the manual per-field column-dropdown editor +
+   category-remap table for an UNKNOWN-source file; (b) date-format/unit override pickers; (c) **the
+   flagged preset gap — fuel presets map no category column so a detected log previews 0-ready ("Unknown
+   category"); recommended fix defaultCategory:'fuel' per preset, send_message'd Angelo C31, awaiting steer**;
+   (d) T6 round-trip e2e (incl. real-export signature validation). Spec: `.kiro/specs/import-trackers/`.
+   This is now the ONLY open feature (maintenance C1 + recurring-expenses C27 both DONE).
 3. ~~**Recurring expenses**~~ — **COMPLETE (T1–T8 all done, C27).** Engine + backend (T1–T3/T5/T7), FE
    client (T6/T7), then the eyes-on FE tail: T7 widget (C5), T5 app-init hook (C12), T6 badge+dialog
    (C9/C16), T4 multi-vehicle split via the shared `SplitConfigEditor` (C22), and **T8 full round-trip
