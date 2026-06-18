@@ -713,6 +713,19 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
    bug-threads-idiom → next-arch-converges lesson again (C62/C65/C72 → C78; sibling to C64 generator + C71
    vehicleUnitsFor). Don't re-scout the volume sites — single-sourced.
 
+> **SCOUTED C91 — no churn warranted (route/pagination idioms already single-sourced + NO source changed since
+> C85).** KEY FACT: `git diff C85..HEAD` over backend/src (excluding __tests__) is EMPTY — no production source
+> changed since the last arch scout (C86 saturated / C87 test-only / C88 eyes-on / C89 dry / C90 docs), so there's
+> structurally nothing freshly-threaded to converge. Scouted the freshest un-recorded candidate anyway — pagination
+> parsing across odometer/photos/expenses routes — ALREADY well-factored: `clampPagination` + `buildPaginatedResponse`
+> are both single-sourced in src/utils/pagination.ts; all 3 routes delegate; the per-endpoint query schemas
+> (odometer/expenses search+tags coercion vs photos' generic commonSchemas.pagination) are deliberately divergent
+> (merging couples endpoint contracts, arch rule 2). The ownership-validate+respond idiom is the C36 "natural Hono
+> idiom" (not mergeable). Recorded no-churn; did NOT manufacture (C4/C12/C36/C85 precedent). RECOMMENDATION (6th
+> confirm): arch is firmly at its structural floor — next over-budget, record no-churn IMMEDIATELY unless a
+> bug/feature cycle threaded a NEW dup since the last arch scout (check the git diff first; if backend/src is
+> unchanged, there's nothing to find).
+>
 > **SCOUTED C85 — no churn warranted (the convert family is fully deduped; remaining idioms are thin or
 > cosmetic).** With the #94 cluster closed (C79), scouted its convert-helper residue firsthand. Two candidates,
 > both REJECTED per arch rule 5 (name a concrete payoff): (1) the 5-arg `convertEfficiency(value,

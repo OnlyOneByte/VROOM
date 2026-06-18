@@ -34,10 +34,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 86 |
 | guard | 6 | 87 |
 | bug | 3 | 89 |
-| arch | 5 | 85 |
+| arch | 5 | 91 |
 | infra | 6 | 90 |
 
-Current cycle: **90**
+Current cycle: **91**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,24 @@ Current cycle: **90**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C91 (arch — no churn warranted; pagination/route idioms already single-sourced + NO source changed since C85,
+  recorded + pivot)** — Balance at C91 (HEAD was C90; nudge label lags): arch (91−85=6/5, +1) the LONE over-budget
+  category → picked (category discipline). Per the C85/C12 "record no-churn FAST when arch next goes over budget"
+  recommendation, but ran one genuine scout first. KEY STRUCTURAL FACT: `git diff 5766239(C85)..HEAD` over
+  backend/src (excluding __tests__) is EMPTY — NO production source changed since the C85 arch scout (C86 saturated
+  / C87 test-only / C88 eyes-on / C89 dry / C90 docs), so there is structurally no freshly-threaded duplication to
+  converge (the exact precondition the C85/C12 notes describe). Scouted the freshest un-recorded candidate anyway —
+  the pagination parsing across odometer/photos/expenses routes — and found it ALREADY well-factored: `clampPagination`
+  + `buildPaginatedResponse` are both single-sourced in src/utils/pagination.ts (a prior arch cycle); all 3 routes
+  delegate; the per-endpoint query schemas (odometer/expenses carry search/tags coercion, photos uses the generic
+  commonSchemas.pagination) are deliberately divergent — merging would couple endpoint-specific contracts (arch
+  rule 2). The ownership-validate+respond idiom is the C36-recorded "natural Hono idiom with shared validators"
+  (not mergeable). Recorded no-churn; did NOT manufacture (the C4/C12/C36/C85 precedent + the GUIDE "Don't
+  manufacture churn"). The convert family stays single-sourced (C64/C71/C78). RECOMMENDATION (now 6th confirm,
+  C4/C6/C12/C36/C85/C91): arch is firmly at its structural floor — next time it goes over budget, record no-churn
+  IMMEDIATELY without re-scouting unless a bug/feature cycle has threaded a NEW dup since the last arch scout (check
+  the git diff first — if backend/src is unchanged, there's nothing to find). Doc-only — no source touched. cov: be
+  87.47% / fe 86.35% (~ — nothing changed).
 - **C90 (infra — branch-hygiene sweep + coverage re-measure, the ~10-cycle cadence; last ran C84)** — Balance at
   C90 (HEAD was C89; nudge label lags): NOTHING strictly over budget; arch (90−85=5/5) + infra (90−84=6/6) both AT
   budget. Infra wins on raw starvation (6 > 5) AND is the higher-leverage pick — its cadence task is inherently
