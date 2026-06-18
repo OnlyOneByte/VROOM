@@ -31,13 +31,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 88 |
-| deep-review | 5 | 86 |
+| deep-review | 5 | 92 |
 | guard | 6 | 87 |
 | bug | 3 | 89 |
 | arch | 5 | 91 |
 | infra | 6 | 90 |
 
-Current cycle: **91**
+Current cycle: **92**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,29 @@ Current cycle: **91**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C92 (deep-review — certified the rate-limit / client-IP abuse-prevention surface CLEAN + already comprehensively
+  guarded firsthand; a NEW area, recorded + pivot)** — Balance at C92 (HEAD was C91; nudge label lags): deep-review
+  (92−86=6/5, +1) the LONE over-budget category → picked. The eyes-on vein closed C88 + the C86 note pointed the next
+  deep-review at "a backend correctness audit of a genuinely UNAUDITED surface." Picked the rate-limiting / client-IP
+  resolution chokepoint — security-load-bearing (a spoofed-XFF bypass lets an attacker get a fresh per-request bucket
+  → defeat the auth brute-force limiter, NORTH_STAR #2 isolation/abuse) and NOT in the prior audited set
+  (backup/restore/import/TCO/sync/notification). Audited THREE layers firsthand, ALL certified clean + already
+  guarded — DON'T re-audit: (1) `getClientIp` (utils/client-ip.ts) — derives the IP from the REAL socket
+  (getConnInfo) and honors X-Forwarded-For ONLY when the socket is a configured trusted proxy; default (no trusted
+  proxies) ignores XFF entirely. client-ip.test.ts (C265) pins all 4 trust branches (default→ignore-XFF,
+  trusted-socket→honor-leftmost-XFF, untrusted-socket→ignore-XFF, no-socket→fallback) + the empty/whitespace-XFF +
+  multi-hop edges + the explicit "two different-XFF requests from one socket share a bucket" bypass-closed assertion.
+  (2) the rate-limit middleware (middleware/rate-limit.ts) — a clean fixed-window limiter; rate-limit.test.ts (C112)
+  pins window-open / up-to-limit-pass / over-limit-429-with-the-documented-headers / body contract / per-key caller
+  isolation / window-reset, PLUS a vacuity guard asserting CONFIG.disableRateLimit===false in the test process (the
+  C77/C91 silent-vacuity trap). (3) the WIRING — the auth limiter keys on `auth:${getClientIp(c)}` (the trusted IP,
+  not the raw header); the sync/backup/restore/trigger limiters key on the authenticated `user.id`. The keyGenerator
+  closures are trivial one-liners — pinning them directly would be coverage theater (the C181/C229 lesson). No fresh
+  defect; the bypass is closed + pinned. Recorded clean; did NOT manufacture a redundant cert (the GUIDE
+  agent-HIGH-often-false + the C86 saturation discipline). Doc-only — no source/test touched. cov: be 87.47% / fe
+  86.35% (~ — nothing changed). NEXT deep-review: another genuinely UNAUDITED backend surface (e.g. the CORS/CSRF
+  origin config, the bodyLimit/zip-bomb upload guards, or the session/cookie lifecycle) — the eyes-on + the
+  data-safety (backup/restore/import) veins are both exhausted.
 - **C91 (arch — no churn warranted; pagination/route idioms already single-sourced + NO source changed since C85,
   recorded + pivot)** — Balance at C91 (HEAD was C90; nudge label lags): arch (91−85=6/5, +1) the LONE over-budget
   category → picked (category discipline). Per the C85/C12 "record no-churn FAST when arch next goes over budget"

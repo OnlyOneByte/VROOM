@@ -91,6 +91,20 @@ now — the "Playwright-blocked" tail was a ~200-cycle MISDIAGNOSIS, see GUIDE.m
 re-audit a data-safety write path, certify it CLEAN against source, and leave a merge-surviving guard.
 Don't trust agent "HIGH" findings — verify firsthand (the archive logged many debunked false-positives).)*
 
+> **CERTIFIED C92 — the rate-limit / client-IP abuse-prevention surface CLEAN + already comprehensively guarded
+> (a NEW area, not in the prior audited set).** Security-load-bearing: a spoofed-XFF bypass would let an attacker
+> get a fresh per-request rate-limit bucket → defeat the auth brute-force limiter. Audited 3 layers firsthand, ALL
+> clean + guarded — DON'T re-audit: (1) `getClientIp` (utils/client-ip.ts) derives from the REAL socket and honors
+> X-Forwarded-For ONLY behind a configured trusted proxy (default ignores it); client-ip.test.ts (C265) pins all 4
+> trust branches + empty/multi-hop XFF edges + the "different-XFF-from-one-socket share a bucket" bypass-closed
+> assertion. (2) the fixed-window limiter (middleware/rate-limit.ts); rate-limit.test.ts (C112) pins
+> window-open/up-to-limit/over-limit-429-with-headers/body/key-isolation/reset + a disableRateLimit vacuity guard.
+> (3) the wiring — auth keys on `auth:${getClientIp(c)}` (trusted IP, not raw header); sync/backup/restore/trigger
+> key on user.id. The keyGenerator one-liners aren't worth a dedicated guard (coverage theater, C181/C229). No
+> defect; recorded clean, did NOT manufacture (GUIDE agent-HIGH-often-false + C86 saturation discipline). NEXT
+> deep-review: another genuinely UNAUDITED surface (CORS/CSRF origin config, bodyLimit/zip-bomb upload guards, or
+> the session/cookie lifecycle) — the eyes-on + data-safety veins are exhausted.
+>
 > **SCOUTED C86 — deep-review surfaces SATURATED (4 candidates verified already-guarded firsthand; no
 > manufacture).** With the backend correctness surfaces broadly certified, scouted 4 fresh candidates and found
 > EACH already well-guarded — DON'T re-audit: (1) the FE sync-manager RETRY/BACKOFF path — sync-manager.test.ts
