@@ -198,6 +198,37 @@ describe('#94 — fleet-wide fuel-stats pools per-vehicle distance by raw summat
     expect(stats.fillupDetails.minVolume).toBeCloseTo(5 / 3.785411784, 2);
   });
 
+  // #94 MONTHLY-CONSUMPTION member FIXED (C65, same Angelo-approved convert-before-pool direction): the
+  // monthlyConsumption chart series (volume + gas-MPG per month) is the 4th #94 limb — buildMonthlyConsumption
+  // pools each row's raw volume into a month AND averages each gas pair's raw efficiency, both across all
+  // vehicles with no per-vehicle conversion. getFuelStats now routes a MIXED-unit fleet through
+  // buildConvertedMonthlyConsumption (convertVolume per row + the C64 convertedGasEfficiencyPoints generator),
+  // so a gal+L fleet no longer sums litres into the gallons volume series (NORTH_STAR #2). A same-unit fleet
+  // still takes the pure builder (skipConversion), so its numbers are unchanged.
+  test('monthlyConsumption volume is converted to the user unit before pooling on a MIXED gal+L fleet (no raw gal+L sum)', async () => {
+    seedUser(testDb.sqlite, USER); // default GALLONS_US
+    seedVehicle(testDb.sqlite, VEH_A); // gallons (default)
+    seedVehicle(testDb.sqlite, VEH_B);
+    // VEH_B reports its volume in LITRES.
+    testDb.sqlite.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
+      JSON.stringify({ distanceUnit: 'miles', volumeUnit: 'liters', chargeUnit: 'kwh' }),
+      VEH_B.id,
+    ]);
+
+    // A: two 20-GALLON fillups (40 gal). B: two 5-LITRE fillups (10 L → 2.642 gal). Converted total
+    // volume across the series = 40 + 10/3.785411784 ≈ 42.642 gal; the pre-fix raw pool would be 50.
+    seedExpense(testDb.sqlite, fillup('a1', VEH_A.id, 10_000, 40, 60, 20));
+    seedExpense(testDb.sqlite, fillup('a2', VEH_A.id, 10_800, 40, 30, 20));
+    seedExpense(testDb.sqlite, fillup('b1', VEH_B.id, 50_000, 40, 60, 5));
+    seedExpense(testDb.sqlite, fillup('b2', VEH_B.id, 50_200, 40, 30, 5));
+
+    const stats = await repo.getFuelStats(USER.id, rangeAll());
+    const totalVolume = stats.monthlyConsumption.reduce((s, m) => s + m.volume, 0);
+
+    expect(totalVolume).toBeCloseTo(40 + 10 / 3.785411784, 2);
+    expect(totalVolume).not.toBeCloseTo(50, 1);
+  });
+
   test('best/worst cost-per-distance span the per-pair values across the WHOLE fleet (un-normalized scalars)', async () => {
     seedUser(testDb.sqlite, USER);
     seedVehicle(testDb.sqlite, VEH_A);

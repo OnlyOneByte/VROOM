@@ -33,11 +33,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 61 |
 | deep-review | 5 | 60 |
 | guard | 6 | 59 |
-| bug | 3 | 62 |
+| bug | 3 | 65 |
 | arch | 5 | 64 |
 | infra | 6 | 63 |
 
-Current cycle: **64**
+Current cycle: **65**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,30 @@ Current cycle: **64**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C65 (bug #94, monthlyConsumption member)** — **Convert per-vehicle volume + gas-MPG to user-global units
+  BEFORE pooling the monthlyConsumption chart series (Angelo-APPROVED Sev-2, NORTH_STAR #2).** Balance at C65:
+  feature/deep-review/guard/bug all AT budget (4/4, 5/5, 6/6, 3/3); bug has the lowest budget (tips first) AND
+  the most concrete actionable work (the #94 class), so it's the highest-leverage pick. Took the 4th of the 6
+  #94 members: `buildMonthlyConsumption` (analytics-charts.ts) pools each fuel row's RAW `volume` into a month
+  bucket AND averages each gas pair's RAW efficiency, both across ALL vehicles with no per-vehicle conversion —
+  so a mixed gal+L / mi+km fleet sums litres into the gallons volume series + averages mi/gal with km/L on the
+  FuelStats monthly chart. Chose it as the cleanest member: it's called from EXACTLY ONE site
+  (`buildFuelStatsFromData`, which already has userUnits/vehicleUnitsMap/skipConversion in scope — no query-layer
+  signature thread needed) and its efficiency limb REUSES the C64 `convertedGasEfficiencyPoints` generator (gas-gate
+  + band filter stay identical/centralized). FIX (the established C58/C62 + getCrossVehicle pattern): added a
+  repository `buildConvertedMonthlyConsumption` twin (per-row `convertVolume` + the C64 generator), switched at the
+  call site by `skipConversion` — the common single-unit fleet still takes the pure builder (zero change), only a
+  mixed fleet hits the twin. Mirrors buildMonthlyConsumption's structure EXACTLY (month-keyed volume map, the
+  `if (entry)` volume-seeded-months-only efficiency guard, ascending sort, most-recent-12 slice) + uses the SAME
+  `normalizeDate` (exported from analytics-charts.ts) so the seconds-vs-ms date contract is preserved. GUARD: +1
+  mixed gal+L behavioral test in fuel-stats-fleet-distance-pooling.test.ts (series volume 42.64 not 50); the C59
+  source-scan still passes (twin call uses real units, no placeholder). Verify: backend validate:local GREEN — tsc
+  0, musl-biome clean (20 pre-existing warnings, none new), 1667 pass / 0 fail (+1), build bundled. Backend-only (no
+  UI → no shot). cov: be 87.46% / fe 86.35% (~ — analytics repo already well-covered; +1 mixed-unit guard). #94
+  PROGRESS: distance (C58) + volume-headline (C62) + monthlyConsumption (C65) DONE; REMAINING = 3 advanced builders
+  (buildSeasonalEfficiency / buildVehicleRadar / buildDayOfWeekPatterns — these live in buildFuelAdvancedFromData
+  which fetches NO units, so they need a query-layer units thread, not just a twin) + the prev-year SQL-sum
+  sub-member (previousYearGallons). Pick one per bug cycle, same convert-before-pool pattern.
 - **C64 (arch)** — **Extracted the converted gas-MPG inner loop into ONE generator across the 3 per-vehicle
   efficiency builders (behavior-preserving, the #126/C427 gas-gate footgun centralized).** arch was the SOLE
   over-budget category (64−57=7/5, +2; all others within budget). Per the C57 watch-note (fresh duplication

@@ -48,6 +48,7 @@ import {
   groupByVehicle,
   isFillup,
   monthKeysInRange,
+  normalizeDate,
   sortByVehicleThenDate,
   toMonthKey,
 } from '../../utils/analytics-charts';
@@ -560,6 +561,61 @@ export class AnalyticsRepository {
       total += distance;
     }
     return total;
+  }
+
+  /**
+   * Monthly consumption (volume + gas-MPG per month) with per-vehicle unit conversion — the #94 twin of
+   * buildMonthlyConsumption (C65). A mixed gal+L / mi+km fleet must convert each vehicle's volume + each
+   * gas pair's efficiency to the user's global units BEFORE pooling into a month, else the chart sums
+   * litres into a gallons headline + averages mi/gal with km/L (NORTH_STAR #2). The common single-unit
+   * fleet still takes the pure builder (skipConversion at the call site); only a mixed fleet reaches here.
+   *
+   * Mirrors buildMonthlyConsumption's structure exactly (volume map keyed by month, gas-pair efficiency
+   * augmenting only volume-seeded months via the `if (entry)` guard, ascending sort, most-recent-12 slice)
+   * — the efficiency limb reuses convertedGasEfficiencyPoints (C64) so the gas/charge gate + band filter
+   * stay identical and un-forgettable; the volume limb converts per row via convertVolume.
+   */
+  private buildConvertedMonthlyConsumption(
+    rows: FuelExpenseRow[],
+    vehicleUnitsMap: Map<string, UnitPreferences>,
+    targetUnits: UnitPreferences
+  ): Array<{ month: string; efficiency: number; volume: number }> {
+    const map = new Map<string, { effSum: number; effCount: number; volume: number }>();
+
+    for (const row of rows) {
+      const d = normalizeDate(row.date);
+      if (!d) continue;
+      const key = toMonthKey(d);
+      const entry = map.get(key) ?? { effSum: 0, effCount: 0, volume: 0 };
+      const v = row.volume ?? 0;
+      const vUnits = vehicleUnitsMap.get(row.vehicleId) ?? { ...DEFAULT_UNIT_PREFERENCES };
+      entry.volume += v === 0 ? 0 : convertVolume(v, vUnits.volumeUnit, targetUnits.volumeUnit);
+      map.set(key, entry);
+    }
+
+    // Efficiency augments only months a volume row already seeded (the buildMonthlyConsumption `if (entry)`
+    // invariant — pinned by analytics-charts-month-window.test.ts). skipConversion:false → always convert.
+    for (const { efficiency, date } of this.convertedGasEfficiencyPoints(
+      rows,
+      vehicleUnitsMap,
+      targetUnits,
+      false
+    )) {
+      const entry = map.get(toMonthKey(new Date(date)));
+      if (entry) {
+        entry.effSum += efficiency;
+        entry.effCount++;
+      }
+    }
+
+    return Array.from(map.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-12)
+      .map(([month, data]) => ({
+        month,
+        efficiency: data.effCount > 0 ? data.effSum / data.effCount : 0,
+        volume: data.volume,
+      }));
   }
 
   /**
@@ -1490,7 +1546,9 @@ export class AnalyticsRepository {
       fillupDetails,
       averageCost,
       distance,
-      monthlyConsumption: buildMonthlyConsumption(fuelRowsByVehicle),
+      monthlyConsumption: skipConversion
+        ? buildMonthlyConsumption(fuelRowsByVehicle)
+        : this.buildConvertedMonthlyConsumption(fuelRowsByVehicle, vehicleUnitsMap, userUnits),
       gasPriceHistory: buildGasPriceHistory(fuelRows),
       fillupCostByVehicle: buildFillupCostByVehicle(fuelRows, vehicleNameMap),
       odometerProgression: this.buildOdometerProgression(fuelRows, vehicleNameMap),

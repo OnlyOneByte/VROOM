@@ -266,7 +266,7 @@ export function buildAmortizationSchedule(
 }
 
 /** Normalize a date field that may be a Date or timestamp (Unix seconds). */
-function normalizeDate(d: Date | number | null): Date | null {
+export function normalizeDate(d: Date | number | null): Date | null {
   if (d == null) return null;
   if (d instanceof Date) return d;
   if (typeof d === 'number') {

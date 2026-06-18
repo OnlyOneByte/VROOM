@@ -309,13 +309,18 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 > offline-outbox field-dropout family #66/#101/#111, or analytics split-sibling overcount if any builder
 > was missed by the #56/#108/#113/#146 sweep).
 
-> **C58+C62: #94 DISTANCE + VOLUME members DONE** — the fleet fuel-stats distance.totalDistance (C58) +
-> volume/fillupDetails (C62) now convert-before-pool (see the Sev-2 block). #94 is a 6-member class; the
-> remaining members — the 4 fuel-advanced builders (buildMonthlyConsumption/buildSeasonalEfficiency/
-> buildVehicleRadar/buildDayOfWeekPatterns, which need a UNITS signature thread, not just activation) + the
-> prev-year SQL-sum sub-member — are each their own bug-cycle pick, SAME convert-before-pool pattern. Other
-> open Angelo bug items: **Sev-4** #129 (OAuth email-sync, re-read archive grounding first), #79
-> (stuck-offline-entry hygiene); #100 json_patch merge + #112 chart palette stay arch/design-gated.
+> **C58+C62+C65: #94 DISTANCE + VOLUME + MONTHLY-CONSUMPTION members DONE** — distance.totalDistance (C58),
+> volume/fillupDetails (C62), and the monthlyConsumption chart series (C65, via a buildConvertedMonthlyConsumption
+> twin switched by skipConversion, reusing the C64 generator for efficiency + convertVolume for volume) now
+> convert-before-pool (see the Sev-2 block). #94 is a 6-member class; the REMAINING members — the 3 fuel-ADVANCED
+> builders (buildSeasonalEfficiency / buildVehicleRadar / buildDayOfWeekPatterns, which live in
+> buildFuelAdvancedFromData — it fetches NO units, so they need a query-layer UNITS thread, not just a twin) + the
+> prev-year SQL-sum sub-member (previousYearGallons) — are each their own bug-cycle pick, SAME convert-before-pool
+> pattern. NOTE C65: monthlyConsumption was the LAST member callable from buildFuelStatsFromData (units already in
+> scope); the 3 advanced builders are a heavier lift (thread userUnits+vehicleUnitsMap+skipConversion through
+> getFuelAdvanced→buildFuelAdvancedFromData first). Other open Angelo bug items: **Sev-4** #129 (OAuth email-sync,
+> re-read archive grounding first), #79 (stuck-offline-entry hygiene); #100 json_patch merge + #112 chart palette
+> stay arch/design-gated.
 >
 > **CLOSED C48: #88** — a deleted vehicle is now pruned from reminders' `expenseSplitConfig` blob +
 > renormalized (see the Sev-3 block). The #88/#97 vehicle-delete reminder-orphan family is CLOSED (junction
@@ -356,16 +361,19 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 >
 > _Severity 2 — wrong numbers shown today (correctness):_
 > - **#94 (MED, 6-member CLASS) — APPROVED: convert-to-user-global BEFORE pooling, mirroring
->   `getCrossVehicle`. DISTANCE (C58) + VOLUME (C62) members DONE.** The fleet fuel-stats + summary
->   `distance.totalDistance` (C58) and `volume.currentYear/currentMonth/prevMonth + fillupDetails` (C62)
->   now convert each vehicle's value to the user's global unit before pooling (a local volumeInUserUnits
->   mirrors computeConvertedTotalDistance; skipConversion no-ops the common single-unit case). +1 mixed-unit
->   guard each (distance 924.27 not 1000; volume 42.64 not 50); non-vacuous. **REMAINING members (own
->   cycles, same pattern):** the 4 fuel-ADVANCED builders (buildMonthlyConsumption / buildSeasonalEfficiency
->   / buildVehicleRadar / buildDayOfWeekPatterns pool mi/gal+km/L — these take fuelRowsByVehicle but no
->   units, so they need a signature thread, not just activation) + the prev-year sub-member
->   (previousYearGallons is a raw SQL SUM in queryFuelAggregates → needs a per-vehicle group-sum at the
->   query layer). Pick one per bug cycle.
+>   `getCrossVehicle`. DISTANCE (C58) + VOLUME (C62) + MONTHLY-CONSUMPTION (C65) members DONE.** The fleet
+>   fuel-stats + summary `distance.totalDistance` (C58), `volume.currentYear/currentMonth/prevMonth +
+>   fillupDetails` (C62), and the `monthlyConsumption` chart series (C65 — a `buildConvertedMonthlyConsumption`
+>   twin switched by skipConversion: per-row convertVolume + the C64 convertedGasEfficiencyPoints generator for
+>   the gas-MPG limb) now convert each vehicle's value to the user's global unit before pooling (skipConversion
+>   no-ops the common single-unit case). +1 mixed-unit guard each (distance 924.27 not 1000; volume 42.64 not
+>   50; monthlyConsumption series volume 42.64 not 50); non-vacuous. **REMAINING members (own cycles, same
+>   pattern):** the 3 fuel-ADVANCED builders (buildSeasonalEfficiency / buildVehicleRadar /
+>   buildDayOfWeekPatterns pool mi/gal+km/L — these live in buildFuelAdvancedFromData, which fetches NO units,
+>   so they need a query-layer signature thread through getFuelAdvanced first, not just a twin) + the prev-year
+>   sub-member (previousYearGallons is a raw SQL SUM in queryFuelAggregates → needs a per-vehicle group-sum at
+>   the query layer). Pick one per bug cycle. (C65 took monthlyConsumption — the last member callable from
+>   buildFuelStatsFromData where units were already in scope.)
 > - ~~**efficiency-band unification (#94-adjacent, C419)**~~ — **DONE C20.** Unified the per-vehicle stats
 >   band (`averageConsecutiveMpg` gas + `calculateAverageMilesPerKwh` electric) onto the canonical
 >   `[5,100]`/`[1,10]` shared with analytics — the 4 band constants now live in calculations.ts as ONE
