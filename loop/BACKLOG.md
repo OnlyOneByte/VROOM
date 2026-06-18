@@ -91,6 +91,16 @@ now — the "Playwright-blocked" tail was a ~200-cycle MISDIAGNOSIS, see GUIDE.m
 re-audit a data-safety write path, certify it CLEAN against source, and leave a merge-surviving guard.
 Don't trust agent "HIGH" findings — verify firsthand (the archive logged many debunked false-positives).)*
 
+> **AUDITED C96 (feature eyes-on) — /profile CLEAN desktop + mobile → EVERY REAL SURFACE NOW EYES-ON.** The last
+> never-shot real surface (the C93 pointer). Shot desktop + mobile (Pixel 5) + Read both PNGs. Desktop: Identity
+> (avatar, editable Display Name, Email, Member Since "June 2026" = correct), Connected Accounts (Google + unlink +
+> Link GitHub), Sessions (Coming Soon), Data & Privacy (Export-all-data working button + "images not included"
+> disclosure; Delete = Coming soon), Sharing + Notifications (Coming Soon). Coming-Soon cards are clean intentional
+> placeholders, not broken. Mobile (393px): NO horizontal overflow (NORTH_STAR #3) — all label↔value rows reflow.
+> Zero console errors. No defect; DON'T re-audit. MILESTONE: every real surface is eyes-on
+> (dashboard/analytics/insurance/financing/maintenance/recurring-dialog/settings/profile + the list pages). The
+> feature category is now fully exhausted of self-authorizable work — import-trackers stays Angelo-gated.
+>
 > **AUDITED C93 (feature eyes-on) — /settings CLEAN desktop + mobile (the never-shot backup/restore + provider
 > + unit-prefs crown-jewel).** /settings had ZERO prior eyes-on (vs /reminders ×12, /insurance ×12, /financing ×10,
 > /expenses ×10, /analytics ×5) — a NORTH_STAR #1 (data-safety) + #3 (mobile) surface never visually verified. Shot

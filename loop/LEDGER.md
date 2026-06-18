@@ -30,14 +30,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 93 |
+| feature | 4 | 96 |
 | deep-review | 5 | 92 |
 | guard | 6 | 94 |
 | bug | 3 | 95 |
 | arch | 5 | 91 |
 | infra | 6 | 90 |
 
-Current cycle: **95**
+Current cycle: **96**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,27 @@ Current cycle: **95**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C96 (feature — eyes-on the LAST never-shot real surface /profile, desktop + mobile; CLEAN → every real surface
+  now eyes-on)** — Balance at C96 (HEAD was C95; nudge label lags): NOTHING strictly over budget; arch (96−91=5/5) +
+  infra (96−90=6/6) both AT budget. Arch is reliably no-churn (C91 confirmed, no source changed since C85) and infra
+  ran C90 (cadence due ~C100), so both are weak picks → took the highest-leverage OPEN item: /profile, the last
+  never-shot REAL surface (the C93 note teed this up — /trips is a Coming-Soon placeholder, /privacypolicy +
+  /termsofservice are static legal copy). Shot DESKTOP + MOBILE (Pixel 5) + Read both PNGs. CERTIFIED CLEAN: desktop
+  renders every section — Identity (DU avatar, Demo User/email, editable Display Name w/ pencil, Email, Member Since
+  "June 2026" = correct vs today 2026-06-18), Connected Accounts (Google provider w/ unlink + "Link GitHub"),
+  Sessions (Coming Soon, dashed fields), Data & Privacy (Export-all-data w/ working Export button + the honest
+  "Images and photos are not included" disclosure; Delete account = Coming soon), Sharing + Notifications (Coming
+  Soon). The Coming-Soon cards are clean intentional placeholders, NOT broken states. MOBILE (393px): NO horizontal
+  overflow (NORTH_STAR #3) — title/subtitle wrap, the Identity label↔value rows reflow with right-aligned values
+  (even the longest, demo@example.com, fits), Connected Accounts row reflows. Zero console errors; no /auth bounce.
+  No defect; no fix (the GUIDE agent-HIGH-findings-often-false discipline). /profile is sound — DON'T re-audit.
+  Read-only shots, no fixtures created. Doc-only — no committable source (shot.mjs is gitignored harness). cov: be
+  87.47% / fe 86.35% (~ — no test/code touched). **MILESTONE: every REAL surface is now eyes-on
+  (dashboard/analytics/insurance/financing-loan+lease/maintenance/recurring-dialog/settings/profile + the
+  vehicles/expenses/reminders lists).** NEXT feature cycle: feature is FULLY exhausted of self-authorizable work —
+  the only open feature (import-trackers) is Angelo-gated on defaultCategory, and every surface is shot → record
+  parked + pivot to the co-starved category UNLESS Angelo steers (import defaultCategory unblocks the detect→commit
+  round-trip + its 4-state shot; #148 the lease burn bar).
 - **C95 (bug — offline-outbox field-dropout scout, DRY [6th consecutive]; recorded + pivot)** — Balance at C95
   (HEAD was C94; nudge label lags): bug (95−89=6/3, +3) the LONE over-budget category → picked (category discipline
   forces it). Cold scouts long exhausted (C6/C10/C15/C83/C89) + NO production source changed since C85, but ran one
