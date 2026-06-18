@@ -33,10 +33,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 39 |
 | guard | 6 | 38 |
 | bug | 3 | 40 |
-| arch | 5 | 36 |
+| arch | 5 | 43 |
 | infra | 6 | 42 |
 
-Current cycle: **42**
+Current cycle: **43**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -355,6 +355,30 @@ Current cycle: **42**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C43 (arch)** — **Dedup the duplicated target-vehicle picker in ImportExpensesDialog into a shared
+  `{#snippet}` (the C37-created drift vector — a genuine fresh pick).** arch was the SOLE over-budget
+  category (43−36=7/5, +2; bug sat AT 3/3, not over). Unlike the C4/C6/C12/C36 no-churn scouts, there was
+  a REAL pick exactly where the standing lesson predicts (a feature cycle copies markup into a component →
+  the NEXT arch cycle dedups it; C15→C17, C22→C23): the C31 preset-path target-vehicle picker (the
+  detected-tracker banner) and the C37 manual-path target-vehicle picker were near-byte-identical ~22-line
+  blocks — same bound `targetVehicleId` + `handleTargetVehicleChange`, same `Select.Root`/trigger/Content/
+  `#each vehicles` + empty-state, differing ONLY in the trigger `id`, wrapper class, and empty-state copy.
+  Verified firsthand there's no existing shared vehicle-picker component and `{#snippet}` is an established
+  idiom here (used across ~15 components). FIX: extracted ONE local `{#snippet targetVehiclePicker(triggerId,
+  emptyText)}` at the top of the dialog content + `{@render}`'d it at both sites; each KEEPS its own wrapper
+  `<div>` (the manual one's `border-t pt-3` separator + the preset one's plain `space-y-1.5` legitimately
+  differ — arch rule 1, converge only the truly-identical inner control). Net −17 LOC (46 del / 29 add).
+  A local snippet, NOT a new shared file — the picker binds this component's `targetVehicleId`/handler, so
+  lifting it out would force a prop-drilling seam for zero reuse elsewhere (rule 1/5). BEHAVIOR-PRESERVING
+  confirmed eyes-on (rule 4, UI-touching): booted fresh (RESET_DB) + ran BOTH picker-path specs GREEN —
+  import-mapping-detect (preset picker: Fuelly auto-detect → pick vehicle → preview) +
+  import-manual-units (manual picker: km/litres log → pick vehicle → committed row converted 160.9344 km→
+  100 mi end-to-end). Read the manual-editor PNG: the "Map your columns" editor + all field/date/unit
+  dropdowns render pixel-identical. No characterization test needed beyond these (the snippet is pure
+  markup; the 3 e2e specs ARE the merge-surviving net, and the C38 helper tests pin the logic). Verify:
+  frontend validate:local GREEN — type-check 0, build OK, 735 tests pass. cov: be 87.33% / fe 86.35% (~ —
+  markup-only dedup, no module logic touched; FE coverage was just MEASURED C42). Arch was NOT at its floor
+  this cycle — the C37 feature created the drift; keep watching for this after eyes-on features.
 - **C42 (infra)** — **Branch-hygiene sweep + coverage re-measure (the ~10-cycle cadence; last ran C35).**
   TWO over budget at C42 — infra (42−35=7/6, +1) and arch (42−36=6/5, +1); infra wins the tie on raw
   starvation (7 > 6). Warranted on substance, not just the counter: 7 cycles since C35 incl. C38's NEW

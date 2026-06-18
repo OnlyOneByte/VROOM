@@ -346,6 +346,15 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
    (same titles/order; create test now asserts `info.sheets === [...SHEET_NAMES]`). +2 drift guards
    (SHEET_NAMES 1:1 with the table count; distinct+non-empty) so a 16th table forces a roster entry.
    green→green (1602 pass). Don't re-scout this surface.
+4. ~~**ImportExpensesDialog target-vehicle picker dedup**~~ — **DONE C43.** The C31 preset-path picker +
+   the C37 manual-path picker were near-byte-identical ~22-line blocks (same bound `targetVehicleId`/
+   `handleTargetVehicleChange`/`Select.Root`/`#each`, differing only in trigger id + wrapper class + empty
+   copy). Extracted ONE local `{#snippet targetVehiclePicker(triggerId, emptyText)}` + `{@render}`'d at
+   both sites (each keeps its own wrapper div — manual has a `border-t` separator, rule 1). Net −17 LOC; a
+   local snippet not a shared file (binds this component's state → no reuse to extract for). Behavior-
+   preserving confirmed eyes-on: both picker-path e2e specs (import-mapping-detect + import-manual-units)
+   GREEN + Read the editor PNG (pixel-identical). The 3 import e2e specs are the merge-surviving net. The
+   C22→C23 "feature copies markup → next arch dedups" lesson again. Don't re-scout this surface.
 
 > **SCOUTED C4 — no churn warranted.** Checked FE date helpers (formatters.ts single-sources
 > toDateInputValue/dateOnlyToISO; expense-filters' local-date parse is INTENTIONALLY a different time

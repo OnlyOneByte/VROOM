@@ -271,6 +271,30 @@
 		</Dialog.Header>
 
 		<div class="space-y-4">
+			<!-- Shared target-vehicle picker (D4): used by BOTH the detected-preset path and the manual
+			     mapping path — the same bound control, only the trigger id + empty-state copy differ. -->
+			{#snippet targetVehiclePicker(triggerId: string, emptyText: string)}
+				<label for={triggerId} class="text-xs font-medium text-foreground">
+					Import into vehicle *
+				</label>
+				{#if vehicles.length === 0}
+					<p class="text-sm text-muted-foreground">{emptyText}</p>
+				{:else}
+					<Select.Root type="single" value={targetVehicleId} onValueChange={handleTargetVehicleChange}>
+						<Select.Trigger id={triggerId} class="w-full">
+							{targetVehicle ? getVehicleDisplayName(targetVehicle) : 'Select a vehicle'}
+						</Select.Trigger>
+						<Select.Content>
+							{#each vehicles as v (v.id)}
+								<Select.Item value={v.id} label={getVehicleDisplayName(v)}>
+									{getVehicleDisplayName(v)}
+								</Select.Item>
+							{/each}
+						</Select.Content>
+					</Select.Root>
+				{/if}
+			{/snippet}
+
 			<!-- File picker -->
 			<div class="space-y-2">
 				<label
@@ -322,29 +346,10 @@
 						column, so choose which vehicle these entries belong to.
 					</p>
 					<div class="space-y-1.5">
-						<label for="import-target-vehicle" class="text-xs font-medium text-foreground">
-							Import into vehicle *
-						</label>
-						{#if vehicles.length === 0}
-							<p class="text-sm text-muted-foreground">Add a vehicle first to import a fuel log.</p>
-						{:else}
-							<Select.Root
-								type="single"
-								value={targetVehicleId}
-								onValueChange={handleTargetVehicleChange}
-							>
-								<Select.Trigger id="import-target-vehicle" class="w-full">
-									{targetVehicle ? getVehicleDisplayName(targetVehicle) : 'Select a vehicle'}
-								</Select.Trigger>
-								<Select.Content>
-									{#each vehicles as v (v.id)}
-										<Select.Item value={v.id} label={getVehicleDisplayName(v)}>
-											{getVehicleDisplayName(v)}
-										</Select.Item>
-									{/each}
-								</Select.Content>
-							</Select.Root>
-						{/if}
+						{@render targetVehiclePicker(
+							'import-target-vehicle',
+							'Add a vehicle first to import a fuel log.'
+						)}
 					</div>
 				</div>
 			{/if}
@@ -465,29 +470,7 @@
 					<!-- Target vehicle (only when no vehicle column is mapped — D4) -->
 					{#if !manualColumns.vehicle}
 						<div class="space-y-1.5 border-t pt-3">
-							<label for="manual-target-vehicle" class="text-xs font-medium text-foreground">
-								Import into vehicle *
-							</label>
-							{#if vehicles.length === 0}
-								<p class="text-sm text-muted-foreground">Add a vehicle first to import.</p>
-							{:else}
-								<Select.Root
-									type="single"
-									value={targetVehicleId}
-									onValueChange={handleTargetVehicleChange}
-								>
-									<Select.Trigger id="manual-target-vehicle" class="w-full">
-										{targetVehicle ? getVehicleDisplayName(targetVehicle) : 'Select a vehicle'}
-									</Select.Trigger>
-									<Select.Content>
-										{#each vehicles as v (v.id)}
-											<Select.Item value={v.id} label={getVehicleDisplayName(v)}>
-												{getVehicleDisplayName(v)}
-											</Select.Item>
-										{/each}
-									</Select.Content>
-								</Select.Root>
-							{/if}
+							{@render targetVehiclePicker('manual-target-vehicle', 'Add a vehicle first to import.')}
 						</div>
 					{/if}
 				</div>
