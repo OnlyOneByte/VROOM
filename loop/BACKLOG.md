@@ -91,6 +91,18 @@ now — the "Playwright-blocked" tail was a ~200-cycle MISDIAGNOSIS, see GUIDE.m
 re-audit a data-safety write path, certify it CLEAN against source, and leave a merge-surviving guard.
 Don't trust agent "HIGH" findings — verify firsthand (the archive logged many debunked false-positives).)*
 
+> **AUDITED C75 — /insurance eyes-on sweep, CLEAN (a suspected defect debunked firsthand).** Shot
+> /insurance DESKTOP + MOBILE with 7 seeded policies + Read both PNGs. Renders the data + four-states clean:
+> PolicyCard (Current Term Expires/Total Cost/Monthly/Vehicles), Documents EMPTY ("No documents uploaded yet"),
+> Claims EMPTY + a populated "Collision · Settled" claim, "Expired" term badges (correct — seed term dates
+> predate now) + Renew. MOBILE: no horizontal overflow (NORTH_STAR #3); all sections reflow; FAB pins bottom.
+> DEBUNKED: "Active Policies" header vs "Expired" badges is NOT a contradiction — groupPoliciesByActive splits
+> on `policy.isActive` (lifecycle: Active/Inactive sections) while "Expired" is the per-TERM currency (lapsed
+> term → Renew affordance); an active policy with an expired current term is the intended state. /insurance is
+> sound — DON'T re-audit. (The mid-page dark New-Policy button in the desktop full-page shot is the known
+> fixed-FAB capture artifact.) Next eyes-on vein: the /financing populated render, or the recurring-expenses
+> dashboard widget in a populated state.
+>
 > **CERTIFIED C74 — the CSV-import idempotency key `deriveImportClientId` FIELD-SENSITIVE + directly guarded.**
 > The crown-jewel import data-safety contract (re-import = no-op via createIdempotent's (userId, clientId)
 > unique index, yet two genuinely-different rows must get DISTINCT keys so both land) was driven only

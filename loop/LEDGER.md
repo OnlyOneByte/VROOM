@@ -30,14 +30,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 68 |
+| feature | 4 | 75 |
 | deep-review | 5 | 74 |
 | guard | 6 | 73 |
 | bug | 3 | 72 |
 | arch | 5 | 71 |
 | infra | 6 | 70 |
 
-Current cycle: **74**
+Current cycle: **75**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,27 @@ Current cycle: **74**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C75 (feature — /insurance eyes-on sweep, CLEAN; a suspected defect debunked firsthand)** — Balance at C75:
+  feature (7/4, +3) the lone most-starved over-budget category → picked. Import-trackers (the only open feature
+  SPEC work) stays Angelo-gated (defaultCategory) + #148 escalated, so per the C68 precedent I took the
+  shootable feature increment: a deep-UI eyes-on of the never-shot /insurance render (the vein C46/C53/C60/C67
+  repeatedly flagged). Stack already up; minted auth, confirmed 7 seeded policies (State Farm + Geico + 5 e2e
+  leftovers), shot /insurance DESKTOP + MOBILE and **Read both PNGs**. CERTIFIED CLEAN: the page renders the
+  data state + four-states correctly — header + New-Policy FAB, per-policy PolicyCard (Current Term:
+  Expires/Total Cost/Monthly/Vehicles), Documents EMPTY ("No documents uploaded yet" + Upload), Claims EMPTY
+  ("No claims filed") AND a populated "Collision · Settled" claim on the e2e claims policy, "Expired" term
+  badges (correct — all seeded term dates predate 2026-06-18) + working Renew. MOBILE: NO horizontal overflow
+  (NORTH_STAR #3) — label/value rows + Current-Term/Documents/Claims sections all reflow to the Pixel-5 width;
+  FAB pins bottom. DEBUNKED a suspected defect firsthand (the GUIDE's "agent HIGH findings are often false"
+  discipline): the "Active Policies" section header vs the "Expired" badges looked contradictory, but they're
+  TWO LEGITIMATE AXES — groupPoliciesByActive splits on `policy.isActive` (policy lifecycle: Active vs Inactive
+  sections), while "Expired" is the per-TERM currency (the current term's date lapsed → the Renew affordance).
+  An active policy with an expired current term is the correct, intended state. NOT a bug; no fix. /insurance is
+  architecturally sound — DON'T re-audit it. (The mid-page dark New-Policy button in the desktop full-page shot
+  is the known fixed-FAB capture artifact, not a render defect — same as prior eyes-on cycles.) No code changed;
+  doc-only. cov: be 87.46% / fe 86.35% (~ — no test/code touched). NEXT feature cycle: still Angelo-gated
+  (import-trackers + #148) → record parked + pivot, OR eyes-on another never-shot surface (the /financing
+  populated render, or the recurring-expenses dashboard widget in a populated state).
 - **C74 (deep-review)** — **Certified the CSV-import idempotency key `deriveImportClientId` FIELD-SENSITIVE +
   left a direct field-by-field guard (a load-bearing data-safety invariant, never directly tested).** Balance
   at C74: deep-review (7/5, +2) most-starved over budget (feature tied on overage +2 but less starved + its
