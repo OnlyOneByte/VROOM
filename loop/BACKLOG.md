@@ -762,14 +762,15 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 filesystem; untracked specs vanish on merge), full regress, coverage re-measure (update the LEDGER cov:
 baseline), refresh `BRANCH_REVIEW.md` grouped by theme so the eventual PR stays reviewable.)*
 
-> **RAN C7 (cadence).** Untracked-test sweep CLEAN (0 stray committed-ext specs; the 45 .meshclaw.e2e.ts
-> are gitignored-by-design). Coverage RE-MEASURED + written to the LEDGER header: BE 87.22% line / 86.96%
-> func; FE 85.95% line / 87.15% func / 78.38% branch — both at the ~87/~86 structural ceiling. Both suites
-> green (BE 1582 / FE 715). Branch = 6 ahead, PR-ready (state recorded in the C7 LEDGER entry since
-> BRANCH_REVIEW.md is gitignored). NEXT cadence ~C17. The 90% goal stays structurally gated — BE tail is
-> OAuth/DI-bound (auth/routes, provider services, backup-orchestrator, db connection), FE tail is eyes-on
-> components; neither is a clean unit pick, so don't chase coverage % directly — let real bug/guard work
-> nudge it.
+> **RAN C90 (cadence; last ran C84).** Untracked-test sweep CLEAN (0 stray committed-ext specs; only the
+> intentional `M .gitignore`/`M frontend/.gitignore` overrides). Coverage RE-MEASURED: BE 87.47% line / 87.19%
+> func (1698 pass) — UNCHANGED vs C84 (C85 no-churn / C86 saturated / C87 source-scan guard [line-covers nothing
+> new] / C88 eyes-on / C89 dry scout); FE 86.35% line / 87.68% func / 78.88% branch (735 pass) — line/func flat,
+> branch +0.10 = v8 rounding noise (no FE source touched since C52). Both at the ~87/~86 structural ceiling. Both
+> suites green (BE 1698 / FE 735). Branch = 90 ahead of fresh origin/main, PR-ready (bug 22 / feature 17 / guard
+> 14 / deep-review 14 / infra 12 / arch 10). NEXT cadence ~C100. The 90% goal stays structurally gated (BE tail
+> OAuth/DI-bound, FE tail eyes-on components) — don't chase % directly. NOTE: C83–C89 swept every self-authorizable
+> vein; the highest-leverage work is now GATED on Angelo (#148/#100/#79/#129 + import defaultCategory).
 >
 > **RAN C14 (cadence).** Untracked-test sweep CLEAN. Coverage RE-MEASURED: BE 87.22%/86.96% (unchanged vs
 > C7 — sync-test additions hit already-covered modules); FE 86.07% line / 87.19% func / 78.53% branch (UP
