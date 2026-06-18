@@ -348,6 +348,21 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 > re-read archive grounding first), #79 (stuck-offline-entry hygiene); #100 json_patch merge + #112 chart palette
 > stay arch/design-gated.
 >
+> **🚩 NEW — ESCALATED C68 (eyes-on, AWAITING ANGELO — displayed-number semantics, NOT auto-fixed):
+> #148 LeaseMetricsCard burn bar reads 0-used when `initialMileage` is null.** Found firsthand during a C68
+> eyes-on of the FinanceTab lease render (the never-shot surface; #140 annual-vs-total CONFIRMED fixed +
+> consistent on both cards — that part is GOOD). `calculateLeaseMetrics` (financing-calculations.ts:498) gates
+> `mileageUsed = max(0, current − initial)` on `initialMileage !== null`, so a lease with NO recorded starting
+> odometer (the COMMON case) leaves `mileageUsed = 0` / `mileageRemaining = full allowance` → the Mileage burn
+> bar shows "0 / 36,000 mi · 36,000 left" even at a 30,000 odometer. BUT the sibling PaymentMetricsGrid Overage
+> card coalesces `initialMileage ?? 0` (FinanceTab.svelte:159) so it computes used=30,000 → the SAME vehicle
+> shows 30,000 driven on the Overage card and 0 on the burn bar (an internal contradiction, the #140 class on a
+> DIFFERENT axis: null-initialMileage handling). Reachable on the seeded e2e lease fixture (initialMileage null,
+> odometer 24,000). RECOMMENDED FIX (a 1-line semantics call, hence escalated): coalesce `initialMileage ?? 0`
+> inside `calculateLeaseMetrics` to match the grid — OR require an initial reading / show "set a starting
+> odometer". Changes a displayed lease-mileage figure → Angelo's steer. send_message tool was unavailable this
+> turn; filed here as the durable escalation record. Eyes-on PNG captured /tmp/c68-finance3.png (not committed).
+>
 > **CLOSED C48: #88** — a deleted vehicle is now pruned from reminders' `expenseSplitConfig` blob +
 > renormalized (see the Sev-3 block). The #88/#97 vehicle-delete reminder-orphan family is CLOSED (junction
 > C40 + blob C48).

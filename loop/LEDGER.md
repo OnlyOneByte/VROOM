@@ -30,14 +30,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 61 |
+| feature | 4 | 68 |
 | deep-review | 5 | 67 |
 | guard | 6 | 66 |
 | bug | 3 | 65 |
 | arch | 5 | 64 |
 | infra | 6 | 63 |
 
-Current cycle: **67**
+Current cycle: **68**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,27 @@ Current cycle: **67**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C68 (feature — eyes-on FinanceTab lease render; #140 CONFIRMED + a NEW defect #148 escalated)** —
+  Balance at C68: feature (7/4, +3) the lone most-starved over-budget category → picked. Import-trackers (the
+  only open feature SPEC work) stays Angelo-gated (preset defaultCategory), so per the standing rule I took the
+  shootable feature increment instead: a deep-UI eyes-on of the FinanceTab LEASE render — a surface CLAUDE.md
+  flagged "stays eyes-on" + the home of the #140 "do it in a UI-work cycle / alongside a screenshot pass" item.
+  Booted nothing (stack already up on :5173/:3001), minted auth, added a 30k odometer reading to the seeded e2e
+  lease (Tesla Model 3, 36-mo/12k-yr), shot the Finance tab (extended the gitignored shot.mjs with a CLICK_TEXT
+  arg since the tab state is client-side, not URL-driven), and **Read the PNG**. CONFIRMED #140 FIXED + consistent
+  firsthand: the Mileage Overage card ("$0 · Within limit") and the burn-bar limit both use the WHOLE-LEASE 36,000
+  allowance (leaseTotalMileageAllowance), no annual-vs-total contradiction. BUT eyes-on surfaced a NEW defect:
+  **#148 — the LeaseMetricsCard burn bar reads "0 / 36,000 · 36,000 left" at a 30k odometer.**
+  `calculateLeaseMetrics` gates `mileageUsed` on `initialMileage !== null`; a lease with no recorded starting
+  odometer (the common case) leaves used=0, while the sibling PaymentMetricsGrid coalesces `initialMileage ?? 0`
+  and computes used=30k → the SAME vehicle shows 30k driven on one card and 0 on the other (the #140 class on the
+  null-initialMileage axis). It changes a displayed lease-mileage figure (semantics: coalesce to 0 / require an
+  initial / show "set a starting odometer") → ESCALATED to Angelo, NOT auto-fixed (GUIDE product-call rule;
+  send_message tool unavailable this turn → filed in BACKLOG as the durable record). Cleaned up the test odometer
+  entry (DELETE /odometer/:id 200; fixture restored to its single 24k entry). Doc-only — no committable source
+  (the shot.mjs CLICK_TEXT add is gitignored harness; no auto-fix). cov: be 87.46% / fe 86.35% (~ — no test/code
+  change). NEXT feature cycle: still Angelo-gated (import-trackers defaultCategory + now #148) → record parked +
+  pivot, OR eyes-on another never-shot surface (insurance/financing populated states).
 - **C67 (deep-review)** — **Certified the sync-worker retry-ceiling coupling CLEAN + left a merge-surviving
   source-scan guard (a real unguarded cross-module invariant, NORTH_STAR #1 backoff honesty).** Balance at C67:
   deep-review (7/5, +2) most-starved over budget (feature tied on overage +2 but deep-review more starved by raw
