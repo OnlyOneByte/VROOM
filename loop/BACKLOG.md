@@ -247,8 +247,12 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 >   `[5,100]`/`[1,10]` shared with analytics — the 4 band constants now live in calculations.ts as ONE
 >   source of truth (analytics-charts imports them). The same car now shows ONE average everywhere. Tests
 >   + property reference impls + the boundary describe updated. validate:local GREEN (1594 pass).
-> - **#69 (MED) — APPROVED: materialize a monthly-only insurance term into TCO** (`monthlyCost ×
->   term-months`) so TCO stops under-reporting for monthly-premium policies. (Consistency with analytics.)
+> - ~~**#69 (MED) — DONE C34.**~~ A monthly-only insurance term (monthlyCost, no totalCost) created NO
+>   expense row, so it showed in analytics but was ABSENT from TCO's insuranceCost bucket. Fixed via
+>   `effectiveTermCost` in hooks.ts: materializes `monthlyCost × monthKeysInRange(start,end).length` (the
+>   same inclusive month count effectiveMonthlyPremium amortizes a totalCost over — symmetric, no
+>   double-count since analytics reads term.monthlyCost directly, not the rows). +2 guards
+>   (premium-expense-hook.test.ts: monthly→$1300 over 13 months; explicit totalCost still wins). Don't re-pick.
 > - **#85 (MED) — APPROVED: relabel "This/Last Year" to reflect the range-relative semantics** (cheap,
 >   honest) rather than re-implementing calendar-year math.
 > - ~~**#51 (LOW) — DONE C29.**~~ `getInsurance` now counts only active policies with ≥1 term

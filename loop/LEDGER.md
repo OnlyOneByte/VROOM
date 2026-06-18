@@ -30,11 +30,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 31 |
 | deep-review | 5 | 33 |
 | guard | 6 | 32 |
-| bug | 3 | 29 |
+| bug | 3 | 34 |
 | arch | 5 | 30 |
 | infra | 6 | 28 |
 
-Current cycle: **33**
+Current cycle: **34**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -353,6 +353,24 @@ Current cycle: **33**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C34 (bug #69)** — **Materialize a monthly-only insurance term into TCO (Angelo-APPROVED Sev-2).** bug
+  was the sole over-budget category (34−29=5/3). Sev-1 (#37/#127) are design-doc-gated (arch rule-6), #94
+  is a 6-member class → took the clean money-facing Sev-2 #69, on fresh C33 TCO context. CONFIRMED
+  FIRSTHAND: `createTermExpenses` (hooks.ts) only materialized an expense when `totalCost > 0`, so a
+  monthly-only term (monthlyCost set, no totalCost) created NO `insurance_term` expense row → it showed in
+  analytics (`getInsurance`→`effectiveMonthlyPremium` honours monthlyCost) but was ABSENT from TCO's
+  insuranceCost bucket (which sums those rows, C33-certified). FIX (Angelo's agreed `monthlyCost ×
+  term-months`): extracted `effectiveTermCost(term)` in hooks.ts — `totalCost` when present, else
+  `monthlyCost × monthKeysInRange(start,end).length` (the SAME inclusive month count
+  effectiveMonthlyPremium amortizes a totalCost over → symmetric). createTermExpenses/updateTermExpenses
+  compute via it; the 3 route call sites now pass monthlyCost+endDate + always call the hook (it no-ops on
+  0). NO DOUBLE-COUNT: analytics reads term.monthlyCost directly, never the materialized rows. GUARD: +2 in
+  premium-expense-hook.test.ts (monthly-only term → rows sum to monthlyCost×13 [2024-01-01→2025-01-01 = 13
+  inclusive month-keys]; explicit totalCost still wins, no costed-path regression). NON-VACUOUS: reverting
+  effectiveTermCost to totalCost-only turns the monthly test RED (0 rows). Verify: backend validate:local
+  GREEN — tsc 0, musl-biome clean, 1608 pass / 0 fail (+2), build bundled. Backend-only (no UI → no shot).
+  cov: be 87.22% / fe 86.14% (~ — insurance hook + the materialization path now pinned for the monthly
+  shape).
 - **C33 (deep-review)** — **Certified the TCO `categorizeTCOExpenses` sourceType-bucketing CLEAN + left a
   money-facing guard.** deep-review was most-starved (33−26=7/5 > bug 4/3). Per the C19/C26 note
   (backup/restore/import/analytics swept), audited the highest-stakes UNAUDITED money path: the per-vehicle
