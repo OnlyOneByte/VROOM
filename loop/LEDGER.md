@@ -33,11 +33,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 61 |
 | deep-review | 5 | 60 |
 | guard | 6 | 59 |
-| bug | 3 | 58 |
+| bug | 3 | 62 |
 | arch | 5 | 57 |
 | infra | 6 | 56 |
 
-Current cycle: **61**
+Current cycle: **62**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,28 @@ Current cycle: **61**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C62 (bug #94, volume member)** — **Convert per-vehicle volume to user-global units BEFORE pooling the
+  fleet fuel-stats volume + fillupDetails (Angelo-APPROVED Sev-2, NORTH_STAR #2).** bug was the SOLE
+  over-budget category (62−58=4/3 +1; arch/infra AT). Cold-scout exhausted → top Angelo-approved item:
+  the next #94 member after C58's distance (same approved convert-before-pool pattern, now guarded by
+  C59). CONFIRMED FIRSTHAND: `buildFuelStatsFromData`'s `sumGallons` summed `row.volume` across ALL
+  vehicles RAW (→ currentYear/currentMonth/prevMonth gallons) + the `volumes` array fed fillupDetails
+  (avg/min/max) raw — so a mixed gal+L fleet pooled gallons with litres. FIX (mirror C58): added a local
+  `volumeInUserUnits(row)` (skipConversion short-circuit, else `convertVolume(v, vehicleUnit, userUnit)`)
+  + routed both sumGallons + the volumes array through it; the C58 fix already brought userUnits/
+  vehicleUnitsMap/skipConversion into scope. No-op for a same-unit fleet (the common case → the C328
+  same-unit pin stays green). EXPLICITLY SCOPED OUT: `previousYearGallons` is a raw SQL `SUM(volume)` from
+  queryFuelAggregates (cross-vehicle, computed before this fn) — converting it needs a per-vehicle
+  group-sum at the query layer, recorded as a separate prev-year sub-member. GUARD: +1 in
+  fuel-stats-fleet-distance-pooling.test.ts — a mixed gal+L fleet reports 40 gal + 10 L→2.642 gal = 42.64,
+  NOT raw 50, + fillupDetails min 5L→1.32 gal; updated the C328 same-unit pin's stale "update when the fix
+  lands" note (still asserts 50 — no-op for same-unit). NON-VACUOUS (verified firsthand): neuter the
+  conversion → ONLY the mixed-volume test RED (same-unit + distance green); reverted → 5/5 green,
+  repository diff = only my change. Verify: backend validate:local GREEN — tsc 0, musl-biome 0 errors (20
+  pre-existing warnings), 1666 pass / 0 fail (+1), build bundled. Backend-only (FE charts already convert
+  per-vehicle; summary scalar is the HTTP path → no shot). cov: be ~87.5% / fe 86.35%. #94 distance (C58)
+  + volume (C62) members DONE; REMAINING: the 4 fuel-advanced builders (buildMonthlyConsumption /
+  buildSeasonalEfficiency / buildVehicleRadar / buildDayOfWeekPatterns) + the prev-year SQL-sum sub-member.
 - **C61 (feature)** — **Import-trackers T6: consolidated manual-fuel round-trip on a same-unit vehicle
   (eyes-on DONE).** feature was the SOLE over-budget category (61−54=7/4, +3). Import-trackers is the only
   open feature; its remaining T4 is the parked-Angelo preset `defaultCategory` (stays parked), so the

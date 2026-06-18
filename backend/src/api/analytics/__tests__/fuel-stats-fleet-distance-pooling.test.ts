@@ -145,15 +145,14 @@ describe('#94 — fleet-wide fuel-stats pools per-vehicle distance by raw summat
     // each vehicle's own volumeUnit (gal OR L), so a mixed-unit fleet pools gallons with litres into one
     // headline number — the volume limb of the #94 class the C328 deep-review surfaced (alongside
     // buildMonthlyConsumption / buildSeasonalEfficiency / buildVehicleRadar / buildDayOfWeekPatterns,
-    // all on the fleet-summary + fuel-advanced paths; all ESCALATED to Angelo, NOT self-fixed — same
-    // semantics call as #94). Both vehicles share the default unit here so the pool is deterministic;
-    // the point of record is that volume is the RAW SUM (proving no per-vehicle normalization gate
-    // exists today), the same proof shape the distance pin above uses. Update when the fix lands.
+    // all on the fleet-summary + fuel-advanced paths. The VOLUME member is now FIXED (C62, Angelo-approved
+    // convert-before-pool); both vehicles share the default unit HERE, so the fix is a no-op and these
+    // same-unit numbers are unchanged (the mixed-unit conversion is pinned by the next test).
     seedUser(testDb.sqlite, USER);
     seedVehicle(testDb.sqlite, VEH_A);
     seedVehicle(testDb.sqlite, VEH_B);
 
-    // A: two 20-volume fillups (40 total); B: two 5-volume fillups (10 total). Raw fleet pool = 50.
+    // A: two 20-volume fillups (40 total); B: two 5-volume fillups (10 total). Same-unit fleet pool = 50.
     seedExpense(testDb.sqlite, fillup('a1', VEH_A.id, 10_000, 40, 60, 20));
     seedExpense(testDb.sqlite, fillup('a2', VEH_A.id, 10_800, 40, 30, 20));
     seedExpense(testDb.sqlite, fillup('b1', VEH_B.id, 50_000, 40, 60, 5));
@@ -161,12 +160,42 @@ describe('#94 — fleet-wide fuel-stats pools per-vehicle distance by raw summat
 
     const stats = await repo.getFuelStats(USER.id, rangeAll());
 
-    // CURRENT behavior: volume summed across the whole fleet, no per-vehicle gal↔L normalization.
+    // Same-unit fleet → conversion is a no-op → the volume sum + fillupDetails are the plain values.
     expect(stats.volume.currentYear).toBe(50);
-    // fillupDetails are the raw cross-vehicle avg/min/max of the four volumes [20,20,5,5].
     expect(stats.fillupDetails.avgVolume).toBeCloseTo(12.5, 5);
     expect(stats.fillupDetails.minVolume).toBe(5);
     expect(stats.fillupDetails.maxVolume).toBe(20);
+  });
+
+  // #94 VOLUME member FIXED (C62, Angelo-approved "convert-to-user-global BEFORE pooling"): a MIXED gal+L
+  // fleet now converts each row's volume to the user's global volume unit before summing the headline
+  // volume + deriving fillupDetails, so gallons and litres are no longer added raw (NORTH_STAR #2).
+  test('a MIXED gal+L fleet converts each volume to the user unit before pooling (no raw gal+L sum)', async () => {
+    seedUser(testDb.sqlite, USER); // user has no prefs → default GALLONS_US
+    seedVehicle(testDb.sqlite, VEH_A); // gallons (default)
+    seedVehicle(testDb.sqlite, VEH_B);
+    // VEH_B reports its volume in LITRES.
+    testDb.sqlite.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
+      JSON.stringify({ distanceUnit: 'miles', volumeUnit: 'liters', chargeUnit: 'kwh' }),
+      VEH_B.id,
+    ]);
+
+    // A: two 20-GALLON fillups (40 gal). B: two 5-LITRE fillups (10 L). Correct user-unit (gal) total =
+    // 40 + (10 L / 3.785411784) ≈ 42.642 gal. The pre-fix raw pool would be 40 + 10 = 50.
+    seedExpense(testDb.sqlite, fillup('a1', VEH_A.id, 10_000, 40, 60, 20));
+    seedExpense(testDb.sqlite, fillup('a2', VEH_A.id, 10_800, 40, 30, 20));
+    seedExpense(testDb.sqlite, fillup('b1', VEH_B.id, 50_000, 40, 60, 5));
+    seedExpense(testDb.sqlite, fillup('b2', VEH_B.id, 50_200, 40, 30, 5));
+
+    const stats = await repo.getFuelStats(USER.id, rangeAll());
+
+    // Converted-then-summed, NOT the raw 50: 40 gal + 10 L→2.642 gal.
+    const litreToGal = 10 / 3.785411784;
+    expect(stats.volume.currentYear).toBeCloseTo(40 + litreToGal, 2);
+    expect(stats.volume.currentYear).not.toBe(50);
+    // fillupDetails: the four volumes converted to gal are [20, 20, 5L→1.321, 5L→1.321] → max 20, min ~1.32.
+    expect(stats.fillupDetails.maxVolume).toBeCloseTo(20, 5);
+    expect(stats.fillupDetails.minVolume).toBeCloseTo(5 / 3.785411784, 2);
   });
 
   test('best/worst cost-per-distance span the per-pair values across the WHOLE fleet (un-normalized scalars)', async () => {

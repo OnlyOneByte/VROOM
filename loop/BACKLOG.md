@@ -309,12 +309,13 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 > offline-outbox field-dropout family #66/#101/#111, or analytics split-sibling overcount if any builder
 > was missed by the #56/#108/#113/#146 sweep).
 
-> **C58: #94 DISTANCE member DONE** — the fleet fuel-stats `distance.totalDistance` now convert-before-pools
-> (see the Sev-2 block). #94 is a 6-member class; the remaining members (VOLUME + the 4 fuel-advanced
-> builders) are each their own bug-cycle pick, SAME approved convert-before-pool pattern (activate the
-> tested machinery / mirror getCrossVehicle). Other open Angelo bug items: **Sev-4** #129 (OAuth email-sync,
-> re-read archive grounding first), #79 (stuck-offline-entry hygiene); #100 json_patch merge + #112 chart
-> palette stay arch/design-gated.
+> **C58+C62: #94 DISTANCE + VOLUME members DONE** — the fleet fuel-stats distance.totalDistance (C58) +
+> volume/fillupDetails (C62) now convert-before-pool (see the Sev-2 block). #94 is a 6-member class; the
+> remaining members — the 4 fuel-advanced builders (buildMonthlyConsumption/buildSeasonalEfficiency/
+> buildVehicleRadar/buildDayOfWeekPatterns, which need a UNITS signature thread, not just activation) + the
+> prev-year SQL-sum sub-member — are each their own bug-cycle pick, SAME convert-before-pool pattern. Other
+> open Angelo bug items: **Sev-4** #129 (OAuth email-sync, re-read archive grounding first), #79
+> (stuck-offline-entry hygiene); #100 json_patch merge + #112 chart palette stay arch/design-gated.
 >
 > **CLOSED C48: #88** — a deleted vehicle is now pruned from reminders' `expenseSplitConfig` blob +
 > renormalized (see the Sev-3 block). The #88/#97 vehicle-delete reminder-orphan family is CLOSED (junction
@@ -355,14 +356,16 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 >
 > _Severity 2 — wrong numbers shown today (correctness):_
 > - **#94 (MED, 6-member CLASS) — APPROVED: convert-to-user-global BEFORE pooling, mirroring
->   `getCrossVehicle`. DISTANCE MEMBER DONE C58.** The fleet fuel-stats + summary `distance.totalDistance`
->   now converts each vehicle's span to the user's global unit before summing (getFuelStats fetches
->   userUnits + getAllVehicleUnits + skipConversion, threads them into computeConvertedTotalDistance —
->   was fed no-op placeholders; the tested machinery just needed activating). +1 mixed-unit guard
->   (924.27 not 1000); non-vacuous; no-op for same-unit fleets. **REMAINING members (own cycles):**
->   VOLUME (getFuelStats sumGallons + fillupDetails pool gal+L raw) + the 4 fuel-advanced builders
->   (buildMonthlyConsumption / buildSeasonalEfficiency / buildVehicleRadar / buildDayOfWeekPatterns pool
->   mi/gal+km/L). Same approved convert-before-pool pattern each — pick one per bug cycle.
+>   `getCrossVehicle`. DISTANCE (C58) + VOLUME (C62) members DONE.** The fleet fuel-stats + summary
+>   `distance.totalDistance` (C58) and `volume.currentYear/currentMonth/prevMonth + fillupDetails` (C62)
+>   now convert each vehicle's value to the user's global unit before pooling (a local volumeInUserUnits
+>   mirrors computeConvertedTotalDistance; skipConversion no-ops the common single-unit case). +1 mixed-unit
+>   guard each (distance 924.27 not 1000; volume 42.64 not 50); non-vacuous. **REMAINING members (own
+>   cycles, same pattern):** the 4 fuel-ADVANCED builders (buildMonthlyConsumption / buildSeasonalEfficiency
+>   / buildVehicleRadar / buildDayOfWeekPatterns pool mi/gal+km/L — these take fuelRowsByVehicle but no
+>   units, so they need a signature thread, not just activation) + the prev-year sub-member
+>   (previousYearGallons is a raw SQL SUM in queryFuelAggregates → needs a per-vehicle group-sum at the
+>   query layer). Pick one per bug cycle.
 > - ~~**efficiency-band unification (#94-adjacent, C419)**~~ — **DONE C20.** Unified the per-vehicle stats
 >   band (`averageConsecutiveMpg` gas + `calculateAverageMilesPerKwh` electric) onto the canonical
 >   `[5,100]`/`[1,10]` shared with analytics — the 4 band constants now live in calculations.ts as ONE

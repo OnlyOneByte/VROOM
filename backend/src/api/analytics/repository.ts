@@ -53,7 +53,7 @@ import {
 } from '../../utils/analytics-charts';
 import { maxOf, minOf } from '../../utils/calculations';
 import { logger } from '../../utils/logger';
-import { convertDistance, convertEfficiency } from '../../utils/unit-conversions';
+import { convertDistance, convertEfficiency, convertVolume } from '../../utils/unit-conversions';
 
 export type { FuelEfficiencyPoint } from '../../utils/analytics-charts';
 
@@ -1397,8 +1397,23 @@ export class AnalyticsRepository {
     const currentMonthFillups = fuelRows.filter((r) => isFillup(r) && inCurrentMonth(r)).length;
     const prevMonthFillups = fuelRows.filter((r) => isFillup(r) && inPrevMonth(r)).length;
 
-    const sumGallons = (rows: FuelExpenseRow[]) => rows.reduce((s, r) => s + (r.volume ?? 0), 0);
+    // #94 (C62): convert each row's volume to the user's global volume unit BEFORE pooling, so a mixed
+    // gal+L fleet no longer sums gallons with litres into the headline volume + fillupDetails
+    // (NORTH_STAR #2). Mirrors the C58 distance member + computeConvertedTotalDistance's per-vehicle
+    // pattern; skipConversion short-circuits the common single-unit case (a no-op there).
+    const volumeInUserUnits = (row: FuelExpenseRow): number => {
+      const v = row.volume ?? 0;
+      if (skipConversion || v === 0) return v;
+      const vUnits = vehicleUnitsMap.get(row.vehicleId) ?? { ...DEFAULT_UNIT_PREFERENCES };
+      return convertVolume(v, vUnits.volumeUnit, userUnits.volumeUnit);
+    };
+    const sumGallons = (rows: FuelExpenseRow[]) =>
+      rows.reduce((s, r) => s + volumeInUserUnits(r), 0);
     const currentYearGallons = sumGallons(fuelRows);
+    // NOTE: previousYearGallons is a raw SQL SUM(volume) from queryFuelAggregates (cross-vehicle,
+    // un-converted) — converting it needs a per-vehicle group-sum at the query layer, a separate #94
+    // sub-member (the prev-year comparison) left for its own cycle. The current-period figures (the
+    // headline + chart-feeding values) are converted here.
     const previousYearGallons = prevYearAgg.totalGallons;
     const currentMonthGallons = sumGallons(fuelRows.filter(inCurrentMonth));
     const prevMonthGallons = sumGallons(fuelRows.filter(inPrevMonth));
@@ -1408,7 +1423,7 @@ export class AnalyticsRepository {
 
     const volumes = fuelRows
       .filter((r) => r.volume != null && r.volume > 0)
-      .map((r) => r.volume as number);
+      .map((r) => volumeInUserUnits(r));
     const fillupDetails = {
       avgVolume: volumes.length > 0 ? volumes.reduce((a, b) => a + b, 0) / volumes.length : null,
       minVolume: volumes.length > 0 ? minOf(volumes) : null,
