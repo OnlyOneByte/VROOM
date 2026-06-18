@@ -416,6 +416,17 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C100:** the FE settings-store `uploadBackup` mode-gated reload is now pinned (+2 in
+> settings-state-contract.test.ts) — the C319 `restoreFromProvider` twin on the FILE-upload restore path. The store
+> gates the post-restore `this.load()` on `mode !== 'preview'` (a non-preview replace/merge must refresh state; a
+> preview must NOT) — C319 pinned the provider path, but the uploadBackup path was unguarded, so a dropped reload
+> would leave the UI showing STALE pre-restore settings (NORTH_STAR #1), invisible to settings-api.test.ts (which
+> pins only the wire/FormData contract). Non-vacuous (drop the gate → only the non-preview test RED, 1 fetch not 2).
+> **First FE coverage movement since C52: 86.86% line / 87.97% func / 79.07% branch (+0.51/+0.29/+0.29).** This is
+> the productive guard frontier now — REAL FE behavioral gaps, NOT backend source-scans on code unchanged since C85.
+> SEEDED for the next guard cycle: load-state.svelte.ts (35% func) + theme.svelte.ts (60%) have genuine untested
+> logic; pin those over another cold backend scan. Don't re-add the uploadBackup pin.
+>
 > **GUARDED C98 (deep-review→guard):** the session-cookie SECURITY-ATTRIBUTE contract is now pinned by a
 > source-scan (`session-cookie-security-attributes.test.ts`, +4) — the C92/C97-flagged unaudited session/cookie
 > lifecycle. The attrs `secure: CONFIG.env==='production'` / `httpOnly: true` / `sameSite: 'Lax'` are hand-copied

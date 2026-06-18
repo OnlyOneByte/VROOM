@@ -19,7 +19,10 @@
 > source-scan guard added a couple covered helper lines); FE FULLY UNCHANGED (no FE source touched since C52; C93/C96
 > were eyes-on shots only, C95 a dry scout). The C90 branch 78.88 was v8 rounding noise — back to 78.78.**
 > Both still at the ~87 BE / ~86 FE structural ceiling; treat as the floor.
-> (C90: BE 87.47/87.19, FE 86.35/87.68/78.88[noise]. C84: BE 87.47/87.19, FE 86.35/87.68/78.78. C77: BE 87.46/87.18, FE 86.35/87.68/78.78. C70: BE 87.46/87.18, FE 86.35/87.68/78.78. C63: BE 87.46/87.17, FE 86.35/87.68/78.78. C56: BE 87.46/87.18, FE 86.35/87.68/78.78. C49: BE 87.47/87.17, FE 86.35/87.68/78.88. C42: BE 87.33/86.97, FE 86.35/87.68/78.78. C35: BE 87.29/86.97, FE 86.14/87.31/78.70.
+> **C100 (guard): FE moved UP for the first time since C52 — 86.86% line / 87.97% func / 79.07% branch (+0.51/+0.29/
+> +0.29) from the +2 settings-store uploadBackup mode-gated-reload tests (a real behavioral gap, not markup). BE
+> unchanged 87.47/87.20.**
+> (C97: BE 87.47/87.20, FE 86.35/87.68/78.78. C90: BE 87.47/87.19, FE 86.35/87.68/78.88[noise]. C84: BE 87.47/87.19, FE 86.35/87.68/78.78. C77: BE 87.46/87.18, FE 86.35/87.68/78.78. C70: BE 87.46/87.18, FE 86.35/87.68/78.78. C63: BE 87.46/87.17, FE 86.35/87.68/78.78. C56: BE 87.46/87.18, FE 86.35/87.68/78.78. C49: BE 87.47/87.17, FE 86.35/87.68/78.88. C42: BE 87.33/86.97, FE 86.35/87.68/78.78. C35: BE 87.29/86.97, FE 86.14/87.31/78.70.
 > C28: BE 87.22/86.97, FE 86.14/87.31/78.70. C21: BE 87.22/86.96, FE
 > 86.07/87.19/78.53. C14: BE 87.22/86.96, FE 86.07/87.19/78.53. C7: FE 85.95/87.15/78.38.)
 
@@ -32,12 +35,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 96 |
 | deep-review | 5 | 98 |
-| guard | 6 | 94 |
+| guard | 6 | 100 |
 | bug | 3 | 99 |
 | arch | 5 | 98 |
 | infra | 6 | 97 |
 
-Current cycle: **99**
+Current cycle: **100**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +359,28 @@ Current cycle: **99**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C100 (guard — pinned the FE settings-store `uploadBackup` mode-gated reload [the C319 twin], the first FE
+  coverage movement since C52)** — Balance at C100 (HEAD was C99; nudge label lags): NOTHING strictly over budget;
+  feature (100−96=4/4) + guard (100−94=6/6) both AT budget. Feature is fully exhausted (every surface eyes-on,
+  import-trackers Angelo-gated) → guard is the higher-leverage pick. Rather than ANOTHER backend source-scan on
+  provably-unchanged code (the C94/C98 seam is fenced + `git diff C85..HEAD` is empty), went looking for GENUINE new
+  value in the FE's real ~13% untested surface. Found it: the settings store (settings.svelte.ts, 57% line / 33%
+  branch) mediates the backup/restore crown-jewel (NORTH_STAR #1), and while C319 pinned `restoreFromProvider`'s
+  preview-vs-non-preview reload + C308 pinned error-clearing, NOTHING pinned the PARALLEL `uploadBackup` path's
+  mode-gated reload — the FILE-upload restore (the more common one: drag a .zip), which gates `this.load()` on
+  `mode !== 'preview'` exactly like restoreFromProvider. A regression dropping its reload leaves the UI showing
+  STALE pre-restore settings after a replace/merge (NORTH_STAR #1 data-correctness), invisible to every test
+  (settings-api.test.ts pins only uploadBackup's wire/FormData contract, not the store's reload). GUARD: +2 in
+  settings-state-contract.test.ts (next to the C319 restoreFromProvider twin) — non-preview uploadBackup → 2 fetches
+  (upload + reload), state refreshed; preview → 1 fetch, no reload, state stays null. Drives the REAL store →
+  settings-api → fetch (mocked), not a re-impl. NON-VACUOUS proved firsthand: dropped the `if (mode !== 'preview')`
+  gate → ONLY the non-preview test RED (1 fetch not 2), preview + the other 6 stay green; restored → 8 pass. The
+  arch-extract→guard-pin sibling pattern, here C319-twin→C100. Verify: frontend validate:local GREEN — type-check
+  0, build OK, 737 pass / 0 fail (+2). FE-only (a store unit test; no UI markup change → no shot needed). cov: be
+  87.47% / **fe 86.86% line / 87.97% func / 79.07% branch — UP +0.51/+0.29/+0.29, the FIRST FE coverage movement
+  since C52** (the new tests cover settings.svelte.ts's uploadBackup reload branches). NEXT guard: the FE store/util
+  layer has a few more real behavioral gaps (load-state.svelte.ts 35% func, theme.svelte.ts 60%) — prefer those
+  genuine FE-logic pins over backend source-scans on unchanged code.
 - **C99 (bug — recorded dry FAST per the C89/C95 discipline; no source changed since C85, 7th consecutive dry)** —
   Balance at C99 (HEAD was C98; nudge label lags): bug (99−95=4/3, +1) the LONE over-budget category → forced by
   category discipline. KEY STRUCTURAL FACT: `git diff 5766239(C85)..HEAD` over production source is EMPTY — NOTHING
