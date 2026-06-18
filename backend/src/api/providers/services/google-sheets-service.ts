@@ -249,6 +249,14 @@ export const SHEET_NAMES = [
   'Reminder Notifications',
 ] as const;
 
+/**
+ * Suffix for the transient per-table tabs used by the atomic backup swap (#37). A backup STAGES every
+ * table's data into `${name}${SHEET_STAGING_SUFFIX}` (leaving the live canonical sheets untouched), and
+ * only once ALL staging writes succeed does it commit a single atomic `batchUpdate` that deletes the old
+ * canonical sheets and renames the staging tabs into their place. Space-free so it needs no A1 quoting.
+ */
+const SHEET_STAGING_SUFFIX = '__vroom_staging';
+
 export interface SpreadsheetInfo {
   id: string;
   name: string;
@@ -517,77 +525,155 @@ export class GoogleSheetsService {
       .from(reminderNotifications)
       .where(eq(reminderNotifications.userId, userId));
 
-    await Promise.all([
-      this.updateSheet(spreadsheetId, 'Vehicles', userVehicles, SHEET_HEADERS.vehicles),
-      this.updateSheet(spreadsheetId, 'Expenses', userExpenses, SHEET_HEADERS.expenses),
-      this.updateSheet(spreadsheetId, 'Insurance Policies', userInsurance, SHEET_HEADERS.insurance),
-      this.updateSheet(
-        spreadsheetId,
-        'Insurance Terms',
-        userInsuranceTerms,
-        SHEET_HEADERS.insuranceTerms
-      ),
-      this.updateSheet(
-        spreadsheetId,
-        'Insurance Term Vehicles',
-        userInsuranceTermVehicles,
-        SHEET_HEADERS.insuranceTermVehicles
-      ),
-      this.updateSheet(
-        spreadsheetId,
-        'Insurance Claims',
-        userInsuranceClaims,
-        SHEET_HEADERS.insuranceClaims
-      ),
-      this.updateSheet(
-        spreadsheetId,
-        'Vehicle Financing',
-        userFinancing.map((f) => f.vehicle_financing),
-        SHEET_HEADERS.financing
-      ),
-      this.updateSheet(spreadsheetId, 'Photos', userPhotos, SHEET_HEADERS.photos),
-      this.updateSheet(spreadsheetId, 'Photo Refs', userPhotoRefs, SHEET_HEADERS.photoRefs),
-      this.updateSheet(
-        spreadsheetId,
-        'Odometer',
-        userOdometer.map((o) => o.odometer_entries),
-        SHEET_HEADERS.odometer
-      ),
-      this.updateSheet(
-        spreadsheetId,
-        'User Preferences',
-        userPreferencesRows,
-        SHEET_HEADERS.userPreferences
-      ),
-      this.updateSheet(spreadsheetId, 'Sync State', syncStateRows, SHEET_HEADERS.syncState),
-      this.updateSheet(spreadsheetId, 'Reminders', userReminders, SHEET_HEADERS.reminders),
-      this.updateSheet(
-        spreadsheetId,
-        'Reminder Vehicles',
-        userReminderVehicles,
-        SHEET_HEADERS.reminderVehicles
-      ),
-      this.updateSheet(
-        spreadsheetId,
-        'Reminder Notifications',
-        userReminderNotifications,
-        SHEET_HEADERS.reminderNotifications
-      ),
-    ]);
+    // Pair each canonical sheet title with the rows + headers it backs up. Order MUST match SHEET_NAMES:
+    // the atomic swap sets each tab's `index` from this array's position, so it has to mirror the
+    // spreadsheet's original create order or the backup's tabs would reshuffle every run.
+    const tables: { title: string; rows: Record<string, unknown>[]; headers: readonly string[] }[] =
+      [
+        { title: 'Vehicles', rows: userVehicles, headers: SHEET_HEADERS.vehicles },
+        { title: 'Expenses', rows: userExpenses, headers: SHEET_HEADERS.expenses },
+        { title: 'Insurance Policies', rows: userInsurance, headers: SHEET_HEADERS.insurance },
+        {
+          title: 'Insurance Terms',
+          rows: userInsuranceTerms,
+          headers: SHEET_HEADERS.insuranceTerms,
+        },
+        {
+          title: 'Insurance Term Vehicles',
+          rows: userInsuranceTermVehicles,
+          headers: SHEET_HEADERS.insuranceTermVehicles,
+        },
+        {
+          title: 'Insurance Claims',
+          rows: userInsuranceClaims,
+          headers: SHEET_HEADERS.insuranceClaims,
+        },
+        {
+          title: 'Vehicle Financing',
+          rows: userFinancing.map((f) => f.vehicle_financing),
+          headers: SHEET_HEADERS.financing,
+        },
+        {
+          title: 'Odometer',
+          rows: userOdometer.map((o) => o.odometer_entries),
+          headers: SHEET_HEADERS.odometer,
+        },
+        { title: 'Photos', rows: userPhotos, headers: SHEET_HEADERS.photos },
+        { title: 'Photo Refs', rows: userPhotoRefs, headers: SHEET_HEADERS.photoRefs },
+        {
+          title: 'User Preferences',
+          rows: userPreferencesRows,
+          headers: SHEET_HEADERS.userPreferences,
+        },
+        { title: 'Sync State', rows: syncStateRows, headers: SHEET_HEADERS.syncState },
+        { title: 'Reminders', rows: userReminders, headers: SHEET_HEADERS.reminders },
+        {
+          title: 'Reminder Vehicles',
+          rows: userReminderVehicles,
+          headers: SHEET_HEADERS.reminderVehicles,
+        },
+        {
+          title: 'Reminder Notifications',
+          rows: userReminderNotifications,
+          headers: SHEET_HEADERS.reminderNotifications,
+        },
+      ];
+
+    await this.writeAllSheetsAtomically(spreadsheetId, tables);
   }
 
-  private async updateSheet<T extends Record<string, unknown>>(
+  /**
+   * Write every table's data to the backup spreadsheet ATOMICALLY (#37). The previous design cleared
+   * then re-wrote each LIVE sheet in place, so a failure mid-run (network blip, 429, the process dying)
+   * left a TORN backup — some sheets rewritten, the one that was mid-write emptied by its preceding clear,
+   * the rest stale — on what may be the user's ONLY copy (NORTH_STAR #1 data-loss). This instead:
+   *   1. STAGE — write each table into a fresh `${title}${SHEET_STAGING_SUFFIX}` tab. The live canonical
+   *      sheets are never touched in this phase, so any failure here is harmless: the prior backup is
+   *      fully intact. We clean up the partial staging tabs and rethrow.
+   *   2. COMMIT — once ALL staging writes succeed, ONE `batchUpdate` deletes the old canonical sheets and
+   *      renames each staging tab to its canonical title. Sheets applies a batchUpdate all-or-nothing, so
+   *      a concurrent reader sees either the entire old backup or the entire new one, never a mix.
+   * Net effect: the backup is replaced as a single transaction, and the old copy is destroyed only at the
+   * instant the new one takes its place.
+   */
+  private async writeAllSheetsAtomically(
+    spreadsheetId: string,
+    tables: { title: string; rows: Record<string, unknown>[]; headers: readonly string[] }[]
+  ): Promise<void> {
+    const stagingTitles = tables.map((t) => `${t.title}${SHEET_STAGING_SUFFIX}`);
+    // Drop any staging tabs orphaned by a previously-interrupted backup, so the create below is clean.
+    await this.deleteSheetsByTitle(spreadsheetId, stagingTitles);
+
+    try {
+      // Phase 1 — create the staging tabs, then fill them. All writes target staging only.
+      await this.sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: {
+          requests: stagingTitles.map((title) => ({ addSheet: { properties: { title } } })),
+        },
+      });
+      await Promise.all(
+        tables.map((t) =>
+          this.writeSheetValues(
+            spreadsheetId,
+            `${t.title}${SHEET_STAGING_SUFFIX}`,
+            t.rows,
+            t.headers
+          )
+        )
+      );
+    } catch (err) {
+      // Staging failed → the live backup is untouched. Best-effort cleanup of partial staging tabs.
+      await this.deleteSheetsByTitle(spreadsheetId, stagingTitles).catch(() => {});
+      throw err;
+    }
+
+    // Phase 2 — atomic swap: delete the old canonical sheets, rename staging → canonical, in ONE batch.
+    // Each rename also sets `index` to the table's canonical position so tab ORDER is preserved across
+    // backups (a staging tab is born at the end; without this the order would drift every run, which is
+    // user-visible in the spreadsheet — and pinned by the create-tab-order test).
+    const info = await this.getSpreadsheetInfo(spreadsheetId);
+    const idByTitle = new Map(info.sheets.map((s) => [s.title, s.id]));
+    const requests: sheets_v4.Schema$Request[] = [];
+    for (const t of tables) {
+      const oldId = idByTitle.get(t.title);
+      if (oldId !== undefined) {
+        requests.push({ deleteSheet: { sheetId: oldId } });
+      }
+    }
+    tables.forEach((t, index) => {
+      const stagingId = idByTitle.get(`${t.title}${SHEET_STAGING_SUFFIX}`);
+      if (stagingId !== undefined) {
+        requests.push({
+          updateSheetProperties: {
+            properties: { sheetId: stagingId, title: t.title, index },
+            fields: 'title,index',
+          },
+        });
+      }
+    });
+    await this.sheets.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests } });
+  }
+
+  /** Delete every sheet whose title is in `titles` (best-effort by current title→id lookup). */
+  private async deleteSheetsByTitle(spreadsheetId: string, titles: string[]): Promise<void> {
+    const info = await this.getSpreadsheetInfo(spreadsheetId);
+    const wanted = new Set(titles);
+    const requests = info.sheets
+      .filter((s) => wanted.has(s.title))
+      .map((s) => ({ deleteSheet: { sheetId: s.id } }));
+    if (requests.length > 0) {
+      await this.sheets.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests } });
+    }
+  }
+
+  /** Write a header row + the data rows into one sheet (RAW). Assumes the sheet exists and is empty. */
+  private async writeSheetValues<T extends Record<string, unknown>>(
     spreadsheetId: string,
     sheetName: string,
     data: T[],
     headers: readonly string[]
   ): Promise<void> {
-    // Clear existing data before writing to remove stale rows
-    await this.sheets.spreadsheets.values.clear({
-      spreadsheetId,
-      range: `${sheetName}!A:Z`,
-    });
-
     const values = [
       [...headers],
       ...data.map((row) => headers.map((header) => this.formatValue(row[header]))),

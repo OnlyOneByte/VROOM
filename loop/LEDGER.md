@@ -32,11 +32,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 41 |
 | deep-review | 5 | 39 |
 | guard | 6 | 38 |
-| bug | 3 | 40 |
+| bug | 3 | 44 |
 | arch | 5 | 43 |
 | infra | 6 | 42 |
 
-Current cycle: **43**
+Current cycle: **44**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -355,6 +355,33 @@ Current cycle: **43**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C44 (bug #37)** — **Atomic Google Sheets backup: stage-then-swap (Angelo-APPROVED Sev-1 data-safety).**
+  bug was the SOLE over-budget category (44−40=4/3, +1). The cold-scout vein is exhausted (C6/C10/C15/C20),
+  so took the top unfinished Angelo-approved item by severity — #37 (HIGH, the only actionable open Sev-1:
+  #36 done C24, #127 is arch-rule-6-gated). CONFIRMED FIRSTHAND: `updateSheet` did per-sheet `clear()` THEN
+  `update()`, and the 15 sheets ran under one `Promise.all` — so a failure mid-run (429 / network / process
+  death) left a TORN backup: some sheets rewritten, the one mid-write EMPTIED by its own preceding clear,
+  the rest stale, on what may be the user's ONLY copy (NORTH_STAR #1 silent data-loss). FIX (Angelo's
+  ratified mechanism — write to temp sheets, then copy-then-promote/swap): new `writeAllSheetsAtomically` —
+  (1) STAGE every table into a fresh `${title}__vroom_staging` tab (live canonical sheets untouched; any
+  staging failure → clean up the temp tabs + rethrow, prior backup fully intact), (2) COMMIT one atomic
+  `batchUpdate` that deletes the old canonical sheets + renames each staging tab to its canonical title AND
+  sets its `index` to the canonical position (Sheets applies a batchUpdate all-or-nothing → a reader sees
+  the whole old OR whole new backup, never a mix; the index keeps tab ORDER stable across backups). Dropped
+  the per-sheet `clear()` entirely (staging tabs are born empty). The `tables` array had to be reordered to
+  match SHEET_NAMES (Odometer before Photos) since the swap now derives each tab's index from its array
+  position — caught by the create-tab-order test (good pin). HARNESS: taught the fake's `batchUpdate` to
+  honor `deleteSheet`/`updateSheetProperties(title,index)` (extracted `applyAddSheet`/`applyDeleteSheet`/
+  `applyRenameSheet`/`applyBatchRequests` to keep cognitive-complexity under the biome cap) + a MONOTONIC
+  `nextSheetId` (real Sheets never reuses ids; `sheets.length` would collide after a delete+rename cycle on
+  the 2nd backup). GUARD (+2 in google-sheets-service.test.ts, the #37 net): a values.update 429 during a
+  RE-backup → the prior backup reads back byte-identical (Toyota still there, not torn/emptied) + no
+  `__vroom_staging` tabs leak + tab order == SHEET_NAMES; a successful re-backup replaces the data (2
+  vehicles) with stable tab order. NON-VACUOUS (revert to clear-then-write → the failure case reads torn).
+  Verify: backend validate:local GREEN — tsc 0, musl-biome 0 errors (20 pre-existing warnings), 1618 pass /
+  0 fail (+2), build bundled. Backend-only (no UI → no shot). #37 DONE — the Sheets-backup Sev-1 pair
+  (#36 C24 + #37 here) is now closed; the remaining Sev-1 #127 is arch-rule-6 design-gated. cov: be ~87.3%
+  / fe 86.35% (~ — Sheets service already fake-seam-covered; +2 pin the atomicity invariant; FE untouched).
 - **C43 (arch)** — **Dedup the duplicated target-vehicle picker in ImportExpensesDialog into a shared
   `{#snippet}` (the C37-created drift vector — a genuine fresh pick).** arch was the SOLE over-budget
   category (43−36=7/5, +2; bug sat AT 3/3, not over). Unlike the C4/C6/C12/C36 no-churn scouts, there was

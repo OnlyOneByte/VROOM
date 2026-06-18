@@ -56,6 +56,12 @@ interface FakeSpreadsheet {
    * injection fix); this captures the option so a guard can assert it directly (RAW vs USER_ENTERED).
    */
   valueInputOptions: Map<string, string | undefined>;
+  /**
+   * Monotonic sheetId source. Real Sheets never reuses a sheetId; using `sheets.length` would collide
+   * after a delete+rename cycle (the #37 atomic-swap backup deletes old tabs then renames staging ones),
+   * so the second backup's addSheet would clash with a surviving id. Counts only ever up.
+   */
+  nextSheetId: number;
 }
 
 interface FaultRule {
@@ -323,6 +329,73 @@ function sheetTitleFromRange(range: string): string {
   return bang === -1 ? range : range.slice(0, bang);
 }
 
+/** addSheet: append a new empty tab with a monotonic sheetId (never reused — mirrors real Sheets). */
+function applyAddSheet(ss: FakeSpreadsheet, req: sheets_v4.Schema$AddSheetRequest): void {
+  const title = req.properties?.title;
+  if (title && !ss.sheets.some((s) => s.title === title)) {
+    ss.sheets.push({ sheetId: ss.nextSheetId, title });
+    ss.nextSheetId += 1;
+  }
+}
+
+/** deleteSheet: drop a tab by id, along with its cell grid + value-input option. */
+function applyDeleteSheet(ss: FakeSpreadsheet, req: sheets_v4.Schema$DeleteSheetRequest): void {
+  const id = req.sheetId;
+  if (id === undefined || id === null) return;
+  const sheet = ss.sheets.find((s) => s.sheetId === id);
+  if (!sheet) return;
+  ss.values.delete(sheet.title);
+  ss.valueInputOptions.delete(sheet.title);
+  ss.sheets = ss.sheets.filter((s) => s.sheetId !== id);
+}
+
+/**
+ * updateSheetProperties: rename a tab (carrying its grid + value-input option to the new title) and/or
+ * reposition it to `index`. The #37 atomic swap renames each staging tab to its canonical title AND sets
+ * index to its canonical position so tab order is preserved across backups; honoring index here lets the
+ * order assertion exercise that. Reposition = remove from current slot, splice in at `index`.
+ */
+function applyRenameSheet(
+  ss: FakeSpreadsheet,
+  req: sheets_v4.Schema$UpdateSheetPropertiesRequest
+): void {
+  const id = req.properties?.sheetId;
+  if (id === undefined || id === null) return;
+  const sheet = ss.sheets.find((s) => s.sheetId === id);
+  if (!sheet) return;
+
+  const newTitle = req.properties?.title;
+  if (newTitle && sheet.title !== newTitle) {
+    const grid = ss.values.get(sheet.title);
+    const opt = ss.valueInputOptions.get(sheet.title);
+    ss.values.delete(sheet.title);
+    ss.valueInputOptions.delete(sheet.title);
+    if (grid !== undefined) ss.values.set(newTitle, grid);
+    if (opt !== undefined) ss.valueInputOptions.set(newTitle, opt);
+    sheet.title = newTitle;
+  }
+
+  const index = req.properties?.index;
+  if (index !== undefined && index !== null) {
+    ss.sheets = ss.sheets.filter((s) => s.sheetId !== id);
+    ss.sheets.splice(index, 0, sheet);
+  }
+}
+
+/**
+ * Apply a spreadsheets.batchUpdate request list in order: addSheet (new empty tab, monotonic id),
+ * deleteSheet (drop a tab + its grid), updateSheetProperties (rename a tab, carrying its grid +
+ * value-input option to the new title). This is the surface the #37 atomic-swap backup drives
+ * (stage → delete old + rename staging → canonical, all in one batch).
+ */
+function applyBatchRequests(ss: FakeSpreadsheet, requests: sheets_v4.Schema$Request[]): void {
+  for (const req of requests) {
+    if (req.addSheet) applyAddSheet(ss, req.addSheet);
+    else if (req.deleteSheet) applyDeleteSheet(ss, req.deleteSheet);
+    else if (req.updateSheetProperties) applyRenameSheet(ss, req.updateSheetProperties);
+  }
+}
+
 /** Build a fake `sheets_v4.Sheets` backed by `store`. */
 export function makeFakeSheets(store: FakeGoogleStore): sheets_v4.Sheets {
   const spreadsheets = {
@@ -335,6 +408,7 @@ export function makeFakeSheets(store: FakeGoogleStore): sheets_v4.Sheets {
         title: s.properties?.title ?? `Sheet${i}`,
       }));
       const id = store.nextId('spreadsheet');
+      const nextSheetId = sheets.length;
       // Register as a Drive file too, so listing the folder finds it (coherence).
       store.files.set(id, {
         id,
@@ -353,6 +427,7 @@ export function makeFakeSheets(store: FakeGoogleStore): sheets_v4.Sheets {
         sheets,
         values: new Map(),
         valueInputOptions: new Map(),
+        nextSheetId,
       });
       return Promise.resolve({
         data: {
@@ -386,13 +461,7 @@ export function makeFakeSheets(store: FakeGoogleStore): sheets_v4.Sheets {
         return Promise.reject(
           googleApiError(404, `Spreadsheet not found: ${params.spreadsheetId}`)
         );
-      const requests = (params.requestBody?.requests ?? []) as sheets_v4.Schema$Request[];
-      for (const req of requests) {
-        const title = req.addSheet?.properties?.title;
-        if (title && !ss.sheets.some((s) => s.title === title)) {
-          ss.sheets.push({ sheetId: ss.sheets.length, title });
-        }
-      }
+      applyBatchRequests(ss, (params.requestBody?.requests ?? []) as sheets_v4.Schema$Request[]);
       return Promise.resolve({ data: {} });
     },
 

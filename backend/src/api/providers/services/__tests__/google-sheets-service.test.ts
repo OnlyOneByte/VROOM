@@ -225,3 +225,81 @@ describe('GoogleSheetsService — error/resilience paths', () => {
     ).rejects.toThrow('Rate limit exceeded');
   });
 });
+
+describe('GoogleSheetsService — atomic backup swap (#37)', () => {
+  // #37: the backup must be ATOMIC. The old in-place design cleared then re-wrote each LIVE sheet, so a
+  // failure mid-run left a TORN backup (some sheets new, the mid-write one emptied by its clear, the rest
+  // stale) on what may be the user's ONLY copy — silent data-loss (NORTH_STAR #1). The fix stages every
+  // table into temp tabs and only swaps them in (delete-old + rename-staging) once ALL staging writes
+  // succeed, in one atomic batchUpdate. These guard the invariant that matters: a failed backup leaves the
+  // PRIOR backup fully intact.
+
+  test('a write failure during a re-backup leaves the previous backup intact (no torn/emptied data)', async () => {
+    await seedVehicle('Toyota', 'Camry', 2020);
+    const svc = makeSvc();
+    // First backup succeeds — this is the user's good copy.
+    const info = await svc.createOrUpdateVroomSpreadsheet(
+      ctx.user.id,
+      'VROOM/Backups',
+      'Demo User'
+    );
+    const before = await svc.readSpreadsheetData(info.id);
+    expect(before.vehicles).toHaveLength(1);
+    expect(before.vehicles[0].make).toBe('Toyota');
+
+    // The user changes data, then a re-backup fails partway through STAGING (a 429 on a values.update).
+    const { db } = await import('../../../../db/connection');
+    const schema = await import('../../../../db/schema');
+    await db.insert(schema.vehicles).values({
+      userId: ctx.user.id,
+      make: 'Honda',
+      model: 'Civic',
+      year: 2021,
+    });
+    store.injectFault('spreadsheets.values.update', googleApiError(429, 'Rate limit exceeded'));
+    await expect(
+      svc.createOrUpdateVroomSpreadsheet(ctx.user.id, 'VROOM/Backups', 'Demo User')
+    ).rejects.toThrow('Rate limit exceeded');
+
+    // The PRIOR backup is byte-for-byte intact — the failed run touched only staging tabs, never the live
+    // canonical sheets. (The old clear-then-write design would have emptied/torn this.)
+    const after = await svc.readSpreadsheetData(info.id);
+    expect(after.vehicles).toHaveLength(1);
+    expect(after.vehicles[0].make).toBe('Toyota');
+
+    // And no staging tabs are left orphaned in the spreadsheet (cleanup ran on failure).
+    const titles = (await svc.getSpreadsheetInfo(info.id)).sheets.map((s) => s.title);
+    expect(titles.some((t) => t.includes('__vroom_staging'))).toBe(false);
+    expect(titles).toEqual([...SHEET_NAMES]);
+  });
+
+  test('a successful re-backup replaces the data and keeps tab order stable', async () => {
+    await seedVehicle('Toyota', 'Camry', 2020);
+    const svc = makeSvc();
+    const info = await svc.createOrUpdateVroomSpreadsheet(
+      ctx.user.id,
+      'VROOM/Backups',
+      'Demo User'
+    );
+    const firstTitles = (await svc.getSpreadsheetInfo(info.id)).sheets.map((s) => s.title);
+
+    // Mutate + re-backup; the new data must show, with the SAME tab set/order (no drift across backups).
+    const { db } = await import('../../../../db/connection');
+    const schema = await import('../../../../db/schema');
+    await db.insert(schema.vehicles).values({
+      userId: ctx.user.id,
+      make: 'Honda',
+      model: 'Civic',
+      year: 2021,
+    });
+    await svc.createOrUpdateVroomSpreadsheet(ctx.user.id, 'VROOM/Backups', 'Demo User');
+
+    const after = await svc.readSpreadsheetData(info.id);
+    expect(after.vehicles).toHaveLength(2);
+    expect(after.vehicles.map((v) => v.make).sort()).toEqual(['Honda', 'Toyota']);
+
+    const secondTitles = (await svc.getSpreadsheetInfo(info.id)).sheets.map((s) => s.title);
+    expect(secondTitles).toEqual(firstTitles);
+    expect(secondTitles).toEqual([...SHEET_NAMES]);
+  });
+});

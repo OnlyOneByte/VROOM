@@ -233,6 +233,13 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 > offline-outbox field-dropout family #66/#101/#111, or analytics split-sibling overcount if any builder
 > was missed by the #56/#108/#113/#146 sweep).
 
+> **CLOSED C44: #37** — the Google Sheets backup is now ATOMIC (stage→swap). See the Sev-1 block below for
+> the fix. **The Sheets-backup data-corruption Sev-1 pair (#36 C24 RAW-write + #37 C44 atomic-swap) is now
+> CLOSED.** The only remaining open Sev-1 is #127 (restore-atomicity), which is arch-rule-6 design-gated
+> (needs `.kiro/specs/<refactor>/design.md` + an authorized arch cycle — NOT a bug pick). So the next bug
+> cycle's top Angelo-approved item is **Sev-2 #94** (the 6-member fleet-unit-pooling class) or **Sev-3 #88**
+> (split-config-blob orphan on vehicle delete).
+
 > **✅ ANGELO-APPROVED 2026-06-17 — these are now ACTIONABLE bug/arch items with a ratified
 > direction (NO further sign-off needed). Angelo approved all the recommended approaches in one pass
 > ("record all your recommendations as approved … Reviewed"). Pick by severity order below; each names
@@ -248,11 +255,15 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 >   AND harmful (reintroduces the C399/C401 apostrophe corruption csv-safety.ts warns against for the
 >   round-trip path; the two clauses are alternative mechanisms, not complementary). Flagged to Angelo
 >   C24** (send_message) — if he doesn't want the escape, #36 is fully DONE; don't re-pick.
-> - **#37 (HIGH) — APPROVED: make the Sheets backup atomic — write to a temp sheet/range, then
->   copy-then-promote (swap). STILL OPEN** (left for its own cycle — a materially larger restructure than
->   #36's one-line switch; the fake seam + `batchUpdate`/`duplicateSheet`/rename API surface is the
->   mechanism). Currently a non-atomic in-place clear-then-write per sheet that can destroy the only good
->   copy on a mid-write failure. Next Sev-1 bug pick.
+> - ~~**#37 (HIGH) — DONE C44.**~~ The Sheets backup is now ATOMIC. Was per-sheet `clear()`-then-`update()`
+>   under one `Promise.all`, so a mid-run failure left a TORN backup (some sheets new, the mid-write one
+>   emptied by its clear, rest stale) on the user's only copy. New `writeAllSheetsAtomically`: STAGE every
+>   table into `${title}__vroom_staging` tabs (live sheets untouched; failure → clean up + rethrow, prior
+>   backup intact), then COMMIT one atomic `batchUpdate` that deletes old canonical sheets + renames staging
+>   → canonical with `index` set (all-or-nothing; tab order stable). Dropped the per-sheet clear. +2 guards
+>   (a 429 during a re-backup leaves the prior backup byte-identical + no staging tabs leak; a successful
+>   re-backup replaces data with stable order). Taught the fake `batchUpdate` delete/rename(+index) +
+>   monotonic sheetId. The Sheets-backup Sev-1 pair (#36 C24 + #37) is now CLOSED. Don't re-pick.
 > - **#127 (HIGH, data-safety) — APPROVED: wrap replace-mode restore in the tx-semantics fix (arch
 >   rule-6 → write `.kiro/specs/<refactor>/design.md` first, then build).** Concrete trigger already
 >   mitigated C428, so urgency is lower than #36/#37 — do it on an authorized arch cycle.
