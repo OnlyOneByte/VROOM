@@ -351,4 +351,39 @@ describe('#54: fleet fuel-efficiency trend never pairs across vehicles', () => {
     expect(trend[0]?.efficiency).toBeCloseTo(30, 5);
     expect(trend.some((p) => p.efficiency < 10)).toBe(false); // no mi/kWh-magnitude leak
   });
+
+  // #126 guard on the CONVERTED path (C66, arch-extract→guard-pin for the C64 *convertedGasEfficiencyPoints
+  // generator). getFuelEfficiencyTrend above uses its OWN forEachVehiclePair loop, NOT the C64 generator — so
+  // it does NOT pin the generator's gas-gate. The mixed-unit summary readers (getQuickStats / getYearEnd /
+  // getSummary) feed avgEfficiency through computeConvertedEfficiencyValues → the generator, and ONLY there is
+  // a PHEV charge session both (a) excluded from the gas average AND (b) NOT mis-fed to convertEfficiency
+  // (which would convert mi/kWh as if it were mi/gal → garbage, the worse half of #126/C427). Property 11
+  // drives this path but seeds gas-only rows, so a gate regression (revert gasEfficiencyPoint →
+  // computeEfficiencyPoint in the generator) would stay green there. This is the direct net: a mixed-unit
+  // (km/L vehicle, mi/gal user) PHEV fleet — the converted avgEfficiency must reflect the gas pair ALONE.
+  test('the CONVERTED summary gas-MPG average excludes a PHEV charge session on a mixed-unit fleet — #126 (C64 generator)', async () => {
+    const { userId } = setupUserAndVehicles(1);
+    const v0 = 'vehicle-user-1-0';
+    // User keeps the default miles/gallons; the vehicle reports km/litres → allVehiclesMatchUnits is false →
+    // skipConversion=false → computeConvertedEfficiencyValues runs the C64 generator's CONVERT branch.
+    testDb.sqlite.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
+      JSON.stringify({ distanceUnit: 'kilometers', volumeUnit: 'liters', chargeUnit: 'kwh' }),
+      v0,
+    ]);
+    // Gas pair: 10000 → 10300 km on 10 L = 30 km/L (in the [5,100] band) → converts to
+    // 30 / 1.609344 × 3.785411784 ≈ 70.57 mi/gal. Charge pair: 20000 → 20060 (60) on 15 kWh = 4 mi/kWh
+    // (would survive the electric [1,10] band PRE-fix and, mis-converted as mi/gal, drag the average down).
+    seedFuel(v0, 'g-1', new Date(2024, 0, 1), 10_000, 10);
+    seedFuel(v0, 'g-2', new Date(2024, 0, 5), 10_300, 10);
+    seedCharge(v0, 'c-1', new Date(2024, 0, 10), 20_000, 15);
+    seedCharge(v0, 'c-2', new Date(2024, 0, 15), 20_060, 15);
+
+    const stats = await repo.getQuickStats(userId, yearToRange(TEST_YEAR));
+    const expectedGasMpg = (30 / 1.609344) * 3.785411784; // ≈ 70.57 mi/gal, gas pair only
+    // Post-fix: exactly the converted gas average. Pre-fix (gate reverted): the ~4 mi/kWh charge point
+    // would average in (mis-converted), pulling avgEfficiency well below the gas-only value.
+    expect(stats.avgEfficiency).not.toBeNull();
+    expect(stats.avgEfficiency as number).toBeCloseTo(expectedGasMpg, 1);
+    expect(stats.avgEfficiency as number).toBeGreaterThan(50); // a charge-contaminated mean would be ~37
+  });
 });

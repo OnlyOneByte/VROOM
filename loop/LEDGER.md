@@ -32,12 +32,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 61 |
 | deep-review | 5 | 60 |
-| guard | 6 | 59 |
+| guard | 6 | 66 |
 | bug | 3 | 65 |
 | arch | 5 | 64 |
 | infra | 6 | 63 |
 
-Current cycle: **65**
+Current cycle: **66**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,25 @@ Current cycle: **65**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C66 (guard)** — **Pinned the C64 `convertedGasEfficiencyPoints` generator's gas/charge gate on the
+  CONVERTED path (arch-extract→guard-pin; the #126/C427 footgun, currently invisible to every test).**
+  Balance at C66: THREE over budget — feature (5/4, +1), deep-review (6/5, +1), guard (7/6, +1); guard is the
+  most-starved (7) → picked. Per the C17→C18 / C50 standing pattern (a freshly-extracted shared helper gets a
+  direct guard next cycle), the C64 generator now feeds 4 builders but had NO net for its gas-gate on the
+  CONVERTED path. VERIFIED the gap firsthand: getFuelEfficiencyTrend's #126 test uses its OWN forEachVehiclePair
+  loop (NOT the generator); Property 11 drives the converted consumers (getQuickStats/getCrossVehicle) but seeds
+  GAS-ONLY rows — so a gate regression (revert gasEfficiencyPoint→computeEfficiencyPoint inside the generator,
+  the exact #126/C427 footgun) would stay GREEN everywhere. GUARD (+1 in cross-vehicle.property.test.ts, next to
+  the #126 sibling): a MIXED-unit (km/L vehicle, mi/gal user → skipConversion=false → the generator's CONVERT
+  branch runs) PHEV fleet with gas fillups + charge sessions; asserts getQuickStats.avgEfficiency = the converted
+  GAS pair alone (30 km/L → 70.57 mi/gal), charge mi/kWh excluded. NON-VACUOUS proved firsthand: reverting the
+  generator's gate (with computeEfficiencyPoint imported) drops avgEfficiency 70.57 → 39.99 (the ~4 mi/kWh charge
+  point mis-converted as mi/gal + averaged in) → RED on the exact value; restored → green. This is the WORSE half
+  of #126 (convertEfficiency mis-converts mi/kWh as mi/gal), now pinned on the one path it can occur. Verify:
+  backend validate:local — tsc 0, musl-biome clean (20 pre-existing warnings, none new), 1667 pass / 0 fail (+1),
+  build bundled. Backend-only (no UI → no shot). cov: be 87.46% / fe 86.35% (~ — guard-only test add; generator
+  already line-covered, this pins the BEHAVIOR). STANDING PATTERN reaffirmed: arch extracts a shared helper
+  (C64) → next guard cycle pins it DIRECTLY against its load-bearing invariant (C66).
 - **C65 (bug #94, monthlyConsumption member)** — **Convert per-vehicle volume + gas-MPG to user-global units
   BEFORE pooling the monthlyConsumption chart series (Angelo-APPROVED Sev-2, NORTH_STAR #2).** Balance at C65:
   feature/deep-review/guard/bug all AT budget (4/4, 5/5, 6/6, 3/3); bug has the lowest budget (tips first) AND

@@ -239,6 +239,17 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C66:** the C64 `convertedGasEfficiencyPoints` generator's gas/charge gate is now pinned on the
+> CONVERTED path (+1 in cross-vehicle.property.test.ts). The C64 dedup centralized the gas-gate across 4
+> builders, but no test drove it on the convert branch: getFuelEfficiencyTrend's #126 test uses its OWN
+> forEachVehiclePair loop (NOT the generator), and Property 11 drives the converted consumers GAS-ONLY — so
+> reverting gasEfficiencyPoint→computeEfficiencyPoint inside the generator (the #126/C427 footgun) stayed green
+> everywhere. New guard: a MIXED-unit (km/L vehicle, mi/gal user → skipConversion=false) PHEV fleet; asserts
+> getQuickStats.avgEfficiency is the converted GAS pair alone (70.57 mi/gal), the ~4 mi/kWh charge excluded.
+> Non-vacuous proved firsthand (reverting the gate drops it 70.57→39.99 → RED on the value). Pins the WORSE half
+> of #126 (convertEfficiency mis-converting mi/kWh as mi/gal). The arch-extract→guard-pin pattern (C17→C18, C50,
+> now C64→C66). Don't re-add.
+>
 > **GUARDED C59:** the C58 #94 convert-before-pool invariant now has a tree-wide source-scan
 > (`no-unconverted-fleet-pooling.test.ts`, +3): asserts NO `computeConverted*`/`buildConverted*` call in
 > repository.ts passes a unit PLACEHOLDER (new Map() / DEFAULT_UNIT_PREFERENCES / hardcoded
