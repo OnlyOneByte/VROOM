@@ -29,12 +29,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 31 |
 | deep-review | 5 | 26 |
-| guard | 6 | 25 |
+| guard | 6 | 32 |
 | bug | 3 | 29 |
 | arch | 5 | 30 |
 | infra | 6 | 28 |
 
-Current cycle: **31**
+Current cycle: **32**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -353,6 +353,22 @@ Current cycle: **31**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C32 (guard)** — **Characterize the C31 import-preset category gap end-to-end (the standing
+  bug-finding→next-guard pattern).** Two cats over budget (guard 7/6, deep-review 6/5 — tie on over-by);
+  guard wins on raw starvation (7 > 6). The C31 eyes-on surfaced a concrete, unguarded invariant: the
+  built-in fuel presets map NO category column, so a detected fuel log maps + resolves the vehicle but
+  buildImportPlan errors EVERY row "Unknown category" → readyCount 0 (the presets import nothing today).
+  The EXISTING round-trip test (import-mapping.test.ts) hand-ADDS a `category:'Type'` column + categoryMap
+  to its mapping, so it tests a hypothetical mapping, NOT the REAL `MAPPING_PRESETS` — the gap was
+  unpinned. GUARD: +2 cases in import-mapping-presets.test.ts driving all 3 real presets through
+  presetToMapping → applyMapping → buildImportPlan: (1) NONE map a category column (the root); (2) each
+  currently yields readyCount 0 / errorCount 1 / message matches /category/ (the end-to-end consequence).
+  Verified the exact behavior firsthand via a scratch probe first (native CSV has a blank category cell →
+  `Unknown category ""`). NET-FLIPPING by design: when the flagged fix (defaultCategory:'fuel' per preset)
+  lands, the category expectation flips to 'fuel' + readyCount to N — these are the tests to update, and
+  they're documented as such. Verify: backend validate:local GREEN — tsc 0, musl-biome clean, 1604 pass /
+  0 fail (+2), build bundled. Backend-only (no UI → no shot). cov: be 87.22% / fe 86.14% (~ — import-mapping
+  modules already covered; +2 pin the preset gap as a characterization net).
 - **C31 (feature)** — **Import-trackers T4: auto-detect + target-vehicle mapping step (eyes-on DONE;
   preset gap flagged).** Nothing strictly over budget (guard/deep-review/feature all tied AT); took the
   highest-leverage open item — import-trackers is the ONLY remaining open feature (the other two DONE), and

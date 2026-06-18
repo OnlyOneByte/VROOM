@@ -171,6 +171,16 @@ the now-shootable eyes-on FE + any newly-touched module.)*
 > created. STANDING PATTERN (loop-improvement): whenever an arch cycle extracts a shared helper, the NEXT
 > guard cycle should pin it directly (C6 monthsBetween, C18 averageConsecutiveMpg). Don't re-add.
 >
+> **GUARDED C32:** the C31 import-preset category gap is characterized end-to-end
+> (import-mapping-presets.test.ts, +2): all 3 real `MAPPING_PRESETS` map no category column → driven through
+> presetToMapping → applyMapping → buildImportPlan, each currently yields readyCount 0 / "Unknown category"
+> (the presets import nothing today). NET-FLIPPING: when the flagged defaultCategory:'fuel' fix lands, the
+> category expectation flips to 'fuel' + readyCount to N — these tests are the update target (documented
+> in-file). Pins the gap the existing round-trip test missed (it hand-adds a category column, never
+> exercises the REAL presets). Don't re-add. STANDING PATTERN extended: a feature/eyes-on cycle that
+> surfaces a concrete unguarded invariant seeds the next guard cycle to characterize it (C31→C32, like
+> arch-extract→guard-pin C17→C18 + one-token-fix→source-scan C24→C25).
+>
 > **GUARDED C25:** the C24 #36 RAW-value-input fix now has a tree-wide source-scan guard
 > (`sheets-raw-value-input.test.ts`, +2): asserts EVERY `valueInputOption:` assignment in
 > google-sheets-service.ts is `'RAW'`, so a reformat-flip back to USER_ENTERED OR a new Sheets write site
