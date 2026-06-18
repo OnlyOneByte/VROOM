@@ -386,6 +386,17 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C94:** the CORS↔CSRF origin-allowlist coupling in app.ts is now pinned by a source-scan
+> (`src/__tests__/cors-csrf-origin-coupling.test.ts`, +4) — the C92-flagged unaudited surface. app.ts wires
+> `cors({ origin: CONFIG.cors.origins })` AND `csrf({ origin: CONFIG.cors.origins })` from the SAME allowlist,
+> coupled only by both referencing that const; NO test pinned it (the 2 "csrf" files assert application-layer
+> OAuth-state userId matching, not the middleware origin allowlist). Drift them (hand csrf a hardcoded/divergent
+> list) → the two trust boundaries split: a CSRF gap on an origin one trusts and the other doesn't, or legit
+> cross-origin state-changing requests rejected as forgery (NORTH_STAR #2) — invisible to a happy-path same-origin
+> test. Guard source-scans both calls for `origin: CONFIG.cors.origins` + asserts they reference the IDENTICAL
+> source (drift detector). Non-vacuous (drift csrf to a hardcoded list → 2 of 4 RED). The one-edit→source-scan
+> pattern (C25/C45/C59/C67/C80/C87). The config-coupling seam (C67/C80/C81/C87/C94) is now broadly fenced. Don't re-add.
+>
 > **GUARDED C87:** bug #18 (split-sibling fillup-count inflation) is now pinned on the PREV-PERIOD axis — the
 > C97 guard's missing twin (+1 in fuel-stats-fleet-distance-pooling.test.ts). The FuelStats "This Period vs Last
 > Period" fillup comparison computes its halves through DIFFERENT predicates across two layers: `fillups.currentYear`

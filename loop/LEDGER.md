@@ -32,12 +32,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 93 |
 | deep-review | 5 | 92 |
-| guard | 6 | 87 |
+| guard | 6 | 94 |
 | bug | 3 | 89 |
 | arch | 5 | 91 |
 | infra | 6 | 90 |
 
-Current cycle: **93**
+Current cycle: **94**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,28 @@ Current cycle: **93**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C94 (guard — pinned the CORS↔CSRF origin-allowlist coupling in app.ts via a source-scan; the C92-flagged
+  unaudited surface)** — Balance at C94 (HEAD was C93; nudge label lags): TWO over budget — guard (94−87=7/6, +1)
+  and bug (94−89=5/3, +2); guard most-starved (7 > 5) → picked (the C84 tie-break: raw starvation wins, not overage).
+  Guard is narrowing + NO production source changed since C85, so I needed a genuine unguarded load-bearing
+  invariant. The C92 deep-review flagged CORS/CSRF origin config as unaudited — verified the gap firsthand: app.ts
+  wires `cors({ origin: CONFIG.cors.origins, ... })` AND `csrf({ origin: CONFIG.cors.origins })` from the SAME
+  allowlist, coupled ONLY by both literally referencing that const — and NO test pinned it (the 2 files mentioning
+  "csrf" assert the application-layer OAuth-state userId match, NOT the middleware origin allowlist). If a future
+  edit drifts them (hands csrf a hardcoded/narrower/wider list, or an env var cors doesn't use), the two trust
+  boundaries SPLIT: CSRF trusting an origin CORS rejects (or vice versa) → either a CSRF-protection gap on an
+  unintended origin or legit cross-origin state-changing requests wrongly rejected as forgery (NORTH_STAR #2
+  isolation), and a happy-path same-origin behavioral test stays GREEN, blind to it. GUARD: new
+  `src/__tests__/cors-csrf-origin-coupling.test.ts` (+4) — source-scans app.ts: both `cors({...})` and `csrf({...})`
+  must pass `origin: CONFIG.cors.origins`, AND both must reference the IDENTICAL origin source (drift detector).
+  NON-VACUOUS proved firsthand: drifting csrf to a hardcoded `['http://localhost:5173']` → 2 of 4 RED (the csrf
+  source assertion + the identical-source check); restored → 4 pass. The one-edit→source-scan pattern (C25/C45/C59/
+  C67/C80/C87) applied to a security middleware-config coupling. Verify: backend validate:local GREEN — tsc 0,
+  musl-biome clean (20 pre-existing warnings, none new), 1703 pass / 0 fail (+5: the +4 here + a prior-uncounted
+  delta), build bundled. Backend-only (no UI → no shot). cov: be 87.47% / fe 86.35% (~ — guard-only source-scan;
+  pins a cross-middleware config coupling a single-request test can't). NEXT guard: thin — prefer a fresh
+  deep-review/feature-surfaced invariant over a cold guard scout; the config-coupling seam (retry-ceiling C67,
+  export-import C80, OPTIONAL-files C81, prev-period C87, CORS/CSRF C94) is now broadly fenced.
 - **C93 (feature — eyes-on the never-shot /settings surface [backup/restore + provider config], desktop + mobile;
   CLEAN)** — Balance at C93 (HEAD was C92; nudge label lags): TWO over budget — feature (93−88=5/4, +1) and bug
   (93−89=4/3, +1); feature most-starved (5 > 4) → picked. Import-trackers stays Angelo-gated (defaultCategory), so
