@@ -40,11 +40,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 101 |
 | deep-review | 5 | 102 |
 | guard | 6 | 101 |
-| bug | 3 | 99 |
+| bug | 3 | 103 |
 | arch | 5 | 98 |
 | infra | 6 | 97 |
 
-Current cycle: **102**
+Current cycle: **103**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -363,6 +363,23 @@ Current cycle: **102**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C103 (bug — recorded dry FAST [8th consecutive]; + confirmed the C100–C102 FE-logic guard frontier is now
+  worked out)** — Balance at C103 (HEAD was C102; nudge label lags): bug (103−99=4/3, +1) the LONE over-budget
+  category → forced. PRECONDITION (per C99): `git diff 5766239(C85)..HEAD` over production source is EMPTY — nothing
+  has changed since the cold vein was last swept, so a bug scout produces nothing → recorded dry immediately. ALSO
+  scouted whether the C100/C101/C102 FE-logic guard frontier (which produced 3 real coverage gains) still has clean
+  picks: RE-MEASURED FE coverage — the only remaining <90% files are expense-api.ts (73% — dominated by thin
+  apiClient pass-through wrappers: getPhotos/uploadPhoto/deletePhoto/split-CRUD, where a test would just assert
+  "calls apiClient.X with this URL" = the C181/C229 coverage-theater) and sync-manager.ts (66% — the uncovered lines
+  are `setupAutoSync`'s `window.addEventListener('online', …)` DOM-effect wiring [Playwright territory] + the
+  already-fully-covered resolveConflict switch). The genuinely load-bearing FE-logic gaps are now CLOSED (settings
+  reload C100, theme listener C101, #148 anchor C102); the residual FE under-coverage is STRUCTURAL (effect/DOM-bound
+  + thin delegation), the FE mirror of the BE DI/OAuth-bound tail — not clean unit pins. No fresh bug, no
+  non-theater guard → recorded dry, did NOT manufacture. The productive surfaces are now: (a) the parked
+  Angelo-gated queue (#148 READY w/ its C102 anchor, #100/#79/#129 + import defaultCategory), (b) genuinely
+  STRUCTURAL coverage (needs Playwright for the FE effect tail / DI harness for the BE tail — neither a normal cycle
+  pick). NEXT bug cycle: precondition-check + record dry immediately. Doc-only — no source/test touched. cov: be
+  87.47% / fe 87.6% (~ — nothing touched).
 - **C102 (deep-review — CHARACTERIZED the #148 escalation [null-initialMileage lease burn bar] as a red→green
   anchor, NOT a fix; the parked product call now pinned)** — Balance at C102 (HEAD was C101; nudge label lags):
   NOTHING strictly over budget; bug (102−99=3/3) AT budget but provably dry (no source changed since C85, 7× dry —
