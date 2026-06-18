@@ -88,6 +88,18 @@ now — the "Playwright-blocked" tail was a ~200-cycle MISDIAGNOSIS, see GUIDE.m
 re-audit a data-safety write path, certify it CLEAN against source, and leave a merge-surviving guard.
 Don't trust agent "HIGH" findings — verify firsthand (the archive logged many debunked false-positives).)*
 
+> **CERTIFIED C60 — the `createProviderInstance` fake-provider production-safety gate CLEAN + guarded.**
+> registry.ts double-gates the `fake` storage provider — instantiates FakeStorageProvider (in-memory, no
+> bytes leave the process) ONLY when CONFIG.allowFakeStorageProvider (ALLOW_FAKE_STORAGE + NODE_ENV !==
+> production), else throws; a fake row reaching production would silently swallow every backup/photo upload
+> (NORTH_STAR #1). The ROUTE-create gate was pinned; this REGISTRY-instantiation gate (the layer restore/
+> sync resolve a live provider through) was not. +2 in registry.test.ts (test env has the gate off → fake
+> throws; the gate short-circuits BEFORE decrypt — garbage creds still throw the gate error). Non-vacuous
+> (remove the gate → both RED). ALSO verified firsthand the provider CREDENTIAL surface is ALREADY guarded
+> (formatProviderResponse omits credentials GET/POST/PUT + C260 re-encrypt, C416 config, #63 tenant-scope,
+> C254 builder branches) — don't re-audit. Next deep-review: the sync-worker retry/backoff path, or an
+> eyes-on /insurance render sweep.
+>
 > **CERTIFIED C53 — `buildTCOMonthlyTrend` (the TCO monthly cost series) CLEAN + guarded.** The per-month
 > TCO series the chart renders was driven only transitively through getTCO; no test pinned its bucketing.
 > Certified firsthand: buckets by (category, sourceType) — financial+financing→financing,

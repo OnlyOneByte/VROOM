@@ -31,13 +31,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 54 |
-| deep-review | 5 | 53 |
+| deep-review | 5 | 60 |
 | guard | 6 | 59 |
 | bug | 3 | 58 |
 | arch | 5 | 57 |
 | infra | 6 | 56 |
 
-Current cycle: **59**
+Current cycle: **60**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,28 @@ Current cycle: **59**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C60 (deep-review)** — **Certified the `createProviderInstance` fake-provider production-safety gate
+  CLEAN + pinned (a previously-unguarded layer).** deep-review was most-starved over budget (60−53=7/5 +2;
+  feature +2 lost on raw starvation). Per the C53 pointer ("auth/provider path"), verified FIRSTHAND that
+  the provider CREDENTIAL surface is ALREADY broadly guarded — formatProviderResponse omits credentials
+  across GET/POST/PUT (providers-routes-http.test.ts:206 + the C260 PUT re-encrypt no-echo), config
+  fail-fast (C416), tenant-scoping (#63), createProviderInstance's google-drive/photos/s3/unknown-type/
+  missing-refreshToken branches (C254) — so did NOT re-audit them. Found the genuine gap: the `fake`
+  storage-provider DOUBLE-GATE in createProviderInstance (registry.ts:217-221) was UNPINNED. It instantiates
+  a FakeStorageProvider (in-memory, no bytes leave the process) ONLY when CONFIG.allowFakeStorageProvider is
+  true (ALLOW_FAKE_STORAGE set AND NODE_ENV !== production), else throws — a `fake` row reaching production
+  would silently swallow every backup/photo upload (NORTH_STAR #1 data-loss). The ROUTE-create gate is
+  pinned, but this REGISTRY-instantiation gate (the layer restore/sync resolve a live provider through, NOT
+  the route) had no test. CERTIFIED FIRSTHAND CLEAN: the test env is allowFakeStorageProvider=false (the
+  prod-safety default), so a fake row → throws 'Fake storage provider is not enabled'; AND the gate
+  short-circuits BEFORE decrypt (a fake row with garbage creds still throws the GATE error, not a parse
+  error — proving the 217→224 ordering). GUARD: +2 in registry.test.ts — no CONFIG mock needed (the test
+  env already has the gate off). NON-VACUOUS (verified firsthand): remove the gate → both RED; reverted →
+  22/22 green, registry.ts byte-identical. Deep-review test-only — no app source touched. Verify: backend
+  validate:local GREEN — tsc 0, musl-biome 0 errors (20 pre-existing warnings), 1665 pass / 0 fail (+2),
+  build bundled. Backend-only (no UI → no shot). cov: be ~87.5% / fe 86.35% (~ — pins the fake-gate; no
+  module logic touched). The provider credential + instantiation path is now broadly certified; next
+  deep-review: the sync-worker retry/backoff path, or an eyes-on /insurance render sweep.
 - **C59 (guard)** — **Tree-wide source-scan pinning the C58 #94 convert-before-pool invariant.** THREE over
   budget at C59 — guard (59−52=7/6 +1), deep-review (6/5 +1), feature (5/4 +1); guard wins on raw starvation
   (7 > 6 > 5). The C58 #94 distance fix's footgun was `getFuelStats` feeding NO-OP PLACEHOLDERS (`new Map()`

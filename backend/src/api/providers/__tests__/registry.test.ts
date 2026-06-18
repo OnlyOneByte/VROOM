@@ -404,5 +404,40 @@ describe('StorageProviderRegistry', () => {
         'Invalid S3 config: missing endpoint, bucket, or region'
       );
     });
+
+    // C60 deep-review (CERTIFIED CLEAN — pins an unguarded PRODUCTION-SAFETY gate). createProviderInstance
+    // double-gates the `fake` storage provider (registry.ts): it instantiates a FakeStorageProvider ONLY
+    // when CONFIG.allowFakeStorageProvider is true (= ALLOW_FAKE_STORAGE set AND NODE_ENV !== production),
+    // else throws. The FakeStorageProvider bypasses real storage (in-memory, no bytes leave the process), so
+    // a `fake` row reaching production would silently swallow every backup/photo upload — a NORTH_STAR #1
+    // data-loss footgun. The route-create gate is pinned (providers-routes-http.test.ts), but this REGISTRY
+    // instantiation gate (a different layer — restore/sync resolve a live provider here, not via the route)
+    // was unpinned. The test env has allowFakeStorageProvider=false (NODE_ENV=test, ALLOW_FAKE_STORAGE
+    // unset), so this pins the SECURITY-DEFAULT branch directly — no CONFIG mock needed.
+    test('C60: a fake provider is REJECTED when allowFakeStorageProvider is off (the prod-safety default)', () => {
+      const db = createMockDb([]);
+      const registry = new StorageProviderRegistry(db as never);
+      const fakeRow = { ...baseProvider, providerType: 'fake' };
+
+      expect(() => registry.createProviderInstance(fakeRow)).toThrow(
+        'Fake storage provider is not enabled'
+      );
+    });
+
+    test('C60: the fake gate SHORT-CIRCUITS before decrypt (a fake row with garbage creds still throws the GATE error, not a decrypt/parse error)', () => {
+      const db = createMockDb([]);
+      const registry = new StorageProviderRegistry(db as never);
+      // Credentials that would throw on JSON.parse if decrypt ran — proving the gate check runs FIRST,
+      // so a fake row never even reaches the credential decrypt path (the ordering in registry.ts:217-224).
+      const fakeRowBadCreds = {
+        ...baseProvider,
+        providerType: 'fake',
+        credentials: 'encrypted:not-valid-json{{{',
+      };
+
+      expect(() => registry.createProviderInstance(fakeRowBadCreds)).toThrow(
+        'Fake storage provider is not enabled'
+      );
+    });
   });
 });
