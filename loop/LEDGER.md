@@ -14,12 +14,12 @@
 > re-measure this cycle; re-measure (`bun test --coverage` / vitest `--coverage`) on guard/arch/bug
 > cycles that touch a module. Goal 90% both (structural ceiling ~87% BE / ~86% FE — the remaining gap
 > is OAuth/DI-bound BE [auth routes, provider services, backup-orchestrator, db connection] + eyes-on FE
-> components). **RE-MEASURED C70 (infra cadence): BE 87.46% line / 87.18% func (file-mean, 1672 pass); FE
-> 86.35% line / 87.68% func / 78.78% branch (v8, 735 pass) — BE func +0.01 vs C63 (the C64 dedup + C65/C69
-> #94 monthlyConsumption/seasonal twins + C66/C67 guards added covered lines); FE UNCHANGED (C64–C69 all
-> backend; no FE module touched since C52's test-only add).** Both still at the ~87 BE / ~86 FE structural
-> ceiling; treat as the floor.
-> (C63: BE 87.46/87.17, FE 86.35/87.68/78.78. C56: BE 87.46/87.18, FE 86.35/87.68/78.78. C49: BE 87.47/87.17, FE 86.35/87.68/78.88. C42: BE 87.33/86.97, FE 86.35/87.68/78.78. C35: BE 87.29/86.97, FE 86.14/87.31/78.70.
+> components). **RE-MEASURED C77 (infra cadence): BE 87.46% line / 87.18% func (file-mean, 1691 pass); FE
+> 86.35% line / 87.68% func / 78.78% branch (v8, 735 pass) — BOTH FLAT vs C70 (C71 vehicleUnitsFor dedup +
+> C65/C69/C72/C76 #94 twins/threads + C73 dispatch guard + C74 import-key guard + C75 eyes-on; all on
+> already-covered analytics/import modules); FE UNCHANGED (C71–C76 all backend; no FE module touched since
+> C52's test-only add).** Both still at the ~87 BE / ~86 FE structural ceiling; treat as the floor.
+> (C70: BE 87.46/87.18, FE 86.35/87.68/78.78. C63: BE 87.46/87.17, FE 86.35/87.68/78.78. C56: BE 87.46/87.18, FE 86.35/87.68/78.78. C49: BE 87.47/87.17, FE 86.35/87.68/78.88. C42: BE 87.33/86.97, FE 86.35/87.68/78.78. C35: BE 87.29/86.97, FE 86.14/87.31/78.70.
 > C28: BE 87.22/86.97, FE 86.14/87.31/78.70. C21: BE 87.22/86.96, FE
 > 86.07/87.19/78.53. C14: BE 87.22/86.96, FE 86.07/87.19/78.53. C7: FE 85.95/87.15/78.38.)
 
@@ -35,9 +35,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 73 |
 | bug | 3 | 76 |
 | arch | 5 | 71 |
-| infra | 6 | 70 |
+| infra | 6 | 77 |
 
-Current cycle: **76**
+Current cycle: **77**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,19 @@ Current cycle: **76**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C77 (infra)** — **Branch-hygiene sweep + coverage re-measure (the ~10-cycle cadence; last ran C70).**
+  TWO over budget at C77 — infra (77−70=7/6, +1) and arch (77−71=6/5, +1); infra wins the tie on raw starvation
+  (7 > 6). Ran a touch early (7 cycles since C70 vs the ~10 guideline) but the budget forces it AND the suite
+  grew +19 (1672→1691) over C71–C76, so the re-measure is substantive, not ceremony. (1) UNTRACKED-TEST SWEEP:
+  CLEAN — zero untracked `.test`/`.spec.ts`/`.svelte` specs (the gitignored `*.meshclaw.e2e.ts` agent specs +
+  the C68 shot.mjs CLICK_TEXT harness are by-design; the persistent `M .gitignore`/`M frontend/.gitignore` are
+  the intentional local overrides). (2) COVERAGE RE-MEASURED: **BE 87.46% line / 87.18% func** (1691 pass); **FE
+  86.35% line / 87.68% func / 78.78% branch** (735 pass) — BOTH FLAT vs C70 (C71–C76 were dedups/twins/guards on
+  already-covered analytics + import modules + a new test file; FE untouched since C52). Both at the ~87 BE /
+  ~86 FE structural ceiling. (3) BOTH-SIDES GREEN: BE 1691 / FE 735. (4) BRANCH STATE: claude-loop-dev = **77
+  commits ahead** of fresh origin/main, PR-ready (category spread bug 19 / feature 15 / guard 12 /
+  deep-review 12 / infra 10 / arch 8; the 77th is the C1 loop-doc reset). Doc-only — no source touched.
+  cov: be 87.46% / fe 86.35% (MEASURED). NEXT cadence ~C87.
 - **C76 (bug #94, vehicleRadar member — the LAST advanced builder)** — **Convert each vehicle's gas-MPG +
   odometer to user-global units BEFORE the cross-fleet normalize (Angelo-APPROVED Sev-2, NORTH_STAR #2).**
   Balance at C76: bug (4/3, +1) the lone over-budget category → picked. Took the 6th/last unit-bearing #94
