@@ -14,12 +14,12 @@
 > re-measure this cycle; re-measure (`bun test --coverage` / vitest `--coverage`) on guard/arch/bug
 > cycles that touch a module. Goal 90% both (structural ceiling ~87% BE / ~86% FE — the remaining gap
 > is OAuth/DI-bound BE [auth routes, provider services, backup-orchestrator, db connection] + eyes-on FE
-> components). **RE-MEASURED C56 (infra cadence): BE 87.46% line / 87.18% func (file-mean, 1659 pass); FE
-> 86.35% line / 87.68% func / 78.78% branch (v8, 735 pass) — BOTH essentially FLAT vs C49 (C50 dedup + C51
-> #98 overwrite + C52/C53/C54/C55 were test additions + small guards; covered lines grew with the file-mean
-> denominator, no net % move). FE UNCHANGED (C50–C55 were all backend; no FE module touched since C52's
-> test-only add).** Both still at the ~87 BE / ~86 FE structural ceiling; treat as the floor.
-> (C49: BE 87.47/87.17, FE 86.35/87.68/78.88. C42: BE 87.33/86.97, FE 86.35/87.68/78.78. C35: BE 87.29/86.97, FE 86.14/87.31/78.70.
+> components). **RE-MEASURED C63 (infra cadence): BE 87.46% line / 87.17% func (file-mean, 1666 pass); FE
+> 86.35% line / 87.68% func / 78.78% branch (v8, 735 pass) — BOTH FLAT vs C56 (C57 dedup + C58/C62 #94
+> distance/volume fixes + C59/C60 guards + C61 eyes-on were small targeted changes / test additions). FE
+> UNCHANGED (C57–C62 all backend; no FE module touched since C52's test-only add).** Both still at the ~87
+> BE / ~86 FE structural ceiling; treat as the floor.
+> (C56: BE 87.46/87.18, FE 86.35/87.68/78.78. C49: BE 87.47/87.17, FE 86.35/87.68/78.88. C42: BE 87.33/86.97, FE 86.35/87.68/78.78. C35: BE 87.29/86.97, FE 86.14/87.31/78.70.
 > C28: BE 87.22/86.97, FE 86.14/87.31/78.70. C21: BE 87.22/86.96, FE
 > 86.07/87.19/78.53. C14: BE 87.22/86.96, FE 86.07/87.19/78.53. C7: FE 85.95/87.15/78.38.)
 
@@ -35,9 +35,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 59 |
 | bug | 3 | 62 |
 | arch | 5 | 57 |
-| infra | 6 | 56 |
+| infra | 6 | 63 |
 
-Current cycle: **62**
+Current cycle: **63**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,20 @@ Current cycle: **62**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C63 (infra)** — **Branch-hygiene sweep + coverage re-measure (the ~10-cycle cadence; last ran C56).**
+  TWO over budget at C63 — infra (63−56=7/6, +1) and arch (63−57=6/5, +1); infra wins the tie on raw
+  starvation (7 > 6). (1) UNTRACKED-TEST SWEEP: CLEAN — zero untracked `.test.ts`/`.spec.ts` (the gitignored
+  `*.meshclaw.e2e.ts` agent specs are by-design — note C61 added import-t6-manual-fuel-roundtrip.meshclaw
+  .e2e.ts, correctly gitignored; the persistent `M .gitignore`/`M frontend/.gitignore` are the intentional
+  local overrides). (2) COVERAGE RE-MEASURED (7 commits since C56): **BE 87.46% line / 87.17% func**
+  (file-mean, 1666 pass); **FE 86.35% line / 87.68% func / 78.78% branch** (v8, 735 pass) — both FLAT vs
+  C56 (C57 dedup + C58/C62 #94 distance/volume + C59/C60 guards + C61 eyes-on were small targeted changes/
+  test additions); FE UNCHANGED (C57–C62 all backend). Both at the ~87 BE / ~86 FE structural ceiling.
+  (3) BOTH-SIDES GREEN: BE 1666 / FE 735. (4) BRANCH STATE: claude-loop-dev = **63 commits ahead** of fresh
+  origin/main (C1–C62: 2 features COMPLETE + import-trackers manual-path fully eyes-on through T6 [detect-
+  commit + the preset defaultCategory parked for Angelo]; category spread bug 15 / feature 13 / guard 10 /
+  deep-review 10 / infra 8 / arch 6), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored.
+  Doc-only — no source touched. cov: be 87.46% / fe 86.35% (MEASURED). NEXT cadence ~C73.
 - **C62 (bug #94, volume member)** — **Convert per-vehicle volume to user-global units BEFORE pooling the
   fleet fuel-stats volume + fillupDetails (Angelo-APPROVED Sev-2, NORTH_STAR #2).** bug was the SOLE
   over-budget category (62−58=4/3 +1; arch/infra AT). Cold-scout exhausted → top Angelo-approved item:
