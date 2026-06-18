@@ -29,14 +29,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 41 |
+| feature | 4 | 47 |
 | deep-review | 5 | 46 |
 | guard | 6 | 45 |
 | bug | 3 | 44 |
 | arch | 5 | 43 |
 | infra | 6 | 42 |
 
-Current cycle: **46**
+Current cycle: **47**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -355,6 +355,27 @@ Current cycle: **46**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C47 (feature)** — **Import-trackers T4: category-remap table for unrecognized category words (eyes-on
+  DONE).** feature was most-starved over budget (47−41=6/4 +2; bug sat AT 3/3, not over). Import-trackers
+  is the only open feature; its remaining unblocked T4 piece was the category-remap table (the
+  `defaultCategory` preset gap stays parked-for-Angelo, T6 e2e is verify-phase). REAL gap: when a foreign
+  CSV's category column carries a word VROOM doesn't recognize, `mapCategory` falls it back to `misc` +
+  surfaces it in the preview's `unmappedCategories` (D2 "never invent"), but the dialog had NO UI to remap
+  it — so the user couldn't rescue a mis-categorized import without editing the CSV. FIX: when a preview
+  surfaces `unmappedCategories`, render an "Unrecognized categories" panel — one row per word + a
+  VROOM-category `Select` (reusing the canonical `categoryLabels` from expense-helpers, NOT a reinvented
+  list — NORTH_STAR #4). Assigning a word folds into `buildMapping`'s `categoryMap` (merged OVER any
+  preset's own map, user choices win; manual path sends categoryMap only once ≥1 word is assigned) +
+  re-previews, so the word resolves, drops out of the list, and its rows re-categorize. State reset on
+  dialog-close + on re-detect (no stale remap bleed). EYES-ON CONFIRMED via
+  `import-category-remap.meshclaw.e2e.ts` + 2 PNGs (Read): a bespoke CSV with `Type=servicing` → the
+  "Unrecognized categories" panel renders (amber, CircleAlert) → map servicing→Maintenance → panel
+  disappears + "1 ready" + "Import 1 row" enabled → committed row imported as `maintenance` (NOT the misc
+  fallback, verified via API). Remap trigger got `data-testid="remap-category-{word}"`. Verify: frontend
+  validate:local GREEN — type-check 0, build OK, 735 tests pass. cov: be ~87.3% / fe 86.35% (~ — UI-markup
+  cycle, the categoryMap round-trip is backend-covered at T1/T3; FE store/util layer untouched). T4 REMAINING:
+  only the Angelo-gated preset `defaultCategory` (the remap table does NOT cover it — a detected preset maps
+  no category COLUMN, so there's no word to remap; that's the parked missing-column decision) + T6 e2e.
 - **C46 (deep-review)** — **Certified the insurance `monthlyPremiumTrend` month-bucketing CLEAN + guarded
   + fixed a latent test-harness epoch bug.** deep-review was most-starved over budget (46−39=7/5 +2;
   feature +1 lost on raw starvation). Per the standing notes (C39/C33/C26 all point to an unaudited

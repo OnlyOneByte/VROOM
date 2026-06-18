@@ -74,14 +74,23 @@
             `import-manual-units.meshclaw.e2e.ts` + shot: a km/litres log mapped + units set to Kilometers/
             Liters → committed row converted 160.9344 km→100 mi, 37.854 L→~10 US gal (verified via API).
             Field/unit Select triggers got `data-testid`s for deterministic e2e targeting.
-      - [ ] **REMAINING (T4 follow-ups):** a category-remap table for unrecognized category WORDS (a manual
-            file's category column passes through verbatim — only NAMED-but-unknown words need a remap UI).
-            **BLOCKER surfaced + flagged to Angelo
-            C31:** the fuel presets map no category column and `mapCategory` leaves a blank category blank
-            (D2 "never invent"), so a detected fuel log previews 0-ready ("Unknown category"). Recommended
-            fix (a): give each fuel preset a `defaultCategory:'fuel'`
-            (backend-preset change, awaiting the steer) — until then the auto-detect path detects+maps but
-            commits nothing.
+      - [x] **CATEGORY-REMAP table DONE (C47, eyes-on CONFIRMED):** when a preview surfaces
+            `unmappedCategories` (a foreign category WORD the importer didn't recognize → falls back to misc,
+            D2 "never invent"), the dialog renders an "Unrecognized categories" panel — one row per word + a
+            VROOM-category `Select` (reusing the canonical `categoryLabels`). Assigning a word folds it into
+            the mapping's `categoryMap` (merged over any preset map; user choices win) and re-previews, so
+            the word resolves + drops out of the list and its rows re-categorize. Eyes-on via
+            `import-category-remap.meshclaw.e2e.ts` + 2 shots (Read): a bespoke CSV with `Type=servicing` →
+            "Unrecognized categories" panel renders → map servicing→Maintenance → panel disappears, "1 ready"
+            → committed row imported as `maintenance` (NOT the misc fallback, verified via API). Remap trigger
+            got `data-testid="remap-category-{word}"`. FE validate:local GREEN (735).
+      - [ ] **REMAINING (T4 follow-ups):** the Angelo-gated preset `defaultCategory`. **BLOCKER surfaced +
+            flagged to Angelo C31:** the fuel presets map no category column and `mapCategory` leaves a blank
+            category blank (D2 "never invent"), so a DETECTED fuel log previews 0-ready ("Unknown category").
+            Recommended fix (a): give each fuel preset a `defaultCategory:'fuel'` (backend-preset change,
+            awaiting the steer) — until then the auto-detect path detects+maps but commits nothing. (NOTE: the
+            C47 remap table does NOT solve this — a detected preset maps no category COLUMN at all, so there's
+            no word to remap; the gap is the missing column, which is the parked `defaultCategory` decision.)
 - [ ] **T5** Four-states + a11y + mobile; compose from the kit.
 
 ## Phase 4 — verify

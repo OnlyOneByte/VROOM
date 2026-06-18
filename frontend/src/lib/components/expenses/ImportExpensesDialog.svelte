@@ -8,6 +8,7 @@
 	import { handleErrorWithNotification } from '$lib/utils/error-handling';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
 	import { getDistanceUnitLabel, getVolumeUnitLabel } from '$lib/utils/units';
+	import { categoryLabels } from '$lib/utils/expense-helpers';
 	import {
 		guessManualColumns,
 		isNativeImportHeaders,
@@ -15,6 +16,7 @@
 	} from '$lib/utils/import-mapping-helpers';
 	import type {
 		DistanceUnit,
+		ExpenseCategory,
 		ImportColumnMapping,
 		ImportDateFormat,
 		ImportMappingPreset,
@@ -68,6 +70,13 @@
 	let manualDistanceUnit = $state<DistanceUnit>('miles');
 	let manualVolumeUnit = $state<VolumeUnit>('gallons_us');
 
+	// Category remap (T4): a foreign category WORD the importer didn't recognize falls back to `misc`
+	// and is surfaced in the preview's `unmappedCategories` (D2 "never invent" — only NAMED-but-unknown
+	// words, not blanks). This maps each such word → a VROOM category; the choices fold into the mapping's
+	// `categoryMap`, so a re-preview re-categorizes those rows (the word then resolves and drops out of
+	// unmappedCategories). '' = not yet assigned (still falls back to misc).
+	let categoryRemap = $state<Record<string, ExpenseCategory>>({});
+
 	// The VROOM fields the manual editor exposes (the importer-consumed subset; missedFillup is niche).
 	const MAPPABLE_FIELDS: { field: NativeImportField; label: string; required?: boolean }[] = [
 		{ field: 'date', label: 'Date', required: true },
@@ -88,6 +97,8 @@
 	];
 	const DISTANCE_UNITS: DistanceUnit[] = ['miles', 'kilometers'];
 	const VOLUME_UNITS: VolumeUnit[] = ['gallons_us', 'gallons_uk', 'liters'];
+	// The 6 VROOM categories, in the canonical label order shared with the expense form / tables / charts.
+	const CATEGORY_OPTIONS = Object.entries(categoryLabels) as [ExpenseCategory, string][];
 
 	let targetVehicle = $derived(vehicles.find((v) => v.id === targetVehicleId));
 	// A manual mapping needs a vehicle column OR a chosen target vehicle (the same D4 rule as a preset).
@@ -96,7 +107,17 @@
 	// Null until the active path is complete (preset: vehicle chosen; manual: date+amount mapped + a vehicle).
 	let mapping = $derived<ImportColumnMapping | null>(buildMapping());
 
+	// The user's category-remap choices, as the backend `categoryMap` (foreign word → VROOM category).
+	// Drops entries the user hasn't assigned yet (''), so an unassigned word keeps falling back to misc.
+	function assignedCategoryMap(): Record<string, ExpenseCategory> {
+		return Object.fromEntries(
+			Object.entries(categoryRemap).filter(([, v]) => v)
+		) as Record<string, ExpenseCategory>;
+	}
+
 	function buildMapping(): ImportColumnMapping | null {
+		const remap = assignedCategoryMap();
+		const hasRemap = Object.keys(remap).length > 0;
 		if (detectedPreset && targetVehicle) {
 			return {
 				source: detectedPreset.id,
@@ -105,7 +126,8 @@
 				dateFormat: detectedPreset.dateFormat,
 				distanceUnit: detectedPreset.distanceUnit,
 				volumeUnit: detectedPreset.volumeUnit,
-				categoryMap: detectedPreset.categoryMap
+				// Merge the user's remap over the preset's own categoryMap (user choices win).
+				categoryMap: { ...detectedPreset.categoryMap, ...remap }
 			};
 		}
 		if (manualMapping && manualColumns.date && manualColumns.amount && manualHasVehicle) {
@@ -120,6 +142,9 @@
 				// mileage/volume into the target vehicle's units (else a metric log imports raw — #NS2).
 				...(columns.mileage ? { distanceUnit: manualDistanceUnit } : {}),
 				...(columns.volume ? { volumeUnit: manualVolumeUnit } : {}),
+				// Only send categoryMap once the user has assigned at least one remap (a manual file's
+				// category column otherwise passes through verbatim — known words resolve, blanks stay blank).
+				...(hasRemap ? { categoryMap: remap } : {}),
 				// No vehicle column → stamp the chosen target vehicle (D4).
 				...(columns.vehicle ? {} : { targetVehicle: getVehicleDisplayName(targetVehicle!) })
 			};
@@ -134,6 +159,9 @@
 
 	// Only the rows that errored — surfaced so the user can fix + re-import just those.
 	let errorRows = $derived(preview?.rows.filter((r) => r.status === 'error') ?? []);
+	// Foreign category words the importer didn't recognize (from the latest preview) → the remap table.
+	// Once the user assigns a word + re-previews, that word resolves and drops out of this list.
+	let unmappedCategories = $derived(preview?.unmappedCategories ?? []);
 
 	/** Reset everything when the dialog closes so a re-open starts clean. */
 	$effect(() => {
@@ -152,6 +180,7 @@
 			manualDateFormat = 'iso';
 			manualDistanceUnit = 'miles';
 			manualVolumeUnit = 'gallons_us';
+			categoryRemap = {};
 		}
 	});
 
@@ -161,6 +190,7 @@
 		targetVehicleId = '';
 		manualMapping = false;
 		manualColumns = {};
+		categoryRemap = {};
 		fileHeaders = [];
 		const headers = parseCsvHeaders(csvText);
 		if (headers.length === 0) return;
@@ -190,6 +220,13 @@
 
 	function setManualColumn(field: NativeImportField, header: string): void {
 		manualColumns = { ...manualColumns, [field]: header };
+		runPreview();
+	}
+
+	/** Assign a VROOM category to an unrecognized foreign category word, then re-preview so the affected
+	 *  rows re-categorize (the word resolves → drops out of unmappedCategories, readyCount may rise). */
+	function setCategoryRemap(word: string, category: ExpenseCategory): void {
+		categoryRemap = { ...categoryRemap, [word]: category };
 		runPreview();
 	}
 
@@ -531,6 +568,42 @@
 					<FileText class="h-4 w-4" />
 					Click outside the box to preview.
 				</p>
+			{/if}
+
+			<!-- Category remap (T4): foreign category WORDS the importer didn't recognize. Each falls back to
+			     Misc until mapped here; assigning one re-previews so its rows re-categorize. -->
+			{#if preview && unmappedCategories.length > 0}
+				<div class="space-y-3 rounded-lg border border-chart-4/40 bg-chart-4/5 p-4">
+					<div class="flex items-center gap-2 text-sm font-medium text-foreground">
+						<CircleAlert class="h-4 w-4 text-chart-4" />
+						Unrecognized categories
+					</div>
+					<p class="text-xs text-muted-foreground">
+						These category names from your file aren't VROOM categories — they'll import as
+						<span class="text-foreground">Misc</span> unless you map them.
+					</p>
+					<div class="space-y-2">
+						{#each unmappedCategories as word (word)}
+							<div class="flex items-center gap-2">
+								<span class="w-28 shrink-0 truncate text-xs text-foreground" title={word}>{word}</span>
+								<Select.Root
+									type="single"
+									value={categoryRemap[word] ?? ''}
+									onValueChange={(v) => setCategoryRemap(word, v as ExpenseCategory)}
+								>
+									<Select.Trigger class="h-8 flex-1 text-xs" data-testid="remap-category-{word}">
+										{categoryRemap[word] ? categoryLabels[categoryRemap[word]] : 'Map to… (Misc)'}
+									</Select.Trigger>
+									<Select.Content>
+										{#each CATEGORY_OPTIONS as [value, label] (value)}
+											<Select.Item {value} {label}>{label}</Select.Item>
+										{/each}
+									</Select.Content>
+								</Select.Root>
+							</div>
+						{/each}
+					</div>
+				</div>
 			{/if}
 		</div>
 
