@@ -28,14 +28,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 31 |
+| feature | 4 | 37 |
 | deep-review | 5 | 33 |
 | guard | 6 | 32 |
 | bug | 3 | 36 |
 | arch | 5 | 36 |
 | infra | 6 | 35 |
 
-Current cycle: **36**
+Current cycle: **37**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -354,6 +354,25 @@ Current cycle: **36**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C37 (feature)** — **Import-trackers T4: manual column-mapping path for unrecognized CSVs (eyes-on
+  DONE).** feature was the sole over-budget category (37−31=6/4). The Angelo-gated fuel-preset
+  `defaultCategory` piece (flagged C31) stays parked, so took the genuinely UNBLOCKED T4 work: the manual
+  column-mapping editor. When detection finds no preset AND the file isn't a native VROOM export
+  (headers ⊉ date/vehicle/category/amount), the dialog renders "Map your columns" — a per-field dropdown
+  for each VROOM field (date*/amount* required + category/vehicle/mileage/volume/fuelType/description/tags)
+  populated from the file's own headers, a date-format picker, and the target-vehicle picker (shown only
+  when no vehicle column is mapped, D4). `guessManualColumns` auto-maps by header-name substring (incl.
+  spent/paid/total→amount, kind→category from C37 eyes-on); `buildMapping` drops unmapped fields → the
+  EXISTING preview/commit runs verbatim. A native export still imports with NO mapping (unchanged path).
+  EYES-ON via `import-manual-mapping.meshclaw.e2e.ts` + 2 shots (Read): a bespoke CSV (Transaction Date/
+  Spent/Kind/Notes) → editor with guessed mappings (Amount→Spent, Category→Kind, Description→Notes) →
+  after picking Daily Driver, "1 ready · 1 row needs attention" (the maintenance row imports; the fuel row
+  correctly errors "fuel rows require fuel amount and mileage" — I didn't map volume/mileage). DEBUG: the
+  first run's "Spent" header wasn't auto-guessed (only amount/price/cost) → added spent/paid/total + kind;
+  a strict-mode `/ready/` selector matched 2 nodes → scoped to the commit button + `.first()`. Verify:
+  frontend validate:local GREEN — type-check 0, build OK, 726 tests. cov: be 87.29% / fe 86.14% (~ —
+  UI-markup cycle; the mapping data path is backend-covered T1-T3 + C32). T4 REMAINING: unit override
+  pickers + a category-remap table; the Angelo-gated preset defaultCategory; T6 round-trip e2e.
 - **C36 (arch-scout → no-churn → bug #85)** — **Arch at its structural floor (4th confirm); pivoted to the
   #85 relabel (Angelo-APPROVED Sev-2).** Two cats over budget (arch 6/5, feature 5/4 — tie on over-by);
   arch wins on raw starvation (6 > 5). SCOUTED firsthand for a clean dedup: (1) my C34 `effectiveTermCost`

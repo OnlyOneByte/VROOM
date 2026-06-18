@@ -7,7 +7,13 @@
 	import { appStore } from '$lib/stores/app.svelte';
 	import { handleErrorWithNotification } from '$lib/utils/error-handling';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
-	import type { ImportColumnMapping, ImportMappingPreset, Vehicle } from '$lib/types';
+	import type {
+		ImportColumnMapping,
+		ImportDateFormat,
+		ImportMappingPreset,
+		NativeImportField,
+		Vehicle
+	} from '$lib/types';
 
 	interface Props {
 		open: boolean;
@@ -36,24 +42,75 @@
 	let detectedPreset = $state<ImportMappingPreset | null>(null);
 	let targetVehicleId = $state('');
 
+	// Manual mapping (T4): when no preset is detected AND the file isn't a native VROOM export, the user
+	// maps each VROOM field to one of the file's own header columns. The native VROOM headers are the
+	// round-trip-export shape — those import directly with NO mapping (unchanged path), so manual mapping
+	// is only offered for an unrecognized foreign file.
+	let fileHeaders = $state<string[]>([]);
+	let manualMapping = $state(false);
+	// VROOM field → the chosen foreign header ('' = unmapped). date/amount are required to import a row.
+	let manualColumns = $state<Partial<Record<NativeImportField, string>>>({});
+	let manualDateFormat = $state<ImportDateFormat>('iso');
+
+	// The native export's own column names — a file already in this shape needs no mapping.
+	const NATIVE_HEADERS = new Set(['date', 'vehicle', 'category', 'amount']);
+	// The VROOM fields the manual editor exposes (the importer-consumed subset; missedFillup is niche).
+	const MAPPABLE_FIELDS: { field: NativeImportField; label: string; required?: boolean }[] = [
+		{ field: 'date', label: 'Date', required: true },
+		{ field: 'amount', label: 'Amount', required: true },
+		{ field: 'category', label: 'Category' },
+		{ field: 'vehicle', label: 'Vehicle' },
+		{ field: 'mileage', label: 'Odometer' },
+		{ field: 'volume', label: 'Volume' },
+		{ field: 'fuelType', label: 'Fuel type' },
+		{ field: 'description', label: 'Description' },
+		{ field: 'tags', label: 'Tags' }
+	];
+	const DATE_FORMATS: { value: ImportDateFormat; label: string }[] = [
+		{ value: 'iso', label: 'ISO (YYYY-MM-DD)' },
+		{ value: 'mdy', label: 'US (MM/DD/YYYY)' },
+		{ value: 'dmy', label: 'EU (DD/MM/YYYY)' },
+		{ value: 'epoch', label: 'Unix timestamp' }
+	];
+
 	let targetVehicle = $derived(vehicles.find((v) => v.id === targetVehicleId));
-	// The mapping sent to the server: the detected preset's field map + the chosen target vehicle's name
-	// (the preset has no vehicle column). Null until both a preset is detected AND a vehicle is chosen.
-	let mapping = $derived<ImportColumnMapping | null>(
-		detectedPreset && targetVehicle
-			? {
-					source: detectedPreset.id,
-					columns: detectedPreset.columns,
-					targetVehicle: getVehicleDisplayName(targetVehicle),
-					dateFormat: detectedPreset.dateFormat,
-					distanceUnit: detectedPreset.distanceUnit,
-					volumeUnit: detectedPreset.volumeUnit,
-					categoryMap: detectedPreset.categoryMap
-				}
-			: null
-	);
+	// A manual mapping needs a vehicle column OR a chosen target vehicle (the same D4 rule as a preset).
+	let manualHasVehicle = $derived(!!manualMapping && (!!manualColumns.vehicle || !!targetVehicle));
+	// The mapping sent to the server: a detected preset's field map, OR the user's manual column map.
+	// Null until the active path is complete (preset: vehicle chosen; manual: date+amount mapped + a vehicle).
+	let mapping = $derived<ImportColumnMapping | null>(buildMapping());
+
+	function buildMapping(): ImportColumnMapping | null {
+		if (detectedPreset && targetVehicle) {
+			return {
+				source: detectedPreset.id,
+				columns: detectedPreset.columns,
+				targetVehicle: getVehicleDisplayName(targetVehicle),
+				dateFormat: detectedPreset.dateFormat,
+				distanceUnit: detectedPreset.distanceUnit,
+				volumeUnit: detectedPreset.volumeUnit,
+				categoryMap: detectedPreset.categoryMap
+			};
+		}
+		if (manualMapping && manualColumns.date && manualColumns.amount && manualHasVehicle) {
+			// Drop empty selections so only mapped fields reach the server.
+			const columns = Object.fromEntries(
+				Object.entries(manualColumns).filter(([, v]) => v)
+			) as Partial<Record<NativeImportField, string>>;
+			return {
+				columns,
+				dateFormat: manualDateFormat,
+				// No vehicle column → stamp the chosen target vehicle (D4).
+				...(columns.vehicle ? {} : { targetVehicle: getVehicleDisplayName(targetVehicle!) })
+			};
+		}
+		return null;
+	}
+
 	// A foreign file is detected but the user hasn't picked a vehicle yet — block preview/commit until they do.
 	let needsTargetVehicle = $derived(!!detectedPreset && !targetVehicle);
+	// Manual mapping is active but incomplete (missing date/amount/vehicle) — block preview until ready.
+	let needsManualMapping = $derived(manualMapping && !mapping);
 
 	// Only the rows that errored — surfaced so the user can fix + re-import just those.
 	let errorRows = $derived(preview?.rows.filter((r) => r.status === 'error') ?? []);
@@ -69,6 +126,10 @@
 			isDetecting = false;
 			detectedPreset = null;
 			targetVehicleId = '';
+			fileHeaders = [];
+			manualMapping = false;
+			manualColumns = {};
+			manualDateFormat = 'iso';
 		}
 	});
 
@@ -76,17 +137,32 @@
 	async function detectSource() {
 		detectedPreset = null;
 		targetVehicleId = '';
+		manualMapping = false;
+		manualColumns = {};
+		fileHeaders = [];
 		const firstLine = csvText.split('\n', 1)[0]?.trim();
 		if (!firstLine) return;
 		// csv-parse-free header split: the importer is delimiter-`,`; good enough to identify headers
 		// (the server does the authoritative parse). Strip surrounding quotes per cell.
 		const headers = firstLine.split(',').map((h) => h.trim().replace(/^"|"$/g, ''));
+		fileHeaders = headers;
 		isDetecting = true;
 		try {
 			detectedPreset = await expenseApi.detectImportSource(headers);
 			// Auto-select the only vehicle so a single-car garage skips the picker.
 			if (detectedPreset && vehicles.length === 1 && vehicles[0]) {
 				targetVehicleId = vehicles[0].id;
+			}
+			// No preset AND not already a native VROOM export → offer manual column mapping. (A native
+			// file — headers include date/vehicle/category/amount — imports directly, unchanged path.)
+			if (!detectedPreset) {
+				const lower = new Set(headers.map((h) => h.toLowerCase()));
+				const isNative = [...NATIVE_HEADERS].every((h) => lower.has(h));
+				if (!isNative && headers.length > 0) {
+					manualMapping = true;
+					manualColumns = guessManualColumns(headers);
+					if (vehicles.length === 1 && vehicles[0]) targetVehicleId = vehicles[0].id;
+				}
 			}
 		} catch {
 			// Detection is best-effort — a failure just falls back to the native (manual) path.
@@ -96,13 +172,39 @@
 		}
 	}
 
+	/** Best-effort initial guess: map a VROOM field to a header whose name contains it (case-insensitive). */
+	function guessManualColumns(headers: string[]): Partial<Record<NativeImportField, string>> {
+		const guess: Partial<Record<NativeImportField, string>> = {};
+		const find = (...needles: string[]) =>
+			headers.find((h) => needles.some((n) => h.toLowerCase().includes(n)));
+		const set = (field: NativeImportField, ...needles: string[]) => {
+			const m = find(...needles);
+			if (m) guess[field] = m;
+		};
+		set('date', 'date');
+		set('amount', 'amount', 'price', 'cost', 'spent', 'paid', 'total');
+		set('category', 'category', 'type', 'kind');
+		set('vehicle', 'vehicle', 'car');
+		set('mileage', 'odometer', 'mileage', 'odo');
+		set('volume', 'volume', 'gallon', 'litre', 'liter', 'fuel amount', 'fill');
+		set('description', 'note', 'description', 'comment');
+		set('tags', 'tag');
+		return guess;
+	}
+
+	function setManualColumn(field: NativeImportField, header: string): void {
+		manualColumns = { ...manualColumns, [field]: header };
+		runPreview();
+	}
+
 	async function runPreview() {
 		if (!csvText.trim()) {
 			preview = null;
 			return;
 		}
-		// A detected foreign file can't preview until the target vehicle is chosen.
-		if (needsTargetVehicle) {
+		// A detected foreign file can't preview until the target vehicle is chosen; a manual mapping
+		// can't until date+amount+vehicle are mapped.
+		if (needsTargetVehicle || needsManualMapping) {
 			preview = null;
 			return;
 		}
@@ -241,6 +343,97 @@
 				</div>
 			{/if}
 
+			<!-- Manual column mapping (unrecognized foreign file, T4) -->
+			{#if manualMapping}
+				<div class="space-y-3 rounded-lg border border-border bg-muted/20 p-4">
+					<div class="flex items-center gap-2 text-sm font-medium text-foreground">
+						<FileText class="h-4 w-4 text-muted-foreground" />
+						Map your columns
+					</div>
+					<p class="text-xs text-muted-foreground">
+						We didn't recognize this format. Match each VROOM field to a column from your file.
+						<span class="text-foreground">Date</span> and <span class="text-foreground">Amount</span>
+						are required.
+					</p>
+
+					<div class="space-y-2">
+						{#each MAPPABLE_FIELDS as f (f.field)}
+							<div class="flex items-center gap-2">
+								<span class="w-28 shrink-0 text-xs text-muted-foreground">
+									{f.label}{f.required ? ' *' : ''}
+								</span>
+								<Select.Root
+									type="single"
+									value={manualColumns[f.field] ?? ''}
+									onValueChange={(v) => setManualColumn(f.field, v)}
+								>
+									<Select.Trigger class="h-8 flex-1 text-xs">
+										{manualColumns[f.field] || '— not mapped —'}
+									</Select.Trigger>
+									<Select.Content>
+										<Select.Item value="" label="— not mapped —">— not mapped —</Select.Item>
+										{#each fileHeaders as h (h)}
+											<Select.Item value={h} label={h}>{h}</Select.Item>
+										{/each}
+									</Select.Content>
+								</Select.Root>
+							</div>
+						{/each}
+					</div>
+
+					<!-- Date format -->
+					<div class="flex items-center gap-2">
+						<span class="w-28 shrink-0 text-xs text-muted-foreground">Date format</span>
+						<Select.Root
+							type="single"
+							value={manualDateFormat}
+							onValueChange={(v) => {
+								manualDateFormat = v as ImportDateFormat;
+								runPreview();
+							}}
+						>
+							<Select.Trigger class="h-8 flex-1 text-xs">
+								{DATE_FORMATS.find((d) => d.value === manualDateFormat)?.label ?? manualDateFormat}
+							</Select.Trigger>
+							<Select.Content>
+								{#each DATE_FORMATS as d (d.value)}
+									<Select.Item value={d.value} label={d.label}>{d.label}</Select.Item>
+								{/each}
+							</Select.Content>
+						</Select.Root>
+					</div>
+
+					<!-- Target vehicle (only when no vehicle column is mapped — D4) -->
+					{#if !manualColumns.vehicle}
+						<div class="space-y-1.5 border-t pt-3">
+							<label for="manual-target-vehicle" class="text-xs font-medium text-foreground">
+								Import into vehicle *
+							</label>
+							{#if vehicles.length === 0}
+								<p class="text-sm text-muted-foreground">Add a vehicle first to import.</p>
+							{:else}
+								<Select.Root
+									type="single"
+									value={targetVehicleId}
+									onValueChange={handleTargetVehicleChange}
+								>
+									<Select.Trigger id="manual-target-vehicle" class="w-full">
+										{targetVehicle ? getVehicleDisplayName(targetVehicle) : 'Select a vehicle'}
+									</Select.Trigger>
+									<Select.Content>
+										{#each vehicles as v (v.id)}
+											<Select.Item value={v.id} label={getVehicleDisplayName(v)}>
+												{getVehicleDisplayName(v)}
+											</Select.Item>
+										{/each}
+									</Select.Content>
+								</Select.Root>
+							{/if}
+						</div>
+					{/if}
+				</div>
+			{/if}
+
 			<!-- Preview -->
 			{#if isPreviewing}
 				<div class="flex items-center justify-center gap-2 py-4 text-sm text-muted-foreground">
@@ -285,6 +478,11 @@
 				<p class="flex items-center gap-2 text-sm text-muted-foreground">
 					<FileText class="h-4 w-4" />
 					Choose a vehicle above to preview the import.
+				</p>
+			{:else if needsManualMapping}
+				<p class="flex items-center gap-2 text-sm text-muted-foreground">
+					<FileText class="h-4 w-4" />
+					Map Date, Amount, and a vehicle above to preview the import.
 				</p>
 			{:else if csvText.trim()}
 				<p class="flex items-center gap-2 text-sm text-muted-foreground">

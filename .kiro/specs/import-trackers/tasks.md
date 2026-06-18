@@ -55,11 +55,22 @@
             step verbatim. A native VROOM export (has its own vehicle column) detects null → unchanged path.
             Eyes-on via `import-mapping-detect.meshclaw.e2e.ts` + shot (`/tmp/c31-import-mapped-preview.png`):
             banner + picker render, "Daily Driver" auto-selected. FE validate:local GREEN (726).
-      - [ ] **REMAINING (T4 follow-ups):** the per-field column-dropdown editor + category-remap table for
-            a MANUAL (unknown-source) file, and date-format/unit override pickers. **BLOCKER surfaced +
-            flagged to Angelo C31:** the fuel presets map no category column and `mapCategory` leaves a
-            blank category blank (D2 "never invent"), so a detected fuel log currently previews 0-ready
-            ("Unknown category"). Recommended fix (a): give each fuel preset a `defaultCategory:'fuel'`
+      - [x] **MANUAL column-mapping path DONE (C37, eyes-on CONFIRMED):** for an UNRECOGNIZED foreign CSV
+            (no preset match, not a native VROOM export), the dialog now renders a "Map your columns" editor
+            — a per-field dropdown for each VROOM field (date*/amount*/category/vehicle/mileage/volume/
+            fuelType/description/tags) populated from the file's own headers + a date-format picker + the
+            target-vehicle picker (shown only when no vehicle column is mapped, D4). Initial guesses
+            auto-map by header-name substring (date/amount[+spent/paid/total]/category[+kind]/…); the user
+            adjusts. buildMapping emits the ImportColumnMapping (drops unmapped fields) → the existing
+            preview/commit runs verbatim. Eyes-on via `import-manual-mapping.meshclaw.e2e.ts` + 2 shots
+            (Read): a bespoke CSV (Transaction Date/Spent/Kind/Notes) → editor with guessed mappings →
+            "1 ready · 1 row needs attention" after picking the vehicle (the maintenance row imports; the
+            fuel row correctly errors "fuel rows require fuel amount and mileage"). FE validate:local GREEN.
+      - [ ] **REMAINING (T4 follow-ups):** unit (distance/volume) override pickers for the manual path +
+            a category-remap table for unrecognized category WORDS. **BLOCKER surfaced + flagged to Angelo
+            C31:** the fuel presets map no category column and `mapCategory` leaves a blank category blank
+            (D2 "never invent"), so a detected fuel log previews 0-ready ("Unknown category"). Recommended
+            fix (a): give each fuel preset a `defaultCategory:'fuel'`
             (backend-preset change, awaiting the steer) — until then the auto-detect path detects+maps but
             commits nothing.
 - [ ] **T5** Four-states + a11y + mobile; compose from the kit.

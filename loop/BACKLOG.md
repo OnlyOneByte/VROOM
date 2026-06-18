@@ -50,11 +50,12 @@ now — the "Playwright-blocked" tail was a ~200-cycle MISDIAGNOSIS, see GUIDE.m
    mileage/mark-serviced unit + HTTP-harness tests, per GUIDE "source-scan > untracked e2e".)
 1. **Import from other trackers** — backend complete (T1 applyMapping, T2 presets+detectSource, T3
    `POST /import` optional mapping + `/import/detect`) + FE client methods. **T4 AUTO-DETECT SLICE DONE
-   (C31, eyes-on):** ImportExpensesDialog auto-detects a Fuelly/Fuelio/Drivvo fuel log → "Detected a
-   <Tracker>" banner + target-vehicle picker (presets have no vehicle column → D4) → builds the mapping →
-   reuses the existing preview/commit. **REMAINING:** (a) the manual per-field column-dropdown editor +
-   category-remap table for an UNKNOWN-source file; (b) date-format/unit override pickers; (c) **the
-   flagged preset gap — fuel presets map no category column so a detected log previews 0-ready ("Unknown
+   (C31, eyes-on)** + **T4 MANUAL COLUMN-MAPPING DONE (C37, eyes-on):** an unrecognized CSV → "Map your
+   columns" editor (per-field dropdowns from the file's headers + date-format picker + target-vehicle
+   picker), auto-guessed by header substring, → existing preview/commit (verified 1-ready end-to-end on a
+   bespoke CSV). **REMAINING:** (a) unit (distance/volume) override pickers for the manual path + a
+   category-remap table for unrecognized category WORDS; (b) **the flagged preset gap — fuel presets map no
+   category column so a detected log previews 0-ready ("Unknown
    category"); recommended fix defaultCategory:'fuel' per preset, send_message'd Angelo C31, awaiting steer**;
    (d) T6 round-trip e2e (incl. real-export signature validation). Spec: `.kiro/specs/import-trackers/`.
    This is now the ONLY open feature (maintenance C1 + recurring-expenses C27 both DONE).
