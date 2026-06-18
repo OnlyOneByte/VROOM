@@ -263,6 +263,82 @@ describe('#94 — fleet-wide fuel-stats pools per-vehicle distance by raw summat
     expect(stats.volume.previousYear).not.toBeCloseTo(50, 1); // NOT the raw gal+L SQL pool
   });
 
+  // bug #18 PREV-PERIOD axis (the C97 currentYear guard's missing twin): the "This Period vs Last Period"
+  // fillup comparison computes its two halves through DIFFERENT predicate implementations across two layers —
+  // fillups.currentYear is in-memory `fuelRows.filter(isFillup)` (volume != null && volume > 0), while
+  // fillups.previousYear is the SQL `COUNT(CASE WHEN volume > 0 THEN 1 END)` in queryFuelAggregates (coupled
+  // only by the "matches the isFillup predicate" comment). A split fuel expense creates volume-null siblings
+  // (ExpenseSplitService.createSiblings) that must NOT inflate either count (bug #18). C97's guard pins ONLY
+  // the currentYear/in-memory half; nothing exercises the prev-period SQL count's null-exclusion — drop the
+  // `CASE WHEN volume > 0` (e.g. plain COUNT(*)) and the prev-period count silently inflates by the split
+  // legs while every test stays green, so "Last Period" over-reports fillups (NORTH_STAR #2). This pins the
+  // SQL half against the same bug on the prev-window.
+  test('fillups.previousYear excludes volume-null split siblings (bug #18 on the prev-period SQL count)', async () => {
+    seedUser(testDb.sqlite, USER);
+    seedVehicle(testDb.sqlite, VEH_A);
+    seedVehicle(testDb.sqlite, VEH_B);
+
+    // Range = calendar 2024 → the prior equal-length window is calendar 2023. Seed PREV-WINDOW (2023):
+    // two genuine fillups (volume-bearing) + one fuel expense split across both cars (two volume-null
+    // siblings). The prev-period fillup count must be 2 (real fillups only), NOT 4 (raw row count).
+    seedExpense(testDb.sqlite, {
+      id: 'py-real-a',
+      vehicleId: VEH_A.id,
+      category: 'fuel',
+      expenseAmount: 40,
+      date: new Date(2023, 2, 10),
+      mileage: 10_000,
+      volume: 10,
+      fuelType: 'Regular',
+      missedFillup: false,
+    });
+    seedExpense(testDb.sqlite, {
+      id: 'py-real-b',
+      vehicleId: VEH_B.id,
+      category: 'fuel',
+      expenseAmount: 38,
+      date: new Date(2023, 2, 12),
+      mileage: 50_000,
+      volume: 9,
+      fuelType: 'Regular',
+      missedFillup: false,
+    });
+    // The split fuel expense: AMOUNT split across both cars, volume=null on each sibling.
+    seedExpense(testDb.sqlite, {
+      id: 'py-split-a',
+      vehicleId: VEH_A.id,
+      category: 'fuel',
+      expenseAmount: 12.5,
+      date: new Date(2023, 4, 1),
+      mileage: null,
+      volume: null,
+      fuelType: null,
+      missedFillup: false,
+    });
+    seedExpense(testDb.sqlite, {
+      id: 'py-split-b',
+      vehicleId: VEH_B.id,
+      category: 'fuel',
+      expenseAmount: 12.5,
+      date: new Date(2023, 4, 1),
+      mileage: null,
+      volume: null,
+      fuelType: null,
+      missedFillup: false,
+    });
+
+    const range = {
+      start: Math.floor(new Date(2024, 0, 1).getTime() / 1000),
+      end: Math.floor(new Date(2025, 0, 1).getTime() / 1000),
+    };
+    const stats = await repo.getFuelStats(USER.id, range);
+
+    // Two real fillups; the two volume-null split siblings are NOT fillups. A plain COUNT(*) would give 4.
+    expect(stats.fillups.previousYear).toBe(2);
+    // The prev-period volume SUM was always correct (null volume contributes 0) — sanity-pin it stays 19.
+    expect(stats.volume.previousYear).toBe(19);
+  });
+
   // #94 MONTHLY-CONSUMPTION member FIXED (C65, same Angelo-approved convert-before-pool direction): the
   // monthlyConsumption chart series (volume + gas-MPG per month) is the 4th #94 limb — buildMonthlyConsumption
   // pools each row's raw volume into a month AND averages each gas pair's raw efficiency, both across all

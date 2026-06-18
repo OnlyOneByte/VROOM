@@ -32,12 +32,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 82 |
 | deep-review | 5 | 86 |
-| guard | 6 | 80 |
+| guard | 6 | 87 |
 | bug | 3 | 83 |
 | arch | 5 | 85 |
 | infra | 6 | 84 |
 
-Current cycle: **86**
+Current cycle: **87**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,33 @@ Current cycle: **86**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C87 (guard — pinned bug #18 split-sibling exclusion on the PREV-PERIOD SQL fillup count, the C97 guard's
+  missing twin)** — Balance at C87 (HEAD was C86; nudge label lags): THREE over budget — guard (87−80=7/6, +1),
+  feature (87−82=5/4, +1), bug (87−83=4/3, +1); guard most-starved (7) → picked. Scouted the convert-dispatch
+  family FIRST (the C73/C80/C86 "guard is narrowing" note) and confirmed it's saturated — C59 placeholder-scan +
+  C73 orientation-scan + per-member behavioral guards (incl. radar C76's ranking-inversion fixture + the C79
+  prev-year VOLUME mixed-unit test) fence every #94 dispatch. Found the genuine GAP one layer over: the FuelStats
+  "This Period vs Last Period" fillup COMPARISON computes its two halves through DIFFERENT predicate
+  implementations across two layers — `fillups.currentYear` is in-memory `fuelRows.filter(isFillup)`
+  (volume != null && volume > 0) while `fillups.previousYear` is the SQL `COUNT(CASE WHEN volume > 0 THEN 1 END)`
+  in queryFuelAggregates (C79's group-by-vehicle shape), coupled only by a "matches the isFillup predicate"
+  comment. A split fuel expense makes volume-null siblings (ExpenseSplitService) that must NOT inflate either
+  count (bug #18 / C97). VERIFIED FIRSTHAND the C97 guard pins ONLY the currentYear/in-memory half — NO test
+  asserts `fillups.previousYear` from a populated DB (summary-route.test.ts:41 is a mocked fixture; previousMonth
+  is the in-memory path), so the SQL count's null-exclusion is un-exercised: drop the `CASE WHEN volume > 0` to a
+  plain `COUNT(*)` and the prev-period count silently inflates by the split legs ("Last Period over-reports
+  fillups", NORTH_STAR #2) while every test stays green. GUARD: +1 in fuel-stats-fleet-distance-pooling.test.ts
+  (next to the C79 prev-year volume test, same 2024-range/2023-prev-window) — seed 2 real fillups + a 2-leg
+  volume-null split in the prev window, assert `fillups.previousYear === 2` (not 4) + the prev volume SUM stays
+  19 (null contributes 0). NON-VACUOUS proved firsthand: forcing `COUNT(*)` → the new test RED (Expected 2,
+  Received 4) while the OTHER 10 in-file + the C97 currentYear test + calendar-month tests ALL stay green
+  (confirming the gap was prev-period-only); restored → 1698 pass. The bug-class-pinned-on-one-layer → guard-pins-
+  the-sibling-layer pattern (C67 cross-module retry-ceiling; here C97 in-memory count → C87 SQL count). Verify:
+  backend validate:local GREEN — tsc 0, musl-biome clean (20 pre-existing warnings, none new), 1698 pass / 0 fail
+  (+1), build bundled. Backend-only (no UI → no shot). cov: be 87.47% / fe 86.35% (~ — analytics repo already
+  line-covered; +1 pins the prev-period SQL predicate's null-exclusion a same-row-shape test can't). Next guard:
+  thin — the fuel-stats count/convert predicates are now fenced on both layers; prefer a fresh deep-review/feature
+  eyes-on-surfaced invariant over another cold guard scout.
 - **C86 (deep-review — surfaces SATURATED; 4 candidates verified already-guarded firsthand, recorded + pivot)**
   — Balance at C86: four AT budget (feature 4/4, deep-review 5/5, guard 6/6, bug 3/3); deep-review has the lowest
   budget (tips first) → picked. Scouted 4 fresh deep-review candidates; EACH already well-guarded, DON'T

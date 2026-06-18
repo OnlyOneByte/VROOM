@@ -339,6 +339,20 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C87:** bug #18 (split-sibling fillup-count inflation) is now pinned on the PREV-PERIOD axis — the
+> C97 guard's missing twin (+1 in fuel-stats-fleet-distance-pooling.test.ts). The FuelStats "This Period vs Last
+> Period" fillup comparison computes its halves through DIFFERENT predicates across two layers: `fillups.currentYear`
+> is in-memory `fuelRows.filter(isFillup)` (volume != null && >0), while `fillups.previousYear` is the SQL
+> `COUNT(CASE WHEN volume > 0 THEN 1 END)` in queryFuelAggregates (the C79 group-by shape), coupled only by a
+> comment. Split fuel siblings carry volume=null (must not inflate either count, bug #18). C97 pinned ONLY the
+> currentYear/in-memory half — nothing asserted `fillups.previousYear` from a populated DB (summary-route.test.ts
+> is mocked), so dropping the SQL `CASE WHEN` to `COUNT(*)` silently inflated "Last Period" by the split legs with
+> every test green. New guard seeds 2 real fillups + a 2-leg volume-null split in the prev window → asserts
+> previousYear===2 (not 4) + prev volume stays 19. Non-vacuous (force COUNT(*) → RED Expected 2/Received 4; the
+> other 10 in-file + the C97 currentYear + calendar-month tests stay green, confirming prev-period-only gap). The
+> bug-pinned-on-one-layer→guard-pins-the-sibling-layer pattern (C67 retry-ceiling; here C97 in-memory→C87 SQL).
+> The fuel-stats count/convert predicates are now fenced on BOTH layers. Don't re-add.
+>
 > **GUARDED C80:** the CSV export↔import COLUMN-NAME contract (round-trip crown-jewel, NORTH_STAR #1) now has
 > a source-scan (`export-import-column-contract.test.ts`, +4). The export writes its header from EXPORT_COLUMNS
 > (routes.ts); the importer reads each cell BY NAME via `get('<col>')` (import-csv.ts) — coupled only by the
