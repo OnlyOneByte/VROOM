@@ -151,6 +151,39 @@ describe('analytics routes (real HTTP stack)', () => {
     expect(res.status).toBe(404);
   });
 
+  // C109 (guard): /vehicle-expenses carries the SAME `validateVehicleOwnership(vehicleId)` cross-tenant
+  // gate as vehicle-tco/vehicle-health (routes.ts:147) — a REQUIRED-vehicleId endpoint — but its ownership
+  // branch was the one vehicle-scoped analytics route this net never pinned (the C185/C290 additions covered
+  // tco/health/fuel-*). The repo method getVehicleExpenses is unit-tested, but a route-layer guard-drop would
+  // serve another tenant's per-vehicle expense analytics by guessing an id (the C109/#52 class). Unlike
+  // tco/health it also REQUIRES startDate+endDate (dateRangeRequiredVehicleQuerySchema), so omit them and
+  // zValidator 400s before the guard — supply the range to reach the ownership branch. RANGE defined above.
+  test('vehicle-expenses serves an OWNED vehicle (200 + envelope)', async () => {
+    const vehicleId = await seedVehicle('Daily Driver');
+    const res = await ctx.authed(
+      'GET',
+      `/api/v1/analytics/vehicle-expenses?${RANGE}&vehicleId=${vehicleId}`
+    );
+    const body = await json<{ success: boolean; data: unknown }>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.data).toBeDefined();
+  });
+
+  test('vehicle-expenses REJECTS a foreign/nonexistent vehicleId with 404 (no cross-tenant analytics leak)', async () => {
+    await seedVehicle('Daily Driver'); // owns SOME vehicle, just not the one queried
+    const res = await ctx.authed(
+      'GET',
+      `/api/v1/analytics/vehicle-expenses?${RANGE}&vehicleId=not-my-vehicle-id`
+    );
+    expect(res.status).toBe(404);
+  });
+
+  test('vehicle-expenses missing the REQUIRED vehicleId is a 400 (query validation, before the guard)', async () => {
+    const res = await ctx.authed('GET', `/api/v1/analytics/vehicle-expenses?${RANGE}`);
+    expect(res.status).toBe(400);
+  });
+
   // #139 (C453): a 0%-APR dealer-promo loan (apr===0, schema .min(0)-valid) must STILL appear in
   // /analytics/financing's loanBreakdown. buildLoanBreakdown previously filtered `&& f.apr` (truthy),
   // dropping apr===0 → a real active loan's principal paydown vanished from the chart (the #92/#117

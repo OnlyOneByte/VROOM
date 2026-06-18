@@ -43,13 +43,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 106 |
-| deep-review | 5 | 102 |
+| deep-review | 5 | 109 |
 | guard | 6 | 108 |
 | bug | 3 | 107 |
 | arch | 5 | 105 |
 | infra | 6 | 104 |
 
-Current cycle: **108**
+Current cycle: **109**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -368,6 +368,28 @@ Current cycle: **108**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C109 (deep-review — pinned the untested /vehicle-expenses analytics route's cross-tenant ownership gate; 2nd
+  route-ownership gap in 2 cycles, vein confirmed productive)** — Balance at C109 (HEAD was C108; nudge label lags):
+  deep-review (109−102=7/5, +2) the most-starved over-budget category → picked. Applied the C108 lesson (map
+  route-endpoint coverage, don't assert saturation): mapped the analytics domain's 13 route handlers vs HTTP-harness
+  coverage — found 4 endpoints with ZERO route-level coverage (/quick-stats, /cross-vehicle, /year-end,
+  /vehicle-expenses), and the highest-leverage is /vehicle-expenses: it's the only one of the 4 carrying a
+  `validateVehicleOwnership(vehicleId)` cross-tenant gate (routes.ts:147), the SAME guard analytics-routes-http.test.ts
+  already pins for its siblings vehicle-tco/vehicle-health/fuel-stats/fuel-advanced (C185/C290) — but
+  /vehicle-expenses was the one vehicle-scoped analytics route the net never covered. The repo method
+  getVehicleExpenses is unit-tested, but a route-layer guard-drop serves another tenant's per-vehicle expense
+  analytics by guessing an id (the C109/#52 cross-tenant class — namesake). GUARD: +3 in analytics-routes-http.test.ts
+  (next to its siblings) — owned → 200 envelope; foreign id → 404 (no leak); missing-required-vehicleId → 400 (the
+  dateRangeRequiredVehicleQuerySchema validation, before the guard). NON-VACUOUS proved firsthand: dropped the
+  ownership gate → ONLY the foreign-id test RED (the leak opens), owned + missing-param stay green; restored → 16
+  pass. Verify: backend validate:local GREEN — tsc 0, musl-biome clean (20 pre-existing warnings, none new), 1713
+  pass / 0 fail (+3), build bundled. Backend-only (no UI → no shot). cov: be ~87.5% (+ the vehicle-expenses route
+  lines) / fe 87.6% (~). PATTERN CONFIRMED: C108 (sync-status) + C109 (vehicle-expenses) are TWO route-ownership
+  gaps found in 2 cycles by mapping endpoint coverage — the HTTP-harness guard/deep-review vein is genuinely
+  productive, NOT the "fixed point" the C103/C107 claims asserted. NEXT deep-review/guard: the remaining 3 untested
+  analytics routes (/quick-stats, /cross-vehicle, /year-end) are user-scoped in the repo (no per-vehicle ownership
+  gate) so thinner, but check the other route domains' unmapped endpoints first (the audit method, not the
+  saturation assumption).
 - **C108 (guard — pinned the untested GET /:id/sync-status route's tenant-isolation chokepoint; corrected the
   premature C103 "frontier worked out" claim)** — Balance at C108 (HEAD was C107; nudge label lags): TWO over
   budget — guard (108−101=7/6, +1) and deep-review (108−102=6/5, +1); guard most-starved (7 > 6, the C84 tie-break)

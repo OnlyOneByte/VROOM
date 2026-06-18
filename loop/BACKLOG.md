@@ -122,6 +122,19 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > is /profile (/trips is a "Coming Soon" placeholder; /privacypolicy + /termsofservice are static legal copy) — after
 > /profile, every real surface is eyes-on and the feature category is fully Angelo-gated.
 >
+> **GUARDED C109 — the untested /vehicle-expenses analytics route's cross-tenant ownership gate (2nd
+> route-ownership gap in 2 cycles).** Mapped the analytics domain's 13 route handlers vs HTTP-harness coverage →
+> 4 routes had ZERO route-level coverage (/quick-stats, /cross-vehicle, /year-end, /vehicle-expenses).
+> /vehicle-expenses is the highest-leverage: the only one of the 4 with a `validateVehicleOwnership` cross-tenant
+> gate (routes.ts:147) — the SAME guard analytics-routes-http.test.ts already pins for vehicle-tco/health/fuel-*
+> (C185/C290), but this route was the one it never covered. Repo method unit-tested; route guard-drop leaks
+> another tenant's per-vehicle expense analytics (C109/#52 class). +3 in analytics-routes-http.test.ts: owned→200,
+> foreign→404 (no leak), missing-required-vehicleId→400. Non-vacuous (drop the gate → foreign-id test RED).
+> PATTERN CONFIRMED (C108 sync-status + C109 vehicle-expenses): mapping route-endpoint coverage finds REAL
+> ownership gaps — the HTTP-harness vein is productive, not the "fixed point" the C103/C107 claims asserted. NEXT:
+> the 3 remaining untested analytics routes are user-scoped (no per-vehicle gate, thinner); check OTHER domains'
+> unmapped endpoints by the same method. Don't re-add the vehicle-expenses pin.
+>
 > **CHARACTERIZED C102 — the #148 null-initialMileage lease burn-bar invariant, as a red→green anchor (NOT a
 > fix).** Audited the lowest-coverage money file (financing-calculations.ts, 75% line) — `calculateLeaseMetrics` is
 > already extraordinarily well-tested (30+ cases + 2 fast-check properties incl. #64/#91/#110), so it's saturated
