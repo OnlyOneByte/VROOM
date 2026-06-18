@@ -33,11 +33,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 54 |
 | deep-review | 5 | 53 |
 | guard | 6 | 52 |
-| bug | 3 | 51 |
+| bug | 3 | 55 |
 | arch | 5 | 50 |
 | infra | 6 | 49 |
 
-Current cycle: **54**
+Current cycle: **55**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,30 @@ Current cycle: **54**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C55 (bug #22)** — **Zip-bomb compression-ratio cap pre-inflation (Angelo-APPROVED Sev-4 hardening).**
+  bug was the SOLE over-budget category (55−51=4/3 +1; arch/infra AT). Cold-scout exhausted → top
+  unfinished Angelo-approved item; the Sev-1/2/3 are done or gated (#94 6-member class; #127/#100 arch-gated;
+  #112 design-gated), so took the contained, clean Sev-4 #22 ("cheap, no new dep"). CONFIRMED FIRSTHAND:
+  `parseZipBackup` (backup.ts) summed each entry's `header.size` (uncompressed) and rejected over
+  maxUncompressedSize — but `header.size` is read from the ZIP central directory = ATTACKER-DECLARED. A bomb
+  can declare a small size to pass the sum, then inflate to GB on `getData()`. FIX (Angelo's "compression-
+  ratio cap pre-inflation"): added `CONFIG.backup.maxCompressionRatio = 1000` + a per-entry guard that
+  rejects when `header.size / header.compressedSize > cap` BEFORE any getData() — `compressedSize` is the
+  REAL in-file byte count, so an absurd declared-vs-actual ratio is a bomb signature the sum can't catch
+  (DEFLATE's ~1032:1 ceiling makes 1000× generous for legit CSV ~3-20× / repetitive headers a few hundred×).
+  compressedSize 0 (empty/stored entry) skipped. Probed AdmZip firsthand to confirm `header.compressedSize`
+  exists. GUARD: +2 in restore-zip-bomb.test.ts (#22 block): an entry UNDER the total-size cap but over the
+  ratio cap → rejected (only the ratio guard can catch it); a real exported backup's every-entry ratio is
+  under the cap + parses through both guards (no false positive). NON-VACUOUS (verified firsthand): neuter
+  the ratio guard → the isolated-ratio test RED; reverted → 4/4 green, backup.ts diff = only my +17.
+  CAUGHT-A-SIDE-EFFECT: the pre-existing all-zeros total-size test (200MB zeros = 1029× ratio) now trips the
+  EARLIER ratio guard → updated its assertion to accept either pre-inflation guard's message (both mean
+  "bomb rejected before inflating"; the total-size guard stays the backstop for a declared-size lie with a
+  plausible ratio). Verify: backend validate:local GREEN — tsc 0, musl-biome 0 errors (20 pre-existing
+  warnings; my 1 new noNonNullAssertion refactored away), 1659 pass / 0 fail (+2), build bundled.
+  Backend-only (no UI → no shot). cov: be ~87.5% / fe 86.35% (~ — the +2 pin the ratio guard; FE untouched).
+  #22 DONE. Remaining Angelo Sev-4: #129 (OAuth email-sync, re-read archive first), #79 (stuck-offline-entry
+  hygiene), #112 (chart palette, design-gated); plus #94 (6-member class, its own cycle).
 - **C54 (feature)** — **Import-trackers T6: merge-surviving no-utc guard for the CSV-import date paths.**
   feature was the SOLE over-budget category (54−47=7/4, +3). Import-trackers is the only open feature; its
   remaining T4 piece is the Angelo-gated preset `defaultCategory` (PARKED — awaiting steer), so the

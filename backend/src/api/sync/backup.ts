@@ -460,6 +460,23 @@ export class BackupService {
     // directory — no inflation) and reject before decompressing anything if the
     // total exceeds the cap. A real backup is CSV text well under this; a bomb is
     // far over. (header.size is the uncompressed byte count for each entry.)
+    //
+    // #22: header.size is ATTACKER-DECLARED, so a bomb can lie (declare a small size to
+    // pass the sum below, then inflate to GB on getData()). Guard the COMPRESSION RATIO
+    // per entry FIRST — compressedSize is the real in-file byte count, and the declared
+    // size being an absurd multiple of it is a bomb signature the sum can't catch. This
+    // runs before any getData(), so a crafted entry is rejected without inflating.
+    for (const e of zipEntries) {
+      const compressed = e.header?.compressedSize ?? 0;
+      const uncompressed = e.header?.size ?? 0;
+      if (compressed > 0 && uncompressed / compressed > CONFIG.backup.maxCompressionRatio) {
+        throw new ValidationError(
+          `Backup archive entry "${e.entryName}" has a suspicious compression ratio ` +
+            `(${Math.round(uncompressed / compressed)}x exceeds the ${CONFIG.backup.maxCompressionRatio}x limit) — possible zip bomb`
+        );
+      }
+    }
+
     const totalUncompressed = zipEntries.reduce((sum, e) => sum + (e.header?.size ?? 0), 0);
     if (totalUncompressed > CONFIG.backup.maxUncompressedSize) {
       throw new ValidationError(

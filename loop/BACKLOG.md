@@ -286,12 +286,11 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 > offline-outbox field-dropout family #66/#101/#111, or analytics split-sibling overcount if any builder
 > was missed by the #56/#108/#113/#146 sweep).
 
-> **CLOSED C51: #98** — sync-manager keep-local now does a real overwrite-on-collision (forceOverwrite
-> honored by createExpenseSchema + createIdempotent; see the Sev-3 block). So the next bug cycle's top
-> Angelo-approved item is **Sev-2 #94** (the 6-member fleet-unit-pooling class — its own dedicated cycle, a
-> multi-builder thread-units-into-builders change, possibly a design pass) or the **Sev-4 hardening** pile
-> (#100 json_patch atomic merge [arch-gated], #22 zip-bomb ratio cap, #129 OAuth email-sync, #112 chart
-> palette [design-gated], #79 stuck-offline-entry hygiene).
+> **CLOSED C55: #22** — zip-bomb compression-ratio cap added pre-inflation (see the Sev-4 block). So the
+> next bug cycle's top Angelo-approved item is **Sev-2 #94** (the 6-member fleet-unit-pooling class — its
+> own dedicated cycle, a multi-builder thread-units-into-builders change, possibly a design pass) or the
+> remaining **Sev-4 hardening** (#129 OAuth email-sync [re-read archive grounding first], #79
+> stuck-offline-entry hygiene; #100 json_patch merge + #112 chart palette stay arch/design-gated).
 >
 > **CLOSED C48: #88** — a deleted vehicle is now pruned from reminders' `expenseSplitConfig` blob +
 > renormalized (see the Sev-3 block). The #88/#97 vehicle-delete reminder-orphan family is CLOSED (junction
@@ -388,8 +387,14 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 > - **#100 (arch-gated) — APPROVED: SQL-atomic merge via `json_patch` in one UPDATE** for the
 >   userPreferences read-modify-write across the 5+ write sites (no migration, no per-user queue, avoids
 >   the C151 async-tx footgun). Last-writer-wins lost-update race today.
-> - **#22 (MED, hardening) — APPROVED: add a compression-ratio cap pre-inflation** to the zip-bomb guard
->   (cheap, no new dep) instead of trusting the attacker-declared `header.size`.
+> - ~~**#22 (MED, hardening) — DONE C55.**~~ parseZipBackup summed each entry's `header.size`
+>   (uncompressed) but that's ATTACKER-DECLARED (ZIP central directory) — a bomb declares a small size to
+>   pass the sum, then inflates to GB on getData(). Added `CONFIG.backup.maxCompressionRatio = 1000` + a
+>   per-entry guard rejecting `header.size / header.compressedSize > cap` BEFORE any inflation
+>   (compressedSize is the real in-file count → an absurd ratio is the bomb signature the sum can't catch).
+>   +2 guards (over-ratio-but-under-total-cap → rejected; real backup ratio under cap, no false positive);
+>   non-vacuous (neuter → RED). Updated the pre-existing all-zeros total-size test (now trips the earlier
+>   ratio guard) to accept either pre-inflation message. Don't re-pick.
 > - **#129 (MED) — APPROVED to fix, but RE-READ the archive grounding (~C-note line 197) FIRST** before
 >   editing — it's a credentials/account-linking finding; don't guess the fix from the one-line summary.
 > - **#112 (LOW) — APPROVED: extend / generate distinct hues for the cross-vehicle analytics chart
