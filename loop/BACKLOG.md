@@ -502,6 +502,16 @@ the now-shootable eyes-on FE + any newly-touched module.)*
 > SEEDED for the next guard cycle: load-state.svelte.ts (35% func) + theme.svelte.ts (60%) have genuine untested
 > logic; pin those over another cold backend scan. Don't re-add the uploadBackup pin.
 >
+> **GUARDED C115:** the expense SPLIT routes' cross-tenant IDOR gap (PUT/DELETE /split/:id) is now pinned (+2
+> expectDenied in the expense IDOR case). Both routes throw NotFoundError when the group isn't (groupId,userId)-owned
+> (groupOwnedBy), so they 4xx-deny a foreign id today, but the cross-tenant-idor.test.ts sweep never covered them —
+> destructive (regenerate/delete sibling rows + photos) + money-bearing, so an un-scoped regression lets A
+> rewrite/delete B's split expenses. Non-vacuous (drop the userId scope from groupOwnedBy → expense IDOR test RED).
+> 6th route gap via the audit method (C108–C115), 5 of them cross-tenant IDOR. REMAINING sweep gap: PUT
+> /notifications/:id/read (reminders — verified (id,userId)-scoped + throws, but not in the sweep; LOW-stakes
+> read-flag). NEXT: pin the notification-read IDOR (last known gap), then record the IDOR sweep COMPLETE for
+> state-changing routes. Don't re-add.
+>
 > **GUARDED C110:** the analytics route domain now has COMPLETE HTTP-harness coverage — pinned the last 3 untested
 > routes (/quick-stats, /cross-vehicle, /year-end) in analytics-routes-http.test.ts (+3). Unlike the C109
 > vehicle-expenses gap these are USER-scoped (no per-vehicle ownership gate), so they pin: per-route auth-gating

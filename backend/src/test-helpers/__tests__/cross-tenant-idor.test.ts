@@ -107,6 +107,29 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
       'PUT expense'
     );
     expectDenied(await ctx.authed('DELETE', `/api/v1/expenses/${eid}`), 'DELETE expense');
+
+    // C115: the SPLIT routes (PUT/DELETE /split/:id) are state-changing + (groupId, userId)-scoped in the
+    // repo (updateSplitExpense/deleteSplitExpense throw NotFoundError when the group isn't found for the
+    // caller), but the IDOR sweep skipped them. They're destructive (regenerate/delete sibling expense rows
+    // + their photos) and money-bearing — a regression to an un-scoped group write would let A rewrite or
+    // delete B's split expenses. Seed B's split group, then prove A is denied both.
+    const gid = (
+      await json<DataEnvelope<{ groupId: string }>>(
+        await asB('POST', '/api/v1/expenses/split', {
+          splitConfig: { method: 'even', vehicleIds: [vid] },
+          category: 'misc',
+          totalAmount: 100,
+          date: '2024-06-02T00:00:00.000Z',
+        })
+      )
+    ).data.groupId;
+    expectDenied(
+      await ctx.authed('PUT', `/api/v1/expenses/split/${gid}`, {
+        splitConfig: { method: 'even', vehicleIds: [vid] },
+      }),
+      'PUT split'
+    );
+    expectDenied(await ctx.authed('DELETE', `/api/v1/expenses/split/${gid}`), 'DELETE split');
   });
 
   test("insurance: A cannot GET/PUT/DELETE B's policy, nor its claim", async () => {

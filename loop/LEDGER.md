@@ -50,12 +50,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 113 |
 | deep-review | 5 | 113 |
-| guard | 6 | 110 |
+| guard | 6 | 115 |
 | bug | 3 | 114 |
 | arch | 5 | 112 |
 | infra | 6 | 111 |
 
-Current cycle: **114**
+Current cycle: **115**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -374,6 +374,25 @@ Current cycle: **114**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C115 (guard — closed the expense SPLIT routes' cross-tenant IDOR gap [PUT/DELETE /split/:id]; 6th route gap via
+  the audit method)** — Balance at C115 (HEAD was C114; nudge label lags): NOTHING strictly over budget; guard
+  most-starved (115−110=5) → picked (the live IDOR route-audit is guard's productive vein). Took the C114 pointer's
+  top target. VERIFIED firsthand both split routes throw NotFoundError when the group isn't `(groupId, userId)`-owned
+  (updateSplitExpense:757 / deleteSplitExpense:714 via groupOwnedBy) — so they correctly 4xx-deny a foreign id today,
+  but the cross-tenant-idor.test.ts sweep never covered them. They're DESTRUCTIVE (regenerate/delete sibling expense
+  rows + their photos) and money-bearing (the C2 #147 financing-source-traceability class), so a regression to an
+  un-scoped group write lets A rewrite/delete B's split expenses. GUARD: +2 expectDenied in the expense IDOR case —
+  seed B's split group (POST /split, B's vehicle), assert A is denied PUT + DELETE on it. NON-VACUOUS proved
+  firsthand: weakened groupOwnedBy to drop the userId scope (eq(groupId) only) → the expense IDOR test RED
+  (cross-tenant split mutate no longer denied); restored → 7 pass. Verify: backend validate:local GREEN — tsc 0,
+  musl-biome clean (20 pre-existing warnings, none new), 1716 pass / 0 fail (+2 expect in an existing test), build
+  bundled. Backend-only (no UI → no shot). cov: be 87.77% / fe 87.6% (~). PATTERN (C108–C115): the route-coverage
+  audit method has now found 6 real route gaps in 7 cycles — 5 cross-tenant IDOR (sync-status read, vehicle-expenses
+  read, financing payoff, insurance terms, expense split). The IDOR sweep is now near-complete for destructive
+  routes. REMAINING: `PUT /notifications/:id/read` (reminders — verified IDOR-safe (id,userId)-scoped + throws, but
+  not in the sweep; LOW-stakes read-flag, queue it). NEXT guard/deep-review: pin the notification-read IDOR (last
+  known sweep gap), then the audit is exhausted for state-changing routes — pivot to a fresh vein or record the IDOR
+  sweep COMPLETE.
 - **C114 (bug — closed the insurance TERM routes' cross-tenant IDOR gap [PUT/DELETE /:id/terms/:termId]; 5th route
   gap via the audit method, an actual cross-tenant defect)** — Balance at C114 (HEAD was C113; nudge label lags):
   bug (114−107=7/3, +4) the LONE over-budget category (most-neglected since C107) → forced. The cold pure-logic vein
