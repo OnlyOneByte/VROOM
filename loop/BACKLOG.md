@@ -1037,20 +1037,20 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 filesystem; untracked specs vanish on merge), full regress, coverage re-measure (update the LEDGER cov:
 baseline), refresh `BRANCH_REVIEW.md` grouped by theme so the eventual PR stays reviewable.)*
 
-> **RAN C111 (cadence; last ran C104).** Untracked-test sweep CLEAN (only the intentional `M .gitignore`/`M
-> frontend/.gitignore` overrides). Coverage RE-MEASURED: **BE 87.77% line / 87.53% func (1717 pass) — +0.30/+0.34 vs
-> C104, moving UP OFF the long-assumed ~87.47% ceiling** from the C108 (sync-status) + C109 (vehicle-expenses) + C110
-> (quick-stats/cross-vehicle/year-end) route-coverage arc (analytics/routes.ts 95.65→97% line) — PROOF the audit
-> found REAL untested route-layer code, not theater; FE 87.6%/88.56%/79.74% UNCHANGED (C105–C110 backend/eyes-on/
-> docs). BE structural ceiling is ~87.8% once route handlers are HTTP-harnessed; residual DI/OAuth-bound. Both green
-> (BE 1717 / FE 739). Branch = 111 ahead, PR-ready (bug 26 / feature 20 / guard 19 / deep-review 18 / infra 15 / arch
-> 12). NEXT cadence ~C121. LIVE VEIN: the C108–C110 route-coverage audit (3 gaps + BE +0.30); analytics fully mapped,
-> apply the method to the next-thinnest domain. Product work GATED on Angelo (#148 READY / import defaultCategory /
-> createLoadState design / #100/#79/#129).
+> **RAN C117 (cadence; last ran C111).** Untracked-test sweep CLEAN (only the intentional `M .gitignore`/`M
+> frontend/.gitignore` overrides). Coverage RE-MEASURED: BE 87.78% line / 87.53% func (1717 pass) — +0.01 line vs
+> C111 (the C113–C116 cross-tenant-idor.test.ts additions are +expect assertions on ownership-gate branches mostly
+> already covered — they pin SECURITY behavior, not new lines, as expected for IDOR guards); FE 87.6%/88.56%/79.74%
+> UNCHANGED (C112–C116 backend/docs). Both at the ~87.8 BE / ~87.6 FE structural ceiling. Both green (BE 1717 / FE
+> 739). Branch = 117 ahead, PR-ready (bug 27 / guard 21 / feature 20 / deep-review 19 / infra 16 / arch 13). NEXT
+> cadence ~C127. STANDING SIGNAL: both self-authorizable coverage frontiers are CLOSED — FE-logic guard (C100–C102,
+> FE +1.25) + route-IDOR audit (C108–C116, 7 gaps + BE +0.31). Highest-leverage work GATED on Angelo (#148 READY /
+> import defaultCategory / createLoadState + seedVehicle arch designs / #100/#79/#129).
 >
-> **RAN C104 (cadence; last ran C97).** Untracked-test sweep CLEAN. Coverage RE-MEASURED: BE 87.47/87.19 (1707 pass)
-> UNCHANGED vs C97; **FE 87.6%/88.56%/79.84% (739 pass) +1.25/+0.88/+1.06 vs C97**, the C100/C101/C102 FE-logic guard
-> arc (FE off its ~86% plateau). Both green (BE 1707 / FE 739), branch 104 ahead. NEXT cadence ~C114.
+> **RAN C111 (cadence; last ran C104).** Untracked-test sweep CLEAN. Coverage RE-MEASURED: **BE 87.77/87.53 (1717
+> pass) — +0.30/+0.34 vs C104, moving UP OFF the ~87.47% ceiling** from the C108–C110 route-coverage arc
+> (analytics/routes.ts 95.65→97%) — PROOF the audit found REAL untested route code; FE 87.6%/88.56%/79.74% unchanged.
+> Both green, branch 111 ahead.
 >
 > **RAN C14 (cadence).** Untracked-test sweep CLEAN. Coverage RE-MEASURED: BE 87.22%/86.96% (unchanged vs
 > C7 — sync-test additions hit already-covered modules); FE 86.07% line / 87.19% func / 78.53% branch (UP

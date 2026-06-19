@@ -24,6 +24,11 @@
 > (settings reload) + C101 (theme listener) + C102 (#148 anchor) FE-logic guard arc. FE is now meaningfully off its
 > old plateau; the residual gap is structural (effect/DOM-bound + DI/OAuth-bound). Both still under the 90% goal but
 > the FE structural ceiling proved ~1.25pts higher than the long-assumed ~86% once the store/util logic was pinned.**
+> **C117 (infra cadence MEASURED): BE 87.78% line / 87.53% func (1717 pass) — +0.01 line vs C111, the C113–C116
+> IDOR assertions hit mostly-already-covered ownership-gate branches (they're +expect in existing files, not new
+> route code); FE 87.6%/88.56%/79.74% UNCHANGED (C112–C116 backend/docs). Both at the ~87.8 BE / ~87.6 FE structural
+> ceiling. The route-coverage audit (C108–C116) is COMPLETE; both self-authorizable coverage frontiers (FE-logic
+> C100–C102, route-IDOR C108–C116) are now closed.**
 > **C111 (infra cadence MEASURED): BE moved UP off its long-assumed ~87.47% ceiling — 87.77% line / 87.53% func
 > (1717 pass), +0.30/+0.34 vs C104, from the C108 (sync-status) + C109 (vehicle-expenses) + C110
 > (quick-stats/cross-vehicle/year-end) route-coverage arc (analytics/routes.ts 95.65→97% line). PROOF the
@@ -53,9 +58,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 116 |
 | bug | 3 | 114 |
 | arch | 5 | 112 |
-| infra | 6 | 111 |
+| infra | 6 | 117 |
 
-Current cycle: **116**
+Current cycle: **117**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -374,6 +379,25 @@ Current cycle: **116**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C117 (infra — branch-hygiene sweep + coverage re-measure, the ~10-cycle cadence; last ran C111)** — Balance at
+  C117 (HEAD was C116; nudge label lags): NOTHING strictly over budget; FOUR at budget (feature 4/4, bug 3/3, arch
+  5/5, infra 6/6); infra most-starved (6) AND the substantive non-dry pick (its re-measure captures the C113–C116
+  IDOR test additions; arch is no-churn, bug is dry, feature is exhausted+gated). Ran ~6 cycles since C111 (a touch
+  early but the at-budget tie + non-dry value justify it). (1) UNTRACKED-TEST SWEEP: CLEAN — zero untracked
+  `.test`/`.spec.ts`/`.svelte.test.ts` specs (only the intentional `M .gitignore` + `M frontend/.gitignore`
+  overrides). (2) COVERAGE RE-MEASURED: **BE 87.78% line / 87.53% func** (1717 pass) — +0.01 line vs C111 (the
+  C113–C116 cross-tenant-idor.test.ts additions are +expect assertions in an existing file driving ownership-gate
+  branches mostly already covered — they pin SECURITY behavior, not new lines, exactly as expected for IDOR guards);
+  **FE 87.6% line / 88.56% func / 79.74% branch** (739 pass) — UNCHANGED (C112–C116 all backend/docs). Both at the
+  ~87.8 BE / ~87.6 FE structural ceiling. (3) BOTH-SIDES GREEN: BE 1717 / FE 739, 0 fail. (4) BRANCH STATE:
+  claude-loop-dev = **117 commits ahead** of fresh origin/main, PR-ready (category spread bug 27 / guard 21 /
+  feature 20 / deep-review 19 / infra 16 / arch 13; the 117th is the C1 loop-doc reset). Recorded here since
+  BRANCH_REVIEW.md is gitignored. Doc-only — no source touched. cov: be 87.78% / fe 87.6% (MEASURED). NEXT cadence
+  ~C127. STANDING SIGNAL: both self-authorizable coverage frontiers are now CLOSED — the FE-logic guard arc
+  (C100–C102, FE +1.25) and the route-IDOR audit (C108–C116, 7 gaps + BE +0.31 since C104). The loop has done deep,
+  genuine work across C100–C116; with both veins exhausted it returns to dry/no-churn/cadence records. The
+  highest-leverage remaining work is GATED on Angelo (#148 READY w/ anchor / import defaultCategory / createLoadState
+  + seedVehicle arch designs / #100/#79/#129) — a steer is the only thing that opens fresh work.
 - **C116 (guard — closed the LAST IDOR-sweep gap [PUT /notifications/:id/read]; route-coverage audit COMPLETE for
   state-changing routes, 7th + final route gap)** — Balance at C116 (HEAD was C115; nudge label lags): NOTHING
   strictly over budget; infra (5) + arch (4) most-starved, but the highest-leverage OPEN item is the C115-queued
