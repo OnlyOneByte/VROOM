@@ -44,12 +44,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 106 |
 | deep-review | 5 | 109 |
-| guard | 6 | 108 |
+| guard | 6 | 110 |
 | bug | 3 | 107 |
 | arch | 5 | 105 |
 | infra | 6 | 104 |
 
-Current cycle: **109**
+Current cycle: **110**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -368,6 +368,27 @@ Current cycle: **109**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C110 (guard — completed analytics-domain route coverage: pinned the 3 remaining untested routes [quick-stats /
+  cross-vehicle / year-end]; the C108/C109 audit-method increment)** — Balance at C110 (HEAD was C109; nudge label
+  lags): NOTHING strictly over budget (feature 4/4, bug 3/3, arch 5/5, infra 6/6 all AT). Took the highest-leverage
+  OPEN item = completing the C108/C109 route-coverage vein (proven productive: 2 cross-tenant gaps in 2 cycles).
+  Recorded under GUARD (the honest category for route HTTP-harness work; nothing was over budget so category-label
+  follows the work). Inventoried the analytics domain's 13 route handlers vs HTTP-harness coverage → the LAST 3
+  with ZERO route-level coverage were /quick-stats, /cross-vehicle, /year-end. Unlike the C109 vehicle-expenses
+  gap these are USER-scoped in the repo (no per-vehicle ownership gate), so the route-layer invariants pinned are:
+  (a) per-route AUTH-gating — every analytics route is behind requireAuth but the C185 net asserted 401 on only ONE
+  representative route, so a mis-mount skipping the middleware on one would've gone unnoticed; (b) the REQUIRED
+  startDate+endDate validation on the two dateRange routes (omit → 400 via zValidator BEFORE any repo work); (c)
+  year-end's OPTIONAL year (omitted → defaults to current year → 200, not 400). GUARD: +3 in
+  analytics-routes-http.test.ts. NON-VACUOUS proved firsthand: dropped the quick-stats zValidator → its 400
+  assertion flips RED (route no longer rejects the missing range); restored → 19 pass. The analytics route domain
+  now has COMPLETE HTTP-harness coverage (all 13 endpoints). Verify: backend validate:local GREEN — tsc 0,
+  musl-biome clean (20 pre-existing warnings, none new), 1716 pass / 0 fail (+3), build bundled. Backend-only (no UI
+  → no shot). cov: be ~87.5% (+ the 3 route paths) / fe 87.6% (~). PATTERN (C108/C109/C110): the route-coverage
+  audit method — inventory a domain's handlers vs HTTP-harness hits, pin the uncovered ones (ownership-gated first,
+  then auth/validation) — is the productive guard/deep-review vein. ONE domain (analytics) now fully mapped + closed.
+  NEXT: apply the same method to the next thinnest domain (auth/photos are OAuth/upload-bound; check
+  financing/insurance/odometer GET-by-id + list routes for any unharnessed ownership-gated handler).
 - **C109 (deep-review — pinned the untested /vehicle-expenses analytics route's cross-tenant ownership gate; 2nd
   route-ownership gap in 2 cycles, vein confirmed productive)** — Balance at C109 (HEAD was C108; nudge label lags):
   deep-review (109−102=7/5, +2) the most-starved over-budget category → picked. Applied the C108 lesson (map

@@ -481,6 +481,18 @@ the now-shootable eyes-on FE + any newly-touched module.)*
 > SEEDED for the next guard cycle: load-state.svelte.ts (35% func) + theme.svelte.ts (60%) have genuine untested
 > logic; pin those over another cold backend scan. Don't re-add the uploadBackup pin.
 >
+> **GUARDED C110:** the analytics route domain now has COMPLETE HTTP-harness coverage — pinned the last 3 untested
+> routes (/quick-stats, /cross-vehicle, /year-end) in analytics-routes-http.test.ts (+3). Unlike the C109
+> vehicle-expenses gap these are USER-scoped (no per-vehicle ownership gate), so they pin: per-route auth-gating
+> (the C185 net asserted 401 on only ONE representative route → a mis-mount skipping requireAuth on one would've
+> gone unnoticed), the REQUIRED startDate+endDate validation on the two dateRange routes (omit → 400), and
+> year-end's OPTIONAL year (omitted → 200 current-year default). Non-vacuous (drop the quick-stats zValidator →
+> its 400 assertion RED). PATTERN (C108/C109/C110): the route-coverage audit method — inventory a domain's handlers
+> vs HTTP-harness hits, pin the uncovered (ownership-gated first, then auth/validation) — is the productive
+> guard/deep-review vein. analytics is the FIRST domain fully mapped + closed (13/13 endpoints). NEXT: apply the
+> same method to the next thinnest domain — auth/photos are OAuth/upload-bound (structural), so check
+> financing/insurance/odometer GET-by-id + list routes for any unharnessed ownership-gated handler. Don't re-add.
+>
 > **GUARDED C108:** the untested `GET /:id/sync-status` provider route's tenant-isolation chokepoint is now
 > pinned (+4 in providers-routes-http.test.ts). Scouting the HTTP-harness guard vein (not source-scan) across all
 > 12 route domains surfaced this endpoint with ZERO coverage despite gating on `findOwnedProviderOrThrow` — the
