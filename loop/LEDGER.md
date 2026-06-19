@@ -24,6 +24,12 @@
 > (settings reload) + C101 (theme listener) + C102 (#148 anchor) FE-logic guard arc. FE is now meaningfully off its
 > old plateau; the residual gap is structural (effect/DOM-bound + DI/OAuth-bound). Both still under the 90% goal but
 > the FE structural ceiling proved ~1.25pts higher than the long-assumed ~86% once the store/util logic was pinned.**
+> **C111 (infra cadence MEASURED): BE moved UP off its long-assumed ~87.47% ceiling — 87.77% line / 87.53% func
+> (1717 pass), +0.30/+0.34 vs C104, from the C108 (sync-status) + C109 (vehicle-expenses) + C110
+> (quick-stats/cross-vehicle/year-end) route-coverage arc (analytics/routes.ts 95.65→97% line). PROOF the
+> route-coverage audit found REAL untested code, not theater. FE 87.6%/88.56%/79.74% UNCHANGED (C105–C110 all
+> backend/eyes-on/docs). The BE structural ceiling is ~87.8% once route-layer handlers are HTTP-harnessed; residual
+> is DI/OAuth-bound.**
 > **C101 (guard): FE moved UP again — 87.6% line / 88.56% func / 79.74% branch (+0.74/+0.59/+0.67 vs C100) from
 > the +1 themeStore.initialize() test (theme.svelte.ts 60.52→92.1% line, 100% func — the C336-skipped one-shot +
 > its live OS-preference listener). BE unchanged 87.47/87.20. The FE store/util layer is the live coverage
@@ -47,9 +53,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 110 |
 | bug | 3 | 107 |
 | arch | 5 | 105 |
-| infra | 6 | 104 |
+| infra | 6 | 111 |
 
-Current cycle: **110**
+Current cycle: **111**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -368,6 +374,24 @@ Current cycle: **110**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C111 (infra — branch-hygiene sweep + coverage re-measure, the ~10-cycle cadence; last ran C104)** — Balance at
+  C111 (HEAD was C110; nudge label lags): FOUR over budget — infra (111−104=7/6, +1), arch (111−105=6/5, +1), feature
+  (111−106=5/4, +1), bug (111−107=4/3, +1); infra wins on raw starvation (7, the C84 tie-break) AND its re-measure
+  actually MOVED this time (the C108–C110 route tests). Ran right in the ~10-cycle window. (1) UNTRACKED-TEST SWEEP:
+  CLEAN — zero untracked `.test`/`.spec.ts`/`.svelte.test.ts` specs (only the intentional `M .gitignore` + `M
+  frontend/.gitignore` overrides). (2) COVERAGE RE-MEASURED: **BE 87.77% line / 87.53% func** (1717 pass) —
+  **+0.30/+0.34 vs C104**, moving UP OFF the long-assumed ~87.47% ceiling, from the C108 (sync-status) + C109
+  (vehicle-expenses) + C110 (quick-stats/cross-vehicle/year-end) route-coverage arc (analytics/routes.ts 95.65→97%
+  line) — PROOF the route-coverage audit found REAL untested route-layer code, not theater; **FE 87.6% line / 88.56%
+  func / 79.74% branch** (739 pass) — UNCHANGED (C105–C110 all backend/eyes-on/docs; no FE source touched). The BE
+  structural ceiling is ~87.8% once route handlers are HTTP-harnessed; residual is DI/OAuth-bound. (3) BOTH-SIDES
+  GREEN: BE 1717 / FE 739, 0 fail. (4) BRANCH STATE: claude-loop-dev = **111 commits ahead** of fresh origin/main,
+  PR-ready (category spread bug 26 / feature 20 / guard 19 / deep-review 18 / infra 15 / arch 12; the 111th is the
+  C1 loop-doc reset). Recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source touched. cov: be
+  87.77% / fe 87.6% (MEASURED). NEXT cadence ~C121. STANDING NOTE: the C108–C110 route-coverage audit is the live
+  productive vein (3 route gaps found + BE coverage +0.30); the analytics domain is fully mapped — apply the same
+  method to the next-thinnest domain. The product-advancing work stays GATED on Angelo (#148 READY w/ anchor /
+  import defaultCategory / createLoadState design / #100/#79/#129).
 - **C110 (guard — completed analytics-domain route coverage: pinned the 3 remaining untested routes [quick-stats /
   cross-vehicle / year-end]; the C108/C109 audit-method increment)** — Balance at C110 (HEAD was C109; nudge label
   lags): NOTHING strictly over budget (feature 4/4, bug 3/3, arch 5/5, infra 6/6 all AT). Took the highest-leverage
