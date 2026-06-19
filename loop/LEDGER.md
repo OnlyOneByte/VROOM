@@ -52,10 +52,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 109 |
 | guard | 6 | 110 |
 | bug | 3 | 107 |
-| arch | 5 | 105 |
+| arch | 5 | 112 |
 | infra | 6 | 111 |
 
-Current cycle: **111**
+Current cycle: **112**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -374,6 +374,24 @@ Current cycle: **111**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C112 (arch — no churn warranted for a self-authorizable increment; surfaced the seedVehicle test-helper
+  convergence as a 2nd design-gated arch item, recorded + pivot)** — Balance at C112 (HEAD was C111; nudge label
+  lags): THREE over budget at +2 — arch (112−105=7/5, +2, most-starved), feature (6/4), bug (5/3); arch wins on raw
+  starvation (7). PRECONDITION: `git diff 5766239(C85)..HEAD` over production source is EMPTY — no fresh PRODUCTION
+  dedup since the last source change (the C91/C98/C105 discipline). Checked whether the only new code since (the
+  C108–C110 route TESTS) threaded a convergence candidate: YES, a real one — `seedVehicle` is re-declared in 51
+  HTTP-harness test files with 7 distinct signatures (32× no-arg, 7× nickname, 4× make, + 4 one-offs), and the
+  C108–C110 work added more call sites. BUT converging it is a SWEEPING 51-file refactor with an options-bag helper
+  — categorically NOT a self-authorizable arch increment (arch rule 1: ONE small reviewable; rule 2: behavior-change
+  risk across 51 test files; it's test-only, lower-leverage than the unchanged production code). Same shape as the
+  C105 createLoadState finding: a REAL, design-gated arch item, not a no-churn cop-out. Recorded no-churn for the
+  cycle + SURFACED the seedVehicle convergence as a 2nd design-gated arch-queue candidate (filed in BACKLOG with the
+  recommended incremental approach: add ONE shared `test-helpers` seeder, migrate one domain per arch cycle once
+  approved — never a 51-file big-bang). Did NOT force the churn (the GUIDE "Don't manufacture churn" + arch rule 6).
+  9th no-churn confirm (C4/C6/C12/C36/C85/C91/C98/C105/C112) — INFORMATIVE again (names a concrete dedup). Doc-only —
+  no source touched. cov: be 87.77% / fe 87.6% (~ — nothing changed). NEXT arch: both real dedups (createLoadState
+  C105, seedVehicle C112) are design-gated multi-file migrations awaiting Angelo; absent a steer, arch stays at its
+  structural floor — record no-churn fast.
 - **C111 (infra — branch-hygiene sweep + coverage re-measure, the ~10-cycle cadence; last ran C104)** — Balance at
   C111 (HEAD was C110; nudge label lags): FOUR over budget — infra (111−104=7/6, +1), arch (111−105=6/5, +1), feature
   (111−106=5/4, +1), bug (111−107=4/3, +1); infra wins on raw starvation (7, the C84 tie-break) AND its re-measure

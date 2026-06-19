@@ -811,6 +811,15 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 ### arch
 *(reliably DRY per the archive. Run a fresh dedup scout; if nothing clean surfaces, record "no churn warranted" + pivot. Obey the arch rules above.)*
 
+> **🚩 DESIGN-GATED (arch rule 6, AWAITING ANGELO) — surfaced C112: converge the `seedVehicle` test helper.** It's
+> re-declared in 51 HTTP-harness test files with 7 distinct signatures (32× no-arg, 7× nickname, 4× make, + 4
+> one-offs). A real DRY win (one shared `test-helpers` seeder vs 51 copies), but converging it is a SWEEPING 51-file
+> refactor with an options-bag — NOT a self-authorizable arch increment (rule 1: one small reviewable; rule 2:
+> behavior-change risk across 51 test files). RECOMMENDED if approved: add ONE shared seeder (an options bag
+> covering nickname/make/extra), migrate ONE domain's test files per arch cycle (never a 51-file big-bang); the
+> 32 no-arg call sites are the trivial first wave. Test-only (lower-leverage than production dedup, which is
+> unchanged since C85). Until Angelo rules, arch records no-churn fast.
+>
 > **🚩 DESIGN-GATED (arch rule 6, AWAITING ANGELO) — surfaced C105: adopt `createLoadState<T>` across the 13
 > load-bearing pages.** The scaffold (load-state.svelte.ts, arch #2) was extracted to centralize the page load triad
 > (isLoading/loadError/load) so the error leg is STRUCTURAL not per-page — the "load failure masquerades as empty
@@ -899,6 +908,13 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
    bug-threads-idiom → next-arch-converges lesson again (C62/C65/C72 → C78; sibling to C64 generator + C71
    vehicleUnitsFor). Don't re-scout the volume sites — single-sourced.
 
+> **SCOUTED C112 — no churn warranted (self-authorizable); surfaced a 2nd design-gated dedup.** Production source
+> unchanged since C85 (no fresh production dedup). The only new code since is the C108–C110 route TESTS, which DID
+> thread a real convergence candidate: `seedVehicle` re-declared in 51 HTTP-harness files (7 signatures). But that's
+> a sweeping 51-file test-only refactor → design-gated (see the new arch queue item above), NOT a self-authorizable
+> increment. Recorded no-churn; surfaced it. 9th no-churn confirm (C4/C6/C12/C36/C85/C91/C98/C105/C112) — both real
+> dedups (createLoadState C105, seedVehicle C112) now await an Angelo design call.
+>
 > **SCOUTED C105 — no churn warranted for a SELF-AUTHORIZABLE increment, but surfaced a REAL design-gated dedup.**
 > Scouted a fresh surface the backend scouts (C85/C91/C98) never touched: the FE load triad. FINDING:
 > `createLoadState<T>` (load-state.svelte.ts) was extracted (arch #2) as a migration SCAFFOLD — docstring: "~14 pages
