@@ -378,6 +378,17 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **CLOSED C114 — the insurance TERM routes' cross-tenant IDOR gap (PUT/DELETE /:id/terms/:termId).** The
+> route-audit method (C108–C113) applied with the bug lens: systematically compared every state-changing route vs
+> the cross-tenant-idor.test.ts sweep → the insurance term routes are gated on validateInsuranceOwnership(id) but
+> were NEVER in the sweep. terms-http.test.ts (C272) pins the inner FK defense (foreign vehicleId in the payload)
+> but always AS the policy owner — the policy-level cross-tenant gate on the term routes was untested. A
+> cross-tenant term edit/delete lets A mutate B's terms + their premium expenses. +2 expectDenied in the insurance
+> IDOR case (PUT + DELETE term); non-vacuous (drop the term PUT gate → IDOR test RED). 5th real route gap in 6
+> cycles (4 cross-tenant IDOR). REMAINING IDOR-sweep gaps to check NEXT: `PUT /notifications/:id/read` (reminders)
+> + `PUT/DELETE /split/:id` (expenses) — both state-changing, neither in the sweep. The cold pure-logic vein stays
+> dry (no production source changed since C85); the productive bug axis is now the IDOR route-audit.
+>
 > **SCOUTED C103/C107 — no fresh defect (8th/9th consecutive; precondition-recorded dry). `git diff C85..HEAD` over
 > production source still EMPTY → a regression is structurally impossible, a scout produces nothing.** Also confirmed the C100–C102 FE-logic guard frontier
 > is now worked out: the only remaining <90% FE files are expense-api.ts (thin apiClient pass-throughs → testing

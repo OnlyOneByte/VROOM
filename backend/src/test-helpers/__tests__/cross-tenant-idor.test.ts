@@ -113,18 +113,21 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     const vid = await idOf(
       await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
     );
-    const pid = await idOf(
-      await asB('POST', '/api/v1/insurance', {
-        company: 'B Mutual',
-        terms: [
-          {
-            startDate: '2024-01-01T00:00:00.000Z',
-            endDate: '2025-01-01T00:00:00.000Z',
-            vehicleCoverage: { vehicleIds: [vid] },
-          },
-        ],
-      })
-    );
+    const policyRes = await asB('POST', '/api/v1/insurance', {
+      company: 'B Mutual',
+      terms: [
+        {
+          startDate: '2024-01-01T00:00:00.000Z',
+          endDate: '2025-01-01T00:00:00.000Z',
+          vehicleCoverage: { vehicleIds: [vid] },
+        },
+      ],
+    });
+    const policyBody =
+      await json<DataEnvelope<{ id: string; terms: Array<{ id: string }> }>>(policyRes);
+    expect(policyRes.status, JSON.stringify(policyBody)).toBeLessThan(300);
+    const pid = policyBody.data.id;
+    const tid = policyBody.data.terms[0].id; // B's term id (nested under the unowned policy)
     const cid = await idOf(
       await asB('POST', `/api/v1/insurance/${pid}/claims`, {
         claimDate: '2024-06-15T00:00:00.000Z',
@@ -138,6 +141,20 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
       'PUT policy'
     );
     expectDenied(await ctx.authed('DELETE', `/api/v1/insurance/${pid}`), 'DELETE policy');
+    // C114: TERM routes (PUT/DELETE /:id/terms/:termId) are state-changing, gated on the SAME
+    // validateInsuranceOwnership(id) as the policy itself (routes.ts:230/257), but the IDOR sweep
+    // skipped them. A cross-tenant term edit/delete would let A mutate B's insurance terms (and their
+    // auto-materialized premium expenses via updateTermExpenses/deleteBySource). terms-http.test.ts
+    // (C272) pins the INNER FK defense (a foreign vehicleId in the coverage payload) but always AS the
+    // policy owner — the policy-level ownership gate on the term routes was never cross-tenant tested.
+    expectDenied(
+      await ctx.authed('PUT', `/api/v1/insurance/${pid}/terms/${tid}`, { policyNumber: 'HACK' }),
+      'PUT term'
+    );
+    expectDenied(
+      await ctx.authed('DELETE', `/api/v1/insurance/${pid}/terms/${tid}`),
+      'DELETE term'
+    );
     // Claims are nested under the (unowned) policy.
     expectDenied(await ctx.authed('GET', `/api/v1/insurance/${pid}/claims`), 'GET claims');
     expectDenied(

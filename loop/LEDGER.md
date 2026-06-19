@@ -51,11 +51,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 113 |
 | deep-review | 5 | 113 |
 | guard | 6 | 110 |
-| bug | 3 | 107 |
+| bug | 3 | 114 |
 | arch | 5 | 112 |
 | infra | 6 | 111 |
 
-Current cycle: **113**
+Current cycle: **114**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -374,6 +374,29 @@ Current cycle: **113**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C114 (bug — closed the insurance TERM routes' cross-tenant IDOR gap [PUT/DELETE /:id/terms/:termId]; 5th route
+  gap via the audit method, an actual cross-tenant defect)** — Balance at C114 (HEAD was C113; nudge label lags):
+  bug (114−107=7/3, +4) the LONE over-budget category (most-neglected since C107) → forced. The cold pure-logic vein
+  is provably dry (no production source changed since C85), but the C108–C113 route-audit method finds REAL defects
+  on a different axis — an unguarded IDOR IS a bug — so applied the bug lens to the C113 pointer (audit the remaining
+  domains' state-changing routes vs the cross-tenant-idor.test.ts sweep). SYSTEMATIC COMPARISON of every PUT/DELETE/
+  PATCH route vs the sweep's covered targets surfaced the gap: the insurance TERM routes (PUT/DELETE
+  /:id/terms/:termId, routes.ts:221/253) are state-changing + gated on the SAME validateInsuranceOwnership(id) as the
+  policy, but the IDOR sweep SKIPPED them. CRITICAL DISTINCTION verified firsthand: terms-http.test.ts (C272) pins
+  the INNER FK defense (rejecting a foreign vehicleId in the coverage payload) — but ALWAYS as the policy OWNER, so
+  the policy-level cross-tenant gate on the term routes was never tested. A cross-tenant term edit/delete lets user A
+  mutate user B's insurance terms + their auto-materialized premium expenses (updateTermExpenses / deleteBySource) —
+  a real destructive cross-tenant write (NORTH_STAR #2). GUARD: +2 expectDenied in cross-tenant-idor.test.ts's
+  insurance case (captured B's term id from the policy-create response; added PUT + DELETE term denials alongside the
+  existing policy/claim ones). NON-VACUOUS proved firsthand: dropped the term PUT ownership gate → the insurance IDOR
+  test RED (cross-tenant term edit no longer denied); restored → 7 pass. Verify: backend validate:local GREEN — tsc
+  0, musl-biome clean (20 pre-existing warnings, none new; 1 file auto-formatted), 1716 pass / 0 fail (+2 expect in
+  an existing test), build bundled. Backend-only (no UI → no shot). cov: be 87.77% / fe 87.6% (~). PATTERN
+  (C108/C109/C110/C113/C114): the route-coverage audit method has now found 5 real route gaps in 6 cycles — 4 of them
+  cross-tenant IDOR (sync-status read, vehicle-expenses read, financing payoff, insurance terms). DEFINITIVELY the
+  productive vein. REMAINING IDOR-sweep gaps to check next: `PUT /notifications/:id/read` (reminders) +
+  `PUT/DELETE /split/:id` (expenses) — both state-changing, neither in the sweep. NEXT bug/deep-review cycle:
+  continue the IDOR audit on those.
 - **C113 (feature parked → deep-review: closed the financing PUT /payoff cross-tenant IDOR gap; 3rd route-ownership
   gap found by the C108–C111 audit method)** — Balance at C113 (HEAD was C112; nudge label lags): TWO over budget at
   +3 — feature (113−106=7/4, +3) and bug (113−107=6/3, +3); feature most-starved → but feature is EXHAUSTED of
