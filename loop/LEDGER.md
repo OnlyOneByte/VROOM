@@ -48,14 +48,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 106 |
-| deep-review | 5 | 109 |
+| feature | 4 | 113 |
+| deep-review | 5 | 113 |
 | guard | 6 | 110 |
 | bug | 3 | 107 |
 | arch | 5 | 112 |
 | infra | 6 | 111 |
 
-Current cycle: **112**
+Current cycle: **113**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -374,6 +374,29 @@ Current cycle: **112**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C113 (feature parked → deep-review: closed the financing PUT /payoff cross-tenant IDOR gap; 3rd route-ownership
+  gap found by the C108–C111 audit method)** — Balance at C113 (HEAD was C112; nudge label lags): TWO over budget at
+  +3 — feature (113−106=7/4, +3) and bug (113−107=6/3, +3); feature most-starved → but feature is EXHAUSTED of
+  self-authorizable work (every surface eyes-on C96/C106, import-trackers gated) → recorded PARKED + pivoted to the
+  highest-leverage open item = the live route-coverage audit vein (the GUIDE park-and-pivot rule; the C108–C111
+  precedent, 3 gaps found + BE coverage +0.30). Recorded under DEEP-REVIEW (a security-audit finding). Applied the
+  C110 pointer — scouted the next domains (financing/odometer/insurance) — and discovered the systematic
+  `cross-tenant-idor.test.ts` (the per-domain IDOR sweep) covers financing's DELETE + PATCH/payment-amount but
+  SKIPS **PUT /:financingId/payoff**, a state-changing route on the SAME `validateFinancingOwnership` gate
+  (routes.ts:219). A cross-tenant payoff lets user A mark user B's financing paid-off (deactivateFinancing →
+  isActive=0 + severs the source link) — a destructive write on B's data, the C108/C109 class on a route the IDOR
+  sweep missed. The payoff route is exercised FUNCTIONALLY (deactivate-hook test, as the owner) but its ownership
+  gate was never cross-tenant-tested. GUARD: +1 expectDenied in cross-tenant-idor.test.ts's financing case (it
+  already seeds B's financing fid — just added the PUT payoff denial alongside DELETE/PATCH). NON-VACUOUS proved
+  firsthand: dropped the payoff ownership gate → the financing IDOR test RED (cross-tenant payoff no longer denied —
+  deactivateFinancing is user-scoped so it no-ops with a non-4xx instead of the proper 404); restored → 7 pass.
+  Verify: backend validate:local GREEN — tsc 0, musl-biome clean (20 pre-existing warnings, none new), 1716 pass / 0
+  fail (+1 expect in an existing test), build bundled. Backend-only (no UI → no shot). cov: be 87.77% / fe 87.6%
+  (~). PATTERN (C108/C109/C110/C113): the route-coverage audit method has now found 4 real route-ownership/coverage
+  gaps across 4 cycles (sync-status, vehicle-expenses, 3 analytics routes, financing payoff) — DEFINITIVELY a
+  productive vein, not a fixed point. The IDOR sweep is now complete for financing's destructive routes. NEXT: audit
+  the remaining domains' state-changing routes against the IDOR sweep (odometer PUT, insurance term/claim PUT/DELETE
+  — check each is in cross-tenant-idor.test.ts).
 - **C112 (arch — no churn warranted for a self-authorizable increment; surfaced the seedVehicle test-helper
   convergence as a 2nd design-gated arch item, recorded + pivot)** — Balance at C112 (HEAD was C111; nudge label
   lags): THREE over budget at +2 — arch (112−105=7/5, +2, most-starved), feature (6/4), bug (5/3); arch wins on raw

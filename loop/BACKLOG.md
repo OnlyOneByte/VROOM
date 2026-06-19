@@ -122,6 +122,16 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > is /profile (/trips is a "Coming Soon" placeholder; /privacypolicy + /termsofservice are static legal copy) — after
 > /profile, every real surface is eyes-on and the feature category is fully Angelo-gated.
 >
+> **GUARDED C113 — the financing PUT /:financingId/payoff cross-tenant IDOR gap (4th route gap via the audit
+> method).** The systematic cross-tenant-idor.test.ts sweep covers financing's DELETE + PATCH/payment-amount but
+> SKIPPED PUT /payoff — a state-changing route on the SAME validateFinancingOwnership gate (routes.ts:219). A
+> cross-tenant payoff lets A mark B's financing paid-off (deactivateFinancing → isActive=0 + severs source link), a
+> destructive write on B's data. Exercised functionally (deactivate-hook test as owner) but never cross-tenant
+> tested. +1 expectDenied in the financing IDOR case (reuses B's seeded fid). Non-vacuous (drop the payoff gate →
+> financing IDOR test RED). PATTERN (C108/C109/C110/C113): the route-coverage audit method has found 4 real
+> route gaps in 4 cycles — definitively productive. NEXT: audit the remaining domains' state-changing routes vs the
+> IDOR sweep (odometer PUT, insurance term/claim PUT/DELETE — verify each is in cross-tenant-idor.test.ts). Don't re-add.
+>
 > **GUARDED C109 — the untested /vehicle-expenses analytics route's cross-tenant ownership gate (2nd
 > route-ownership gap in 2 cycles).** Mapped the analytics domain's 13 route handlers vs HTTP-harness coverage →
 > 4 routes had ZERO route-level coverage (/quick-stats, /cross-vehicle, /year-end, /vehicle-expenses).

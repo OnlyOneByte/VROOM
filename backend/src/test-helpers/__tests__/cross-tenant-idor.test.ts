@@ -150,7 +150,7 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     );
   });
 
-  test("financing: A cannot DELETE/PATCH B's financing", async () => {
+  test("financing: A cannot DELETE/PATCH/PAYOFF B's financing", async () => {
     const vid = await idOf(
       await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
     );
@@ -171,6 +171,14 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
       'PATCH financing'
     );
     expectDenied(await ctx.authed('DELETE', `/api/v1/financing/${fid}`), 'DELETE financing');
+    // C113: PUT /:financingId/payoff is a state-changing route gated on the SAME
+    // validateFinancingOwnership (routes.ts:219) as DELETE, but the IDOR sweep skipped it. A
+    // cross-tenant payoff would let A mark B's financing paid-off (deactivateFinancing → isActive=0,
+    // severs the source link) — a destructive write on B's data. Pin it alongside its siblings.
+    expectDenied(
+      await ctx.authed('PUT', `/api/v1/financing/${fid}/payoff`, {}),
+      'PUT financing payoff'
+    );
   });
 
   test("odometer: A cannot GET/PUT/DELETE B's odometer entry", async () => {
