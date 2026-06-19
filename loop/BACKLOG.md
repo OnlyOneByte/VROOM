@@ -502,6 +502,17 @@ the now-shootable eyes-on FE + any newly-touched module.)*
 > SEEDED for the next guard cycle: load-state.svelte.ts (35% func) + theme.svelte.ts (60%) have genuine untested
 > logic; pin those over another cold backend scan. Don't re-add the uploadBackup pin.
 >
+> **GUARDED C116 — ROUTE-COVERAGE IDOR AUDIT COMPLETE.** Closed the last sweep gap: PUT /notifications/:id/read
+> (reminders), state-changing + (id,userId)-scoped (throws NotFoundError) but never in the sweep. +2 in the reminder
+> IDOR case (raw-seed B's notification, assert A denied + B's row stays unread). Non-vacuous (drop the userId scope
+> → reminder IDOR test RED). **MILESTONE: the route-coverage audit (C108–C116) found + closed 7 real route gaps in 9
+> cycles — 6 cross-tenant IDOR (sync-status, vehicle-expenses, financing payoff, insurance terms, expense split,
+> notification read) + 3 analytics auth/validation routes. cross-tenant-idor.test.ts now covers EVERY state-changing
+> route across all domains; analytics is fully HTTP-harnessed. This vein is EXHAUSTED — genuinely productive for 9
+> cycles, now done.** The self-authorizable veins are all swept again; record dry/no-churn fast + the highest-leverage
+> work is GATED on Angelo (#148 READY / import defaultCategory / createLoadState + seedVehicle arch designs /
+> #100/#79/#129). Don't re-add.
+>
 > **GUARDED C115:** the expense SPLIT routes' cross-tenant IDOR gap (PUT/DELETE /split/:id) is now pinned (+2
 > expectDenied in the expense IDOR case). Both routes throw NotFoundError when the group isn't (groupId,userId)-owned
 > (groupOwnedBy), so they 4xx-deny a foreign id today, but the cross-tenant-idor.test.ts sweep never covered them —

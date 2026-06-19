@@ -267,6 +267,26 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
       'PUT reminder'
     );
     expectDenied(await ctx.authed('DELETE', `/api/v1/reminders/${rid}`), 'DELETE reminder');
+
+    // C116 (the LAST known IDOR-sweep gap): PUT /notifications/:id/read is a state-changing route
+    // gated on markNotificationRead's (id, userId) scope (it throws NotFoundError when no row matches —
+    // repository.ts:565), but the sweep never covered it. Raw-seed a notification owned by B (the API
+    // only creates these via the trigger), then prove A can't mark B's notification read. Closes the
+    // route-coverage IDOR audit (C108–C116) for every state-changing route.
+    ctx.sqlite.run(
+      `INSERT INTO reminder_notifications (id, reminder_id, user_id, due_date, due_odometer, is_read, created_at)
+       VALUES ('n-idor-b', ?, ?, 1700000000, NULL, 0, 1000)`,
+      [rid, bId]
+    );
+    expectDenied(
+      await ctx.authed('PUT', '/api/v1/reminders/notifications/n-idor-b/read'),
+      'PUT notification read'
+    );
+    // And B's notification is untouched — still unread.
+    const stillUnread = ctx.sqlite
+      .query('SELECT is_read FROM reminder_notifications WHERE id = ?')
+      .get('n-idor-b') as { is_read: number };
+    expect(stillUnread.is_read).toBe(0);
   });
 
   test("photo: A cannot list/upload to B's vehicle via the generic photo route", async () => {

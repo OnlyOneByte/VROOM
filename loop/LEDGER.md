@@ -50,12 +50,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 113 |
 | deep-review | 5 | 113 |
-| guard | 6 | 115 |
+| guard | 6 | 116 |
 | bug | 3 | 114 |
 | arch | 5 | 112 |
 | infra | 6 | 111 |
 
-Current cycle: **115**
+Current cycle: **116**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -374,6 +374,26 @@ Current cycle: **115**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C116 (guard — closed the LAST IDOR-sweep gap [PUT /notifications/:id/read]; route-coverage audit COMPLETE for
+  state-changing routes, 7th + final route gap)** — Balance at C116 (HEAD was C115; nudge label lags): NOTHING
+  strictly over budget; infra (5) + arch (4) most-starved, but the highest-leverage OPEN item is the C115-queued
+  last IDOR gap (completing the C108–C116 route-audit vein beats an early infra re-measure [ran C111] or an arch
+  no-churn). Took it. `PUT /notifications/:id/read` is state-changing + gated on markNotificationRead's (id, userId)
+  scope (throws NotFoundError when no row matches, repository.ts:565) — so it 4xx-denies a foreign id today, but the
+  cross-tenant-idor.test.ts sweep never covered it. GUARD: +2 in the reminders IDOR case — raw-seed a notification
+  owned by B (the API only mints these via the trigger), assert A is denied PUT-read + B's notification stays unread
+  (is_read=0). NON-VACUOUS proved firsthand: dropped the userId scope from markNotificationRead → reminder IDOR test
+  RED (A marks B's notification read, 200 not 404, is_read flips); restored → 7 pass. Verify: backend validate:local
+  GREEN — tsc 0, musl-biome clean (20 pre-existing warnings, none new), 1716 pass / 0 fail (+2 expect in an existing
+  test), build bundled. Backend-only (no UI → no shot). cov: be 87.77% / fe 87.6% (~). **MILESTONE — the
+  route-coverage audit (C108–C116) is COMPLETE: 7 real route gaps found + closed in 9 cycles, 6 cross-tenant IDOR
+  (sync-status read, vehicle-expenses read, financing payoff, insurance terms, expense split, notification read) + 3
+  analytics auth/validation routes. cross-tenant-idor.test.ts now covers EVERY state-changing route across all
+  domains; the analytics domain is fully HTTP-harnessed. This vein is now EXHAUSTED — it found genuine security
+  gaps for 9 cycles but is done.** NEXT: the self-authorizable veins are all swept again (the route-audit was the
+  last productive one); record dry/no-churn fast + the highest-leverage work is GATED on Angelo (#148 READY w/
+  anchor / import defaultCategory / createLoadState + seedVehicle arch designs / #100/#79/#129) — a steer is the
+  only thing that opens fresh work.
 - **C115 (guard — closed the expense SPLIT routes' cross-tenant IDOR gap [PUT/DELETE /split/:id]; 6th route gap via
   the audit method)** — Balance at C115 (HEAD was C114; nudge label lags): NOTHING strictly over budget; guard
   most-starved (115−110=5) → picked (the live IDOR route-audit is guard's productive vein). Took the C114 pointer's
