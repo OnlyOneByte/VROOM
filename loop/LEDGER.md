@@ -433,6 +433,12 @@ Current cycle: **146**
   source touched → no shot needed). cov: be 88.21% / fe 88.23% (~ — no test/source change). The PR's only red check
   should now go green on the next CI run — pushing so CI re-runs; if green, the PR is merge-ready and the override can
   lift. NEXT: confirm CI conclusion next cycle; if Frontend Tests flips to success, ping Angelo merge-ready.
+  **[C30 CONFIRMED]** CI re-ran on 5d89397 → **Frontend Tests: success**. ALL PR-gating checks now GREEN (Backend
+  Tests ✓ · Frontend Tests ✓ · update-release-draft ✓; the only skipped jobs are deploy-only, not PR-gating). The
+  C146 `npm ci` fix is validated end-to-end IN CI — the FE blocker that gated this PR since C141 is closed. **PHASE
+  BOUNDARY: the PR is merge-ready.** Pinged Angelo. The PR-green override has done its job; awaiting his merge / lift
+  of the override block (after which normal balance-table rotation resumes — current starvation: feature most-starved
+  at last-touched 121).
 - **C145 (PR-GREEN override — VERIFIED the `vite@8.1.0-beta.0` forward path is blocked too; ALL levers exhausted)** —
   Override active; main unchanged; Angelo not ruled. Backend GREEN / Frontend RED. Last cycle I'd offered to test
   vite@8.1.0-beta.0 (the next Vite, which pins a coordinated rolldown 1.1.1 — so it'd dodge the C144 export-mismatch).
