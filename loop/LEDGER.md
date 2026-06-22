@@ -420,9 +420,21 @@ Current cycle: **141**
   branch-introduced regression (locally the build passes on node22). FIX: bumped the frontend job's Node 20→22 in
   ci-cd.yml (matches CLAUDE.md's documented node22+bun toolchain + Vite 8's preferred engine). This edits the CI
   workflow that gates all PRs/main — flagged to Angelo as a config change (send_message), but applied because it's
-  the evidence-backed blocker the override exists to clear, low-risk, and reversible. VERIFY: pushed so CI re-runs
-  on Node 22; awaiting the result. cov: be 88.21% / fe 88.23% (~ — CI config only). If green: all three PR checks
-  (Backend C139+C140, Frontend C141) pass → PR #114 merge-ready; ping Angelo to merge / lift the override.
+  the evidence-backed blocker the override exists to clear, low-risk, and reversible. **OUTCOME: Node 22 did NOT
+  fix the build (run #294 still red) — the version-floor was a wrong guess** (Node-20.x-latest already met
+  `^20.19.0`). Kept the bump (correct hygiene vs the project's node22 standard), but it's not the cause.
+  **REAL ROOT CAUSE** (found by reproducing CI's FRESH `npm install` + `vite build` — my earlier local builds reused
+  a stale node_modules so they passed): `vite build` fails with 11 `[PARSE_ERROR] Expected ',' or ')' but found
+  '?'` from **rolldown@1.0.3** (Vite 8's bundler) choking on TypeScript **optional-parameter** syntax in `.svelte`
+  scripts — `handleSubmit(event?)`, `formatLastSync(lastSyncAt?)`, `scrollTo(index, jump?)`, carousel.svelte, AND
+  inside the dependency `node_modules/layerchart/.../TooltipContext.svelte`. rolldown parses the Svelte
+  `<script lang="ts">` as plain JS → `param?` is a syntax error. PRE-EXISTING PROJECT-WIDE toolchain regression:
+  main's own CI run #274 (3ff50fa) is ALSO `failure`, frontend/ is byte-identical to main, vite 8.0.16 on both →
+  NOT branch-caused + NOT loop-fixable with a one-liner. Needs a DEPENDENCY/BUILD decision (pin Vite→7.x
+  [rollup-based, parses TS fine] / pin-or-upgrade rolldown / fix the svelte-vite TS preprocessor). Per override
+  step 5 (red check needing a version/semantics decision → send_message Angelo, don't guess) → ESCALATED, not
+  auto-fixed. STATUS: Backend Tests GREEN (C139+C140); Frontend Tests BLOCKED on the toolchain call. cov: be
+  88.21% / fe 88.23% (~). NEXT: await Angelo's toolchain decision; apply + re-verify the FRESH-install build.
 - **C140 (PR-GREEN override — fix the 2nd RED CI failure: registry.test.ts's leaking `mock.module('encryption')`
   corrupted the providers-routes-http credential-encryption assertion)** — After C139 (the 0005-snapshot fix), CI
   run #292 dropped backend annotations 10→2: the migration cascade was GONE, leaving an ISOLATED failure
