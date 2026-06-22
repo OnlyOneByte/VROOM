@@ -90,7 +90,7 @@ cycle (slow-budget categories mis-forecast otherwise).
 | arch | 5 | 131 |
 | infra | 6 | 136 |
 
-Current cycle: **137**
+Current cycle: **139**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -409,6 +409,26 @@ Current cycle: **137**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C139 (PR-GREEN override — fix RED CI: missing `0005_snapshot.json` made `db:generate` emit a spurious 0006
+  that re-created an existing index → Backend Tests failed)** — PRIORITY OVERRIDE active (Angelo): only job is a
+  green PR (C138 recorded the override + merged latest main). Read the LIVE CI via the public GitHub API (no `gh` on
+  host): PR #114 "Merge Monday", HEAD 380a35e, mergeable_state=unstable — BOTH `Backend Tests` + `Frontend Tests` =
+  failure (run #291). Pulled failure detail from the check-run ANNOTATIONS endpoint (job logs are admin-gated 403).
+  BACKEND ROOT CAUSE (confirmed + FIXED): annotation `Migration 0006_careful_vance_astro failed: index
+  vehicles_user_license_plate_idx already exists` → cascading `testDb.sqlite undefined` in sql-helpers.test.ts.
+  Traced firsthand: `drizzle/meta/` had committed snapshots 0000–0004 but **0005_snapshot.json was NEVER committed**
+  (when 0005_license_plate_per_user.sql landed Jun 11), though _journal lists 0005. So CI's `db:generate` diffs
+  schema.ts against the stale 0004 snapshot → re-emits the 0005 license-plate index as a spurious 0006 (its
+  prevId=0004's id, proving it skipped 0005) → the migration test harness applies BOTH 0005 (creates index) + 0006
+  (re-creates) → "already exists" → fail. FIX: committed the missing `0005_snapshot.json` (the just-generated 0006
+  snapshot IS the correct post-0005 serialization → saved as 0005; restored _journal to its committed 6 entries;
+  deleted the spurious 0006). VERIFY: the EXACT CI sequence now passes — `db:generate` → "No schema changes, nothing
+  to migrate 😴" (no 0006) → `bun test` 1770 pass / 0 fail; type-check + biome check clean. FRONTEND failure:
+  annotation is only a bare workflow exit-1 (no file detail; logs admin-gated); all FE CI steps
+  (install/type-check/eslint/test 749/build) pass firsthand locally — can't repro. Per the override ("fix ONE red
+  check per cycle, push so CI re-runs"): shipping the confirmed backend fix; the fresh run gives a clean FE signal
+  (next cycle reads new annotations with the backend noise gone). cov: be 88.21% / fe 88.23% (~ — migration-meta
+  only, no src). NEXT: read run #292; if Backend green + FE still red, drill the now-isolated FE failure.
 - **C137 (bug — REAL a11y defect fixed: 2 odometer forms' icon back-button had no accessible name; FRESH vein)** —
   Balance at C137 (HEAD was C136): feature (16/4) + bug (15/3) most-starved over budget. Feature Angelo-gated. Bug's
   COLD-scout vein is dry (no prod source since C85) — BUT that precondition only rules out REGRESSIONS in changed
