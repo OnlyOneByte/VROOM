@@ -24,6 +24,11 @@
 > (settings reload) + C101 (theme listener) + C102 (#148 anchor) FE-logic guard arc. FE is now meaningfully off its
 > old plateau; the residual gap is structural (effect/DOM-bound + DI/OAuth-bound). Both still under the 90% goal but
 > the FE structural ceiling proved ~1.25pts higher than the long-assumed ~86% once the store/util logic was pinned.**
+> **C130 (infra cadence MEASURED): BOTH suites crossed 88% line for the first time. BE 88.13% line / 87.79% func
+> (1769 pass) — +0.35 vs C123, the C126/C127 photo-coverage arc; FE 88.08% line / 88.4% func / 79.94% branch /
+> 85.94% stmts (746 pass) — +0.48 vs C123, the C128/C129 store arc. The C126–C129 guard arc moved BOTH suites off
+> the long ~87.7 plateau. All four self-authorizable coverage veins (FE-logic C100–C102, route-IDOR C108–C116,
+> analytics-builder C119–C122, store/repo C126–C129) now CLOSED; residual sub-90% is structural.**
 > **C129 (guard MEASURED): FE moved UP again — 88.08% line / 88.4% func / 79.94% branch / 85.94% stmts (746 pass),
 > +0.34 line vs C128, from pinning auth-store updateDisplayName + logout-failure (auth.svelte.ts 90.47→100% line,
 > 50→83.33% branch). BE unchanged 88.02% (frontend-only). Third consecutive real coverage gain off the plateau
@@ -77,9 +82,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 129 |
 | bug | 3 | 122 |
 | arch | 5 | 124 |
-| infra | 6 | 123 |
+| infra | 6 | 130 |
 
-Current cycle: **129**
+Current cycle: **130**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -398,6 +403,25 @@ Current cycle: **129**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C130 (infra — branch-hygiene sweep + coverage re-measure, the ~10-cycle cadence; last ran C123)** — Balance at
+  C130 (HEAD was C129): FOUR over budget — feature (9/4, +5) + bug (8/3, +5) most-starved but PERPETUALLY BLOCKED
+  (feature detect-commit Angelo-gated, manual half fully eyes-on; bug `git diff C85..HEAD` over prod src EMPTY —
+  verified) — and infra (7/6, +1) + arch (6/5, +1). Among the ACTIONABLE over-budget pair, picked infra: it's the
+  substantive non-dry pick (its cadence is due AND it captures the C126–C129 coverage arc), whereas arch is a
+  no-churn record (no production source since C85). (1) UNTRACKED-TEST SWEEP: CLEAN — the C126/C127/C128/C129 test
+  files are all tracked/committed; only the intentional `M .gitignore` / `M frontend/.gitignore` overrides remain.
+  (2) COVERAGE RE-MEASURED — BOTH suites crossed 88% line for the first time: BE 88.13% line / 87.79% func (1769
+  pass) — UP from C123's 87.78 via the C126 (PhotoRepository finders) + C127 (photoThumbnailResponse behavioral)
+  arc; FE 88.08% line / 88.4% func / 79.94% branch / 85.94% stmts (746 pass) — UP from C123's 87.6 via the C128
+  (settings restoreFromProvider) + C129 (auth updateDisplayName/logout) store arc. The C126–C129 guard arc was the
+  productive vein that finally moved BOTH suites off the long ~87.7 plateau (+0.35 BE, +0.48 FE). (3) BOTH-SIDES
+  GREEN: BE validate:local exit 0 (1769) / FE 746, 0 fail. (4) BRANCH STATE: claude-loop-dev = 130 commits ahead of
+  fresh origin/main, PR-ready (category spread bug 28 / guard 26 / feature 21 / deep-review 21 / infra 18 / arch 15
+  — guard surged on the coverage arc; healthy balance across all six). Doc-only — no source touched. cov: be 88.13%
+  / fe 88.08% (MEASURED). NEXT cadence ~C140. STANDING SIGNAL: the clean store-logic + constructed-repo + pure-fn
+  coverage picks (C126–C129) are now worked through — residual sub-90% is structural (OAuth/network/orchestrator/DI/
+  SQL/DOM/timer/SSR-guard). All four self-authorizable veins (FE-logic C100–C102, route-IDOR C108–C116,
+  analytics-builder C119–C122, store/repo-coverage C126–C129) are CLOSED; highest-leverage work GATED on Angelo.
 - **C129 (guard — pin auth-store `updateDisplayName` merge + `logout` failure path; auth.svelte.ts → 100% line)** —
   Balance at C129 (HEAD was C128): feature (8/4, +4) + bug (7/3, +4) co-most-starved, both BLOCKED (feature
   detect-commit Angelo-gated; bug `git diff C85..HEAD` over prod src EMPTY — verified); infra (6/6) + arch (5/5)

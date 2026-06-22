@@ -1150,6 +1150,17 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 filesystem; untracked specs vanish on merge), full regress, coverage re-measure (update the LEDGER cov:
 baseline), refresh `BRANCH_REVIEW.md` grouped by theme so the eventual PR stays reviewable.)*
 
+> **RAN C130 (cadence; last ran C123).** Untracked-test sweep CLEAN (C126/C127/C128/C129 test files all tracked;
+> only the intentional `M .gitignore`/`M frontend/.gitignore` overrides). Coverage RE-MEASURED — BOTH suites
+> crossed 88% line for the first time: BE 88.13% line / 87.79% func (1769 pass), +0.35 vs C123 (the C126
+> PhotoRepository-finders + C127 photoThumbnailResponse-behavioral arc); FE 88.08% line / 88.4% func / 79.94%
+> branch / 85.94% stmts (746 pass), +0.48 vs C123 (the C128 settings-restore + C129 auth-store arc). The C126–C129
+> guard arc was the productive vein that finally moved BOTH suites off the long ~87.7 plateau. Both green (BE 1769 /
+> FE 746). Branch = 130 ahead, PR-ready (bug 28 / guard 26 / feature 21 / deep-review 21 / infra 18 / arch 15).
+> NEXT cadence ~C140. STANDING SIGNAL: all four self-authorizable coverage veins (FE-logic C100–C102, route-IDOR
+> C108–C116, analytics-builder C119–C122, store/repo C126–C129) are CLOSED; residual sub-90% is structural
+> (OAuth/network/orchestrator/DI/SQL/DOM/timer/SSR-guard); highest-leverage work GATED on Angelo.
+>
 > **RAN C123 (cadence; last ran C117).** Untracked-test sweep CLEAN (the C119/C120/C122 test files all tracked;
 > only the intentional `M .gitignore`/`M frontend/.gitignore` overrides remain). Coverage RE-MEASURED: BE 87.78%
 > line / 87.54% func (1757 pass) — line FLAT vs C117, but `analytics-charts.ts` jumped 95→99.63% line / 99.01% func
