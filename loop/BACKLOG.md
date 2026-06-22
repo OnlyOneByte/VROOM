@@ -1,5 +1,10 @@
 # BACKLOG — VROOM autonomous loop
 
+> ## 🎯 PRIORITY OVERRIDE ACTIVE (2026-06-21) — see GUIDE.md top block.
+> The balance-table rotation below is SUSPENDED: until Angelo lifts it, every cycle works ONLY on
+> getting the open PR (claude-loop-dev → main) green. All items in this file are PARKED. Do not pick
+> from the queue. Resume normal category selection only after the override block is removed.
+
 > Re-ranked every cycle. Pick the top unblocked item in the most-starved over-budget category
 > (LEDGER balance check); else the highest-leverage item overall. Keep this lean — prune done
 > items, promote what the last cycle surfaced.
