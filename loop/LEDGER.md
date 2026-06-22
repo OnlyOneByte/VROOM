@@ -53,14 +53,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 113 |
+| feature | 4 | 121 |
 | deep-review | 5 | 119 |
 | guard | 6 | 120 |
 | bug | 3 | 114 |
 | arch | 5 | 118 |
 | infra | 6 | 117 |
 
-Current cycle: **120**
+Current cycle: **121**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -379,6 +379,31 @@ Current cycle: **120**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C121 (feature — import-trackers T5: the manual-mapping editor eyes-on at MOBILE, the last untested viewport)** —
+  Balance at C121 (HEAD was C120): feature (8/4, +4) most-starved + bug (7/3, +4), both OVER. Bug is structurally
+  dry (git diff C85..HEAD over production src EMPTY). Feature has been recorded "blocked" the last several cycles
+  on the Angelo-gated detect-commit (defaultCategory) — but this cycle I VERIFIED the block firsthand by reading
+  .kiro/specs/import-trackers/tasks.md and found a REAL unblocked slice: T5 (four-states + a11y + MOBILE-first) for
+  the committable MANUAL-mapping editor, which was only ever shot at DESKTOP (C37/C41/C47/C61). The mobile render
+  of that editor — the most control-dense VROOM dialog section (a per-field flex row [w-28 label + flex-1 Select]
+  for every MAPPABLE_FIELD + date-format + conditional Odometer/Volume unit pickers + target-vehicle picker, inside
+  a sm:max-w-lg Dialog.Content) — is a genuine NORTH_STAR #3 (no-mobile-overflow) gap, NOT the parked decision.
+  INCREMENT: wrote import-manual-mapping-mobile.meshclaw.e2e.ts (Pixel 5, 393px) — pastes a foreign CSV crafted to
+  match NO preset signature (avoids odometer/fillamount/odo/litres/totalprice/typeoffuel; uses Mileage+Gallons so
+  the conditional unit pickers render = the WIDEST editor state), opens the manual editor, maps mileage+volume,
+  asserts BOTH unit pickers visible AND scrollWidth ≤ clientWidth+1 (no horizontal overflow), captures the PNG.
+  FIRSTHAND DISCOVERY along the way: my first CSV used Odo/Litres headers → tripped Fuelio auto-detect (substring
+  signature match), proving the detect path also renders cleanly at mobile (banner + vehicle picker, no overflow) —
+  but I wanted the manual editor, so switched to non-signature headers. EYES-ON: Read /tmp/c121-manual-mapping-
+  mobile.png — every field row + date-format + Odometer-unit + Volume-unit (Gallons US) reflow cleanly at 393px,
+  zero horizontal overflow, the /expenses page behind it intact. VERIFY: the mobile spec passes (no-overflow
+  assertion green); no product source touched (the .meshclaw.e2e.ts spec is gitignored-by-design — the
+  merge-surviving net is the backend HTTP/unit tests per GUIDE "source-scan > untracked e2e"; FE validate not
+  required as no FE source changed). The manual-mapping editor is now eyes-on across BOTH viewports; the only
+  remaining import-trackers tail (auto-detect-preset commit + populated-detect four-state) stays Angelo-gated on
+  defaultCategory. cov: be 87.78% / fe 87.6% (~ — no source touched, eyes-on only). NEXT feature: import-trackers
+  has NO unblocked increment left (manual half fully eyes-on desktop+mobile; detect-commit Angelo-gated) — next
+  feature over-budget cycle records that + pivots to the co-starved category.
 - **C120 (guard — certify + pin the MAINTENANCE + GAS-PRICE chart builder family, 3 zero-coverage builders)** —
   Balance at C120 (HEAD was C119): feature (7/4, +3) most-starved, bug (6/3, +3), both OVER but BLOCKED — feature
   import-trackers defaultCategory Angelo-gated (manual half fully eyes-on), bug structurally dry (git diff

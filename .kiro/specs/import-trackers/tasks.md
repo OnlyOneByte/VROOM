@@ -91,7 +91,18 @@
             awaiting the steer) — until then the auto-detect path detects+maps but commits nothing. (NOTE: the
             C47 remap table does NOT solve this — a detected preset maps no category COLUMN at all, so there's
             no word to remap; the gap is the missing column, which is the parked `defaultCategory` decision.)
-- [ ] **T5** Four-states + a11y + mobile; compose from the kit.
+- [~] **T5** Four-states + a11y + mobile; compose from the kit.
+      - [x] **MANUAL editor MOBILE eyes-on DONE (C121):** the manual column-mapping editor — the most
+            control-dense dialog section (per-field flex rows + date-format + conditional Odometer/Volume
+            unit pickers + target-vehicle picker in a sm:max-w-lg Dialog.Content) — verified at Pixel-5
+            (393px) via `import-manual-mapping-mobile.meshclaw.e2e.ts` + shot (Read /tmp/c121-manual-mapping-
+            mobile.png): every field row + date-format + both unit pickers reflow cleanly, NO horizontal
+            overflow (asserted scrollWidth ≤ clientWidth+1, NORTH_STAR #3). Complements the desktop shots
+            (C37/C41/C47/C61). The detect-preset path was incidentally confirmed mobile-clean too (a stray
+            Odo/Litres CSV tripped Fuelio detection mid-cycle → banner + vehicle picker render no-overflow).
+      - [ ] **REMAINING:** the populated-detect FOUR-STATE shots (loading/empty/error/data of the
+            auto-detect path) are gated on the same Angelo `defaultCategory` decision as the T6 detect-commit
+            (a detected preset previews 0-ready until then, so the populated-data state can't be captured).
 
 ## Phase 4 — verify
 - [~] **T6** E2E (auto-detected preset path + manual-mapping path, mi + km vehicle) + eyes-on

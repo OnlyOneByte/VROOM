@@ -65,16 +65,21 @@ now — the "Playwright-blocked" tail was a ~200-cycle MISDIAGNOSIS, see GUIDE.m
    midnight-UTC rollback) + pins buildLocalDate stays the path; non-vacuous both ways. **T6 MANUAL FUEL
    round-trip DONE (C61, eyes-on):** a complete same-unit (mi/gallons) manual fuel log → commit → a real
    `fuel` expense with EXACT mileage+volume (no conversion drift, verified via API); the T6 MANUAL half is
-   now fully eyes-on (C37/C41/C47/C61). **REMAINING (both Angelo-BLOCKED, no unblocked work left):**
+   now fully eyes-on (C37/C41/C47/C61). **T5 MANUAL editor MOBILE eyes-on DONE (C121):** the manual
+   column-mapping editor (the most control-dense VROOM dialog section) verified at Pixel-5 (393px) via
+   `import-manual-mapping-mobile.meshclaw.e2e.ts` + shot (Read /tmp/c121-manual-mapping-mobile.png) — every
+   field row + date-format + both conditional unit pickers reflow cleanly, NO horizontal overflow (asserted
+   scrollWidth ≤ clientWidth+1, NORTH_STAR #3). The manual editor is now eyes-on across BOTH viewports.
+   **REMAINING (both Angelo-BLOCKED, no unblocked work left):**
    (b) **the preset gap — a DETECTED Fuelly/Fuelio/Drivvo log maps NO category COLUMN so it previews 0-ready
    ("Unknown category") → nothing to commit; recommended fix defaultCategory:'fuel' per preset,
    send_message'd Angelo C31, awaiting steer** (the C47 remap does NOT cover this — no column = no word to
    remap); (c) the AUTO-DETECT-PRESET round-trip THROUGH COMMIT + the populated-detect four-state shot are
    GATED on (b). Spec: `.kiro/specs/import-trackers/`.
-   This is the ONLY open feature (maintenance C1 + recurring-expenses C27 both DONE), and it now has NO
-   unblocked increment left — the manual half is fully verified; the detect-commit + 4-state shot both wait
-   on Angelo's defaultCategory. The next feature over-budget cycle should record that + pivot to the
-   co-starved category.
+   This is the ONLY open feature (maintenance C1 + recurring-expenses C27 both DONE), and after C121 it has NO
+   unblocked increment left — the manual half is fully verified desktop + mobile; the detect-commit + 4-state
+   shot both wait on Angelo's defaultCategory. The next feature over-budget cycle should record that + pivot to
+   the co-starved category.
 3. ~~**Recurring expenses**~~ — **COMPLETE (T1–T8 all done, C27).** Engine + backend (T1–T3/T5/T7), FE
    client (T6/T7), then the eyes-on FE tail: T7 widget (C5), T5 app-init hook (C12), T6 badge+dialog
    (C9/C16), T4 multi-vehicle split via the shared `SplitConfigEditor` (C22), and **T8 full round-trip
