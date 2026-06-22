@@ -549,6 +549,16 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C134 — `apiClient.raw` URL-build + credentials (the file-download/data-export path, api-client.ts →
+> 100% line).** Lines 131-132 (apiClient.raw, the raw-Response fetch for FILE DOWNLOADS — the backup-ZIP export,
+> NORTH_STAR #1 data portability) were uncovered; sibling tests never drove it. Extended the tracked
+> api-client.test.ts (+3): relative url base-prefixed + `credentials: 'include'` ALWAYS sent (dropped credentials =
+> 401 on every download); absolute http url passes through; method+headers forward. Non-vacuous (drop credentials →
+> 2 RED). api-client.ts 95.23→100% line; OVERALL FE 88.08→88.23%. ALSO proved `offline.svelte.ts`'s online/offline
+> window listeners (18-23) structurally hard firsthand — dispatchEvent didn't re-target the import-time listener,
+> deleted the brittle test (the DOM/effect-bound FE residual, C101 class). The FE service/util layer is now at its
+> structural ceiling; self-authorizable coverage is complete BOTH sides. Don't re-add.
+
 > **GUARDED C133 — the pending-OAuth-credentials MAX_SIZE eviction (DoS-prevention branch, pending-credentials.ts
 > → 100% line).** The credentials store (stages a provider OAuth refresh token between callback + provider-create)
 > was 92% line; the uncovered lines 53-56 are the MAX_SIZE (1000) oldest-eviction branch in storePending — a

@@ -24,6 +24,9 @@
 > (settings reload) + C101 (theme listener) + C102 (#148 anchor) FE-logic guard arc. FE is now meaningfully off its
 > old plateau; the residual gap is structural (effect/DOM-bound + DI/OAuth-bound). Both still under the 90% goal but
 > the FE structural ceiling proved ~1.25pts higher than the long-assumed ~86% once the store/util logic was pinned.**
+> **C134 (guard MEASURED): FE 88.23% line / 88.69% func / 80.23% branch / 86.07% stmts (749 pass), +0.15 line vs
+> C130, from pinning apiClient.raw (api-client.ts 95.23→100% line). BE unchanged 88.13% (frontend-only). The FE
+> service/util layer is now at its structural ceiling — self-authorizable coverage is complete both sides.**
 > **C130 (infra cadence MEASURED): BOTH suites crossed 88% line for the first time. BE 88.13% line / 87.79% func
 > (1769 pass) — +0.35 vs C123, the C126/C127 photo-coverage arc; FE 88.08% line / 88.4% func / 79.94% branch /
 > 85.94% stmts (746 pass) — +0.48 vs C123, the C128/C129 store arc. The C126–C129 guard arc moved BOTH suites off
@@ -79,12 +82,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 121 |
 | deep-review | 5 | 132 |
-| guard | 6 | 133 |
+| guard | 6 | 134 |
 | bug | 3 | 122 |
 | arch | 5 | 131 |
 | infra | 6 | 130 |
 
-Current cycle: **133**
+Current cycle: **134**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -403,6 +406,28 @@ Current cycle: **133**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C134 (guard — pin `apiClient.raw` URL-build + credentials; the file-download/data-export path was uncovered)** —
+  Balance at C134 (HEAD was C133): NOTHING actionable over budget — feature (13/4) + bug (12/3) most-starved but
+  PERPETUALLY BLOCKED (feature detect-commit Angelo-gated; bug `git diff C85..HEAD` over prod src EMPTY — verified).
+  Per "nothing actionable over → highest-leverage open item." SCOUT (re-checking C133's "frontier exhausted" claim
+  honestly): re-ran FE coverage. FIRST tried `offline.svelte.ts` (88% line / 50% branch, the online/offline window
+  LISTENERS 18-23) but PROVED it structurally hard firsthand — wrote the test, `window.dispatchEvent(new
+  Event('offline'))` did NOT flip the status (import-time listener on a global window happy-dom doesn't reliably
+  re-target), 3 RED → DELETED the brittle test (the documented DOM/effect-bound FE residual, the C101 listener-
+  harness class — not a clean pick). PIVOTED to `api-client.ts` (95.23% line) — lines 131-132 = `apiClient.raw`, the
+  raw-Response fetch used for FILE DOWNLOADS (the backup-ZIP export, NORTH_STAR #1 data portability); unlike
+  request() it returns the Response un-unwrapped, and the sibling tests never drove it. GUARD: extended the tracked
+  api-client.test.ts (+3): a relative url is base-prefixed + `credentials: 'include'` ALWAYS sent (a dropped
+  credentials = a 401 on every download); an absolute http url passes through unchanged; method+headers options
+  forward (credentials still forced). NON-VACUOUS proven firsthand: dropped `credentials: 'include'` from raw() → 2
+  tests RED. (Also caught + fixed a strict-TS issue: bare `mock.calls[0]` indexing → the file's `?? []` safe-destructure
+  idiom, so svelte-check stays green.) VERIFY GATE GREEN: FE validate:local exit 0 (type-check + build + vitest),
+  749 pass (+3 vs C133's 746). Frontend-only → BE validate not required. COVERAGE: api-client.ts 95.23→**100% line /
+  100% func** (residual 41/65/68 are branch-only absolute-url ternary alts, structural); OVERALL FE 88.08→**88.23%
+  line / 88.69% func / 80.23% branch**. Modifies a TRACKED test file (committed regression net). cov: be 88.13% /
+  fe 88.23% (MEASURED). NEXT guard: the FE service/util layer is now at its structural ceiling (api-client +
+  expense-api pass-throughs + sync-manager DOM/timer + the offline/theme listeners are all effect/DOM-bound) — the
+  self-authorizable coverage work is genuinely complete both sides.
 - **C133 (guard — pin the pending-OAuth-credentials MAX_SIZE eviction; the DoS-prevention branch was uncovered)** —
   Balance at C133 (HEAD was C132): NOTHING actionable over budget — feature (12/4) + bug (11/3) most-starved but
   PERPETUALLY BLOCKED (feature detect-commit Angelo-gated; bug `git diff C85..HEAD` over prod src EMPTY — verified);

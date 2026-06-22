@@ -195,3 +195,43 @@ describe('withPagination', () => {
 		expect(withPagination('/api/v1/expenses')).toBe('/api/v1/expenses');
 	});
 });
+
+// apiClient.raw (api-client.ts:131-132) was UNCOVERED — it's the raw-Response fetch used for file
+// downloads (e.g. the backup-ZIP export, NORTH_STAR #1 data portability). Unlike request(), it does NOT
+// unwrap the envelope; it returns the Response directly. The load-bearing bits: a relative url is
+// base-prefixed (absolute http(s) passes through), and `credentials: 'include'` is ALWAYS sent so the
+// auth cookie rides along (a dropped credentials = a 401 on every download).
+describe('apiClient.raw', () => {
+	test('prefixes a relative url with the base and always sends credentials: include', async () => {
+		const resp = jsonResponse({ ok: true });
+		mockFetch.mockResolvedValueOnce(resp);
+
+		const out = await apiClient.raw('/api/v1/backup/export');
+
+		// returns the Response verbatim (no envelope unwrap)
+		expect(out).toBe(resp);
+		expect(mockFetch).toHaveBeenCalledTimes(1);
+		const [url, init] = mockFetch.mock.calls[0] ?? [];
+		expect(url).toBe('/api/v1/backup/export'); // base is '' (PUBLIC_API_URL unset) → bare path
+		expect(init?.credentials).toBe('include');
+	});
+
+	test('passes an absolute http url through unchanged (no base prefix)', async () => {
+		mockFetch.mockResolvedValueOnce(jsonResponse({}));
+		await apiClient.raw('https://cdn.example.com/file.zip');
+		const [url] = mockFetch.mock.calls[0] ?? [];
+		expect(url).toBe('https://cdn.example.com/file.zip');
+	});
+
+	test('forwards the method + headers options', async () => {
+		mockFetch.mockResolvedValueOnce(jsonResponse({}));
+		await apiClient.raw('/api/v1/backup/export', {
+			method: 'POST',
+			headers: { 'X-Test': '1' }
+		});
+		const [, init] = mockFetch.mock.calls[0] ?? [];
+		expect(init?.method).toBe('POST');
+		expect(init?.headers).toEqual({ 'X-Test': '1' });
+		expect(init?.credentials).toBe('include'); // credentials still forced even with options
+	});
+});
