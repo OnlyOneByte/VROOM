@@ -90,7 +90,7 @@ cycle (slow-budget categories mis-forecast otherwise).
 | arch | 5 | 131 |
 | infra | 6 | 136 |
 
-Current cycle: **143**
+Current cycle: **144**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -409,6 +409,22 @@ Current cycle: **143**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C144 (PR-GREEN override — VERIFIED the rolldown-override fix candidate fails; the last untested lever is now
+  disproven → fully gated on Angelo)** — Override active; main unchanged (fb35c17); Angelo not ruled. Backend GREEN
+  / Frontend RED. Last cycle I'd offered to verify the `overrides: { rolldown: 1.1.2 }` candidate before applying —
+  did that this cycle (LOCAL + fully reverted, never committed/pushed): added the override, fresh `npm install`
+  (resolved rolldown→1.1.2), ran the full FE gate. RESULT: **WORSE, not fixed** — `vite build` still EXIT 1 with a
+  NEW harder error `SyntaxError: module 'rolldown/experimental' does not provide an export named
+  'viteWasmFallbackPlugin'` (Vite 8.0.16 imports a rolldown API that 1.1.2 removed/renamed), AND type-check + test
+  regressed to EXIT 1 (they passed on 1.0.3). So rolldown is WELDED to its exact Vite-pinned version (1.0.3); a
+  newer rolldown breaks the Vite↔rolldown contract harder. Fully reverted (npm ci → rolldown back to 1.0.3,
+  overrides back to just serialize-javascript, working tree clean). This DISPROVES the last untested lever —
+  combined with C141.5/C142/C143 the full autonomous fix-space is now exhausted: Vite-downgrade (reverts his
+  migration), plugin-bump (already latest+vite8-compat), lockfile-respect (lock also pins 1.0.3), rolldown-override
+  (verified incompatible). The blocker is unambiguously an upstream Vite-8/rolldown 1.0.3 parser bug needing
+  Angelo's migration-level call (8.1.0-beta / await upstream / pause the migration). Reported the verification
+  result to Angelo (the promised follow-up, not a new ping). No code committed. cov: be 88.21% / fe 88.23% (~).
+  NEXT: resume on Angelo's decision / override lift; no remaining loop-safe action on this PR.
 - **C143 (PR-GREEN override — FE blocker investigation EXHAUSTED; no loop-safe fix exists → HOLDING for Angelo)** —
   Override active; main unchanged (fb35c17); Angelo not ruled in-repo; Backend GREEN / Frontend RED (rolldown
   TS-optional-param parse, C141.5). This cycle RULED OUT every remaining loop-safe fix firsthand, so I'm not
