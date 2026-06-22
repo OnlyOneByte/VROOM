@@ -129,7 +129,7 @@
 <FormLayout>
 	<!-- Header -->
 	<div class="mb-6 flex items-center gap-3">
-		<Button variant="ghost" size="icon" onclick={() => gotoDynamic(returnTo)}>
+		<Button variant="ghost" size="icon" aria-label="Back" onclick={() => gotoDynamic(returnTo)}>
 			<ArrowLeft class="h-5 w-5" />
 		</Button>
 		<h1 class="text-2xl font-bold text-foreground">Add Odometer Reading</h1>

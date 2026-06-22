@@ -86,11 +86,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 121 |
 | deep-review | 5 | 135 |
 | guard | 6 | 134 |
-| bug | 3 | 122 |
+| bug | 3 | 137 |
 | arch | 5 | 131 |
 | infra | 6 | 136 |
 
-Current cycle: **136**
+Current cycle: **137**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -409,6 +409,28 @@ Current cycle: **136**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C137 (bug — REAL a11y defect fixed: 2 odometer forms' icon back-button had no accessible name; FRESH vein)** —
+  Balance at C137 (HEAD was C136): feature (16/4) + bug (15/3) most-starved over budget. Feature Angelo-gated. Bug's
+  COLD-scout vein is dry (no prod source since C85) — BUT that precondition only rules out REGRESSIONS in changed
+  code, not PRE-EXISTING quality debt. Scouted a genuinely fresh self-authorizable bug source per NORTH_STAR #3
+  ("passes axe"): the route-smoke axe sweep enforces a11yClean on the 13 STATIC routes but CANNOT reach the
+  DYNAMIC/param routes (it can't hardcode an entity id) — and axe (programmatic labels/contrast/ARIA) catches a
+  CLASS visual eyes-on (C124/C125/C131/C132) misses. Wrote a scout spec running AxeBuilder (wcag2a/2aa,
+  serious+critical) against the 7 un-swept dynamic forms using seeded ids. FOUND A REAL DEFECT: `button-name`
+  (critical) on `/vehicles/[id]/odometer/new` — the icon-only ArrowLeft back-button (variant=ghost size=icon) has
+  NO discernible text + NO aria-label, so a screen-reader user can't identify it. Traced firsthand: the odometer
+  EDIT page (`[entryId]/edit:150`) shares the IDENTICAL unlabeled back-button (2 instances of one defect; the EDIT
+  page wasn't in my first scout pass). FIX: added `aria-label="Back"` to BOTH (the canonical convention — TagInput/
+  ExpenseSearchFilters label their icon controls the same way). The other 5 dynamic forms (term-new/term-edit/
+  insurance-edit/vehicle-edit/vehicle-detail) scanned CLEAN — their headers use text back-links, not icon buttons.
+  VERIFY: re-ran the axe scout → all 7 dynamic routes now PASS (both odometer routes fixed). FE validate:local exit
+  0 (type-check + build + vitest), 749 pass. FE-only → BE validate not required. NOTE: this is the FIRST production
+  source change since C85 — the bug/arch cold-scout precondition (`git diff C85..HEAD` empty) is now RESET; the new
+  baseline for future cold scouts is this commit. The scout spec (dynamic-routes-a11y.meshclaw.e2e.ts) is
+  gitignored-by-design; the merge-surviving net is the source fix + the route-smoke a11yClean ratchet (which the
+  static routes already enforce). cov: be 88.21% / fe 88.23% (~ — markup-only a11y attr, no logic lines). NEXT bug:
+  the a11y dynamic-route vein is now swept + clean; re-running it is the recheck. The cold pure-logic vein resets to
+  this commit as baseline.
 - **C136 (infra — branch-hygiene sweep + coverage re-measure, the ~10-cycle cadence; last ran C130)** — Balance at
   C136 (HEAD was C135): feature (15/4) + bug (14/3) most-starved but PERPETUALLY BLOCKED (feature detect-commit
   Angelo-gated; bug `git diff C85..HEAD` over prod src EMPTY — verified); infra (6/6) + arch (5/5) at budget. Picked

@@ -453,6 +453,18 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **CLOSED C137 — REAL a11y defect (button-name critical) on BOTH odometer forms; a FRESH vein broke the
+> cold-scout drought.** The cold pure-logic precondition (git diff C85..HEAD empty) only rules out regressions in
+> CHANGED code, not PRE-EXISTING debt. Scouted NORTH_STAR #3 ("passes axe"): route-smoke enforces a11yClean on the
+> 13 STATIC routes but can't reach the DYNAMIC/param routes (no hardcodable id), and axe catches a label/ARIA class
+> visual eyes-on misses. AxeBuilder (wcag2a/2aa, serious+critical) over the 7 un-swept dynamic forms found
+> `button-name` (critical) on /vehicles/[id]/odometer/new — the icon-only ArrowLeft back-button (ghost/icon) had no
+> text + no aria-label (a screen-reader can't name it); the odometer EDIT page shared the IDENTICAL button (2
+> instances). FIX: aria-label="Back" on both (the TagInput/ExpenseSearchFilters icon-control convention). The other
+> 5 dynamic forms scanned CLEAN (text back-links). Re-ran the scout → all 7 PASS; FE validate green (749). FIRST
+> production source change since C85 → the cold-scout precondition baseline RESETS to this commit. Scout spec is
+> gitignored; the net is the source fix + the route-smoke a11yClean ratchet. Don't re-fix.
+>
 > **SCOUTED C122 — no fresh defect (10th consecutive; precondition-recorded dry + PIVOTED to guard). `git diff
 > C85..HEAD` over production source EMPTY → regression structurally impossible.** Bug was forced (most-starved
 > +5) but provably dry, so per the C99/C103/C107 discipline recorded dry immediately and pivoted the cycle's
