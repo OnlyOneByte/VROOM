@@ -81,13 +81,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 121 |
-| deep-review | 5 | 132 |
+| deep-review | 5 | 135 |
 | guard | 6 | 134 |
 | bug | 3 | 122 |
 | arch | 5 | 131 |
 | infra | 6 | 130 |
 
-Current cycle: **134**
+Current cycle: **135**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -406,6 +406,28 @@ Current cycle: **134**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C135 (deep-review — CERTIFIED the merge-restore `detectConflicts` insert-vs-probe symmetry CLEAN; a
+  raw-UNIQUE-throw gap hypothesis DEBUNKED firsthand)** — Balance at C135 (HEAD was C134): NOTHING actionable over
+  budget — feature (14/4) + bug (13/3) most-starved but PERPETUALLY BLOCKED (feature detect-commit Angelo-gated;
+  bug `git diff C85..HEAD` over prod src EMPTY — verified). Per "nothing actionable over → highest-leverage open
+  item"; with the coverage frontier closed (C134), took the deep-review BACKEND-CORRECTNESS cert vein (distinct
+  from coverage-chasing). SCOUT: `restore.ts` `detectConflicts` (NORTH_STAR #1 merge-restore data-safety, subject
+  of the #93/#132/#441 reactive fixes) had no single "CERTIFIED" ledger entry. Traced firsthand a plausible gap:
+  the INSERT path touches 15 tables but detectConflicts PROBES only 9 → the 6 inserted-but-unprobed
+  (insuranceTerms/insuranceTermVehicles/insuranceClaims/odometerEntries/reminderNotifications/reminderVehicles all
+  carry client-supplied text PKs that survive export→import) looked like a raw-UNIQUE-throw-aborts-whole-restore
+  risk on a colliding merge. DEBUNKED: `restore-table-coverage.test.ts` (C209/C302/C441) ALREADY guards this exact
+  insert-vs-probe symmetry — its test 2 documents all 6 in CHILD_OF_PROBED_PARENT with the load-bearing reasoning
+  that a colliding merge ABORTS on the probed PARENT's conflict first (detectConflicts returns BEFORE the
+  transaction runs), so the child insert is unreachable on a collision. Confirmed firsthand the guard PASSES (3/3)
+  + the #93/#132 collision tests pass (2/2). So detectConflicts + its drift symmetry is genuinely CERTIFIED CLEAN
+  and COMPREHENSIVELY GUARDED — the parent-collides-first invariant closes the class. Recorded the cert + the
+  debunked hypothesis; did NOT manufacture a redundant guard (the C86/C16 verify-firsthand-find-already-guarded
+  discipline). VERIFY: no source touched (cert + debunk). cov: be 88.13% / fe 88.23% (~). NEXT deep-review: the
+  backend data-safety surfaces are now broadly certified (backup-export C81, restore-stamp C8/C11, restore-ordering
+  C13, restore-conflict-symmetry C135, idempotency-key C74, OAuth-state C39, rate-limit C92, photo-allowlist C3) —
+  remaining audits would re-scan certified ground; real new findings now come only from an Angelo steer or a
+  feature/bug-surfaced concrete invariant.
 - **C134 (guard — pin `apiClient.raw` URL-build + credentials; the file-download/data-export path was uncovered)** —
   Balance at C134 (HEAD was C133): NOTHING actionable over budget — feature (13/4) + bug (12/3) most-starved but
   PERPETUALLY BLOCKED (feature detect-commit Angelo-gated; bug `git diff C85..HEAD` over prod src EMPTY — verified).

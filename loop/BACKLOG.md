@@ -109,6 +109,18 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > builders if any (buildFuelEfficiencyAndCost / buildVehicleMaintenanceCosts), else an eyes-on populated surface.
 > Don't re-add.
 
+> **CERTIFIED C135 — the merge-restore `detectConflicts` insert-vs-probe symmetry CLEAN (a raw-UNIQUE-throw gap
+> hypothesis DEBUNKED firsthand).** restore.ts's INSERT path touches 15 tables but detectConflicts PROBES only 9 —
+> the 6 inserted-but-unprobed (insuranceTerms/insuranceTermVehicles/insuranceClaims/odometerEntries/
+> reminderNotifications/reminderVehicles, all client-supplied text PKs that survive export→import) LOOKED like a
+> raw-UNIQUE-throw-aborts-whole-restore risk on a colliding merge (the #93/#132/#441 class). DEBUNKED:
+> `restore-table-coverage.test.ts` (C209/C302/C441) ALREADY guards this exact symmetry — test 2 documents all 6 in
+> CHILD_OF_PROBED_PARENT with the reasoning that a colliding merge ABORTS on the probed PARENT's conflict first
+> (detectConflicts returns BEFORE the transaction), so the child insert is unreachable on a collision. Confirmed
+> the guard PASSES (3/3) + #93/#132 collision tests pass (2/2). detectConflicts is CERTIFIED CLEAN + comprehensively
+> guarded; did NOT manufacture a redundant guard (C86/C16 verify-firsthand discipline). The backend data-safety
+> surfaces are now broadly certified — remaining audits would re-scan certified ground. Don't re-audit.
+>
 > **AUDITED C132 (eyes-on) — the last 2 never-shot EDIT forms CLEAN → MILESTONE: every real surface eyes-on.**
 > Shot `/vehicles/[id]/odometer/[entryId]/edit` + `/insurance/[id]/terms/[termId]/edit` (the EDIT twins of the
 > C125/C124 /new forms; the differentiator is the value-HYDRATION path — a blank edit form is the C68 data-loss
