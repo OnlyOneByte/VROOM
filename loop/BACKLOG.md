@@ -1087,6 +1087,19 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 filesystem; untracked specs vanish on merge), full regress, coverage re-measure (update the LEDGER cov:
 baseline), refresh `BRANCH_REVIEW.md` grouped by theme so the eventual PR stays reviewable.)*
 
+> **RAN C123 (cadence; last ran C117).** Untracked-test sweep CLEAN (the C119/C120/C122 test files all tracked;
+> only the intentional `M .gitignore`/`M frontend/.gitignore` overrides remain). Coverage RE-MEASURED: BE 87.78%
+> line / 87.54% func (1757 pass) — line FLAT vs C117, but `analytics-charts.ts` jumped 95→99.63% line / 99.01% func
+> from the C119–C122 analytics-builder sweep (the module was near the file-mean, so overall is flat; residual
+> ceiling DI/SQL/OAuth-bound). Its only "uncovered" rows (275, 1025-1026) are the bun ternary-in-`new Date()`
+> line-attribution artifact (C100 lesson), not real gaps — the C122 mutant proved line 275 IS exercised. FE 87.6%
+> line / 88.56% func / 79.84% branch / 85.57% stmts (739 pass) — FULLY UNCHANGED vs C117 (no FE source since).
+> Both green (BE 1757 / FE 739). Branch = 123 ahead, PR-ready (bug 28 / guard 22 / feature 21 / deep-review 20 /
+> infra 17 / arch 14). NEXT cadence ~C133. STANDING SIGNAL: the analytics-builder coverage vein (C119–C122) now
+> joins FE-logic (C100–C102) + route-IDOR (C108–C116) as a CLOSED self-authorizable frontier; highest-leverage work
+> is GATED on Angelo (#148 READY / import defaultCategory / createLoadState + seedVehicle arch designs /
+> #100/#79/#129).
+>
 > **RAN C117 (cadence; last ran C111).** Untracked-test sweep CLEAN (only the intentional `M .gitignore`/`M
 > frontend/.gitignore` overrides). Coverage RE-MEASURED: BE 87.78% line / 87.53% func (1717 pass) — +0.01 line vs
 > C111 (the C113–C116 cross-tenant-idor.test.ts additions are +expect assertions on ownership-gate branches mostly

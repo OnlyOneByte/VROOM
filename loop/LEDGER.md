@@ -24,6 +24,12 @@
 > (settings reload) + C101 (theme listener) + C102 (#148 anchor) FE-logic guard arc. FE is now meaningfully off its
 > old plateau; the residual gap is structural (effect/DOM-bound + DI/OAuth-bound). Both still under the 90% goal but
 > the FE structural ceiling proved ~1.25pts higher than the long-assumed ~86% once the store/util logic was pinned.**
+> **C123 (infra cadence MEASURED): BE 87.78% line / 87.54% func (1757 pass) — line FLAT vs C117 but
+> `analytics-charts.ts` jumped 95→99.63% line / 99.01% func from the C119–C122 analytics-builder sweep (the module
+> was already near the file-mean, so overall is flat; residual ceiling is DI/SQL/OAuth-bound). FE 87.6% line /
+> 88.56% func / 79.84% branch / 85.57% stmts (739 pass) — FULLY UNCHANGED vs C117 (no FE source since: C119/C120/C122
+> backend, C121 eyes-on). The analytics-builder coverage frontier (C119–C122) now joins FE-logic (C100–C102) +
+> route-IDOR (C108–C116) as a CLOSED self-authorizable vein. Both at the ~87.8 BE / ~87.6 FE structural ceiling.**
 > **C117 (infra cadence MEASURED): BE 87.78% line / 87.53% func (1717 pass) — +0.01 line vs C111, the C113–C116
 > IDOR assertions hit mostly-already-covered ownership-gate branches (they're +expect in existing files, not new
 > route code); FE 87.6%/88.56%/79.74% UNCHANGED (C112–C116 backend/docs). Both at the ~87.8 BE / ~87.6 FE structural
@@ -58,9 +64,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 122 |
 | bug | 3 | 122 |
 | arch | 5 | 118 |
-| infra | 6 | 117 |
+| infra | 6 | 123 |
 
-Current cycle: **122**
+Current cycle: **123**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -379,6 +385,26 @@ Current cycle: **122**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C123 (infra — branch-hygiene sweep + coverage re-measure, the ~10-cycle cadence; last ran C117)** — Balance at
+  C123 (HEAD was C122): NOTHING strictly over budget; TWO at budget — infra (6/6) + arch (5/5). Picked infra: it's
+  the more-starved at-budget one (6 vs 5) AND the substantive non-dry pick (its re-measure captures the C119–C122
+  analytics-coverage arc), whereas arch is a no-churn record (no production source since C85). (1) UNTRACKED-TEST
+  SWEEP: CLEAN — the C119/C120/C122 test files are all tracked/committed; only the intentional `M .gitignore` / `M
+  frontend/.gitignore` overrides remain uncommitted (by design). (2) COVERAGE RE-MEASURED: BE 87.78% line / 87.54%
+  func (1757 pass; 1756 under the --coverage run's timing) — line FLAT vs C117 but `analytics-charts.ts` jumped
+  95→**99.63% line / 99.01% func** from the C119 (expense-summary) + C120 (maintenance/gas-price) + C122 (date/group
+  roots) sweep (the module is now near-fully pinned; its only "uncovered" rows — 275, 1025-1026 — are the bun
+  ternary-in-`new Date()` line-attribution artifact [C100 lesson], NOT real gaps: the C122 mutant proved line 275's
+  seconds branch IS exercised). The overall line is flat because the module was already near the file-mean; the
+  residual ceiling is DI/SQL/OAuth-bound (repository.ts, auth, provider services). FE 87.6% line / 88.56% func /
+  79.84% branch / 85.57% stmts (739 pass) — FULLY UNCHANGED vs C117 (no FE source touched since: C119/C120/C122
+  backend, C121 eyes-on-only). (3) BOTH-SIDES GREEN: BE 1757 / FE 739, 0 fail. (4) BRANCH STATE: claude-loop-dev =
+  123 commits ahead of fresh origin/main, PR-ready (category spread bug 28 / guard 22 / feature 21 / deep-review 20
+  / infra 17 / arch 14 — healthy balance across all six). Doc-only — no source touched. cov: be 87.78% / fe 87.6%
+  (MEASURED). NEXT cadence ~C133. STANDING SIGNAL: the analytics-builder coverage vein (C119–C122) is now
+  essentially exhausted — `analytics-charts.ts` at 99.6%. The self-authorizable frontiers (FE-logic C100–C102,
+  route-IDOR C108–C116, analytics-builder C119–C122) are all closed; highest-leverage work is GATED on Angelo (#148
+  READY / import defaultCategory / createLoadState + seedVehicle arch designs / #100/#79/#129).
 - **C122 (bug→guard pivot — bug forced + provably dry; pinned 2 foundational zero-coverage analytics primitives)** —
   Balance at C122 (HEAD was C121): bug (8/3, +5) most-starved by far. BUG PRECONDITION (the C99/C103/C107
   discipline): `git diff C85..HEAD` over backend/src + frontend/src (excl. tests) is EMPTY — no production source
