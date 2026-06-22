@@ -525,6 +525,17 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C127 — BEHAVIORAL pin of `photoThumbnailResponse` (the photo-serve security headers had only a
+> SOURCE scan).** The C227 #77 thumbnail-serve builder already had photo-serve-headers.test.ts, but that's a SOURCE
+> SCAN (readFileSync + .toContain) — it never CALLS the function, so it showed 0% line coverage and a header object
+> mis-wired to the Response would pass it. New `photo-thumbnail-response.test.ts` (+4) drives the real fn + asserts
+> the constructed Response's actual headers + body: the MANDATORY nosniff (#77/#35 stored-content MIME-sniff vector),
+> Content-Type=mimeType verbatim, Cache-Control private (no shared-proxy cross-user cache), CORP cross-origin, + the
+> buffer round-trips as the body. Non-vacuous (drop nosniff → 2 RED while the source-scan stays green). photos/
+> helpers.ts 75.38→87.88% line (only validatePhotoOwnership's getDb-singleton slice left). The clean constructed-repo
+> + pure-fn coverage picks (C126 finders, C127 this) are now worked through; remaining <88% backend is structural.
+> Don't re-add.
+
 > **GUARDED C126 — 3 uncovered PhotoRepository finders pinned; FIRST real BE coverage movement in many cycles
 > (+0.24 line).** Coverage-scouted every backend src <75% line: the OAuth/photo/google-photos/backup-orchestrator/
 > db-connection/sync files are the documented DI/OAuth/network STRUCTURAL ceiling, but `photo-repository.ts`

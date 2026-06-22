@@ -65,12 +65,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 121 |
 | deep-review | 5 | 125 |
-| guard | 6 | 126 |
+| guard | 6 | 127 |
 | bug | 3 | 122 |
 | arch | 5 | 124 |
 | infra | 6 | 123 |
 
-Current cycle: **126**
+Current cycle: **127**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -389,6 +389,27 @@ Current cycle: **126**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C127 (guard — BEHAVIORAL pin of `photoThumbnailResponse`; the security headers had a SOURCE-scan but no
+  executing test)** — Balance at C127 (HEAD was C126): bug (5/3, +2) + feature (6/4, +2) co-most-starved over
+  budget, both BLOCKED (bug `git diff C85..HEAD` over prod src EMPTY — verified; feature detect-commit Angelo-gated,
+  manual half fully eyes-on). Per don't-force-a-blocked-pick, continued the C126 coverage vein. SCOUT: re-ran
+  coverage, scanned the 60–88% band; `photos/helpers.ts` (75.38% line) had two uncovered slices —
+  `validatePhotoOwnership` (17-24, getDb-SINGLETON-bound → NOT cleanly unit-testable, the C229 trap, correctly
+  skipped) and `photoThumbnailResponse` (110-117, a PURE fn). FINDING: photoThumbnailResponse already has a guard
+  (photo-serve-headers.test.ts) but it's a SOURCE SCAN (reads helpers.ts as text via readFileSync + .toContain) —
+  it NEVER calls the function, so the fn showed 0% line coverage and a header object mis-wired to the Response (wrong
+  arg, body/headers swapped) would pass the scan. GUARD: new `photo-thumbnail-response.test.ts` (+4, +8 expect)
+  drives the REAL function + asserts the constructed Response's actual headers + body: all four serve headers
+  including the MANDATORY `X-Content-Type-Options: nosniff` (#77/#35 — the serve uses the client-asserted,
+  never-sniffed mimeType, so dropping nosniff reopens the stored-content MIME-sniff vector), Content-Type echoes
+  mimeType verbatim, Cache-Control `private` (shared proxy must not cache another user's photo), CORP cross-origin,
+  + the buffer round-trips byte-for-byte as the body. NON-VACUOUS proven firsthand: removed the nosniff header line
+  → 2 tests RED (got null) while the source-scan would've stayed green — exactly the behavioral gap it can't catch.
+  VERIFY GATE GREEN: BE validate:local exit 0, 1770 pass (+4 vs C126's 1766), build bundled. COVERAGE: photos/
+  helpers.ts 75.38→**87.88% line / 83.33% func** (only 17-24 left = the getDb-bound validatePhotoOwnership, as
+  predicted). Backend-only → FE validate not required. cov: be ~88.05% / fe 87.6% (helpers slice; overall ~flat —
+  re-measure next infra cadence). NEXT guard: the remaining <88% backend files are structural (OAuth/network/
+  orchestrator/getDb-singleton) — the clean constructed-repo + pure-fn coverage picks are now worked through.
 - **C126 (guard — pin 3 uncovered PhotoRepository finders; first real coverage MOVEMENT in many cycles +0.24 BE)** —
   Balance at C126 (HEAD was C125): feature (5/4, +1) + bug (4/3, +1) both over budget but BLOCKED (feature
   import-trackers detect-commit Angelo-gated, manual half fully eyes-on; bug `git diff C85..HEAD` over prod src
