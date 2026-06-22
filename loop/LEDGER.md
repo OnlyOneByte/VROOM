@@ -90,7 +90,7 @@ cycle (slow-budget categories mis-forecast otherwise).
 | arch | 5 | 131 |
 | infra | 6 | 136 |
 
-Current cycle: **144**
+Current cycle: **145**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -409,6 +409,22 @@ Current cycle: **144**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C145 (PR-GREEN override — VERIFIED the `vite@8.1.0-beta.0` forward path is blocked too; ALL levers exhausted)** —
+  Override active; main unchanged; Angelo not ruled. Backend GREEN / Frontend RED. Last cycle I'd offered to test
+  vite@8.1.0-beta.0 (the next Vite, which pins a coordinated rolldown 1.1.1 — so it'd dodge the C144 export-mismatch).
+  Tested LOCAL + fully reverted: read-only confirmed 8.1.0-beta.0 pins rolldown 1.1.1 (and there are NO stable
+  1.0.4+ patches between 1.0.3 and 1.1.0 — the beta is the only newer-rolldown path). Tried installing it → **npm
+  ERESOLVE**: `@sveltejs/vite-plugin-svelte@7.1.2` peers `vite ^8.0.0-beta.7 || ^8.0.0`, which EXCLUDES `8.1.0-beta.0`
+  (a pre-release of the next minor). So the 8.1-beta needs `--force`/`--legacy-peer-deps` + a coordinated
+  vite-plugin-svelte bump = migration surgery, NOT a loop-safe step. Reverted (npm ci → vite 8.0.16 / rolldown
+  1.0.3, tree clean). LEVERS NOW FULLY EXHAUSTED (every avenue firsthand-disproven across C141.5–C145):
+  Vite-downgrade (reverts his migration), plugin-bump (already latest+vite8-only-peer), lockfile-respect (lock pins
+  1.0.3), rolldown-override→1.1.2 (incompatible-export, C144), vite@8.1-beta (peer-blocked, this cycle). The PR is
+  a pure upstream Vite-8/rolldown-1.0.3 parser bug needing Angelo's migration-level decision (force-install the
+  coordinated 8.1-beta+plugin set, await an upstream rolldown patch, or pause the migration to 7.x). Reported to
+  Angelo (closes the "test 8.1-beta?" question). ZERO remaining loop-safe actions on this PR. No code committed.
+  cov: be 88.21% / fe 88.23% (~). NEXT: genuinely nothing autonomous left here — resume only on Angelo's decision
+  / override lift.
 - **C144 (PR-GREEN override — VERIFIED the rolldown-override fix candidate fails; the last untested lever is now
   disproven → fully gated on Angelo)** — Override active; main unchanged (fb35c17); Angelo not ruled. Backend GREEN
   / Frontend RED. Last cycle I'd offered to verify the `overrides: { rolldown: 1.1.2 }` candidate before applying —
