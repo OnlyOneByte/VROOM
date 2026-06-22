@@ -109,6 +109,19 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > builders if any (buildFuelEfficiencyAndCost / buildVehicleMaintenanceCosts), else an eyes-on populated surface.
 > Don't re-add.
 
+> **AUDITED C132 (eyes-on) — the last 2 never-shot EDIT forms CLEAN → MILESTONE: every real surface eyes-on.**
+> Shot `/vehicles/[id]/odometer/[entryId]/edit` + `/insurance/[id]/terms/[termId]/edit` (the EDIT twins of the
+> C125/C124 /new forms; the differentiator is the value-HYDRATION path — a blank edit form is the C68 data-loss
+> footgun). Read both PNGs, both correctly HYDRATED: odometer-edit Reading "31200" / Date "07/15/2024" (seeded
+> recordedAt, correct LOCAL date) / Note + 16/500 counter / +Delete CTA; term-edit Start "Jan 1 2024" / End "Jun 30
+> 2024" (seeded, correct local — #138 round-trip verified on load) / Total 1200 / Monthly 200 / "Daily Driver"
+> checkbox CHECKED (junction hydrated) / Policy# "SF123456789". ZERO console errors. No defect. **MILESTONE: every
+> real surface now eyes-on** — all pages + ALL create+edit forms (expense/vehicle/insurance/term×2/odometer×2/
+> provider×2). The eyes-on vein is EXHAUSTED; deep-review returns to backend correctness audits. ALSO rejected a
+> reminders/repository.ts coverage pick (findByVehicleId, uncovered) — no live route caller + no constructed-repo
+> test harness → heavy scaffolding or C181/C229 theater; confirms C130's "clean store/repo picks worked through".
+> Don't re-shoot.
+>
 > **AUDITED C131 (eyes-on) — the never-shot `/settings/providers/[id]/edit` form CLEAN desktop + mobile.** The
 > storage-credential EDIT surface (the #103/#123 fail-fast config-validation subject, NORTH_STAR #1 data-safety — a
 > bricked provider config breaks backups) was never shot (only provider-NEW). Shot DESKTOP + MOBILE (Pixel 5)

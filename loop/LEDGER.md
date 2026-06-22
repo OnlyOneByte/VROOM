@@ -78,13 +78,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 121 |
-| deep-review | 5 | 131 |
+| deep-review | 5 | 132 |
 | guard | 6 | 129 |
 | bug | 3 | 122 |
 | arch | 5 | 131 |
 | infra | 6 | 130 |
 
-Current cycle: **131**
+Current cycle: **132**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -403,6 +403,28 @@ Current cycle: **131**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C132 (deep-review — eyes-on cert of the last 2 never-shot EDIT forms → MILESTONE: every real surface eyes-on)** —
+  Balance at C132 (HEAD was C131): NOTHING actionable over budget — feature (11/4) + bug (10/3) most-starved but
+  PERPETUALLY BLOCKED (feature detect-commit Angelo-gated; bug `git diff C85..HEAD` over prod src EMPTY — verified);
+  guard/infra/arch/deep-review all under. Per "nothing actionable over → highest-leverage open item." SCOUTED a
+  reminders/repository.ts coverage pick first (findByVehicleId, 262-284 uncovered) but REJECTED it: the method has
+  NO live route caller (only a dead import in vehicles/routes.ts) + no reminder test builds a constructed-repo over
+  a migrated in-memory DB, so covering it = heavy scaffolding OR the C181/C229 coverage-theater trap — confirming
+  C130's "clean store/repo picks worked through" claim firsthand. PIVOTED to the eyes-on never-shot-surface vein
+  and CLOSED it: shot the last 2 never-shot real surfaces — `/vehicles/[id]/odometer/[entryId]/edit` +
+  `/insurance/[id]/terms/[termId]/edit` (the EDIT twins of the C125/C124 /new forms; the differentiator is the
+  value-HYDRATION path — a blank/never-rendered edit form is the C68 data-loss footgun). Read both PNGs. CLEAN,
+  both correctly HYDRATED: odometer-edit → Reading "31200", Date "07/15/2024" (the seeded recordedAt, correct LOCAL
+  date no UTC off-by-one), Note "Summer road trip" + accurate 16/500 counter, +Delete CTA (the edit-only affordance);
+  term-edit → Start "January 1, 2024" / End "June 30, 2024" (seeded dates, correct local — the #138 round-trip
+  verified on the load path), Total 1200 / Monthly 200, "Daily Driver" checkbox CHECKED (the term's linked vehicle
+  — junction hydrated), Policy# "SF123456789". ZERO console errors both, status 200, no auth bounce. No defect.
+  **MILESTONE: every real surface is now eyes-on** — pages (dashboard/analytics/insurance/financing/maintenance/
+  recurring/settings/profile/expenses/reminders/vehicle-detail) + ALL create+edit forms (expense/vehicle/insurance/
+  term ×2/odometer ×2/provider ×2), desktop + mobile sampled. The #138 date-only round-trip is confirmed correct on
+  every edit-load path. VERIFY: no source touched (eyes-on cert). cov: be 88.13% / fe 88.08% (~). NEXT deep-review:
+  the eyes-on vein is now EXHAUSTED (no never-shot surface left) — deep-review returns to backend correctness audits
+  of genuinely unaudited invariants, or awaits an Angelo steer / a feature/bug-surfaced concrete finding.
 - **C131 (arch no-churn → pivot to deep-review: eyes-on cert of the never-shot `/settings/providers/[id]/edit`
   form)** — Balance at C131 (HEAD was C130): FOUR over budget — feature (10/4) + bug (9/3) most-starved but
   PERPETUALLY BLOCKED (feature detect-commit Angelo-gated; bug `git diff C85..HEAD` over prod src EMPTY — verified),
