@@ -79,12 +79,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 121 |
 | deep-review | 5 | 132 |
-| guard | 6 | 129 |
+| guard | 6 | 133 |
 | bug | 3 | 122 |
 | arch | 5 | 131 |
 | infra | 6 | 130 |
 
-Current cycle: **132**
+Current cycle: **133**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -403,6 +403,27 @@ Current cycle: **132**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C133 (guard — pin the pending-OAuth-credentials MAX_SIZE eviction; the DoS-prevention branch was uncovered)** —
+  Balance at C133 (HEAD was C132): NOTHING actionable over budget — feature (12/4) + bug (11/3) most-starved but
+  PERPETUALLY BLOCKED (feature detect-commit Angelo-gated; bug `git diff C85..HEAD` over prod src EMPTY — verified);
+  guard/infra/arch/deep-review under. Per "nothing actionable over → highest-leverage open item." SCOUT: with the
+  eyes-on vein exhausted (C132) + the four coverage veins closed, scanned the analytics SQL layer (DB-bound, not
+  clean) + the private analytics-repo helpers (computeAverageEfficiency/resolveUnitsOrDefault — PRIVATE, not
+  exported, only class-reachable → would need an API change or DB scaffolding, skipped) and the sub-100% exported
+  utils. Lowest was `pending-credentials.ts` (92% line) — a CREDENTIALS/security module (stages a provider OAuth
+  refresh token between callback + provider-create). The uncovered lines 53-56 are the MAX_SIZE (1000) oldest-
+  eviction branch in storePending — a DoS-prevention contract (abandoned OAuth flows must not grow the in-memory
+  store unbounded). The existing test (C83) conceded a "light functional check" that stored ONE entry, never
+  reaching MAX_SIZE → the eviction never executed. GUARD: extended the tracked pending-credentials.test.ts (+1):
+  fill to MAX_SIZE → store one more → assert the cap HOLDS (size stays 1000), the OLDEST (insertion-order) entry is
+  evicted, the newest is retained, and only ONE eviction per over-cap insert (second-oldest survives). NON-VACUOUS
+  proven firsthand: removed the eviction delete → size grew to 1001 (the unbounded-growth regression) → test RED.
+  VERIFY GATE GREEN: BE validate:local exit 0, 1771 pass, build bundled. COVERAGE: pending-credentials.ts
+  92→**100% line / 100% func** (the security module is now fully pinned). Backend-only → FE validate not required.
+  Modifies a TRACKED test file (committed regression net). cov: be ~88.15% / fe 88.08%. NEXT guard: the
+  exported-pure-util coverage frontier is now essentially exhausted (calculations 98.94/validation 99.20/
+  analytics-charts 99.63 are at their structural ceilings; logger is log-string noise) — residual is DB/DI/OAuth/
+  network/private-method bound. The self-authorizable coverage work is genuinely complete.
 - **C132 (deep-review — eyes-on cert of the last 2 never-shot EDIT forms → MILESTONE: every real surface eyes-on)** —
   Balance at C132 (HEAD was C131): NOTHING actionable over budget — feature (11/4) + bug (10/3) most-starved but
   PERPETUALLY BLOCKED (feature detect-commit Angelo-gated; bug `git diff C85..HEAD` over prod src EMPTY — verified);

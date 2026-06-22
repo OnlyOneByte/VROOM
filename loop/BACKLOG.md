@@ -549,6 +549,17 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C133 — the pending-OAuth-credentials MAX_SIZE eviction (DoS-prevention branch, pending-credentials.ts
+> → 100% line).** The credentials store (stages a provider OAuth refresh token between callback + provider-create)
+> was 92% line; the uncovered lines 53-56 are the MAX_SIZE (1000) oldest-eviction branch in storePending — a
+> DoS-prevention contract (abandoned OAuth flows must not grow the in-memory store unbounded). The C83 test
+> conceded a "light functional check" that stored ONE entry, never reaching MAX_SIZE. Extended the tracked
+> pending-credentials.test.ts (+1): fill to MAX_SIZE → store one more → cap HOLDS (1000), OLDEST evicted, newest
+> retained, only ONE eviction per over-cap insert. Non-vacuous (remove the eviction delete → size 1001 → RED).
+> pending-credentials.ts 92→100% line. The exported-pure-util coverage frontier is now exhausted (calculations
+> 98.94 / validation 99.20 / analytics-charts 99.63 at structural ceilings); residual is DB/DI/OAuth/private-method
+> bound. Self-authorizable coverage work is genuinely complete. Don't re-add.
+
 > **GUARDED C129 — auth-store `updateDisplayName` merge + `logout` failure path (auth.svelte.ts → 100% line).**
 > auth.svelte.ts was 90.47% line / 50% BRANCH; the low branch flagged `updateDisplayName` (74-81, ENTIRELY
 > untested) + the `logout` catch (117, only success was tested). Extended the tracked `auth.test.ts` (+3):
