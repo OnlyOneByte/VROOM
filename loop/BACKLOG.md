@@ -1207,6 +1207,15 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 filesystem; untracked specs vanish on merge), full regress, coverage re-measure (update the LEDGER cov:
 baseline), refresh `BRANCH_REVIEW.md` grouped by theme so the eventual PR stays reviewable.)*
 
+> **RAN C136 (cadence; last ran C130).** Untracked-test sweep CLEAN (C133/C134 test files tracked; only the
+> intentional `M .gitignore`/`M frontend/.gitignore` overrides). Coverage RE-MEASURED: BE 88.21% line / 87.79% func
+> (1770 pass), +0.08 vs C130 (the C133 pending-credentials-eviction→100% + C134 arc); FE 88.23% line / 88.69% func /
+> 80.32% branch / 86.14% stmts (749 pass), matches C134 (C135 doc-only cert). Both holding above 88% line. Both
+> green (BE 1770 / FE 749). Branch = 136 ahead, PR-ready (guard 28 / bug 28 / deep-review 23 / feature 21 / infra 19
+> / arch 16). NEXT cadence ~C146. STANDING SIGNAL: all self-authorizable veins CLOSED (coverage both sides C126–C134,
+> eyes-on every surface C132, route-IDOR C108–C116, analytics-builders C119–C122, data-safety certs C135 + set); the
+> loop is at steady-state maintenance — highest-leverage work GATED on Angelo.
+>
 > **RAN C130 (cadence; last ran C123).** Untracked-test sweep CLEAN (C126/C127/C128/C129 test files all tracked;
 > only the intentional `M .gitignore`/`M frontend/.gitignore` overrides). Coverage RE-MEASURED — BOTH suites
 > crossed 88% line for the first time: BE 88.13% line / 87.79% func (1769 pass), +0.35 vs C123 (the C126

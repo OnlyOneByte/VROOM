@@ -24,6 +24,9 @@
 > (settings reload) + C101 (theme listener) + C102 (#148 anchor) FE-logic guard arc. FE is now meaningfully off its
 > old plateau; the residual gap is structural (effect/DOM-bound + DI/OAuth-bound). Both still under the 90% goal but
 > the FE structural ceiling proved ~1.25pts higher than the long-assumed ~86% once the store/util logic was pinned.**
+> **C136 (infra cadence MEASURED): BE 88.21% line / 87.79% func (1770 pass) — +0.08 vs C130 (the C133/C134 arc);
+> FE 88.23% line / 88.69% func / 80.32% branch / 86.14% stmts (749 pass) — matches C134 (C135 doc-only). Both
+> holding above 88% line. All self-authorizable coverage veins CLOSED; the loop is at steady-state maintenance.**
 > **C134 (guard MEASURED): FE 88.23% line / 88.69% func / 80.23% branch / 86.07% stmts (749 pass), +0.15 line vs
 > C130, from pinning apiClient.raw (api-client.ts 95.23→100% line). BE unchanged 88.13% (frontend-only). The FE
 > service/util layer is now at its structural ceiling — self-authorizable coverage is complete both sides.**
@@ -85,9 +88,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 134 |
 | bug | 3 | 122 |
 | arch | 5 | 131 |
-| infra | 6 | 130 |
+| infra | 6 | 136 |
 
-Current cycle: **135**
+Current cycle: **136**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -406,6 +409,24 @@ Current cycle: **135**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C136 (infra — branch-hygiene sweep + coverage re-measure, the ~10-cycle cadence; last ran C130)** — Balance at
+  C136 (HEAD was C135): feature (15/4) + bug (14/3) most-starved but PERPETUALLY BLOCKED (feature detect-commit
+  Angelo-gated; bug `git diff C85..HEAD` over prod src EMPTY — verified); infra (6/6) + arch (5/5) at budget. Picked
+  infra: it's AT its cadence budget (the budget IS the ~10-cycle cadence signal; last ran C130) AND the substantive
+  non-dry pick (captures the C133/C134 coverage arc), whereas arch is a guaranteed no-churn (no prod source since
+  C85). (1) UNTRACKED-TEST SWEEP: CLEAN — the C133/C134 test files are tracked/committed; only the intentional
+  `M .gitignore` / `M frontend/.gitignore` overrides remain. (2) COVERAGE RE-MEASURED: BE 88.21% line / 87.79% func
+  (1770 pass) — +0.08 vs C130's 88.13, the C133 (pending-credentials eviction → 100%) + C134 contributions; FE
+  88.23% line / 88.69% func / 80.32% branch / 86.14% stmts (749 pass) — matches C134 (C135 was a doc-only cert, no
+  FE source). Both holding above 88% line. (3) BOTH-SIDES GREEN: BE validate:local exit 0 (1770) / FE 749, 0 fail.
+  (4) BRANCH STATE: claude-loop-dev = 136 commits ahead of fresh origin/main, PR-ready (category spread guard 28 /
+  bug 28 / deep-review 23 / feature 21 / infra 19 / arch 16 — guard tied bug atop the C126–C134 coverage arc;
+  healthy balance across all six). Doc-only — no source touched. cov: be 88.21% / fe 88.23% (MEASURED). NEXT cadence
+  ~C146. STANDING SIGNAL: all self-authorizable veins are CLOSED — coverage both sides (C126–C134), eyes-on every
+  surface (C132 milestone), route-IDOR (C108–C116), analytics-builders (C119–C122), backend data-safety certs
+  (C135 + the C3/C8/C13/C39/C74/C81/C92 set). The loop is at steady-state maintenance: bug dry / arch no-churn /
+  guard+deep-review re-scanning certified ground / infra cadence. Highest-leverage work GATED on Angelo (#148 READY
+  / import defaultCategory / createLoadState + seedVehicle arch designs / #100/#79/#129).
 - **C135 (deep-review — CERTIFIED the merge-restore `detectConflicts` insert-vs-probe symmetry CLEAN; a
   raw-UNIQUE-throw gap hypothesis DEBUNKED firsthand)** — Balance at C135 (HEAD was C134): NOTHING actionable over
   budget — feature (14/4) + bug (13/3) most-starved but PERPETUALLY BLOCKED (feature detect-commit Angelo-gated;
