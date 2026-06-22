@@ -55,12 +55,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 121 |
 | deep-review | 5 | 119 |
-| guard | 6 | 120 |
-| bug | 3 | 114 |
+| guard | 6 | 122 |
+| bug | 3 | 122 |
 | arch | 5 | 118 |
 | infra | 6 | 117 |
 
-Current cycle: **121**
+Current cycle: **122**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -379,6 +379,28 @@ Current cycle: **121**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C122 (bug→guard pivot — bug forced + provably dry; pinned 2 foundational zero-coverage analytics primitives)** —
+  Balance at C122 (HEAD was C121): bug (8/3, +5) most-starved by far. BUG PRECONDITION (the C99/C103/C107
+  discipline): `git diff C85..HEAD` over backend/src + frontend/src (excl. tests) is EMPTY — no production source
+  has changed since the cold vein was last swept, so a regression is STRUCTURALLY IMPOSSIBLE and a scout produces
+  nothing. Recorded dry IMMEDIATELY (10th consecutive dry bug cycle: C6/C10/C15/C83/C89/C95/C99/C103/C107/C122) +
+  pivoted to the highest-leverage ACTIONABLE increment — the zero-coverage analytics-primitive vein (C119/C120
+  certified the LEAF builders; this pins the two ROOT primitives every builder calls). SCOUT: re-grepped → the two
+  remaining zero-coverage helpers are FOUNDATIONAL, not thin: `normalizeDate` (the SECONDS-vs-MS epoch heuristic,
+  `< 1e12` → ×1000) is the exact boundary where date corruption hides — the DB stores timestamps in SECONDS (the
+  recurring mode:'timestamp' footgun the loop re-finds at C46/C34/C209), so a drifted threshold shifts every chart's
+  dates by 1000×, and NOTHING asserted it; `groupByVehicle` is the #54 cross-vehicle-pooling guard (never pairs two
+  cars' consecutive rows). Read both against source firsthand — CORRECT (clean cert). GUARD: new
+  `normalize-date-group-by-vehicle.test.ts` (+9, +16 expect): normalizeDate null→null / Date→identity / seconds×1000
+  (1.7e9→2023) / ms-verbatim / the 1e12 boundary→ms (2001 not year-33658) / epoch-0→1970; groupByVehicle empty→empty
+  + per-vehicle order preserved + single-group. NON-VACUOUS proven firsthand: dropped the `×1000` seconds-scaling →
+  the seconds-epoch test went RED (received 1700000000 not …000, the exact 1000× corruption). Full verify gate
+  GREEN: BE validate:local exit 0, 1757 pass (+9 vs C121's 1748), build bundled. Backend-only → FE validate not
+  required. The analytics-builder coverage sweep (C119 expense-summary, C120 maintenance/gas-price, C122
+  date/group roots) is now essentially complete — remaining sub-100% analytics files are DI/SQL-bound (repository.ts)
+  or transitively-covered. cov: be ~87.78% / fe 87.6% (~ — new tests drive already-covered lines; re-measure next
+  infra cadence ~C127). NEXT bug cycle: precondition still holds (no source changed) → record dry + pivot; real
+  defects now come only from a deep-review/feature-surfaced invariant or an Angelo steer.
 - **C121 (feature — import-trackers T5: the manual-mapping editor eyes-on at MOBILE, the last untested viewport)** —
   Balance at C121 (HEAD was C120): feature (8/4, +4) most-starved + bug (7/3, +4), both OVER. Bug is structurally
   dry (git diff C85..HEAD over production src EMPTY). Feature has been recorded "blocked" the last several cycles

@@ -396,6 +396,14 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **SCOUTED C122 — no fresh defect (10th consecutive; precondition-recorded dry + PIVOTED to guard). `git diff
+> C85..HEAD` over production source EMPTY → regression structurally impossible.** Bug was forced (most-starved
+> +5) but provably dry, so per the C99/C103/C107 discipline recorded dry immediately and pivoted the cycle's
+> substantive work to the co-productive guard vein: pinned the two foundational zero-coverage analytics primitives
+> (`normalizeDate` seconds-vs-ms boundary + `groupByVehicle`; see the guard GUARDED-C122 entry). NEXT bug cycle:
+> precondition still holds → record dry + pivot; real defects now come only from a deep-review/feature-surfaced
+> invariant or an Angelo steer.
+>
 > **CLOSED C114 — the insurance TERM routes' cross-tenant IDOR gap (PUT/DELETE /:id/terms/:termId).** The
 > route-audit method (C108–C113) applied with the bug lens: systematically compared every state-changing route vs
 > the cross-tenant-idor.test.ts sweep → the insurance term routes are gated on validateInsuranceOwnership(id) but
@@ -495,6 +503,17 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 *(queue empty — repopulate from real bug classes. Pattern: HTTP-harness (createTestApp + s3-provider
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
+
+> **GUARDED C122 — the two FOUNDATIONAL analytics primitives `normalizeDate` + `groupByVehicle` CLEAN + pinned
+> (the last zero-coverage roots).** Closing the analytics-builder coverage sweep at its ROOTS (C119 expense-summary
+> + C120 maintenance/gas-price certified the leaf builders; these are the primitives every builder calls).
+> `normalizeDate` is the SECONDS-vs-MS epoch heuristic (`< 1e12` → ×1000) — the exact boundary where date
+> corruption hides, since the DB stores timestamps in SECONDS (the recurring mode:'timestamp' footgun, C46/C34/C209)
+> and NOTHING asserted it; `groupByVehicle` is the #54 cross-vehicle-pooling guard. Read both against source
+> firsthand — CORRECT. New `normalize-date-group-by-vehicle.test.ts` (+9) pins: null→null / Date→identity /
+> seconds×1000 / ms-verbatim / the 1e12 boundary→ms / epoch-0→1970; group order-preserving + empty + single-group.
+> Non-vacuous proven (drop the ×1000 → seconds-epoch test RED). BE 1757 pass. The analytics-builder coverage sweep
+> is now essentially complete; remaining sub-100% analytics files are DI/SQL-bound (repository.ts). Don't re-add.
 
 > **GUARDED C120 — the MAINTENANCE + GAS-PRICE chart builder family CLEAN + pinned (3 zero-coverage builders).**
 > Continuing the C119 analytics-builder coverage sweep: re-grepped every analytics-charts.ts builder vs test
