@@ -109,6 +109,16 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > builders if any (buildFuelEfficiencyAndCost / buildVehicleMaintenanceCosts), else an eyes-on populated surface.
 > Don't re-add.
 
+> **AUDITED C125 (eyes-on) — the never-shot `/vehicles/[id]/odometer/new` form CLEAN desktop + mobile.** The
+> odometer entry form is the data-entry path feeding `getCurrentOdometer` (drives lease-overage money + reminder
+> firing + MPG — the #76/#130/#244 bug family), so an unrendered field here is high-severity. Shot DESKTOP +
+> MOBILE (Pixel 5) against the seeded Toyota Camry + Read both PNGs. CLEAN: Odometer Reading input, Date defaulted
+> to TODAY (correct LOCAL date, not a UTC off-by-one — the #87/#106/#138 seam), Note (optional) w/ a 0/500 char
+> counter, Photos & Receipts uploader + empty-state, Cancel / Save Reading CTAs. Mobile (393px): all fields
+> full-width stacked, Cancel/Save side-by-side, NO horizontal overflow (NORTH_STAR #3). ZERO console errors both.
+> No defect — DON'T re-shoot. Remaining never-shot surfaces are the term/odometer EDIT forms (likely identical to
+> their just-shot /new siblings — low marginal value); after a quick confirm the surface set is fully eyes-on.
+>
 > **AUDITED C124 (eyes-on) — the never-shot `/insurance/[id]/terms/new` form CLEAN desktop + mobile.** The
 > InsuranceTermForm (572-line money+date form, the bug-#138 UTC-date subject) was never shot. Shot DESKTOP +
 > MOBILE (Pixel 5) against a seeded State Farm policy + Read both PNGs. Desktop: all 4 sections render —

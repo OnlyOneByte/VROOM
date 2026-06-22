@@ -60,13 +60,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 121 |
-| deep-review | 5 | 124 |
+| deep-review | 5 | 125 |
 | guard | 6 | 122 |
 | bug | 3 | 122 |
 | arch | 5 | 124 |
 | infra | 6 | 123 |
 
-Current cycle: **124**
+Current cycle: **125**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -385,6 +385,25 @@ Current cycle: **124**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C125 (deep-review — eyes-on cert of the never-shot `/vehicles/[id]/odometer/new` form, the getCurrentOdometer
+  entry path)** — Balance at C125 (HEAD was C124): NOTHING over budget; TWO at budget — feature (4/4, most-starved
+  by raw count) + bug (3/3). Both BLOCKED: feature import-trackers manual half is fully eyes-on desktop+mobile
+  (C121) and the detect-commit is Angelo-gated on defaultCategory; bug is structurally dry (`git diff C85..HEAD`
+  over production src EMPTY, verified). Per don't-force-a-blocked-pick + "nothing over → highest-leverage open
+  item", continued the productive C124 never-shot-surface eyes-on vein (the one deep-review vein that still pays —
+  "E2E can't catch never-rendered fields", C68). PICK RATIONALE: the odometer entry form is the data-entry path
+  feeding `getCurrentOdometer`, which drives lease-overage MONEY + reminder firing + MPG (the #76/#130/#244 bug
+  family lives on this exact value) — a never-rendered field here is high-severity, so it's the highest-leverage
+  unshot surface. Shot DESKTOP + MOBILE (Pixel 5) against the seeded Toyota Camry (miles/gallons) + Read both PNGs.
+  CLEAN: Odometer Reading input (placeholder "e.g. 45000"), Date defaulted to TODAY 06/22/2026 (correct LOCAL date,
+  not a UTC off-by-one — the #87/#106/#138 date-family seam), Note (optional) with a live 0/500 char counter, Photos
+  & Receipts uploader + empty-state copy ("They'll upload when you save"), Cancel / Save Reading CTAs. Mobile
+  (393px): all fields full-width stacked, Cancel/Save side-by-side in-card, NO horizontal overflow (NORTH_STAR #3).
+  ZERO console errors both viewports, status 200, no auth bounce. No defect — recorded CLEAN, don't re-shoot.
+  VERIFY: no source touched (eyes-on cert). cov: be 87.78% / fe 87.6% (~ — no source). NEXT deep-review: the only
+  remaining never-shot real surfaces are the insurance term EDIT + odometer EDIT forms (likely identical to their
+  /new siblings just shot/C124 — low marginal value); after a quick confirm the surface set is fully eyes-on and
+  deep-review returns to backend correctness audits or awaits an Angelo steer.
 - **C124 (arch no-churn → pivot to deep-review: eyes-on cert of the never-shot `/insurance/[id]/terms/new` form)** —
   Balance at C124 (HEAD was C123): arch (6/5, +1) most-starved over budget; deep-review (5/5) at budget. ARCH
   PRECONDITION (the C112/C118 discipline): `git diff C118(043b84b)..HEAD` over backend/src + frontend/src (excl.
