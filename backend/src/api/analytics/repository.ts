@@ -37,6 +37,7 @@ import {
   computeMpgAndCostPerMile,
   computePreviousYearComparison,
   computeRegularityScore,
+  DAY_NAMES,
   effectiveMonthlyPremium,
   type FuelEfficiencyPoint,
   type FuelExpenseRow,
@@ -48,12 +49,15 @@ import {
   groupByVehicle,
   isFillup,
   monthKeysInRange,
+  normalizeDate,
+  type RadarUnitConverters,
+  SEASON_MAP,
   sortByVehicleThenDate,
   toMonthKey,
 } from '../../utils/analytics-charts';
 import { maxOf, minOf } from '../../utils/calculations';
 import { logger } from '../../utils/logger';
-import { convertDistance, convertEfficiency } from '../../utils/unit-conversions';
+import { convertDistance, convertEfficiency, convertVolume } from '../../utils/unit-conversions';
 
 export type { FuelEfficiencyPoint } from '../../utils/analytics-charts';
 
@@ -458,6 +462,112 @@ export class AnalyticsRepository {
   }
 
   /**
+   * A single vehicle's unit preferences from the fleet map, defaulting to DEFAULT_UNIT_PREFERENCES when
+   * absent. The `?? { ...DEFAULT_UNIT_PREFERENCES }` fallback is LOAD-BEARING — a per-vehicle convert site
+   * (convertVolume/convertEfficiency/convertDistance) reads `.volumeUnit`/`.distanceUnit` off the result,
+   * so a missing-vehicle row without the default would throw. Hand-repeated at 5 convert sites
+   * (convertedGasEfficiencyPoints, computeConvertedTotalDistance, the monthlyConsumption + volume +
+   * cross-vehicle-comparison loops); one source of truth so no site can silently drop the default (a fresh
+   * clone each call, matching the prior spread — never a shared mutable default object).
+   */
+  private vehicleUnitsFor(
+    vehicleUnitsMap: Map<string, UnitPreferences>,
+    vehicleId: string
+  ): UnitPreferences {
+    return vehicleUnitsMap.get(vehicleId) ?? { ...DEFAULT_UNIT_PREFERENCES };
+  }
+
+  /**
+   * Convert ONE fuel row's volume to the user's global volume unit (#94 convert-before-pool). The
+   * `row.volume ?? 0` coalesce + the `=== 0` short-circuit (a missing/zero volume converts to 0, never
+   * NaN) + the per-vehicle vehicleUnitsFor lookup were hand-repeated at the 3 volume-pooling sites
+   * (buildConvertedMonthlyConsumption, buildConvertedDayOfWeekPatterns, the buildFuelStatsFromData
+   * volumeInUserUnits closure). ONE source of truth so the zero-guard + per-vehicle-unit lookup can't drift
+   * between them. (volumeInUserUnits keeps its OWN leading `skipConversion ||` guard — it's the only volume
+   * path reached on BOTH branches; the other two are only called on the already-mixed-unit branch.)
+   */
+  private convertRowVolume(
+    row: FuelExpenseRow,
+    vehicleUnitsMap: Map<string, UnitPreferences>,
+    targetUnits: UnitPreferences
+  ): number {
+    const v = row.volume ?? 0;
+    if (v === 0) return 0;
+    const vUnits = this.vehicleUnitsFor(vehicleUnitsMap, row.vehicleId);
+    return convertVolume(v, vUnits.volumeUnit, targetUnits.volumeUnit);
+  }
+
+  /**
+   * Build the per-vehicle unit converters buildVehicleRadar applies to its gas-MPG + odometer metrics
+   * before the cross-fleet normalize (#94, C76). Keeps analytics-charts unit-naive: the repository owns the
+   * convertEfficiency/convertDistance deps + the vehicleUnitsFor fallback; each closure converts a value
+   * from THAT vehicle's units to the user's global units (identity when they already match, since the
+   * convert fns short-circuit equal from/to). Only built on the mixed-unit (non-skip) branch.
+   */
+  private radarUnitConverters(
+    vehicleUnitsMap: Map<string, UnitPreferences>,
+    userUnits: UnitPreferences
+  ): RadarUnitConverters {
+    return {
+      efficiency: (value, vehicleId) => {
+        const v = this.vehicleUnitsFor(vehicleUnitsMap, vehicleId);
+        return convertEfficiency(
+          value,
+          v.distanceUnit,
+          v.volumeUnit,
+          userUnits.distanceUnit,
+          userUnits.volumeUnit
+        );
+      },
+      distance: (value, vehicleId) => {
+        const v = this.vehicleUnitsFor(vehicleUnitsMap, vehicleId);
+        return convertDistance(value, v.distanceUnit, userUnits.distanceUnit);
+      },
+    };
+  }
+
+  /**
+   * The ONE source of truth for the converted gas-MPG inner loop every per-vehicle efficiency builder
+   * shares: group fuel rows by vehicle, walk consecutive pairs, gate to GAS points, and convert each to
+   * the target unit system (a no-op when skipConversion). Yields `{ vehicleId, efficiency, date }`; each
+   * consumer (computeConvertedEfficiencyValues / buildConvertedEfficiencyTrend /
+   * buildConvertedFuelEfficiencyComparison) accumulates the tuples its own way.
+   *
+   * gasEfficiencyPoint (not computeEfficiencyPoint): a PHEV's charge session stores kWh in `volume`, so
+   * computeEfficiencyPoint would emit a ~mi/kWh value that, summed into a gas-MPG average labeled mi/gal,
+   * drags it down — and worse, convertEfficiency would mis-convert that mi/kWh as if it were mi/gal.
+   * Centralizing the gate here means no converted-efficiency builder can silently reintroduce the
+   * #119/#122 (C413) / #126 (C427) gas/charge contamination by forgetting it.
+   */
+  private *convertedGasEfficiencyPoints(
+    fuelRows: FuelExpenseRow[],
+    vehicleUnitsMap: Map<string, UnitPreferences>,
+    targetUnits: UnitPreferences,
+    skipConversion: boolean
+  ): Generator<{ vehicleId: string; efficiency: number; date: string }> {
+    for (const [vehicleId, rows] of groupByVehicle(fuelRows)) {
+      const vUnits = this.vehicleUnitsFor(vehicleUnitsMap, vehicleId);
+      for (let i = 1; i < rows.length; i++) {
+        const current = rows[i];
+        const previous = rows[i - 1];
+        if (!current || !previous) continue;
+        const point = gasEfficiencyPoint(current, previous);
+        if (!point) continue;
+        const efficiency = skipConversion
+          ? point.efficiency
+          : convertEfficiency(
+              point.efficiency,
+              vUnits.distanceUnit,
+              vUnits.volumeUnit,
+              targetUnits.distanceUnit,
+              targetUnits.volumeUnit
+            );
+        yield { vehicleId, efficiency, date: point.date };
+      }
+    }
+  }
+
+  /**
    * Compute per-vehicle efficiency values, converting each to the target unit system.
    * Iterates fuel rows grouped by vehicle, computes efficiency from consecutive pairs,
    * and converts to the target units when skipConversion is false.
@@ -469,31 +579,13 @@ export class AnalyticsRepository {
     skipConversion: boolean
   ): number[] {
     const values: number[] = [];
-    for (const [vehicleId, rows] of groupByVehicle(fuelRows)) {
-      const vUnits = vehicleUnitsMap.get(vehicleId) ?? { ...DEFAULT_UNIT_PREFERENCES };
-      for (let i = 1; i < rows.length; i++) {
-        const current = rows[i];
-        const previous = rows[i - 1];
-        if (!current || !previous) continue;
-        // gasEfficiencyPoint (not computeEfficiencyPoint): this is a gas-MPG average — a PHEV's charge
-        // session (mi/kWh) must NOT be summed in, and crucially must NOT be fed to convertEfficiency
-        // (which would convert mi/kWh as if it were mi/gal → garbage). The #119/#122 gas/charge
-        // partition (C413) on the converted/summary repository path it missed (#126, C427).
-        const point = gasEfficiencyPoint(current, previous);
-        if (!point) continue;
-
-        values.push(
-          skipConversion
-            ? point.efficiency
-            : convertEfficiency(
-                point.efficiency,
-                vUnits.distanceUnit,
-                vUnits.volumeUnit,
-                targetUnits.distanceUnit,
-                targetUnits.volumeUnit
-              )
-        );
-      }
+    for (const { efficiency } of this.convertedGasEfficiencyPoints(
+      fuelRows,
+      vehicleUnitsMap,
+      targetUnits,
+      skipConversion
+    )) {
+      values.push(efficiency);
     }
     return values;
   }
@@ -531,12 +623,162 @@ export class AnalyticsRepository {
       if (mileages.length < 2) continue;
       let distance = maxOf(mileages) - minOf(mileages);
       if (!skipConversion && distance > 0) {
-        const vUnits = vehicleUnitsMap.get(vId) ?? { ...DEFAULT_UNIT_PREFERENCES };
+        const vUnits = this.vehicleUnitsFor(vehicleUnitsMap, vId);
         distance = convertDistance(distance, vUnits.distanceUnit, targetUnits.distanceUnit);
       }
       total += distance;
     }
     return total;
+  }
+
+  /**
+   * Monthly consumption (volume + gas-MPG per month) with per-vehicle unit conversion — the #94 twin of
+   * buildMonthlyConsumption (C65). A mixed gal+L / mi+km fleet must convert each vehicle's volume + each
+   * gas pair's efficiency to the user's global units BEFORE pooling into a month, else the chart sums
+   * litres into a gallons headline + averages mi/gal with km/L (NORTH_STAR #2). The common single-unit
+   * fleet still takes the pure builder (skipConversion at the call site); only a mixed fleet reaches here.
+   *
+   * Mirrors buildMonthlyConsumption's structure exactly (volume map keyed by month, gas-pair efficiency
+   * augmenting only volume-seeded months via the `if (entry)` guard, ascending sort, most-recent-12 slice)
+   * — the efficiency limb reuses convertedGasEfficiencyPoints (C64) so the gas/charge gate + band filter
+   * stay identical and un-forgettable; the volume limb converts per row via convertVolume.
+   */
+  private buildConvertedMonthlyConsumption(
+    rows: FuelExpenseRow[],
+    vehicleUnitsMap: Map<string, UnitPreferences>,
+    targetUnits: UnitPreferences
+  ): Array<{ month: string; efficiency: number; volume: number }> {
+    const map = new Map<string, { effSum: number; effCount: number; volume: number }>();
+
+    for (const row of rows) {
+      const d = normalizeDate(row.date);
+      if (!d) continue;
+      const key = toMonthKey(d);
+      const entry = map.get(key) ?? { effSum: 0, effCount: 0, volume: 0 };
+      entry.volume += this.convertRowVolume(row, vehicleUnitsMap, targetUnits);
+      map.set(key, entry);
+    }
+
+    // Efficiency augments only months a volume row already seeded (the buildMonthlyConsumption `if (entry)`
+    // invariant — pinned by analytics-charts-month-window.test.ts). skipConversion:false → always convert.
+    for (const { efficiency, date } of this.convertedGasEfficiencyPoints(
+      rows,
+      vehicleUnitsMap,
+      targetUnits,
+      false
+    )) {
+      const entry = map.get(toMonthKey(new Date(date)));
+      if (entry) {
+        entry.effSum += efficiency;
+        entry.effCount++;
+      }
+    }
+
+    return Array.from(map.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-12)
+      .map(([month, data]) => ({
+        month,
+        efficiency: data.effCount > 0 ? data.effSum / data.effCount : 0,
+        volume: data.volume,
+      }));
+  }
+
+  /**
+   * Seasonal gas-MPG (avg efficiency + fillup count per season) with per-vehicle unit conversion — the
+   * #94 twin of buildSeasonalEfficiency (C69). A mixed mi/gal + km/L fleet must convert each gas pair's
+   * efficiency to the user's global units BEFORE pooling into a season, else the seasonal average mixes
+   * mi/gal with km/L (NORTH_STAR #2). The common single-unit fleet keeps the pure builder (skipConversion
+   * at the call site); only a mixed fleet reaches here.
+   *
+   * Mirrors buildSeasonalEfficiency's structure exactly (fillupCount counts only volume-bearing rows via
+   * isFillup — the #108 split-sibling overcount guard, UNITLESS so no conversion; efficiency buckets the
+   * converted gas points by season) — the efficiency limb reuses convertedGasEfficiencyPoints (C64) so the
+   * gas/charge gate + band filter stay identical and un-forgettable.
+   */
+  private buildConvertedSeasonalEfficiency(
+    fuelRows: FuelExpenseRow[],
+    vehicleUnitsMap: Map<string, UnitPreferences>,
+    targetUnits: UnitPreferences
+  ): Array<{ season: string; avgEfficiency: number; fillupCount: number }> {
+    const seasonData = new Map<string, { effSum: number; effCount: number; fillupCount: number }>();
+
+    // fillupCount: only volume-bearing rows (#108, the #56/#108 split-sibling overcount class). Unitless.
+    for (const row of fuelRows) {
+      const d = normalizeDate(row.date);
+      if (!d) continue;
+      if (!isFillup(row)) continue;
+      const season = SEASON_MAP[d.getMonth()] ?? 'Winter';
+      const entry = seasonData.get(season) ?? { effSum: 0, effCount: 0, fillupCount: 0 };
+      entry.fillupCount++;
+      seasonData.set(season, entry);
+    }
+
+    // Efficiency augments only seasons a volume row already seeded (the buildSeasonalEfficiency `if (entry)`
+    // invariant). skipConversion:false → always convert each gas pair to the user's global units.
+    for (const { efficiency, date } of this.convertedGasEfficiencyPoints(
+      fuelRows,
+      vehicleUnitsMap,
+      targetUnits,
+      false
+    )) {
+      const season = SEASON_MAP[new Date(date).getMonth()] ?? 'Winter';
+      const entry = seasonData.get(season);
+      if (entry) {
+        entry.effSum += efficiency;
+        entry.effCount++;
+      }
+    }
+
+    return ['Winter', 'Spring', 'Summer', 'Fall'].map((season) => {
+      const data = seasonData.get(season);
+      return {
+        season,
+        avgEfficiency: data && data.effCount > 0 ? data.effSum / data.effCount : 0,
+        fillupCount: data?.fillupCount ?? 0,
+      };
+    });
+  }
+
+  /**
+   * Day-of-week fuel patterns (fillup count + avg cost + avg volume per weekday) with per-vehicle VOLUME
+   * conversion — the #94 twin of buildDayOfWeekPatterns (C72). avgVolume sums each fillup's `volume` across
+   * ALL vehicles; volume is stored in each vehicle's own unit (gal OR L), so a mixed gal+L fleet skews the
+   * per-weekday avgVolume (NORTH_STAR #2). fillupCount (a count) and avgCost ($ — currency, not unit-bearing)
+   * are NOT converted. The common single-unit fleet keeps the pure builder (skipConversion at the call site).
+   *
+   * Mirrors buildDayOfWeekPatterns's structure exactly (isFillup-gated count — the #113 split-sibling
+   * overcount guard; totalCost/totalGallons accumulators; the same DAY_NAMES projection) — only the
+   * per-row volume is converted to the user's global unit first, via the shared vehicleUnitsFor + convertVolume.
+   */
+  private buildConvertedDayOfWeekPatterns(
+    fuelRows: FuelExpenseRow[],
+    vehicleUnitsMap: Map<string, UnitPreferences>,
+    targetUnits: UnitPreferences
+  ): Array<{ day: string; fillupCount: number; avgCost: number; avgVolume: number }> {
+    const dayData = new Map<string, { count: number; totalCost: number; totalGallons: number }>();
+
+    for (const row of fuelRows) {
+      const d = normalizeDate(row.date);
+      if (!d) continue;
+      if (!isFillup(row)) continue;
+      const dayName = DAY_NAMES[d.getDay()] ?? 'Sunday';
+      const entry = dayData.get(dayName) ?? { count: 0, totalCost: 0, totalGallons: 0 };
+      entry.count++;
+      entry.totalCost += row.expenseAmount;
+      entry.totalGallons += this.convertRowVolume(row, vehicleUnitsMap, targetUnits);
+      dayData.set(dayName, entry);
+    }
+
+    return [...DAY_NAMES].map((day) => {
+      const data = dayData.get(day);
+      return {
+        day,
+        fillupCount: data?.count ?? 0,
+        avgCost: data && data.count > 0 ? data.totalCost / data.count : 0,
+        avgVolume: data && data.count > 0 ? data.totalGallons / data.count : 0,
+      };
+    });
   }
 
   /**
@@ -551,32 +793,17 @@ export class AnalyticsRepository {
   ): Array<{ month: string; efficiency: number }> {
     const monthMap = new Map<string, { effSum: number; effCount: number }>();
 
-    for (const [vehicleId, rows] of groupByVehicle(fuelRows)) {
-      const vUnits = vehicleUnitsMap.get(vehicleId) ?? { ...DEFAULT_UNIT_PREFERENCES };
-      for (let i = 1; i < rows.length; i++) {
-        const current = rows[i];
-        const previous = rows[i - 1];
-        if (!current || !previous) continue;
-        // gasEfficiencyPoint: gas-MPG trend — exclude a PHEV's charge mi/kWh before pooling/convert (#126/C427).
-        const point = gasEfficiencyPoint(current, previous);
-        if (!point) continue;
-
-        const converted = skipConversion
-          ? point.efficiency
-          : convertEfficiency(
-              point.efficiency,
-              vUnits.distanceUnit,
-              vUnits.volumeUnit,
-              targetUnits.distanceUnit,
-              targetUnits.volumeUnit
-            );
-
-        const month = toMonthKey(new Date(point.date));
-        const entry = monthMap.get(month) ?? { effSum: 0, effCount: 0 };
-        entry.effSum += converted;
-        entry.effCount++;
-        monthMap.set(month, entry);
-      }
+    for (const { efficiency, date } of this.convertedGasEfficiencyPoints(
+      fuelRows,
+      vehicleUnitsMap,
+      targetUnits,
+      skipConversion
+    )) {
+      const month = toMonthKey(new Date(date));
+      const entry = monthMap.get(month) ?? { effSum: 0, effCount: 0 };
+      entry.effSum += efficiency;
+      entry.effCount++;
+      monthMap.set(month, entry);
     }
 
     return (
@@ -707,7 +934,7 @@ export class AnalyticsRepository {
     userId: string,
     range: DateRange,
     vehicleId?: string
-  ): Promise<{ count: number; totalGallons: number }> {
+  ): Promise<{ count: number; volumeByVehicle: Map<string, number> }> {
     const conditions = [
       eq(expenses.userId, userId),
       eq(expenses.category, 'fuel'),
@@ -717,19 +944,26 @@ export class AnalyticsRepository {
     if (vehicleId) conditions.push(eq(expenses.vehicleId, vehicleId));
     // COUNT only volume-bearing rows so the previous-year fillup count matches the
     // in-memory isFillup predicate in buildFuelStatsFromData (a split fuel sibling has
-    // volume=null and is not a fillup — bug #18). The gallons SUM is unaffected (null
-    // volume contributes nothing) but is kept explicit for symmetry.
-    const result = await this.db
+    // volume=null and is not a fillup — bug #18). GROUP the volume SUM BY vehicle so the
+    // caller can convert each vehicle's sum to the user's global volume unit BEFORE pooling
+    // — a mixed gal+L fleet otherwise sums litres with gallons into the prev-year headline
+    // (#94, NORTH_STAR #2; the prev-year sub-member the C62 current-period fix left, fixed C79).
+    const rows = await this.db
       .select({
+        vehicleId: expenses.vehicleId,
         count: sql<number>`COUNT(CASE WHEN ${expenses.volume} > 0 THEN 1 END)`,
         totalGallons: sql<number>`COALESCE(SUM(${expenses.volume}), 0)`,
       })
       .from(expenses)
-      .where(and(...conditions));
-    return {
-      count: result[0]?.count ?? 0,
-      totalGallons: result[0]?.totalGallons ?? 0,
-    };
+      .where(and(...conditions))
+      .groupBy(expenses.vehicleId);
+    let count = 0;
+    const volumeByVehicle = new Map<string, number>();
+    for (const r of rows) {
+      count += r.count;
+      if (r.totalGallons > 0) volumeByVehicle.set(r.vehicleId, r.totalGallons);
+    }
+    return { count, volumeByVehicle };
   }
 
   /** Build odometer progression chart data from fuel expenses. */
@@ -1310,21 +1544,34 @@ export class AnalyticsRepository {
         start: range.start - (range.end - range.start),
         end: range.start,
       };
-      const [vehicleNameMap, fuelRows, prevYearAgg] = await Promise.all([
-        this.queryVehicleNameMap(userId, vehicleId),
-        this.queryFuelExpenses(userId, range, vehicleId),
-        this.queryFuelAggregates(userId, prevRange, vehicleId),
-      ]);
+      const [vehicleNameMap, fuelRows, prevYearAgg, userUnits, vehicleUnitsMap] = await Promise.all(
+        [
+          this.queryVehicleNameMap(userId, vehicleId),
+          this.queryFuelExpenses(userId, range, vehicleId),
+          this.queryFuelAggregates(userId, prevRange, vehicleId),
+          this.getUserUnits(userId),
+          this.getAllVehicleUnits(userId),
+        ]
+      );
 
       // Sort by vehicleId then date for functions that need consecutive same-vehicle pairs
       const fuelRowsByVehicle = sortByVehicleThenDate(fuelRows);
+
+      // #94 (C58): convert each vehicle's distance to the user's global units BEFORE pooling the
+      // fleet-wide totalDistance scalar — a mixed mi+km fleet otherwise sums miles with kilometres
+      // (NORTH_STAR #2). Mirrors getCrossVehicle: skip the conversion when every vehicle already
+      // matches the user's units (a no-op for the common single-unit case).
+      const skipConversion = this.allVehiclesMatchUnits(vehicleUnitsMap, userUnits);
 
       return this.buildFuelStatsFromData(
         fuelRows,
         fuelRowsByVehicle,
         vehicleNameMap,
         range,
-        prevYearAgg
+        prevYearAgg,
+        userUnits,
+        vehicleUnitsMap,
+        skipConversion
       );
     } catch (error) {
       logger.error('Failed to compute fuel stats', {
@@ -1343,7 +1590,10 @@ export class AnalyticsRepository {
     fuelRowsByVehicle: FuelExpenseRow[],
     vehicleNameMap: Map<string, string>,
     range: DateRange,
-    prevYearAgg: { count: number; totalGallons: number }
+    prevYearAgg: { count: number; volumeByVehicle: Map<string, number> },
+    userUnits: UnitPreferences,
+    vehicleUnitsMap: Map<string, UnitPreferences>,
+    skipConversion: boolean
   ): FuelStatsData {
     const now = new Date();
     const currentMonth = now.getMonth();
@@ -1381,9 +1631,29 @@ export class AnalyticsRepository {
     const currentMonthFillups = fuelRows.filter((r) => isFillup(r) && inCurrentMonth(r)).length;
     const prevMonthFillups = fuelRows.filter((r) => isFillup(r) && inPrevMonth(r)).length;
 
-    const sumGallons = (rows: FuelExpenseRow[]) => rows.reduce((s, r) => s + (r.volume ?? 0), 0);
+    // #94 (C62): convert each row's volume to the user's global volume unit BEFORE pooling, so a mixed
+    // gal+L fleet no longer sums gallons with litres into the headline volume + fillupDetails
+    // (NORTH_STAR #2). Mirrors the C58 distance member + computeConvertedTotalDistance's per-vehicle
+    // pattern; skipConversion short-circuits the common single-unit case (a no-op there).
+    const volumeInUserUnits = (row: FuelExpenseRow): number =>
+      // skipConversion short-circuits to the raw value (the common single-unit fleet); otherwise the
+      // shared convertRowVolume does the `?? 0` + per-vehicle convert. This is the only volume path
+      // reached on BOTH branches, hence the extra leading guard the two converted-only twins don't need.
+      skipConversion ? (row.volume ?? 0) : this.convertRowVolume(row, vehicleUnitsMap, userUnits);
+    const sumGallons = (rows: FuelExpenseRow[]) =>
+      rows.reduce((s, r) => s + volumeInUserUnits(r), 0);
     const currentYearGallons = sumGallons(fuelRows);
-    const previousYearGallons = prevYearAgg.totalGallons;
+    // #94 (C79, the LAST sub-member): previousYearGallons is now a PER-VEHICLE group-sum from
+    // queryFuelAggregates (volumeByVehicle), so each vehicle's prev-year litres/gallons converts to the
+    // user's global volume unit BEFORE pooling — a mixed gal+L fleet no longer sums litres with gallons
+    // into the "Last Period" comparison (the prev-year twin of the C62 current-period fix). skipConversion
+    // short-circuits the common single-unit case to a plain sum (a no-op).
+    const previousYearGallons = skipConversion
+      ? [...prevYearAgg.volumeByVehicle.values()].reduce((s, v) => s + v, 0)
+      : [...prevYearAgg.volumeByVehicle.entries()].reduce((s, [vId, vol]) => {
+          const vUnits = this.vehicleUnitsFor(vehicleUnitsMap, vId);
+          return s + convertVolume(vol, vUnits.volumeUnit, userUnits.volumeUnit);
+        }, 0);
     const currentMonthGallons = sumGallons(fuelRows.filter(inCurrentMonth));
     const prevMonthGallons = sumGallons(fuelRows.filter(inPrevMonth));
 
@@ -1392,7 +1662,7 @@ export class AnalyticsRepository {
 
     const volumes = fuelRows
       .filter((r) => r.volume != null && r.volume > 0)
-      .map((r) => r.volume as number);
+      .map((r) => volumeInUserUnits(r));
     const fillupDetails = {
       avgVolume: volumes.length > 0 ? volumes.reduce((a, b) => a + b, 0) / volumes.length : null,
       minVolume: volumes.length > 0 ? minOf(volumes) : null,
@@ -1410,14 +1680,16 @@ export class AnalyticsRepository {
     // Distance must be summed PER VEHICLE (max-min within each car), then totaled. Pooling
     // every vehicle's odometer readings into one max-min gives garbage for a multi-vehicle
     // user (e.g. a car at 12k mi and one at 95k mi would report ~83k). Delegate to the shared
-    // computeConvertedTotalDistance (C392) with skipConversion=true — this summary path is
-    // single-unit so it doesn't convert; the unit args are ignored under skipConversion. ONE
-    // source of truth for the per-vehicle group→max-min→sum, in lockstep with the year-end path.
+    // computeConvertedTotalDistance (C392), now threading the REAL per-vehicle units (#94, C58):
+    // each vehicle's span is converted to the user's global distance unit BEFORE summing, so a
+    // mixed mi+km fleet no longer pools miles with kilometres (NORTH_STAR #2). skipConversion
+    // short-circuits the common single-unit case. ONE source of truth for the per-vehicle
+    // group→max-min→sum, in lockstep with the year-end + cross-vehicle paths.
     const totalDistance = this.computeConvertedTotalDistance(
       fuelRows,
-      new Map(),
-      DEFAULT_UNIT_PREFERENCES,
-      true
+      vehicleUnitsMap,
+      userUnits,
+      skipConversion
     );
     const daysSoFar = Math.max(
       1,
@@ -1449,7 +1721,9 @@ export class AnalyticsRepository {
       fillupDetails,
       averageCost,
       distance,
-      monthlyConsumption: buildMonthlyConsumption(fuelRowsByVehicle),
+      monthlyConsumption: skipConversion
+        ? buildMonthlyConsumption(fuelRowsByVehicle)
+        : this.buildConvertedMonthlyConsumption(fuelRowsByVehicle, vehicleUnitsMap, userUnits),
       gasPriceHistory: buildGasPriceHistory(fuelRows),
       fillupCostByVehicle: buildFillupCostByVehicle(fuelRows, vehicleNameMap),
       odometerProgression: this.buildOdometerProgression(fuelRows, vehicleNameMap),
@@ -1464,20 +1738,28 @@ export class AnalyticsRepository {
     vehicleId?: string
   ): Promise<FuelAdvancedData> {
     try {
-      const [vehicleNameMap, fuelRows, allExpenses] = await Promise.all([
-        this.queryVehicleNameMap(userId, vehicleId),
-        this.queryFuelExpenses(userId, range, vehicleId),
-        this.queryAllExpenses(userId, range, vehicleId),
-      ]);
+      const [vehicleNameMap, fuelRows, allExpenses, userUnits, vehicleUnitsMap] = await Promise.all(
+        [
+          this.queryVehicleNameMap(userId, vehicleId),
+          this.queryFuelExpenses(userId, range, vehicleId),
+          this.queryAllExpenses(userId, range, vehicleId),
+          this.getUserUnits(userId),
+          this.getAllVehicleUnits(userId),
+        ]
+      );
 
       // Sort by vehicleId then date for functions that need consecutive same-vehicle pairs
       const fuelRowsByVehicle = sortByVehicleThenDate(fuelRows);
+      const skipConversion = this.allVehiclesMatchUnits(vehicleUnitsMap, userUnits);
 
       return this.buildFuelAdvancedFromData(
         fuelRows,
         fuelRowsByVehicle,
         allExpenses,
-        vehicleNameMap
+        vehicleNameMap,
+        userUnits,
+        vehicleUnitsMap,
+        skipConversion
       );
     } catch (error) {
       logger.error('Failed to compute fuel advanced analytics', {
@@ -1495,14 +1777,40 @@ export class AnalyticsRepository {
     fuelRows: FuelExpenseRow[],
     fuelRowsByVehicle: FuelExpenseRow[],
     allExpenses: GeneralExpenseRow[],
-    vehicleNameMap: Map<string, string>
+    vehicleNameMap: Map<string, string>,
+    userUnits: UnitPreferences,
+    vehicleUnitsMap: Map<string, UnitPreferences>,
+    skipConversion: boolean
   ): FuelAdvancedData {
     const maintenanceRows = allExpenses.filter((e) => e.category === 'maintenance');
     return {
       maintenanceTimeline: buildMaintenanceTimeline(maintenanceRows, new Date()),
-      seasonalEfficiency: buildSeasonalEfficiency(fuelRowsByVehicle),
-      vehicleRadar: buildVehicleRadar(allExpenses, fuelRowsByVehicle, vehicleNameMap),
-      dayOfWeekPatterns: buildDayOfWeekPatterns(fuelRows),
+      // #94 (C69): a MIXED-unit fleet converts each gas pair's efficiency to the user's global units
+      // BEFORE pooling into a season, so mi/gal and km/L are not averaged raw (NORTH_STAR #2). The common
+      // single-unit fleet keeps the pure builder (skipConversion). seasonalEfficiency's fillupCount limb
+      // is unitless; only avgEfficiency needed the convert. (dayOfWeekPatterns volume fixed C72,
+      // vehicleRadar gas-MPG+odometer fixed C76 — the #94 fuel-ADVANCED builders are now all converted.)
+      seasonalEfficiency: skipConversion
+        ? buildSeasonalEfficiency(fuelRowsByVehicle)
+        : this.buildConvertedSeasonalEfficiency(fuelRowsByVehicle, vehicleUnitsMap, userUnits),
+      // #94 (C76): vehicleRadar normalizes per-vehicle gas-MPG + odometer ACROSS the fleet; a mixed
+      // mi+km/gal+L fleet must convert each vehicle's two unit-bearing metrics to the user's global units
+      // BEFORE the min/max normalize, else the ranking inverts (a km/L car scored against mpg). Pass the
+      // converters only on the mixed branch; same-unit fleet keeps the raw builder (no-op).
+      vehicleRadar: skipConversion
+        ? buildVehicleRadar(allExpenses, fuelRowsByVehicle, vehicleNameMap)
+        : buildVehicleRadar(
+            allExpenses,
+            fuelRowsByVehicle,
+            vehicleNameMap,
+            this.radarUnitConverters(vehicleUnitsMap, userUnits)
+          ),
+      // #94 (C72): avgVolume sums each fillup's volume across the fleet; a mixed gal+L fleet must convert
+      // per-vehicle before pooling (NORTH_STAR #2). fillupCount + avgCost ($) are unit-free. Same-unit
+      // fleet keeps the pure builder.
+      dayOfWeekPatterns: skipConversion
+        ? buildDayOfWeekPatterns(fuelRows)
+        : this.buildConvertedDayOfWeekPatterns(fuelRows, vehicleUnitsMap, userUnits),
       monthlyCostHeatmap: buildMonthlyCostHeatmap(allExpenses),
       fillupIntervals: buildFillupIntervals(fuelRows),
     };
@@ -1552,7 +1860,7 @@ export class AnalyticsRepository {
             : 0;
 
         if (!skipConversion && totalDist > 0) {
-          const vUnits = vehicleUnitsMap.get(vId) ?? { ...DEFAULT_UNIT_PREFERENCES };
+          const vUnits = this.vehicleUnitsFor(vehicleUnitsMap, vId);
           totalDist = convertDistance(totalDist, vUnits.distanceUnit, userUnits.distanceUnit);
         }
 
@@ -1606,41 +1914,23 @@ export class AnalyticsRepository {
     vehicleUnitsMap: Map<string, UnitPreferences>,
     userUnits: UnitPreferences
   ): CrossVehicleData['fuelEfficiencyComparison'] {
-    const byVehicle = groupByVehicle(fuelRows);
-
-    // Compute monthly efficiency per vehicle, converting to user's global units
+    // Compute monthly efficiency per vehicle, converting to user's global units. Reached only on the
+    // mixed-unit (non-skip) branch — getCrossVehicle uses buildFuelEfficiencyComparison when units match
+    // — so always convert (skipConversion: false).
     const monthVehicleEff = new Map<string, Map<string, { sum: number; count: number }>>();
-    for (const [vId, rows] of byVehicle) {
-      const vUnits = vehicleUnitsMap.get(vId) ?? { ...DEFAULT_UNIT_PREFERENCES };
-      for (let i = 1; i < rows.length; i++) {
-        const current = rows[i];
-        const previous = rows[i - 1];
-        if (!current || !previous) continue;
-        // gasEfficiencyPoint: this converted comparison is gas MPG — exclude a PHEV's charge mi/kWh BEFORE
-        // convertEfficiency (which would mis-convert mi/kWh as mi/gal). Matches the skipConversion twin
-        // buildFuelEfficiencyComparison's gas gate, restoring branch parity (#126/C427, the #119/#122 class).
-        const point = gasEfficiencyPoint(current, previous);
-        if (!point) continue;
-
-        const converted = convertEfficiency(
-          point.efficiency,
-          vUnits.distanceUnit,
-          vUnits.volumeUnit,
-          userUnits.distanceUnit,
-          userUnits.volumeUnit
-        );
-
-        const month = toMonthKey(new Date(point.date));
-        if (!monthVehicleEff.has(month)) monthVehicleEff.set(month, new Map());
-        const vehicleMap = monthVehicleEff.get(month) as Map<
-          string,
-          { sum: number; count: number }
-        >;
-        const entry = vehicleMap.get(vId) ?? { sum: 0, count: 0 };
-        entry.sum += converted;
-        entry.count++;
-        vehicleMap.set(vId, entry);
-      }
+    for (const { vehicleId: vId, efficiency, date } of this.convertedGasEfficiencyPoints(
+      fuelRows,
+      vehicleUnitsMap,
+      userUnits,
+      false
+    )) {
+      const month = toMonthKey(new Date(date));
+      if (!monthVehicleEff.has(month)) monthVehicleEff.set(month, new Map());
+      const vehicleMap = monthVehicleEff.get(month) as Map<string, { sum: number; count: number }>;
+      const entry = vehicleMap.get(vId) ?? { sum: 0, count: 0 };
+      entry.sum += efficiency;
+      entry.count++;
+      vehicleMap.set(vId, entry);
     }
 
     return Array.from(monthVehicleEff.entries())
@@ -1788,11 +2078,18 @@ export class AnalyticsRepository {
       const { vehicleDetails, totalMonthlyPremiums, totalAnnualPremiums, carrierMap, monthlyMap } =
         this.buildInsuranceDetails(activePolicies, termRows, junctionRows, vehicleNameMap);
 
+      // #51: count only active policies that have at least one term. A TERM-LESS active policy
+      // contributes $0 (buildInsuranceDetails does `if (!latestTerm) continue`), so counting it in
+      // activePoliciesCount made the headline internally inconsistent — "N active policies" but the
+      // premium totals summed over fewer. Use the SAME has-a-term predicate the premium path gates on.
+      const policyIdsWithTerms = new Set(termRows.map((t) => t.policyId));
+      const activePoliciesWithTerms = activePolicies.filter((p) => policyIdsWithTerms.has(p.id));
+
       return {
         summary: {
           totalMonthlyPremiums,
           totalAnnualPremiums,
-          activePoliciesCount: activePolicies.length,
+          activePoliciesCount: activePoliciesWithTerms.length,
         },
         vehicleDetails,
         monthlyPremiumTrend: Array.from(monthlyMap.entries())
@@ -2091,13 +2388,19 @@ export class AnalyticsRepository {
         fuelRowsByVehicle,
         vehicleNameMap,
         range,
-        prevYearAgg
+        prevYearAgg,
+        userUnits,
+        vehicleUnitsMap,
+        skipConversion
       );
       const fuelAdvanced = this.buildFuelAdvancedFromData(
         fuelRows,
         fuelRowsByVehicle,
         allExpenses,
-        vehicleNameMap
+        vehicleNameMap,
+        userUnits,
+        vehicleUnitsMap,
+        skipConversion
       );
 
       return { quickStats, fuelStats, fuelAdvanced };

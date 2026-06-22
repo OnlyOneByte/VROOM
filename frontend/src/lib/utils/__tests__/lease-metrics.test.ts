@@ -78,6 +78,30 @@ describe('calculateLeaseMetrics — guards & null paths', () => {
 		expect(m?.isOverMileage).toBe(false);
 	});
 
+	// CHARACTERIZATION of the #148 escalation (deep-review, C102) — NOT a fix; pins what the code does
+	// TODAY so the eventual product decision has a red→green anchor. The mileage gate (financing-calculations
+	// .ts:497) requires `initialMileage !== null` for mileageUsed to be computed; with a null initial (a lease
+	// with NO recorded starting odometer — the common case) it leaves mileageUsed=0 / mileageRemaining=full,
+	// so the LeaseMetricsCard burn bar reads "0 / 36,000 · 36,000 left" even at a real current odometer. The
+	// SIBLING PaymentMetricsGrid coalesces `initialMileage ?? 0` (FinanceTab.svelte) and computes used from 0,
+	// so the SAME vehicle shows driven-miles on the Overage card and 0 on the burn bar (#148, the #140 class on
+	// the null-initialMileage axis). This is ESCALATED to Angelo (a displayed-$ semantics call: coalesce to 0 /
+	// require an initial / show "set a starting odometer") — NOT auto-fixed. When the decision lands, UPDATE
+	// these expectations to the chosen semantics (this test is the documented update target).
+	test('#148 CHARACTERIZATION: null initialMileage leaves mileageUsed 0 even at a real currentMileage (parked, awaiting Angelo)', () => {
+		// currentMileage 30,000, but NO initial recorded → the gate is false → used stays 0, remaining full.
+		const m = calculateLeaseMetrics(makeLease({ mileageLimit: 12000 }), 30000, null);
+		expect(m).not.toBeNull();
+		expect(m?.mileageUsed).toBe(0); // TODAY: the burn bar reads 0-driven (the #148 defect, pinned not fixed)
+		expect(m?.mileageRemaining).toBe(36000); // full term-scaled total, as if nothing were driven
+		expect(m?.projectedExcessMiles).toBe(0);
+		expect(m?.projectedExcessFee).toBe(0);
+		expect(m?.isOverMileage).toBe(false);
+		// Contrast (documents the contradiction): WITH initial=0, the same currentMileage drives used=30,000.
+		const withZeroInitial = calculateLeaseMetrics(makeLease({ mileageLimit: 12000 }), 30000, 0);
+		expect(withZeroInitial?.mileageUsed).toBe(30000);
+	});
+
 	// #110 (C374): endDate is nullable; when absent, calculateLeaseMetrics derives the lease end from
 	// the term. The old fallback used termMonths × 30 DAYS — ~0.4 days short per month — so a 36-mo
 	// lease ended ~16 days early, understating daysRemaining and inflating the excess-fee projection.

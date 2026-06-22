@@ -529,5 +529,5 @@
 	/>
 
 	<!-- CSV import dialog (previews via dryRun, then commits) -->
-	<ImportExpensesDialog bind:open={importOpen} onImported={handleImported} />
+	<ImportExpensesDialog bind:open={importOpen} {vehicles} onImported={handleImported} />
 {/if}

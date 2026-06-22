@@ -11,6 +11,7 @@
 
 import { describe, expect, test } from 'bun:test';
 import { DistanceUnit, VolumeUnit } from '../../../types';
+import { buildImportPlan, type ImportVehicle } from '../import-csv';
 import { applyMapping } from '../import-mapping';
 import {
   detectSource,
@@ -110,5 +111,62 @@ describe('presetToMapping → applyMapping (presets feed a valid T1 ColumnMappin
     const mapping = presetToMapping(preset);
     expect(mapping.targetVehicle).toBeUndefined();
     expect(mapping.columns).toEqual(preset.columns);
+  });
+});
+
+// C32 CHARACTERIZATION (the C31 eyes-on finding, flagged to Angelo): the built-in fuel-log presets map
+// NO category column (Fuelly/Fuelio/Drivvo refuel exports have no category field — they're definitionally
+// all fuel). applyMapping emits a BLANK category cell, and mapCategory deliberately leaves a blank blank
+// (the D2 "never invent a category" rule), so buildImportPlan errors EVERY row "Unknown category" →
+// readyCount 0. Net: a perfectly-detected fuel log imports NOTHING today. These tests PIN that current
+// behavior so the recommended fix (give each fuel preset a defaultCategory:'fuel') is a deliberate,
+// net-flipping change — when it lands, the `category` expectation flips to 'fuel' and readyCount to N,
+// and these tests are the ones to update. (Distinct from the round-trip test in import-mapping.test.ts,
+// which hand-adds a category column to the mapping and so never exercises the REAL presets' gap.)
+describe('MAPPING_PRESETS — category-column gap (C31 finding, characterization)', () => {
+  const vehicles: ImportVehicle[] = [
+    { id: 'veh-1', make: 'Honda', model: 'Civic', year: 2020, nickname: 'Daily Driver' },
+  ];
+
+  // One representative real-export row per preset (headers are the preset's own column names).
+  const PRESET_ROWS: Record<string, string> = {
+    fuelly: [
+      'Date,Odometer,Fill Amount,Price,Fuel Type,Notes',
+      '03/01/2026,30000,9,36.00,Gas,x',
+    ].join('\n'),
+    fuelio: ['Data,Odo (km),Fuel (litres),Price,Notes', '01/03/2026,48280,34,52.00,x'].join('\n'),
+    drivvo: [
+      'Date,Odometer,Total price,Price per unit,Volume,Type of fuel,Observation',
+      '01/03/2026,48280,52.00,1.53,34,Gas,x',
+    ].join('\n'),
+  };
+
+  test('NONE of the presets map a category column (the root of the gap)', () => {
+    for (const preset of MAPPING_PRESETS) {
+      expect(
+        preset.columns.category,
+        `${preset.id} should have no category column today`
+      ).toBeUndefined();
+    }
+  });
+
+  test('every preset currently yields 0 ready rows — "Unknown category" (pins the gap end-to-end)', () => {
+    for (const preset of MAPPING_PRESETS) {
+      const mapping = presetToMapping(preset, 'Daily Driver');
+      const csv = PRESET_ROWS[preset.id];
+      expect(csv, `add a sample row for preset ${preset.id}`).toBeDefined();
+
+      // Convert into a miles/US-gal vehicle (matches the seeded demo vehicle's units).
+      const native = applyMapping(csv, mapping, {
+        distanceUnit: DistanceUnit.MILES,
+        volumeUnit: VolumeUnit.GALLONS_US,
+      });
+      const plan = buildImportPlan(native.csv, vehicles);
+
+      // CURRENT behavior: the row maps + the vehicle resolves, but the blank category fails validation.
+      expect(plan.readyCount, `${preset.id} ready count (pre-defaultCategory fix)`).toBe(0);
+      expect(plan.errorCount, `${preset.id} error count`).toBe(1);
+      expect(plan.rows[0]?.message, `${preset.id} error message`).toMatch(/category/i);
+    }
   });
 });

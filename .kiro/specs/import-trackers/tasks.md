@@ -40,16 +40,94 @@
       `columns`) → rewrote as explicit per-field optionals. backend validate:local EXIT 0 (1038 pass, +9).
 
 ## Phase 3 — frontend
-- [ ] **T4** Import-dialog mapping step: detected-source banner, per-field column dropdowns from the
+- [~] **T4** Import-dialog mapping step: detected-source banner, per-field column dropdowns from the
       file headers, unit/date-format/target-vehicle pickers, category-remap table. Reuse the existing
       preview/commit step. Types + service wiring.
       - [x] **Types + service wiring DONE (C140, non-eyes-on):** `src/lib/types/import-mapping.ts`
             (ImportColumnMapping/ImportMappingPreset/NativeImportField mirroring the backend) +
             `expenseApi.importExpensesCsv(csv, dryRun, mapping?)` (backward-compat) +
-            `detectImportSource(headers)`; +5 tests. REMAINING = the dialog MARKUP (eyes-on).
-- [ ] **T5** Four-states + a11y + mobile; compose from the kit.
+            `detectImportSource(headers)`; +5 tests.
+      - [x] **AUTO-DETECT + target-vehicle slice DONE (C31, eyes-on CONFIRMED):** ImportExpensesDialog
+            now (1) auto-detects a Fuelly/Fuelio/Drivvo fuel log from its headers (`detectImportSource`),
+            (2) shows a "Detected a <Tracker> fuel log" banner + a target-vehicle picker (these presets
+            carry no `vehicle` column → D4 requires picking one; auto-selects the only vehicle), (3) builds
+            the `ImportColumnMapping` from the preset + chosen vehicle and reuses the existing preview/commit
+            step verbatim. A native VROOM export (has its own vehicle column) detects null → unchanged path.
+            Eyes-on via `import-mapping-detect.meshclaw.e2e.ts` + shot (`/tmp/c31-import-mapped-preview.png`):
+            banner + picker render, "Daily Driver" auto-selected. FE validate:local GREEN (726).
+      - [x] **MANUAL column-mapping path DONE (C37, eyes-on CONFIRMED):** for an UNRECOGNIZED foreign CSV
+            (no preset match, not a native VROOM export), the dialog now renders a "Map your columns" editor
+            — a per-field dropdown for each VROOM field (date*/amount*/category/vehicle/mileage/volume/
+            fuelType/description/tags) populated from the file's own headers + a date-format picker + the
+            target-vehicle picker (shown only when no vehicle column is mapped, D4). Initial guesses
+            auto-map by header-name substring (date/amount[+spent/paid/total]/category[+kind]/…); the user
+            adjusts. buildMapping emits the ImportColumnMapping (drops unmapped fields) → the existing
+            preview/commit runs verbatim. Eyes-on via `import-manual-mapping.meshclaw.e2e.ts` + 2 shots
+            (Read): a bespoke CSV (Transaction Date/Spent/Kind/Notes) → editor with guessed mappings →
+            "1 ready · 1 row needs attention" after picking the vehicle (the maintenance row imports; the
+            fuel row correctly errors "fuel rows require fuel amount and mileage"). FE validate:local GREEN.
+      - [x] **MANUAL UNIT pickers DONE (C41, eyes-on CONFIRMED):** the manual path now exposes Odometer-unit
+            + Volume-unit pickers (shown only when those columns are mapped), defaulting to the target
+            vehicle's units (= no conversion baseline). `buildMapping` sends the file's distanceUnit/volumeUnit
+            only when the matching column is mapped, so applyMapping converts INTO the vehicle's units —
+            closing the C37 gap where a metric log imported raw (NORTH_STAR #2). Eyes-on via
+            `import-manual-units.meshclaw.e2e.ts` + shot: a km/litres log mapped + units set to Kilometers/
+            Liters → committed row converted 160.9344 km→100 mi, 37.854 L→~10 US gal (verified via API).
+            Field/unit Select triggers got `data-testid`s for deterministic e2e targeting.
+      - [x] **CATEGORY-REMAP table DONE (C47, eyes-on CONFIRMED):** when a preview surfaces
+            `unmappedCategories` (a foreign category WORD the importer didn't recognize → falls back to misc,
+            D2 "never invent"), the dialog renders an "Unrecognized categories" panel — one row per word + a
+            VROOM-category `Select` (reusing the canonical `categoryLabels`). Assigning a word folds it into
+            the mapping's `categoryMap` (merged over any preset map; user choices win) and re-previews, so
+            the word resolves + drops out of the list and its rows re-categorize. Eyes-on via
+            `import-category-remap.meshclaw.e2e.ts` + 2 shots (Read): a bespoke CSV with `Type=servicing` →
+            "Unrecognized categories" panel renders → map servicing→Maintenance → panel disappears, "1 ready"
+            → committed row imported as `maintenance` (NOT the misc fallback, verified via API). Remap trigger
+            got `data-testid="remap-category-{word}"`. FE validate:local GREEN (735).
+      - [ ] **REMAINING (T4 follow-ups):** the Angelo-gated preset `defaultCategory`. **BLOCKER surfaced +
+            flagged to Angelo C31:** the fuel presets map no category column and `mapCategory` leaves a blank
+            category blank (D2 "never invent"), so a DETECTED fuel log previews 0-ready ("Unknown category").
+            Recommended fix (a): give each fuel preset a `defaultCategory:'fuel'` (backend-preset change,
+            awaiting the steer) — until then the auto-detect path detects+maps but commits nothing. (NOTE: the
+            C47 remap table does NOT solve this — a detected preset maps no category COLUMN at all, so there's
+            no word to remap; the gap is the missing column, which is the parked `defaultCategory` decision.)
+- [~] **T5** Four-states + a11y + mobile; compose from the kit.
+      - [x] **MANUAL editor MOBILE eyes-on DONE (C121):** the manual column-mapping editor — the most
+            control-dense dialog section (per-field flex rows + date-format + conditional Odometer/Volume
+            unit pickers + target-vehicle picker in a sm:max-w-lg Dialog.Content) — verified at Pixel-5
+            (393px) via `import-manual-mapping-mobile.meshclaw.e2e.ts` + shot (Read /tmp/c121-manual-mapping-
+            mobile.png): every field row + date-format + both unit pickers reflow cleanly, NO horizontal
+            overflow (asserted scrollWidth ≤ clientWidth+1, NORTH_STAR #3). Complements the desktop shots
+            (C37/C41/C47/C61). The detect-preset path was incidentally confirmed mobile-clean too (a stray
+            Odo/Litres CSV tripped Fuelio detection mid-cycle → banner + vehicle picker render no-overflow).
+      - [ ] **REMAINING:** the populated-detect FOUR-STATE shots (loading/empty/error/data of the
+            auto-detect path) are gated on the same Angelo `defaultCategory` decision as the T6 detect-commit
+            (a detected preset previews 0-ready until then, so the populated-data state can't be captured).
 
 ## Phase 4 — verify
-- [ ] **T6** E2E (auto-detected preset path + manual-mapping path, mi + km vehicle) + eyes-on
+- [~] **T6** E2E (auto-detected preset path + manual-mapping path, mi + km vehicle) + eyes-on
       screenshots of all four states. regress.sh green. Consider extending the `no-utc-month-parse`
       guard to cover `import-mapping.ts`.
+      - [x] **DATE-GUARD slice DONE (C54):** the merge-surviving no-utc guard for the import date paths is
+            committed — `no-utc-import-date.test.ts` (+3) scans import-mapping.ts / local-date.ts /
+            import-csv.ts for a Date built from a date-only string OR `${y}-${m}-${d}` template (the
+            midnight-UTC rollback, #23/#59/#87), and pins that import-mapping still routes through
+            buildLocalDate. Non-vacuous BOTH ways (both antipattern forms → RED; the 2 legit new Date(ms)/
+            new Date(s) sites don't false-flag). The behavioral net (import-mapping.test.ts local-time
+            discipline across iso/mdy/dmy/epoch) already existed; this is the structural tree-wide net.
+      - [x] **MANUAL FUEL round-trip (same-unit, mi/gallons) DONE (C61, eyes-on CONFIRMED):** the common
+            real case the per-slice specs hadn't committed — a complete manual fuel log (date/amount/
+            category/odometer/volume/fuelType/description all mapped) on a MILES vehicle with units left at
+            the vehicle's defaults (no conversion) → commits a real `fuel` expense with EXACT mileage 42000
+            + volume 11.5 (verified via API, no conversion drift). `import-t6-manual-fuel-roundtrip
+            .meshclaw.e2e.ts` + shot (Read): the "Map your columns" editor with all fields mapped, units
+            Miles/Gallons (US), "1 ready" → "Import 1 row". Complements C41 (km→mi conversion) + C37 (the
+            maintenance row / the fuel row's missing-field error). FE validate:local GREEN (735).
+      - [ ] **REMAINING (T6, BLOCKED):** the AUTO-DETECT PRESET round-trip THROUGH COMMIT. A detected
+            Fuelly/Fuelio/Drivvo log maps NO category column, so `mapCategory` leaves it blank (D2 "never
+            invent") → the preview is 0-ready ("Unknown category") and there's nothing to commit. The C47
+            remap table does NOT help (a preset maps no category COLUMN, so there's no word to remap). This
+            is the parked `defaultCategory:'fuel'`-per-preset decision (send_message'd Angelo C31) — the
+            detect-path commit can't be exercised until he rules. The manual path (the committable half) is
+            now fully eyes-on (C37/C41/C47/C61). Four-state screenshots are likewise gated on the detect
+            commit for the populated-detect state.

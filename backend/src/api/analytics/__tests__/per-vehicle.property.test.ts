@@ -480,6 +480,72 @@ describe('#27: financed vehicle TCO does not double-count principal', () => {
 });
 
 // ---------------------------------------------------------------------------
+// C33 deep-review CERT: categorizeTCOExpenses buckets a `financial` row by its sourceType, NOT by
+// category alone. The predicate is `category==='financial' && sourceType==='financing'` → financingInterest;
+// `financial` + 'insurance_term' → insuranceCost; ANY OTHER `financial` row (sourceType 'reminder' from a
+// recurring expense [C27], or null from a manual financial entry) falls through to otherCosts. This is the
+// money-facing seam recurring-expenses (C27) now exercises (it materializes financial+'reminder' rows), and
+// it was UNPINNED — the prior #27 tests only seed financing-sourced financial rows. Certified firsthand
+// (C33 probe): reminder/null financial → otherCosts, NOT financingInterest. NON-VACUOUS: dropping the
+// `sourceType==='financing'` clause (bucketing by category alone) would pull the reminder+null rows into
+// financingInterest → and since this vehicle is PRICED, computeTCOTotal would then EXCLUDE them as
+// "principal-retiring payments", silently dropping a recurring financial cost from TCO. This pins the
+// guard so that mis-edit turns RED.
+// ---------------------------------------------------------------------------
+describe('C33: TCO buckets financial rows by sourceType (recurring/manual → otherCosts, not financing)', () => {
+  function seedFinancialRow(
+    vehicleId: string,
+    id: string,
+    amount: number,
+    sourceType: string | null
+  ): void {
+    testDb.sqlite.run(
+      'INSERT INTO expenses (id, vehicle_id, user_id, category, expense_amount, date, source_type, missed_fillup) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        id,
+        vehicleId,
+        'user-1',
+        'financial',
+        amount,
+        Math.floor(new Date(2024, 0, 15).getTime() / 1000),
+        sourceType,
+        0,
+      ]
+    );
+  }
+
+  test('a recurring (reminder) + a manual (null) financial row land in otherCosts, not financingInterest', async () => {
+    // No purchasePrice → financing payments are kept (the unpriced cost-signal path), so a mis-bucket
+    // would show up directly in financingInterest rather than being masked by the #27 exclusion.
+    const { userId, vehicle } = setupUserAndVehicle({ purchasePrice: null });
+    seedFinancialRow(vehicle.id, 'fin', 200, 'financing'); // a real loan payment
+    seedFinancialRow(vehicle.id, 'ins', 75, 'insurance_term'); // an insurance premium
+    seedFinancialRow(vehicle.id, 'rem', 100, 'reminder'); // a recurring financial expense (C27)
+    seedFinancialRow(vehicle.id, 'man', 50, null); // a manual financial expense
+
+    const result = await repo.getVehicleTCO(userId, vehicle.id);
+
+    expect(result.financingInterest).toBe(200); // ONLY the 'financing' row
+    expect(result.insuranceCost).toBe(75); // ONLY the 'insurance_term' row
+    expect(result.otherCosts).toBe(150); // reminder ($100) + manual ($50) — NOT financing
+    expect(result.totalCost).toBe(425);
+  });
+
+  test('PRICED + a recurring financial row → the recurring cost survives in otherCosts (not dropped by #27)', async () => {
+    // The dangerous mis-bucket: if a reminder financial row were treated as financing, computeTCOTotal
+    // would EXCLUDE it (purchasePrice counted), silently dropping the cost. Pin that it's kept.
+    const { userId, vehicle } = setupUserAndVehicle({ purchasePrice: 30000 });
+    seedFinancialRow(vehicle.id, 'rem', 100, 'reminder');
+
+    const result = await repo.getVehicleTCO(userId, vehicle.id);
+
+    expect(result.financingInterest).toBe(0); // no financing-sourced row
+    expect(result.otherCosts).toBe(100); // the recurring cost is kept
+    expect(result.totalCost).toBe(30100); // price + the recurring expense
+  });
+});
+
+// ---------------------------------------------------------------------------
 // #28 + #27, YEAR-SCOPED arm (C333 deep-review → guard). Every getVehicleTCO call in the suite
 // omitted the optional `year` arg, so the year-scoped accounting path was UNPINNED — including the
 // load-bearing rule computeTCOTotal documents (repository.ts:1081): purchasePrice is an all-time-only

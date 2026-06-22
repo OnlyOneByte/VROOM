@@ -62,7 +62,7 @@ function countFilteredPairs(expenses: Expense[]): number {
     if (current.mileage && previous.mileage && current.volume) {
       const miles = current.mileage - previous.mileage;
       const mpg = miles / current.volume;
-      if (mpg > 0 && mpg < 150) count++;
+      if (mpg >= 5 && mpg <= 100) count++;
     }
   }
   return count;
@@ -82,7 +82,7 @@ function countUnfilteredPairs(expenses: Expense[]): number {
     if (current.mileage && previous.mileage && current.volume) {
       const miles = current.mileage - previous.mileage;
       const mpg = miles / current.volume;
-      if (mpg > 0 && mpg < 150) count++;
+      if (mpg >= 5 && mpg <= 100) count++;
     }
   }
   return count;

@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull, lte, ne, type SQL } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, isNull, lte, ne, type SQL } from 'drizzle-orm';
 import { CONFIG } from '../../config';
 import type { AppDatabase } from '../../db/connection';
 import { getDb, transaction } from '../../db/connection';
@@ -8,6 +8,7 @@ import type { DrizzleTransaction } from '../../db/types';
 import { DatabaseError, NotFoundError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { BaseRepository } from '../../utils/repository';
+import { pruneVehicleFromSplitConfig } from './split-config-helpers';
 
 // ============================================================================
 // Types
@@ -418,6 +419,74 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
       .update(reminders)
       .set({ isActive: false, updatedAt: new Date() })
       .where(eq(reminders.id, id));
+  }
+
+  /**
+   * Deactivate any of the user's ACTIVE reminders that have NO remaining vehicles (#97, C40). When a
+   * vehicle is deleted, its `reminder_vehicles` junction rows cascade away (schema onDelete:cascade), but
+   * the reminder ROW survives — a reminder whose sole/last vehicle was the deleted one is left
+   * `is_active=1` with zero vehicles, which the trigger then skips `no_vehicles` every run forever with no
+   * user signal. Called after a vehicle delete: flip those to inactive so they leave the "active" surface
+   * (and stop inflating the recurring-cost run-rate). Returns the count deactivated. Scoped by userId.
+   */
+  async deactivateVehicleless(userId: string): Promise<number> {
+    // Active reminders for this user that have no junction row at all.
+    const orphanRows = await this.db
+      .select({ id: reminders.id })
+      .from(reminders)
+      .leftJoin(reminderVehicles, eq(reminders.id, reminderVehicles.reminderId))
+      .where(
+        and(
+          eq(reminders.userId, userId),
+          eq(reminders.isActive, true),
+          isNull(reminderVehicles.reminderId)
+        )
+      );
+    const ids = orphanRows.map((r) => r.id);
+    if (ids.length === 0) return 0;
+    await this.db
+      .update(reminders)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(and(eq(reminders.userId, userId), inArray(reminders.id, ids)));
+    return ids.length;
+  }
+
+  /**
+   * Prune a deleted vehicle from every reminder's `expenseSplitConfig` blob and renormalize (#88, C48).
+   * Unlike the reminder_vehicles junction (FK onDelete:cascade), the split-config JSON is NOT FK-managed,
+   * so a deleted vehicle's leg lingers in the blob — and on the next trigger `createExpenseFromReminder`
+   * builds siblings from the blob's vehicleIds → an INSERT for the dead vehicleId → an FK violation that
+   * (the C151 async-tx footgun) leaves the surviving legs partially committed. Call this BEFORE
+   * `deactivateVehicleless` on a vehicle delete: each affected config is pruned via
+   * `pruneVehicleFromSplitConfig` (drop the leg, rescale a percentage split, keep absolute amounts) when
+   * ≥2 legs remain, else the blob is CLEARED to null so the reminder falls back to the single-vehicle
+   * junction path (and deactivateVehicleless then catches a now-vehicleless reminder). Scoped by userId.
+   * Returns the count of configs changed.
+   */
+  async pruneSplitConfigsForDeletedVehicle(
+    userId: string,
+    deletedVehicleId: string
+  ): Promise<number> {
+    // Only reminders that actually carry a split config can reference the deleted vehicle in their blob.
+    const rows = await this.db
+      .select({ id: reminders.id, expenseSplitConfig: reminders.expenseSplitConfig })
+      .from(reminders)
+      .where(and(eq(reminders.userId, userId), isNotNull(reminders.expenseSplitConfig)));
+
+    let changed = 0;
+    for (const row of rows) {
+      const config = row.expenseSplitConfig;
+      if (!config) continue;
+      const pruned = pruneVehicleFromSplitConfig(config, deletedVehicleId);
+      // The helper returns the SAME reference when the deleted id wasn't in the config → skip the write.
+      if (pruned === config) continue;
+      await this.db
+        .update(reminders)
+        .set({ expenseSplitConfig: pruned, updatedAt: new Date() })
+        .where(and(eq(reminders.id, row.id), eq(reminders.userId, userId)));
+      changed++;
+    }
+    return changed;
   }
 
   /**

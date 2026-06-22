@@ -64,6 +64,28 @@ async function createPolicy(
   return { policyId: body.data.id, termId: body.data.terms[0]!.id };
 }
 
+/** Create a policy whose single term is MONTHLY-priced (no totalCost) — the #69 path. */
+async function createMonthlyPolicy(
+  vehicleIds: string[],
+  monthlyCost: number
+): Promise<{ policyId: string; termId: string }> {
+  const res = await ctx.authed('POST', '/api/v1/insurance', {
+    company: 'Acme Mutual',
+    terms: [
+      {
+        startDate: '2024-01-01T00:00:00.000Z',
+        endDate: '2025-01-01T00:00:00.000Z',
+        policyNumber: 'POL-M',
+        monthlyCost,
+        vehicleCoverage: { vehicleIds },
+      },
+    ],
+  });
+  const body = await json<DataEnvelope<PolicyRow>>(res);
+  expect(res.status, JSON.stringify(body)).toBe(201);
+  return { policyId: body.data.id, termId: body.data.terms[0]!.id };
+}
+
 interface InsExpenseRow {
   id: string;
   expense_amount: number;
@@ -128,6 +150,48 @@ describe('insurance premium → expense hook lifecycle', () => {
     const cents = rows.map((r) => Math.round(r.expense_amount * 100)).sort((a, b) => a - b);
     expect(cents).toEqual([3333, 3333, 3334]);
     expect(new Set(rows.map((r) => r.vehicle_id))).toEqual(new Set([v1, v2, v3]));
+  });
+
+  // #69 (C34): a MONTHLY-only term (monthlyCost, no totalCost) previously created NO expense row, so it
+  // showed in analytics (effectiveMonthlyPremium honours monthlyCost) but was ABSENT from TCO's
+  // insuranceCost bucket — an under-report. The hook now materializes monthlyCost × the term's month span
+  // (the same inclusive month count effectiveMonthlyPremium amortizes a totalCost over → symmetric, no
+  // double-count: analytics reads term.monthlyCost directly, never these rows). A 2024-01-01 → 2025-01-01
+  // term spans 13 month-keys (inclusive both endpoints), so $100/mo → $1300 materialized.
+  test('#69: a monthly-only term materializes monthlyCost × term-months into TCO-visible expense rows', async () => {
+    const v1 = await seedVehicle('Honda');
+    const { termId } = await createMonthlyPolicy([v1], 100);
+
+    const rows = autoExpensesForTerm(termId);
+    expect(rows).toHaveLength(1); // one covered vehicle → one sibling
+    expect(rows[0]!.expense_amount).toBeCloseTo(1300, 2); // 100/mo × 13 months
+    expect(rows[0]!.category).toBe('financial');
+    expect(rows[0]!.tags ?? '').toContain('insurance');
+    expect(rows[0]!.source_type).toBe('insurance_term');
+  });
+
+  test('#69: an explicit totalCost still wins over monthlyCost (no change to the costed path)', async () => {
+    // A term with BOTH set uses totalCost verbatim (effectiveTermCost precedence) — pins that the #69
+    // monthly path doesn't disturb the existing costed-term materialization.
+    const v1 = await seedVehicle('Honda');
+    const res = await ctx.authed('POST', '/api/v1/insurance', {
+      company: 'Acme Mutual',
+      terms: [
+        {
+          startDate: '2024-01-01T00:00:00.000Z',
+          endDate: '2025-01-01T00:00:00.000Z',
+          policyNumber: 'POL-B',
+          totalCost: 1200,
+          monthlyCost: 100,
+          vehicleCoverage: { vehicleIds: [v1] },
+        },
+      ],
+    });
+    const body = await json<DataEnvelope<PolicyRow>>(res);
+    expect(res.status, JSON.stringify(body)).toBe(201);
+    const rows = autoExpensesForTerm(body.data.terms[0]!.id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.expense_amount).toBeCloseTo(1200, 2); // totalCost, not 100×13
   });
 
   test('updating the term cost regenerates the auto-expenses at the new amount', async () => {

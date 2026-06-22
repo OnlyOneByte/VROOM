@@ -21,7 +21,7 @@
 
 import { describe, expect, test } from 'bun:test';
 import { getTableName, is, Table } from 'drizzle-orm';
-import { TABLE_FILENAME_MAP, TABLE_SCHEMA_MAP } from '../../../config';
+import { OPTIONAL_BACKUP_FILES, TABLE_FILENAME_MAP, TABLE_SCHEMA_MAP } from '../../../config';
 import * as schema from '../../../db/schema';
 
 // Tables intentionally NOT in a backup. Each must have a real reason — if you add a table
@@ -69,7 +69,24 @@ describe('backup table coverage (drift guards — cycle 208)', () => {
     expect(Object.keys(TABLE_SCHEMA_MAP).sort()).toEqual(Object.keys(TABLE_FILENAME_MAP).sort());
   });
 
-  // The third guard — createBackup()'s emitted keys vs the registry — runs the real service
+  test('every OPTIONAL_BACKUP_FILES entry is a real TABLE_FILENAME_MAP value (no orphan → no false-required file)', () => {
+    // getRequiredBackupFiles() = TABLE_FILENAME_MAP values MINUS OPTIONAL_BACKUP_FILES. The two lists are
+    // coupled ONLY by the literal filename strings matching. If an OPTIONAL entry drifts from the map
+    // (a typo, or a map rename like reminder_vehicles.csv → reminders_vehicles.csv without updating the
+    // OPTIONAL set), the stale OPTIONAL string filters out NOTHING → that genuinely-optional file becomes
+    // REQUIRED → parseZipBackup rejects a valid older backup missing it ("Missing required files"), so the
+    // user can't recover their own data (NORTH_STAR #1). Pin OPTIONAL ⊆ map-values so the two can't drift.
+    const mapValues = new Set(Object.values(TABLE_FILENAME_MAP));
+    const orphans = [...OPTIONAL_BACKUP_FILES].filter((f) => !mapValues.has(f));
+    expect(
+      orphans,
+      `OPTIONAL_BACKUP_FILES entr(ies) not present in TABLE_FILENAME_MAP — a stale/typo'd optional ` +
+        `filename makes a real backup file REQUIRED, failing restore of a valid older backup that omits ` +
+        `it (NORTH_STAR #1). Keep OPTIONAL_BACKUP_FILES a subset of the map's values:\n${orphans.join('\n')}`
+    ).toEqual([]);
+  });
+
+  // The fourth guard — createBackup()'s emitted keys vs the registry — runs the real service
   // against a seeded DB, so it lives in its own file (backup-createbackup-keys.test.ts) under
   // the createTestApp harness, to avoid mixing DB-bound and pure tests in one process.
 });

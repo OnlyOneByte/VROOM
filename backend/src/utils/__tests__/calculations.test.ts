@@ -7,6 +7,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { Expense } from '../../db/schema';
 import {
+  averageConsecutiveMpg,
   calculateAverageMilesPerKwh,
   calculateMilesPerKwh,
   parseClampedInt,
@@ -156,6 +157,92 @@ describe('calculateAverageMilesPerKwh', () => {
     // After sorting: index 0 (mileage 1000) then index 2 (mileage 1100)
     // 100 miles / 30 kWh = 3.333
     expect(result).toBeCloseTo(100 / 30, 5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// averageConsecutiveMpg (C17 dedup) — the SHARED consecutive-fill-up MPG loop that calculateAverageMPG
+// (calculations.ts) and calculateAverageMpg (vehicle-stats.ts) both delegate to. Before C17 the loop was
+// hand-copied at both sites (C161 proved a copy once lost its guard); now it's ONE helper. It was only
+// tested INDIRECTLY through its two callers (the C181/C229 "helper tested only in isolation" gap, same as
+// monthsBetween/C6) — these pin its OWN cells directly so a future edit to the band / skip / guard can't
+// drift undetected. The helper takes PRE-SORTED rows (callers own the sort) + the minimal {mileage,
+// volume, missedFillup} shape. The outlier band is the CANONICAL inclusive [MIN_VALID_MPG, MAX_VALID_MPG]
+// = [5,100] shared with the analytics charts (#30/C419, Angelo-APPROVED C20 — was (0,150) here).
+// ---------------------------------------------------------------------------
+describe('averageConsecutiveMpg (C17 shared consecutive-pair MPG loop)', () => {
+  test('averages consecutive pairs: miles-driven / current.volume', () => {
+    // (1500−1000)/20 = 25 ; (2100−1500)/20 = 30 → mean 27.5 (both in the [5,100] band)
+    expect(
+      averageConsecutiveMpg([
+        { mileage: 1000, volume: 20, missedFillup: false },
+        { mileage: 1500, volume: 20, missedFillup: false },
+        { mileage: 2100, volume: 20, missedFillup: false },
+      ])
+    ).toBeCloseTo((500 / 20 + 600 / 20) / 2, 5);
+  });
+
+  test('< 2 rows (and an empty list) → null (no pair to average)', () => {
+    expect(averageConsecutiveMpg([])).toBeNull();
+    expect(averageConsecutiveMpg([{ mileage: 1000, volume: 20 }])).toBeNull();
+  });
+
+  test('skips a pair touching a missedFillup row (current OR previous)', () => {
+    // 3 rows, the middle one missedFillup → both pairs (0,1) and (1,2) skipped → null.
+    expect(
+      averageConsecutiveMpg([
+        { mileage: 1000, volume: 20 },
+        { mileage: 1100, volume: 25, missedFillup: true },
+        { mileage: 1200, volume: 25 },
+      ])
+    ).toBeNull();
+  });
+
+  test('requires both odometer readings AND the current volume (else the pair is dropped)', () => {
+    // previous mileage null → pair (0,1) dropped; current volume null → pair (1,2) dropped → null.
+    expect(
+      averageConsecutiveMpg([
+        { mileage: null, volume: 20 },
+        { mileage: 1100, volume: 25 },
+        { mileage: 1200, volume: null },
+      ])
+    ).toBeNull();
+  });
+
+  test('drops unrealistic MPG outside [5,100]: a too-LOW (<5) and too-HIGH (>100) pair both excluded', () => {
+    // (1080−1000)/20 = 4 → below MIN_VALID_MPG (5) → dropped; (3200−1080)/20 = 106 → above MAX (100) → dropped.
+    expect(
+      averageConsecutiveMpg([
+        { mileage: 1000, volume: 20 },
+        { mileage: 1080, volume: 20 }, // 4 mpg → < 5 → dropped
+        { mileage: 3200, volume: 20 }, // 106 mpg → > 100 → dropped
+      ])
+    ).toBeNull();
+  });
+
+  test('the [5,100] band is INCLUSIVE at both edges (exactly 5 and exactly 100 are kept)', () => {
+    // NOTE the loop guard is `current.mileage && previous.mileage` (truthy) — a 0 odometer is falsy and
+    // drops the pair, so anchor at a non-zero start. delta 100 / vol 20 = exactly 5 (=MIN) → kept.
+    expect(
+      averageConsecutiveMpg([
+        { mileage: 10, volume: 20 },
+        { mileage: 110, volume: 20 }, // delta 100 → 5.0 (== MIN_VALID_MPG) → kept
+      ])
+    ).toBeCloseTo(5, 5);
+    // delta 2000 / vol 20 = exactly 100 (=MAX) → kept.
+    expect(
+      averageConsecutiveMpg([
+        { mileage: 10, volume: 20 },
+        { mileage: 2010, volume: 20 }, // delta 2000 → 100.0 (== MAX_VALID_MPG) → kept
+      ])
+    ).toBeCloseTo(100, 5);
+    // just OUTSIDE: 4.95 (<5) and 100.05 (>100) → both dropped → null.
+    expect(
+      averageConsecutiveMpg([
+        { mileage: 10, volume: 20 },
+        { mileage: 109, volume: 20 }, // delta 99 → 4.95 → < 5 → dropped → null
+      ])
+    ).toBeNull();
   });
 });
 

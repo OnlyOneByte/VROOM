@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { EXPENSE_CATEGORIES } from '../../db/types';
-import { splitConfigSchema } from '../expenses/validation';
+import { splitConfigSchema, splitConfigVehicleIds } from '../expenses/validation';
 
 const reminderTypeSchema = z.enum(['expense', 'notification']);
 const frequencySchema = z.enum(['weekly', 'monthly', 'yearly', 'custom']);
@@ -141,12 +141,10 @@ function refineSplitConfig(data: ReminderRefineInput, ctx: z.RefinementCtx) {
   // still catches a genuine mismatch against the merged full object. The sum checks below are
   // vehicleIds-independent and always run.
   if (data.vehicleIds) {
-    const splitVehicleIds =
-      data.expenseSplitConfig.method === 'even'
-        ? data.expenseSplitConfig.vehicleIds
-        : data.expenseSplitConfig.allocations.map((a) => a.vehicleId);
+    // splitConfigVehicleIds owns the `even ? vehicleIds : allocations.map(...)` extraction (one source
+    // of truth, C50); it returns a de-duped array, so new Set(...) here is the same set as before.
     const provided = new Set(data.vehicleIds);
-    const split = new Set(splitVehicleIds);
+    const split = new Set(splitConfigVehicleIds(data.expenseSplitConfig));
 
     if (provided.size !== split.size || ![...provided].every((id) => split.has(id))) {
       ctx.addIssue({

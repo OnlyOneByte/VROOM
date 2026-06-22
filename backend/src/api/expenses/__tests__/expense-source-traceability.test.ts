@@ -53,6 +53,11 @@ interface TriggerResultShape {
   skipped: Array<{ reminderId: string; reason: string }>;
 }
 
+interface SplitResponse {
+  success: true;
+  data: { groupId: string; groupTotal: number; splitMethod: string };
+}
+
 async function seedVehicle(): Promise<string> {
   const res = await ctx.authed('POST', '/api/v1/vehicles', {
     make: 'Honda',
@@ -415,5 +420,98 @@ describe('#125 — PUT verifies a financing source link (not just the asymmetry/
       sourceId: fin.data.id,
     });
     expect(res.status, await res.clone().text()).toBe(201);
+  });
+});
+
+// #147 (C2): the SPLIT-UPDATE path (PUT /expenses/split/:id) is the financing-source-link path the
+// per-vehicle check (#145 on create, #125 on the regular PUT) missed. updateSplitExpense REGENERATES the
+// siblings carrying the group's existing sourceType/sourceId forward (the update schema doesn't expose
+// them), but the NEW splitConfig can land them on a DIFFERENT vehicle set. computeBalance sums financing
+// payments by (sourceType,sourceId) with NO vehicle scope, so reallocating a financing-sourced split onto
+// a vehicle whose active financing isn't that sourceId mis-attributes a loan payment → understates the
+// displayed balance (NORTH_STAR #1). The route now re-validates the carried link against the new vehicles
+// before regenerating, mirroring the create-split per-vehicle guard.
+describe('#147 — PUT /split re-validates the carried financing source against the NEW vehicle set', () => {
+  /** Seed a vehicle and (optionally) active loan financing on it; return both ids. */
+  async function seedVehicleWithFinancing(): Promise<{ vehicleId: string; financingId: string }> {
+    const vehicleId = await seedVehicle();
+    const finRes = await ctx.authed('POST', `/api/v1/financing/vehicles/${vehicleId}/financing`, {
+      financingType: 'loan',
+      provider: 'TestBank',
+      originalAmount: 20000,
+      termMonths: 60,
+      startDate: '2024-01-01T00:00:00.000Z',
+      paymentAmount: 400,
+      apr: 5,
+    });
+    const fin = await json<DataEnvelope<{ id: string }>>(finRes);
+    expect(finRes.status, JSON.stringify(fin)).toBeLessThan(300);
+    return { vehicleId, financingId: fin.data.id };
+  }
+
+  test('reallocating a financing-sourced split onto a vehicle WITHOUT that financing → 400 (was 200 pre-fix)', async () => {
+    // Vehicle A has the loan; create a single-vehicle financing-sourced split on A (valid at create).
+    const { vehicleId: vehA, financingId } = await seedVehicleWithFinancing();
+    const vehB = await seedVehicle(); // a second vehicle with NO financing
+
+    const createRes = await ctx.authed('POST', '/api/v1/expenses/split', {
+      splitConfig: { method: 'even', vehicleIds: [vehA] },
+      category: 'financial',
+      totalAmount: 400,
+      date: '2024-07-01T00:00:00.000Z',
+      sourceType: 'financing',
+      sourceId: financingId,
+    });
+    const created = await json<SplitResponse>(createRes);
+    expect(createRes.status, JSON.stringify(created)).toBe(201);
+
+    // Now REALLOCATE the same group to vehicle B. The carried-forward financing link (sourceId=A's loan)
+    // no longer matches B's active financing (none), so the regenerated sibling would mis-attribute a
+    // payment against A's loan from a row on B. Must be rejected.
+    const res = await ctx.authed('PUT', `/api/v1/expenses/split/${created.data.groupId}`, {
+      splitConfig: { method: 'even', vehicleIds: [vehB] },
+      totalAmount: 400,
+    });
+    expect(res.status, await res.clone().text()).toBe(400); // "Vehicle has no active financing"
+  });
+
+  test('reallocating WITHIN the same financed vehicle still succeeds (the guard is not over-broad)', async () => {
+    const { vehicleId, financingId } = await seedVehicleWithFinancing();
+    const createRes = await ctx.authed('POST', '/api/v1/expenses/split', {
+      splitConfig: { method: 'even', vehicleIds: [vehicleId] },
+      category: 'financial',
+      totalAmount: 400,
+      date: '2024-07-01T00:00:00.000Z',
+      sourceType: 'financing',
+      sourceId: financingId,
+    });
+    const created = await json<SplitResponse>(createRes);
+    expect(createRes.status, JSON.stringify(created)).toBe(201);
+
+    // Edit the total but keep the same (financed) vehicle — the carried link still validates.
+    const res = await ctx.authed('PUT', `/api/v1/expenses/split/${created.data.groupId}`, {
+      splitConfig: { method: 'even', vehicleIds: [vehicleId] },
+      totalAmount: 500,
+    });
+    expect(res.status, await res.clone().text()).toBe(200);
+  });
+
+  test('a SOURCE-LESS split reallocates freely across vehicles (no financing link to re-check)', async () => {
+    const vehA = await seedVehicle();
+    const vehB = await seedVehicle();
+    const createRes = await ctx.authed('POST', '/api/v1/expenses/split', {
+      splitConfig: { method: 'even', vehicleIds: [vehA] },
+      category: 'misc',
+      totalAmount: 30,
+      date: '2024-07-01T00:00:00.000Z',
+    });
+    const created = await json<SplitResponse>(createRes);
+    expect(createRes.status, JSON.stringify(created)).toBe(201);
+
+    const res = await ctx.authed('PUT', `/api/v1/expenses/split/${created.data.groupId}`, {
+      splitConfig: { method: 'even', vehicleIds: [vehB] },
+      totalAmount: 30,
+    });
+    expect(res.status, await res.clone().text()).toBe(200);
   });
 });

@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { calendarYearRange, monthsOwnedInYear, toDate } from '../repository';
+import { calendarYearRange, monthsBetween, monthsOwnedInYear, toDate } from '../repository';
 
 describe('monthsOwnedInYear — year-scoped ownership span (C121 #28)', () => {
   test('a vehicle owned for the WHOLE year counts 12 months', () => {
@@ -38,6 +38,43 @@ describe('monthsOwnedInYear — year-scoped ownership span (C121 #28)', () => {
   test('bought and queried within the same single month counts 1 (the divisor never collapses below the calling Math.max(1,…))', () => {
     // Jun 2024 → Jun 2024: month index 5 to 5 inclusive = 1.
     expect(monthsOwnedInYear(new Date(2024, 5, 5), new Date(2024, 5, 20), 2024)).toBe(1);
+  });
+});
+
+// monthsBetween (C194-era helper): the signed `(year×12 + month-delta)` whole-calendar-months count
+// behind TWO money-facing denominators — financing months-elapsed (Math.max(0,…)) and the all-time TCO
+// cost-per-month divisor (Math.max(1,…)). Until now it was only IMPORTED + name-checked in a comment
+// (per-vehicle.property.test.ts:574), never directly asserted — the C181/C229 "helper tested only in
+// isolation" gap: a divergent reimplementation (a dropped `* 12`, a flipped subtraction) would turn NO
+// test red. These pin the raw contract (the docstring's signed result; callers apply their own clamp),
+// so a regression in the shared divisor can't slip through. Local getMonth/getFullYear, like the helper.
+describe('monthsBetween — signed whole-calendar-months count (money divisor)', () => {
+  test('a whole year apart counts 12 (the year×12 term)', () => {
+    expect(monthsBetween(new Date(2023, 0, 15), new Date(2024, 0, 15))).toBe(12);
+  });
+
+  test('within the same month counts 0 (day-of-month is ignored — whole-month granularity)', () => {
+    expect(monthsBetween(new Date(2024, 5, 1), new Date(2024, 5, 28))).toBe(0);
+  });
+
+  test('a few months forward in the same year counts the month delta (Mar → Sep = 6)', () => {
+    expect(monthsBetween(new Date(2024, 2, 10), new Date(2024, 8, 10))).toBe(6);
+  });
+
+  test('crossing a year boundary sums year×12 + month-delta (Nov 2023 → Feb 2024 = 3)', () => {
+    // (2024-2023)*12 + (1 - 10) = 12 - 9 = 3
+    expect(monthsBetween(new Date(2023, 10, 1), new Date(2024, 1, 1))).toBe(3);
+  });
+
+  test('multi-year span (Jun 2020 → Jun 2024 = 48)', () => {
+    expect(monthsBetween(new Date(2020, 5, 1), new Date(2024, 5, 1))).toBe(48);
+  });
+
+  test('is SIGNED — `to` before `from` yields a negative count (the documented raw contract)', () => {
+    // The helper returns the raw signed value; the financing/cost-per-month callers clamp with their
+    // own Math.max(0,…)/Math.max(1,…). Pin the negative so a future abs()/clamp creeping INTO the
+    // helper (which would mask a caller's own clamp choice) turns this red.
+    expect(monthsBetween(new Date(2024, 5, 1), new Date(2024, 2, 1))).toBe(-3);
   });
 });
 

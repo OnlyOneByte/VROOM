@@ -15,7 +15,7 @@ import { storePending } from '../../utils/pending-credentials';
 import { authProviderRepository, buildAuthProviderConfig } from './auth-provider-repository';
 import { getLucia, googleProvider } from './lucia';
 import { getEnabledProvider, getEnabledProviders, getProvider } from './providers/registry';
-import { validateAndRefreshSession } from './utils';
+import { consumeOAuthState, validateAndRefreshSession } from './utils';
 
 const routes = new Hono();
 
@@ -263,25 +263,18 @@ async function resolveNewUser(
 }
 
 // --- Auth callback helper: validate OAuth state for link flow ---
+// Single-use + flow-isolated consume via the shared consumeOAuthState (C39); the 'auth-link' flowType
+// must match, else reject+delete (anti-fixation).
 function validateLinkState(stateParam: string | null) {
-  const storedData = stateParam ? oauthStateStore.get(stateParam) : undefined;
-  if (!stateParam || !storedData || storedData.flowType !== 'auth-link') {
-    if (stateParam) oauthStateStore.delete(stateParam);
-    return { error: 'invalid_state' as const };
-  }
-  oauthStateStore.delete(stateParam);
-  return { data: storedData };
+  const storedData = consumeOAuthState(oauthStateStore, stateParam, 'auth-link');
+  return storedData ? { data: storedData } : { error: 'invalid_state' as const };
 }
 
 // --- Auth callback helper: validate OAuth state for login flow ---
+// Login flow requires an entry with NO flowType (a link/provider state must NOT log a user in).
 function validateLoginState(stateParam: string | null) {
-  const storedData = stateParam ? oauthStateStore.get(stateParam) : undefined;
-  if (!stateParam || !storedData || storedData.flowType) {
-    if (stateParam) oauthStateStore.delete(stateParam);
-    return { error: 'invalid_state' as const };
-  }
-  oauthStateStore.delete(stateParam);
-  return { data: storedData };
+  const storedData = consumeOAuthState(oauthStateStore, stateParam, undefined);
+  return storedData ? { data: storedData } : { error: 'invalid_state' as const };
 }
 
 // --- Auth callback helper: handle link conflict check ---

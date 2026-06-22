@@ -277,6 +277,54 @@ describe('getInsurance — #14 OPEN QUESTION: an expired latest term still count
   });
 });
 
+describe('getInsurance — #51: term-less active policies excluded from activePoliciesCount', () => {
+  // A term-less active policy contributes $0 to the premium totals (buildInsuranceDetails skips it via
+  // `if (!latestTerm) continue`). Pre-fix activePoliciesCount counted it anyway → "2 active policies"
+  // beside premiums summed over only 1, an internal inconsistency. The count now uses the SAME
+  // has-a-term predicate the premium path gates on.
+  test('an active policy with NO terms is not counted (count matches the policies contributing premiums)', async () => {
+    policy('p-withterm', 'GEICO'); // active, HAS a term → counts + contributes premium
+    term({
+      id: 't1',
+      policyId: 'p-withterm',
+      startMs: now - 30 * MS_DAY,
+      endMs: now + 335 * MS_DAY,
+      monthlyCost: 100,
+    });
+    seedInsuranceTermVehicle(testDb.sqlite, { termId: 't1', vehicleId: 'veh-1' });
+
+    policy('p-noterm', 'Allstate'); // active, NO term → $0, must NOT inflate the count
+
+    const result = await repo.getInsurance(USER);
+    // Only the policy that actually contributes a premium is counted.
+    expect(result.summary.activePoliciesCount).toBe(1);
+    expect(result.summary.totalMonthlyPremiums).toBeCloseTo(100, 2);
+  });
+
+  test('an active policy WITH a term is still counted (the fix does not over-exclude)', async () => {
+    policy('p1', 'GEICO');
+    term({
+      id: 't1',
+      policyId: 'p1',
+      startMs: now - 30 * MS_DAY,
+      endMs: now + 335 * MS_DAY,
+      monthlyCost: 75,
+    });
+    seedInsuranceTermVehicle(testDb.sqlite, { termId: 't1', vehicleId: 'veh-1' });
+
+    const result = await repo.getInsurance(USER);
+    expect(result.summary.activePoliciesCount).toBe(1);
+  });
+
+  test('a term-less active policy alongside ZERO termed policies yields count 0 + $0', async () => {
+    policy('p-noterm', 'Allstate'); // active, but no term anywhere
+
+    const result = await repo.getInsurance(USER);
+    expect(result.summary.activePoliciesCount).toBe(0);
+    expect(result.summary.totalMonthlyPremiums).toBe(0);
+  });
+});
+
 describe('getInsurance — empty / no-data', () => {
   test('a user with no policies gets a zeroed summary, not a throw', async () => {
     const result = await repo.getInsurance(USER);
@@ -284,6 +332,121 @@ describe('getInsurance — empty / no-data', () => {
     expect(result.summary.activePoliciesCount).toBe(0);
     expect(result.vehicleDetails).toEqual([]);
     expect(result.costByCarrier).toEqual([]);
+  });
+});
+
+// C46 deep-review: the `monthlyPremiumTrend` series (the per-month premium chart the analytics tab
+// renders) was driven ONLY transitively through getInsurance — every prior test asserts the totals /
+// per-vehicle split / count / contract, but NONE pins the month-by-month bucketing. That's the C6/C18
+// "helper output never asserted" gap on a money-facing series: a regression in accumulateMonthlyPremiums
+// (e.g. adding the premium ONCE instead of per-month, or an off-by-one on the span) would distort the
+// trend chart and pass every existing test. These certify the bucketing firsthand. Day-1-anchored,
+// inclusive of both endpoint months (monthKeysInRange, the #14/cycle-14 contract effectiveMonthlyPremium
+// amortizes over) — uses UTC month boundaries so the keys are timezone-stable.
+//
+// HARNESS NOTE (firsthand audit finding): insurance_terms.start_date/end_date are Drizzle `mode:
+// 'timestamp'` columns — SQLite stores Unix SECONDS, and the real repository writes via the ORM
+// (`.insert(...).values({ startDate: Date })`), which divides by 1000. The shared `term()` helper above
+// inserts raw MILLISECONDS via direct SQL, so a term's dates read back ~1000× too large (year ~55970).
+// The pre-existing tests never caught this because they're date-INDEPENDENT (monthlyCost flows straight
+// through effectiveMonthlyPremium; the totalCost test only asserts > 0) — the trend is the first
+// assertion that depends on the stored epoch. So these seed SECONDS (`termSeconds`) to match the
+// production storage contract; the PRODUCTION path is clean (verified by seeding the real seconds shape).
+function termSeconds(opts: {
+  id: string;
+  policyId: string;
+  startMs: number;
+  endMs: number;
+  monthlyCost?: number | null;
+  totalCost?: number | null;
+}): void {
+  testDb.sqlite.run(
+    'INSERT INTO insurance_terms (id, policy_id, start_date, end_date, monthly_cost, total_cost) VALUES (?, ?, ?, ?, ?, ?)',
+    [
+      opts.id,
+      opts.policyId,
+      Math.floor(opts.startMs / 1000),
+      Math.floor(opts.endMs / 1000),
+      opts.monthlyCost ?? null,
+      opts.totalCost ?? null,
+    ]
+  );
+}
+
+describe('getInsurance — monthlyPremiumTrend bucketing (C46 deep-review)', () => {
+  test('a term contributes its monthly premium to EACH month it spans (inclusive both ends)', async () => {
+    policy('p1', 'GEICO');
+    // Jan 1 → Mar 31 2024 inclusive = exactly 3 month-keys, each carrying the full $100 monthly premium.
+    termSeconds({
+      id: 't1',
+      policyId: 'p1',
+      startMs: Date.UTC(2024, 0, 1),
+      endMs: Date.UTC(2024, 2, 31),
+      monthlyCost: 100,
+    });
+    seedInsuranceTermVehicle(testDb.sqlite, { termId: 't1', vehicleId: 'veh-1' });
+
+    const result = await repo.getInsurance(USER);
+    expect(result.monthlyPremiumTrend).toEqual([
+      { month: '2024-01', premiums: 100 },
+      { month: '2024-02', premiums: 100 },
+      { month: '2024-03', premiums: 100 },
+    ]);
+  });
+
+  test('overlapping policies SUM their premiums in the shared months', async () => {
+    // p1 spans Jan–Feb @ $100/mo; p2 spans Feb–Mar @ $30/mo. February is shared → 130.
+    policy('p1', 'GEICO');
+    policy('p2', 'Allstate');
+    termSeconds({
+      id: 't1',
+      policyId: 'p1',
+      startMs: Date.UTC(2024, 0, 10),
+      endMs: Date.UTC(2024, 1, 20),
+      monthlyCost: 100,
+    });
+    termSeconds({
+      id: 't2',
+      policyId: 'p2',
+      startMs: Date.UTC(2024, 1, 5),
+      endMs: Date.UTC(2024, 2, 5),
+      monthlyCost: 30,
+    });
+    seedInsuranceTermVehicle(testDb.sqlite, { termId: 't1', vehicleId: 'veh-1' });
+    seedInsuranceTermVehicle(testDb.sqlite, { termId: 't2', vehicleId: 'veh-1' });
+
+    const result = await repo.getInsurance(USER);
+    const byMonth = new Map(result.monthlyPremiumTrend.map((p) => [p.month, p.premiums]));
+    expect(byMonth.get('2024-01')).toBeCloseTo(100, 2);
+    expect(byMonth.get('2024-02')).toBeCloseTo(130, 2); // overlap sums
+    expect(byMonth.get('2024-03')).toBeCloseTo(30, 2);
+    // The series is sorted ascending by month-key (the response .sort() contract).
+    expect(result.monthlyPremiumTrend.map((p) => p.month)).toEqual([
+      '2024-01',
+      '2024-02',
+      '2024-03',
+    ]);
+  });
+
+  test('a totalCost-only term spreads its AMORTIZED monthly premium across each spanned month', async () => {
+    // totalCost 300 over a Jan–Mar (3-month) span → effectiveMonthlyPremium 100, in EACH month
+    // (not the lump sum in one bucket — the trend shows the recurring cost, matching the totals path).
+    policy('p1', 'GEICO');
+    termSeconds({
+      id: 't1',
+      policyId: 'p1',
+      startMs: Date.UTC(2024, 0, 1),
+      endMs: Date.UTC(2024, 2, 31),
+      totalCost: 300,
+    });
+    seedInsuranceTermVehicle(testDb.sqlite, { termId: 't1', vehicleId: 'veh-1' });
+
+    const result = await repo.getInsurance(USER);
+    expect(result.monthlyPremiumTrend).toEqual([
+      { month: '2024-01', premiums: 100 },
+      { month: '2024-02', premiums: 100 },
+      { month: '2024-03', premiums: 100 },
+    ]);
   });
 });
 

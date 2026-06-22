@@ -39,7 +39,13 @@ import {
 } from './import-mapping';
 import { detectSource } from './import-mapping-presets';
 import { expenseRepository } from './repository';
-import { createSplitExpenseSchema, tagElementSchema, updateSplitSchema } from './validation';
+import {
+  createSplitExpenseSchema,
+  type SplitConfig,
+  splitConfigVehicleIds,
+  tagElementSchema,
+  updateSplitSchema,
+} from './validation';
 
 const routes = new Hono();
 
@@ -98,15 +104,24 @@ const createExpenseSchemaBase = baseExpenseSchema.omit({
   splitMethod: true,
 });
 
-const createExpenseSchema = createExpenseSchemaBase.refine(
-  (data) => {
-    // Enforce both-or-neither for source fields
-    const hasType = !!data.sourceType;
-    const hasId = !!data.sourceId;
-    return hasType === hasId;
-  },
-  { message: 'sourceType and sourceId must both be provided or both omitted', path: ['sourceType'] }
-);
+const createExpenseSchema = createExpenseSchemaBase
+  // #98 (C51): conflict-resolution keep-local opt-in. When an offline edit collides with an existing
+  // (userId, clientId) row, this flag tells the idempotent create to APPLY the edit (update the row)
+  // rather than no-op-return the stored version — so a resolved local edit is never silently lost. A
+  // plain retry omits it → the pure idempotent no-op is unchanged. create-only (not on update).
+  .extend({ forceOverwrite: z.boolean().optional() })
+  .refine(
+    (data) => {
+      // Enforce both-or-neither for source fields
+      const hasType = !!data.sourceType;
+      const hasId = !!data.sourceId;
+      return hasType === hasId;
+    },
+    {
+      message: 'sourceType and sourceId must both be provided or both omitted',
+      path: ['sourceType'],
+    }
+  );
 
 // clientId is a create-only idempotency key; it must not be mutable via update.
 // `tags` is overridden to drop the base `.default([])`: a Zod `.default()` SURVIVES `.partial()`, so
@@ -194,6 +209,26 @@ async function assertFinancingSourceValid(
   }
 }
 
+/**
+ * A 'financing'-sourced split must point at the ACTIVE financing of EVERY vehicle it lands on —
+ * each sibling is a separate vehicleId and computeBalance sums by (sourceType,sourceId) with NO
+ * vehicle scope, so a sibling on a vehicle whose active financing isn't `sourceId` mis-attributes a
+ * loan payment → understates that balance (#145/#125, the within-tenant financing-source class).
+ * No-op for a source-less split (assertFinancingSourceValid returns early when sourceType !==
+ * 'financing'). Shared by POST /split (new config) AND PUT /split (the carried-forward link must be
+ * re-checked against the NEW vehicle set — #147, the path the per-vehicle check missed).
+ */
+async function assertSplitFinancingSourceValid(
+  sourceType: string | undefined,
+  sourceId: string | undefined,
+  splitConfig: SplitConfig
+): Promise<void> {
+  if (sourceType !== 'financing') return;
+  for (const vehicleId of splitConfigVehicleIds(splitConfig)) {
+    await assertFinancingSourceValid(sourceType, sourceId, vehicleId);
+  }
+}
+
 // Exported so the query-contract (search/limit/tags coercion) can be unit-tested
 // at the route boundary without standing up a server.
 export const expenseQuerySchema = z.object({
@@ -235,20 +270,10 @@ routes.post('/split', zValidator('json', createSplitExpenseSchema), async (c) =>
   const user = c.get('user');
   const data = c.req.valid('json');
 
-  // A 'financing'-sourced split must point at the active financing of EACH vehicle it touches —
-  // every sibling lands on a different vehicleId, and computeBalance sums by (sourceType,sourceId)
-  // per vehicle, so validate the link against each (#145, the #125/C422 financing-source check the
-  // split path missed). No-op for a source-less split (assertFinancingSourceValid returns early when
-  // sourceType !== 'financing'). The schema now restricts sourceType to the 'financing' literal.
-  if (data.sourceType === 'financing') {
-    const splitVehicleIds =
-      data.splitConfig.method === 'even'
-        ? data.splitConfig.vehicleIds
-        : data.splitConfig.allocations.map((a) => a.vehicleId);
-    for (const vehicleId of new Set(splitVehicleIds)) {
-      await assertFinancingSourceValid(data.sourceType, data.sourceId, vehicleId);
-    }
-  }
+  // A 'financing'-sourced split must point at the active financing of EACH vehicle it touches (#145,
+  // the #125/C422 financing-source check the split path missed). The schema restricts sourceType to
+  // the 'financing' literal; the shared helper validates per vehicle (no-op for a source-less split).
+  await assertSplitFinancingSourceValid(data.sourceType, data.sourceId, data.splitConfig);
 
   const siblings = await expenseRepository.createSplitExpense(data, user.id);
   const first = siblings[0];
@@ -280,6 +305,21 @@ routes.put(
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const data = c.req.valid('json');
+
+    // The regenerated siblings CARRY FORWARD the group's existing sourceType/sourceId (the update
+    // schema doesn't expose them — see updateSplitExpense), but the NEW splitConfig may land them on a
+    // DIFFERENT vehicle set. computeBalance sums financing payments by (sourceType,sourceId) with no
+    // vehicle scope, so reallocating a financing-sourced split onto a vehicle whose active financing
+    // isn't that sourceId mis-attributes a loan payment → understates the balance (#147, the #125/#145
+    // financing-source class on the split-UPDATE path the per-vehicle check missed). Re-validate the
+    // carried link against the new vehicles before regenerating. getSplitExpense is userId-scoped (404s
+    // a non-owned/absent group); a source-less split is a no-op.
+    const existing = await expenseRepository.getSplitExpense(id, user.id);
+    await assertSplitFinancingSourceValid(
+      existing[0]?.sourceType ?? undefined,
+      existing[0]?.sourceId ?? undefined,
+      data.splitConfig
+    );
 
     const siblings = await expenseRepository.updateSplitExpense(id, data, user.id);
     const first = siblings[0];
@@ -420,7 +460,11 @@ const exportQuerySchema = z.object({
 
 // Stable, import-friendly column order. Raw values (ISO dates, unformatted
 // numbers) for portability; a human Vehicle name column for readability.
-const EXPORT_COLUMNS = [
+// The CSV header set the export writes. EXPORTED so the round-trip guard
+// (export-import-column-contract.test.ts) can assert every key the importer reads is present here —
+// a renamed/dropped column would otherwise silently break the export→re-import round-trip (NORTH_STAR #1)
+// with no test catching it (export + import tests each hard-code their own headers).
+export const EXPORT_COLUMNS = [
   'date',
   'vehicle',
   'category',
@@ -615,9 +659,12 @@ routes.post('/import/detect', zValidator('json', detectSourceSchema), (c) => {
 // POST /api/expenses - Create a new expense
 routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
   const user = c.get('user');
+  // Separate the control flag from the row data: forceOverwrite (#98) governs the idempotent-create
+  // collision behavior, it is NOT a column — keep it out of the inserted/overwritten row.
+  const { forceOverwrite, ...body } = c.req.valid('json');
   // Strip fuel-only fields from a non-fuel create (#76 server-side): a stray mileage would otherwise
   // poison getCurrentOdometer (cross-category UNION). For a fuel expense this is a no-op.
-  const expenseData = clearFuelFieldsIfNotFuel(c.req.valid('json'));
+  const expenseData = clearFuelFieldsIfNotFuel(body);
 
   // Verify vehicle exists and belongs to user
   await validateVehicleOwnership(expenseData.vehicleId, user.id);
@@ -639,10 +686,14 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
 
   // Idempotent create: a retried offline POST with the same clientId returns the
   // original row instead of duplicating it. Plain create when clientId is absent.
-  const createdExpense = await expenseRepository.createIdempotent({
-    ...expenseData,
-    userId: user.id,
-  });
+  // forceOverwrite (#98): a keep-local conflict resolution APPLIES the edit on collision.
+  const createdExpense = await expenseRepository.createIdempotent(
+    {
+      ...expenseData,
+      userId: user.id,
+    },
+    forceOverwrite ?? false
+  );
 
   // D5: a mileaged expense is also a new odometer reading — re-check this vehicle's mileage reminders
   // so a crossed milestone fires immediately. Only when mileage is present (getCurrentOdometer reads

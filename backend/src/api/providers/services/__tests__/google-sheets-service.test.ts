@@ -28,12 +28,15 @@ type GoogleSheetsServiceCtor = typeof import('../google-sheets-service').GoogleS
 let ctx: TestApp;
 let store: FakeGoogleStore;
 let GoogleSheetsService: GoogleSheetsServiceCtor;
+let SHEET_NAMES: readonly string[];
 let makeSvc: () => InstanceType<GoogleSheetsServiceCtor>;
 
 beforeEach(async () => {
   ctx = await createTestApp();
   store = new FakeGoogleStore();
-  ({ GoogleSheetsService } = await import('../google-sheets-service'));
+  // Dynamic import (after createTestApp sets DATABASE_URL) — the module binds the DB at load. Pull
+  // SHEET_NAMES from the same import rather than a static one, to keep the load-order rule intact.
+  ({ GoogleSheetsService, SHEET_NAMES } = await import('../google-sheets-service'));
   makeSvc = () => new GoogleSheetsService('fake-refresh-token', makeFakeSheetsClients(store));
 });
 
@@ -54,10 +57,10 @@ describe('GoogleSheetsService.createOrUpdateVroomSpreadsheet', () => {
 
     expect(info.name).toBe('VROOM Data - Demo User');
     expect(info.webViewLink).toContain(info.id);
-    // 15 sheets created up front (added Insurance Claims)
-    expect(info.sheets.map((s) => s.title)).toContain('Vehicles');
-    expect(info.sheets.map((s) => s.title)).toContain('Insurance Claims');
-    expect(info.sheets).toHaveLength(15);
+    // createSpreadsheet builds its tabs from the canonical SHEET_NAMES roster (C30 dedup): the created
+    // tab set must equal it exactly (same titles, same count) — proves the extraction is behavior-preserving.
+    expect(info.sheets.map((s) => s.title)).toEqual([...SHEET_NAMES]);
+    expect(info.sheets).toHaveLength(SHEET_NAMES.length);
 
     // The folder path was created: one VROOM, one Backups nested under it.
     const vroom = [...store.files.values()].find(
@@ -161,6 +164,52 @@ describe('GoogleSheetsService.readSpreadsheetData', () => {
   });
 });
 
+describe('GoogleSheetsService — formula-injection safety (#36)', () => {
+  // The backup writes must use RAW, not USER_ENTERED — otherwise a cell value beginning with a formula
+  // trigger (=,+,-,@) is parsed as a live formula by Sheets (injection + the user's OWN data silently
+  // round-trips back as the formula RESULT, not the text they stored). The fake records grids identically
+  // regardless of the option, so a plain round-trip can't catch a regression — assert the option directly.
+  test('writes every sheet with valueInputOption RAW (not USER_ENTERED)', async () => {
+    await seedVehicle('Toyota', 'Camry', 2020);
+    const info = await makeSvc().createOrUpdateVroomSpreadsheet(
+      ctx.user.id,
+      'VROOM/Backups',
+      'Demo User'
+    );
+
+    const ss = store.spreadsheets.get(info.id);
+    expect(ss).toBeDefined();
+    // At least the Vehicles sheet was written; whatever was written used RAW.
+    const opts = [...(ss?.valueInputOptions.values() ?? [])];
+    expect(opts.length).toBeGreaterThan(0);
+    expect(opts.every((o) => o === 'RAW')).toBe(true);
+    expect(opts).not.toContain('USER_ENTERED');
+  });
+
+  test('a make beginning with "=" round-trips VERBATIM (stored inert, not a formula)', async () => {
+    // A maliciously- or accidentally-formula-shaped value must survive backup→restore byte-exact.
+    const formula = '=HYPERLINK("http://evil","x")';
+    await seedVehicle(formula, 'Civic', 2019);
+    const svc = makeSvc();
+    const info = await svc.createOrUpdateVroomSpreadsheet(
+      ctx.user.id,
+      'VROOM/Backups',
+      'Demo User'
+    );
+
+    // Stored cell is the literal text (no leading-quote escaping added on this round-trip path) —
+    // assert against the actual cell, NOT a JSON.stringify substring (which escapes the inner quotes).
+    const grid = store.spreadsheets.get(info.id)?.values.get('Vehicles');
+    const makeCol = (grid?.[0] ?? []).indexOf('make');
+    expect(makeCol).toBeGreaterThanOrEqual(0);
+    expect(grid?.[1]?.[makeCol]).toBe(formula);
+
+    // And it reads back as exactly that string (parseValue leaves a non-numeric/non-date string as-is).
+    const data = await svc.readSpreadsheetData(info.id);
+    expect(data.vehicles[0].make).toBe(formula);
+  });
+});
+
 describe('GoogleSheetsService — error/resilience paths', () => {
   test('a failed spreadsheet create surfaces the API error', async () => {
     store.injectFault('spreadsheets.create', googleApiError(403, 'Insufficient permissions'));
@@ -174,5 +223,83 @@ describe('GoogleSheetsService — error/resilience paths', () => {
     await expect(
       makeSvc().createOrUpdateVroomSpreadsheet(ctx.user.id, 'VROOM/Backups', 'Demo User')
     ).rejects.toThrow('Rate limit exceeded');
+  });
+});
+
+describe('GoogleSheetsService — atomic backup swap (#37)', () => {
+  // #37: the backup must be ATOMIC. The old in-place design cleared then re-wrote each LIVE sheet, so a
+  // failure mid-run left a TORN backup (some sheets new, the mid-write one emptied by its clear, the rest
+  // stale) on what may be the user's ONLY copy — silent data-loss (NORTH_STAR #1). The fix stages every
+  // table into temp tabs and only swaps them in (delete-old + rename-staging) once ALL staging writes
+  // succeed, in one atomic batchUpdate. These guard the invariant that matters: a failed backup leaves the
+  // PRIOR backup fully intact.
+
+  test('a write failure during a re-backup leaves the previous backup intact (no torn/emptied data)', async () => {
+    await seedVehicle('Toyota', 'Camry', 2020);
+    const svc = makeSvc();
+    // First backup succeeds — this is the user's good copy.
+    const info = await svc.createOrUpdateVroomSpreadsheet(
+      ctx.user.id,
+      'VROOM/Backups',
+      'Demo User'
+    );
+    const before = await svc.readSpreadsheetData(info.id);
+    expect(before.vehicles).toHaveLength(1);
+    expect(before.vehicles[0].make).toBe('Toyota');
+
+    // The user changes data, then a re-backup fails partway through STAGING (a 429 on a values.update).
+    const { db } = await import('../../../../db/connection');
+    const schema = await import('../../../../db/schema');
+    await db.insert(schema.vehicles).values({
+      userId: ctx.user.id,
+      make: 'Honda',
+      model: 'Civic',
+      year: 2021,
+    });
+    store.injectFault('spreadsheets.values.update', googleApiError(429, 'Rate limit exceeded'));
+    await expect(
+      svc.createOrUpdateVroomSpreadsheet(ctx.user.id, 'VROOM/Backups', 'Demo User')
+    ).rejects.toThrow('Rate limit exceeded');
+
+    // The PRIOR backup is byte-for-byte intact — the failed run touched only staging tabs, never the live
+    // canonical sheets. (The old clear-then-write design would have emptied/torn this.)
+    const after = await svc.readSpreadsheetData(info.id);
+    expect(after.vehicles).toHaveLength(1);
+    expect(after.vehicles[0].make).toBe('Toyota');
+
+    // And no staging tabs are left orphaned in the spreadsheet (cleanup ran on failure).
+    const titles = (await svc.getSpreadsheetInfo(info.id)).sheets.map((s) => s.title);
+    expect(titles.some((t) => t.includes('__vroom_staging'))).toBe(false);
+    expect(titles).toEqual([...SHEET_NAMES]);
+  });
+
+  test('a successful re-backup replaces the data and keeps tab order stable', async () => {
+    await seedVehicle('Toyota', 'Camry', 2020);
+    const svc = makeSvc();
+    const info = await svc.createOrUpdateVroomSpreadsheet(
+      ctx.user.id,
+      'VROOM/Backups',
+      'Demo User'
+    );
+    const firstTitles = (await svc.getSpreadsheetInfo(info.id)).sheets.map((s) => s.title);
+
+    // Mutate + re-backup; the new data must show, with the SAME tab set/order (no drift across backups).
+    const { db } = await import('../../../../db/connection');
+    const schema = await import('../../../../db/schema');
+    await db.insert(schema.vehicles).values({
+      userId: ctx.user.id,
+      make: 'Honda',
+      model: 'Civic',
+      year: 2021,
+    });
+    await svc.createOrUpdateVroomSpreadsheet(ctx.user.id, 'VROOM/Backups', 'Demo User');
+
+    const after = await svc.readSpreadsheetData(info.id);
+    expect(after.vehicles).toHaveLength(2);
+    expect(after.vehicles.map((v) => v.make).sort()).toEqual(['Honda', 'Toyota']);
+
+    const secondTitles = (await svc.getSpreadsheetInfo(info.id)).sheets.map((s) => s.title);
+    expect(secondTitles).toEqual(firstTitles);
+    expect(secondTitles).toEqual([...SHEET_NAMES]);
   });
 });
