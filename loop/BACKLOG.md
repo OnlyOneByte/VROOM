@@ -4,6 +4,15 @@
 > The balance-table rotation below is SUSPENDED: until Angelo lifts it, every cycle works ONLY on
 > getting the open PR (claude-loop-dev → main) green. All items in this file are PARKED. Do not pick
 > from the queue. Resume normal category selection only after the override block is removed.
+>
+> **PR STATUS (updated C146):** Both CI failures now have committed fixes. Backend Tests already GREEN
+> (C139 missing-snapshot + C140 mock-leak). The Frontend Tests failure — long mis-diagnosed (C141.5–C145)
+> as a fatal upstream Vite-8/rolldown-1.0.3 parser bug needing Angelo's migration decision — was actually
+> **CI's own destructive `rm lock && npm install`** triggering rolldown's buggy WASM-fallback parser. C146
+> fixes it: the FE CI install step is now `npm ci` against the cross-platform-complete committed lockfile
+> (`npm ci` builds 0 errors; `rm lock && npm install` builds 5 errors — proven firsthand both ways).
+> Awaiting CI re-run to confirm Frontend Tests flips green → then the PR is merge-ready and this block
+> can lift. (If CI still red for a NEW reason, that's the next cycle's single job.)
 
 > Re-ranked every cycle. Pick the top unblocked item in the most-starved over-budget category
 > (LEDGER balance check); else the highest-leverage item overall. Keep this lean — prune done

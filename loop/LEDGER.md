@@ -88,9 +88,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 134 |
 | bug | 3 | 137 |
 | arch | 5 | 131 |
-| infra | 6 | 136 |
+| infra | 6 | 146 |
 
-Current cycle: **145**
+Current cycle: **146**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -409,6 +409,30 @@ Current cycle: **145**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C146 (PR-GREEN override — FIXED the frontend CI failure: it was CI's destructive `rm lock && npm install`, NOT an upstream parser bug)** —
+  Override active; main unchanged (fb35c17); HEAD was 0d96620 (C145). Re-checked upstream FIRST (the only thing that
+  moves without Angelo): byte-identical to C145 — vite@latest still 8.0.16, beta still 8.1.0-beta.0, vite-plugin-svelte
+  still 7.1.2, NO new rolldown 1.0.4+ patch. So the "await an upstream patch" path was still closed. THEN re-derived the
+  blocker from scratch instead of re-confirming the C141.5–C145 conclusion — and the conclusion was **WRONG**. Those
+  cycles tested version *bumps* (downgrade / plugin-bump / rolldown-override / 8.1-beta) and never tested the install
+  *method*. The real divergence: **`npm ci` (committed lockfile) builds CLEAN** (0 PARSE_ERROR, full bundle, 749/749
+  FE tests) but **CI's `rm -rf node_modules package-lock.json && npm install`** (its "workaround for the npm
+  optional-dependencies bug") regenerates a DIFFERENT lockfile that fails with 5× `[PARSE_ERROR] Expected ',' or ')'
+  but found '?'` on TS optional params (`event?`, `lastSyncAt?`, `jump?`) — on the SAME vite@8.0.16 / rolldown@1.0.3.
+  Proof matrix run firsthand THIS cycle (clean node_modules each time): committed-lock build → exit 0 / 0 errors (×2,
+  incl. a full `npm ci` from scratch); `rm lock && npm install` build → exit 1 / 5 errors. The lockfile diff confirms
+  the mechanism — the destructive re-resolve shifts rolldown's platform-binding/`@emnapi/runtime` resolution onto the
+  buggy WASM-fallback parser path. The committed `package-lock.json` is **cross-platform-complete** (verified all 15
+  `@rolldown/binding-*` entries incl. `linux-x64-gnu` for the x64 CI runner, each `os`/`cpu`-scoped), so `npm ci` on
+  CI installs the correct native binding → build passes. FIX (infra, one CI step): replaced the FE job's
+  `rm -rf node_modules package-lock.json && npm install && npm install --frozen-lockfile` with `npm ci` + a comment
+  documenting the failure mode and the local proof. This is squarely the override's mandate (a CI build-break fix, not
+  a $/semantics product call). VERIFY (both sides, full local gate): backend validate:local GREEN (tsc 0, musl-biome
+  clean, 1771 pass, build bundled); frontend validate:local GREEN on a from-scratch `npm ci` tree (tsc 0, build 0
+  PARSE_ERROR, 749/749 tests). Working tree clean of lockfile churn (restored). Infra cycle (CI yaml only; no app
+  source touched → no shot needed). cov: be 88.21% / fe 88.23% (~ — no test/source change). The PR's only red check
+  should now go green on the next CI run — pushing so CI re-runs; if green, the PR is merge-ready and the override can
+  lift. NEXT: confirm CI conclusion next cycle; if Frontend Tests flips to success, ping Angelo merge-ready.
 - **C145 (PR-GREEN override — VERIFIED the `vite@8.1.0-beta.0` forward path is blocked too; ALL levers exhausted)** —
   Override active; main unchanged; Angelo not ruled. Backend GREEN / Frontend RED. Last cycle I'd offered to test
   vite@8.1.0-beta.0 (the next Vite, which pins a coordinated rolldown 1.1.1 — so it'd dodge the C144 export-mismatch).

@@ -77,11 +77,17 @@ jobs:
           node-version: '22'
 
       - name: Install dependencies
-        run: |
-          # Workaround for npm optional dependencies bug
-          rm -rf node_modules package-lock.json
-          npm install
-          npm install --frozen-lockfile
+        # Use `npm ci` against the COMMITTED lockfile. The previous step did
+        # `rm -rf node_modules package-lock.json && npm install` as a "workaround for the npm
+        # optional-dependencies bug" — but that destructive re-resolve is what was BREAKING the
+        # frontend build: regenerating the lock changes rolldown's platform-binding resolution and
+        # `vite build` then hits the rolldown WASM-fallback parser, which fatally chokes on TS
+        # optional params in .svelte files (`[PARSE_ERROR] Expected ',' or ')' but found '?'`, 5×).
+        # The committed package-lock.json is cross-platform-complete (all 15 @rolldown/binding-*
+        # entries incl. linux-x64-gnu for this runner), so `npm ci` installs the correct native
+        # binding and the build passes. Verified locally on the same vite@8.0.16 / rolldown@1.0.3:
+        # `npm ci` build → 0 parse errors; `rm lock && npm install` build → 5 parse errors.
+        run: npm ci
 
       - name: Prepare SvelteKit
         run: npm run prepare
