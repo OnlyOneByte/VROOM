@@ -60,13 +60,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 121 |
-| deep-review | 5 | 119 |
+| deep-review | 5 | 124 |
 | guard | 6 | 122 |
 | bug | 3 | 122 |
-| arch | 5 | 118 |
+| arch | 5 | 124 |
 | infra | 6 | 123 |
 
-Current cycle: **123**
+Current cycle: **124**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -385,6 +385,28 @@ Current cycle: **123**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C124 (arch no-churn → pivot to deep-review: eyes-on cert of the never-shot `/insurance/[id]/terms/new` form)** —
+  Balance at C124 (HEAD was C123): arch (6/5, +1) most-starved over budget; deep-review (5/5) at budget. ARCH
+  PRECONDITION (the C112/C118 discipline): `git diff C118(043b84b)..HEAD` over backend/src + frontend/src (excl.
+  tests) is EMPTY — the only changes since the last arch scout are the C119/C120/C122 characterization TEST files
+  (not new production code to converge). So arch is at its structural floor → recorded no-churn IMMEDIATELY (11th
+  confirm: C4/C6/C12/C36/C85/C91/C98/C105/C112/C118/C124; both real dedups createLoadState + seedVehicle stay
+  design-gated awaiting Angelo) + pivoted the substantive work to the co-starved deep-review. DEEP-REVIEW: the
+  analytics-builder + financing-calc surfaces are now SATURATED (C119–C122 + the financing module's property suites
+  / month-overflow-clamp / minimum-payment tests all confirmed comprehensive firsthand this cycle — did NOT
+  manufacture a redundant cert per the C86 discipline), so picked the one deep-review vein that still pays: an
+  EYES-ON of a never-shot real surface (the GUIDE "E2E can't catch never-rendered fields" lesson). Scouted captured
+  shots vs routes → `/insurance/[id]/terms/new` (the InsuranceTermForm, a 572-line money+date form, the bug-#138
+  UTC-date subject) was NEVER shot. Shot DESKTOP + MOBILE (Pixel 5) against a seeded State Farm policy + Read both
+  PNGs. CLEAN: desktop renders all 4 sections — Coverage Period (Start/End Date * pickers, the #138 fields), Finance
+  Details (Total/Monthly Cost + Payment Amount + Premium Frequency), Covered Vehicles (all 4 seeded vehicles as
+  checkboxes = the multi-vehicle term link), Policy Details (number/deductible/coverage desc/limit/agent ×3); the
+  "State Farm" sub-header interpolates from the policy; Save Term / Cancel CTAs present; ZERO console errors. Mobile
+  (393px): the 2-col field pairs reflow to single-column stacked, full-width pickers/inputs, NO horizontal overflow
+  (NORTH_STAR #3), Save FAB pins bottom. No defect — recorded CLEAN, don't re-shoot. VERIFY: status 200 both
+  viewports, 0 console errors; no source touched (eyes-on cert). cov: be 87.78% / fe 87.6% (~ — no source). NEXT
+  deep-review: remaining never-shot real surfaces are the odometer entry forms (/vehicles/[id]/odometer/new) + the
+  insurance term EDIT form; else the surface set is fully eyes-on and deep-review returns to backend audits.
 - **C123 (infra — branch-hygiene sweep + coverage re-measure, the ~10-cycle cadence; last ran C117)** — Balance at
   C123 (HEAD was C122): NOTHING strictly over budget; TWO at budget — infra (6/6) + arch (5/5). Picked infra: it's
   the more-starved at-budget one (6 vs 5) AND the substantive non-dry pick (its re-measure captures the C119–C122

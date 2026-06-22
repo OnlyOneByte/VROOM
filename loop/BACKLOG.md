@@ -109,6 +109,17 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > builders if any (buildFuelEfficiencyAndCost / buildVehicleMaintenanceCosts), else an eyes-on populated surface.
 > Don't re-add.
 
+> **AUDITED C124 (eyes-on) — the never-shot `/insurance/[id]/terms/new` form CLEAN desktop + mobile.** The
+> InsuranceTermForm (572-line money+date form, the bug-#138 UTC-date subject) was never shot. Shot DESKTOP +
+> MOBILE (Pixel 5) against a seeded State Farm policy + Read both PNGs. Desktop: all 4 sections render —
+> Coverage Period (Start/End Date * pickers), Finance Details (Total/Monthly Cost + Payment Amount + Premium
+> Frequency), Covered Vehicles (all 4 seeded vehicles as checkboxes = the multi-vehicle term link), Policy Details
+> (number/deductible/coverage desc/limit/agent ×3); "State Farm" sub-header interpolates from the policy; Save Term
+> / Cancel CTAs; ZERO console errors. Mobile (393px): 2-col field pairs reflow to single-column stacked, full-width
+> pickers/inputs, NO horizontal overflow (NORTH_STAR #3), Save FAB pins bottom. No defect — DON'T re-shoot.
+> Remaining never-shot real surfaces: the odometer entry forms (/vehicles/[id]/odometer/new) + the insurance term
+> EDIT form; after those the surface set is fully eyes-on.
+>
 > **AUDITED C106 (feature eyes-on) — the FULL POPULATED dashboard CLEAN desktop + mobile (the primary landing
 > surface, only ever partially-shot at C5/C12).** Shot desktop + mobile (Pixel 5) + Read both PNGs. Desktop: 4 KPI
 > cards (Total Vehicles 4 / Total Expenses $21,677.87 / Monthly Average $277.92 / Active Financing 2, subtitle
