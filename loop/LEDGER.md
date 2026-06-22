@@ -24,6 +24,10 @@
 > (settings reload) + C101 (theme listener) + C102 (#148 anchor) FE-logic guard arc. FE is now meaningfully off its
 > old plateau; the residual gap is structural (effect/DOM-bound + DI/OAuth-bound). Both still under the 90% goal but
 > the FE structural ceiling proved ~1.25pts higher than the long-assumed ~86% once the store/util logic was pinned.**
+> **C126 (guard MEASURED): BE moved UP off the long-flat ~87.78% ceiling — 88.02% line / 87.64% func (1766 pass),
+> +0.24/+0.10 vs C123, from pinning 3 uncovered PhotoRepository finders (photo-repository.ts 72.90→97.28% line).
+> FIRST non-flat BE coverage gain in many cycles — proof the file was a REAL gap, not theater. FE 87.6% unchanged
+> (backend-only). The other <75% backend files are structural (OAuth/network/orchestrator/DI-bound).**
 > **C123 (infra cadence MEASURED): BE 87.78% line / 87.54% func (1757 pass) — line FLAT vs C117 but
 > `analytics-charts.ts` jumped 95→99.63% line / 99.01% func from the C119–C122 analytics-builder sweep (the module
 > was already near the file-mean, so overall is flat; residual ceiling is DI/SQL/OAuth-bound). FE 87.6% line /
@@ -61,12 +65,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 121 |
 | deep-review | 5 | 125 |
-| guard | 6 | 122 |
+| guard | 6 | 126 |
 | bug | 3 | 122 |
 | arch | 5 | 124 |
 | infra | 6 | 123 |
 
-Current cycle: **125**
+Current cycle: **126**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -385,6 +389,28 @@ Current cycle: **125**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C126 (guard — pin 3 uncovered PhotoRepository finders; first real coverage MOVEMENT in many cycles +0.24 BE)** —
+  Balance at C126 (HEAD was C125): feature (5/4, +1) + bug (4/3, +1) both over budget but BLOCKED (feature
+  import-trackers detect-commit Angelo-gated, manual half fully eyes-on; bug `git diff C85..HEAD` over prod src
+  EMPTY — verified). Per don't-force-a-blocked-pick, scouted for the highest-leverage ACTIONABLE increment instead
+  of another eyes-on. SCOUT: ran `bun test --coverage`, listed every backend src file <75% line. The OAuth
+  routes/providers + photo/google-photos services + backup-orchestrator + db/connection + sync routes are all the
+  documented DI/OAuth/network STRUCTURAL ceiling (not clean unit picks) — BUT `photo-repository.ts` (72.90% line)
+  stood out: its uncovered methods (`findIdsByUser` 47-69, `findById`/`findCoverPhoto` 134-148) are pure
+  constructor-injected DB queries, and the file's own comment (C229) confirms it switched off the getDb singleton
+  to `this.db` — so a `new PhotoRepository(testDb)` drives REAL code (NOT the C229 coverage-theater trap). GUARD:
+  new `photo-repository-finders.test.ts` (+9, +11 expect) over a migrated in-memory DB (the batch-by-entity-type
+  pattern): findIdsByUser USER-scoped + entityType-narrowed + extraConditions-AND-merged + empty (it's the
+  bulk-delete id finder → a dropped userId scope = cross-tenant leak, the #48/#72/#180 class); findById row/null;
+  findCoverPhoto isCover-only/null-when-none/null-when-empty. NON-VACUOUS proven firsthand: removed the userId base
+  condition from findIdsByUser → the tenant-scope test went RED (returned USER_B's id). VERIFY GATE GREEN: BE
+  validate:local exit 0, 1766 pass (+9 vs C125's 1757), build bundled. COVERAGE MOVED (re-measured): photo-
+  repository.ts 72.90→**97.28% line / 96.15% func** (only 200-203 left, the setCoverPhoto tx tail already covered by
+  set-cover-entity-scope.test.ts — a tool-attribution artifact); OVERALL BE **87.78→88.02% line / 87.64% func**, a
+  genuine +0.24 line — the FIRST non-flat coverage gain in many cycles, proving this was a REAL gap not theater.
+  Backend-only → FE validate not required. cov: be 88.02% / fe 87.6% (MEASURED). NEXT guard: the other <75% backend
+  files are genuinely structural (OAuth/network/orchestrator/DI-bound) — photo-repository was the last clean
+  HTTP-harness-or-constructed-repo coverage pick. Future guard cycles thin again; highest-leverage work GATED on Angelo.
 - **C125 (deep-review — eyes-on cert of the never-shot `/vehicles/[id]/odometer/new` form, the getCurrentOdometer
   entry path)** — Balance at C125 (HEAD was C124): NOTHING over budget; TWO at budget — feature (4/4, most-starved
   by raw count) + bug (3/3). Both BLOCKED: feature import-trackers manual half is fully eyes-on desktop+mobile

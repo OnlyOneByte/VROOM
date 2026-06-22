@@ -525,6 +525,17 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C126 — 3 uncovered PhotoRepository finders pinned; FIRST real BE coverage movement in many cycles
+> (+0.24 line).** Coverage-scouted every backend src <75% line: the OAuth/photo/google-photos/backup-orchestrator/
+> db-connection/sync files are the documented DI/OAuth/network STRUCTURAL ceiling, but `photo-repository.ts`
+> (72.90%) had pure constructor-injected DB finders untested (`findIdsByUser`/`findById`/`findCoverPhoto`) — and
+> the C229 comment confirms it drives `this.db`, not the getDb singleton (NOT coverage-theater). New
+> `photo-repository-finders.test.ts` (+9) over a migrated in-memory DB pins: findIdsByUser USER-scoped +
+> entityType-narrowed + extraConditions-merged + empty (it's the bulk-delete id finder → cross-tenant-leak class
+> #48/#72/#180); findById row/null; findCoverPhoto isCover-only/null. Non-vacuous (drop the userId scope → tenant
+> test RED). photo-repository.ts 72.90→97.28% line; OVERALL BE 87.78→88.02%. The remaining <75% backend files are
+> genuinely structural — this was the last clean constructed-repo coverage pick. Don't re-add.
+
 > **GUARDED C122 — the two FOUNDATIONAL analytics primitives `normalizeDate` + `groupByVehicle` CLEAN + pinned
 > (the last zero-coverage roots).** Closing the analytics-builder coverage sweep at its ROOTS (C119 expense-summary
 > + C120 maintenance/gas-price certified the leaf builders; these are the primitives every builder calls).
