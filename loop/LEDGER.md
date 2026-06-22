@@ -57,10 +57,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 113 |
 | guard | 6 | 116 |
 | bug | 3 | 114 |
-| arch | 5 | 112 |
+| arch | 5 | 118 |
 | infra | 6 | 117 |
 
-Current cycle: **117**
+Current cycle: **118**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -379,6 +379,18 @@ Current cycle: **117**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C118 (arch — no churn warranted; recorded fast per the C91/C112 discipline, nothing threaded since C112)** —
+  Balance at C118 (HEAD was C117; nudge label lags): THREE over budget at +1 — arch (118−112=6/5, +1, most-starved),
+  feature (5/4), bug (4/3); arch wins on raw starvation (6). PRECONDITION (the C91/C98/C105/C112 discipline):
+  `git diff 3b98df8(C112)..HEAD` shows the ONLY code change since the last arch scout is the C113–C116 IDOR
+  additions, all consolidated INSIDE one file (cross-tenant-idor.test.ts, the systematic sweep — the correct single
+  source, not a new duplication); production source remains unchanged since C85. So nothing fresh to converge.
+  Recorded no-churn IMMEDIATELY without re-scouting (the GUIDE "Don't manufacture churn" + the C112 recommendation).
+  The two REAL dedups stay design-gated awaiting Angelo: createLoadState adoption (C105, 13 pages) + seedVehicle
+  convergence (C112, 51 test files). 10th no-churn confirm (C4/C6/C12/C36/C85/C91/C98/C105/C112/C118). Doc-only — no
+  source touched. cov: be 87.78% / fe 87.6% (~ — nothing changed). NEXT arch: absent an Angelo steer on the two
+  design-gated migrations, arch stays at its structural floor — record no-churn fast (check the git diff since the
+  last arch scout first; if no new dup threaded, it's an immediate no-churn).
 - **C117 (infra — branch-hygiene sweep + coverage re-measure, the ~10-cycle cadence; last ran C111)** — Balance at
   C117 (HEAD was C116; nudge label lags): NOTHING strictly over budget; FOUR at budget (feature 4/4, bug 3/3, arch
   5/5, infra 6/6); infra most-starved (6) AND the substantive non-dry pick (its re-measure captures the C113–C116
