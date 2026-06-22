@@ -525,6 +525,15 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C129 — auth-store `updateDisplayName` merge + `logout` failure path (auth.svelte.ts → 100% line).**
+> auth.svelte.ts was 90.47% line / 50% BRANCH; the low branch flagged `updateDisplayName` (74-81, ENTIRELY
+> untested) + the `logout` catch (117, only success was tested). Extended the tracked `auth.test.ts` (+3):
+> updateDisplayName merges the returned displayName into the existing user preserving other fields (the `if (user)`
+> spread-merge) + returns it; no-op on local state when there's no user; a failed logout sets error + does NOT throw
+> (does-not-force-clear-session pinned). Non-vacuous (neuter the merge → RED). auth.svelte.ts 90.47→100% line /
+> 50→83.33% branch (only line 84 = the loginWith browser SSR-guard left); OVERALL FE 87.74→88.08%. Third consecutive
+> real coverage gain (C126 BE, C128 FE, C129 FE). The clean store-logic FE picks are now worked through. Don't re-add.
+
 > **GUARDED C128 — settings-store `restoreFromProvider` mode-gated reload + error path (NORTH_STAR #1
 > data-safety; FE coverage frontier).** Scouted FE coverage → `settings.svelte.ts` (67.5%) had `restoreFromProvider`
 > (the provider-path restore) unpinned in the STORE: settings-api.test.ts pins only the wire contract, C308 pins

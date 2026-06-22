@@ -24,6 +24,10 @@
 > (settings reload) + C101 (theme listener) + C102 (#148 anchor) FE-logic guard arc. FE is now meaningfully off its
 > old plateau; the residual gap is structural (effect/DOM-bound + DI/OAuth-bound). Both still under the 90% goal but
 > the FE structural ceiling proved ~1.25pts higher than the long-assumed ~86% once the store/util logic was pinned.**
+> **C129 (guard MEASURED): FE moved UP again — 88.08% line / 88.4% func / 79.94% branch / 85.94% stmts (746 pass),
+> +0.34 line vs C128, from pinning auth-store updateDisplayName + logout-failure (auth.svelte.ts 90.47→100% line,
+> 50→83.33% branch). BE unchanged 88.02% (frontend-only). Third consecutive real coverage gain off the plateau
+> (C126 BE +0.24, C128 FE +0.14, C129 FE +0.34). Residual FE is structural (DOM/timer/SSR-guard/pass-through).**
 > **C128 (guard MEASURED): FE moved UP — 87.74% line / 88.56% func / 79.74% branch / 85.63% stmts (743 pass),
 > +0.14 line vs C123, from pinning settings-store `restoreFromProvider` mode-gated reload + error path
 > (settings.svelte.ts 67.5→70% line). BE unchanged 88.02% (frontend-only cycle). Both coverage frontiers (BE
@@ -70,12 +74,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 121 |
 | deep-review | 5 | 125 |
-| guard | 6 | 128 |
+| guard | 6 | 129 |
 | bug | 3 | 122 |
 | arch | 5 | 124 |
 | infra | 6 | 123 |
 
-Current cycle: **128**
+Current cycle: **129**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -394,6 +398,24 @@ Current cycle: **128**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C129 (guard — pin auth-store `updateDisplayName` merge + `logout` failure path; auth.svelte.ts → 100% line)** —
+  Balance at C129 (HEAD was C128): feature (8/4, +4) + bug (7/3, +4) co-most-starved, both BLOCKED (feature
+  detect-commit Angelo-gated; bug `git diff C85..HEAD` over prod src EMPTY — verified); infra (6/6) + arch (5/5)
+  at budget (infra cadence not due till ~C133, arch would be no-churn). Per don't-force-a-blocked-pick, continued
+  the FE coverage vein (C128). SCOUT: `auth.svelte.ts` was 90.47% line / 50% BRANCH — the low branch flagged real
+  untested logic: `updateDisplayName` (74-81, ENTIRELY untested — the profile-edit method) + the `logout` catch
+  (117, the existing test only covered logout success). GUARD: extended the tracked `auth.test.ts` (+3): (1)
+  updateDisplayName merges the returned displayName into the existing user while PRESERVING other fields (the
+  `if (user)` spread-merge, not a clobber) + returns the updated user; (2) it's a no-op on local state when there's
+  no current user (the guard); (3) a failed logout SETS error + does NOT throw (the 117 catch — pinned as
+  does-not-force-clear-session so a future change there is deliberate). NON-VACUOUS proven firsthand: neutered the
+  displayName merge → the merge test went RED. VERIFY GATE GREEN: FE validate:local exit 0 (type-check + build +
+  vitest), 746 pass (+3 vs C128's 743). Frontend-only → BE validate not required. COVERAGE: auth.svelte.ts
+  90.47→**100% line / 50→83.33% branch / 100% func** (only line 84 left = the loginWith `browser` SSR-guard, needs
+  env sim); OVERALL FE 87.74→**88.08% line / 85.94% stmts** (third consecutive real coverage gain: C126 BE, C128 FE,
+  C129 FE). This modifies a TRACKED test file (committed regression net, not a gitignored spec). cov: be 88.02% /
+  fe 88.08% (MEASURED). NEXT guard: the residual FE gaps (sync-manager DOM/timer, expense-api pass-throughs,
+  loginWith SSR-guard) are all structural — the clean store-logic FE picks are now genuinely worked through.
 - **C128 (guard — pin settings-store `restoreFromProvider` mode-gated reload + error path, a NORTH_STAR #1
   data-safety invariant; pivoted FE this cycle)** — Balance at C128 (HEAD was C127): feature (7/4, +3) + bug (6/3,
   +3) co-most-starved over budget, both BLOCKED (feature detect-commit Angelo-gated, manual half fully eyes-on;
