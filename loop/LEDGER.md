@@ -90,7 +90,7 @@ cycle (slow-budget categories mis-forecast otherwise).
 | arch | 5 | 131 |
 | infra | 6 | 136 |
 
-Current cycle: **141**
+Current cycle: **142**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -409,6 +409,23 @@ Current cycle: **141**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C142 (PR-GREEN override — FE blocker still gated on Angelo; CORRECTED the fix direction: it's his in-progress
+  Vite-8 migration, NOT a downgrade)** — Override still active; main unchanged (fb35c17); Angelo hasn't ruled
+  in-repo yet. CI unchanged: Backend GREEN, Frontend RED (the C141.5 rolldown TS-optional-param parse failure).
+  HYGIENE: discarded an unintended `M frontend/package-lock.json` drift left by last cycle's CI-repro fresh
+  `npm install` (newer transitive deps — @adobe/css-tools/@babel/runtime etc.); restored the committed lock so the
+  PR isn't polluted with a churned lockfile (which could itself break CI's --frozen-lockfile). KEY CORRECTION to the
+  C141.5 escalation: traced the git history of frontend/package.json's vite line → Vite 8 was NOT a stray dependabot
+  bump; `251d3fb` bumped 7.3.2→8.0.16 followed by DELIBERATE human compat work (`4f87a64 fix(build): use
+  @tailwindcss/vite plugin for Vite 8 compat`, `22ecb68 fix(charts): upgrade chart registry + layerchart to
+  next.65`). So this is Angelo's IN-PROGRESS Vite-8 migration — option-1 "pin Vite back to 7.x" would REVERT his
+  work and is the WRONG fix (don't undo deliberate migration). Also confirmed `svelte.config.js` already sets
+  `vitePreprocess()` (TS transpile IS configured) and `@sveltejs/vite-plugin-svelte` is 7.1.2 — so the failure is a
+  vite-plugin-svelte 7.1.2 ↔ Vite 8 ↔ rolldown 1.0.3 INTEGRATION gap (the preprocessor's TS output isn't reaching
+  rolldown before it parses), i.e. the forward fix is a vite-plugin-svelte / rolldown version bump, NOT a Vite
+  downgrade. This is firmly a dependency decision inside his migration → re-escalated with the corrected, sharper
+  diagnosis; HOLDING (the only mechanically-safe action — reverting Vite — is actively wrong). No code changed.
+  cov: be 88.21% / fe 88.23% (~). NEXT: await Angelo's toolchain decision; apply + re-verify the FRESH-install build.
 - **C141 (PR-GREEN override — fix the LAST red check: bump CI Node 20→22 so Vite 8's `vite build` step passes)** —
   After C140, CI run #293: **Backend Tests = SUCCESS** (both backend fixes landed), Frontend Tests still failing
   with only a bare workflow exit-1 (no file annotation; job logs admin-gated). Pinpointed the step via the public
