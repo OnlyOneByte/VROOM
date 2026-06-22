@@ -91,6 +91,19 @@ now — the "Playwright-blocked" tail was a ~200-cycle MISDIAGNOSIS, see GUIDE.m
 re-audit a data-safety write path, certify it CLEAN against source, and leave a merge-surviving guard.
 Don't trust agent "HIGH" findings — verify firsthand (the archive logged many debunked false-positives).)*
 
+> **GUARDED C119 — the dashboard EXPENSE-SUMMARY builder family CLEAN + pinned (4 zero-coverage builders).** A
+> fresh grep of every analytics-charts.ts builder vs its test references found FOUR with ZERO coverage —
+> `buildExpenseByCategory`, `buildVehicleExpenseBreakdown`, `buildMonthlyExpenseTrends`, `findBiggestExpense` (all
+> GeneralExpenseRow[] → dashboard chart data). The C67 unpinned-builder audit (analytics-charts-unpinned.test.ts)
+> certified the fuel/date siblings but never reached this expense-summary set. Read each against source firsthand —
+> all CORRECT (no defect). New `expense-summary-builders.test.ts` (+16) pins: percentages SUM to 100 + total===0→[]
+> + unknown→misc fold (buildExpenseByCategory); the same fold WITHOUT percentages (buildVehicleExpenseBreakdown);
+> slice(-24) keeps the NEWEST 24 months (the C11 oldest-slice direction class) + co-accumulate + dateless-drop
+> (buildMonthlyExpenseTrends); strict-greater max + []→null + null-desc fallback + ISO date (findBiggestExpense).
+> Non-vacuous proven (flip slice(-24)→slice(0,24) → RED). BE 1732 pass. NEXT: the last zero-coverage analytics
+> builders if any (buildFuelEfficiencyAndCost / buildVehicleMaintenanceCosts), else an eyes-on populated surface.
+> Don't re-add.
+
 > **AUDITED C106 (feature eyes-on) — the FULL POPULATED dashboard CLEAN desktop + mobile (the primary landing
 > surface, only ever partially-shot at C5/C12).** Shot desktop + mobile (Pixel 5) + Read both PNGs. Desktop: 4 KPI
 > cards (Total Vehicles 4 / Total Expenses $21,677.87 / Monthly Average $277.92 / Active Financing 2, subtitle

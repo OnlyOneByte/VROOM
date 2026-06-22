@@ -54,13 +54,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 113 |
-| deep-review | 5 | 113 |
+| deep-review | 5 | 119 |
 | guard | 6 | 116 |
 | bug | 3 | 114 |
 | arch | 5 | 118 |
 | infra | 6 | 117 |
 
-Current cycle: **118**
+Current cycle: **119**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -379,6 +379,27 @@ Current cycle: **118**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C119 (deep-review — certify + guard the dashboard EXPENSE-SUMMARY builder family, 4 zero-coverage builders)** —
+  Balance at C119 (HEAD was C118): THREE over budget — feature (6/4, +2) + deep-review (6/5, +1) co-most-starved
+  by raw starvation, bug (5/3, +2). Feature is BLOCKED (import-trackers defaultCategory Angelo-gated; manual half
+  fully eyes-on — don't-force-a-blocked-pick) and bug is structurally dry (git diff C85..HEAD over production src
+  EMPTY). Deep-review is the most-starved NON-blocked category that can produce a genuine increment on unchanged
+  code — picked it. SCOUT: grepped every analytics-charts.ts builder vs its test references; found FOUR with ZERO
+  test files — `buildExpenseByCategory`, `buildVehicleExpenseBreakdown`, `buildMonthlyExpenseTrends`,
+  `findBiggestExpense` (all GeneralExpenseRow[] → dashboard chart data; the C67 unpinned-builder audit certified the
+  fuel/date siblings but never reached this expense-summary set). Read each against source firsthand — all CORRECT
+  (no defect; recorded a CLEAN cert, did NOT manufacture a fix). GUARD: new `expense-summary-builders.test.ts` (+16,
+  +32 expect) pinning the load-bearing invariants: buildExpenseByCategory percentages SUM to 100 + total===0→[]
+  (divide-by-zero guard) + unknown-category→misc fold; buildVehicleExpenseBreakdown same fold WITHOUT percentages;
+  buildMonthlyExpenseTrends localeCompare+slice(-24) keeps the NEWEST 24 months (the C11 oldest-slice direction
+  class) + same-month co-accumulate + dateless dropped; findBiggestExpense strict-greater max (first-wins tie) +
+  []→null + null-desc fallback + ISO date. NON-VACUOUS proven firsthand: flipped slice(-24)→slice(0,24) (the C11
+  regression) → the slice-direction test went RED (newest 2023-12 not 2024-06), then reverted. Full verify gate
+  GREEN: BE validate:local exit 0, 1732 pass (+15 vs C117's 1717), build bundled. Backend-only (no FE source) → FE
+  validate not required. The C67 "never-pinned analytics builder" deep-review vein still pays — this expense-summary
+  family was the set that audit missed. cov: be ~87.78% / fe 87.6% (~ — new tests drive already-covered builder
+  lines; re-measure on the next infra cadence ~C127). NEXT deep-review: the remaining zero-coverage analytics
+  builders if any (buildFuelEfficiencyAndCost, buildVehicleMaintenanceCosts), else an eyes-on of a populated surface.
 - **C118 (arch — no churn warranted; recorded fast per the C91/C112 discipline, nothing threaded since C112)** —
   Balance at C118 (HEAD was C117; nudge label lags): THREE over budget at +1 — arch (118−112=6/5, +1, most-starved),
   feature (5/4), bug (4/3); arch wins on raw starvation (6). PRECONDITION (the C91/C98/C105/C112 discipline):
