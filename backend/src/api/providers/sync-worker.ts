@@ -69,7 +69,7 @@ const BASE_BACKOFF_SECONDS = 30;
  * photoRefRepository.findPendingOrFailed. Setting a ref's retryCount to this value takes it
  * out of the pending/failed work set (used to terminally park a non-retryable auth failure).
  */
-const MAX_RETRY_COUNT = 3;
+export const MAX_RETRY_COUNT = 3;
 
 /**
  * Check whether a failed ref should be skipped due to exponential backoff.

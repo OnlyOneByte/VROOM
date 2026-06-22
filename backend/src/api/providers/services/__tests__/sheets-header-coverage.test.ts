@@ -24,7 +24,7 @@
 import { describe, expect, test } from 'bun:test';
 import { getTableColumns } from 'drizzle-orm';
 import { TABLE_SCHEMA_MAP } from '../../../../config';
-import { SHEET_HEADERS } from '../google-sheets-service';
+import { SHEET_HEADERS, SHEET_NAMES } from '../google-sheets-service';
 
 describe('Google Sheets header coverage (column drift guard — cycle 211)', () => {
   test('SHEET_HEADERS covers exactly the same table keys as TABLE_SCHEMA_MAP', () => {
@@ -69,5 +69,23 @@ describe('Google Sheets header coverage (column drift guard — cycle 211)', () 
       `Sheets header(s) name a column that no longer exists in the schema — on restore the ` +
         `value lands nowhere. Remove them from SHEET_HEADERS or fix the rename:\n${stale.join('\n')}`
     ).toEqual([]);
+  });
+});
+
+// C30: SHEET_NAMES (the canonical tab roster, extracted from the hand-copied createSpreadsheet +
+// ensureRequiredSheets lists) must stay 1:1 with the table set. Without this, adding a 16th table to
+// SHEET_HEADERS/schema would create+ensure 15 tabs while the read/write surfaces expect 16 (a tab whose
+// data never persists) — the exact drift the extraction guards against.
+describe('Google Sheets tab roster (SHEET_NAMES drift guard — C30)', () => {
+  test('SHEET_NAMES has exactly one tab per SHEET_HEADERS table (no missing/extra tab)', () => {
+    // `as const` makes SHEET_NAMES.length a literal tuple type; widen to number for the comparison.
+    const tabCount: number = SHEET_NAMES.length;
+    expect(tabCount).toBe(Object.keys(SHEET_HEADERS).length);
+  });
+
+  test('SHEET_NAMES entries are all distinct + non-empty (no dup/blank tab title)', () => {
+    const tabCount: number = SHEET_NAMES.length;
+    expect(new Set(SHEET_NAMES).size).toBe(tabCount);
+    expect(SHEET_NAMES.every((n) => n.trim().length > 0)).toBe(true);
   });
 });

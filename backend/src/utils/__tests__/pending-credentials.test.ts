@@ -86,4 +86,27 @@ describe('max-size eviction (the uncovered capacity branch)', () => {
     expect(getPendingEmail('u1', 'n1')).toBe('e@example.com');
     expect(pendingProviderCredentials.size).toBe(1);
   });
+
+  // The capacity branch (storePending lines 53-56) was UNCOVERED: the prior test only stored ONE
+  // entry, never reaching MAX_SIZE. This is a DoS-prevention contract — abandoned OAuth flows must
+  // not grow the in-memory store unbounded; at capacity the OLDEST (insertion-order) entry is evicted.
+  test('at MAX_SIZE, storing one more evicts the OLDEST entry and holds the cap', () => {
+    const MAX_SIZE = 1000;
+    // Fill exactly to capacity. Fresh entries, so cleanupExpired() drops none.
+    for (let i = 0; i < MAX_SIZE; i++) {
+      storePending(`user-${i}`, 'n', `tok-${i}`, `e${i}@example.com`);
+    }
+    expect(pendingProviderCredentials.size).toBe(MAX_SIZE);
+    expect(pendingProviderCredentials.has('user-0:n')).toBe(true); // oldest present
+
+    // One more push trips the eviction branch.
+    storePending('newcomer', 'n', 'tok-new', 'new@example.com');
+
+    // The cap holds (no unbounded growth), the oldest was evicted, the newest is present.
+    expect(pendingProviderCredentials.size).toBe(MAX_SIZE);
+    expect(pendingProviderCredentials.has('user-0:n')).toBe(false); // oldest evicted
+    expect(getPendingEmail('newcomer', 'n')).toBe('new@example.com'); // newest retained
+    // only ONE eviction per over-cap insert → the second-oldest survived
+    expect(pendingProviderCredentials.has('user-1:n')).toBe(true);
+  });
 });

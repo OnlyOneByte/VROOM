@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, test } from 'vitest';
-import { resetSplitAllocations } from '$lib/utils/expense-helpers';
+import { buildSplitConfig, resetSplitAllocations } from '$lib/utils/expense-helpers';
 
 describe('resetSplitAllocations', () => {
 	test("'even' carries NO per-vehicle rows (the backend splits evenly itself)", () => {
@@ -44,5 +44,65 @@ describe('resetSplitAllocations', () => {
 		expect(resetSplitAllocations('percentage', ['only'])).toEqual([
 			{ vehicleId: 'only', percentage: 100 }
 		]);
+	});
+});
+
+/**
+ * Unit tests for buildSplitConfig — the API-union builder shared by ExpenseForm and ReminderForm
+ * (extracted C23, dedup of two near-byte-identical local `buildSplitConfig` copies; ReminderForm's was
+ * added C22 with the T4 split, immediately creating the drift vector). Both forms are
+ * eyes-on/Playwright-blocked, so this pure helper IS the merge-surviving net: it pins the per-method
+ * shape + the missing-value→0 coalesce, so the two forms can't drift to a different materialized split
+ * for the same state. Pairs with resetSplitAllocations above (the seed) — together they bracket the
+ * split-config lifecycle.
+ */
+describe('buildSplitConfig', () => {
+	test("'even' carries the vehicleIds (backend computes the per-vehicle split itself)", () => {
+		expect(buildSplitConfig('even', ['v1', 'v2', 'v3'], [])).toEqual({
+			method: 'even',
+			vehicleIds: ['v1', 'v2', 'v3']
+		});
+	});
+
+	test("'absolute' maps each allocation to {vehicleId, amount}", () => {
+		expect(
+			buildSplitConfig('absolute', ['v1', 'v2'], [
+				{ vehicleId: 'v1', amount: 30 },
+				{ vehicleId: 'v2', amount: 70 }
+			])
+		).toEqual({
+			method: 'absolute',
+			allocations: [
+				{ vehicleId: 'v1', amount: 30 },
+				{ vehicleId: 'v2', amount: 70 }
+			]
+		});
+	});
+
+	test("'percentage' maps each allocation to {vehicleId, percentage}", () => {
+		expect(
+			buildSplitConfig('percentage', ['v1', 'v2'], [
+				{ vehicleId: 'v1', percentage: 60 },
+				{ vehicleId: 'v2', percentage: 40 }
+			])
+		).toEqual({
+			method: 'percentage',
+			allocations: [
+				{ vehicleId: 'v1', percentage: 60 },
+				{ vehicleId: 'v2', percentage: 40 }
+			]
+		});
+	});
+
+	test('a cleared absolute input (undefined amount) coalesces to 0, NOT undefined in the payload', () => {
+		// A divergent copy that dropped `?? 0` would emit {vehicleId, amount: undefined} → a backend
+		// schema reject (amount is z.number()). The coalesce is the load-bearing bit.
+		const out = buildSplitConfig('absolute', ['v1'], [{ vehicleId: 'v1' }]);
+		expect(out).toEqual({ method: 'absolute', allocations: [{ vehicleId: 'v1', amount: 0 }] });
+	});
+
+	test('a cleared percentage input (undefined percentage) coalesces to 0', () => {
+		const out = buildSplitConfig('percentage', ['v1'], [{ vehicleId: 'v1' }]);
+		expect(out).toEqual({ method: 'percentage', allocations: [{ vehicleId: 'v1', percentage: 0 }] });
 	});
 });

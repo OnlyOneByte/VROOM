@@ -151,6 +151,78 @@ describe('analytics routes (real HTTP stack)', () => {
     expect(res.status).toBe(404);
   });
 
+  // C109 (guard): /vehicle-expenses carries the SAME `validateVehicleOwnership(vehicleId)` cross-tenant
+  // gate as vehicle-tco/vehicle-health (routes.ts:147) — a REQUIRED-vehicleId endpoint — but its ownership
+  // branch was the one vehicle-scoped analytics route this net never pinned (the C185/C290 additions covered
+  // tco/health/fuel-*). The repo method getVehicleExpenses is unit-tested, but a route-layer guard-drop would
+  // serve another tenant's per-vehicle expense analytics by guessing an id (the C109/#52 class). Unlike
+  // tco/health it also REQUIRES startDate+endDate (dateRangeRequiredVehicleQuerySchema), so omit them and
+  // zValidator 400s before the guard — supply the range to reach the ownership branch. RANGE defined above.
+  test('vehicle-expenses serves an OWNED vehicle (200 + envelope)', async () => {
+    const vehicleId = await seedVehicle('Daily Driver');
+    const res = await ctx.authed(
+      'GET',
+      `/api/v1/analytics/vehicle-expenses?${RANGE}&vehicleId=${vehicleId}`
+    );
+    const body = await json<{ success: boolean; data: unknown }>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.data).toBeDefined();
+  });
+
+  test('vehicle-expenses REJECTS a foreign/nonexistent vehicleId with 404 (no cross-tenant analytics leak)', async () => {
+    await seedVehicle('Daily Driver'); // owns SOME vehicle, just not the one queried
+    const res = await ctx.authed(
+      'GET',
+      `/api/v1/analytics/vehicle-expenses?${RANGE}&vehicleId=not-my-vehicle-id`
+    );
+    expect(res.status).toBe(404);
+  });
+
+  test('vehicle-expenses missing the REQUIRED vehicleId is a 400 (query validation, before the guard)', async () => {
+    const res = await ctx.authed('GET', `/api/v1/analytics/vehicle-expenses?${RANGE}`);
+    expect(res.status).toBe(400);
+  });
+
+  // C110 (the C108/C109 route-coverage audit, completing the analytics domain): /quick-stats,
+  // /cross-vehicle, /year-end were the 3 analytics routes with ZERO HTTP-harness coverage. Unlike the
+  // vehicle-scoped routes above they're USER-scoped in the repo (no per-vehicle ownership gate), so the
+  // route-layer invariants to pin are: (a) auth-gating — every analytics route is behind requireAuth, but
+  // the C185 net asserted 401 on only ONE representative route (/financing); these pin it per-route so a
+  // mis-mount that skipped the middleware on one wouldn't go unnoticed; (b) the REQUIRED startDate+endDate
+  // validation on the two dateRange routes (omit → 400 via zValidator, BEFORE any repo work); (c) year-end's
+  // year is OPTIONAL (omitted → defaults to the current year → 200, not 400). Drives the REAL routes.
+  test('quick-stats: 401 anon / 400 missing range / 200 envelope with a valid range', async () => {
+    expect((await ctx.anon('GET', `/api/v1/analytics/quick-stats?${RANGE}`)).status).toBe(401);
+    expect((await ctx.authed('GET', '/api/v1/analytics/quick-stats')).status).toBe(400); // range required
+    const res = await ctx.authed('GET', `/api/v1/analytics/quick-stats?${RANGE}`);
+    const body = await json<{ success: boolean; data: unknown }>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.data).toBeDefined();
+  });
+
+  test('cross-vehicle: 401 anon / 400 missing range / 200 envelope with a valid range', async () => {
+    expect((await ctx.anon('GET', `/api/v1/analytics/cross-vehicle?${RANGE}`)).status).toBe(401);
+    expect((await ctx.authed('GET', '/api/v1/analytics/cross-vehicle')).status).toBe(400);
+    const res = await ctx.authed('GET', `/api/v1/analytics/cross-vehicle?${RANGE}`);
+    const body = await json<{ success: boolean; data: unknown }>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.data).toBeDefined();
+  });
+
+  test('year-end: 401 anon / 200 with NO year (defaults to current year, optional param) / 200 with a year', async () => {
+    expect((await ctx.anon('GET', '/api/v1/analytics/year-end')).status).toBe(401);
+    // year is OPTIONAL — omitted must NOT 400; it defaults to the current year.
+    const noYear = await ctx.authed('GET', '/api/v1/analytics/year-end');
+    const noYearBody = await json<{ success: boolean; data: unknown }>(noYear);
+    expect(noYear.status, JSON.stringify(noYearBody)).toBe(200);
+    expect(noYearBody.success).toBe(true);
+    const withYear = await ctx.authed('GET', '/api/v1/analytics/year-end?year=2024');
+    expect(withYear.status).toBe(200);
+  });
+
   // #139 (C453): a 0%-APR dealer-promo loan (apr===0, schema .min(0)-valid) must STILL appear in
   // /analytics/financing's loanBreakdown. buildLoanBreakdown previously filtered `&& f.apr` (truthy),
   // dropping apr===0 → a real active loan's principal paydown vanished from the chart (the #92/#117

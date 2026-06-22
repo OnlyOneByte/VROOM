@@ -56,6 +56,7 @@
 	} from '$lib/components/ui/empty';
 	import * as Select from '$lib/components/ui/select';
 	import SplitExpenseBadge from './split/SplitExpenseBadge.svelte';
+	import RecurringExpenseBadge from './RecurringExpenseBadge.svelte';
 	import PaginationControls from '$lib/components/common/pagination-controls.svelte';
 	import { IsMobile } from '$lib/hooks/is-mobile.svelte';
 
@@ -494,6 +495,11 @@
 										<span class="truncate">{getVehicleDisplayName(vehicle)}</span>
 									{/if}
 								</div>
+								{#if expense.sourceType === 'reminder'}
+									<div class="mt-1.5">
+										<RecurringExpenseBadge />
+									</div>
+								{/if}
 								{#if expense.tags && expense.tags.length > 0}
 									<div class="flex flex-wrap gap-1 mt-1.5">
 										{#each expense.tags as tag (tag)}
@@ -759,6 +765,9 @@
 											<span class="whitespace-nowrap"
 												>{categoryLabels[expense.category as ExpenseCategory]}</span
 											>
+											{#if expense.sourceType === 'reminder'}
+												<RecurringExpenseBadge />
+											{/if}
 										</div>
 									</TableCell>
 									<TableCell>

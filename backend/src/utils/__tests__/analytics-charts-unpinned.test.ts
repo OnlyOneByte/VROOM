@@ -555,8 +555,8 @@ describe('an EV-only vehicle yields an EMPTY gas-MPG series but a real cost-per-
 // local reference and tests THAT — the C229 coverage-theater trap — so a regression changing
 // MAX_VALID_MPG (5–100 gas) or MAX_VALID_MI_KWH (1–10 electric) would leave it green while production
 // shifted. These drive the exported computeEfficiencyPoint directly so the band can't drift unnoticed.
-// (Note: the per-vehicle stats path [calculations.ts / vehicle-stats.ts] uses a DIFFERENT inline band
-// `mpg > 0 && mpg < 150` — that divergence is a behavior/direction call, escalated C419, not pinned here.)
+// (As of C20 the per-vehicle stats path [calculations.ts averageConsecutiveMpg / calculateAverageMilesPerKwh]
+// shares this SAME canonical band — the #30/C419 divergence was unified to [5,100]/[1,10], Angelo-APPROVED.)
 describe('computeEfficiencyPoint — realistic-band boundaries (gas 5–100, electric 1–10) on the REAL fn', () => {
   // efficiency = (current.mileage − previous.mileage) / current.volume; control volume=1 so efficiency
   // equals the mileage delta. fuelType 'regular' = gas band [5,100]; 'Level 2 (AC)' = electric [1,10].

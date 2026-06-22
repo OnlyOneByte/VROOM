@@ -6,7 +6,7 @@
  */
 
 import { isElectricFuelType } from '../db/types';
-import { calculateAverageMilesPerKwh, maxOf } from './calculations';
+import { averageConsecutiveMpg, calculateAverageMilesPerKwh, maxOf } from './calculations';
 
 // Helper types for vehicle stats calculations
 export interface FuelExpense {
@@ -157,34 +157,9 @@ function calculateMileageStats(
  * while making the helper correct for any future consumer that forgets to pre-sort.
  */
 function calculateAverageMpg(unorderedExpenses: FuelExpense[]): number | null {
-  const expensesWithMileage = [...unorderedExpenses].sort(
-    (a, b) => a.date.getTime() - b.date.getTime()
-  );
-  const mpgValues: number[] = [];
-
-  for (let i = 1; i < expensesWithMileage.length; i++) {
-    const current = expensesWithMileage[i];
-    const previous = expensesWithMileage[i - 1];
-
-    // Skip pairs affected by missed fill-ups
-    if (current.missedFillup || previous.missedFillup) {
-      continue;
-    }
-
-    if (current.mileage && previous.mileage && current.volume) {
-      const milesDriven = current.mileage - previous.mileage;
-      const mpg = milesDriven / current.volume;
-
-      // Filter out unrealistic values (likely data errors)
-      if (mpg > 0 && mpg < 150) {
-        mpgValues.push(mpg);
-      }
-    }
-  }
-
-  if (mpgValues.length > 0) {
-    return mpgValues.reduce((sum, mpg) => sum + mpg, 0) / mpgValues.length;
-  }
-
-  return null;
+  // Defensive inline date sort (#75: the helper requires chronological order for correct pairwise
+  // odometer deltas), then run the SHARED consecutive-pair MPG average (C17 dedup — the same loop +
+  // missedFillup skip + (0,150) band that calculateAverageMPG uses; C161 proved hand-copies drift).
+  const sorted = [...unorderedExpenses].sort((a, b) => a.date.getTime() - b.date.getTime());
+  return averageConsecutiveMpg(sorted);
 }

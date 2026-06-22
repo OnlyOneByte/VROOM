@@ -308,6 +308,54 @@ describe('DELETE /api/v1/providers/:id', () => {
  * a FOREIGN user's provider that COEXISTS in the shared DB (a second createTestApp would reset it) and
  * prove our destructive ops can't touch it.
  */
+// C108 (guard): GET /:id/sync-status had ZERO HTTP coverage despite carrying the SAME
+// findOwnedProviderOrThrow tenant-isolation chokepoint the PUT/DELETE paths pin — but on a READ path. A
+// guard-drop here would leak ANOTHER tenant's per-category photo-sync counts (total/synced/failed) for any
+// provider id (NORTH_STAR #2 isolation), invisible to every existing test. This pins: owned → 200 with the
+// 4-category {total,synced,failed} shape; foreign id → 404 (no existence leak); anon → 401.
+describe('GET /api/v1/providers/:id/sync-status — owned read + tenant isolation', () => {
+  const SYNC_CATEGORIES = [
+    'vehicle_photos',
+    'expense_receipts',
+    'insurance_docs',
+    'odometer_readings',
+  ].sort();
+
+  test('owned provider → 200 with the per-category {total,synced,failed} shape', async () => {
+    const created = await createProvider();
+    const res = await ctx.authed('GET', `/api/v1/providers/${created.id}/sync-status`);
+    expect(res.status).toBe(200);
+    const data = (await json<DataEnvelope<Record<string, Record<string, number>>>>(res)).data;
+    expect(Object.keys(data).sort()).toEqual(SYNC_CATEGORIES);
+    // Each category is the exact counts triad; a fresh provider has nothing synced/failed yet.
+    for (const cat of SYNC_CATEGORIES) {
+      expect(Object.keys(data[cat]).sort()).toEqual(['failed', 'synced', 'total']);
+      expect(data[cat].synced).toBe(0);
+      expect(data[cat].failed).toBe(0);
+      expect(typeof data[cat].total).toBe('number');
+    }
+  });
+
+  test("404s another user's provider id (the ownership chokepoint — no sync-status leak)", async () => {
+    const created = await createProvider();
+    const other = await createTestApp();
+    const res = await other.authed('GET', `/api/v1/providers/${created.id}/sync-status`);
+    expect(res.status).toBe(404); // findOwnedProviderOrThrow — same guard as PUT/DELETE, now pinned on the read
+    other.close();
+  });
+
+  test('404s a non-existent provider id', async () => {
+    const res = await ctx.authed('GET', '/api/v1/providers/nonexistent-id/sync-status');
+    expect(res.status).toBe(404);
+  });
+
+  test('rejects an unauthenticated sync-status read (401)', async () => {
+    const created = await createProvider();
+    const res = await ctx.anon('GET', `/api/v1/providers/${created.id}/sync-status`);
+    expect(res.status).toBe(401);
+  });
+});
+
 describe('#63 — provider PUT/DELETE writes are tenant-scoped (foreign row survives)', () => {
   /** Seed a provider owned by ANOTHER user directly; returns its id. */
   function seedForeignProvider(id: string): void {

@@ -12,7 +12,7 @@ import { clampPagination, type PaginatedResult } from '../../utils/pagination';
 import { BaseRepository } from '../../utils/repository';
 import { assertVehiclesOwned } from '../../utils/vehicle-ownership';
 import { expenseSplitService } from './split-service';
-import type { SplitConfig } from './validation';
+import { type SplitConfig, splitConfigVehicleIds } from './validation';
 export interface ExpenseFilters {
   vehicleId?: string;
   userId?: string;
@@ -247,13 +247,22 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
    * — so a retried offline POST is a no-op. When clientId is absent this is a plain
    * create. The pre-check + unique index together close the retry race: a concurrent
    * duplicate insert hits the unique constraint, which we recover by re-reading.
+   *
+   * `overwrite` (#98, C51): when the caller is a conflict RESOLUTION choosing keep-local (not a blind
+   * retry), a (userId, clientId) collision must APPLY the local edit, not silently discard it. With the
+   * flag set, an existing row is UPDATED with the new data (preserving its id/userId/clientId/createdAt —
+   * clientId/userId are stripped from the patch so the identity + idempotency key never change) instead
+   * of returned unchanged. Default false keeps the plain-retry path a pure no-op (NORTH_STAR #1: a
+   * resolved offline edit is never lost).
    */
-  async createIdempotent(data: NewExpense): Promise<Expense> {
+  async createIdempotent(data: NewExpense, overwrite = false): Promise<Expense> {
     if (!data.clientId) {
       return this.create(data);
     }
     const existing = await this.findByClientId(data.clientId, data.userId);
-    if (existing) return existing;
+    if (existing) {
+      return overwrite ? this.applyLocalOverwrite(existing.id, data) : existing;
+    }
 
     try {
       return await this.create(data);
@@ -261,9 +270,24 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       // Lost the race: another request inserted the same (userId, clientId).
       // Re-read and return the winner rather than surfacing a constraint error.
       const raced = await this.findByClientId(data.clientId, data.userId);
-      if (raced) return raced;
+      if (raced) {
+        // Same overwrite contract on the raced winner so a concurrent keep-local still applies the edit.
+        return overwrite ? this.applyLocalOverwrite(raced.id, data) : raced;
+      }
       throw error;
     }
+  }
+
+  /**
+   * Apply a keep-local overwrite (#98) onto the existing (userId, clientId) row: replace its mutable
+   * fields with the local edit while keeping the identity + idempotency keys IMMUTABLE — clientId/userId
+   * are stripped from the patch so they (and the row id/createdAt) never change. ONE source of truth for
+   * the overwrite, shared by both createIdempotent collision branches (the pre-check hit + the raced
+   * winner) so the immutability contract can't drift between them.
+   */
+  private applyLocalOverwrite(rowId: string, data: NewExpense): Promise<Expense> {
+    const { clientId: _clientId, userId: _userId, ...patch } = data;
+    return this.update(rowId, patch);
   }
 
   /**
@@ -601,15 +625,10 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
    * Throws NotFoundError if any vehicle is not found or not owned.
    */
   private async validateVehicleOwnership(splitConfig: SplitConfig, userId: string): Promise<void> {
-    const vehicleIds =
-      splitConfig.method === 'even'
-        ? splitConfig.vehicleIds
-        : splitConfig.allocations.map((a) => a.vehicleId);
-
-    // Delegate the cross-tenant ownership query to the shared assertVehiclesOwned (C376) — ONE source
-    // of truth shared with the insurance term path. This wrapper keeps the split-config field
-    // extraction; the helper owns the `userId AND id IN (ids)` predicate + the NotFoundError throw.
-    await assertVehiclesOwned(this.db, vehicleIds, userId);
+    // splitConfigVehicleIds owns the `even ? vehicleIds : allocations.map(...)` extraction (one source
+    // of truth, C50); assertVehiclesOwned (C376) owns the cross-tenant `userId AND id IN (ids)` query +
+    // NotFoundError throw, shared with the insurance term path.
+    await assertVehiclesOwned(this.db, splitConfigVehicleIds(splitConfig), userId);
   }
 
   /**

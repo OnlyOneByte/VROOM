@@ -49,7 +49,7 @@ function referenceMpg(expenses: FuelExpense[]): { mpgValues: number[]; avg: numb
     if (current.mileage && previous.mileage && current.volume) {
       const miles = current.mileage - previous.mileage;
       const mpg = miles / current.volume;
-      if (mpg > 0 && mpg < 150) {
+      if (mpg >= 5 && mpg <= 100) {
         mpgValues.push(mpg);
       }
     }
@@ -69,7 +69,7 @@ function countUnfilteredPairs(expenses: FuelExpense[]): number {
     if (current.mileage && previous.mileage && current.volume) {
       const miles = current.mileage - previous.mileage;
       const mpg = miles / current.volume;
-      if (mpg > 0 && mpg < 150) count++;
+      if (mpg >= 5 && mpg <= 100) count++;
     }
   }
   return count;
@@ -117,7 +117,7 @@ function verifyMpgValuesMatchReference(expenses: FuelExpense[], mpgValues: numbe
     if (current.mileage && previous.mileage && current.volume) {
       const miles = current.mileage - previous.mileage;
       const mpg = miles / current.volume;
-      if (mpg > 0 && mpg < 150) {
+      if (mpg >= 5 && mpg <= 100) {
         expect(mpgValues[validIdx]).toBeCloseTo(mpg, 5);
         validIdx++;
       }
@@ -562,44 +562,45 @@ describe('Property 6: a mixed fuel+charge vehicle keeps MPG and mi/kWh isolated'
 });
 
 // ---------------------------------------------------------------------------
-// Realistic-MPG outlier band (#30, C430 guard). calculateAverageMpg drops a pair whose computed MPG
-// is outside `mpg > 0 && mpg < 150` (vehicle-stats.ts:179) as a likely data error. The property
-// suite above only "covered" this band through a LOCAL re-implementation (referenceMpg L43-59 /
-// countUnfilteredPairs L64-76 each carry their own `mpg > 0 && mpg < 150`), and the generators only
-// emit realistic 8–40 MPG — so the REAL export's boundary was never driven (the C181/C229
-// coverage-theater pattern). These pin it FIRSTHAND through calculateVehicleStats with one realistic
-// 30-MPG anchor pair plus one out-of-band pair, asserting the average reflects ONLY the kept pair.
-// NOTE: this locks the CURRENT (0, 150) contract; #30 (escalated C419) is the open direction call to
-// unify it with analytics-charts' documented [5,100]/[1,10] band — pinning today's behavior here does
-// NOT pre-decide that, it just makes a silent regression of the filter detectable.
+// Realistic-MPG outlier band (#30, C430 guard; band UNIFIED to [5,100] in C20, Angelo-APPROVED).
+// calculateAverageMpg drops a pair whose computed MPG is outside the CANONICAL inclusive
+// [MIN_VALID_MPG, MAX_VALID_MPG] = [5,100] shared with analytics-charts (#30/C419) — previously (0,150)
+// here, which made the same car show two different averages on the per-vehicle stats card vs the
+// Analytics Fuel Stats card. These pin the band FIRSTHAND through calculateVehicleStats with one
+// realistic 30-MPG anchor pair plus one out-of-band pair, asserting the average reflects ONLY the kept
+// pair. (The property suite above drives the band via referenceMpg's matching predicate; these pin the
+// REAL export's boundary, avoiding the C181/C229 coverage-theater pattern.)
 // ---------------------------------------------------------------------------
-describe('averageMpg excludes out-of-band outlier pairs (#30)', () => {
-  // idx0→idx1: 300 mi / 10 gal = 30 MPG (realistic, KEPT). idx1→idx2 is the out-of-band pair under test.
+describe('averageMpg excludes out-of-band outlier pairs (#30, [5,100] band)', () => {
+  // idx0→idx1: 300 mi / 10 gal = 30 MPG (in-band, KEPT). idx1→idx2 is the out-of-band pair under test.
   const anchor0 = makeFuelExpense({ mileage: 10000, volume: 10, missedFillup: false, index: 0 });
   const anchor1 = makeFuelExpense({ mileage: 10300, volume: 10, missedFillup: false, index: 1 });
 
-  test('an above-band pair (>150 MPG, a mistyped tiny volume) is dropped, averaging only the realistic pair', () => {
-    // idx1→idx2: 350 mi / 2 gal = 175 MPG (> 150) — a 2-gal top-off mis-logged after 350 miles.
+  test('an above-band pair (>100 MPG, a mistyped tiny volume) is dropped, averaging only the realistic pair', () => {
+    // idx1→idx2: 350 mi / 2 gal = 175 MPG (> 100) — a 2-gal top-off mis-logged after 350 miles.
     const outlier = makeFuelExpense({ mileage: 10650, volume: 2, missedFillup: false, index: 2 });
     const stats = calculateVehicleStats([anchor0, anchor1, outlier], 10000, true, false);
-    // Non-vacuous: if the < 150 cap regressed (loosened/dropped), this would be (30 + 175) / 2 = 102.5.
+    // Non-vacuous: if the 100 cap regressed (loosened to the old 150 / dropped), this would be (30 + 175) / 2.
     expect(stats.averageMpg).toBeCloseTo(30, 5);
   });
 
-  test('a pair at EXACTLY 150 MPG is dropped (the load-bearing `< 150`, not `<= 150`)', () => {
-    // idx1→idx2: 300 mi / 2 gal = 150 MPG exactly — excluded because the bound is strict.
-    const atBoundary = makeFuelExpense({
-      mileage: 10600,
-      volume: 2,
-      missedFillup: false,
-      index: 2,
-    });
-    const stats = calculateVehicleStats([anchor0, anchor1, atBoundary], 10000, true, false);
-    // Non-vacuous: a `<= 150` regression would include 150 → (30 + 150) / 2 = 90.
+  test('the band is INCLUSIVE: a pair at EXACTLY 100 MPG (=MAX) is KEPT', () => {
+    // idx1→idx2: 200 mi / 2 gal = 100 MPG exactly — kept because MAX_VALID_MPG is inclusive (<=).
+    const atMax = makeFuelExpense({ mileage: 10500, volume: 2, missedFillup: false, index: 2 });
+    const stats = calculateVehicleStats([anchor0, anchor1, atMax], 10000, true, false);
+    // Both pairs kept → (30 + 100) / 2 = 65. Non-vacuous: an exclusive `< 100` would drop 100 → 30.
+    expect(stats.averageMpg).toBeCloseTo((30 + 100) / 2, 5);
+  });
+
+  test('a below-band pair (<5 MPG) is dropped (the MIN_VALID_MPG=5 floor, new in C20)', () => {
+    // idx1→idx2: 40 mi / 10 gal = 4 MPG — below the 5-MPG floor (a city-traffic mis-log / wrong units).
+    const tooLow = makeFuelExpense({ mileage: 10340, volume: 10, missedFillup: false, index: 2 });
+    const stats = calculateVehicleStats([anchor0, anchor1, tooLow], 10000, true, false);
+    // Non-vacuous: the OLD (0,150) band kept 4 MPG → (30 + 4) / 2 = 17; the [5,100] band drops it → 30.
     expect(stats.averageMpg).toBeCloseTo(30, 5);
   });
 
-  test('a non-positive pair (a duplicate/zero-delta odometer reading) is dropped (the `mpg > 0` edge)', () => {
+  test('a non-positive pair (a duplicate/zero-delta odometer reading) is dropped', () => {
     // idx1→idx2: same odometer (10300) → 0 mi → mpg 0 — a fill-up logged twice at one reading.
     const zeroDelta = makeFuelExpense({
       mileage: 10300,
@@ -608,7 +609,7 @@ describe('averageMpg excludes out-of-band outlier pairs (#30)', () => {
       index: 2,
     });
     const stats = calculateVehicleStats([anchor0, anchor1, zeroDelta], 10000, true, false);
-    // Non-vacuous: a `>= 0` regression would include the 0-MPG pair → (30 + 0) / 2 = 15.
+    // Non-vacuous: a regression admitting 0 would give (30 + 0) / 2 = 15.
     expect(stats.averageMpg).toBeCloseTo(30, 5);
   });
 });

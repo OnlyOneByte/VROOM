@@ -107,24 +107,50 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
       'PUT expense'
     );
     expectDenied(await ctx.authed('DELETE', `/api/v1/expenses/${eid}`), 'DELETE expense');
+
+    // C115: the SPLIT routes (PUT/DELETE /split/:id) are state-changing + (groupId, userId)-scoped in the
+    // repo (updateSplitExpense/deleteSplitExpense throw NotFoundError when the group isn't found for the
+    // caller), but the IDOR sweep skipped them. They're destructive (regenerate/delete sibling expense rows
+    // + their photos) and money-bearing — a regression to an un-scoped group write would let A rewrite or
+    // delete B's split expenses. Seed B's split group, then prove A is denied both.
+    const gid = (
+      await json<DataEnvelope<{ groupId: string }>>(
+        await asB('POST', '/api/v1/expenses/split', {
+          splitConfig: { method: 'even', vehicleIds: [vid] },
+          category: 'misc',
+          totalAmount: 100,
+          date: '2024-06-02T00:00:00.000Z',
+        })
+      )
+    ).data.groupId;
+    expectDenied(
+      await ctx.authed('PUT', `/api/v1/expenses/split/${gid}`, {
+        splitConfig: { method: 'even', vehicleIds: [vid] },
+      }),
+      'PUT split'
+    );
+    expectDenied(await ctx.authed('DELETE', `/api/v1/expenses/split/${gid}`), 'DELETE split');
   });
 
   test("insurance: A cannot GET/PUT/DELETE B's policy, nor its claim", async () => {
     const vid = await idOf(
       await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
     );
-    const pid = await idOf(
-      await asB('POST', '/api/v1/insurance', {
-        company: 'B Mutual',
-        terms: [
-          {
-            startDate: '2024-01-01T00:00:00.000Z',
-            endDate: '2025-01-01T00:00:00.000Z',
-            vehicleCoverage: { vehicleIds: [vid] },
-          },
-        ],
-      })
-    );
+    const policyRes = await asB('POST', '/api/v1/insurance', {
+      company: 'B Mutual',
+      terms: [
+        {
+          startDate: '2024-01-01T00:00:00.000Z',
+          endDate: '2025-01-01T00:00:00.000Z',
+          vehicleCoverage: { vehicleIds: [vid] },
+        },
+      ],
+    });
+    const policyBody =
+      await json<DataEnvelope<{ id: string; terms: Array<{ id: string }> }>>(policyRes);
+    expect(policyRes.status, JSON.stringify(policyBody)).toBeLessThan(300);
+    const pid = policyBody.data.id;
+    const tid = policyBody.data.terms[0].id; // B's term id (nested under the unowned policy)
     const cid = await idOf(
       await asB('POST', `/api/v1/insurance/${pid}/claims`, {
         claimDate: '2024-06-15T00:00:00.000Z',
@@ -138,6 +164,20 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
       'PUT policy'
     );
     expectDenied(await ctx.authed('DELETE', `/api/v1/insurance/${pid}`), 'DELETE policy');
+    // C114: TERM routes (PUT/DELETE /:id/terms/:termId) are state-changing, gated on the SAME
+    // validateInsuranceOwnership(id) as the policy itself (routes.ts:230/257), but the IDOR sweep
+    // skipped them. A cross-tenant term edit/delete would let A mutate B's insurance terms (and their
+    // auto-materialized premium expenses via updateTermExpenses/deleteBySource). terms-http.test.ts
+    // (C272) pins the INNER FK defense (a foreign vehicleId in the coverage payload) but always AS the
+    // policy owner — the policy-level ownership gate on the term routes was never cross-tenant tested.
+    expectDenied(
+      await ctx.authed('PUT', `/api/v1/insurance/${pid}/terms/${tid}`, { policyNumber: 'HACK' }),
+      'PUT term'
+    );
+    expectDenied(
+      await ctx.authed('DELETE', `/api/v1/insurance/${pid}/terms/${tid}`),
+      'DELETE term'
+    );
     // Claims are nested under the (unowned) policy.
     expectDenied(await ctx.authed('GET', `/api/v1/insurance/${pid}/claims`), 'GET claims');
     expectDenied(
@@ -150,7 +190,7 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     );
   });
 
-  test("financing: A cannot DELETE/PATCH B's financing", async () => {
+  test("financing: A cannot DELETE/PATCH/PAYOFF B's financing", async () => {
     const vid = await idOf(
       await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
     );
@@ -171,6 +211,14 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
       'PATCH financing'
     );
     expectDenied(await ctx.authed('DELETE', `/api/v1/financing/${fid}`), 'DELETE financing');
+    // C113: PUT /:financingId/payoff is a state-changing route gated on the SAME
+    // validateFinancingOwnership (routes.ts:219) as DELETE, but the IDOR sweep skipped it. A
+    // cross-tenant payoff would let A mark B's financing paid-off (deactivateFinancing → isActive=0,
+    // severs the source link) — a destructive write on B's data. Pin it alongside its siblings.
+    expectDenied(
+      await ctx.authed('PUT', `/api/v1/financing/${fid}/payoff`, {}),
+      'PUT financing payoff'
+    );
   });
 
   test("odometer: A cannot GET/PUT/DELETE B's odometer entry", async () => {
@@ -219,6 +267,26 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
       'PUT reminder'
     );
     expectDenied(await ctx.authed('DELETE', `/api/v1/reminders/${rid}`), 'DELETE reminder');
+
+    // C116 (the LAST known IDOR-sweep gap): PUT /notifications/:id/read is a state-changing route
+    // gated on markNotificationRead's (id, userId) scope (it throws NotFoundError when no row matches —
+    // repository.ts:565), but the sweep never covered it. Raw-seed a notification owned by B (the API
+    // only creates these via the trigger), then prove A can't mark B's notification read. Closes the
+    // route-coverage IDOR audit (C108–C116) for every state-changing route.
+    ctx.sqlite.run(
+      `INSERT INTO reminder_notifications (id, reminder_id, user_id, due_date, due_odometer, is_read, created_at)
+       VALUES ('n-idor-b', ?, ?, 1700000000, NULL, 0, 1000)`,
+      [rid, bId]
+    );
+    expectDenied(
+      await ctx.authed('PUT', '/api/v1/reminders/notifications/n-idor-b/read'),
+      'PUT notification read'
+    );
+    // And B's notification is untouched — still unread.
+    const stillUnread = ctx.sqlite
+      .query('SELECT is_read FROM reminder_notifications WHERE id = ?')
+      .get('n-idor-b') as { is_read: number };
+    expect(stillUnread.is_read).toBe(0);
   });
 
   test("photo: A cannot list/upload to B's vehicle via the generic photo route", async () => {

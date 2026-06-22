@@ -96,6 +96,35 @@ describe('settings store — state-management contracts (C319)', () => {
 		expect(settingsStore.settings).toBeNull(); // never loaded
 	});
 
+	// The uploadBackup twin of the restoreFromProvider reload contract (above). uploadBackup is the
+	// FILE-upload restore path (the more common one — drag a .zip in), and it gates the post-restore
+	// this.load() on `mode !== 'preview'` exactly like restoreFromProvider. C319 pinned the provider
+	// path; this pins the file-upload path so a regression dropping its reload — which would leave the UI
+	// showing STALE pre-restore settings after a replace/merge (NORTH_STAR #1 data-correctness) — goes RED.
+	// (settings-api.test.ts pins uploadBackup's wire/FormData contract, not the store's mode-gated reload.)
+	it('a non-preview uploadBackup REFRESHES state via load() (second fetch = the reload)', async () => {
+		// 1st fetch = the restore upload; 2nd fetch = this.load()'s GET /settings.
+		mockFetch
+			.mockResolvedValueOnce(okJson({ success: true, imported: {} }))
+			.mockResolvedValueOnce(okJson(SETTINGS));
+
+		const file = new File(['backup-bytes'], 'vroom-backup.zip', { type: 'application/zip' });
+		await settingsStore.uploadBackup(file, 'replace');
+
+		expect(mockFetch).toHaveBeenCalledTimes(2); // upload + reload
+		expect(settingsStore.settings).toEqual(SETTINGS); // refreshed from the post-restore GET
+	});
+
+	it('a PREVIEW uploadBackup does NOT reload (read-only — no state change to reflect)', async () => {
+		mockFetch.mockResolvedValueOnce(okJson({ success: true, preview: {} }));
+
+		const file = new File(['backup-bytes'], 'vroom-backup.zip', { type: 'application/zip' });
+		await settingsStore.uploadBackup(file, 'preview');
+
+		expect(mockFetch).toHaveBeenCalledTimes(1); // upload only, no reload
+		expect(settingsStore.settings).toBeNull(); // never loaded
+	});
+
 	it('reset() clears settings, error, and loading state (the logout path)', async () => {
 		mockFetch.mockResolvedValueOnce(okJson(SETTINGS));
 		await settingsStore.load();

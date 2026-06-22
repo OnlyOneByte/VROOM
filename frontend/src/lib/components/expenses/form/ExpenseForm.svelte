@@ -41,16 +41,10 @@
 	import { Checkbox } from '$lib/components/ui/checkbox';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
 	import { formatCurrency, dateOnlyToISO, toDateInputValue } from '$lib/utils/formatters';
-	import { categoryLabels, resetSplitAllocations } from '$lib/utils/expense-helpers';
+	import { buildSplitConfig, categoryLabels, resetSplitAllocations } from '$lib/utils/expense-helpers';
 	import { extractUniqueTags } from '$lib/utils/expense-filters';
 	import { COMMON_EXPENSE_TAGS } from '$lib/types';
-	import type {
-		ExpenseCategory,
-		ExpenseFormErrors,
-		Vehicle,
-		Expense,
-		SplitConfig
-	} from '$lib/types';
+	import type { ExpenseCategory, ExpenseFormErrors, Vehicle, Expense } from '$lib/types';
 	import { isElectricFuelType, getDistanceUnitLabel } from '$lib/utils/units';
 	import FormLayout from '$lib/components/common/form-layout.svelte';
 
@@ -519,7 +513,7 @@
 
 			if (isGroupEditMode && groupId) {
 				// Update split expense group
-				const splitConfig = buildSplitConfig();
+				const splitConfig = buildSplitConfig(splitMethod, selectedVehicleIds, splitAllocations);
 				await expenseApi.updateSplitExpense(groupId, {
 					splitConfig,
 					totalAmount: parseFloat(formData.amount)
@@ -541,7 +535,7 @@
 				gotoDynamic(returnTo);
 			} else if (isSplit && selectedVehicleIds.length >= 2) {
 				// Create split expense group
-				const splitConfig = buildSplitConfig();
+				const splitConfig = buildSplitConfig(splitMethod, selectedVehicleIds, splitAllocations);
 				const result = await expenseApi.createSplitExpense({
 					splitConfig,
 					category: formData.category as ExpenseCategory,
@@ -776,27 +770,6 @@
 		splitAllocations = allocs;
 	}
 
-	function buildSplitConfig(): SplitConfig {
-		if (splitMethod === 'even') {
-			return { method: 'even', vehicleIds: selectedVehicleIds };
-		} else if (splitMethod === 'absolute') {
-			return {
-				method: 'absolute',
-				allocations: splitAllocations.map(a => ({
-					vehicleId: a.vehicleId,
-					amount: a.amount ?? 0
-				}))
-			};
-		} else {
-			return {
-				method: 'percentage',
-				allocations: splitAllocations.map(a => ({
-					vehicleId: a.vehicleId,
-					percentage: a.percentage ?? 0
-				}))
-			};
-		}
-	}
 </script>
 
 <FormLayout>

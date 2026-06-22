@@ -19,6 +19,7 @@ import { expenseRepository } from '../expenses/repository';
 import { financingRepository, withComputedBalance } from '../financing/repository';
 import { odometerRepository } from '../odometer/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
+import { reminderRepository } from '../reminders/repository';
 import { preferencesRepository } from '../settings/repository';
 import { photoRoutes } from './photo-routes';
 import { vehicleRepository } from './repository';
@@ -300,6 +301,17 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   await deletePhotosForEntities('odometer_entry', odometerIds, user.id);
 
   await vehicleRepository.delete(id);
+
+  // #88: the reminder_vehicles junction cascades, but a reminder's `expenseSplitConfig` JSON blob is NOT
+  // FK-managed — its leg for the deleted vehicle lingers, so the next trigger builds a split sibling for
+  // the dead vehicleId → an FK violation that leaves the surviving legs half-committed (C151 footgun).
+  // Prune the deleted leg + renormalize FIRST (clears the blob when <2 legs remain).
+  await reminderRepository.pruneSplitConfigsForDeletedVehicle(user.id, id);
+
+  // #97: the reminder_vehicles junction rows cascade away with the vehicle, but a reminder whose
+  // sole/last vehicle was this one is left active with ZERO vehicles — the trigger skips it
+  // 'no_vehicles' forever with no user signal. Deactivate any such now-vehicleless active reminder.
+  await reminderRepository.deactivateVehicleless(user.id);
 
   return c.json({
     success: true,

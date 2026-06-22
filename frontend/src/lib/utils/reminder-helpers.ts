@@ -53,6 +53,51 @@ export function shouldTriggerRecurringExpenses(opts: {
 	return !sameLocalDay; // skip if already triggered today (the user's local calendar day)
 }
 
+/** localStorage key for the last opportunistic recurring-trigger timestamp (T5 once-per-day debounce). */
+export const RECURRING_TRIGGER_TS_KEY = 'vroom_recurring_last_trigger';
+
+/**
+ * Opportunistic recurring-expenses materialization (recurring-expenses T5/D1 — the app-init hook).
+ * Reads the last-trigger timestamp from localStorage, applies the pure `shouldTriggerRecurringExpenses`
+ * gate (authed + online + not-already-today), and on a pass POSTs the trigger then stamps the timestamp
+ * so it runs AT MOST once per local calendar day. Fail-soft: a trigger error is swallowed (this is a
+ * best-effort background nudge — the user can still hit the manual "Run due reminders" button), and the
+ * timestamp is only stamped AFTER a successful POST so a transient failure retries on the next app open.
+ *
+ * `trigger` is injected (the reminderApi.trigger fn) so the layout owns the import + this stays unit-
+ * testable without the service/network. Returns whether a trigger was actually fired. No-op + false off
+ * `browser` (no localStorage) or when the gate declines.
+ */
+export async function maybeTriggerRecurringExpenses(opts: {
+	isAuthed: boolean;
+	isOnline: boolean;
+	isBrowser: boolean;
+	trigger: () => Promise<unknown>;
+	now?: number;
+}): Promise<boolean> {
+	if (!opts.isBrowser) return false;
+	const now = opts.now ?? Date.now();
+	const stored = localStorage.getItem(RECURRING_TRIGGER_TS_KEY);
+	const lastRunMs = stored ? Number(stored) : null;
+	const gate = shouldTriggerRecurringExpenses({
+		isAuthed: opts.isAuthed,
+		isOnline: opts.isOnline,
+		// A corrupt/non-numeric stored value parses to NaN — treat it as "never run" (trigger) rather
+		// than passing NaN into the gate's same-local-day Date math (new Date(NaN) → Invalid Date).
+		lastRunMs: lastRunMs !== null && Number.isFinite(lastRunMs) ? lastRunMs : null,
+		now
+	});
+	if (!gate) return false;
+	try {
+		await opts.trigger();
+		// Stamp only on success so a failed POST retries next app open (don't burn the daily window).
+		localStorage.setItem(RECURRING_TRIGGER_TS_KEY, String(now));
+		return true;
+	} catch {
+		return false;
+	}
+}
+
 /** Whether a reminder has a time axis (triggerMode time|both) — i.e. a recurrence schedule applies. */
 export function hasTimeAxis(reminder: Reminder): boolean {
 	return reminder.triggerMode === 'time' || reminder.triggerMode === 'both';

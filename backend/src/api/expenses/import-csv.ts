@@ -298,7 +298,7 @@ function clearImportedFuelFields(expense: ImportableExpense): ImportableExpense 
  * same file re-imported produces the exact same keys in the same order → all dedup. The
  * `csv:` prefix namespaces it away from offline cuid clientIds and manual NULLs.
  */
-function deriveImportClientId(expense: ImportableExpense, occurrence: number): string {
+export function deriveImportClientId(expense: ImportableExpense, occurrence: number): string {
   const content = [
     expense.vehicleId,
     expense.category,

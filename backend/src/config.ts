@@ -180,6 +180,16 @@ export const CONFIG = {
     // decompressed size so a zip bomb can't inflate to many GB and OOM the
     // process. Generous vs any real backup (CSV text), tiny vs a bomb.
     maxUncompressedSize: 200 * 1024 * 1024,
+    // Per-entry compression-ratio cap (#22): the maxUncompressedSize check sums the
+    // ZIP-central-directory `size` field, which is ATTACKER-DECLARED — a bomb can lie
+    // (declare a small size to pass the sum, then inflate to GB on getData()). The
+    // DEFLATE ratio is also bounded (~1032:1 theoretical max per pass), so any entry
+    // whose declared size is an absurd multiple of its (real, in-file) compressedSize
+    // is a bomb signature regardless of what the size field claims. Real CSV text
+    // compresses ~3-20x, repetitive headers up to a few hundred x; 1000x is generous
+    // headroom for legit data, far below a nested/crafted bomb. compressedSize 0
+    // (an empty/stored entry) is skipped — nothing to inflate.
+    maxCompressionRatio: 1000,
     currentVersion: '1.0.0',
     supportedModes: ['preview', 'replace', 'merge'] as const,
     defaultRetentionCount: 10,
@@ -286,8 +296,11 @@ export function getBackupTableKeys(): string[] {
   return Object.keys(TABLE_SCHEMA_MAP);
 }
 
-// Files that may be absent in older backups (pre-migration)
-const OPTIONAL_BACKUP_FILES = new Set([
+// Files that may be absent in older backups (pre-migration). EXPORTED so a drift guard can assert this
+// set is a SUBSET of TABLE_FILENAME_MAP's values — an entry here that drifts from the map (typo, or a map
+// rename) silently makes a genuinely-optional file REQUIRED, so a valid older backup missing it fails
+// restore with "Missing required files" (NORTH_STAR #1: the user can't recover their own backup).
+export const OPTIONAL_BACKUP_FILES = new Set([
   'insurance_terms.csv',
   'insurance_term_vehicles.csv',
   'insurance_claims.csv',

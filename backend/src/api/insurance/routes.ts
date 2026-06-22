@@ -108,19 +108,20 @@ routes.post('/', zValidator('json', createPolicySchema), async (c) => {
   const data = c.req.valid('json');
   const policy = await insurancePolicyRepository.create(data, user.id);
 
-  // Auto-create split expenses for each term that has a totalCost
+  // Auto-create split expenses for each term that has a cost (totalCost OR a monthly premium, #69).
+  // The hook computes the effective total (createTermExpenses → effectiveTermCost) and no-ops on 0.
   for (const term of policy.terms) {
-    if (term.totalCost && term.totalCost > 0) {
-      const termVehicleIds = vehicleIdsForTerm(policy.termVehicleCoverage, term.id);
-      await createTermExpenses({
-        termId: term.id,
-        vehicleIds: termVehicleIds,
-        totalCost: term.totalCost,
-        startDate: term.startDate,
-        policyNumber: term.policyNumber ?? undefined,
-        userId: user.id,
-      });
-    }
+    const termVehicleIds = vehicleIdsForTerm(policy.termVehicleCoverage, term.id);
+    await createTermExpenses({
+      termId: term.id,
+      vehicleIds: termVehicleIds,
+      totalCost: term.totalCost ?? 0,
+      monthlyCost: term.monthlyCost,
+      startDate: term.startDate,
+      endDate: term.endDate,
+      policyNumber: term.policyNumber ?? undefined,
+      userId: user.id,
+    });
   }
 
   return c.json(
@@ -199,18 +200,18 @@ routes.post(
     const termData = c.req.valid('json');
     const policy = await insurancePolicyRepository.addTerm(id, termData, user.id);
 
-    // Auto-create split expenses if the new term has a totalCost
-    if (termData.totalCost && termData.totalCost > 0) {
-      const termVehicleIds = vehicleIdsForTerm(policy.termVehicleCoverage, policy.newTermId);
-      await createTermExpenses({
-        termId: policy.newTermId,
-        vehicleIds: termVehicleIds,
-        totalCost: termData.totalCost,
-        startDate: termData.startDate,
-        policyNumber: termData.policyNumber,
-        userId: user.id,
-      });
-    }
+    // Auto-create split expenses if the new term has a cost (totalCost OR a monthly premium, #69).
+    const termVehicleIds = vehicleIdsForTerm(policy.termVehicleCoverage, policy.newTermId);
+    await createTermExpenses({
+      termId: policy.newTermId,
+      vehicleIds: termVehicleIds,
+      totalCost: termData.totalCost ?? 0,
+      monthlyCost: termData.monthlyCost,
+      startDate: termData.startDate,
+      endDate: termData.endDate,
+      policyNumber: termData.policyNumber,
+      userId: user.id,
+    });
 
     return c.json({ success: true, data: policy, message: 'Term added successfully' }, 201);
   }
@@ -236,7 +237,9 @@ routes.put(
         termId,
         vehicleIds: termVehicleIds,
         totalCost: updatedTerm.totalCost ?? 0,
+        monthlyCost: updatedTerm.monthlyCost,
         startDate: updatedTerm.startDate,
+        endDate: updatedTerm.endDate,
         policyNumber: updatedTerm.policyNumber ?? undefined,
         userId: user.id,
       });

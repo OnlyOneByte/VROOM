@@ -37,29 +37,53 @@ export function sortExpensesByDate<T extends { date: Date | string }>(expenses: 
 /**
  * Calculate MPG (Miles Per Gallon) from miles driven and fuel consumed
  */
+/**
+ * The ONE canonical realistic-efficiency band (#30/C419, Angelo-APPROVED 2026-06-17). Both the
+ * per-vehicle stats averages here AND the analytics charts (analytics-charts.ts imports these) gate
+ * outliers on the SAME inclusive bounds, so the same car can't show two different averages on the
+ * per-vehicle stats card vs the Analytics Fuel Stats card. Matches the documented chart band ([5,100]
+ * gas mi/gal, [1,10] electric mi/kWh) + the frontend expense-helpers.ts filter.
+ */
+export const MIN_VALID_MPG = 5;
+export const MAX_VALID_MPG = 100;
+export const MIN_VALID_MI_KWH = 1;
+export const MAX_VALID_MI_KWH = 10;
+
 export function calculateMPG(miles: number, fuel: number): number {
   return fuel > 0 ? miles / fuel : 0;
 }
 
+/** The minimal row shape the consecutive-MPG pairing reads (id/date/etc. are irrelevant to the math). */
+interface MpgPairRow {
+  mileage?: number | null;
+  volume?: number | null;
+  missedFillup?: boolean;
+}
+
 /**
- * Calculate average MPG from a series of fuel expenses
- * Uses consecutive mileage readings to determine miles driven between fill-ups
+ * Average MPG over CONSECUTIVE fill-up pairs of an ALREADY-CHRONOLOGICALLY-SORTED list (C17 dedup).
+ *
+ * The identical pairing loop — skip a pair touching a `missedFillup` (the #66/#101 unlogged-gap rule),
+ * require both odometer readings + the current volume, `mpg = miles/volume`, drop unrealistic values
+ * outside (0,150) — was hand-copied in `calculateAverageMPG` (here) and `calculateAverageMpg`
+ * (vehicle-stats.ts). C161 recorded that a hand-copied variant of this exact loop once LOST its guard,
+ * so the copies are a live bug vector. ONE source of truth.
+ *
+ * Takes PRE-SORTED rows so each caller keeps its OWN sort contract (calculations.ts via
+ * `sortExpensesByDate`; vehicle-stats.ts via a defensive inline date sort, #75) — the dedup is
+ * behavior-preserving, not a sort-policy change. The outlier band is now the CANONICAL [MIN_VALID_MPG,
+ * MAX_VALID_MPG] = [5,100] shared with the analytics charts (#30/C419, Angelo-APPROVED 2026-06-17) — it
+ * used to be (0,150) here, so the same car showed two different averages on the per-vehicle stats card
+ * vs the Analytics Fuel Stats card; unified on the documented [5,100] band.
  */
-export function calculateAverageMPG(fuelExpenses: Expense[]): number | null {
-  if (fuelExpenses.length < 2) {
-    return null;
-  }
-
-  // Sort by date to ensure chronological order (sortExpensesByDate — the shared pairwise-order invariant)
-  const sortedExpenses = sortExpensesByDate(fuelExpenses);
-
+export function averageConsecutiveMpg(sortedExpenses: MpgPairRow[]): number | null {
   const mpgValues: number[] = [];
 
   for (let i = 1; i < sortedExpenses.length; i++) {
     const current = sortedExpenses[i];
     const previous = sortedExpenses[i - 1];
 
-    // Skip pairs affected by missed fill-ups
+    // Skip pairs affected by missed fill-ups (the segment spans an unlogged gap).
     if (current.missedFillup || previous.missedFillup) {
       continue;
     }
@@ -68,8 +92,8 @@ export function calculateAverageMPG(fuelExpenses: Expense[]): number | null {
       const miles = current.mileage - previous.mileage;
       const mpg = calculateMPG(miles, current.volume);
 
-      // Filter out unrealistic values (negative miles or extremely high/low MPG)
-      if (mpg > 0 && mpg < 150) {
+      // Filter out unrealistic values, on the canonical [5,100] band shared with analytics (#30/C419).
+      if (mpg >= MIN_VALID_MPG && mpg <= MAX_VALID_MPG) {
         mpgValues.push(mpg);
       }
     }
@@ -81,6 +105,20 @@ export function calculateAverageMPG(fuelExpenses: Expense[]): number | null {
 
   const sum = mpgValues.reduce((acc, mpg) => acc + mpg, 0);
   return sum / mpgValues.length;
+}
+
+/**
+ * Calculate average MPG from a series of fuel expenses
+ * Uses consecutive mileage readings to determine miles driven between fill-ups
+ */
+export function calculateAverageMPG(fuelExpenses: Expense[]): number | null {
+  if (fuelExpenses.length < 2) {
+    return null;
+  }
+
+  // Sort by date to ensure chronological order (sortExpensesByDate — the shared pairwise-order invariant),
+  // then run the shared consecutive-pair MPG average (C17 dedup).
+  return averageConsecutiveMpg(sortExpensesByDate(fuelExpenses));
 }
 
 /**
@@ -123,8 +161,9 @@ export function calculateAverageMilesPerKwh(chargeExpenses: EfficiencyExpense[])
       const miles = current.mileage - previous.mileage;
       const milesPerKwh = calculateMilesPerKwh(miles, current.volume);
 
-      // Filter out unrealistic values (negative miles or > 10 mi/kWh)
-      if (milesPerKwh > 0 && milesPerKwh < 10) {
+      // Filter out unrealistic values, on the canonical [1,10] mi/kWh band shared with analytics
+      // (#30/C419, Angelo-APPROVED) — was (0,10) here, diverging from analytics' lower bound of 1.
+      if (milesPerKwh >= MIN_VALID_MI_KWH && milesPerKwh <= MAX_VALID_MI_KWH) {
         milesPerKwhValues.push(milesPerKwh);
       }
     }

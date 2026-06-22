@@ -69,6 +69,25 @@ export const splitConfigSchema = z.discriminatedUnion('method', [
 /** Inferred SplitConfig type — the API-layer discriminated union. */
 export type SplitConfig = z.infer<typeof splitConfigSchema>;
 
+/**
+ * The distinct vehicleIds a split config touches, across all three methods (even: `vehicleIds`;
+ * absolute/percentage: the allocation rows). ONE source of truth for the `even ? vehicleIds :
+ * allocations.map(...)` extraction that was hand-copied at 3 sites (the expenses route's ownership
+ * loop, the expense repo's validateVehicleOwnership, the reminder validator's split-vs-vehicleIds
+ * check). Typed on the minimal structural shape so BOTH `SplitConfig` (this module) and the DB-layer
+ * `ReminderSplitConfig` satisfy it without a cross-import. De-duped (Set) — a malformed config naming
+ * the same vehicle twice yields it once, matching the callers' prior `[...new Set(ids)]`.
+ */
+export function splitConfigVehicleIds(
+  config:
+    | { method: 'even'; vehicleIds: string[] }
+    | { method: 'absolute' | 'percentage'; allocations: { vehicleId: string }[] }
+): string[] {
+  const ids =
+    config.method === 'even' ? config.vehicleIds : config.allocations.map((a) => a.vehicleId);
+  return [...new Set(ids)];
+}
+
 // ---------------------------------------------------------------------------
 // Create / Update Split Expense Schemas
 // ---------------------------------------------------------------------------
