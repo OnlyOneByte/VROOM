@@ -24,6 +24,11 @@
 > (settings reload) + C101 (theme listener) + C102 (#148 anchor) FE-logic guard arc. FE is now meaningfully off its
 > old plateau; the residual gap is structural (effect/DOM-bound + DI/OAuth-bound). Both still under the 90% goal but
 > the FE structural ceiling proved ~1.25pts higher than the long-assumed ~86% once the store/util logic was pinned.**
+> **C128 (guard MEASURED): FE moved UP — 87.74% line / 88.56% func / 79.74% branch / 85.63% stmts (743 pass),
+> +0.14 line vs C123, from pinning settings-store `restoreFromProvider` mode-gated reload + error path
+> (settings.svelte.ts 67.5→70% line). BE unchanged 88.02% (frontend-only cycle). Both coverage frontiers (BE
+> C126/C127, FE C128) have now each yielded a real gain off the long plateau — the clean store-logic/constructed-repo
+> picks are nearly worked through; residual is DOM/timer/OAuth/DI/SQL-structural.**
 > **C126 (guard MEASURED): BE moved UP off the long-flat ~87.78% ceiling — 88.02% line / 87.64% func (1766 pass),
 > +0.24/+0.10 vs C123, from pinning 3 uncovered PhotoRepository finders (photo-repository.ts 72.90→97.28% line).
 > FIRST non-flat BE coverage gain in many cycles — proof the file was a REAL gap, not theater. FE 87.6% unchanged
@@ -65,12 +70,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 121 |
 | deep-review | 5 | 125 |
-| guard | 6 | 127 |
+| guard | 6 | 128 |
 | bug | 3 | 122 |
 | arch | 5 | 124 |
 | infra | 6 | 123 |
 
-Current cycle: **127**
+Current cycle: **128**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -389,6 +394,28 @@ Current cycle: **127**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C128 (guard — pin settings-store `restoreFromProvider` mode-gated reload + error path, a NORTH_STAR #1
+  data-safety invariant; pivoted FE this cycle)** — Balance at C128 (HEAD was C127): feature (7/4, +3) + bug (6/3,
+  +3) co-most-starved over budget, both BLOCKED (feature detect-commit Angelo-gated, manual half fully eyes-on;
+  bug `git diff C85..HEAD` over prod src EMPTY — verified). Per don't-force-a-blocked-pick, continued the coverage
+  vein — but pivoted to the FRONTEND (C126/C127 swept backend). SCOUT: ran `vitest --coverage`, the lowest real-logic
+  FE file was `settings.svelte.ts` (67.5% line); its uncovered lines 142-148/162-163 are `restoreFromProvider` (the
+  PROVIDER-path restore) + `loadRestoreProviders` catch blocks. FINDING: settings-api.test.ts pins only the WIRE
+  contract; settings-error-clearing.test.ts (C308) pins error-CLEAR-on-entry + one error-SET case (listAllBackups) —
+  but `restoreFromProvider`'s mode-gated post-restore reload (the C319/C100 invariant `uploadBackup` got pinned at
+  C100, the provider twin did NOT) + its error-set path were both unpinned in the STORE. GUARD: new
+  `settings-restore-from-provider.test.ts` (+4) drives the store through the mocked fetch (C308 pattern): a
+  non-preview (replace) restore reloads (2 fetches: restore + GET /settings); a preview restore does NOT (1 fetch —
+  the dry-run view must survive); merge also reloads (the non-preview branch covers replace AND merge); a failed
+  restore SETS store.error + re-throws. The reload is observed via the EXTRA GET the non-preview path issues. WHY IT
+  MATTERS: a dropped reload after a replace/merge restore leaves STALE pre-restore settings on screen — a silent
+  NORTH_STAR #1 footgun. NON-VACUOUS proven firsthand: neutered the gate to `if (false)` → the replace + merge
+  reload tests went RED (only 1 fetch), preview + error stayed green (isolates the exact invariant). VERIFY GATE
+  GREEN: FE validate:local exit 0 (type-check + build + vitest), 743 pass (+4 vs C127's 739). Frontend-only → BE
+  validate not required. COVERAGE: settings.svelte.ts 67.5→70% line; OVERALL FE 87.6→87.74% line / 85.63% stmts (a
+  genuine FE gain). cov: be 88.02% / fe 87.74% (MEASURED). NEXT guard: settings.svelte.ts 162-163
+  (loadRestoreProviders catch) + the sync-manager/expense-api tails are DOM/timer/pass-through-bound (C103/C107
+  structural) — the clean FE store-logic picks are nearly worked through.
 - **C127 (guard — BEHAVIORAL pin of `photoThumbnailResponse`; the security headers had a SOURCE-scan but no
   executing test)** — Balance at C127 (HEAD was C126): bug (5/3, +2) + feature (6/4, +2) co-most-starved over
   budget, both BLOCKED (bug `git diff C85..HEAD` over prod src EMPTY — verified; feature detect-commit Angelo-gated,

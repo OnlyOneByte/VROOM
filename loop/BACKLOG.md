@@ -525,6 +525,17 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C128 — settings-store `restoreFromProvider` mode-gated reload + error path (NORTH_STAR #1
+> data-safety; FE coverage frontier).** Scouted FE coverage → `settings.svelte.ts` (67.5%) had `restoreFromProvider`
+> (the provider-path restore) unpinned in the STORE: settings-api.test.ts pins only the wire contract, C308 pins
+> error-CLEAR-on-entry — but the C319/C100 mode-gated post-restore reload (uploadBackup got it at C100, this twin
+> did NOT) + the error-set path were untested. New `settings-restore-from-provider.test.ts` (+4): non-preview
+> (replace/merge) reloads (2 fetches), preview does NOT (1 — dry-run view survives), failed restore sets error +
+> re-throws. A dropped reload after replace/merge = STALE pre-restore settings on screen (silent NORTH_STAR #1).
+> Non-vacuous (neuter the gate to `if (false)` → replace+merge tests RED, preview+error green). settings.svelte.ts
+> 67.5→70% line; OVERALL FE 87.6→87.74%. Don't re-add. The clean store-logic FE picks are nearly worked through
+> (162-163 loadRestoreProviders catch + sync-manager/expense-api tails are DOM/timer/pass-through-structural).
+
 > **GUARDED C127 — BEHAVIORAL pin of `photoThumbnailResponse` (the photo-serve security headers had only a
 > SOURCE scan).** The C227 #77 thumbnail-serve builder already had photo-serve-headers.test.ts, but that's a SOURCE
 > SCAN (readFileSync + .toContain) — it never CALLS the function, so it showed 0% line coverage and a header object
