@@ -90,7 +90,7 @@ cycle (slow-budget categories mis-forecast otherwise).
 | arch | 5 | 131 |
 | infra | 6 | 136 |
 
-Current cycle: **139**
+Current cycle: **140**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -409,6 +409,27 @@ Current cycle: **139**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C140 (PR-GREEN override — fix the 2nd RED CI failure: registry.test.ts's leaking `mock.module('encryption')`
+  corrupted the providers-routes-http credential-encryption assertion)** — After C139 (the 0005-snapshot fix), CI
+  run #292 dropped backend annotations 10→2: the migration cascade was GONE, leaving an ISOLATED failure
+  `providers-routes-http.test.ts:268 expect(received).not.toContain('rotated-secret-9999')` — the stored credentials
+  column held `encrypted:{"secretAccessKey":"rotated-secret-9999",...}` (plaintext under a fake prefix) instead of
+  real AES ciphertext. ROOT CAUSE (traced firsthand): `registry.test.ts:12` does
+  `mock.module('../../../utils/encryption', { encrypt: p => \`encrypted:${p}\` })` and NEVER restores it — Bun's
+  mock.module is PROCESS-GLOBAL + non-restorable (sync-worker.test.ts:17 documents this; .kiro steering says
+  inject-don't-mock.module). When CI's file order ran registry before providers-routes-http, the stub `encrypt`
+  leaked into the REAL PUT-credentials route → it stored the plaintext-prefixed blob → the "encrypted at rest,
+  never echo the secret" SECURITY assertion failed. It passed locally only because local file ordering avoided the
+  collision. FIX (per the steering doc, matching the sync-worker precedent): DROP the mock.module; set a
+  deterministic `PROVIDER_ENCRYPTION_KEY` (mirrors test-helpers/http-client.ts) + build fixtures with the REAL
+  `encrypt()` via an `enc()` helper (7 credential literals converted; the garbage-creds fake-gate test keeps its
+  intent via `enc('not-valid-json{{{')`). VERIFY: ran registry + providers-routes-http together in the CI-FAILING
+  order → 48 pass / 0 fail (leak gone); full CI backend sequence green — db:generate no-op, type-check OK, biome 0
+  errors, bun test 1770 pass / 0 fail, build OK. Both confirmed backend failures (C139 migration + C140 mock-leak)
+  are now fixed. FRONTEND: still a bare workflow exit-1 (no readable detail; logs admin-gated; all FE CI steps green
+  firsthand locally) — pushing so the fresh run gives a clean, backend-noise-free FE signal. cov: be 88.21% / fe
+  88.23% (~ — test-only). NEXT: read the post-push CI run; if backend green + FE still red, the FE failure is now
+  isolated for the next cycle to drill.
 - **C139 (PR-GREEN override — fix RED CI: missing `0005_snapshot.json` made `db:generate` emit a spurious 0006
   that re-created an existing index → Backend Tests failed)** — PRIORITY OVERRIDE active (Angelo): only job is a
   green PR (C138 recorded the override + merged latest main). Read the LIVE CI via the public GitHub API (no `gh` on

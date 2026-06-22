@@ -3,16 +3,22 @@ import type { UserProvider } from '../../../db/schema';
 import type { StorageConfig } from '../../../types';
 import { StorageProviderRegistry } from '../domains/storage/registry';
 
-// --- Mock encryption ---
-// The only module-mock this file needs: the fixtures store credentials as
-// `encrypted:{...}` so decrypt() must strip that prefix. The GoogleDriveProvider
-// is NO LONGER mocked — createProviderInstance builds the REAL provider (its
-// OAuth2 client is lazy, no network at construction), and the tests only assert
-// provider.type, so the real class is exactly what we want to verify.
-mock.module('../../../utils/encryption', () => ({
-  encrypt: (plaintext: string) => `encrypted:${plaintext}`,
-  decrypt: (ciphertext: string) => ciphertext.replace('encrypted:', ''),
-}));
+// --- Real encryption (NOT mock.module) ---
+// This file previously did `mock.module('../../../utils/encryption', ...)` to stub encrypt/decrypt with
+// an `encrypted:`-prefix scheme for fixture convenience. But Bun's mock.module is PROCESS-GLOBAL and
+// CANNOT be restored (mock.restore only undoes mock() spies) — so the stub LEAKED into later files: when
+// CI's file ordering ran this before providers-routes-http.test.ts, the leaked `encrypt` made the real
+// PUT-credentials route store `encrypted:{...plaintext...}`, failing that file's "encrypted at rest, never
+// echoes the plaintext secret" security assertion. Per .kiro/steering/TestingExternalAPIs.md
+// (inject-don't-mock.module — the same fix the sync-worker suite already adopted), use the REAL encrypt:
+// set a deterministic key (mirrors test-helpers/http-client.ts) and build fixture credentials via encrypt().
+process.env.PROVIDER_ENCRYPTION_KEY ||= '0'.repeat(64);
+const { encrypt } = await import('../../../utils/encryption');
+
+/** Encrypt a credentials object the way the real routes store it (so registry.decrypt round-trips). */
+function enc(creds: unknown): string {
+  return encrypt(JSON.stringify(creds));
+}
 
 // --- Test fixtures ---
 
@@ -23,7 +29,7 @@ const baseProvider: UserProvider = {
   providerType: 'google-drive',
   providerAccountId: null,
   displayName: 'My Google Drive',
-  credentials: 'encrypted:{"refreshToken":"tok-123"}',
+  credentials: enc({ refreshToken: 'tok-123' }),
   config: { photoRootPath: 'VROOM/Photos' },
   status: 'active',
   lastSyncAt: null,
@@ -330,7 +336,7 @@ describe('StorageProviderRegistry', () => {
       const db = createMockDb([]);
       const registry = new StorageProviderRegistry(db as never);
 
-      const badCreds = { ...baseProvider, credentials: 'encrypted:{"noToken":true}' };
+      const badCreds = { ...baseProvider, credentials: enc({ noToken: true }) };
 
       expect(() => registry.createProviderInstance(badCreds)).toThrow(
         'Invalid Google Drive credentials: missing refreshToken'
@@ -346,7 +352,7 @@ describe('StorageProviderRegistry', () => {
       const row = {
         ...baseProvider,
         providerType: 'google-photos',
-        credentials: 'encrypted:{"refreshToken":"tok-gp"}',
+        credentials: enc({ refreshToken: 'tok-gp' }),
         config: { albumId: 'album-xyz' },
       };
       expect(registry.createProviderInstance(row).type).toBe('google-photos');
@@ -358,7 +364,7 @@ describe('StorageProviderRegistry', () => {
       const row = {
         ...baseProvider,
         providerType: 'google-photos',
-        credentials: 'encrypted:{"noToken":true}',
+        credentials: enc({ noToken: true }),
       };
       expect(() => registry.createProviderInstance(row)).toThrow(
         'Invalid Google Photos credentials: missing refreshToken'
@@ -371,7 +377,7 @@ describe('StorageProviderRegistry', () => {
       const row = {
         ...baseProvider,
         providerType: 's3',
-        credentials: 'encrypted:{"accessKeyId":"AK","secretAccessKey":"SK"}',
+        credentials: enc({ accessKeyId: 'AK', secretAccessKey: 'SK' }),
         config: { endpoint: 'https://s3.example.com', bucket: 'b', region: 'us-east-1' },
       };
       expect(registry.createProviderInstance(row).type).toBe('s3');
@@ -383,7 +389,7 @@ describe('StorageProviderRegistry', () => {
       const row = {
         ...baseProvider,
         providerType: 's3',
-        credentials: 'encrypted:{"accessKeyId":"AK"}', // missing secretAccessKey
+        credentials: enc({ accessKeyId: 'AK' }), // missing secretAccessKey
         config: { endpoint: 'https://s3.example.com', bucket: 'b', region: 'us-east-1' },
       };
       expect(() => registry.createProviderInstance(row)).toThrow(
@@ -397,7 +403,7 @@ describe('StorageProviderRegistry', () => {
       const row = {
         ...baseProvider,
         providerType: 's3',
-        credentials: 'encrypted:{"accessKeyId":"AK","secretAccessKey":"SK"}',
+        credentials: enc({ accessKeyId: 'AK', secretAccessKey: 'SK' }),
         config: { bucket: 'b' }, // missing endpoint + region
       };
       expect(() => registry.createProviderInstance(row)).toThrow(
@@ -432,7 +438,7 @@ describe('StorageProviderRegistry', () => {
       const fakeRowBadCreds = {
         ...baseProvider,
         providerType: 'fake',
-        credentials: 'encrypted:not-valid-json{{{',
+        credentials: enc('not-valid-json{{{'),
       };
 
       expect(() => registry.createProviderInstance(fakeRowBadCreds)).toThrow(
