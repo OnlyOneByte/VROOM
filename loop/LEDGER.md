@@ -55,12 +55,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 113 |
 | deep-review | 5 | 119 |
-| guard | 6 | 116 |
+| guard | 6 | 120 |
 | bug | 3 | 114 |
 | arch | 5 | 118 |
 | infra | 6 | 117 |
 
-Current cycle: **119**
+Current cycle: **120**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -379,6 +379,27 @@ Current cycle: **119**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C120 (guard — certify + pin the MAINTENANCE + GAS-PRICE chart builder family, 3 zero-coverage builders)** —
+  Balance at C120 (HEAD was C119): feature (7/4, +3) most-starved, bug (6/3, +3), both OVER but BLOCKED — feature
+  import-trackers defaultCategory Angelo-gated (manual half fully eyes-on), bug structurally dry (git diff
+  C85..HEAD over production src EMPTY, verified). Don't-force-a-blocked-pick → recorded both fast, pivoted to the
+  highest-leverage ACTIONABLE increment: the zero-coverage analytics-builder vein C119 opened (NORTH_STAR #5,
+  committed regression-prevention on never-tested code). SCOUT: re-grepped every analytics-charts.ts builder vs
+  test references → 3 more zero-coverage CHART builders the C67 (fuel/date) + C119 (expense-summary) audits never
+  reached — `buildGasPriceHistory`, `buildVehicleMaintenanceCosts`, `buildMaintenanceTimeline` (the last drives the
+  private buildTimelineEntry / estimateServiceInterval / assignTimelineStatus trio). Read each against source
+  firsthand — all CORRECT (clean cert, no defect, no manufacture). GUARD: new `maintenance-gasprice-builders.test.ts`
+  (+15, +27 expect): buildGasPriceHistory keeps only priced fillups (volume>0 ∧ amount>0 ∧ date) + price=amount/vol
+  + fuelType ?? 'Regular' + slice(-100); buildVehicleMaintenanceCosts category==='maintenance' ONLY (fuel/financial
+  excluded) + month-bucket sum + ascending sort + dateless-drop; buildMaintenanceTimeline groups by description
+  (case-insensitive; null→'general maintenance') + assignTimelineStatus thresholds (<0 overdue / <30 warning / else
+  good) + single-occurrence interval default 180 + sorted by daysRemaining ascending. NON-VACUOUS proven firsthand:
+  shrank the warning band <30→<5 → the 10-day warning-status test went RED ('good' not 'warning'), then reverted.
+  Full verify gate GREEN: BE validate:local exit 0, 1748 pass (+16 vs C119's 1732), build bundled. Backend-only (no
+  FE source) → FE validate not required. cov: be ~87.78% / fe 87.6% (~ — new tests drive already-covered builder
+  lines; re-measure next infra cadence ~C127). Remaining zero-coverage analytics builders: groupByVehicle +
+  normalizeDate (thin primitives, lower-leverage). NEXT actionable: those two if a guard cycle recurs, else an
+  eyes-on populated surface — the productive vein is the analytics-builder coverage sweep.
 - **C119 (deep-review — certify + guard the dashboard EXPENSE-SUMMARY builder family, 4 zero-coverage builders)** —
   Balance at C119 (HEAD was C118): THREE over budget — feature (6/4, +2) + deep-review (6/5, +1) co-most-starved
   by raw starvation, bug (5/3, +2). Feature is BLOCKED (import-trackers defaultCategory Angelo-gated; manual half

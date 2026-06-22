@@ -491,6 +491,19 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C120 — the MAINTENANCE + GAS-PRICE chart builder family CLEAN + pinned (3 zero-coverage builders).**
+> Continuing the C119 analytics-builder coverage sweep: re-grepped every analytics-charts.ts builder vs test
+> references → 3 more with ZERO coverage the C67 (fuel/date) + C119 (expense-summary) audits never reached —
+> `buildGasPriceHistory`, `buildVehicleMaintenanceCosts`, `buildMaintenanceTimeline` (the last drives the private
+> buildTimelineEntry / estimateServiceInterval / assignTimelineStatus trio). Read each against source firsthand —
+> all CORRECT (clean cert). New `maintenance-gasprice-builders.test.ts` (+15) pins: priced-fillup filter +
+> price=amount/vol + fuelType ?? 'Regular' + slice(-100) (gas-price); category==='maintenance' ONLY + month-sum +
+> ascending + dateless-drop (vehicle-maintenance-costs); description grouping (case-insensitive; null→'general
+> maintenance') + the assignTimelineStatus thresholds (<0 overdue / <30 warning / else good) + single-occurrence
+> interval default 180 + daysRemaining-ascending sort (maintenance-timeline). Non-vacuous proven (shrink the warning
+> band <30→<5 → the 10-day warning test RED). BE 1748 pass. Remaining zero-coverage analytics builders:
+> groupByVehicle + normalizeDate (thin primitives, lower-leverage). Don't re-add.
+
 > **GUARDED C101:** themeStore.initialize() + its live OS-preference listener now pinned (+1 in
 > theme-initialize.test.ts) — the C336-skipped one-shot. C336 pinned setPreference but skipped initialize(); its
 > load-bearing untested branch is the `prefers-color-scheme` change listener that re-applies the theme live ONLY
