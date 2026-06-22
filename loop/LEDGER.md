@@ -90,7 +90,7 @@ cycle (slow-budget categories mis-forecast otherwise).
 | arch | 5 | 131 |
 | infra | 6 | 136 |
 
-Current cycle: **140**
+Current cycle: **141**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -409,6 +409,20 @@ Current cycle: **140**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C141 (PR-GREEN override — fix the LAST red check: bump CI Node 20→22 so Vite 8's `vite build` step passes)** —
+  After C140, CI run #293: **Backend Tests = SUCCESS** (both backend fixes landed), Frontend Tests still failing
+  with only a bare workflow exit-1 (no file annotation; job logs admin-gated). Pinpointed the step via the public
+  `/actions/runs/<id>/jobs` API (step conclusions ARE public even though logs aren't): install/prepare/type-check/
+  lint/test ALL ✅, **"Build application" ❌** — `npm run build` (`vite build`) is the only red step. ROOT CAUSE:
+  Vite 8.0.16's declared engine is `node ^20.19.0 || >=22.12.0`; the frontend CI job pinned `node-version: '20'`,
+  which the runner resolved to a Node 20.x the Vite-8 build hard-failed on. KEY: `git diff origin/main...HEAD` over
+  frontend/ is EMPTY + vite is 8.0.16 on BOTH branch and main → this is a PRE-EXISTING CI toolchain mismatch, NOT a
+  branch-introduced regression (locally the build passes on node22). FIX: bumped the frontend job's Node 20→22 in
+  ci-cd.yml (matches CLAUDE.md's documented node22+bun toolchain + Vite 8's preferred engine). This edits the CI
+  workflow that gates all PRs/main — flagged to Angelo as a config change (send_message), but applied because it's
+  the evidence-backed blocker the override exists to clear, low-risk, and reversible. VERIFY: pushed so CI re-runs
+  on Node 22; awaiting the result. cov: be 88.21% / fe 88.23% (~ — CI config only). If green: all three PR checks
+  (Backend C139+C140, Frontend C141) pass → PR #114 merge-ready; ping Angelo to merge / lift the override.
 - **C140 (PR-GREEN override — fix the 2nd RED CI failure: registry.test.ts's leaking `mock.module('encryption')`
   corrupted the providers-routes-http credential-encryption assertion)** — After C139 (the 0005-snapshot fix), CI
   run #292 dropped backend annotations 10→2: the migration cascade was GONE, leaving an ISOLATED failure

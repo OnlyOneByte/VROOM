@@ -70,7 +70,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          # Node 22: Vite 8 (the frontend build tool) requires `^20.19.0 || >=22.12.0`. The old '20'
+          # pin resolved to a Node 20.x the `vite build` step hard-failed on (the only red CI step;
+          # install/type-check/lint/test all passed). 22 matches the project's documented toolchain
+          # (CLAUDE.md: node22+bun) and Vite 8's preferred engine.
+          node-version: '22'
 
       - name: Install dependencies
         run: |
