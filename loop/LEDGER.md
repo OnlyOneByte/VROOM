@@ -78,13 +78,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 121 |
-| deep-review | 5 | 125 |
+| deep-review | 5 | 131 |
 | guard | 6 | 129 |
 | bug | 3 | 122 |
-| arch | 5 | 124 |
+| arch | 5 | 131 |
 | infra | 6 | 130 |
 
-Current cycle: **130**
+Current cycle: **131**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -403,6 +403,28 @@ Current cycle: **130**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C131 (arch no-churn → pivot to deep-review: eyes-on cert of the never-shot `/settings/providers/[id]/edit`
+  form)** — Balance at C131 (HEAD was C130): FOUR over budget — feature (10/4) + bug (9/3) most-starved but
+  PERPETUALLY BLOCKED (feature detect-commit Angelo-gated; bug `git diff C85..HEAD` over prod src EMPTY — verified),
+  arch (7/5, +2) + deep-review (6/5, +1). Among the ACTIONABLE pair, arch is most-starved (+2) → checked its
+  precondition first: `git diff C118(043b84b)..HEAD` over backend/src + frontend/src (excl. tests) is EMPTY (only
+  the C119–C129 test files changed since the last arch scout) → arch at its structural floor → recorded no-churn
+  IMMEDIATELY (12th confirm: C4/C6/C12/C36/C85/C91/C98/C105/C112/C118/C124/C131; both real dedups createLoadState +
+  seedVehicle stay design-gated awaiting Angelo) + pivoted the substantive work to the co-starved deep-review (the
+  C124/C125 combined-cycle pattern). DEEP-REVIEW: the four self-authorizable coverage veins are closed (C130), so
+  took the eyes-on never-shot-surface vein. Scouted routes vs captured shots → `/settings/providers/[id]/edit` was
+  NEVER shot (only provider-NEW). It's the storage-credential EDIT surface — the #103/#123 fail-fast
+  config-validation subject, NORTH_STAR #1 data-safety (a bricked provider config breaks backups). Shot DESKTOP +
+  MOBILE (Pixel 5) against the seeded fake storage provider + Read both PNGs. CLEAN: all sections render
+  PRE-POPULATED from the existing row (confirms the edit-load path) — Display Name ("e2e fake provider …"),
+  Connection Settings (Provider root path "VROOM" + help), Photo Folder Settings (Root Path "VROOM/photos" +
+  collapsible category paths), Backup Settings (folder "VROOM/Backups" + ZIP toggle), Danger Zone (red-bordered
+  Delete Provider = destructive-action disclosure), Update Provider CTA. Mobile (393px): all cards full-width
+  stacked, help text wraps cleanly, NO horizontal overflow (NORTH_STAR #3), Update FAB pins bottom. ZERO console
+  errors both viewports, status 200, no auth bounce. No defect — recorded CLEAN, don't re-shoot. VERIFY: no source
+  touched (eyes-on cert). cov: be 88.13% / fe 88.08% (~ — no source). NEXT deep-review: the remaining never-shot
+  real surfaces are the term/odometer EDIT forms (likely identical to their /new siblings shot C124/C125 — low
+  marginal value); after a quick confirm the surface set is fully eyes-on and deep-review returns to backend audits.
 - **C130 (infra — branch-hygiene sweep + coverage re-measure, the ~10-cycle cadence; last ran C123)** — Balance at
   C130 (HEAD was C129): FOUR over budget — feature (9/4, +5) + bug (8/3, +5) most-starved but PERPETUALLY BLOCKED
   (feature detect-commit Angelo-gated, manual half fully eyes-on; bug `git diff C85..HEAD` over prod src EMPTY —

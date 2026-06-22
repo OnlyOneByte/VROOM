@@ -109,6 +109,17 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > builders if any (buildFuelEfficiencyAndCost / buildVehicleMaintenanceCosts), else an eyes-on populated surface.
 > Don't re-add.
 
+> **AUDITED C131 (eyes-on) — the never-shot `/settings/providers/[id]/edit` form CLEAN desktop + mobile.** The
+> storage-credential EDIT surface (the #103/#123 fail-fast config-validation subject, NORTH_STAR #1 data-safety — a
+> bricked provider config breaks backups) was never shot (only provider-NEW). Shot DESKTOP + MOBILE (Pixel 5)
+> against the seeded fake storage provider + Read both PNGs. CLEAN: all sections render PRE-POPULATED from the
+> existing row (confirms the edit-load path) — Display Name, Connection Settings (root path "VROOM"), Photo Folder
+> Settings (Root Path + collapsible category paths), Backup Settings (folder + ZIP toggle), Danger Zone
+> (red-bordered Delete = destructive-action disclosure), Update CTA. Mobile (393px): all cards full-width stacked,
+> help text wraps, NO horizontal overflow (NORTH_STAR #3), Update FAB pins bottom. ZERO console errors both. No
+> defect — DON'T re-shoot. Remaining never-shot surfaces: the term/odometer EDIT forms (likely identical to their
+> /new siblings shot C124/C125); after a quick confirm the surface set is fully eyes-on.
+>
 > **AUDITED C125 (eyes-on) — the never-shot `/vehicles/[id]/odometer/new` form CLEAN desktop + mobile.** The
 > odometer entry form is the data-entry path feeding `getCurrentOdometer` (drives lease-overage money + reminder
 > firing + MPG — the #76/#130/#244 bug family), so an unrendered field here is high-severity. Shot DESKTOP +
