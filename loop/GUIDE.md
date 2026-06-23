@@ -1,29 +1,9 @@
 # LOOP GUIDE — VROOM autonomous dev (read FIRST, every cycle)
 
-> ## 🎯 ACTIVE PRIORITY OVERRIDE (set 2026-06-21 by Angelo) — GET THE PR GREEN
-> **Until this block is removed, IGNORE the balance-table category rotation. Every cycle's single
-> job is: make all checks pass on the open PR (claude-loop-dev → main).** Concretely, each cycle:
-> 1. **Find the actual failures.** Check the PR's CI: GitHub Actions on the OnlyOneByte/VROOM PR
->    (`gh pr checks` / `gh pr view --json statusCheckRollup` via a `/tmp/*.sh` script — gh over the
->    `env -u GIT_SSH_COMMAND` remote). If you can't reach CI, run the FULL local gate as the proxy:
->    `cd backend && mise exec -- bun run validate:local` AND `cd frontend && mise exec -- npm run validate:local`.
-> 2. **Fix ONE red check per cycle**, smallest coherent fix. Real test failures, type errors, build
->    breaks, lint. Commit via the script + `bash loop/push.sh` so CI re-runs.
-> 3. **CI vs local divergence is the likely gotcha** (don't be surprised by it):
->    - CI runs the **glibc** biome (`bun run check`); the loop uses the **musl** binary locally. A
->      green `validate:local` can still fail CI lint. If CI lint is red, read the exact rule from the
->      CI log and hand-fix (musl autofix is the closest local mirror but not identical).
->    - The ~44 `*.meshclaw.e2e.ts` specs are **gitignored** → they do NOT run in CI. "Tests on the PR"
->      = the committed unit / HTTP-harness / source-scan suites + whatever the GitHub workflow runs.
->      Don't chase an e2e "failure" that only exists locally.
->    - dependabot may have bumped deps on main (csv-parse 7, backend-minor-patch group) — a red check
->      could be a post-merge-of-main dep break, not loop code. Rebase/merge main if CI is testing stale.
-> 4. **Do NOT start new feature/bug/arch/deep-review work** while this override stands — those are the
->    PENDING-ANGELO + eyes-on items, all parked. If the PR is fully green and nothing is red, say so and
->    HALT/stay-silent (don't manufacture a cycle); ping Angelo that it's merge-ready.
-> 5. Product-call fixes still don't get auto-made (a red check that needs a $/semantics decision →
->    `send_message` Angelo, don't guess).
-> Remove this block when Angelo says the PR is merged / the override is lifted.
+> _PR-green override (2026-06-21) LIFTED 2026-06-23: the PR was squash-merged to main; the branch
+> was reset onto fresh origin/main (force-push authorized by Angelo). Normal balance-table rotation
+> resumes. The C146 npm-ci CI fix, the merged loop work, and Angelo's 2026-06-23 decisions are all
+> on main now._
 
 > Distilled from C1–C338+. NORTH_STAR.md = vision + quality bar. BACKLOG.md = ranked queue.
 > LEDGER.md = per-cycle log + balance table. This file = HOW to run a cycle well.

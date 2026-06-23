@@ -88,15 +88,33 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 134 |
 | bug | 3 | 137 |
 | arch | 5 | 131 |
-| infra | 6 | 146 |
+| infra | 6 | 147 |
 
-Current cycle: **146**
+Current cycle: **147**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C147 (infra — POST-SQUASH-MERGE BRANCH RECONCILE + lift the PR-green override)** — The PR
+  (claude-loop-dev → main) was **squash-merged** by Angelo; origin/main moved fb35c17 → `116fcd8`
+  ("Merge Monday (#114)" + dependabot #116/#117). The squash captured ALL loop work incl. the C146
+  `npm ci` CI fix, the override block, and Angelo's 2026-06-23 BACKLOG decisions. Per the documented
+  squash-merge precedent (the original branch tip is NOT an ancestor of the squash), the correct
+  "rebase" = **reset the branch onto fresh origin/main**, not replay the 152 already-squashed commits.
+  Angelo authorized the one-time force-push (the branch is the loop's own; PR already merged; nothing
+  else builds on it). Did: verified 3 preconditions firsthand (local HEAD == origin/claude-loop-dev
+  `2644fc0`; origin/main BACKLOG == 2644fc0's parent BACKLOG, i.e. a clean superset; gitignore deltas
+  vs main are additions-only) → `git reset --hard origin/main` → re-applied the two keeper deltas from
+  2644fc0 (the agent-harness `.gitignore`/`frontend/.gitignore` rules + the 2026-06-23 BACKLOG
+  decisions) → **lifted the PR-green override** from GUIDE.md + BACKLOG.md (the removal condition Angelo
+  set — "PR merged" — is met) → recorded this entry. Verified post-reset: all dep files + ci-cd.yml +
+  LEDGER == origin/main byte-for-byte (the C146 npm-ci fix is present; no lockfile churn — the
+  rolldown-WASM footgun is moot since the lockfiles are main's exact bytes). Then force-push. Normal
+  6-category balance-table rotation resumes next cycle. Doc/gitignore-only — no app source touched
+  → no validate:local / shot needed (the tree == a main that already passed CI on merge). cov: be
+  88.21% / fe 88.23% (~ — carried, nothing measured this reconcile cycle).
 - **C1 (feature)** — Maintenance-schedule **T9 / eyes-on closeout**. Picked the highest-leverage open
   item (balance all-0, nothing over budget; feature has the lowest budget + eyes-on is now unblocked per
   GUIDE). Booted a fresh stack (RESET_DB reseed + START_SERVERS) and ran the untracked

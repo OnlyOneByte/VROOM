@@ -1,18 +1,8 @@
 # BACKLOG — VROOM autonomous loop
 
-> ## 🎯 PRIORITY OVERRIDE ACTIVE (2026-06-21) — see GUIDE.md top block.
-> The balance-table rotation below is SUSPENDED: until Angelo lifts it, every cycle works ONLY on
-> getting the open PR (claude-loop-dev → main) green. All items in this file are PARKED. Do not pick
-> from the queue. Resume normal category selection only after the override block is removed.
->
-> **PR STATUS (updated C146):** Both CI failures now have committed fixes. Backend Tests already GREEN
-> (C139 missing-snapshot + C140 mock-leak). The Frontend Tests failure — long mis-diagnosed (C141.5–C145)
-> as a fatal upstream Vite-8/rolldown-1.0.3 parser bug needing Angelo's migration decision — was actually
-> **CI's own destructive `rm lock && npm install`** triggering rolldown's buggy WASM-fallback parser. C146
-> fixes it: the FE CI install step is now `npm ci` against the cross-platform-complete committed lockfile
-> (`npm ci` builds 0 errors; `rm lock && npm install` builds 5 errors — proven firsthand both ways).
-> Awaiting CI re-run to confirm Frontend Tests flips green → then the PR is merge-ready and this block
-> can lift. (If CI still red for a NEW reason, that's the next cycle's single job.)
+> _PR-green override (2026-06-21) LIFTED 2026-06-23 — PR squash-merged; branch reset onto fresh main
+> (force-push authorized). Normal balance-table rotation resumes; queue is live again. The C146 npm-ci
+> CI fix + Angelo's 2026-06-23 decisions are on main._
 
 > Re-ranked every cycle. Pick the top unblocked item in the most-starved over-budget category
 > (LEDGER balance check); else the highest-leverage item overall. Keep this lean — prune done
@@ -85,11 +75,16 @@ now — the "Playwright-blocked" tail was a ~200-cycle MISDIAGNOSIS, see GUIDE.m
    field row + date-format + both conditional unit pickers reflow cleanly, NO horizontal overflow (asserted
    scrollWidth ≤ clientWidth+1, NORTH_STAR #3). The manual editor is now eyes-on across BOTH viewports.
    **REMAINING (both Angelo-BLOCKED, no unblocked work left):**
-   (b) **the preset gap — a DETECTED Fuelly/Fuelio/Drivvo log maps NO category COLUMN so it previews 0-ready
-   ("Unknown category") → nothing to commit; recommended fix defaultCategory:'fuel' per preset,
-   send_message'd Angelo C31, awaiting steer** (the C47 remap does NOT cover this — no column = no word to
-   remap); (c) the AUTO-DETECT-PRESET round-trip THROUGH COMMIT + the populated-detect four-state shot are
-   GATED on (b). Spec: `.kiro/specs/import-trackers/`.
+   (b) **✅ DECIDED 2026-06-23 (Angelo): add `defaultCategory:'fuel'` to each fuel-tracker preset
+   (Fuelly/Fuelio/Drivvo).** A DETECTED fuel-tracker log maps NO category COLUMN, so today every row previews
+   0-ready ("Unknown category") → nothing to commit. Fix: set `defaultCategory:'fuel'` on the 3 presets so
+   blank-category rows from a detected fuel tracker default to `fuel` (mapCategory still leaves a NAMED-but-
+   unknown word alone — the C47 remap path is unchanged; this only fills the empty-cell case). After it lands,
+   flip the C32 characterization (`import-mapping-presets.test.ts` — all 3 presets currently assert readyCount=0;
+   with the default they should produce ready fuel rows) + drive the T6 auto-detect-preset round-trip THROUGH
+   COMMIT + the 4-state shot (both were GATED on this). EXECUTE when the PR-green override lifts.
+   (c) the AUTO-DETECT-PRESET round-trip THROUGH COMMIT + the populated-detect four-state shot UNBLOCK once (b)
+   lands. Spec: `.kiro/specs/import-trackers/`.
    This is the ONLY open feature (maintenance C1 + recurring-expenses C27 both DONE), and after C121 it has NO
    unblocked increment left — the manual half is fully verified desktop + mobile; the detect-commit + 4-state
    shot both wait on Angelo's defaultCategory. The next feature over-budget cycle should record that + pivot to
@@ -896,7 +891,12 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 > re-read archive grounding first), #79 (stuck-offline-entry hygiene); #100 json_patch merge + #112 chart palette
 > stay arch/design-gated.
 >
-> **🚩 NEW — ESCALATED C68 (eyes-on, AWAITING ANGELO — displayed-number semantics, NOT auto-fixed):
+> **✅ DECIDED 2026-06-23 (Angelo): null/zero initial → treat as 0.** Apply `initialMileage ?? 0` inside
+> `calculateLeaseMetrics` (financing-calculations.ts:~497) so the burn bar matches the Overage card; flip the
+> C102 characterization test's expectations (null-initial now → mileageUsed = current odometer, remaining =
+> allowance − used). 1-line gate change + 1 test flip. EXECUTE when the PR-green override lifts (normal rotation).
+>
+> **🚩 NEW — ESCALATED C68 (eyes-on — displayed-number semantics, NOT auto-fixed):
 > #148 LeaseMetricsCard burn bar reads 0-used when `initialMileage` is null.** Found firsthand during a C68
 > eyes-on of the FinanceTab lease render (the never-shot surface; #140 annual-vs-total CONFIRMED fixed +
 > consistent on both cards — that part is GOOD). `calculateLeaseMetrics` (financing-calculations.ts:498) gates
@@ -1017,9 +1017,11 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 >   stale characterization test updated to the now-real overwrite (wire contract unchanged). Don't re-pick.
 >
 > _Severity 4 — hardening / display (lower urgency):_
-> - **#100 (arch-gated) — APPROVED: SQL-atomic merge via `json_patch` in one UPDATE** for the
->   userPreferences read-modify-write across the 5+ write sites (no migration, no per-user queue, avoids
->   the C151 async-tx footgun). Last-writer-wins lost-update race today.
+> - **#100 (arch-gated) — ✅ DECIDED 2026-06-23 (Angelo agrees with the approved approach): SQL-atomic
+>   merge via `json_patch` in one UPDATE** for the userPreferences read-modify-write across the 5+ write
+>   sites (no migration, no per-user queue, avoids the C151 async-tx footgun). Last-writer-wins lost-update
+>   race today. EXECUTE when the PR-green override lifts — arch cycle, one write site at a time if needed;
+>   add a guard that the merge is a single atomic statement (no read-then-write JS gap).
 > - ~~**#22 (MED, hardening) — DONE C55.**~~ parseZipBackup summed each entry's `header.size`
 >   (uncompressed) but that's ATTACKER-DECLARED (ZIP central directory) — a bomb declares a small size to
 >   pass the sum, then inflates to GB on getData(). Added `CONFIG.backup.maxCompressionRatio = 1000` + a
@@ -1028,12 +1030,31 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 >   +2 guards (over-ratio-but-under-total-cap → rejected; real backup ratio under cap, no false positive);
 >   non-vacuous (neuter → RED). Updated the pre-existing all-zeros total-size test (now trips the earlier
 >   ratio guard) to accept either pre-inflation message. Don't re-pick.
-> - **#129 (MED) — APPROVED to fix, but RE-READ the archive grounding (~C-note line 197) FIRST** before
->   editing — it's a credentials/account-linking finding; don't guess the fix from the one-line summary.
+> - **#129 (MED) — ✅ DECIDED 2026-06-23 (Angelo: "dig it out" → investigated; fix = sync-only-if-unset).**
+>   GROUNDING (read firsthand from auth/routes.ts + archive C433): `updateExistingUserProfile`
+>   (auth/routes.ts:176) runs on EVERY OAuth login and does `db.update(users).set({ email: userInfo.email,
+>   displayName, updatedAt })` — i.e. it OVERWRITES `users.email` (the VROOM login identity) with whatever
+>   email the provider currently reports. The UNIQUE-collision branch IS correct (catches "another user has
+>   this email", falls back to updating displayName only — no cross-account hijack). The real defect: a
+>   *within-account* drift is silent — if you change your Google/GitHub PRIMARY email, your next VROOM login
+>   silently changes the email you log in with, with no notice. **DECISION: sync the email only when the
+>   stored `users.email` is empty/unset (first-link backfill); otherwise DO NOT overwrite on login.** (Keep
+>   `displayName`/`avatarUrl` syncing as-is — only `email` is identity-sensitive.) IMPLEMENTATION: in
+>   `updateExistingUserProfile`, fetch the current row; build the `.set({...})` so `email` is included ONLY
+>   when the existing email is null/''; keep the displayName/updatedAt update unconditional; the UNIQUE
+>   try/catch stays (still relevant for the first-link backfill). Add an HTTP-harness/repo guard: existing
+>   non-empty email is PRESERVED across a re-login with a different provider email; an unset email IS
+>   backfilled. (The `authProviderRepository.updateProfile` call that records the provider-account's own
+>   email is unchanged — that's the per-provider record, not the login identity.) EXECUTE when the override
+>   lifts. NOTE: the `auth_error=email_exists` flow for NEW account creation (routes.ts:226/259) is a
+>   separate, already-correct path — don't touch it.
 > - **#112 (LOW) — APPROVED: extend / generate distinct hues for the cross-vehicle analytics chart
 >   palette** for legibility at fleet size.
-> - **#79 (LOW) — APPROVED: add a data-hygiene path so a malformed fuel offline entry can't get stuck**
->   (skip/repair + surface, don't silently retry forever).
+> - **#79 (LOW) — ✅ DECIDED 2026-06-23 (Angelo agrees with the approved approach): add a data-hygiene path
+>   so a malformed fuel offline entry can't get stuck** (skip/repair + surface to the user, don't silently
+>   retry forever). EXECUTE when the override lifts — detect the unsyncable/malformed outbox row, move it to
+>   a failed/needs-attention bucket (not infinite silent re-skip), surface it; add a guard that a malformed
+>   entry is parked + surfaced rather than retried indefinitely.
 >
 > _Maintenance-feature follow-ons (from the C1 T9 closeout):_
 > - **lease/loan currentMileage→currentOdometer — APPROVED: CONFIRM the C157 all-time landing, then
@@ -1049,25 +1070,30 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 ### arch
 *(reliably DRY per the archive. Run a fresh dedup scout; if nothing clean surfaces, record "no churn warranted" + pivot. Obey the arch rules above.)*
 
-> **🚩 DESIGN-GATED (arch rule 6, AWAITING ANGELO) — surfaced C112: converge the `seedVehicle` test helper.** It's
+> **✅ APPROVED 2026-06-23 (Angelo) — converge the `seedVehicle` test helper, INCREMENTALLY.** It's
 > re-declared in 51 HTTP-harness test files with 7 distinct signatures (32× no-arg, 7× nickname, 4× make, + 4
-> one-offs). A real DRY win (one shared `test-helpers` seeder vs 51 copies), but converging it is a SWEEPING 51-file
-> refactor with an options-bag — NOT a self-authorizable arch increment (rule 1: one small reviewable; rule 2:
-> behavior-change risk across 51 test files). RECOMMENDED if approved: add ONE shared seeder (an options bag
-> covering nickname/make/extra), migrate ONE domain's test files per arch cycle (never a 51-file big-bang); the
-> 32 no-arg call sites are the trivial first wave. Test-only (lower-leverage than production dedup, which is
-> unchanged since C85). Until Angelo rules, arch records no-churn fast.
+> one-offs). MANDATE: add ONE shared `test-helpers` seeder (an options bag covering nickname/make/extra),
+> then migrate ONE domain's test files per arch cycle — **NEVER a 51-file big-bang** (arch rules 1/2). The 32
+> no-arg call sites are the trivial first wave. Behavior must be preserved in every migrated file (green→green;
+> the seeder's defaults must reproduce each call site's current vehicle exactly). Test-only. EXECUTE when the
+> PR-green override lifts; this becomes the standing arch vein (one domain per arch cycle) until all 51 converge.
+> (NOTE: a `.kiro/specs/` design doc is OPTIONAL here since Angelo approved the incremental plan directly —
+> the options-bag shape can be defined in the shared helper's docstring; if the first migration surfaces a
+> behavior-divergent call site, pause + escalate that specific one.)
 >
-> **🚩 DESIGN-GATED (arch rule 6, AWAITING ANGELO) — surfaced C105: adopt `createLoadState<T>` across the 13
-> load-bearing pages.** The scaffold (load-state.svelte.ts, arch #2) was extracted to centralize the page load triad
-> (isLoading/loadError/load) so the error leg is STRUCTURAL not per-page — the "load failure masquerades as empty
-> state" bug class (dashboard/reminders/settings/vehicle-detail C57). It has ZERO adopters; 13 pages still hand-roll
-> it. NOT self-authorizable: every page loads MULTIPLE values via Promise.all into separate $state vars while
-> createLoadState holds ONE `data`, so adoption is a reactivity REWRITE per page (composite type or N load-states +
-> rewire every `isLoading`→`loadState.isLoading` template binding) touching observable render → needs
-> `.kiro/specs/load-state-migration/design.md` + Angelo sign-off + shot-before/after per page (arch rules 1/2/4/6).
-> RECOMMENDED if approved: migrate ONE page per arch cycle (start with a single-load page if one exists, else define
-> the composite-state shape in the design doc). Until Angelo rules, arch records no-churn fast.
+> **✅ APPROVED 2026-06-23 (Angelo) — adopt `createLoadState<T>` across the 13 load-bearing pages, via a
+> design doc + ONE page per cycle.** The scaffold (load-state.svelte.ts, arch #2) centralizes the page load
+> triad (isLoading/loadError/load) so the error leg is STRUCTURAL not per-page — the "load failure masquerades
+> as empty state" bug class (dashboard/reminders/settings/vehicle-detail C57). Today: ZERO adopters; 13 pages
+> hand-roll it. Because every page loads MULTIPLE values via Promise.all into separate `$state` vars while
+> createLoadState holds ONE `data`, adoption is a reactivity REWRITE per page (composite-state type or N
+> load-states + rewire every `isLoading`→`loadState.isLoading` template binding) touching OBSERVABLE render.
+> MANDATE (arch rules 1/2/4/6 still apply since this changes render): FIRST write
+> `.kiro/specs/load-state-migration/design.md` defining the composite-state shape (how a multi-load page maps
+> onto createLoadState — composite `data` object vs N parallel load-states) + the per-page migration recipe;
+> then migrate ONE page per arch cycle, shot-before/after to prove not a pixel moves, green→green. Start with
+> the simplest-load page. EXECUTE when the PR-green override lifts — the design-doc cycle is the first step,
+> then it becomes a standing arch vein (one page per cycle) until all 13 adopt it.
 
 1. ~~**MPG-pairing dedup**~~ — **DONE C17.** Extracted `averageConsecutiveMpg(sortedExpenses)` in
    calculations.ts; both `calculateAverageMPG` (calculations.ts) and `calculateAverageMpg`

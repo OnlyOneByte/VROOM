@@ -121,3 +121,7 @@ RankedTODO.md
 .meshclaw-autopilot/
 STATUS.md
 BRANCH_REVIEW.md
+# verify-it-works harness (shot.sh/shot.mjs/regress.sh/make-auth-state.ts/auth-state.json) — local-only
+.meshclaw-tools/
+# local node22+bun toolchain pin, not part of the product
+mise.local.toml
