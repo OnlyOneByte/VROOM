@@ -47,6 +47,14 @@ export interface OfflineExpense {
 	description?: string;
 	timestamp: number;
 	synced: boolean;
+	/**
+	 * Parked because the row is PERMANENTLY unsyncable (a malformed/incomplete entry that fails the same
+	 * way on every attempt — e.g. a fuel row missing volume/charge or mileage, isIncompleteFuelExpense).
+	 * Such a row must NOT be retried forever: it's excluded from getPendingExpenses (so syncAll stops
+	 * re-attempting it) and surfaced via getNeedsAttentionExpenses for the user to fix or discard (#79).
+	 * A transient (network/server) failure is NOT flagged — only a structural, self-resolving-impossible one.
+	 */
+	needsAttention?: boolean;
 	version?: string; // Storage format version
 }
 
@@ -163,9 +171,37 @@ export function removeOfflineExpense(id: string): void {
 	saveOfflineExpenses(updatedExpenses);
 }
 
-// Get pending (unsynced) expenses
+// Get pending (unsynced) expenses. EXCLUDES rows parked as needsAttention (#79) — a permanently
+// unsyncable malformed entry must not be silently re-attempted on every syncAll; it's surfaced
+// separately via getNeedsAttentionExpenses for the user to fix/discard.
 export function getPendingExpenses(): OfflineExpense[] {
-	return loadOfflineExpenses().filter(expense => !expense.synced);
+	return loadOfflineExpenses().filter(expense => !expense.synced && !expense.needsAttention);
+}
+
+// Rows parked as permanently-unsyncable (#79) — surfaced to the user as "needs attention" (fix or
+// discard) instead of being retried forever. Unsynced + flagged.
+export function getNeedsAttentionExpenses(): OfflineExpense[] {
+	return loadOfflineExpenses().filter(expense => !expense.synced && expense.needsAttention);
+}
+
+// Park a malformed/unsyncable expense as needs-attention (#79). Idempotent; a parked row drops out of
+// getPendingExpenses so the sync loop stops re-attempting it. Clearing the flag (after the user edits
+// it) is `clearNeedsAttention`, which re-admits the row to the pending set.
+export function markExpenseNeedsAttention(id: string): void {
+	const currentExpenses = loadOfflineExpenses();
+	const updatedExpenses = currentExpenses.map(expense =>
+		expense.id === id ? { ...expense, needsAttention: true } : expense
+	);
+	saveOfflineExpenses(updatedExpenses);
+}
+
+// Clear the needs-attention flag (e.g. after the user fixes the row) so it re-enters the pending set.
+export function clearNeedsAttention(id: string): void {
+	const currentExpenses = loadOfflineExpenses();
+	const updatedExpenses = currentExpenses.map(expense =>
+		expense.id === id ? { ...expense, needsAttention: false } : expense
+	);
+	saveOfflineExpenses(updatedExpenses);
 }
 
 // Mark expense as synced
@@ -194,13 +230,16 @@ export async function syncOfflineExpenses(): Promise<void> {
 
 	try {
 		for (const expense of pendingExpenses) {
-			// Validate fuel expense requirements
+			// Validate fuel expense requirements. A malformed fuel row is PERMANENTLY unsyncable — park it as
+			// needs-attention (#79) instead of `continue`-skipping it every run (the old behavior re-evaluated
+			// + silently re-skipped it forever). Parking drops it from getPendingExpenses + surfaces it.
 			if (isIncompleteFuelExpense(expense)) {
 				if (import.meta.env.DEV) {
 					console.warn(
-						`Skipping expense ${expense.id}: Fuel expenses require volume/charge and mileage data`
+						`Parking expense ${expense.id} (needs attention): fuel expenses require volume/charge and mileage`
 					);
 				}
+				markExpenseNeedsAttention(expense.id);
 				continue;
 			}
 

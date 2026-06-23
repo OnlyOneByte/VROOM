@@ -1078,11 +1078,16 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 >   source-scan gating the email write on `!current?.email`, non-vacuous. backend validate:local GREEN. Don't re-fix.
 > - **#112 (LOW) — APPROVED: extend / generate distinct hues for the cross-vehicle analytics chart
 >   palette** for legibility at fleet size.
-> - **#79 (LOW) — ✅ DECIDED 2026-06-23 (Angelo agrees with the approved approach): add a data-hygiene path
->   so a malformed fuel offline entry can't get stuck** (skip/repair + surface to the user, don't silently
->   retry forever). EXECUTE when the override lifts — detect the unsyncable/malformed outbox row, move it to
->   a failed/needs-attention bucket (not infinite silent re-skip), surface it; add a guard that a malformed
->   entry is parked + surfaced rather than retried indefinitely.
+> - **#79 (LOW) — ✅ CLOSED C159 (was: ✅ DECIDED 2026-06-23 Angelo — park + surface, don't retry forever).**
+>   A malformed offline fuel row (isIncompleteFuelExpense) was retried pointlessly then silently re-attempted
+>   on every syncAll forever (the legacy path just `continue`-skipped it). Fixed: added a `needsAttention`
+>   flag + helpers (markExpenseNeedsAttention/clearNeedsAttention/getNeedsAttentionExpenses); getPendingExpenses
+>   excludes parked rows; syncSingleExpense flags the incomplete-fuel failure `permanent` → syncExpenses parks
+>   it (no retry, counted as result.needsAttention) instead of burning retries; the legacy syncOfflineExpenses
+>   parks too. Guard (+5): offline-storage + sync-manager suites. FE validate:local GREEN (757). **FOLLOW-ON
+>   (FE component, not yet built):** a UI surface reading getNeedsAttentionExpenses to show parked rows + a
+>   fix/discard action — a feature-ish increment (do when a UI cycle fits; the data path + flag are ready).
+>   Don't re-fix the sync logic.
 >
 > _Maintenance-feature follow-ons (from the C1 T9 closeout):_
 > - **lease/loan currentMileage→currentOdometer — APPROVED: CONFIRM the C157 all-time landing, then

@@ -5,6 +5,9 @@ import {
 	saveOfflineExpenses,
 	removeOfflineExpense,
 	getPendingExpenses,
+	getNeedsAttentionExpenses,
+	markExpenseNeedsAttention,
+	clearNeedsAttention,
 	isIncompleteFuelExpense,
 	markExpenseAsSynced,
 	clearSyncedExpenses,
@@ -254,6 +257,69 @@ describe('Offline Storage', () => {
 			const pending = getPendingExpenses();
 			expect(pending).toHaveLength(1);
 			expect(pending[0]?.id).toBe('pending-1');
+		});
+	});
+
+	// #79 (C159): a malformed/unsyncable row is PARKED as needsAttention — it must drop out of the pending
+	// set (so syncAll stops silently re-attempting it forever) and surface via getNeedsAttentionExpenses.
+	describe('needs-attention parking (#79)', () => {
+		const rows: OfflineExpense[] = [
+			{
+				id: 'ok-1',
+				vehicleId: 'v1',
+				tags: ['maintenance'],
+				category: 'maintenance',
+				amount: 100,
+				date: '2024-01-02',
+				timestamp: Date.now(),
+				synced: false
+			},
+			{
+				id: 'malformed-1',
+				vehicleId: 'v1',
+				tags: ['fuel'],
+				category: 'fuel',
+				amount: 50,
+				date: '2024-01-01',
+				timestamp: Date.now(),
+				synced: false,
+				needsAttention: true
+			}
+		];
+
+		it('getPendingExpenses EXCLUDES a needs-attention row (no infinite silent re-attempt)', () => {
+			localStorageMock.getItem.mockReturnValue(JSON.stringify(rows));
+			const pending = getPendingExpenses();
+			expect(pending.map(e => e.id)).toEqual(['ok-1']); // the parked malformed row is NOT pending
+		});
+
+		it('getNeedsAttentionExpenses surfaces ONLY the parked (unsynced + flagged) rows', () => {
+			localStorageMock.getItem.mockReturnValue(JSON.stringify(rows));
+			const parked = getNeedsAttentionExpenses();
+			expect(parked.map(e => e.id)).toEqual(['malformed-1']);
+		});
+
+		it('a SYNCED row is never surfaced as needs-attention (synced wins)', () => {
+			localStorageMock.getItem.mockReturnValue(
+				JSON.stringify([{ ...rows[1], synced: true, needsAttention: true }])
+			);
+			expect(getNeedsAttentionExpenses()).toHaveLength(0);
+		});
+
+		it('markExpenseNeedsAttention flags the target row only; clearNeedsAttention re-admits it to pending', () => {
+			localStorageMock.getItem.mockReturnValue(
+				JSON.stringify([{ ...rows[0] }, { ...rows[1], needsAttention: false }])
+			);
+			markExpenseNeedsAttention('malformed-1');
+			let saved = JSON.parse(localStorageMock.setItem.mock.calls.at(-1)[1]);
+			expect(saved.find((e: OfflineExpense) => e.id === 'malformed-1').needsAttention).toBe(true);
+			expect(saved.find((e: OfflineExpense) => e.id === 'ok-1').needsAttention).toBeFalsy();
+
+			// After the user fixes it, clearing re-admits the row to the pending set.
+			localStorageMock.getItem.mockReturnValue(JSON.stringify(saved));
+			clearNeedsAttention('malformed-1');
+			saved = JSON.parse(localStorageMock.setItem.mock.calls.at(-1)[1]);
+			expect(saved.find((e: OfflineExpense) => e.id === 'malformed-1').needsAttention).toBe(false);
 		});
 	});
 

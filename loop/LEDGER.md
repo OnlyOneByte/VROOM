@@ -91,23 +91,43 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 153 |
 | deep-review | 5 | 157 |
 | guard | 6 | 158 |
-| bug | 3 | 155 |
+| bug | 3 | 159 |
 | arch | 5 | 156 |
 | infra | 6 | 154 |
 
-Current cycle: **158**
+Current cycle: **159**
 
-> **NOTE (C158): feature was most-starved (5/4) but is BLOCKED — all 3 spec features complete (C153), no
-> self-authorizable feature work; new features need Angelo sign-off (flagged C153). Per the documented rule,
-> recorded feature as over-budget-but-blocked + pivoted to the co-starved guard. feature's `last-touched 153`
-> stays — it's not "touched", just un-pickable until Angelo greenlights a new spec. The clock keeps running;
-> each feature-over-budget cycle re-records this + pivots.**
+> **NOTE (C158/C159): feature is BLOCKED (all 3 spec features complete C153; new features need Angelo
+> sign-off, flagged C153). Each feature-over-budget cycle re-records this + pivots to the co-starved category.
+> C159: feature 6/4 (highest ratio) but blocked → pivoted to the next over-budget = bug (4/3).**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C159 (bug #79 — a malformed offline fuel entry retried/re-skipped forever; Angelo-decided: park + surface)** —
+  Balance recompute (cycle 159): feature highest ratio (6/4) but BLOCKED (no spec work; re-recorded + pivoted);
+  next over-budget = bug (4/3 = 1.33×). Executed the last remaining Angelo-DECIDED bug, **#79**. **The defect:**
+  an offline fuel row missing volume/charge or mileage (isIncompleteFuelExpense) is PERMANENTLY unsyncable —
+  it fails identically on every attempt. In sync-manager's syncExpenses that failure scheduled backoff retries
+  (burned them pointlessly) then sat pending forever, silently re-attempted on every future syncAll; the legacy
+  syncOfflineExpenses just `continue`-skipped it every run. Either way it never surfaced as needing user action.
+  **Fix (Angelo-decided 2026-06-23: park + surface, don't retry forever):** added a `needsAttention` flag to
+  OfflineExpense + helpers (markExpenseNeedsAttention / clearNeedsAttention / getNeedsAttentionExpenses);
+  getPendingExpenses now EXCLUDES parked rows (so syncAll stops re-attempting them). syncSingleExpense flags an
+  incomplete-fuel failure as `permanent`; syncExpenses parks it (markExpenseNeedsAttention, NO retry scheduled,
+  counted as result.needsAttention not result.failed) so it doesn't drag result.success false (nothing to
+  retry). The legacy syncOfflineExpenses parks instead of silent-skip. **Guard (+5):** offline-storage.test.ts
+  (+4: getPendingExpenses excludes parked; getNeedsAttentionExpenses surfaces only unsynced+flagged; synced
+  wins; mark/clear round-trip) + sync-manager.test.ts (+1: a malformed row is parked, NOT retried — asserts
+  markExpenseNeedsAttention called + retryCount 0 + no retry-backoff timer scheduled). Non-vacuous. VERIFY:
+  frontend validate:local GREEN (tsc 0, build 0 PARSE_ERROR, 757 pass [+5]); existing 49 offline/sync tests
+  still green (behavior-preserving for the healthy paths). FE sync/storage LOGIC change, no markup → no shot;
+  the user-facing "needs attention" SURFACING (a component reading getNeedsAttentionExpenses) is a documented
+  follow-on FE increment. #79 CLOSED — **all 4 Angelo-decided bugs (#148/#129/#79 + #100 arch-gated) now
+  resolved or queued**; #100 stays arch-design-gated. cov: be 88.33% / fe 88.24% (~ — added behavior + guards
+  on offline-storage/sync-manager).
 - **C158 (guard — pin the auth-account UNLINK route: last-account lockout + cross-tenant ownership, end-to-end)** —
   Balance recompute (cycle 158): feature most-starved (5/4 = 1.25×) but BLOCKED (all 3 spec features done C153,
   no self-authorizable feature work — needs Angelo sign-off); recorded that + pivoted to the co-starved guard
