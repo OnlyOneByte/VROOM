@@ -94,13 +94,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 153 |
-| deep-review | 5 | 157 |
+| deep-review | 5 | 162 |
 | guard | 6 | 158 |
 | bug | 3 | 159 |
 | arch | 5 | 160 |
 | infra | 6 | 161 |
 
-Current cycle: **161**
+Current cycle: **162**
 
 > **NOTE (C158/C159): feature is BLOCKED (all 3 spec features complete C153; new features need Angelo
 > sign-off, flagged C153). Each feature-over-budget cycle re-records this + pivots to the co-starved category.
@@ -111,6 +111,24 @@ Current cycle: **161**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C162 (deep-review — certify the C159 #79 needs-attention parking COMPOSES safely across the offline flows; +guard)** —
+  Balance recompute (cycle 162): feature BLOCKED (re-recorded + pivoted); deep-review + bug both at budget
+  (1.0×), deep-review longer-absolute-starved (5 vs 3) + higher-leverage → picked. Certified a FRESH invariant:
+  the C159 #79 parking (needsAttention) was guarded in ISOLATION (park-not-retry + the helpers) but its
+  COMPOSITION with the existing offline flows was uncertified. Traced + verified FIRSTHAND (scratch probes,
+  then deleted), all CLEAN: (1) **clearSyncedExpenses KEEPS a parked row** — it's unsynced, so it survives for
+  the user to fix; only synced rows are cleared. CRITICAL because the legacy syncOfflineExpenses calls
+  clearSyncedExpenses() right after parking — a regression dropping parked rows would DELETE the malformed
+  entry (data loss, NORTH_STAR #1). (2) **partition is exact** — a parked row is in getNeedsAttentionExpenses,
+  NOT getPendingExpenses (no double-count, no strand). (3) **an already-parked row is a full no-op for a later
+  syncAll** — excluded from getPendingExpenses → never POSTed/re-checked/re-counted/re-parked (this is what
+  makes "park" actually STOP the infinite re-attempt). (4) source-confirmed the orphaned-retry re-check
+  (sync-manager:281) + the auto-sync online-trigger (:366) both route through getPendingExpenses, so a parked
+  row no-ops both. No defect. Guard (+2): offline-storage.test.ts (clearSyncedExpenses keeps parked) +
+  sync-manager.test.ts (a later syncAll over a parked row = no POST / no re-count / clean success). Non-vacuous.
+  VERIFY: frontend validate:local GREEN (tsc 0, build 0 PARSE_ERROR, 759 pass [+2]). Test-only, no production
+  source → no shot. cov: be 88.39% / fe 88.44% (~ — composition guards, the modules were already covered). The
+  #79 mechanism is now certified end-to-end across park/retry/clear/auto-sync.
 - **C161 (infra — branch-hygiene sweep + coverage re-measure; the ~10-cycle cadence, due since C154)** —
   Balance recompute (cycle 161): feature highest ratio (8/4) but BLOCKED (re-recorded + pivoted); infra now
   genuinely over budget (7/6 = 1.17×) AND substantively due — 6 cycles since C154 with real coverage adds

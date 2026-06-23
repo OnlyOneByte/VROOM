@@ -107,6 +107,15 @@ category. shot.sh eyes-on works — the "Playwright-blocked" tail was a ~200-cyc
 re-audit a data-safety write path, certify it CLEAN against source, and leave a merge-surviving guard.
 Don't trust agent "HIGH" findings — verify firsthand (the archive logged many debunked false-positives).)*
 
+> **CERTIFIED C162 — the C159 #79 needs-attention parking COMPOSES safely across the offline flows (CLEAN +
+> guarded).** The C159 parking was guarded in isolation; this certifies the cross-flow composition: (1)
+> clearSyncedExpenses KEEPS a parked row (it's unsynced — survives for the user to fix; the legacy
+> syncOfflineExpenses calls it right after parking, so a regression dropping parked rows = data loss); (2) a
+> parked row partitions exactly (in getNeedsAttentionExpenses, NOT getPendingExpenses); (3) an already-parked
+> row is a full no-op for a later syncAll (excluded from getPendingExpenses → never re-POSTed/re-counted); (4)
+> the orphaned-retry re-check + auto-sync trigger both route through getPendingExpenses (source-confirmed). No
+> defect. Guard +2 (offline-storage + sync-manager suites). Don't re-audit.
+
 > **CERTIFIED C157 — `resolveNewUser`'s email-collision + race-retry invariant CLEAN (NORTH_STAR #2 no-merge +
 > guarded).** The OAuth new-account path was only STRUCTURALLY tested; certified its data-safety contract
 > firsthand: (1) pre-check — existing email → `email_exists`, no implicit merge; (2) transactional catch

@@ -387,6 +387,27 @@ describe('Sync Manager', () => {
 				setTimeoutSpy.mockRestore();
 			}
 		});
+
+		// #79 COMPOSITION (C162 deep-review): an ALREADY-parked row (needsAttention=true) is excluded from
+		// getPendingExpenses — so syncAll never feeds it to the sync loop. It must NOT be POSTed, re-checked,
+		// re-counted, or re-parked: a subsequent syncAll over a parked row is a complete no-op for it. This
+		// is what makes "park" actually STOP the infinite re-attempt (the #79 goal) — verified end-to-end
+		// through the public syncAll, not just the helper in isolation.
+		it('an already-parked row is NOT re-attempted by a later syncAll (no POST, no re-count)', async () => {
+			// The mocked getPendingExpenses filters !synced && !needsAttention (mirrors the real impl), so a
+			// parked row simply isn't in the pending set syncAll iterates.
+			vi.mocked(loadOfflineExpenses).mockReturnValue([{ ...malformedFuel, needsAttention: true }]);
+			mockFetch.mockResolvedValue(apiOk([]));
+
+			const result = await syncManager.syncAll();
+
+			expect(result.synced).toBe(0);
+			expect(result.failed).toBe(0);
+			expect(result.needsAttention).toBe(0); // not re-parked — it was never in the loop
+			expect(vi.mocked(markExpenseNeedsAttention)).not.toHaveBeenCalled();
+			expect(mockFetch).not.toHaveBeenCalled(); // no conflict-check GET, no create POST
+			expect(result.success).toBe(true); // nothing pending to fail → a clean success
+		});
 	});
 
 	describe('retry mechanism', () => {

@@ -395,6 +395,53 @@ describe('Offline Storage', () => {
 			expect(savedData).toHaveLength(1);
 			expect(savedData[0].id).toBe('pending-1');
 		});
+
+		// #79 composition (C162 deep-review): a PARKED (needsAttention) row is UNSYNCED, so
+		// clearSyncedExpenses MUST keep it — it survives for the user to fix/discard, never dropped as if
+		// it were synced. The legacy syncOfflineExpenses calls clearSyncedExpenses() after its loop, so a
+		// regression that dropped parked rows here would silently DELETE the malformed entry (data loss,
+		// NORTH_STAR #1) right after parking it. Pins parked survives + synced dropped + pending kept.
+		it('KEEPS a parked (needsAttention) row — only synced rows are cleared (#79 data-safety)', () => {
+			const mockExpenses: OfflineExpense[] = [
+				{
+					id: 'synced-1',
+					vehicleId: 'v1',
+					tags: ['fuel'],
+					category: 'fuel',
+					amount: 50,
+					date: '2024-01-01',
+					timestamp: Date.now(),
+					synced: true
+				},
+				{
+					id: 'parked-1',
+					vehicleId: 'v1',
+					tags: ['fuel'],
+					category: 'fuel',
+					amount: 60,
+					date: '2024-01-02',
+					timestamp: Date.now(),
+					synced: false,
+					needsAttention: true
+				},
+				{
+					id: 'pending-1',
+					vehicleId: 'v1',
+					tags: ['maintenance'],
+					category: 'maintenance',
+					amount: 100,
+					date: '2024-01-03',
+					timestamp: Date.now(),
+					synced: false
+				}
+			];
+			localStorageMock.getItem.mockReturnValue(JSON.stringify(mockExpenses));
+
+			clearSyncedExpenses();
+
+			const saved = JSON.parse(localStorageMock.setItem.mock.calls.at(-1)[1]) as OfflineExpense[];
+			expect(saved.map(e => e.id).sort()).toEqual(['parked-1', 'pending-1']); // synced gone, parked SURVIVES
+		});
 	});
 
 	describe('removeOfflineExpense', () => {
