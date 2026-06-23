@@ -589,6 +589,14 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C152 — the C148 `defaultCategory` fuel-tracker commit at the ROUTE layer (end-to-end).** C151 pinned
+> the pure applyMapping/buildImportPlan path; this pins the actual user flow through `POST /import`: a detected
+> fuel tracker (NO category column) + a preset mapping carrying `defaultCategory:'fuel'` → translated + COMMITTED
+> via the real HTTP stack. Guards that `columnMappingSchema` ACCEPTS defaultCategory (a regression dropping it
+> would silently strip it before applyMapping → back to 0-ready "Unknown category", the C148 bug). +2 in
+> import-mapping-route.test.ts (commit round-trip: 200/imported 1/GET shows fuel + mileage + volume; dry-run:
+> readyCount 1, no write). Non-vacuous (drop defaultCategory from the schema → both RED). Don't re-add.
+
 > **GUARDED C134 — `apiClient.raw` URL-build + credentials (the file-download/data-export path, api-client.ts →
 > 100% line).** Lines 131-132 (apiClient.raw, the raw-Response fetch for FILE DOWNLOADS — the backup-ZIP export,
 > NORTH_STAR #1 data portability) were uncovered; sibling tests never drove it. Extended the tracked

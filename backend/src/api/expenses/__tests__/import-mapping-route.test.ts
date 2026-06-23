@@ -198,6 +198,58 @@ describe('POST /import — foreign-tracker mapping path (T3)', () => {
   });
 });
 
+// C152 GUARD (the C148 defaultCategory at the ROUTE layer): C151 pinned the pure applyMapping/buildImportPlan
+// path, but the actual user flow Angelo's fix enables — a DETECTED fuel tracker (NO category column) committed
+// through the real HTTP stack — had no route-level coverage. columnMappingSchema must ACCEPT defaultCategory
+// (bounded to a real ExpenseCategory) and the route must translate → commit a real fuel expense. Pins the
+// end-to-end wiring so a schema/route regression (e.g. dropping defaultCategory from columnMappingSchema →
+// stripped before applyMapping → back to 0-ready) can't silently return.
+describe('POST /import — fuel-tracker defaultCategory commits through the route (C148/C152)', () => {
+  // A Fuelly-shaped file with NO category column (the real case: refuel exports are all-fuel, no category field).
+  const FUELLY_NO_CATEGORY_CSV = [
+    'Date,Odometer,Fill Amount,Price',
+    '03/01/2026,30000,9,36.00',
+  ].join('\n');
+  const FUELLY_MAPPING = {
+    source: 'fuelly',
+    columns: { date: 'Date', mileage: 'Odometer', volume: 'Fill Amount', amount: 'Price' },
+    targetVehicle: 'Daily Driver',
+    dateFormat: 'mdy' as const,
+    distanceUnit: 'miles' as const,
+    volumeUnit: 'gallons_us' as const,
+    defaultCategory: 'fuel' as const,
+  };
+
+  test('a detected fuel log with no category column commits as a fuel expense', async () => {
+    await seedVehicle('Daily Driver');
+    const res = await ctx.authed('POST', '/api/v1/expenses/import', {
+      csv: FUELLY_NO_CATEGORY_CSV,
+      mapping: FUELLY_MAPPING,
+    });
+    const body = await json<ImportResponse>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.data.imported).toBe(1); // was 0-ready "Unknown category" before the C148 defaultCategory fix
+    expect(body.data.errorCount).toBe(0);
+    const [row] = await listExpenses();
+    expect(row.category).toBe('fuel'); // the blank category cell was defaulted to fuel server-side
+    expect(row.mileage).toBe(30000); // fuel-row fields preserved (no over-clear)
+    expect(row.volume).toBe(9);
+  });
+
+  test('dry-run preview of a defaulted fuel log reports ready rows without writing', async () => {
+    await seedVehicle('Daily Driver');
+    const res = await ctx.authed('POST', '/api/v1/expenses/import', {
+      csv: FUELLY_NO_CATEGORY_CSV,
+      mapping: FUELLY_MAPPING,
+      dryRun: true,
+    });
+    const body = await json<ImportResponse>(res);
+    expect(body.data.readyCount).toBe(1);
+    expect(body.data.imported).toBe(0);
+    expect((await listExpenses()).length).toBe(0);
+  });
+});
+
 describe('POST /import/detect', () => {
   test('identifies a Fuelio file from its headers', async () => {
     const res = await ctx.authed('POST', '/api/v1/expenses/import/detect', {

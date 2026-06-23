@@ -85,18 +85,38 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 148 |
 | deep-review | 5 | 151 |
-| guard | 6 | 134 |
+| guard | 6 | 152 |
 | bug | 3 | 149 |
 | arch | 5 | 150 |
 | infra | 6 | 147 |
 
-Current cycle: **151**
+Current cycle: **152**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C152 (guard — pin the C148 `defaultCategory` fuel-tracker commit at the ROUTE layer, end-to-end)** —
+  Balance recompute (cycle 152): guard most-starved (last-touched 134 → starved 18, budget 6 = 3.0×, frozen
+  since C134 by the override); feature + bug sit exactly AT budget (1.0×, not over). The guard vein is largely
+  saturated (pure-logic + FE store/util at structural ceilings), so pinned the FRESHEST uncovered production
+  surface: the C148 `defaultCategory` flow at the HTTP ROUTE layer. C151 certified the PURE
+  applyMapping/buildImportPlan path, but the actual user flow Angelo's fix enables — a DETECTED fuel tracker
+  (NO category column) sent to `POST /import` with a preset mapping carrying `defaultCategory:'fuel'`,
+  translated + COMMITTED through the real stack — had ZERO route-level coverage (import-mapping-route.test.ts's
+  cases all used files WITH a category column). The risk: `columnMappingSchema` must ACCEPT `defaultCategory`
+  (a regression dropping it from the schema would silently strip it before applyMapping → back to 0-ready
+  "Unknown category", the exact bug C148 fixed) — and that wiring was untested. Verified firsthand (scratch
+  probe through ctx.authed, then deleted): a Fuelly-shaped no-category CSV + defaultCategory:fuel → 200,
+  imported 1, a real `fuel` expense with mileage/volume preserved. Added 2 durable guards to
+  import-mapping-route.test.ts: the commit round-trip (200, imported 1, GET shows category fuel + mileage
+  30000 + volume 9) + the dry-run preview (readyCount 1, writes nothing). Non-vacuous (drop defaultCategory
+  from columnMappingSchema → both RED, back to 0-ready). VERIFY: backend validate:local GREEN (tsc 0,
+  musl-biome clean after check:musl:fix reflowed the new block, 1777 pass / 0 fail [+2], build bundled).
+  Backend-test-only; no production source, no render → no shot. cov: be 88.21% / fe 88.23% (~ — route guard,
+  the route was already covered for other paths; this pins the defaultCategory wiring). The C148 import-tracker
+  fix is now pinned at BOTH the pure layer (C151) and the route layer (C152).
 - **C151 (deep-review — certify the C148 `defaultCategory` change composes safely with the import write-path; +guard)** —
   Balance recompute (cycle 151): deep-review most-starved (last-touched 135 → starved 16, budget 5 = 3.2×,
   the override froze it since C135), edging guard (2.8×). The eyes-on vein is exhausted (C132 milestone) +
