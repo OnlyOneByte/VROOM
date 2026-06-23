@@ -1108,15 +1108,15 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 > bag make/model/year/nickname/extra, defaults = Toyota Camry 2022) was ESTABLISHED C150. Behavior must be
 > preserved in every migrated file (green→green; each call passes its exact prior vehicle). NEVER a big-bang.
 > - **✅ WAVE 1 (C150): insurance domain** — 5 files, all byte-identical no-arg → `seedVehicle(ctx)`. Net −50 LOC, 27/27.
-> - **✅ WAVE 2 (C156): reminders domain** — 15 files (the largest no-arg cluster), each passing its OWN
->   make/model/year via the options bag (they varied) → `seedVehicle(ctx, { make, model, year })`. Net −151 LOC,
->   129/129. **20 of ~51 files converged.**
-> - **REMAINING (~31 files), pick ONE domain per arch cycle:** the **expenses** no-arg + nickname mix; the
->   **sync** no-arg/make cluster; the **make-param** variant (`seedVehicle(make)` — premium-expense-hook,
->   delete-split-child, odometer/update-route, restore-*, google-sheets-service); the **nickname** variant
->   (export-csv, import-csv, import-mapping-route, analytics-routes-http, vehicle-photo-routes,
->   vehicles-list-financing-contract, financing-*); + vehicle-tco-zero-state's `extra` bag. If a migration
->   surfaces a behavior-divergent call site, pause + escalate that specific one.
+> - **✅ WAVE 2 (C156): reminders domain** — 15 files, each passing its OWN make/model/year. Net −151 LOC, 129/129.
+> - **✅ WAVE 3 (C160): sync domain** — 5 files (3 no-arg each its own make/model/year + 2 make-param rewritten
+>   to inject the file's model/year). Net −52 LOC, 227/227. **25 of ~51 files converged.**
+> - **REMAINING (~26 files), pick ONE domain per arch cycle:** the **expenses** domain (largest, ~13 files,
+>   mixes no-arg/nickname/make — good next wave); + the scattered one-offs — nickname (export-csv, import-csv,
+>   import-mapping-route, analytics-routes-http, vehicle-photo-routes, vehicles-list-financing-contract,
+>   financing-*) + make-param (premium-expense-hook, delete-split-child, odometer/update-route,
+>   google-sheets-service) + vehicle-tco-zero-state's `extra` bag. If a migration surfaces a behavior-divergent
+>   call site, pause + escalate that specific one.
 > (NOTE: the `analytics-test-generators.ts` `seedVehicle(db, vehicle)` + the property-test `seedVehiclesWith*`
 > are a DIFFERENT contract — direct-DB seeders, not the route-harness one — leave them out of this convergence.)
 >

@@ -22,6 +22,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -29,17 +30,6 @@ beforeEach(async () => {
   ctx = await createTestApp();
 });
 afterEach(() => ctx.close());
-
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Toyota',
-    model: 'Camry',
-    year: 2022,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
 
 async function seedPolicy(vehicleId: string): Promise<string> {
   const res = await ctx.authed('POST', '/api/v1/insurance', {
@@ -74,7 +64,7 @@ function claimRows(): ClaimRowDb[] {
 
 describe('backup → restore round-trip preserves insurance claims', () => {
   test('a filed claim survives export + restore with its fields intact', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const policyId = await seedPolicy(vehicleId);
 
     // File a fully-populated claim via the real route.
@@ -126,7 +116,7 @@ describe('backup → restore round-trip preserves insurance claims', () => {
   // throws on restore; post-fix the claim photo round-trips. Seed the photos row directly (the upload
   // route is multipart; the bug is purely in the validator, not the upload path).
   test('a photo attached to an insurance claim survives the round-trip (does not abort restore) — #C404', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const policyId = await seedPolicy(vehicleId);
 
     const created = await ctx.authed('POST', `/api/v1/insurance/${policyId}/claims`, {
@@ -162,7 +152,7 @@ describe('backup → restore round-trip preserves insurance claims', () => {
   });
 
   test('multiple claims on a policy all survive the round-trip', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const policyId = await seedPolicy(vehicleId);
 
     for (const t of ['collision', 'theft', 'weather']) {
@@ -204,7 +194,7 @@ describe('backup → restore round-trip preserves insurance claims', () => {
 // ---------------------------------------------------------------------------
 describe('a photo on EVERY upload-accepted entity type survives backup→restore (#C404 drift-guard)', () => {
   test('vehicle / insurance_policy / insurance_claim / expense / odometer_entry photos all round-trip', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const policyId = await seedPolicy(vehicleId);
 
     // insurance_claim id

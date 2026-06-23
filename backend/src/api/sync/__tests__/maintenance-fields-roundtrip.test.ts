@@ -25,6 +25,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -32,17 +33,6 @@ beforeEach(async () => {
   ctx = await createTestApp();
 });
 afterEach(() => ctx.close());
-
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Subaru',
-    model: 'Forester',
-    year: 2021,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
 
 interface ReminderRowDb {
   id: string;
@@ -83,7 +73,7 @@ async function roundTrip(): Promise<void> {
 
 describe('backup → restore round-trip preserves maintenance-schedule fields', () => {
   test('a mileage-only reminder + its mileage notification survive with every field intact', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Forester', year: 2021 });
 
     // A pure-mileage reminder: NULL next_due_date, the four mileage columns populated.
     ctx.sqlite.run(
@@ -127,7 +117,7 @@ describe('backup → restore round-trip preserves maintenance-schedule fields', 
   });
 
   test('a time+mileage (both) reminder preserves both axes through the round-trip', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Forester', year: 2021 });
 
     // triggerMode 'both': a real next_due_date AND the mileage columns.
     ctx.sqlite.run(
@@ -154,7 +144,7 @@ describe('backup → restore round-trip preserves maintenance-schedule fields', 
   });
 
   test('a plain time reminder restores with mileage columns NULL (not 0 or empty)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Forester', year: 2021 });
 
     // A normal time reminder created via the real API → triggerMode defaults to 'time',
     // mileage columns are all NULL. They must come back NULL, not coerced to 0.

@@ -21,12 +21,8 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import {
-  createTestApp,
-  type DataEnvelope,
-  json,
-  type TestApp,
-} from '../../../test-helpers/http-client';
+import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -34,13 +30,6 @@ beforeEach(async () => {
   ctx = await createTestApp();
 });
 afterEach(() => ctx.close());
-
-async function seedVehicle(make: string): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', { make, model: 'M', year: 2022 });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
 
 interface ReminderRow {
   id: string;
@@ -53,8 +42,8 @@ function reminderRows(): ReminderRow[] {
 
 describe('backup → restore round-trip preserves a reminder expenseSplitConfig (nested JSON)', () => {
   test('a multi-vehicle absolute split config survives export + restore byte-for-byte', async () => {
-    const vehA = await seedVehicle('Toyota');
-    const vehB = await seedVehicle('Honda');
+    const vehA = await seedVehicle(ctx, { make: 'Toyota', model: 'M', year: 2022 });
+    const vehB = await seedVehicle(ctx, { make: 'Honda', model: 'M', year: 2022 });
 
     // A two-vehicle ABSOLUTE split — allocations is an array of objects, so its JSON body carries
     // the commas + quotes that stress the CSV quote-escaping. Amounts sum to expenseAmount (120).
@@ -107,8 +96,8 @@ describe('backup → restore round-trip preserves a reminder expenseSplitConfig 
   });
 
   test('an EVEN split config (nested vehicleIds array) also round-trips intact', async () => {
-    const vehA = await seedVehicle('Toyota');
-    const vehB = await seedVehicle('Honda');
+    const vehA = await seedVehicle(ctx, { make: 'Toyota', model: 'M', year: 2022 });
+    const vehB = await seedVehicle(ctx, { make: 'Honda', model: 'M', year: 2022 });
 
     const splitConfig = { method: 'even' as const, vehicleIds: [vehA, vehB] };
 

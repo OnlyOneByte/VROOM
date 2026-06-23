@@ -92,10 +92,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 157 |
 | guard | 6 | 158 |
 | bug | 3 | 159 |
-| arch | 5 | 156 |
+| arch | 5 | 160 |
 | infra | 6 | 154 |
 
-Current cycle: **159**
+Current cycle: **160**
 
 > **NOTE (C158/C159): feature is BLOCKED (all 3 spec features complete C153; new features need Angelo
 > sign-off, flagged C153). Each feature-over-budget cycle re-records this + pivots to the co-starved category.
@@ -106,6 +106,25 @@ Current cycle: **159**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C160 (arch — converge the `seedVehicle` test helper, wave 3: sync domain; Angelo-approved standing vein)** —
+  Balance recompute (cycle 160): feature highest ratio (7/4) but BLOCKED (re-recorded + pivoted); excluding it,
+  infra was most-starved (6/6 = at budget) but had NO fresh substantive work — untracked-test sweep CLEAN both
+  sides + the coverage cadence isn't due until ~C164, so a sweep would be ceremony. Per GUIDE ("most-starved
+  over-budget, ELSE highest-leverage open item"), took the highest-leverage open vein: the seedVehicle
+  convergence (arch, Angelo-approved standing). **Wave 3 = the sync domain** (5 files): 3 no-arg (each its own
+  make/model/year — claims-roundtrip Toyota Camry 2022, restore-junction-refs Honda Civic 2021,
+  maintenance-fields-roundtrip Subaru Forester 2021) + 2 make-param (`seedVehicle(make)` with constant
+  model/year — restore-empty-replace-guard model 'X'/2021, reminder-split-config model 'M'/2022). Each migrated
+  call passes its EXACT prior values to the shared `seedVehicle(ctx, {...})` so behavior is preserved; the
+  make-param call sites (`seedVehicle('Honda')`) were rewritten to inject the file's model/year. Scripted
+  transform; cleaned 2 now-unused json/DataEnvelope imports the decl-removal left behind (caught via the +2
+  warning delta — fixed back to baseline 20). Net −52 LOC. Behavior-preserving (green→green): the 27 sync
+  suites 227/227 pass; full backend validate:local GREEN (tsc 0, musl-biome clean / 20 warnings = baseline,
+  1789 pass / 0 fail, build bundled). Test-only → no shot. **Progress: 25 of ~51 files converged** (insurance 5
+  C150 + reminders 15 C156 + sync 5 C160). REMAINING (~26 files): the **expenses** domain (the largest, mixes
+  no-arg/nickname/make — ~13 files, a good next wave) + the scattered nickname/make one-offs (analytics-routes,
+  vehicle-photo-routes, financing-*, odometer/update-route, premium-expense-hook, google-sheets-service,
+  vehicle-tco-zero-state's extra bag). cov: be 88.33% / fe 88.24% (~ — test-helper refactor, no prod line).
 - **C159 (bug #79 — a malformed offline fuel entry retried/re-skipped forever; Angelo-decided: park + surface)** —
   Balance recompute (cycle 159): feature highest ratio (6/4) but BLOCKED (no spec work; re-recorded + pivoted);
   next over-budget = bug (4/3 = 1.33×). Executed the last remaining Angelo-DECIDED bug, **#79**. **The defect:**
