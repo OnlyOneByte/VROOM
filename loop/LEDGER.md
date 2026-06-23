@@ -84,19 +84,39 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 148 |
-| deep-review | 5 | 135 |
+| deep-review | 5 | 151 |
 | guard | 6 | 134 |
 | bug | 3 | 149 |
 | arch | 5 | 150 |
 | infra | 6 | 147 |
 
-Current cycle: **150**
+Current cycle: **151**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C151 (deep-review — certify the C148 `defaultCategory` change composes safely with the import write-path; +guard)** —
+  Balance recompute (cycle 151): deep-review most-starved (last-touched 135 → starved 16, budget 5 = 3.2×,
+  the override froze it since C135), edging guard (2.8×). The eyes-on vein is exhausted (C132 milestone) +
+  backend data-safety broadly certified (C135), so picked a FRESH invariant: the just-landed C148
+  `defaultCategory` change introduced new behavior into `applyMapping`/`mapCategory` that intersects the import
+  write-path's fuel-field hygiene (#137/C448 clearImportedFuelFields + parseRow's fuel-completeness gate) — and
+  the C148 tests only covered fuel rows WITH complete volume+mileage. Traced + verified FIRSTHAND (scratch
+  probe, then deleted) two previously-untested edges, BOTH CLEAN: (1) a blank-category row defaulted to `fuel`
+  but LACKING volume/mileage does NOT slip through — parseRow's line-252 fuel-completeness gate still fires →
+  clean per-row error, readyCount 0, no bad insert (the default fills the category cell, doesn't bypass
+  validation); (2) `defaultCategory` is schema-typed as ANY ExpenseCategory, so a non-fuel default (e.g.
+  'maintenance') on a row carrying a stray odometer/volume has those fuel-only fields NULLED by
+  clearImportedFuelFields — exactly as a named-non-fuel row does → no getCurrentOdometer cross-category MAX
+  poison, no fuel-field-leak path. No defect (the C148 fix is sound). Left a merge-surviving guard:
+  `import-mapping-presets.test.ts` +2 (the C151 describe) pinning both edges, non-vacuous (drop the line-252
+  gate → case 1 RED; drop clearImportedFuelFields → case 2 RED). VERIFY: backend validate:local GREEN (tsc 0,
+  musl-biome clean, 1775 pass / 0 fail [+2], build bundled). Backend-test-only; no production source, no render
+  → no shot. cov: be 88.21% / fe 88.23% (~ — guard-only, the import modules were already covered; this pins a
+  behavior intersection, not new lines). NEXT deep-review: the C149 lease-metrics gate change is unit-pinned
+  already (C102 anchor flipped); fresh invariants now come from feature/bug-surfaced seams.
 - **C150 (arch — converge the `seedVehicle` test helper, wave 1: insurance domain; Angelo-approved 2026-06-23)** —
   Balance recompute (cycle 150): arch most-starved (last-touched 131 → starved 19, budget 5 = 3.8×, the
   override froze it since C131). Both design-gated arch convergence candidates were APPROVED by Angelo

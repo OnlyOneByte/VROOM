@@ -103,6 +103,15 @@ now — the "Playwright-blocked" tail was a ~200-cycle MISDIAGNOSIS, see GUIDE.m
 re-audit a data-safety write path, certify it CLEAN against source, and leave a merge-surviving guard.
 Don't trust agent "HIGH" findings — verify firsthand (the archive logged many debunked false-positives).)*
 
+> **CERTIFIED C151 — the C148 `defaultCategory` change composes safely with the import write-path (CLEAN +
+> guarded).** The C148 fuel-tracker `defaultCategory:'fuel'` introduced new behavior into applyMapping/mapCategory
+> that intersects the import fuel-field hygiene (#137/C448 clearImportedFuelFields + parseRow's fuel-completeness
+> gate), and the C148 tests only covered fuel rows WITH complete fields. Verified firsthand, both edges CLEAN:
+> (1) a defaulted-`fuel` row LACKING volume/mileage still hits parseRow's line-252 gate → clean per-row error,
+> readyCount 0, no bad insert; (2) a NON-fuel `defaultCategory` (schema allows any ExpenseCategory) on a row
+> carrying a stray odometer/volume has those fields NULLED by clearImportedFuelFields → no getCurrentOdometer
+> poison. No defect. Guard: import-mapping-presets.test.ts +2 (non-vacuous both ways). Don't re-audit.
+
 > **GUARDED C119 — the dashboard EXPENSE-SUMMARY builder family CLEAN + pinned (4 zero-coverage builders).** A
 > fresh grep of every analytics-charts.ts builder vs its test references found FOUR with ZERO coverage —
 > `buildExpenseByCategory`, `buildVehicleExpenseBreakdown`, `buildMonthlyExpenseTrends`, `findBiggestExpense` (all
