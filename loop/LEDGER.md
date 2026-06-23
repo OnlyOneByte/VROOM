@@ -89,19 +89,39 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 153 |
-| deep-review | 5 | 151 |
+| deep-review | 5 | 157 |
 | guard | 6 | 152 |
 | bug | 3 | 155 |
 | arch | 5 | 156 |
 | infra | 6 | 154 |
 
-Current cycle: **156**
+Current cycle: **157**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C157 (deep-review — certify `resolveNewUser`'s email-collision + race-retry invariant CLEAN; +guard)** —
+  Balance recompute (cycle 157): deep-review most-starved (last-touched 151 → starved 6, budget 5 = 1.2×, the
+  only one over; feature at budget 1.0× but no open spec work → needs Angelo). Picked a FRESH load-bearing
+  invariant adjacent to the C155 auth change: `resolveNewUser` (auth/routes.ts) — the new-account creation path
+  on an OAuth login — whose collision handling is a NORTH_STAR #2 contract (VROOM NEVER implicitly merges two
+  accounts) but was only STRUCTURALLY tested (route order / delegation / rate-limiter), never behaviorally.
+  Certified firsthand (scratch probes, then deleted): (1) PRE-CHECK — an existing email → `email_exists`
+  redirect, no merge; (2) TRANSACTIONAL CATCH (concurrency-only) — re-queries findByProviderIdentity: a
+  same-provider-identity race-winner → idempotent userId; a different-account-same-email → `email_exists`
+  (never a cross-account login). **Corrected my own schema understanding mid-review:** initially mis-read
+  schema.ts as having NO unique index on the provider tuple (concluding users.email was the sole tx UNIQUE);
+  a firsthand index dump revealed `up_auth_identity_idx` — a PARTIAL UNIQUE on (provider_type,
+  provider_account_id) WHERE domain='auth' (added by migration, not the table def). This makes the invariant
+  STRONGER: the provider-identity UNIQUE guarantees the race-winner row is unambiguous. No defect — the logic
+  is CLEAN. Left a merge-surviving guard: resolve-new-user-collision.test.ts (+5) modeling both layers against
+  the REAL migrated schema (pre-check no-merge; catch race-winner-vs-collision; + a schema-fact test pinning
+  the partial-UNIQUE auth-identity index so a migration dropping it trips RED). Non-vacuous. VERIFY: backend
+  validate:local GREEN (tsc 0, musl-biome clean, 1785 pass / 0 fail [+5], build bundled). Backend-test-only;
+  no render → no shot. cov: be 88.33% / fe 88.24% (~ — the private handler stays integration-bound; this pins
+  the logic+schema contract). The auth-callback resolution seam is now behaviorally certified (was a gap).
 - **C156 (arch — converge the `seedVehicle` test helper, wave 2: reminders domain; Angelo-approved standing vein)** —
   Balance recompute (cycle 156): arch most-starved (last-touched 150 → starved 6, budget 5 = 1.2×, the only
   one over; deep-review at budget 1.0×). Continued the C150 seedVehicle convergence vein (one domain per arch

@@ -107,6 +107,15 @@ category. shot.sh eyes-on works — the "Playwright-blocked" tail was a ~200-cyc
 re-audit a data-safety write path, certify it CLEAN against source, and leave a merge-surviving guard.
 Don't trust agent "HIGH" findings — verify firsthand (the archive logged many debunked false-positives).)*
 
+> **CERTIFIED C157 — `resolveNewUser`'s email-collision + race-retry invariant CLEAN (NORTH_STAR #2 no-merge +
+> guarded).** The OAuth new-account path was only STRUCTURALLY tested; certified its data-safety contract
+> firsthand: (1) pre-check — existing email → `email_exists`, no implicit merge; (2) transactional catch
+> (concurrency-only) — a same-provider-identity race-winner → idempotent userId, a different-account-same-email
+> → `email_exists` (never a cross-account login). Found `up_auth_identity_idx` (partial UNIQUE on
+> provider_type+provider_account_id WHERE domain='auth') makes the race-winner retry unambiguous (corrected an
+> initial mis-read that there was no such index). No defect. Guard: resolve-new-user-collision.test.ts (+5) —
+> both branches vs the real migrated schema + a schema-fact pin on the partial-UNIQUE index. Don't re-audit.
+
 > **CERTIFIED C151 — the C148 `defaultCategory` change composes safely with the import write-path (CLEAN +
 > guarded).** The C148 fuel-tracker `defaultCategory:'fuel'` introduced new behavior into applyMapping/mapCategory
 > that intersects the import fuel-field hygiene (#137/C448 clearImportedFuelFields + parseRow's fuel-completeness
