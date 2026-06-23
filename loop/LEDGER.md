@@ -24,6 +24,11 @@
 > (settings reload) + C101 (theme listener) + C102 (#148 anchor) FE-logic guard arc. FE is now meaningfully off its
 > old plateau; the residual gap is structural (effect/DOM-bound + DI/OAuth-bound). Both still under the 90% goal but
 > the FE structural ceiling proved ~1.25pts higher than the long-assumed ~86% once the store/util logic was pinned.**
+> **C154 (infra cadence MEASURED): BE 88.33% line / 87.91% func (1776 pass) — +0.12 vs C136; FE 88.24% line /
+> 88.72% func / 80.25% branch / 86.09% stmts (752 pass) — +0.01 vs C136. Both UP slightly off the C136 plateau
+> (the C148/C151/C152 import-mapping guards + C149 lease-gate + C153 buildPresetMapping extraction added covered
+> lines). Both hold above 88% line at the structural ceiling (residual DI/OAuth/SQL BE + effect/DOM FE). The
+> import-trackers feature completing (C153) added no new uncovered surface — its slices were already pinned. NEXT ~C164.**
 > **C136 (infra cadence MEASURED): BE 88.21% line / 87.79% func (1770 pass) — +0.08 vs C130 (the C133/C134 arc);
 > FE 88.23% line / 88.69% func / 80.32% branch / 86.14% stmts (749 pass) — matches C134 (C135 doc-only). Both
 > holding above 88% line. All self-authorizable coverage veins CLOSED; the loop is at steady-state maintenance.**
@@ -88,15 +93,31 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 152 |
 | bug | 3 | 149 |
 | arch | 5 | 150 |
-| infra | 6 | 147 |
+| infra | 6 | 154 |
 
-Current cycle: **153**
+Current cycle: **154**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C154 (infra — branch-hygiene sweep + coverage re-measure; the ~10-cycle cadence, last MEASURED C136)** —
+  Balance recompute (cycle 154): bug (1.67×) + infra (1.17×) both over budget; bug edged by ratio but its
+  cold-vein is provably dry (the C148/C149 prod changes are fixed+pinned, C150–C152 test-only, C153 just
+  shipped+guarded), so per the record-dry-fast discipline took the productive over-budget pick: the infra
+  cadence sweep (overdue — the last true coverage re-measure was C136, ~18 cycles back; C147 was the
+  branch-reconcile, not a measurement). (1) UNTRACKED-TEST SWEEP: CLEAN both sides — zero untracked
+  `.test.ts`/`.spec.ts` (the gitignored `.meshclaw.e2e.ts` are by-design). (2) COVERAGE RE-MEASURED:
+  **BE 88.33% line / 87.91% func (1776 pass); FE 88.24% line / 88.72% func / 80.25% branch / 86.09% stmts
+  (752 pass).** Both UP slightly vs C136 (BE 88.21/87.79, FE 88.23/88.69/80.32) — the C148/C151/C152 import
+  guards + C149 lease-gate + the C153 buildPresetMapping extraction added covered lines; both hold above 88%
+  line at the documented structural ceiling (residual is DI/OAuth/SQL-bound BE + effect/DOM-bound FE, both
+  unchanged in character). (3) BOTH-SIDES GREEN: BE 1776 / FE 752, 0 fail. (4) BRANCH STATE: claude-loop-dev =
+  7 commits ahead of fresh origin/main (C147 reconcile + C148 feature + C149 bug + C150 arch + C151 deep-review
+  + C152 guard + C153 feature), 0 behind, PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only
+  (coverage runs exercised the full suites; no source touched → no build/shot). cov: be 88.33% / fe 88.24%
+  (MEASURED). NEXT cadence ~C164.
 - **C153 (feature — import-trackers (c): the auto-detect→preview→COMMIT round-trip, eyes-on; closes the feature)** —
   Balance recompute (cycle 153): bug (1.33×) + feature (1.25×) both over budget; bug edged by ratio but its
   cold-vein is provably dry (only recent prod changes are C148/C149, both fixed+pinned), so per the
