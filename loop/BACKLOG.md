@@ -74,21 +74,19 @@ now — the "Playwright-blocked" tail was a ~200-cycle MISDIAGNOSIS, see GUIDE.m
    `import-manual-mapping-mobile.meshclaw.e2e.ts` + shot (Read /tmp/c121-manual-mapping-mobile.png) — every
    field row + date-format + both conditional unit pickers reflow cleanly, NO horizontal overflow (asserted
    scrollWidth ≤ clientWidth+1, NORTH_STAR #3). The manual editor is now eyes-on across BOTH viewports.
-   **REMAINING (both Angelo-BLOCKED, no unblocked work left):**
-   (b) **✅ DECIDED 2026-06-23 (Angelo): add `defaultCategory:'fuel'` to each fuel-tracker preset
-   (Fuelly/Fuelio/Drivvo).** A DETECTED fuel-tracker log maps NO category COLUMN, so today every row previews
-   0-ready ("Unknown category") → nothing to commit. Fix: set `defaultCategory:'fuel'` on the 3 presets so
-   blank-category rows from a detected fuel tracker default to `fuel` (mapCategory still leaves a NAMED-but-
-   unknown word alone — the C47 remap path is unchanged; this only fills the empty-cell case). After it lands,
-   flip the C32 characterization (`import-mapping-presets.test.ts` — all 3 presets currently assert readyCount=0;
-   with the default they should produce ready fuel rows) + drive the T6 auto-detect-preset round-trip THROUGH
-   COMMIT + the 4-state shot (both were GATED on this). EXECUTE when the PR-green override lifts.
-   (c) the AUTO-DETECT-PRESET round-trip THROUGH COMMIT + the populated-detect four-state shot UNBLOCK once (b)
-   lands. Spec: `.kiro/specs/import-trackers/`.
-   This is the ONLY open feature (maintenance C1 + recurring-expenses C27 both DONE), and after C121 it has NO
-   unblocked increment left — the manual half is fully verified desktop + mobile; the detect-commit + 4-state
-   shot both wait on Angelo's defaultCategory. The next feature over-budget cycle should record that + pivot to
-   the co-starved category.
+   **REMAINING:**
+   (b) ~~add `defaultCategory:'fuel'` to each fuel-tracker preset~~ — **DONE (C148, Angelo-approved 2026-06-23).**
+   Added an optional `defaultCategory` to `ColumnMapping` (+ zod schema, bounded to a real ExpenseCategory) that
+   fills ONLY a blank category cell; set `defaultCategory:'fuel'` on all 3 fuel presets + carried through
+   `presetToMapping`; mirrored on the FE types. mapCategory still leaves a NAMED-but-unknown word as the misc
+   fallback (C47 path untouched — pinned by a new test). Flipped the C32 characterization: every preset now
+   yields ready `fuel` rows end-to-end (was 0-ready "Unknown category"). Both validate:local GREEN.
+   (c) **NEXT FEATURE INCREMENT (now UNBLOCKED by (b), eyes-on):** the AUTO-DETECT-PRESET round-trip THROUGH
+   COMMIT + the populated-detect four-state shot. With (b) landed, a detected Fuelly/Fuelio/Drivvo log now
+   previews ready fuel rows, so the full FE→BE→DB→render round-trip is finally exercisable: boot
+   (START_SERVERS=1 RESET_DB=1) → upload a real-shaped fuel CSV → detect banner → preview (ready N) → commit →
+   the materialized fuel expenses render on /expenses → shot.sh + Read the PNG (loading/empty/error/data
+   four-state). This closes import-trackers' feature-DoD (the last spec tail). Spec: `.kiro/specs/import-trackers/`.
 3. ~~**Recurring expenses**~~ — **COMPLETE (T1–T8 all done, C27).** Engine + backend (T1–T3/T5/T7), FE
    client (T6/T7), then the eyes-on FE tail: T7 widget (C5), T5 app-init hook (C12), T6 badge+dialog
    (C9/C16), T4 multi-vehicle split via the shared `SplitConfigEditor` (C22), and **T8 full round-trip

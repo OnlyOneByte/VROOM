@@ -83,20 +83,42 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 121 |
+| feature | 4 | 148 |
 | deep-review | 5 | 135 |
 | guard | 6 | 134 |
 | bug | 3 | 137 |
 | arch | 5 | 131 |
 | infra | 6 | 147 |
 
-Current cycle: **147**
+Current cycle: **148**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C148 (feature — import-trackers (b): fuel-tracker presets get `defaultCategory:'fuel'`, Angelo-approved 2026-06-23)** —
+  First normal cycle post-override-lift. Balance recompute (cycle 148): the override froze rotation since
+  C138, so feature was the most-starved (last-touched 121 → starved 27, budget 4) AND its sole open item
+  was just UNBLOCKED — Angelo decided import-trackers (b) on 2026-06-23 with the note "EXECUTE when the
+  PR-green override lifts" (it lifted C147). Clear pick. **The gap (C31/C32 finding):** Fuelly/Fuelio/Drivvo
+  refuel exports have NO category column (definitionally all fuel), so a DETECTED log mapped a BLANK category
+  cell → `mapCategory('')` returned `''` → buildImportPlan errored every row "Unknown category" → 0-ready.
+  A perfectly-detected fuel log imported NOTHING. **Fix (minimal, opt-in):** added an optional
+  `defaultCategory` to `ColumnMapping` (+ the zod schema, bounded to a real ExpenseCategory) that fills ONLY
+  a blank category cell; set `defaultCategory:'fuel'` on all 3 fuel presets + carried it through
+  `presetToMapping`; mirrored the field on the FE `ImportColumnMapping`/`ImportMappingPreset` types. The
+  NAMED-but-unknown→misc path (D2/C47 remap) is deliberately untouched — verified by a new test that a row
+  WITH a category column holding an unrecognized word still falls back to misc + reports unmapped (NOT
+  coerced to fuel). **Flipped the C32 characterization** (was: every preset 0-ready "Unknown category"; now:
+  every preset yields 1 ready `fuel` row end-to-end through buildImportPlan, native category cell == 'fuel',
+  committed expense.category == 'fuel'). VERIFY (both sides, full local gate): backend validate:local GREEN
+  (tsc 0, musl-biome clean after check:musl:fix wrapped the mapCategory call, 1772 pass / 1 skip / 0 fail,
+  build bundled); frontend validate:local GREEN on the reset npm-ci tree (tsc 0, build 0 PARSE_ERROR — also
+  re-confirms the C146 fix, 749/749). Backend-logic + FE-type only → no shot this cycle. **(c) the
+  auto-detect-preset round-trip THROUGH COMMIT + the populated-detect 4-state shot is now UNBLOCKED** (it
+  gated on (b)) → that's the next feature increment (eyes-on, boot+shot.sh+Read). cov: be 88.21% / fe 88.23%
+  (~ — import-mapping modules were already covered; this added behavior-flip tests, not new uncovered lines).
 - **C147 (infra — POST-SQUASH-MERGE BRANCH RECONCILE + lift the PR-green override)** — The PR
   (claude-loop-dev → main) was **squash-merged** by Angelo; origin/main moved fb35c17 → `116fcd8`
   ("Merge Monday (#114)" + dependabot #116/#117). The squash captured ALL loop work incl. the C146

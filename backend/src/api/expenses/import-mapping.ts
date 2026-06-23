@@ -56,6 +56,14 @@ export interface ColumnMapping {
   volumeUnit?: VolumeUnit;
   /** Foreign category word (lower-cased) → VROOM enum (D2). Unmatched → `misc` + a note. */
   categoryMap?: Record<string, ExpenseCategory>;
+  /**
+   * Category to stamp on a row whose category cell is BLANK (no category column mapped, or an empty
+   * cell). Fuel-tracker exports (Fuelly/Fuelio/Drivvo) have no category column — they're definitionally
+   * all fuel — so their presets set this to `fuel`, turning an otherwise-0-ready detected log into ready
+   * fuel rows. Only the EMPTY cell is filled; a NAMED-but-unrecognized word still falls back to `misc`
+   * with a note (the D2/C47 remap path is unchanged).
+   */
+  defaultCategory?: ExpenseCategory;
 }
 
 // A foreign header name mapped onto a native field: bounded, non-empty when present.
@@ -90,6 +98,7 @@ export const columnMappingSchema = z.object({
   distanceUnit: z.enum(DistanceUnit).optional(),
   volumeUnit: z.enum(VolumeUnit).optional(),
   categoryMap: z.record(z.string().max(200), z.enum(EXPENSE_CATEGORIES)).optional(),
+  defaultCategory: z.enum(EXPENSE_CATEGORIES).optional(),
 });
 
 /**
@@ -206,12 +215,15 @@ export function normalizeForeignDate(raw: string, format: ImportDateFormat): str
 /** Map a foreign category word to a VROOM enum (D2). Returns the fallback word when it misses. */
 function mapCategory(
   raw: string,
-  categoryMap: Record<string, ExpenseCategory> | undefined
+  categoryMap: Record<string, ExpenseCategory> | undefined,
+  defaultCategory: ExpenseCategory | undefined
 ): { value: string; unmapped?: string } {
   const word = raw.trim();
-  // A blank category stays blank → buildImportPlan reports "Unknown category"; we never
-  // invent a category for an empty cell (only NAMED-but-unrecognized words fall back).
-  if (!word) return { value: '' };
+  // A blank category cell: use the mapping's defaultCategory when set (fuel-tracker presets set
+  // `fuel` — those exports have no category column but are definitionally all fuel), else stay
+  // blank → buildImportPlan reports "Unknown category". We still never invent a category for a
+  // NAMED-but-unrecognized word (those fall back to misc below), only fill a truly empty cell.
+  if (!word) return { value: defaultCategory ?? '' };
   const lc = word.toLowerCase();
   if ((EXPENSE_CATEGORIES as readonly string[]).includes(lc)) return { value: lc };
   const mapped = categoryMap?.[lc] ?? categoryMap?.[word];
@@ -293,7 +305,11 @@ export function applyMapping(
 
   const unmapped = new Set<string>();
   const outRows = records.map((rec) => {
-    const category = mapCategory(read(rec, 'category'), mapping.categoryMap);
+    const category = mapCategory(
+      read(rec, 'category'),
+      mapping.categoryMap,
+      mapping.defaultCategory
+    );
     if (category.unmapped) unmapped.add(category.unmapped);
     return {
       date: normalizeForeignDate(read(rec, 'date'), mapping.dateFormat),
