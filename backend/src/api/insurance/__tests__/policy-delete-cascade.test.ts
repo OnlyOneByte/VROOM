@@ -17,6 +17,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -48,17 +49,6 @@ function insuranceExpenseCount(): number {
   return row.n;
 }
 
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Toyota',
-    model: 'Camry',
-    year: 2022,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
-
 async function seedPolicyWithClaim(
   vehicleId: string
 ): Promise<{ policyId: string; claimId: string }> {
@@ -87,7 +77,7 @@ async function seedPolicyWithClaim(
 
 describe('insurance policy deletion cascades photo cleanup to itself + claims', () => {
   test("deleting a policy removes its own AND its claims' photo rows (no orphans)", async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx);
     const { policyId, claimId } = await seedPolicyWithClaim(vehicleId);
 
     seedPhoto({ id: 'pol-doc', entityType: 'insurance_policy', entityId: policyId });
@@ -109,7 +99,7 @@ describe('insurance policy deletion cascades photo cleanup to itself + claims', 
   });
 
   test('deleting a single claim directly removes its photo rows (no orphans)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx);
     const { policyId, claimId } = await seedPolicyWithClaim(vehicleId);
     seedPhoto({ id: 'claim-doc-direct', entityType: 'insurance_claim', entityId: claimId });
     expect(photoCount('insurance_claim', claimId)).toBe(1);
@@ -128,7 +118,7 @@ describe('insurance policy deletion cascades photo cleanup to itself + claims', 
   // cascade-delete leaves the expense ORPHANED (still summed into TCO insurance cost forever) unless the
   // DELETE-policy route deletes it explicitly — which DELETE-term/UPDATE-term did but policy-delete didn't.
   test("deleting a policy removes its terms' auto-materialized premium expenses (no orphan)", async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx);
     // A term WITH a totalCost → createTermExpenses fires (the seedPolicyWithClaim term has none).
     const pol = await ctx.authed('POST', '/api/v1/insurance', {
       company: 'Acme Mutual',

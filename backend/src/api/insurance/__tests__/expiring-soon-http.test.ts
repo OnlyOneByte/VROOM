@@ -19,6 +19,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -26,17 +27,6 @@ beforeEach(async () => {
   ctx = await createTestApp();
 });
 afterEach(() => ctx.close());
-
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Toyota',
-    model: 'Camry',
-    year: 2022,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
 
 interface ExpiringResponse {
   success: boolean;
@@ -74,7 +64,7 @@ async function seedSoonExpiringTerm(vehicleId: string): Promise<string> {
 
 describe('GET /insurance/expiring-soon — #70 malformed `days` must not silently hide expiring terms', () => {
   test('the default window finds a ~20-days-out term (baseline)', async () => {
-    const vid = await seedVehicle();
+    const vid = await seedVehicle(ctx);
     const termId = await seedSoonExpiringTerm(vid);
 
     const res = await ctx.authed('GET', '/api/v1/insurance/expiring-soon');
@@ -85,7 +75,7 @@ describe('GET /insurance/expiring-soon — #70 malformed `days` must not silentl
   });
 
   test('REGRESSION: a non-numeric `?days=abc` falls back to the 30-day default (was: Invalid Date → empty)', async () => {
-    const vid = await seedVehicle();
+    const vid = await seedVehicle(ctx);
     const termId = await seedSoonExpiringTerm(vid);
 
     const res = await ctx.authed('GET', '/api/v1/insurance/expiring-soon?days=abc');
@@ -97,7 +87,7 @@ describe('GET /insurance/expiring-soon — #70 malformed `days` must not silentl
   });
 
   test('an explicit valid `?days=45` is honored', async () => {
-    const vid = await seedVehicle();
+    const vid = await seedVehicle(ctx);
     const termId = await seedSoonExpiringTerm(vid);
 
     const res = await ctx.authed('GET', '/api/v1/insurance/expiring-soon?days=45');
@@ -108,7 +98,7 @@ describe('GET /insurance/expiring-soon — #70 malformed `days` must not silentl
   });
 
   test('an absurd `?days=99999` clamps to the 366-day ceiling (no unbounded window)', async () => {
-    await seedVehicle();
+    await seedVehicle(ctx);
     const res = await ctx.authed('GET', '/api/v1/insurance/expiring-soon?days=99999');
     const body = await json<ExpiringResponse>(res);
     expect(res.status, JSON.stringify(body)).toBe(200);

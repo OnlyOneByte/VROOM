@@ -1071,16 +1071,21 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 ### arch
 *(reliably DRY per the archive. Run a fresh dedup scout; if nothing clean surfaces, record "no churn warranted" + pivot. Obey the arch rules above.)*
 
-> **✅ APPROVED 2026-06-23 (Angelo) — converge the `seedVehicle` test helper, INCREMENTALLY.** It's
-> re-declared in 51 HTTP-harness test files with 7 distinct signatures (32× no-arg, 7× nickname, 4× make, + 4
-> one-offs). MANDATE: add ONE shared `test-helpers` seeder (an options bag covering nickname/make/extra),
-> then migrate ONE domain's test files per arch cycle — **NEVER a 51-file big-bang** (arch rules 1/2). The 32
-> no-arg call sites are the trivial first wave. Behavior must be preserved in every migrated file (green→green;
-> the seeder's defaults must reproduce each call site's current vehicle exactly). Test-only. EXECUTE when the
-> PR-green override lifts; this becomes the standing arch vein (one domain per arch cycle) until all 51 converge.
-> (NOTE: a `.kiro/specs/` design doc is OPTIONAL here since Angelo approved the incremental plan directly —
-> the options-bag shape can be defined in the shared helper's docstring; if the first migration surfaces a
-> behavior-divergent call site, pause + escalate that specific one.)
+> **🔄 STANDING ARCH VEIN (Angelo-approved 2026-06-23) — converge the `seedVehicle` test helper, ONE domain
+> per arch cycle.** The shared seeder `backend/src/test-helpers/seed.ts` (`seedVehicle(ctx, opts?)`, options
+> bag make/model/year/nickname/extra, defaults = Toyota Camry 2022) was ESTABLISHED C150. Behavior must be
+> preserved in every migrated file (green→green; each call passes its exact prior vehicle). NEVER a big-bang.
+> - **✅ WAVE 1 (C150): insurance domain** — 5 files (terms-http, claims-http, claim-photos-http,
+>   policy-delete-cascade, expiring-soon-http), all byte-identical no-arg → `seedVehicle(ctx)`. Net −50 LOC, 27/27.
+> - **REMAINING (~46 files, ~6 domains), pick ONE per arch cycle:** the no-arg **reminders** cluster (×12, but
+>   make/model/year VARY → each migrated call passes its own values; recommended NEXT — largest single batch);
+>   the **expenses** no-arg + nickname mix; the **sync** no-arg/make cluster; the **make-param** variant
+>   (`seedVehicle(make)` — premium-expense-hook, delete-split-child, restore-*, …); the **nickname** variant
+>   (export-csv, import-csv, analytics-routes-http, vehicle-photo-routes, financing-*); the remaining one-offs
+>   (vehicle-tco-zero-state's `extra` bag, google-sheets-service's make/model/year-default). If a migration
+>   surfaces a behavior-divergent call site, pause + escalate that specific one.
+> (NOTE: the `analytics-test-generators.ts` `seedVehicle(db, vehicle)` + the property-test `seedVehiclesWith*`
+> are a DIFFERENT contract — direct-DB seeders, not the route-harness one — leave them out of this convergence.)
 >
 > **✅ APPROVED 2026-06-23 (Angelo) — adopt `createLoadState<T>` across the 13 load-bearing pages, via a
 > design doc + ONE page per cycle.** The scaffold (load-state.svelte.ts, arch #2) centralizes the page load

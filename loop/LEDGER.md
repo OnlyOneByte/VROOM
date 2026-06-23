@@ -87,16 +87,38 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 135 |
 | guard | 6 | 134 |
 | bug | 3 | 149 |
-| arch | 5 | 131 |
+| arch | 5 | 150 |
 | infra | 6 | 147 |
 
-Current cycle: **149**
+Current cycle: **150**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C150 (arch — converge the `seedVehicle` test helper, wave 1: insurance domain; Angelo-approved 2026-06-23)** —
+  Balance recompute (cycle 150): arch most-starved (last-touched 131 → starved 19, budget 5 = 3.8×, the
+  override froze it since C131). Both design-gated arch convergence candidates were APPROVED by Angelo
+  2026-06-23: `createLoadState` adoption (needs a `.kiro/specs/load-state-migration/design.md` FIRST + touches
+  render) and **`seedVehicle` converge** (test-only, direct approval, no design-doc gate, "ONE domain per arch
+  cycle, NEVER a 51-file big-bang"). Picked seedVehicle as the lower-risk first vein (test-only, arch rules
+  1/2 satisfied trivially; createLoadState's render-touching design-doc cycle waits). **Did:** added the ONE
+  shared seeder `backend/src/test-helpers/seed.ts` — `seedVehicle(ctx, opts?)` with an options bag
+  (make/model/year/nickname/extra) defaulting to the most common inlined shape (Toyota Camry 2022), driving the
+  REAL `POST /vehicles` route + the identical `<300` status-with-body assertion every inlined copy used. Then
+  migrated **wave 1 = the insurance domain** (5 files: terms-http, claims-http, claim-photos-http,
+  policy-delete-cascade, expiring-soon-http) — all had a BYTE-IDENTICAL no-arg decl (Toyota Camry 2022), so the
+  shared defaults reproduce each exactly: removed the 5 local decls, imported the shared one, rewrote every
+  call to `seedVehicle(ctx)`. Net −50 LOC. Behavior-preserving (green→green): the 5 suites 27/27 pass, full
+  backend validate:local GREEN (tsc 0, musl-biome clean, 1773 pass / 0 fail, build bundled). Test-only, no
+  production source, no render → no shot. **LEFT for later waves** (the standing vein, one domain per arch
+  cycle): the make-param variant (`seedVehicle(make)` — premium-expense-hook, delete-split-child, etc.), the
+  nickname variant (export-csv, import-csv, analytics-routes-http, …), and the remaining no-arg cluster
+  (reminders ×12 incl. make/model/year VARIATION → each migrated call passes its exact values, expenses,
+  sync). ~46 files remain across ~6 domains. NEXT arch cycle: migrate ONE more domain (recommend the reminders
+  no-arg cluster — largest single batch, each call passes its own make/model/year). cov: be 88.21% / fe 88.23%
+  (~ — test-helper refactor, no production line touched).
 - **C149 (bug #148 — null `initialMileage` lease burn bar reads 0-used; Angelo-decided 2026-06-23: treat null/zero initial as 0)** —
   Balance recompute (cycle 149): the override froze rotation C138–147, so 4 categories are over budget; bug
   was most-starved-relative-to-budget (last-touched 137 → starved 12, budget 3 = 4.0×, also the lowest budget).

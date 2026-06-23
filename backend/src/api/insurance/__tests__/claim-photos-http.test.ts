@@ -16,6 +16,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -23,17 +24,6 @@ beforeEach(async () => {
   ctx = await createTestApp();
 });
 afterEach(() => ctx.close());
-
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Toyota',
-    model: 'Camry',
-    year: 2022,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
 
 async function seedPolicy(vehicleId: string): Promise<string> {
   const res = await ctx.authed('POST', '/api/v1/insurance', {
@@ -63,7 +53,7 @@ async function seedClaim(policyId: string): Promise<string> {
 
 describe('insurance_claim photo entity-type', () => {
   test('GET photos for an owned claim passes the ownership gate (200, empty list)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx);
     const policyId = await seedPolicy(vehicleId);
     const claimId = await seedClaim(policyId);
 
