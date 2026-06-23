@@ -90,18 +90,40 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 153 |
 | deep-review | 5 | 157 |
-| guard | 6 | 152 |
+| guard | 6 | 158 |
 | bug | 3 | 155 |
 | arch | 5 | 156 |
 | infra | 6 | 154 |
 
-Current cycle: **157**
+Current cycle: **158**
+
+> **NOTE (C158): feature was most-starved (5/4) but is BLOCKED — all 3 spec features complete (C153), no
+> self-authorizable feature work; new features need Angelo sign-off (flagged C153). Per the documented rule,
+> recorded feature as over-budget-but-blocked + pivoted to the co-starved guard. feature's `last-touched 153`
+> stays — it's not "touched", just un-pickable until Angelo greenlights a new spec. The clock keeps running;
+> each feature-over-budget cycle re-records this + pivots.**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C158 (guard — pin the auth-account UNLINK route: last-account lockout + cross-tenant ownership, end-to-end)** —
+  Balance recompute (cycle 158): feature most-starved (5/4 = 1.25×) but BLOCKED (all 3 spec features done C153,
+  no self-authorizable feature work — needs Angelo sign-off); recorded that + pivoted to the co-starved guard
+  (tied with bug at budget 1.0×; guard longer-starved absolutely, 6 vs 3). Picked the freshest high-stakes
+  UNCOVERED surface (the C155/C157 cycles put me in auth/routes.ts): **DELETE /api/v1/auth/accounts/:id**, the
+  auth-provider unlink — which enforces two load-bearing account-security invariants but had ZERO coverage.
+  Certified firsthand (no defect, the route is well-built): (1) LAST-ACCOUNT LOCKOUT — unlinking the ONLY
+  sign-in method is refused (400 LAST_ACCOUNT) so a user can't lock themselves out; the count runs INSIDE the
+  delete transaction (concurrency-safe); (2) CROSS-TENANT OWNERSHIP — the row must belong to the requester AND
+  be domain='auth', so another user's account id OR a non-auth (storage) provider row → 404, no deletion
+  (NORTH_STAR #2). Guard: unlink-account-http.test.ts (+4 via createTestApp, seeding auth providers through
+  ctx.sqlite since the harness seeds only the users row) — last-account 400+preserved, 2→unlink-one 204+other
+  survives, foreign-user 404+untouched, storage-domain row 404+survives. Non-vacuous (each asserts the DB
+  side-effect, not just the status). VERIFY: backend validate:local GREEN (tsc 0, musl-biome clean, 1789 pass
+  / 0 fail [+4], build bundled). Backend-test-only; no render → no shot. cov: be 88.33% / fe 88.24% (~ — the
+  unlink route handler is now HTTP-harness covered; it was a real 0-coverage gap on an account-security path).
 - **C157 (deep-review — certify `resolveNewUser`'s email-collision + race-retry invariant CLEAN; +guard)** —
   Balance recompute (cycle 157): deep-review most-starved (last-touched 151 → starved 6, budget 5 = 1.2×, the
   only one over; feature at budget 1.0× but no open spec work → needs Angelo). Picked a FRESH load-bearing

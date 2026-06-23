@@ -602,6 +602,13 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C158 — the auth-account UNLINK route (DELETE /auth/accounts/:id), end-to-end.** A 0-coverage
+> account-security path pinned via createTestApp: (1) last-account lockout — unlinking the ONLY sign-in method
+> → 400 LAST_ACCOUNT, row preserved (count runs inside the delete tx, concurrency-safe); (2) cross-tenant —
+> another user's account id OR a non-auth (storage) provider row → 404, no deletion (NORTH_STAR #2); + the
+> happy path (2 providers → unlink one → 204, other survives). +4 in unlink-account-http.test.ts, each asserts
+> the DB side-effect. Certified CLEAN (no defect). Don't re-add.
+
 > **GUARDED C152 — the C148 `defaultCategory` fuel-tracker commit at the ROUTE layer (end-to-end).** C151 pinned
 > the pure applyMapping/buildImportPlan path; this pins the actual user flow through `POST /import`: a detected
 > fuel tracker (NO category column) + a preset mapping carrying `defaultCategory:'fuel'` → translated + COMMITTED
