@@ -611,6 +611,13 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C163 — the import route's unowned-`targetVehicle` cross-tenant path (NORTH_STAR #2).** A mapping
+> whose targetVehicle the user does NOT own imports nothing: resolveTargetUnits returns {} (skip conversion,
+> no guessing toward a foreign vehicle's units) AND buildImportPlan rejects the rows "No vehicle named X in
+> your garage" → readyCount 0, no leak, no insert. The route-level cross-tenant path had no test (existing
+> cases all target an OWNED vehicle). +1 in import-mapping-route.test.ts, non-vacuous. Surfaced by the C163
+> bug-scout (dry on the C153/C159-changed surfaces → pivoted to this guard). Don't re-add.
+
 > **GUARDED C158 — the auth-account UNLINK route (DELETE /auth/accounts/:id), end-to-end.** A 0-coverage
 > account-security path pinned via createTestApp: (1) last-account lockout — unlinking the ONLY sign-in method
 > → 400 LAST_ACCOUNT, row preserved (count runs inside the delete tx, concurrency-safe); (2) cross-tenant —

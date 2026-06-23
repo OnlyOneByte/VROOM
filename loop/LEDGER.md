@@ -95,12 +95,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 153 |
 | deep-review | 5 | 162 |
-| guard | 6 | 158 |
-| bug | 3 | 159 |
+| guard | 6 | 163 |
+| bug | 3 | 163 |
 | arch | 5 | 160 |
 | infra | 6 | 161 |
 
-Current cycle: **162**
+Current cycle: **163**
 
 > **NOTE (C158/C159): feature is BLOCKED (all 3 spec features complete C153; new features need Angelo
 > sign-off, flagged C153). Each feature-over-budget cycle re-records this + pivots to the co-starved category.
@@ -111,6 +111,24 @@ Current cycle: **162**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C163 (bug-scout DRY → pivot to guard: pin the import-route unowned-targetVehicle cross-tenant path)** —
+  Balance recompute (cycle 163): feature BLOCKED (re-recorded + pivoted); bug the only over-budget (4/3 = 1.33×).
+  The Angelo-decided bug queue is fully drained (#148/#129/#79 closed, #100 arch-gated), so this was a cold
+  write-path scout. Precondition: production source HAS changed (C153 dialog + C159 offline-storage/sync-manager),
+  so the scout is non-ceremonial. SCOUTED the freshly-changed surfaces firsthand, ALL CLEAN: (1) the C159
+  `needsAttention` flag round-trips cleanly through load/save/add/migrate (plain persisted boolean, preserved by
+  the `...expense` spread — no asymmetry); (2) the import route's vehicle resolution — both resolveTargetUnits
+  AND buildImportPlan scope `targetVehicle` to `vehicleRepository.findByUserId(user.id)`, no cross-tenant leak.
+  No fresh defect → recorded DRY. Per the C122 discipline (bug forced but dry → pivot the substantive work to
+  the co-productive guard vein), pinned a real 0-coverage data-safety path the scout surfaced: a mapping whose
+  `targetVehicle` the user does NOT own. Verified firsthand (scratch probe, then deleted): unowned target →
+  readyCount 0, errorCount 1, "No vehicle named X in your garage", no leak, no insert (resolveTargetUnits
+  returns {} skip-conversion + buildImportPlan rejects by name — both legs cross-tenant safe, NORTH_STAR #2).
+  The route-level cross-tenant path had no test (existing cases all target an OWNED vehicle). Guard (+1) in
+  import-mapping-route.test.ts, non-vacuous. VERIFY: backend validate:local GREEN (tsc 0, musl-biome clean / 20
+  warnings baseline, 1790 pass / 0 fail [+1], build bundled). Backend-test-only → no shot. cov: be 88.39% / fe
+  88.44% (~ — route already covered for owned paths; this pins the unowned cross-tenant leg). NEXT bug cycle:
+  cold vein dry again unless new prod source lands → record + pivot.
 - **C162 (deep-review — certify the C159 #79 needs-attention parking COMPOSES safely across the offline flows; +guard)** —
   Balance recompute (cycle 162): feature BLOCKED (re-recorded + pivoted); deep-review + bug both at budget
   (1.0×), deep-review longer-absolute-starved (5 vs 3) + higher-leverage → picked. Certified a FRESH invariant:

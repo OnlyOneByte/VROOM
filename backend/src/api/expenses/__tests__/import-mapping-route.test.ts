@@ -196,6 +196,35 @@ describe('POST /import — foreign-tracker mapping path (T3)', () => {
     });
     expect(res.status).toBe(400);
   });
+
+  // C163 GUARD (bug-scout pivot): a mapping whose `targetVehicle` the user does NOT own must NOT import
+  // against another tenant's vehicle (NORTH_STAR #2). The route resolves targetVehicle ONLY against the
+  // caller's own fleet on BOTH legs — resolveTargetUnits returns {} (skip unit conversion, no guessing
+  // toward a foreign vehicle's units, the C60 risk) AND buildImportPlan rejects the rows by name. So an
+  // unowned target → 0 ready, a clean "No vehicle named X in your garage" per-row error, no leak, no
+  // insert. This route-level cross-tenant path had no test (the existing cases all target an owned vehicle).
+  test('a mapping targeting an UNOWNED vehicle imports nothing (cross-tenant safe, no leak)', async () => {
+    await seedVehicle('Daily Driver'); // the user's ONLY vehicle
+    const res = await ctx.authed('POST', '/api/v1/expenses/import', {
+      csv: ['Data,Odo (km),Fuel (litres),Price', '15/03/2024,160,37,52.40'].join('\n'),
+      mapping: {
+        columns: { date: 'Data', mileage: 'Odo (km)', volume: 'Fuel (litres)', amount: 'Price' },
+        targetVehicle: "Somebody Else's Car", // NOT in the user's garage
+        dateFormat: 'dmy',
+        distanceUnit: 'kilometers',
+        volumeUnit: 'liters',
+        defaultCategory: 'fuel',
+      },
+      dryRun: true, // preview only — assert it would import nothing even before committing
+    });
+    const body = await json<ImportResponse>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.data.readyCount).toBe(0); // unowned target → nothing ready
+    expect(body.data.errorCount).toBe(1);
+    expect(body.data.rows[0].message).toMatch(/no vehicle named/i); // safe by-name rejection, no leak
+    // And nothing was written (dryRun, but also confirm the garage is untouched).
+    expect((await listExpenses()).length).toBe(0);
+  });
 });
 
 // C152 GUARD (the C148 defaultCategory at the ROUTE layer): C151 pinned the pure applyMapping/buildImportPlan
