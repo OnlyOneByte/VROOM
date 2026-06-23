@@ -1052,24 +1052,14 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 >   +2 guards (over-ratio-but-under-total-cap → rejected; real backup ratio under cap, no false positive);
 >   non-vacuous (neuter → RED). Updated the pre-existing all-zeros total-size test (now trips the earlier
 >   ratio guard) to accept either pre-inflation message. Don't re-pick.
-> - **#129 (MED) — ✅ DECIDED 2026-06-23 (Angelo: "dig it out" → investigated; fix = sync-only-if-unset).**
->   GROUNDING (read firsthand from auth/routes.ts + archive C433): `updateExistingUserProfile`
->   (auth/routes.ts:176) runs on EVERY OAuth login and does `db.update(users).set({ email: userInfo.email,
->   displayName, updatedAt })` — i.e. it OVERWRITES `users.email` (the VROOM login identity) with whatever
->   email the provider currently reports. The UNIQUE-collision branch IS correct (catches "another user has
->   this email", falls back to updating displayName only — no cross-account hijack). The real defect: a
->   *within-account* drift is silent — if you change your Google/GitHub PRIMARY email, your next VROOM login
->   silently changes the email you log in with, with no notice. **DECISION: sync the email only when the
->   stored `users.email` is empty/unset (first-link backfill); otherwise DO NOT overwrite on login.** (Keep
->   `displayName`/`avatarUrl` syncing as-is — only `email` is identity-sensitive.) IMPLEMENTATION: in
->   `updateExistingUserProfile`, fetch the current row; build the `.set({...})` so `email` is included ONLY
->   when the existing email is null/''; keep the displayName/updatedAt update unconditional; the UNIQUE
->   try/catch stays (still relevant for the first-link backfill). Add an HTTP-harness/repo guard: existing
->   non-empty email is PRESERVED across a re-login with a different provider email; an unset email IS
->   backfilled. (The `authProviderRepository.updateProfile` call that records the provider-account's own
->   email is unchanged — that's the per-provider record, not the login identity.) EXECUTE when the override
->   lifts. NOTE: the `auth_error=email_exists` flow for NEW account creation (routes.ts:226/259) is a
->   separate, already-correct path — don't touch it.
+> - **#129 (MED) — ✅ CLOSED C155 (was: ✅ DECIDED 2026-06-23 Angelo — sync-only-if-unset).**
+>   `updateExistingUserProfile` (auth/routes.ts) ran on every OAuth login + OVERWROTE `users.email` (the VROOM
+>   login identity) with the provider's currently-reported email, so a within-account email change silently
+>   swapped the login email. Fixed: read the current row; sync `email` ONLY as a first-link backfill (stored
+>   email empty/unset — NOT NULL so ''), else update displayName/updatedAt + PRESERVE email. Kept the UNIQUE
+>   try/catch (reachable on backfill); left authProviderRepository.updateProfile + the email_exists new-account
+>   flow untouched. Guard: login-email-preservation.test.ts (+3) — behavioral model (preserve vs backfill) +
+>   source-scan gating the email write on `!current?.email`, non-vacuous. backend validate:local GREEN. Don't re-fix.
 > - **#112 (LOW) — APPROVED: extend / generate distinct hues for the cross-vehicle analytics chart
 >   palette** for legibility at fleet size.
 > - **#79 (LOW) — ✅ DECIDED 2026-06-23 (Angelo agrees with the approved approach): add a data-hygiene path

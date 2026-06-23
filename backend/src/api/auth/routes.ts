@@ -184,7 +184,30 @@ async function updateExistingUserProfile(
     displayName: userInfo.displayName,
     avatarUrl: userInfo.avatarUrl,
   });
-  // Update users table — wrap email update in try/catch for UNIQUE constraint
+  // #129 (C155): DO NOT overwrite the VROOM login identity (users.email) on every login. The old code
+  // set email := the provider's CURRENTLY-reported email each time, so a user who changed their
+  // Google/GitHub primary email had their VROOM login email silently swapped on the next login (a
+  // within-account identity drift, no notice). Sync email ONLY as a first-link BACKFILL — when the
+  // stored email is empty/unset — otherwise preserve it. displayName/avatarUrl stay synced (not
+  // identity-sensitive); the provider's own email is still recorded by updateProfile above (the
+  // per-provider record, not the login identity). The cross-account UNIQUE-collision branch is kept:
+  // it's still reachable on the backfill write. (users.email is NOT NULL, so "unset" = empty string.)
+  const [current] = await db
+    .select({ email: users.email })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  const shouldBackfillEmail = !current?.email;
+  if (!shouldBackfillEmail) {
+    // Common path: preserve the existing login email; only refresh the display fields.
+    await db
+      .update(users)
+      .set({ displayName: userInfo.displayName, updatedAt: new Date() })
+      .where(eq(users.id, userId));
+    return;
+  }
+  // First-link backfill: the stored email is empty → adopt the provider's. Wrap in try/catch for the
+  // UNIQUE constraint (another account may already hold this email — fall back to display-only).
   try {
     await db
       .update(users)
@@ -193,7 +216,7 @@ async function updateExistingUserProfile(
   } catch (emailErr) {
     if (emailErr instanceof Error && emailErr.message.includes('UNIQUE constraint failed')) {
       logger.warn(
-        'Skipped email update due to UNIQUE conflict — another user already has this email',
+        'Skipped email backfill due to UNIQUE conflict — another user already has this email',
         {
           userId,
           attemptedEmail: userInfo.email,

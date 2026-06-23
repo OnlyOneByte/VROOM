@@ -91,17 +91,38 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 153 |
 | deep-review | 5 | 151 |
 | guard | 6 | 152 |
-| bug | 3 | 149 |
+| bug | 3 | 155 |
 | arch | 5 | 150 |
 | infra | 6 | 154 |
 
-Current cycle: **154**
+Current cycle: **155**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C155 (bug #129 — OAuth login silently overwrote the VROOM login email; Angelo-decided: sync-only-if-unset)** —
+  Balance recompute (cycle 155): bug most-starved (last-touched 149 → starved 6, budget 3 = 2.0×). Took the
+  now-unblocked Angelo-DECIDED #129 (over a cold scout) — a real MED data-integrity defect with the fix already
+  specified. **The defect:** `updateExistingUserProfile` (auth/routes.ts) runs on EVERY OAuth login and did
+  `users.set({ email: userInfo.email, ... })` — OVERWRITING the VROOM login identity with the provider's
+  currently-reported email each time. So a user who changed their Google/GitHub PRIMARY email had their VROOM
+  login email silently swapped on the next login (a within-account drift, no notice). The cross-account
+  UNIQUE-collision branch was already correct (no hijack). **Fix (Angelo-decided 2026-06-23):** read the
+  current row; sync `email` ONLY as a first-link BACKFILL (when the stored email is empty/unset — users.email
+  is NOT NULL so "unset" = ''); otherwise update displayName/updatedAt only and PRESERVE the email. Kept the
+  UNIQUE try/catch (still reachable on the backfill write); left the per-provider authProviderRepository
+  .updateProfile + the separate new-account email_exists flow untouched (per the decision). **Guard
+  (committed, 2-way so a regression to unconditional overwrite breaks it):**
+  login-email-preservation.test.ts — (A) a behavioral model of the exact decision logic vs a real in-memory
+  users table (non-empty email PRESERVED across a re-login with a different provider email; empty email
+  BACKFILLED) + (B) a source-scan asserting routes.ts gates the email write on `!current?.email` (so a future
+  edit can't silently restore the blind `set({ email })`). +3 tests, non-vacuous. VERIFY: backend
+  validate:local GREEN (tsc 0, musl-biome clean after check:musl:fix reflowed the new file, 1780 pass / 0
+  fail [+3], build bundled). Backend-only; no render → no shot. #129 CLOSED. cov: be 88.33% / fe 88.24% (~ —
+  auth/routes.ts gained a few covered lines via the model; the private handler stays integration-bound).
+  REMAINING decided bug: #79 (offline-outbox hygiene, LOW) — next bug cycle.
 - **C154 (infra — branch-hygiene sweep + coverage re-measure; the ~10-cycle cadence, last MEASURED C136)** —
   Balance recompute (cycle 154): bug (1.67×) + infra (1.17×) both over budget; bug edged by ratio but its
   cold-vein is provably dry (the C148/C149 prod changes are fixed+pinned, C150–C152 test-only, C153 just
