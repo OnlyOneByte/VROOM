@@ -20,6 +20,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 /** Shapes the assertions read off the reminder JSON envelopes. */
 interface ReminderRow {
@@ -44,18 +45,6 @@ beforeEach(async () => {
 afterEach(() => ctx.close());
 
 /** Seed a vehicle the test user owns (reminders require >=1 vehicleId). */
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Toyota',
-    model: 'Camry',
-    year: 2022,
-  });
-  // Read the body exactly once (a Response body is a single-use stream).
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
-
 async function createNotificationReminder(vehicleId: string) {
   const res = await ctx.authed('POST', '/api/v1/reminders', {
     name: 'Registration renewal',
@@ -69,7 +58,7 @@ async function createNotificationReminder(vehicleId: string) {
 
 describe('reminders HTTP routes', () => {
   test('POST creates a reminder (201), GET lists it', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const created = await createNotificationReminder(vehicleId);
     expect(created.status).toBe(201);
 
@@ -81,7 +70,7 @@ describe('reminders HTTP routes', () => {
   });
 
   test('PUT { isActive:false } pauses — the merge+revalidate path that 400d', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const created = await createNotificationReminder(vehicleId);
     const { data } = await json<DataEnvelope<ReminderWithJoins>>(created);
     const id = data.reminder.id;
@@ -118,7 +107,7 @@ describe('reminders HTTP routes', () => {
     // Pins the UPDATE-path ownership gate — the second site converged onto the shared
     // validateVehicleIdsOwned helper (C141). A valid reminder, then a PUT that swaps in a
     // foreign vehicleId must be rejected by the same validator, not silently accepted.
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const created = await createNotificationReminder(vehicleId);
     const id = (await json<DataEnvelope<ReminderWithJoins>>(created)).data.reminder.id;
 
@@ -139,7 +128,7 @@ describe('reminders HTTP routes', () => {
     // trigger service fires it and emits a notification. Exercises the full POST
     // /trigger route (rate limiter → handler → trigger service → DB) — the one
     // reminders endpoint the HTTP layer didn't cover (TODO.md AI-testing gap #278).
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     await createNotificationReminder(vehicleId);
 
     const res = await ctx.authed('POST', '/api/v1/reminders/trigger');

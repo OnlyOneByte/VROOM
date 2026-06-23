@@ -18,6 +18,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -25,17 +26,6 @@ beforeEach(async () => {
   ctx = await createTestApp();
 });
 afterEach(() => ctx.close());
-
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Honda',
-    model: 'Civic',
-    year: 2021,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
 
 async function createOverdueExpenseReminder(vehicleId: string): Promise<string> {
   const res = await ctx.authed('POST', '/api/v1/reminders', {
@@ -79,7 +69,7 @@ function materializedExpenseIds(reminderId: string): string[] {
 
 describe('reminder delete cascade (recurring-expenses T3 — keep history, sever link)', () => {
   test('deleting an expense reminder KEEPS its materialized expenses but NULLs their source link', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const reminderId = await createOverdueExpenseReminder(vehicleId);
 
     // Materialize the expense row(s) via the real trigger path.
@@ -114,7 +104,7 @@ describe('reminder delete cascade (recurring-expenses T3 — keep history, sever
 
   test('deleting a non-expense (notification) reminder is a clean no-op on expenses', async () => {
     // A notification reminder materializes NO expense rows; clearSource matches 0, delete succeeds.
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const res = await ctx.authed('POST', '/api/v1/reminders', {
       name: 'Oil change',
       type: 'notification',

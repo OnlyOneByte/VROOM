@@ -24,6 +24,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -31,17 +32,6 @@ beforeEach(async () => {
   ctx = await createTestApp();
 });
 afterEach(() => ctx.close());
-
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Honda',
-    model: 'Civic',
-    year: 2021,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
 
 interface TriggerResultShape {
   createdExpenses: Array<{ id: string }>;
@@ -96,7 +86,7 @@ async function createOverdueExpenseReminder(
 
 describe('expense-reminder trigger (auto-creates financial records)', () => {
   test('an overdue expense reminder creates an expense carrying its template + source link', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const reminderId = await createOverdueExpenseReminder(vehicleId);
 
     const res = await ctx.authed('POST', '/api/v1/reminders/trigger');
@@ -122,7 +112,7 @@ describe('expense-reminder trigger (auto-creates financial records)', () => {
   });
 
   test('triggering twice does not duplicate the already-processed period', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const reminderId = await createOverdueExpenseReminder(vehicleId);
 
     await ctx.authed('POST', '/api/v1/reminders/trigger');
@@ -148,7 +138,7 @@ describe('expense-reminder trigger (auto-creates financial records)', () => {
   // is never reached.) Construction: weekly, a handful of weeks of history, endDate ≈ now (so it lands
   // in the straddling period after the last <=now step) — only a few catch-up iterations, well under 12.
   test('a bounded reminder whose endDate lands at the natural loop exit (under the catch-up cap) is deactivated, not left active (#116)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
 
     // Dates relative to the server clock so the test is wall-clock-independent. Weekly from 24 days
     // ago → occurrences at -24/-17/-10/-3 days (all <= now, 4 iterations « 12 cap), then the final
@@ -177,7 +167,7 @@ describe('expense-reminder trigger (auto-creates financial records)', () => {
   });
 
   test('endDate bounds catch-up to the in-window occurrences, then deactivates', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     // Monthly, anchored on the 15th, window [Jan 15, Apr 1] 2024 (all in the past
     // => fully overdue now). In-window occurrences: Jan 15, Feb 15, Mar 15 (each
     // <= Apr 1); Apr 15 is past endDate. So the trigger must create EXACTLY 3
@@ -212,8 +202,8 @@ describe('expense-reminder trigger (auto-creates financial records)', () => {
 
 /** Seed two vehicles, return their ids. */
 async function seedTwoVehicles(): Promise<[string, string]> {
-  const a = await seedVehicle();
-  const b = await seedVehicle();
+  const a = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
+  const b = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
   return [a, b];
 }
 
@@ -330,7 +320,7 @@ describe('expense-reminder trigger — split materialization (recurring-expenses
 describe('#88: split reminder naming a DELETED vehicle is contained, not a trigger-wide failure (C288 characterization)', () => {
   test('the deleted vehicle never gets a sibling + the reminder is reported skipped; an independent reminder still fires; run returns 200', async () => {
     const [v1, v2] = await seedTwoVehicles();
-    const v3 = await seedVehicle();
+    const v3 = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
 
     // A split reminder over v1+v2, and an independent single-vehicle reminder on v3 (the control).
     const splitReminderId = await createOverdueExpenseReminder(v1, {

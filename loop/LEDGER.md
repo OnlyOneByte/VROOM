@@ -92,16 +92,35 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 151 |
 | guard | 6 | 152 |
 | bug | 3 | 155 |
-| arch | 5 | 150 |
+| arch | 5 | 156 |
 | infra | 6 | 154 |
 
-Current cycle: **155**
+Current cycle: **156**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C156 (arch — converge the `seedVehicle` test helper, wave 2: reminders domain; Angelo-approved standing vein)** —
+  Balance recompute (cycle 156): arch most-starved (last-touched 150 → starved 6, budget 5 = 1.2×, the only
+  one over; deep-review at budget 1.0×). Continued the C150 seedVehicle convergence vein (one domain per arch
+  cycle). **Wave 2 = the reminders domain** (15 files, the largest no-arg cluster). Unlike insurance (wave 1,
+  byte-identical), each reminders file used its OWN make/model/year (Honda Civic 2021, Kia Soul 2019, Mazda
+  CX-5 2020, Subaru Outback 2020, Toyota Camry/RAV4 2022, Honda CR-V, Mazda 3 …), so each migrated call passes
+  its exact values via the options bag — `seedVehicle(ctx, { make, model, year })` — to preserve behavior, NOT
+  the shared default. Did via a scripted mechanical transform (per file: add the shared import, delete the
+  local decl, rewrite every `seedVehicle()` call); 2 files needed a tolerant pass (reminders-http had an extra
+  comment line inside the decl; trigger-mileage trailed the first script's abort). Verified: 0 leftover local
+  decls / 0 bare calls / all 15 import the shared seeder. Net −151 LOC. Behavior-preserving (green→green): the
+  reminders suites 129/129 pass; full backend validate:local GREEN (tsc 0, musl-biome clean with NO format
+  fixes needed, 1780 pass / 0 fail, build bundled). Test-only, no production source → no shot. **Progress: 20
+  of ~51 files converged (insurance 5 C150 + reminders 15 C156).** REMAINING waves (one domain per arch cycle):
+  the make-param variant (`seedVehicle(make)` — premium-expense-hook, delete-split-child, odometer/update-route,
+  restore-*, google-sheets-service), the nickname variant (export-csv, import-csv, import-mapping-route,
+  analytics-routes-http, vehicle-photo-routes, vehicles-list-financing-contract, financing-*), + the expenses/sync
+  no-arg cluster + vehicle-tco-zero-state's `extra` bag. The analytics-test-generators direct-DB seeders stay OUT
+  (different contract). cov: be 88.33% / fe 88.24% (~ — test-helper refactor, no production line touched).
 - **C155 (bug #129 — OAuth login silently overwrote the VROOM login email; Angelo-decided: sync-only-if-unset)** —
   Balance recompute (cycle 155): bug most-starved (last-touched 149 → starved 6, budget 3 = 2.0×). Took the
   now-unblocked Angelo-DECIDED #129 (over a cold scout) — a real MED data-integrity defect with the fix already
