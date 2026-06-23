@@ -1100,10 +1100,11 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 >   flag + helpers (markExpenseNeedsAttention/clearNeedsAttention/getNeedsAttentionExpenses); getPendingExpenses
 >   excludes parked rows; syncSingleExpense flags the incomplete-fuel failure `permanent` → syncExpenses parks
 >   it (no retry, counted as result.needsAttention) instead of burning retries; the legacy syncOfflineExpenses
->   parks too. Guard (+5): offline-storage + sync-manager suites. FE validate:local GREEN (757). **FOLLOW-ON
->   (FE component, not yet built):** a UI surface reading getNeedsAttentionExpenses to show parked rows + a
->   fix/discard action — a feature-ish increment (do when a UI cycle fits; the data path + flag are ready).
->   Don't re-fix the sync logic.
+>   parks too. Guard (+5): offline-storage + sync-manager suites. FE validate:local GREEN (757).
+>   **FOLLOW-ON SURFACED C165 (eyes-on):** OfflineExpenseCards now renders a "Needs attention" section
+>   (warning-amber + alert icon, "edit to add the missing info or discard") fed by a needsAttentionExpenses
+>   prop from /expenses; also fixed the parent's pending derivation which had mislabeled parked rows as
+>   "Pending Sync". #79 is COMPLETE end-to-end (decide → park C159 → cert C162 → surface C165). Don't re-fix.
 >
 > _Maintenance-feature follow-ons (from the C1 T9 closeout):_
 > - **lease/loan currentMileage→currentOdometer — APPROVED: CONFIRM the C157 all-time landing, then

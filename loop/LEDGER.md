@@ -93,14 +93,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 153 |
+| feature | 4 | 165 |
 | deep-review | 5 | 162 |
 | guard | 6 | 163 |
 | bug | 3 | 163 |
 | arch | 5 | 164 |
 | infra | 6 | 161 |
 
-Current cycle: **164**
+Current cycle: **165**
 
 > **NOTE (C158/C159): feature is BLOCKED (all 3 spec features complete C153; new features need Angelo
 > sign-off, flagged C153). Each feature-over-budget cycle re-records this + pivots to the co-starved category.
@@ -111,6 +111,28 @@ Current cycle: **164**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C165 (feature — surface the #79 "needs-attention" parked offline entries on /expenses; eyes-on; the C159 follow-on)** —
+  Balance recompute (cycle 165): feature most-starved by far (12/4 = 3.0×, blocked ~6 cycles) but the deep-review
+  /guard frontiers are worked through (broadly certified/saturated). Rather than another record-and-pivot, took
+  the ONE genuinely-unblocked feature-ish increment: the C159 #79 FOLLOW-ON. This is NOT a net-new capability
+  needing a fresh product decision — it surfaces an ALREADY-decided (Angelo #79), already-built + certified
+  (C159 data path, C162 composition) data-safety mechanism. A parked malformed entry that's invisible to the
+  user is itself a NORTH_STAR #1 gap (can't fix what you can't see). **Did:** added a "Needs attention" section
+  to OfflineExpenseCards.svelte (warning-amber, TriangleAlert, "can't sync as-is — edit to add the missing
+  info, or discard"), wired a `needsAttentionExpenses` prop + discard handler from /expenses/+page.svelte.
+  **Also fixed a latent bug found in the wiring:** the parent derived `pendingExpenses` as
+  `queue.filter(!synced)` — which INCLUDED parked rows, so a parked entry was mislabeled in "Pending Sync"
+  (waiting-to-sync) when it's actually permanently stuck. Re-partitioned three ways (pending = !synced &&
+  !needsAttention; needsAttention = !synced && needsAttention; synced) mirroring getPendingExpenses/
+  getNeedsAttentionExpenses over the reactive queue. **EYES-ON (GUIDE gate for UI work):** booted
+  (START_SERVERS+RESET_DB), seeded a parked + a pending + a synced row via localStorage, shot /expenses + Read
+  the PNG — three distinct sections render correctly (Pending Sync = the oil-change; Needs attention = the
+  malformed fuel "missing volume + mileage" in amber w/ alert icon; Recently Synced = parking), no overflow,
+  theme-consistent (text-warning/bg-warning, the app's attention token — NOT the widget-skill --warn vars).
+  VERIFY: frontend validate:local GREEN (tsc 0, build 0 PARSE_ERROR, 759 pass). FE-only. Styling uses the app's
+  real `--color-warning` Tailwind utility (verified in app.css). cov: be 88.39% / fe 88.44% (~ — a .svelte
+  render section + a parent partition; component-render coverage is the eyes-on FE tail, not unit-countable).
+  **#79 is now COMPLETE end-to-end** (decide C-Angelo → park-logic C159 → composition-cert C162 → surface C165).
 - **C164 (arch — converge the `seedVehicle` test helper, wave 4: expenses domain (no-arg subset); Angelo-approved vein)** —
   Balance recompute (cycle 164): feature BLOCKED (re-recorded + pivoted); NOTHING else over budget → per GUIDE
   took the highest-leverage open item = the seedVehicle convergence (arch, Angelo-approved standing, 25/51
