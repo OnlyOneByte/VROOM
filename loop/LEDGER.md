@@ -86,17 +86,41 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 148 |
 | deep-review | 5 | 135 |
 | guard | 6 | 134 |
-| bug | 3 | 137 |
+| bug | 3 | 149 |
 | arch | 5 | 131 |
 | infra | 6 | 147 |
 
-Current cycle: **148**
+Current cycle: **149**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C149 (bug #148 — null `initialMileage` lease burn bar reads 0-used; Angelo-decided 2026-06-23: treat null/zero initial as 0)** —
+  Balance recompute (cycle 149): the override froze rotation C138–147, so 4 categories are over budget; bug
+  was most-starved-relative-to-budget (last-touched 137 → starved 12, budget 3 = 4.0×, also the lowest budget).
+  The cold pure-logic vein is provably dry (no production source pre-C148; the C89–C122 dry-scout chain), so
+  instead took the now-UNBLOCKED Angelo-decided bug: **#148** (LeaseMetricsCard mileage burn bar). The defect
+  (found C68 eyes-on, characterization-pinned C102): `calculateLeaseMetrics` (financing-calculations.ts:498)
+  gated `mileageUsed = max(0, current − initial)` on `initialMileage !== null`, so a lease with NO recorded
+  starting odometer (the COMMON case) left mileageUsed=0 / remaining=full → the burn bar read "0 / 36,000 ·
+  36,000 left" at a real 30k odometer, WHILE the sibling PaymentMetricsGrid Overage card coalesces
+  `initialMileage ?? 0` (FinanceTab.svelte:163) and showed the true driven miles — the SAME vehicle
+  contradicted itself on one screen (the #140 class on the null-initial axis, money/UX). **Fix (Angelo-decided
+  2026-06-23):** coalesce `const startMileage = initialMileage ?? 0` inside calculateLeaseMetrics + drop the
+  `initialMileage !== null` clause from the gate (keeping `currentMileage !== null && financing.mileageLimit`);
+  route the projected-driven-miles space-correction (#91) through `startMileage` too. Now the burn bar matches
+  the Overage card by construction. **Flipped the C102 red→green anchor** (lease-metrics.test.ts): was "null
+  initial → mileageUsed 0" (pinned defect); now "null initial treated as 0 → mileageUsed = currentMileage =
+  the initial=0 result" (asserts the contradiction is resolved: m.mileageUsed === withZeroInitial.mileageUsed
+  && same remaining). VERIFY: frontend validate:local GREEN (tsc 0, build 0 PARSE_ERROR, 749/749; the targeted
+  lease-metrics suite 35/35). FE-pure-util fix; the consuming render (LeaseMetricsCard `mileageUsed
+  .toLocaleString()`) is unchanged + the fix is fully asserted against the REAL function, so no fixture-only
+  shot manufactured (the seeded leases have non-null initialMileage 25000/15000 → they exercise the
+  already-correct path; a null-initial shot would need a fabricated fixture, lower-value than the unit proof
+  per the GUIDE source-proof>untracked-e2e principle). cov: be 88.21% / fe 88.23% (~ — lease-metrics.ts was
+  already covered; this flips a gate + the anchor test, no new uncovered lines). #148 is CLOSED.
 - **C148 (feature — import-trackers (b): fuel-tracker presets get `defaultCategory:'fuel'`, Angelo-approved 2026-06-23)** —
   First normal cycle post-override-lift. Balance recompute (cycle 148): the override froze rotation since
   C138, so feature was the most-starved (last-touched 121 → starved 27, budget 4) AND its sole open item

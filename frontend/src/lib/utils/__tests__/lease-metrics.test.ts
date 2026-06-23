@@ -78,28 +78,24 @@ describe('calculateLeaseMetrics — guards & null paths', () => {
 		expect(m?.isOverMileage).toBe(false);
 	});
 
-	// CHARACTERIZATION of the #148 escalation (deep-review, C102) — NOT a fix; pins what the code does
-	// TODAY so the eventual product decision has a red→green anchor. The mileage gate (financing-calculations
-	// .ts:497) requires `initialMileage !== null` for mileageUsed to be computed; with a null initial (a lease
-	// with NO recorded starting odometer — the common case) it leaves mileageUsed=0 / mileageRemaining=full,
-	// so the LeaseMetricsCard burn bar reads "0 / 36,000 · 36,000 left" even at a real current odometer. The
-	// SIBLING PaymentMetricsGrid coalesces `initialMileage ?? 0` (FinanceTab.svelte) and computes used from 0,
-	// so the SAME vehicle shows driven-miles on the Overage card and 0 on the burn bar (#148, the #140 class on
-	// the null-initialMileage axis). This is ESCALATED to Angelo (a displayed-$ semantics call: coalesce to 0 /
-	// require an initial / show "set a starting odometer") — NOT auto-fixed. When the decision lands, UPDATE
-	// these expectations to the chosen semantics (this test is the documented update target).
-	test('#148 CHARACTERIZATION: null initialMileage leaves mileageUsed 0 even at a real currentMileage (parked, awaiting Angelo)', () => {
-		// currentMileage 30,000, but NO initial recorded → the gate is false → used stays 0, remaining full.
+	// #148 FIX (C149, Angelo-decided 2026-06-23: null/zero initial → treat as 0). The mileage gate used to
+	// require `initialMileage !== null`, so a lease with NO recorded starting odometer (the common case) left
+	// mileageUsed=0 / mileageRemaining=full while the SIBLING PaymentMetricsGrid Overage card coalesced
+	// `initialMileage ?? 0` (FinanceTab.svelte) and showed the true driven miles — the SAME vehicle contradicted
+	// itself on one screen (the #140 class on the null-initialMileage axis). The fix coalesces `initialMileage ??
+	// 0` inside calculateLeaseMetrics so the burn bar matches the Overage card. This test was the C102 red→green
+	// anchor; it now asserts the FIXED semantics (null-initial drives used from 0, identical to initial=0).
+	test('#148 FIX: null initialMileage is treated as 0 → mileageUsed = currentMileage (matches the Overage card)', () => {
+		// currentMileage 30,000, NO initial recorded → coalesced to 0 → used = 30,000, remaining = total − used.
 		const m = calculateLeaseMetrics(makeLease({ mileageLimit: 12000 }), 30000, null);
 		expect(m).not.toBeNull();
-		expect(m?.mileageUsed).toBe(0); // TODAY: the burn bar reads 0-driven (the #148 defect, pinned not fixed)
-		expect(m?.mileageRemaining).toBe(36000); // full term-scaled total, as if nothing were driven
-		expect(m?.projectedExcessMiles).toBe(0);
-		expect(m?.projectedExcessFee).toBe(0);
-		expect(m?.isOverMileage).toBe(false);
-		// Contrast (documents the contradiction): WITH initial=0, the same currentMileage drives used=30,000.
+		expect(m?.mileageUsed).toBe(30000); // FIXED: null initial treated as 0 (the burn bar now reads driven miles)
+		expect(m?.mileageRemaining).toBe(6000); // 36000 term-scaled total − 30000 used
+		// null-initial and initial=0 must now agree (the contradiction with the Overage card is resolved).
 		const withZeroInitial = calculateLeaseMetrics(makeLease({ mileageLimit: 12000 }), 30000, 0);
 		expect(withZeroInitial?.mileageUsed).toBe(30000);
+		expect(m?.mileageUsed).toBe(withZeroInitial?.mileageUsed);
+		expect(m?.mileageRemaining).toBe(withZeroInitial?.mileageRemaining);
 	});
 
 	// #110 (C374): endDate is nullable; when absent, calculateLeaseMetrics derives the lease end from

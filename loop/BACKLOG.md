@@ -889,10 +889,13 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 > re-read archive grounding first), #79 (stuck-offline-entry hygiene); #100 json_patch merge + #112 chart palette
 > stay arch/design-gated.
 >
-> **✅ DECIDED 2026-06-23 (Angelo): null/zero initial → treat as 0.** Apply `initialMileage ?? 0` inside
-> `calculateLeaseMetrics` (financing-calculations.ts:~497) so the burn bar matches the Overage card; flip the
-> C102 characterization test's expectations (null-initial now → mileageUsed = current odometer, remaining =
-> allowance − used). 1-line gate change + 1 test flip. EXECUTE when the PR-green override lifts (normal rotation).
+> **✅ CLOSED C149 (was: ✅ DECIDED 2026-06-23 Angelo — null/zero initial → treat as 0).** Coalesced
+> `const startMileage = initialMileage ?? 0` inside `calculateLeaseMetrics` + dropped the `initialMileage !==
+> null` gate clause (kept `currentMileage !== null && financing.mileageLimit`), routed the #91 driven-miles
+> space-correction through `startMileage` too — the burn bar now matches the sibling Overage card
+> (FinanceTab.svelte:163 `initialMileage ?? 0`) by construction. Flipped the C102 red→green anchor to the fixed
+> semantics (null-initial → mileageUsed = currentMileage = the initial=0 result; asserts both cards agree). FE
+> validate:local GREEN (749/749). FE-pure-util fix, consuming render unchanged. #148 CLOSED. Don't re-fix.
 >
 > **🚩 NEW — ESCALATED C68 (eyes-on — displayed-number semantics, NOT auto-fixed):
 > #148 LeaseMetricsCard burn bar reads 0-used when `initialMileage` is null.** Found firsthand during a C68
