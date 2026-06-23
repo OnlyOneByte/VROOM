@@ -83,20 +83,45 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 148 |
+| feature | 4 | 153 |
 | deep-review | 5 | 151 |
 | guard | 6 | 152 |
 | bug | 3 | 149 |
 | arch | 5 | 150 |
 | infra | 6 | 147 |
 
-Current cycle: **152**
+Current cycle: **153**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C153 (feature — import-trackers (c): the auto-detect→preview→COMMIT round-trip, eyes-on; closes the feature)** —
+  Balance recompute (cycle 153): bug (1.33×) + feature (1.25×) both over budget; bug edged by ratio but its
+  cold-vein is provably dry (only recent prod changes are C148/C149, both fixed+pinned), so per the
+  record-dry-fast discipline pivoted to the productive over-budget pick: import-trackers (c), the increment I
+  queued at C148. **Found a real defect:** the C148 backend `defaultCategory:'fuel'` fix was INERT through the
+  UI — `ImportExpensesDialog.buildMapping()` constructed the preset mapping but did NOT forward
+  `detectedPreset.defaultCategory`, so a detected Fuelly/Fuelio/Drivvo log STILL previewed 0-ready "Unknown
+  category" in the actual dialog (the backend route accepted defaultCategory, but the FE never sent it). Fixed
+  by carrying it through; extracted the preset→mapping construction to a pure `buildPresetMapping` helper
+  (import-mapping-helpers.ts) so the passthrough is COMMITTED-test-pinned (+3 guards; the e2e is gitignored).
+  **EYES-ON (the GUIDE gate for UI work):** booted (START_SERVERS+RESET_DB), drove the full round-trip via the
+  detect e2e spec → Read the PNGs: the dialog shows "Detected a Fuelly fuel log" + "2 ready" + an enabled
+  "Import 2 rows" (was 0-ready/disabled) → commit → the 2 fuel expenses render on /expenses (FE→BE→DB→render,
+  the import-trackers feature-DoD). **Eyes-on was itself blocked + fixed:** the branch's reset-to-main pulled
+  Playwright 1.61 (wants chromium build 1228) but the host only caches 1223 → "Executable doesn't exist". Added
+  a cached-build executablePath fallback to shot.mjs + playwright.meshclaw.config.ts (gitignored harness, 1223
+  launches fine under 1.61) — eyes-on unblocked without a network install. **Also caught a cross-fix
+  regression in eyes-on:** the gitignored lease-mileage-whole-allowance e2e pinned the PRE-C149 null-initial
+  behavior (mileageUsed 0 → "36,000 left"); C149 (null initial → 0) correctly makes it 24,000 used → "12,000
+  left" — updated the spec to the post-C149 + #140 combined semantics (also fixed a latent mi-vs-km label bug
+  in it). VERIFY: frontend validate:local GREEN (tsc 0, build 0 PARSE_ERROR, 752 pass [+3]); both e2e specs
+  pass (gitignored, local proof). Tracked diff: 3 files (dialog delegates to buildPresetMapping + the helper +
+  3 committed guards). **import-trackers is now feature-COMPLETE** (maintenance C1 + recurring-expenses C27 +
+  import-trackers C153 — all 3 spec features done). cov: be 88.21% / fe 88.23% (~ — new guards pin a behavior,
+  the helper was already exercised).
 - **C152 (guard — pin the C148 `defaultCategory` fuel-tracker commit at the ROUTE layer, end-to-end)** —
   Balance recompute (cycle 152): guard most-starved (last-touched 134 → starved 18, budget 6 = 3.0×, frozen
   since C134 by the override); feature + bug sit exactly AT budget (1.0×, not over). The guard vein is largely

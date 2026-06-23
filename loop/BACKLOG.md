@@ -39,10 +39,12 @@ A category may go at most **N cycles** untouched before it MUST be picked next.
 ## Ranked queue (top = next)
 
 ### feature
-*(2 of the 3 spec-approved features are now COMPLETE — maintenance-schedule (C1) + recurring-expenses
-(C27, T1–T8). **Import-trackers is the ONLY remaining open feature** (its mapping-step dialog is genuine
-unbuilt UI). Feature-DoD: not done until the FE→BE→DB round-trip is exercised eyes-on. shot.sh + e2e work
-now — the "Playwright-blocked" tail was a ~200-cycle MISDIAGNOSIS, see GUIDE.md.)*
+*(**ALL 3 spec-approved features are now COMPLETE** — maintenance-schedule (C1) + recurring-expenses (C27,
+T1–T8) + import-trackers (C153, the auto-detect→commit round-trip eyes-on). No open spec feature remains.
+Future feature work needs a fresh spec + Angelo sign-off (NORTH_STAR horizon: trips/location, receipt OCR,
+vehicle sharing, float→cents money migration) — draft + flag Angelo, don't self-authorize. Until then a
+feature-over-budget cycle records "no open spec feature; needs Angelo sign-off" + pivots to the co-starved
+category. shot.sh eyes-on works — the "Playwright-blocked" tail was a ~200-cycle MISDIAGNOSIS, see GUIDE.md.)*
 
 1. ~~**Maintenance-schedule reminders**~~ — **DONE (C1 2026-06-17).** Backend was 100%; the last tail
    (T7/T8/T9 eyes-on) is now CONFIRMED via shot.sh — the mileage form reveal/hide logic + the
@@ -81,12 +83,14 @@ now — the "Playwright-blocked" tail was a ~200-cycle MISDIAGNOSIS, see GUIDE.m
    `presetToMapping`; mirrored on the FE types. mapCategory still leaves a NAMED-but-unknown word as the misc
    fallback (C47 path untouched — pinned by a new test). Flipped the C32 characterization: every preset now
    yields ready `fuel` rows end-to-end (was 0-ready "Unknown category"). Both validate:local GREEN.
-   (c) **NEXT FEATURE INCREMENT (now UNBLOCKED by (b), eyes-on):** the AUTO-DETECT-PRESET round-trip THROUGH
-   COMMIT + the populated-detect four-state shot. With (b) landed, a detected Fuelly/Fuelio/Drivvo log now
-   previews ready fuel rows, so the full FE→BE→DB→render round-trip is finally exercisable: boot
-   (START_SERVERS=1 RESET_DB=1) → upload a real-shaped fuel CSV → detect banner → preview (ready N) → commit →
-   the materialized fuel expenses render on /expenses → shot.sh + Read the PNG (loading/empty/error/data
-   four-state). This closes import-trackers' feature-DoD (the last spec tail). Spec: `.kiro/specs/import-trackers/`.
+   (c) ~~the AUTO-DETECT-PRESET round-trip THROUGH COMMIT + eyes-on~~ — **DONE (C153, eyes-on).** Found + fixed
+   a real defect: the C148 backend defaultCategory fix was INERT through the UI — ImportExpensesDialog.buildMapping
+   didn't forward detectedPreset.defaultCategory, so a detected fuel log still previewed 0-ready in the dialog.
+   Fixed (carried it through; extracted buildPresetMapping helper + 3 committed guards). Eyes-on verified the full
+   round-trip: detect "Fuelly fuel log" → "2 ready" → enabled "Import 2 rows" → commit → 2 fuel expenses render on
+   /expenses (FE→BE→DB→render). Both validate:local GREEN. **import-trackers is FEATURE-COMPLETE.** (Eyes-on was
+   itself unblocked this cycle: Playwright 1.61 wanted chromium-1228 but the host caches 1223 → added a cached-build
+   executablePath fallback to the gitignored shot.mjs + playwright.meshclaw.config.ts.)
 3. ~~**Recurring expenses**~~ — **COMPLETE (T1–T8 all done, C27).** Engine + backend (T1–T3/T5/T7), FE
    client (T6/T7), then the eyes-on FE tail: T7 widget (C5), T5 app-init hook (C12), T6 badge+dialog
    (C9/C16), T4 multi-vehicle split via the shared `SplitConfigEditor` (C22), and **T8 full round-trip
