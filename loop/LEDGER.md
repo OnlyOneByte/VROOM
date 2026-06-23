@@ -97,10 +97,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 162 |
 | guard | 6 | 163 |
 | bug | 3 | 163 |
-| arch | 5 | 160 |
+| arch | 5 | 164 |
 | infra | 6 | 161 |
 
-Current cycle: **163**
+Current cycle: **164**
 
 > **NOTE (C158/C159): feature is BLOCKED (all 3 spec features complete C153; new features need Angelo
 > sign-off, flagged C153). Each feature-over-budget cycle re-records this + pivots to the co-starved category.
@@ -111,6 +111,23 @@ Current cycle: **163**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C164 (arch — converge the `seedVehicle` test helper, wave 4: expenses domain (no-arg subset); Angelo-approved vein)** —
+  Balance recompute (cycle 164): feature BLOCKED (re-recorded + pivoted); NOTHING else over budget → per GUIDE
+  took the highest-leverage open item = the seedVehicle convergence (arch, Angelo-approved standing, 25/51
+  done). **Wave 4 = the expenses domain's no-arg subset** (6 of the 11 expenses files): summary-http (Toyota
+  Camry 2021), split-financing-balance-roundtrip / non-fuel-clears-fuel-fields / update-clear-description /
+  expenses-http (Honda Civic 2021), update-preserves-tags (Honda Fit 2019) — each migrated call passes its OWN
+  make/model/year to `seedVehicle(ctx, {...})`. Scripted transform; all 6 still use json</DataEnvelope beyond
+  the removed decl, so no import cleanup needed (unlike the C160 sync pair). Net −60 LOC. **Deliberately
+  scoped to the no-arg subset** (arch rule 1, reviewability): the expenses domain's heterogeneous variants —
+  make-param (delete-split-child), nickname-required (import-csv, import-mapping-route), nickname-optional
+  (export-csv), + the distinct seedVehicleWithFinancing helper — are LEFT for a dedicated later wave. Behavior-
+  preserving (green→green): all 28 expenses suites 277/277 pass; full backend validate:local GREEN (tsc 0,
+  musl-biome clean / 20 warnings baseline, 1790 pass / 0 fail, build bundled). Test-only → no shot. **Progress:
+  31 of ~51 files converged** (insurance 5 + reminders 15 + sync 5 + expenses-no-arg 6). REMAINING (~20):
+  the expenses nickname/make variants (5 files) + the scattered one-offs (analytics-routes, vehicle-photo-routes,
+  financing-*, odometer/update-route, premium-expense-hook, google-sheets-service, vehicle-tco-zero-state's
+  extra bag). cov: be 88.39% / fe 88.44% (~ — test-helper refactor, no prod line).
 - **C163 (bug-scout DRY → pivot to guard: pin the import-route unowned-targetVehicle cross-tenant path)** —
   Balance recompute (cycle 163): feature BLOCKED (re-recorded + pivoted); bug the only over-budget (4/3 = 1.33×).
   The Angelo-decided bug queue is fully drained (#148/#129/#79 closed, #100 arch-gated), so this was a cold

@@ -17,6 +17,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -24,17 +25,6 @@ beforeEach(async () => {
   ctx = await createTestApp();
 });
 afterEach(() => ctx.close());
-
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Honda',
-    model: 'Civic',
-    year: 2021,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
 
 interface FuelCols {
   category: string;
@@ -52,7 +42,7 @@ function expenseRow(id: string): FuelCols {
 
 describe('non-fuel expense writes null the fuel-only fields (#76 backend)', () => {
   test('POST a misc expense carrying stray volume/fuelType/mileage → stored with them nulled', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const res = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId,
       category: 'misc',
@@ -76,7 +66,7 @@ describe('non-fuel expense writes null the fuel-only fields (#76 backend)', () =
   });
 
   test('PUT switching a fuel expense to maintenance nulls its fuel fields', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     // A valid fuel expense first (volume + mileage required by the create refinement).
     const created = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId,
@@ -105,7 +95,7 @@ describe('non-fuel expense writes null the fuel-only fields (#76 backend)', () =
   });
 
   test('PUT writing a stray mileage onto an ALREADY-non-fuel row (no category sent) nulls it (#76 third leg, C434)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     // A maintenance expense — no fuel fields. (Created non-fuel, so it has no mileage to start.)
     const created = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId,
@@ -140,7 +130,7 @@ describe('non-fuel expense writes null the fuel-only fields (#76 backend)', () =
   });
 
   test('a genuine fuel expense keeps its fuel fields (no over-clear)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const res = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId,
       category: 'fuel',

@@ -27,6 +27,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -42,17 +43,6 @@ interface VehicleWithFinancing {
 interface SplitData {
   groupId: string;
   groupTotal: number;
-}
-
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Honda',
-    model: 'Civic',
-    year: 2021,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
 }
 
 /** Create active loan financing on the vehicle; return the financing id. */
@@ -83,7 +73,7 @@ async function getBalance(vehicleId: string): Promise<number> {
 
 describe('financing-sourced split expense — balance round-trip (C4 guard, #147 purpose)', () => {
   test('a financing-sourced split REDUCES the displayed balance by the split total', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const financingId = await seedFinancing(vehicleId, 20000);
 
     // Fresh loan: balance == originalAmount (no payments yet).
@@ -106,7 +96,7 @@ describe('financing-sourced split expense — balance round-trip (C4 guard, #147
   });
 
   test('reallocating the split (PUT /split, same financed vehicle) keeps attribution correct', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const financingId = await seedFinancing(vehicleId, 20000);
 
     const createRes = await ctx.authed('POST', '/api/v1/expenses/split', {
@@ -134,7 +124,7 @@ describe('financing-sourced split expense — balance round-trip (C4 guard, #147
   });
 
   test('a SOURCE-LESS split does NOT touch the financing balance', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     await seedFinancing(vehicleId, 20000);
 
     const res = await ctx.authed('POST', '/api/v1/expenses/split', {

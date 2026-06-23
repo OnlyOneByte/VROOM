@@ -17,6 +17,7 @@ import {
   type PaginatedEnvelope,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 /** Minimal shapes the assertions below read off the JSON envelopes. */
 interface ExpenseRow {
@@ -31,17 +32,6 @@ beforeEach(async () => {
   ctx = await createTestApp();
 });
 afterEach(() => ctx.close());
-
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Honda',
-    model: 'Civic',
-    year: 2021,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
 
 async function createExpense(
   vehicleId: string,
@@ -68,7 +58,7 @@ async function createExpense(
 
 describe('expenses HTTP search/pagination', () => {
   test('?search= matches description across the whole result set', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     await createExpense(
       vehicleId,
       'maintenance',
@@ -87,7 +77,7 @@ describe('expenses HTTP search/pagination', () => {
   });
 
   test('?search= also matches category', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     await createExpense(vehicleId, 'maintenance', 75, 'oil', '2026-01-10T12:00:00.000Z');
     await createExpense(vehicleId, 'fuel', 45, 'gas', '2026-01-15T12:00:00.000Z');
 
@@ -98,7 +88,7 @@ describe('expenses HTTP search/pagination', () => {
   });
 
   test('limit/offset paginate the full set', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     for (let i = 0; i < 5; i++) {
       const day = String(10 + i).padStart(2, '0');
       await createExpense(vehicleId, 'misc', 1 + i, `row ${i}`, `2026-02-${day}T12:00:00.000Z`);
@@ -117,7 +107,7 @@ describe('expenses HTTP search/pagination', () => {
   });
 
   test('search is user-scoped (no cross-user leakage via the route)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     await createExpense(vehicleId, 'misc', 5, 'unique-marker-xyz', '2026-01-10T12:00:00.000Z');
 
     // A second app == a second user with a fresh DB reset; the marker must not leak.
@@ -141,7 +131,7 @@ describe('expenses HTTP search/pagination', () => {
  */
 describe('PUT /api/v1/expenses/:id — vehicle reassignment ownership (#61)', () => {
   test('reassigning the expense to a FOREIGN vehicle is rejected 404 (ownership guard)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const expenseId = await createExpense(
       vehicleId,
       'misc',
@@ -170,8 +160,8 @@ describe('PUT /api/v1/expenses/:id — vehicle reassignment ownership (#61)', ()
   });
 
   test('reassigning to the user’s OWN second vehicle still works (200) — guard isn’t over-broad', async () => {
-    const v1 = await seedVehicle();
-    const v2 = await seedVehicle();
+    const v1 = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
+    const v2 = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const expenseId = await createExpense(v1, 'misc', 9, 'move to v2', '2026-03-02T12:00:00.000Z');
 
     const res = await ctx.authed('PUT', `/api/v1/expenses/${expenseId}`, { vehicleId: v2 });
@@ -181,7 +171,7 @@ describe('PUT /api/v1/expenses/:id — vehicle reassignment ownership (#61)', ()
   });
 
   test('a PUT that does NOT touch vehicleId still updates normally (no regression)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const expenseId = await createExpense(
       vehicleId,
       'misc',
@@ -208,7 +198,7 @@ describe('POST /api/v1/expenses — forceOverwrite keep-local resolution (#98)',
   }
 
   test('a collision WITH forceOverwrite applies the local edit in place (same id, new amount)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const clientId = 'c51-overwrite';
     const first = await postExpense({
       vehicleId,
@@ -241,7 +231,7 @@ describe('POST /api/v1/expenses — forceOverwrite keep-local resolution (#98)',
   });
 
   test('a collision WITHOUT forceOverwrite is the idempotent no-op (original amount kept)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const clientId = 'c51-noop';
     const first = await postExpense({
       vehicleId,
@@ -272,7 +262,7 @@ describe('POST /api/v1/expenses — forceOverwrite keep-local resolution (#98)',
 // amount, so this exercises the category-switch leg of the overwrite. Drives real VROOM logic end-to-end.
 describe('C52 — a keep-local overwrite that switches fuel→non-fuel clears the stale fuel fields (#98 ∩ #76)', () => {
   test('overwriting a fuel row with a maintenance edit nulls volume/mileage/fuelType', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const clientId = 'c52-fuel-switch';
 
     // Original: a FUEL expense carrying volume + mileage + fuelType.

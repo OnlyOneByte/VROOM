@@ -18,6 +18,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 interface SummaryBody {
   totalAmount: number;
@@ -32,17 +33,6 @@ beforeEach(async () => {
   ctx = await createTestApp();
 });
 afterEach(() => ctx.close());
-
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Toyota',
-    model: 'Camry',
-    year: 2021,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
 
 async function createExpense(
   vehicleId: string,
@@ -64,7 +54,7 @@ async function createExpense(
 
 describe('GET /expenses/summary — monthly bucketing (unixepoch regression)', () => {
   test('buckets expenses into correct YYYY-MM months and computes a sane average', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2021 });
     // Two expenses in 2026-01, one in 2026-03 → 3-month calendar span (Jan..Mar).
     await createExpense(vehicleId, 100, '2026-01-10T12:00:00.000Z');
     await createExpense(vehicleId, 50, '2026-01-20T12:00:00.000Z');
@@ -93,7 +83,7 @@ describe('GET /expenses/summary — monthly bucketing (unixepoch regression)', (
   });
 
   test('category breakdown buckets by category with correct sums', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2021 });
     await createExpense(vehicleId, 40, '2026-02-01T12:00:00.000Z', 'maintenance');
     await createExpense(vehicleId, 60, '2026-02-02T12:00:00.000Z', 'maintenance');
     await createExpense(vehicleId, 25, '2026-02-03T12:00:00.000Z', 'misc');
