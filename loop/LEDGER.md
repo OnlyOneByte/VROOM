@@ -99,13 +99,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 174 |
-| deep-review | 5 | 170 |
+| deep-review | 5 | 175 |
 | guard | 6 | 172 |
 | bug | 3 | 173 |
 | arch | 5 | 171 |
 | infra | 6 | 169 |
 
-Current cycle: **174**
+Current cycle: **175**
 
 > **NOTE (C174): feature is UNBLOCKED and now BUILDING. 3 specs greenlit by Angelo 2026-06-24 (theming/
 > money-cents/trips, restored C167). C174 began the theming-engine build at T1 (the additive
@@ -118,6 +118,30 @@ Current cycle: **174**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C175 (deep-review — certify the C174 NOT NULL column survives backup-restore; found+fixed a REAL restore-abort class)** —
+  Balance recompute (cycle 175): nothing strictly OVER budget; deep-review + infra both AT budget (5/5, 6/6). Infra's
+  cadence isn't due (C169 measured, next ~C179), so took deep-review on the freshest, highest-leverage target: C174
+  just added a NOT NULL column, whose top data-safety risk (NORTH_STAR #1) is whether an old/partial backup still
+  RESTORES. The DatabaseMigrations.md steering doc explicitly flags the `coerceRow` footgun for NOT-NULL-with-default
+  columns. **VERIFIED FIRSTHAND (scratch probe driving the REAL coerceRow + a real insert into the migrated table):**
+  - column ABSENT (old backup predating it) → key stays absent → SQLite applies DEFAULT 'default' → SAFE.
+  - present-but-EMPTY ('' / 'null' / 'NULL') → coerceRow blindly nulled it → **INSERT THREW `NOT NULL constraint
+    failed` → the WHOLE replace-mode restore aborts** (the user recovers NOTHING from their own valid backup). REAL
+    defect, NOT a false HIGH. Reachable via the Sheets path (parseValue('') → null) + the CSV/ZIP path on a blank cell;
+    and NOT C174-specific — `currencyUnit`/`backupFrequency`/`unitPreferences`/`syncInactivityMinutes` shared the
+    latent gap (C174 widened the surface, surfacing the pre-existing class).
+  **FIX (one place, principled generalization):** in `coerceRow`, an empty/null value for a NOT NULL column carrying
+  a STATIC default now resolves to that default instead of null — exactly what the code already did for booleans
+  (`col.default ?? false`), generalized to all types via `col.notNull && col.hasDefault && col.default !== undefined`.
+  Re-probed: all empties (theme/currency/freq/units/mins) now fall back to their defaults; real values preserved; JSON
+  default round-trips. **GUARD:** +5 in backup.test.ts (the non-boolean sibling of the existing empty-NOT-NULL-boolean
+  block) — pins each NOT-NULL-text-default column coerces empty→its column `default` (driven off the REAL schema
+  metadata so it can't drift), a full row-of-empties stays insert-schema-valid, the absent-key case stays safe, and a
+  real value isn't over-coerced. NON-VACUITY PROVEN: reverting the fix turned exactly the 4 new guards RED with the
+  precise diagnostics; restored byte-identical. VERIFY: backend validate:local GREEN (tsc 0, musl-biome clean, 1808
+  pass / 0 fail [+5], build bundled). Repo-layer fix + test-only, no UI → no shot. cov: be 88.39% / fe 88.44% (~ — a
+  branch in coerceRow + guards; the restore-safety contract is now pinned class-wide). This both certifies C174's
+  column is restore-safe AND closes a pre-existing restore-abort class for every NOT-NULL-default column.
 - **C174 (feature — theming-engine T1: the additive `userPreferences.themePreference` column + migration 0006)** —
   Balance recompute (cycle 174): feature most-starved (7/4 = 1.75×) and now genuinely UNBLOCKED (3 greenlit specs),
   so this is the cycle feature STOPS recording-and-pivoting and BUILDS. Took the loop's standing recommendation:

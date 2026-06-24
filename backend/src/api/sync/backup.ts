@@ -84,15 +84,32 @@ export function coerceRow(row: Record<string, unknown>, table: Table): Record<st
     const col = column as any;
     const val = coerced[columnName];
 
+    // A NOT NULL column that carries a STATIC default: an absent/empty/null backup value must resolve to
+    // that default, never to null — else the insert throws `NOT NULL constraint failed` and the WHOLE
+    // restore aborts (the user can't recover ANY data from their own valid backup, NORTH_STAR #1). This is
+    // the steering-doc `coerceRow` footgun (DatabaseMigrations.md): the boolean special-case below already
+    // did exactly this (`col.default ?? false`); this generalizes it to every type (text `themePreference`/
+    // `currencyUnit`/`backupFrequency`, JSON `unitPreferences`, integer `syncInactivityMinutes`, …). Gated
+    // on a STATIC `default` (not a `$defaultFn` — those columns here are nullable, so they keep the null path).
+    const hasStaticDefault = col.notNull && col.hasDefault && col.default !== undefined;
+
     if (val === undefined || val === null) {
       if (BOOLEAN_TYPES.has(col.columnType)) {
         coerced[columnName] = val === undefined ? (col.default ?? false) : false;
+      } else if (hasStaticDefault) {
+        // null (explicit) would violate NOT NULL; undefined (absent key) would also let the DB default
+        // apply, but we set it explicitly so every restore path is uniform.
+        coerced[columnName] = col.default;
       }
       continue;
     }
     const strVal = String(val);
     if (strVal === '' || strVal === 'null' || strVal === 'NULL' || strVal === 'undefined') {
-      coerced[columnName] = BOOLEAN_TYPES.has(col.columnType) ? false : null;
+      coerced[columnName] = BOOLEAN_TYPES.has(col.columnType)
+        ? false
+        : hasStaticDefault
+          ? col.default
+          : null;
       continue;
     }
 

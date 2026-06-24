@@ -17,6 +17,7 @@ import {
   insurancePolicies,
   odometerEntries,
   photos,
+  userPreferences,
   vehicleFinancing,
   vehicles,
 } from '../../../db/schema';
@@ -302,6 +303,63 @@ describe('Validation: empty NOT NULL booleans pass after coercion', () => {
     const schema = createInsertSchema(insurancePolicies);
     const result = schema.safeParse(coerced);
     expect(result.success).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// coerceRow: NOT NULL columns with a STATIC default (C175 deep-review).
+//
+// An empty/null backup cell for a NOT NULL column carrying a static default must coerce to that DEFAULT,
+// never to null — else the insert throws `NOT NULL constraint failed` and the WHOLE restore aborts (the
+// user can't recover ANY data from their own valid backup, NORTH_STAR #1). Verified firsthand that the
+// pre-fix coerceRow nulled these (the theming-engine C174 `themePreference` add re-surfaced the
+// DatabaseMigrations.md footgun; `currencyUnit`/`backupFrequency`/`unitPreferences`/`syncInactivityMinutes`
+// shared the latent gap). This is the non-boolean sibling of the block above.
+// ---------------------------------------------------------------------------
+
+describe('coerceRow: empty NOT NULL columns with a static default fall back to the default (C175)', () => {
+  // Drive the REAL schema column metadata so this can't drift from the table definition.
+  const cols = getTableColumns(userPreferences) as Record<string, { default?: unknown }>;
+
+  test.each([
+    ['themePreference', 'theme'],
+    ['currencyUnit', 'currency'],
+    ['backupFrequency', 'frequency'],
+  ] as const)('empty %s coerces to its column default (not null) — restore cannot abort', (colName) => {
+    const expected = cols[colName].default;
+    // Sanity: the column genuinely declares a static default (guards against a schema change that drops it).
+    expect(expected, `${colName} must declare a static default`).toBeDefined();
+    for (const empty of ['', 'null', 'NULL', 'undefined']) {
+      const coerced = coerceRow({ userId: 'u1', [colName]: empty }, userPreferences);
+      expect(coerced[colName], `${colName}='${empty}' must fall back to the default`).toBe(
+        expected
+      );
+    }
+    // An entirely ABSENT key (an old backup predating the column) is also safe — left absent so the DB
+    // default applies (it must NOT be forced to null).
+    const absent = coerceRow({ userId: 'u1' }, userPreferences);
+    expect(absent[colName] === undefined || absent[colName] === expected).toBe(true);
+  });
+
+  test('a full userPreferences row of empties coerces to a schema-valid row (whole-row restore survives)', () => {
+    // Every NOT NULL column blank — the worst-case partial/legacy backup. Pre-fix this produced multiple
+    // nulls → NOT NULL violations on insert. Now the insert schema accepts the coerced row.
+    const row = buildMinimalStringRow(userPreferences, {
+      themePreference: '',
+      currencyUnit: '',
+      backupFrequency: '',
+      unitPreferences: '',
+      syncInactivityMinutes: '',
+    });
+    const coerced = coerceRow(row, userPreferences);
+    expect(coerced.themePreference).toBe('default');
+    const schema = createInsertSchema(userPreferences);
+    expect(schema.safeParse(coerced).success).toBe(true);
+  });
+
+  test('a real (non-empty) value is preserved — the fallback is not over-broad', () => {
+    const coerced = coerceRow({ userId: 'u1', themePreference: 'instrument' }, userPreferences);
+    expect(coerced.themePreference).toBe('instrument');
   });
 });
 

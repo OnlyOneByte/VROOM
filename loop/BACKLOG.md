@@ -138,6 +138,18 @@ shot.sh eyes-on works — the "Playwright-blocked" tail was a ~200-cycle MISDIAG
 re-audit a data-safety write path, certify it CLEAN against source, and leave a merge-surviving guard.
 Don't trust agent "HIGH" findings — verify firsthand (the archive logged many debunked false-positives).)*
 
+> **CERTIFIED + FIXED C175 — the C174 NOT NULL column is restore-safe; closed a pre-existing restore-abort class
+> for ALL NOT-NULL-default columns.** Certifying C174's `themePreference` against the backup/restore path
+> (NORTH_STAR #1) surfaced a REAL defect (verified firsthand, not a false HIGH): `coerceRow` nulled an
+> empty/'null'/'NULL' cell for a NOT-NULL-with-default column → `INSERT` threw `NOT NULL constraint failed` →
+> the WHOLE replace-mode restore aborted (user recovers nothing from a valid backup). Reachable via the Sheets
+> path (parseValue('')→null) + a blank CSV/ZIP cell; NOT C174-specific (`currencyUnit`/`backupFrequency`/
+> `unitPreferences`/`syncInactivityMinutes` shared it — C174 just widened the surface). FIX: coerceRow now falls
+> an empty NOT-NULL-with-static-default value back to that default (generalizing the existing boolean
+> `col.default ?? false` to all types). Guard: +5 in backup.test.ts (the non-boolean sibling of the
+> empty-NOT-NULL-boolean block), driven off real schema metadata; non-vacuous (revert → 4 RED). An ABSENT key
+> (old backup predating a column) was already safe (DB default applies). Don't re-audit.
+
 > **CERTIFIED C170 — the C168 `json_patch` atomic-merge primitive composes safely; #100 RMW sites censused
 > (CLEAN, no regression + drift guard).** Census of every `preferencesRepository.update` on a JSON config
 > column: 4 RMW sites remain (settings-PUT merge [validation-coupled], providers create-auto-populate +
