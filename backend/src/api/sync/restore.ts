@@ -19,6 +19,7 @@ import {
   reminders,
   reminderVehicles,
   syncState,
+  trips,
   userPreferences,
   userProviders,
   vehicleFinancing,
@@ -54,6 +55,7 @@ export interface ImportSummary {
   photoRefs: number;
   userPreferences: number;
   syncState: number;
+  trips: number;
 }
 
 export interface RestoreResponse {
@@ -107,6 +109,7 @@ class RestoreService {
       photoRefs: parsedBackup.photoRefs?.length ?? 0,
       userPreferences: parsedBackup.userPreferences?.length ?? 0,
       syncState: parsedBackup.syncState?.length ?? 0,
+      trips: parsedBackup.trips?.length ?? 0,
     };
 
     if (mode === 'preview') {
@@ -222,6 +225,7 @@ class RestoreService {
       photoRefs: sheetData.photoRefs?.length ?? 0,
       userPreferences: sheetData.userPreferences?.length ?? 0,
       syncState: sheetData.syncState?.length ?? 0,
+      trips: (sheetData as ParsedBackupData).trips?.length ?? 0,
     };
 
     if (mode === 'preview') {
@@ -357,6 +361,17 @@ class RestoreService {
         idColumn: syncState.userId,
         idField: 'userId' as const,
       },
+      {
+        // trips is userId-owned with its OWN id PK (the vehicle link is an FK, cascade-on-delete). Same
+        // profile as reminders/expenses — probe it directly so a merge-restore id collision is reported as
+        // a clean conflict, not a raw UNIQUE-PK throw that aborts the whole restore (#93/C300 class).
+        data: data.trips ?? [],
+        table: trips,
+        name: 'trips',
+        scope: eq(trips.userId, userId),
+        idColumn: trips.id,
+        idField: 'id' as const,
+      },
     ];
 
     for (const { data: items, table, name, scope, idColumn, idField } of tables) {
@@ -396,6 +411,10 @@ class RestoreService {
 
     // Delete expenses directly by userId
     await tx.delete(expenses).where(eq(expenses.userId, userId));
+
+    // Delete trips directly by userId (trips carry a user_id column; this also removes them before
+    // their vehicle FK would cascade — same direct-by-userId pattern as photos/expenses).
+    await tx.delete(trips).where(eq(trips.userId, userId));
 
     // Delete odometer entries before vehicles (FK constraint)
     if (vehicleIds.length > 0) {
@@ -509,6 +528,12 @@ class RestoreService {
       await tx
         .insert(odometerEntries)
         .values(this.stampUserId(data.odometer, userId) as (typeof odometerEntries.$inferInsert)[]);
+    }
+    // Insert trips AFTER vehicles (trips.vehicle_id FK) — userId-stamped like odometer/expenses.
+    if ((data.trips?.length ?? 0) > 0) {
+      await tx
+        .insert(trips)
+        .values(this.stampUserId(data.trips, userId) as (typeof trips.$inferInsert)[]);
     }
     // Insert user preferences and sync state
     if (data.userPreferences?.length > 0) {

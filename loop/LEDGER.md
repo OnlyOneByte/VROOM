@@ -129,14 +129,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 195 |
+| feature | 4 | 202 |
 | deep-review | 5 | 201 |
 | guard | 6 | 196 |
 | bug | 3 | 173 |
 | arch | 5 | 199 |
 | infra | 6 | 200 |
 
-Current cycle: **201**
+Current cycle: **202**
 
 > **NOTE (C174): feature is UNBLOCKED and now BUILDING. 3 specs greenlit by Angelo 2026-06-24 (theming/
 > money-cents/trips, restored C167). C174 began the theming-engine build at T1 (the additive
@@ -148,6 +148,33 @@ Current cycle: **201**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C202 (feature: trips-location T1+T4 — `trips` table + migration 0007 + the FULL backup round-trip)** —
+  Balance recompute (cycle 202): bug most-starved (29/3 = 9.67×) but provably-dry cold-vein (C199/C200/C201 were
+  test/doc/FE-only — no backend prod logic changed since the C183 scout) → recorded DRY. Next over-budget = FEATURE
+  (7/4 = 1.75×). CORRECTED a C200/C201 framing error: "feature is gated" was only true of theming PHASE 4 (the picker,
+  gated on the `instrument` palette) — but THREE specs are greenlit (Angelo 2026-06-24), and TWO are UNSTARTED &
+  fully loop-buildable: money-cents-migration + trips-location. Picked **trips-location** over money-cents on RISK:
+  money-cents T1+T2 are a "land-together" data-safety core (schema-flip + backup shim) that doesn't fit one-task-per-
+  starvation-cycle cleanly; trips T1 is purely additive (new table, no backfill, no call-site conversion — the spec
+  itself names it the better unblock). **What landed: T1** — `trips` table (mirrors odometerEntries; distance derived
+  not stored R2; no float-money column §7) + Trip types + migration `0007_previous_ikaris.sql` (additive CREATE TABLE
+  + index, the 0003 class) via drizzle-kit + migration-0007.test.ts (+8: shape, cascade both FKs, pre-data survival,
+  double-apply reject). **T1 forced T4** — the backup-table-coverage drift guard FAILS the moment a schema table
+  isn't backed up (BY DESIGN, spec §4), so a persisted-but-un-backed-up table is NOT a coherent half-state; landed T4
+  WITH T1 (the same data-safety "land-together" discipline money-cents mandates — NORTH_STAR #1: no silent loss). T4
+  wired `trips` end-to-end: config (3 maps incl. OPTIONAL), ZIP export query+return, validateReferentialIntegrity
+  (new validateTripRefs), restore FK-ordered insert + delete + ImportSummary + the merge-conflict PROBE
+  (detectConflicts — userId-owned own-id-PK, the reminders/#93 precedent → clean conflict not raw UNIQUE throw),
+  BackupData/ParsedBackupData types, AND the Google Sheets path (SHEET_HEADERS + SHEET_NAMES + export tab + readback,
+  tolerating a missing tab in older backups). ALL THREE drift guards (backup-/restore-table-coverage +
+  sheets-header-coverage) green; +4 trips-roundtrip.test.ts (field-for-field ZIP round-trip, null optionals, 3
+  purposes, absent-vehicle REJECTED pre-wipe). Backend validate:local GREEN (tsc 0, musl 21 warn baseline / 0 error,
+  **1836 pass / 0 fail** +13 vs C199, build bundled). Backend-only (route is T3, UI is T6) → NO eyes-on this cycle.
+  NOTE: the C188–C199 seedVehicle waves left pre-existing warn-level `noUnusedImports` drift on HEAD (not CI-failing —
+  `check:musl` exits 0; the "1 error" in a truncated run was a FORMAT violation in my own new file, fixed via
+  check:musl:fix). cov: be ~88.4% (re-measure deferred to the next infra cadence; +13 tests, new table+pipeline
+  covered) / fe 88.73% (~, untouched). REMAINING trips: T2 repo + T3 routes + T5 analytics (loop-buildable), T6
+  eyes-on. (Bug stays 173 — provably-dry cold vein.)
 - **C201 (bug-scout DRY → deep-review: certify the theming engine's FOUC contract, FIX the latent theme-id pre-paint gap)** —
   Balance recompute (cycle 201): bug most-starved (28/3 = 9.33×) but provably dry (C199/C200 were test/doc-only — no
   prod logic changed since the C183 scout, 20th consecutive) → recorded DRY. feature next (6/4 = 1.50× over) but its

@@ -49,7 +49,15 @@ legitimate authorization. C166 wrongly reverted the trips+money-cents greenlight
 them (don't repeat — a committed Angelo greenlight is real, ASK before reverting). So feature cycles now BUILD:
 pick the most-starved over-budget item among the 3 unblocked specs (each backend-first, one task per cycle). Do
 NOT build vehicle-sharing T1+ until its T0 clears. Other horizon items (receipt OCR) still need their own spec.
-shot.sh eyes-on works — the "Playwright-blocked" tail was a ~200-cycle MISDIAGNOSIS, see GUIDE.md.)*
+shot.sh eyes-on works — the "Playwright-blocked" tail was a ~200-cycle MISDIAGNOSIS, see GUIDE.md.
+**PROGRESS: theming Phase 1–3 engine-complete (T1–T9), Phase 4 picker GATED on the `instrument` palette.
+trips-location T1+T4 DONE (C202) — schema + migration 0007 + the FULL backup round-trip (the data-safety
+guards COUPLE T1↔T4: a schema table that isn't backed up trips the coverage guard, so they land together).
+REMAINING trips: T2 repository + T3 routes + T5 analytics (all loop-buildable, backend-first), then T6
+eyes-on FE. money-cents-migration UNSTARTED — its T1+T2 are a "land-together" data-safety core (schema-flip
++ backup version-bump/shim) that should land in a single coherent cycle, NOT split across starvation cycles,
+else the schema is cents while the pipeline still writes floats (NORTH_STAR #1). So the next feature cycles
+prefer the clean trips arc (T2/T3/T5) over money-cents until that coupled pair can be done together.**)*
 
 0. **Theming engine** — **GREENLIT & BUILD-UNBLOCKED (Angelo ratified D1–D7 ✅, 2026-06-24 parallel agent).**
    `.kiro/specs/theming-engine/`. A first-class theming engine: a registry of built-in themes (the existing

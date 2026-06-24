@@ -10,17 +10,32 @@
   UNBLOCKED** — T1–T5 are now loop-buildable (one `feature` cycle each, verified via `validate:local`); T6 is
   the eyes-on tail. Runs alongside money-cents-migration (also greenlit same day) — the loop picks whichever
   is the most-starved over-budget feature cycle; both are independent.
-- [ ] **T1 — Schema + migration.** Additive `trips` table + `trips_vehicle_date_idx` (design §1); one
-  `CREATE TABLE` migration (the 0003 additive class). +schema types. No data backfill (new table).
+- [x] **T1 — Schema + migration. ✅ DONE (C202).** Additive `trips` table + `trips_vehicle_date_idx`
+  (design §1) in schema.ts (mirrors odometerEntries; `distance` NOT stored — derived R2; no float-money
+  column per §7) + `Trip`/`NewTrip` inferred types. Migration `0007_previous_ikaris.sql` generated via
+  drizzle-kit (a single additive `CREATE TABLE` + index, the 0003 class — NOT the 0004 rebuild footgun) +
+  snapshot + journal. Guard: migration-0007.test.ts (+8) — column set, NOT-NULL/nullable shape, the
+  composite index, an insert+read, vehicle-delete AND user-delete FK cascade, pre-0007 data survives
+  untouched, double-apply rejected. Non-vacuous (all 8 drive the real migration SQL). validate:local green.
 - [ ] **T2 — Repository + ownership helper.** `TripRepository` (CRUD, all userId-scoped, the C155 tenant
   discipline) + `validateTripOwnership` into the `validateXOwnership` family (the C160 pattern). Unit tests
   over the in-memory harness, incl. a cross-tenant delete-scope test (the #52 regression class).
 - [ ] **T3 — Routes + Zod validation.** The 6 endpoints (design §3); `createTripSchema` with the
   `endOdometer >= startOdometer` cross-field refinement (R2) + `purpose` enum + local-day `tripDate` (R5).
   HTTP tests via createTestApp (ownership 404s, the R2 reject, the distance-derivation echo).
-- [ ] **T4 — Backup round-trip (data-safety, R3).** Wire `trips` into export + restore (userId-stamped) +
-  `validateReferentialIntegrity` + BOTH table-coverage source-scan guards. Round-trip test (seed trips →
-  export → wipe → restore → identical). NORTH_STAR #1.
+- [x] **T4 — Backup round-trip (data-safety, R3). ✅ DONE (C202, landed WITH T1 — the data-safety guards
+  COUPLE them: the backup-table-coverage source-scan fails the moment a schema table isn't backed up, so a
+  persisted-but-un-backed-up `trips` is not a coherent half-state; "land together" like money-cents' core).**
+  Wired `trips` into: config (TABLE_SCHEMA_MAP + TABLE_FILENAME_MAP + OPTIONAL_BACKUP_FILES), the ZIP export
+  query + return (backup.ts), `validateReferentialIntegrity` (new `validateTripRefs` — trip.vehicleId ∈
+  in-backup vehicles), the restore FK-ordered insert + delete + ImportSummary + the merge-conflict PROBE
+  (detectConflicts — trips is userId-owned with its own id PK, the reminders/#93 precedent, so a colliding
+  merge reports a clean conflict not a raw UNIQUE throw), the BackupData/ParsedBackupData types, AND the
+  Google Sheets path (SHEET_HEADERS + SHEET_NAMES + export tab + readback, tolerating a missing Trips tab in
+  older backups). All THREE drift guards (backup-/restore-table-coverage + sheets-header-coverage) green.
+  Round-trip test: trips-roundtrip.test.ts (+4) — a fully-populated trip survives ZIP export→replace-restore
+  field-for-field; NULL optionals round-trip as null; 3 purposes survive; a trip naming an absent vehicle is
+  REJECTED pre-wipe (validateTripRefs fires). NORTH_STAR #1. validate:local green (1836 pass).
 - [ ] **T5 — Mileage-summary analytics (R4).** `getTripSummary` (per-vehicle + cross-fleet: miles-by-purpose,
   business-$ at the D3 rate, count, avg; div-guarded). Property/characterization tests (sum-by-purpose =
   total; business-$ = businessMiles × rate; empty → zeros not NaN).

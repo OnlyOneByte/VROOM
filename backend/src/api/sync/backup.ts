@@ -31,6 +31,7 @@ import {
   reminders,
   reminderVehicles,
   syncState,
+  trips,
   userPreferences,
   vehicleFinancing,
   vehicles,
@@ -321,7 +322,7 @@ export class BackupService {
 
   async createBackup(userId: string): Promise<BackupData> {
     const db = getDb();
-    const [userVehicles, userExpenses, userFinancing, userInsurance, userOdometer] =
+    const [userVehicles, userExpenses, userFinancing, userInsurance, userOdometer, userTrips] =
       await Promise.all([
         db.select().from(vehicles).where(eq(vehicles.userId, userId)),
         db.select().from(expenses).where(eq(expenses.userId, userId)),
@@ -338,6 +339,9 @@ export class BackupService {
           .innerJoin(vehicles, eq(odometerEntries.vehicleId, vehicles.id))
           .where(eq(vehicles.userId, userId))
           .then((r) => r.map((x) => x.odometer_entries)),
+        // Trips are userId-stamped directly (like photos), so a plain userId scope is enough — but a
+        // trip also carries vehicleId, exported verbatim for the restore referential-integrity check.
+        db.select().from(trips).where(eq(trips.userId, userId)),
       ]);
 
     // Query insurance terms for user's policies
@@ -420,6 +424,7 @@ export class BackupService {
       reminders: userReminders,
       reminderVehicles: userReminderVehicles,
       reminderNotifications: userReminderNotifications,
+      trips: userTrips,
     };
   }
 
@@ -614,6 +619,7 @@ export class BackupService {
       ),
       ...this.validateClaimRefs(backup.insuranceClaims ?? [], policyIds, termIds, vehicleIds),
       ...this.validateOdometerRefs(backup.odometer ?? [], vehicleIds),
+      ...this.validateTripRefs(backup.trips ?? [], vehicleIds),
       ...this.validatePhotoRefs(backup.photos ?? [], {
         vehicleIds,
         expenseIds,
@@ -777,6 +783,19 @@ export class BackupService {
     for (const entry of odometerList) {
       if (!vehicleIds.has(String(entry.vehicleId))) {
         errors.push(`Odometer entry ${entry.id} references non-existent vehicle`);
+      }
+    }
+    return errors;
+  }
+
+  // A trip references a vehicle (trips.vehicle_id, ON DELETE cascade) — reject a backup whose trip names a
+  // vehicle absent from the same backup (else the restore INSERT would FK-violate after the wipe). Mirrors
+  // validateOdometerRefs — the trips-location T4 referential check (spec §4).
+  private validateTripRefs(tripList: Record<string, unknown>[], vehicleIds: Set<string>): string[] {
+    const errors: string[] = [];
+    for (const trip of tripList) {
+      if (!vehicleIds.has(String(trip.vehicleId))) {
+        errors.push(`Trip ${trip.id} references non-existent vehicle`);
       }
     }
     return errors;

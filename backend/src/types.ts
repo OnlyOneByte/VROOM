@@ -152,6 +152,9 @@ export interface BackupData {
   reminders?: import('./db/schema').Reminder[];
   reminderVehicles?: import('./db/schema').ReminderVehicle[];
   reminderNotifications?: import('./db/schema').ReminderNotification[];
+  // Optional: absent in backups predating the trips-location feature (trips-location T4); the restore
+  // path treats trips.csv as OPTIONAL_BACKUP_FILES so an older backup without it still restores.
+  trips?: import('./db/schema').Trip[];
 }
 
 export interface ParsedBackupData {
@@ -171,6 +174,7 @@ export interface ParsedBackupData {
   reminders?: Record<string, unknown>[];
   reminderVehicles?: Record<string, unknown>[];
   reminderNotifications?: Record<string, unknown>[];
+  trips?: Record<string, unknown>[];
 }
 
 // Backup provider types

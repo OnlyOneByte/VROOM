@@ -376,6 +376,39 @@ export const odometerEntries = sqliteTable(
   })
 );
 
+// Trips table (trips-location T1, spec §1) — manual trip log per vehicle. Mirrors odometerEntries (the
+// closest existing shape). `distance` is NOT stored; it's derived `max(0, endOdometer − startOdometer)` at
+// read time (R2, the #46 clamp) so a later odometer correction can't desync a stored distance. No GPS in v1
+// (D5): startLocation/endLocation are optional free-text labels. The business-mileage rate lives in
+// preferences (display-time), so this table introduces NO float-money column (design §7 — inherits the
+// money-cents migration cleanly).
+export const trips = sqliteTable(
+  'trips',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    vehicleId: text('vehicle_id')
+      .notNull()
+      .references(() => vehicles.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    startOdometer: integer('start_odometer').notNull(),
+    endOdometer: integer('end_odometer').notNull(), // R2: end >= start enforced at Zod; distance derived
+    purpose: text('purpose').notNull(), // 'business' | 'personal' | 'commute' | 'other' (D4)
+    tripDate: integer('trip_date', { mode: 'timestamp' }).notNull(),
+    startLocation: text('start_location'), // D5: free-text label, optional (no GPS in v1)
+    endLocation: text('end_location'),
+    note: text('note'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    vehicleDateIdx: index('trips_vehicle_date_idx').on(table.vehicleId, table.tripDate),
+  })
+);
+
 // Photos table (v2: added userId FK, added photos_user_entity_type_idx)
 export const photos = sqliteTable(
   'photos',
@@ -581,6 +614,9 @@ export type NewSession = typeof sessions.$inferInsert;
 
 export type OdometerEntry = typeof odometerEntries.$inferSelect;
 export type NewOdometerEntry = typeof odometerEntries.$inferInsert;
+
+export type Trip = typeof trips.$inferSelect;
+export type NewTrip = typeof trips.$inferInsert;
 
 export type Photo = typeof photos.$inferSelect;
 export type NewPhoto = typeof photos.$inferInsert;
