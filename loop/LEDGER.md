@@ -101,11 +101,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 167 |
 | deep-review | 5 | 170 |
 | guard | 6 | 172 |
-| bug | 3 | 168 |
+| bug | 3 | 173 |
 | arch | 5 | 171 |
 | infra | 6 | 169 |
 
-Current cycle: **172**
+Current cycle: **173**
 
 > **NOTE (C158/C159): feature is BLOCKED (all 3 spec features complete C153; new features need Angelo
 > sign-off, flagged C153). Each feature-over-budget cycle re-records this + pivots to the co-starved category.
@@ -116,6 +116,28 @@ Current cycle: **172**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C173 (bug — the #79 "Needs attention" card misdirected the user to the WRONG missing field; fix + source-scan guard)** —
+  Balance recompute (cycle 173): bug most-starved (5/3 = 1.67×), over with feature (6/4 = 1.50×, unblocked but lower
+  ratio). Took bug. The cold pure-logic vein is dry, so per the C163 discipline scouted the production source CHANGED
+  since the last bug scout (C163): the C165 FE offline partition (OfflineExpenseCards.svelte + expenses/+page.svelte),
+  not yet bug-scouted. **REAL DEFECT FOUND (eyes-on/surfacing-accuracy, NORTH_STAR #1):** the "Needs attention" card
+  description told the user "a fuel entry needs its AMOUNT and mileage" — but the parking GATE is
+  `isIncompleteFuelExpense` = `(!volume && !charge) || !mileage`, which NEVER checks amount. So the card named a field
+  that is ALWAYS present on a parked row (formatCurrency(amount) renders right below it) while OMITTING the real
+  culprit (fuel volume/charge). #79/C165's entire purpose is a FIXABLE surfacing of a permanently-unsyncable row — a
+  message pointing at the wrong field defeats it. The sync-manager's own permanent-error text already says the right
+  thing ("require volume/charge and mileage"); the card had drifted. **FIX:** corrected the copy to "a fuel entry needs
+  its fuel amount — volume or charge — and mileage", matching the codified gate + the sync-manager message (a bounded
+  copy fix, NOT a semantics change — the gate was already decided/codified, so loop-fixable, not Angelo-gated).
+  **GUARD:** +1 source-scan in offline-storage.test.ts (the #79 parking describe) — pins the card copy names the gate's
+  real fields (volume/charge + mileage) AND must NOT revert to "needs its amount and mileage" (no .svelte render
+  harness exists in the project → source-scan is the merge-surviving net, the GUIDE idiom). NON-VACUITY PROVEN:
+  reverted the copy → the guard went RED with the exact line; restored. EYES-ON (GUIDE UI gate): booted
+  (START_SERVERS+RESET_DB), seeded a parked malformed fuel row + a pending row via localStorage (addInitScript), shot
+  /expenses + Read the PNG — three sections render correctly, the amber "Needs attention" card shows the corrected
+  description, no overflow, theme-consistent. VERIFY: frontend validate:local GREEN (tsc 0, build OK, 760 pass / 0 fail
+  [+1]). cov: be 88.39% / fe 88.44% (~ — a .svelte copy line + a source-scan guard; component-render coverage is the
+  eyes-on FE tail, not unit-countable). The C165 offline-partition surface is now bug-scouted + the fix guarded.
 - **C172 (guard — tree-wide validate-before-persist source-scan for the #62/#109/#125/#145 financing-source-link class)** —
   Balance recompute (cycle 172): guard most-starved (9/6 = 1.50×), over with bug (4/3 = 1.33×) + feature (5/4 = 1.25×,
   unblocked but lowest ratio). Took guard. The guard queue is empty + pure-logic coverage is saturated, so picked the

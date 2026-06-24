@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
 	addOfflineExpense,
@@ -320,6 +321,32 @@ describe('Offline Storage', () => {
 			clearNeedsAttention('malformed-1');
 			saved = JSON.parse(localStorageMock.setItem.mock.calls.at(-1)[1]);
 			expect(saved.find((e: OfflineExpense) => e.id === 'malformed-1').needsAttention).toBe(false);
+		});
+
+		// C173 (bug): the "Needs attention" card description must name the fields the parking GATE actually
+		// checks. The gate is isIncompleteFuelExpense — `(!volume && !charge) || !mileage` — which never looks
+		// at `amount`. The original copy said "a fuel entry needs its AMOUNT and mileage", misdirecting the
+		// user to a field that is always present on a parked row (formatCurrency(amount) renders right below
+		// it) while omitting the real culprit (fuel volume/charge). #79/C165's whole point is a FIXABLE
+		// surfacing (NORTH_STAR #1 no-silent-loss) — a message pointing at the wrong field defeats it. This is
+		// a source-scan (no .svelte render harness in this project): pins the card copy to the gate's actual
+		// fields so the two can't drift back out of sync. Mirrors the sync-manager's own permanent-error text.
+		it('the Needs-attention card names the fields the parking gate checks (volume/charge + mileage, not bare amount) [C173]', () => {
+			const src = readFileSync(
+				`${process.cwd()}/src/lib/components/expenses/OfflineExpenseCards.svelte`,
+				'utf8'
+			);
+			// Isolate the needs-attention <CardNs.Description> copy (between the section's title and its close).
+			const start = src.indexOf("Needs attention ({needsAttentionExpenses.length})");
+			expect(start, 'the Needs-attention section exists').toBeGreaterThan(-1);
+			const descSlice = src.slice(start, start + 400);
+			// The gate's real fields, by their user-facing names.
+			expect(descSlice).toMatch(/volume/i);
+			expect(descSlice).toMatch(/charge/i);
+			expect(descSlice).toMatch(/mileage/i);
+			// NON-VACUITY / regression-catch: it must NOT misdirect with the original "its amount and mileage"
+			// phrasing (amount is never part of isIncompleteFuelExpense). A revert to that copy trips this.
+			expect(descSlice).not.toMatch(/needs its amount and mileage/i);
 		});
 	});
 

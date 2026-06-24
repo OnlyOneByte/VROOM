@@ -92,8 +92,8 @@
 				<div>
 					<CardNs.Title>Needs attention ({needsAttentionExpenses.length})</CardNs.Title>
 					<CardNs.Description>
-						These offline entries can't sync as-is (a fuel entry needs its amount and mileage). Edit
-						the expense to add the missing info, or discard it.
+						These offline entries can't sync as-is (a fuel entry needs its fuel amount — volume or
+						charge — and mileage). Edit the expense to add the missing info, or discard it.
 					</CardNs.Description>
 				</div>
 				<div class="p-2 rounded-lg bg-warning/10">

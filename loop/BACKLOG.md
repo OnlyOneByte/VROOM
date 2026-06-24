@@ -1163,6 +1163,11 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 >   (warning-amber + alert icon, "edit to add the missing info or discard") fed by a needsAttentionExpenses
 >   prop from /expenses; also fixed the parent's pending derivation which had mislabeled parked rows as
 >   "Pending Sync". #79 is COMPLETE end-to-end (decide → park C159 → cert C162 → surface C165). Don't re-fix.
+>   **COPY FIX C173 (bug):** the surfaced card's description misdirected — it said a fuel entry "needs its
+>   AMOUNT and mileage", but the parking gate (isIncompleteFuelExpense) checks `(!volume && !charge) || !mileage`
+>   and never amount (amount is always present + rendered below). Corrected to "fuel amount — volume or charge —
+>   and mileage" (matches the gate + the sync-manager permanent-error text); +1 source-scan guard in
+>   offline-storage.test.ts pins the copy to the gate's real fields. Eyes-on re-shot (seeded parked row). Don't re-fix.
 >
 > _Maintenance-feature follow-ons (from the C1 T9 closeout):_
 > - **lease/loan currentMileage→currentOdometer — APPROVED: CONFIRM the C157 all-time landing, then
