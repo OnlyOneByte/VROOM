@@ -1297,16 +1297,17 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 > - **✅ WAVE 3 (C160): sync domain** — 5 files (3 no-arg + 2 make-param). Net −52 LOC, 227/227.
 > - **✅ WAVE 4 (C164): expenses domain — no-arg subset** — 6 files (summary-http, split-financing-balance-roundtrip,
 >   update-preserves-tags, non-fuel-clears-fuel-fields, update-clear-description, expenses-http), each its own
->   make/model/year. Net −60 LOC, 277/277. **31 of ~51 files converged.**
-> - **REMAINING (~20 files), pick ONE per arch cycle:** the expenses **nickname/make variants** (delete-split-child
->   make-param; import-csv + import-mapping-route nickname-required; export-csv nickname-optional — a good next
->   wave, all expenses-domain); + the scattered one-offs — nickname (analytics-routes-http, vehicle-photo-routes,
->   vehicles-list-financing-contract, financing-*) + make-param (premium-expense-hook, odometer/update-route,
->   google-sheets-service) + vehicle-tco-zero-state's `extra` bag. (The expense-source-traceability
->   `seedVehicleWithFinancing` is a DISTINCT helper — leave it out.) If a migration surfaces a behavior-divergent
->   call site, pause + escalate that specific one.
-> (NOTE: the `analytics-test-generators.ts` `seedVehicle(db, vehicle)` + the property-test `seedVehiclesWith*`
-> are a DIFFERENT contract — direct-DB seeders, not the route-harness one — leave them out of this convergence.)
+>   make/model/year. Net −60 LOC, 277/277.
+> - **✅ WAVES 5–12 (C171/C177/C182/C188/C194/C197/C198/C199): all remaining HTTP-route copies** — expenses
+>   import-pair (C171) + make-param/nickname-optional pair (C177); financing pair (C182); vehicles no-arg pair
+>   (C188) + nickname pair (C194); analytics pair (C197); odometer-update + insurance-premium-hook make-param pair
+>   (C198); expense-source-traceability no-arg (C199, its seedVehicleWithFinancing keeps calling the wrapper).
+> - **✅✅ CONVERGENCE PROJECT COMPLETE (C199): all 46 HTTP-route `seedVehicle` copies now use the ONE shared
+>   helper.** The lone remaining `seedVehicle` (google-sheets-service.test.ts) is correctly OUT of scope — a raw
+>   `db.insert` VOID seeder (no route POST, returns void), a different mechanism the route-based helper doesn't
+>   model — alongside the analytics-test-generators / property-test direct-DB seeders. **THIS ARCH VEIN IS
+>   EXHAUSTED** — next arch cycles need a fresh behavior-preserving dedup target, or record "no churn warranted" +
+>   pivot (arch rule 5). Don't re-scout seedVehicle.
 >
 > **✅ APPROVED 2026-06-23 (Angelo) — adopt `createLoadState<T>` across the 13 load-bearing pages, via a
 > design doc + ONE page per cycle.** The scaffold (load-state.svelte.ts, arch #2) centralizes the page load

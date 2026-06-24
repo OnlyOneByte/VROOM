@@ -123,10 +123,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 193 |
 | guard | 6 | 196 |
 | bug | 3 | 173 |
-| arch | 5 | 198 |
+| arch | 5 | 199 |
 | infra | 6 | 192 |
 
-Current cycle: **198**
+Current cycle: **199**
 
 > **NOTE (C174): feature is UNBLOCKED and now BUILDING. 3 specs greenlit by Angelo 2026-06-24 (theming/
 > money-cents/trips, restored C167). C174 began the theming-engine build at T1 (the additive
@@ -138,6 +138,25 @@ Current cycle: **198**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C199 (bug-scout DRY → deep-review scout [SATURATED] → pivot to arch: converge the LAST HTTP-route `seedVehicle` — CONVERGENCE PROJECT COMPLETE)** —
+  Balance recompute (cycle 199): bug most-starved (26/3 = 8.67×) but provably dry (only theming code changed since
+  the C183 scout, 18th consecutive — C198 test-only) → scout ceremony, recorded DRY. Most-starved over-budget after
+  bug = DEEP-REVIEW (6/5 = 1.2×). Opened it on a fresh non-theming surface — the offline sync-manager
+  conflict-resolution tree (determineConflictType / checkForExistingExpense / the retry path). **Scouted firsthand,
+  found CLEAN + already-saturated:** amount uses cents-tolerant `Math.abs<0.01` (not exact float eq), tags use
+  intentional `.some()` overlap with a `?.` null-guard, date `===` on the ISO string; the #133 NaN bug is fixed +
+  commented, and #121/C424 retry-resurrection + C426 pending-recheck are guarded. No fresh defect (the data-safety
+  veins are comprehensively certified after ~25 cycles). Per the GUIDE (no clean pick → record + pivot), recorded
+  the deep-review as a no-fresh-target scout (NOT bumped) and pivoted the substantive work to ARCH. **Wave 12
+  (FINAL) = the last HTTP-route seedVehicle:** expense-source-traceability (no-arg Honda Civic 2021, 21 call sites
+  + a seedVehicleWithFinancing that calls it) converged onto the shared test-helpers/seed via a thin wrapper. **THE
+  seedVehicle CONVERGENCE PROJECT IS COMPLETE: all 46 HTTP-route copies now use the ONE shared helper.** The lone
+  remaining `seedVehicle` (google-sheets-service.test.ts) is correctly OUT of scope — a raw `db.insert` void seeder
+  (no route POST, returns void), a DIFFERENT mechanism the route-based shared helper doesn't model. Behavior-
+  preserving (green→green): the suite 21/21 pass; full backend validate:local GREEN (tsc 0, musl-biome clean, 1823
+  pass / 0 fail — UNCHANGED count, pure test-helper refactor, build bundled). Net −4 LOC. Test-only → no shot. **The
+  arch convergence vein is now EXHAUSTED — next arch cycles need a fresh dedup target or record "no churn warranted"
+  + pivot.** cov: be 88.39% / fe 88.65% (~ — test-helper refactor, no prod line). (Bug stays 173 — provably-dry cold vein.)
 - **C198 (bug-scout DRY → deep-review scout [SATURATED, caught a near-miss] → pivot to arch: converge `seedVehicle` wave 11, the make-param pair)** —
   Balance recompute (cycle 198): bug most-starved (25/3 = 8.33×) but provably dry (only theming code changed since
   the C183 scout, 17th consecutive — C197 test-only) → scout ceremony, recorded DRY. deep-review + infra both AT
