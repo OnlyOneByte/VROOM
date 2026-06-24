@@ -40,28 +40,29 @@ A category may go at most **N cycles** untouched before it MUST be picked next.
 
 ### feature
 *(The 3 original spec-approved features are COMPLETE — maintenance-schedule (C1) + recurring-expenses (C27,
-T1–T8) + import-trackers (C153, the auto-detect→commit round-trip eyes-on). **FOUR specs are now DRAFTED and
-AWAITING ANGELO SIGN-OFF, ALL build-BLOCKED at their T0 gate:** theming-engine (`.kiro/specs/theming-engine/`,
-D1–D7), vehicle-sharing (`.kiro/specs/vehicle-sharing/`, D1–D8), trips-location (`.kiro/specs/trips-location/`,
-D1–D6), money-cents-migration (`.kiro/specs/money-cents-migration/`, D1–D5). NONE is greenlit — do NOT build
-any T1+ until Angelo ratifies that spec's decisions (a prior cycle erroneously flipped trips + money-cents T0
-to "greenlit"; reverted C166 — there is NO record of Angelo approving them). Other horizon items (receipt OCR)
-still need their own spec. Until a spec is UNBLOCKED, a feature-over-budget cycle records "no UNBLOCKED spec
-feature; needs Angelo sign-off" + pivots to the co-starved category. shot.sh eyes-on works — the
-"Playwright-blocked" tail was a ~200-cycle MISDIAGNOSIS, see GUIDE.md.)*
+T1–T8) + import-trackers (C153, the auto-detect→commit round-trip eyes-on). **THREE NEW SPECS ARE GREENLIT &
+BUILD-UNBLOCKED — Angelo ratified them 2026-06-24 via a parallel agent (so the loop isn't blocked):**
+theming-engine (D1–D7 ✅), money-cents-migration (D1–D5 ✅), trips-location (D1–D6 ✅). A FOURTH —
+vehicle-sharing (D1–D8) — is DRAFTED but still BLOCKED at its T0 (Angelo greenlit 3, not this one). NOTE/lesson
+(C166→C167): a parallel-agent greenlight lands as a committed T0 flip WITH NO in-session message; that IS
+legitimate authorization. C166 wrongly reverted the trips+money-cents greenlights as "fabricated"; C167 restored
+them (don't repeat — a committed Angelo greenlight is real, ASK before reverting). So feature cycles now BUILD:
+pick the most-starved over-budget item among the 3 unblocked specs (each backend-first, one task per cycle). Do
+NOT build vehicle-sharing T1+ until its T0 clears. Other horizon items (receipt OCR) still need their own spec.
+shot.sh eyes-on works — the "Playwright-blocked" tail was a ~200-cycle MISDIAGNOSIS, see GUIDE.md.)*
 
-0. **Theming engine** — **SPEC DRAFTED, BLOCKED on Angelo (D1–D7).** `.kiro/specs/theming-engine/`
-   (requirements + design + tasks). A first-class theming engine: a registry of built-in themes (the
-   existing look + the explored "Instrument Cluster" / "Garage Journal" looks, productized), a `/settings`
-   picker with live preview, persistence via a new `userPreferences.themePreference` + a localStorage
-   mirror, backup round-trip, and a seam for future user-authored themes. **Load-bearing insight: a theme
-   is a pure token swap on the EXISTING `app.css` custom-property system — ZERO component/markup changes**
-   (R1). Backend-first, fully additive (`default` ≡ today's look byte-for-byte, so an un-chosen user sees
-   no change). Open decisions D1–D7 must be ratified first (esp. D1 engine + 1-theme-first, D2
-   persist-in-userPreferences, D5 which themes + their names, D7 token-only-no-textures-v1). Hard a11y
-   gate per theme (D4 = strict, the `--destructive` 3.9:1 precedent). Mocks: artifact
-   `vroom-design-language-option-1-instrument-cluster` + `vroom-redesign-mocks/`. Phase-4 custom-theme
-   authoring is explicitly OUT (its own future `.kiro/specs/theme-authoring/`).
+0. **Theming engine** — **GREENLIT & BUILD-UNBLOCKED (Angelo ratified D1–D7 ✅, 2026-06-24 parallel agent).**
+   `.kiro/specs/theming-engine/`. A first-class theming engine: a registry of built-in themes (the existing
+   look + the explored "Instrument Cluster" / "Garage Journal" looks, productized), a `/settings` picker with
+   live preview, persistence via a new `userPreferences.themePreference` + a localStorage mirror, backup
+   round-trip, and a seam for future user-authored themes. **Load-bearing insight: a theme is a pure token
+   swap on the EXISTING `app.css` custom-property system — ZERO component/markup changes** (R1). Backend-first,
+   fully additive (`default` ≡ today's look byte-for-byte). Ratified: D1 engine+1-theme-first, D2
+   persist-in-userPreferences, D3 theme×mode orthogonal, D4 a11y HARD gate, D5 `default`+`instrument` first
+   (`garage` fast-follow), D6 custom-theme seam only, D7 token-only v1. **NEXT TASK: T1 — `userPreferences
+   .themePreference` column + Drizzle migration** (tasks.md Phase 1). Phase-4 custom-theme authoring is OUT
+   (its own future `.kiro/specs/theme-authoring/`). Mocks: `vroom-design-language-option-1-instrument-cluster`
+   + `vroom-redesign-mocks/`.
 
 0. **Vehicle sharing** — **SPEC DRAFTED, BLOCKED on Angelo (D1–D8).** `.kiro/specs/vehicle-sharing/`
    (requirements + design + tasks, drafted 2026-06-24). TODO.md #9 "BIGGGG" greenfield feature: an owner

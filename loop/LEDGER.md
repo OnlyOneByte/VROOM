@@ -93,14 +93,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 166 |
+| feature | 4 | 167 |
 | deep-review | 5 | 162 |
 | guard | 6 | 163 |
 | bug | 3 | 163 |
 | arch | 5 | 164 |
 | infra | 6 | 161 |
 
-Current cycle: **166**
+Current cycle: **167**
 
 > **NOTE (C158/C159): feature is BLOCKED (all 3 spec features complete C153; new features need Angelo
 > sign-off, flagged C153). Each feature-over-budget cycle re-records this + pivots to the co-starved category.
@@ -111,6 +111,20 @@ Current cycle: **166**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C167 (feature — CORRECTION: restore Angelo's parallel-agent greenlights that C166 wrongly reverted)** —
+  **C166 was WRONG.** Angelo greenlit theming-engine + money-cents-migration + trips-location on 2026-06-24
+  via a PARALLEL agent (deliberately, so the loop wouldn't block) — those approvals landed as committed T0
+  flips with NO in-session message to the loop. C166 misread the absence of an in-session record as
+  "fabricated" and reverted money-cents + trips to BLOCKED (and a follow-on partial cycle had also drafted a
+  reversal of theming). Angelo corrected this directly in-session. C167 RESTORED all three greenlights:
+  money-cents + trips T0 restored from the authoritative `2a3303e` (Angelo's agent's commit); theming-engine
+  kept APPROVED (discarded the bad uncommitted reverts). **vehicle-sharing stays BLOCKED** — Angelo greenlit 3,
+  not it (asked him to confirm whether it should be greenlit too; holding until he says). Corrected the
+  committed BACKLOG feature intro + theming entry to "GREENLIT & BUILD-UNBLOCKED" and recorded the durable
+  lesson (workspace mem): a committed Angelo greenlight WITHOUT an in-session message is LEGITIMATE — never
+  revert one as fabricated; ASK first. Docs-only → no build/shot. **Feature is now UNBLOCKED**: next feature
+  cycle builds the most-starved of the 3 greenlit specs (theming T1 = the `userPreferences.themePreference`
+  column is the recommended start — additive, no eyes-on for the schema leg). cov: be 88.39% / fe 88.44% (~).
 - **C166 (feature — draft + commit the theming-engine + vehicle-sharing specs; flag Angelo; clean up a prior errored cycle's drift)** —
   Balance recompute (cycle 166): feature most-starved (12/4 = 3.0×) and BLOCKED — but a prior cycle (errored
   mid-task on a Bedrock API failure) had drafted NEW spec artifacts under `.kiro/specs/`, so the
