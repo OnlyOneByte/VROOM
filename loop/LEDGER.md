@@ -29,6 +29,11 @@
 > (C155 email-fix / C157 resolveNewUser / C158 unlink-route) + the C159 offline needs-attention helpers
 > (pure+covered) added covered lines; FE crossed 88.4 line (a fresh high). Structural ceiling holds (DI/OAuth/SQL
 > BE + effect/DOM FE). NEXT ~C171.**
+> **C169 (infra cadence MEASURED): BE 88.39% line / 87.99% func (1792 pass) — +0.06 vs C154; FE 88.44% line /
+> 88.92% func / 80.57% branch / 86.36% stmts (759 pass) — +0.20 line / +7 tests vs C154. Both UP off the C154
+> reading (BE: C155 auth-email + C168 json_patch guards; FE: C165 #79 needs-attention partition + C162/C163
+> guards). Both hold above 88% line at the structural ceiling. Feature now UNBLOCKED (3 specs greenlit C167) —
+> next feature-over-budget cycle builds (theming T1). NEXT ~C179.**
 > **C154 (infra cadence MEASURED): BE 88.33% line / 87.91% func (1776 pass) — +0.12 vs C136; FE 88.24% line /
 > 88.72% func / 80.25% branch / 86.09% stmts (752 pass) — +0.01 vs C136. Both UP slightly off the C136 plateau
 > (the C148/C151/C152 import-mapping guards + C149 lease-gate + C153 buildPresetMapping extraction added covered
@@ -98,9 +103,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 163 |
 | bug | 3 | 168 |
 | arch | 5 | 164 |
-| infra | 6 | 161 |
+| infra | 6 | 169 |
 
-Current cycle: **168**
+Current cycle: **169**
 
 > **NOTE (C158/C159): feature is BLOCKED (all 3 spec features complete C153; new features need Angelo
 > sign-off, flagged C153). Each feature-over-budget cycle re-records this + pivots to the co-starved category.
@@ -111,6 +116,22 @@ Current cycle: **168**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C169 (infra — branch-hygiene sweep + coverage re-measure; the ~10-cycle cadence, last MEASURED C154)** —
+  Balance recompute (cycle 169): infra (8/6 = 1.33×) + deep-review (7/5 = 1.4×) over budget. deep-review edged
+  by ratio, but its frontiers are freshly-certified (C162 #79, C157 resolveNewUser, C168's own guard) while
+  infra had a CONCRETE overdue task — the cadence sweep, ~15 cycles since C154, and the C155–C168 arc added
+  real production modules (auth email-preservation, the json_patch primitive) worth re-measuring. Took infra.
+  (1) UNTRACKED-TEST SWEEP: CLEAN both sides — zero untracked `.test.ts`/`.spec.ts` (the gitignored
+  `.meshclaw.e2e.ts` are by-design). (2) COVERAGE RE-MEASURED: **BE 88.39% line / 87.99% func (1792 pass); FE
+  88.44% line / 88.92% func / 80.57% branch / 86.36% stmts (759 pass).** Both UP vs C154 (BE 88.33/87.91; FE
+  88.24/88.72/80.25, 752 pass) — BE +0.06 line (C155 auth + C168 json_patch guards), FE +0.20 line / +7 tests
+  (the C165 #79-surfacing FE partition + C162/C163 guards). Both hold above 88% line at the structural ceiling
+  (residual DI/OAuth/SQL BE + effect/DOM FE, unchanged in character). (3) BOTH-SIDES GREEN: BE 1792 / FE 759,
+  0 fail. (4) BRANCH STATE: claude-loop-dev = 23 commits ahead of fresh origin/main, 0 behind, PR-ready
+  (recorded here since BRANCH_REVIEW.md is gitignored). NOTE: feature is now UNBLOCKED — 3 specs greenlit
+  (theming/money-cents/trips, restored C167); the next feature-over-budget cycle BUILDS (theming T1 recommended).
+  Doc-only (coverage runs exercised the full suites; no source touched → no build/shot). cov: be 88.39% / fe
+  88.44% (MEASURED). NEXT cadence ~C179.
 - **C168 (bug #100 — atomic `json_patch` userPreferences merge; first write site; Angelo-decided)** —
   Balance recompute (cycle 168): bug most-starved (5/3 = 1.67×), over with infra (7/6) + deep-review (6/5).
   Took bug — and rather than a (dry) cold-scout, executed the Angelo-DECIDED #100 (SQL-atomic prefs merge),
