@@ -123,10 +123,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 193 |
 | guard | 6 | 196 |
 | bug | 3 | 173 |
-| arch | 5 | 194 |
+| arch | 5 | 197 |
 | infra | 6 | 192 |
 
-Current cycle: **196**
+Current cycle: **197**
 
 > **NOTE (C174): feature is UNBLOCKED and now BUILDING. 3 specs greenlit by Angelo 2026-06-24 (theming/
 > money-cents/trips, restored C167). C174 began the theming-engine build at T1 (the additive
@@ -139,6 +139,21 @@ Current cycle: **196**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C197 (bug-scout DRY [precondition] → pivot to arch: converge `seedVehicle` wave 10, the analytics pair — completes the analytics domain)** —
+  Balance recompute (cycle 197): bug most-starved (24/3 = 8.0×) but provably dry (only theming UI plumbing + store
+  wiring changed since the C183 scout, 16th consecutive — C196 test-only) → scout is ceremony. Recorded the
+  bug-scout DRY; nothing else over budget → per GUIDE took the highest-leverage open item = the Angelo-approved
+  seedVehicle convergence (arch). **Wave 10 = the analytics pair** (analytics-routes-http nickname-required Honda
+  Civic 2021 + vehicle-tco-zero-state extra-bag Honda Civic 2021): converged both onto the shared test-helpers/seed
+  — a nickname wrapper + an extra-bag wrapper (the shared SeedVehicleOptions already supports both `nickname` +
+  `extra`), make/model/year explicit (shared default is a Camry). Both keep their other json/DataEnvelope refs so
+  imports survive (caught + restored a wrongly-dropped import on the tco file before validating). **This COMPLETES
+  the analytics domain.** Behavior-preserving (green→green): both suites 22/22 pass; full backend validate:local
+  GREEN (tsc 0, musl-biome clean, 1823 pass / 0 fail — UNCHANGED count, pure test-helper refactor, build bundled).
+  Net −9 LOC. Test-only → no shot. **Progress: 43 of ~51 files converged**; REMAINING (4): expenses-source-traceability
+  (+ its distinct seedVehicleWithFinancing helper), insurance premium-expense-hook, odometer update-route,
+  google-sheets-service. cov: be 88.39% / fe 88.65% (~ — test-helper refactor, no prod line). (Bug stays 173 —
+  provably-dry cold vein.)
 - **C196 (bug-scout DRY [precondition] → pivot to guard: pin the T9 settingsStore.load() → reconcileServerTheme wiring)** —
   Balance recompute (cycle 196): bug most-starved (23/3 = 7.67×) but provably dry (only theming UI plumbing + store
   wiring changed since the C183 scout, 15th consecutive — C195 store-logic/test-only) → scout is ceremony. Recorded
