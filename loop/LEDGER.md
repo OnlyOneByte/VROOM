@@ -107,12 +107,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 181 |
 | deep-review | 5 | 180 |
-| guard | 6 | 178 |
+| guard | 6 | 183 |
 | bug | 3 | 173 |
 | arch | 5 | 182 |
 | infra | 6 | 176 |
 
-Current cycle: **182**
+Current cycle: **183**
 
 > **NOTE (C174): feature is UNBLOCKED and now BUILDING. 3 specs greenlit by Angelo 2026-06-24 (theming/
 > money-cents/trips, restored C167). C174 began the theming-engine build at T1 (the additive
@@ -125,6 +125,26 @@ Current cycle: **182**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C183 (bug-scout DRY [verified firsthand] → pivot to guard: pin the #293 financing coalesce-list completeness)** —
+  Balance recompute (cycle 183): bug most-starved + extreme (10/3 = 3.33×); infra also over (7/6 = 1.17×). C182 was
+  test-only, but at 3.33× (+ the C137 lesson: the cold precondition rules out REGRESSIONS, not PRE-EXISTING debt)
+  did a GENUINE firsthand scout of an un-recently-audited money-facing write path: the **financing** create/update
+  routes (#27/#90/#91/#92/#99 family). **VERIFIED CLEAN firsthand:** all writes ownership-gated (POST→
+  validateVehicleOwnership, PATCH/payoff/DELETE→validateFinancingOwnership); the PATCH is narrowly scoped (paymentAmount
+  only, can't switch type); the create-or-replace path's #67 re-activate + #293 cross-type coalesce-to-null + #92
+  loan-terms validation are all intact; and I CENSUSED the coalesce list against the live schema — it covers EXACTLY
+  the nullable cross-type/schedule columns (apr, paymentDayOfMonth/Week, residualValue, mileageLimit, excessMileageFee
+  + endDate:null), every other column .notNull(). No fresh defect. Per C122/C163 (verified-dry bug → pivot the
+  substantive work to a co-productive vein), pinned the merge-survival GAP the scout surfaced: the #293 coalesce-list
+  completeness is load-bearing but UNGUARDED — the existing behavioral test (refinance-cross-type-field-reset)
+  enumerates today's fields by hand, so a FUTURE nullable financing column would leave the replace path silently
+  merging it stale (reopening #293) while every test stays green. **GUARD:** refinance-coalesce-completeness.test.ts
+  (+3) — censuses the live `vehicleFinancing` nullable columns via getTableColumns, subtracts the system-managed
+  timestamps, and asserts EACH remaining one is explicitly handled in the replace-path SET object (source-scan, the
+  C25/C170/C172 idiom). NON-VACUITY PROVEN: dropping `mileageLimit` from the SET turns it RED naming the exact field;
+  restored byte-identical. VERIFY: backend validate:local GREEN (tsc 0, musl-biome clean, 1823 pass / 0 fail [+3],
+  build bundled). Test-only → no shot. cov: be 88.39% / fe 88.44% (~ — schema-reflection source-scan, no prod line).
+  (Bug stays 173 — verified-dry cold vein. Infra cadence is due ~C186; deferred this cycle to close the scout's gap.)
 - **C182 (bug-scout DRY [verified firsthand] → pivot to arch: converge `seedVehicle` wave 7, the financing domain pair)** —
   Balance recompute (cycle 182): bug most-starved + heavily forcing (9/3 = 3.0×); arch + infra AT budget (5/5, 6/6).
   C181 changed prod source but it was a types-only file (theme-types.ts, no runtime defect surface), so rather than

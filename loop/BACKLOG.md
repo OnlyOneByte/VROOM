@@ -681,6 +681,16 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C183 — the #293 financing create-or-replace coalesce-list COMPLETENESS (NORTH_STAR #2).** A C183
+> bug-scout VERIFIED FIRSTHAND that the financing write path is clean (ownership-gated; the #67 re-activate +
+> #293 cross-type coalesce + #92 loan-terms validation intact; coalesce list covers exactly the nullable
+> cross-type/schedule columns). GAP closed: the C293 behavioral test (refinance-cross-type-field-reset)
+> enumerates today's fields by hand, so a FUTURE nullable financing column would leave the replace path
+> silently merging it stale (#293 reopens) with every test green. +3 in refinance-coalesce-completeness.test.ts:
+> censuses the live `vehicleFinancing` nullable columns (getTableColumns), subtracts system-managed timestamps,
+> asserts each remaining one is reset in the replace-path SET object. Non-vacuous (drop `mileageLimit` from the
+> SET → RED naming it). Don't re-add.
+
 > **GUARDED C178 — the reminder split-config cross-tenant defense, end-to-end (NORTH_STAR #2, #88 family).** A
 > C178 bug-scout VERIFIED FIRSTHAND (real HTTP probe) that a PUT cannot smuggle a foreign vehicle via
 > `expenseSplitConfig.vehicleIds` while omitting top-level `vehicleIds` — defended in depth by (a) the merge+
