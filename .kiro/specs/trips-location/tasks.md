@@ -4,11 +4,12 @@
 > This is a NORTH_STAR horizon feature; like every prior feature it's backend-first, with the UI as an
 > eyes-on (Playwright-gated) tail. T1–T5 are fully loop-buildable once T0 clears; T6 is eyes-on.
 
-- [ ] **T0 — Sign-off gate.** Angelo ratifies: D1 (is trips the right next horizon feature?), D2 (odometer
-  linkage: reuse vs parallel), D3 (business-mileage rate model), D4 (purpose enum vs tags), D5 (free-text
-  location only in v1, GPS deferred), D6 (backend-first order). Until then, NO build — this spec is the
-  go/no-go artifact. **If Angelo prefers money-cents (already specced) or a different horizon item, this
-  spec is shelved, not discarded.**
+- [x] **T0 — Sign-off gate — ✅ GREENLIT by Angelo 2026-06-24.** D1–D6 ratified at the spec's recommended
+  option for each (D1 yes-trips-is-a-go-horizon-feature; D2 reuse odometer linkage; D3 business-mileage rate
+  model; D4 purpose enum; D5 free-text location only in v1, GPS deferred; D6 backend-first). **BUILD
+  UNBLOCKED** — T1–T5 are now loop-buildable (one `feature` cycle each, verified via `validate:local`); T6 is
+  the eyes-on tail. Runs alongside money-cents-migration (also greenlit same day) — the loop picks whichever
+  is the most-starved over-budget feature cycle; both are independent.
 - [ ] **T1 — Schema + migration.** Additive `trips` table + `trips_vehicle_date_idx` (design §1); one
   `CREATE TABLE` migration (the 0003 additive class). +schema types. No data backfill (new table).
 - [ ] **T2 — Repository + ownership helper.** `TripRepository` (CRUD, all userId-scoped, the C155 tenant
