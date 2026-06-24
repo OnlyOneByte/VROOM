@@ -23,6 +23,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle as seedVehicleShared } from '../../../test-helpers/seed';
 import { ENTITY_TO_CATEGORY } from '../../providers/domains/storage/storage-provider';
 
 let ctx: TestApp;
@@ -48,16 +49,10 @@ function photoCount(entityType: string, entityId: string): number {
   return row.n;
 }
 
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Toyota',
-    model: 'Camry',
-    year: 2022,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
+// This file's fixture is the shared default vehicle (Toyota Camry 2022); converge onto the shared
+// test-helpers/seed seedVehicle (arch convergence, Angelo-approved) — no opts needed since the default
+// matches exactly. A thin no-arg wrapper keeps the call sites untouched.
+const seedVehicle = (): Promise<string> => seedVehicleShared(ctx);
 
 async function seedExpense(vehicleId: string): Promise<string> {
   const res = await ctx.authed('POST', '/api/v1/expenses', {

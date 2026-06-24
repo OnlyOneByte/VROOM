@@ -116,10 +116,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 186 |
 | guard | 6 | 183 |
 | bug | 3 | 173 |
-| arch | 5 | 182 |
+| arch | 5 | 188 |
 | infra | 6 | 184 |
 
-Current cycle: **187**
+Current cycle: **188**
 
 > **NOTE (C174): feature is UNBLOCKED and now BUILDING. 3 specs greenlit by Angelo 2026-06-24 (theming/
 > money-cents/trips, restored C167). C174 began the theming-engine build at T1 (the additive
@@ -132,6 +132,22 @@ Current cycle: **187**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C188 (bug-scout DRY [precondition] → pivot to arch: converge `seedVehicle` wave 8, the vehicles no-arg pair)** —
+  Balance recompute (cycle 188): bug most-starved (15/3 = 5.0×) but the only prod change since the last real scout
+  (C183) is theme DATA + the pure UNCALLED C187 resolver (no reachable runtime/logic surface) → 7th consecutive
+  provably-dry cold vein, scout is ceremony. Recorded the bug-scout DRY and pivoted to the co-over-budget ARCH
+  (6/5 = 1.2×) with the concrete Angelo-approved pick: the seedVehicle convergence. **Wave 8 = the vehicles-domain
+  no-arg pair** (vehicle-delete-cascade + vehicle-stats-current-odometer): delete-cascade's fixture IS the shared
+  default (Toyota Camry 2022) → a no-arg `seedVehicleShared(ctx)` wrapper, zero opts; stats-current-odometer is a
+  Honda Civic 2021 + initialMileage 10000 → make/model/year explicit + initialMileage via `extra` (preserving the
+  cross-source-MAX baseline the tests assert). Both keep their other json/DataEnvelope refs so imports survive.
+  Behavior-preserving (green→green): both suites 19/19 pass; full backend validate:local GREEN (tsc 0, musl-biome
+  clean, 1822 pass / 0 fail — UNCHANGED count, pure test-helper refactor, build bundled). Net −4 LOC. Test-only →
+  no shot. **Progress: 39 of ~51 files converged**; REMAINING (~10): the 2 vehicles nickname files
+  (photo-routes-http Subaru Outback, list-financing-contract Honda Civic), analytics (analytics-routes-http,
+  vehicle-tco-zero-state), expenses-source-traceability (+ its seedVehicleWithFinancing), insurance
+  premium-expense-hook, odometer update-route, photos entity-ownership-gate, google-sheets-service. cov: be 88.39%
+  / fe 88.45% (~ — test-helper refactor, no prod line). (Bug stays 173 — provably-dry cold vein.)
 - **C187 (bug-scout DRY [precondition] → pivot to feature: theming-engine T6 — the pure total theme resolver)** —
   Balance recompute (cycle 187): bug most-starved (14/3 = 4.67×) but the only prod change since the last real scout
   (C183) is theme DATA (theme-registry.ts), no logic surface → 6th consecutive provably-dry cold vein, scout is
