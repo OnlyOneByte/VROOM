@@ -136,6 +136,16 @@ shot.sh eyes-on works — the "Playwright-blocked" tail was a ~200-cycle MISDIAG
 re-audit a data-safety write path, certify it CLEAN against source, and leave a merge-surviving guard.
 Don't trust agent "HIGH" findings — verify firsthand (the archive logged many debunked false-positives).)*
 
+> **CERTIFIED C170 — the C168 `json_patch` atomic-merge primitive composes safely; #100 RMW sites censused
+> (CLEAN, no regression + drift guard).** Census of every `preferencesRepository.update` on a JSON config
+> column: 4 RMW sites remain (settings-PUT merge [validation-coupled], providers create-auto-populate +
+> cleanupStorageConfig [read-dependent], backup-orchestrator wholesale auto-backup) — ALL pre-existing,
+> already-tracked #100 follow-ups; C168 converted the cleanest (cleanupBackupConfig) to atomic + the
+> primitive is correct (C168 guard). The orchestrator↔provider-delete interleave is a real but pre-existing
+> #100 instance (mutex serializes backup runs, not deletes), NOT a C168 regression. Guard:
+> prefs-rmw-inventory.test.ts (+4) source-scans the exact RMW count per file so a NEW unguarded write trips
+> it. Don't re-audit — converting the orchestrator/settings-PUT sites is the tracked #100 arch/bug follow-up.
+
 > **CERTIFIED C162 — the C159 #79 needs-attention parking COMPOSES safely across the offline flows (CLEAN +
 > guarded).** The C159 parking was guarded in isolation; this certifies the cross-flow composition: (1)
 > clearSyncedExpenses KEEPS a parked row (it's unsynced — survives for the user to fix; the legacy

@@ -99,13 +99,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 167 |
-| deep-review | 5 | 162 |
+| deep-review | 5 | 170 |
 | guard | 6 | 163 |
 | bug | 3 | 168 |
 | arch | 5 | 164 |
 | infra | 6 | 169 |
 
-Current cycle: **169**
+Current cycle: **170**
 
 > **NOTE (C158/C159): feature is BLOCKED (all 3 spec features complete C153; new features need Angelo
 > sign-off, flagged C153). Each feature-over-budget cycle re-records this + pivots to the co-starved category.
@@ -116,6 +116,25 @@ Current cycle: **169**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C170 (deep-review — certify the C168 `json_patch` primitive + census the remaining #100 RMW sites; +drift guard)** —
+  Balance recompute (cycle 170): deep-review most-starved (8/5 = 1.6×), over with arch (6/5) + guard (7/6).
+  Took deep-review with a FRESH invariant from the C168 arc: does the new atomic `mergeJsonField` compose
+  safely with the userPreferences write sites that still read-modify-write, and did C168 leave a regression?
+  Censused every `preferencesRepository.update` touching a JSON config column (storageConfig/backupConfig)
+  firsthand: exactly **4 RMW sites remain** — settings-PUT merge (validation-coupled, tracked #100 follow-up),
+  providers create-auto-populate + cleanupStorageConfig (the latter read-DEPENDENT — can't be a static patch),
+  and backup-orchestrator's wholesale auto-backup write. **Finding (CLEAN, no new defect):** C168 is sound —
+  it converted the CLEANEST site (cleanupBackupConfig) to atomic and the primitive is correct (pinned C168).
+  The orchestrator↔provider-delete interleave is a REAL but PRE-EXISTING #100 instance (the wholesale write
+  from a stale read could clobber a concurrent atomic delete) — NOT a C168 regression, and the backup mutex
+  serializes backup RUNS but not provider-deletes; it's already in the tracked #100 follow-up surface. Left a
+  merge-surviving SOURCE-SCAN drift guard: prefs-rmw-inventory.test.ts (+4) pins the exact RMW-call count per
+  file (settings 1 / providers 2 / orchestrator 1) + asserts cleanupBackupConfig uses the atomic path — so a
+  NEW unguarded RMW write trips it (forces atomic-or-track). VERIFY: backend validate:local GREEN (tsc 0,
+  musl-biome clean, 1796 pass / 0 fail [+4], build bundled). Test-only; no production source, no render → no
+  shot. cov: be 88.39% / fe 88.44% (~ — source-scan guard, no new covered lines). The #100 follow-up scope is
+  now precisely bounded + drift-protected; converting the orchestrator/settings-PUT sites stays a tracked
+  arch/bug item.
 - **C169 (infra — branch-hygiene sweep + coverage re-measure; the ~10-cycle cadence, last MEASURED C154)** —
   Balance recompute (cycle 169): infra (8/6 = 1.33×) + deep-review (7/5 = 1.4×) over budget. deep-review edged
   by ratio, but its frontiers are freshly-certified (C162 #79, C157 resolveNewUser, C168's own guard) while
