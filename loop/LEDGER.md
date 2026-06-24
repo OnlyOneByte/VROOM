@@ -112,14 +112,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 189 |
+| feature | 4 | 191 |
 | deep-review | 5 | 186 |
 | guard | 6 | 190 |
 | bug | 3 | 173 |
 | arch | 5 | 188 |
 | infra | 6 | 184 |
 
-Current cycle: **190**
+Current cycle: **191**
 
 > **NOTE (C174): feature is UNBLOCKED and now BUILDING. 3 specs greenlit by Angelo 2026-06-24 (theming/
 > money-cents/trips, restored C167). C174 began the theming-engine build at T1 (the additive
@@ -132,6 +132,28 @@ Current cycle: **190**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C191 (bug-scout DRY [precondition] → pivot to feature: theming-engine T8 — the store themeId axis)** —
+  Balance recompute (cycle 191): bug most-starved (18/3 = 6.0×) but provably dry (only theming-engine
+  pure/build-time code changed since the C183 scout, 10th consecutive) → scout is ceremony; infra over (7/6) but
+  its cadence isn't due (C184 measured ~C194, nothing changed coverage materially → an early re-measure is also
+  ceremony). Recorded the bug-scout DRY and took the highest-leverage open item = the active greenlit theming build
+  (Phase 3). **Built theming-engine T8 (core):** extended `theme.svelte.ts` with the `themeId` axis ORTHOGONAL to
+  the light/dark mode (D3): a `vroom-theme-id` localStorage mirror, `themeId` getter, `setTheme(id)`, and
+  `applyTheme(preference, themeId)` now sets `<html>` `data-theme` (non-default id → the attribute that selects a
+  themes.css block; `default` → attribute REMOVED so app.css's bare :root serves the identity) alongside `.dark`.
+  `initialize()` applies BOTH axes; `setPreference`/`setTheme` each preserve the OTHER axis; the matchMedia OS
+  listener preserves the active id. The existing `setPreference`/`current`/`initialize` API + its consumers
+  (ThemeCard, +layout) are untouched (verified: those tests + theme-fouc-contract all stay green). +unit tests
+  (theme-id-axis.test.ts, +6): setTheme persists+sets data-theme, default removes it, mode↔id orthogonality BOTH
+  directions, unknown id degrades gracefully (R8, never throws). **DELIBERATELY deferred (flagged to Angelo, NOT
+  self-authorized): the theme-color meta still uses the hard-coded brand hex by mode** — migrating it to the
+  RESOLVED theme's brand token is a VISIBLE browser-chrome change (PWA status-bar tint; uncapturable by shot.sh +
+  an oklch-in-`<meta>` compat question), a design sub-part deferred until a non-default theme ships; likewise the
+  app.html head-script `data-theme` set (id-axis anti-FOUC leg) is moot until a non-default theme exists. VERIFY:
+  frontend validate:local GREEN (svelte-check 0 errors, build OK, 802 pass / 0 fail [+6]). Store-logic (jsdom-tested),
+  no new rendered surface (the picker is T10) → no shot. Ticked tasks.md T8 [~]. **NEXT: T9** (server sync + hydrate
+  reconcile — setTheme pushes themePreference to the settings PUT [the C179 field]; on settingsStore.load() server
+  wins if it differs from the mirror). cov: be 88.39% / fe 88.45% (~ — store axis, fully unit-covered).
 - **C190 (bug-scout DRY [precondition] → pivot to guard: pin the app.html anti-FOUC head-script ↔ theme-store contract)** —
   Balance recompute (cycle 190): bug most-starved (17/3 = 5.67×) but the only prod change since the last real scout
   (C183) is theming-engine pure/build-time code (registry data, resolver, themes.css generator + a zero-rule css

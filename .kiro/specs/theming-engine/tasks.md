@@ -84,13 +84,20 @@
       seam; with only `default` today there's no non-default block to flash.
 
 ## Phase 3 — store generalization + wiring
-- [ ] **T8** Extend `theme.svelte.ts` — add the `themeId` axis alongside the existing mode:
-      `vroom-theme-id` localStorage mirror, `themeId` getter, `setTheme(id)`, and an `applyTheme()`
-      that sets `document.documentElement` `data-theme` + `.dark` (driving the T7 `themes.css`) AND the
-      `theme-color` meta from the resolved theme's brand token (not the hard-coded hex). `initialize()`
-      applies BOTH axes. Preserve the existing `setPreference(mode)` API + the `matchMedia` system
-      listener. +unit tests (the C100/C101 FE-store guard pattern): setTheme persists+applies,
-      initialize applies both, mode-change re-applies the correct variant.
+- [~] **T8 (C191, core DONE; theme-color-token sub-part flagged)** Extended `theme.svelte.ts` with the
+      `themeId` axis alongside the mode: `vroom-theme-id` mirror, `themeId` getter, `setTheme(id)`, and
+      `applyTheme(preference, themeId)` now sets `<html>` `data-theme` (a non-default id → the attribute
+      driving themes.css; `default` → attribute REMOVED so app.css's bare :root serves the identity) +
+      the `.dark` class. `initialize()` applies BOTH axes; `setPreference`/`setTheme` each preserve the
+      OTHER axis (orthogonal, D3); the matchMedia system listener preserves the active id. Existing
+      `setPreference`/`current`/`initialize` API + consumers (ThemeCard, +layout) untouched. +unit tests
+      (theme-id-axis.test.ts, +6): setTheme persists+sets data-theme, default removes it, mode↔id
+      orthogonality both directions, unknown id degrades (R8). FE validate:local GREEN (svelte-check 0, 802
+      pass). **REMAINING (flagged to Angelo, NOT loop-self-authorized): the theme-color meta still uses the
+      hard-coded brand hex by mode** — migrating it to the RESOLVED theme's brand token is a VISIBLE
+      browser-chrome change (the PWA status-bar tint; uncapturable by shot.sh + an oklch-in-`<meta>` compat
+      question), so it's a design sub-part deferred until a non-default theme ships. Also deferred: the
+      app.html head-script `data-theme` set (the id-axis anti-FOUC leg) — moot until a non-default theme exists.
 - [ ] **T9** Server sync + hydrate reconcile. `setTheme` pushes `themePreference` to the settings PUT
       (fail-soft — a network error keeps the local mirror, never blanks the theme). On
       `settingsStore.load()` (root layout, cycle-203), if `settings.themePreference` differs from the

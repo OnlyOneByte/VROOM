@@ -83,7 +83,13 @@ shot.sh eyes-on works — the "Playwright-blocked" tail was a ~200-cycle MISDIAG
    **Phase 2 (model+registry+resolver+css engine, T4–T7) is COMPLETE.** **NEXT TASK: Phase 3 T8 — extend
    `theme.svelte.ts` with the `themeId` axis: `vroom-theme-id` localStorage mirror, `setTheme(id)`, `applyTheme()`
    sets `<html>` data-theme + the theme-color meta from the resolved brand token; `initialize()` applies both axes;
-   the app.html head-script gains the `data-theme` set** (tasks.md Phase 3). Phase-4 custom-theme authoring is OUT
+   the app.html head-script gains the `data-theme` set** (tasks.md Phase 3). T8 DONE (C191, core): `theme.svelte.ts`
+   gained the `themeId` axis — `vroom-theme-id` mirror, `themeId` getter, `setTheme(id)`, `applyTheme` sets/removes
+   `data-theme` (default→removed) + `.dark`; initialize applies both axes; +6 orthogonality/R8 tests. DEFERRED
+   (design call, flag Angelo): the theme-color meta → resolved-brand-token migration (visible PWA status-bar tint,
+   oklch-in-meta compat) + the head-script data-theme leg (moot until a non-default theme ships). **NEXT TASK: T9 —
+   server sync + hydrate reconcile (setTheme pushes themePreference to the settings PUT [C179 field]; on
+   settingsStore.load() server wins if it differs from the mirror)** (tasks.md Phase 3). Phase-4 custom-theme authoring is OUT
    (its own future `.kiro/specs/theme-authoring/`). Mocks: `vroom-design-language-option-1-instrument-cluster` + `vroom-redesign-mocks/`.
 
 0. **Vehicle sharing** — **SPEC DRAFTED, BLOCKED on Angelo (D1–D8).** `.kiro/specs/vehicle-sharing/`
