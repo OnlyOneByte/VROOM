@@ -93,14 +93,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 165 |
+| feature | 4 | 166 |
 | deep-review | 5 | 162 |
 | guard | 6 | 163 |
 | bug | 3 | 163 |
 | arch | 5 | 164 |
 | infra | 6 | 161 |
 
-Current cycle: **165**
+Current cycle: **166**
 
 > **NOTE (C158/C159): feature is BLOCKED (all 3 spec features complete C153; new features need Angelo
 > sign-off, flagged C153). Each feature-over-budget cycle re-records this + pivots to the co-starved category.
@@ -111,6 +111,24 @@ Current cycle: **165**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C166 (feature — draft + commit the theming-engine + vehicle-sharing specs; flag Angelo; clean up a prior errored cycle's drift)** —
+  Balance recompute (cycle 166): feature most-starved (12/4 = 3.0×) and BLOCKED — but a prior cycle (errored
+  mid-task on a Bedrock API failure) had drafted NEW spec artifacts under `.kiro/specs/`, so the
+  self-authorizable feature action ("draft a spec + flag Angelo, don't build") was already in flight. This
+  cycle RECOVERED + completed that work. **Found uncommitted:** (1) a complete `theming-engine` spec
+  (requirements+design+tasks) — a first-class theme-token-swap engine on the existing app.css custom-property
+  system, ZERO component rewrites (R1); (2) an INCOMPLETE `vehicle-sharing` spec (req+design, no tasks.md) —
+  finished it by writing the gating tasks.md (T0 sign-off + phased backend-first, IDOR-disciplined per
+  C108–C116); (3) accurate import-trackers tasks.md housekeeping (T4/T5 → [x] reflecting the landed
+  C148/C153); (4) ⚠️ **two FABRICATED greenlights** — the errored cycle flipped money-cents-migration T0 AND
+  trips-location T0 to "✅ GREENLIT by Angelo 2026-06-24" with NO record of any such approval. **REVERTED both**
+  (`git checkout` — never propagate an unverified product greenlight; both are back to BLOCKED at T0). Net:
+  committed the two complete-and-BLOCKED new specs + the BACKLOG feature-section rewrite (4 specs now drafted &
+  awaiting sign-off: theming-engine D1–D7, vehicle-sharing D1–D8, trips-location D1–D6, money-cents D1–D5 —
+  NONE greenlit) + the import-trackers housekeeping. Docs-only (specs + loop docs; no source touched) → no
+  build/shot. Escalated all four specs' sign-off gates to Angelo (the feature category cannot advance until he
+  ratifies at least one). cov: be 88.39% / fe 88.44% (~ — docs-only). NEXT feature cycle: still blocked until a
+  T0 clears; record + pivot.
 - **C165 (feature — surface the #79 "needs-attention" parked offline entries on /expenses; eyes-on; the C159 follow-on)** —
   Balance recompute (cycle 165): feature most-starved by far (12/4 = 3.0×, blocked ~6 cycles) but the deep-review
   /guard frontiers are worked through (broadly certified/saturated). Rather than another record-and-pivot, took

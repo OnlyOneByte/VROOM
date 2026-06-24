@@ -39,12 +39,40 @@ A category may go at most **N cycles** untouched before it MUST be picked next.
 ## Ranked queue (top = next)
 
 ### feature
-*(**ALL 3 spec-approved features are now COMPLETE** — maintenance-schedule (C1) + recurring-expenses (C27,
-T1–T8) + import-trackers (C153, the auto-detect→commit round-trip eyes-on). No open spec feature remains.
-Future feature work needs a fresh spec + Angelo sign-off (NORTH_STAR horizon: trips/location, receipt OCR,
-vehicle sharing, float→cents money migration) — draft + flag Angelo, don't self-authorize. Until then a
-feature-over-budget cycle records "no open spec feature; needs Angelo sign-off" + pivots to the co-starved
-category. shot.sh eyes-on works — the "Playwright-blocked" tail was a ~200-cycle MISDIAGNOSIS, see GUIDE.md.)*
+*(The 3 original spec-approved features are COMPLETE — maintenance-schedule (C1) + recurring-expenses (C27,
+T1–T8) + import-trackers (C153, the auto-detect→commit round-trip eyes-on). **FOUR specs are now DRAFTED and
+AWAITING ANGELO SIGN-OFF, ALL build-BLOCKED at their T0 gate:** theming-engine (`.kiro/specs/theming-engine/`,
+D1–D7), vehicle-sharing (`.kiro/specs/vehicle-sharing/`, D1–D8), trips-location (`.kiro/specs/trips-location/`,
+D1–D6), money-cents-migration (`.kiro/specs/money-cents-migration/`, D1–D5). NONE is greenlit — do NOT build
+any T1+ until Angelo ratifies that spec's decisions (a prior cycle erroneously flipped trips + money-cents T0
+to "greenlit"; reverted C166 — there is NO record of Angelo approving them). Other horizon items (receipt OCR)
+still need their own spec. Until a spec is UNBLOCKED, a feature-over-budget cycle records "no UNBLOCKED spec
+feature; needs Angelo sign-off" + pivots to the co-starved category. shot.sh eyes-on works — the
+"Playwright-blocked" tail was a ~200-cycle MISDIAGNOSIS, see GUIDE.md.)*
+
+0. **Theming engine** — **SPEC DRAFTED, BLOCKED on Angelo (D1–D7).** `.kiro/specs/theming-engine/`
+   (requirements + design + tasks). A first-class theming engine: a registry of built-in themes (the
+   existing look + the explored "Instrument Cluster" / "Garage Journal" looks, productized), a `/settings`
+   picker with live preview, persistence via a new `userPreferences.themePreference` + a localStorage
+   mirror, backup round-trip, and a seam for future user-authored themes. **Load-bearing insight: a theme
+   is a pure token swap on the EXISTING `app.css` custom-property system — ZERO component/markup changes**
+   (R1). Backend-first, fully additive (`default` ≡ today's look byte-for-byte, so an un-chosen user sees
+   no change). Open decisions D1–D7 must be ratified first (esp. D1 engine + 1-theme-first, D2
+   persist-in-userPreferences, D5 which themes + their names, D7 token-only-no-textures-v1). Hard a11y
+   gate per theme (D4 = strict, the `--destructive` 3.9:1 precedent). Mocks: artifact
+   `vroom-design-language-option-1-instrument-cluster` + `vroom-redesign-mocks/`. Phase-4 custom-theme
+   authoring is explicitly OUT (its own future `.kiro/specs/theme-authoring/`).
+
+0. **Vehicle sharing** — **SPEC DRAFTED, BLOCKED on Angelo (D1–D8).** `.kiro/specs/vehicle-sharing/`
+   (requirements + design + tasks, drafted 2026-06-24). TODO.md #9 "BIGGGG" greenfield feature: an owner
+   grants another EXISTING VROOM user scoped (viewer|editor) access to a SPECIFIC vehicle. Additive
+   migration 0006 `vehicle_shares` + a `requireVehicleRead/Write` access resolver that REPLACES
+   `validateVehicleOwnership` on shared routes (owner via `vehicles.userId`, else accepted-share level, else
+   **404 not 403** — the #80 enumeration-oracle discipline). **Highest-care feature: every gate-widening
+   slice is a potential IDOR**, so each ships its `cross-tenant-idor.test.ts` entries in the same cycle (the
+   C108–C116 method). Owner-only actions (delete/financing/share-mgmt) keep STRICT ownership. Backend-first,
+   one domain per slice. STALE-CLAIM CORRECTED in the spec: TODO.md's "types already defined" is false — this
+   is fully greenfield (no sharing tables/types exist). Open D1–D8 must be ratified first.
 
 1. ~~**Maintenance-schedule reminders**~~ — **DONE (C1 2026-06-17).** Backend was 100%; the last tail
    (T7/T8/T9 eyes-on) is now CONFIRMED via shot.sh — the mileage form reveal/hide logic + the
