@@ -29,6 +29,13 @@
 > (C155 email-fix / C157 resolveNewUser / C158 unlink-route) + the C159 offline needs-attention helpers
 > (pure+covered) added covered lines; FE crossed 88.4 line (a fresh high). Structural ceiling holds (DI/OAuth/SQL
 > BE + effect/DOM FE). NEXT ~C171.**
+> **C176 (infra cadence MEASURED): BE 88.39% line / 87.99% func (1808 pass) — FLAT vs C169 (line identical);
+> FE 88.44% line / 88.92% func / 80.66% branch / 86.43% stmts (760 pass) — FLAT vs C169 (+0.09 branch / +0.07
+> stmts). Both hold at the structural ceiling. The C170–C175 arc added +16 BE tests (C170 RMW drift guard +
+> C172 source-link validate-before-persist + C174 migration-0006 + C175 coerceRow restore-safety) + 1 FE test
+> (C173 needs-attention copy source-scan) — all in ALREADY-covered modules or a repo branch now covered, so
+> coverage stayed flat (more tests, same covered-line ratio = the expected signature of guard/fix cycles).
+> Untracked-test sweep CLEAN both sides; branch 30 ahead / 0 behind origin/main, PR-ready. NEXT ~C186.**
 > **C169 (infra cadence MEASURED): BE 88.39% line / 87.99% func (1792 pass) — +0.06 vs C154; FE 88.44% line /
 > 88.92% func / 80.57% branch / 86.36% stmts (759 pass) — +0.20 line / +7 tests vs C154. Both UP off the C154
 > reading (BE: C155 auth-email + C168 json_patch guards; FE: C165 #79 needs-attention partition + C162/C163
@@ -103,9 +110,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 172 |
 | bug | 3 | 173 |
 | arch | 5 | 171 |
-| infra | 6 | 169 |
+| infra | 6 | 176 |
 
-Current cycle: **175**
+Current cycle: **176**
 
 > **NOTE (C174): feature is UNBLOCKED and now BUILDING. 3 specs greenlit by Angelo 2026-06-24 (theming/
 > money-cents/trips, restored C167). C174 began the theming-engine build at T1 (the additive
@@ -118,6 +125,22 @@ Current cycle: **175**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C176 (infra — branch-hygiene sweep + coverage re-measure; the ~10-cycle cadence, last MEASURED C169)** —
+  Balance recompute (cycle 176): infra the ONLY category strictly over budget (7/6 = 1.17×); bug + arch sat AT
+  budget (3/3, 5/5). Took infra — the cadence was due (~7 cycles since C169) and the C168–C175 arc added real
+  production surface (json_patch primitive, the themePreference column + migration 0006, the coerceRow
+  restore-safety fix) worth re-measuring. (1) UNTRACKED-TEST SWEEP: CLEAN both sides — zero untracked
+  `.test.ts`/`.spec.ts` (the gitignored `.meshclaw.e2e.ts` are by-design); working tree clean. (2) COVERAGE
+  RE-MEASURED: **BE 88.39% line / 87.99% func (1808 pass); FE 88.44% line / 88.92% func / 80.66% branch / 86.43%
+  stmts (760 pass).** Both FLAT vs C169 (BE line identical; FE +0.09 branch / +0.07 stmts) — the C170–C175 arc
+  added +16 BE / +1 FE tests, but ALL in already-covered modules (RMW drift guard C170, source-link
+  validate-before-persist C172, migration-0006 C174, coerceRow restore-safety C175) or a repo branch now covered,
+  so the covered-line ratio held (more tests at the same ratio = the expected guard/fix-cycle signature, not a
+  stall). Both at the structural ceiling (DI/OAuth/SQL BE + effect/DOM FE, unchanged in character). (3) BOTH-SIDES
+  GREEN: BE 1808 / FE 760, 0 fail. (4) BRANCH STATE: claude-loop-dev = 30 commits ahead of fresh origin/main, 0
+  behind, PR-ready. NOTE: feature is BUILDING (theming-engine T1 done C174; T2 = settings PUT field is next). Doc-only
+  (coverage runs exercised the full suites; no source touched → no build/shot). cov: be 88.39% / fe 88.44% (MEASURED).
+  NEXT cadence ~C186.
 - **C175 (deep-review — certify the C174 NOT NULL column survives backup-restore; found+fixed a REAL restore-abort class)** —
   Balance recompute (cycle 175): nothing strictly OVER budget; deep-review + infra both AT budget (5/5, 6/6). Infra's
   cadence isn't due (C169 measured, next ~C179), so took deep-review on the freshest, highest-leverage target: C174
