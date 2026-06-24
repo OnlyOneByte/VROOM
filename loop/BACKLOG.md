@@ -63,10 +63,13 @@ shot.sh eyes-on works — the "Playwright-blocked" tail was a ~200-cycle MISDIAG
    the additive `userPreferences.themePreference` column + migration 0006 + Sheets header. T2 DONE (C179): the
    settings PUT field — explicit bounded `themePreference: z.string().min(1).max(64).optional()` (createInsertSchema
    had left it unbounded), routed through the #82 per-field merge; +7 HTTP tests (persist/GET round-trip/both-way
-   sibling-merge/>64+empty reject/no-op).** **NEXT TASK: T3 — backup round-trip: SHEET_HEADERS already carries
-   themePreference (C174), so T3 = a round-trip guard test proving a restore re-applies the user's theme id**
-   (tasks.md Phase 1). Phase-4 custom-theme authoring is OUT (its own future `.kiro/specs/theme-authoring/`).
-   Mocks: `vroom-design-language-option-1-instrument-cluster` + `vroom-redesign-mocks/`.
+   sibling-merge/>64+empty reject/no-op). T3 DONE (C180): the backup round-trip — themePreference rides the
+   schema-derived CSV set + the C174 Sheets header + C175 coerceRow safety; +3 round-trip tests
+   (theme-preference-roundtrip.test.ts) certify a non-default theme survives the real
+   exportAsZip→restoreFromBackup stack.** **Phase 1 (backend persistence T1–T3) is COMPLETE + certified. NEXT
+   TASK: T4 — `frontend/src/lib/theme/theme-types.ts` (ThemeId/ThemeMode/ThemeTokenKey/ThemeDefinition; types
+   only, no values)** (tasks.md Phase 2, FE pure). Phase-4 custom-theme authoring is OUT (its own future
+   `.kiro/specs/theme-authoring/`). Mocks: `vroom-design-language-option-1-instrument-cluster` + `vroom-redesign-mocks/`.
 
 0. **Vehicle sharing** — **SPEC DRAFTED, BLOCKED on Angelo (D1–D8).** `.kiro/specs/vehicle-sharing/`
    (requirements + design + tasks, drafted 2026-06-24). TODO.md #9 "BIGGGG" greenfield feature: an owner
@@ -139,6 +142,14 @@ shot.sh eyes-on works — the "Playwright-blocked" tail was a ~200-cycle MISDIAG
 *(queue empty — repopulate as the loop surfaces surfaces to audit. Standing veins from the archive:
 re-audit a data-safety write path, certify it CLEAN against source, and leave a merge-surviving guard.
 Don't trust agent "HIGH" findings — verify firsthand (the archive logged many debunked false-positives).)*
+
+> **CERTIFIED C180 — the theming-persistence arc (C174+C175+C179) round-trips through backup→restore CLEAN.** A
+> C180 deep-review (pivot from a verified-dry insurance-claims bug scout) certified firsthand that a user's
+> `themePreference` survives the TRUE `exportAsZip → restoreFromBackup('replace')` stack: it rides the
+> schema-derived CSV column set + the C174 Sheets header, and the C175 coerceRow NOT-NULL-default fix keeps an
+> empty cell → `'default'` (never a restore-aborting null). Guard: theme-preference-roundtrip.test.ts (+3) — a
+> non-default theme survives, default round-trips as default (control), a paired sibling pref survives alongside.
+> Non-vacuous (drop themePreference on coerce → 2 RED). This IS theming-engine T3. Don't re-audit.
 
 > **CERTIFIED + FIXED C175 — the C174 NOT NULL column is restore-safe; closed a pre-existing restore-abort class
 > for ALL NOT-NULL-default columns.** Certifying C174's `themePreference` against the backup/restore path

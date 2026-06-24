@@ -106,13 +106,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 179 |
-| deep-review | 5 | 175 |
+| deep-review | 5 | 180 |
 | guard | 6 | 178 |
 | bug | 3 | 173 |
 | arch | 5 | 177 |
 | infra | 6 | 176 |
 
-Current cycle: **179**
+Current cycle: **180**
 
 > **NOTE (C174): feature is UNBLOCKED and now BUILDING. 3 specs greenlit by Angelo 2026-06-24 (theming/
 > money-cents/trips, restored C167). C174 began the theming-engine build at T1 (the additive
@@ -125,6 +125,26 @@ Current cycle: **179**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C180 (bug-scout DRY [verified firsthand] → pivot to deep-review: certify the theming-persistence backup round-trip = theming-engine T3)** —
+  Balance recompute (cycle 180): bug most-starved (7/3 = 2.33×). The precondition flipped vs C179 — C179 CHANGED
+  production source (settings/routes.ts), so a scout is non-ceremonial this time. Scouted a genuinely fresh write-path
+  surface firsthand (GUIDE validation-asymmetry seam): the **insurance claims** create/update path (#84/#125 class —
+  PUT skipping a POST-enforced validation). **VERIFIED CLEAN firsthand:** both POST (288) + PUT (305) call
+  `validateClaimRefs` (owned-vehicleId + term-on-THIS-policy); the repo update/delete are doubly-scoped
+  (`findById(policyId,claimId)` precheck + `WHERE id AND policy_id` on the write) — no cross-policy/cross-tenant leak;
+  and the #84/#125 surface is ALREADY fully guarded (C247/C369 cover POST+PUT vehicleId+termId rejection). No fresh
+  defect, and no guard gap to fill there. Per C122/C163 (forced-but-dry bug → pivot the substantive work to a
+  co-productive vein), pivoted to DEEP-REVIEW (next over-budget-adjacent, AT budget 5/5) with a genuinely fresh,
+  uncertified target: the C174+C175+C179 theming-PERSISTENCE arc's backup→restore round-trip. **Certified firsthand:**
+  themePreference rides the schema-derived CSV column set + the C174 Sheets header + the C175 coerceRow
+  NOT-NULL-default safety; a non-default theme survives the TRUE `exportAsZip → restoreFromBackup('replace')` stack.
+  This certification IS theming-engine **T3's** deliverable, so ticked T3. **GUARD:** +theme-preference-roundtrip.test.ts
+  (+3): non-default theme survives the real round-trip, default round-trips as `'default'` (control), a paired sibling
+  pref (currencyUnit) survives alongside (no field dropped). NON-VACUITY PROVEN: dropping themePreference on coerce →
+  the two non-default tests RED; restored. VERIFY: backend validate:local GREEN (tsc 0, musl-biome clean, 1820 pass /
+  0 fail [+3], build bundled). Test-only → no shot. (Bug stays at 173 — a provably-dry cold vein; it'll keep being
+  scouted+pivoted until prod source changes meaningfully.) cov: be 88.39% / fe 88.44% (~ — round-trip guard, no prod
+  line). theming T1+T2+T3 (the whole backend-persistence phase) now DONE + certified; NEXT is T4 (FE theme-types, pure).
 - **C179 (bug-scout DRY [precondition] → pivot to feature: theming-engine T2 — the settings PUT themePreference field)** —
   Balance recompute (cycle 179): bug most-starved (6/3 = 2.0×), feature next over (5/4 = 1.25×). Took bug first, but
   the anti-ceremony precondition is decisive: `git diff 877a26f(C178)..HEAD -- src` is EMPTY — ZERO production source

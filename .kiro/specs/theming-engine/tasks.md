@@ -32,10 +32,14 @@
       fresh user defaults to `'default'`, PUT persists + GET round-trips, per-field merge both directions,
       >64 + empty rejected (400, stored value unchanged), omitted is a no-op. Non-vacuity proven (drop the
       bound → length+empty RED). `bun run validate:local` GREEN (1817 pass).
-- [ ] **T3** Backup round-trip. Add `themePreference` to `SHEET_HEADERS` (Google Sheets path) +
-      extend the backup round-trip coverage guard so a restore re-applies the user's theme id (the
-      cycle-3/C15 contract; inherits the C300/#93 merge-restore prefs-collision handling). +guard test
-      proving the field survives export→import. `bun run validate:local` green.
+- [x] **T3 (C180)** Backup round-trip. `themePreference` was already in `SHEET_HEADERS` (added T1/C174)
+      and rides the schema-derived CSV column set automatically; T3 CERTIFIED the round-trip firsthand and
+      left the guard. +theme-preference-roundtrip.test.ts (+3): a non-default theme id survives the TRUE
+      `exportAsZip → restoreFromBackup('replace')` stack (CSV serialize → coerceRow → FK-ordered insert),
+      the default round-trips as `'default'` (control), and a paired sibling pref (currencyUnit) survives
+      alongside it (no field dropped). Inherits the C175 coerceRow NOT-NULL-default safety (an empty cell
+      → `'default'`, never a restore-aborting null). Non-vacuity proven (drop themePreference on coerce →
+      the two non-default tests RED). `bun run validate:local` GREEN (1820 pass).
 
 ## Phase 2 — theme model + registry + resolver (frontend, pure, no UI)
 - [ ] **T4** `frontend/src/lib/theme/theme-types.ts` — `ThemeId`, `ThemeMode`, `ThemeTokenKey` (the
