@@ -131,12 +131,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 202 |
 | deep-review | 5 | 201 |
-| guard | 6 | 196 |
+| guard | 6 | 203 |
 | bug | 3 | 173 |
 | arch | 5 | 199 |
 | infra | 6 | 200 |
 
-Current cycle: **202**
+Current cycle: **203**
 
 > **NOTE (C174): feature is UNBLOCKED and now BUILDING. 3 specs greenlit by Angelo 2026-06-24 (theming/
 > money-cents/trips, restored C167). C174 began the theming-engine build at T1 (the additive
@@ -148,6 +148,25 @@ Current cycle: **202**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C203 (bug-scout on the FRESH C202 trips pipeline [CLEAN — date/tz seam verified firsthand] → pivot to guard: pin the tripDate timestamp round-trip)** —
+  Balance recompute (cycle 203): bug most-starved (30/3 = 10.0×). **The cold-vein precondition NO LONGER holds — C202
+  added genuinely new backend prod logic (the trips table + the entire backup/restore/sheets pipeline) since the C183
+  scout — so this is a REAL scout, not ceremony.** Scouted the highest-risk element I introduced: the `tripDate`
+  **timestamp-mode** column surviving CSV + Sheets serialization (date/tz is the loop's richest bug vein — #87/#106/
+  #131). Verified BOTH serializers firsthand (backup.ts convertToCSV + sheets formatValue both `Date→toISOString()`,
+  structurally identical to odometer's certified `recordedAt`), then PROVED it with a throwaway probe: a non-midnight
+  UTC instant (2024-06-20T13:30:00Z = 1718890200) round-trips EXACTLY through the real exportAsZip→restoreFromBackup
+  stack. Also probed MERGE mode firsthand: a colliding trip id reports a CLEAN conflict `{table:'trips',id:...}` (the
+  #93-class probe I wired works — no raw UNIQUE throw); the "clean-merge" no-op is the established always-collide-on-
+  prefs/syncState behavior, not a trips defect. **Bug scout CLEAN — no defect** (the new pipeline mirrors the
+  certified odometer path). Per the GUIDE (verified clean → record + pivot), recorded the scout and pivoted to GUARD
+  (7/6 = 1.17× over, the next-most-starved) to close the gap the scout exposed: the C202 round-trip test asserted
+  every trip field EXCEPT `tripDate`'s value, so a future serialization regression on the timestamp column wouldn't go
+  red. STRENGTHENED trips-roundtrip.test.ts: the fully-populated case now seeds a non-midnight `trip_date` + asserts
+  it survives to the exact second. Non-vacuous (temporarily truncating the serializer to `.toISOString().slice(0,10)`
+  → RED with Expected 1718890200 / Received 1718841600, the exact 48600s midnight-shift; reverted). Test-only (no prod
+  source) → no shot. Backend validate:local GREEN (1836 pass / 0 fail, unchanged count — a stronger expect in an
+  existing test). cov: be ~88.4% (~, test-only) / fe 88.73% (~). (Bug stays 173 — scout clean, no fix; guard→203.)
 - **C202 (feature: trips-location T1+T4 — `trips` table + migration 0007 + the FULL backup round-trip)** —
   Balance recompute (cycle 202): bug most-starved (29/3 = 9.67×) but provably-dry cold-vein (C199/C200/C201 were
   test/doc/FE-only — no backend prod logic changed since the C183 scout) → recorded DRY. Next over-budget = FEATURE

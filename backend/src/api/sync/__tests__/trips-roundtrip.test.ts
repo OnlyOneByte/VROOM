@@ -80,10 +80,16 @@ function seedTrip(
 describe('backup → restore round-trip preserves trips (T4)', () => {
   test('a fully-populated trip survives export + restore with its fields intact', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    // A NON-midnight UTC instant (13:30:00Z) — exercises the tripDate timestamp-mode column through the
+    // CSV Date→toISOString→coerceRow `new Date()` round-trip. A date-only truncation or a tz-shift on
+    // either serializer leg would move this off the exact epoch (the #87/#106/#131 date-seam class; the
+    // C203 bug-scout verified this path clean firsthand, this pins it so a future regression goes red).
+    const tripDateSec = Math.floor(Date.UTC(2024, 5, 20, 13, 30, 0) / 1000);
     seedTrip(ctx, 'trip-1', vehicleId, {
       start_odometer: 24000,
       end_odometer: 24135,
       purpose: 'business',
+      trip_date: tripDateSec,
       start_location: 'Office',
       end_location: 'Client site',
       note: 'Q2 review meeting',
@@ -108,6 +114,8 @@ describe('backup → restore round-trip preserves trips (T4)', () => {
     expect(row.start_odometer).toBe(24000);
     expect(row.end_odometer).toBe(24135);
     expect(row.purpose).toBe('business');
+    // The timestamp survives to the exact second — no date-only truncation, no tz drift (C203 scout).
+    expect(row.trip_date).toBe(tripDateSec);
     expect(row.start_location).toBe('Office');
     expect(row.end_location).toBe('Client site');
     expect(row.note).toBe('Q2 review meeting');

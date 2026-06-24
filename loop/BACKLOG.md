@@ -745,6 +745,17 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C203 — the trips `tripDate` timestamp round-trip (NORTH_STAR #1, the date/tz seam class).** A C203
+> bug-scout on the FRESH C202 trips backup pipeline VERIFIED FIRSTHAND that `tripDate` (a `mode:'timestamp'`
+> column) survives CSV export→restore to the exact second — both serializers `Date→toISOString()`, mirroring
+> odometer's certified `recordedAt`; a throwaway probe confirmed a non-midnight UTC instant round-trips exactly,
+> and merge-mode reports a clean conflict on a colliding trip id (the #93 probe works). CLEAN — no defect. GAP
+> closed: the C202 trips-roundtrip test asserted every field EXCEPT `tripDate`'s value, so a future date-only
+> truncation / tz-shift on either serializer leg wouldn't go red. Strengthened trips-roundtrip.test.ts: the
+> fully-populated case seeds a non-midnight `trip_date` + asserts it survives exactly. Non-vacuous (truncate the
+> serializer to `.slice(0,10)` → RED, the exact 48600s midnight-shift). The #87/#106/#131 date-seam class is now
+> pinned on the new timestamp column. Don't re-add.
+
 > **GUARDED C196 — the T9 settingsStore.load() → reconcileServerTheme WIRING (NORTH_STAR #2, cross-device sync).**
 > C195's theme-server-sync.test.ts pins reconcileServerTheme in ISOLATION; nothing drove load() + asserted it
 > invokes the reconcile with the fetched settings.themePreference. A refactor dropping that line silently breaks
