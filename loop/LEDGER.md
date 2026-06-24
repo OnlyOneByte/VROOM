@@ -131,12 +131,19 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 202 |
 | deep-review | 5 | 201 |
-| guard | 6 | 203 |
+| guard | 6 | 204 |
 | bug | 3 | 173 |
 | arch | 5 | 199 |
 | infra | 6 | 200 |
 
-Current cycle: **203**
+Current cycle: **204**
+
+> **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
+> a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
+> pivoted to a guard (the scout's value is the firsthand certification, the guard is the durable artifact).
+> The pure-logic bug surface remains exhausted; bug fixes now come ONLY from a freshly-added feature surface
+> (the trips T2/T3/T5 arc will add more) or an Angelo-unblocked product call. Bug's last-touched stays 173
+> because no DEFECT was fixed — but the scouts ARE happening every cycle bug is over budget, as required.**
 
 > **NOTE (C174): feature is UNBLOCKED and now BUILDING. 3 specs greenlit by Angelo 2026-06-24 (theming/
 > money-cents/trips, restored C167). C174 began the theming-engine build at T1 (the additive
@@ -148,6 +155,25 @@ Current cycle: **203**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C204 (bug-scout on the trips GOOGLE SHEETS path [CLEAN — distinct serializer verified firsthand] → guard: pin the trips Sheets round-trip)** —
+  Balance recompute (cycle 204): bug most-starved (31/3 = 10.33×, the ONLY strictly over-budget category). Cold-vein
+  still doesn't apply (C202's trips pipeline is fresh prod logic; C203 was test-only). C203 certified the trips ZIP/CSV
+  path's tripDate + merge-conflict — but the GOOGLE SHEETS path is a DISTINCT serializer (the explicit C193 lesson:
+  formatValue → grid → parseValue, with its own hazards — parseValue re-coerces every cell: numeric-looking→Number,
+  ISO-shaped→new Date()), and C202 wired trips into it (export tab + readback) WITHOUT a firsthand round-trip. Scouted
+  that surface firsthand with a throwaway fake-Sheets probe: a trip with a non-midnight tripDate (2024-06-20T13:30:00Z)
+  exports all 12 columns, tripDate serializes as the full ISO instant, reads back EXACTLY (parseValue's ISO regex →
+  new Date()), odometers come back as numbers, the empty endLocation → null, text verbatim. **Bug scout CLEAN — no
+  defect** (the Sheets serializer handles trips correctly). Per the GUIDE (verified clean → record + pivot), recorded
+  the scout + pivoted to GUARD to close the gap: the Sheets trips round-trip had NO committed test (C193's lesson is
+  the Sheets path needs its OWN guard, distinct from the ZIP path's trips-roundtrip.test.ts). Added to
+  google-sheets-service.test.ts (+1, in the readSpreadsheetData describe, mirroring the C193 themePreference cert): a
+  vehicle+trip seeded via the real DB → createOrUpdateVroomSpreadsheet → assert the Trips grid carries the ISO tripDate
+  + the readback preserves vehicleId/odometers/purpose/tripDate-to-the-instant/locations(null)/note. Stable 14 pass ×3
+  runs (an early single UNIQUE-users.email fail was the documented createTestApp DB-reset transient, not my test).
+  Backend validate:local GREEN (1837 pass / 0 fail, +1). Test-only → no shot. The trips data-safety surface is now
+  certified on BOTH backup serializers (ZIP C202/C203 + Sheets C204). cov: be ~88.4% (~, test-only) / fe 88.73% (~).
+  (Bug stays 173 — scout clean, no fix; guard→204.)
 - **C203 (bug-scout on the FRESH C202 trips pipeline [CLEAN — date/tz seam verified firsthand] → pivot to guard: pin the tripDate timestamp round-trip)** —
   Balance recompute (cycle 203): bug most-starved (30/3 = 10.0×). **The cold-vein precondition NO LONGER holds — C202
   added genuinely new backend prod logic (the trips table + the entire backup/restore/sheets pipeline) since the C183

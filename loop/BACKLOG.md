@@ -745,6 +745,17 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C204 — the trips GOOGLE SHEETS round-trip (NORTH_STAR #1, the C193 distinct-serializer lesson).** A
+> C204 bug-scout (bug 31/3 over budget) VERIFIED FIRSTHAND that a trip survives the Sheets export→read path — a
+> DISTINCT serializer from the ZIP/CSV path C203 pinned (formatValue→grid→parseValue, where parseValue re-coerces
+> every cell: numeric→Number, ISO-shaped→new Date()). A throwaway fake-Sheets probe confirmed a non-midnight
+> tripDate exports as the full ISO instant + reads back exactly, odometers as numbers, empty endLocation→null. CLEAN
+> — no defect. GAP closed: the Sheets trips round-trip had NO committed test (C193's lesson: the Sheets path needs its
+> OWN guard). +1 in google-sheets-service.test.ts (readSpreadsheetData describe, mirroring the C193 themePreference
+> cert): seed a vehicle+trip → export → assert the Trips grid's ISO tripDate + the full readback (vehicleId,
+> odometers, purpose, tripDate-to-the-instant, locations null, note). Trips now certified on BOTH backup serializers
+> (ZIP C202/C203 + Sheets C204). Don't re-add.
+
 > **GUARDED C203 — the trips `tripDate` timestamp round-trip (NORTH_STAR #1, the date/tz seam class).** A C203
 > bug-scout on the FRESH C202 trips backup pipeline VERIFIED FIRSTHAND that `tripDate` (a `mode:'timestamp'`
 > column) survives CSV export→restore to the exact second — both serializers `Date→toISOString()`, mirroring
