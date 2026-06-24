@@ -123,10 +123,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 193 |
 | guard | 6 | 190 |
 | bug | 3 | 173 |
-| arch | 5 | 188 |
+| arch | 5 | 194 |
 | infra | 6 | 192 |
 
-Current cycle: **193**
+Current cycle: **194**
 
 > **NOTE (C174): feature is UNBLOCKED and now BUILDING. 3 specs greenlit by Angelo 2026-06-24 (theming/
 > money-cents/trips, restored C167). C174 began the theming-engine build at T1 (the additive
@@ -139,6 +139,20 @@ Current cycle: **193**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C194 (bug-scout DRY [precondition] → pivot to arch: converge `seedVehicle` wave 9, the vehicles nickname pair — completes the vehicles domain)** —
+  Balance recompute (cycle 194): bug most-starved (21/3 = 7.0×) but provably dry (only theming UI plumbing changed
+  since the C183 scout, 13th consecutive — C193 test-only) → scout is ceremony. Recorded the bug-scout DRY and
+  pivoted to the co-over-budget ARCH (6/5 = 1.2×) with the Angelo-approved seedVehicle convergence. **Wave 9 = the
+  vehicles-domain NICKNAME pair** (vehicle-photo-routes-http Subaru Outback 2021 + vehicles-list-financing-contract
+  Honda Civic 2022): both hand-redeclared a local `seedVehicle(nickname)`, converged onto the shared
+  test-helpers/seed via a thin nickname wrapper (make/model/year explicit — the shared default is a Camry). Both
+  keep their other json/DataEnvelope refs so imports survive. **This COMPLETES the vehicles domain** (no-arg pair
+  C188 + nickname pair C194). Behavior-preserving (green→green): both suites 10/10 pass; full backend validate:local
+  GREEN (tsc 0, musl-biome clean, 1823 pass / 0 fail — UNCHANGED count, pure test-helper refactor, build bundled).
+  Net −10 LOC. Test-only → no shot. **Progress: 41 of ~51 files converged**; REMAINING (6): analytics
+  (analytics-routes-http, vehicle-tco-zero-state), expenses-source-traceability (+ its seedVehicleWithFinancing),
+  insurance premium-expense-hook, odometer update-route, google-sheets-service. cov: be 88.39% / fe 88.65% (~ —
+  test-helper refactor, no prod line). (Bug stays 173 — provably-dry cold vein.)
 - **C193 (bug-scout DRY [precondition] → pivot to deep-review: certify the themePreference GOOGLE SHEETS round-trip)** —
   Balance recompute (cycle 193): bug most-starved (20/3 = 6.67×) but provably dry (only theming UI plumbing changed
   since the C183 scout, 12th consecutive — C192 doc-only) → scout is ceremony. Recorded the bug-scout DRY and

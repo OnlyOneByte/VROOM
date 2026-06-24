@@ -21,6 +21,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle as seedVehicleShared } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -29,17 +30,11 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-async function seedVehicle(nickname: string): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Subaru',
-    model: 'Outback',
-    year: 2021,
-    nickname,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
+// This file's fixture is a nickname-required Subaru Outback 2021; converge onto the shared test-helpers/seed
+// seedVehicle (arch convergence, Angelo-approved) via a thin wrapper that keeps make/model/year explicit
+// (the shared default is a Toyota Camry) so behavior is preserved.
+const seedVehicle = (nickname: string): Promise<string> =>
+  seedVehicleShared(ctx, { make: 'Subaru', model: 'Outback', year: 2021, nickname });
 
 /** Raw-insert a photo row (no storage provider needed for the DB-only list/cover paths). */
 function seedPhoto(opts: {
