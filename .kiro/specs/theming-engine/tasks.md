@@ -62,10 +62,13 @@
       AA-tuned (A3/R10/D4), which is a product/design decision (the mock dir is a gitignored working file, absent
       from the tree). The registry + guard accept it with zero structural change (add one ThemeDefinition).
       Flagged to Angelo: supply the `instrument` palette (or greenlight deriving it from the mock).
-- [ ] **T6** `resolveTheme(themeId, mode, systemPref)` — total resolver: definition lookup with
-      `default` fallback on unknown id (**R8**); pick light/dark by `mode==='system'?systemPref:mode`;
-      return the token map. Pure. +unit tests: every built-in × {light,dark,system×sysPref}, unknown →
-      default, empty/garbage → default, never throws.
+- [x] **T6 (C187)** `resolve-theme.ts` — `resolveTheme(themeId, mode, systemPref)` total resolver +
+      `resolveThemeDefinition` (id→def, default fallback R8, Object.hasOwn so prototype keys don't false-hit)
+      + `resolveVariant` (mode→light/dark; `system`→systemPref, garbage→light). Pure, never throws. +unit
+      tests (resolve-theme.test.ts, +12): every built-in × {light,dark}; `system` follows OS pref; explicit
+      mode ignores pref; unknown id→default; empty/null/garbage ids+modes never throw + yield a COMPLETE
+      token map; the prototype-pollution case (`constructor`/`toString`→default). FE validate:local GREEN
+      (svelte-check 0, 785 pass).
 - [ ] **T7** `themes.css` generation + anti-FOUC seam **[A1 = option (b)]**. Emit one
       `:root[data-theme="<id>"]` / `:root[data-theme="<id>"].dark` block per registry theme (a small
       build/codegen step or a checked-in generated file with a guard test that it ⊇ the registry ids).

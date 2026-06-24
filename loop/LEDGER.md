@@ -112,14 +112,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 185 |
+| feature | 4 | 187 |
 | deep-review | 5 | 186 |
 | guard | 6 | 183 |
 | bug | 3 | 173 |
 | arch | 5 | 182 |
 | infra | 6 | 184 |
 
-Current cycle: **186**
+Current cycle: **187**
 
 > **NOTE (C174): feature is UNBLOCKED and now BUILDING. 3 specs greenlit by Angelo 2026-06-24 (theming/
 > money-cents/trips, restored C167). C174 began the theming-engine build at T1 (the additive
@@ -132,6 +132,22 @@ Current cycle: **186**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C187 (bug-scout DRY [precondition] → pivot to feature: theming-engine T6 — the pure total theme resolver)** —
+  Balance recompute (cycle 187): bug most-starved (14/3 = 4.67×) but the only prod change since the last real scout
+  (C183) is theme DATA (theme-registry.ts), no logic surface → 6th consecutive provably-dry cold vein, scout is
+  ceremony. Recorded the bug-scout DRY and pivoted to the highest-leverage OPEN item = the active greenlit theming
+  build (feature not over budget but the most leverage + fully unblocked). **Built theming-engine T6:**
+  `resolve-theme.ts` — `resolveTheme(themeId, mode, systemPref)`, a PURE TOTAL resolver: `resolveThemeDefinition`
+  (id→def, `default` fallback R8 via `Object.hasOwn` so Object.prototype keys can't false-hit) + `resolveVariant`
+  (mode→light/dark; `system`→systemPref, garbage→light) + the composed `resolveTheme` returning the token map.
+  Never throws — any malformed input degrades to default's light variant (a corrupted persisted theme can't blank
+  the UI). Fully deterministic from `default` + the type model (both present) — NO design call. +unit tests
+  (resolve-theme.test.ts, +12): every built-in × {light,dark}; `system` follows OS pref; explicit mode ignores
+  pref; unknown id→default; empty/null/garbage never throws + yields a COMPLETE token map (no partial-leak);
+  prototype-pollution (`constructor`/`toString`→default). VERIFY: frontend validate:local GREEN (svelte-check 0
+  errors, build OK, 785 pass / 0 fail [+12]). Pure module + unit tests, no UI render → no shot. Ticked tasks.md T6.
+  **NEXT: T7** (themes.css generation + the anti-FOUC `data-theme` head seam — emits one block per registry theme;
+  still unblocked on `default` alone). cov: be 88.39% / fe 88.45% (~ — pure resolver, fully unit-covered).
 - **C186 (bug-scout DRY [precondition] → pivot to deep-review: certify the theming token-contract chain + pin the @theme-alias↔managed-set link)** —
   Balance recompute (cycle 186): bug most-starved (13/3 = 4.33×) but the only prod change since the last real scout
   (C183) is `theme-registry.ts` — pure token DATA, no runtime consumer/logic surface, so a scout there is ceremony.

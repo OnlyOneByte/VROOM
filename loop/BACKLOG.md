@@ -75,8 +75,11 @@ shot.sh eyes-on works — the "Playwright-blocked" tail was a ~200-cycle MISDIAG
    keys present both variants, no stray keys).** **DESIGN-GATED (flag Angelo): the first non-default theme
    `instrument` — its 32-token oklch palette must be distilled from the design-language mock + AA-tuned (A3/R10/D4),
    a product call the loop won't self-author (mock dir is gitignored/absent). Registry accepts it with zero
-   structural change.** **NEXT TASK: T6 — `resolveTheme(themeId, mode, systemPref)`: total resolver, pure, unblocked
-   (needs only `default` + the type model, both present)** (tasks.md Phase 2). Phase-4 custom-theme authoring is OUT
+   structural change.** T6 DONE (C187): `resolve-theme.ts` — pure total resolver (resolveTheme + resolveThemeDefinition[R8 fallback,
+   Object.hasOwn] + resolveVariant); +12 unit tests (built-ins, system-pref, unknown→default, garbage-never-throws,
+   prototype-pollution).** **NEXT TASK: T7 — `themes.css` generation + the anti-FOUC `data-theme` head seam (emit
+   one `:root[data-theme=<id>]` block per registry theme; still unblocked on `default` alone)** (tasks.md Phase 2).
+   Phase-4 custom-theme authoring is OUT
    (its own future `.kiro/specs/theme-authoring/`). Mocks: `vroom-design-language-option-1-instrument-cluster` + `vroom-redesign-mocks/`.
 
 0. **Vehicle sharing** — **SPEC DRAFTED, BLOCKED on Angelo (D1–D8).** `.kiro/specs/vehicle-sharing/`
