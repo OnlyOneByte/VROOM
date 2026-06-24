@@ -87,10 +87,16 @@ shot.sh eyes-on works — the "Playwright-blocked" tail was a ~200-cycle MISDIAG
    gained the `themeId` axis — `vroom-theme-id` mirror, `themeId` getter, `setTheme(id)`, `applyTheme` sets/removes
    `data-theme` (default→removed) + `.dark`; initialize applies both axes; +6 orthogonality/R8 tests. DEFERRED
    (design call, flag Angelo): the theme-color meta → resolved-brand-token migration (visible PWA status-bar tint,
-   oklch-in-meta compat) + the head-script data-theme leg (moot until a non-default theme ships). **NEXT TASK: T9 —
-   server sync + hydrate reconcile (setTheme pushes themePreference to the settings PUT [C179 field]; on
-   settingsStore.load() server wins if it differs from the mirror)** (tasks.md Phase 3). Phase-4 custom-theme authoring is OUT
-   (its own future `.kiro/specs/theme-authoring/`). Mocks: `vroom-design-language-option-1-instrument-cluster` + `vroom-redesign-mocks/`.
+   oklch-in-meta compat) + the head-script data-theme leg (moot until a non-default theme ships). T9 DONE (C195):
+   server sync + hydrate reconcile — UserSettings gained themePreference?; setTheme pushes to the settings PUT
+   fail-soft (never reverts on error); themeStore.reconcileServerTheme is the server-wins hydrate called from
+   settingsStore.load(); +8 tests.** **Phase 3 (store generalization + wiring, T8–T9) is COMPLETE — the engine is
+   fully built + server-synced end-to-end.** **⚠️ PHASE 4 (the picker UI T10 + per-theme eyes-on T11 + a11y gate
+   T12 + e2e T13) IS GATED on the `instrument` palette — a product/DESIGN call (flag Angelo): a picker needs a 2nd
+   theme to pick, and `instrument`'s 32-token oklch AA-tuned palette must be distilled from the design-language mock
+   (gitignored/absent), which the loop won't self-author. Until that lands, theming has NO more loop-buildable
+   tasks — the whole engine ships `default`-only (zero visual change, fully guarded).** Phase-4 custom-theme
+   authoring is OUT (its own future `.kiro/specs/theme-authoring/`). Mocks: `vroom-design-language-option-1-instrument-cluster` + `vroom-redesign-mocks/`.
 
 0. **Vehicle sharing** — **SPEC DRAFTED, BLOCKED on Angelo (D1–D8).** `.kiro/specs/vehicle-sharing/`
    (requirements + design + tasks, drafted 2026-06-24). TODO.md #9 "BIGGGG" greenfield feature: an owner

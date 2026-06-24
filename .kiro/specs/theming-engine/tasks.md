@@ -98,11 +98,16 @@
       browser-chrome change (the PWA status-bar tint; uncapturable by shot.sh + an oklch-in-`<meta>` compat
       question), so it's a design sub-part deferred until a non-default theme ships. Also deferred: the
       app.html head-script `data-theme` set (the id-axis anti-FOUC leg) — moot until a non-default theme exists.
-- [ ] **T9** Server sync + hydrate reconcile. `setTheme` pushes `themePreference` to the settings PUT
-      (fail-soft — a network error keeps the local mirror, never blanks the theme). On
-      `settingsStore.load()` (root layout, cycle-203), if `settings.themePreference` differs from the
-      mirror, server wins (cross-device correctness) + update the mirror. +tests for the reconcile
-      precedence. **[D2]**
+- [x] **T9 (C195)** Server sync + hydrate reconcile. `UserSettings` gained `themePreference?` (FE type now
+      mirrors the C174/C179 server field). `setTheme` pushes `themePreference` to the settings PUT via
+      `persistThemeToServer` — FAIL-SOFT (the push is not awaited + its rejection is swallowed, so a
+      network/auth error can never revert/blank the just-picked theme; the local mirror is the session
+      source of truth). New `themeStore.reconcileServerTheme(serverThemeId)` is the server-wins hydrate:
+      `settingsStore.load()` calls it after the settings fetch — a server value differing from the mirror is
+      adopted (mirror + data-theme updated) and NOT re-pushed; equal/absent is a no-op. +tests
+      (theme-server-sync.test.ts, +8): setTheme pushes, fail-soft rejection doesn't revert, reconcile adopts
+      a differing server value, doesn't re-push, no-ops on equal/absent. FE validate:local GREEN
+      (svelte-check 0, 808 pass). **Phase 3 (store generalization + wiring, T8–T9) is COMPLETE.**
 
 ## Phase 4 — picker UI (eyes-on)
 - [ ] **T10** `/settings` ThemeSection — a responsive grid of theme cards (compose `Card`+`Badge`+ring

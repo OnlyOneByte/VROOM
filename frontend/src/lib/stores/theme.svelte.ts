@@ -1,4 +1,5 @@
 import { browser } from '$app/environment';
+import { settingsApi } from '$lib/services/settings-api';
 import { DEFAULT_THEME_ID } from '$lib/theme/theme-registry';
 
 export type ThemePreference = 'light' | 'dark' | 'system';
@@ -52,6 +53,19 @@ function applyTheme(preference: ThemePreference, themeId: string = getStoredThem
 	if (meta) {
 		meta.setAttribute('content', resolved === 'dark' ? '#1a1a2e' : '#2563eb');
 	}
+}
+
+/**
+ * Push the selected theme id to the server (T9, D2 — synced for cross-device correctness). FAIL-SOFT: a
+ * network/auth error is swallowed (logged in dev only) so it can NEVER blank or revert the theme the user
+ * just picked — the local mirror is the source of truth for the active session; the server is best-effort
+ * durability. Not awaited by setTheme (the UI re-skins instantly; the sync rides in the background).
+ */
+function persistThemeToServer(id: string): void {
+	if (!browser) return;
+	settingsApi.updateSettings({ themePreference: id }).catch((err) => {
+		if (import.meta.env.DEV) console.error('Failed to sync themePreference to server:', err);
+	});
 }
 
 function createThemeStore() {
@@ -110,6 +124,24 @@ function createThemeStore() {
 			}
 			themeId = id;
 			applyTheme(current, id);
+			// Sync to the server (fail-soft) so the choice follows the user across devices (T9/D2).
+			persistThemeToServer(id);
+		},
+
+		/**
+		 * Reconcile the persisted theme id against the SERVER value on settings hydrate (T9/D2). Server wins
+		 * for cross-device correctness: if the server's themePreference differs from the local mirror, adopt
+		 * it (update the mirror + re-apply) — but do NOT re-push (the server already has it; that's the whole
+		 * point of server-wins). A no-op when they already agree or the server value is absent/empty. Called
+		 * from settingsStore.load() (root layout) after the settings fetch.
+		 */
+		reconcileServerTheme(serverThemeId: string | null | undefined) {
+			if (!serverThemeId || serverThemeId === themeId) return;
+			if (browser) {
+				localStorage.setItem(THEME_ID_KEY, serverThemeId);
+			}
+			themeId = serverThemeId;
+			applyTheme(current, serverThemeId);
 		}
 	};
 }

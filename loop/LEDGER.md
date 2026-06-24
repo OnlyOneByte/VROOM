@@ -119,14 +119,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 191 |
+| feature | 4 | 195 |
 | deep-review | 5 | 193 |
 | guard | 6 | 190 |
 | bug | 3 | 173 |
 | arch | 5 | 194 |
 | infra | 6 | 192 |
 
-Current cycle: **194**
+Current cycle: **195**
 
 > **NOTE (C174): feature is UNBLOCKED and now BUILDING. 3 specs greenlit by Angelo 2026-06-24 (theming/
 > money-cents/trips, restored C167). C174 began the theming-engine build at T1 (the additive
@@ -139,6 +139,25 @@ Current cycle: **194**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C195 (bug-scout DRY [precondition] → pivot to feature: theming-engine T9 — server sync + hydrate reconcile; Phase 3 COMPLETE)** —
+  Balance recompute (cycle 195): bug most-starved (22/3 = 7.33×) but provably dry (only theming UI plumbing changed
+  since the C183 scout, 14th consecutive — C194 test-only) → scout is ceremony. Recorded the bug-scout DRY and took
+  the highest-leverage open item = feature T9 (AT budget 4/4, the active greenlit theming build, unblocked: it
+  wires the C179 settings field to the C191 store). **Built theming-engine T9:** (1) added `themePreference?` to the
+  `UserSettings` FE type (mirrors the C174/C179 server field). (2) `setTheme` now pushes `themePreference` to the
+  settings PUT via `persistThemeToServer` — FAIL-SOFT (not awaited + rejection swallowed, so a network/auth error
+  can NEVER revert/blank the just-picked theme; the local mirror is the session source of truth, the server is
+  best-effort durability). (3) new `themeStore.reconcileServerTheme(serverThemeId)` — the server-wins hydrate:
+  `settingsStore.load()` calls it after the settings fetch; a server value differing from the mirror is adopted
+  (mirror + data-theme updated) and NOT re-pushed (server already has it), equal/absent is a no-op. The store→
+  settings-api dep is a service import (no store↔store cycle); settings store→theme store is a clean one-way edge.
+  +tests (theme-server-sync.test.ts, +8): setTheme pushes, fail-soft rejection doesn't revert, reconcile adopts a
+  differing server value / doesn't re-push / no-ops on equal+absent. VERIFY: frontend validate:local GREEN
+  (svelte-check 0 errors, build OK, 808 pass / 0 fail [+8]). Store-logic wiring (unit-tested vs mocked settingsApi),
+  no rendered surface (setTheme isn't UI-bound until the picker T10) → no shot. Ticked tasks.md T9. **theming Phase 3
+  (store generalization + wiring, T8–T9) is COMPLETE — the engine is fully built + server-synced; Phase 4 is the
+  picker UI (T10), GATED on the `instrument` palette (Angelo design call) since a picker needs a 2nd theme to pick.**
+  cov: be 88.39% / fe 88.65% (~ — store wiring, fully unit-covered). (Bug stays 173 — provably-dry cold vein.)
 - **C194 (bug-scout DRY [precondition] → pivot to arch: converge `seedVehicle` wave 9, the vehicles nickname pair — completes the vehicles domain)** —
   Balance recompute (cycle 194): bug most-starved (21/3 = 7.0×) but provably dry (only theming UI plumbing changed
   since the C183 scout, 13th consecutive — C193 test-only) → scout is ceremony. Recorded the bug-scout DRY and
