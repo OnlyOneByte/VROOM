@@ -107,12 +107,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 174 |
 | deep-review | 5 | 175 |
-| guard | 6 | 172 |
+| guard | 6 | 178 |
 | bug | 3 | 173 |
 | arch | 5 | 177 |
 | infra | 6 | 176 |
 
-Current cycle: **177**
+Current cycle: **178**
 
 > **NOTE (C174): feature is UNBLOCKED and now BUILDING. 3 specs greenlit by Angelo 2026-06-24 (theming/
 > money-cents/trips, restored C167). C174 began the theming-engine build at T1 (the additive
@@ -125,6 +125,28 @@ Current cycle: **177**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C178 (bug-scout DRY [verified firsthand] → pivot to guard: pin the reminder split-config cross-tenant defense end-to-end)** —
+  Balance recompute (cycle 178): bug the ONLY category strictly over budget (5/3 = 1.67×). Owed a GENUINE fresh
+  scout (last cycle was dry-then-pivot), so scouted the GUIDE write-path validation-asymmetry gold seam on an
+  un-recently-certified surface: the **reminder split-config vehicleId** path (#88 family — an FK in a JSON blob
+  that can bypass the junction ownership check). Hypothesis: a PUT could smuggle a foreign vehicle via
+  `expenseSplitConfig.vehicleIds` while omitting top-level `vehicleIds` (which alone is ownership-checked).
+  **VERIFIED FIRSTHAND via a real createTestApp HTTP probe** (created an expense reminder on an owned vehicle +
+  a second user's vehicle seeded directly): the path is **CLEAN** — defended in DEPTH by two layers: (a) the PUT's
+  merge+re-parse runs `createReminderSchema` on `{existing.vehicleIds, ...partial}`, so the split-vs-vehicleIds
+  MATCH invariant rejects a foreign blob when vehicleIds is omitted (400 "Split config vehicle IDs must match
+  vehicleIds"); (b) when vehicleIds IS sent, `validateVehicleIdsOwned` rejects it (400 "Vehicles not found or not
+  owned"). Nothing leaked. NO fresh defect → recorded DRY (a verified-clean scout, not assumed). **Per the
+  C122/C163 discipline (bug forced but dry → pivot the substantive work to the co-productive guard vein, AT budget
+  6/6), pinned the real gap the scout surfaced:** the HTTP-level COMPOSITION of these two layers had no test —
+  existing coverage is (b) standalone (reminders-http.test.ts:106) + the match invariant at the schema-UNIT level
+  (reminder-refinements.test.ts:146), but nothing drove a foreign id reachable ONLY through the split blob at the
+  route boundary. +1 in reminders-http.test.ts: a PUT with a foreign vehicle in the split config (vehicleIds
+  omitted) → 4xx, the explicit-both variant → 4xx, and the junction still holds ONLY the owned vehicle (no leak).
+  NON-VACUITY PROVEN: neutering the `refineSplitConfig` match-check (the #88-class defense) turns exactly this
+  guard RED; restored validation.ts byte-identical. VERIFY: backend validate:local GREEN (tsc 0, musl-biome clean,
+  1810 pass / 0 fail [+1], build bundled). Test-only → no shot. cov: be 88.39% / fe 88.44% (~ — HTTP-harness guard,
+  no prod line). The #88-family split-config cross-tenant surface on the reminder PUT path is now drift-protected.
 - **C177 (bug-scout DRY → pivot to arch: converge `seedVehicle` wave 6, the expenses make-param + nickname-optional pair — completes the expenses domain)** —
   Balance recompute (cycle 177): bug most-starved over budget (4/3 = 1.33×), arch next (6/5 = 1.20×). Took bug
   first: checked #140 (the queue's standing "clean one-edit, eyes-on-deferred" candidate) — it's ALREADY FIXED +

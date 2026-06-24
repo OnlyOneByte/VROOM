@@ -118,6 +118,62 @@ describe('reminders HTTP routes', () => {
     expect(res.status).toBeLessThan(500);
   });
 
+  // C178 (guard): a PUT must not be able to smuggle a foreign vehicleId in ONLY through the
+  // `expenseSplitConfig` JSON blob while OMITTING top-level `vehicleIds`. The blob carries its own
+  // vehicleIds (the #88 footgun family: an FK in a JSON column that bypasses the junction ownership
+  // check). It's defended in DEPTH by TWO layers that this pins compose end-to-end at the HTTP boundary:
+  //   (a) the merge+re-parse runs `createReminderSchema` on {existing.vehicleIds, ...partial}, so the
+  //       split-config-vs-vehicleIds MATCH invariant rejects a config that names anything but the
+  //       (owned) existing vehicleIds when vehicleIds is omitted; and
+  //   (b) when vehicleIds IS sent, validateVehicleIdsOwned rejects the foreign id outright.
+  // Existing tests cover (b) standalone + the match invariant at the schema-UNIT level; neither drives
+  // this HTTP composition (a foreign id reachable ONLY via the split blob). A regression that moved the
+  // split match-check behind an `if (vehicleIds)` that the merge doesn't satisfy would reopen #88-class.
+  test('PUT cannot attach a foreign vehicle via expenseSplitConfig alone (omitting vehicleIds)', async () => {
+    const owned = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    // A second user's vehicle, seeded directly (cross-tenant).
+    ctx.sqlite.run(
+      "INSERT INTO users (id, email, display_name) VALUES ('u2', 'u2@example.com', 'U2')"
+    );
+    ctx.sqlite.run(
+      "INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('foreign-veh', 'u2', 'Foreign', 'Car', 2020)"
+    );
+    const created = await ctx.authed('POST', '/api/v1/reminders', {
+      name: 'Recurring wash',
+      type: 'expense',
+      actionMode: 'automatic',
+      expenseCategory: 'maintenance',
+      frequency: 'monthly',
+      triggerMode: 'time',
+      startDate: '2024-01-01T00:00:00.000Z',
+      vehicleIds: [owned],
+      expenseAmount: 100,
+    });
+    const id = (await json<DataEnvelope<ReminderWithJoins>>(created)).data.reminder.id;
+
+    // (a) Foreign vehicle ONLY in the split blob, vehicleIds omitted → the merged-parse match invariant
+    //     (split IDs must equal the existing OWNED vehicleIds) rejects it.
+    const viaBlob = await ctx.authed('PUT', `/api/v1/reminders/${id}`, {
+      expenseSplitConfig: { method: 'even', vehicleIds: ['foreign-veh'] },
+    });
+    expect(viaBlob.status).toBeGreaterThanOrEqual(400);
+    expect(viaBlob.status).toBeLessThan(500);
+
+    // (b) Foreign vehicle in BOTH vehicleIds and the matching blob → the ownership gate rejects it.
+    const viaBoth = await ctx.authed('PUT', `/api/v1/reminders/${id}`, {
+      vehicleIds: ['foreign-veh'],
+      expenseSplitConfig: { method: 'even', vehicleIds: ['foreign-veh'] },
+    });
+    expect(viaBoth.status).toBeGreaterThanOrEqual(400);
+    expect(viaBoth.status).toBeLessThan(500);
+
+    // NOTHING leaked: the junction still holds only the owned vehicle, no foreign id persisted.
+    const junction = ctx.sqlite
+      .query('SELECT vehicle_id FROM reminder_vehicles WHERE reminder_id = ?')
+      .all(id) as { vehicle_id: string }[];
+    expect(junction.map((r) => r.vehicle_id)).toEqual([owned]);
+  });
+
   test('anonymous access is unauthorized', async () => {
     const res = await ctx.anon('GET', '/api/v1/reminders');
     expect(res.status).toBe(401);

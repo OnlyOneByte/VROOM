@@ -664,6 +664,15 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C178 — the reminder split-config cross-tenant defense, end-to-end (NORTH_STAR #2, #88 family).** A
+> C178 bug-scout VERIFIED FIRSTHAND (real HTTP probe) that a PUT cannot smuggle a foreign vehicle via
+> `expenseSplitConfig.vehicleIds` while omitting top-level `vehicleIds` — defended in depth by (a) the merge+
+> re-parse's split-vs-vehicleIds MATCH invariant (merge fills the existing OWNED ids → foreign blob 400s) and
+> (b) `validateVehicleIdsOwned` when vehicleIds IS sent. CLEAN, no defect. But the HTTP composition had no test
+> (existing: (b) standalone + the match invariant at schema-unit level). +1 in reminders-http.test.ts: foreign
+> vehicle in the split blob alone → 4xx, explicit-both → 4xx, junction holds only the owned vehicle (no leak).
+> Non-vacuous (neuter the match-check → RED). Don't re-add.
+
 > **GUARDED C172 — tree-wide validate-before-persist for the #62/#109/#125/#145 financing-source-link class.**
 > The within-tenant integrity class (a forged `{sourceType:'financing', sourceId}` mis-attributes a row as a loan
 > payment → understates the displayed balance, computeBalance's exact predicate; NORTH_STAR #1) is closed across all
