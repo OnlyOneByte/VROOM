@@ -123,10 +123,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 193 |
 | guard | 6 | 196 |
 | bug | 3 | 173 |
-| arch | 5 | 197 |
+| arch | 5 | 198 |
 | infra | 6 | 192 |
 
-Current cycle: **197**
+Current cycle: **198**
 
 > **NOTE (C174): feature is UNBLOCKED and now BUILDING. 3 specs greenlit by Angelo 2026-06-24 (theming/
 > money-cents/trips, restored C167). C174 began the theming-engine build at T1 (the additive
@@ -138,7 +138,31 @@ Current cycle: **197**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
-## Cycle log
+- **C198 (bug-scout DRY → deep-review scout [SATURATED, caught a near-miss] → pivot to arch: converge `seedVehicle` wave 11, the make-param pair)** —
+  Balance recompute (cycle 198): bug most-starved (25/3 = 8.33×) but provably dry (only theming code changed since
+  the C183 scout, 17th consecutive — C197 test-only) → scout ceremony, recorded DRY. deep-review + infra both AT
+  budget; infra cadence isn't due (C192, ~C202), so opened a DEEP-REVIEW on a NON-theming surface (deep-reviews had
+  gone theming-heavy). **Scouted firsthand + found the surface SATURATED:** restore FK-ordering (guarded C13),
+  split-amount cents-exactness (property-tested), themePreference round-trips (C180/C193) all already certified.
+  Probed the #94 fleet-pooling class on `buildMonthlyConsumption` and **NEARLY committed a characterization
+  asserting it pools unit-blind — then CAUGHT THE ERROR firsthand:** BACKLOG says #94 monthlyConsumption was CLOSED
+  at C65, and the source confirms it (repository.ts:636 `buildMonthlyConsumptionConverted` converts per-vehicle
+  volume before pooling for a mixed fleet; the pure builder is unit-blind BY DESIGN because conversion happens
+  upstream), with the invariant ALREADY guarded (fuel-stats-fleet-distance-pooling.test.ts:349 "volume is converted
+  to the user unit before pooling on a MIXED gal+L fleet"). My isolated-builder probe mischaracterized
+  closed-and-correct code as broken — REVERTED the test before commit (verified the file is byte-identical to HEAD).
+  Per the GUIDE "don't manufacture churn; verify firsthand, no clean pick → record + pivot," recorded the
+  deep-review as a no-fresh-target sweep (deep-review NOT bumped — it produced no artifact) and pivoted the
+  substantive work to ARCH (the Angelo-approved seedVehicle convergence). **Wave 11 = the remaining make-param
+  pair** (odometer/update-route make-default Honda Civic 2021 + insurance/premium-expense-hook make-param model
+  'Test' 2022): both converged onto the shared test-helpers/seed via a thin make wrapper preserving the exact prior
+  payload. Behavior-preserving (green→green): both suites 15/15 pass; full backend validate:local GREEN (tsc 0,
+  musl-biome clean, 1823 pass / 0 fail — UNCHANGED count, pure test-helper refactor, build bundled). Net −6 LOC.
+  Test-only → no shot. **Progress: 45 of ~51 files converged**; REMAINING (2 + the distinct helper):
+  expenses-source-traceability (+ its seedVehicleWithFinancing), google-sheets-service. cov: be 88.39% / fe 88.65%
+  (~ — test-helper refactor, no prod line). LESSON (re-affirmed): a "HIGH"/escalation a deep-review surfaces can be
+  ALREADY-CLOSED — check the BACKLOG closed-notes + the real call path before pinning a "characterization." (Bug
+  stays 173 — provably-dry cold vein.)
 - **C197 (bug-scout DRY [precondition] → pivot to arch: converge `seedVehicle` wave 10, the analytics pair — completes the analytics domain)** —
   Balance recompute (cycle 197): bug most-starved (24/3 = 8.0×) but provably dry (only theming UI plumbing + store
   wiring changed since the C183 scout, 16th consecutive — C196 test-only) → scout is ceremony. Recorded the

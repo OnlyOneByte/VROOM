@@ -23,6 +23,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle as seedVehicleShared } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -31,12 +32,11 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-async function seedVehicle(make: string): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', { make, model: 'Test', year: 2022 });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
+// This file's fixtures are make-only ("Honda"/"Toyota"/"Mazda" with a constant model/year); converge onto
+// the shared test-helpers/seed seedVehicle (arch convergence, Angelo-approved) via a thin make wrapper that
+// preserves the exact prior payload (model 'Test', year 2022) so behavior is unchanged.
+const seedVehicle = (make: string): Promise<string> =>
+  seedVehicleShared(ctx, { make, model: 'Test', year: 2022 });
 
 interface PolicyRow {
   id: string;

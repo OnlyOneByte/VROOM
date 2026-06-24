@@ -22,6 +22,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle as seedVehicleShared } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -30,12 +31,11 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-async function seedVehicle(make = 'Honda'): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', { make, model: 'Civic', year: 2021 });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
+// This file's fixture is a make-param Honda (default) Civic 2021; converge onto the shared test-helpers/seed
+// seedVehicle (arch convergence, Angelo-approved) via a thin make wrapper preserving the exact prior payload
+// (model 'Civic', year 2021) so behavior is unchanged (the shared default is a Camry).
+const seedVehicle = (make = 'Honda'): Promise<string> =>
+  seedVehicleShared(ctx, { make, model: 'Civic', year: 2021 });
 
 interface OdometerEntry {
   id: string;
