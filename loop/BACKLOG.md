@@ -151,6 +151,14 @@ shot.sh eyes-on works — the "Playwright-blocked" tail was a ~200-cycle MISDIAG
 re-audit a data-safety write path, certify it CLEAN against source, and leave a merge-surviving guard.
 Don't trust agent "HIGH" findings — verify firsthand (the archive logged many debunked false-positives).)*
 
+> **CERTIFIED C186 — the theming token-contract chain is airtight end-to-end + the @theme-alias link is now guarded.**
+> A C186 deep-review (pivot from a ceremony bug scout) certified firsthand the full chain: app.css `:root`/`.dark`
+> (32 keys) ≡ THEME_TOKEN_KEYS (C181) ≡ `default` registry (C185) ≡ the `@theme inline` Tailwind `--color-*` aliases
+> (32, 1:1). The last un-pinned link — every `--color-<x>: var(--raw)` references an engine-MANAGED raw token (else
+> a theme switch leaves the alias stale, a visual leak) — is now guarded: theme-token-keys.test.ts (+2) parses the
+> @theme block + asserts each aliased raw token is in THEME_TOKEN_KEYS. Non-vacuous (inject a rogue `--color-*`
+> alias → RED). The C181+C185+C186 triad drift-protects the whole token contract. Don't re-audit.
+
 > **CERTIFIED C180 — the theming-persistence arc (C174+C175+C179) round-trips through backup→restore CLEAN.** A
 > C180 deep-review (pivot from a verified-dry insurance-claims bug scout) certified firsthand that a user's
 > `themePreference` survives the TRUE `exportAsZip → restoreFromBackup('replace')` stack: it rides the

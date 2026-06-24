@@ -59,3 +59,38 @@ describe('THEME_TOKEN_KEYS mirrors the app.css per-variant token set (T4)', () =
     expect(new Set(THEME_TOKEN_KEYS).size).toBe(THEME_TOKEN_KEYS.length);
   });
 });
+
+/**
+ * C186 (deep-review) — the `@theme inline` Tailwind color aliases must reference ONLY engine-managed raw
+ * tokens. app.css maps each Tailwind color utility via `--color-<x>: var(--<rawToken>)`. The theme engine
+ * (T7) swaps the RAW tokens per `data-theme`; a Tailwind utility re-resolves through its `--color-*` alias.
+ * So if a `--color-foo: var(--foo)` alias references a raw token NOT in THEME_TOKEN_KEYS, switching themes
+ * would leave `--color-foo` resolving to a stale/unmanaged value — a visual leak the registry/token guards
+ * can't see. Certified firsthand (C186) that today all 32 color aliases map 1:1 onto the 32 managed keys;
+ * this pins it so a NEW Tailwind color alias (a routine app.css edit) can't land without adding its raw
+ * token to the engine (THEME_TOKEN_KEYS + the registry).
+ */
+describe('@theme inline color aliases reference only engine-managed tokens (C186)', () => {
+  // The `--color-*: var(--x)` aliases inside the `@theme inline { ... }` block.
+  const themeBlock = APP_CSS.match(/@theme[^{]*\{([\s\S]*?)\}/)?.[1] ?? '';
+  const aliasedRawTokens = new Set<string>();
+  for (const m of themeBlock.matchAll(/--color-[a-z0-9-]+\s*:\s*var\(--([a-z0-9-]+)\)/gim)) {
+    const raw = m[1];
+    if (raw) aliasedRawTokens.add(raw);
+  }
+  const managed = new Set<string>(THEME_TOKEN_KEYS);
+
+  test('the @theme color-alias scan is non-vacuous', () => {
+    expect(aliasedRawTokens.size).toBeGreaterThan(20);
+  });
+
+  test('every --color-* alias points at a THEME_TOKEN_KEYS-managed raw token (no stale-alias leak)', () => {
+    const unmanaged = [...aliasedRawTokens].filter((t) => !managed.has(t));
+    expect(
+      unmanaged,
+      `These Tailwind --color-* aliases reference raw tokens the theme engine does NOT manage — a theme ` +
+        `switch would leave them STALE (a visual leak). Add each to THEME_TOKEN_KEYS + the registry, or ` +
+        `point the alias at a managed token:\n  ${unmanaged.join(', ')}`
+    ).toEqual([]);
+  });
+});

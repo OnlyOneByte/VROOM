@@ -113,13 +113,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 185 |
-| deep-review | 5 | 180 |
+| deep-review | 5 | 186 |
 | guard | 6 | 183 |
 | bug | 3 | 173 |
 | arch | 5 | 182 |
 | infra | 6 | 184 |
 
-Current cycle: **185**
+Current cycle: **186**
 
 > **NOTE (C174): feature is UNBLOCKED and now BUILDING. 3 specs greenlit by Angelo 2026-06-24 (theming/
 > money-cents/trips, restored C167). C174 began the theming-engine build at T1 (the additive
@@ -132,6 +132,23 @@ Current cycle: **185**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C186 (bug-scout DRY [precondition] → pivot to deep-review: certify the theming token-contract chain + pin the @theme-alias↔managed-set link)** —
+  Balance recompute (cycle 186): bug most-starved (13/3 = 4.33×) but the only prod change since the last real scout
+  (C183) is `theme-registry.ts` — pure token DATA, no runtime consumer/logic surface, so a scout there is ceremony.
+  Recorded the bug-scout DRY and pivoted to the co-over-budget DEEP-REVIEW (6/5 = 1.2×) with the freshest target:
+  the T4/T5 theming arc I just built. **Certified the token-contract chain firsthand:** app.css `:root`/`.dark` (32
+  keys) ≡ THEME_TOKEN_KEYS (32, C181 guard) ≡ `default` registry (C185 guard) ≡ the `@theme inline` Tailwind
+  `--color-*` aliases (32). The LAST link — every `--color-<x>: var(--<raw>)` alias references an engine-MANAGED raw
+  token — was the one UN-pinned invariant: a `--color-foo: var(--foo)` alias whose raw token isn't in
+  THEME_TOKEN_KEYS would resolve STALE when T7 swaps `data-theme` (a visual leak the registry/token guards can't
+  see). Verified firsthand: all 32 aliases map 1:1 onto the 32 managed keys — CLEAN, no leak. **GUARD:** extended
+  theme-token-keys.test.ts (+2) — parses the `@theme inline` block, extracts every `--color-*`→`var(--raw)`
+  reference, asserts each raw token is in THEME_TOKEN_KEYS (so a NEW Tailwind color alias — a routine app.css edit —
+  can't land without adding its token to the engine). NON-VACUITY PROVEN: injecting a rogue `--color-rogue:
+  var(--rogue-unmanaged)` turns it RED naming the exact token; app.css restored byte-identical. VERIFY: frontend
+  validate:local GREEN (svelte-check 0 errors, build OK, 773 pass / 0 fail [+2]). Test-only → no shot. cov: be
+  88.39% / fe 88.45% (~ — source-scan guard, no runtime line). The theming token contract is now drift-protected
+  end-to-end (the C181+C185+C186 guard triad). (Bug stays 173 — provably-dry cold vein.)
 - **C185 (bug-scout DRY [precondition] → pivot to feature: theming-engine T5 — the `default` theme registry + identity guard; `instrument` design-gated)** —
   Balance recompute (cycle 185): bug most-starved (12/3 = 4.0×) but the precondition holds — `git diff
   ac5f7e1(C184)..HEAD -- src` is EMPTY (C184 was doc-only), 5th consecutive provably-dry cold vein; re-scanning is
