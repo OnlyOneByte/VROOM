@@ -66,9 +66,13 @@ shot.sh eyes-on works — the "Playwright-blocked" tail was a ~200-cycle MISDIAG
    sibling-merge/>64+empty reject/no-op). T3 DONE (C180): the backup round-trip — themePreference rides the
    schema-derived CSV set + the C174 Sheets header + C175 coerceRow safety; +3 round-trip tests
    (theme-preference-roundtrip.test.ts) certify a non-default theme survives the real
-   exportAsZip→restoreFromBackup stack.** **Phase 1 (backend persistence T1–T3) is COMPLETE + certified. NEXT
-   TASK: T4 — `frontend/src/lib/theme/theme-types.ts` (ThemeId/ThemeMode/ThemeTokenKey/ThemeDefinition; types
-   only, no values)** (tasks.md Phase 2, FE pure). Phase-4 custom-theme authoring is OUT (its own future
+   exportAsZip→restoreFromBackup stack.** **Phase 1 (backend persistence T1–T3) is COMPLETE + certified. T4 DONE
+   (C181): `frontend/src/lib/theme/theme-types.ts` — the type model (ThemeId/ThemeMode[re-exported from the store's
+   ThemePreference]/ThemeTokenKey[the censused 32-key app.css color set]/ThemeTokens/ThemeVariant/ThemeDefinition) +
+   a frozen THEME_TOKEN_KEYS tuple; +5 source-scan guard pinning the keys == the live app.css :root/.dark set.**
+   **NEXT TASK: T5 — `theme-registry.ts`: `default`'s light+dark maps extracted verbatim from app.css (a guard
+   asserts equality → zero visual change) + the first non-default theme (`instrument`, oklch, AA-tuned); the
+   integrity test uses THEME_TOKEN_KEYS** (tasks.md Phase 2). Phase-4 custom-theme authoring is OUT (its own future
    `.kiro/specs/theme-authoring/`). Mocks: `vroom-design-language-option-1-instrument-cluster` + `vroom-redesign-mocks/`.
 
 0. **Vehicle sharing** — **SPEC DRAFTED, BLOCKED on Angelo (D1–D8).** `.kiro/specs/vehicle-sharing/`

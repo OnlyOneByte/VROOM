@@ -105,14 +105,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 179 |
+| feature | 4 | 181 |
 | deep-review | 5 | 180 |
 | guard | 6 | 178 |
 | bug | 3 | 173 |
 | arch | 5 | 177 |
 | infra | 6 | 176 |
 
-Current cycle: **180**
+Current cycle: **181**
 
 > **NOTE (C174): feature is UNBLOCKED and now BUILDING. 3 specs greenlit by Angelo 2026-06-24 (theming/
 > money-cents/trips, restored C167). C174 began the theming-engine build at T1 (the additive
@@ -125,6 +125,25 @@ Current cycle: **180**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C181 (bug-scout DRY [precondition] → pivot to feature: theming-engine T4 — the FE theme type model + token-key census guard)** —
+  Balance recompute (cycle 181): bug most-starved (8/3 = 2.67×) but the precondition holds — `git diff
+  50b78a8(C180)..HEAD -- src` is EMPTY (C180 was test-only), so the cold vein is provably dry; re-scanning is
+  ceremony (C99/C103/C107). Recorded the bug-scout DRY and pivoted to the highest-leverage open item = the active
+  greenlit theming build, now in Phase 2 (pure FE, no UI). **Built theming-engine T4:** `frontend/src/lib/theme/
+  theme-types.ts` — the type model. **Load-bearing census done firsthand:** scanned app.css and found `:root`
+  (light) + `.dark` (dark) declare an IDENTICAL 32-key color-token set; `--radius` is the lone `:root`-only
+  (variant-invariant layout) token → excluded from the per-variant `ThemeTokenKey`. Types: `ThemeId`, `ThemeMode`
+  (RE-EXPORTED from the existing store's `ThemePreference` — single source of truth, not a competing redeclaration),
+  `ThemeTokenKey` (the 32 keys), `ThemeTokens` (full Record), `ThemeVariant`, `ThemeSource`, `ThemeDefinition`
+  (id/label/description/swatch/light/dark/source) + a frozen `THEME_TOKEN_KEYS` tuple (`satisfies readonly
+  ThemeTokenKey[]`). Types only — no values (T5), no registry, no runtime. **GUARD:** theme-token-keys.test.ts (+5)
+  source-scans app.css `:root`/`.dark` and pins light/dark parity + `THEME_TOKEN_KEYS` == the live `.dark` set
+  EXACTLY + `--radius` excluded — so a future token add/remove forces a matching types update (can't silently
+  desync the engine). The guard passing also PROVES the 32 keys were transcribed correctly. VERIFY: frontend
+  validate:local GREEN (svelte-check 0 errors, build OK, 765 pass / 0 fail [+5]). Pure types + source-scan, no UI
+  render → no shot (spec: T4 is types-only). Ticked tasks.md T4. **NEXT: T5** (theme-registry.ts — `default`'s
+  light+dark maps extracted verbatim from app.css + the first non-default theme `instrument`; the T5 integrity test
+  uses `THEME_TOKEN_KEYS`). cov: be 88.39% / fe 88.44% (~ — types + a source-scan guard, no runtime line).
 - **C180 (bug-scout DRY [verified firsthand] → pivot to deep-review: certify the theming-persistence backup round-trip = theming-engine T3)** —
   Balance recompute (cycle 180): bug most-starved (7/3 = 2.33×). The precondition flipped vs C179 — C179 CHANGED
   production source (settings/routes.ts), so a scout is non-ceremonial this time. Scouted a genuinely fresh write-path

@@ -42,9 +42,16 @@
       the two non-default tests RED). `bun run validate:local` GREEN (1820 pass).
 
 ## Phase 2 — theme model + registry + resolver (frontend, pure, no UI)
-- [ ] **T4** `frontend/src/lib/theme/theme-types.ts` — `ThemeId`, `ThemeMode`, `ThemeTokenKey` (the
-      EXACT set of custom properties `app.css` declares), `ThemeTokens`, `ThemeVariant`,
-      `ThemeDefinition` (id/label/description/swatch/light/dark/source). No values yet; types only.
+- [x] **T4 (C181)** `frontend/src/lib/theme/theme-types.ts` — `ThemeId`, `ThemeMode` (re-exported from
+      the existing store's `ThemePreference` = the single source of truth, not redeclared), `ThemeTokenKey`
+      (the EXACT 32-key per-variant color set `app.css` declares — censused firsthand: `:root` and `.dark`
+      declare an identical 32-key set; `--radius` is `:root`-only/variant-invariant → excluded),
+      `ThemeTokens` (full Record), `ThemeVariant` (light+dark), `ThemeSource`, `ThemeDefinition`
+      (id/label/description/swatch/light/dark/source). + a frozen `THEME_TOKEN_KEYS` const tuple
+      (`satisfies readonly ThemeTokenKey[]`). Types only, no values/registry/runtime. GUARD:
+      theme-token-keys.test.ts (+5) source-scans app.css `:root`/`.dark` and pins light/dark parity +
+      `THEME_TOKEN_KEYS` == the live set exactly + `--radius` excluded (the merge-surviving net so a token
+      add/remove can't silently desync the engine). FE validate:local GREEN (svelte-check 0, 765 pass).
 - [ ] **T5** `theme-registry.ts` — `THEME_REGISTRY`. `default`'s light+dark token maps **extracted
       verbatim from the current `app.css`** (a guard test asserts they equal the live `:root`/`.dark`
       values → zero visual change for existing users + catches baseline drift). Add the FIRST
