@@ -720,6 +720,14 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C196 — the T9 settingsStore.load() → reconcileServerTheme WIRING (NORTH_STAR #2, cross-device sync).**
+> C195's theme-server-sync.test.ts pins reconcileServerTheme in ISOLATION; nothing drove load() + asserted it
+> invokes the reconcile with the fetched settings.themePreference. A refactor dropping that line silently breaks
+> cross-device theme sync with every test green. +2 in settings-state-contract.test.ts (the load()-contract harness):
+> drives the REAL load() with a mocked GET carrying a non-default themePreference + asserts the theme store adopted
+> it end-to-end (themeId + data-theme); + a no-op (absent server value → local mirror wins). Non-vacuous (drop the
+> reconcile call from load() → RED). Don't re-add.
+
 > **GUARDED C190 — the app.html anti-FOUC head-script ↔ theme-store contract (NORTH_STAR #3, no-FOUC).** The
 > inline `<script>` in app.html runs before first paint, reading `localStorage('vroom-theme-preference')` + adding
 > the `dark` class — duplicating four constants the theme store owns (STORAGE_KEY, the `dark` class, the `system`

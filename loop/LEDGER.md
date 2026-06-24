@@ -121,12 +121,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 195 |
 | deep-review | 5 | 193 |
-| guard | 6 | 190 |
+| guard | 6 | 196 |
 | bug | 3 | 173 |
 | arch | 5 | 194 |
 | infra | 6 | 192 |
 
-Current cycle: **195**
+Current cycle: **196**
 
 > **NOTE (C174): feature is UNBLOCKED and now BUILDING. 3 specs greenlit by Angelo 2026-06-24 (theming/
 > money-cents/trips, restored C167). C174 began the theming-engine build at T1 (the additive
@@ -139,6 +139,21 @@ Current cycle: **195**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C196 (bug-scout DRY [precondition] → pivot to guard: pin the T9 settingsStore.load() → reconcileServerTheme wiring)** —
+  Balance recompute (cycle 196): bug most-starved (23/3 = 7.67×) but provably dry (only theming UI plumbing + store
+  wiring changed since the C183 scout, 15th consecutive — C195 store-logic/test-only) → scout is ceremony. Recorded
+  the bug-scout DRY and pivoted to the co-over-budget GUARD (6/6, the only other category at/over). **The gap C195
+  left:** theme-server-sync.test.ts (C195) pins `reconcileServerTheme` in ISOLATION (calling it directly), but
+  NOTHING drove `settingsStore.load()` + asserted it actually invokes the reconcile with the fetched
+  `settings.themePreference`. A refactor dropping that one line from load() would silently break cross-device theme
+  sync (NORTH_STAR #2) with every existing test green — the classic unit-covered-but-wiring-unguarded seam. **GUARD:**
+  +2 in settings-state-contract.test.ts (the store→settings-api→fetch[mocked] harness that owns load() contracts) —
+  drives the REAL load() with a mocked GET returning a non-default themePreference + asserts the THEME store adopted
+  it end-to-end (themeId + data-theme = 'instrument'); + a no-op case (absent server value → local mirror wins).
+  NON-VACUITY PROVEN: dropping the reconcileServerTheme call from load() turns the adopt test RED; settings.svelte.ts
+  restored byte-identical. VERIFY: frontend validate:local GREEN (svelte-check 0, build OK, 810 pass / 0 fail [+2]).
+  Test-only → no shot. cov: be 88.39% / fe 88.65% (~ — store-wiring integration pin, no prod line). The theming
+  engine's server-sync seam is now guarded end-to-end (unit C195 + wiring C196). (Bug stays 173 — provably-dry cold vein.)
 - **C195 (bug-scout DRY [precondition] → pivot to feature: theming-engine T9 — server sync + hydrate reconcile; Phase 3 COMPLETE)** —
   Balance recompute (cycle 195): bug most-starved (22/3 = 7.33×) but provably dry (only theming UI plumbing changed
   since the C183 scout, 14th consecutive — C194 test-only) → scout is ceremony. Recorded the bug-scout DRY and took
