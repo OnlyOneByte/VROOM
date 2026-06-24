@@ -162,6 +162,44 @@ describe('GoogleSheetsService.readSpreadsheetData', () => {
     expect(data.vehicles[0].model).toBe('Civic');
     expect(data.metadata.userId).toBe(ctx.user.id);
   });
+
+  // C193 (deep-review): certify the C174 `themePreference` column survives the GOOGLE SHEETS round-trip.
+  // C180 certified the ZIP/CSV path (exportAsZip → restoreFromBackup); the Sheets path is a DISTINCT
+  // serializer (formatValue → grid → parseValue → coerceRow) with its own hazards (parseValue('')→null,
+  // numeric-looking ids), and it was never asserted for themePreference. themePreference rides
+  // SHEET_HEADERS (C174) on export + TABLE_SCHEMA_MAP coerce on restore; this drives the REAL fake-Sheets
+  // create→read chain to prove a non-default theme id makes the full round trip intact (NORTH_STAR #1).
+  test('a non-default themePreference survives the Sheets export→read round-trip (C174/C193)', async () => {
+    await seedVehicle('Honda', 'Civic', 2019); // a vehicle so readSpreadsheetData resolves the userId
+    const { db } = await import('../../../../db/connection');
+    const schema = await import('../../../../db/schema');
+    // Seed the user's prefs row with a NON-default theme (the value that must survive).
+    await db.insert(schema.userPreferences).values({
+      userId: ctx.user.id,
+      themePreference: 'instrument',
+    });
+
+    const svc = makeSvc();
+    const info = await svc.createOrUpdateVroomSpreadsheet(
+      ctx.user.id,
+      'VROOM/Backups',
+      'Demo User'
+    );
+
+    // The exported User Preferences sheet carries the themePreference header + value...
+    const grid = store.spreadsheets.get(info.id)?.values.get('User Preferences');
+    const headerRow = grid?.[0] ?? [];
+    const themeCol = headerRow.indexOf('themePreference');
+    expect(themeCol, 'themePreference column present in the Sheets export').toBeGreaterThanOrEqual(
+      0
+    );
+    expect(grid?.[1]?.[themeCol]).toBe('instrument');
+
+    // ...and it reads back as exactly 'instrument' (formatValue→parseValue leaves the string as-is).
+    const data = await svc.readSpreadsheetData(info.id);
+    expect(data.userPreferences).toHaveLength(1);
+    expect(data.userPreferences[0].themePreference).toBe('instrument');
+  });
 });
 
 describe('GoogleSheetsService — formula-injection safety (#36)', () => {

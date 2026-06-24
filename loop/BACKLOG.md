@@ -164,6 +164,14 @@ shot.sh eyes-on works — the "Playwright-blocked" tail was a ~200-cycle MISDIAG
 re-audit a data-safety write path, certify it CLEAN against source, and leave a merge-surviving guard.
 Don't trust agent "HIGH" findings — verify firsthand (the archive logged many debunked false-positives).)*
 
+> **CERTIFIED C193 — themePreference survives the GOOGLE SHEETS backup round-trip (NORTH_STAR #1).** C180 covered
+> the ZIP/CSV path; the Sheets path is a distinct serializer (formatValue → grid → parseValue → coerceRow). A C193
+> deep-review verified firsthand (the real fake-Sheets create→read chain) that a non-default `instrument` theme
+> survives intact — export grid carries the SHEET_HEADERS column + readSpreadsheetData reads it back as 'instrument'
+> (the C175 coerceRow fix protects the Sheets restore too, via TABLE_SCHEMA_MAP). +1 in google-sheets-service.test.ts;
+> complementary to the C211 header-coverage guard (header EXISTS) — this pins the VALUE survives read-back.
+> Non-vacuous (drop the header → RED). themePreference now certified on BOTH backup paths. Don't re-audit.
+
 > **CERTIFIED C186 — the theming token-contract chain is airtight end-to-end + the @theme-alias link is now guarded.**
 > A C186 deep-review (pivot from a ceremony bug scout) certified firsthand the full chain: app.css `:root`/`.dark`
 > (32 keys) ≡ THEME_TOKEN_KEYS (C181) ≡ `default` registry (C185) ≡ the `@theme inline` Tailwind `--color-*` aliases

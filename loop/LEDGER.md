@@ -120,13 +120,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 191 |
-| deep-review | 5 | 186 |
+| deep-review | 5 | 193 |
 | guard | 6 | 190 |
 | bug | 3 | 173 |
 | arch | 5 | 188 |
 | infra | 6 | 192 |
 
-Current cycle: **192**
+Current cycle: **193**
 
 > **NOTE (C174): feature is UNBLOCKED and now BUILDING. 3 specs greenlit by Angelo 2026-06-24 (theming/
 > money-cents/trips, restored C167). C174 began the theming-engine build at T1 (the additive
@@ -139,6 +139,24 @@ Current cycle: **192**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C193 (bug-scout DRY [precondition] → pivot to deep-review: certify the themePreference GOOGLE SHEETS round-trip)** —
+  Balance recompute (cycle 193): bug most-starved (20/3 = 6.67×) but provably dry (only theming UI plumbing changed
+  since the C183 scout, 12th consecutive — C192 doc-only) → scout is ceremony. Recorded the bug-scout DRY and
+  pivoted to the co-over-budget DEEP-REVIEW (7/5 = 1.4×, highest over-budget after the dry bug). **Fresh target the
+  C174–C180 arc left:** C180 certified themePreference survives the ZIP/CSV backup round-trip, but the GOOGLE SHEETS
+  path is a DISTINCT serializer (formatValue → grid → parseValue → coerceRow) with its own hazards (parseValue('')
+  →null, numeric-looking ids) and was NEVER certified for the C174 column. **Verified firsthand:** the Sheets export
+  includes themePreference via SHEET_HEADERS (C174) + the restore coerces it via TABLE_SCHEMA_MAP (so the C175
+  NOT-NULL-default fix protects it too); drove the REAL fake-Sheets create→read chain — a non-default `instrument`
+  theme survives intact (export grid carries the header+value; readSpreadsheetData reads it back as 'instrument').
+  CLEAN, no defect. **GUARD:** +1 in google-sheets-service.test.ts (the existing fake-seam round-trip harness) —
+  seeds a userPreferences row with a non-default theme, asserts the export grid carries it AND readSpreadsheetData
+  round-trips it. Complementary to the C211 sheets-header-coverage guard (that pins the header EXISTS; this pins the
+  VALUE survives read-back). NON-VACUITY PROVEN: dropping themePreference from SHEET_HEADERS turns the cert RED;
+  restored byte-identical. VERIFY: backend validate:local GREEN (tsc 0, musl-biome clean, 1823 pass / 0 fail [+1],
+  build bundled). Test-only → no shot. cov: be 88.39% / fe 88.65% (~ — fake-seam round-trip cert, no prod line).
+  The themePreference persistence arc is now certified on BOTH backup paths (CSV C180 + Sheets C193). (Bug stays
+  173 — provably-dry cold vein.)
 - **C192 (infra — branch-hygiene sweep + coverage re-measure; cadence, last MEASURED C184)** —
   Balance recompute (cycle 192): bug most-starved (19/3 = 6.33×) but provably dry (only theming UI plumbing changed
   since the C183 scout, 11th consecutive — no backend write-path/money/date gold seam) → scout is ceremony. Among
