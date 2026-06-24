@@ -109,10 +109,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 180 |
 | guard | 6 | 178 |
 | bug | 3 | 173 |
-| arch | 5 | 177 |
+| arch | 5 | 182 |
 | infra | 6 | 176 |
 
-Current cycle: **181**
+Current cycle: **182**
 
 > **NOTE (C174): feature is UNBLOCKED and now BUILDING. 3 specs greenlit by Angelo 2026-06-24 (theming/
 > money-cents/trips, restored C167). C174 began the theming-engine build at T1 (the additive
@@ -125,6 +125,26 @@ Current cycle: **181**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C182 (bug-scout DRY [verified firsthand] → pivot to arch: converge `seedVehicle` wave 7, the financing domain pair)** —
+  Balance recompute (cycle 182): bug most-starved + heavily forcing (9/3 = 3.0×); arch + infra AT budget (5/5, 6/6).
+  C181 changed prod source but it was a types-only file (theme-types.ts, no runtime defect surface), so rather than
+  auto-dry at 3.0× I did a GENUINE firsthand scout on an un-recently-audited write path (GUIDE validation-asymmetry
+  seam): the **odometer** routes (the #68/#76/#180 getCurrentOdometer family). **VERIFIED CLEAN firsthand:** every
+  path is ownership-gated (validateVehicleOwnership / validateOdometerOwnership); POST+PUT both recheck mileage
+  reminders; the repo UNION-ALL legs are userId-scoped (vehicleScope = `vehicle_id AND user_id`, #48); and the PUT's
+  `BaseRepository.update(id)` is id-only BUT guarded by a preceding `validateOdometerOwnership(id,user.id)` that
+  404s a cross-tenant id before any write. No asymmetry, no leak, no fresh defect. Per C122/C163 (verified-dry bug →
+  pivot the substantive work), pivoted to ARCH (AT budget; infra cadence not due till ~C186) with a concrete
+  Angelo-approved pick: the seedVehicle convergence. **Wave 7 = the financing domain pair** (financing-deactivate-hook
+  + financing-get-contract): both hand-redeclared a byte-identical local `seedVehicle(nickname)` → Honda Civic 2022,
+  so one mechanical rule converges both onto the shared test-helpers/seed via a thin nickname wrapper (make/model/year
+  explicit — the shared default is a Camry). Behavior-preserving (green→green): both suites 9/9 pass; full backend
+  validate:local GREEN (tsc 0, musl-biome clean, 1820 pass / 0 fail — UNCHANGED count, pure test-helper refactor,
+  build bundled). Net −10 LOC. Test-only → no shot. **Progress: 37 of ~51 files converged**; REMAINING (~11): analytics
+  (analytics-routes-http, vehicle-tco-zero-state), expenses (expense-source-traceability + its seedVehicleWithFinancing),
+  insurance premium-expense-hook, odometer update-route, photos entity-ownership-gate, google-sheets-service, vehicles
+  (delete-cascade no-arg, photo-routes-http, list-financing-contract, stats-current-odometer). cov: be 88.39% / fe
+  88.44% (~ — test-helper refactor, no prod line). (Bug stays at 173 — a provably/verified-dry cold vein.)
 - **C181 (bug-scout DRY [precondition] → pivot to feature: theming-engine T4 — the FE theme type model + token-key census guard)** —
   Balance recompute (cycle 181): bug most-starved (8/3 = 2.67×) but the precondition holds — `git diff
   50b78a8(C180)..HEAD -- src` is EMPTY (C180 was test-only), so the cold vein is provably dry; re-scanning is
