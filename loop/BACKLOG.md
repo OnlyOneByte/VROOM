@@ -1100,11 +1100,18 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 >   stale characterization test updated to the now-real overwrite (wire contract unchanged). Don't re-pick.
 >
 > _Severity 4 — hardening / display (lower urgency):_
-> - **#100 (arch-gated) — ✅ DECIDED 2026-06-23 (Angelo agrees with the approved approach): SQL-atomic
->   merge via `json_patch` in one UPDATE** for the userPreferences read-modify-write across the 5+ write
->   sites (no migration, no per-user queue, avoids the C151 async-tx footgun). Last-writer-wins lost-update
->   race today. EXECUTE when the PR-green override lifts — arch cycle, one write site at a time if needed;
->   add a guard that the merge is a single atomic statement (no read-then-write JS gap).
+> - **#100 — 🔄 PARTIALLY CLOSED C168 (Angelo-decided: SQL-atomic `json_patch` merge, no migration).**
+>   Added `PreferencesRepository.mergeJsonField(userId, column, patch)` — one `UPDATE … json_patch(coalesce(
+>   col,'{}'), ?)` that deep-merges (RFC-7386) inside the DB engine, killing the read-modify-write lost-update
+>   race. **DONE:** the `cleanupBackupConfig` provider-delete site (read→JS-delete→write → one atomic
+>   `{providers:{[id]:null}}` null-delete patch). Guard: prefs-atomic-merge.test.ts (+3: deep-merge,
+>   null-delete, the race property both-writers-survive + RMW-loses non-vacuity); C245 cleanup HTTP test stays
+>   green. **REMAINING (tracked follow-up, arch/bug cycle):** the **settings-PUT** merge site
+>   (`settings/routes.ts:246`) — it validates the MERGED result (validateStorageConfig/validateBackupConfig)
+>   BETWEEN read and write and uses the bespoke #82 per-provider merge, so swapping to an atomic patch needs
+>   care (validation ordering + RFC-7386 null-delete vs intentional category-clearing). + the `cleanupStorageConfig`
+>   site has a read-DEPENDENT edit (null a default only if it points at the deleted provider) that can't be a
+>   static patch — leave it RMW or split the static part. The reusable atomic primitive now exists for both.
 > - ~~**#22 (MED, hardening) — DONE C55.**~~ parseZipBackup summed each entry's `header.size`
 >   (uncompressed) but that's ATTACKER-DECLARED (ZIP central directory) — a bomb declares a small size to
 >   pass the sum, then inflates to GB on getData(). Added `CONFIG.backup.maxCompressionRatio = 1000` + a

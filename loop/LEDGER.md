@@ -96,11 +96,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 167 |
 | deep-review | 5 | 162 |
 | guard | 6 | 163 |
-| bug | 3 | 163 |
+| bug | 3 | 168 |
 | arch | 5 | 164 |
 | infra | 6 | 161 |
 
-Current cycle: **167**
+Current cycle: **168**
 
 > **NOTE (C158/C159): feature is BLOCKED (all 3 spec features complete C153; new features need Angelo
 > sign-off, flagged C153). Each feature-over-budget cycle re-records this + pivots to the co-starved category.
@@ -111,6 +111,30 @@ Current cycle: **167**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C168 (bug #100 — atomic `json_patch` userPreferences merge; first write site; Angelo-decided)** —
+  Balance recompute (cycle 168): bug most-starved (5/3 = 1.67×), over with infra (7/6) + deep-review (6/5).
+  Took bug — and rather than a (dry) cold-scout, executed the Angelo-DECIDED #100 (SQL-atomic prefs merge),
+  the last loop-fixable decided bug (the rest of the queue is product/semantics-gated). **The defect:** the
+  userPreferences write pattern (`getOrCreate` → JS-merge → `update`) is a read-modify-write with a
+  lost-update race — two concurrent requests merge their deltas onto the same stale snapshot, last-writer
+  clobbers the other (the #82 per-provider fix closed the within-request wipe but not the across-request
+  interleave). **Fix (Angelo-decided: SQL-atomic `json_patch` in one UPDATE, no migration):** added
+  `PreferencesRepository.mergeJsonField(userId, column, patch)` — a single `UPDATE … SET col =
+  json_patch(coalesce(col,'{}'), ?)` that deep-merges (RFC-7386) inside the DB engine with no JS
+  read-then-write gap. Verified the semantics firsthand first (deep-merge recurses; scalar/array replaces;
+  `null` deletes a key). Applied it to the cleanest race site — **`cleanupBackupConfig`** (provider-delete):
+  the old read→JS-delete→write became one atomic `{ providers: { [id]: null } }` patch (null-delete removes
+  just that provider, siblings survive even under a concurrent write). Per Angelo's "one write site at a
+  time" — the settings-PUT merge site is LEFT for a follow-up because it validates the MERGED result
+  (`validateStorageConfig`/`validateBackupConfig`) between read and write + uses the bespoke #82
+  per-provider merge, so an atomic-patch swap there needs care (validation ordering + null-delete vs
+  intentional category-clearing); flagged in BACKLOG. **Guards:** the existing C245 delete-cleanup HTTP test
+  stays green (behavior-preserving on the changed site); NEW prefs-atomic-merge.test.ts (+3) pins the
+  primitive — deep-merge, null-delete, and THE RACE PROPERTY (two concurrent delta-patches both survive),
+  with a non-vacuity assertion modelling the old RMW losing the first writer. VERIFY: backend validate:local
+  GREEN (tsc 0, musl-biome clean, 1792 pass / 0 fail [+3], build bundled). Backend-only → no shot. #100 is
+  PARTIALLY closed (the cleanup site + the reusable atomic primitive); the settings-PUT site is the tracked
+  follow-up. cov: be 88.39% / fe 88.44% (~ — repo method + one route site, guarded).
 - **C167 (feature — CORRECTION: restore Angelo's parallel-agent greenlights that C166 wrongly reverted)** —
   **C166 was WRONG.** Angelo greenlit theming-engine + money-cents-migration + trips-location on 2026-06-24
   via a PARALLEL agent (deliberately, so the loop wouldn't block) — those approvals landed as committed T0

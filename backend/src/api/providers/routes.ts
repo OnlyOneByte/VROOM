@@ -472,14 +472,18 @@ async function cleanupStorageConfig(userId: string, providerId: string): Promise
   await preferencesRepository.update(userId, { storageConfig });
 }
 
-// Helper: clean up backup_config when a storage provider is deleted
+// Helper: clean up backup_config when a storage provider is deleted.
+// ATOMIC per #100 (Angelo-decided): instead of read → JS-delete → write (a lost-update race where a
+// concurrent settings merge clobbers this removal, or vice-versa), patch the single key to `null` in one
+// UPDATE. RFC-7386 `json_patch` deletes a key set to null, so `{ providers: { [id]: null } }` removes JUST
+// this provider's backup entry while every sibling provider's settings survive — even under a concurrent
+// write. getOrCreate first so the row exists; the early-return avoids a no-op patch when nothing's there.
 async function cleanupBackupConfig(userId: string, providerId: string): Promise<void> {
   const prefs = await preferencesRepository.getOrCreate(userId);
   if (!prefs.backupConfig?.providers?.[providerId]) return;
-  const updated = { ...prefs.backupConfig };
-  updated.providers = { ...updated.providers };
-  delete updated.providers[providerId];
-  await preferencesRepository.update(userId, { backupConfig: updated });
+  await preferencesRepository.mergeJsonField(userId, 'backupConfig', {
+    providers: { [providerId]: null },
+  });
 }
 
 // DELETE /api/v1/providers/:id — delete provider with cleanup

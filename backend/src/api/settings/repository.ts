@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { NewUserPreferences, SyncState, UserPreferences } from '../../db/schema';
@@ -60,6 +60,46 @@ export class PreferencesRepository {
       return result[0];
     } catch (error) {
       throw new DatabaseError('Failed to update user preferences', error);
+    }
+  }
+
+  /**
+   * ATOMIC deep-merge of a partial JSON patch into one JSON column, in a SINGLE UPDATE (#100,
+   * Angelo-decided 2026-06-23). The legacy read-modify-write pattern — `getOrCreate()` → JS-merge →
+   * `update()` — has a lost-update race: a concurrent request's merge, computed from the same stale read,
+   * clobbers ours (last-writer-wins). SQLite's `json_patch(target, patch)` applies an RFC-7386 merge-patch
+   * RECURSIVELY inside the DB engine with no JS read-then-write gap, so two concurrent delta-merges BOTH
+   * survive.
+   *
+   * RFC-7386 semantics (verified firsthand): nested objects deep-merge; a scalar/array replaces; and a
+   * `null` value in the patch DELETES that key. So this method serves two shapes: (a) a partial deep-merge
+   * of nested settings, and (b) a key-deletion (patch `{ [k]: null }`) — e.g. removing a deleted provider
+   * from `backupConfig.providers`. Callers needing conditional/read-dependent edits (e.g. "null a default
+   * only if it points at this provider") still can't be a static patch — those stay read-modify-write.
+   *
+   * `column` is constrained to the JSON-typed preference columns; `coalesce(col,'{}')` lets a NULL/unset
+   * column merge cleanly from empty. Returns the updated row (or null if the user has no prefs row — callers
+   * ensure the row exists, e.g. via getOrCreate, before patching).
+   */
+  async mergeJsonField(
+    userId: string,
+    column: 'storageConfig' | 'backupConfig',
+    patch: Record<string, unknown>
+  ): Promise<UserPreferences | null> {
+    // Closed, literal map camelCase field → snake_case SQL column (no user input reaches the column name).
+    const sqlColumn = column === 'storageConfig' ? 'storage_config' : 'backup_config';
+    try {
+      const result = await this.db
+        .update(userPreferences)
+        .set({
+          [column]: sql`json_patch(coalesce(${sql.raw(sqlColumn)}, '{}'), ${JSON.stringify(patch)})`,
+          updatedAt: new Date(),
+        })
+        .where(eq(userPreferences.userId, userId))
+        .returning();
+      return result[0] ?? null;
+    } catch (error) {
+      throw new DatabaseError('Failed to merge user preferences JSON field', error);
     }
   }
 }
