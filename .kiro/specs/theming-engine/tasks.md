@@ -52,13 +52,16 @@
       theme-token-keys.test.ts (+5) source-scans app.css `:root`/`.dark` and pins light/dark parity +
       `THEME_TOKEN_KEYS` == the live set exactly + `--radius` excluded (the merge-surviving net so a token
       add/remove can't silently desync the engine). FE validate:local GREEN (svelte-check 0, 765 pass).
-- [ ] **T5** `theme-registry.ts` — `THEME_REGISTRY`. `default`'s light+dark token maps **extracted
-      verbatim from the current `app.css`** (a guard test asserts they equal the live `:root`/`.dark`
-      values → zero visual change for existing users + catches baseline drift). Add the FIRST
-      non-default theme per **[D1/D5]** (recommend `instrument`), token set distilled from
-      `vroom-redesign-mocks/design-language.css`, re-expressed in `oklch` **[A2]** and pre-tuned for AA
-      **[A3/R10]**. +registry-integrity tests: every definition declares ALL token keys (no missing-key
-      leak); `default` ≡ app.css.
+- [~] **T5 (C185, default DONE; `instrument` DESIGN-GATED)** `theme-registry.ts` — `THEME_REGISTRY` +
+      `DEFAULT_THEME_ID`. `default`'s light+dark token maps transcribed VERBATIM from `app.css` `:root`/`.dark`
+      (all 32 keys × 2 variants). +registry-integrity guard (theme-registry.test.ts, +6): `default` ≡ app.css
+      VALUE-FOR-VALUE (parses live app.css → zero visual change + baseline-drift detection), every definition
+      declares ALL token keys in BOTH variants (no missing-key leak) + NO stray keys. FE validate:local GREEN
+      (svelte-check 0, 771 pass). **REMAINING (design-gated, NOT loop-self-authorizable): the first non-default
+      theme `instrument`** — its 32-token oklch palette must be distilled from the design-language mock +
+      AA-tuned (A3/R10/D4), which is a product/design decision (the mock dir is a gitignored working file, absent
+      from the tree). The registry + guard accept it with zero structural change (add one ThemeDefinition).
+      Flagged to Angelo: supply the `instrument` palette (or greenlight deriving it from the mock).
 - [ ] **T6** `resolveTheme(themeId, mode, systemPref)` — total resolver: definition lookup with
       `default` fallback on unknown id (**R8**); pick light/dark by `mode==='system'?systemPref:mode`;
       return the token map. Pure. +unit tests: every built-in × {light,dark,system×sysPref}, unknown →

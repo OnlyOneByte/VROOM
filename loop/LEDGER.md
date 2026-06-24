@@ -112,14 +112,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 181 |
+| feature | 4 | 185 |
 | deep-review | 5 | 180 |
 | guard | 6 | 183 |
 | bug | 3 | 173 |
 | arch | 5 | 182 |
 | infra | 6 | 184 |
 
-Current cycle: **184**
+Current cycle: **185**
 
 > **NOTE (C174): feature is UNBLOCKED and now BUILDING. 3 specs greenlit by Angelo 2026-06-24 (theming/
 > money-cents/trips, restored C167). C174 began the theming-engine build at T1 (the additive
@@ -132,6 +132,25 @@ Current cycle: **184**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C185 (bug-scout DRY [precondition] → pivot to feature: theming-engine T5 — the `default` theme registry + identity guard; `instrument` design-gated)** —
+  Balance recompute (cycle 185): bug most-starved (12/3 = 4.0×) but the precondition holds — `git diff
+  ac5f7e1(C184)..HEAD -- src` is EMPTY (C184 was doc-only), 5th consecutive provably-dry cold vein; re-scanning is
+  ceremony. Recorded the bug-scout DRY and pivoted to FEATURE (AT budget 4/4, edging deep-review on
+  buildability) = the active greenlit theming build. **Built theming-engine T5 (the `default` half):**
+  `theme-registry.ts` — `THEME_REGISTRY` + `DEFAULT_THEME_ID`, with `default`'s light+dark token maps transcribed
+  VERBATIM from app.css `:root`/`.dark` (all 32 keys × 2 variants). **GUARD:** theme-registry.test.ts (+6) — the
+  registry-integrity contract: `default` ≡ app.css VALUE-FOR-VALUE (parses the live app.css at test time → proves
+  zero visual change for existing users + catches baseline drift), every definition declares ALL THEME_TOKEN_KEYS
+  in BOTH variants (no missing-key leak), + NO stray keys. The value-for-value test passing also PROVES the 64
+  transcribed oklch values are byte-exact. **DELIBERATELY did NOT build the first non-default theme `instrument`**
+  (the spec's other T5 half): its 32-token oklch palette must be distilled from the design-language mock + AA-tuned
+  (A3/R10/D4) — a product/DESIGN call, not loop-self-authorizable (NORTH_STAR: never self-invent a feature's design;
+  the mock dir is a gitignored working file, absent). The registry + guard accept it with zero structural change
+  (add one ThemeDefinition). FLAGGED to Angelo via the tasks.md T5 note. VERIFY: frontend validate:local GREEN
+  (svelte-check 0 errors, build OK, 771 pass / 0 fail [+6]). Pure data + source-scan guard, no UI render → no shot.
+  Ticked tasks.md T5 as [~] (default done, instrument gated). **NEXT: T6** (resolveTheme — total resolver, pure,
+  unblocked: it only needs `default` + the type model, both present). cov: be 88.39% / fe 88.45% (~ — token data +
+  a guard, no runtime branch).
 - **C184 (infra — branch-hygiene sweep + coverage re-measure; the ~10-cycle cadence, last MEASURED C176)** —
   Balance recompute (cycle 184): bug most-starved (11/3 = 3.67×) but the precondition holds — `git diff
   649c854(C183)..HEAD -- src` is EMPTY (C183 was test-only) + four consecutive verified-clean firsthand scouts

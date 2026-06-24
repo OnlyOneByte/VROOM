@@ -70,10 +70,14 @@ shot.sh eyes-on works — the "Playwright-blocked" tail was a ~200-cycle MISDIAG
    (C181): `frontend/src/lib/theme/theme-types.ts` — the type model (ThemeId/ThemeMode[re-exported from the store's
    ThemePreference]/ThemeTokenKey[the censused 32-key app.css color set]/ThemeTokens/ThemeVariant/ThemeDefinition) +
    a frozen THEME_TOKEN_KEYS tuple; +5 source-scan guard pinning the keys == the live app.css :root/.dark set.**
-   **NEXT TASK: T5 — `theme-registry.ts`: `default`'s light+dark maps extracted verbatim from app.css (a guard
-   asserts equality → zero visual change) + the first non-default theme (`instrument`, oklch, AA-tuned); the
-   integrity test uses THEME_TOKEN_KEYS** (tasks.md Phase 2). Phase-4 custom-theme authoring is OUT (its own future
-   `.kiro/specs/theme-authoring/`). Mocks: `vroom-design-language-option-1-instrument-cluster` + `vroom-redesign-mocks/`.
+   T5 (C185, default DONE / instrument design-gated): `theme-registry.ts` — THEME_REGISTRY + DEFAULT_THEME_ID,
+   `default` transcribed verbatim from app.css; +6 integrity guard (default ≡ app.css value-for-value, all token
+   keys present both variants, no stray keys).** **DESIGN-GATED (flag Angelo): the first non-default theme
+   `instrument` — its 32-token oklch palette must be distilled from the design-language mock + AA-tuned (A3/R10/D4),
+   a product call the loop won't self-author (mock dir is gitignored/absent). Registry accepts it with zero
+   structural change.** **NEXT TASK: T6 — `resolveTheme(themeId, mode, systemPref)`: total resolver, pure, unblocked
+   (needs only `default` + the type model, both present)** (tasks.md Phase 2). Phase-4 custom-theme authoring is OUT
+   (its own future `.kiro/specs/theme-authoring/`). Mocks: `vroom-design-language-option-1-instrument-cluster` + `vroom-redesign-mocks/`.
 
 0. **Vehicle sharing** — **SPEC DRAFTED, BLOCKED on Angelo (D1–D8).** `.kiro/specs/vehicle-sharing/`
    (requirements + design + tasks, drafted 2026-06-24). TODO.md #9 "BIGGGG" greenfield feature: an owner
