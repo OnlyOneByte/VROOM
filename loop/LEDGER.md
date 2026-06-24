@@ -29,6 +29,13 @@
 > (C155 email-fix / C157 resolveNewUser / C158 unlink-route) + the C159 offline needs-attention helpers
 > (pure+covered) added covered lines; FE crossed 88.4 line (a fresh high). Structural ceiling holds (DI/OAuth/SQL
 > BE + effect/DOM FE). NEXT ~C171.**
+> **C192 (infra cadence MEASURED): BE 88.39% line / 87.99% func (1822 pass) — FLAT vs C184 (BE untouched since
+> C188); FE 88.65% line / 88.82% func / 80.77% branch / 86.57% stmts (802 pass) — UP +0.20 line / +37 tests vs
+> C184. The C185–C191 theming Phase-2/3 arc added 5 new FE modules WELL-COVERED (resolve-theme 100% line,
+> theme.svelte 100% func, theme-registry/types/themes-css all guarded) — so FE moved UP (genuine new covered
+> surface, not flat). themes-css.ts 85.71% (the uncovered lines = the empty-registry placeholder + the
+> non-default-block path, exercised once `instrument` ships). Untracked-test sweep CLEAN both sides; branch 46
+> ahead / 0 behind origin/main, PR-ready. NEXT ~C202.**
 > **C184 (infra cadence MEASURED): BE 88.39% line / 87.99% func (1822 pass) — FLAT vs C176/C169 (line identical);
 > FE 88.45% line / 88.92% func / 80.57% branch / 86.37% stmts (765 pass) — FLAT vs C176 (+0.01 line). Both hold at
 > the structural ceiling. The C177–C183 arc added +14 BE / +5 FE tests (C178 reminder-split-config guard, C179
@@ -117,9 +124,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 190 |
 | bug | 3 | 173 |
 | arch | 5 | 188 |
-| infra | 6 | 184 |
+| infra | 6 | 192 |
 
-Current cycle: **191**
+Current cycle: **192**
 
 > **NOTE (C174): feature is UNBLOCKED and now BUILDING. 3 specs greenlit by Angelo 2026-06-24 (theming/
 > money-cents/trips, restored C167). C174 began the theming-engine build at T1 (the additive
@@ -132,6 +139,22 @@ Current cycle: **191**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C192 (infra — branch-hygiene sweep + coverage re-measure; cadence, last MEASURED C184)** —
+  Balance recompute (cycle 192): bug most-starved (19/3 = 6.33×) but provably dry (only theming UI plumbing changed
+  since the C183 scout, 11th consecutive — no backend write-path/money/date gold seam) → scout is ceremony. Among
+  the other over-budget cats, infra (8/6 = 1.33×) edged deep-review (6/5 = 1.2×) AND — unlike C191 — was NOT
+  ceremony: the C185–C191 arc added 5 new FE theming modules + ~6 test files, real new surface worth re-measuring
+  (cadence ~due). (1) UNTRACKED-TEST SWEEP: CLEAN both sides; working tree clean. (2) COVERAGE RE-MEASURED: **BE
+  88.39% line / 87.99% func (1822 pass) — FLAT vs C184 (BE untouched since C188); FE 88.65% line / 88.82% func /
+  80.77% branch / 86.57% stmts (802 pass) — UP +0.20 line / +37 tests vs C184.** FE moved UP because the theming
+  modules landed WELL-COVERED (resolve-theme 100% line, theme.svelte 100% func, theme-registry/types all guarded;
+  themes-css 85.71% — the uncovered = the empty-registry placeholder + non-default-block path, exercised once
+  `instrument` ships) — genuine new covered surface, not flat. Both above the structural ceiling. (3) BOTH-SIDES
+  GREEN: BE 1822 / FE 802, 0 fail. (4) BRANCH STATE: claude-loop-dev = 46 commits ahead of fresh origin/main, 0
+  behind, PR-ready. NOTE: feature is BUILDING — theming Phase 3 T9 (server sync + hydrate reconcile) is the next
+  feature increment; the picker T10 + theme-color migration await the `instrument` palette (Angelo design call).
+  Doc-only (coverage runs exercised the full suites; no source touched → no build/shot). cov: be 88.39% / fe 88.65%
+  (MEASURED). NEXT cadence ~C202.
 - **C191 (bug-scout DRY [precondition] → pivot to feature: theming-engine T8 — the store themeId axis)** —
   Balance recompute (cycle 191): bug most-starved (18/3 = 6.0×) but provably dry (only theming-engine
   pure/build-time code changed since the C183 scout, 10th consecutive) → scout is ceremony; infra over (7/6) but
