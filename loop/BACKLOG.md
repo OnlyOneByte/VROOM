@@ -170,6 +170,23 @@ shot.sh eyes-on works — the "Playwright-blocked" tail was a ~200-cycle MISDIAG
 re-audit a data-safety write path, certify it CLEAN against source, and leave a merge-surviving guard.
 Don't trust agent "HIGH" findings — verify firsthand (the archive logged many debunked false-positives).)*
 
+> **CERTIFIED + FIXED C201 — the anti-FOUC head-script now pre-paints the THEME-ID axis, not just dark/light
+> (NORTH_STAR #3, no-FOUC).** A C201 deep-review of the just-built theming engine (pivot from a provably-dry bug
+> cold-vein, 20th consecutive) certified the token-contract chain (C181/C185/C186), the registry≡app.css guard, the
+> generated-CSS freshness guard, and the `.dark`/`data-theme` co-location on `<html>` ALL airtight — then found ONE
+> real latent gap firsthand: theme.svelte.ts promises the `vroom-theme-id` mirror exists "so the anti-FOUC
+> head-script (app.html) + the store agree", but T8 wired only the dark-class axis into app.html's pre-paint script.
+> The theme-id axis was a NO-OP today (default-only registry → applyTheme never sets data-theme), so nothing went
+> red — but the instant a non-default theme (`instrument`) ships and a user selects it, every load would paint the
+> DEFAULT look until hydration's initialize() runs, then FLASH to the chosen theme (the exact white-flash NORTH_STAR
+> #3 forbids, on a second axis the C190 dark-class guard couldn't see). FIX: app.html now reads `vroom-theme-id` and
+> sets `data-theme` pre-paint, mirroring applyTheme (default/absent → no attribute). Guard: extended
+> theme-fouc-contract.test.ts (+3, the C201 block) — pins the head-script's mirror key (THEME_ID_KEY, parsed from the
+> store), the set-data-theme action, and the DEFAULT_THEME_ID sentinel (imported from the registry) against app.html,
+> so a rename of either trips unless app.html is updated in lockstep. Non-vacuous (strip the data-theme setter → 3
+> RED, dark-axis 4 stay green). Behavior-preserving today; closes the latent seam BEFORE the gated palette exposes it.
+> Don't re-audit — the theming engine's FOUC contract is now complete on both axes.
+
 > **CERTIFIED C193 — themePreference survives the GOOGLE SHEETS backup round-trip (NORTH_STAR #1).** C180 covered
 > the ZIP/CSV path; the Sheets path is a distinct serializer (formatValue → grid → parseValue → coerceRow). A C193
 > deep-review verified firsthand (the real fake-Sheets create→read chain) that a non-default `instrument` theme

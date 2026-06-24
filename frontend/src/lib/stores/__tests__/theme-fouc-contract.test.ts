@@ -17,6 +17,7 @@
 
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
+import { DEFAULT_THEME_ID } from '$lib/theme/theme-registry';
 
 const CWD = process.cwd();
 const APP_HTML = readFileSync(`${CWD}/src/app.html`, 'utf8');
@@ -25,6 +26,12 @@ const STORE_SRC = readFileSync(`${CWD}/src/lib/stores/theme.svelte.ts`, 'utf8');
 /** Extract the store's STORAGE_KEY literal from its source (the value the head-script must read). */
 function storeStorageKey(): string {
   const m = STORE_SRC.match(/const STORAGE_KEY\s*=\s*['"]([^'"]+)['"]/);
+  return m?.[1] ?? '';
+}
+
+/** Extract the store's THEME_ID_KEY literal (the theme-id mirror the head-script must read pre-paint). */
+function storeThemeIdKey(): string {
+  const m = STORE_SRC.match(/const THEME_ID_KEY\s*=\s*['"]([^'"]+)['"]/);
   return m?.[1] ?? '';
 }
 
@@ -59,5 +66,50 @@ describe('app.html anti-FOUC head-script mirrors the theme store (C190 contract 
     expect(APP_HTML).toContain("=== 'system'");
     // And the head-script's default when the key is absent must be 'system' too (matches the store).
     expect(APP_HTML).toMatch(/\|\|\s*['"]system['"]/);
+  });
+});
+
+/**
+ * C201 (deep-review) — the head-script must ALSO pre-paint the THEME-ID axis, not just dark/light.
+ *
+ * The store comment (theme.svelte.ts) promises the `vroom-theme-id` mirror exists "so the anti-FOUC
+ * head-script (app.html) + the store agree" — but T8 wired only the dark-class axis into app.html. The
+ * theme-id axis is a no-op TODAY (default-only registry → applyTheme never sets data-theme), so the gap
+ * is invisible; the instant a non-default theme (`instrument`) ships and a user selects it, every load
+ * would paint the DEFAULT look until hydration's initialize() runs, then flash to the chosen theme — the
+ * exact FOUC NORTH_STAR #3 forbids, on a SECOND axis the dark-class guard above can't see. This pins the
+ * head-script's data-theme pre-paint against the store's three load-bearing theme-id constants:
+ *   1. the mirror key (`vroom-theme-id` = THEME_ID_KEY) the store writes and the head-script must read,
+ *   2. the DEFAULT_THEME_ID sentinel that means "no override" (head-script must NOT set data-theme for it),
+ *   3. the set-data-theme-on-<html> action (mirrors applyTheme's root.setAttribute('data-theme', id)).
+ * Source-of-truth: THEME_ID_KEY is parsed from the store; DEFAULT_THEME_ID is imported from the registry —
+ * so a rename of either trips this unless app.html is updated in lockstep (the C190 cross-file idiom).
+ */
+describe('app.html head-script pre-paints the theme-id axis (C201 contract guard)', () => {
+  test('the head-script reads the SAME theme-id mirror key the store writes', () => {
+    const key = storeThemeIdKey();
+    expect(key, 'store THEME_ID_KEY is parseable').toBeTruthy();
+    // The store reads + writes the mirror via THEME_ID_KEY...
+    expect(STORE_SRC).toContain('localStorage.getItem(THEME_ID_KEY)');
+    expect(STORE_SRC).toContain('localStorage.setItem(THEME_ID_KEY, id)');
+    // ...and the head-script must getItem that exact literal pre-paint.
+    expect(APP_HTML).toContain(`localStorage.getItem('${key}')`);
+  });
+
+  test('the head-script sets data-theme on <html> (mirrors applyTheme)', () => {
+    // store: root.setAttribute('data-theme', themeId)
+    expect(STORE_SRC).toMatch(/setAttribute\(\s*['"]data-theme['"]/);
+    // head-script: el.setAttribute('data-theme', themeId)
+    expect(APP_HTML).toMatch(/setAttribute\(\s*['"]data-theme['"]/);
+  });
+
+  test('the head-script treats the DEFAULT_THEME_ID sentinel as "no override" (no data-theme set)', () => {
+    // The store clears data-theme for the default id (applyTheme: id !== DEFAULT_THEME_ID guards the set);
+    // the head-script must use the SAME sentinel so the identity theme stays attribute-free (app.css :root
+    // serves it). DEFAULT_THEME_ID is the registry's exported constant — pin both files against it.
+    expect(STORE_SRC).toMatch(/themeId\s*!==\s*DEFAULT_THEME_ID/);
+    expect(APP_HTML).toContain(`!== '${DEFAULT_THEME_ID}'`);
+    // ...and the head-script defaults the absent mirror to that same sentinel (matches getStoredThemeId).
+    expect(APP_HTML).toMatch(new RegExp(`\\|\\|\\s*['"]${DEFAULT_THEME_ID}['"]`));
   });
 });

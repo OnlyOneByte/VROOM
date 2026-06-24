@@ -21,11 +21,17 @@
 	<body data-sveltekit-preload-data="hover" class="safe-top safe-bottom">
 		<script>
 			(function () {
+				var el = document.documentElement;
 				var theme = localStorage.getItem('vroom-theme-preference') || 'system';
 				var isDark =
 					theme === 'dark' ||
 					(theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-				if (isDark) document.documentElement.classList.add('dark');
+				if (isDark) el.classList.add('dark');
+				// Theme-id axis (T8): mirror the store's applyTheme — a non-default theme id sets
+				// data-theme PRE-PAINT so a custom theme doesn't flash the default look on load
+				// (the same no-FOUC contract the dark class above honors). default/absent → no attribute.
+				var themeId = localStorage.getItem('vroom-theme-id') || 'default';
+				if (themeId && themeId !== 'default') el.setAttribute('data-theme', themeId);
 			})();
 		</script>
 		<div style="display: contents">%sveltekit.body%</div>

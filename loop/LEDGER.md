@@ -130,13 +130,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 195 |
-| deep-review | 5 | 193 |
+| deep-review | 5 | 201 |
 | guard | 6 | 196 |
 | bug | 3 | 173 |
 | arch | 5 | 199 |
 | infra | 6 | 200 |
 
-Current cycle: **200**
+Current cycle: **201**
 
 > **NOTE (C174): feature is UNBLOCKED and now BUILDING. 3 specs greenlit by Angelo 2026-06-24 (theming/
 > money-cents/trips, restored C167). C174 began the theming-engine build at T1 (the additive
@@ -148,6 +148,27 @@ Current cycle: **200**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C201 (bug-scout DRY → deep-review: certify the theming engine's FOUC contract, FIX the latent theme-id pre-paint gap)** —
+  Balance recompute (cycle 201): bug most-starved (28/3 = 9.33×) but provably dry (C199/C200 were test/doc-only — no
+  prod logic changed since the C183 scout, 20th consecutive) → recorded DRY. feature next (6/4 = 1.50× over) but its
+  picker tail (T10) is Angelo-gated on the `instrument` palette → blocked, pivot. Most-starved ACTIONABLE over-budget =
+  DEEP-REVIEW (8/5 = 1.60×). Opened it on the just-built theming engine (the freshest un-certified surface per the
+  C200 milestone). Certified firsthand CLEAN: the token-contract chain (C181/C185/C186 — app.css 32 keys ≡
+  THEME_TOKEN_KEYS ≡ default registry ≡ @theme aliases), the registry≡app.css value guard, the generated-CSS freshness
+  guard, and the `.dark`/`data-theme` co-location on `<html>` (applyTheme sets both on documentElement). Found ONE real
+  latent gap: theme.svelte.ts promises the `vroom-theme-id` mirror exists "so the anti-FOUC head-script + the store
+  agree", but T8 wired ONLY the dark-class axis into app.html's pre-paint script — the theme-id axis was never
+  pre-painted. NO-OP today (default-only → data-theme never set), so invisible + nothing red; but once `instrument`
+  ships + is selected, every load would paint DEFAULT then FLASH to the chosen theme (the FOUC NORTH_STAR #3 forbids,
+  on a 2nd axis the C190 guard can't see). FIX: app.html now reads `vroom-theme-id` + sets `data-theme` pre-paint,
+  mirroring applyTheme (default/absent → no attribute). GUARD: extended theme-fouc-contract.test.ts (+3, C201 block) —
+  pins the mirror key (THEME_ID_KEY parsed from store), the set-data-theme action, + the DEFAULT_THEME_ID sentinel
+  (imported from registry) against app.html; a rename trips it unless app.html updates in lockstep. Non-vacuous
+  (strip the data-theme setter → 3 RED, dark-axis 4 stay green — verified firsthand). Behavior-preserving today; closes
+  the latent seam BEFORE the gated palette exposes it. FE validate:local GREEN (type-check + build + 813 pass, +3 vs
+  C200). BE untouched. Pre-paint head-script is a no-op today (default-only) → nothing new to render → no shot (the
+  eyes-on payoff materializes when `instrument` ships, Angelo-gated). cov: be 88.39% / fe 88.73% (~ — guard+html, no
+  new prod-logic line; +3 tests). (Bug stays 173 — provably-dry cold vein.)
 - **C200 (bug-scout DRY → deep-review scout [SATURATED] → pivot to infra: cadence sweep + coverage re-measure; milestone state-of-the-loop)** —
   Balance recompute (cycle 200): bug most-starved (27/3 = 9.0×) but provably dry (only theming code changed since
   the C183 scout, 19th consecutive — C199 test-only) → scout ceremony, recorded DRY. Highest over-budget after bug =
