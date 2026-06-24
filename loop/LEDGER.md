@@ -100,12 +100,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 167 |
 | deep-review | 5 | 170 |
-| guard | 6 | 163 |
+| guard | 6 | 172 |
 | bug | 3 | 168 |
 | arch | 5 | 171 |
 | infra | 6 | 169 |
 
-Current cycle: **171**
+Current cycle: **172**
 
 > **NOTE (C158/C159): feature is BLOCKED (all 3 spec features complete C153; new features need Angelo
 > sign-off, flagged C153). Each feature-over-budget cycle re-records this + pivots to the co-starved category.
@@ -116,6 +116,26 @@ Current cycle: **171**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C172 (guard — tree-wide validate-before-persist source-scan for the #62/#109/#125/#145 financing-source-link class)** —
+  Balance recompute (cycle 172): guard most-starved (9/6 = 1.50×), over with bug (4/3 = 1.33×) + feature (5/4 = 1.25×,
+  unblocked but lowest ratio). Took guard. The guard queue is empty + pure-logic coverage is saturated, so picked the
+  GUIDE's merge-survival idiom (C25/C271/C170): a structural source-scan pinning a load-bearing invariant tree-wide.
+  **The invariant:** the within-tenant financing-source-link integrity class (#62/#109/#125/#145, just closed C465) is
+  enforced across all FOUR expense-write paths (POST / · PUT /:id · POST /split · PUT /split/:id) by
+  `assertFinancingSourceValid`/`assertSplitFinancingSourceValid` — a forged `{sourceType:'financing', sourceId}` link
+  is the exact predicate `computeBalance` sums, so an unvalidated one understates the displayed loan balance
+  (NORTH_STAR #1). But every existing test is BEHAVIORAL (per-path HTTP) — a behavioral test for path N can't protect a
+  FUTURE path N+1. **Verified firsthand FIRST (no defect):** all 4 paths validate; the 5th persist method
+  (`importExpenses`) is source-link-free BY CONSTRUCTION (CSV has no sourceType column — import-csv.ts/import-mapping.ts
+  never set sourceType/sourceId). New `expense-source-validation-coverage.test.ts` (+3): (1) pins the write surface =
+  exactly 4 persist calls (a 5th forces a guard update) + importExpenses present; (2) asserts every persist call is
+  preceded WITHIN ITS HANDLER by a source-link validator (slices routes.ts from the enclosing `routes.post/put(` to the
+  persist offset, requires an `await assert(Split)?FinancingSourceValid(` in between); (3) pins the import path stays
+  source-link-free. **NON-VACUITY PROVEN:** temporarily removed the POST / validator → the per-handler test went RED with
+  the precise diagnostic; restored routes.ts byte-identical to HEAD (verified `git diff` empty). VERIFY: backend
+  validate:local GREEN (tsc 0, musl-biome clean / 20 baseline warnings, 1799 pass / 0 fail [+3], build bundled).
+  Test-only; no production source → no shot. A new unguarded expense-write path now trips the guard (forces
+  validate-or-pin). cov: be 88.39% / fe 88.44% (~ — source-scan guard, no new covered prod lines).
 - **C171 (arch — converge the `seedVehicle` test helper, wave 5: the expenses nickname-import pair; Angelo-approved vein)** —
   Balance recompute (cycle 171): arch most-starved by RATIO (7/5 = 1.40×), edging guard (8/6 = 1.33×); feature
   is UNBLOCKED but only AT budget (4/4 = 1.0×), deep-review/bug/infra under. Per the C169 ratio-tiebreak, took

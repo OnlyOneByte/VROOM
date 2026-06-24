@@ -650,6 +650,18 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C172 — tree-wide validate-before-persist for the #62/#109/#125/#145 financing-source-link class.**
+> The within-tenant integrity class (a forged `{sourceType:'financing', sourceId}` mis-attributes a row as a loan
+> payment → understates the displayed balance, computeBalance's exact predicate; NORTH_STAR #1) is closed across all
+> FOUR expense-write paths (POST / · PUT /:id · POST /split · PUT /split/:id) by assertFinancingSourceValid/
+> assertSplitFinancingSourceValid — but EVERY existing test is BEHAVIORAL (per-path HTTP), so a FUTURE 5th write path
+> added without the validator would silently reopen it with no test going red. New expense-source-validation-coverage
+> .test.ts (+3): pins the write surface = exactly 4 persist calls (5th forces a guard update); asserts every persist
+> call is preceded WITHIN ITS HANDLER by a source-link validator (handler-slice scan); pins the import path stays
+> source-link-free (CSV has no sourceType column — verified firsthand, the 5th persist `importExpenses` is safe by
+> construction). Non-vacuous (remove a handler's validator → the per-handler test RED). Certified CLEAN (no defect).
+> Don't re-add.
+
 > **GUARDED C163 — the import route's unowned-`targetVehicle` cross-tenant path (NORTH_STAR #2).** A mapping
 > whose targetVehicle the user does NOT own imports nothing: resolveTargetUnits returns {} (skip conversion,
 > no guessing toward a foreign vehicle's units) AND buildImportPlan rejects the rows "No vehicle named X in
