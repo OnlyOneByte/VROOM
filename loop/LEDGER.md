@@ -114,12 +114,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 189 |
 | deep-review | 5 | 186 |
-| guard | 6 | 183 |
+| guard | 6 | 190 |
 | bug | 3 | 173 |
 | arch | 5 | 188 |
 | infra | 6 | 184 |
 
-Current cycle: **189**
+Current cycle: **190**
 
 > **NOTE (C174): feature is UNBLOCKED and now BUILDING. 3 specs greenlit by Angelo 2026-06-24 (theming/
 > money-cents/trips, restored C167). C174 began the theming-engine build at T1 (the additive
@@ -132,6 +132,23 @@ Current cycle: **189**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C190 (bug-scout DRY [precondition] → pivot to guard: pin the app.html anti-FOUC head-script ↔ theme-store contract)** —
+  Balance recompute (cycle 190): bug most-starved (17/3 = 5.67×) but the only prod change since the last real scout
+  (C183) is theming-engine pure/build-time code (registry data, resolver, themes.css generator + a zero-rule css
+  import) — no reachable user-facing write-path defect surface, 9th consecutive provably-dry cold vein → scout is
+  ceremony. Recorded the bug-scout DRY and pivoted to the co-over-budget GUARD (7/6 = 1.17×). The theming work
+  surfaced a real UNGUARDED cross-file contract: app.html runs an inline anti-FOUC `<script>` BEFORE first paint
+  that reads `localStorage.getItem('vroom-theme-preference')` + sets the `dark` class on <html> — duplicating FOUR
+  load-bearing constants the theme store owns (the STORAGE_KEY, the `dark` class, the `system` sentinel, the
+  `(prefers-color-scheme: dark)` query). app.html is RAW HTML outside the type system + the store's tests, so a
+  store-side rename of any of them would silently flash light-on-dark every load (NORTH_STAR #3) with NOTHING going
+  red. **GUARD:** theme-fouc-contract.test.ts (+4) source-scans BOTH files and asserts they agree on all four (the
+  store's STORAGE_KEY literal is parsed from source + asserted present in app.html's getItem; the dark class, the
+  media query, and the `system` default likewise). NON-VACUITY PROVEN: renaming STORAGE_KEY → 'vroom-theme-pref-v2'
+  (the exact FOUC-breaking drift) turns the key-mirror test RED; store restored byte-identical. VERIFY: frontend
+  validate:local GREEN (svelte-check 0, build OK, 796 pass / 0 fail [+4]). Test-only → no shot. cov: be 88.39% / fe
+  88.45% (~ — cross-file source-scan, no runtime line). (Bug stays 173 — provably-dry cold vein. Feature: theming
+  Phase 3 T8 is the next feature increment.)
 - **C189 (bug-scout DRY [precondition] → pivot to feature: theming-engine T7 — themes.css generator + load seam, eyes-on)** —
   Balance recompute (cycle 189): bug most-starved (16/3 = 5.33×) but the only prod change since the last real scout
   (C183) is theme data + the uncalled C187 resolver → 8th consecutive provably-dry cold vein, scout is ceremony.

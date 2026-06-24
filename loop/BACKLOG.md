@@ -700,6 +700,14 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C190 — the app.html anti-FOUC head-script ↔ theme-store contract (NORTH_STAR #3, no-FOUC).** The
+> inline `<script>` in app.html runs before first paint, reading `localStorage('vroom-theme-preference')` + adding
+> the `dark` class — duplicating four constants the theme store owns (STORAGE_KEY, the `dark` class, the `system`
+> sentinel, the `(prefers-color-scheme: dark)` query). app.html is raw HTML outside the type system + the store's
+> tests, so a store-side rename would silently flash light-on-dark every load with nothing red. +4 in
+> theme-fouc-contract.test.ts: source-scans BOTH files + asserts they agree on all four (the store's STORAGE_KEY
+> literal is parsed from source). Non-vacuous (rename STORAGE_KEY → key-mirror test RED). Don't re-add.
+
 > **GUARDED C183 — the #293 financing create-or-replace coalesce-list COMPLETENESS (NORTH_STAR #2).** A C183
 > bug-scout VERIFIED FIRSTHAND that the financing write path is clean (ownership-gated; the #67 re-activate +
 > #293 cross-type coalesce + #92 loan-terms validation intact; coalesce list covers exactly the nullable
