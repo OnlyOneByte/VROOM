@@ -23,11 +23,15 @@
       the sheets-header-coverage drift guard green — the column would otherwise be silently dropped on a
       Sheets backup; the full backup round-trip + its own guard remains T3). Backend validate:local GREEN
       (1803 pass). **[D2]**
-- [ ] **T2** Settings route field. Extend the settings PUT Zod schema with `themePreference:
-      z.string().max(64).optional()` and route it through the EXISTING per-field merge
-      (`settings/routes.ts` — the #82/C82 discipline; never wholesale-overwrite, never wipe sibling
-      prefs). GET returns it. +HTTP tests: PUT persists + merges (sibling prefs untouched), GET
-      round-trips, omitted field is a no-op. `bun run validate:local` green.
+- [x] **T2 (C179)** Settings route field. Added an EXPLICIT bounded `themePreference:
+      z.string().min(1).max(64).optional()` to `updateSettingsSchema.extend()` — createInsertSchema had
+      auto-derived it as an UNBOUNDED string from the plain-text column (verified firsthand: a 5000-char
+      id persisted pre-fix). Routed through the EXISTING row-level merge (`...restUpdates` →
+      `repository.update`, which sets only provided fields — the #82 per-field discipline; verified theme
+      survives a sibling PUT and vice-versa). GET returns it. +HTTP tests (theme-preference.test.ts, +7):
+      fresh user defaults to `'default'`, PUT persists + GET round-trips, per-field merge both directions,
+      >64 + empty rejected (400, stored value unchanged), omitted is a no-op. Non-vacuity proven (drop the
+      bound → length+empty RED). `bun run validate:local` GREEN (1817 pass).
 - [ ] **T3** Backup round-trip. Add `themePreference` to `SHEET_HEADERS` (Google Sheets path) +
       extend the backup round-trip coverage guard so a restore re-applies the user's theme id (the
       cycle-3/C15 contract; inherits the C300/#93 merge-restore prefs-collision handling). +guard test

@@ -105,14 +105,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 174 |
+| feature | 4 | 179 |
 | deep-review | 5 | 175 |
 | guard | 6 | 178 |
 | bug | 3 | 173 |
 | arch | 5 | 177 |
 | infra | 6 | 176 |
 
-Current cycle: **178**
+Current cycle: **179**
 
 > **NOTE (C174): feature is UNBLOCKED and now BUILDING. 3 specs greenlit by Angelo 2026-06-24 (theming/
 > money-cents/trips, restored C167). C174 began the theming-engine build at T1 (the additive
@@ -125,6 +125,25 @@ Current cycle: **178**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C179 (bug-scout DRY [precondition] → pivot to feature: theming-engine T2 — the settings PUT themePreference field)** —
+  Balance recompute (cycle 179): bug most-starved (6/3 = 2.0×), feature next over (5/4 = 1.25×). Took bug first, but
+  the anti-ceremony precondition is decisive: `git diff 877a26f(C178)..HEAD -- src` is EMPTY — ZERO production source
+  changed since the last (C178) scout, and C177/C178 were both verified-clean firsthand scouts. Per C99/C103/C107,
+  re-scanning provably-unchanged surfaces is pure ceremony → recorded the bug-scout DRY immediately and PIVOTED to
+  the co-over-budget FEATURE vein (genuinely buildable — theming is greenlit + building). **Built theming-engine
+  T2:** the settings PUT `themePreference` field. **Probed firsthand first:** the C174 column was ALREADY accepted +
+  persisted (createInsertSchema auto-derived it) and the partial PUT ALREADY merges siblings correctly — BUT it was
+  an UNBOUNDED string (a 5000-char id persisted; an empty '' persisted). FIX: added an EXPLICIT
+  `themePreference: z.string().min(1).max(64).optional()` to `updateSettingsSchema.extend()` (a storage/abuse bound;
+  not an allow-list — the T6 resolver treats an unknown id as `default`, so any <=64-char value is safe). Routed
+  through the existing row-level `repository.update` merge (the #82 per-field discipline — a field not sent is left
+  untouched). +HTTP tests (theme-preference.test.ts, +7): fresh user defaults to `'default'`, PUT persists + GET
+  round-trips, per-field merge BOTH directions (theme survives a currency PUT + vice-versa), >64 + empty rejected
+  (400, stored value unchanged), omitted is a no-op. NON-VACUITY PROVEN: dropping the bound turns exactly the
+  length+empty guards RED; restored. VERIFY: backend validate:local GREEN (tsc 0, musl-biome clean, 1817 pass / 0
+  fail [+7], build bundled). Backend route/schema only, no UI render → no shot. Ticked tasks.md T2. **NEXT: T3**
+  (backup round-trip — SHEET_HEADERS already has themePreference [C174]; T3 = the round-trip guard test + restore
+  re-applies the theme). cov: be 88.39% / fe 88.44% (~ — one bounded schema field + HTTP guards).
 - **C178 (bug-scout DRY [verified firsthand] → pivot to guard: pin the reminder split-config cross-tenant defense end-to-end)** —
   Balance recompute (cycle 178): bug the ONLY category strictly over budget (5/3 = 1.67×). Owed a GENUINE fresh
   scout (last cycle was dry-then-pivot), so scouted the GUIDE write-path validation-asymmetry gold seam on an
