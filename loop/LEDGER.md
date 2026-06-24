@@ -29,6 +29,13 @@
 > (C155 email-fix / C157 resolveNewUser / C158 unlink-route) + the C159 offline needs-attention helpers
 > (pure+covered) added covered lines; FE crossed 88.4 line (a fresh high). Structural ceiling holds (DI/OAuth/SQL
 > BE + effect/DOM FE). NEXT ~C171.**
+> **C184 (infra cadence MEASURED): BE 88.39% line / 87.99% func (1822 pass) — FLAT vs C176/C169 (line identical);
+> FE 88.45% line / 88.92% func / 80.57% branch / 86.37% stmts (765 pass) — FLAT vs C176 (+0.01 line). Both hold at
+> the structural ceiling. The C177–C183 arc added +14 BE / +5 FE tests (C178 reminder-split-config guard, C179
+> themePreference HTTP, C180 theme round-trip, C181 theme-token-keys, C182 financing seedVehicle converge, C183
+> coalesce-completeness) — ALL guards/test-helpers/types in already-covered modules, so the covered-line ratio held
+> (the expected guard/fix-cycle signature). Untracked-test sweep CLEAN both sides; branch 38 ahead / 0 behind
+> origin/main, PR-ready. NEXT ~C194.**
 > **C176 (infra cadence MEASURED): BE 88.39% line / 87.99% func (1808 pass) — FLAT vs C169 (line identical);
 > FE 88.44% line / 88.92% func / 80.66% branch / 86.43% stmts (760 pass) — FLAT vs C169 (+0.09 branch / +0.07
 > stmts). Both hold at the structural ceiling. The C170–C175 arc added +16 BE tests (C170 RMW drift guard +
@@ -110,9 +117,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 183 |
 | bug | 3 | 173 |
 | arch | 5 | 182 |
-| infra | 6 | 176 |
+| infra | 6 | 184 |
 
-Current cycle: **183**
+Current cycle: **184**
 
 > **NOTE (C174): feature is UNBLOCKED and now BUILDING. 3 specs greenlit by Angelo 2026-06-24 (theming/
 > money-cents/trips, restored C167). C174 began the theming-engine build at T1 (the additive
@@ -125,6 +132,22 @@ Current cycle: **183**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C184 (infra — branch-hygiene sweep + coverage re-measure; the ~10-cycle cadence, last MEASURED C176)** —
+  Balance recompute (cycle 184): bug most-starved (11/3 = 3.67×) but the precondition holds — `git diff
+  649c854(C183)..HEAD -- src` is EMPTY (C183 was test-only) + four consecutive verified-clean firsthand scouts
+  (C178/C180/C182/C183), so re-scanning a provably-unchanged cold vein is ceremony (C99/C103/C107). Recorded the
+  bug-scout DRY and took the next over-budget category = INFRA (7/6 = 1.33×), whose cadence was genuinely DUE
+  (flagged C183, last measured C176). (1) UNTRACKED-TEST SWEEP: CLEAN both sides — zero untracked
+  `.test.ts`/`.spec.ts`; working tree clean. (2) COVERAGE RE-MEASURED: **BE 88.39% line / 87.99% func (1822 pass);
+  FE 88.45% line / 88.92% func / 80.57% branch / 86.37% stmts (765 pass).** Both FLAT vs C176 (BE line identical;
+  FE +0.01 line) — the C177–C183 arc added +14 BE / +5 FE tests (C178 reminder-split-config guard, C179
+  themePreference HTTP, C180 theme round-trip, C181 theme-token-keys, C182 financing converge, C183
+  coalesce-completeness), ALL guards/test-helpers/types in already-covered modules, so the covered-line ratio held
+  (the expected guard/fix-cycle signature, not a stall). Both at the structural ceiling (DI/OAuth/SQL BE +
+  effect/DOM FE). (3) BOTH-SIDES GREEN: BE 1822 / FE 765, 0 fail. (4) BRANCH STATE: claude-loop-dev = 38 commits
+  ahead of fresh origin/main, 0 behind, PR-ready. NOTE: feature is BUILDING — theming Phase 1 (T1–T3) done +
+  certified, T4 (FE types) done; T5 (theme-registry) is the next feature increment. Doc-only (coverage runs
+  exercised the full suites; no source touched → no build/shot). cov: be 88.39% / fe 88.45% (MEASURED). NEXT cadence ~C194.
 - **C183 (bug-scout DRY [verified firsthand] → pivot to guard: pin the #293 financing coalesce-list completeness)** —
   Balance recompute (cycle 183): bug most-starved + extreme (10/3 = 3.33×); infra also over (7/6 = 1.17×). C182 was
   test-only, but at 3.33× (+ the C137 lesson: the cold precondition rules out REGRESSIONS, not PRE-EXISTING debt)
