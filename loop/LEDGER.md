@@ -102,10 +102,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 170 |
 | guard | 6 | 163 |
 | bug | 3 | 168 |
-| arch | 5 | 164 |
+| arch | 5 | 171 |
 | infra | 6 | 169 |
 
-Current cycle: **170**
+Current cycle: **171**
 
 > **NOTE (C158/C159): feature is BLOCKED (all 3 spec features complete C153; new features need Angelo
 > sign-off, flagged C153). Each feature-over-budget cycle re-records this + pivots to the co-starved category.
@@ -116,6 +116,24 @@ Current cycle: **170**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C171 (arch — converge the `seedVehicle` test helper, wave 5: the expenses nickname-import pair; Angelo-approved vein)** —
+  Balance recompute (cycle 171): arch most-starved by RATIO (7/5 = 1.40×), edging guard (8/6 = 1.33×); feature
+  is UNBLOCKED but only AT budget (4/4 = 1.0×), deep-review/bug/infra under. Per the C169 ratio-tiebreak, took
+  arch — and it had a genuine clean pick (NOT manufactured churn, arch rule 5): the Angelo-approved seedVehicle
+  convergence, the wave C164 explicitly deferred. **Wave 5 = the expenses nickname-required IMPORT pair**
+  (import-csv + import-mapping-route): both hand-redeclared a byte-identical local `seedVehicle(nickname: string)`
+  → Honda Civic 2021, so a single mechanical rule converges both onto the shared `test-helpers/seed` seedVehicle.
+  make/model/year passed EXPLICITLY (the shared default is a Toyota Camry) to preserve each fixture exactly — the
+  import-csv suite depends on the literal "2021 Honda Civic" name-match + the #102 same-year/make/model ambiguity
+  cases, so the model identity is load-bearing. import-csv wraps it in a thin `seedCivic(nickname)` (24 call sites
+  with 3 nicknames); import-mapping-route inlines `seedVehicle(ctx, {…})` (10 sites, one nickname). Net −12 LOC,
+  two more local copies gone. Behavior-preserving (green→green): full backend validate:local GREEN (tsc 0,
+  musl-biome clean / 20 warnings baseline, 1796 pass / 0 fail — UNCHANGED count, a pure test-helper refactor adds
+  no test, build bundled). Test-only → no shot. **Progress: 33 of ~51 files converged** (insurance 5 + reminders
+  15 + sync 5 + expenses-no-arg 6 + expenses-nickname-import 2). REMAINING (~18): the expenses make-param/nickname
+  one-offs (delete-split-child make-param, export-csv nickname-optional, expense-source-traceability +
+  its distinct seedVehicleWithFinancing) + the scattered analytics/financing/photo/odometer/vehicles one-offs.
+  cov: be 88.39% / fe 88.44% (~ — test-helper refactor, no prod line touched).
 - **C170 (deep-review — certify the C168 `json_patch` primitive + census the remaining #100 RMW sites; +drift guard)** —
   Balance recompute (cycle 170): deep-review most-starved (8/5 = 1.6×), over with arch (6/5) + guard (7/6).
   Took deep-review with a FRESH invariant from the C168 arc: does the new atomic `mergeJsonField` compose

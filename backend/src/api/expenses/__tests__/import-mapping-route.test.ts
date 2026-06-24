@@ -16,6 +16,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -24,19 +25,10 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-/** Seed a vehicle (default unit prefs = miles / US gallons). Returns its id. */
-async function seedVehicle(nickname: string): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Honda',
-    model: 'Civic',
-    year: 2021,
-    nickname,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
-
+// Seed the file's fixture vehicle: a Honda Civic 2021 (default unit prefs = miles / US gallons) with
+// the given nickname — the foreign-tracker mappings target it by name. Converged onto the shared
+// test-helpers/seed seedVehicle (arch convergence, Angelo-approved); make/model/year passed explicitly
+// to preserve the prior fixture exactly (the shared default is a Toyota Camry).
 async function listExpenses(): Promise<
   Array<{ category: string; expenseAmount: number; mileage: number | null; volume: number | null }>
 > {
@@ -88,7 +80,7 @@ const FUELIO_MAPPING = {
 
 describe('POST /import — backward compatibility (no mapping)', () => {
   test('a native VROOM CSV still imports unchanged when no mapping is sent', async () => {
-    await seedVehicle('Daily Driver');
+    await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021, nickname: 'Daily Driver' });
     const csv = [
       'date,vehicle,category,amount',
       '2024-06-01T00:00:00.000Z,Daily Driver,misc,12.50',
@@ -103,7 +95,7 @@ describe('POST /import — backward compatibility (no mapping)', () => {
 
 describe('POST /import — foreign-tracker mapping path (T3)', () => {
   test('a Fuelio metric file maps + converts into a miles/US-gal vehicle and commits', async () => {
-    await seedVehicle('Daily Driver');
+    await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021, nickname: 'Daily Driver' });
     const res = await ctx.authed('POST', '/api/v1/expenses/import', {
       csv: FUELIO_CSV,
       mapping: FUELIO_MAPPING,
@@ -121,7 +113,7 @@ describe('POST /import — foreign-tracker mapping path (T3)', () => {
   });
 
   test('dry-run previews the mapped plan without writing', async () => {
-    await seedVehicle('Daily Driver');
+    await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021, nickname: 'Daily Driver' });
     const res = await ctx.authed('POST', '/api/v1/expenses/import', {
       csv: FUELIO_CSV,
       mapping: FUELIO_MAPPING,
@@ -135,7 +127,7 @@ describe('POST /import — foreign-tracker mapping path (T3)', () => {
   });
 
   test('re-importing the same mapped file is idempotent (inherits the native dedup)', async () => {
-    await seedVehicle('Daily Driver');
+    await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021, nickname: 'Daily Driver' });
     const first = await json<ImportResponse>(
       await ctx.authed('POST', '/api/v1/expenses/import', {
         csv: FUELIO_CSV,
@@ -155,7 +147,7 @@ describe('POST /import — foreign-tracker mapping path (T3)', () => {
   });
 
   test('an unmapped category word surfaces in unmappedCategories (D2 visible note)', async () => {
-    await seedVehicle('Daily Driver');
+    await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021, nickname: 'Daily Driver' });
     const csv = ['Data,Price,Type', '15/03/2024,"10,00",Parking'].join('\n');
     const res = await ctx.authed('POST', '/api/v1/expenses/import', {
       csv,
@@ -170,7 +162,7 @@ describe('POST /import — foreign-tracker mapping path (T3)', () => {
   });
 
   test('a malformed mapped row is reported per-row, not a whole-file 500', async () => {
-    await seedVehicle('Daily Driver');
+    await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021, nickname: 'Daily Driver' });
     // Fuel row with a non-numeric amount → buildImportPlan flags it as a row error.
     const csv = ['Data,Price,Type', '15/03/2024,not-a-number,Gas'].join('\n');
     const res = await ctx.authed('POST', '/api/v1/expenses/import', {
@@ -189,7 +181,7 @@ describe('POST /import — foreign-tracker mapping path (T3)', () => {
   });
 
   test('an unparseable foreign file → 400 (not 500)', async () => {
-    await seedVehicle('Daily Driver');
+    await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021, nickname: 'Daily Driver' });
     const res = await ctx.authed('POST', '/api/v1/expenses/import', {
       csv: 'a,b\n"unterminated,1',
       mapping: { columns: { date: 'a' }, dateFormat: 'iso' },
@@ -204,7 +196,7 @@ describe('POST /import — foreign-tracker mapping path (T3)', () => {
   // unowned target → 0 ready, a clean "No vehicle named X in your garage" per-row error, no leak, no
   // insert. This route-level cross-tenant path had no test (the existing cases all target an owned vehicle).
   test('a mapping targeting an UNOWNED vehicle imports nothing (cross-tenant safe, no leak)', async () => {
-    await seedVehicle('Daily Driver'); // the user's ONLY vehicle
+    await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021, nickname: 'Daily Driver' }); // the user's ONLY vehicle
     const res = await ctx.authed('POST', '/api/v1/expenses/import', {
       csv: ['Data,Odo (km),Fuel (litres),Price', '15/03/2024,160,37,52.40'].join('\n'),
       mapping: {
@@ -250,7 +242,7 @@ describe('POST /import — fuel-tracker defaultCategory commits through the rout
   };
 
   test('a detected fuel log with no category column commits as a fuel expense', async () => {
-    await seedVehicle('Daily Driver');
+    await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021, nickname: 'Daily Driver' });
     const res = await ctx.authed('POST', '/api/v1/expenses/import', {
       csv: FUELLY_NO_CATEGORY_CSV,
       mapping: FUELLY_MAPPING,
@@ -266,7 +258,7 @@ describe('POST /import — fuel-tracker defaultCategory commits through the rout
   });
 
   test('dry-run preview of a defaulted fuel log reports ready rows without writing', async () => {
-    await seedVehicle('Daily Driver');
+    await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021, nickname: 'Daily Driver' });
     const res = await ctx.authed('POST', '/api/v1/expenses/import', {
       csv: FUELLY_NO_CATEGORY_CSV,
       mapping: FUELLY_MAPPING,
