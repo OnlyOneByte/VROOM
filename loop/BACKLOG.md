@@ -59,10 +59,12 @@ shot.sh eyes-on works — the "Playwright-blocked" tail was a ~200-cycle MISDIAG
    swap on the EXISTING `app.css` custom-property system — ZERO component/markup changes** (R1). Backend-first,
    fully additive (`default` ≡ today's look byte-for-byte). Ratified: D1 engine+1-theme-first, D2
    persist-in-userPreferences, D3 theme×mode orthogonal, D4 a11y HARD gate, D5 `default`+`instrument` first
-   (`garage` fast-follow), D6 custom-theme seam only, D7 token-only v1. **NEXT TASK: T1 — `userPreferences
-   .themePreference` column + Drizzle migration** (tasks.md Phase 1). Phase-4 custom-theme authoring is OUT
-   (its own future `.kiro/specs/theme-authoring/`). Mocks: `vroom-design-language-option-1-instrument-cluster`
-   + `vroom-redesign-mocks/`.
+   (`garage` fast-follow), D6 custom-theme seam only, D7 token-only v1. **BUILD STARTED C174. T1 DONE (C174):
+   the additive `userPreferences.themePreference` column + migration 0006 + Sheets header; migration-0006.test.ts
+   verifies fresh-db:init apply + pre-0006 backfill to `'default'`.** **NEXT TASK: T2 — settings PUT Zod field
+   `themePreference: z.string().max(64).optional()` routed through the #82 per-field merge + GET round-trip +
+   HTTP tests** (tasks.md Phase 1). Phase-4 custom-theme authoring is OUT (its own future
+   `.kiro/specs/theme-authoring/`). Mocks: `vroom-design-language-option-1-instrument-cluster` + `vroom-redesign-mocks/`.
 
 0. **Vehicle sharing** — **SPEC DRAFTED, BLOCKED on Angelo (D1–D8).** `.kiro/specs/vehicle-sharing/`
    (requirements + design + tasks, drafted 2026-06-24). TODO.md #9 "BIGGGG" greenfield feature: an owner

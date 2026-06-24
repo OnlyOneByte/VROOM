@@ -98,24 +98,46 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 167 |
+| feature | 4 | 174 |
 | deep-review | 5 | 170 |
 | guard | 6 | 172 |
 | bug | 3 | 173 |
 | arch | 5 | 171 |
 | infra | 6 | 169 |
 
-Current cycle: **173**
+Current cycle: **174**
 
-> **NOTE (C158/C159): feature is BLOCKED (all 3 spec features complete C153; new features need Angelo
-> sign-off, flagged C153). Each feature-over-budget cycle re-records this + pivots to the co-starved category.
-> C159: feature 6/4 (highest ratio) but blocked → pivoted to the next over-budget = bug (4/3).**
+> **NOTE (C174): feature is UNBLOCKED and now BUILDING. 3 specs greenlit by Angelo 2026-06-24 (theming/
+> money-cents/trips, restored C167). C174 began the theming-engine build at T1 (the additive
+> userPreferences.themePreference column + migration 0006). Each feature-over-budget cycle now BUILDS the
+> next task of the most-starved greenlit spec; vehicle-sharing stays gated (Angelo greenlit 3, not it).
+> (Historical C158/C159: feature was BLOCKED then — re-recorded + pivoted — until the C167 greenlights.)**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C174 (feature — theming-engine T1: the additive `userPreferences.themePreference` column + migration 0006)** —
+  Balance recompute (cycle 174): feature most-starved (7/4 = 1.75×) and now genuinely UNBLOCKED (3 greenlit specs),
+  so this is the cycle feature STOPS recording-and-pivoting and BUILDS. Took the loop's standing recommendation:
+  theming-engine T1, the cleanest entry (additive schema leg, no eyes-on). **Did:** added `theme_preference text
+  NOT NULL DEFAULT 'default'` to userPreferences (schema.ts) — fully additive, `'default'` reproduces today's look
+  byte-for-byte so existing rows backfill with zero visual change (D2: only the theme ID persists here; light/dark
+  mode stays device-local). Generated the migration via `db:generate` → `0006_mixed_zarek.sql` (`ALTER TABLE
+  user_preferences ADD theme_preference text DEFAULT 'default' NOT NULL`) + snapshot + journal (NOT db:push — the
+  steering-doc-correct path; drizzle-kit generate works fine on this host, only push is bun-broken). **Caught by a
+  guard (the loop working as designed):** the sheets-header-coverage drift guard (cycle-211) went RED — a schema
+  column missing from `SHEET_HEADERS` is silently dropped on a Google Sheets backup. Added `themePreference` to
+  `SHEET_HEADERS.userPreferences` in schema-order (the full backup round-trip + its OWN guard test is the tracked T3;
+  this header addition is the minimum to keep the column from silently dropping + the tree green). **Verify:**
+  migration-0006.test.ts (+4) — column exists, NOT NULL + dflt `'default'`, a pre-0006 prefs row backfills
+  `'default'`, a new insert omitting it takes the default; migration-general applies all 7 in sequence. Confirmed on
+  the REAL path: a fresh `DATABASE_URL=… db:init` produces `theme_preference TEXT NOT NULL dflt 'default'` (cid 11).
+  Backend validate:local GREEN (tsc 0, musl-biome clean, 1803 pass / 0 fail [+4], build bundled). Backend schema/
+  migration only, no UI render → no shot. Ticked tasks.md T1. **NEXT: T2** (settings PUT Zod field +
+  per-field-merge #82 discipline + GET round-trip + HTTP tests). cov: be 88.39% / fe 88.44% (~ — schema + migration
+  + config header; migration tests + header guard cover the new surface).
 - **C173 (bug — the #79 "Needs attention" card misdirected the user to the WRONG missing field; fix + source-scan guard)** —
   Balance recompute (cycle 173): bug most-starved (5/3 = 1.67×), over with feature (6/4 = 1.50×, unblocked but lower
   ratio). Took bug. The cold pure-logic vein is dry, so per the C163 discipline scouted the production source CHANGED

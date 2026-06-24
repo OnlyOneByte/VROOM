@@ -172,6 +172,7 @@ export const SHEET_HEADERS = {
     'userId',
     'unitPreferences',
     'currencyUnit',
+    'themePreference',
     'autoBackupEnabled',
     'backupFrequency',
     'syncOnInactivity',

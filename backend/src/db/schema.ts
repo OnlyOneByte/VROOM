@@ -308,6 +308,11 @@ export const userPreferences = sqliteTable('user_preferences', {
     .notNull()
     .default(DEFAULT_UNIT_PREFERENCES),
   currencyUnit: text('currency_unit').notNull().default('USD'),
+  // Theming engine (theming-engine spec T1, D2). The user's selected theme id; 'default' reproduces
+  // today's look byte-for-byte, so this is fully additive — existing rows backfill 'default' and
+  // nothing changes until a user picks another theme. The light/dark *mode* stays device-local
+  // (localStorage) by current convention (D2); only the theme *id* is persisted/synced here.
+  themePreference: text('theme_preference').notNull().default('default'),
   autoBackupEnabled: integer('auto_backup_enabled', { mode: 'boolean' }).notNull().default(false),
   backupFrequency: text('backup_frequency').notNull().default('weekly'), // 'daily' | 'weekly' | 'monthly'
   syncOnInactivity: integer('sync_on_inactivity', { mode: 'boolean' }).notNull().default(true),

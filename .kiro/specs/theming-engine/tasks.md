@@ -14,11 +14,15 @@
       Build T1+.
 
 ## Phase 1 — backend persistence (additive, backward-compatible)
-- [ ] **T1** `userPreferences.themePreference` column. Add `theme_preference text NOT NULL DEFAULT
-      'default'` to `backend/src/db/schema.ts` `userPreferences`; generate the Drizzle migration
-      (`000X_*.sql` + snapshot + journal) per `DatabaseMigrations.md`; apply via `db:init` (NOT
-      drizzle-kit push — fails under bun on this host). Seed default unchanged. Verify: migration
-      applies on a fresh `db:init`, existing rows backfill `'default'`. **[D2]**
+- [x] **T1 (C174)** `userPreferences.themePreference` column. Added `theme_preference text NOT NULL
+      DEFAULT 'default'` to `backend/src/db/schema.ts` `userPreferences`; generated the Drizzle migration
+      via `db:generate` → `0006_mixed_zarek.sql` (`ALTER TABLE user_preferences ADD theme_preference text
+      DEFAULT 'default' NOT NULL`) + snapshot + journal. Verified: applies on a fresh `db:init` (column =
+      TEXT NOT NULL dflt `'default'`); an existing pre-0006 prefs row backfills `'default'`
+      (migration-0006.test.ts, +4). Also added `themePreference` to `SHEET_HEADERS.userPreferences` (keeps
+      the sheets-header-coverage drift guard green — the column would otherwise be silently dropped on a
+      Sheets backup; the full backup round-trip + its own guard remains T3). Backend validate:local GREEN
+      (1803 pass). **[D2]**
 - [ ] **T2** Settings route field. Extend the settings PUT Zod schema with `themePreference:
       z.string().max(64).optional()` and route it through the EXISTING per-field merge
       (`settings/routes.ts` — the #82/C82 discipline; never wholesale-overwrite, never wipe sibling
