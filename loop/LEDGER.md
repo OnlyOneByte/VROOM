@@ -112,14 +112,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 187 |
+| feature | 4 | 189 |
 | deep-review | 5 | 186 |
 | guard | 6 | 183 |
 | bug | 3 | 173 |
 | arch | 5 | 188 |
 | infra | 6 | 184 |
 
-Current cycle: **188**
+Current cycle: **189**
 
 > **NOTE (C174): feature is UNBLOCKED and now BUILDING. 3 specs greenlit by Angelo 2026-06-24 (theming/
 > money-cents/trips, restored C167). C174 began the theming-engine build at T1 (the additive
@@ -132,6 +132,27 @@ Current cycle: **188**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C189 (bug-scout DRY [precondition] → pivot to feature: theming-engine T7 — themes.css generator + load seam, eyes-on)** —
+  Balance recompute (cycle 189): bug most-starved (16/3 = 5.33×) but the only prod change since the last real scout
+  (C183) is theme data + the uncalled C187 resolver → 8th consecutive provably-dry cold vein, scout is ceremony.
+  Recorded the bug-scout DRY and pivoted to the highest-leverage open item = the active greenlit theming build.
+  **Built theming-engine T7:** `themes-css.ts` — a PURE generator (`generateThemesCss`/`themeBlocks`/
+  `nonDefaultThemeIds`) emitting one `:root[data-theme="<id>"]` (light) + `:root[data-theme="<id>"].dark` (dark)
+  block per NON-default registry theme. **Design call: `default` is EXCLUDED** — app.css already owns its bare
+  `:root`/`.dark` (data-theme absent = default), so generating a default block would duplicate + risk drift, and
+  the C185 guard already pins default≡app.css. Checked-in `themes.css` generated from THEME_REGISTRY (a placeholder
+  today — only `default` registered) + imported in `+layout.svelte` right after app.css (Vite bundles it into the
+  head stylesheet → zero-FOUC non-default paint, zero JS token duplication). **GUARD:** themes-css.test.ts (+7) —
+  generator emits both selectors with ALL tokens (synthetic theme), excludes default, AND the committed themes.css
+  == generateThemesCss(THEME_REGISTRY) BYTE-FOR-BYTE (adding a registry theme without regenerating trips it — the
+  C25/C170 source-scan idiom applied to a codegen artifact). **EYES-ON (GUIDE UI gate — touches +layout.svelte):**
+  booted (START_SERVERS+RESET_DB), regress.sh GREEN (91 pass), shot /dashboard + Read the PNG → renders
+  BYTE-IDENTICAL to the default look (the zero-rule themes.css import is a clean no-op; no FOUC, no console errors,
+  no visual regression). VERIFY: frontend validate:local GREEN (svelte-check 0, build OK, 792 pass / 0 fail [+7]).
+  Ticked tasks.md T7. **NEXT: Phase 3 T8** (extend theme.svelte.ts — the `themeId` axis: `vroom-theme-id` mirror,
+  `setTheme(id)`, `applyTheme()` sets `data-theme` + the theme-color meta; the head-script `data-theme` set lands
+  here too). cov: be 88.39% / fe 88.45% (~ — pure generator + a zero-rule css import + guards). **theming Phase 2
+  (T4–T7, the model+registry+resolver+css engine) is COMPLETE; Phase 3 wires it to the store/UI.**
 - **C188 (bug-scout DRY [precondition] → pivot to arch: converge `seedVehicle` wave 8, the vehicles no-arg pair)** —
   Balance recompute (cycle 188): bug most-starved (15/3 = 5.0×) but the only prod change since the last real scout
   (C183) is theme DATA + the pure UNCALLED C187 resolver (no reachable runtime/logic surface) → 7th consecutive

@@ -69,11 +69,19 @@
       mode ignores pref; unknown id→default; empty/null/garbage ids+modes never throw + yield a COMPLETE
       token map; the prototype-pollution case (`constructor`/`toString`→default). FE validate:local GREEN
       (svelte-check 0, 785 pass).
-- [ ] **T7** `themes.css` generation + anti-FOUC seam **[A1 = option (b)]**. Emit one
-      `:root[data-theme="<id>"]` / `:root[data-theme="<id>"].dark` block per registry theme (a small
-      build/codegen step or a checked-in generated file with a guard test that it ⊇ the registry ids).
-      Load it in `<head>`. This is what makes a non-default theme paint with zero FOUC and zero token
-      duplication in JS.
+- [x] **T7 (C189)** `themes.css` generation + load seam. `themes-css.ts` — a PURE generator
+      (`generateThemesCss`/`themeBlocks`/`nonDefaultThemeIds`) emitting one `:root[data-theme="<id>"]`
+      (light) + `:root[data-theme="<id>"].dark` (dark) block per NON-default registry theme (`default` is
+      excluded — app.css owns its bare `:root`/`.dark`; generating it would duplicate + risk drift, and the
+      C185 guard already pins default≡app.css). Checked-in `themes.css` generated from THEME_REGISTRY
+      (placeholder today — only `default` registered) + imported in `+layout.svelte` right after app.css so
+      a non-default theme paints with zero FOUC, zero JS token duplication. +guard (themes-css.test.ts, +7):
+      generator emits both selectors with ALL tokens (synthetic theme), excludes default, AND the committed
+      themes.css == generateThemesCss(THEME_REGISTRY) byte-for-byte (adding a theme without regenerating
+      trips it). EYES-ON: booted + shot /dashboard → renders byte-identical to default (the zero-rule import
+      is a clean no-op), regress.sh GREEN (91 pass). FE validate:local GREEN (svelte-check 0, 792 pass).
+      NOTE: the `data-theme` head-script set (FOUC for the id axis) is T8's store wiring — T7 is the css
+      seam; with only `default` today there's no non-default block to flash.
 
 ## Phase 3 — store generalization + wiring
 - [ ] **T8** Extend `theme.svelte.ts` — add the `themeId` axis alongside the existing mode:

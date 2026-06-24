@@ -77,9 +77,13 @@ shot.sh eyes-on works — the "Playwright-blocked" tail was a ~200-cycle MISDIAG
    a product call the loop won't self-author (mock dir is gitignored/absent). Registry accepts it with zero
    structural change.** T6 DONE (C187): `resolve-theme.ts` — pure total resolver (resolveTheme + resolveThemeDefinition[R8 fallback,
    Object.hasOwn] + resolveVariant); +12 unit tests (built-ins, system-pref, unknown→default, garbage-never-throws,
-   prototype-pollution).** **NEXT TASK: T7 — `themes.css` generation + the anti-FOUC `data-theme` head seam (emit
-   one `:root[data-theme=<id>]` block per registry theme; still unblocked on `default` alone)** (tasks.md Phase 2).
-   Phase-4 custom-theme authoring is OUT
+   prototype-pollution).** T7 DONE (C189): `themes-css.ts` pure generator (one `:root[data-theme=<id>]` light + `.dark` block per
+   NON-default theme; default excluded — app.css owns its bare :root/.dark) + checked-in themes.css imported in
+   +layout.svelte; +7 guard incl. committed-file == generator byte-for-byte; eyes-on /dashboard byte-identical.**
+   **Phase 2 (model+registry+resolver+css engine, T4–T7) is COMPLETE.** **NEXT TASK: Phase 3 T8 — extend
+   `theme.svelte.ts` with the `themeId` axis: `vroom-theme-id` localStorage mirror, `setTheme(id)`, `applyTheme()`
+   sets `<html>` data-theme + the theme-color meta from the resolved brand token; `initialize()` applies both axes;
+   the app.html head-script gains the `data-theme` set** (tasks.md Phase 3). Phase-4 custom-theme authoring is OUT
    (its own future `.kiro/specs/theme-authoring/`). Mocks: `vroom-design-language-option-1-instrument-cluster` + `vroom-redesign-mocks/`.
 
 0. **Vehicle sharing** — **SPEC DRAFTED, BLOCKED on Angelo (D1–D8).** `.kiro/specs/vehicle-sharing/`
