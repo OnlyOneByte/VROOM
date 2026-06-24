@@ -1355,6 +1355,19 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 >   model — alongside the analytics-test-generators / property-test direct-DB seeders. **THIS ARCH VEIN IS
 >   EXHAUSTED** — next arch cycles need a fresh behavior-preserving dedup target, or record "no churn warranted" +
 >   pivot (arch rule 5). Don't re-scout seedVehicle.
+
+> **✅ CONVERGED C205 — the vehicleId-FK referential validators in backup.ts (a FRESH rule-of-three, NOT
+> seedVehicle).** `validateFinancingRefs` + `validateOdometerRefs` were a pre-existing byte-identical pair; the
+> C202 `validateTripRefs` addition tipped it to THREE — iterate rows, `if (!vehicleIds.has(String(row.vehicleId)))
+> push `${Label} ${row.id} references non-existent vehicle``. Converged onto one shared private
+> `validateVehicleFkRefs(rows, vehicleIds, label)`; the 3 callers are now one-line delegations preserving each
+> message verbatim. (validateExpenseRefs has an extra userId check; claim/junction have optional/second FKs — all
+> genuinely different, correctly LEFT alone; the clean boundary is exactly the 3 simple vehicleId-only checks.)
+> Behavior-preserving green→green (1840 pass). Guard: +3 convergence cases in backup.test.ts drive all 3 through
+> the public validateBackupData + assert each EXACT per-entity label (non-vacuous: rename one → only its case RED).
+> **The arch convergence vein is exhausted again** — next arch needs another fresh rule-of-three (the trips T2/T3
+> repo+route build will likely surface one — e.g. a `validateXOwnership` or repository CRUD shape) or record
+> no-churn-warranted + pivot. Don't re-scout this trio.
 >
 > **✅ APPROVED 2026-06-23 (Angelo) — adopt `createLoadState<T>` across the 13 load-bearing pages, via a
 > design doc + ONE page per cycle.** The scaffold (load-state.svelte.ts, arch #2) centralizes the page load

@@ -133,10 +133,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 201 |
 | guard | 6 | 204 |
 | bug | 3 | 173 |
-| arch | 5 | 199 |
+| arch | 5 | 205 |
 | infra | 6 | 200 |
 
-Current cycle: **204**
+Current cycle: **205**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -155,6 +155,25 @@ Current cycle: **204**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C205 (bug-scout DRY → arch: converge the 3 byte-identical vehicleId-FK referential validators, +convergence guard)** —
+  Balance recompute (cycle 205): bug most-starved (32/3 = 10.67×) but the trips surfaces are now BOTH certified (ZIP
+  C203 + Sheets C204) and C203/C204 were test-only → no fresh prod logic since → scout dry, recorded. Next over-budget
+  = ARCH (6/5 = 1.2×). **Arch's convergence vein was declared exhausted at C199 — but C202 genuinely added a THIRD
+  copy of an existing pattern (validateTripRefs alongside the pre-existing validateFinancingRefs + validateOdometerRefs
+  in backup.ts), tipping a real rule-of-three. NOT manufactured churn — the duplication predated me; trips tipped
+  it.** The three were byte-identical save the entity label: iterate rows, `if (!vehicleIds.has(String(row.vehicleId)))
+  push `${Label} ${row.id} references non-existent vehicle``. (validateExpenseRefs has an extra userId check, claim/
+  junction have optional/second FKs — genuinely different, correctly LEFT alone; the clean boundary is exactly these
+  3.) Converged onto one shared private `validateVehicleFkRefs(rows, vehicleIds, label)`; the 3 callers became
+  one-line delegations preserving each message VERBATIM (behavior-preserving — no test asserts the strings, but a
+  restore-UI/log consumer could). ARCH-RULE GUARD: +3 convergence cases in backup.test.ts drive all 3 through the
+  PUBLIC validateBackupData with a bogus vehicleId + assert each emits its EXACT per-entity label, so a future
+  "simplify the label" edit to the shared helper can't silently change one entity's text. Non-vacuous (rename the
+  Trip label to 'Journey' → ONLY the Trip case RED, 2 pass/1 fail, verified firsthand; reverted). Behavior-preserving
+  green→green: backend validate:local GREEN (tsc 0, musl 21 warn baseline, 1840 pass / 0 fail, +3 convergence cases,
+  build bundled). Net LOC down (3 method bodies → 3 delegations + 1 helper). Backend-only refactor → no shot. cov: be
+  ~88.4% (~) / fe 88.73% (~). **The arch convergence vein is exhausted AGAIN — next arch needs a fresh rule-of-three
+  (likely surfaced by the trips T2/T3 repo+route build) or record no-churn-warranted + pivot.** (Bug stays 173 — scout dry.)
 - **C204 (bug-scout on the trips GOOGLE SHEETS path [CLEAN — distinct serializer verified firsthand] → guard: pin the trips Sheets round-trip)** —
   Balance recompute (cycle 204): bug most-starved (31/3 = 10.33×, the ONLY strictly over-budget category). Cold-vein
   still doesn't apply (C202's trips pipeline is fresh prod logic; C203 was test-only). C203 certified the trips ZIP/CSV

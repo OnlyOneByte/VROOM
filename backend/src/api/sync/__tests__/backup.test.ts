@@ -17,6 +17,7 @@ import {
   insurancePolicies,
   odometerEntries,
   photos,
+  trips,
   userPreferences,
   vehicleFinancing,
   vehicles,
@@ -775,6 +776,53 @@ describe('validateBackupData: referential integrity', () => {
     expect(result.valid).toBe(false);
     expect(result.errors.some((e) => e.includes('non-existent vehicle'))).toBe(true);
   });
+
+  // C205 (arch dedup convergence guard): financing / odometer / trips each own purely via a vehicleId FK,
+  // and their three byte-identical ref-checks were converged onto one shared `validateVehicleFkRefs(rows,
+  // vehicleIds, label)` helper (the C202 trips addition tipped the rule-of-three). The convergence is
+  // behavior-preserving ONLY if each caller still emits its EXACT prior message — a future "simplify the
+  // label" edit to the shared helper could silently change one entity's validation text (which a restore
+  // UI / a log consumer may match on). This drives all THREE through the public validateBackupData with a
+  // bogus vehicleId and asserts the precise per-entity string survives. Non-vacuous: change any label in
+  // the helper's callers and the matching assertion goes RED.
+  const VEHICLE_FK_CASES: {
+    label: string;
+    table: Parameters<typeof getTableColumns>[0];
+    key: keyof ParsedBackupData;
+  }[] = [
+    { label: 'Financing', table: vehicleFinancing, key: 'financing' },
+    { label: 'Odometer entry', table: odometerEntries, key: 'odometer' },
+    { label: 'Trip', table: trips, key: 'trips' },
+  ];
+
+  for (const { label, table, key } of VEHICLE_FK_CASES) {
+    test(`${label} row referencing a non-existent vehicle fails with its exact label (C205 convergence)`, () => {
+      const row = coerceRow(buildMinimalStringRow(table, { vehicleId: 'ghost' }), table);
+      const base: ParsedBackupData = {
+        metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+        vehicles: [],
+        expenses: [],
+        financing: [],
+        insurance: [],
+        insuranceTerms: [],
+        insuranceTermVehicles: [],
+        userPreferences: [],
+        syncState: [],
+        photos: [],
+        odometer: [],
+        photoRefs: [],
+      };
+      const backup: ParsedBackupData = { ...base, [key]: [row] };
+      const result = backupService.validateBackupData(backup);
+      expect(result.valid).toBe(false);
+      // The EXACT message contract each converged caller must still produce: "<Label> <id> references
+      // non-existent vehicle". A regression renaming a caller's label fails only its own case here.
+      expect(
+        result.errors.some((e) => e === `${label} ${row.id} references non-existent vehicle`),
+        `expected the exact "${label} <id> references non-existent vehicle" message; got: ${JSON.stringify(result.errors)}`
+      ).toBe(true);
+    });
+  }
 });
 
 // ---------------------------------------------------------------------------

@@ -694,17 +694,32 @@ export class BackupService {
     return errors;
   }
 
+  /**
+   * Shared referential check for a row that owns purely via a `vehicleId` FK (financing/odometer/trips —
+   * each cascade-deletes with its vehicle). Rejects a backup whose row names a vehicle absent from the SAME
+   * backup, so the post-wipe restore INSERT can't FK-violate. The three callers were byte-identical save the
+   * entity label (a rule-of-three the C202 trips addition tipped — dedup'd C205); the message is preserved
+   * verbatim (`<Label> <id> references non-existent vehicle`) so any consumer of the text is unaffected.
+   */
+  private validateVehicleFkRefs(
+    rows: Record<string, unknown>[],
+    vehicleIds: Set<string>,
+    label: string
+  ): string[] {
+    const errors: string[] = [];
+    for (const row of rows) {
+      if (!vehicleIds.has(String(row.vehicleId))) {
+        errors.push(`${label} ${row.id} references non-existent vehicle`);
+      }
+    }
+    return errors;
+  }
+
   private validateFinancingRefs(
     financingList: Record<string, unknown>[],
     vehicleIds: Set<string>
   ): string[] {
-    const errors: string[] = [];
-    for (const financing of financingList) {
-      if (!vehicleIds.has(String(financing.vehicleId))) {
-        errors.push(`Financing ${financing.id} references non-existent vehicle`);
-      }
-    }
-    return errors;
+    return this.validateVehicleFkRefs(financingList, vehicleIds, 'Financing');
   }
 
   private validateInsuranceRefs(insuranceList: Record<string, unknown>[]): string[] {
@@ -779,26 +794,13 @@ export class BackupService {
     odometerList: Record<string, unknown>[],
     vehicleIds: Set<string>
   ): string[] {
-    const errors: string[] = [];
-    for (const entry of odometerList) {
-      if (!vehicleIds.has(String(entry.vehicleId))) {
-        errors.push(`Odometer entry ${entry.id} references non-existent vehicle`);
-      }
-    }
-    return errors;
+    return this.validateVehicleFkRefs(odometerList, vehicleIds, 'Odometer entry');
   }
 
-  // A trip references a vehicle (trips.vehicle_id, ON DELETE cascade) — reject a backup whose trip names a
-  // vehicle absent from the same backup (else the restore INSERT would FK-violate after the wipe). Mirrors
-  // validateOdometerRefs — the trips-location T4 referential check (spec §4).
+  // A trip references a vehicle (trips.vehicle_id, ON DELETE cascade) — the trips-location T4 referential
+  // check (spec §4), via the shared vehicleId-FK helper.
   private validateTripRefs(tripList: Record<string, unknown>[], vehicleIds: Set<string>): string[] {
-    const errors: string[] = [];
-    for (const trip of tripList) {
-      if (!vehicleIds.has(String(trip.vehicleId))) {
-        errors.push(`Trip ${trip.id} references non-existent vehicle`);
-      }
-    }
-    return errors;
+    return this.validateVehicleFkRefs(tripList, vehicleIds, 'Trip');
   }
 
   private validatePhotoRefs(
