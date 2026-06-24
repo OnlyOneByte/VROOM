@@ -109,10 +109,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 175 |
 | guard | 6 | 172 |
 | bug | 3 | 173 |
-| arch | 5 | 171 |
+| arch | 5 | 177 |
 | infra | 6 | 176 |
 
-Current cycle: **176**
+Current cycle: **177**
 
 > **NOTE (C174): feature is UNBLOCKED and now BUILDING. 3 specs greenlit by Angelo 2026-06-24 (theming/
 > money-cents/trips, restored C167). C174 began the theming-engine build at T1 (the additive
@@ -125,6 +125,28 @@ Current cycle: **176**
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
+- **C177 (bug-scout DRY → pivot to arch: converge `seedVehicle` wave 6, the expenses make-param + nickname-optional pair — completes the expenses domain)** —
+  Balance recompute (cycle 177): bug most-starved over budget (4/3 = 1.33×), arch next (6/5 = 1.20×). Took bug
+  first: checked #140 (the queue's standing "clean one-edit, eyes-on-deferred" candidate) — it's ALREADY FIXED +
+  merged (BACKLOG C68 eyes-on confirmed it; removed-stale C1), NOT open. The cold pure-logic vein is dry, so per
+  the C163 discipline scoped the production source changed since the last bug scout (C173): ONLY the C174/C175
+  backup-path surface (themePreference column, coerceRow restore-safety) — and C175 was itself a deep-review that
+  CERTIFIED that surface firsthand. Also confirmed the new themePreference write path is clean: the settings PUT
+  schema is a closed `.partial()` z.object, so it strips (doesn't persist) themePreference until T2 adds it — no
+  injection. Re-scouting an already-certified surface is ceremony (C99/C103/C107), so recorded the bug-scout DRY
+  and PIVOTED the substantive work to the co-over-budget arch vein. **ARCH (Angelo-approved seedVehicle
+  convergence, wave 6):** converged the last two expenses-domain locals — delete-split-child.test.ts (make-param,
+  Honda/Toyota model 'Test' year 2021 → thin make wrapper) + export-csv.test.ts (nickname-optional, Honda Civic
+  2021 → seedCivic wrapper). Both keep make/model/year explicit (shared default is a Camry) so behavior is
+  preserved; export-csv dropped its now-unused json+DataEnvelope imports, delete-split-child dropped DataEnvelope.
+  **This COMPLETES the expenses domain** (no-arg subset C164 + import pair C171 + this pair). Behavior-preserving
+  (green→green): the 2 suites 12/12 pass; full backend validate:local GREEN (tsc 0, musl-biome clean, 1808 pass /
+  0 fail — UNCHANGED count, pure test-helper refactor, build bundled). Net −10 LOC. Test-only → no shot. **Progress:
+  35 of ~51 files converged**; REMAINING (~13): analytics (analytics-routes-http, vehicle-tco-zero-state),
+  financing (deactivate-hook, get-contract), insurance premium-expense-hook, odometer update-route, photos
+  entity-ownership-gate, google-sheets-service, vehicles (delete-cascade, photo-routes-http,
+  list-financing-contract, stats-current-odometer) + the distinct seedVehicleWithFinancing helper. cov: be 88.39%
+  / fe 88.44% (~ — test-helper refactor, no prod line).
 - **C176 (infra — branch-hygiene sweep + coverage re-measure; the ~10-cycle cadence, last MEASURED C169)** —
   Balance recompute (cycle 176): infra the ONLY category strictly over budget (7/6 = 1.17×); bug + arch sat AT
   budget (3/3, 5/5). Took infra — the cadence was due (~7 cycles since C169) and the C168–C175 arc added real

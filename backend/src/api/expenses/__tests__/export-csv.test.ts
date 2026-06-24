@@ -9,12 +9,8 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import {
-  createTestApp,
-  type DataEnvelope,
-  json,
-  type TestApp,
-} from '../../../test-helpers/http-client';
+import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -23,17 +19,16 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-async function seedVehicle(nickname?: string): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
+// This file's fixture vehicle is a Honda Civic 2021 with an optional nickname; converge onto the shared
+// seedVehicle (arch convergence, Angelo-approved) via a thin wrapper preserving the exact prior make/model/
+// year (the shared default is a Camry). nickname stays optional — an omitted call seeds the unnamed Civic.
+const seedCivic = (nickname?: string): Promise<string> =>
+  seedVehicle(ctx, {
     make: 'Honda',
     model: 'Civic',
     year: 2021,
     ...(nickname ? { nickname } : {}),
   });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
 
 async function createExpense(
   vehicleId: string,
@@ -61,7 +56,7 @@ describe('GET /api/v1/expenses/export (CSV)', () => {
   });
 
   test('returns a CSV attachment with a header row and the vehicle name', async () => {
-    const vehicleId = await seedVehicle('Daily Driver');
+    const vehicleId = await seedCivic('Daily Driver');
     await createExpense(vehicleId, 'fuel', 52.4, 'Shell top-up', '2024-06-01T00:00:00.000Z');
     await createExpense(vehicleId, 'maintenance', 120, 'Oil change', '2024-06-10T00:00:00.000Z');
 
@@ -85,7 +80,7 @@ describe('GET /api/v1/expenses/export (CSV)', () => {
   });
 
   test('category filter narrows the export', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedCivic();
     await createExpense(vehicleId, 'fuel', 40, 'Fuel A', '2024-06-01T00:00:00.000Z');
     await createExpense(vehicleId, 'fuel', 41, 'Fuel B', '2024-06-02T00:00:00.000Z');
     await createExpense(vehicleId, 'maintenance', 200, 'Brakes', '2024-06-03T00:00:00.000Z');
@@ -102,7 +97,7 @@ describe('GET /api/v1/expenses/export (CSV)', () => {
   test('search filter narrows the export to matching rows (matches the table)', async () => {
     // Before cycle 186 the export ignored search, so a searched table + Export CSV
     // gave a BROADER file than the user was viewing. Now it matches.
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedCivic();
     await createExpense(
       vehicleId,
       'maintenance',
@@ -122,7 +117,7 @@ describe('GET /api/v1/expenses/export (CSV)', () => {
   });
 
   test('tags filter narrows the export (AND semantics, comma-joined param)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedCivic();
     // Seed with tags directly (createExpense helper doesn't take tags).
     const mk = async (desc: string, tags: string[]) => {
       const r = await ctx.authed('POST', '/api/v1/expenses', {
@@ -164,7 +159,7 @@ describe('GET /api/v1/expenses/export (CSV)', () => {
     // treats it as literal text — RFC quoting alone does not stop this. (Quote-
     // free payload so RFC-4180 doesn't double-up embedded `"` and muddy the
     // substring assertions.)
-    const vehicleId = await seedVehicle('Daily Driver');
+    const vehicleId = await seedCivic('Daily Driver');
     const payload = "=2+5+cmd|' /C calc'!A0";
     await createExpense(vehicleId, 'misc', 10, payload, '2024-06-01T00:00:00.000Z');
 
@@ -185,7 +180,7 @@ describe('GET /api/v1/expenses/export (CSV)', () => {
     const setRes = await ctx.authed('PUT', '/api/v1/settings', { currencyUnit: 'EUR' });
     expect(setRes.status, await setRes.text()).toBe(200);
 
-    const vehicleId = await seedVehicle('Euro Car');
+    const vehicleId = await seedCivic('Euro Car');
     await createExpense(vehicleId, 'misc', 30, 'Parking', '2024-06-01T00:00:00.000Z');
 
     const res = await ctx.authed('GET', '/api/v1/expenses/export');
@@ -198,7 +193,7 @@ describe('GET /api/v1/expenses/export (CSV)', () => {
   test('defaults the currency column to USD when no preference row exists', async () => {
     // The seeded harness user has no preferences row until something creates one;
     // the export must fall back to USD (and must NOT create a row as a side effect).
-    const vehicleId = await seedVehicle('Default Car');
+    const vehicleId = await seedCivic('Default Car');
     await createExpense(vehicleId, 'misc', 12, 'Default', '2024-06-01T00:00:00.000Z');
 
     const res = await ctx.authed('GET', '/api/v1/expenses/export');
@@ -211,7 +206,7 @@ describe('GET /api/v1/expenses/export (CSV)', () => {
     // reach the CSV un-escaped (no leading quote). (Amounts can't be negative —
     // the create schema enforces min(0) — so the negative-number safety property
     // is pinned at the unit level in csv-safety.test.ts instead.)
-    const vehicleId = await seedVehicle('Numbers');
+    const vehicleId = await seedCivic('Numbers');
     await createExpense(vehicleId, 'misc', 52.4, 'Plain note', '2024-06-02T00:00:00.000Z');
 
     const res = await ctx.authed('GET', '/api/v1/expenses/export');
