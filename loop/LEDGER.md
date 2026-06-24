@@ -129,14 +129,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 202 |
+| feature | 4 | 206 |
 | deep-review | 5 | 201 |
 | guard | 6 | 204 |
 | bug | 3 | 173 |
 | arch | 5 | 205 |
 | infra | 6 | 200 |
 
-Current cycle: **205**
+Current cycle: **206**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -155,6 +155,25 @@ Current cycle: **205**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C206 (bug-scout DRY → feature: trips-location T2 — TripRepository + validateTripOwnership)** —
+  Balance recompute (cycle 206): bug most-starved (33/3 = 11×) but the trips surfaces are certified (C203 ZIP +
+  C204 Sheets) and no fresh prod logic landed since C202 → scout dry, recorded. NOTHING else strictly over budget
+  (feature/deep-review/infra all exactly AT budget: 4/4, 5/5, 6/6) → took the highest-leverage open item = trips T2
+  (advances the only actively-building greenlit arc + adds genuinely new prod logic, which breaks the C201–C205
+  bug-dry→guard/arch loop by giving future scouts a real surface). Built `TripRepository` (src/api/trips/
+  repository.ts): extends BaseRepository (create/findById/update/delete) + userId-scoped finders
+  (findByIdAndUserId / findByUserId(filters?) / findByVehicle / findByUserIdPaginated / findIdsByVehicleId) + a
+  tenant-safe `deleteByIdAndUserId` keying on BOTH id AND userId (the #52 lesson — an id-only delete lets one user
+  delete another's row) + an exported pure `tripDistance(start,end)` = max(0, end−start) clamp (R2/#46; distance
+  DERIVED not stored, one source of truth for T3/T5). Added `validateTripOwnership` to the validateXOwnership family
+  (validation.ts, C160 pattern; NotFound never 403 — #80 enumeration discipline; backed by the repo's userId-scoped
+  read). Tests (+14): repository.test.ts (12 — CRUD, every finder userId-scoped, filter combos, pagination, and the
+  REQUIRED #52 cross-tenant DELETE-scope regression: a foreign delete is a no-op→false) + tripDistance clamp (2,
+  incl. the negative-guard). Behavior-additive (new table+module, zero existing behavior touched): backend
+  validate:local GREEN (tsc 0, musl 21 warn baseline, 1852 pass / 0 fail, +12 net, build bundled). Backend-only →
+  no shot. cov: be ~88.4% (~, new module fully covered) / fe 88.73% (~). REMAINING trips: T3 routes (consumes
+  validateTripOwnership + the repo — likely surfaces the next arch rule-of-three) + T5 analytics, then T6 eyes-on.
+  (Bug stays 173 — scout dry.)
 - **C205 (bug-scout DRY → arch: converge the 3 byte-identical vehicleId-FK referential validators, +convergence guard)** —
   Balance recompute (cycle 205): bug most-starved (32/3 = 10.67×) but the trips surfaces are now BOTH certified (ZIP
   C203 + Sheets C204) and C203/C204 were test-only → no fresh prod logic since → scout dry, recorded. Next over-budget

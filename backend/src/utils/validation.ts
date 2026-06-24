@@ -74,11 +74,13 @@ import { financingRepository } from '../api/financing/repository';
 import { insurancePolicyRepository } from '../api/insurance/repository';
 import { odometerRepository } from '../api/odometer/repository';
 import { type ReminderWithVehicles, reminderRepository } from '../api/reminders/repository';
+import { tripRepository } from '../api/trips/repository';
 import { vehicleRepository } from '../api/vehicles/repository';
 import type {
   Expense,
   InsurancePolicy,
   OdometerEntry,
+  Trip,
   Vehicle,
   VehicleFinancing,
 } from '../db/schema';
@@ -207,6 +209,21 @@ export async function validateOdometerOwnership(
     throw new NotFoundError('Odometer entry');
   }
   return entry;
+}
+
+/**
+ * Validate that a trip belongs to the user, returning it (trips-location T2, the C160 family). Trips own
+ * via a userId column, so the repository's own userId-scoped read is the ownership check — mirrors the
+ * validateReminderOwnership shape (findByIdAndUserId → NotFoundError → return entity). A NotFoundError
+ * (never 403) keeps the #80 enumeration-oracle discipline: a foreign or absent id is indistinguishable.
+ * @throws NotFoundError if the trip is not found or doesn't belong to the user
+ */
+export async function validateTripOwnership(tripId: string, userId: string): Promise<Trip> {
+  const trip = await tripRepository.findByIdAndUserId(tripId, userId);
+  if (!trip) {
+    throw new NotFoundError('Trip');
+  }
+  return trip;
 }
 
 /**

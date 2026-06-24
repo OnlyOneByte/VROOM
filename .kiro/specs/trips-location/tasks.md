@@ -17,9 +17,16 @@
   snapshot + journal. Guard: migration-0007.test.ts (+8) — column set, NOT-NULL/nullable shape, the
   composite index, an insert+read, vehicle-delete AND user-delete FK cascade, pre-0007 data survives
   untouched, double-apply rejected. Non-vacuous (all 8 drive the real migration SQL). validate:local green.
-- [ ] **T2 — Repository + ownership helper.** `TripRepository` (CRUD, all userId-scoped, the C155 tenant
-  discipline) + `validateTripOwnership` into the `validateXOwnership` family (the C160 pattern). Unit tests
-  over the in-memory harness, incl. a cross-tenant delete-scope test (the #52 regression class).
+- [x] **T2 — Repository + ownership helper. ✅ DONE (C206).** `TripRepository` (backend/src/api/trips/
+  repository.ts) extends BaseRepository (inherits create/findById/update/delete) + userId-scoped finders
+  (findByIdAndUserId, findByUserId(filters?), findByVehicle, findByUserIdPaginated, findIdsByVehicleId) +
+  a tenant-safe `deleteByIdAndUserId` keying on BOTH id AND userId (the #52 lesson) + an exported pure
+  `tripDistance` clamp helper (R2/#46, distance derived not stored — one source of truth for T3/T5).
+  `validateTripOwnership` added to the validateXOwnership family (validation.ts, the C160 pattern; NotFound
+  not 403 — #80 enumeration discipline). Unit tests (+14: repository.test.ts 12 + tripDistance 2) over the
+  in-memory migrated harness: CRUD, every finder userId-scoped, filter combinations, pagination, and the
+  REQUIRED #52 cross-tenant delete-scope test (a foreign delete is a no-op → false). validate:local GREEN
+  (1852 pass). REMAINING: T3 routes (consumes validateTripOwnership + the repo) + T5 analytics, then T6 eyes-on.
 - [ ] **T3 — Routes + Zod validation.** The 6 endpoints (design §3); `createTripSchema` with the
   `endOdometer >= startOdometer` cross-field refinement (R2) + `purpose` enum + local-day `tripDate` (R5).
   HTTP tests via createTestApp (ownership 404s, the R2 reject, the distance-derivation echo).
