@@ -27,9 +27,20 @@
   in-memory migrated harness: CRUD, every finder userId-scoped, filter combinations, pagination, and the
   REQUIRED #52 cross-tenant delete-scope test (a foreign delete is a no-op → false). validate:local GREEN
   (1852 pass). REMAINING: T3 routes (consumes validateTripOwnership + the repo) + T5 analytics, then T6 eyes-on.
-- [ ] **T3 — Routes + Zod validation.** The 6 endpoints (design §3); `createTripSchema` with the
-  `endOdometer >= startOdometer` cross-field refinement (R2) + `purpose` enum + local-day `tripDate` (R5).
-  HTTP tests via createTestApp (ownership 404s, the R2 reject, the distance-derivation echo).
+- [x] **T3 — Routes + Zod validation. ✅ DONE (C210).** `src/api/trips/{routes,validation}.ts` + registered
+  at `/api/v1/trips` in app.ts. validation.ts: `createTripSchema` (R2 `endOdometer >= startOdometer`
+  cross-field refine + D4 `purpose` z.enum [TRIP_PURPOSES exported] + R5 `tripDate` z.coerce.date() with a
+  future-guard + D5 optional bounded locations/note) + `updateTripSchema` (partial, KEEPS the R2 refine so a
+  both-odometer PUT can't invert). Endpoints: POST / (vehicleId in body → validateVehicleOwnership before
+  insert), GET / (paginated, vehicleId+purpose filters), GET /:id + PUT /:id (validateTripOwnership), DELETE
+  /:id (tenant-safe deleteByIdAndUserId → 404 on a foreign/absent id), GET /vehicle/:vehicleId. **DEVIATION
+  from §3 (noted): the vehicle-scoped list is `/api/v1/trips/vehicle/:vehicleId` (self-contained in the trips
+  router) rather than `/api/v1/vehicles/:id/trips` (which would need a cross-router add to the vehicles
+  router) — same data, cleaner module boundary; revisit if the FE T6 prefers the nested path.** HTTP tests
+  (+18, trips-http.test.ts via createTestApp): create happy + R2/future/bad-purpose/unowned-vehicle-404; list
+  paginated + purpose-filter + tenant-scope; get own/foreign-404; vehicle-list + unowned-404; update happy +
+  R2-on-PUT + foreign-404-no-write; delete happy + foreign-404-removes-nothing (#52) + anon-401. All ownership
+  misses are 404 not 403 (#80). validate:local GREEN (1873 pass). REMAINING: T5 analytics, then T6 eyes-on FE.
 - [x] **T4 — Backup round-trip (data-safety, R3). ✅ DONE (C202, landed WITH T1 — the data-safety guards
   COUPLE them: the backup-table-coverage source-scan fails the moment a schema table isn't backed up, so a
   persisted-but-un-backed-up `trips` is not a coherent half-state; "land together" like money-cents' core).**

@@ -135,14 +135,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 206 |
+| feature | 4 | 210 |
 | deep-review | 5 | 208 |
 | guard | 6 | 207 |
 | bug | 3 | 173 |
 | arch | 5 | 205 |
 | infra | 6 | 209 |
 
-Current cycle: **209**
+Current cycle: **210**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -161,6 +161,25 @@ Current cycle: **209**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C210 (bug-scout DRY → feature: trips-location T3 — routes + Zod validation, 6 endpoints)** —
+  Balance recompute (cycle 210): bug most-starved (37/3 = 12.33×) but the trips surfaces are certified
+  (C203/C204/C207/C208) + no fresh non-trips prod logic → scout dry, recorded. NOTHING strictly over budget
+  (feature 4/4 + arch 5/5 both AT threshold, not over) → highest-leverage open item = trips T3 (advances the
+  active arc + adds genuinely new prod logic). Built `src/api/trips/{routes,validation}.ts`, registered at
+  `/api/v1/trips`. validation.ts: createTripSchema (R2 endOdometer>=startOdometer cross-field refine + D4
+  purpose z.enum [TRIP_PURPOSES exported for T5/T6] + R5 tripDate z.coerce.date() future-guard + D5 optional
+  bounded locations/note) + updateTripSchema (partial, KEEPS the R2 refine so a both-odometer PUT can't
+  invert). 6 endpoints mirroring the odometer-route idiom: POST / (vehicleId in body → validateVehicleOwnership
+  pre-insert), GET / (paginated + vehicleId/purpose filters), GET /:id + PUT /:id (validateTripOwnership),
+  DELETE /:id (tenant-safe deleteByIdAndUserId → 404 on foreign/absent), GET /vehicle/:vehicleId. DEVIATION
+  (noted in spec): vehicle-scoped list is /api/v1/trips/vehicle/:vehicleId not /api/v1/vehicles/:id/trips
+  (self-contained module boundary vs a cross-router add). HTTP tests (+18, trips-http.test.ts via createTestApp):
+  create happy + R2/future/bad-purpose/unowned-vehicle-404; list paginated/filter/tenant-scope; get
+  own/foreign-404; vehicle-list/unowned-404; update happy/R2-on-PUT/foreign-404-no-write; delete
+  happy/foreign-404-removes-nothing(#52)/anon-401 — every ownership miss is 404 not 403 (#80). validate:local
+  GREEN (tsc 0, musl 21 warn baseline, 1873 pass / 0 fail, +18, build bundled). Backend-only (UI is T6) → no
+  shot. cov: be ~88.5%+ (~, new routes+validation fully covered by the HTTP suite; re-measure next cadence ~C219)
+  / fe 88.73% (~). REMAINING trips: T5 analytics (getTripSummary), then T6 eyes-on FE. (Bug stays 173 — scout dry.)
 - **C209 (bug-scout DRY → infra: cadence sweep + coverage re-measure)** —
   Balance recompute (cycle 209): bug most-starved (36/3 = 12×) but the trips surfaces are certified
   (C203/C204/C207/C208) and no fresh non-trips prod logic landed → scout dry, recorded. Next over-budget = INFRA

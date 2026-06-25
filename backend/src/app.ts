@@ -24,6 +24,7 @@ import { routes as providerRoutes } from './api/providers/routes';
 import { routes as reminderRoutes } from './api/reminders/routes';
 import { routes as settingsRoutes } from './api/settings/routes';
 import { routes as syncRoutes } from './api/sync/routes';
+import { routes as tripRoutes } from './api/trips/routes';
 import { routes as vehicleRoutes } from './api/vehicles/routes';
 import { CONFIG } from './config';
 import { activityTracker, bodyLimit, errorHandler, optionalAuth, rateLimiter } from './middleware';
@@ -151,6 +152,7 @@ app.route('/api/v1/settings', settingsRoutes);
 app.route('/api/v1/sync', syncRoutes);
 app.route('/api/v1/analytics', analyticsRoutes);
 app.route('/api/v1/reminders', reminderRoutes);
+app.route('/api/v1/trips', tripRoutes);
 
 // Backward compatibility: Redirect /api/* to /api/v1/* (except /api root)
 app.use('/api/*', async (c, next) => {

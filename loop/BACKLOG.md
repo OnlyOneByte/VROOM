@@ -55,8 +55,9 @@ trips-location T1+T4 DONE (C202) — schema + migration 0007 + the FULL backup r
 guards COUPLE T1↔T4: a schema table that isn't backed up trips the coverage guard, so they land together).
 trips T2 DONE (C206) — TripRepository (userId-scoped CRUD + finders + #52-safe deleteByIdAndUserId + the
 derived tripDistance clamp) + validateTripOwnership in the validateXOwnership family (+14 tests incl. the
-cross-tenant delete-scope regression). REMAINING trips: T3 routes + T5 analytics (loop-buildable,
-backend-first), then T6 eyes-on FE. money-cents-migration UNSTARTED — its T1+T2 are a "land-together" data-safety core (schema-flip
+cross-tenant delete-scope regression). trips T3 DONE (C210) — routes + validation (6 endpoints at
+/api/v1/trips, createTripSchema R2/D4/R5 + updateTripSchema partial keeping R2; +18 HTTP tests, all
+ownership-miss = 404 #80). REMAINING trips: T5 analytics (getTripSummary), then T6 eyes-on FE. money-cents-migration UNSTARTED — its T1+T2 are a "land-together" data-safety core (schema-flip
 + backup version-bump/shim) that should land in a single coherent cycle, NOT split across starvation cycles,
 else the schema is cents while the pipeline still writes floats (NORTH_STAR #1). So the next feature cycles
 prefer the clean trips arc (T2/T3/T5) over money-cents until that coupled pair can be done together.**)*
