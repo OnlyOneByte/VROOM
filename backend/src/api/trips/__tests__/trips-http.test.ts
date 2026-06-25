@@ -498,6 +498,52 @@ describe('GET /api/v1/trips/summary (T5 mileage rollup)', () => {
     expect(body.data.milesByPurpose.personal).toBe(30);
   });
 
+  // C236 escalation-anchor (the #148/C102 pattern) for the #94 unit-pooling class on the trips cross-fleet
+  // rollup. The cross-fleet summary sums tripDistance across ALL vehicles, but trip odometers are stored in
+  // EACH vehicle's own distanceUnit (R2) — so a mixed mi+km fleet pools mi + km into ONE unlabeled scalar
+  // (the #94 class the C223 deep-review already filed + escalated as product-gated). This PINS today's
+  // raw-pool behavior (a km vehicle's 200-unit trip + a mi vehicle's 100-unit trip → totalMiles 300, NOT
+  // unit-converted) so the eventual #94 fix (convert-to-user-global / per-vehicle-only / require-vehicleId)
+  // FLIPS a RED assertion rather than silently changing a displayed figure unnoticed. NOT a fix — the call
+  // is Angelo's (escalated); this is the characterization net that makes the change visible when it lands.
+  test('cross-fleet summary POOLS raw odometer deltas across mixed-unit vehicles (#94 anchor — characterization, not endorsement)', async () => {
+    // Full unitPreferences shape (the create schema requires all three) — only distanceUnit differs.
+    const miVehicle = await seedVehicle(ctx, {
+      make: 'Toyota',
+      model: 'Camry',
+      year: 2022,
+      extra: {
+        unitPreferences: { distanceUnit: 'miles', volumeUnit: 'gallons_us', chargeUnit: 'kwh' },
+      },
+    });
+    const kmVehicle = await seedVehicle(ctx, {
+      make: 'Renault',
+      model: 'Zoe',
+      year: 2023,
+      extra: {
+        unitPreferences: { distanceUnit: 'kilometers', volumeUnit: 'liters', chargeUnit: 'kwh' },
+      },
+    });
+    await ctx.authed(
+      'POST',
+      '/api/v1/trips',
+      VALID(miVehicle, { startOdometer: 1000, endOdometer: 1100, purpose: 'business' }) // 100 mi
+    );
+    await ctx.authed(
+      'POST',
+      '/api/v1/trips',
+      VALID(kmVehicle, { startOdometer: 5000, endOdometer: 5200, purpose: 'business' }) // 200 km
+    );
+
+    const res = await ctx.authed('GET', '/api/v1/trips/summary');
+    const body = await json<DataEnvelope<{ totalMiles: number; businessMiles: number }>>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    // TODAY: 100 (mi) + 200 (km) summed RAW = 300, with no per-vehicle conversion (the #94 imperfection).
+    // When #94 is ruled + fixed, this number changes → this assertion goes RED → update it deliberately.
+    expect(body.data.totalMiles).toBe(300);
+    expect(body.data.businessMiles).toBe(300);
+  });
+
   test('summary scoped to a vehicle counts only that vehicle’s trips', async () => {
     const v1 = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const v2 = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });

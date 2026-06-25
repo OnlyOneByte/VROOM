@@ -159,12 +159,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 227 |
 | deep-review | 5 | 233 |
-| guard | 6 | 232 |
+| guard | 6 | 236 |
 | bug | 3 | 234 |
 | arch | 5 | 235 |
 | infra | 6 | 231 |
 
-Current cycle: **235**
+Current cycle: **236**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -183,6 +183,25 @@ Current cycle: **235**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C236 (feature gated → highest-leverage open item = guard: characterization-anchor the trips cross-fleet #94 unit-pooling)** —
+  Balance recompute (cycle 236): ONLY feature is over budget (9/4 = 2.25×) and it's FULLY GATED → record + pivot.
+  Nothing else strictly over budget → highest-leverage open UN-GATED item. Scouted firsthand: buildTripSummaryByMonth
+  is exported+tested but has NO prod consumer (dead-code — an arch call, and I just did arch C235, so deferred);
+  the trips cross-fleet summary POOLS tripDistance across vehicles while trip odometers are stored per-vehicle-unit
+  (R2) → a mixed mi+km fleet pools mi+km into one unlabeled scalar = the #94 class. CONFIRMED it's ALREADY the
+  escalated/product-gated #94 (the C223 deep-review filed exactly this: "the summary card POOLS all vehicles' miles
+  … the #94 pooling class, out of scope"), and the FE calls getSummary() cross-fleet (reachable) — so NOT a fresh
+  find, no re-escalation. BUT the cross-fleet pooling was documented in PROSE with NO committed characterization
+  test (the existing cross-fleet HTTP test used a SINGLE vehicle, so it never exercised the mixed-unit pool). Built
+  the escalation-ANCHOR guard (#148/C102 pattern): a 2-vehicle mi+km fleet, asserting today's cross-fleet totalMiles
+  pools RAW (100mi + 200km → 300, unconverted) — so when Angelo rules #94 + the fix lands (convert-to-user-global /
+  per-vehicle-only / require-vehicleId), this assertion goes RED and forces a deliberate update rather than a silent
+  displayed-figure change. Explicitly labeled "characterization, not endorsement". (Found+fixed a test-setup snag
+  firsthand: vehicle-create requires the FULL unitPreferences shape {distance,volume,charge}, not a partial.) +1 in
+  trips-http.test.ts. Test-only → no shot. validate:local GREEN (tsc 0, musl 21 warn baseline, 1920 pass / 0 fail,
+  +1, build bundled, whole-tree clean). cov: be 88.92% (~) / fe 89.11% (~). (guard→236; the cross-fleet #94 member
+  is now characterization-pinned so the eventual fix is visible. NEW backlog note: buildTripSummaryByMonth dead-code,
+  an arch candidate for a future cycle.)
 - **C235 (arch scout → NO churn warranted [both candidates fail the bar] — recorded + held)** —
   Balance recompute (cycle 235): feature most-starved (8/4 = 2.0×) but FULLY GATED (money-cents escalated/parked
   C232, trips T6b-3 gated on C214, theming + vehicle-sharing gated) → record + pivot (C232–C234 discipline). Next

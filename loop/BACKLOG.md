@@ -878,6 +878,15 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **ANCHORED C236 — the trips cross-fleet #94 unit-pooling (escalation-anchor, the #148/C102 pattern).** The
+> cross-fleet trips summary pools tripDistance across vehicles while odometers are stored per-vehicle-unit (R2),
+> so a mixed mi+km fleet pools mi+km into one unlabeled scalar — the ALREADY-escalated #94 class (C223 filed it;
+> reachable via the FE getSummary()). It was prose-documented but UNPINNED (the existing cross-fleet HTTP test
+> used a single vehicle). +1 in trips-http.test.ts: a 2-vehicle mi+km fleet asserts today's raw pool (100mi+200km
+> → 300 unconverted), labeled "characterization, not endorsement" — so the eventual #94 fix flips a RED assertion
+> instead of silently changing a displayed figure. NOT a fix (Angelo's call); the anchor makes the change visible.
+> Don't re-anchor.
+
 > **GUARDED C232 — the `commonSchemas.clampedPaginationFields` contract (the C229 dedup's no-default + runtime-max
 > semantics).** The C229 rule-of-three extraction (odometer + trips list-query fields) was UNGUARDED — nothing
 > pinned what makes it DISTINCT from the sibling `commonSchemas.pagination` (which bakes in `.default(50)/.default(0)`
@@ -1531,6 +1540,13 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 
 ### arch
 *(reliably DRY per the archive. Run a fresh dedup scout; if nothing clean surfaces, record "no churn warranted" + pivot. Obey the arch rules above.)*
+
+> **ARCH CANDIDATE (filed C236) — `buildTripSummaryByMonth` is dead code.** Exported + unit-tested
+> (trip-summary.ts:79, the C212 R5 monthly-bucket builder) but has NO production consumer (no route/FE calls it;
+> built speculatively for a "later monthly trip view" that never landed). NORTH_STAR #6 dead-code per arch rules.
+> A future arch cycle: either DELETE it (+ its tests) as cruft, OR confirm it's imminent planned surface and leave
+> a note. Deferred from C236 (that cycle had just done arch C235; removing a tested+exported fn is its own judged
+> increment). Not urgent — it's inert, not a correctness risk.
 
 > **SCOUTED C235 — no churn warranted (2 candidates, both fail the bar).** (1) `error instanceof Error ?
 > error.message : String(error)` (59 occurrences) — a helper ALREADY EXISTS (`extractErrorMessage`,
