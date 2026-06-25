@@ -44,9 +44,12 @@ bash /tmp/<boot>.sh            # START_SERVERS=1 RESET_DB=1 bash .meshclaw-tools
 bash .meshclaw-tools/shot.sh /<route> [mobile|desktop] /tmp/out.png   # then Read the PNG
 ```
 Anonymous shot: point `AUTH_STATE` at a NONEXISTENT path (NOT `/dev/null` — that crashes the
-JSON parse); shot.mjs falls back to anonymous, the `/me` 401 is expected. So the three
-human-gated feature tails (maintenance T9, import-trackers T4–T6, recurring-expenses T4–T8) and
-periodic deep-UI-review are now loop-closable: boot → shoot → Read → critique → fix → re-shoot.
+JSON parse); shot.mjs falls back to anonymous, the `/me` 401 is expected. **The three signed-off
+feature tails are now ALL COMPLETE (verified C312 against the specs' tasks.md — every task `[x]`):
+maintenance T9 (C1), import-trackers T0–T6 (through C153, eyes-on confirmed), recurring-expenses
+T0–T8 (eyes-on confirmed).** So eyes-on is the loop-closable mechanism (boot → shoot → Read →
+critique → fix → re-shoot) for periodic deep-UI-review + any FUTURE gated feature once greenlit —
+but there is NO open signed-off feature work left; every remaining feature is Angelo-gated.
 
 **Blank CHARTS in a full-page screenshot are a known ARTIFACT, not a defect (C242).** ChartCard gates chart
 children behind `gate.visible` (createVisibilityWatch — IntersectionObserver + a MutationObserver on the
@@ -79,7 +82,7 @@ never a bare `.trim()`.
 > (gated) or a NOT-YET-AUDITED shipped subsystem (the un-audited list is nearly empty).
 | Category | State | What still pays off |
 |---|---|---|
-| **feature** | UNBLOCKED via shot.sh but ALL tails GATED | the 3 eyes-on tails + every other feature is Angelo-gated (money-cents sequencing, C214 trips↔odometer lifecycle, `instrument` palette, vehicle-sharing). Record gated + pivot until a gate clears. |
+| **feature** | the 3 signed-off tails are ALL COMPLETE (C312-verified: maintenance T9 / import-trackers T0–T6 / recurring-expenses T0–T8, every task `[x]`); every REMAINING feature is Angelo-GATED | NO open signed-off feature work left. Gated: money-cents sequencing, C214 trips↔odometer lifecycle, `instrument` palette, vehicle-sharing, + the ~15 product-gated bug items. Record gated + pivot until a gate clears; eyes-on is ready for the next greenlit spec. |
 | **bug** | **SATURATED on the SWEPT surfaces (C253/C257/C261/C265), but a NOT-YET-AUDITED subsystem can still yield a real fix (C291)** | write-path asymmetry / date-tz / money-calc all swept BE (trips-summary, expenses, settings/sync/vehicles repos) + FE (financing-calculations — the #92/#99/#110/#117/#330 family closed). Record dry on the FIRST recheck of a SWEPT surface + pivot. BUT: the C290→C291 arc showed a fresh firsthand scout of an un-audited shipped subsystem (the backup→restore round-trip) surfaced a REAL data-loss gap (validateUniqueConstraints covered only 2 of 5 backed-up UNIQUE indexes, #127 leg) with NO gate clearing — so when bug is over budget, prefer scouting a subsystem NOT on the swept-list over re-checking a closed family. |
 | **deep-review** | **SATURATED across NINE subsystems (C255–C301)** | trips arc (C255), repo layer (C260), TCO chain (C266, Property 14 + #27/#28), offline-sync (C274), CSV-import (C279), provider-config (C285), backup→restore round-trip (C290), auth OAuth core (C296), financing computeBalance (C301) — ALL certified CLEAN firsthand. VERIFY firsthand — agent "HIGH" findings are often false (C21/C60/C333). A fresh certification now needs a genuinely NOT-YET-AUDITED shipped subsystem (the un-audited list is nearly empty); else record saturated + pivot. Don't re-audit any of the nine. |
 | **guard** | **SATURATED both sides (C261/C263)** | the C250/C251/C256/C257 filter-branch vein took the reachable plain-repo/route gaps; remaining sub-100% is v8 artifacts + DEV-gated catch + apiClient-wrapper THEATER (C181/C229) + DOM/timer-bound. Don't manufacture a vacuous/theater test — record saturated + pivot. |

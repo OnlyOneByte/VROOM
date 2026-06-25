@@ -235,9 +235,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 306 |
 | bug | 3 | 311 |
 | arch | 5 | 310 |
-| infra | 6 | 309 |
+| infra | 6 | 312 |
 
-Current cycle: **311**
+Current cycle: **312**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,24 @@ Current cycle: **311**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C312 (PHASE BOUNDARY + infra GUIDE-freshness: discovered the standing nudge's "3 feature tails are shootable" premise is STALE — all three signed-off specs are COMPLETE; escalated to Angelo + corrected the stale GUIDE feature framing)** —
+  Balance recompute (cycle 312): feature was nominally most-starved (85 over budget) and the nudge says the 3 tails are
+  "shootable" — so I checked them firsthand against the specs' tasks.md before treating feature as actionable. FINDING:
+  all three signed-off feature specs are FULLY COMPLETE — every task [x]: maintenance T9 (C1, eyes-on confirmed),
+  import-trackers T0–T6 (through C153, eyes-on confirmed), recurring-expenses T0–T8 (eyes-on confirmed). The nudge's "3
+  shootable tails" premise is STALE — they were shootable, got shot, and are done. So feature has NO open self-authorizable
+  work (everything else is Angelo-gated). This is a genuine PHASE BOUNDARY: combined with the C290–C311 arc (ten subsystems
+  certified end-to-end + the un-audited list exhausted + arch structurally dry via C286 + bug/deep-review/guard recording
+  dry/saturated on first recheck), ALL self-directed veins are now genuinely worked through. Per the GUIDE (phase boundary
+  + product call): ESCALATED to Angelo via send_message (the stale-premise finding + the 3 highest-leverage options — open
+  the PR at 166 / greenlight a gated feature for real source / rule on the parked bug items) THEN pivoted to the one honest
+  self-authorizable increment: an infra GUIDE-freshness fix (the C267 pattern) correcting the stale "3 shootable tails"
+  claim in TWO GUIDE spots (line 48 eyes-on note + the feature-row) so a future session does not waste a cycle
+  re-discovering the tails are done (exactly as I nearly did this cycle). Verify: docs-only (GUIDE feature framing ×2 +
+  this LEDGER + balance table + BACKLOG note); no source touched, both suites green (1949 BE / 868 FE). cov: be 89.29% /
+  fe 89.43% (~). (infra→312. STANDING SIGNAL now SHARPENED: not just "net-new feature SOURCE Angelo-gated" but "ALL
+  self-directed AND all signed-off-feature work is COMPLETE" — the loop is in pure steady-state maintenance [dry scouts +
+  periodic cadence] until Angelo opens the PR or greenlights gated source. The branch is 166 ahead / 0 behind, PR-ready.)
 - **C311 (bug-scout DRY: the fuel-stats period aggregation [getFuelStats/buildFuelStatsFromData — the This/Last Month/Year dashboard+fuel-tab cards, the #85/#86/#18/#94 family] certified CLEAN firsthand → dry, pivot fast, no manufactured test)** —
   Balance recompute (cycle 311): nothing strictly OVER budget; bug most-starved by ratio (3/3, 1.00×). Per the
   C293-refreshed bug-row guidance, scouted a not-yet-rechecked money-facing surface: getFuelStats /
