@@ -217,11 +217,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 227 |
 | deep-review | 5 | 274 |
 | guard | 6 | 276 |
-| bug | 3 | 273 |
+| bug | 3 | 277 |
 | arch | 5 | 275 |
 | infra | 6 | 272 |
 
-Current cycle: **276**
+Current cycle: **277**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -240,6 +240,26 @@ Current cycle: **276**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C277 (bug-scout DRY [insurance effectiveMonthlyPremium clean] → pivot attempt CORRECTED my own C276 mis-filing: collectSourceFiles is a rule-of-TWO, not three — NOT a convergence target)** —
+  Balance recompute (cycle 277): bug was the sole over-budget category (4/3 = 1.33×). Did ONE fresh firsthand scout on
+  an unscanned money path: insurance effectiveMonthlyPremium (analytics-charts.ts:210 — the #8/#69 premium money
+  helper). CLEAN: monthlyCost wins via `!= null` (NOT `?? 0`, so an explicit 0 is honored — the #8 fix), else
+  amortizes totalCost over the calendar-month span with a monthsInTerm===0 x/0 guard; the documented-correct symmetry
+  with effectiveTermCost (C266). NO defect. PIVOTED to the genuinely-queued durable artifact — the C276-filed
+  collectSourceFiles convergence — but FIRSTHAND BODY-COMPARE (the C212/C244/C270 check-before-converge discipline)
+  CORRECTED the C276 filing: the 3 collectSourceFiles copies are NOT byte-identical. no-utc-date-input's body
+  DELIBERATELY skips the __tests__ dir (with a comment: a test file may legitimately assert against the idiom, so the
+  guard protects PRODUCT code only) — a semantically-DISTINCT, stricter scope; no-native-dialogs + no-utc-month-parse
+  scan __tests__ too. So only 2 of 3 are identical = a rule-of-TWO (below the bar); converging all 3 would either
+  BREAK no-utc-date-input's tests-skip (a behavior change) or need an over-parameterized skipDirs helper (manufactured
+  churn, the C270 case). The C276 filing was based on the meta-guard's NAME+idiom grep match, not a body diff — my
+  firsthand compare corrects it: NOT a clean convergence. UN-FILED it from the arch queue (corrected to "rule-of-two,
+  do not converge"). No code changed (the right call was to NOT force a bad dedup). Verify: audit only — both suites
+  green at C276 (1935 BE / 866 FE), no source touched. Docs-only. cov: be 89.27% / fe 89.11% (~). (bug→277: the scout
+  DID happen + a real correction made [a mis-filed arch target retracted before it caused a bad convergence — the
+  C237 "verify before acting" discipline working]. LESSON: a grep-match filing [name + idiom] is NOT a verified
+  rule-of-three — only a firsthand BODY diff confirms convergence; file convergence targets as "candidate, body-diff
+  pending" not "confirmed". NEXT bug cycle record dry on first recheck + pivot.)
 - **C276 (guard: pin the C275 collectSvelteFiles convergence with a meta-guard [NORTH_STAR #5] — AND surfaced a 2nd un-converged walker family, FILED as a follow-on)** —
   Balance recompute (cycle 276): nothing strictly OVER budget; guard most-starved non-gated (5/6). Took the symmetric
   NORTH_STAR #5 move to C275: pair the just-made rule-of-four convergence with a merge-surviving guard so a FUTURE

@@ -727,6 +727,13 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **SCOUTED C277 — insurance effectiveMonthlyPremium (the #8/#69 premium money helper) certified CLEAN firsthand →
+> dry; pivot attempt corrected the C276 collectSourceFiles mis-filing (see arch §).** effectiveMonthlyPremium:
+> monthlyCost wins via `!= null` (honors an explicit 0 — the #8 fix), else amortizes totalCost over the calendar-month
+> span with a monthsInTerm===0 x/0 guard; the documented-correct symmetry with effectiveTermCost (C266). NO defect.
+> Pivoted to the C276-filed collectSourceFiles convergence but firsthand body-compare showed it's a rule-of-TWO +
+> divergent third (not a clean dedup) → retracted the filing (arch §). NEXT bug cycle record dry on first recheck.
+
 > **SCOUTED C273 — getCrossVehicle (the #94 correct convert-before-pool contrast) certified CLEAN firsthand → recorded
 > dry + pivoted.** Bug over budget (4/3). Probed getCrossVehicle (analytics/repository.ts:1820) — the #94 path that
 > converts per-vehicle units BEFORE pooling (the contrast the product-gated #94 summary builders lack). CLEAN:
@@ -1815,13 +1822,14 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 > lines gone), overall BE 89.23→89.27%. FOLLOW-ON (the C252 note): the "extend dead-code sweep to all repository.ts"
 > advances — financing (C252) + reminders (C259) done; next arch can scout the remaining repos for zero-caller methods.
 
-> **OPEN (FILED C276) — converge the `collectSourceFiles` walker (rule-of-THREE), a SECOND walker family C275 missed.**
-> A C276 meta-guard's over-broad first draft surfaced it: `collectSourceFiles` (collects .ts + .svelte source files —
-> a DIFFERENT signature than collectSvelteFiles) is re-declared byte-similarly in no-native-dialogs.test.ts +
-> no-utc-date-input.test.ts + no-utc-month-parse.test.ts. That's a genuine rule-of-three. A future arch cycle: verify
-> the 3 bodies are byte-identical (the C212/C244 check), and if so extract to _helpers/collect-source-files.ts (mirror
-> the C275 collect-svelte-files pattern) + extend the C276 meta-guard to pin it too. Then both walker families are
-> converged + guarded. (Deferred from C276 to avoid scope-creep mid-guard-cycle.)
+> **❌ RETRACTED C277 (the C276 `collectSourceFiles` filing) — NOT a convergence target; it's a rule-of-TWO + a
+> divergent third.** C276 FILED it from the meta-guard's NAME+idiom grep match (not a body diff). A C277 firsthand
+> body-compare corrects that: the 3 collectSourceFiles copies are NOT byte-identical — no-utc-date-input DELIBERATELY
+> skips the `__tests__` dir (documented: a test may legitimately assert against the idiom, so the guard protects
+> PRODUCT code only), a semantically-distinct stricter scope; no-native-dialogs + no-utc-month-parse scan __tests__
+> too. So only 2 of 3 match = rule-of-TWO (below the bar); converging all 3 would BREAK no-utc-date-input's tests-skip
+> or need an over-parameterized skipDirs helper (manufactured churn, the C270 case). DO NOT converge. LESSON: a
+> grep-match filing (name + idiom) is NOT a verified rule-of-three — only a firsthand body diff confirms it.
 
 > **✅ CONVERGED C275 — the byte-identical `collectSvelteFiles` source-scan walker (rule-of-FOUR) onto a shared
 > test-helper.** The recursive .svelte walker was BYTE-IDENTICAL in 4 source-scan guards (no-interpolated-arbitrary-class,
