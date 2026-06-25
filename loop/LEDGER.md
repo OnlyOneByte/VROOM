@@ -162,9 +162,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 239 |
 | bug | 3 | 234 |
 | arch | 5 | 235 |
-| infra | 6 | 237 |
+| infra | 6 | 240 |
 
-Current cycle: **239**
+Current cycle: **240**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -183,6 +183,24 @@ Current cycle: **239**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C240 (bug scout via the eyes-on vein → the lead [#140] was STALE doc-drift, NOT open → infra: reconcile CLAUDE.md's stale bug-list against the live BACKLOG)** —
+  Balance recompute (cycle 240): bug most-starved + over budget (6/3 = 2.0×). Followed the C239 eyes-on bug-scout vein
+  to its strongest lead: #140 (LeaseMetricsCard annual-vs-total), which CLAUDE.md's bug list flags as OPEN — "a clean
+  one-edit, eyes-on-blocked; the next UI-work cycle should land it" — now that eyes-on is unblocked. But CROSS-CHECKED
+  firsthand before acting: the LIVE loop/BACKLOG.md says #140 was verified ALREADY-FIXED + REMOVED from the queue C1
+  (2026-06-17) as post-reset doc-drift, and a C68 eyes-on already CONFIRMED it fixed. Verified in SOURCE: all 3
+  LeaseMetricsCard display sites route through leaseTotalMileageAllowance (LeaseMetricsCard.svelte:42; the lone
+  mileageLimit use is the {#if} presence-guard, not a bare annual comparison). **#140 is genuinely fixed — NOT open
+  work; the CLAUDE.md note is stale (C466-era, pre-reset).** No bug to fix → but the scout surfaced a REAL loop-hygiene
+  defect: CLAUDE.md (the tracked entry-point doc) carries #140 as OPEN with an active "next UI-work cycle should land
+  it" instruction that just mis-triggered this scout + would mislead any future cycle or a human reading it. FIX
+  (doc-reconciliation, infra): corrected the CLAUDE.md #140 entry to CLOSED (with the C68/source evidence) + flagged
+  that its bug-list is a point-in-time snapshot superseded by loop/BACKLOG.md (the live queue), so the two can't keep
+  drifting into contradictory "open" claims. Distinguished it from the SEPARATE #148 (null-initialMileage burn bar)
+  which IS genuinely open + Angelo-escalated. No code change → no validate/shot (doc-only). cov: be 88.92% (~) / fe
+  89.11% (~). (bug stays 234 — the lead was stale, no defect; infra→240. LESSON: a stale OPEN claim in a secondary doc
+  is a real landmine — the live loop/BACKLOG is the source of truth; reconcile, don't re-chase. The eyes-on bug vein
+  is still valid — C239 used it cleanly — but its leads must be cross-checked against the live queue first.)
 - **C239 (bug scout via the EYES-ON unblock [fresh vein] → clean cert → guard: pin the analytics fuel empty-state gate)** —
   Balance recompute (cycle 239): bug most-starved + over budget (5/3 = 1.67×). The pure-logic trips bug surface is
   exhausted (C238 dry), but the eyes-on unblock opens a bug-scout vein NOT used this session: a visual/a11y/state
