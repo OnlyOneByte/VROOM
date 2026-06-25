@@ -186,11 +186,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 227 |
 | deep-review | 5 | 260 |
 | guard | 6 | 256 |
-| bug | 3 | 257 |
+| bug | 3 | 261 |
 | arch | 5 | 259 |
 | infra | 6 | 254 |
 
-Current cycle: **260**
+Current cycle: **261**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -209,6 +209,29 @@ Current cycle: **260**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C261 (bug-scout DRY — settings/sync/vehicles repos certified CLEAN firsthand; NO clean guard pivot [target 100%-covered or structural-ceiling] → record dry + pivot, the C99/C103 discipline)** —
+  Balance recompute (cycle 261): two over budget — bug (4/3 = 1.33×) + infra (7/6 = 1.17×); bug more starved → bug
+  (infra cadence ran C254, next ~C264). Per C95/C204 did ONE fresh firsthand scout. SCOUTED a genuinely
+  unscrutinized surface — settings/repository.ts (the #100 userPreferences RMW path) + the SyncState date methods
+  (the #42 backup-honesty watermark) + vehicles/repository.ts. CERTIFIED CLEAN: (1) mergeJsonField — the #100
+  Angelo-decided json_patch atomic merge (RFC-7386, no JS read-write gap), column name is a closed literal map (no
+  injection); (2) hasChangesSinceLastSync — strict-`>` watermark with the C144 #42 snapshot-timing care (an
+  equality collision is a sub-ms race the snapshot-vs-end-of-run margin already covers — intended boundary, not a
+  bug); (3) updateSyncDate snapshots at backup-generation time (#42); (4) vehicles findByLicensePlate is per-user
+  scoped (the #80 fix — no cross-tenant 409/enumeration). NO defect. PIVOT ATTEMPT for a guard: settings/repository.ts
+  is ALREADY 100% line/func (mergeJsonField + the date methods pinned by prefs-atomic-merge + settings-repository.property
+  + backup-orchestrator-execute). Pulled per-file coverage for a filter-branch guard pick (the C256/C257 vein) — but
+  every remaining sub-92% file is the documented STRUCTURAL CEILING: auth providers (OAuth), sync backup/restore/routes
+  (DI/orchestrator), auth/utils:110-117 (the setCookie in validateAndRefreshSession's refresh branch — Lucia-bound),
+  + the catch/DatabaseError tails (financing/insurance hooks, expenses/reminders/vehicles repos — verified firsthand
+  31-35/90-91 are both DatabaseError re-throws). The clean filter-branch coverage vein (C250/C251/C256/C257) is now
+  WORKED THROUGH — the reachable plain-repo/route gaps are covered, C259 removed the one dead method, the rest is
+  DI/OAuth/catch. So NO clean guard pivot exists. Per C99/C103/C107 (dry scout + re-scanning provably-covered surfaces
+  is ceremony) recorded dry + pivoted FAST rather than manufacture a redundant/vacuous test. Verify: audit only — BE
+  suite green at C260 (1935 pass), no source touched. Docs-only. cov: be 89.28% / fe 89.11% (~). (bug→261: the scout
+  DID happen as the over-budget discipline requires; recorded dry. The bug surface AND the filter-branch guard vein
+  are BOTH worked through now — NEXT bug cycle record dry on the first recheck + pivot; real defects come only from a
+  fresh feature surface [Angelo-gated] or an Angelo steer. Don't re-scout settings/sync/vehicles repos.)
 - **C260 (deep-review: complete the repo-layer dead-code sweep [the C252 follow-on] — every other zero-prod-caller method is TESTED ratified-ahead-of-need surface, NOT cruft; audit-only, no removal)** —
   Balance recompute (cycle 260): nothing strictly OVER budget; three AT threshold (deep-review 5/5, bug 3/3, infra
   6/6). Per C248 took the highest-leverage of the tied — deep-review (bug is documented dry; infra cadence ran C254,

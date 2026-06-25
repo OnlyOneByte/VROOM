@@ -701,6 +701,17 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **SCOUTED C261 — settings/sync/vehicles repos certified CLEAN firsthand; NO clean guard pivot → recorded dry + pivoted (the C99/C103 discipline).**
+> Bug over budget (4/3). Scouted settings/repository.ts (#100 RMW path) + SyncState date methods (#42 watermark) +
+> vehicles/repository.ts. CLEAN: mergeJsonField (Angelo-decided json_patch atomic, closed-literal column, no injection);
+> hasChangesSinceLastSync (strict-`>` watermark, C144 #42 snapshot-timing — equality is a sub-ms race the margin covers,
+> intended); findByLicensePlate per-user scoped (#80). NO defect. Guard pivot ATTEMPTED but settings/repository.ts is
+> ALREADY 100% line/func, and every remaining sub-92% file is the STRUCTURAL CEILING (auth OAuth, sync DI, auth/utils
+> setCookie Lucia-bound, catch/DatabaseError tails — verified firsthand). The clean filter-branch coverage vein
+> (C250/C251/C256/C257) is now WORKED THROUGH. Per C99/C103 recorded dry + pivoted fast (no redundant/vacuous test).
+> NEXT bug cycle: record dry on first recheck + pivot — real defects come only from a fresh feature surface (Angelo-gated)
+> or an Angelo steer. Don't re-scout settings/sync/vehicles repos.
+
 > **SCOUTED C257 — expenses/repository.ts read/filter surface certified CLEAN firsthand → recorded dry + pivoted to a guard.**
 > Bug sole over-budget (4/3). Scouted the biggest plain-repo gap (expenses/repository.ts, 79% line — code the C250/C256
 > filter-branch cycles hadn't checked for DEFECTS) on the gold query-asymmetry seam. CLEAN: buildExpenseConditions
