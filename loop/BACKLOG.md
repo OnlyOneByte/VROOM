@@ -213,6 +213,14 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > (.meshclaw-tools/) so the knob is a local capability gain, not a committed artifact — the cert is the committed value.
 > A future eyes-on cycle could extend to /analytics + /vehicles/[id] dark if a fresh concern arises; no defect here.
 
+> **CERTIFIED C285 — the storage-provider config-validation fail-fast path (#103/#123) CLEAN firsthand.** Audited
+> providers/routes.ts: ONE shared validateStorageProviderConfig (the C416 dedup) wired into BOTH create
+> (resolveProviderCredentials, #103/C349) AND PUT (#123/C416). The create/PUT gate `!endpoint||!bucket||!region` is
+> BYTE-IDENTICAL to buildS3Provider's use-site check (registry.ts:8) — no gate-ok-but-use-throws gap, no
+> silently-bricked row can persist. The whitespace-only edge passes both identically (S3 SDK rejects it; .trim() is a
+> product call, not a defect). NO defect; covered by the C239/C416 provider tests. Deep-review vein saturated across
+> trips/repos/TCO/offline-sync/CSV-import/provider-config. Don't re-audit.
+
 > **CERTIFIED C279 — the CSV-IMPORT money/unit normalization (the #102/#103/#104/#124/#137 foreign-data family) CLEAN
 > firsthand.** Audited import-mapping.ts: normalizeDecimal (both-separator → last-is-decimal, US+EU; the #124 fix);
 > mapVolume/mapMileage (isFinite-guard returns raw → loud error, convert-only-when-both-units-known); mapCategory

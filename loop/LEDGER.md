@@ -231,13 +231,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 227 |
-| deep-review | 5 | 279 |
+| deep-review | 5 | 285 |
 | guard | 6 | 283 |
 | bug | 3 | 284 |
 | arch | 5 | 281 |
 | infra | 6 | 282 |
 
-Current cycle: **284**
+Current cycle: **285**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,25 @@ Current cycle: **284**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C285 (deep-review: the storage-provider config-validation fail-fast path [#103/#123] certified CLEAN firsthand — the create + PUT gate is byte-identical to the use-site enforcement, no silent-bricked-row possible)** —
+  Balance recompute (cycle 285): deep-review was the sole over-budget category (6/5 = 1.2×). The vein is saturated
+  across trips/repos/TCO/offline-sync/CSV-import, so picked a fresh not-yet-audited subsystem: the storage-provider
+  config-validation fail-fast path (providers/routes.ts — the #103/#123 family, security-adjacent: a bricked S3 config
+  must NOT persist silently then throw on every use). AUDITED FIRSTHAND: ONE shared validateStorageProviderConfig (the
+  C416 dedup) wired into BOTH write paths — CREATE (resolveProviderCredentials:283, the #103/C349 fix) AND PUT (:423,
+  the #123/C416 fix that closed the verbatim-write footgun on the update path). VERIFIED the gate matches the use-site:
+  the create/PUT check `!c.endpoint || !c.bucket || !c.region` is BYTE-IDENTICAL to buildS3Provider's instantiation
+  check (registry.ts:8) — so there is NO gate-says-ok-but-use-throws gap; a config the provider can't instantiate with
+  CANNOT persist. (google-drive resolves config server-side from the OAuth nonce, google-photos needs only creds —
+  correctly no required-config gate.) Probed the whitespace-only edge ("  " endpoint passes the falsy gate) — but it
+  passes BOTH the gate AND the use-site identically (no inconsistency), is a self-typed config the S3 SDK rejects at
+  the network boundary, and tightening to .trim() is a validation-strictness product call, NOT a correctness defect.
+  NO fresh defect; the fail-fast contract (no silently-bricked row) holds. Covered by the C239/C416 provider tests.
+  Re-pinning would be the don't-certify-already-guarded trap → recorded the firsthand certification, no manufactured
+  guard. Verify: audit only — no source touched, both suites green at C283 (1935 BE / 867 FE). Docs-only. cov: be
+  89.28% / fe 89.3% (~). (deep-review→285. The provider config-validation path is CERTIFIED — gate ≡ use-site, don't
+  re-audit. The deep-review vein is now saturated across trips/repos/TCO/offline-sync/CSV-import/provider-config; NEXT
+  deep-review needs a fresh feature surface [Angelo-gated] or record saturated + pivot.)
 - **C284 (bug-scout DRY: the reminder endDate-boundary family [#12/#107/#114/#116] certified CLEAN firsthand — all 4 exit paths guarded via the shared hasReminderEndedBy predicate)** —
   Balance recompute (cycle 284): bug was the sole over-budget category (4/3 = 1.33×). Did ONE fresh firsthand scout on
   an unscanned-this-run surface: the reminder date-advance / endDate-boundary family (trigger-service.ts — the
