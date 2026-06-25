@@ -215,13 +215,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 227 |
-| deep-review | 5 | 268 |
+| deep-review | 5 | 274 |
 | guard | 6 | 271 |
 | bug | 3 | 273 |
 | arch | 5 | 270 |
 | infra | 6 | 272 |
 
-Current cycle: **273**
+Current cycle: **274**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -240,6 +240,27 @@ Current cycle: **273**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C274 (deep-review: the OFFLINE-SYNC round-trip [NORTH_STAR #1 crown-jewel "offline writes never drop"] certified CLEAN firsthand — no fresh defect, every historical fix intact + guarded)** —
+  Balance recompute (cycle 274): deep-review was the sole over-budget category (6/5 = 1.2×). Per the C267 GUIDE
+  deep-review is saturated across the audited subsystems (trips C255, repos C260, TCO C266), so picked the most
+  safety-critical NOT-yet-this-run-audited path: the offline-sync round-trip (sync-manager.ts — NORTH_STAR #1 "offline
+  writes never drop", the crown jewel). AUDITED FIRSTHAND end-to-end + certified the invariant holds: (1)
+  markExpenseAsSynced is called ONLY after a genuine POST success (syncSingleExpense returns {success:true} only after
+  apiClient.post resolves; a thrown POST → {success:false} → retry/park, NEVER marked synced); (2) the POST sends
+  clientId so a retried POST returns the original row, not a duplicate (the #98/C51 idempotency fix); (3) a
+  structurally-unsyncable row (isIncompleteFuelExpense) PARKS as needs-attention, not infinite-retry/silent-drop
+  (#79/C159); (4) checkForExistingExpense maps GET rows through fromBackendExpense — no NaN mis-classification
+  (#133/C442); (5) determineConflictType compares amount(0.01-tol)/tags/date correctly; (6) retrySingleExpense
+  re-checks getPendingExpenses() before acting, so an orphaned backoff timer can't resurrect a resolved conflict
+  (#134/C426). EVERY failure mode is handled (transient→retry-with-backoff, permanent→park, duplicate/modified→surface
+  conflict, success→synced) — nothing silently drops. NO fresh defect; the path is comprehensively guarded
+  (sync-manager.test.ts + the #134/#135 nets). This is the most safety-critical FE path + every historical fix
+  (#98/#133/#134/#79) is intact in the current code. Re-pinning would be the "don't certify already-guarded surfaces"
+  trap → recorded the firsthand re-certification, no manufactured guard. Verify: audit only — no source touched, both
+  suites green at C272 (1935 BE / 860 FE). Docs-only. cov: be 89.27% / fe 89.11% (~). (deep-review→274. The
+  offline-sync crown-jewel is CERTIFIED current — don't re-audit. The deep-review vein is now saturated across trips
+  [C255] + repos [C260] + TCO [C266] + offline-sync [C274]; NEXT deep-review needs a fresh feature surface
+  [Angelo-gated] or record saturated + pivot.)
 - **C273 (bug-scout DRY — getCrossVehicle [the #94 correct convert-before-pool contrast] certified CLEAN firsthand; record dry + pivot, no manufactured test [C267-GUIDE/C261/C265 discipline])** —
   Balance recompute (cycle 273): bug was the sole over-budget category (4/3 = 1.33×). Per the C267-refreshed GUIDE bug
   is saturated, but did ONE genuine firsthand probe on a path not scouted this run: getCrossVehicle (analytics/

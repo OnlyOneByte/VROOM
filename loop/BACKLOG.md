@@ -213,6 +213,14 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > (.meshclaw-tools/) so the knob is a local capability gain, not a committed artifact — the cert is the committed value.
 > A future eyes-on cycle could extend to /analytics + /vehicles/[id] dark if a fresh concern arises; no defect here.
 
+> **CERTIFIED C274 — the OFFLINE-SYNC round-trip (NORTH_STAR #1 crown-jewel "offline writes never drop") CLEAN
+> firsthand.** Audited sync-manager.ts end-to-end: markExpenseAsSynced only after a genuine POST success (a thrown
+> POST never marks synced); clientId idempotency (#98); permanent rows park as needs-attention not infinite-retry
+> (#79); checkForExistingExpense maps through fromBackendExpense (no NaN mis-classify, #133); retrySingleExpense
+> re-checks getPendingExpenses so an orphaned timer can't resurrect a resolved conflict (#134). Every failure mode
+> handled, nothing silently drops. NO fresh defect; comprehensively guarded (sync-manager.test.ts). Every historical
+> fix (#98/#133/#134/#79) intact. The deep-review vein is saturated across trips/repos/TCO/offline-sync. Don't re-audit.
+
 > **SATURATED C266 — the TCO computation chain (the product's headline money figure) certified CLEAN firsthand; every
 > load-bearing invariant already pinned.** Audited getVehicleTCO → categorizeTCOExpenses → computeTCOTotal against
 > source: the #27 double-count exclusion (priced→financing-rows excluded / unpriced→counted), #28 year-scoping
