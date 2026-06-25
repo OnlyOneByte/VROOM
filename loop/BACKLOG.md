@@ -74,10 +74,16 @@ E2E today-dated POST through the live stack succeeded. **REMAINING: T6b-3 EDIT/D
 ruling** (editing endOdometer / deleting a trip leaves a stale linked odometer entry — Angelo's trips↔odometer
 lifecycle call; CREATE shipped because it's fully decided via D2/C213). The card-level edit/delete buttons land
 once C214 is ruled. Standing D3 follow-on: persist the business-mileage rate (userPreferences column + per-trip override) — its
-own schema/migration+backup-coverage slice, NOT yet built. money-cents-migration UNSTARTED — its T1+T2 are a "land-together" data-safety core (schema-flip
-+ backup version-bump/shim) that should land in a single coherent cycle, NOT split across starvation cycles,
-else the schema is cents while the pipeline still writes floats (NORTH_STAR #1). So the next feature cycles
-prefer the clean trips arc (T2/T3/T5) over money-cents until that coupled pair can be done together.**)*
+own schema/migration+backup-coverage slice, NOT yet built. **money-cents-migration ESCALATED-PARKED (C232) —
+🚩 awaiting an Angelo SEQUENCING ruling.** Verified firsthand that the spec's "T1+T2 land together, before
+T3–T6" leaves a MULTI-CYCLE app-corruption window: T1 flips cols to INTEGER affinity but SQLite stores
+dollar-floats as-is (the live write path = T3 unbuilt) + the display edge sends the value verbatim (T6 unbuilt),
+so between T2 and T6 the PR-ready branch misdisplays money 100× ($45.50→$4550) + mixes units on SUM. The spec's
+"land together" only covers BACKUP safety, not this. send_message Angelo C232 with 3 options: (a) build T1–T7 in
+ONE cycle [recommended — branch never broken]; (b) per-cycle compat shim; (c) keep parked. DO NOT build until he
+picks the sequencing. So feature cycles have NO clean un-gated work right now (trips T6b-3 gated on C214, theming
+picker gated on the `instrument` palette, vehicle-sharing gated, money-cents gated on this) → feature-over-budget
+cycles record + pivot to guard/deep-review/arch/infra until a gate clears.**)*
 
 0. **Theming engine** — **GREENLIT & BUILD-UNBLOCKED (Angelo ratified D1–D7 ✅, 2026-06-24 parallel agent).**
    `.kiro/specs/theming-engine/`. A first-class theming engine: a registry of built-in themes (the existing
@@ -849,6 +855,17 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 *(queue empty — repopulate from real bug classes. Pattern: HTTP-harness (createTestApp + s3-provider
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
+
+> **GUARDED C232 — the `commonSchemas.clampedPaginationFields` contract (the C229 dedup's no-default + runtime-max
+> semantics).** The C229 rule-of-three extraction (odometer + trips list-query fields) was UNGUARDED — nothing
+> pinned what makes it DISTINCT from the sibling `commonSchemas.pagination` (which bakes in `.default(50)/.default(0)`
+> + a hardcoded `.max(100)`). A "tidy-up" repointing a clampPagination route at `pagination` would silently
+> restore the exact C212/C229 divergence (changed clamp/default behavior + a cap that stops tracking CONFIG).
+> +7 in clamped-pagination-fields.test.ts: string-coercion, at-max accepted, over-max REJECTED, <1/negative
+> rejected, NO defaults (omitted → undefined, clampPagination supplies the default downstream), cap tracks
+> CONFIG.pagination.maxPageSize, and the sibling `pagination` DOES default 50/0 (pinning the intentional
+> contrast). Non-vacuous (inject defaults+hardcoded-max → the no-default guard REDs). Pure schema test (no DB/HTTP)
+> → merge-survives. Don't re-guard.
 
 > **CERTIFIED + GUARDED C228 — the trips CREATE optional-field NULL invariant (FE undefined→absent→null, NORTH_STAR #1).**
 > A C228 deep-review (after an arch no-churn scout) certified firsthand that the C227 TripForm's blank

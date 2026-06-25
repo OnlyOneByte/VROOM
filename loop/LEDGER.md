@@ -159,12 +159,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 227 |
 | deep-review | 5 | 228 |
-| guard | 6 | 225 |
+| guard | 6 | 232 |
 | bug | 3 | 230 |
 | arch | 5 | 229 |
 | infra | 6 | 231 |
 
-Current cycle: **231**
+Current cycle: **232**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -183,6 +183,31 @@ Current cycle: **231**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C232 (feature ESCALATED [money-cents sequencing — Angelo] → pivot to guard: pin the clampedPaginationFields contract)** —
+  Balance recompute (cycle 232): feature most-starved + over budget (5/4 = 1.25×; guard 7/6 = 1.17× also over).
+  Feature's only un-gated buildable work is money-cents-migration (Angelo greenlit T0 2026-06-24) — the trips arc's
+  clean increments are exhausted (T6b-3 gated on C214), theming/vehicle-sharing gated. Assessed T1+T2 (the
+  spec-mandated "land together" data-safety core) and hit a SEQUENCING problem the spec doesn't resolve — VERIFIED
+  FIRSTHAND: T1 flips 14 cols real→integer, but SQLite stores a float in an INTEGER-affinity col AS-IS (probe:
+  12.34 stays 12.34), the live write path still sends dollar-floats (T3 unbuilt), and the display edge sends the
+  stored value verbatim (T6 unbuilt, routes.ts:523). So between T2 and T6 (4+ "one task per cycle" cycles) the
+  PR-ready branch would MISDISPLAY money 100× ($45.50→$4550) + MIX units on SUM (probe: 1246.34 not 2468) — a
+  NORTH_STAR #1 violation in the running app. The spec's "land together" is scoped to BACKUP safety, not this
+  app-level corruption window. Per the GUIDE (money/data-safety = a product/arch call, escalate don't auto-fix;
+  arch rule #6 never self-authorize a money migration) + the standing nudge (product call → send_message Angelo,
+  then pivot — don't auto-fix): ESCALATED to Angelo via send_message with 3 options (a: build T1–T7 in ONE cycle
+  so the branch is never broken [recommended]; b: temporary compat shim per cycle; c: keep parked for a focused
+  session). Did NOT build + did NOT self-deviate from the ratified one-task-per-cycle plan. PIVOTED to guard (the
+  other over-budget category, 7/6): the C229 commonSchemas.clampedPaginationFields dedup was UNGUARDED — nothing
+  pinned its contract (the no-default + runtime-maxPageSize semantics that distinguish it from the divergent
+  commonSchemas.pagination; a "tidy-up" repointing a clampPagination route at `pagination` would silently restore
+  the C212/C229 divergence). +7 in clamped-pagination-fields.test.ts (string-coercion; at-max accepted; over-max
+  REJECTED; <1 / negative rejected; NO defaults → omitted stays undefined; cap tracks CONFIG; the sibling
+  `pagination` DOES default 50/0 — pinning the intentional contrast). Non-vacuous (inject the divergence [defaults
+  + hardcoded max] → the no-default guard goes RED; verified firsthand, then restored). Test-only → no shot.
+  validate:local GREEN (tsc 0, musl 21 warn baseline, 1917 pass / 0 fail, +7, build bundled, whole-tree clean).
+  cov: be 88.92%+ (~, new guard on covered module) / fe 89.11% (~). (guard→232; money-cents PARKED awaiting Angelo's
+  sequencing pick — NEW open item below.)
 - **C231 (infra: cadence sweep + coverage re-measure — both suites cross 89% line)** —
   Balance recompute (cycle 231): infra most-starved + the ONLY strictly over-budget category (7/6 = 1.17×;
   feature 4/4 + guard 6/6 at threshold, not over). Coverage was last MEASURED C224; the C225–C230 arc added
