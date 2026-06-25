@@ -217,11 +217,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 227 |
 | deep-review | 5 | 268 |
 | guard | 6 | 271 |
-| bug | 3 | 269 |
+| bug | 3 | 273 |
 | arch | 5 | 270 |
 | infra | 6 | 272 |
 
-Current cycle: **272**
+Current cycle: **273**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -240,6 +240,23 @@ Current cycle: **272**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C273 (bug-scout DRY — getCrossVehicle [the #94 correct convert-before-pool contrast] certified CLEAN firsthand; record dry + pivot, no manufactured test [C267-GUIDE/C261/C265 discipline])** —
+  Balance recompute (cycle 273): bug was the sole over-budget category (4/3 = 1.33×). Per the C267-refreshed GUIDE bug
+  is saturated, but did ONE genuine firsthand probe on a path not scouted this run: getCrossVehicle (analytics/
+  repository.ts:1820 — the #94 CORRECT-contrast path that converts per-vehicle units BEFORE pooling, the convert-before-
+  pool reference the product-gated #94 summary builders lack). CERTIFIED CLEAN: (1) costPerDistance converts per-vehicle
+  distance to user-global units (skipConversion-gated convertDistance, 1862-1865) BEFORE the divide — the correct #94
+  behavior; (2) the div-guard `totalDist > 0 ? totalCost/totalDist : null` prevents x/0 NaN; (3) the minMileage=+Infinity
+  / maxMileage=0 init + the `maxMileage>0 && minMileage<+Infinity` guard correctly yields totalDist=0 → null (not NaN)
+  for a vehicle with expenses-but-no-mileage; (4) fuel efficiency routes through buildConvertedFuelEfficiencyComparison
+  on the mixed-unit branch (per-vehicle convert via convertedGasEfficiencyPoints). NO defect — it's the documented
+  correct contrast to the escalated #94 summary-pool class, already covered by the #94/C301/C328 characterization suite.
+  Per the C267 GUIDE + C261/C265 (record dry on first recheck + pivot; re-pinning covered code is ceremony/theater),
+  recorded dry + pivoted FAST without manufacturing a test. Verify: audit only — no source touched, both suites green at
+  C272 (1935 BE / 860 FE). Docs-only. cov: be 89.27% / fe 89.11% (~). (bug→273: the scout DID happen as the over-budget
+  discipline requires. getCrossVehicle is the correct #94 contrast — CERTIFIED, don't re-scout. The bug surface stays
+  comprehensively worked through [BE repos C253/C257/C261, FE money-calc C265, analytics-contrast C273]; NEXT bug cycle
+  record dry on first recheck + pivot — real defects come ONLY from a fresh feature surface [Angelo-gated] or a steer.)
 - **C271 (guard: pin the DARK-MODE correctness invariant C268/C269 verified by EYE — a no-theme-clashing-colors source-scan over all .svelte; the FIRST merge-surviving artifact for the fresh dark axis)** —
   Balance recompute (cycle 271): guard was the sole over-budget category (8/6 = 1.33×). C261/C263 verified guard
   saturated on the EXISTING surfaces, but C268/C269 opened a FRESH axis (dark mode) that I certified MANUALLY (eyes-on

@@ -719,6 +719,16 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **SCOUTED C273 — getCrossVehicle (the #94 correct convert-before-pool contrast) certified CLEAN firsthand → recorded
+> dry + pivoted.** Bug over budget (4/3). Probed getCrossVehicle (analytics/repository.ts:1820) — the #94 path that
+> converts per-vehicle units BEFORE pooling (the contrast the product-gated #94 summary builders lack). CLEAN:
+> costPerDistance converts distance to user-global units before the divide (skipConversion-gated), div-guard prevents
+> x/0 NaN, the minMileage=+Inf/maxMileage=0 init yields totalDist=0→null (not NaN) for expenses-without-mileage, fuel
+> eff routes through buildConvertedFuelEfficiencyComparison on the mixed-unit branch. NO defect (the documented correct
+> #94 contrast, covered by the #94/C301/C328 suite). Per C267-GUIDE/C261/C265 recorded dry + pivoted fast (no
+> manufactured test). Bug surface stays worked through (BE repos C253/C257/C261, FE money-calc C265, analytics C273).
+> Don't re-scout getCrossVehicle. NEXT bug cycle record dry on first recheck + pivot.
+
 > **SCOUTED C269 — DARK-MODE eyes-on sweep (the C239–C247 visual-sweep vein on the fresh dark axis): /vehicles/[id]
 > Overview + Finance-tab certified CLEAN, no defect.** C268 opened the dark axis (2 routes); this swept the densest
 > contrast-prone surface — vehicle-detail money cards. Shot+Read /vehicles/[id] Overview (Vehicle Info + Insurance +
