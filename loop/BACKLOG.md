@@ -95,8 +95,12 @@ cycles record + pivot to guard/deep-review/arch/infra until a gate clears.**)*
    theme (one feature cycle each): distill the mock → 32-token oklch both variants → AA-tune until theme-contrast
    passes → add the ThemeDefinition to THEME_REGISTRY → regenerate themes.css → the registry-integrity + byte-fresh +
    contrast guards auto-cover it (zero structural change). ✅ `blueprint` REGISTERED + AA-PASSED (C313, lowest pair
-   5.77). NEXT theming cycle: T10 the /settings picker UI (now 2 themes → eyes-on becomes meaningful) OR register the
-   next palette (bento/vaporwave/cyberpunk/aurora) by the recipe.**
+   5.77) + distinctness-guarded (C314) + wiring-guarded (C315) + dark-cascade-certified (C316) + swatch-deduped (C317).
+   ✅ **T10 PICKER DONE + EYES-ON (C318):** ThemePickerCard.svelte on /settings — a registry-theme grid with per-theme
+   swatch strips + selected ring + setTheme(id) live re-skin; shot the picker (Default + Blueprint render correctly) + the
+   blueprint dashboard re-skin (status 200, zero console errors). The engine is now USER-REACHABLE. NEXT theming cycle:
+   register the next palette (bento/vaporwave/cyberpunk/aurora) by the C313 distill→AA-tune→guard recipe — each is now
+   immediately user-visible via the picker — OR T11 per-theme dashboard eyes-on ×{light,dark} OR T12 axe a11y gate.**
    _(Original 2026-06-24 greenlight + Phase 1–3 build log retained below for grounding.)_ **GREENLIT & BUILD-UNBLOCKED (Angelo ratified D1–D7 ✅, 2026-06-24 parallel agent).**
    `.kiro/specs/theming-engine/`. A first-class theming engine: a registry of built-in themes (the existing
    look + the explored "Instrument Cluster" / "Garage Journal" looks, productized), a `/settings` picker with

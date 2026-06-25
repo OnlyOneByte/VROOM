@@ -230,14 +230,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 313 |
+| feature | 4 | 318 |
 | deep-review | 5 | 314 |
 | guard | 6 | 315 |
 | bug | 3 | 316 |
 | arch | 5 | 317 |
 | infra | 6 | 312 |
 
-Current cycle: **317**
+Current cycle: **318**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,23 @@ Current cycle: **317**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C318 (FEATURE theming T10: the /settings theme-ID picker — eyes-on verified, the engine is now user-reachable)** —
+  Balance recompute (cycle 318): feature over budget (5 starved, budget 4) AND the highest-leverage open item — both point
+  to T10. Built ThemePickerCard.svelte: a responsive grid of registry theme cards (composes the kit Card, no bespoke
+  controls per DesignSystem.md), each previewing ITS OWN palette via a swatch strip resolved from that theme's definition
+  (NOT the active CSS vars — so Default shows neutrals, Blueprint shows cyan/blue), selected-state ring + check, click →
+  themeStore.setTheme(id) → instant live re-skin. Orthogonal to the existing light/dark ThemeCard mode selector (D3).
+  Empty-safe (registry always has default). Wired into /settings after ThemeCard. EYES-ON (the T10 payoff, now meaningful
+  with 2 themes): booted servers + minted auth + shot /settings → picker renders Default + Blueprint with correct per-theme
+  swatches + blueprint selected-ring; seeded blueprint into the auth-state localStorage + shot /dashboard → FULL PAGE
+  re-skins cleanly, status 200, ZERO console errors, no FOUC/blank. (Shot blueprint in LIGHT = the intentional subtle
+  "whiteprint"; the dramatic cyan-on-navy is the dark variant, AA-tuned C313 + cascade-certified C316.) Verify: FE
+  validate:local GREEN (920 tests). BE untouched. Committed 82801fd, pushed (branch 178 ahead / 0 behind). cov: be 89.29% /
+  fe 89.43% (~ — the picker is a .svelte component, eyes-on-covered not unit-covered; FE source coverage will tick at T13
+  e2e). HARNESS NOTE: this sandbox reaps detached servers when the spawning Bash call returns — eyes-on must run boot→mint→
+  shoot in ONE long-timeout call (recorded for future UI cycles). (feature→318. T10 DONE. NEXT theming: T11 per-theme
+  dashboard eyes-on ×{light,dark}, OR register the next palette [bento/vaporwave/cyberpunk/aurora] by the C313 recipe, OR T12
+  axe a11y gate. The picker now makes every future theme registration immediately user-visible + shootable.)
 - **C317 (ARCH dedup: extracted DEFAULT_SWATCH — converged the swatch literal C313 self-introduced across the two theme definitions)** —
   Balance recompute (cycle 317): arch most-starved over budget (7 starved, budget 5, 1.4×) — forced pick. Ran the C286
   FAST-DRY precondition: the ONLY production-source commit since arch's last touch (C310) is C313, and it introduced a real
