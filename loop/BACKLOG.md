@@ -689,6 +689,18 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **SCOUTED C257 — expenses/repository.ts read/filter surface certified CLEAN firsthand → recorded dry + pivoted to a guard.**
+> Bug sole over-budget (4/3). Scouted the biggest plain-repo gap (expenses/repository.ts, 79% line — code the C250/C256
+> filter-branch cycles hadn't checked for DEFECTS) on the gold query-asymmetry seam. CLEAN: buildExpenseConditions
+> (shared findPaginated/findAll/export builder) has the inclusive-endDate local-day fix + LIKE-escape + AND-tags;
+> findPaginated has an allowlisted sort + stable id tiebreaker; getSummary period/recent boundaries sound;
+> getPerVehicleStats uses Unix-SECONDS cutoff matching the timestamp column (no C122 ms-drift). NO defect. Pivoted to
+> guard: getPerVehicleStats is reachable (dashboard /vehicle-stats route) but was ENTIRELY untested → +5 in a new
+> vehicle-stats-route.test.ts (per-vehicle GROUP BY, 30-day recentAmount boundary, custom recentDays, lastExpenseDate
+> MAX, userId scope). expenses/repository.ts 79.23→86.55% line / 98.28→100% func. Don't re-scout this repo; the residual
+> uncovered lines are the catch/DatabaseError DI-bound structural ceiling. Future bug cycles stay dry until a fresh
+> feature surface / Angelo-unblocked gate.
+
 > **SCOUTED C253 — trips-summary MONEY-RATE path certified CLEAN firsthand → recorded dry + pivoted to a guard.**
 > Bug was most-starved over budget (5/3) but the cold veins are worked-through, so did ONE fresh firsthand scout on a
 > post-C212 surface: the trips-summary business-$ (businessMileageValue = businessMiles × rate, a DISPLAYED $ figure,

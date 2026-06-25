@@ -186,11 +186,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 227 |
 | deep-review | 5 | 255 |
 | guard | 6 | 256 |
-| bug | 3 | 253 |
+| bug | 3 | 257 |
 | arch | 5 | 252 |
 | infra | 6 | 254 |
 
-Current cycle: **256**
+Current cycle: **257**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -209,6 +209,31 @@ Current cycle: **256**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C257 (bug-scout DRY → pivot to guard: certify expenses/repository.ts read/filter surface CLEAN + pin the untested getPerVehicleStats dashboard route — repo 79→86.55% line)** —
+  Balance recompute (cycle 257): bug was the sole over-budget category (4/3 = 1.33×; arch AT 5/5, not over). The
+  pure-logic/visual/write-path veins are documented exhausted, so per the C95/C204 discipline did ONE fresh firsthand
+  scout then recorded dry + pivoted. SCOUTED expenses/repository.ts (the biggest plain-repo coverage gap at 79% line,
+  read code the C250/C256 filter-branch cycles hadn't scrutinized for DEFECTS — the gold write-path/query-asymmetry
+  seam). CERTIFIED CLEAN firsthand: (1) buildExpenseConditions — the SHARED findPaginated/findAll/CSV-export builder
+  — has the inclusive-endDate local-day fix (endOfDayIfDateOnly, the #C6/#61/#103 boundary class), the LIKE-metachar
+  escape with ESCAPE clause (#41), AND-tag semantics via json_each; a divergence here is the "export shows more than
+  the table" class — none. (2) findPaginated — allowlisted sort column (no injection) + a stable id tiebreaker (ties
+  can't drop/dup across pages). (3) getSummary — period gte boundary via the shared getPeriodStartDate, recentAmount
+  deliberately always-30d, monthlyAverage calendar-span. (4) getPerVehicleStats — the recentAmount cutoff is Unix
+  SECONDS (Math.floor(.../1000)) matching the `timestamp`-mode date column (NO ms/seconds drift, the C122 normalizeDate
+  class), COALESCE-guarded SUM, userId-scoped. NO defect. PIVOTED to the co-productive guard: getPerVehicleStats is
+  REACHABLE (the dashboard GET /vehicle-stats route) but was ENTIRELY UNTESTED (the grep "vehicle-stats" hits were all
+  the unrelated vehicle-stats.ts helper). +5 in a new vehicle-stats-route.test.ts (createTestApp): per-vehicle GROUP BY
+  (no cross-vehicle bleed), the recentAmount 30-day boundary (an old 60d expense excluded, a 5d one included — pins the
+  seconds contract firsthand), a custom recentDays widening the window, lastExpenseDate = MAX, userId scope (no foreign
+  vehicle). Drives the REAL route stack (the C181/C229 anti-theater lesson). VERIFIED: expenses/repository.ts 79.23→
+  86.55% line / 98.28→100% func (the 405-452 getPerVehicleStats block dropped from uncovered; residual = the
+  catch/DatabaseError blocks, DI-bound structural ceiling); overall BE 89.15→89.23% line / 88.62→88.68% func. Verify:
+  BE validate:local GREEN — tsc 0, musl whole-tree clean (21-warn baseline, 0 errors), 1935 pass / 0 fail (+5), build
+  bundled. Backend-only (route HTTP test) → no shot. cov: be 89.23% (MEASURED, +0.08 line) / fe 89.11% (~). (bug→257:
+  the scout DID happen as the over-budget discipline requires; recorded dry + left a durable covered-SOURCE guard, the
+  C122/C204 pattern fused with the C250 filter-branch vein. expenses repo read/filter surface CERTIFIED — don't
+  re-scout. NEXT bug cycle stays dry until a fresh feature surface / Angelo-unblocked gate; record dry FAST + pivot.)
 - **C256 (guard: cover the un-tested odometer HISTORY route via the C250/C251 filter-branch pattern — odometer/routes.ts 87→100% line, real new covered SOURCE)** —
   Balance recompute (cycle 256): nothing strictly over budget except the gated feature (227, parked); bug AT
   threshold (3/3, not over). Per the C248 convention took the highest-leverage open item = the ONE vein still
