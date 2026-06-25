@@ -151,11 +151,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 227 |
 | deep-review | 5 | 228 |
 | guard | 6 | 225 |
-| bug | 3 | 226 |
+| bug | 3 | 230 |
 | arch | 5 | 229 |
 | infra | 6 | 224 |
 
-Current cycle: **229**
+Current cycle: **230**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -174,6 +174,27 @@ Current cycle: **229**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C230 (bug: FIX a CRASH-class defect on the C227 TripForm — submit threw `raw.trim is not a function`, NO trip ever created)** —
+  Balance recompute (cycle 230): bug most-starved + over budget (4/3 = 1.33×; infra 6/6 at threshold, not over).
+  Scouted the freshest prod surface (the C227 TripForm + trip-form-validation.ts FE write path) on the GUIDE's
+  gold seam — and found a SEVERE self-introduced defect. The validator's `parseOdometer` did `raw.trim()`
+  assuming a string, but **Svelte coerces an `<input type="number">` bind:value to a NUMBER (or null when
+  cleared) at runtime** — so the declared-string startOdometer/endOdometer actually hold NUMBERS once the user
+  types. `(1000).trim()` → TypeError, thrown OUTSIDE handleSubmit's try block → **clicking "Log Trip" silently
+  did nothing; the form could NEVER create a trip.** VERIFIED FIRSTHAND by driving the real form via Playwright
+  (fill vehicle+odometers → click → pageError `raw.trim is not a function`, trips 0→0). **C227's "eyes-on
+  verified" was the gap: it only OPENED the dialog + ran a curl E2E (strings/JSON) — it never FILLED + SUBMITTED
+  the real form, so the crash hid; the unit tests passed only because they fed strings.** This is exactly the
+  "agent HIGH findings need firsthand proof" discipline — I confirmed the crash AND the fix on the live form.
+  FIX: parseOdometer tolerates `string | number | null` (typeof-guard the `.trim()`, the parseInt/parseFloat
+  pattern the working ExpenseForm validator uses); typed the form state `string | number | null` to match
+  reality; exported parseOdometer + routed handleSubmit through it (killing the secondary parseInt-vs-Number
+  asymmetry — `1e3` would've parsed differently). GUARD: +4 unit tests (number-typed odometers → valid; cleared
+  null → missing-not-crash; R2 across mixed string/number; parseOdometer string|number|null table). RE-VERIFIED
+  on the live form: fill+submit → trip CREATED 0→1, no pageErrors, correct values; eyes-on shot of the filled
+  dialog. validate:local GREEN (svelte-check 0, build, 842 pass, +4). Servers killed (ports down); probe scripts
+  removed (tree clean). cov: be 88.92% (~) / fe ~88.9% (~). LESSON: a UI feature's eyes-on MUST drive the real
+  user action (fill+submit), not just render — re-shooting an opened dialog isn't the round trip. (bug→230.)
 - **C229 (arch: converge the clamped-pagination list-query field-set onto commonSchemas — rule-of-three, behavior-preserving)** —
   Balance recompute (cycle 229): arch most-starved + over budget (7/5 = 1.4×; bug 3/3 at threshold, rest under).
   Took arch + ran a fresh dedup scout (C228 had scouted a DIFFERENT vein set). Found a genuine rule-of-three this

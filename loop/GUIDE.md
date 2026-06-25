@@ -44,6 +44,17 @@ JSON parse); shot.mjs falls back to anonymous, the `/me` 401 is expected. So the
 human-gated feature tails (maintenance T9, import-trackers T4–T6, recurring-expenses T4–T8) and
 periodic deep-UI-review are now loop-closable: boot → shoot → Read → critique → fix → re-shoot.
 
+**A FORM's eyes-on MUST drive the real user action — fill + submit, not just render (C230).** A
+screenshot of an OPENED dialog proves layout, NOT that the submit works. C227 shot the trips form
+open + ran a curl E2E (JSON strings) and called it "eyes-on verified"; C230 then found the submit
+THREW `raw.trim is not a function` on every click (Svelte coerces `<input type="number">` to a
+NUMBER, but the validator assumed a string) — the form could never create a trip, invisible to both
+a render-only shot and string-fed unit tests. For any form, drive it via Playwright (createRequire
+playwright from `frontend/`, the cached-chromium fallback like shot.mjs): open → fill fields →
+click submit → assert the row was actually created (and no `pageerror`). Inputs typed `number`
+reach JS as `number | null`, NOT the seed string — parse with `parseInt`/`parseFloat`/typeof-guards,
+never a bare `.trim()`.
+
 ## Category veins — where work actually is (C338 reality)
 | Category | State | What still pays off |
 |---|---|---|

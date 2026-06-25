@@ -16,6 +16,7 @@
 	import { settingsStore } from '$lib/stores/settings.svelte';
 	import { TRIP_PURPOSES, type TripPurpose, type Vehicle } from '$lib/types';
 	import {
+		parseOdometer,
 		validateTripFields,
 		type TripFormData,
 		type TripFormErrors
@@ -30,10 +31,12 @@
 
 	let { open = $bindable(), vehicles, onSaved }: Props = $props();
 
-	// Form fields (raw strings the inputs bind; parsed/validated by validateTripFields).
+	// Form fields. The odometer fields bind to `<input type="number">`, which Svelte coerces to a NUMBER
+	// (or null when cleared) — so they're typed `string | number | null` even though seeded ''; parseOdometer
+	// tolerates all three (the C230 fix). Everything else is a plain string the inputs bind.
 	let vehicleId = $state('');
-	let startOdometer = $state('');
-	let endOdometer = $state('');
+	let startOdometer = $state<string | number | null>('');
+	let endOdometer = $state<string | number | null>('');
 	let purpose = $state<TripPurpose>('business');
 	let tripDate = $state(toDateInputValue(new Date()));
 	let startLocation = $state('');
@@ -88,12 +91,17 @@
 		errors = validateTripFields(currentForm());
 		if (Object.keys(errors).length > 0) return;
 
+		// Parse via the SAME helper validation used (not a divergent parseInt — which would disagree on
+		// e.g. '1e3'); validation already guaranteed both are non-null, the ?? 0 is a type-narrowing floor.
+		const startValue = parseOdometer(startOdometer) ?? 0;
+		const endValue = parseOdometer(endOdometer) ?? 0;
+
 		isSubmitting = true;
 		try {
 			await tripApi.create({
 				vehicleId,
-				startOdometer: parseInt(startOdometer, 10),
-				endOdometer: parseInt(endOdometer, 10),
+				startOdometer: startValue,
+				endOdometer: endValue,
 				purpose,
 				// The backend reads this as noon-local (dateOnlyToISO), so "today" is accepted (the C226 fix).
 				tripDate: dateOnlyToISO(tripDate),

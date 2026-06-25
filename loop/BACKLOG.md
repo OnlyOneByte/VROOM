@@ -671,6 +671,19 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **CLOSED C230 — CRASH-class defect on the C227 TripForm: submit threw `raw.trim is not a function`, the form
+> could NEVER create a trip (self-introduced C227, caught by driving the REAL form).** A C230 bug-scout on the
+> fresh TripForm write path: `parseOdometer` did `raw.trim()` assuming a string, but Svelte COERCES an
+> `<input type="number">` bind:value to a NUMBER (or null when cleared) — so startOdometer/endOdometer hold
+> numbers once typed. `(1000).trim()` → TypeError thrown OUTSIDE handleSubmit's try → clicking "Log Trip"
+> silently did nothing. VERIFIED FIRSTHAND via Playwright fill+submit (pageError + trips 0→0), then re-verified
+> the fix (trips 0→1, no errors). C227's eyes-on only OPENED the dialog + ran a curl E2E — never filled+submitted
+> the real form, so the crash hid; unit tests passed because they fed strings. FIX: parseOdometer tolerates
+> string|number|null (typeof-guard, the ExpenseForm parseInt/parseFloat pattern); form state typed to match;
+> exported parseOdometer + routed submit through it (kills the parseInt-vs-Number asymmetry). +4 guards (number/
+> null/mixed/parseOdometer-table). FE validate green (842). **LESSON: a UI feature's eyes-on MUST drive the real
+> user action (fill+submit), not just render the surface.** Don't re-fix.
+
 > **CLOSED C226 — REAL date/tz future-guard defect on the C210 trips CREATE/PUT (the gold #87/#106 seam, self-
 > introduced + caught before the form lands).** A C226 bug-scout (bug most-starved, 5/3) on the soon-to-be-form-
 > backed create-date path probed the GUIDE's date-off-by-one seam firsthand: `createTripSchema`'s future-guard was

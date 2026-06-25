@@ -16,9 +16,14 @@ import type { TripPurpose } from '$lib/types';
 
 export interface TripFormData {
 	vehicleId: string;
-	/** Raw <input> strings; parsed to non-negative integers here. */
-	startOdometer: string;
-	endOdometer: string;
+	/**
+	 * Odometer field values. Typed `string | number` because Svelte COERCES an `<input type="number">`
+	 * `bind:value` to a NUMBER at runtime (and to `null` when the box is cleared) — so although the form
+	 * seeds these as '', they hold numbers once the user types. parseOdometer must tolerate both (the
+	 * C230 fix: a bare `.trim()` threw `raw.trim is not a function` on the coerced number, killing submit).
+	 */
+	startOdometer: string | number | null;
+	endOdometer: string | number | null;
 	purpose: TripPurpose;
 	/** 'YYYY-MM-DD' from the DatePicker. */
 	tripDate: string;
@@ -29,9 +34,14 @@ export interface TripFormData {
 
 export type TripFormErrors = Partial<Record<keyof TripFormData, string>>;
 
-/** Parse a raw odometer string to a non-negative integer, or null when it isn't one. */
-function parseOdometer(raw: string): number | null {
-	const trimmed = raw.trim();
+/**
+ * Parse a raw odometer field value to a non-negative integer, or null when it isn't one. Tolerates the
+ * `string | number | null` the form actually holds (Svelte coerces a number-input to a number / null —
+ * see TripFormData), so it never calls a string method on a number (the C230 `raw.trim` crash).
+ */
+export function parseOdometer(raw: string | number | null | undefined): number | null {
+	if (raw === null || raw === undefined) return null;
+	const trimmed = typeof raw === 'string' ? raw.trim() : raw;
 	if (trimmed === '') return null;
 	const n = Number(trimmed);
 	if (!Number.isInteger(n) || n < 0) return null;

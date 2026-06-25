@@ -10,7 +10,7 @@
  */
 
 import { describe, expect, test } from 'vitest';
-import { validateTripFields, type TripFormData } from '../trip-form-validation';
+import { parseOdometer, validateTripFields, type TripFormData } from '../trip-form-validation';
 
 /** A date-only 'YYYY-MM-DD' offset from today by `days` (local calendar). */
 function localDateOffset(days: number): string {
@@ -54,6 +54,34 @@ describe('validateTripFields', () => {
 		expect(validateTripFields(form({ startOdometer: '' })).startOdometer).toBeTruthy();
 		expect(validateTripFields(form({ startOdometer: '-5' })).startOdometer).toBeTruthy();
 		expect(validateTripFields(form({ startOdometer: '12.5' })).startOdometer).toBeTruthy();
+	});
+
+	// C230 regression: Svelte coerces an <input type="number"> bind:value to a NUMBER (or null when
+	// cleared), so the form actually passes numbers — NOT the strings the seed implies. A bare `.trim()`
+	// threw "raw.trim is not a function" and killed submit silently. These pin that the validator accepts
+	// the coerced shapes the live form really produces (the bug was invisible to string-only tests).
+	test('accepts NUMBER-typed odometers (the Svelte type=number coercion the live form sends)', () => {
+		expect(validateTripFields(form({ startOdometer: 1000, endOdometer: 1080 }))).toEqual({});
+	});
+
+	test('treats a null odometer (cleared number input) as missing, not a crash', () => {
+		const errors = validateTripFields(form({ startOdometer: null, endOdometer: null }));
+		expect(errors.startOdometer).toBeTruthy();
+		expect(errors.endOdometer).toBeTruthy();
+	});
+
+	test('R2 holds across mixed string/number odometers (end < start)', () => {
+		expect(validateTripFields(form({ startOdometer: 1080, endOdometer: '1000' })).endOdometer).toBeTruthy();
+	});
+
+	test('parseOdometer tolerates string | number | null (the exported submit-path parser)', () => {
+		expect(parseOdometer('1000')).toBe(1000);
+		expect(parseOdometer(1000)).toBe(1000);
+		expect(parseOdometer(0)).toBe(0);
+		expect(parseOdometer(null)).toBeNull();
+		expect(parseOdometer('')).toBeNull();
+		expect(parseOdometer(12.5)).toBeNull(); // non-integer
+		expect(parseOdometer(-5)).toBeNull(); // negative
 	});
 
 	test('requires a valid end odometer', () => {
