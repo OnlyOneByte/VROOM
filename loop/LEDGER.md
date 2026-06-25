@@ -187,10 +187,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 255 |
 | guard | 6 | 256 |
 | bug | 3 | 257 |
-| arch | 5 | 258 |
+| arch | 5 | 259 |
 | infra | 6 | 254 |
 
-Current cycle: **258**
+Current cycle: **259**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -209,6 +209,28 @@ Current cycle: **258**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C259 (arch: remove dead code reminderRepository.findByVehicleId — zero callers, contract confirmed clean, the C251/C252 dead-code class; behavior-preserving)** —
+  Balance recompute (cycle 259): nothing strictly over budget except the gated feature (227, parked). Per the C248
+  convention took the highest-leverage open item = the guard filter-branch coverage vein (C250/C251/C256/C257, the
+  one still yielding real covered-SOURCE gains). Pulled per-file BE coverage to find the next clean reachable
+  low-spot — but the sub-90% files were ALL the documented structural ceiling (auth-routes OAuth, photos/providers/
+  sync DI-bound, + catch/DatabaseError tails in financing/insurance hooks + expenses/reminders repos). The one
+  "reachable" reminders/repository.ts line-272 method `findByVehicleId` (inner-JOIN read, uncovered 260-284) turned
+  out to be DEAD CODE, not a coverage gap: exhaustive grep found ZERO callers anywhere (the only `.findByVehicleId`
+  uses are on financingRepository/insurancePolicyRepository/OdometerRepository — DIFFERENT repos); none of the 4
+  reminderRepository importers (validation/routes/trigger-service/vehicles-routes) call it; added in the initial
+  feature commit 50aed3a but never wired; NO .kiro/specs reference (UNLIKE buildTripSummaryByMonth, which design §5
+  ratified — the C237 caution check, done firsthand not skipped). So this is the C251/C252 findActiveFinancing class:
+  genuine dead code, private unpublished backend → no external API contract. REMOVED the method + its doc comment (20
+  lines); NO orphaned imports (reminderVehicles ×20 / DatabaseError ×9 / innerJoin ×2 all used elsewhere — tsc + a
+  per-file biome check on reminders/repository.ts both clean, confirming). Behavior-preserving: 1935 pass / 0 fail
+  UNCHANGED (nothing depended on it), tsc 0, whole-tree musl clean (21-warn baseline). Removing the dead uncovered
+  method also RAISED the file's covered ratio: reminders/repository.ts 82.84→88.05% line; overall BE 89.23→89.27%
+  line / 88.68→88.70% func. Verify: BE validate:local GREEN. Backend-only (dead-code delete) → no shot. cov: be
+  89.27% (MEASURED, +0.04 line) / fe 89.11% (~). (arch→259 [2nd arch cycle running — C258 was the self-dup
+  convergence; this is a fresh dead-code find, NOT manufactured churn]. The C245 util dead-code sweep + C252
+  financing are now joined by reminders; the "extend dead-code sweep to all repository.ts" follow-on advances. NEXT
+  arch: the remaining repos may hold more zero-caller methods — scout them, else record no-churn + pivot.)
 - **C258 (arch: converge my own C256-introduced duplicate PaginatedEnvelope type onto the shared harness export + complete that shared type — behavior-preserving, the C222/C23 self-drift class)** —
   Balance recompute (cycle 258): arch was the sole over-budget category (6/5 = 1.2×; nothing else over except gated
   feature). Arch is near its structural floor, so per the C23 lesson scouted the FRESHEST drift vector — the test

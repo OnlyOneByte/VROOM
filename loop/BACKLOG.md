@@ -1690,6 +1690,16 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 ### arch
 *(reliably DRY per the archive. Run a fresh dedup scout; if nothing clean surfaces, record "no churn warranted" + pivot. Obey the arch rules above.)*
 
+> **✅ REMOVED C259 — `reminderRepository.findByVehicleId` dead code (the C251/C252 dead-code class).** Pulled per-file
+> BE coverage for a filter-branch guard pick; the one "reachable" reminders/repository.ts low-spot (findByVehicleId,
+> line 272) was actually DEAD: exhaustive grep = ZERO callers (the only `.findByVehicleId` uses are on financing/
+> insurance/odometer repos), none of the 4 reminderRepository importers call it, added in the initial feature commit
+> but never wired, NO .kiro/specs reference (the C237 ratified-surface check, done firsthand). Removed the method + doc
+> (20 lines); no orphaned imports (reminderVehicles/DatabaseError/innerJoin all used elsewhere — tsc + per-file biome
+> clean). Behavior-preserving: 1935 pass UNCHANGED. Bonus: reminders/repository.ts 82.84→88.05% line (dead uncovered
+> lines gone), overall BE 89.23→89.27%. FOLLOW-ON (the C252 note): the "extend dead-code sweep to all repository.ts"
+> advances — financing (C252) + reminders (C259) done; next arch can scout the remaining repos for zero-caller methods.
+
 > **✅ CONVERGED C258 — my own C256-introduced duplicate `PaginatedEnvelope` type onto the shared harness export
 > (the C222/C23 self-drift class).** C256's odometer-history-route.test.ts re-declared `interface PaginatedEnvelope<T>`
 > locally when http-client.ts:48 already EXPORTS it (+ expenses-http.test.ts imports it). Dropped the local

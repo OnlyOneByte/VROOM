@@ -266,26 +266,6 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     }
   }
 
-  /**
-   * Find all reminders associated with a specific vehicle for a user.
-   */
-  async findByVehicleId(vehicleId: string, userId: string): Promise<Reminder[]> {
-    try {
-      const rows = await this.db
-        .select({ reminder: reminders })
-        .from(reminders)
-        .innerJoin(reminderVehicles, eq(reminders.id, reminderVehicles.reminderId))
-        .where(and(eq(reminderVehicles.vehicleId, vehicleId), eq(reminders.userId, userId)));
-      return rows.map((r) => r.reminder);
-    } catch (error) {
-      logger.error('Failed to find reminders for vehicle', {
-        vehicleId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw new DatabaseError('Failed to find reminders for vehicle', error);
-    }
-  }
-
   // --------------------------------------------------------------------------
   // Mutation methods
   // --------------------------------------------------------------------------
