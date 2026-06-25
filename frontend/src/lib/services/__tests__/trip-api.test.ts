@@ -85,13 +85,26 @@ describe('tripApi.getSummary (R4 rollup)', () => {
 		expect(res).toEqual(SUMMARY);
 	});
 
-	test('vehicleId + rate are serialized (rate=0 survives, it is a real number)', async () => {
+	test('vehicleId + a non-zero rate are serialized', async () => {
 		get.mockResolvedValueOnce(SUMMARY);
 		await tripApi.getSummary({ vehicleId: 'v1', rate: 0.67 });
 		const url = get.mock.calls[0]?.[0] as string;
 		expect(url).toContain('/api/v1/trips/summary?');
 		expect(url).toContain('vehicleId=v1');
 		expect(url).toContain('rate=0.67');
+	});
+
+	// C219 (guard): rate=0 is a MEANINGFUL business value (explicit free reimbursement / "no rate"), NOT an
+	// absent param — it must SURVIVE serialization, unlike an empty-string vehicleId which is dropped. The
+	// trip-api passes `rate: params.rate` raw (no `|| undefined` coercion that would nuke a 0), relying on
+	// buildQueryString's `value != null` check (drops only null/undefined, keeps a numeric 0). A C219
+	// bug-scout verified this firsthand; this pins it so a future `rate || undefined` refactor (the
+	// reminder-api isActive:false truthy-drop class) can't silently swallow an explicit-zero rate.
+	test('rate=0 SURVIVES (a meaningful explicit-zero, not a dropped falsy)', async () => {
+		get.mockResolvedValueOnce(SUMMARY);
+		await tripApi.getSummary({ rate: 0 });
+		const url = get.mock.calls[0]?.[0] as string;
+		expect(url, `url was: ${url}`).toContain('rate=0');
 	});
 });
 

@@ -793,6 +793,14 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C219 — the trip-api `rate=0` query survival (the explicit-zero / falsy-drop class).** A C219
+> bug-scout on the FRESH C218 trip-api wrapper verified firsthand that `getSummary({rate:0})` serializes
+> `rate=0` (a meaningful explicit-zero business value, not an absent param) — buildQueryString drops only
+> null/undefined, and trip-api passes the rate RAW (no `|| undefined` coercion). CLEAN. GAP closed: the C218
+> tests only covered rate=0.67 (and one was MISLABELED "rate=0 survives" — fixed). +1 dedicated guard; non-vacuous
+> (a `rate || undefined` refactor → only this RED). Guards the reminder-api isActive:false truthy-drop class on
+> the new surface. Don't re-add.
+
 > **GUARDED C216 — D2's "a trip drives the mileage-reminder axis", end-to-end.** A C216 bug-scout (bug 5/3
 > over) verified firsthand the second half of D2's promise: a trip whose endOdometer crosses a mileage
 > reminder's milestone FIRES the notification (POST → createFromTrip → getCurrentOdometer → recheck →

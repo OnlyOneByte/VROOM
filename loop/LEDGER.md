@@ -144,12 +144,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 218 |
 | deep-review | 5 | 213 |
-| guard | 6 | 216 |
+| guard | 6 | 219 |
 | bug | 3 | 211 |
 | arch | 5 | 212 |
 | infra | 6 | 217 |
 
-Current cycle: **218**
+Current cycle: **219**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -168,6 +168,20 @@ Current cycle: **218**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C219 (bug-scout on the C218 trip-api [CLEAN — rate=0 query survival verified] → guard: pin the explicit-zero rate)** —
+  Balance recompute (cycle 219): bug most-starved + over budget (8/3 = 2.67×). Cold-vein LIFTED — C218 added a
+  FRESH FE surface (trip-api.ts + trip types) the prior scouts never touched → a real scout. Probed the
+  highest-risk spot in that thin wrapper: the query-string construction's falsy-handling (the
+  reminder-api isActive:false truthy-drop class). Specifically `rate=0` — a MEANINGFUL business value (explicit
+  free reimbursement / "no rate"), not an absent param. Verified firsthand: `getSummary({rate:0})` produces
+  `rate=0` in the URL — buildQueryString drops only null/undefined (`value != null`, keeps a numeric 0), and
+  trip-api passes `rate: params.rate` RAW (no `|| undefined` coercion that would nuke a 0). **CLEAN — no
+  defect.** Per the GUIDE (clean scout → record + pivot to guard; bug drove, the artifact is a guard), closed
+  the gap: the C218 tests only covered rate=0.67 (and one test was MISLABELED "rate=0 survives" while testing
+  0.67 — fixed the label). +1 dedicated guard pinning rate=0 survival + corrected the mislabeled test. Non-vacuous
+  (introduce `rate || undefined` → ONLY the rate=0 guard RED, the URL collapses to the bare path; verified
+  firsthand). FE validate:local GREEN (svelte-check 0, build, 826 pass / 0 fail, +1). Test-only (data-layer
+  guard, no UI) → no shot. cov: be 88.92% (~) / fe ~88.7%+ (~). (Bug stays 211 — scout clean, no fix; guard→219.)
 - **C218 (bug-scout DRY [saturated] → feature: trips T6a — the FE data layer [trip types + trip-api.ts])** —
   Balance recompute (cycle 218): bug most-starved (7/3 = 2.33×) but the trips surface is scout-saturated (5
   consecutive, no prod change since C213) → dry, recorded. Next over-budget = FEATURE (5/4 = 1.25×, edging arch's
