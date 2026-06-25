@@ -234,10 +234,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 314 |
 | guard | 6 | 315 |
 | bug | 3 | 316 |
-| arch | 5 | 310 |
+| arch | 5 | 317 |
 | infra | 6 | 312 |
 
-Current cycle: **316**
+Current cycle: **317**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,19 @@ Current cycle: **316**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C317 (ARCH dedup: extracted DEFAULT_SWATCH — converged the swatch literal C313 self-introduced across the two theme definitions)** —
+  Balance recompute (cycle 317): arch most-starved over budget (7 starved, budget 5, 1.4×) — forced pick. Ran the C286
+  FAST-DRY precondition: the ONLY production-source commit since arch's last touch (C310) is C313, and it introduced a real
+  self-dup — `swatch: ['primary','accent','background','foreground']` copy-pasted into BOTH DEFAULT_THEME + BLUEPRINT_THEME,
+  set to repeat once per future theme (bento/vaporwave/cyberpunk/aurora). NOT fast-dry → a legitimate small dedup (the
+  C222/C258/C275/C292 self-introduced-dup-convergence pattern, exactly the GUIDE's named fresh arch lane). Extracted a shared
+  DEFAULT_SWATCH const both definitions reuse (a theme MAY still override for a characterful preview — flexibility preserved).
+  Behavior-preserving (identical array values + type), test-anchored (registry-integrity + the swatch-referencing tests
+  exercise both, green→green). Concrete forward payoff: every future theme reuses one constant instead of re-pasting.
+  Verify: FE validate:local GREEN (920 tests UNCHANGED — the refactor signature). BE untouched. Committed c15a3a4, pushed
+  (branch 175 ahead / 0 behind). cov: be 89.29% / fe 89.43% (~). (arch→317. NEXT: the highest-leverage open item is feature
+  T10 — the /settings ThemeSection picker [ThemeCard.svelte already exists for the mode selector; T10 adds the theme-ID grid;
+  eyes-on is now meaningful with 2 themes] — OR register the next palette.)
 - **C316 (BUG-scout DRY: the blueprint dark-mode CSS cascade certified CLEAN firsthand → no defect, no manufactured guard)** —
   Balance recompute (cycle 316): bug most-starved over budget (5 starved, budget 3, 1.67×). Swept surfaces are dry, but
   C313 added genuinely fresh source (the live theme-render path), so per the GUIDE bug-row I scouted THAT — the real,
