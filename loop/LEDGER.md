@@ -234,10 +234,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 285 |
 | guard | 6 | 283 |
 | bug | 3 | 284 |
-| arch | 5 | 281 |
+| arch | 5 | 286 |
 | infra | 6 | 282 |
 
-Current cycle: **285**
+Current cycle: **286**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,22 @@ Current cycle: **285**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C286 (arch NO CHURN, recorded FAST via the C99 precondition: NO production source changed since C259, so nothing fresh to dedup — the self-dup vein is provably dry)** —
+  Balance recompute (cycle 286): nothing strictly OVER budget; arch most-starved non-gated (5/5, AT budget). Applied
+  the C99 fast-dry precondition to arch: a dedup target requires FRESHLY-THREADED duplicate code, so checked
+  firsthand whether any production source (non-test, non-loop-docs) changed recently — `git log` over
+  backend/src + frontend/src .ts EXCLUDING tests/__tests__ shows the LAST production-source commit was C259 (the
+  findByVehicleId dead-code removal); EVERYTHING since (C260–C285, 26 cycles) has been audit/docs/test-only. The
+  C258/C275 self-dup convergences already swept the freshly-authored test-helper code; C281 firsthand-ruled the BE
+  walker (none) + SRC_ROOT (can't converge); C270/C277 ruled the createExpense/collectSourceFiles quads below-bar. So
+  with NO new production source threaded since C259, there is STRUCTURALLY nothing new to dedup (the arch parallel to
+  the C99 "git diff empty → regression impossible → record dry fast" bug precondition). Recorded no-churn-warranted +
+  pivot (arch rule 5), FAST — did not re-scout the already-ruled targets. Verify: audit only — no source touched, both
+  suites green at C283 (1935 BE / 867 FE). Docs-only. cov: be 89.28% / fe 89.3% (~). (arch→286. STANDING ARCH
+  PRECONDITION [new]: at cycle start, if `git log` over production-src since the last source commit is empty, the
+  self-dup/dedup vein is structurally dry → record no-churn FAST + pivot; a real arch target now comes ONLY from a
+  fresh feature surface [Angelo-gated] threading new duplicate code. Don't re-scout createExpense/collectSourceFiles/
+  BE-walker/SRC_ROOT — all firsthand-ruled below-bar.)
 - **C285 (deep-review: the storage-provider config-validation fail-fast path [#103/#123] certified CLEAN firsthand — the create + PUT gate is byte-identical to the use-site enforcement, no silent-bricked-row possible)** —
   Balance recompute (cycle 285): deep-review was the sole over-budget category (6/5 = 1.2×). The vein is saturated
   across trips/repos/TCO/offline-sync/CSV-import, so picked a fresh not-yet-audited subsystem: the storage-provider

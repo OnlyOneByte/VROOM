@@ -1861,6 +1861,14 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 > lines gone), overall BE 89.23→89.27%. FOLLOW-ON (the C252 note): the "extend dead-code sweep to all repository.ts"
 > advances — financing (C252) + reminders (C259) done; next arch can scout the remaining repos for zero-caller methods.
 
+> **NO CHURN C286 (recorded FAST via the new fast-dry precondition) — NO production source changed since C259, so
+> nothing fresh to dedup.** `git log` over backend/src+frontend/src .ts (excluding tests) shows the last
+> production-source commit was C259; C260–C285 (26 cycles) were all audit/docs/test-only. With no new source threaded,
+> the self-dup/dedup vein is STRUCTURALLY dry (the arch parallel to the C99 bug precondition). Recorded the standing
+> FAST-DRY PRECONDITION in the GUIDE arch row. Don't re-scout the already-ruled below-bar targets (createExpense C270 /
+> collectSourceFiles C277 / BE-walker + SRC_ROOT C281); a real arch target now needs a fresh feature surface
+> (Angelo-gated) threading new duplicate code.
+
 > **NO CHURN C281 — 2 more self-dup candidates scouted, both below the bar.** (1) No BACKEND file-walker dup exists
 > (grep of all backend *.test.ts for a recursive readdirSync/collect/walk = zero; the BE source-scans read known files
 > directly). (2) The `SRC_ROOT = join(dirname(fileURLToPath(import.meta.url)),'..','..','..')` line is byte-identical
