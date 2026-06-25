@@ -202,10 +202,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 268 |
 | guard | 6 | 263 |
 | bug | 3 | 269 |
-| arch | 5 | 264 |
+| arch | 5 | 270 |
 | infra | 6 | 267 |
 
-Current cycle: **269**
+Current cycle: **270**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -224,6 +224,27 @@ Current cycle: **269**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C270 (arch NO CHURN WARRANTED — the 4-file `createExpense` test-helper quad is a rule-of-FOUR with 4 DIVERGENT signatures, below the bar; converging = manufactured churn [C212/C244 discipline])** —
+  Balance recompute (cycle 270): arch + guard both over budget (arch 6/5 = 1.2×, guard 7/6 = 1.17×); arch more starved
+  → arch. Arch is DRY (dead-code sweep complete C260/C264, seedVehicle done C199); the GUIDE-updated fresh vector is
+  "self-introduced dups in code authored last cycles" (C222/C258). SCOUTED: 4 expenses test files declare a local
+  route-POST `createExpense` helper (summary-http, expenses-http, export-csv, the C257 vehicle-stats-route) + NO shared
+  expense seeder exists in test-helpers — superficially a seedVehicle-style rule-of-three convergence. VERIFIED EACH
+  FIRSTHAND (the C212/C244 "check signatures before converging" discipline) — they DIVERGE materially: (a) summary-http
+  `(vehicleId,amount,isoDate,category='misc')`→id, auto-derived description; (b) expenses-http `(vehicleId,category,
+  amount,description,date)`→id, +fuel-fields-when-fuel; (c) export-csv same params as (b) but →VOID (asserts <300, no
+  id) + fuel; (d) vehicle-stats-route `(vehicleId,amount,date,category='maintenance')`→void, fixed description. They
+  differ in PARAM ORDER (2 orderings), RETURN TYPE (id vs void), DESCRIPTION handling (3 ways), and FUEL-field logic (2
+  have it, 2 don't). Converging needs a newly-authored over-parameterized helper (optional params/fuel/return) to serve
+  4 distinct call shapes — exactly the C212/C244 "rule-of-N needing a newly-authored helper with divergent shapes is
+  below the bar / manufactured churn (GUIDE-forbidden)". UNLIKE seedVehicle (C150 helper already existed + bodies
+  near-identical), here no shared seeder exists + bodies genuinely differ. Also scouted the 2 newest files for OTHER
+  self-dups: isoDaysAgo is unique, createManualEntry/createFuelExpenseWithMileage/getStats are single-use file-local,
+  the seedVehicle wrapper is the already-converged C199 pattern. NO clean dedup → recorded "no churn warranted" + pivot
+  (arch rule 5); did NOT manufacture. Verify: audit only — no source touched, both suites green at C262 (1935 BE / 860
+  FE). Docs-only. cov: be 89.27% / fe 89.11% (~). (arch→270. The createExpense quad is a documented BELOW-BAR
+  non-target — don't re-scout it for convergence unless a 5th IDENTICAL-signature copy appears [which would still need
+  the bodies to match, not just the name]. Arch stays at its structural floor; NEXT arch record no-churn fast + pivot.)
 - **C269 (bug-scout EYES-ON DARK, the C239–C247 visual-sweep vein on the fresh dark axis: /vehicles/[id] Overview + Finance-tab certified CLEAN — the densest money surface, no defect)** —
   Balance recompute (cycle 269): bug was the sole over-budget category (4/3 = 1.33×). The SOURCE-audit bug surface is
   saturated, but C268 opened a FRESH eyes-on axis (dark mode) + shot only 2 of ~9 routes — the densest contrast-prone

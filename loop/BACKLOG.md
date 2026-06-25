@@ -1782,6 +1782,15 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 > lines gone), overall BE 89.23→89.27%. FOLLOW-ON (the C252 note): the "extend dead-code sweep to all repository.ts"
 > advances — financing (C252) + reminders (C259) done; next arch can scout the remaining repos for zero-caller methods.
 
+> **NO CHURN C270 — the 4-file `createExpense` test-helper quad is a rule-of-FOUR with 4 DIVERGENT signatures, below
+> the bar.** Scouted the self-dup vector: 4 expenses test files (summary-http, expenses-http, export-csv, C257
+> vehicle-stats-route) each declare a local route-POST createExpense + no shared expense seeder exists. But firsthand
+> they DIVERGE (param order ×2, return id-vs-void, description 3 ways, fuel-fields 2-of-4) — converging needs a
+> newly-authored over-parameterized helper for 4 distinct call shapes = manufactured churn (the C212/C244 below-bar
+> case; UNLIKE seedVehicle where the C150 helper existed + bodies matched). The other newest-file helpers (isoDaysAgo,
+> createManualEntry, getStats) are single-use file-local. Recorded no-churn + pivot (arch rule 5). Don't re-scout the
+> createExpense quad unless a 5th IDENTICAL-signature-AND-body copy appears.
+
 > **✅ CONVERGED C258 — my own C256-introduced duplicate `PaginatedEnvelope` type onto the shared harness export
 > (the C222/C23 self-drift class).** C256's odometer-history-route.test.ts re-declared `interface PaginatedEnvelope<T>`
 > locally when http-client.ts:48 already EXPORTS it (+ expenses-http.test.ts imports it). Dropped the local
