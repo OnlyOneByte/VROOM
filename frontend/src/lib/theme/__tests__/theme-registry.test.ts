@@ -79,4 +79,31 @@ describe('THEME_REGISTRY integrity + default ≡ app.css (T5)', () => {
       expect(def[key], `default.dark.${key} must match app.css .dark`).toBe(cssDark[key]);
     }
   });
+
+  // A NON-default theme must actually DIFFER from `default` in BOTH variants — else it is a silent no-op
+  // theme. This is a real footgun: each new ThemeDefinition is authored by copy-pasting the DEFAULT_LIGHT/
+  // DEFAULT_DARK blocks and editing values (theme-registry.ts), so a registration that forgets to change
+  // the values ships a theme the picker offers but that paints identically to default — and EVERY other
+  // guard stays green (contrast passes: it IS default's known-AA palette; registry-integrity passes: all
+  // keys present; css-freshness passes: a block is emitted). Nothing else catches "registered but inert".
+  // Distinct = at least one token value differs (not necessarily all). Skips `default` itself.
+  const nonDefaultThemes = Object.values(THEME_REGISTRY).filter((t) => t.id !== DEFAULT_THEME_ID);
+  if (nonDefaultThemes.length > 0) {
+    const defLight = THEME_REGISTRY[DEFAULT_THEME_ID]?.light as ThemeTokens;
+    const defDark = THEME_REGISTRY[DEFAULT_THEME_ID]?.dark as ThemeTokens;
+    describe.each(nonDefaultThemes)('non-default theme "$id" is not a silent default clone', (theme) => {
+      test('its LIGHT variant differs from default.light in at least one token', () => {
+        const differs = THEME_TOKEN_KEYS.some(
+          (k) => theme.light[k as ThemeTokenKey] !== defLight[k as ThemeTokenKey]
+        );
+        expect(differs, `${theme.id}.light is byte-identical to default.light (inert theme)`).toBe(true);
+      });
+      test('its DARK variant differs from default.dark in at least one token', () => {
+        const differs = THEME_TOKEN_KEYS.some(
+          (k) => theme.dark[k as ThemeTokenKey] !== defDark[k as ThemeTokenKey]
+        );
+        expect(differs, `${theme.id}.dark is byte-identical to default.dark (inert theme)`).toBe(true);
+      });
+    });
+  }
 });
