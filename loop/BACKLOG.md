@@ -1939,6 +1939,14 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 filesystem; untracked specs vanish on merge), full regress, coverage re-measure (update the LEDGER cov:
 baseline), refresh `BRANCH_REVIEW.md` grouped by theme so the eventual PR stays reviewable.)*
 
+> **RAN C254 (cadence; last ran C246).** Untracked-test sweep CLEAN both sides (the 56 .meshclaw.e2e.ts gitignored
+> BY DESIGN — the loop's local regress harness, not tracked-vanishing). Tree clean; no orphan dev servers; branch
+> 108 ahead / 0 behind, PR-ready. Coverage RE-MEASURED: **BE 89.04% line / 88.54% func (1926 pass) — UP +0.12/+0.10
+> vs C246**, the first BE movement in the gated stretch (the C250/C251/C253 filter-branch coverage pattern added +6
+> covered-source HTTP tests). FE 89.11% line / 89.23% func / 81.34% branch / 86.99% stmts (860 pass) — FLAT vs C246
+> (C247 was a source-scan guard). Both hold at/above the ~89% structural ceiling, both green. BRANCH_REVIEW.md is
+> gitignored (not in the PR) → no refresh artifact. NEXT cadence ~C264.
+
 > **RAN C136 (cadence; last ran C130).** Untracked-test sweep CLEAN (C133/C134 test files tracked; only the
 > intentional `M .gitignore`/`M frontend/.gitignore` overrides). Coverage RE-MEASURED: BE 88.21% line / 87.79% func
 > (1770 pass), +0.08 vs C130 (the C133 pending-credentials-eviction→100% + C134 arc); FE 88.23% line / 88.69% func /

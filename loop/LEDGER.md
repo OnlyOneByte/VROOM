@@ -29,6 +29,22 @@
 > (C155 email-fix / C157 resolveNewUser / C158 unlink-route) + the C159 offline needs-attention helpers
 > (pure+covered) added covered lines; FE crossed 88.4 line (a fresh high). Structural ceiling holds (DI/OAuth/SQL
 > BE + effect/DOM FE). NEXT ~C171.**
+> **C254 (infra cadence MEASURED): BE 89.04% line / 88.54% func (1926 pass / 1 skip / 236 files) — UP +0.12 line /
+> +0.10 func vs C246, the first BE coverage MOVEMENT in the gated stretch: the C250 expenses-summary-vehicleId (+2),
+> C251 reminders-list-filters (+1), C253 trips-summary-rate-boundary (+3) HTTP tests drove the C250/C251 filter-branch
+> coverage pattern (cover a clean reachable untested PATH, not theater) → +6 covered-source tests that nudged the
+> line off the long ~88.9 BE plateau. FE 89.11% line / 89.23% func / 81.34% branch / 86.99% stmts (860 pass / 80
+> files) — FLAT vs C246 (the C247 reminder-card-mobile-stack guard is a SOURCE-SCAN reading an existing file → covered
+> test lines, not new covered SOURCE branches, the expected guard-cycle signature). Both hold at/above the ~89%
+> structural ceiling, both green. Untracked-test sweep CLEAN both sides (the 56 .meshclaw.e2e.ts are gitignored BY
+> DESIGN — the loop's local regress harness; no tracked-vanishing specs); tree clean; no live orphan dev servers
+> (:3001/:5173 down); branch 108 ahead / 0 behind origin/main, PR-ready. The C247–C253 stretch (mobile-fix + the
+> 3 filter-branch coverage gains + dead-code removal + the trips-rate guard) was productive within the gate — BE
+> coverage moved for the first time since the C217 trips arc. BRANCH_REVIEW.md is gitignored (not in the PR; per
+> CLAUDE.md don't rely on it) → no refresh artifact. NEXT cadence ~C264. STANDING SIGNAL: net-new feature SOURCE
+> stays Angelo-gated (money-cents sequencing / C214 lifecycle / instrument palette / vehicle-sharing); the
+> self-directed veins keep yielding guards + the occasional filter-branch coverage gain, but the structural ceiling
+> (BE DI/singleton/OAuth + FE eyes-on components) holds ~89% both sides.**
 > **C246 (infra cadence MEASURED): BE 88.92% line / 88.44% func (1920 pass) — FLAT vs C231 (BE untouched since
 > C234; C235–C245 were FE/docs/scouts). FE 89.11% line / 89.23% func / 81.34% branch / 86.99% stmts (857 pass /
 > 79 files) — line + func FLAT vs C231, branch −0.09 / stmts −0.06 (v8 rounding noise: the +15 FE tests since C231
@@ -172,9 +188,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 251 |
 | bug | 3 | 253 |
 | arch | 5 | 252 |
-| infra | 6 | 246 |
+| infra | 6 | 254 |
 
-Current cycle: **253**
+Current cycle: **254**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
