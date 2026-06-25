@@ -235,9 +235,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 306 |
 | bug | 3 | 308 |
 | arch | 5 | 304 |
-| infra | 6 | 303 |
+| infra | 6 | 309 |
 
-Current cycle: **308**
+Current cycle: **309**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,24 @@ Current cycle: **308**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C309 (infra coverage cadence; last full measure C299: untracked-test sweep CLEAN, BE re-measured [func +0.31 — the C300 dead-code removal took db/types.ts 66.67→100% func], GUIDE standing-truth freshened to C309)** —
+  Balance recompute (cycle 309): arch + infra tied at 1.00× (5/5, 6/6); infra most-starved by absolute count (6 > 5) AND
+  the coverage cadence was due (last full measure C299, ~C309). (Arch would have been a no-churn-fast record — the C286
+  precondition still holds, no source since C300 — so infra is both more-starved and the genuinely-productive pick.) Ran
+  the sweep: (1) untracked-file sweep CLEAN — git status --untracked-files=all shows ZERO untracked; (2) no orphan dev
+  servers (ss -ltnp: no :3001/:5173 listeners); (3) Coverage RE-MEASURED: BE 89.29% line / 89.32% func (1949 pass / 0
+  fail / 241 files) — func UP +0.31 vs C299 (89.01), line flat (89.29). The C300 dead-code removal lifted func EXACTLY as
+  predicted: db/types.ts 66.67→100.00% func (deleting the 0-coverage isValidPaymentFrequency/createEnumGuard raised the
+  file covered-fraction). FE UNCHANGED at 89.43% line / 90.05% func / 81.75% branch (868 pass) — VERIFIED firsthand the
+  latest FE-source commit is C289 (no FE .ts/.svelte touched C290–C308), so carried forward not re-run (the C262/C272/C293
+  /C299 pattern). Both hold above the ~89% structural ceiling, both green. (4) DOC-FRESHNESS: refreshed the GUIDE coverage
+  standing-truth (C299 → C309 numbers + the C300-removal provenance). Tree clean; branch 163 ahead / 0 behind, PR-ready.
+  Verify: docs-only (GUIDE standing-truth + this LEDGER + balance table + BACKLOG infra note); no source touched, both
+  suites green. cov: be 89.29% / fe 89.43% (MEASURED BE, FE carried). (infra→309. NEXT cadence ~C319. The C300 removal is
+  a clean illustration that dead-code deletion IMPROVES the func metric [the covered-fraction rises when a 0-coverage
+  function is removed] — a small durable structural gain under the feature-gate. STANDING SIGNAL holds: net-new feature
+  SOURCE Angelo-gated; the self-directed veins are firsthand-saturated [the C290–C308 arc certified the backup/auth/
+  financing/odometer/insurance/split subsystems end-to-end].)
 - **C308 (bug-scout DRY: createFromTrip [the trip→odometer write feeding getCurrentOdometer — the C298 backbone] certified CLEAN firsthand → dry, pivot fast, no manufactured test)** —
   Balance recompute (cycle 308): nothing strictly OVER budget; bug most-starved by ratio (3/3, 1.00×). Per the
   C293-refreshed bug-row guidance, scouted a not-yet-rechecked reachable surface: createFromTrip (odometer/repository.ts:48

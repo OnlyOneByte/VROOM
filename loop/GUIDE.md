@@ -87,10 +87,11 @@ never a bare `.trim()`.
 | **infra** | live (the one always-productive vein) | ~every 10 cycles: untracked-`*.test.ts` sweep + coverage re-measure (update the LEDGER cov: baseline) + this GUIDE/doc-freshness pass. (BRANCH_REVIEW.md is gitignored — NOT in the PR, no refresh artifact.) |
 
 ## Standing truths (don't re-discover these)
-- **Coverage 90% is NOT loop-closable** (RE-MEASURED C299: 89.29% BE line / 89.01% func [1949 pass] · 89.43% FE
+- **Coverage 90% is NOT loop-closable** (RE-MEASURED C309: 89.29% BE line / 89.32% func [1949 pass] · 89.43% FE
   line / 90.05% func / 81.75% branch [868 pass, C289] — the structural ceiling, UP from the stale ~86/~84 via the
-  C250–C257 filter-branch covered-source climb; BE crept +0.01/+0.04 vs C293 [the C295 unique-constraint guard + the
-  C296 checkLinkConflicts export/DI + takeover guard], FE flat since C289 [no FE source touched C290–C298]). BE gaps are
+  C250–C257 filter-branch covered-source climb; BE func +0.31 vs C299 [the C300 dead-code removal took db/types.ts
+  66.67→100% func by deleting the 0-coverage isValidPaymentFrequency/createEnumGuard], FE flat since C289 [no FE source
+  touched C290–C308]). BE gaps are
   DI/singleton/OAuth + catch/DatabaseError tails; FE gaps are eyes-on components + DOM/timer + apiClient-wrapper
   theater. `cov:` tag every LEDGER entry; re-measure on cycles that touch a module. The filter-branch vein that
   drove the climb is now SATURATED (C261/C263) — don't expect further movement without new feature SOURCE.

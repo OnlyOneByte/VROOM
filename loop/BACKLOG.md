@@ -2381,6 +2381,15 @@ baseline), refresh `BRANCH_REVIEW.md` grouped by theme so the eventual PR stays 
 > ahead). Docs-only, behavior-preserving. NEXT coverage cadence ~C309. SIGNAL: net-new feature SOURCE Angelo-gated; the
 > un-audited-subsystem list is nearly empty.
 
+> **RAN C309 (coverage cadence — BE re-measure triggered by the C300 dead-code removal; last full cadence C299).**
+> Untracked-file sweep CLEAN (zero untracked); no orphan dev servers (ss -ltnp: :3001/:5173 down); branch 163 ahead / 0
+> behind, PR-ready. Coverage RE-MEASURED: BE 89.29% line / 89.32% func (1949 pass) — func UP +0.31 vs C299 (the C300
+> removal took db/types.ts 66.67→100% func by deleting the 0-coverage isValidPaymentFrequency/createEnumGuard). FE
+> UNCHANGED 89.43% line / 90.05% func (868 pass) — verified no FE source touched C290–C308 (latest FE commit C289),
+> carried forward. Both above the ~89% ceiling, green. Refreshed the GUIDE coverage standing-truth → C309 numbers. NEXT
+> cadence ~C319. SIGNAL: dead-code deletion IMPROVES the func metric (covered-fraction rises); net-new feature SOURCE
+> Angelo-gated.
+
 > **RAN C299 (coverage cadence — BE re-measure triggered by the C295/C296 auth+guard touches; last full cadence C293).**
 > Untracked-file sweep CLEAN (zero untracked); no orphan dev servers (ss -ltnp: :3001/:5173 down); branch 153 ahead / 0
 > behind, PR-ready. Coverage RE-MEASURED: BE 89.29% line / 89.01% func (1949 pass) — UP +0.01/+0.04 vs C293 (the C295
