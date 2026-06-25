@@ -29,6 +29,12 @@
 > (C155 email-fix / C157 resolveNewUser / C158 unlink-route) + the C159 offline needs-attention helpers
 > (pure+covered) added covered lines; FE crossed 88.4 line (a fresh high). Structural ceiling holds (DI/OAuth/SQL
 > BE + effect/DOM FE). NEXT ~C171.**
+> **C224 (infra cadence MEASURED): BE 88.92% line / 88.13% func (1903 pass) — FLAT vs C217 (BE untouched since;
+> C218–C223 were FE + LEDGER). FE 88.85% line / 89.15% func / 80.78% branch / 86.75% stmts (826 pass) — UP +0.12
+> line / +0.24 func / +0.10 branch vs C217, from the C218 trip-api/types (unit-tested) + the C220–C223 trips
+> list page (the FE's first real movement in the trips arc). Both hold/up at the structural ceiling, both green.
+> Untracked-test sweep CLEAN both sides; tree clean; no orphan dev servers; branch 78 ahead / 0 behind
+> origin/main, PR-ready. NEXT cadence ~C234.**
 > **C217 (infra cadence MEASURED): BE 88.92% line / 88.14% func (1903 pass) — UP +0.39 line / +0.08 func vs
 > C209, the C210–C216 trips arc (trips routes/repository/validation + trip-summary all 100% line; odometer
 > repository 100% line incl. createFromTrip). FE 88.73% line / 88.91% func / 80.68% branch / 86.62% stmts (813
@@ -147,9 +153,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 219 |
 | bug | 3 | 221 |
 | arch | 5 | 222 |
-| infra | 6 | 217 |
+| infra | 6 | 224 |
 
-Current cycle: **223**
+Current cycle: **224**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -168,6 +174,21 @@ Current cycle: **223**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C224 (infra: cadence sweep + coverage re-measure)** —
+  Balance recompute (cycle 224): infra most-starved + the ONLY strictly over-budget category (7/6 = 1.17×; feature
+  4/4 + bug 3/3 at threshold, not over). Coverage was last MEASURED C217, and the FE moved materially across the 4
+  cycles since (C220 trips list page, C221 truncation fix, C222 dedup, C223 unit-label fix) — all carried as
+  estimated `fe ~88.7% (~)`, so a real re-measure was due. (1) UNTRACKED-TEST SWEEP: CLEAN both sides; tree clean;
+  no orphan dev servers (the C223 cleanup held). (2) COVERAGE RE-MEASURED: **BE 88.92% line / 88.13% func (1903
+  pass) — FLAT vs C217** (BE untouched since; C218–C223 were FE + LEDGER); **FE 88.85% line / 89.15% func / 80.78%
+  branch / 86.75% stmts (826 pass) — UP +0.12 line / +0.24 func / +0.10 branch vs C217**, the C218 trip-api/types +
+  the C220–C223 trips list page (the FE's first real coverage movement of the trips arc). (3) BOTH-SIDES GREEN: BE
+  1903 / FE 826, 0 fail. (4) BRANCH: 78 ahead / 0 behind origin/main, PR-ready. Doc-only (coverage runs exercised
+  the full suites; no source touched → no build/shot). STATE: the trips backend (T1–T5 + D2) + the read-only list
+  UI (T6b-1) are complete + hardened (correctness C221, cleanliness C222, unit-correctness C223). REMAINING
+  loop-buildable: trips T6b-2 (the create/edit form, eyes-on/shootable) + the C223-filed 403-on-vehicle-delete
+  scout; everything else is Angelo-gated (C214 lifecycle / instrument palette / vehicle-sharing T0). cov: be
+  88.92% / fe 88.85% (MEASURED). NEXT cadence ~C234.
 - **C223 (deep-review: certify trips unit-correctness → FIX a REAL mixed-fleet mislabel on the per-trip cards [NORTH_STAR #2])** —
   Balance recompute (cycle 223): deep-review most-starved + over budget (10/5 = 2.0×). Scouted the freshest
   uncertified surface (the C220–C222 trips FE) for a load-bearing invariant: UNIT-CORRECTNESS (NORTH_STAR #2,
