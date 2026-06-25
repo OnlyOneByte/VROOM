@@ -17,6 +17,7 @@ import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { changeTracker, requireAuth } from '../../middleware';
+import { logger } from '../../utils/logger';
 import { buildPaginatedResponse, clampPagination } from '../../utils/pagination';
 import { buildTripSummary } from '../../utils/trip-summary';
 import {
@@ -71,14 +72,26 @@ routes.post('/', zValidator('json', createTripSchema), async (c) => {
   // write an odometer entry at endOdometer/tripDate, DEDUPED by (vehicle, day, reading) so it doesn't
   // double-count a manual reading the user also logged. Then recheck mileage reminders (the new reading may
   // cross a milestone), mirroring the odometer route's create path. Both are best-effort — the trip is
-  // already persisted, so a recheck/linkage hiccup never fails the create.
-  await odometerRepository.createFromTrip({
-    vehicleId: data.vehicleId,
-    userId: user.id,
-    odometer: data.endOdometer,
-    recordedAt: data.tripDate,
-  });
-  await reminderTriggerService.recheckMileageReminders(user.id, data.vehicleId);
+  // ALREADY persisted, so a side-effect hiccup must NOT fail the create. recheckMileageReminders is
+  // internally guarded (C42, never throws), but createFromTrip is a plain repo write whose dedup SELECT /
+  // INSERT CAN throw a DatabaseError — left unguarded, that 500'd a create whose trip row already committed,
+  // so the FE showed "failed" and a retry made a DUPLICATE (C233: the "never fails the create" comment was a
+  // lie for this leg). Wrap the whole D2 block: log + swallow, return the 201 the persisted trip earned.
+  try {
+    await odometerRepository.createFromTrip({
+      vehicleId: data.vehicleId,
+      userId: user.id,
+      odometer: data.endOdometer,
+      recordedAt: data.tripDate,
+    });
+    await reminderTriggerService.recheckMileageReminders(user.id, data.vehicleId);
+  } catch (error) {
+    logger.error('Trip D2 odometer-linkage/reminder-recheck failed (trip already persisted)', {
+      tripId: trip.id,
+      vehicleId: data.vehicleId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   return c.json({ success: true, data: trip, message: 'Trip created' }, 201);
 });

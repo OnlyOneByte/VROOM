@@ -235,6 +235,39 @@ describe('POST /api/v1/trips (create)', () => {
     ).n;
     expect(n).toBe(1); // same (vehicle, day, reading) → one odometer entry, not two
   });
+
+  // C233 deep-review: the route comments "Both [D2 side-effects] are best-effort — the trip is already
+  // persisted, so a … hiccup never fails the create." recheckMileageReminders is internally guarded (C42)
+  // but createFromTrip is a plain repo write that CAN throw a DatabaseError; left unguarded it 500'd a create
+  // whose trip row ALREADY committed → the FE showed "failed" + a retry made a DUPLICATE. Fault-inject a
+  // createFromTrip throw and pin the contract: the create still returns 201 AND the trip is persisted (the
+  // best-effort linkage swallows + logs, never propagates). Non-vacuous: drop the route try/catch → 500 here.
+  test('a createFromTrip (D2 linkage) throw does NOT fail the create — trip persists, 201 returned (C233)', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    const { odometerRepository } = await import('../../odometer/repository');
+    const original = odometerRepository.createFromTrip;
+    // Simulate a DB hiccup in the D2 side-effect AFTER the trip row commits.
+    odometerRepository.createFromTrip = async () => {
+      throw new Error('simulated DB hiccup in createFromTrip');
+    };
+    try {
+      const res = await ctx.authed(
+        'POST',
+        '/api/v1/trips',
+        VALID(vehicleId, { startOdometer: 1000, endOdometer: 1100 })
+      );
+      expect(res.status, await res.text()).toBe(201);
+      // The trip is persisted regardless of the side-effect failure (no orphaned 500).
+      const n = (
+        ctx.sqlite.query('SELECT COUNT(*) AS n FROM trips WHERE vehicle_id = ?').get(vehicleId) as {
+          n: number;
+        }
+      ).n;
+      expect(n).toBe(1);
+    } finally {
+      odometerRepository.createFromTrip = original;
+    }
+  });
 });
 
 // C216 (guard): the SECOND half of D2's promise — "a trip's end reading drives the mileage-reminder axis".

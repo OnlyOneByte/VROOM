@@ -158,13 +158,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 227 |
-| deep-review | 5 | 228 |
+| deep-review | 5 | 233 |
 | guard | 6 | 232 |
 | bug | 3 | 230 |
 | arch | 5 | 229 |
 | infra | 6 | 231 |
 
-Current cycle: **232**
+Current cycle: **233**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -183,6 +183,26 @@ Current cycle: **232**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C233 (feature gated → pivot to deep-review: FIX a real best-effort-contract violation on the trip CREATE D2 side-effects)** —
+  Balance recompute (cycle 233): feature most-starved + over budget (6/4 = 1.5×) but FULLY GATED — money-cents
+  escalated/parked (C232, awaiting Angelo's sequencing pick), trips T6b-3 gated on C214, theming picker gated on
+  the `instrument` palette, vehicle-sharing gated. Per C232's recorded discipline (no un-gated feature work →
+  record + pivot), pivoted to the next-most-starved actionable = deep-review (5/5). Certified a load-bearing
+  invariant firsthand on the trip CREATE path and found it VIOLATED. The route comments "Both [D2 side-effects]
+  are best-effort — the trip is already persisted, so a … hiccup never fails the create." VERIFIED that's a LIE
+  for one leg: recheckMileageReminders is internally guarded (C42, never throws), BUT `odometerRepository.
+  createFromTrip` is a plain repo write whose dedup SELECT / INSERT CAN throw a DatabaseError, left UNGUARDED in
+  the route. Fault-injected a createFromTrip throw firsthand → **response 500, but the trip row ALREADY committed
+  (1 row persisted)** → the FE shows "Failed to log trip", the user retries, and gets a DUPLICATE trip (+ a
+  duplicate odometer entry on the retry). NOT a semantics call — the route's OWN stated contract is "never fails
+  the create" + the odometer/expense sibling routes already treat these side-effects as best-effort; making code
+  match its documented intent is a clean correctness fix. FIX: wrapped the whole D2 block (createFromTrip +
+  recheck) in a try/catch that logs + swallows, returning the 201 the persisted trip earned. GUARD: +1 in
+  trips-http.test.ts (fault-inject createFromTrip throw → still 201 + trip persisted). Non-vacuous (drop the
+  try/catch → the guard REDs at 500; verified firsthand, restored). Backend-only → no shot. validate:local GREEN
+  (tsc 0, musl 21 warn baseline, 1918 pass / 0 fail, +1, build bundled, whole-tree clean). cov: be 88.92%+ (~,
+  the route's catch branch now covered) / fe 89.11% (~). (deep-review→233; this closes the trip-create
+  duplicate-on-side-effect-failure class.)
 - **C232 (feature ESCALATED [money-cents sequencing — Angelo] → pivot to guard: pin the clampedPaginationFields contract)** —
   Balance recompute (cycle 232): feature most-starved + over budget (5/4 = 1.25×; guard 7/6 = 1.17× also over).
   Feature's only un-gated buildable work is money-cents-migration (Angelo greenlit T0 2026-06-24) — the trips arc's

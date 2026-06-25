@@ -677,6 +677,16 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **CLOSED C233 — best-effort-contract violation on the trip CREATE D2 side-effects (a 500 + duplicate-on-retry
+> class), found by a deep-review.** The trip POST comments its D2 side-effects "best-effort … never fails the
+> create", but only recheckMileageReminders is internally guarded (C42); `odometerRepository.createFromTrip` is a
+> plain repo write whose dedup SELECT/INSERT CAN throw a DatabaseError, left UNGUARDED in the route. Fault-injected
+> firsthand: a createFromTrip throw → 500 response, but the trip row ALREADY committed → FE shows "failed", user
+> retries → DUPLICATE trip + odometer entry. Clean correctness fix (matching the route's OWN stated contract + the
+> odometer/expense sibling best-effort pattern — not a semantics call): wrapped the D2 block in a log+swallow
+> try/catch, returning the earned 201. +1 guard in trips-http.test.ts (fault-inject → still 201 + persisted);
+> non-vacuous (drop the try/catch → 500 RED). Don't re-fix.
+
 > **CLOSED C230 — CRASH-class defect on the C227 TripForm: submit threw `raw.trim is not a function`, the form
 > could NEVER create a trip (self-introduced C227, caught by driving the REAL form).** A C230 bug-scout on the
 > fresh TripForm write path: `parseOdometer` did `raw.trim()` assuming a string, but Svelte COERCES an
