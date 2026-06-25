@@ -769,6 +769,15 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **SCOUTED C298 — getCurrentOdometer (the cross-category odometer-read backbone for mileage reminders + lease-overage)
+> certified CLEAN firsthand → dry.** The #76/#130/#137/#244 fixes hardened the WRITE side (clearing stray mileage on
+> non-fuel rows); this scouted the READ aggregation (MAX over expenses.mileage UNION odometer_entries.odometer).
+> Certified: cross-source MAX correct; the userId scope (parameterized vehicleScope) on BOTH legs (#48 belt-and-braces,
+> no cross-tenant leak); empty→null; the asymmetric null-filter is CORRECT (expenses.mileage nullable so filtered;
+> odometer_entries.odometer is .notNull() so none to filter). Comprehensively guarded by get-current-odometer.test.ts
+> (MAX both directions + 0-edge + cross-tenant v-other-tenant scope). NO defect. Recorded dry + pivot. The #76
+> odometer-poisoning family is now closed across BOTH write sites AND the read aggregation. Don't re-scout getCurrentOdometer.
+
 > **SCOUTED C294 — the NATIVE CSV-import parse path (import-csv.ts — export→re-import round-trip, NORTH_STAR #1) certified
 > CLEAN firsthand → dry.** Picked a not-yet-audited subsystem (per the C293 bug-row reword) distinct from foreign-mapping
 > (C279) + restore coerceRow (C280). Certified: parseAmount/Mileage/Volume strict Number()+finite/integer/range guards;

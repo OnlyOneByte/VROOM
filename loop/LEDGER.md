@@ -233,11 +233,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 227 |
 | deep-review | 5 | 296 |
 | guard | 6 | 295 |
-| bug | 3 | 294 |
+| bug | 3 | 298 |
 | arch | 5 | 297 |
 | infra | 6 | 293 |
 
-Current cycle: **297**
+Current cycle: **298**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,25 @@ Current cycle: **297**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C298 (bug-scout DRY: getCurrentOdometer [the cross-category odometer-read backbone for mileage reminders + lease-overage] certified CLEAN firsthand → dry, pivot fast, no manufactured test)** —
+  Balance recompute (cycle 298): bug was the ONLY category strictly OVER budget (4/3 = 1.33×). Per the C293-refreshed
+  bug-row guidance, scouted a NOT-YET-RECHECKED reachable surface: getCurrentOdometer (odometer/repository.ts:203) — the
+  cross-category READ (MAX over expenses.mileage UNION odometer_entries.odometer) that backs mileage-reminder firing +
+  lease-overage projection (money-facing). The four #76/#130/#137/#244 fixes hardened the WRITE side (clearing stray
+  mileage on non-fuel rows); this scouted the READ AGGREGATION itself. CERTIFIED CLEAN FIRSTHAND: (1) cross-source MAX
+  over both legs is correct (highest reading wins); (2) the userId scope (vehicleScope = `vehicle_id = ? AND user_id =
+  ?`, parameterized → no injection) is applied to BOTH UNION legs (the #48 belt-and-braces, explicitly commented) — an
+  unvalidated vehicleId cannot pull another user reading; (3) empty → SQL NULL → returns null; (4) the ASYMMETRIC
+  NULL-filter is CORRECT not a bug: the expenses leg has `mileage IS NOT NULL` (mileage is nullable) while the
+  odometer_entries leg has none — verified firsthand that odometer_entries.odometer is `.notNull()` in the schema, so
+  there are no NULLs to filter (and MAX skips NULLs anyway). NO fresh defect; comprehensively guarded by
+  get-current-odometer.test.ts (null-on-empty, cross-source MAX both directions, the 0-reading edge, AND the cross-tenant
+  scope: v-other-tenant → null for USER_ID but 77000 for OTHER_USER, pinning the userId scope on both legs). Per the
+  C99/C204 discipline recorded dry + pivoted fast, no manufactured test (covered). Verify: audit only — no source
+  touched, both suites green (1949 BE / 868 FE). Docs-only. cov: be 89.28% / fe 89.43% (~). (bug→298. getCurrentOdometer
+  is CERTIFIED CLEAN — cross-source MAX + dual-leg userId scope + correct asymmetric null-filter; don't re-scout it. The
+  #76 odometer-poisoning family is now closed across BOTH the write sites [#76/#130/#137/#244] AND the read aggregation
+  [C298]. NEXT bug cycle: another un-audited subsystem or record dry on first recheck.)
 - **C297 (arch NO CHURN, recorded FAST: the only fresh dedup candidate [resolveProviderState ↔ consumeOAuthState, surfaced by the C296 auth audit] is a DIVERGENT target — clean extraction would change an UNTESTED behavior; ruled below-bar per the C277 rule-of-two-plus-divergent pattern)** —
   Balance recompute (cycle 297): nothing strictly OVER budget; bug + arch tied at 1.00× (3/3, 5/5), so a highest-leverage
   pick. Took arch on a concrete lead the C296 auth audit surfaced (fresh in context): the C39 comment in auth/routes.ts
