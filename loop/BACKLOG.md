@@ -701,6 +701,16 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **SCOUTED C265 — the FE money-facing financing-calculations surface certified CLEAN firsthand → recorded dry + pivoted (no manufactured test).**
+> Bug over budget (4/3). Prior scouts this run were all BE (C253/C257/C261), so scouted FE financing-calculations.ts
+> (the #92/#99/#110/#115/#117/#330 money-date family's home). CLEAN: calculateNextPaymentDate/calculatePayoffDate/
+> calculatePaymentDate all use addMonthsClamped (anchor re-derive, no incremental clamp) — the day-of-month overflow
+> class is closed on the FE twin, consistent with BE; calculateMinimumPayment is the standard amortization formula
+> (null for non-loan/0%-APR, the #117 baseline reason — closed). NO defect; money-date math is BE↔FE-consistent. No
+> clean guard pivot (both sides saturated C261/C263). Per C261/C99/C103 recorded dry + pivoted fast. NEXT bug cycle:
+> record dry on first recheck + pivot — real defects come only from a fresh feature surface (Angelo-gated) or a steer.
+> Don't re-scout financing-calculations.
+
 > **SCOUTED C261 — settings/sync/vehicles repos certified CLEAN firsthand; NO clean guard pivot → recorded dry + pivoted (the C99/C103 discipline).**
 > Bug over budget (4/3). Scouted settings/repository.ts (#100 RMW path) + SyncState date methods (#42 watermark) +
 > vehicles/repository.ts. CLEAN: mergeJsonField (Angelo-decided json_patch atomic, closed-literal column, no injection);

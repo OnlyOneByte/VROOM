@@ -201,11 +201,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 227 |
 | deep-review | 5 | 260 |
 | guard | 6 | 263 |
-| bug | 3 | 261 |
+| bug | 3 | 265 |
 | arch | 5 | 264 |
 | infra | 6 | 262 |
 
-Current cycle: **264**
+Current cycle: **265**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -224,6 +224,25 @@ Current cycle: **264**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C265 (bug-scout DRY — the FE money-facing financing-calculations surface certified CLEAN firsthand; record dry + pivot, no manufactured test [C261/C99/C103 discipline])** —
+  Balance recompute (cycle 265): bug was the sole over-budget category (4/3 = 1.33×). The prior bug scouts this run
+  were all BACKEND (trips-summary C253, expenses C257, settings/sync/vehicles C261), so scouted a DISTINCT money-facing
+  surface: FE financing-calculations.ts (the #92/#99/#110/#115/#117/#330 bug family's home — NORTH_STAR #1/#2 displayed
+  $ math). CERTIFIED CLEAN firsthand: (1) calculateNextPaymentDate / calculatePayoffDate / calculatePaymentDate — all
+  use addMonthsClamped (re-derive base+N months from the anchor, NOT incremental clamp) → the day-of-month overflow
+  class (#99/#330) is closed on the FE twin too, consistent with the BE; (2) calculatePayoffDate lease path =
+  addMonthsClamped(start, termMonths), loan path walks the balance with a negative-am guard (principal≤0 → bail); (3)
+  calculateMinimumPayment = the standard amortization formula, returns null for non-loan / 0%-APR (the exact #117
+  reason the planner baseline falls back to paymentAmount — that fix closed), clean rounding. NO defect. The money-calc
+  date-math is consistent BE↔FE. Per the C261 recorded instruction ("record dry on first recheck + pivot; the bug
+  surface AND the filter-branch guard vein are both worked through") + C261/C263 establishing NO clean guard pivot
+  exists (both sides saturated — re-pinning 100%-covered or structural-ceiling code is ceremony/theater), recorded dry
+  + pivoted FAST without manufacturing a test. Verify: audit only — no source touched, both suites green at C262 (1935
+  BE / 860 FE). Docs-only. cov: be 89.27% / fe 89.11% (~). (bug→265: the scout DID happen as the over-budget discipline
+  requires. The bug surface is comprehensively worked through — BE repos [C253/C257/C261] + FE money-calc [C265]; the
+  #92/#99/#110/#115/#117/#330 money-date family closed + BE↔FE-consistent. NEXT bug cycle record dry on first recheck +
+  pivot; real defects come ONLY from a fresh feature surface [Angelo-gated] or an Angelo steer. Don't re-scout
+  financing-calculations.)
 - **C264 (arch: NO CHURN WARRANTED — extend the dead-code sweep to the FE lib/utils export surface [the C260 pattern, FE side]; clean, no genuine dead export, no removal)** —
   Balance recompute (cycle 264): nothing strictly OVER budget; bug + arch tied AT threshold (3/3, 5/5). Per C248 took
   the highest-leverage — arch over the dry bug vein (C261), with a GENUINELY un-scouted surface: every dead-code sweep
