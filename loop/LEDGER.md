@@ -231,13 +231,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 313 |
-| deep-review | 5 | 307 |
+| deep-review | 5 | 314 |
 | guard | 6 | 306 |
 | bug | 3 | 311 |
 | arch | 5 | 310 |
 | infra | 6 | 312 |
 
-Current cycle: **313**
+Current cycle: **314**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,23 @@ Current cycle: **313**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C314 (DEEP-REVIEW theming: audited the engine now that C313 shipped the first REAL non-default theme; GUARDED the registered-but-inert-theme gap firsthand)** —
+  Balance recompute (cycle 314): deep-review most-starved over budget (7 starved, budget 5, 1.4×). Normally saturated
+  across 10 subsystems — but C313 added genuinely fresh source (the first non-default theme), so the audit is real, not a
+  re-scan. Verified firsthand: (1) the RESOLVER is already auto-covered — its `Object.entries(THEME_REGISTRY)` loop now
+  exercises `blueprint`, and would go RED if blueprint fell back to default (blueprint.light ≠ default.light); re-certifying
+  it = the certify-already-guarded trap, skipped. (2) the STORE's `data-theme` SET branch was previously only ever driven
+  with `instrument` — an id that was DROPPED and never registered, i.e. an unknown-id (R8) path from the registry's view.
+  (3) THE GAP: each ThemeDefinition is authored by copy-pasting DEFAULT_LIGHT/DEFAULT_DARK and editing values, so a
+  registration that forgets to edit ships a SILENT NO-OP theme — and all 3 existing guards stay green (contrast passes: it
+  IS default's AA palette; registry-integrity: all keys present; css-freshness: a block emitted). Nothing caught
+  "registered but inert". Added a distinctness guard (theme-registry.test.ts): every non-default theme must differ from
+  default in BOTH variants (≥1 token). NON-VACUOUS — proven firsthand by injecting a default-clone theme (both variants
+  correctly FAILED), reverted; blueprint passes (genuinely distinct, verified). Verify: FE validate:local GREEN (918 tests,
+  +2 vs C313). BE untouched. Committed 6f3fa02, pushed (branch 169 ahead / 0 behind). cov: be 89.29% / fe 89.43% (~ —
+  test-side lines; FE SOURCE coverage moves at the T10 picker). (deep-review→314. The theming engine is now certified for
+  the multi-theme era: resolver auto-covered, distinctness + contrast + integrity + byte-freshness all guard each new
+  theme. NEXT high-leverage: feature T10 picker [eyes-on now meaningful] OR register the next palette.)
 - **C313 (FEATURE theming Phase 4 UNBLOCKED by Angelo 2026-06-25: registered the first non-default theme `blueprint` + added the D4 WCAG-AA contrast hard-gate guard)** —
   Balance recompute (cycle 313): feature most-starved AND over budget (86 starved, budget 4) — and Angelo cleared its
   gate this session (ratified default + 5 priority themes: blueprint/bento/vaporwave/cyberpunk/aurora, rest as fill-in;
