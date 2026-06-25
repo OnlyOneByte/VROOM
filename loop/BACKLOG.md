@@ -213,6 +213,19 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > (.meshclaw-tools/) so the knob is a local capability gain, not a committed artifact — the cert is the committed value.
 > A future eyes-on cycle could extend to /analytics + /vehicles/[id] dark if a fresh concern arises; no defect here.
 
+> **CERTIFIED C301 — the financing computeBalance chain (the headline loan-balance figure) CLEAN firsthand.** Formula =
+> Math.max(0, originalAmount − SUM(payments)) — clamps at 0 (the #27/#92 siblings depend on it); payment predicate sums
+> expenses WHERE sourceType=financing AND sourceId IN (ids), 2 queries no N+1. THE load-bearing question (neither query
+> filters userId) resolved SAFE via a two-part chain: (a) every caller scopes the financingId to the user first
+> (validateVehicleOwnership / own-vehicles / pre-scoped rows — never attacker-controlled); (b) the unscoped payment-sum
+> is safe because a payment expense can only carry that sourceId if it passed assertFinancingSourceValid at WRITE time
+> (#125/C422 + #145/C465 — owned-link enforced), so no other user expense can reference user A financingId. The unscoped
+> sum is safe PRECISELY because the #62/#109/#125/#145 write-boundary link-integrity class closed every write path. NO
+> defect; guarded (financing-balance.property + refinance-balance-reset + with-computed-balance + split-roundtrip +
+> analytics HTTP; the write-guard by expense-source-validation-coverage). Deep-review now saturated across trips/repos/
+> TCO/offline-sync/CSV-import/provider-config/backup-round-trip/auth-core/financing-balance. Don't re-audit. (The C77
+> computeBalance DB-singleton bind is a standing test-infra limitation, not a defect — needs a repo-DI seam, gated.)
+
 > **CERTIFIED C296 — the AUTH OAuth login/link/session core CLEAN firsthand + GUARDED the one un-pinned takeover
 > boundary.** consumeOAuthState (CSRF single-use + flow-isolation + anti-fixation) and validateAndRefreshSession
 > (invalid→null / fresh→as-is / near-expiry NEW-before-OLD rotation / createSession-throws fails-open) are

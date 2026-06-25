@@ -231,13 +231,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 227 |
-| deep-review | 5 | 296 |
+| deep-review | 5 | 301 |
 | guard | 6 | 300 |
 | bug | 3 | 298 |
 | arch | 5 | 300 |
 | infra | 6 | 299 |
 
-Current cycle: **300**
+Current cycle: **301**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,33 @@ Current cycle: **300**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C301 (deep-review: the financing computeBalance chain [the headline loan-balance figure] certified CLEAN firsthand — the Math.max(0,…) clamp + owned-id read scope + the write-guard-protected payment predicate; cross-tenant safety is a sound consequence of the #62/#109/#125/#145 link-integrity class)** —
+  Balance recompute (cycle 301): deep-review + bug tied at 1.00× (5/5, 3/3); deep-review most-starved by absolute count
+  (5 > 3). The vein is saturated across trips/repos/TCO/offline-sync/CSV-import/provider-config/backup-round-trip/
+  auth-core, so picked a NOT-YET-CERTIFIED load-bearing money surface: financing computeBalance/computeBalances
+  (financing/repository.ts:78/92 — the headline loan-balance figure; #92/#99/#110/#117 fixed individual amortization
+  bugs but the CORE balance computation was never certified as a whole this window). CERTIFIED CLEAN FIRSTHAND: (1) the
+  formula is Math.max(0, originalAmount − SUM(payments)) — clamps at 0 (an overpaid loan reads 0, never a phantom
+  negative; the #27 TCO-exclusion + #92 0%-APR siblings depend on this); (2) the payment predicate sums expenses WHERE
+  sourceType='financing' AND sourceId IN (ids) grouped by source_id — 2 queries total (no N+1); computeBalance delegates
+  to computeBalances([id]), miss→0 (mirrors prior). (3) THE LOAD-BEARING QUESTION — neither query filters by userId.
+  Traced it firsthand: it is SAFE via a two-part chain. (a) READ scope: every caller scopes the financingId to the user
+  FIRST — financing/routes.ts:96 validateVehicleOwnership before findByVehicleId; vehicles/routes the user OWN vehicles;
+  analytics already-scoped financingRows — so the id is never attacker-controlled. (b) the unscoped PAYMENT-SUM is safe
+  because a payment expense can only carry that sourceId if it passed assertFinancingSourceValid at WRITE time
+  (#125/C422 POST + PUT, #145/C465 split — validates the financing link is OWNED by the writer), so no other user
+  expense can reference user A financingId. The unscoped sum is safe PRECISELY because the #62/#109/#125/#145
+  write-boundary link-integrity class closed every write path. NO fresh defect; comprehensively guarded
+  (financing-balance.property.test.ts [math/clamp] + refinance-balance-reset.test.ts [the #67/C206/C240 multi-step reset]
+  + with-computed-balance.test.ts + split-financing-balance-roundtrip.test.ts + analytics HTTP; the write-guard pinned by
+  expense-source-validation-coverage + expense-source-traceability). Re-pinning would be the C266 don't-certify-already
+  -guarded trap → recorded the firsthand certification, no manufactured test. Verify: audit only — no source touched,
+  both suites green (1949 BE / 868 FE). Docs-only. cov: be 89.29% / fe 89.43% (~). (deep-review→301. computeBalance is
+  CERTIFIED — formula + read-scope + write-guard-protected predicate; don't re-audit. The deep-review vein is saturated
+  across trips/repos/TCO/offline-sync/CSV-import/provider-config/backup-round-trip/auth-core/financing-balance; NEXT
+  deep-review needs a fresh feature surface [gated] or record saturated + pivot. NOTE: the C77 computeBalance
+  DB-singleton bind [analytics getFinancing unpinnable in-memory, Property-23 skip] is a STANDING test-infra limitation,
+  NOT a defect — left as-is, needs a repo-DI seam Angelo has not prioritized.)
 - **C300 (guard scout → arch DEAD-CODE removal [the C259 pattern]: the 66.67%-func anomaly in db/types.ts was isValidPaymentFrequency — zero consumers, zero tests, never wired; removed it + its sole helper createEnumGuard + the isPaymentFrequency barrel re-export, behavior-preserving)** —
   Balance recompute (cycle 300): nothing strictly OVER budget; among non-gated categories guard most-starved (5/6,
   0.83×). Guard is marked SATURATED, so per discipline did ONE fresh scout for a reachable un-pinned pure-logic invariant
