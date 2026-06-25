@@ -169,12 +169,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 227 |
 | deep-review | 5 | 244 |
-| guard | 6 | 242 |
+| guard | 6 | 249 |
 | bug | 3 | 248 |
 | arch | 5 | 245 |
 | infra | 6 | 246 |
 
-Current cycle: **248**
+Current cycle: **249**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -193,6 +193,24 @@ Current cycle: **248**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C249 (guard scout: 4 candidates, all ALREADY covered → guard surface saturated; recorded, no manufactured test)** —
+  Balance recompute (cycle 249): guard most-starved + over budget (7/6 = 1.17×). Scouted firsthand for a genuine
+  unguarded invariant (not a manufactured source-scan): (1) the C220 /trips route in route-smoke a11y coverage —
+  ALREADY there (route-smoke:72, a11yClean). (2) the trips list pagination over-max-limit behavior — covered: the
+  list uses listQuerySchema which spreads clampedPaginationFields, so over-max is REJECTED at zValidator (the C232
+  guard pins exactly that on the shared field-set; the route inherits it — testing it again would duplicate C232).
+  (3) the .meshclaw.e2e specs' merge-survival — all 56 are gitignored (frontend/.gitignore:36 `e2e/*.meshclaw.e2e.ts`)
+  BY DESIGN: they're the loop's local regress.sh harness, which is exactly WHY the loop prefers tracked source-scan
+  + HTTP-harness guards over e2e for merge survival (a known standing truth, not a fixable gap; tracking 56 specs is
+  a policy change, not a guard increment). (4) the C247 reminders partition logic (isReminderTimeDue / frequencyLabel
+  / isMileageTracking / hasTimeAxis) — ALREADY guarded by reminder-helpers.test.ts. **Every candidate is already
+  covered — the guard surface is saturated for the current (gated) prod-logic.** Per the loop discipline (don't
+  manufacture churn — the arch-rule-5 principle applied to guard), recorded the saturation scout WITHOUT a redundant
+  test. No code change → no validate/shot (doc-only). cov: be 88.92% (~) / fe 89.11% (~). (guard→249 — a real
+  fresh-surface scout, all-covered. C232–C249 = 18 gated/dry cycles; bug [pure-logic + visual], arch [dedup +
+  dead-code], guard, and deep-review veins are ALL now worked through/saturated. The loop is at full steady-state:
+  it certifies + records on a 103-ahead PR-ready branch; 0 new covered surface is possible until an Angelo gate
+  clears. Money-cents sequencing remains the top unblock — status sent C237; the queue is the bottleneck, not the loop.)
 - **C248 (bug scout: hunt the C247 mobile-occlusion CLASS for siblings → none reachable [verified firsthand]; clean)** —
   Balance recompute (cycle 248): nothing strictly over budget except gated-feature → highest-leverage open item =
   scout the C247 occlusion class (`justify-between` row + a `flex-shrink-0` action cluster beside a `min-w-0`

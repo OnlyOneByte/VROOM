@@ -910,6 +910,14 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **SCOUTED C249 — guard surface SATURATED for the current (gated) prod-logic; no manufactured test.** 4
+> candidates, all already covered: /trips in route-smoke a11y (line 72); trips pagination over-max rejection
+> (inherited from the C232 clampedPaginationFields guard — re-testing duplicates it); the C247 reminders
+> partition logic (reminder-helpers.test.ts); and the .meshclaw.e2e merge-survival is a KNOWN by-design gitignore
+> (frontend/.gitignore:36 — the loop prefers tracked source-scan/HTTP guards precisely because these 56 specs are
+> local-only). Recent prod-logic (C226 date-guard, C247 mobile-stack, C242 chart-gate, C239 fuel-empty,
+> C241 FAB-clearance) is all guarded. Future guard cycles need a fresh feature surface or unblocked gate. Don't re-scout.
+
 > **CERTIFIED C244 — the FE↔BE error-envelope contract is CLEAN + already-guarded both sides (no new guard).** A
 > C244 deep-review certified the cross-cutting seam every error toast depends on: BE formatErrorResponse emits
 > `{success:false, error:{code,message,details?}}`; FE apiClient parses `errorBody.error?.{message,code,details}` →
