@@ -235,9 +235,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 283 |
 | bug | 3 | 287 |
 | arch | 5 | 286 |
-| infra | 6 | 282 |
+| infra | 6 | 288 |
 
-Current cycle: **287**
+Current cycle: **288**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,24 @@ Current cycle: **287**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C288 (infra coverage cadence; last ran C282: untracked-test sweep CLEAN both sides, coverage RE-MEASURED flat-to-up, GUIDE standing-truth freshened to the C288 numbers)** —
+  Balance recompute (cycle 288): nothing strictly OVER budget; among non-gated categories infra was most-starved
+  (6/6, AT threshold) — and the coverage cadence (last ran C282) was due. Ran the full branch-hygiene sweep: (1)
+  untracked-`*.test.ts` sweep CLEAN both sides — `git status --untracked-files=all` shows ZERO untracked files (the 56
+  .meshclaw.e2e.ts are gitignored BY DESIGN; nothing the loop authored is at risk of vanishing on merge). (2) no
+  orphan dev servers — the `pgrep bun/vite` matches were the sweep command's OWN command line (the recurring
+  false-positive); the authoritative `ss -ltnp` confirms NO :3001/:5173 listeners. (3) Coverage RE-MEASURED both
+  sides firsthand: BE 89.27% line / 88.68% func (1935 pass / 0 fail / 238 files) — FLAT vs C282 (89.28/88.70,
+  sub-rounding noise; NO BE source or BE test changed since — C259 last source, C283 was FE-only). FE 89.3% line /
+  89.79% func / 81.4% branch / 87.12% stmts (867 pass / 82 files) — line UP +0.13 vs C282 (89.17), the C283 themes-css
+  sort-comparator test (866→867, themes-css.ts 85.71→100% line) lifting the FE line figure. Both hold at/above the
+  ~89% structural ceiling, both green. (4) Doc-freshness: the GUIDE "Standing truths" coverage line still cited the
+  stale C262 measure (~89.1% FE line) — refreshed it to the C288 numbers (89.27 BE / 89.3 FE, with the FLAT-vs-C282
+  provenance). Tree clean; branch 142 ahead / 0 behind origin/main, PR-ready. BRANCH_REVIEW.md is gitignored → no
+  refresh artifact. Verify: docs-only (GUIDE standing-truth + this LEDGER + balance table + BACKLOG infra note); no
+  source touched, both suites green. cov: be 89.27% / fe 89.3% (MEASURED). (infra→288. NEXT cadence ~C298. STANDING
+  SIGNAL unchanged: all self-directed veins firsthand-saturated; BE coverage frozen at 89.27 since C259 [no source
+  threaded], FE creeps up only when a guard/test lands [C283 +0.13]; net-new feature SOURCE stays Angelo-gated.)
 - **C287 (bug-scout DRY: the photo sync-worker terminal-auth handling [#105/#144 fail-open family] certified CLEAN firsthand end-to-end — terminal auth parks, doesn't retry-forever)** —
   Balance recompute (cycle 287): nothing strictly OVER budget; bug most-starved non-gated (3/3, AT threshold). Did ONE
   fresh firsthand scout on an unscanned-this-run security-adjacent surface: the photo sync-worker terminal-auth

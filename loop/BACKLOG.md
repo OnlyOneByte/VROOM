@@ -2216,6 +2216,16 @@ baseline), refresh `BRANCH_REVIEW.md` grouped by theme so the eventual PR stays 
 > + the rewrite idiom ("the X body" not "X's body"). Docs-only, the GUIDE-freshness vein (like C267). NEXT coverage
 > cadence ~C282.
 
+> **RAN C288 (coverage cadence; last ran C282).** Untracked-test sweep CLEAN both sides — `git status
+> --untracked-files=all` shows ZERO untracked files (the 56 .meshclaw.e2e.ts gitignored BY DESIGN; nothing the loop
+> authored is at merge risk). No orphan dev servers (the pgrep bun/vite false-positive again — the matches were the
+> sweep command's own line; `ss -ltnp` confirmed :3001/:5173 down); tree clean; branch 142 ahead / 0 behind, PR-ready.
+> Coverage RE-MEASURED: BE 89.27% line / 88.68% func (1935 pass / 0 fail) — FLAT vs C282 (no BE source/test since
+> C259; sub-rounding noise). FE 89.3% line / 89.79% func / 81.4% branch (867 pass, +1 vs C282 = the C283 themes-css
+> sort-comparator test) — line UP +0.13 (themes-css.ts 85.71→100%). Both at/above the ~89% structural ceiling, both
+> green. Refreshed the GUIDE "Standing truths" coverage line (was the stale C262 ~89.1% FE → the C288 measure). NEXT
+> cadence ~C298. SIGNAL unchanged: all self-directed veins firsthand-saturated; net-new feature SOURCE Angelo-gated.
+
 > **RAN C282 (coverage cadence; last ran C272).** Untracked-test sweep CLEAN both sides (56 .meshclaw.e2e.ts
 > gitignored BY DESIGN); the C275 collect-svelte-files helper + C276 meta-guard CONFIRMED TRACKED (survive merge).
 > Tree clean; no orphan dev servers (precise pgrep: no bun / no vite); branch 136 ahead / 0 behind, PR-ready. Coverage
