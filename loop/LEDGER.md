@@ -233,11 +233,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 313 |
 | deep-review | 5 | 314 |
 | guard | 6 | 315 |
-| bug | 3 | 311 |
+| bug | 3 | 316 |
 | arch | 5 | 310 |
 | infra | 6 | 312 |
 
-Current cycle: **315**
+Current cycle: **316**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,20 @@ Current cycle: **315**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C316 (BUG-scout DRY: the blueprint dark-mode CSS cascade certified CLEAN firsthand → no defect, no manufactured guard)** —
+  Balance recompute (cycle 316): bug most-starved over budget (5 starved, budget 3, 1.67×). Swept surfaces are dry, but
+  C313 added genuinely fresh source (the live theme-render path), so per the GUIDE bug-row I scouted THAT — the real,
+  not-yet-bug-checked runtime question: does blueprint's dark override actually WIN the cascade over app.css's `.dark`, or
+  does dark-mode blueprint silently paint DEFAULT-dark? Certified CLEAN firsthand: (1) `:root[data-theme="blueprint"].dark`
+  specificity (0,3,0) beats app.css `.dark` (0,1,0) → wins regardless of source order; (2) both token blocks are UNLAYERED
+  (the `@layer base` starts at app.css:130, after the :root/.dark blocks at 7/54) so they are not demoted under any layered
+  rule; (3) `@layer base` redefines NONE of the 32 color tokens (grep empty) → no cascade inversion; (4) the store sets BOTH
+  `data-theme` and `.dark` on the SAME <html> element (theme.svelte.ts:39-44). So dark blueprint paints blueprint-dark, not
+  default-dark. NO defect. Did NOT manufacture a guard — guard was just exercised C315, and an import-ORDER guard would be
+  vacuous (specificity makes order irrelevant, verified). Doc-only dry scout (the C308/C311 pattern). Verify: no source
+  touched, suites unchanged green (920 FE). cov: be 89.29% / fe 89.43% (~). (bug→316. The theming render path is now
+  certified across the cascade too. NEXT high-leverage open item: feature T10 picker [eyes-on now meaningful] OR arch
+  [6 starved, over budget — but FAST-DRY precondition likely: no production-src dedup vector since C313 was additive].)
 - **C315 (GUARD theming: pinned the layout→themes.css wiring — the one line that makes a registered theme actually paint)** —
   Balance recompute (cycle 315): guard most-starved over budget (9 starved, budget 6, 1.5×). Normally saturated, but C313's
   fresh source (themes.css + blueprint) opened a real vein. Found the ONE unguarded wiring line: themes.css (the generated
