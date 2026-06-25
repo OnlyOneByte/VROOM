@@ -67,20 +67,23 @@ click submit → assert the row was actually created (and no `pageerror`). Input
 reach JS as `number | null`, NOT the seed string — parse with `parseInt`/`parseFloat`/typeof-guards,
 never a bare `.trim()`.
 
-## Category veins — where work actually is (C338 baseline; **SATURATION re-confirmed firsthand C253–C266**)
-> **STEADY-STATE (C266): every SELF-DIRECTED vein is firsthand-verified WORKED-THROUGH.** The C253–C266 arc
-> produced 3 real code artifacts (C252/C259 dead-code removals + C256/C257 covered-source tests) and ~11
-> dry/saturated/no-churn records. Net-new SOURCE now requires an Angelo-gated feature or steer. This is the
-> CORRECT signal under a hard feature-gate, NOT a failure — but DON'T re-scout the surfaces marked SATURATED
-> below; record the verified state on the FIRST recheck + pivot. A real defect/guard now comes ONLY from a
-> fresh feature surface (gated) or a NOT-YET-AUDITED shipped subsystem.
+## Category veins — where work actually is (C338 baseline; **SATURATION re-confirmed firsthand C253–C302**)
+> **STEADY-STATE (re-confirmed C302): every SELF-DIRECTED vein is firsthand-verified WORKED-THROUGH.** The
+> C290–C302 arc — the most productive non-gated stretch since dark mode — found + fixed a REAL data-loss gap
+> (C291 #127 cross-row-UNIQUE), guarded BOTH pre-wipe legs (C290 FK + C295 UNIQUE) + the auth account-takeover
+> boundary (C296), converged a self-dup (C292), removed dead code (C300 db/types), and certified five fresh
+> subsystems CLEAN (backup-round-trip C290, auth-core C296, financing-balance C301, CSV-import C294, odometer-read
+> C298, split-allocation C302). Net-new SOURCE still requires an Angelo-gated feature or steer. This is the CORRECT
+> signal under a hard feature-gate, NOT a failure — but DON'T re-scout the surfaces marked SATURATED below; record
+> the verified state on the FIRST recheck + pivot. A real defect/guard now comes ONLY from a fresh feature surface
+> (gated) or a NOT-YET-AUDITED shipped subsystem (the un-audited list is nearly empty).
 | Category | State | What still pays off |
 |---|---|---|
 | **feature** | UNBLOCKED via shot.sh but ALL tails GATED | the 3 eyes-on tails + every other feature is Angelo-gated (money-cents sequencing, C214 trips↔odometer lifecycle, `instrument` palette, vehicle-sharing). Record gated + pivot until a gate clears. |
 | **bug** | **SATURATED on the SWEPT surfaces (C253/C257/C261/C265), but a NOT-YET-AUDITED subsystem can still yield a real fix (C291)** | write-path asymmetry / date-tz / money-calc all swept BE (trips-summary, expenses, settings/sync/vehicles repos) + FE (financing-calculations — the #92/#99/#110/#117/#330 family closed). Record dry on the FIRST recheck of a SWEPT surface + pivot. BUT: the C290→C291 arc showed a fresh firsthand scout of an un-audited shipped subsystem (the backup→restore round-trip) surfaced a REAL data-loss gap (validateUniqueConstraints covered only 2 of 5 backed-up UNIQUE indexes, #127 leg) with NO gate clearing — so when bug is over budget, prefer scouting a subsystem NOT on the swept-list over re-checking a closed family. |
-| **deep-review** | **SATURATED (C255/C260/C266)** | trips arc, repo layer, + the TCO chain (Property 14 + #27/#28, the most invariant-protected surface) all certified CLEAN. VERIFY firsthand — agent "HIGH" findings are often false (C21/C60/C333). Needs a fresh/un-audited subsystem; else record saturated + pivot. |
+| **deep-review** | **SATURATED across NINE subsystems (C255–C301)** | trips arc (C255), repo layer (C260), TCO chain (C266, Property 14 + #27/#28), offline-sync (C274), CSV-import (C279), provider-config (C285), backup→restore round-trip (C290), auth OAuth core (C296), financing computeBalance (C301) — ALL certified CLEAN firsthand. VERIFY firsthand — agent "HIGH" findings are often false (C21/C60/C333). A fresh certification now needs a genuinely NOT-YET-AUDITED shipped subsystem (the un-audited list is nearly empty); else record saturated + pivot. Don't re-audit any of the nine. |
 | **guard** | **SATURATED both sides (C261/C263)** | the C250/C251/C256/C257 filter-branch vein took the reachable plain-repo/route gaps; remaining sub-100% is v8 artifacts + DEV-gated catch + apiClient-wrapper THEATER (C181/C229) + DOM/timer-bound. Don't manufacture a vacuous/theater test — record saturated + pivot. |
-| **arch** | **DRY; dead-code sweep COMPLETE both sides (C260 BE repos + C264 FE lib/utils)** | behavior-preserving test-anchored ONE small dedup. The fresh vector is SELF-INTRODUCED dups in code authored last cycles (C222 capitalize, C258 PaginatedEnvelope, C275 collectSvelteFiles). **FAST-DRY PRECONDITION (C286):** at cycle start, if `git log` over production-src (backend/src+frontend/src `*.ts`, EXCLUDING tests/`__tests__`) shows NO commit since the last source-touching cycle, the dedup vein is STRUCTURALLY dry (nothing newly threaded) → record no-churn FAST + pivot, don't re-scout. Already-ruled below-bar: createExpense quad (C270 divergent), collectSourceFiles (C277 rule-of-2+divergent), BE walker (C281 none), SRC_ROOT (C281 per-file-depth). Don't manufacture churn. |
+| **arch** | **DRY; dead-code sweep COMPLETE (C260 BE repos + C264 FE lib/utils + C300 db/types)** | behavior-preserving test-anchored ONE small dedup. The fresh vector is SELF-INTRODUCED dups in code authored last cycles (C222 capitalize, C258 PaginatedEnvelope, C275 collectSvelteFiles, C292 dupCheck — converged the C291 sibling). **FAST-DRY PRECONDITION (C286):** at cycle start, if `git log` over production-src (backend/src+frontend/src `*.ts`, EXCLUDING tests/`__tests__`) shows NO commit since the last source-touching cycle, the dedup vein is STRUCTURALLY dry (nothing newly threaded) → record no-churn FAST + pivot, don't re-scout. Already-ruled below-bar: createExpense quad (C270 divergent), collectSourceFiles (C277 rule-of-2+divergent), BE walker (C281 none), SRC_ROOT (C281 per-file-depth), resolveProviderState↔consumeOAuthState (C297 divergent — returnTo-on-error untested). Don't manufacture churn. |
 | **infra** | live (the one always-productive vein) | ~every 10 cycles: untracked-`*.test.ts` sweep + coverage re-measure (update the LEDGER cov: baseline) + this GUIDE/doc-freshness pass. (BRANCH_REVIEW.md is gitignored — NOT in the PR, no refresh artifact.) |
 
 ## Standing truths (don't re-discover these)

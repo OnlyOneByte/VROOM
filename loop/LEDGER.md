@@ -235,9 +235,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 300 |
 | bug | 3 | 302 |
 | arch | 5 | 300 |
-| infra | 6 | 299 |
+| infra | 6 | 303 |
 
-Current cycle: **302**
+Current cycle: **303**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,25 @@ Current cycle: **302**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C303 (infra GUIDE-freshness pass [the C267 pattern, NOT the coverage cadence]: the Category-veins table was materially stale — deep-review said "SATURATED C255/C260/C266" while C290–C301 certified 6 MORE subsystems; refreshed the deep-review + arch rows + the banner)** —
+  Balance recompute (cycle 303): nothing strictly OVER budget; among non-gated categories infra most-starved (4/6,
+  0.67×). The full coverage RE-MEASURE is NOT due (ran C299, next ~C309; only the C300 dead-code removal touched source
+  since, so it would be flat). The higher-leverage infra increment is the GUIDE Category-veins FRESHNESS pass (the C267
+  pattern): the C290–C302 arc certified + guarded a swath of subsystems the stale veins table did not reflect, risking a
+  future session re-scouting them. Branch-hygiene sweep CLEAN (zero untracked; no orphan dev servers; 157 ahead).
+  Refreshed THREE stale GUIDE spots: (1) the DEEP-REVIEW row — was "SATURATED C255/C260/C266" listing only trips/repo/TCO,
+  now lists ALL NINE certified subsystems (trips C255, repos C260, TCO C266, offline-sync C274, CSV-import C279,
+  provider-config C285, backup-round-trip C290, auth-core C296, financing-balance C301) so a future cycle does not
+  re-audit them; (2) the ARCH row dead-code-sweep scope — added the C300 db/types removal + the C292 dupCheck
+  self-dup convergence + the C297 resolveProviderState divergent ruling to the already-ruled-below-bar list; (3) the
+  banner — re-anchored from C266 to C302 with the C290–C302 arc summary (the most productive non-gated stretch since dark
+  mode: a real #127 fix, both pre-wipe guard legs, the takeover guard, a self-dup convergence, a dead-code removal, 5
+  fresh certifications). Docs-only, behavior-preserving — keeps the read-path accurate so a fresh session does not waste
+  cycles re-scouting saturated surfaces (the exact C267 value). Verify: docs-only (GUIDE ×3 + this LEDGER + balance table
+  + BACKLOG infra note); no source touched, both suites green (1949 BE / 868 FE). cov: be 89.29% / fe 89.43% (~ — not
+  re-measured, no source since C300). (infra→303. NEXT coverage cadence ~C309; NEXT GUIDE-freshness when the veins table
+  drifts again. STANDING SIGNAL unchanged: net-new feature SOURCE Angelo-gated; the un-audited-subsystem list is nearly
+  empty after the C290–C301 deep-review arc.)
 - **C302 (bug-scout DRY: the split-expense allocation math [computeAllocations even/absolute/percentage — the NORTH_STAR #1 "legs sum to header" money invariant] certified CLEAN firsthand → dry, pivot fast, no manufactured test)** —
   Balance recompute (cycle 302): bug was the ONLY category strictly OVER budget (4/3 = 1.33×). Per the C293-refreshed
   bug-row guidance, scouted a not-yet-rechecked money-facing surface: split-service.ts computeAllocations (87.50% func in

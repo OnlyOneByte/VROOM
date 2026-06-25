@@ -2335,6 +2335,14 @@ baseline), refresh `BRANCH_REVIEW.md` grouped by theme so the eventual PR stays 
 > + the rewrite idiom ("the X body" not "X's body"). Docs-only, the GUIDE-freshness vein (like C267). NEXT coverage
 > cadence ~C282.
 
+> **RAN C303 (GUIDE-freshness pass — the C267 pattern, NOT the coverage cadence).** The Category-veins table was
+> materially stale: the deep-review row said "SATURATED C255/C260/C266" listing only trips/repo/TCO, while the C290–C301
+> arc certified 6 MORE subsystems. Refreshed (1) the deep-review row → all NINE certified subsystems (so no future
+> re-audit), (2) the arch row dead-code-sweep scope (+ C300 db/types, C292 dupCheck, C297 divergent ruling), (3) the
+> banner → re-anchored C266→C302 with the arc summary. Branch-hygiene sweep CLEAN (zero untracked, no orphans, 157
+> ahead). Docs-only, behavior-preserving. NEXT coverage cadence ~C309. SIGNAL: net-new feature SOURCE Angelo-gated; the
+> un-audited-subsystem list is nearly empty.
+
 > **RAN C299 (coverage cadence — BE re-measure triggered by the C295/C296 auth+guard touches; last full cadence C293).**
 > Untracked-file sweep CLEAN (zero untracked); no orphan dev servers (ss -ltnp: :3001/:5173 down); branch 153 ahead / 0
 > behind, PR-ready. Coverage RE-MEASURED: BE 89.29% line / 89.01% func (1949 pass) — UP +0.01/+0.04 vs C293 (the C295
