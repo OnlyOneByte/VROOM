@@ -143,6 +143,53 @@ describe('POST /api/v1/trips (create)', () => {
     expect(res.status).toBe(404);
   });
 
+  // C228 deep-review cert (NORTH_STAR #1, backup-safety): a create that OMITS the optional locations/note
+  // must persist them as SQL NULL — not '' and not the string 'undefined'. The C227 TripForm sends
+  // `value.trim() || undefined`, JSON drops undefined keys, Zod .optional() leaves them absent, and the
+  // route coalesces `data.x ?? null`. This pins that whole FE→BE→DB chain end-to-end (the omitted path was
+  // implicit in every other test via the VALID() helper but never ASSERTED to land as null), so a future
+  // refactor that dropped the `?? null` or made the schema default to '' would flip a RED assertion. Reads
+  // the row straight from SQLite (the stored value, not the API echo) to catch a coercion the JSON wouldn't.
+  test('a create omitting optional locations/note persists them as NULL (FE undefined→absent→null, #1)', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    const res = await ctx.authed('POST', '/api/v1/trips', {
+      vehicleId,
+      startOdometer: 1000,
+      endOdometer: 1100,
+      purpose: 'personal',
+      tripDate: '2024-06-20T12:00:00.000Z',
+      // startLocation / endLocation / note deliberately omitted (the blank-field wire shape)
+    });
+    const body = await json<DataEnvelope<{ id: string }>>(res);
+    expect(res.status, JSON.stringify(body)).toBe(201);
+
+    const row = ctx.sqlite
+      .query('SELECT start_location, end_location, note FROM trips WHERE id = ?')
+      .get(body.data.id) as {
+      start_location: string | null;
+      end_location: string | null;
+      note: string | null;
+    };
+    expect(row.start_location).toBeNull();
+    expect(row.end_location).toBeNull();
+    expect(row.note).toBeNull();
+  });
+
+  test('a create WITH locations/note round-trips the values through the stack (the populated path)', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    const res = await ctx.authed(
+      'POST',
+      '/api/v1/trips',
+      VALID(vehicleId, { startLocation: 'Home', endLocation: 'Office', note: 'Standup' })
+    );
+    const body =
+      await json<DataEnvelope<{ startLocation: string; endLocation: string; note: string }>>(res);
+    expect(res.status, JSON.stringify(body)).toBe(201);
+    expect(body.data.startLocation).toBe('Home');
+    expect(body.data.endLocation).toBe('Office');
+    expect(body.data.note).toBe('Standup');
+  });
+
   // D2 (ratified): creating a trip ALSO writes an odometer entry at endOdometer/tripDate, so the trip's
   // end reading feeds the all-time currentOdometer + the mileage-reminder axis (reuse, not a parallel log).
   test('creating a trip feeds currentOdometer via a deduped odometer entry (D2)', async () => {

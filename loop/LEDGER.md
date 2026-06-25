@@ -149,13 +149,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 227 |
-| deep-review | 5 | 223 |
+| deep-review | 5 | 228 |
 | guard | 6 | 225 |
 | bug | 3 | 226 |
 | arch | 5 | 222 |
 | infra | 6 | 224 |
 
-Current cycle: **227**
+Current cycle: **228**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -174,6 +174,29 @@ Current cycle: **227**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C228 (arch scout → NO churn warranted [rule-of-two w/ divergent semantics] → deep-review: certify the trips CREATE optional-null FE→BE→DB invariant + guard)** —
+  Balance recompute (cycle 228): arch most-starved + over budget (6/5 = 1.2×; deep-review 5/5 at threshold, rest
+  under). Took ARCH first, scouted three veins firsthand: (1) the `X?.unitPreferences ?? settingsStore.unitPreferences`
+  $derived one-liner (~8 sites) — but it's a trivial line across EYES-ON components; a helper would touch 8 files
+  (rule #1 "ONE small refactor") + force re-shooting each (rule #4) for near-zero payoff. (2) Local-day-boundary
+  Date construction — only a RULE-OF-TWO (expenses repo endOfDayIfDateOnly + my C226 trips endOfToday) with
+  DIVERGENT semantics (conditional-on-midnight vs unconditional) + a start-of-day singleton (odometer); consolidating
+  would change behavior (rule #2) or over-parameterize — below the rule-of-three bar (the C212 precedent). (3) FE
+  form validators are per-feature BY CONVENTION (vehicle/expense/trip each own a *-form-validation.ts), not
+  duplication; TripForm reuses dateOnlyToISO/toDateInputValue/capitalize, reinvents nothing. **No clean pick →
+  recorded "no churn warranted" + pivoted** (the GUIDE's explicit arch guidance; don't manufacture churn). PIVOT to
+  DEEP-REVIEW (next-most-starved, 5/5): certified the freshest uncertified seam — the C227 TripForm → live create
+  optional-field round-trip. Probed firsthand: FE sends `value.trim() || undefined` → JSON drops undefined keys →
+  Zod .optional() leaves them absent → route `?? null` → persists SQL NULL (backup-safe, NORTH_STAR #1). CLEAN. The
+  probe also surfaced a latent edge: an empty-STRING `''` (if a future caller sent it) would persist as `''` not
+  null — a `''`-vs-null DB inconsistency the TripForm guards against today but an edit form could regress. GUARD: +2
+  in trips-http.test.ts — a create OMITTING locations/note persists them as NULL (read straight from SQLite, not the
+  API echo); a populated create round-trips the values. Non-vacuous (route `?? ''` → the null-cert RED, verified
+  firsthand; the `?? null`→undefined swap is Drizzle-equivalent so I targeted the REALISTIC `''` regression). NOTE:
+  the whole-tree musl check caught a formatter reflow my new SQLite-query cast introduced that the PER-FILE check
+  missed (the CLAUDE.md warning) — fixed via check:musl --write. Test-only → no shot. validate:local GREEN (tsc 0,
+  musl 21 warn baseline, 1910 pass / 0 fail, +2, build bundled). cov: be 88.92% (~) / fe 88.85% (~). (arch stays
+  222 — scout dry, no increment; deep-review→228.)
 - **C227 (feature: trips-location T6b-2 — the CREATE trip form, eyes-on verified; EDIT/DELETE deferred to the C214 ruling)** —
   Balance recompute (cycle 227): feature most-starved + over budget (7/4 = 1.75×; arch 5/5 at threshold, rest
   under). Built the trips create form (the clean loop-buildable feature increment, de-risked by C226's today-date

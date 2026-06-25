@@ -837,6 +837,15 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **CERTIFIED + GUARDED C228 — the trips CREATE optional-field NULL invariant (FE undefined→absent→null, NORTH_STAR #1).**
+> A C228 deep-review (after an arch no-churn scout) certified firsthand that the C227 TripForm's blank
+> locations/note (`value.trim() || undefined`) round-trips correctly: JSON drops the undefined keys → Zod
+> .optional() leaves them absent → the route `?? null` → persists SQL NULL (the backup-safe value). +2 guards
+> in trips-http.test.ts (a create OMITTING them persists NULL, read straight from SQLite; a populated create
+> round-trips the values). Non-vacuous (route `?? ''` → the null-cert RED — the realistic regression is a
+> `''`-vs-null DB inconsistency, which the form guards against today but an edit form could reintroduce).
+> Pins the FE→BE→DB optional-field contract before the T6b-3 edit form lands. Don't re-cert.
+
 > **GUARDED C219 — the trip-api `rate=0` query survival (the explicit-zero / falsy-drop class).** A C219
 > bug-scout on the FRESH C218 trip-api wrapper verified firsthand that `getSummary({rate:0})` serializes
 > `rate=0` (a meaningful explicit-zero business value, not an absent param) — buildQueryString drops only
