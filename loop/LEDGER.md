@@ -143,13 +143,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 220 |
-| deep-review | 5 | 213 |
+| deep-review | 5 | 223 |
 | guard | 6 | 219 |
 | bug | 3 | 221 |
 | arch | 5 | 222 |
 | infra | 6 | 217 |
 
-Current cycle: **222**
+Current cycle: **223**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -168,6 +168,24 @@ Current cycle: **222**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C223 (deep-review: certify trips unit-correctness → FIX a REAL mixed-fleet mislabel on the per-trip cards [NORTH_STAR #2])** —
+  Balance recompute (cycle 223): deep-review most-starved + over budget (10/5 = 2.0×). Scouted the freshest
+  uncertified surface (the C220–C222 trips FE) for a load-bearing invariant: UNIT-CORRECTNESS (NORTH_STAR #2,
+  metric users). FINDING (real defect, not ceremony): the C220 trips list labeled EVERY trip's distance via the
+  GLOBAL `settingsStore.unitPreferences.distanceUnit`, but trip odometers are stored same-unit-as-the-vehicle (R2)
+  and each vehicle carries its OWN unitPreferences (the per-vehicle pattern OdometerTab/LeaseMetricsCard already
+  follow). So a mixed-fleet user (km vehicle + mi vehicle, global=mi) saw the km vehicle's trips mislabeled "mi" —
+  the #94/C353 mixed-units class on the trips surface. SCOPE split cleanly: (a) per-trip CARDS each know their
+  vehicleId → loop-fixable (label by the vehicle's own unit); (b) the SUMMARY card pools all vehicles' miles via
+  getSummary() → a single label there is the product-gated/escalated #94 pooling class (out of scope). FIX (a):
+  added a vehicleId→label map (vehicle.unitPreferences ?? global, the graceful-default idiom), routed the per-trip
+  card distance through it; the summary keeps the global label (commented as the #94 limitation). EYES-ON VERIFIED
+  (the GUIDE gate): seeded a km vehicle (Renault Zoe, distanceUnit=kilometers) + a trip, shot /trips, Read — the km
+  trip reads "250 km" while the mi vehicle's trips read "75 mi"/"135 mi" (fix works); the summary correctly still
+  shows the pooled "460 mi" (the escalated #94 boundary, visible + correctly untouched). svelte-check 0, no console
+  errors. FE validate:local GREEN (826 pass / 0 fail). NOTE: the km test vehicle's API delete hit a 403 (a separate
+  vehicle-delete quirk worth a future scout) — left in the gitignored dev DB (RESET_DB wipes it next boot), no
+  committed-state impact. cov: be 88.92% (~) / fe ~88.7% (~). REMAINING: trips T6b-2 (form). (Bug stays 221.)
 - **C222 (arch: converge the C220 inline `purposeLabel` onto the shared `capitalize` util — NORTH_STAR #4 "one way")** —
   Balance recompute (cycle 222): arch most-starved + over budget (10/5 = 2.0×). Scouted the trips FE for a CLEAN
   fresh dedup (not the Angelo-gated createLoadState rewrite — the 6-page four-states triad is arch #2, a per-page

@@ -25,11 +25,32 @@
 	// page 1 while the summary says more — the dashboard/expenses "page-1-masquerades-as-all" class).
 	let totalCount = $state(0);
 
+	// The GLOBAL distance label — used ONLY on the cross-fleet Mileage Summary card (which pools all
+	// vehicles' miles via getSummary(); a single label on a mixed mi+km fleet is the #94 pooling class,
+	// product-gated/escalated — out of scope here).
 	let distLabel = $derived(getDistanceUnitLabel(settingsStore.unitPreferences.distanceUnit, true));
 	// vehicleId -> display name, so each trip card can name its vehicle (graceful fallback if deleted).
 	let vehicleNames = $derived(
 		new Map(vehicles.map((v) => [v.id, getVehicleDisplayName(v)]))
 	);
+	// vehicleId -> THAT vehicle's distance label. Trip odometers are stored same-unit-as-the-vehicle (R2),
+	// so a per-trip card must label distance by its OWN vehicle's distanceUnit, NOT the global setting —
+	// else a km vehicle's trips read "mi" for a mixed-fleet user (NORTH_STAR #2, the per-vehicle-units
+	// pattern OdometerTab/LeaseMetricsCard already follow). Falls back to the global pref when the vehicle
+	// (or its prefs) is absent — the `unitPreferences ?? settingsStore` graceful-default idiom.
+	let vehicleDistLabels = $derived(
+		new Map(
+			vehicles.map((v) => [
+				v.id,
+				getDistanceUnitLabel(
+					(v.unitPreferences ?? settingsStore.unitPreferences).distanceUnit,
+					true
+				)
+			])
+		)
+	);
+	const tripDistLabel = (vehicleId: string): string =>
+		vehicleDistLabels.get(vehicleId) ?? distLabel;
 
 	async function load() {
 		isLoading = true;
@@ -151,7 +172,7 @@
 							</div>
 							<p class="font-medium">
 								{tripDistance(trip).toLocaleString()}
-								{distLabel}
+								{tripDistLabel(trip.vehicleId)}
 								<span class="text-sm font-normal text-muted-foreground">
 									({trip.startOdometer.toLocaleString()} → {trip.endOdometer.toLocaleString()})
 								</span>

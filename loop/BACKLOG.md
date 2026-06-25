@@ -211,6 +211,18 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > RED, dark-axis 4 stay green). Behavior-preserving today; closes the latent seam BEFORE the gated palette exposes it.
 > Don't re-audit — the theming engine's FOUC contract is now complete on both axes.
 
+> **CERTIFIED + FIXED C223 — trips unit-correctness: per-trip cards mislabeled a non-global-unit vehicle's
+> distance (NORTH_STAR #2, the #94 mixed-units class).** A C223 deep-review found the C220 trips list labeled
+> EVERY trip's distance via the GLOBAL distanceUnit, but trip odometers are stored same-unit-as-the-vehicle (R2)
+> and each vehicle has its OWN unitPreferences — so a km vehicle's trips read "mi" for a mixed-fleet user. FIX
+> (loop-authorizable half): per-trip CARDS now label by their own vehicle's unit (vehicle.unitPreferences ??
+> global), matching OdometerTab/LeaseMetricsCard. The cross-fleet SUMMARY card's single label stays global — it
+> POOLS all vehicles' miles (getSummary), so that's the product-gated/escalated #94 pooling class, out of scope.
+> EYES-ON: seeded a km vehicle + trip, shot /trips — km trip "250 km" vs mi trips "75/135 mi" (verified). FE
+> validate green (826). Don't re-fix the per-card half; the summary-pool label remains the #94 family.
+> NOTE (future bug scout): the km test vehicle's DELETE /api/v1/vehicles/:id returned 403 (not 404/200) — a
+> possible vehicle-delete ownership/guard quirk worth a firsthand scout next time bug is over budget.
+
 > **CERTIFIED + GUARDED C208 — the Sheets backup POPULATE-step coverage (the 3rd hand-maintained list).** A C208
 > deep-review scouted the Google Sheets write path firsthand (the C204 surface) and found a real un-pinned
 > invariant: `updateSpreadsheetWithUserData` builds a hand-maintained local `tables` array (one {title,rows,headers}
