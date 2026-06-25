@@ -220,8 +220,10 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > POOLS all vehicles' miles (getSummary), so that's the product-gated/escalated #94 pooling class, out of scope.
 > EYES-ON: seeded a km vehicle + trip, shot /trips — km trip "250 km" vs mi trips "75/135 mi" (verified). FE
 > validate green (826). Don't re-fix the per-card half; the summary-pool label remains the #94 family.
-> NOTE (future bug scout): the km test vehicle's DELETE /api/v1/vehicles/:id returned 403 (not 404/200) — a
-> possible vehicle-delete ownership/guard quirk worth a firsthand scout next time bug is over budget.
+> NOTE (RESOLVED C225 — NOT A BUG): the km test vehicle's DELETE → 403 was a FALSE ALARM. A C225 bug-scout
+> reproduced + traced it to Hono's csrf({origin: CONFIG.cors.origins}) (app.ts) correctly rejecting a raw
+> curl DELETE that sent NO Origin header; the SAME DELETE with a valid Origin returns 200. CSRF working as
+> designed; the real same-origin FE deletes fine. Behaviorally pinned in csrf-state-change-protection.test.ts (C225). Closed.
 
 > **CERTIFIED + GUARDED C208 — the Sheets backup POPULATE-step coverage (the 3rd hand-maintained list).** A C208
 > deep-review scouted the Google Sheets write path firsthand (the C204 surface) and found a real un-pinned
@@ -823,6 +825,14 @@ the now-shootable eyes-on FE + any newly-touched module.)*
 > tests only covered rate=0.67 (and one was MISLABELED "rate=0 survives" — fixed). +1 dedicated guard; non-vacuous
 > (a `rate || undefined` refactor → only this RED). Guards the reminder-api isActive:false truthy-drop class on
 > the new surface. Don't re-add.
+
+> **GUARDED C225 — the CSRF state-change boundary, behaviorally (NORTH_STAR #2 forgery isolation).** A C225
+> bug-scout on the C223 403-vehicle-delete lead found it a FALSE ALARM (csrf() rejecting an Origin-less curl,
+> working as designed — the same DELETE with a valid Origin returns 200). The CSRF↔CORS origin coupling had a
+> source-scan guard (cors-csrf-origin-coupling) but no behavioral rejection test. +3 in
+> csrf-state-change-protection.test.ts: same-origin DELETE → 200; cross-site DELETE (foreign Origin +
+> Sec-Fetch-Site: cross-site) → 403 + vehicle survives; cross-site GET → 200 (reads unguarded). Non-vacuous
+> (loosen csrf to origin:()=>true → only the cross-site-403 RED). Closes the C223 403 phantom. Don't re-add.
 
 > **GUARDED C216 — D2's "a trip drives the mileage-reminder axis", end-to-end.** A C216 bug-scout (bug 5/3
 > over) verified firsthand the second half of D2's promise: a trip whose endOdometer crosses a mileage

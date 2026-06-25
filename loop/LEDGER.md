@@ -150,12 +150,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 220 |
 | deep-review | 5 | 223 |
-| guard | 6 | 219 |
+| guard | 6 | 225 |
 | bug | 3 | 221 |
 | arch | 5 | 222 |
 | infra | 6 | 224 |
 
-Current cycle: **224**
+Current cycle: **225**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -174,6 +174,22 @@ Current cycle: **224**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C225 (bug-scout on the C223 403-vehicle-delete lead [FALSE ALARM — CSRF working as designed] → guard: pin the CSRF state-change boundary)** —
+  Balance recompute (cycle 225): bug most-starved + over budget (4/3 = 1.33×), with a CONCRETE fresh lead — the
+  C223-filed `DELETE /api/v1/vehicles/:id` → 403. Scouted it firsthand: reproduced the 403 (`{code:HTTPException,
+  message:""}` — a bare empty-message 403, Hono's csrf() signature), traced it to `csrf({origin:
+  CONFIG.cors.origins})` (app.ts:117), then PROVED the diagnosis: the SAME DELETE with a valid `Origin:
+  http://localhost:5173` returns 200 "Vehicle deleted successfully". **FALSE ALARM — no defect:** the C223 403 was
+  my own raw `curl` DELETE sending NO Origin header; CSRF correctly rejects a cross-origin state-change. The real
+  FE (same-origin) deletes fine. Resolving a filed phantom IS value (removes it from the backlog). Per the GUIDE
+  (clean scout → record + pivot to guard), pinned the boundary: the CSRF↔CORS origin COUPLING had a source-scan
+  guard (cors-csrf-origin-coupling.test.ts) but NO behavioral test of an actual rejection. +3 in
+  csrf-state-change-protection.test.ts: a same-origin DELETE succeeds (200), an IDENTICAL cross-site DELETE
+  (foreign Origin + Sec-Fetch-Site: cross-site) is 403'd + the vehicle SURVIVES, a cross-site GET is unaffected
+  (reads not guarded). Non-vacuous (loosen csrf to origin:()=>true → ONLY the cross-site-403 case RED; verified
+  firsthand). A NORTH_STAR #2 forgery-isolation boundary, now behaviorally pinned. validate:local GREEN (tsc 0,
+  musl 21 warn baseline, 1906 pass / 0 fail, +3, build bundled). Test-only → no shot. cov: be 88.92% (~) / fe
+  88.85% (~). (Bug stays 221 — scout clean, no fix; guard→225. The C223 403 item is CLOSED as not-a-bug in BACKLOG.)
 - **C224 (infra: cadence sweep + coverage re-measure)** —
   Balance recompute (cycle 224): infra most-starved + the ONLY strictly over-budget category (7/6 = 1.17×; feature
   4/4 + bug 3/3 at threshold, not over). Coverage was last MEASURED C217, and the FE moved materially across the 4
