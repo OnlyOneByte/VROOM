@@ -204,6 +204,15 @@ cycles record + pivot to guard/deep-review/arch/infra until a gate clears.**)*
 re-audit a data-safety write path, certify it CLEAN against source, and leave a merge-surviving guard.
 Don't trust agent "HIGH" findings — verify firsthand (the archive logged many debunked false-positives).)*
 
+> **SATURATED C266 — the TCO computation chain (the product's headline money figure) certified CLEAN firsthand; every
+> load-bearing invariant already pinned.** Audited getVehicleTCO → categorizeTCOExpenses → computeTCOTotal against
+> source: the #27 double-count exclusion (priced→financing-rows excluded / unpriced→counted), #28 year-scoping
+> (purchasePrice all-time-only), and the breakdown-sums-to-total override (countedFinancingInterest) are ALL
+> comprehensively pinned — per-vehicle.property.test.ts Property 14 + #27 both directions + the C333 #28 year-scoped arm
+> (which also debunked a false double-count bug) + vehicle-tco-zero-state (div-by-zero guards). NO un-certified
+> invariant, NO fresh defect. Recorded saturation (re-pinning = the don't-certify-already-guarded trap). The
+> deep-review vein is SATURATED across all major subsystems (trips C255, repos C260, TCO C266). Don't re-audit TCO.
+
 > **SWEPT C260 — the repo-layer dead-code sweep (the C252/C259 follow-on) is COMPLETE + clean.** Scouted all 9
 > src/api/*/repository.ts for zero-caller exported methods. A naive grep flagged 6; firsthand verification (the C333
 > "agent-HIGH-often-false" discipline) debunked all — getUserUnits/getAllVehicleUnits/findByClientId are called via

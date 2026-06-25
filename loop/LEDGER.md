@@ -199,13 +199,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 227 |
-| deep-review | 5 | 260 |
+| deep-review | 5 | 266 |
 | guard | 6 | 263 |
 | bug | 3 | 265 |
 | arch | 5 | 264 |
 | infra | 6 | 262 |
 
-Current cycle: **265**
+Current cycle: **266**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -224,6 +224,28 @@ Current cycle: **265**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C266 (deep-review SATURATED — the TCO computation chain [the product's headline money figure] certified CLEAN firsthand, every load-bearing invariant already pinned; no fresh defect, no manufactured guard)** —
+  Balance recompute (cycle 266): deep-review was the sole over-budget category (6/5 = 1.2×). Targeted the most
+  load-bearing un-end-to-end-audited surface: the TCO chain (getVehicleTCO → categorizeTCOExpenses → computeTCOTotal)
+  — TCO IS the product ("the true cost of car ownership"), the headline $ figure, home of the #27/#28 accounting
+  family. AUDITED FIRSTHAND against source: (1) categorizeTCOExpenses buckets by (category, sourceType) — financial+
+  financing→financingInterest, financial+insurance_term→insurance, fuel/maintenance direct, else otherCosts (the C33
+  cert — the sourceType check is load-bearing: a reminder/manual financial row correctly falls to otherCosts, NOT
+  mis-bucketed as loan interest then #27-excluded). (2) computeTCOTotal applies #28 (purchasePrice only in the
+  all-time total, never a year window) + #27 option-c (when purchasePrice counted, EXCLUDE financing-payment rows —
+  they retire the already-counted price, a balance-transfer not new spend), returning countedFinancingInterest so the
+  reported bucket matches the total. (3) the assembly overrides financingInterest with countedFinancingInterest →
+  breakdown SUMS to totalCost. ALL of it is ALREADY comprehensively pinned: per-vehicle.property.test.ts Property 14
+  (breakdown==sum, property-tested over random expense sets), #27 BOTH directions (priced→excluded+still-sums /
+  unpriced→counted), the C333-added #28 year-scoped arm (which ALSO debunked a false "double-count bug" on
+  year+unpriced+financed — the price was a prior-year acquisition absent from the window), + vehicle-tco-zero-state
+  (costPerDistance null on 0 distance, all-finite). NO un-certified invariant remains; NO fresh defect. Re-pinning
+  would be the "don't certify already-guarded surfaces redundantly" trap (recorded lesson) → recorded the
+  firsthand-verified saturation, no manufactured guard. Verify: audit only — no source touched, both suites green at
+  C262 (1935 BE / 860 FE). Docs-only. cov: be 89.27% / fe 89.11% (~). (deep-review→266. The deep-review vein is now
+  SATURATED across all major subsystems — trips C255, repos C260, TCO C266; the TCO chain [Property 14 + #27 + #28 +
+  zero-state] is the codebase's most invariant-protected surface. Don't re-audit TCO. NEXT deep-review needs a fresh
+  feature surface [Angelo-gated] or a not-yet-audited shipped subsystem; record saturated + pivot if forced.)
 - **C265 (bug-scout DRY — the FE money-facing financing-calculations surface certified CLEAN firsthand; record dry + pivot, no manufactured test [C261/C99/C103 discipline])** —
   Balance recompute (cycle 265): bug was the sole over-budget category (4/3 = 1.33×). The prior bug scouts this run
   were all BACKEND (trips-summary C253, expenses C257, settings/sync/vehicles C261), so scouted a DISTINCT money-facing
