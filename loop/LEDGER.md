@@ -159,12 +159,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 227 |
 | deep-review | 5 | 238 |
-| guard | 6 | 241 |
+| guard | 6 | 242 |
 | bug | 3 | 234 |
 | arch | 5 | 235 |
 | infra | 6 | 240 |
 
-Current cycle: **241**
+Current cycle: **242**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -183,6 +183,29 @@ Current cycle: **241**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C242 (eyes-on bug scout on /vehicles/[id] [CLEAN — blank charts = headless 0×0-gate artifact, NOT a defect] → guard: pin ChartCard's visibility-gate)** —
+  Balance recompute (cycle 242): bug most-starved + over budget (8/3 = 2.67×; arch 7/5 = 1.4× also over). Continued
+  the C239/C241 eyes-on bug-scout vein on a fresh data-bearing route: /vehicles/[id] (the seeded loan vehicle —
+  FinanceTab/lease-metrics/#148 surface). Booted + minted auth + shot Overview + Finance DESKTOP + MOBILE + Read all.
+  FINDINGS: Overview (vehicle info, insurance correctly "Expired" [term ended 2024, env 2026], stats $426.30 /
+  24.6 mi/gal / $0.12/mi) + Finance (Next Payment $372.86, payoff Jul-2031, Total Cost $22,371.63, No-Payment-History
+  empty state) + mobile tab bar all render CLEAN, no console errors. NOTED the Amortization + Expense-Trend +
+  Fuel-Efficiency charts rendering BLANK in the full-page capture while sibling stats showed data — INVESTIGATED
+  firsthand rather than filing (the GUIDE's "agent HIGH findings need firsthand proof"): ChartCard.svelte
+  DELIBERATELY gates chart children behind `gate.visible` (createVisibilityWatch: IntersectionObserver + a
+  MutationObserver on the `hidden` tab ancestor) because LayerChart (SVG, dimension-measured) mounts into a 0×0
+  container below the fold / in an inactive bits-ui tab → negative-width crash; a headless full-page shot never
+  scrolls those into a measured viewport, so they correctly show the gated-state SKELETON. **Clean scout — the blank
+  charts are a known 0×0-gate SCREENSHOT ARTIFACT, NOT a defect** (charts mount for a real user on scroll-in/tab-
+  activate). Per the GUIDE (clean scout → record + pivot to a guard), pinned the load-bearing gate (untested — no
+  charts component harness): +4 source-scan guards in chart-card-visibility-gate.test.ts (uses createVisibilityWatch;
+  gates children behind {#if gate.visible} [the 0×0-crash guard]; the not-yet-visible state renders a Skeleton NOT a
+  blank box [NORTH_STAR #3]; the full loading/error/empty/data four-state). Non-vacuous (neuter the gate → 2 tests
+  RED incl. the Skeleton-fallback; verified firsthand, restored). Servers killed (ports down). FE validate:local GREEN
+  (svelte-check 0, build, 857 pass / 79 files, +4). cov: be 88.92% (~) / fe 89.11%+ (~). (guard→242; bug stays 234 —
+  eyes-on scout clean, no fix. Three un-shot core routes now swept clean [C239 dash+analytics, C241 expenses, C242
+  vehicle-detail]; settings + reminders[needs seeded reminders] remain. The blank-chart-in-headless artifact is now
+  documented so a future shot scout doesn't mis-file it.)
 - **C241 (eyes-on bug scout on /expenses [CLEAN] → guard: pin the FAB bottom-clearance correspondence)** —
   Balance recompute (cycle 241): bug most-starved + over budget (7/3 = 2.33×; arch 6/5 = 1.2× also over). Continued
   the C239 eyes-on bug-scout vein on a FRESH un-shot route: /expenses (the highest-traffic, most overflow/state-prone

@@ -44,6 +44,14 @@ JSON parse); shot.mjs falls back to anonymous, the `/me` 401 is expected. So the
 human-gated feature tails (maintenance T9, import-trackers T4–T6, recurring-expenses T4–T8) and
 periodic deep-UI-review are now loop-closable: boot → shoot → Read → critique → fix → re-shoot.
 
+**Blank CHARTS in a full-page screenshot are a known ARTIFACT, not a defect (C242).** ChartCard gates chart
+children behind `gate.visible` (createVisibilityWatch — IntersectionObserver + a MutationObserver on the
+`hidden` tab ancestor) because LayerChart (SVG, dimension-measured) crashes on a 0×0 below-the-fold / inactive-
+tab container. A headless full-page shot never scrolls those into a measured viewport, so they render the
+gated-state Skeleton (blank-ish). Charts mount fine for a real user on scroll-in / tab-activate. Don't file a
+"blank charts" bug — to actually SEE a chart, the chart must be in the initial viewport (shoot a focused route
+where it's above the fold, or accept the Skeleton). Pinned by chart-card-visibility-gate.test.ts.
+
 **A FORM's eyes-on MUST drive the real user action — fill + submit, not just render (C230).** A
 screenshot of an OPENED dialog proves layout, NOT that the submit works. C227 shot the trips form
 open + ran a curl E2E (JSON strings) and called it "eyes-on verified"; C230 then found the submit

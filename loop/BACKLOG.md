@@ -878,6 +878,17 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **CERTIFIED + GUARDED C242 — ChartCard's visibility-gate + four-state contract (eyes-on /vehicles/[id] scout →
+> clean → guard).** A C242 eyes-on shot the seeded loan vehicle's Overview + Finance tabs: all render clean
+> (insurance "Expired", lease math, empty-states correct). The Amortization/Expense-Trend/Fuel-Efficiency charts
+> rendering BLANK in the full-page capture is NOT a defect — ChartCard gates chart children behind `gate.visible`
+> (createVisibilityWatch: IntersectionObserver + MutationObserver on the `hidden` tab ancestor) because LayerChart
+> mounts into a 0×0 container below-the-fold/inactive-tab → negative-width crash; a headless full-page shot never
+> scrolls them into a measured viewport, so they show the gated-state Skeleton (by design). Pinned the gate (was
+> untested): +4 source-scan guards in chart-card-visibility-gate.test.ts (createVisibilityWatch; {#if gate.visible}
+> gate; Skeleton-not-blank fallback; four-state). Non-vacuous (neuter the gate → 2 RED). **The blank-chart-in-headless
+> artifact is now a documented known (see GUIDE) so future shot scouts don't mis-file it.** Don't re-guard.
+
 > **CERTIFIED + GUARDED C241 — the FloatingActionButton bottom-clearance correspondence (eyes-on /expenses scout
 > → clean → guard).** A C241 eyes-on shot /expenses desktop+mobile: header/filters/table/split-row all render
 > clean (no overflow/console errors). The fixed "Add Expense" FAB overlapping rows in the full-page shot is the
