@@ -75,6 +75,25 @@ describe('themes.css generator (T7)', () => {
     const reg = { default: THEME_REGISTRY[DEFAULT_THEME_ID] as ThemeDefinition, synthetic: SYNTHETIC };
     expect(generateThemesCss(reg, DEFAULT_THEME_ID)).toBe(generateThemesCss(reg, DEFAULT_THEME_ID));
   });
+
+  // TWO non-default themes given OUT of id-order: both generateThemesCss (block order) and
+  // nonDefaultThemeIds must emit them id-SORTED. This drives the `.sort((a,b) => a.id.localeCompare(b.id))`
+  // comparator in BOTH functions (themes-css.ts:50/65) — the existing single-SYNTHETIC tests never compare
+  // two elements, so the comparator was uncovered (the C250/C251 reachable-branch pattern; no `instrument`
+  // / no DB / no gate needed). A regression to insertion-order or a reversed comparator turns this RED.
+  test('multiple non-default themes are emitted id-sorted (the comparator fires with ≥2)', () => {
+    const zz: ThemeDefinition = { ...SYNTHETIC, id: 'zztheme', label: 'ZZ' };
+    const aa: ThemeDefinition = { ...SYNTHETIC, id: 'aatheme', label: 'AA' };
+    // Registry insertion order is zz BEFORE aa — output must still be aa BEFORE zz.
+    const reg = {
+      default: THEME_REGISTRY[DEFAULT_THEME_ID] as ThemeDefinition,
+      zztheme: zz,
+      aatheme: aa,
+    };
+    expect(nonDefaultThemeIds(reg, DEFAULT_THEME_ID)).toEqual(['aatheme', 'zztheme']);
+    const css = generateThemesCss(reg, DEFAULT_THEME_ID);
+    expect(css.indexOf('data-theme="aatheme"')).toBeLessThan(css.indexOf('data-theme="zztheme"'));
+  });
 });
 
 describe('checked-in themes.css is in sync with the registry (T7 freshness guard)', () => {

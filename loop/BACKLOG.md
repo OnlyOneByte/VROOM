@@ -1050,6 +1050,13 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **COVERED C283 — the themes-css.ts sort comparator (themes-css 85.71→100% line), via the C250/C251 reachable-branch
+> pattern.** generateThemesCss + nonDefaultThemeIds .sort((a,b)=>a.id.localeCompare(b.id)) (themes-css.ts:50/65) was
+> uncovered only because the existing tests drove ONE synthetic theme (a 0/1-element sort never compares) — NOT because
+> instrument is gated (the C189 note was imprecise). +1 test (two non-default themes out-of-order → both emit them
+> id-sorted) drives the comparator with ≥2; non-vacuous (reverse → RED). themes-css.ts → 100% line; FE 89.17→89.3%.
+> No instrument/DB/gate needed. Don't re-scout themes-css.
+
 > **GUARDED C276 — the C275 collectSvelteFiles convergence (meta-guard, NORTH_STAR #5).** Pairs C275: a new
 > _helpers/no-duplicate-file-walker.test.ts scans __tests__/*.test.ts for a LOCAL `function collectSvelteFiles(` decl
 > outside the shared helper → fails if a future guard re-declares it (non-vacuous: inject → RED). Scoped to the exact

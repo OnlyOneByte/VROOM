@@ -232,12 +232,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 227 |
 | deep-review | 5 | 279 |
-| guard | 6 | 276 |
+| guard | 6 | 283 |
 | bug | 3 | 280 |
 | arch | 5 | 281 |
 | infra | 6 | 282 |
 
-Current cycle: **282**
+Current cycle: **283**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,25 @@ Current cycle: **282**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C283 (guard: cover the themes-css.ts sort comparator [reachable NOW with ≥2 themes — no instrument/gate] — themes-css 85.71→100% line, the C250/C251 reachable-branch pattern + corrects a stale C189 note)** —
+  Balance recompute (cycle 283): guard was the sole over-budget category (7/6 = 1.17×). Guard is firsthand-saturated
+  (existing surfaces C261/C263, dark-clash C271, meta-guard C276), so per the C263/C249 discipline did ONE genuine
+  fresh scout before recording saturated. The shared collect-svelte-files helper is already transitively covered (4
+  consumers + meta-guard) → not a gap. But the FE per-file scan flagged themes-css.ts at 85.71% line (uncovered 50,65)
+  — and the C189 note claiming those need `instrument` to ship was IMPRECISE: lines 50/65 are the
+  `.sort((a,b)=>a.id.localeCompare(b.id))` comparators in generateThemesCss + nonDefaultThemeIds, uncovered only
+  because the existing tests drive ONE synthetic theme (a 0/1-element sort never compares). REACHABLE NOW with a
+  synthetic 2-theme registry — no instrument, no DB, no gate (the C250/C251 reachable-branch pattern, a real
+  covered-SOURCE gain not theater). +1 test in themes-css.test.ts: two non-default themes given OUT of id-order
+  (zztheme before aatheme) → both functions must emit them id-SORTED (nonDefaultThemeIds === [aa,zz];
+  generateThemesCss block order aa before zz). NON-VACUOUS verified firsthand: reversing the comparator
+  (b.localeCompare a) turns it RED; revert → green. VERIFIED: themes-css.ts 85.71→100% line (the 50/65 comparators now
+  covered); overall FE 89.17→89.3% line / 89.26→89.79% func / 81.4→81.49% branch. Verify: FE validate:local GREEN —
+  svelte-check 0 errors (7-warn baseline), build OK, 867 pass / 82 files (+1). FE-test-only → no shot. cov: be 89.28%
+  / fe 89.3% (MEASURED, +0.13 line). (guard→283. themes-css.ts is now 100% — the sort comparators covered; corrected
+  the stale C189 "needs instrument" note [they only needed a ≥2-theme test]. A genuine covered-source guard — the
+  C250/C251 reachable-branch vein still had this one pick. NEXT guard cycle: re-pull the per-file table; if no clean
+  reachable pure-logic gap remains, record saturated + pivot.)
 - **C281 (arch NO CHURN WARRANTED — 2 self-dup candidates scouted firsthand, both fail the bar: no BE walker dup; the SRC_ROOT idiom is a per-file-depth constant that can't cleanly converge)** —
   Balance recompute (cycle 281): arch was the sole over-budget category (6/5 = 1.2×). Arch is at its structural floor
   (dead-code sweep complete both sides C260/C264; FE collectSvelteFiles converged C275; collectSourceFiles is the
