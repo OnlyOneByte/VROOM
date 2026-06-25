@@ -130,13 +130,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 206 |
-| deep-review | 5 | 201 |
+| deep-review | 5 | 208 |
 | guard | 6 | 207 |
 | bug | 3 | 173 |
 | arch | 5 | 205 |
 | infra | 6 | 200 |
 
-Current cycle: **207**
+Current cycle: **208**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -155,6 +155,25 @@ Current cycle: **207**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C208 (deep-review: certify + guard the Sheets backup POPULATE-step coverage — the 3rd hand-maintained list)** —
+  Balance recompute (cycle 208): bug most-starved (35/3 = 11.67×) but the trips surfaces are certified
+  (C203/C204/C207) and no fresh non-trips prod logic landed → scout dry, recorded. Next over-budget = DEEP-REVIEW
+  (7/5 = 1.4×; infra 8/6 = 1.33× but cadence isn't due till ~C210). Scouted the Google Sheets backup write path
+  firsthand (a surface I TOUCHED in C204 without fully certifying). FOUND a real, un-pinned load-bearing invariant:
+  `updateSpreadsheetWithUserData` builds a hand-maintained local `tables` array (one {title,rows,headers} per table)
+  that drives the atomic swap — a THIRD hand list beyond SHEET_HEADERS (guard A/B) + SHEET_NAMES (C30), and the
+  Sheets analog of the ZIP-side createBackup() populate step (pinned by backup-createbackup-keys). Certified firsthand
+  it's CORRECT + in-order today (incl. the C204 Trips append). But it was UNGUARDED, and — critically — NOT caught by
+  the existing round-trip/tab-order tests: createSpreadsheet builds the (empty) canonical tab from SHEET_NAMES anyway,
+  and the Phase-2 delete+rename loop iterates `tables`, so a table OMITTED from the populate array leaves its stale/
+  empty canonical tab in place → `titles === SHEET_NAMES` still passes while that table's real data is silently never
+  written (NORTH_STAR #1 data-loss). No defect, but a genuine guard gap. GUARD: +2 in sheets-header-coverage.test.ts
+  (C208 block) — source-scan the populate array's `title:` literals (scoped to the method body, ending at the
+  writeAllSheetsAtomically call) + assert they equal SHEET_NAMES in order, + a non-vacuity floor. Non-vacuous (drop
+  the Trips populate entry → RED, the diff shows `- "Trips"` missing while it stays in SHEET_NAMES; reverted). The
+  C172 cross-file-list idiom. Test-only → no shot. validate:local GREEN (1855 pass / 0 fail, +2). cov: be ~88.4% (~)
+  / fe 88.73% (~). The Sheets backup path is now drift-protected on ALL THREE hand lists (headers + tab-roster +
+  populate). (Bug stays 173 — scout dry.)
 - **C207 (bug-scout on the trips vehicle-delete cascade [CLEAN — no trip-photo orphan + already drift-guarded] → guard: pin the trips cascade end-to-end)** —
   Balance recompute (cycle 207): bug most-starved (34/3 = 11.33×). C206 added genuinely fresh prod logic
   (TripRepository) so a scout isn't ceremony — but I already tested that surface comprehensively (12 tests). Scouted

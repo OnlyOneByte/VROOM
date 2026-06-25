@@ -197,6 +197,18 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > RED, dark-axis 4 stay green). Behavior-preserving today; closes the latent seam BEFORE the gated palette exposes it.
 > Don't re-audit — the theming engine's FOUC contract is now complete on both axes.
 
+> **CERTIFIED + GUARDED C208 — the Sheets backup POPULATE-step coverage (the 3rd hand-maintained list).** A C208
+> deep-review scouted the Google Sheets write path firsthand (the C204 surface) and found a real un-pinned
+> invariant: `updateSpreadsheetWithUserData` builds a hand-maintained local `tables` array (one {title,rows,headers}
+> per table) driving the atomic swap — a THIRD hand list beyond SHEET_HEADERS (guard A/B) + SHEET_NAMES (C30), the
+> Sheets analog of the ZIP createBackup() populate step. CERTIFIED correct + in-order today (incl. the C204 Trips
+> append). Critically NOT caught by the round-trip/tab-order tests: createSpreadsheet makes the empty canonical tab
+> from SHEET_NAMES anyway + the Phase-2 delete/rename loop iterates `tables`, so a table OMITTED from the populate
+> array leaves its stale/empty tab in place — `titles === SHEET_NAMES` passes while its data is silently never
+> written (NORTH_STAR #1). +2 in sheets-header-coverage.test.ts (C208): source-scan the populate `title:` literals
+> (scoped to the method body) + assert == SHEET_NAMES in order + a non-vacuity floor. Non-vacuous (drop the Trips
+> entry → RED). The Sheets path is now drift-protected on ALL THREE hand lists. Don't re-audit.
+
 > **CERTIFIED C193 — themePreference survives the GOOGLE SHEETS backup round-trip (NORTH_STAR #1).** C180 covered
 > the ZIP/CSV path; the Sheets path is a distinct serializer (formatValue → grid → parseValue → coerceRow). A C193
 > deep-review verified firsthand (the real fake-Sheets create→read chain) that a non-default `instrument` theme
