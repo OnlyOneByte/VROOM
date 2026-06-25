@@ -99,6 +99,52 @@ describe('POST /api/v1/trips (create)', () => {
     const res = await ctx.authed('POST', '/api/v1/trips', VALID(vehicleId));
     expect(res.status).toBe(404);
   });
+
+  // D2 (ratified): creating a trip ALSO writes an odometer entry at endOdometer/tripDate, so the trip's
+  // end reading feeds the all-time currentOdometer + the mileage-reminder axis (reuse, not a parallel log).
+  test('creating a trip feeds currentOdometer via a deduped odometer entry (D2)', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    const res = await ctx.authed(
+      'POST',
+      '/api/v1/trips',
+      VALID(vehicleId, { startOdometer: 4800, endOdometer: 5000 })
+    );
+    expect(res.status).toBe(201);
+
+    // An odometer entry now exists at the trip's end reading...
+    const odoRows = ctx.sqlite
+      .query('SELECT odometer FROM odometer_entries WHERE vehicle_id = ?')
+      .all(vehicleId) as { odometer: number }[];
+    expect(odoRows.map((r) => r.odometer)).toContain(5000);
+
+    // ...and getCurrentOdometer reflects it (drives maintenance mileage reminders + lease overage).
+    const { odometerRepository } = await import('../../odometer/repository');
+    expect(await odometerRepository.getCurrentOdometer(vehicleId, ctx.user.id)).toBe(5000);
+  });
+
+  test('a second trip the SAME day at the SAME end reading does NOT double-log the odometer (D2 dedup)', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    const body = (end: number) =>
+      VALID(vehicleId, {
+        startOdometer: 4800,
+        endOdometer: end,
+        tripDate: '2024-06-20T08:00:00.000Z',
+      });
+    await ctx.authed('POST', '/api/v1/trips', body(5000));
+    await ctx.authed('POST', '/api/v1/trips', {
+      ...body(5000),
+      tripDate: '2024-06-20T19:00:00.000Z',
+    });
+
+    const n = (
+      ctx.sqlite
+        .query('SELECT COUNT(*) AS n FROM odometer_entries WHERE vehicle_id = ?')
+        .get(vehicleId) as {
+        n: number;
+      }
+    ).n;
+    expect(n).toBe(1); // same (vehicle, day, reading) → one odometer entry, not two
+  });
 });
 
 describe('GET /api/v1/trips (list)', () => {

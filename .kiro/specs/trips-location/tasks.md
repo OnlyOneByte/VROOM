@@ -69,7 +69,17 @@
   follow-on.** Tests: trip-summary.test.ts (+9 incl. a fast-check property: Σ milesByPurpose == totalMiles,
   businessMileageValue == businessMiles × rate, empty → zeros-not-NaN, inverted-pair-clamps-0, unknown-
   purpose→other) + 4 HTTP cases (cross-fleet/vehicle-scoped/unowned-404/empty-zeros). validate:local GREEN
-  (1889 pass). **The trips BACKEND arc (T1–T5) is COMPLETE; only T6 (eyes-on FE) remains.**
+  (1889 pass).
+- [x] **D2 odometer linkage — ✅ DONE (C213, the ratified-but-unbuilt requirement).** A C213 deep-review of the
+  trips↔odometer interaction caught that D2 ("reuse odometer linkage", ratified at T0) was NEVER implemented:
+  T1–T5 wrote no odometer entry, so a created trip's endOdometer did NOT feed `getCurrentOdometer` (probe: POST
+  trip end=5000 → 0 odometer_entries / getCurrentOdometer null) — breaking the maintenance-reminder + lease-overage
+  axis D2 requires. FIX: `OdometerRepository.createFromTrip({vehicleId,userId,odometer,recordedAt})` writes an entry
+  at endOdometer/tripDate DEDUPED by (vehicleId, local calendar-day, odometer value) → null when a same-day-same-
+  reading entry already exists (the user's manual log; D2's "avoid the divergent double-count"); the trip POST calls
+  it + rechecks mileage reminders (mirroring the odometer route). Tests: create-from-trip.test.ts (+6) + 2 HTTP
+  (POST trip → getCurrentOdometer reflects endOdometer; a same-day-same-reading 2nd trip doesn't double-log).
+  validate:local GREEN (1897 pass). **NOW the trips BACKEND is genuinely complete (T1–T5 + D2); only T6 (eyes-on FE) remains.**
 - [ ] **T6 — Frontend (eyes-on tail, R6).** trips list + form + summary card + `trip-api.ts` client (the
   C149/C163 service pattern); four-states + a11y + mobile; then the FE→BE→DB e2e (feature-DoD). **Playwright-
   sandbox-blocked in the loop → lands "code-complete, eyes-on pending"** like maintenance T9 / import T4–6.

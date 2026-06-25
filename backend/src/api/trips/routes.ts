@@ -25,6 +25,8 @@ import {
   validateTripOwnership,
   validateVehicleOwnership,
 } from '../../utils/validation';
+import { odometerRepository } from '../odometer/repository';
+import { reminderTriggerService } from '../reminders/trigger-service';
 import { tripRepository } from './repository';
 import { createTripSchema, TRIP_PURPOSES, updateTripSchema } from './validation';
 
@@ -66,6 +68,19 @@ routes.post('/', zValidator('json', createTripSchema), async (c) => {
     endLocation: data.endLocation ?? null,
     note: data.note ?? null,
   });
+
+  // D2 (ratified): the trip's END reading feeds the all-time currentOdometer + the mileage-reminder axis —
+  // write an odometer entry at endOdometer/tripDate, DEDUPED by (vehicle, day, reading) so it doesn't
+  // double-count a manual reading the user also logged. Then recheck mileage reminders (the new reading may
+  // cross a milestone), mirroring the odometer route's create path. Both are best-effort — the trip is
+  // already persisted, so a recheck/linkage hiccup never fails the create.
+  await odometerRepository.createFromTrip({
+    vehicleId: data.vehicleId,
+    userId: user.id,
+    odometer: data.endOdometer,
+    recordedAt: data.tripDate,
+  });
+  await reminderTriggerService.recheckMileageReminders(user.id, data.vehicleId);
 
   return c.json({ success: true, data: trip, message: 'Trip created' }, 201);
 });

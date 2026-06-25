@@ -5,7 +5,7 @@
  * combining expenses.mileage and odometer_entries.odometer.
  */
 
-import { and, count, desc, eq, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gte, lt, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { NewOdometerEntry, OdometerEntry } from '../../db/schema';
@@ -35,6 +35,55 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
   /** IDs of all manual odometer entries for a vehicle (for cascade cleanup). */
   async findIdsByVehicleId(vehicleId: string): Promise<string[]> {
     return this.findIdsByColumn(odometerEntries.vehicleId, vehicleId);
+  }
+
+  /**
+   * Create an odometer entry derived from another signal (a trip's end reading — trips-location D2,
+   * "reuse the odometer linkage"), DEDUPED by (vehicleId, calendar-day of recordedAt, odometer value):
+   * if an entry already exists for the same vehicle + same local day + same reading, skip the insert and
+   * return null (the user may have logged the reading manually too — D2 avoids the divergent double-count).
+   * Returns the created entry on insert. userId-scoped on the dedup probe (the C109/#52 tenant discipline).
+   * `note` defaults to a provenance marker so the unified history shows where the reading came from.
+   */
+  async createFromTrip(entry: {
+    vehicleId: string;
+    userId: string;
+    odometer: number;
+    recordedAt: Date;
+    note?: string;
+  }): Promise<OdometerEntry | null> {
+    // Same-day window [startOfDay, nextDay) on the LOCAL calendar day of recordedAt (R5 local-day
+    // semantics) — a trip and a manual reading on the same day at the same value are the same observation.
+    const dayStart = new Date(
+      entry.recordedAt.getFullYear(),
+      entry.recordedAt.getMonth(),
+      entry.recordedAt.getDate()
+    );
+    const nextDay = new Date(dayStart);
+    nextDay.setDate(nextDay.getDate() + 1);
+
+    const existing = await this.db
+      .select({ id: odometerEntries.id })
+      .from(odometerEntries)
+      .where(
+        and(
+          eq(odometerEntries.vehicleId, entry.vehicleId),
+          eq(odometerEntries.userId, entry.userId),
+          eq(odometerEntries.odometer, entry.odometer),
+          gte(odometerEntries.recordedAt, dayStart),
+          lt(odometerEntries.recordedAt, nextDay)
+        )
+      )
+      .limit(1);
+    if (existing.length > 0) return null; // dedup: same (vehicle, day, reading) already recorded
+
+    return this.create({
+      vehicleId: entry.vehicleId,
+      userId: entry.userId,
+      odometer: entry.odometer,
+      recordedAt: entry.recordedAt,
+      note: entry.note ?? 'From trip',
+    });
   }
 
   /**

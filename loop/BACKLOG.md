@@ -60,8 +60,13 @@ cross-tenant delete-scope regression). trips T3 DONE (C210) — routes + validat
 ownership-miss = 404 #80). C211 fixed a partial-PUT R2-bypass (#109/#130) on that surface. trips T5 DONE
 (C212) — pure buildTripSummary (miles-by-purpose, business-$=miles×rate, count, avg; div-guarded) +
 GET /trips/summary; the business RATE is a query param (default 0), its userPreferences persistence DEFERRED
-as a separate D3 schema slice (NOT self-authored). **The trips BACKEND arc T1–T5 is COMPLETE; only T6 (eyes-on
-FE: list + form + summary card + trip-api.ts) remains — Playwright-gated, lands code-complete-eyes-on-pending.** money-cents-migration UNSTARTED — its T1+T2 are a "land-together" data-safety core (schema-flip
+as a separate D3 schema slice (NOT self-authored). **D2 odometer-linkage DONE (C213)** — a deep-review caught
+that the RATIFIED D2 ("a trip feeds currentOdometer") had no task and was silently skipped across T1–T5; now a
+trip POST writes a deduped odometer entry at endOdometer/tripDate (createFromTrip) so it drives the
+maintenance-reminder + lease-overage axis. **The trips BACKEND is now GENUINELY complete (T1–T5 + D2); only T6
+(eyes-on FE: list + form + summary card + trip-api.ts) remains — Playwright-gated, lands
+code-complete-eyes-on-pending.** Standing D3 follow-on: persist the business-mileage rate (userPreferences
+column + per-trip override) — its own schema/migration+backup-coverage slice, NOT yet built. money-cents-migration UNSTARTED — its T1+T2 are a "land-together" data-safety core (schema-flip
 + backup version-bump/shim) that should land in a single coherent cycle, NOT split across starvation cycles,
 else the schema is cents while the pipeline still writes floats (NORTH_STAR #1). So the next feature cycles
 prefer the clean trips arc (T2/T3/T5) over money-cents until that coupled pair can be done together.**)*

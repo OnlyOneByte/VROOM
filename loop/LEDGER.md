@@ -135,14 +135,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 212 |
-| deep-review | 5 | 208 |
+| feature | 4 | 213 |
+| deep-review | 5 | 213 |
 | guard | 6 | 207 |
 | bug | 3 | 211 |
 | arch | 5 | 212 |
 | infra | 6 | 209 |
 
-Current cycle: **212**
+Current cycle: **213**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -161,6 +161,25 @@ Current cycle: **212**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C213 (deep-review of trips↔odometer → caught a RATIFIED-BUT-UNBUILT requirement [D2] → built it: trip→odometer linkage)** —
+  Balance recompute (cycle 213): deep-review + guard tied most-starved (both 5/5, 6/6 at threshold; nothing strictly
+  over). Took DEEP-REVIEW + scouted the freshly-completed trips backend's interaction with the odometer subsystem
+  (a genuinely-uncertified seam). FINDING (real, not ceremony): `getCurrentOdometer` UNIONs expenses.mileage +
+  odometer_entries but NOT trips.end_odometer — and **D2 was RATIFIED at T0 ("reuse odometer linkage": a trip writes
+  an odometerEntries row so it feeds currentOdometer + the mileage-reminder axis), yet NONE of T1–T5 implemented it.**
+  I wrongly called the backend "complete" at C212. Probe confirmed firsthand: POST trip end=5000 → 0 odometer_entries,
+  getCurrentOdometer null. This is NOT a self-authored product call — D2 is APPROVED; it's an unbuilt approved
+  requirement (loop-buildable), distinct from the still-deferred D3 rate-persistence. BUILT IT:
+  `OdometerRepository.createFromTrip` writes an entry at endOdometer/tripDate DEDUPED by (vehicleId, local
+  calendar-day, odometer value) → null on a same-day-same-reading dup (the user's manual log; D2's
+  avoid-double-count); the trip POST calls it + rechecks mileage reminders (mirrors the odometer route). Tests:
+  create-from-trip.test.ts (+6: creates/dedups-same-day-reading/allows-diff-reading/allows-diff-day/userId-scoped-
+  dedup/provenance-note) + 2 HTTP (POST trip → getCurrentOdometer reflects endOdometer; same-day-same-reading 2nd
+  trip doesn't double-log). The existing trips-roundtrip/cascade tests stay green (they SQL-seed trips, bypassing the
+  route — no behavior change there). validate:local GREEN (tsc 0, musl 21 warn baseline, 1897 pass / 0 fail, +8,
+  build bundled). Backend-only → no shot. **NOW the trips backend is GENUINELY complete (T1–T5 + the D2 linkage);
+  only T6 (eyes-on FE) remains.** LESSON: "feature complete" must check the spec's RATIFIED decisions, not just the
+  numbered tasks — a decision (D2) had no task and was silently skipped. cov: be ~88.5%+ (~) / fe 88.73% (~).
 - **C212 (arch scout → NO churn warranted [rule-of-two only] → feature: trips-location T5 — mileage-summary analytics; trips BACKEND COMPLETE)** —
   Balance recompute (cycle 212): arch most-starved over-budget (7/5 = 1.4×; nothing else over). Ran a fresh arch
   dedup scout firsthand on the C210 trips routes: the `listQuerySchema` {limit/offset + CONFIG.maxPageSize +
