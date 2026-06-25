@@ -217,11 +217,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 227 |
 | deep-review | 5 | 279 |
 | guard | 6 | 276 |
-| bug | 3 | 277 |
+| bug | 3 | 280 |
 | arch | 5 | 275 |
 | infra | 6 | 278 |
 
-Current cycle: **279**
+Current cycle: **280**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -240,6 +240,26 @@ Current cycle: **279**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C280 (bug-scout DRY: the backup coerceRow numeric coercion [#209/#68 restore-coercion family] certified CLEAN firsthand — the suspected EU-decimal corruption is NOT reachable via VROOM own round-trip)** —
+  Balance recompute (cycle 280): nothing strictly OVER budget; bug + arch tied AT threshold (3/3, 5/5). Per C248 took
+  bug (the over-budget-discipline driver) on a fresh safety-critical path not scouted this run: backup coerceRow
+  (backup.ts:71 — restore data-safety, NORTH_STAR #1, the #209/#68 numeric-coercion family). AUDITED FIRSTHAND: the
+  INTEGER/REAL paths use a STRICT Number(strVal.replace(/,/g,'')) (NOT parseInt/parseFloat — which stop at the first
+  non-digit + would truncate a Sheets-FORMATTED_VALUE "12,345" odometer to 12, the #68 corruption); garbage tail →
+  NaN → null (matches the contract); integer path rounds (Sheets "12345.0"); the NOT-NULL-static-default fallback
+  (#175) prevents a null-insert restore-abort across all types. SUSPECTED a EU-decimal hazard: the comma-strip turns
+  "12,50" (EU EUR 12.50) → "1250" → 1250 (100x over) and "1.234,56" → 1.234. PROBED THE ROUND-TRIP firsthand: the
+  EXPORT serializes via String(value) on a JS number (google-sheets-service formatValue:719) → ALWAYS a canonical
+  .-decimal, NEVER EU/thousands (String(1234.56)="1234.56", String(12.5)="12.5"). So VROOM own export never WRITES the
+  format that would corrupt on read — the comma-strip is a DEFENSIVE measure for Sheets FORMATTED_VALUE US-thousands
+  (correct on the integer path), and the EU-decimal edge is only reachable via a HAND-EDITED EU-formatted Sheet =
+  the same product-gated #24 locale-ambiguity territory as C279 normalizeDecimal, NOT a fresh loop-fixable defect.
+  NO fresh defect; coerceRow is covered by backup.test.ts (the #175/#209 nets). Per the C253/C273/C277/C279 discipline
+  recorded dry + pivoted fast, no manufactured test. Verify: audit only — no source touched, both suites green at C276
+  (1935 BE / 866 FE). Docs-only. cov: be 89.27% / fe 89.11% (~). (bug→280: the scout DID happen + a suspected money
+  bug was DEBUNKED by a firsthand round-trip probe [export writes canonical decimals → the corruption is unreachable].
+  coerceRow CERTIFIED — don't re-scout; the EU-decimal-in-Sheets case is the product-gated #24. NEXT bug cycle record
+  dry on first recheck + pivot — real defects come ONLY from a fresh feature surface [Angelo-gated] or a steer.)
 - **C279 (deep-review: the CSV-IMPORT money/unit normalization [the #102/#103/#104/#124/#137 foreign-data family] certified CLEAN firsthand — incl. a firsthand multi-comma probe that DEBUNKED a suspected money bug)** —
   Balance recompute (cycle 279): nothing strictly OVER budget; deep-review most-starved non-gated (5/5). The audited
   subsystems are saturated (trips C255, repos C260, TCO C266, offline-sync C274), so picked a fresh safety-critical

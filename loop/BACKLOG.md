@@ -736,6 +736,14 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **SCOUTED C280 — backup coerceRow numeric coercion (the #209/#68 restore family) certified CLEAN firsthand → dry.**
+> Audited coerceRow (backup.ts:71): INTEGER/REAL use strict Number(strip-commas) NOT parseInt (the #68 fix — a Sheets
+> "12,345" odometer would truncate to 12 under parseInt); garbage→null; the NOT-NULL-default fallback (#175) prevents
+> a restore-abort. SUSPECTED a EU-decimal hazard (comma-strip: "12,50"→1250, 100x) but PROBED the round-trip firsthand:
+> the export serializes via String(number) → ALWAYS canonical .-decimal, never EU/thousands — so VROOM own export never
+> writes the corrupting format; the EU edge is only a hand-edited Sheet = the product-gated #24, not a fresh defect.
+> NO defect; covered by backup.test.ts. Recorded dry + pivot. Don't re-scout coerceRow.
+
 > **SCOUTED C277 — insurance effectiveMonthlyPremium (the #8/#69 premium money helper) certified CLEAN firsthand →
 > dry; pivot attempt corrected the C276 collectSourceFiles mis-filing (see arch §).** effectiveMonthlyPremium:
 > monthlyCost wins via `!= null` (honors an explicit 0 — the #8 fix), else amortizes totalCost over the calendar-month
