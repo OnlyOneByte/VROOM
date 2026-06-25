@@ -213,6 +213,15 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > (.meshclaw-tools/) so the knob is a local capability gain, not a committed artifact — the cert is the committed value.
 > A future eyes-on cycle could extend to /analytics + /vehicles/[id] dark if a fresh concern arises; no defect here.
 
+> **CERTIFIED C279 — the CSV-IMPORT money/unit normalization (the #102/#103/#104/#124/#137 foreign-data family) CLEAN
+> firsthand.** Audited import-mapping.ts: normalizeDecimal (both-separator → last-is-decimal, US+EU; the #124 fix);
+> mapVolume/mapMileage (isFinite-guard returns raw → loud error, convert-only-when-both-units-known); mapCategory
+> (#102/D2 — blank→defaultCategory else "Unknown", named-unknown→misc, never invents); normalizeForeignDate
+> (local-time, the cycle-6/11 discipline). PROBED a suspected multi-comma money bug firsthand: "1,234,567" → NaN →
+> caller errors it loudly (NOT a ~1e6× wrong number — no silent corruption). The only residual is the "1,234"
+> single-comma EU/US ambiguity = the DOCUMENTED product-gated #24, not a fresh defect. NO fresh defect; covered by
+> import-mapping.test.ts. The deep-review vein is saturated across trips/repos/TCO/offline-sync/CSV-import. Don't re-audit.
+
 > **CERTIFIED C274 — the OFFLINE-SYNC round-trip (NORTH_STAR #1 crown-jewel "offline writes never drop") CLEAN
 > firsthand.** Audited sync-manager.ts end-to-end: markExpenseAsSynced only after a genuine POST success (a thrown
 > POST never marks synced); clientId idempotency (#98); permanent rows park as needs-attention not infinite-retry

@@ -215,13 +215,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 227 |
-| deep-review | 5 | 274 |
+| deep-review | 5 | 279 |
 | guard | 6 | 276 |
 | bug | 3 | 277 |
 | arch | 5 | 275 |
 | infra | 6 | 278 |
 
-Current cycle: **278**
+Current cycle: **279**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -240,6 +240,28 @@ Current cycle: **278**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C279 (deep-review: the CSV-IMPORT money/unit normalization [the #102/#103/#104/#124/#137 foreign-data family] certified CLEAN firsthand — incl. a firsthand multi-comma probe that DEBUNKED a suspected money bug)** —
+  Balance recompute (cycle 279): nothing strictly OVER budget; deep-review most-starved non-gated (5/5). The audited
+  subsystems are saturated (trips C255, repos C260, TCO C266, offline-sync C274), so picked a fresh safety-critical
+  path: the CSV foreign-import money/unit normalization (import-mapping.ts — NORTH_STAR #1/#2, home of the
+  #102/#103/#104/#124/#137 family). AUDITED FIRSTHAND: (1) normalizeDecimal (the #124 fix) — both-separator → decimal
+  is the LAST-appearing one, other stripped as thousands (US 1,234.56 AND EU 1.234,56 both → 1234.56); single-comma →
+  decimal. (2) mapVolume/mapMileage — normalize → !Number.isFinite guard returns RAW (buildImportPlan errors it, no
+  silent NaN) → convert only when both units known (else pass-through, no wrong-unit corruption); mapMileage rounds
+  (documented A1 loss). (3) mapCategory (#102/D2) — blank→defaultCategory (fuel presets) else blank→"Unknown
+  category"; named-but-unrecognized→misc (never invents). (4) normalizeForeignDate — local-time construction (the
+  cycle-6/11 UTC-midnight discipline), epoch sec/ms, explicit-TZ honored. SUSPECTED a multi-comma money bug
+  (normalizeDecimal single-comma path uses String.replace(',', '.') which replaces only the FIRST comma) → PROBED
+  FIRSTHAND: "1,234,567" → "1.234,567" → Number = NaN → the caller's isFinite guard returns raw → buildImportPlan
+  reports a clean per-row error. So the dangerous case FAILS LOUDLY, NOT as a ~1000000× wrong number — NO silent
+  corruption. The only residual is "1,234" → 1.234 (EU-vs-US single-comma ambiguity), which is the DOCUMENTED
+  product-gated #24/#124 territory, not a fresh defect. NO fresh defect; the #102/#103/#104/#124/#137 family is
+  intact + covered (import-mapping.test.ts + import-mapping-presets.test.ts). Re-pinning would be the
+  don't-certify-already-guarded trap → recorded the firsthand certification, no manufactured guard. Verify: audit only
+  — no source touched, both suites green at C276 (1935 BE / 866 FE). Docs-only. cov: be 89.27% / fe 89.11% (~).
+  (deep-review→279. The CSV-import normalization is CERTIFIED — don't re-audit; the single-comma ambiguity is the
+  product-gated #24, not loop-fixable. The deep-review vein is now saturated across trips/repos/TCO/offline-sync/
+  CSV-import; NEXT deep-review needs a fresh feature surface [Angelo-gated] or record saturated + pivot.)
 - **C278 (infra: harden the GUIDE commit rule with the APOSTROPHE hazard that broke C277 — a real this-session operating-manual gap)** —
   Balance recompute (cycle 278): nothing strictly OVER budget; infra most-starved non-gated (6/6, AT budget). The
   coverage cadence is not due (~C282), so didn't re-run it prematurely. Took a JUSTIFIED loop-tooling fix: C277's
