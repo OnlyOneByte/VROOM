@@ -234,10 +234,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 307 |
 | guard | 6 | 306 |
 | bug | 3 | 308 |
-| arch | 5 | 304 |
+| arch | 5 | 310 |
 | infra | 6 | 309 |
 
-Current cycle: **309**
+Current cycle: **310**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,19 @@ Current cycle: **309**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C310 (arch NO CHURN, recorded FAST via the C286 precondition: STILL zero production-source commits since C300 [same structural state as C304] → the dedup vein remains structurally dry)** —
+  Balance recompute (cycle 310): arch was the ONLY category strictly OVER budget (6/5 = 1.20×). Applied the C286
+  FAST-DRY PRECONDITION firsthand: `git log` over backend/src + frontend/src .ts EXCLUDING tests/__tests__ since C300
+  (314de68) is EMPTY — STILL zero production-source commits (C301 deep-review-cert, C302 bug-dry, C303 GUIDE-freshness,
+  C304 arch-no-churn, C305 bug-dry, C306 guard-saturated, C307 deep-review-cert, C308 bug-dry, C309 infra-cadence were
+  ALL docs/audit/cert). Identical structural state to C304 (also post-C300, also fired the precondition); the last
+  source touch was C300, a dead-code REMOVAL that subtracts (cannot introduce a dup). So nothing newly threaded to
+  dedup → recorded no-churn-warranted + pivot, FAST — did NOT re-scout the ruled-below-bar targets (createExpense quad
+  C270, collectSourceFiles C277, BE walker C281, SRC_ROOT C281, resolveProviderState C297; the C292 dupCheck already
+  converged). Verify: audit only — no source touched, both suites green (1949 BE / 868 FE). Docs-only. cov: be 89.29% /
+  fe 89.43% (~). (arch→310. The dedup vein is structurally dry until a fresh FEATURE surface [Angelo-gated] threads new
+  duplicate production code — this is the C286 precondition working as designed: under the hard feature-gate, arch
+  over-budget cycles correctly record no-churn-FAST rather than manufacturing churn. Don't re-scout the ruled list.)
 - **C309 (infra coverage cadence; last full measure C299: untracked-test sweep CLEAN, BE re-measured [func +0.31 — the C300 dead-code removal took db/types.ts 66.67→100% func], GUIDE standing-truth freshened to C309)** —
   Balance recompute (cycle 309): arch + infra tied at 1.00× (5/5, 6/6); infra most-starved by absolute count (6 > 5) AND
   the coverage cadence was due (last full measure C299, ~C309). (Arch would have been a no-churn-fast record — the C286
