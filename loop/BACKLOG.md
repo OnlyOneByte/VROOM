@@ -1008,6 +1008,15 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C271 — the DARK-MODE theme-clash class (NORTH_STAR #3), the first merge-surviving artifact for the fresh
+> dark axis C268/C269 verified by eye.** C268/C269 certified dark mode CLEAN manually (PNGs don't travel); this pins
+> the SOURCE invariant. +3 in no-theme-clashing-colors.test.ts (the no-hardcoded-currency source-scan idiom): scans all
+> .svelte for bare (non-dark:) bg/text/border-{white,black,gray-N,slate-N,zinc-N,neutral-N}; allowlists the 5 sites
+> verified firsthand as intentional (button/badge destructive-variant text-white on fixed red; dialog/alert/sheet
+> bg-black/50 scrims) + an anti-drift check that each allowlist entry still has a hardcoded color. Non-vacuous (inject
+> bg-white → RED with the exact diagnostic). FE validate GREEN (863, +3). A future component can't silently reintroduce
+> a dark-clash. Don't re-scout component colors — the guard watches the class continuously.
+
 > **COVERED C256 — the un-tested odometer HISTORY route, via the C250/C251 filter-branch pattern (real new
 > covered SOURCE, not theater).** Per-file BE coverage flagged odometer/routes.ts at 87.27% line / 91.67% func with
 > the GET /:vehicleId/history handler (70-83) uncovered: its repo method getHistory (UNION of expenses.mileage +

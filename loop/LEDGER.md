@@ -200,12 +200,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 227 |
 | deep-review | 5 | 268 |
-| guard | 6 | 263 |
+| guard | 6 | 271 |
 | bug | 3 | 269 |
 | arch | 5 | 270 |
 | infra | 6 | 267 |
 
-Current cycle: **270**
+Current cycle: **271**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -224,6 +224,30 @@ Current cycle: **270**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C271 (guard: pin the DARK-MODE correctness invariant C268/C269 verified by EYE — a no-theme-clashing-colors source-scan over all .svelte; the FIRST merge-surviving artifact for the fresh dark axis)** —
+  Balance recompute (cycle 271): guard was the sole over-budget category (8/6 = 1.33×). C261/C263 verified guard
+  saturated on the EXISTING surfaces, but C268/C269 opened a FRESH axis (dark mode) that I certified MANUALLY (eyes-on
+  PNGs) — and that correctness rests on components using theme TOKENS, not hardcoded clashing palette colors (the
+  NORTH_STAR #3 / widgets-skill clash class), with NO merge-surviving guard pinning it (the PNGs don't travel). A
+  source-scan guard is the durable artifact (GUIDE: source-scan > untracked e2e). SCOUTED firsthand: grepped all
+  .svelte for bare (non-dark:) `(bg|text|border)-(white|black|gray-N|slate-N|zinc-N|neutral-N)`. Found exactly 5 hits,
+  CLASSIFIED EACH FIRSTHAND (the C333 discipline) as INTENTIONAL + theme-agnostic, NOT clashes: button/badge `text-white`
+  is ONLY on the destructive variant (white on the fixed-red bg-destructive — deliberate fixed contrast, the
+  shadcn-svelte convention; other variants use *-foreground tokens); dialog/alert-dialog/sheet `bg-black/50` are modal
+  SCRIMS (theme-agnostic dimming backdrops). So the tree is genuinely clean — exactly why C268/C269 dark rendered
+  flawlessly. NEW no-theme-clashing-colors.test.ts (+3, the no-hardcoded-currency.test.ts source-scan idiom): (1) a
+  live-not-no-op floor (>20 .svelte found); (2) the main scan — no bare palette color outside the 5-site ALLOWLIST,
+  with a precise "route through a semantic theme token" diagnostic; (3) an anti-drift check — every ALLOWLIST entry
+  still exists + still has a hardcoded color (so a refactor-to-tokens can't leave the allowlist silently over-permitting).
+  NON-VACUOUS verified firsthand: injected `bg-white` into CategorySelector.svelte → guard RED with the exact
+  `:55 → bg-white` diagnostic; reverted → green. Caught my own svelte-check strict-index error (lines[i] possibly
+  undefined under noUncheckedIndexedAccess → switched to `for...of lines.entries()`). Verify: FE validate:local GREEN —
+  svelte-check 0 errors (7 warn baseline), build OK, 863 pass / 81 files (+3). FE-source-scan (reads existing .svelte)
+  → no shot needed (the rendered correctness is the C268/C269 eyes-on; this pins the SOURCE invariant). cov: be 89.27%
+  / fe 89.11% (~ — a source-scan guard reads existing files, the expected guard-cycle signature). (guard→271: the
+  dark-mode clash class is now MERGE-SURVIVING-guarded; a future component can't silently reintroduce a clash. This is
+  a genuinely fresh guard [the dark axis C268 opened], NOT a re-scout of the C261/C263-saturated existing surfaces.
+  Don't re-scout component colors — the guard now watches the whole class continuously.)
 - **C270 (arch NO CHURN WARRANTED — the 4-file `createExpense` test-helper quad is a rule-of-FOUR with 4 DIVERGENT signatures, below the bar; converging = manufactured churn [C212/C244 discipline])** —
   Balance recompute (cycle 270): arch + guard both over budget (arch 6/5 = 1.2×, guard 7/6 = 1.17×); arch more starved
   → arch. Arch is DRY (dead-code sweep complete C260/C264, seedVehicle done C199); the GUIDE-updated fresh vector is
