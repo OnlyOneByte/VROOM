@@ -17,6 +17,7 @@
 	import { Avatar, AvatarFallback } from '$lib/components/ui/avatar';
 	import UnitPreferencesCard from '$lib/components/settings/cards/UnitPreferencesCard.svelte';
 	import ThemeCard from '$lib/components/settings/cards/ThemeCard.svelte';
+	import ThemePickerCard from '$lib/components/settings/cards/ThemePickerCard.svelte';
 	import PWAInstallCard from '$lib/components/settings/cards/PwaInstallCard.svelte';
 	import BackupNowDialog from '$lib/components/settings/storage-provider/backup/BackupDialog.svelte';
 	import UnifiedRestoreDialog from '$lib/components/settings/storage-provider/backup/RestoreDialog.svelte';
@@ -270,6 +271,7 @@
 			</a>
 
 			<ThemeCard />
+			<ThemePickerCard />
 			<UnitPreferencesCard bind:distanceUnit bind:volumeUnit bind:chargeUnit bind:currencyUnit />
 			<PWAInstallCard />
 			<PhotoStorageSettings
