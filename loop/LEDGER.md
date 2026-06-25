@@ -200,12 +200,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 227 |
 | deep-review | 5 | 260 |
-| guard | 6 | 256 |
+| guard | 6 | 263 |
 | bug | 3 | 261 |
 | arch | 5 | 259 |
 | infra | 6 | 262 |
 
-Current cycle: **262**
+Current cycle: **263**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -224,6 +224,27 @@ Current cycle: **262**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C263 (guard SATURATED — FE pure-logic branch gaps verified firsthand as artifacts / theater / structural-ceiling; no clean guard, recorded + no manufactured test [the C249 discipline])** —
+  Balance recompute (cycle 263): guard was the sole over-budget category (7/6 = 1.17×). Guard is documented largely
+  worked-through (filter-branch vein saturated C261), but it was FORCED over budget, so per the C249 discipline made a
+  fresh firsthand attempt at a real reachable gap before recording saturated. Targeted FE branch coverage (81.34%, the
+  lowest metric). Pulled per-file FE coverage + verified each sub-100%-branch .ts candidate FIRSTHAND: (1)
+  formatters.ts 88.88% br "uncovered 51-52" — DEBUNKED, capitalize IS fully tested incl. the empty-string edge
+  (formatters.test.ts:159); the 51-52 flag is the v8 line-attribution ARTIFACT (the C100/C123 class — bun/v8
+  mis-attributes expression lines). (2) offline-storage.ts 91.3% line 145 — the `if (import.meta.env.DEV) console.error`
+  in a localStorage-quota catch: error-injection + DEV-env-gated, structural ceiling. (3) expense-api.ts 61.9% br —
+  the file aggregate is dragged by the apiClient-wrapper methods (117-271) whose only "test" would MOCK apiClient +
+  assert the mock returns what it was told (the C181/C229 coverage-THEATER trap); the one genuinely-pure exported fn
+  buildExpenseQuery is ALREADY comprehensively branch-tested (build-expense-query.test.ts — every param branch incl.
+  search-trim/whitespace-drop/repeated-tags/sortBy/sortDir/composition). (4) the .svelte.ts + sync-manager gaps are
+  component/effect/DOM/timer-bound. CONCLUSION: every reachable pure-logic branch is covered; the remaining sub-100% is
+  v8 artifacts + DEV-gated catch + wrapper-theater + DOM/timer — the documented structural ceiling, BOTH sides now
+  (BE confirmed C261). Per C249 (guard forced over-budget but no clean test → record saturated, do NOT manufacture a
+  vacuous/theater guard) recorded the firsthand-verified saturation + pivoted. Verify: audit only — no source touched,
+  both suites green at C262 (1935 BE / 860 FE). Docs-only. cov: be 89.27% / fe 89.11% (~). (guard→263: the scout DID
+  happen as the over-budget discipline requires. The guard vein is SATURATED both sides — NEXT guard cycle record
+  saturated FAST + pivot; a real guard now needs a fresh feature surface [Angelo-gated] or a deep-review-surfaced
+  invariant. Don't re-scout formatters/offline-storage/expense-api for branch coverage.)
 - **C261 (bug-scout DRY — settings/sync/vehicles repos certified CLEAN firsthand; NO clean guard pivot [target 100%-covered or structural-ceiling] → record dry + pivot, the C99/C103 discipline)** —
   Balance recompute (cycle 261): two over budget — bug (4/3 = 1.33×) + infra (7/6 = 1.17×); bug more starved → bug
   (infra cadence ran C254, next ~C264). Per C95/C204 did ONE fresh firsthand scout. SCOUTED a genuinely

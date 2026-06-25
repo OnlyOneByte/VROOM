@@ -979,6 +979,16 @@ the now-shootable eyes-on FE + any newly-touched module.)*
 > (after C250 expenses-summary, C251 reminders-list). The vein still has picks — next guard cycle: re-pull the
 > per-file table for the next plain reachable route/repo gap. Don't re-cover odometer routes (now 100%).
 
+> **SCOUTED C263 — guard SATURATED both sides (FE pure-logic branch gaps verified firsthand); no manufactured test.**
+> Guard forced over budget (7/6). Targeted FE branch coverage (81.34%, lowest metric) + verified each sub-100%-branch
+> .ts candidate FIRSTHAND: formatters.ts "51-52" = v8 line-attribution artifact (capitalize fully tested incl. empty
+> string); offline-storage.ts:145 = DEV-gated catch (structural); expense-api.ts 61.9% = apiClient-wrapper theater
+> (C181/C229) — its one pure fn buildExpenseQuery is already comprehensively branch-tested; the rest are
+> .svelte.ts/sync-manager DOM/timer-bound. Every reachable pure-logic branch is covered; the remainder is artifacts +
+> DEV-catch + wrapper-theater + DOM/timer (structural ceiling, both sides — BE confirmed C261). Per C249 recorded
+> saturated + pivoted (no vacuous/theater test). NEXT guard cycle: record saturated FAST + pivot; a real guard needs a
+> fresh feature surface (Angelo-gated) or a deep-review-surfaced invariant. Don't re-scout formatters/offline-storage/expense-api.
+
 > **SCOUTED C249 — guard surface SATURATED for the current (gated) prod-logic; no manufactured test.** 4
 > candidates, all already covered: /trips in route-smoke a11y (line 72); trips pagination over-max rejection
 > (inherited from the C232 clampedPaginationFields guard — re-testing duplicates it); the C247 reminders
