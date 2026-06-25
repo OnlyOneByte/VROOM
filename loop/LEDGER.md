@@ -233,11 +233,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 227 |
 | deep-review | 5 | 279 |
 | guard | 6 | 283 |
-| bug | 3 | 280 |
+| bug | 3 | 284 |
 | arch | 5 | 281 |
 | infra | 6 | 282 |
 
-Current cycle: **283**
+Current cycle: **284**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,24 @@ Current cycle: **283**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C284 (bug-scout DRY: the reminder endDate-boundary family [#12/#107/#114/#116] certified CLEAN firsthand — all 4 exit paths guarded via the shared hasReminderEndedBy predicate)** —
+  Balance recompute (cycle 284): bug was the sole over-budget category (4/3 = 1.33×). Did ONE fresh firsthand scout on
+  an unscanned-this-run surface: the reminder date-advance / endDate-boundary family (trigger-service.ts — the
+  bug-#12/#107/#114/#116 class: a BOUNDED reminder must DEACTIVATE when it crosses endDate, not keep firing forever).
+  AUDITED FIRSTHAND, all 4 exit paths guarded: (1) fastForwardPastNow IN-LOOP (:281) deactivates the moment nextDue
+  crosses endDate (#12); (2) fastForwardPastNow POST-LOOP exit (:318) — the #107/C362 fix: the FINAL advance that
+  steps PAST now is tested against endDate before the forward write (the straddling-now boundary the while-guard
+  skips); (3) the main catch-up loop post-loop guard (:487, C409) mirrors it for the natural-exit case (#116); (4)
+  mark-serviced re-arm (routes.ts:147) deactivates a bounded reminder serviced after its end (#114). All 4 route
+  through the SHARED hasReminderEndedBy predicate (the C409 dedup of the once-hand-inlined boundary check) + a
+  non-progress backstop (#13) bails if the date doesn't advance. NO defect — the #12/#107/#114/#116 endDate-boundary
+  class is closed across ALL exit paths + single-sourced. Covered by trigger-mileage / mark-serviced /
+  recheck-on-write tests. Per the C261/C273/C280 discipline recorded dry + pivoted fast, no manufactured test. Verify:
+  audit only — no source touched, both suites green at C283 (1935 BE / 867 FE). Docs-only. cov: be 89.28% / fe 89.3%
+  (~). (bug→284: the scout DID happen + certified the endDate-boundary family clean firsthand. Don't re-scout the
+  reminder date-advance family — it's closed + single-predicate-sourced. The bug surface stays comprehensively worked
+  through; NEXT bug cycle record dry on first recheck + pivot — real defects come ONLY from a fresh feature surface
+  [Angelo-gated] or a steer.)
 - **C283 (guard: cover the themes-css.ts sort comparator [reachable NOW with ≥2 themes — no instrument/gate] — themes-css 85.71→100% line, the C250/C251 reachable-branch pattern + corrects a stale C189 note)** —
   Balance recompute (cycle 283): guard was the sole over-budget category (7/6 = 1.17×). Guard is firsthand-saturated
   (existing surfaces C261/C263, dark-clash C271, meta-guard C276), so per the C263/C249 discipline did ONE genuine

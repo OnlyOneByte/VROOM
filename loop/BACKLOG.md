@@ -736,6 +736,13 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **SCOUTED C284 — the reminder endDate-boundary family (#12/#107/#114/#116) certified CLEAN firsthand → dry.**
+> Audited trigger-service.ts: a bounded reminder must deactivate when it crosses endDate, not fire forever. All 4 exit
+> paths guarded via the shared hasReminderEndedBy predicate (the C409 dedup): fastForwardPastNow in-loop (#12) +
+> post-loop straddling-now exit (#107/C362), the catch-up natural-exit guard (#116), mark-serviced re-arm (#114); +
+> a non-progress backstop (#13). NO defect — the class is closed across ALL exits + single-sourced. Covered by
+> trigger-mileage/mark-serviced tests. Recorded dry + pivot. Don't re-scout the reminder date-advance family.
+
 > **SCOUTED C280 — backup coerceRow numeric coercion (the #209/#68 restore family) certified CLEAN firsthand → dry.**
 > Audited coerceRow (backup.ts:71): INTEGER/REAL use strict Number(strip-commas) NOT parseInt (the #68 fix — a Sheets
 > "12,345" odometer would truncate to 12 under parseInt); garbage→null; the NOT-NULL-default fallback (#175) prevents
