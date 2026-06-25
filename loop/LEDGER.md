@@ -151,11 +151,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 220 |
 | deep-review | 5 | 223 |
 | guard | 6 | 225 |
-| bug | 3 | 221 |
+| bug | 3 | 226 |
 | arch | 5 | 222 |
 | infra | 6 | 224 |
 
-Current cycle: **225**
+Current cycle: **226**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -174,6 +174,26 @@ Current cycle: **225**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C226 (bug: FIX a REAL date/tz future-guard defect on the C210 trips CREATE/PUT — today-as-noon-local 400'd as "future")** —
+  Balance recompute (cycle 226): bug most-starved + over budget (5/3 = 1.67×) — ahead of feature (6/4 = 1.5×).
+  Per the GUIDE, ran a fresh-surface scout on the soon-to-be-form-backed create-date path (the trips FE is the
+  freshest prod surface). First swept the trips display/repo/validation/date seams firsthand — all CLEAN (matching
+  the C204–C210 certs: ownership scoping, merged-pair PUT R2, dedup, dateOnlyToISO/toDateInputValue round-trip,
+  #94 pooling already escalated). Then hit the GUIDE's GOLD date-off-by-one seam (#87/#106/#39) on the CREATE
+  future-guard: `createTripSchema` did `tripDate <= new Date()` (an ABSOLUTE-instant compare), but the FE contract
+  sends `dateOnlyToISO(date)` = NOON LOCAL. **PROVED firsthand** (probe at server 03:06 UTC): a trip dated TODAY,
+  sent as today-noon-local, is +8.89h "in the future" vs `now` → 400 "tripDate cannot be in the future." The
+  form's OWN DEFAULT (log today's trip) would break for the entire local morning, every day. **REAL defect, NOT a
+  semantics call:** R5 ratifies LOCAL-CALENDAR-DAY semantics + there's NO ratified reject-future requirement (the
+  guard was my own C210 addition — sibling to C211's self-introduced PUT asymmetry on this same surface), so the
+  instant-vs-day comparison is simply wrong. FIX: extracted `notFutureLocalDay(d)` — compare against the END of the
+  current LOCAL day (23:59:59.999) — wired into BOTH create + update schemas; updated the header docstring. GUARD:
+  +2 in trips-http.test.ts (today-as-noon-local → 201; tomorrow-as-noon-local → 400; both dynamically computed off
+  `new Date()` so they pin the exact bug in any runner TZ). Non-vacuous (restored the absolute-instant guard → ONLY
+  the today case RED, 1 fail; verified firsthand, then restored). Backend-only (Zod) → no shot. validate:local
+  GREEN (tsc 0, musl 21 warn baseline, 1908 pass / 0 fail, +2, build bundled). The #87/#106/#39 date-off-by-one
+  family now closed on the trips WRITE path. cov: be 88.92% (~) / fe 88.85% (~). (bug→226; this also de-risks the
+  T6b-2 form, which would otherwise have 400'd on its own default date.)
 - **C225 (bug-scout on the C223 403-vehicle-delete lead [FALSE ALARM — CSRF working as designed] → guard: pin the CSRF state-change boundary)** —
   Balance recompute (cycle 225): bug most-starved + over budget (4/3 = 1.33×), with a CONCRETE fresh lead — the
   C223-filed `DELETE /api/v1/vehicles/:id` → 403. Scouted it firsthand: reproduced the 403 (`{code:HTTPException,

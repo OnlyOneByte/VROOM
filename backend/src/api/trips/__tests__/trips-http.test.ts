@@ -88,6 +88,49 @@ describe('POST /api/v1/trips (create)', () => {
     expect(res.status).toBe(400);
   });
 
+  // The R5 future-guard compares the LOCAL CALENDAR DAY, not the absolute instant. The FE sends a date-only
+  // value anchored at NOON LOCAL (dateOnlyToISO); a bare `d <= new Date()` instant guard 400'd a trip dated
+  // TODAY whenever the server clock was before local noon (noon-local-today is then hours "in the future"),
+  // breaking the form's own default for the entire local morning. These two pin the fix (the #87/#106 family).
+  test('ACCEPTS a trip dated TODAY sent as noon-local (the FE dateOnlyToISO contract — not a future reject)', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    const now = new Date();
+    // Exactly what FE dateOnlyToISO(today) produces: today's local Y/M/D anchored at 12:00 LOCAL.
+    const todayNoonLocal = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      12,
+      0,
+      0
+    ).toISOString();
+    const res = await ctx.authed(
+      'POST',
+      '/api/v1/trips',
+      VALID(vehicleId, { tripDate: todayNoonLocal })
+    );
+    expect(res.status, await res.text()).toBe(201);
+  });
+
+  test('still rejects TOMORROW (a genuine future local day, 400) — the guard is not neutered', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    const now = new Date();
+    const tomorrowNoonLocal = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() + 1,
+      12,
+      0,
+      0
+    ).toISOString();
+    const res = await ctx.authed(
+      'POST',
+      '/api/v1/trips',
+      VALID(vehicleId, { tripDate: tomorrowNoonLocal })
+    );
+    expect(res.status).toBe(400);
+  });
+
   test('rejects an unknown purpose (D4 enum, 400)', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const res = await ctx.authed('POST', '/api/v1/trips', VALID(vehicleId, { purpose: 'joyride' }));

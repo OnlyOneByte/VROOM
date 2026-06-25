@@ -667,6 +667,21 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **CLOSED C226 — REAL date/tz future-guard defect on the C210 trips CREATE/PUT (the gold #87/#106 seam, self-
+> introduced + caught before the form lands).** A C226 bug-scout (bug most-starved, 5/3) on the soon-to-be-form-
+> backed create-date path probed the GUIDE's date-off-by-one seam firsthand: `createTripSchema`'s future-guard was
+> `tripDate <= new Date()` (an ABSOLUTE-instant compare), but the FE contract sends `dateOnlyToISO(date)` = NOON
+> LOCAL. With the server clock before local noon, today-at-noon-local is HOURS in the "future" vs `now` → a trip
+> dated TODAY 400s "tripDate cannot be in the future" (probe: server 03:06 UTC → today rejected, gap +8.89h). The
+> form's own default action (log today) would break for the entire local morning, every day. NOT a semantics call:
+> R5 mandates LOCAL-CALENDAR-DAY semantics + there is NO ratified reject-future requirement (the guard was my own
+> C210 addition) → the instant-vs-day comparison is simply wrong. FIX: extracted `notFutureLocalDay` (compare
+> against END of the current LOCAL day, 23:59:59.999) wired into BOTH create + update schemas. +2 guards in trips-
+> http.test.ts (today-as-noon-local → 201; tomorrow-as-noon-local → 400, dynamically computed so they pin the
+> exact bug); non-vacuous (restore the absolute-instant guard → ONLY the today case RED, verified firsthand).
+> Backend-only (Zod) → no shot. validate:local GREEN (1908 pass, +2). The #87/#106/#39 date-off-by-one family now
+> closed on the trips write path (sibling to C211's PUT asymmetry on the same C210 surface). Don't re-fix.
+
 > **CLOSED C221 — REAL silent-truncation defect on the C220 trips list page (self-introduced, caught same-arc).**
 > A C221 bug-scout on the FRESH C220 list page found it called `tripApi.list()` (route default limit=20) + read
 > only `tripPage.data` with NO paginator, while the Mileage Summary card reads `getSummary()` = ALL trips → a
