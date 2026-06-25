@@ -63,20 +63,28 @@ click submit → assert the row was actually created (and no `pageerror`). Input
 reach JS as `number | null`, NOT the seed string — parse with `parseInt`/`parseFloat`/typeof-guards,
 never a bare `.trim()`.
 
-## Category veins — where work actually is (C338 reality)
+## Category veins — where work actually is (C338 baseline; **SATURATION re-confirmed firsthand C253–C266**)
+> **STEADY-STATE (C266): every SELF-DIRECTED vein is firsthand-verified WORKED-THROUGH.** The C253–C266 arc
+> produced 3 real code artifacts (C252/C259 dead-code removals + C256/C257 covered-source tests) and ~11
+> dry/saturated/no-churn records. Net-new SOURCE now requires an Angelo-gated feature or steer. This is the
+> CORRECT signal under a hard feature-gate, NOT a failure — but DON'T re-scout the surfaces marked SATURATED
+> below; record the verified state on the FIRST recheck + pivot. A real defect/guard now comes ONLY from a
+> fresh feature surface (gated) or a NOT-YET-AUDITED shipped subsystem.
 | Category | State | What still pays off |
 |---|---|---|
-| **feature** | was "blocked", now UNBLOCKED via shot.sh | the 3 eyes-on tails — boot+shoot+verify the round trip |
-| **bug** | still surfaces REAL defects | write-path **validation asymmetry** is the gold seam (parent ownership checked, FK/config written verbatim — #80/#82/#84/#90–#100). Date/tz math (setMonth overflow, UTC slice). One fresh-surface scout, then record + pivot if dry. |
-| **deep-review** | live | certify load-bearing invariants CLEAN + leave a merge-surviving guard. **VERIFY firsthand against source — agent "HIGH" findings are often false (C21/C60/C333).** |
-| **guard** | live | HTTP-harness (createTestApp + s3-seam) + source-scan guards. Narrowing now (pure-logic saturated). |
-| **arch** | reliably DRY | behavior-preserving, test-anchored, ONE small dedup. When no clean pick: record "no churn warranted" + pivot. Don't manufacture churn. |
-| **infra** | live | ~every 10 cycles: untracked-`*.test.ts` sweep + regress + coverage re-measure + BRANCH_REVIEW refresh. |
+| **feature** | UNBLOCKED via shot.sh but ALL tails GATED | the 3 eyes-on tails + every other feature is Angelo-gated (money-cents sequencing, C214 trips↔odometer lifecycle, `instrument` palette, vehicle-sharing). Record gated + pivot until a gate clears. |
+| **bug** | **SATURATED (C253/C257/C261/C265)** | write-path asymmetry / date-tz / money-calc all swept BE (trips-summary, expenses, settings/sync/vehicles repos) + FE (financing-calculations — the #92/#99/#110/#117/#330 family closed + BE↔FE-consistent). Record dry on the FIRST recheck + pivot. |
+| **deep-review** | **SATURATED (C255/C260/C266)** | trips arc, repo layer, + the TCO chain (Property 14 + #27/#28, the most invariant-protected surface) all certified CLEAN. VERIFY firsthand — agent "HIGH" findings are often false (C21/C60/C333). Needs a fresh/un-audited subsystem; else record saturated + pivot. |
+| **guard** | **SATURATED both sides (C261/C263)** | the C250/C251/C256/C257 filter-branch vein took the reachable plain-repo/route gaps; remaining sub-100% is v8 artifacts + DEV-gated catch + apiClient-wrapper THEATER (C181/C229) + DOM/timer-bound. Don't manufacture a vacuous/theater test — record saturated + pivot. |
+| **arch** | **DRY; dead-code sweep COMPLETE both sides (C260 BE repos + C264 FE lib/utils)** | behavior-preserving test-anchored ONE small dedup. The fresh vector is SELF-INTRODUCED dups in code authored last cycles (C222 capitalize, C258 PaginatedEnvelope). When no clean pick: record "no churn warranted" + pivot. Don't manufacture churn. |
+| **infra** | live (the one always-productive vein) | ~every 10 cycles: untracked-`*.test.ts` sweep + coverage re-measure (update the LEDGER cov: baseline) + this GUIDE/doc-freshness pass. (BRANCH_REVIEW.md is gitignored — NOT in the PR, no refresh artifact.) |
 
 ## Standing truths (don't re-discover these)
-- **Coverage 90% is NOT loop-closable** (~86% BE / ~84% FE structural ceiling). BE gaps are
-  DI/singleton/OAuth-bound; FE gaps are eyes-on components (now shootable, so this can finally move).
-  `cov:` tag every LEDGER entry; re-measure on bug/guard/arch cycles that touch a module.
+- **Coverage 90% is NOT loop-closable** (MEASURED C262: ~89.3% BE line / ~89.1% FE line — the structural
+  ceiling, UP from the stale ~86/~84 via the C250–C257 filter-branch covered-source climb). BE gaps are
+  DI/singleton/OAuth + catch/DatabaseError tails; FE gaps are eyes-on components + DOM/timer + apiClient-wrapper
+  theater. `cov:` tag every LEDGER entry; re-measure on cycles that touch a module. The filter-branch vein that
+  drove the climb is now SATURATED (C261/C263) — don't expect further movement without new feature SOURCE.
 - **Coverage theater:** a green test that RE-IMPLEMENTS a module's logic locally is NOT coverage —
   drive the REAL module (C181/C229).
 - **async-tx footgun (C151):** a throw escaping an async `transaction()` after a sync INSERT does

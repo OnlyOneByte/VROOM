@@ -203,9 +203,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 263 |
 | bug | 3 | 265 |
 | arch | 5 | 264 |
-| infra | 6 | 262 |
+| infra | 6 | 267 |
 
-Current cycle: **266**
+Current cycle: **267**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -224,6 +224,23 @@ Current cycle: **266**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C267 (infra: refresh the stale GUIDE operating manual — encode the C253–C266 firsthand-verified vein saturation + correct the coverage numbers, so future cycles don't re-scout exhausted surfaces)** —
+  Balance recompute (cycle 267): nothing strictly OVER budget; infra most-starved non-gated (5/6). Took a genuinely
+  high-leverage, non-churn infra increment: the GUIDE's "Category veins" table was MATERIALLY STALE — it still said
+  bug "still surfaces REAL defects" + guard "Narrowing now (pure-logic saturated)", but C253–C266 firsthand-verified
+  bug (C253/C257/C261/C265), deep-review (C255/C260/C266), guard (C261/C263), and the dead-code sweep (C260/C264) as
+  ALL worked-through. A stale manual makes future cycles re-scout exhausted veins (wasted turns) — encoding the
+  confirmed saturation IS the GUIDE's purpose (loop-improvement). UPDATED: (1) the veins table — each self-directed
+  category now marked SATURATED with its certifying cycles + the next-cycle action ("record the verified state on
+  first recheck + pivot"), feature marked ALL-GATED, infra noted as the one always-productive vein; added a
+  STEADY-STATE banner (the arc = 3 code artifacts + ~11 dry/saturated records, the correct signal under a hard
+  feature-gate). (2) the coverage standing-truth — the stale ~86%/~84% → the C262-MEASURED ~89.3% BE / ~89.1% FE,
+  noting the filter-branch climb that drove it is now saturated. (3) corrected the BRANCH_REVIEW mention (gitignored,
+  not a PR artifact). Behavior-preserving (docs only — no source, no test). Verify: single-file markdown change, both
+  suites green at C262 (1935 BE / 860 FE), no validate needed. cov: be 89.27% / fe 89.11% (~). (infra→267. The GUIDE
+  now matches reality, so a fresh session won't waste cycles re-discovering the saturation. Left the illustrative
+  "~147 commits ahead" in Halt as-is — a rough figure, accurate per-cycle in the LEDGER, not worth per-cycle churn.
+  NEXT infra cadence [coverage re-measure] ~C272.)
 - **C266 (deep-review SATURATED — the TCO computation chain [the product's headline money figure] certified CLEAN firsthand, every load-bearing invariant already pinned; no fresh defect, no manufactured guard)** —
   Balance recompute (cycle 266): deep-review was the sole over-budget category (6/5 = 1.2×). Targeted the most
   load-bearing un-end-to-end-audited surface: the TCO chain (getVehicleTCO → categorizeTCOExpenses → computeTCOTotal)

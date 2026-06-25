@@ -2055,6 +2055,13 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 filesystem; untracked specs vanish on merge), full regress, coverage re-measure (update the LEDGER cov:
 baseline), refresh `BRANCH_REVIEW.md` grouped by theme so the eventual PR stays reviewable.)*
 
+> **RAN C267 (GUIDE refresh — not the coverage cadence).** The GUIDE "Category veins" table was materially stale
+> (bug "still surfaces REAL defects", guard "Narrowing now") while C253–C266 firsthand-verified every self-directed
+> vein SATURATED. Updated the table (each category marked SATURATED + its certifying cycles + next-cycle action;
+> feature ALL-GATED; added a STEADY-STATE banner) + corrected the coverage standing-truth (stale ~86/~84 → C262-MEASURED
+> ~89.3 BE / ~89.1 FE) + fixed the BRANCH_REVIEW mention (gitignored, not a PR artifact). Docs-only, behavior-preserving.
+> So a fresh session won't waste cycles re-scouting exhausted surfaces. NEXT coverage cadence ~C272.
+
 > **RAN C262 (cadence; last ran C254).** Untracked-test sweep CLEAN both sides (the 56 .meshclaw.e2e.ts gitignored
 > BY DESIGN). Tree clean; no orphan dev servers (:3001/:5173 free — the pgrep false-positive matched its own command,
 > confirmed via precise process+port check); branch 116 ahead / 0 behind, PR-ready. Coverage RE-MEASURED: **BE 89.27%
