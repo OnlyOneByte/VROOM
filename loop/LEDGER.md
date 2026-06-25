@@ -29,6 +29,12 @@
 > (C155 email-fix / C157 resolveNewUser / C158 unlink-route) + the C159 offline needs-attention helpers
 > (pure+covered) added covered lines; FE crossed 88.4 line (a fresh high). Structural ceiling holds (DI/OAuth/SQL
 > BE + effect/DOM FE). NEXT ~C171.**
+> **C209 (infra cadence MEASURED): BE 88.53% line / 88.06% func (1855 pass) — UP +0.14 line / +0.07 func vs
+> C200, the C202–C208 trips arc (TripRepository fully covered + the new validators/guards add covered lines on
+> real modules); FE 88.73% line / 88.91% func / 80.68% branch / 86.62% stmts (813 pass) — FLAT vs C200 (the
+> trips arc is BACKEND-only so far; the FE eyes-on is T6, still ahead). Both hold at the structural ceiling, both
+> green. Untracked-test sweep CLEAN both sides; tree clean; branch 63 ahead / 0 behind origin/main, PR-ready.
+> NEXT cadence ~C219.**
 > **C200 (infra cadence MEASURED — milestone cycle): BE 88.39% line / 87.99% func (1823 pass) — FLAT vs C192
 > (+1 test, the C193 sheets cert); FE 88.73% line / 88.91% func / 80.77% branch / 86.68% stmts (810 pass) — UP
 > +0.08 line / +8 tests vs C192 (the C195 server-sync + C196 load-reconcile-wiring store tests). Both hold/up at
@@ -134,9 +140,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 207 |
 | bug | 3 | 173 |
 | arch | 5 | 205 |
-| infra | 6 | 200 |
+| infra | 6 | 209 |
 
-Current cycle: **208**
+Current cycle: **209**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -155,6 +161,21 @@ Current cycle: **208**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C209 (bug-scout DRY → infra: cadence sweep + coverage re-measure)** —
+  Balance recompute (cycle 209): bug most-starved (36/3 = 12×) but the trips surfaces are certified
+  (C203/C204/C207/C208) and no fresh non-trips prod logic landed → scout dry, recorded. Next over-budget = INFRA
+  (9/6 = 1.5×) AND the cadence sweep is overdue (last MEASURED C200, +9 commits / the GUIDE's ~10-cycle cadence).
+  (1) UNTRACKED-TEST SWEEP: CLEAN both sides (no orphan *.test.ts); tree clean. (2) COVERAGE RE-MEASURED:
+  **BE 88.53% line / 88.06% func (1855 pass) — UP +0.14 line / +0.07 func vs C200** (the C202–C208 trips arc:
+  TripRepository fully covered + the new validateTripOwnership/validateVehicleFkRefs + the migration/round-trip/
+  cascade/populate guards all add covered lines on REAL modules); **FE 88.73% line / 88.91% func / 80.68% branch /
+  86.62% stmts (813 pass) — FLAT vs C200** (the trips arc is BACKEND-only so far; the FE eyes-on tail is T6, still
+  ahead). (3) BOTH-SIDES GREEN: BE 1855 / FE 813, 0 fail. (4) BRANCH: claude-loop-dev = 63 ahead / 0 behind
+  origin/main, PR-ready. Doc-only (coverage runs exercised the full suites; no source touched → no build/shot).
+  STATE: the trips arc (T1+T4 C202, T2 C206) + its data-safety certs (C203/C204/C207/C208) is the loop's active
+  productive vein; bug stays provably-dry (fixes only from a fresh feature surface or an Angelo product call), the
+  two arch/deep-review veins re-exhaust after each trips increment opens a new rule-of-three / invariant. NEXT
+  feature = trips T3 (routes + Zod). cov: be 88.53% / fe 88.73% (MEASURED). NEXT cadence ~C219.
 - **C208 (deep-review: certify + guard the Sheets backup POPULATE-step coverage — the 3rd hand-maintained list)** —
   Balance recompute (cycle 208): bug most-starved (35/3 = 11.67×) but the trips surfaces are certified
   (C203/C204/C207) and no fresh non-trips prod logic landed → scout dry, recorded. Next over-budget = DEEP-REVIEW
