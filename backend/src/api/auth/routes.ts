@@ -301,15 +301,19 @@ function validateLoginState(stateParam: string | null) {
 }
 
 // --- Auth callback helper: handle link conflict check ---
-async function checkLinkConflicts(
+// The account-takeover boundary: an OAuth identity already bound to ANOTHER user must be rejected
+// (account_conflict), the SAME user is an idempotent no-op (already_linked), and an unbound identity
+// is free to link (null). EXPORTED + repo-injectable (default = the singleton, so the route call-site
+// is unchanged) so the 3-way decision is unit-testable against a real seeded repo without the
+// getDb-singleton bind (the C77 DI-seam pattern) — a regression here would silently enable linking
+// someone else's provider identity to your account.
+export async function checkLinkConflicts(
   authProviderId: string,
   providerAccountId: string,
-  currentUserId: string
+  currentUserId: string,
+  repo: Pick<typeof authProviderRepository, 'findByProviderIdentity'> = authProviderRepository
 ): Promise<string | null> {
-  const existingRow = await authProviderRepository.findByProviderIdentity(
-    authProviderId,
-    providerAccountId
-  );
+  const existingRow = await repo.findByProviderIdentity(authProviderId, providerAccountId);
   if (!existingRow) return null;
   if (existingRow.userId === currentUserId) return 'already_linked';
   return 'account_conflict';

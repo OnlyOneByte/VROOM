@@ -231,13 +231,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 227 |
-| deep-review | 5 | 290 |
+| deep-review | 5 | 296 |
 | guard | 6 | 295 |
 | bug | 3 | 294 |
 | arch | 5 | 292 |
 | infra | 6 | 293 |
 
-Current cycle: **295**
+Current cycle: **296**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,35 @@ Current cycle: **295**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C296 (deep-review: the AUTH subsystem certified firsthand — consumeOAuthState + validateAndRefreshSession already fully guarded [no re-cert] — found + pinned the ONE un-guarded load-bearing security invariant: the checkLinkConflicts account-takeover boundary, via a minimal repo-DI refactor + a mutation-verified guard)** —
+  Balance recompute (cycle 296): deep-review was the SOLE over-budget category (6/5 = 1.20×). The vein is saturated
+  across trips/repos/TCO/offline-sync/CSV-import/provider-config/backup-round-trip, so picked a NOT-YET-CERTIFIED
+  load-bearing subsystem: AUTH (auth/utils.ts + auth/routes.ts — individual fixes #155/#157/#158/#129 landed but the
+  OAuth login→session→link flow was never certified as a whole this window). CERTIFIED FIRSTHAND: (1) consumeOAuthState
+  (the OAuth-state CSRF consumer) — single-use (success + every failure path deletes), flow-isolation (login
+  expectedFlow=undefined requires NO flowType; link/provider exact-match — both cross-directions reject), anti-fixation
+  (mismatched state deleted on failed lookup); COMPREHENSIVELY pinned by consume-oauth-state.test.ts (all 3 contracts +
+  3 flow directions) → no re-cert (the C266 trap). (2) validateAndRefreshSession — invalid→null, fresh→as-is,
+  near-expiry rotates NEW-before-invalidate-OLD, createSession-throws FAILS OPEN; pinned by
+  validate-and-refresh-session.test.ts → no re-cert. (3) the link callback (/callback/link) defense-in-depth chain:
+  state-consume → session-validate → CSRF cross-check (storedData.userId === session user) → checkLinkConflicts →
+  create. FOUND the ONE un-pinned load-bearing invariant: checkLinkConflicts (the ACCOUNT-TAKEOVER boundary — unbound→
+  null / same-user→already_linked / OTHER-user→account_conflict) had its repo-level findByProviderIdentity scoping
+  tested but the 3-way DECISION itself was NOT directly pinned. A regression flipping account_conflict→already_linked
+  would silently let attacker B link victim A's provider identity. PINNED it non-theater: checkLinkConflicts was
+  module-private + called the getDb-singleton repo (the C77 bind), so made a MINIMAL behavior-preserving change —
+  exported it + added an optional repo param defaulting to the singleton (route call-site UNCHANGED) — then drove the
+  REAL function against a real seeded in-memory AuthProviderRepository (NOT a re-implementation, the C181/C229 trap).
+  +5 tests (all 3 branches + provider-keying + a second-identity-still-free case). MUTATION-TESTED non-vacuous:
+  account_conflict→already_linked makes the takeover test FAIL loudly; restoring → green. Verify: BE bun run
+  validate:local GREEN (tsc + check:musl [1 formatter reflow on the new file fixed, C228 class] + 1949 pass / 0 fail
+  [+5 vs C295] + build bundled). No FE source touched. cov: be 89.28% / fe 89.43% (~ — the DI param + export add a
+  couple covered lines on routes.ts checkLinkConflicts; full re-measure ~C303). (deep-review→296. The auth OAuth
+  login/link/session core is now CERTIFIED CLEAN + the takeover boundary GUARDED; don't re-audit consumeOAuthState/
+  validateAndRefreshSession/checkLinkConflicts. The deep-review vein is saturated across trips/repos/TCO/offline-sync/
+  CSV-import/provider-config/backup-round-trip/auth-core; NEXT deep-review needs a fresh feature surface [gated] or
+  record saturated + pivot. NOTE: #129 email-sync-on-login [auth/routes.ts:176, filed C433] stays Angelo-gated — a
+  product call, not certified-away here.)
 - **C295 (guard: added backup-unique-constraint-coverage.test.ts — the symmetric sibling of the C290 ref-validation guard — pinning that validateUniqueConstraints stays complete vs schema drift; closes the LAST un-guarded leg of the #127/C428 pre-wipe net)** —
   Balance recompute (cycle 295): deep-review + guard tied at 1.00× (5/5, 6/6); guard most-starved by absolute count
   (6 > 5). The GUIDE marks guard SATURATED, but there is a GENUINE merge-surviving guard that completes the C290–C292

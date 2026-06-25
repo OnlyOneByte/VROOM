@@ -213,6 +213,18 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > (.meshclaw-tools/) so the knob is a local capability gain, not a committed artifact — the cert is the committed value.
 > A future eyes-on cycle could extend to /analytics + /vehicles/[id] dark if a fresh concern arises; no defect here.
 
+> **CERTIFIED C296 — the AUTH OAuth login/link/session core CLEAN firsthand + GUARDED the one un-pinned takeover
+> boundary.** consumeOAuthState (CSRF single-use + flow-isolation + anti-fixation) and validateAndRefreshSession
+> (invalid→null / fresh→as-is / near-expiry NEW-before-OLD rotation / createSession-throws fails-open) are
+> COMPREHENSIVELY pinned (consume-oauth-state + validate-and-refresh-session tests) → no re-cert. The link callback
+> defense-in-depth chain (state-consume → session-validate → CSRF cross-check → checkLinkConflicts → create) is sound.
+> FOUND the ONE un-pinned load-bearing invariant: checkLinkConflicts (the ACCOUNT-TAKEOVER boundary — unbound→null /
+> same-user→already_linked / OTHER-user→account_conflict) had its repo scoping tested but the 3-way DECISION un-pinned.
+> Pinned it non-theater: exported + repo-injectable (minimal DI, route call-site unchanged), drove the REAL fn vs a real
+> seeded repo, +5 tests, mutation-verified (account_conflict→already_linked fails the takeover test). Deep-review now
+> saturated across trips/repos/TCO/offline-sync/CSV-import/provider-config/backup-round-trip/auth-core. Don't re-audit.
+> (#129 email-sync-on-login stays Angelo-gated — a product call, not certified-away.)
+
 > **CERTIFIED C290 — the BACKUP→RESTORE round-trip crown jewel (NORTH_STAR #1) CLEAN firsthand + closed the ONE
 > drift-guard gap.** Certified the table-coverage completeness: 19 physical sqliteTables = 16 in TABLE_SCHEMA_MAP + 3
 > EXCLUDED_BY_DESIGN (users/user_providers/sessions), exact, no drift since C208. The four existing guards
