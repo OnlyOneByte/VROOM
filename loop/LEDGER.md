@@ -168,13 +168,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 227 |
-| deep-review | 5 | 244 |
+| deep-review | 5 | 250 |
 | guard | 6 | 249 |
 | bug | 3 | 248 |
 | arch | 5 | 245 |
 | infra | 6 | 246 |
 
-Current cycle: **249**
+Current cycle: **250**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -193,6 +193,26 @@ Current cycle: **249**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C250 (deep-review → a REAL coverage low-spot: the untested vehicleId-scoped expense summary; +2 HTTP tests, first new covered SOURCE in 18 gated cycles)** —
+  Balance recompute (cycle 250): deep-review most-starved + over budget (6/5 = 1.2×). Instead of another
+  scout→already-covered→record (ceremony after 18 dry cycles), pulled the actual per-file BE coverage to find a
+  CLEAN non-DI low-spot. Most low files are the documented structural ceiling (auth-routes OAuth-bound,
+  photo-service/providers DI-bound, backup-orchestrator, connection) — but **expenses/repository.ts at 78.82% line
+  stood out** as a plain repo never flagged structural. Read the uncovered lines: most are `catch(error)`
+  DB-failure branches (genuinely need a DI seam — theater bait, skipped), BUT lines 466 + 488 are the two
+  `if (filters.vehicleId)` SCOPING branches in `getSummary` (the period window + the recent-30d window) — and
+  EVERY existing summary-http test calls /summary with NO vehicleId (cross-fleet), so the vehicle-SCOPED summary
+  path was untested end-to-end. Reachable via GET /expenses/summary?vehicleId= (the route passes it through +
+  ownership-checks). +2 HTTP tests (summary-http.test.ts): a 2-vehicle fleet → ?vehicleId=v1 returns ONLY v1's
+  totals+categories (v2's 999 excluded — covers :466/:488); an UNOWNED vehicleId → 404 (the route ownership branch,
+  #80). NOT theater — drives the real getSummary scoping, not a reimplementation. VERIFIED the gain: expenses/
+  repository.ts 78.82→79.23% line (the 466/488 entries dropped from the uncovered list; the catch-block ranges
+  remain as expected); overall BE 88.92→88.93% line — **the FIRST new covered SOURCE surface in the C232–C249
+  gated stretch** (every prior increment was a guard/cert/doc on existing code). validate:local GREEN (tsc 0, musl
+  21 warn baseline, 1922 pass / 0 fail, +2, build bundled, whole-tree clean). Test-only → no shot. cov: be 88.93%
+  (MEASURED, +0.01) / fe 89.11% (~). (deep-review→250. LESSON: even in a gated stretch, a per-file coverage pull
+  can surface a CLEAN reachable low-spot [a never-scoped-by-test code path] that's neither DI-bound nor theater —
+  distinct from the structural ceiling. The remaining expenses-repo gap [catch branches] IS DI-bound, documented.)
 - **C249 (guard scout: 4 candidates, all ALREADY covered → guard surface saturated; recorded, no manufactured test)** —
   Balance recompute (cycle 249): guard most-starved + over budget (7/6 = 1.17×). Scouted firsthand for a genuine
   unguarded invariant (not a manufactured source-scan): (1) the C220 /trips route in route-smoke a11y coverage —

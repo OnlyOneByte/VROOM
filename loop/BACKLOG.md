@@ -918,6 +918,14 @@ the now-shootable eyes-on FE + any newly-touched module.)*
 > local-only). Recent prod-logic (C226 date-guard, C247 mobile-stack, C242 chart-gate, C239 fuel-empty,
 > C241 FAB-clearance) is all guarded. Future guard cycles need a fresh feature surface or unblocked gate. Don't re-scout.
 
+> **GUARDED C250 — the vehicleId-scoped expense summary path (a real, non-DI coverage low-spot).** A C250
+> per-file coverage pull found expenses/repository.ts at 78.82% line; its getSummary `if (filters.vehicleId)`
+> scoping branches (repository.ts:466 + 488 — period + recent-30d windows) were untested because every existing
+> summary-http test calls /summary cross-fleet (no vehicleId). +2 HTTP tests: ?vehicleId=v1 scopes totals/
+> categories to v1 only (v2 excluded); unowned vehicleId → 404 (#80). Drove repo line 78.82→79.23% + overall BE
+> 88.92→88.93% — the first new covered SOURCE in the 18-cycle gated stretch. The remaining repo gap is the
+> catch(error) DB-failure branches (DI-bound, documented — theater to force). Don't re-guard the scoped path.
+
 > **CERTIFIED C244 — the FE↔BE error-envelope contract is CLEAN + already-guarded both sides (no new guard).** A
 > C244 deep-review certified the cross-cutting seam every error toast depends on: BE formatErrorResponse emits
 > `{success:false, error:{code,message,details?}}`; FE apiClient parses `errorBody.error?.{message,code,details}` →
