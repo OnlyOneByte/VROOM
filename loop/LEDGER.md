@@ -232,12 +232,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 227 |
 | deep-review | 5 | 296 |
-| guard | 6 | 295 |
+| guard | 6 | 300 |
 | bug | 3 | 298 |
-| arch | 5 | 297 |
+| arch | 5 | 300 |
 | infra | 6 | 299 |
 
-Current cycle: **299**
+Current cycle: **300**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,28 @@ Current cycle: **299**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C300 (guard scout → arch DEAD-CODE removal [the C259 pattern]: the 66.67%-func anomaly in db/types.ts was isValidPaymentFrequency — zero consumers, zero tests, never wired; removed it + its sole helper createEnumGuard + the isPaymentFrequency barrel re-export, behavior-preserving)** —
+  Balance recompute (cycle 300): nothing strictly OVER budget; among non-gated categories guard most-starved (5/6,
+  0.83×). Guard is marked SATURATED, so per discipline did ONE fresh scout for a reachable un-pinned pure-logic invariant
+  before recording — mined the C299 BE coverage report. The standout sub-100% pure-logic file was db/types.ts (66.67%
+  func / 100% line). FOUND it is NOT an un-guarded reachable invariant — it is DEAD CODE: isValidPaymentFrequency
+  (db/types.ts:54, a createEnumGuard-generated PaymentFrequency guard) has ZERO live consumers (grep across backend AND
+  frontend), ZERO direct tests, and is never wired — only RE-EXPORTED as isPaymentFrequency from the types.ts barrel,
+  which is itself consumed nowhere. The paymentFrequency schema column is a text-with-default; this runtime guard
+  validates it at no call site. A test for it would be coverage THEATER (C181/C229 — a test must drive REACHABLE
+  behavior). This is the C259/C237 cruft criteria EXACTLY (zero-refs-incl-tests + never-wired + no coherent-tested-sibling
+  -API — UNLIKE the C260 ratified-surface case). So the disciplined outcome converts the guard scout into an ARCH
+  dead-code removal (NORTH_STAR #6, the C259 precedent where a guard/coverage scout that surfaces dead code becomes an
+  arch removal): deleted isValidPaymentFrequency + its SOLE helper createEnumGuard (no other use) + the isPaymentFrequency
+  barrel re-export. The PaymentFrequency TYPE re-export stays (a type, separately consumed). Verify: BE bun run
+  validate:local GREEN (tsc clean — NO dangling reference, which independently CONFIRMS zero consumers — + check:musl
+  clean + 1949 pass / 0 fail [UNCHANGED — behavior-preserving, nothing tested it] + build bundled). No FE source touched.
+  cov: be 89.29% / fe 89.43% (~ — removing a 0-coverage dead function nudges the file off 66.67% func; full re-measure
+  next cadence ~C309). (guard→300 [the scout happened — the C201 precedent: last-touched advances even when the artifact
+  lands in another category] + arch→300 [the removal]. db/types.ts is now {EXPENSE_CATEGORIES + labels/descriptions +
+  ReminderSplitConfig + ELECTRIC_FUEL_TYPES + isElectricFuelType} — all live + tested. The dead-code sweep [C252/C259/C260
+  repos + C264 FE lib/utils] extends to the db/types layer. Don't re-scout db/types. NEXT guard cycle: record saturated on
+  first recheck unless a fresh report gap appears.)
 - **C299 (infra coverage cadence; last full cadence C293: untracked-test sweep CLEAN, BE re-measured [+0.01/+0.04 vs C293 from the C295/C296 auth+guard work], GUIDE standing-truth freshened to C299)** —
   Balance recompute (cycle 299): nothing strictly OVER budget; among non-gated categories infra most-starved (6/6,
   1.00×) — and a genuine leverage trigger: C296 touched auth/routes.ts (the checkLinkConflicts export+DI) + C295/C296

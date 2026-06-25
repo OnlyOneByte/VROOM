@@ -1915,6 +1915,15 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 ### arch
 *(reliably DRY per the archive. Run a fresh dedup scout; if nothing clean surfaces, record "no churn warranted" + pivot. Obey the arch rules above.)*
 
+> **DEAD-CODE C300 — removed isValidPaymentFrequency + createEnumGuard + the isPaymentFrequency barrel re-export (the
+> C259 pattern, extends the dead-code sweep to the db/types layer).** A guard scout of the C299 coverage report flagged
+> db/types.ts at 66.67% func; firsthand it was NOT an un-pinned reachable invariant but DEAD CODE — isValidPaymentFrequency
+> has zero live consumers (backend AND frontend), zero tests, never wired (only re-exported as isPaymentFrequency, itself
+> consumed nowhere; the paymentFrequency column is text-with-default validated at no call site). A test would be theater
+> (C181/C229). Removed all three (+ the sole helper createEnumGuard); the PaymentFrequency TYPE re-export stays. tsc clean
+> (no dangling ref = confirms zero consumers), 1949 pass UNCHANGED (behavior-preserving). Don't re-scout db/types — now
+> all-live ({EXPENSE_CATEGORIES + labels + ReminderSplitConfig + ELECTRIC_FUEL_TYPES + isElectricFuelType}).
+
 > **NO CHURN C297 — resolveProviderState ↔ consumeOAuthState ruled a DIVERGENT dedup target (recorded fast).** The C296
 > auth audit surfaced the C39-noted lead: the provider OAuth callback keeps its own inline state-consume
 > (resolveProviderState) separate from the shared consumeOAuthState. The consume KERNEL (get→flow-check→delete) is
