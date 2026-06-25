@@ -169,12 +169,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 227 |
 | deep-review | 5 | 250 |
-| guard | 6 | 249 |
+| guard | 6 | 251 |
 | bug | 3 | 248 |
 | arch | 5 | 245 |
 | infra | 6 | 246 |
 
-Current cycle: **250**
+Current cycle: **251**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -193,6 +193,27 @@ Current cycle: **250**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C251 (arch scout: found dead code [findActiveFinancing] → FILED [C237 caution] + applied the C250 pattern: cover the untested reminders list filters → guard)** —
+  Balance recompute (cycle 251): arch most-starved + over budget (6/5 = 1.2×). Dedup/dead-code-util veins ruled
+  (C235/C244/C245); scouted the next-lowest plain repos. ARCH FINDING: `financingRepository.findActiveFinancing()`
+  (repo:65, the uncovered 62-69) has NO real caller (only a comment mention in routes.ts:147 + the test docstring)
+  + NO spec mandate + never-called since its initial-feat commit → genuine dead code (and an UNSCOPED all-tenant
+  finder = a mild cross-tenant liability if ever used). BUT per the C237 lesson (buildTripSummaryByMonth was
+  "no consumer" yet ratified surface), removing an EXPORTED repo method warrants caution — FILED it as a dead-code
+  candidate with full evidence (BACKLOG) rather than unilaterally delete this cycle; a focused arch cycle can remove
+  it after confirming no external API contract. PIVOTED to the productive C250 pattern (cover a clean reachable
+  untested PATH, not theater): reminders/repository.ts findByUserId has type/isActive/vehicleId filter branches
+  (repo:117/120/125) that the LIST route fully exposes (routes.ts:203-205) but NO test exercised (every test fetched
+  the unfiltered list). +1 HTTP test in reminders-http.test.ts: a 2-vehicle fleet + notification(paused)+expense
+  reminders, then ?type=notification / ?isActive=false / ?vehicleId=v2 each discriminate correctly (covers the
+  type filter, the isActive filter, AND the junction-JOIN vehicleId path). NOT theater — drives real findByUserId
+  filtering. VERIFIED: reminders/repository.ts 80.77→82.84% line (the filter-branch lines dropped from uncovered;
+  catch-blocks remain, DI-bound); overall BE 88.93→88.94% — 2nd consecutive cycle of new covered SOURCE via the
+  filter-branch pattern. (Fixed a tsc catch firsthand: the test's local ReminderRow type needed `type` added.)
+  validate:local GREEN (tsc 0, musl 21 warn baseline, 1923 pass / 0 fail, +1, build bundled, whole-tree clean).
+  Test-only → no shot. cov: be 88.94% (MEASURED, +0.01) / fe 89.11% (~). (guard→251; arch stays 245 — scout found
+  dead code but FILED not removed [C237 caution]. The C250 filter-branch coverage vein has now yielded 2 clean
+  picks [expenses summary, reminders list] — a productive gated-stretch move; more plain-repo filter branches may remain.)
 - **C250 (deep-review → a REAL coverage low-spot: the untested vehicleId-scoped expense summary; +2 HTTP tests, first new covered SOURCE in 18 gated cycles)** —
   Balance recompute (cycle 250): deep-review most-starved + over budget (6/5 = 1.2×). Instead of another
   scout→already-covered→record (ceremony after 18 dry cycles), pulled the actual per-file BE coverage to find a

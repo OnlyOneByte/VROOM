@@ -26,6 +26,7 @@ import { seedVehicle } from '../../../test-helpers/seed';
 interface ReminderRow {
   id: string;
   isActive: boolean;
+  type: string;
 }
 interface ReminderWithJoins {
   reminder: ReminderRow;
@@ -67,6 +68,52 @@ describe('reminders HTTP routes', () => {
     const body = await json<DataEnvelope<ReminderWithJoins[]>>(list);
     expect(body.data).toHaveLength(1);
     expect(body.data[0].reminder.isActive).toBe(true);
+  });
+
+  // C251 coverage: the reminders LIST route exposes ?type / ?isActive / ?vehicleId (routes.ts:203-205) →
+  // findByUserId's filter branches (repository.ts:117 type, 120 isActive, 125 vehicleId-JOIN), but every
+  // existing test fetched the UNFILTERED list, so those branches sat untested (the repo at 80.77% line).
+  // These drive each filter through the REAL route + assert it discriminates: type=notification excludes an
+  // expense reminder; isActive=false returns only the paused one; vehicleId returns only that vehicle's
+  // (the junction-JOIN path). NOT theater — exercises the real findByUserId filtering, not a reimplementation.
+  test('GET / filters by type / isActive / vehicleId (the findByUserId filter branches)', async () => {
+    const v1 = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    const v2 = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2023 });
+
+    // A notification reminder on v1 (active), an expense reminder on v2, then pause the notification.
+    const notif = await createNotificationReminder(v1);
+    const notifId = (await json<DataEnvelope<ReminderWithJoins>>(notif)).data.reminder.id;
+    await ctx.authed('POST', '/api/v1/reminders', {
+      name: 'Insurance premium',
+      type: 'expense',
+      frequency: 'monthly',
+      startDate: '2024-01-01T00:00:00.000Z',
+      vehicleIds: [v2],
+      expenseCategory: 'financial',
+      expenseAmount: 100,
+    });
+    await ctx.authed('PUT', `/api/v1/reminders/${notifId}`, { isActive: false });
+
+    // type=notification → only the (now-paused) notification, NOT the expense reminder.
+    const byType = await json<DataEnvelope<ReminderWithJoins[]>>(
+      await ctx.authed('GET', '/api/v1/reminders?type=notification')
+    );
+    expect(byType.data).toHaveLength(1);
+    expect(byType.data[0].reminder.type).toBe('notification');
+
+    // isActive=false → only the paused notification (the expense reminder is active).
+    const byActive = await json<DataEnvelope<ReminderWithJoins[]>>(
+      await ctx.authed('GET', '/api/v1/reminders?isActive=false')
+    );
+    expect(byActive.data).toHaveLength(1);
+    expect(byActive.data[0].reminder.isActive).toBe(false);
+
+    // vehicleId=v2 → only the expense reminder (the junction-JOIN filter path).
+    const byVehicle = await json<DataEnvelope<ReminderWithJoins[]>>(
+      await ctx.authed('GET', `/api/v1/reminders?vehicleId=${v2}`)
+    );
+    expect(byVehicle.data).toHaveLength(1);
+    expect(byVehicle.data[0].reminder.type).toBe('expense');
   });
 
   test('PUT { isActive:false } pauses — the merge+revalidate path that 400d', async () => {

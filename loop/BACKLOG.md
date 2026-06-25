@@ -918,6 +918,14 @@ the now-shootable eyes-on FE + any newly-touched module.)*
 > local-only). Recent prod-logic (C226 date-guard, C247 mobile-stack, C242 chart-gate, C239 fuel-empty,
 > C241 FAB-clearance) is all guarded. Future guard cycles need a fresh feature surface or unblocked gate. Don't re-scout.
 
+> **GUARDED C251 — the reminders LIST filter branches (type / isActive / vehicleId-JOIN).** findByUserId
+> (reminders/repository.ts:117/120/125) supports all 3 filters + the LIST route exposes them (routes.ts:203-205),
+> but every test fetched the unfiltered list. +1 HTTP test: a 2-vehicle fleet + notification(paused)+expense
+> reminders → ?type=notification / ?isActive=false / ?vehicleId=v2 each discriminate (covers all 3 branches incl.
+> the junction-JOIN). Drove reminders/repository.ts 80.77→82.84% + overall BE 88.93→88.94% (2nd consecutive new
+> covered SOURCE via the C250 filter-branch pattern). Don't re-guard. (The remaining repo gap = catch-block
+> DB-failure branches, DI-bound.)
+
 > **GUARDED C250 — the vehicleId-scoped expense summary path (a real, non-DI coverage low-spot).** A C250
 > per-file coverage pull found expenses/repository.ts at 78.82% line; its getSummary `if (filters.vehicleId)`
 > scoping branches (repository.ts:466 + 488 — period + recent-30d windows) were untested because every existing
@@ -1645,6 +1653,15 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 > can't self-author). **Correct action: LEAVE IT (covered + inert), pending a future monthly-trip-view task** — do
 > NOT delete, do NOT self-wire. (The lesson: "exported + no consumer" is necessary-but-not-sufficient for cruft —
 > check the spec for ratified-ahead-of-need surface first.)
+
+> **DEAD-CODE CANDIDATE (filed C251) — `financingRepository.findActiveFinancing()` (repo:65).** NO real caller
+> (only a comment in routes.ts:147 + a test docstring), NO spec mandate, never-called since its initial-feat
+> commit. An UNSCOPED all-tenant finder (no userId filter) — also a mild cross-tenant liability if ever wired.
+> Looks like genuine dead code (NORTH_STAR #6), distinct from the C237 ratified-but-deferred class (no spec names
+> it). DEFERRED removal (C237 caution: removing an exported repo method warrants confirming no external API
+> contract first). A focused arch cycle: delete it (+ its financing-get-contract.test reference) after confirming
+> nothing external depends on it. NOTE: the C245 dead-code sweep MISSED this — it scanned src/utils/*.ts, not
+> src/api/*/repository.ts; a future sweep should cover the repo layer too.
 
 > **SWEPT C245 — full backend dead-code sweep, NO genuine dead code.** Scanned every exported `src/utils/*.ts`
 > fn for non-test/non-defining-file refs. 7 candidates, all verified firsthand as NOT dead: calculateMPG/
