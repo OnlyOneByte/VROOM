@@ -887,6 +887,14 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **CERTIFIED C244 — the FE↔BE error-envelope contract is CLEAN + already-guarded both sides (no new guard).** A
+> C244 deep-review certified the cross-cutting seam every error toast depends on: BE formatErrorResponse emits
+> `{success:false, error:{code,message,details?}}`; FE apiClient parses `errorBody.error?.{message,code,details}` →
+> ApiError. Verified firsthand BOTH halves are ALREADY tested: BE error-handler.test.ts pins the nested
+> error.{code,message} across all error types; FE api-client.test.ts pins "ApiError carries backend
+> error.message + code + status" + the errorBody.message fallback. No drift, no gap — certified clean, no
+> manufactured guard (a cross-file shape-literal source-scan would be marginal over two solid existing tests).
+
 > **CERTIFIED + GUARDED C242 — ChartCard's visibility-gate + four-state contract (eyes-on /vehicles/[id] scout →
 > clean → guard).** A C242 eyes-on shot the seeded loan vehicle's Overview + Finance tabs: all render clean
 > (insurance "Expired", lease math, empty-states correct). The Amortization/Expense-Trend/Fuel-Efficiency charts
@@ -1598,6 +1606,14 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 > can't self-author). **Correct action: LEAVE IT (covered + inert), pending a future monthly-trip-view task** — do
 > NOT delete, do NOT self-wire. (The lesson: "exported + no consumer" is necessary-but-not-sufficient for cruft —
 > check the spec for ratified-ahead-of-need surface first.)
+
+> **SCOUTED C244 — no churn warranted (4 candidates, all fail the bar).** (1) FE `|| undefined` filter-drop —
+> already behind shared buildQueryString; per-site drops are intentional (reminder-api keeps isActive:false). (2)
+> `findByIdAndUserId` — only trips+expenses byte-identical (vehicles is reversed-arg findByUserIdAndId, reminders
+> returns a JOIN type); a BaseRepository host needs widening `table:{id}`→`{id,userId}` (touches every subclass)
+> for a rule-of-TWO → below the bar. (3) backend success-envelope `c.json({success:true,data})` — 44 sites + the
+> createSuccessResponse helper ALREADY EXISTS but underused; converging is a SWEEP across ~12 files (rule #1) +
+> the helper doesn't carry the per-site status code. (4) error-message idiom — ruled C235. Don't re-scout these.
 
 > **SCOUTED C235 — no churn warranted (2 candidates, both fail the bar).** (1) `error instanceof Error ?
 > error.message : String(error)` (59 occurrences) — a helper ALREADY EXISTS (`extractErrorMessage`,

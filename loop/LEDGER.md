@@ -158,13 +158,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 227 |
-| deep-review | 5 | 238 |
+| deep-review | 5 | 244 |
 | guard | 6 | 242 |
 | bug | 3 | 243 |
 | arch | 5 | 235 |
 | infra | 6 | 240 |
 
-Current cycle: **243**
+Current cycle: **244**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -183,6 +183,28 @@ Current cycle: **243**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C244 (arch scout → NO churn [2 candidates, both sweep/rule-of-two] → deep-review: CERTIFY the FE↔BE error-envelope contract CLEAN on both sides)** —
+  Balance recompute (cycle 244): arch most-starved + over budget (9/5 = 1.8×; deep-review 6/5 = 1.2× also over).
+  Took ARCH, scouted 4 dedup candidates firsthand: (1) FE `|| undefined` filter-drop — already behind the shared
+  buildQueryString; the per-call-site drops are intentional (reminder-api preserves isActive:false), not dup. (2)
+  `findByIdAndUserId` — 4 repos, but only trips+expenses are byte-identical; vehicles is reversed-arg
+  `findByUserIdAndId`, reminders returns a JOINed type; hosting it in BaseRepository needs widening the base
+  `table: {id}` constraint to `{id,userId}` (touches every subclass) for a rule-of-TWO → below the bar (C212/C235
+  precedent). (3) backend success-envelope `c.json({success:true,data})` — 44 sites + a helper (createSuccessResponse)
+  ALREADY EXISTS but underused; converging 44 sites across ~12 files is a SWEEP (arch rule #1: never a sweeping
+  rewrite) + each c.json sets an implicit/explicit status the helper doesn't carry. (4) error-message idiom — already
+  ruled C235. **No clean pick → recorded "no churn warranted" + pivoted** (arch rule #5). PIVOT to deep-review
+  (next over-budget, 6/5): certified the cross-cutting FE↔BE ERROR-ENVELOPE contract — the single seam every error
+  toast depends on. BE `formatErrorResponse` emits `{success:false, error:{code,message,details?}}`; FE apiClient
+  parses `errorBody.error?.{message,code,details}` → ApiError. Verified firsthand BOTH halves are ALREADY GUARDED:
+  BE error-handler.test.ts pins the nested `error.{code,message}` across all error types; FE api-client.test.ts
+  pins "ApiError carries backend error.message + code + status" from the nested shape + the errorBody.message
+  fallback. **The contract is CERTIFIED CLEAN end-to-end, independently tested on both sides** — no drift, no gap,
+  no manufactured guard needed (adding a cross-file shape-literal source-scan would be marginal over two solid
+  existing tests). No code change → no validate/shot (LEDGER+BACKLOG doc-only). cov: be 88.92% (~) / fe 89.11% (~).
+  (deep-review→244; arch stays 235 — dry scout, no increment. C232–C244 = 13 gated/dry cycles; both self-directed
+  veins [pure-logic bugs, visual sweep] + the clean arch/guard picks are now worked through. The loop certifies +
+  records honestly; net-new code awaits an Angelo gate — money-cents sequencing the top unblock, status sent C237.)
 - **C243 (eyes-on bug scout on /settings [CLEAN] → the eyes-on visual-sweep vein is now SATURATED; recorded, no manufactured guard)** —
   Balance recompute (cycle 243): bug most-starved + over budget (9/3 = 3.0×; arch 8/5 = 1.6× also over). Took the
   4th + last data-bearing core route on the C239 eyes-on bug vein: /settings (the most form-heavy remaining —
