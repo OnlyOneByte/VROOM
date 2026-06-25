@@ -29,6 +29,21 @@
 > (C155 email-fix / C157 resolveNewUser / C158 unlink-route) + the C159 offline needs-attention helpers
 > (pure+covered) added covered lines; FE crossed 88.4 line (a fresh high). Structural ceiling holds (DI/OAuth/SQL
 > BE + effect/DOM FE). NEXT ~C171.**
+> **C262 (infra cadence MEASURED): BE 89.27% line / 88.70% func (1935 pass / 353 files) — UP +0.23 line / +0.16
+> func vs C254, continuing the gated-stretch coverage climb: the C256 odometer-history-route (+4) + C257
+> vehicle-stats-route (+5) HTTP tests (the C250/C251 filter-branch pattern → +9 covered-source tests, odometer/routes
+> 87→100% + expenses/repo 79→86.55%) + C259 dead-code removal (reminders findByVehicleId, 82.84→88.05% on that file).
+> FE 89.11% line / 89.23% func / 81.34% branch / 86.99% stmts (860 pass / 80 files) — FLAT vs C254 (no FE source
+> changed; C256–C261 were all backend HTTP-test / dead-code / audit cycles). Both hold at/above the ~89% structural
+> ceiling, both green. Untracked-test sweep CLEAN both sides (the 56 .meshclaw.e2e.ts gitignored BY DESIGN); tree
+> clean; no live orphan dev servers (:3001/:5173 free — the pgrep -f "bun --hot"/"vite" matches were its OWN command
+> line, the recurring false-positive; the precise process+port check confirmed zero). Branch 116 ahead / 0 behind
+> origin/main, PR-ready. The C254→C262 stretch (C255 deep-review SATURATED trips, C256/C257 filter-branch coverage,
+> C258 self-dup convergence, C259 dead-code, C260 repo dead-code sweep COMPLETE, C261 bug-scout dry) was productive
+> within the gate — BE coverage climbed +0.23 from 3 covered-source picks. BRANCH_REVIEW.md is gitignored (not in the
+> PR) → no refresh artifact. NEXT cadence ~C272. STANDING SIGNAL: every self-directed vein (bug, deep-review, visual
+> sweep, dead-code, filter-branch coverage) is now WORKED THROUGH; the structural ceiling (BE DI/singleton/OAuth + FE
+> eyes-on components) holds ~89% both sides; net-new feature SOURCE stays Angelo-gated.**
 > **C254 (infra cadence MEASURED): BE 89.04% line / 88.54% func (1926 pass / 1 skip / 236 files) — UP +0.12 line /
 > +0.10 func vs C246, the first BE coverage MOVEMENT in the gated stretch: the C250 expenses-summary-vehicleId (+2),
 > C251 reminders-list-filters (+1), C253 trips-summary-rate-boundary (+3) HTTP tests drove the C250/C251 filter-branch
@@ -188,9 +203,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 256 |
 | bug | 3 | 261 |
 | arch | 5 | 259 |
-| infra | 6 | 254 |
+| infra | 6 | 262 |
 
-Current cycle: **261**
+Current cycle: **262**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
