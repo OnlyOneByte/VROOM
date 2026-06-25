@@ -29,6 +29,13 @@
 > (C155 email-fix / C157 resolveNewUser / C158 unlink-route) + the C159 offline needs-attention helpers
 > (pure+covered) added covered lines; FE crossed 88.4 line (a fresh high). Structural ceiling holds (DI/OAuth/SQL
 > BE + effect/DOM FE). NEXT ~C171.**
+> **C217 (infra cadence MEASURED): BE 88.92% line / 88.14% func (1903 pass) — UP +0.39 line / +0.08 func vs
+> C209, the C210–C216 trips arc (trips routes/repository/validation + trip-summary all 100% line; odometer
+> repository 100% line incl. createFromTrip). FE 88.73% line / 88.91% func / 80.68% branch / 86.62% stmts (813
+> pass) — FLAT vs C209 (trips is BACKEND-only; the FE eyes-on tail is T6). Both hold/up at the structural
+> ceiling, both green. trips/validation.ts shows 66.67% FUNC but 100% LINE — a bun-coverage quirk counting the
+> .refine() arrow predicates, NOT a logic gap (the C211 partial-PUT tests exercise them behaviorally). Untracked-
+> test sweep CLEAN both sides; tree clean; branch 71 ahead / 0 behind origin/main, PR-ready. NEXT cadence ~C227.**
 > **C209 (infra cadence MEASURED): BE 88.53% line / 88.06% func (1855 pass) — UP +0.14 line / +0.07 func vs
 > C200, the C202–C208 trips arc (TripRepository fully covered + the new validators/guards add covered lines on
 > real modules); FE 88.73% line / 88.91% func / 80.68% branch / 86.62% stmts (813 pass) — FLAT vs C200 (the
@@ -140,9 +147,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 216 |
 | bug | 3 | 211 |
 | arch | 5 | 212 |
-| infra | 6 | 209 |
+| infra | 6 | 217 |
 
-Current cycle: **216**
+Current cycle: **217**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -161,6 +168,23 @@ Current cycle: **216**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C217 (bug-scout SATURATED [trips surface, 5 consecutive] → record dry → infra: cadence sweep + coverage re-measure)** —
+  Balance recompute (cycle 217): bug most-starved + over budget (6/3 = 2.0×). Cold-vein: C214/C215/C216 were all
+  test-only, so the last prod change is C213 — and the trips/D2 surface has now been scouted FIVE consecutive
+  cycles (C211 fixed the PUT asymmetry, C213 built the linkage, C214 escalated the lifecycle, C215 dedup edges,
+  C216 mileage-fires) → genuinely SATURATED; a 6th scout is ceremony. Recorded dry, pivoted to INFRA (next
+  over-budget at 8/6 = 1.33×, AND coverage was last MEASURED C209 — BEFORE the substantial T3/T5/D2 backend code
+  landed, so the number was stale). (1) UNTRACKED-TEST SWEEP: CLEAN both sides; tree clean. (2) COVERAGE
+  RE-MEASURED: **BE 88.92% line / 88.14% func (1903 pass) — UP +0.39 line / +0.08 func vs C209** (the trips arc:
+  trips routes/repository + trip-summary all 100% line, odometer repository 100% incl. createFromTrip); **FE
+  88.73% line / 88.91% func / 80.68% branch / 86.62% stmts (813 pass) — FLAT vs C209** (trips backend-only; FE
+  tail is T6). trips/validation.ts 66.67% func / 100% line = a bun-coverage .refine()-arrow quirk, not a gap (the
+  C211 partial-PUT tests cover it behaviorally). (3) BOTH-SIDES GREEN: BE 1903 / FE 813, 0 fail. (4) BRANCH: 71
+  ahead / 0 behind origin/main, PR-ready. Doc-only (coverage runs exercised the full suites; no source touched →
+  no build/shot). STATE: the trips backend (T1–T5 + D2) is COMPLETE + comprehensively certified/guarded across
+  C202–C216; the surface is saturated. The high-leverage remainder is Angelo-GATED — most directly the C214
+  trips↔odometer lifecycle call, plus the instrument palette (theming T10) + vehicle-sharing T0 + trips T6
+  eyes-on + the D3 rate-persistence slice. cov: be 88.92% / fe 88.73% (MEASURED). NEXT cadence ~C227.
 - **C216 (bug-scout on D2's "drives mileage reminders" claim [CLEAN — fires end-to-end] → guard: pin trip→milestone notification)** —
   Balance recompute (cycle 216): bug most-starved + over budget (5/3 = 1.67×). Cold-vein: C214/C215 were test-only,
   so the last prod-logic change is C213 (createFromTrip + the trip-POST recheck wiring) — a real scout target.
