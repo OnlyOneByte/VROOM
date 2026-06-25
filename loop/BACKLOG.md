@@ -1026,6 +1026,12 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C276 — the C275 collectSvelteFiles convergence (meta-guard, NORTH_STAR #5).** Pairs C275: a new
+> _helpers/no-duplicate-file-walker.test.ts scans __tests__/*.test.ts for a LOCAL `function collectSvelteFiles(` decl
+> outside the shared helper → fails if a future guard re-declares it (non-vacuous: inject → RED). Scoped to the exact
+> symbol (no raw-readdir over-flag, the C271 lesson). The first over-broad draft serendipitously surfaced a 2nd
+> un-converged walker family (collectSourceFiles) → FILED as an arch follow-on (see arch §). FE validate GREEN (866, +3).
+
 > **GUARDED C271 — the DARK-MODE theme-clash class (NORTH_STAR #3), the first merge-surviving artifact for the fresh
 > dark axis C268/C269 verified by eye.** C268/C269 certified dark mode CLEAN manually (PNGs don't travel); this pins
 > the SOURCE invariant. +3 in no-theme-clashing-colors.test.ts (the no-hardcoded-currency source-scan idiom): scans all
@@ -1808,6 +1814,14 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 > clean). Behavior-preserving: 1935 pass UNCHANGED. Bonus: reminders/repository.ts 82.84→88.05% line (dead uncovered
 > lines gone), overall BE 89.23→89.27%. FOLLOW-ON (the C252 note): the "extend dead-code sweep to all repository.ts"
 > advances — financing (C252) + reminders (C259) done; next arch can scout the remaining repos for zero-caller methods.
+
+> **OPEN (FILED C276) — converge the `collectSourceFiles` walker (rule-of-THREE), a SECOND walker family C275 missed.**
+> A C276 meta-guard's over-broad first draft surfaced it: `collectSourceFiles` (collects .ts + .svelte source files —
+> a DIFFERENT signature than collectSvelteFiles) is re-declared byte-similarly in no-native-dialogs.test.ts +
+> no-utc-date-input.test.ts + no-utc-month-parse.test.ts. That's a genuine rule-of-three. A future arch cycle: verify
+> the 3 bodies are byte-identical (the C212/C244 check), and if so extract to _helpers/collect-source-files.ts (mirror
+> the C275 collect-svelte-files pattern) + extend the C276 meta-guard to pin it too. Then both walker families are
+> converged + guarded. (Deferred from C276 to avoid scope-creep mid-guard-cycle.)
 
 > **✅ CONVERGED C275 — the byte-identical `collectSvelteFiles` source-scan walker (rule-of-FOUR) onto a shared
 > test-helper.** The recursive .svelte walker was BYTE-IDENTICAL in 4 source-scan guards (no-interpolated-arbitrary-class,

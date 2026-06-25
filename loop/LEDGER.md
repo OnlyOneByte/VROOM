@@ -216,12 +216,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 227 |
 | deep-review | 5 | 274 |
-| guard | 6 | 271 |
+| guard | 6 | 276 |
 | bug | 3 | 273 |
 | arch | 5 | 275 |
 | infra | 6 | 272 |
 
-Current cycle: **275**
+Current cycle: **276**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -240,6 +240,26 @@ Current cycle: **275**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C276 (guard: pin the C275 collectSvelteFiles convergence with a meta-guard [NORTH_STAR #5] — AND surfaced a 2nd un-converged walker family, FILED as a follow-on)** —
+  Balance recompute (cycle 276): nothing strictly OVER budget; guard most-starved non-gated (5/6). Took the symmetric
+  NORTH_STAR #5 move to C275: pair the just-made rule-of-four convergence with a merge-surviving guard so a FUTURE
+  source-scan guard can't silently re-declare the walker locally + un-converge it (the natural drift — copying the
+  "enumerate every .svelte" boilerplate is exactly what C275 cleaned across 4 files). NEW
+  _helpers/no-duplicate-file-walker.test.ts (+3): scans every __tests__/*.test.ts for a LOCAL `function
+  collectSvelteFiles(` decl outside the allowlisted shared helper; live-floor + helper-still-exports checks.
+  NON-VACUOUS verified firsthand (inject a local collectSvelteFiles into fab-bottom-clearance → RED with the exact
+  "un-converges the C275 dedup" diagnostic; revert → green). KEY: the FIRST regex draft (RAW_WALKER_IDIOM =
+  readdirSync(...withFileTypes)) OVER-FLAGGED 4 files (the C271 over-flag lesson repeating) — and that false-positive
+  SURFACED A REAL DISCOVERY: a SECOND, distinct walker family `collectSourceFiles` (collects .ts+.svelte; re-declared
+  byte-similarly in no-native-dialogs + no-utc-date-input + no-utc-month-parse) is its OWN un-converged rule-of-three
+  that C275 missed. Narrowed the guard to the EXACT symbol C275 converged (collectSvelteFiles only, by name — no raw-
+  idiom over-match, no self-false-positive on the guard's own collectTestFiles), and FILED collectSourceFiles as a
+  follow-on arch target (the honest split: guard the DONE convergence now, queue the new finding — NOT scope-creep
+  mid-cycle). Verify: FE validate:local GREEN — svelte-check 0 errors (7-warn baseline), build OK, 866 pass / 82 files
+  (+3). Test-infra guard (reads existing .test.ts) → no shot. cov: be 89.27% / fe 89.11% (~). (guard→276. The C275
+  collectSvelteFiles convergence is now MERGE-GUARDED; collectSourceFiles convergence FILED for a future arch cycle
+  [the rule-of-three is real — 3 byte-similar copies]. LESSON re-confirmed: a source-scan's first regex over-flags —
+  narrow it to the exact converged symbol; here the over-flag was serendipitous, revealing the 2nd family.)
 - **C275 (arch: CONVERGED the byte-identical `collectSvelteFiles` source-scan walker [rule-of-FOUR] onto a shared test-helper — the genuine dedup the C271 guard tipped; behavior-preserving, net −48 LOC)** —
   Balance recompute (cycle 275): nothing strictly OVER budget; arch most-starved non-gated (5/5, over next cycle).
   Rather than a no-churn record, scouted the self-dup vector (GUIDE) on a target the C271 dark-clash guard may have
