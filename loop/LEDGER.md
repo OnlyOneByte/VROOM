@@ -161,10 +161,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 233 |
 | guard | 6 | 232 |
 | bug | 3 | 234 |
-| arch | 5 | 229 |
+| arch | 5 | 235 |
 | infra | 6 | 231 |
 
-Current cycle: **234**
+Current cycle: **235**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -183,6 +183,26 @@ Current cycle: **234**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C235 (arch scout → NO churn warranted [both candidates fail the bar] — recorded + held)** —
+  Balance recompute (cycle 235): feature most-starved (8/4 = 2.0×) but FULLY GATED (money-cents escalated/parked
+  C232, trips T6b-3 gated on C214, theming + vehicle-sharing gated) → record + pivot (C232–C234 discipline). Next
+  actionable over-budget = arch (6/5 = 1.2×). Ran a fresh dedup scout firsthand on two candidates the C233/C234
+  fixes raised: (1) the `error instanceof Error ? error.message : String(error)` idiom — 59 occurrences, looks like
+  a textbook rule-of-three, BUT a helper ALREADY EXISTS (`extractErrorMessage` in utils/error-handling.ts) and is
+  ALREADY ADOPTED at all 4 genuine value-extraction sites (index/connection/trigger-service/sync-worker); the
+  remaining ~55 are the `logger.error(msg, { error: <idiom> })` STRUCTURED-LOG form that the helper's own docstring
+  DELIBERATELY scopes out ("the idiom is the standard structured-logging shape, not a value extraction; converging
+  them is a separate (larger) call") — a 20+ file sweep that violates arch rule #1 (ONE small reviewable refactor).
+  So the rule-of-three is ALREADY CONVERGED for its in-scope domain; the rest is a documented deliberate exclusion,
+  not unconverged duplication. (2) the C233/C234 best-effort try/catch — only rule-of-TWO with DIVERGENT bodies +
+  log messages; a `bestEffort(fn, ctx)` HOF for two sites is below the rule-of-three bar + would obscure control
+  flow (the manufactured-churn trap, the C212/C228 precedent). **No clean pick → recorded "no churn warranted" +
+  held** (arch rule #5; don't manufacture churn). Also firsthand-confirmed (while scouting) that the trips backup
+  RESTORE does NOT re-fire D2's createFromTrip — insertBackupData does a raw tx-scoped table insert (not the trip
+  route), and odometer_entries round-trips as its own backed-up table, so no double-log; sound by construction,
+  already covered. No code change → no validate/shot needed (LEDGER+BACKLOG doc-only). cov: be 88.92% (~) / fe
+  89.11% (~). (arch→235; the loop is now in a sustained record-and-pivot stretch — every category's clean veins are
+  worked through or gated, so cycles converge to dry scouts until Angelo clears a gate. Flagged below.)
 - **C234 (feature gated → pivot to bug: FIX the C233 best-effort-contract class's SIBLING on the vehicle-delete path)** —
   Balance recompute (cycle 234): feature most-starved (7/4 = 1.75×) but FULLY GATED (money-cents escalated/parked
   C232, trips T6b-3 gated on C214, theming + vehicle-sharing gated) → record + pivot (C232/C233 discipline). Next-

@@ -1532,6 +1532,14 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 ### arch
 *(reliably DRY per the archive. Run a fresh dedup scout; if nothing clean surfaces, record "no churn warranted" + pivot. Obey the arch rules above.)*
 
+> **SCOUTED C235 — no churn warranted (2 candidates, both fail the bar).** (1) `error instanceof Error ?
+> error.message : String(error)` (59 occurrences) — a helper ALREADY EXISTS (`extractErrorMessage`,
+> utils/error-handling.ts) + is adopted at all 4 genuine VALUE-extraction sites; the ~55 remaining are the
+> `logger.error(msg, {error:<idiom>})` STRUCTURED-LOG form the helper's docstring DELIBERATELY scopes out
+> (converging = a 20+ file sweep, violates arch rule #1). Already-converged for its domain; don't re-scout.
+> (2) the C233/C234 best-effort try/catch — rule-of-TWO with divergent bodies; a HOF wrapper is below the bar +
+> obscures control flow (manufactured-churn trap). Don't extract.
+
 > **✅ CONVERGED C229 — the clamped-pagination list-query field-set onto `commonSchemas.clampedPaginationFields`
 > (NORTH_STAR #4, rule-of-three).** The C210 trips route made the third site of a now-VERBATIM-identical
 > `{ limit: z.coerce.number().int().min(1).max(CONFIG.pagination.maxPageSize).optional(), offset: ...min(0).optional() }`
