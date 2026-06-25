@@ -137,12 +137,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 213 |
 | deep-review | 5 | 213 |
-| guard | 6 | 207 |
+| guard | 6 | 214 |
 | bug | 3 | 211 |
 | arch | 5 | 212 |
 | infra | 6 | 209 |
 
-Current cycle: **213**
+Current cycle: **214**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -161,6 +161,22 @@ Current cycle: **213**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C214 (guard: characterization-pin the trips↔odometer EDIT/DELETE lifecycle + ESCALATE the semantics call to Angelo)** —
+  Balance recompute (cycle 214): guard most-starved + the ONLY strictly over-budget category (7/6 = 1.17×; bug
+  3/3 at threshold, rest under). Took guard — but probed for a GENUINE invariant first (not ceremony). The C213 D2
+  linkage (trip CREATE writes an odometer entry) opened a fresh cross-feature lifecycle surface; probed trip
+  EDIT/DELETE firsthand: **the linked odometer entry has NO lifecycle tie back to its trip** — correcting a
+  fat-fingered endOdometer 5000→500, or deleting the trip, leaves the original 5000 entry → getCurrentOdometer
+  stays 5000, poisoning the maintenance-reminder + lease-overage axes (the #76/#244 stray-reading class), with no
+  user signal. This is a SEMANTICS call, not a clear bug: independent-observation (current; consistent with D2's
+  dedup-by-observation; simple, no schema) vs owned-child (edit updates / delete cascades; needs an
+  odometer_entries source-link schema+migration+backup slice). ESCALATED to Angelo via send_message (filed the
+  two models + a hybrid; recommended owned-child for data-quality but it's his product call — did NOT auto-fix).
+  GUARD: +2 characterization tests in trips-http.test.ts pinning TODAY's independent-observation behavior (edit
+  endOdometer→entry+getCurrentOdometer unchanged at 5000; delete trip→entry survives) so it's explicit, can't
+  silently drift, and the chosen fix flips a RED assertion (the #148/C102 escalation-anchor pattern). Test-only
+  (no prod change) → no shot. validate:local GREEN (tsc 0, musl 21 warn baseline, 1899 pass / 0 fail, +2, build
+  bundled). cov: be ~88.5%+ (~) / fe 88.73% (~). NEW open Angelo item: trips↔odometer lifecycle (filed below).
 - **C213 (deep-review of trips↔odometer → caught a RATIFIED-BUT-UNBUILT requirement [D2] → built it: trip→odometer linkage)** —
   Balance recompute (cycle 213): deep-review + guard tied most-starved (both 5/5, 6/6 at threshold; nothing strictly
   over). Took DEEP-REVIEW + scouted the freshly-completed trips backend's interaction with the odometer subsystem

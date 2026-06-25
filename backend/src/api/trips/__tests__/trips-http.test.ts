@@ -147,6 +147,69 @@ describe('POST /api/v1/trips (create)', () => {
   });
 });
 
+// C214 (guard — CHARACTERIZATION of the CURRENT trips↔odometer lifecycle, escalated to Angelo). The D2
+// linkage (C213) writes an odometer entry on trip CREATE, but that entry has NO lifecycle tie back to its
+// trip: editing the trip's endOdometer or deleting the trip leaves the original odometer reading in place,
+// so getCurrentOdometer keeps the stale value (the #76/#244 stray-reading-poisons-currentOdometer class on
+// the maintenance-reminder + lease-overage axes). Whether that's correct (independent-observation model) or
+// a bug (owned-child model needing a source-link schema slice) is a SEMANTICS decision filed with Angelo
+// (send_message C214). These tests PIN today's behavior so it's explicit + can't silently drift; when the
+// decision lands, the chosen fix flips the relevant assertion RED (the #148/C102 escalation-anchor pattern).
+const odoCount = (ctx: TestApp, vehicleId: string): number =>
+  (
+    ctx.sqlite
+      .query('SELECT COUNT(*) AS n FROM odometer_entries WHERE vehicle_id = ?')
+      .get(vehicleId) as {
+      n: number;
+    }
+  ).n;
+
+describe('trips↔odometer lifecycle on EDIT/DELETE (C214 characterization — pending Angelo)', () => {
+  test('editing a trip’s endOdometer does NOT update the linked odometer entry (independent-observation, today)', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    const created = await ctx.authed(
+      'POST',
+      '/api/v1/trips',
+      VALID(vehicleId, { startOdometer: 1000, endOdometer: 5000 })
+    );
+    const { data } = await json<DataEnvelope<{ id: string }>>(created);
+    expect(odoCount(ctx, vehicleId)).toBe(1);
+
+    // Correct the reading downward (fat-finger 5000 → 500).
+    const put = await ctx.authed('PUT', `/api/v1/trips/${data.id}`, {
+      startOdometer: 100,
+      endOdometer: 500,
+    });
+    expect(put.status).toBe(200);
+
+    const { odometerRepository } = await import('../../odometer/repository');
+    // TODAY: the original 5000 odometer entry lingers; getCurrentOdometer still reads 5000. (If Angelo
+    // chooses the owned-child model, this becomes 500 + this assertion flips.)
+    expect(odoCount(ctx, vehicleId)).toBe(1);
+    expect(await odometerRepository.getCurrentOdometer(vehicleId, ctx.user.id)).toBe(5000);
+  });
+
+  test('deleting a trip does NOT remove the linked odometer entry (independent-observation, today)', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
+    const created = await ctx.authed(
+      'POST',
+      '/api/v1/trips',
+      VALID(vehicleId, { startOdometer: 1000, endOdometer: 5000 })
+    );
+    const { data } = await json<DataEnvelope<{ id: string }>>(created);
+    expect(odoCount(ctx, vehicleId)).toBe(1);
+
+    const del = await ctx.authed('DELETE', `/api/v1/trips/${data.id}`);
+    expect(del.status).toBe(200);
+
+    const { odometerRepository } = await import('../../odometer/repository');
+    // TODAY: the odometer entry survives the trip delete (a point-in-time observation). (Owned-child model
+    // would cascade it away → 0 + null.)
+    expect(odoCount(ctx, vehicleId)).toBe(1);
+    expect(await odometerRepository.getCurrentOdometer(vehicleId, ctx.user.id)).toBe(5000);
+  });
+});
+
 describe('GET /api/v1/trips (list)', () => {
   test('lists the user’s trips, newest first, with a total count', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });

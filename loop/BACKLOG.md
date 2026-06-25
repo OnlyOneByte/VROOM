@@ -649,6 +649,16 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **🚩 ESCALATED C214 (semantics call, NOT auto-fixed — characterization-pinned, awaiting Angelo) — the
+> trips↔odometer EDIT/DELETE lifecycle.** The C213 D2 linkage writes an odometer entry on trip CREATE, but it
+> has NO lifecycle tie back: editing a trip's endOdometer (fat-finger 5000→500) or deleting the trip leaves the
+> original 5000 odometer entry → getCurrentOdometer stays stale 5000, poisoning maintenance-reminder + lease-
+> overage (the #76/#244 stray-reading class), no user signal. SEMANTICS call: (a) independent-observation
+> (current — consistent with D2 dedup; no schema) vs (b) owned-child (edit updates / delete cascades — needs an
+> odometer_entries source-link schema+migration+backup slice) vs (c) hybrid (delete-cascades, edit-keeps).
+> send_message C214 filed it; recommended (b) for data-quality. Characterization-pinned in trips-http.test.ts
+> (the current (a) behavior) so the chosen fix flips a RED test (the #148 anchor pattern). Do NOT build until ruled.
+
 > **CLOSED C211 — REAL write-path validation-asymmetry defect on the C210 trips PUT (the gold seam, self-
 > introduced + caught same-arc).** A C211 bug-scout — LIVE again because C210 added fresh trips routes/validation
 > — probed the GUIDE's gold seam (write-path asymmetry) on the new PUT and found it firsthand: `PUT {endOdometer:
