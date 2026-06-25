@@ -232,12 +232,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 227 |
 | deep-review | 5 | 301 |
-| guard | 6 | 300 |
+| guard | 6 | 306 |
 | bug | 3 | 305 |
 | arch | 5 | 304 |
 | infra | 6 | 303 |
 
-Current cycle: **305**
+Current cycle: **306**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,25 @@ Current cycle: **305**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C306 (guard scout SATURATED, recorded: the C299-flagged import-mapping-presets.ts [85.71% func] is 100% LINE-covered with all 3 exported fns tested — the func shortfall is a v8 artifact, NOT a reachable un-pinned invariant; presetToMapping zero-consumer is the C260 ratified-surface case, not cruft)** —
+  Balance recompute (cycle 306): deep-review + guard tied at 1.00× (5/5, 6/6); guard most-starved by absolute count
+  (6 > 5). Guard is marked SATURATED, so per discipline did ONE fresh scout before recording — the standout sub-100% pure
+  module in the C299 report was import-mapping-presets.ts (85.71% func, the foreign-CSV source-detection/preset table).
+  FOUND it is NOT a reachable un-pinned invariant: the file is 100.00% LINE-covered, and all THREE exported functions are
+  comprehensively tested by import-mapping-presets.test.ts (normalizeHeader case/punctuation/BOM-strip; detectSource
+  per-preset + robustness + cross-detect + self-consistency + null-on-unknown; presetToMapping → applyMapping round-trip).
+  The 85.71% func (6 of 7) with 100% line is a v8 ARTIFACT — an inline callback (a .filter/.reduce/.some/.every predicate)
+  counted as a distinct "function" whose body sits on an already-covered line. Pinning it would be coverage THEATER (the
+  C263/C282 "remaining sub-100% is v8 artifacts" case). SEPARATELY confirmed presetToMapping has zero non-test consumers
+  (grep) — but UNLIKE the C300 isValidPaymentFrequency cruft, this is the C260/C237 RATIFIED-SURFACE case: it is part of
+  the import-trackers feature (T1–T6, code-complete-but-eyes-on-pending per CLAUDE.md), a coherent sibling of the tested
+  detectSource/normalizeHeader API, AND it has a dedicated test → a ratified-ahead-of-need surface awaiting its
+  eyes-on-blocked UI consumer, NOT dead code. LEFT it. No fresh guard target, no dead code → recorded SATURATED + pivot.
+  Verify: audit only — no source touched, both suites green (1949 BE / 868 FE). Docs-only. cov: be 89.29% / fe 89.43%
+  (~). (guard→306. import-mapping-presets is line-100% + all exports tested; the func-metric shortfall is a v8 artifact —
+  don't re-scout it, and don't remove presetToMapping [C260 ratified surface]. The guard vein is saturated: remaining
+  sub-100% func is v8 artifacts + DI/OAuth/network + eyes-on-FE; a real guard target now needs a fresh report gap on
+  REACHABLE behavior. NEXT guard cycle: record saturated on first recheck unless such a gap appears.)
 - **C305 (bug-scout DRY: the insurance premium materialization hook [effectiveTermCost + createTermExpenses/updateTermExpenses — the term→TCO money path, #57/#69 family] certified CLEAN firsthand → dry, pivot fast, no manufactured test)** —
   Balance recompute (cycle 305): nothing strictly OVER budget; bug most-starved by ratio (3/3, 1.00×). Per the
   C293-refreshed bug-row guidance, scouted a not-yet-rechecked money-facing surface: the insurance premium

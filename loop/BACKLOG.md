@@ -1161,6 +1161,14 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **SATURATED C306 — the C299-flagged import-mapping-presets.ts (85.71% func) is 100% LINE-covered, all 3 exports
+> tested → the func shortfall is a v8 artifact, not a reachable gap.** normalizeHeader/detectSource/presetToMapping are
+> all pinned by import-mapping-presets.test.ts (per-preset + robustness + cross-detect + self-consistency + round-trip);
+> the 6-of-7 func count with 100% line is a v8 inline-callback artifact (C263/C282 case) — pinning it would be theater.
+> presetToMapping has zero non-test consumers BUT is the C260/C237 ratified-surface case (import-trackers T1–T6,
+> eyes-on-pending; tested + coherent-sibling API), NOT C300-style cruft — left it. Recorded saturated + pivot. Don't
+> re-scout import-mapping-presets; don't remove presetToMapping.
+
 > **GUARDED C295 — backup-unique-constraint-coverage.test.ts: the symmetric sibling of the C290 ref-validation drift
 > guard, pinning that validateUniqueConstraints stays complete vs schema drift.** C291 extended the check to all 5
 > DB-level UNIQUE indexes on backed-up tables; C290 guarded the ref-validation leg — but NOTHING pinned the
