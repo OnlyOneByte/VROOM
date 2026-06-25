@@ -234,10 +234,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 301 |
 | guard | 6 | 300 |
 | bug | 3 | 302 |
-| arch | 5 | 300 |
+| arch | 5 | 304 |
 | infra | 6 | 303 |
 
-Current cycle: **303**
+Current cycle: **304**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,20 @@ Current cycle: **303**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C304 (arch NO CHURN, recorded FAST via the C286 precondition: ZERO production-source commits since C300, and C300 itself was a dead-code REMOVAL [subtracts, introduces no dup] → the self-dup/dedup vein is structurally dry)** —
+  Balance recompute (cycle 304): nothing strictly OVER budget; among non-gated categories arch most-starved (4/5, 0.80×).
+  Applied the C286 FAST-DRY PRECONDITION firsthand: a dedup target requires FRESHLY-THREADED duplicate production source,
+  so checked git log over backend/src + frontend/src .ts EXCLUDING tests/__tests__ — ZERO production-source commits since
+  C300 (C301 deep-review-cert + C302 bug-dry-scout + C303 GUIDE-freshness were all docs/audit-only). The last source
+  touch was C300 itself, and crucially C300 was a dead-code REMOVAL (deleted isValidPaymentFrequency/createEnumGuard) —
+  removing code SUBTRACTS, it cannot introduce a new duplicate to converge. So there is STRUCTURALLY nothing newly
+  threaded to dedup (the arch parallel to the C99 git-diff-empty bug precondition). Recorded no-churn-warranted + pivot,
+  FAST — did NOT re-scout the already-ruled-below-bar targets (createExpense quad C270, collectSourceFiles C277, BE
+  walker C281, SRC_ROOT C281, resolveProviderState↔consumeOAuthState C297; the C292 dupCheck self-dup already converged).
+  Verify: audit only — no source touched, both suites green (1949 BE / 868 FE). Docs-only. cov: be 89.29% / fe 89.43%
+  (~). (arch→304. The dedup vein is dry until a fresh FEATURE surface [Angelo-gated] threads new duplicate code — under
+  the hard feature-gate, arch over-budget cycles will keep recording no-churn-fast via the C286 precondition, as
+  designed. Don't re-scout the ruled-below-bar list.)
 - **C303 (infra GUIDE-freshness pass [the C267 pattern, NOT the coverage cadence]: the Category-veins table was materially stale — deep-review said "SATURATED C255/C260/C266" while C290–C301 certified 6 MORE subsystems; refreshed the deep-review + arch rows + the banner)** —
   Balance recompute (cycle 303): nothing strictly OVER budget; among non-gated categories infra most-starved (4/6,
   0.67×). The full coverage RE-MEASURE is NOT due (ran C299, next ~C309; only the C300 dead-code removal touched source
