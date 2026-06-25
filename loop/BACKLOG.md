@@ -1480,6 +1480,20 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 ### arch
 *(reliably DRY per the archive. Run a fresh dedup scout; if nothing clean surfaces, record "no churn warranted" + pivot. Obey the arch rules above.)*
 
+> **✅ CONVERGED C229 — the clamped-pagination list-query field-set onto `commonSchemas.clampedPaginationFields`
+> (NORTH_STAR #4, rule-of-three).** The C210 trips route made the third site of a now-VERBATIM-identical
+> `{ limit: z.coerce.number().int().min(1).max(CONFIG.pagination.maxPageSize).optional(), offset: ...min(0).optional() }`
+> list-query field pair (odometer + trips were byte-identical; both pair with clampPagination). C212 correctly
+> deferred this as a rule-of-TWO needing a new helper + flagged that `commonSchemas.pagination` is SEMANTICALLY
+> DIVERGENT (`.default(50)`/`.default(0)` + hardcoded `.max(100)` — adopting it would change clamp/default
+> behavior). With the trips surface it crossed the rule-of-three bar, so extracted `clampedPaginationFields` (the
+> NO-DEFAULT, runtime-`maxPageSize` form — DISTINCT from `pagination`, documented inline) into commonSchemas; both
+> routes spread it (`z.object({ ...commonSchemas.clampedPaginationFields, <filters> })`), trips keeps its
+> vehicleId/purpose. Behavior-preserving (same field validators; 84 odometer+trips HTTP tests green→green, full
+> suite 1910 unchanged) — removed the now-unused CONFIG import from both routes. Net −6 dup LOC / +1 documented
+> source of truth. Expenses is correctly OUT of scope (its limit/offset use a different `.string().transform().pipe()`
+> form, no schema-level maxPageSize cap). Don't re-scout this field-set.
+
 > **🔄 STANDING ARCH VEIN (Angelo-approved 2026-06-23) — converge the `seedVehicle` test helper, ONE domain
 > per arch cycle.** The shared seeder `backend/src/test-helpers/seed.ts` (`seedVehicle(ctx, opts?)`, options
 > bag make/model/year/nickname/extra, defaults = Toyota Camry 2022) was ESTABLISHED C150. Behavior must be

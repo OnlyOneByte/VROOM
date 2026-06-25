@@ -16,7 +16,6 @@
 import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { CONFIG } from '../../config';
 import { changeTracker, requireAuth } from '../../middleware';
 import { buildPaginatedResponse, clampPagination } from '../../utils/pagination';
 import { buildTripSummary } from '../../utils/trip-summary';
@@ -33,8 +32,7 @@ import { createTripSchema, TRIP_PURPOSES, updateTripSchema } from './validation'
 const routes = new Hono();
 
 const listQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(CONFIG.pagination.maxPageSize).optional(),
-  offset: z.coerce.number().int().min(0).optional(),
+  ...commonSchemas.clampedPaginationFields,
   vehicleId: z.string().min(1).optional(),
   purpose: z.enum(TRIP_PURPOSES).optional(),
 });

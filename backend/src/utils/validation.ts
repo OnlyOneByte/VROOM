@@ -6,11 +6,34 @@
  */
 
 import { z } from 'zod';
+import { CONFIG } from '../config';
+
+/**
+ * The raw `limit`/`offset` field validators for a list endpoint that pairs with `clampPagination`
+ * (utils/pagination.ts). DISTINCT from `commonSchemas.pagination` below: this form is NO-DEFAULT +
+ * caps `limit` at the runtime `CONFIG.pagination.maxPageSize` (not a hardcoded 100), exactly matching
+ * what `clampPagination` re-clamps — so an out-of-range value is rejected at the boundary while an
+ * omitted one falls through to `clampPagination`'s `defaultPageSize`. `commonSchemas.pagination`
+ * instead bakes in `.default(50)`/`.default(0)` + a hardcoded `.max(100)`, which would CHANGE
+ * clamp/default behavior if a clampPagination consumer adopted it (the C212 divergence). Spread into a
+ * route's own `z.object({...})` so it can add endpoint-specific filters (e.g. vehicleId/purpose).
+ */
+const clampedPaginationFields = {
+  limit: z.coerce.number().int().min(1).max(CONFIG.pagination.maxPageSize).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+} as const;
 
 /**
  * Common validation schemas
  */
 export const commonSchemas = {
+  /**
+   * Raw `limit`/`offset` fields for a `clampPagination`-backed list query — spread into a route's
+   * `z.object({ ...commonSchemas.clampedPaginationFields, <filters> })`. See the note on
+   * `clampedPaginationFields` for why this differs from `pagination` (no defaults; runtime max).
+   */
+  clampedPaginationFields,
+
   /**
    * Generic ID validation
    */

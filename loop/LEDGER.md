@@ -152,10 +152,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 228 |
 | guard | 6 | 225 |
 | bug | 3 | 226 |
-| arch | 5 | 222 |
+| arch | 5 | 229 |
 | infra | 6 | 224 |
 
-Current cycle: **228**
+Current cycle: **229**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -174,6 +174,23 @@ Current cycle: **228**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C229 (arch: converge the clamped-pagination list-query field-set onto commonSchemas — rule-of-three, behavior-preserving)** —
+  Balance recompute (cycle 229): arch most-starved + over budget (7/5 = 1.4×; bug 3/3 at threshold, rest under).
+  Took arch + ran a fresh dedup scout (C228 had scouted a DIFFERENT vein set). Found a genuine rule-of-three this
+  time: the C210 trips list route made the THIRD site of a verbatim-identical clamped-pagination field pair —
+  `limit: z.coerce.number().int().min(1).max(CONFIG.pagination.maxPageSize).optional()` + `offset: …min(0).optional()`
+  — byte-identical to odometer's listQuerySchema (both pair with clampPagination). C212 had correctly DEFERRED this
+  as a rule-of-TWO (a new helper for two sites is below the bar) AND flagged that the existing
+  `commonSchemas.pagination` is SEMANTICALLY DIVERGENT (`.default(50)/.default(0)` + hardcoded `.max(100)` would
+  change clamp/default behavior). The trips surface tipped it to rule-of-three, so the dedup is now warranted —
+  but onto a NEW field-set, NOT the divergent `pagination`. Extracted `commonSchemas.clampedPaginationFields` (the
+  no-default, runtime-maxPageSize form, with an inline note on why it differs from `pagination`); both routes spread
+  it (`z.object({ ...commonSchemas.clampedPaginationFields, <filters> })`), trips keeps its vehicleId/purpose +
+  removed the now-unused CONFIG import from both. Behavior-preserving (arch rule #2): identical field validators →
+  84 odometer+trips HTTP tests green→green, full suite 1910 UNCHANGED. Net −6 dup LOC / +1 documented source of
+  truth. Expenses correctly OUT of scope (different `.string().transform().pipe()` form). No UI → no shot. Whole-tree
+  musl clean (caught no reflow this time; the per-file autofix reordered the new import). validate:local GREEN (tsc
+  0, musl 21 warn baseline, 1910 pass / 0 fail, build bundled). cov: be 88.92% (~) / fe 88.85% (~). (arch→229.)
 - **C228 (arch scout → NO churn warranted [rule-of-two w/ divergent semantics] → deep-review: certify the trips CREATE optional-null FE→BE→DB invariant + guard)** —
   Balance recompute (cycle 228): arch most-starved + over budget (6/5 = 1.2×; deep-review 5/5 at threshold, rest
   under). Took ARCH first, scouted three veins firsthand: (1) the `X?.unitPreferences ?? settingsStore.unitPreferences`
