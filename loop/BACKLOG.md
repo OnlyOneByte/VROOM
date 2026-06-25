@@ -2303,6 +2303,14 @@ baseline), refresh `BRANCH_REVIEW.md` grouped by theme so the eventual PR stays 
 > + the rewrite idiom ("the X body" not "X's body"). Docs-only, the GUIDE-freshness vein (like C267). NEXT coverage
 > cadence ~C282.
 
+> **RAN C299 (coverage cadence — BE re-measure triggered by the C295/C296 auth+guard touches; last full cadence C293).**
+> Untracked-file sweep CLEAN (zero untracked); no orphan dev servers (ss -ltnp: :3001/:5173 down); branch 153 ahead / 0
+> behind, PR-ready. Coverage RE-MEASURED: BE 89.29% line / 89.01% func (1949 pass) — UP +0.01/+0.04 vs C293 (the C295
+> unique-constraint guard + C296 checkLinkConflicts export/DI + takeover guard). FE UNCHANGED 89.43% line / 90.05% func
+> (868 pass) — verified no FE source touched C290–C298 (latest FE commit C289), carried forward not re-run. Both above
+> the ~89% ceiling, green. Refreshed the GUIDE coverage standing-truth → C299 numbers. NEXT cadence ~C309. SIGNAL:
+> net-new feature SOURCE Angelo-gated; the C290–C298 backup/auth/odometer certification arc kept coverage creeping up.
+
 > **RAN C293 (coverage cadence — BE re-measure triggered by the C291/C292 backup.ts touches; last full cadence C288).**
 > Untracked-file sweep CLEAN (zero untracked); no orphan dev servers (ss -ltnp: :3001/:5173 down); branch 147 ahead / 0
 > behind, PR-ready. Coverage RE-MEASURED: BE 89.28% line / 88.97% func (1942 pass) — line +0.01 / func +0.29 vs C288

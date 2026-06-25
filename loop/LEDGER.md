@@ -235,9 +235,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 295 |
 | bug | 3 | 298 |
 | arch | 5 | 297 |
-| infra | 6 | 293 |
+| infra | 6 | 299 |
 
-Current cycle: **298**
+Current cycle: **299**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,24 @@ Current cycle: **298**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C299 (infra coverage cadence; last full cadence C293: untracked-test sweep CLEAN, BE re-measured [+0.01/+0.04 vs C293 from the C295/C296 auth+guard work], GUIDE standing-truth freshened to C299)** —
+  Balance recompute (cycle 299): nothing strictly OVER budget; among non-gated categories infra most-starved (6/6,
+  1.00×) — and a genuine leverage trigger: C296 touched auth/routes.ts (the checkLinkConflicts export+DI) + C295/C296
+  added BE tests since the C293 measure, so a BE re-measure is warranted per the GUIDE re-measure-on-module-touch rule.
+  Ran the sweep: (1) untracked-file sweep CLEAN — git status --untracked-files=all shows ZERO untracked; (2) no orphan
+  dev servers (ss -ltnp: no :3001/:5173 listeners); (3) Coverage RE-MEASURED: BE 89.29% line / 89.01% func (1949 pass /
+  0 fail / 241 files) — UP +0.01 line / +0.04 func vs C293 (89.28/88.97): the C295 backup-unique-constraint-coverage
+  guard + the C296 checkLinkConflicts export/DI + takeover guard added covered lines. auth/routes.ts sits at 35.14% func
+  — the OAuth/network-bound callback handlers are the structural ceiling (the pure helpers checkLinkConflicts/
+  consumeOAuthState/validateAndRefreshSession ARE covered). FE UNCHANGED at 89.43% line / 90.05% func / 81.75% branch
+  (868 pass) — VERIFIED firsthand no FE source (.ts/.svelte) touched C290–C298 (the latest FE commit is C289), so carried
+  forward not re-run (the C262/C272/C293 pattern). Both hold above the ~89% structural ceiling, both green. (4)
+  DOC-FRESHNESS: refreshed the GUIDE coverage standing-truth (C293 → C299 numbers + provenance). Tree clean; branch 153
+  ahead / 0 behind, PR-ready. Verify: docs-only (GUIDE standing-truth + this LEDGER + balance table + BACKLOG infra
+  note); no source touched, both suites green. cov: be 89.29% / fe 89.43% (MEASURED BE, FE carried). (infra→299. NEXT
+  cadence ~C309. The C290–C298 arc [the backup round-trip + auth-core + odometer-read certifications, the #127/C428
+  two-leg guard, the checkLinkConflicts takeover guard] held both suites green + BE coverage creeping up under the
+  feature-gate; STANDING SIGNAL holds: net-new feature SOURCE Angelo-gated.)
 - **C298 (bug-scout DRY: getCurrentOdometer [the cross-category odometer-read backbone for mileage reminders + lease-overage] certified CLEAN firsthand → dry, pivot fast, no manufactured test)** —
   Balance recompute (cycle 298): bug was the ONLY category strictly OVER budget (4/3 = 1.33×). Per the C293-refreshed
   bug-row guidance, scouted a NOT-YET-RECHECKED reachable surface: getCurrentOdometer (odometer/repository.ts:203) — the
