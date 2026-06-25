@@ -235,9 +235,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 315 |
 | bug | 3 | 316 |
 | arch | 5 | 317 |
-| infra | 6 | 312 |
+| infra | 6 | 319 |
 
-Current cycle: **318**
+Current cycle: **319**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,19 @@ Current cycle: **318**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C319 (INFRA cadence: coverage RE-MEASURE [replacing the carried `~` tags] + untracked-test sweep + tracked-survival check)** —
+  Balance recompute (cycle 319): infra most-starved over budget (7 starved, budget 6) — and a real re-measure was due:
+  every cov: tag C313–C318 was carried-forward `~`, while 6 cycles added theme tests + the picker. RE-MEASURED FE
+  (vitest --coverage): **89.46% line / 87.33% stmts / 90.05% func / 81.75% branch (920 tests / 83 files)** — line +0.03 vs
+  the C309 89.43 baseline, func holding AT 90.05 (the theme engine files are well-covered: resolve-theme 100% line,
+  theme.svelte 100% line). The new ThemePickerCard.svelte is a .svelte component → eyes-on-covered not unit-counted (vitest
+  does not list it; it will tick at T13 e2e), so it correctly does NOT move the line. BE UNCHANGED at the C309 reading
+  (89.29% line / 88.70% func) — confirmed no backend/src commit this session (newest is C300, pre-session). Untracked-test
+  sweep CLEAN: zero untracked unit tests (the .meshclaw.e2e.ts are gitignored BY DESIGN); the 3 theme guard files
+  (contrast/registry/themes-css) CONFIRMED git-tracked → survive merge. Tree clean, branch PR-ready. Doc-only cadence (the
+  value is the accurate re-measure + clean sweep). Verify: measurement-only, suites green (920 FE). cov: be 89.29% line /
+  88.70% func · fe 89.46% line / 90.05% func (MEASURED, not ~). (infra→319. The C313–C319 theming arc is fully measured +
+  swept. NEXT: register the next palette [bento] by the C313 recipe, now immediately user-visible via the C318 picker.)
 - **C318 (FEATURE theming T10: the /settings theme-ID picker — eyes-on verified, the engine is now user-reachable)** —
   Balance recompute (cycle 318): feature over budget (5 starved, budget 4) AND the highest-leverage open item — both point
   to T10. Built ThemePickerCard.svelte: a responsive grid of registry theme cards (composes the kit Card, no bespoke
