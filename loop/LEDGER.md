@@ -29,6 +29,22 @@
 > (C155 email-fix / C157 resolveNewUser / C158 unlink-route) + the C159 offline needs-attention helpers
 > (pure+covered) added covered lines; FE crossed 88.4 line (a fresh high). Structural ceiling holds (DI/OAuth/SQL
 > BE + effect/DOM FE). NEXT ~C171.**
+> **C272 (infra cadence MEASURED): BE 89.27% line / 88.69% func (1935 pass / 353 files) — FLAT vs C262 (no BE
+> source changed since; C263–C271 were FE-guard/audit/docs/eyes-on cycles). FE 89.11% line / 89.23% func / 81.34%
+> branch / 86.99% stmts (863 pass / 81 files) — line/branch/stmts FLAT vs C262, +3 tests (the C271
+> no-theme-clashing-colors guard — a SOURCE-SCAN reading existing .svelte → covered test lines, not new covered
+> SOURCE branches, the expected guard-cycle signature). Both hold at the ~89% structural ceiling, both green.
+> Untracked-test sweep CLEAN both sides (the 56 .meshclaw.e2e.ts gitignored BY DESIGN); the C271 dark-mode guard
+> CONFIRMED TRACKED (git ls-files) → survives merge. Tree clean; no live orphan dev servers (:5173 down — the
+> pgrep "[v]ite" RUNNING match was its own transient shell, the recurring false-positive; the precise process+port
+> check confirmed zero). Branch 126 ahead / 0 behind origin/main, PR-ready. The C262→C272 stretch (C263 guard-
+> saturation-record, C264 FE dead-code sweep, C265 bug-dry, C266 TCO deep-review, C267 GUIDE refresh, C268/C269
+> dark-mode eyes-on, C270 arch no-churn, C271 dark-clash guard) added 1 real code artifact (the C271 guard) + the
+> dark-mode eyes-on certification — productive within the gate, but coverage flat (every increment was a
+> guard/cert/audit on existing code, by design under the feature-gate). BRANCH_REVIEW.md gitignored → no refresh
+> artifact. NEXT cadence ~C282. STANDING SIGNAL: source-audit veins saturated (per the C267-refreshed GUIDE); the
+> dark axis is now both eyes-on-verified (C268/C269) + merge-guarded (C271); net-new feature SOURCE stays
+> Angelo-gated.**
 > **C262 (infra cadence MEASURED): BE 89.27% line / 88.70% func (1935 pass / 353 files) — UP +0.23 line / +0.16
 > func vs C254, continuing the gated-stretch coverage climb: the C256 odometer-history-route (+4) + C257
 > vehicle-stats-route (+5) HTTP tests (the C250/C251 filter-branch pattern → +9 covered-source tests, odometer/routes
@@ -203,9 +219,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 271 |
 | bug | 3 | 269 |
 | arch | 5 | 270 |
-| infra | 6 | 267 |
+| infra | 6 | 272 |
 
-Current cycle: **271**
+Current cycle: **272**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +

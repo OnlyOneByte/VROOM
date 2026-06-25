@@ -2100,6 +2100,14 @@ baseline), refresh `BRANCH_REVIEW.md` grouped by theme so the eventual PR stays 
 > ~89.3 BE / ~89.1 FE) + fixed the BRANCH_REVIEW mention (gitignored, not a PR artifact). Docs-only, behavior-preserving.
 > So a fresh session won't waste cycles re-scouting exhausted surfaces. NEXT coverage cadence ~C272.
 
+> **RAN C272 (coverage cadence; last ran C262).** Untracked-test sweep CLEAN both sides (56 .meshclaw.e2e.ts
+> gitignored BY DESIGN); the C271 dark-mode guard CONFIRMED TRACKED (survives merge). Tree clean; no orphan dev
+> servers (the pgrep vite false-positive again — precise check confirmed :5173 down); branch 126 ahead / 0 behind,
+> PR-ready. Coverage RE-MEASURED: BE 89.27% line / 88.69% func (1935 pass) — FLAT vs C262 (no BE source since). FE
+> 89.11% line / 81.34% branch (863 pass, +3 = the C271 source-scan guard) — FLAT (source-scan reads existing files,
+> the guard-cycle signature). Both at the ~89% structural ceiling, both green. NEXT cadence ~C282. SIGNAL: source-audit
+> veins saturated; dark axis eyes-on-verified (C268/C269) + merge-guarded (C271); net-new feature SOURCE Angelo-gated.
+
 > **RAN C262 (cadence; last ran C254).** Untracked-test sweep CLEAN both sides (the 56 .meshclaw.e2e.ts gitignored
 > BY DESIGN). Tree clean; no orphan dev servers (:3001/:5173 free — the pgrep false-positive matched its own command,
 > confirmed via precise process+port check); branch 116 ahead / 0 behind, PR-ready. Coverage RE-MEASURED: **BE 89.27%
