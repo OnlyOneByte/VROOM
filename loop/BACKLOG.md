@@ -1451,6 +1451,13 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 >   EXHAUSTED** — next arch cycles need a fresh behavior-preserving dedup target, or record "no churn warranted" +
 >   pivot (arch rule 5). Don't re-scout seedVehicle.
 
+> **✅ CONVERGED C222 — the C220 trips `purposeLabel` onto the shared `capitalize` util (NORTH_STAR #4).** The
+> C220 trips list page re-implemented capitalize inline (`charAt(0).toUpperCase()+slice(1)`) — byte-identical to
+> the existing `capitalize(s)` in formatters.ts. Dropped the inline helper + routed the purpose badge through the
+> shared util; behavior-preserving (eyes-on re-shot: badges render identical), net −3 LOC, FE validate green (826).
+> A needless re-implementation, not a 3-site pattern — the only prod duplicate (the expenses charAt-toUpperCase
+> copies are test fixtures, out of scope). Don't re-scout this. The arch convergence vein is exhausted again.
+
 > **NO CHURN WARRANTED C212 — the per-domain `listQuerySchema` is a rule-of-TWO, not three.** A C212 arch
 > scout (arch 7/5 over) examined the C210 trips routes for a fresh dedup target: the {limit/offset +
 > CONFIG.maxPageSize + clampPagination} query schema is hand-rolled in ONLY odometer + trips (expenses/analytics

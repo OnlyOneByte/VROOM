@@ -146,10 +146,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 213 |
 | guard | 6 | 219 |
 | bug | 3 | 221 |
-| arch | 5 | 212 |
+| arch | 5 | 222 |
 | infra | 6 | 217 |
 
-Current cycle: **221**
+Current cycle: **222**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -168,6 +168,18 @@ Current cycle: **221**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C222 (arch: converge the C220 inline `purposeLabel` onto the shared `capitalize` util — NORTH_STAR #4 "one way")** —
+  Balance recompute (cycle 222): arch most-starved + over budget (10/5 = 2.0×). Scouted the trips FE for a CLEAN
+  fresh dedup (not the Angelo-gated createLoadState rewrite — the 6-page four-states triad is arch #2, a per-page
+  reactivity REWRITE, NOT loop-authorizable). Found a genuine one: my C220 trips page RE-IMPLEMENTED capitalize
+  inline as `purposeLabel(p) = p.charAt(0).toUpperCase()+p.slice(1)` — byte-identical to the EXISTING shared
+  `capitalize(s)` in formatters.ts (line 50). A needless re-implementation of a shared helper (NORTH_STAR #4 "one
+  way to do a thing"). Converged: dropped `purposeLabel`, imported + called `capitalize(trip.purpose)`. Behavior-
+  preserving (the badge renders identically). Eyes-on: re-shot /trips — "Personal"/"Business" badges render
+  identical to C220/C221, no regression, no console errors. svelte-check 0; FE validate:local GREEN (826 pass /
+  0 fail). Net −3 LOC. (The expenses *test files* also hand-roll the same charAt-toUpperCase, but they're TEST
+  fixtures, not prod — out of scope; the only prod re-impl was the trips one.) cov: be 88.92% (~) / fe ~88.7% (~).
+  The arch convergence vein is exhausted again (next needs a fresh rule-of-three or no-churn + pivot). (Bug stays 221.)
 - **C221 (bug: FIX a REAL silent-truncation defect on the C220 trips list page — self-introduced, caught same-arc)** —
   Balance recompute (cycle 221): bug most-starved (10/3 = 3.33×). **Cold-vein LIFTED — C220 added a fresh prod
   surface (the trips list page) no scout had touched** → a real scout. Probed it firsthand: the page calls

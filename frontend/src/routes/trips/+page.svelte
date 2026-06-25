@@ -5,7 +5,7 @@
 	import { vehicleApi } from '$lib/services/vehicle-api';
 	import type { Trip, TripSummary, Vehicle } from '$lib/types';
 	import { tripDistance } from '$lib/types';
-	import { formatDate } from '$lib/utils/formatters';
+	import { capitalize, formatDate } from '$lib/utils/formatters';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
 	import { getDistanceUnitLabel } from '$lib/utils/units';
 	import { settingsStore } from '$lib/stores/settings.svelte';
@@ -30,11 +30,6 @@
 	let vehicleNames = $derived(
 		new Map(vehicles.map((v) => [v.id, getVehicleDisplayName(v)]))
 	);
-
-	// Capitalize the D4 purpose enum for display ('business' -> 'Business').
-	function purposeLabel(purpose: string): string {
-		return purpose.charAt(0).toUpperCase() + purpose.slice(1);
-	}
 
 	async function load() {
 		isLoading = true;
@@ -151,7 +146,7 @@
 					<CardNs.CardContent class="flex items-start justify-between gap-4 py-4">
 						<div class="min-w-0 space-y-1">
 							<div class="flex items-center gap-2">
-								<Badge variant="secondary">{purposeLabel(trip.purpose)}</Badge>
+								<Badge variant="secondary">{capitalize(trip.purpose)}</Badge>
 								<span class="text-sm text-muted-foreground">{formatDate(trip.tripDate)}</span>
 							</div>
 							<p class="font-medium">
