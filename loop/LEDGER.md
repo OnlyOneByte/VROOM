@@ -233,11 +233,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 227 |
 | deep-review | 5 | 290 |
 | guard | 6 | 289 |
-| bug | 3 | 287 |
+| bug | 3 | 291 |
 | arch | 5 | 286 |
 | infra | 6 | 288 |
 
-Current cycle: **290**
+Current cycle: **291**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,32 @@ Current cycle: **290**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C291 (bug FIX — REAL defect: validateUniqueConstraints [the #127/C428 pre-wipe cross-row check] covered only 2 of the 5 DB-level UNIQUE indexes on backed-up tables; extended it to the 3 missed composite indexes → closes a live empty-account data-loss gap)** —
+  Balance recompute (cycle 291): bug was the ONLY category strictly OVER budget (4/3 = 1.33×; arch tied at budget 5/5
+  but not over). The GUIDE marks bug SATURATED, so per discipline did ONE fresh firsthand scout on a NOT-YET-RECHECKED
+  reachable data-safety surface: validateUniqueConstraints (backup.ts) — the #127/C428 leg the C290 deep-review certified
+  the FK side of but did NOT audit. FOUND A REAL DEFECT (not a dry scout): the #127 invariant is "catch EVERY DB-level
+  UNIQUE index before the replace-mode wipe" but the check covered only 2 (expenses.clientId, vehicles.licensePlate).
+  Enumerated all unique indexes firsthand: schema has 5 on backed-up tables; the 3 MISSED are composite —
+  pr_photo_provider_idx (photoRefs: photoId+providerId), rn_reminder_due_idx (reminderNotifications: reminderId+dueDate),
+  rn_reminder_odo_idx (reminderNotifications: reminderId+dueOdometer, partial WHERE due_odometer IS NOT NULL). CONFIRMED
+  REACHABLE: all 3 are real CREATE UNIQUE INDEX statements in the migrations (drizzle/0000 + 0004), and photoRefs +
+  reminderNotifications are both backed-up AND restored (verified C290). So a corrupt/truncated/hand-edited backup with a
+  duplicate on ANY of the 3 passes per-row + referential validation → the replace-mode WIPE commits → the colliding
+  INSERT throws a raw UNIQUE error mid-tx → bun-sqlite async-tx does NOT roll back the wipe (the C151 footgun) → account
+  left EMPTY. SAME threat model + consequence C428 deemed worth guarding, on 3 indexes it missed. FIX: added a
+  dupCheckComposite helper (multi-column key; skips a row if ANY keyed field is null — mirrors SQLite NULL-distinct + the
+  partial-index WHERE-NOT-NULL semantics, the same null-skip the scalar dupCheck has) + wired the 3 indexes; the join uses
+  an explicit   separator (unambiguous composite key). +4 tests in the #127 describe (3 rejection — one per index,
+  incl. the mileage NULL-dueDate axis — + 1 acceptance: 2 mileage rows at DIFFERENT odometers do NOT trip it).
+  MUTATION-TESTED non-vacuous: removing the 3 dispatch calls makes exactly the 3 rejection tests FAIL (the
+  unique-constraint substrings come ONLY from the fix, not a parallel referential error); restoring → all green. Verify:
+  BE bun run validate:local GREEN (tsc + check:musl clean + 1942 pass / 0 fail [+4 vs C290 1938] + build bundled). No FE
+  source touched. cov: be 89.27% / fe 89.43% (~ — backup.ts gains a few covered lines in validateUniqueConstraints; full
+  re-measure next infra cadence ~C298). (bug→291: a REAL fix landed [the #127 cross-row UNIQUE check now covers ALL 5
+  backed-up unique indexes — clientId, licensePlate, photoRef photo+provider, reminderNotification reminder+dueDate,
+  reminder+dueOdometer]. Don't re-scout validateUniqueConstraints — now complete. The #127/C428 data-loss family is now
+  closed across BOTH the FK leg [C290] AND the full cross-row-UNIQUE leg [C291].)
 - **C290 (deep-review: the BACKUP→RESTORE round-trip crown jewel [NORTH_STAR #1] certified CLEAN firsthand + closed the ONE drift-guard gap — added a FIFTH guard pinning referential-integrity-validation coverage)** —
   Balance recompute (cycle 290): nothing strictly OVER budget; deep-review + bug tied at 1.00× (5/5, 3/3), deep-review
   most-starved by absolute count. The GUIDE marks deep-review SATURATED across trips/repos/TCO/offline-sync/CSV-import/

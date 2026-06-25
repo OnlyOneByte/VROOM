@@ -16,7 +16,9 @@ import {
   insuranceClaims,
   insurancePolicies,
   odometerEntries,
+  photoRefs,
   photos,
+  reminderNotifications,
   trips,
   userPreferences,
   vehicleFinancing,
@@ -512,6 +514,93 @@ describe('validateBackupData: cross-row unique constraints (#127)', () => {
     } as Record<string, unknown>;
     const result = backupService.validateBackupData(backupWith({ vehicles: [v1, v2] }));
     expect(result.valid).toBe(true);
+  });
+
+  // The three COMPOSITE unique indexes the original #127 check missed (C291). Each is a real
+  // CREATE UNIQUE INDEX in the migrations on a backed-up + restored table, so a duplicate survives
+  // per-row + referential validation, then throws on the colliding INSERT AFTER the replace-mode
+  // wipe → empty account (the same #127/C428 / C151-footgun data-loss trigger as clientId/licensePlate).
+  // Each asserts on the SPECIFIC unique-constraint message substring, so a parallel referential error
+  // (the synthetic parent rows aren't all present) cannot make the assertion pass spuriously — the
+  // assertion fires only if THIS unique check produced its error.
+  test('two photoRefs sharing (photoId, providerId) are rejected — pr_photo_provider_idx', () => {
+    const mk = (id: string) =>
+      ({
+        ...coerceRow(buildMinimalStringRow(photoRefs), photoRefs),
+        id,
+        photoId: 'photo-1',
+        providerId: 'provider-1',
+      }) as Record<string, unknown>;
+    const result = backupService.validateBackupData(
+      backupWith({ photoRefs: [mk('pr1'), mk('pr2')] })
+    );
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('photoRef photo+provider'))).toBe(true);
+  });
+
+  test('two reminderNotifications sharing (reminderId, dueDate) are rejected — rn_reminder_due_idx', () => {
+    const due = new Date('2024-03-01T00:00:00Z');
+    const mk = (id: string) =>
+      ({
+        ...coerceRow(
+          buildMinimalStringRow(reminderNotifications, { userId: 'u1' }),
+          reminderNotifications
+        ),
+        id,
+        reminderId: 'rem-1',
+        dueDate: due,
+        dueOdometer: null,
+      }) as Record<string, unknown>;
+    const result = backupService.validateBackupData(
+      backupWith({ reminderNotifications: [mk('rn1'), mk('rn2')] })
+    );
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('reminder+dueDate'))).toBe(true);
+  });
+
+  test('two MILEAGE reminderNotifications sharing (reminderId, dueOdometer) are rejected — rn_reminder_odo_idx', () => {
+    // Mileage rows carry a NULL dueDate (the time index treats them as distinct) but collide on the
+    // partial odometer index. The composite check on (reminderId, dueOdometer) must catch them.
+    const mk = (id: string) =>
+      ({
+        ...coerceRow(
+          buildMinimalStringRow(reminderNotifications, { userId: 'u1' }),
+          reminderNotifications
+        ),
+        id,
+        reminderId: 'rem-1',
+        dueDate: null,
+        dueOdometer: 50000,
+      }) as Record<string, unknown>;
+    const result = backupService.validateBackupData(
+      backupWith({ reminderNotifications: [mk('rn1'), mk('rn2')] })
+    );
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('reminder+dueOdometer'))).toBe(true);
+  });
+
+  test('mileage reminderNotifications at DIFFERENT odometers do NOT trip the unique check (NULL dueDate + distinct dueOdometer)', () => {
+    // Two mileage rows for the same reminder but DIFFERENT odometer milestones: NULL dueDate makes the
+    // time index distinct, and distinct dueOdometer makes the mileage index distinct too → neither
+    // composite check should flag them. Pins that the null-skip + distinct-key path mirrors SQLite
+    // semantics (a regression that keyed nulls as '' would falsely flag the time index here). Asserts
+    // specifically that NO unique-constraint error was produced (a parallel referential error from the
+    // synthetic parent-less reminder is irrelevant to what this test pins).
+    const mk = (id: string, odo: number) =>
+      ({
+        ...coerceRow(
+          buildMinimalStringRow(reminderNotifications, { userId: 'u1' }),
+          reminderNotifications
+        ),
+        id,
+        reminderId: 'rem-1',
+        dueDate: null,
+        dueOdometer: odo,
+      }) as Record<string, unknown>;
+    const result = backupService.validateBackupData(
+      backupWith({ reminderNotifications: [mk('rn1', 50000), mk('rn2', 60000)] })
+    );
+    expect(result.errors.some((e) => e.includes('violates a unique constraint'))).toBe(false);
   });
 });
 

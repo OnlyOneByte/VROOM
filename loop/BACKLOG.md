@@ -757,6 +757,17 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **FIXED C291 — validateUniqueConstraints (the #127/C428 pre-wipe cross-row check) covered only 2 of 5 DB-level UNIQUE
+> indexes on backed-up tables → extended to the 3 missed composite indexes, closing a live empty-account data-loss gap.**
+> The #127 invariant is "catch EVERY DB-level UNIQUE index before the replace-mode wipe" but the check only covered
+> expenses.clientId + vehicles.licensePlate. The schema has 5 unique indexes on backed-up tables; the 3 MISSED are
+> composite — pr_photo_provider_idx (photoRefs), rn_reminder_due_idx + rn_reminder_odo_idx (reminderNotifications). All 3
+> are real CREATE UNIQUE INDEX in the migrations on backed-up + RESTORED tables, so a duplicate survives validation → the
+> wipe commits → the colliding INSERT throws → C151 async-tx no-rollback → account EMPTY (the exact #127/C428 trigger, on
+> 3 indexes it missed). Added a dupCheckComposite helper (null-in-any-column → skip, mirroring SQLite NULL-distinct + the
+> partial-index WHERE-NOT-NULL) + wired all 3; +4 tests, mutation-tested non-vacuous. The #127/C428 data-loss family is
+> now closed across BOTH the FK leg (C290) AND the full cross-row-UNIQUE leg (C291). Don't re-scout validateUniqueConstraints.
+
 > **SCOUTED C287 — the photo sync-worker terminal-auth handling (#105/#144 fail-open family) certified CLEAN firsthand
 > end-to-end → dry.** Audited sync-worker.ts: a terminal AUTH_INVALID/PERMISSION_DENIED (codes the adapters map 401/403
 > to) jumps retryCount to MAX_RETRY_COUNT (=3) + prefixes "Reconnect required:". VERIFIED the park works: findPendingOrFailed

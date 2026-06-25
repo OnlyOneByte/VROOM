@@ -672,8 +672,41 @@ export class BackupService {
         seen.add(key);
       }
     };
+    // Composite-key variant for multi-column unique indexes. SQLite treats a NULL in ANY indexed
+    // column as DISTINCT (and the partial mileage index is `WHERE due_odometer IS NOT NULL`), so a
+    // row missing any keyed field is skipped — it can never collide. Mirrors dupCheck's null skip.
+    const dupCheckComposite = (
+      rows: Record<string, unknown>[] | undefined,
+      fields: string[],
+      label: string
+    ): void => {
+      const seen = new Set<string>();
+      for (const row of rows ?? []) {
+        const values = fields.map((f) => row[f]);
+        if (values.some((v) => v == null)) continue; // NULL in any column → distinct (never collides)
+        const key = values.map((v) => String(v)).join('\u0000'); // NUL join — unambiguous composite key
+        if (seen.has(key)) {
+          errors.push(`Duplicate ${label} "${key}" — backup violates a unique constraint`);
+        }
+        seen.add(key);
+      }
+    };
     dupCheck(backup.expenses, 'clientId', 'expense clientId');
     dupCheck(backup.vehicles, 'licensePlate', 'vehicle licensePlate');
+    // The remaining DB-level UNIQUE indexes on backed-up + restored tables (C291 — the #127/C428 leg
+    // those two checks missed): a duplicate on any of these survives per-row + referential validation,
+    // then throws on the colliding INSERT after the replace-mode wipe → empty account (C151 footgun).
+    dupCheckComposite(backup.photoRefs, ['photoId', 'providerId'], 'photoRef photo+provider'); // pr_photo_provider_idx
+    dupCheckComposite(
+      backup.reminderNotifications,
+      ['reminderId', 'dueDate'],
+      'reminderNotification reminder+dueDate'
+    ); // rn_reminder_due_idx (time axis; null dueDate → distinct)
+    dupCheckComposite(
+      backup.reminderNotifications,
+      ['reminderId', 'dueOdometer'],
+      'reminderNotification reminder+dueOdometer'
+    ); // rn_reminder_odo_idx (mileage axis; partial WHERE due_odometer IS NOT NULL)
     return errors;
   }
 
