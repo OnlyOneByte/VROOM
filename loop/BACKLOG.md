@@ -677,6 +677,18 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **SCOUTED C253 — trips-summary MONEY-RATE path certified CLEAN firsthand → recorded dry + pivoted to a guard.**
+> Bug was most-starved over budget (5/3) but the cold veins are worked-through, so did ONE fresh firsthand scout on a
+> post-C212 surface: the trips-summary business-$ (businessMileageValue = businessMiles × rate, a DISPLAYED $ figure,
+> NORTH_STAR #1/#2). Hypothesised `summaryQuerySchema.rate = z.coerce.number().min(0).optional()` could pass a
+> non-finite rate ('Infinity'/'1e999' → ∞/NaN money). DEBUNKED FIRSTHAND via a Zod probe: this version's
+> z.coerce.number() REJECTS 'Infinity'/'1e999'/'NaN'/'-Infinity' (invalid_type) AND .min(0) rejects a negative rate
+> (too_small) — the path can't produce non-finite/negative money; pure buildTripSummary is already unit+property
+> tested. NO defect. Pivoted to guard (the boundary had no HTTP test): +3 trips-http.test.ts cases (negative→400,
+> non-finite→400, valid positive→finite correct $); non-vacuous (drop .min(0) → negative-rate guard RED). The
+> trips-summary money path is now certified + boundary-pinned — DON'T re-scout it. Future bug cycles stay dry until a
+> fresh feature surface / Angelo-unblocked gate; record dry FAST + pivot.
+
 > **SCOUTED C248 — the C247 mobile-occlusion CLASS has NO reachable sibling (verified firsthand).** Grep found 11
 > cards with the `justify-between` + `flex-shrink-0` + `min-w-0 truncate` combo; the multi-button candidates
 > (PolicyCard, ClaimsSection) were shot firsthand on /insurance mobile (incl. a seeded long-description claim):

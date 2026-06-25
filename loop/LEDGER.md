@@ -170,11 +170,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 227 |
 | deep-review | 5 | 250 |
 | guard | 6 | 251 |
-| bug | 3 | 248 |
+| bug | 3 | 253 |
 | arch | 5 | 252 |
 | infra | 6 | 246 |
 
-Current cycle: **252**
+Current cycle: **253**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -193,6 +193,34 @@ Current cycle: **252**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C253 (bug-scout DRY → pivot to guard: certify the trips-summary money-RATE boundary clean + pin it at the HTTP stack)** —
+  Balance recompute (cycle 253): excluding the gated feature (last 227, Angelo-blocked), bug was most-starved + over
+  budget (5/3 = 1.67×; infra 7/6 = 1.17× also over, but bug is more starved). The pure-logic/visual/write-path/IDOR/
+  date veins are all documented worked-through, so per the C95/C122/C204 dry-scout discipline did ONE fresh firsthand
+  scout then recorded + pivoted. SCOUTED the trips-summary MONEY path (businessMileageValue = businessMiles × rate, a
+  DISPLAYED $ figure — NORTH_STAR #1/#2 — and a fresh post-C212 surface): hypothesised the `summaryQuerySchema.rate =
+  z.coerce.number().min(0).optional()` (routes.ts:46) could pass a non-finite rate ('Infinity'/'1e999' →
+  businessMiles × ∞ = Infinity/NaN money) the way the GUIDE's write-path-asymmetry seam predicts. DEBUNKED FIRSTHAND
+  (the GUIDE "agent-HIGH-often-false" + "record dry FAST" discipline): a Zod probe showed THIS version's z.coerce.number()
+  REJECTS 'Infinity'/'1e999'/'NaN'/'-Infinity'/'1e400' with invalid_type, AND .min(0) rejects a negative rate (too_small),
+  so the path CANNOT produce a non-finite or negative money figure. The only quirk (`?rate=` empty → 0) is harmless (the
+  documented default). The pure buildTripSummary is already unit + property tested (trip-summary.test.ts). NO defect.
+  PIVOTED to the co-productive guard vein: the money-rate boundary I certified had NO HTTP guard (the existing summary
+  tests only exercise a happy 0.5 rate + the #94 anchor). +3 HTTP tests in trips-http.test.ts: a NEGATIVE rate → 400
+  (no negative reimbursement $), a NON-FINITE rate ('Infinity'/'NaN') → 400 (no Infinity/NaN money), and a valid
+  positive rate (0.655) → a finite, correct businessMileageValue (100×0.655=65.5, Number.isFinite asserted). NON-VACUOUS
+  verified firsthand: dropping .min(0) from the schema turns the negative-rate guard RED (rate=-0.5 → 200 not 400), the
+  non-finite guards still pass (coercion alone catches those) — restored → green. The merge-surviving net: a future
+  loosening of summaryQuerySchema.rate (drop .min(0) / swap the coercing parse for a plain z.number() that accepts ∞)
+  goes RED with the exact money-corruption diagnostic. CAUGHT MY OWN C228 reflow: validate first failed at check:musl
+  ("1 error") — a formatter line-wrap in my new test (NOT the 3 pre-existing baseline-warn noUnusedImports in
+  expenses/insurance/settings, which are warn-level on clean HEAD, confirmed by stashing); check:musl:fix on my file →
+  whole-tree clean. Verify: backend validate:local GREEN — tsc 0, musl whole-tree clean (21-warn baseline, 0 errors),
+  1926 pass / 0 fail (+3), build bundled. Backend-only (Zod/HTTP) → no shot. cov: be 88.95% (~ — the summary route +
+  schema were already covered by the happy-path test; +3 pin the boundary contract, not new lines) / fe 89.11% (~).
+  (bug→253: the scout DID happen as the over-budget discipline requires; recorded dry + left a durable guard, the
+  C122/C204 pattern. The trips-summary money path is now CERTIFIED + boundary-pinned — don't re-scout it. NEXT bug
+  cycle stays dry until a fresh feature surface or an Angelo-unblocked gate; record dry FAST + pivot.)
 - **C252 (arch: REMOVE the C251-filed dead code [findActiveFinancing] — contract confirmed clean, behavior-preserving)** —
   Balance recompute (cycle 252): arch most-starved + over budget (7/5 = 1.4×). Took the concrete, evidence-backed
   arch task C251 filed: remove `financingRepository.findActiveFinancing()`. C251 deferred for "confirm no external

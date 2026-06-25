@@ -578,6 +578,53 @@ describe('GET /api/v1/trips/summary (T5 mileage rollup)', () => {
     expect(body.data.totalMiles).toBe(0);
     expect(body.data.averageTripMiles).toBe(0);
   });
+
+  // C253 money-rate boundary guard (NORTH_STAR #1/#2 — businessMileageValue = businessMiles × rate is a
+  // DISPLAYED $ figure). A C253 bug-scout certified the summary money path clean firsthand: the
+  // `summaryQuerySchema.rate = z.coerce.number().min(0).optional()` (routes.ts:46) REJECTS a negative rate
+  // (would flip the reimbursement $ negative) and a non-finite rate ('Infinity'/'NaN' → businessMiles × ∞ =
+  // Infinity/NaN money), so no defect — but NO HTTP test pinned that boundary. These are the merge-surviving
+  // net: loosening the schema (dropping .min(0), or swapping the coercing parse for a plain z.number() that
+  // accepts Infinity) would let a garbage/negative money rate through → these go RED with the exact diagnostic.
+  test('a NEGATIVE rate is rejected (no negative reimbursement $) — 400', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    await ctx.authed(
+      'POST',
+      '/api/v1/trips',
+      VALID(vehicleId, { startOdometer: 1000, endOdometer: 1100, purpose: 'business' })
+    );
+    const res = await ctx.authed('GET', '/api/v1/trips/summary?rate=-0.5');
+    expect(res.status).toBe(400);
+  });
+
+  test('a NON-FINITE rate is rejected (no Infinity/NaN money) — 400', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    await ctx.authed(
+      'POST',
+      '/api/v1/trips',
+      VALID(vehicleId, { startOdometer: 1000, endOdometer: 1100, purpose: 'business' })
+    );
+    const inf = await ctx.authed('GET', '/api/v1/trips/summary?rate=Infinity');
+    expect(inf.status).toBe(400);
+    const nan = await ctx.authed('GET', '/api/v1/trips/summary?rate=NaN');
+    expect(nan.status).toBe(400);
+  });
+
+  test('a valid positive rate yields a finite, correct business-$ (the in-band contract)', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    await ctx.authed(
+      'POST',
+      '/api/v1/trips',
+      VALID(vehicleId, { startOdometer: 1000, endOdometer: 1100, purpose: 'business' })
+    );
+    const res = await ctx.authed('GET', '/api/v1/trips/summary?rate=0.655');
+    const body =
+      await json<DataEnvelope<{ businessMiles: number; businessMileageValue: number }>>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.data.businessMiles).toBe(100);
+    expect(body.data.businessMileageValue).toBeCloseTo(65.5, 5); // 100 × 0.655, finite
+    expect(Number.isFinite(body.data.businessMileageValue)).toBe(true);
+  });
 });
 
 describe('PUT /api/v1/trips/:id', () => {
