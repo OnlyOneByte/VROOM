@@ -29,6 +29,15 @@
 > (C155 email-fix / C157 resolveNewUser / C158 unlink-route) + the C159 offline needs-attention helpers
 > (pure+covered) added covered lines; FE crossed 88.4 line (a fresh high). Structural ceiling holds (DI/OAuth/SQL
 > BE + effect/DOM FE). NEXT ~C171.**
+> **C231 (infra cadence MEASURED): BE 88.92% line / 88.43% func (1910 pass) — line FLAT vs C224, func UP +0.30
+> (88.13→88.43) from the C225 CSRF-guard + C228 optional-null cert + C229 commonSchemas dedup adding covered
+> helper lines. FE 89.11% line / 89.23% func / 81.43% branch / 87.05% stmts (842 pass) — UP +0.26 line / +0.08
+> func / +0.65 branch / +0.30 stmts vs C224, from the C227 trip-form-validation + C230 parseOdometer fix/guards
+> (the trips components dir is now 97.36% line / 100% func; TripForm.svelte markup itself stays eyes-on-verified,
+> the expected .svelte structural pattern). BOTH suites crossed 89% line — a fresh high both sides, the tightest
+> era yet (BE↔FE line gap ~0.2pts). Untracked-test sweep CLEAN both sides; tree clean; no live orphan dev servers
+> (ports down); branch 85 ahead / 0 behind origin/main, PR-ready. STATUS/BRANCH_REVIEW are stale gitignored
+> working files (not in the PR; per CLAUDE.md don't rely on them). NEXT cadence ~C241.**
 > **C224 (infra cadence MEASURED): BE 88.92% line / 88.13% func (1903 pass) — FLAT vs C217 (BE untouched since;
 > C218–C223 were FE + LEDGER). FE 88.85% line / 89.15% func / 80.78% branch / 86.75% stmts (826 pass) — UP +0.12
 > line / +0.24 func / +0.10 branch vs C217, from the C218 trip-api/types (unit-tested) + the C220–C223 trips
@@ -153,9 +162,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 225 |
 | bug | 3 | 230 |
 | arch | 5 | 229 |
-| infra | 6 | 224 |
+| infra | 6 | 231 |
 
-Current cycle: **230**
+Current cycle: **231**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -174,6 +183,21 @@ Current cycle: **230**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C231 (infra: cadence sweep + coverage re-measure — both suites cross 89% line)** —
+  Balance recompute (cycle 231): infra most-starved + the ONLY strictly over-budget category (7/6 = 1.17×;
+  feature 4/4 + guard 6/6 at threshold, not over). Coverage was last MEASURED C224; the C225–C230 arc added
+  tests both sides (C225 CSRF +3, C228 optional-null cert +2, C230 trip-form +4) all carried as estimated `~`,
+  so a real re-measure was due. (1) UNTRACKED-TEST SWEEP: CLEAN both sides (the bun filesystem-discovery merge-
+  loss risk) — no untracked *.test.ts / *.meshclaw.e2e. (2) TREE: clean, no stray files; no LIVE orphan dev
+  servers (ports 3001/5173 down — the C230 cleanup held; the pgrep counts were transient zombies). (3) COVERAGE
+  RE-MEASURED: **BE 88.92% line / 88.43% func (1910 pass)** — line FLAT vs C224, func UP +0.30 (the C225/C228/C229
+  covered helper lines); **FE 89.11% line / 89.23% func / 81.43% branch / 87.05% stmts (842 pass)** — UP +0.26
+  line / +0.65 branch vs C224, from C227 trip-form-validation + C230 parseOdometer fix/guards (trips components
+  dir now 97.36% line / 100% func). **BOTH suites crossed 89% line — a fresh high both sides, BE↔FE gap ~0.2pts,
+  the tightest era yet.** Still under the 90% goal (structural ceiling: BE DI/OAuth/SQL-bound, FE eyes-on .svelte
+  markup like TripForm itself). (4) BRANCH: 85 ahead / 0 behind origin/main, PR-ready. STATUS/BRANCH_REVIEW are
+  stale gitignored working files (not in the PR; don't rely on them per CLAUDE.md). No source change → no shot,
+  no validate beyond the coverage runs (both green). cov: be 88.92% / fe 89.11% (MEASURED). NEXT cadence ~C241. (infra→231.)
 - **C230 (bug: FIX a CRASH-class defect on the C227 TripForm — submit threw `raw.trim is not a function`, NO trip ever created)** —
   Balance recompute (cycle 230): bug most-starved + over budget (4/3 = 1.33×; infra 6/6 at threshold, not over).
   Scouted the freshest prod surface (the C227 TripForm + trip-form-validation.ts FE write path) on the GUIDE's
