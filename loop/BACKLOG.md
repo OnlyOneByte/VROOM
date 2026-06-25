@@ -744,6 +744,13 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **SCOUTED C287 — the photo sync-worker terminal-auth handling (#105/#144 fail-open family) certified CLEAN firsthand
+> end-to-end → dry.** Audited sync-worker.ts: a terminal AUTH_INVALID/PERMISSION_DENIED (codes the adapters map 401/403
+> to) jumps retryCount to MAX_RETRY_COUNT (=3) + prefixes "Reconnect required:". VERIFIED the park works: findPendingOrFailed
+> filters retryCount<3, so 3 → `3<3` false → EXCLUDED (genuinely parked, not retried). The const↔SQL-literal coupling
+> is pinned by sync-worker-retry-ceiling-sync.test.ts (C67). NO defect — the #105/#43/#44 family is closed at the
+> consumer leg. Recorded dry + pivot. Don't re-scout the sync-worker auth family.
+
 > **SCOUTED C284 — the reminder endDate-boundary family (#12/#107/#114/#116) certified CLEAN firsthand → dry.**
 > Audited trigger-service.ts: a bounded reminder must deactivate when it crosses endDate, not fire forever. All 4 exit
 > paths guarded via the shared hasReminderEndedBy predicate (the C409 dedup): fastForwardPastNow in-loop (#12) +

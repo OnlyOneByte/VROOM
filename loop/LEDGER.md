@@ -233,11 +233,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 227 |
 | deep-review | 5 | 285 |
 | guard | 6 | 283 |
-| bug | 3 | 284 |
+| bug | 3 | 287 |
 | arch | 5 | 286 |
 | infra | 6 | 282 |
 
-Current cycle: **286**
+Current cycle: **287**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,22 @@ Current cycle: **286**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C287 (bug-scout DRY: the photo sync-worker terminal-auth handling [#105/#144 fail-open family] certified CLEAN firsthand end-to-end — terminal auth parks, doesn't retry-forever)** —
+  Balance recompute (cycle 287): nothing strictly OVER budget; bug most-starved non-gated (3/3, AT threshold). Did ONE
+  fresh firsthand scout on an unscanned-this-run security-adjacent surface: the photo sync-worker terminal-auth
+  handling (sync-worker.ts — the #105/#144 fail-open family: a revoked/expired token must PARK, not retry forever as
+  a transient flake). CERTIFIED CLEAN END-TO-END: (1) processSingleRef catch (:279) sets isTerminalAuth =
+  isSyncError && code∈{AUTH_INVALID, PERMISSION_DENIED} (the codes the adapters map 401/403 to, #105); (2) on terminal
+  auth it jumps retryCount straight to MAX_RETRY_COUNT (=3) + prefixes "Reconnect required:" so provider-stats
+  surfaces it honestly, not as a transient flake (#144); (3) VERIFIED the park actually WORKS firsthand: findPendingOrFailed
+  (photo-ref-repository.ts:82) filters `retryCount < 3`, so retryCount=3 → `3 < 3` false → the ref is EXCLUDED from
+  re-picking (genuinely parked, not re-tried); (4) the const↔SQL-literal coupling (MAX_RETRY_COUNT===the `< 3` bound)
+  is pinned by sync-worker-retry-ceiling-sync.test.ts (the C67 guard). NO defect — the terminal-auth fix works exactly
+  as designed; the #105/#43/#44 fail-open family is closed at the sync-worker consumer leg. Per the C284/C280 discipline
+  recorded dry + pivoted fast, no manufactured test. Verify: audit only — no source touched, both suites green at C283
+  (1935 BE / 867 FE). Docs-only. cov: be 89.28% / fe 89.3% (~). (bug→287: the scout DID happen + certified the
+  terminal-auth park clean firsthand [retryCount=3 → 3<3 false → excluded]. Don't re-scout the sync-worker auth family
+  — closed + guarded. NEXT bug cycle record dry on first recheck + pivot.)
 - **C286 (arch NO CHURN, recorded FAST via the C99 precondition: NO production source changed since C259, so nothing fresh to dedup — the self-dup vein is provably dry)** —
   Balance recompute (cycle 286): nothing strictly OVER budget; arch most-starved non-gated (5/5, AT budget). Applied
   the C99 fast-dry precondition to arch: a dedup target requires FRESHLY-THREADED duplicate code, so checked
