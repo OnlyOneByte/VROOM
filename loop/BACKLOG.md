@@ -1654,14 +1654,11 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 > NOT delete, do NOT self-wire. (The lesson: "exported + no consumer" is necessary-but-not-sufficient for cruft —
 > check the spec for ratified-ahead-of-need surface first.)
 
-> **DEAD-CODE CANDIDATE (filed C251) — `financingRepository.findActiveFinancing()` (repo:65).** NO real caller
-> (only a comment in routes.ts:147 + a test docstring), NO spec mandate, never-called since its initial-feat
-> commit. An UNSCOPED all-tenant finder (no userId filter) — also a mild cross-tenant liability if ever wired.
-> Looks like genuine dead code (NORTH_STAR #6), distinct from the C237 ratified-but-deferred class (no spec names
-> it). DEFERRED removal (C237 caution: removing an exported repo method warrants confirming no external API
-> contract first). A focused arch cycle: delete it (+ its financing-get-contract.test reference) after confirming
-> nothing external depends on it. NOTE: the C245 dead-code sweep MISSED this — it scanned src/utils/*.ts, not
-> src/api/*/repository.ts; a future sweep should cover the repo layer too.
+> **✅ REMOVED C252 — `financingRepository.findActiveFinancing()` dead code (filed C251).** Confirmed firsthand
+> the contract was clean (only 2 comment mentions + the defn; zero call sites; private app, no external API), then
+> removed the method + its orphaned `asc` import + updated the 2 comments to name "the isActive-filtered queries".
+> Behavior-preserving: 1923 pass UNCHANGED, tsc 0, whole-tree clean. Don't re-file. NOTE still open: the C245
+> util-only dead-code sweep should extend to ALL src/api/*/repository.ts (a future arch cycle) — financing done.
 
 > **SWEPT C245 — full backend dead-code sweep, NO genuine dead code.** Scanned every exported `src/utils/*.ts`
 > fn for non-test/non-defining-file refs. 7 candidates, all verified firsthand as NOT dead: calculateMPG/

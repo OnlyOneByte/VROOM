@@ -6,7 +6,7 @@
  * Balance is computed on read: originalAmount - SUM(financing payment expenses).
  */
 
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { NewVehicleFinancing, VehicleFinancing } from '../../db/schema';
@@ -60,14 +60,6 @@ export class FinancingRepository extends BaseRepository<VehicleFinancing, NewVeh
       .where(eq(vehicleFinancing.vehicleId, vehicleId))
       .limit(1);
     return result[0] || null;
-  }
-
-  async findActiveFinancing(): Promise<VehicleFinancing[]> {
-    return await this.db
-      .select()
-      .from(vehicleFinancing)
-      .where(eq(vehicleFinancing.isActive, true))
-      .orderBy(asc(vehicleFinancing.startDate));
   }
 
   /**

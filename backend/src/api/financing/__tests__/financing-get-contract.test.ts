@@ -124,7 +124,7 @@ describe('GET single financing — enriched contract (FE↔BE drift guard)', () 
  * row exists it reuses it via update(). `isActive` is .optional() in the create schema (a
  * .notNull().default(true) column → drizzle-zod omits it), and the FE financing payload never sends it,
  * so the update LEFT the prior isActive=false → the new active loan was silently dropped from
- * findActiveFinancing + loanBreakdown/analytics + the FE's isActive gate. The fix re-activates (+ clears
+ * the isActive-filtered queries (loanBreakdown/analytics) + the FE's isActive gate. The fix re-activates (+ clears
  * endDate) on the upsert. These pin that contract over the real HTTP stack.
  */
 describe('POST financing upsert — #67 re-activates a paid-off record', () => {

@@ -171,10 +171,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 250 |
 | guard | 6 | 251 |
 | bug | 3 | 248 |
-| arch | 5 | 245 |
+| arch | 5 | 252 |
 | infra | 6 | 246 |
 
-Current cycle: **251**
+Current cycle: **252**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -193,6 +193,21 @@ Current cycle: **251**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C252 (arch: REMOVE the C251-filed dead code [findActiveFinancing] — contract confirmed clean, behavior-preserving)** —
+  Balance recompute (cycle 252): arch most-starved + over budget (7/5 = 1.4×). Took the concrete, evidence-backed
+  arch task C251 filed: remove `financingRepository.findActiveFinancing()`. C251 deferred for "confirm no external
+  contract first" — did that firsthand this cycle: the ONLY 3 references are 2 COMMENTS (routes.ts:147, test
+  docstring:127) + the method definition itself — ZERO call sites; financingRepository is imported by 3 modules but
+  none call it; the backend is a PRIVATE app (vroom-backend, not a published package) → no external API contract.
+  Safe to remove (NORTH_STAR #6). REMOVED: the method + its now-orphaned `asc` import (it was the lone asc() user —
+  tsc would've errored if I'd missed it, and validate caught nothing → confirms the clean removal). Updated the 2
+  comments to name "the isActive-filtered queries" instead of the deleted method (the meaning — the isActive column
+  gates analytics/FE — stays accurate). Behavior-preserving: 1923 pass / 0 fail UNCHANGED (nothing depended on it),
+  tsc 0, whole-tree musl clean. No prod-behavior change → no shot. validate:local GREEN. cov: be ~88.95% (~, a dead
+  uncovered method removed → the file's covered ratio rises) / fe 89.11% (~). (arch→252; the C251 dead-code candidate
+  is CLOSED-removed. LESSON: "FILE then remove next cycle after confirming contract" is the right cadence for
+  removing exported surface — the C237 caution satisfied by a deliberate firsthand contract check, not skipped.
+  Also flagged C251: the C245 util-only dead-code sweep should extend to the repo layer — done ad-hoc here for financing.)
 - **C251 (arch scout: found dead code [findActiveFinancing] → FILED [C237 caution] + applied the C250 pattern: cover the untested reminders list filters → guard)** —
   Balance recompute (cycle 251): arch most-starved + over budget (6/5 = 1.2×). Dedup/dead-code-util veins ruled
   (C235/C244/C245); scouted the next-lowest plain repos. ARCH FINDING: `financingRepository.findActiveFinancing()`
