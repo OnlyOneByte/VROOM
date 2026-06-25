@@ -677,7 +677,22 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
-> **VEIN STATUS (C243): the eyes-on visual-sweep bug vein is now SATURATED.** The C239 unblock opened a fresh
+> **CLOSED C247 — REAL mobile-occlusion defect on the /reminders card (NORTH_STAR #3), found on the LAST
+> un-swept route.** A C247 eyes-on scout SEEDED 3 reminders via the API (the route had 0, deferred C243) + shot
+> mobile: the card was a single `flex items-start justify-between` row with a `min-w-0` title beside a
+> `flex-shrink-0` action cluster — for a mileage reminder (up to 5 buttons: Serviced+Pause+edit+delete) the cluster
+> claimed full phone width and starved the title to a ~1-char sliver ("Oil change" unreadable; truncate couldn't
+> help). Fix (CSS-only): stack title-above-actions on mobile (flex-col → sm:flex-row sm:justify-between) + action
+> cluster flex-wrap sm:flex-nowrap. Re-shot mobile → title readable, actions below. +3 source-scan guards
+> (reminder-card-mobile-stack.test.ts); non-vacuous (revert → 3 RED). Reachable on any active mileage reminder.
+> Don't re-fix.
+
+> **VEIN STATUS (C247, supersedes C243): the eyes-on visual-sweep vein is now COMPLETE — all 5 core routes swept.**
+> dash+analytics (C239), expenses (C241), vehicle-detail (C242), settings (C243), reminders (C247). The C243
+> "saturated" note was PREMATURE — C247 then found+fixed a real mobile-occlusion defect on /reminders (the route
+> C243 couldn't shoot for lack of seeded data; its multi-button card row was invisible to the other sweeps). LESSON:
+> "saturated" requires having actually SHOT every route with REPRESENTATIVE data — a route that needs seeding isn't
+> swept until you seed it. Now genuinely complete; future bug cycles need a fresh feature surface or unblocked gate. The C239 unblock opened a fresh
 > bug-scout vein (shoot un-shot routes for NORTH_STAR #3 defects pure-logic/unit tests miss). Across C239–C243 all
 > 4 data-bearing core routes were swept + Read desktop+mobile, ALL CLEAN: dashboard+analytics (C239), expenses
 > (C241), vehicle-detail (C242), settings (C243). Each clean scout that had an UNGUARDED invariant left a guard

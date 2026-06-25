@@ -170,11 +170,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 227 |
 | deep-review | 5 | 244 |
 | guard | 6 | 242 |
-| bug | 3 | 243 |
+| bug | 3 | 247 |
 | arch | 5 | 245 |
 | infra | 6 | 246 |
 
-Current cycle: **246**
+Current cycle: **247**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -193,6 +193,27 @@ Current cycle: **246**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C247 (eyes-on bug scout on /reminders [SEEDED] → FOUND + FIXED a real mobile-occlusion defect [NORTH_STAR #3])** —
+  Balance recompute (cycle 247): bug most-starved + over budget (4/3 = 1.33×). Took the one un-shot core route C243
+  deferred (/reminders, 0 seeded reminders) — now exercisable by SEEDING via the API. Booted + minted auth + seeded
+  3 reminders (a due time-notification, an upcoming expense, a mileage reminder) + shot DESKTOP + MOBILE + Read both.
+  DESKTOP rendered correctly (Due-now/Upcoming partitions, badges, the mileage "Serviced" re-arm shown only on the
+  mileage card with NO Monthly badge [the frequencyLabel fix], $150 expense + Receipt dialog icon). **MOBILE: a REAL
+  DEFECT** — the reminder card's CardContent was a single `flex items-start justify-between` row with a `min-w-0`
+  title block beside a `flex-shrink-0` action cluster; a mileage reminder's cluster is up to 5 buttons
+  (Serviced+Pause+edit+delete), so on a phone it claimed full width and STARVED the title to a ~1-char sliver ("Oil
+  change" unreadable). The `truncate` on the title couldn't save it — the action row was wider than the phone.
+  Reachable on any active mileage reminder (the common maintenance case). FIX (CSS-only, behavior-preserving): stack
+  the title above the actions on mobile (`flex flex-col … sm:flex-row sm:justify-between sm:gap-4`) + let the action
+  cluster wrap (`flex-wrap sm:flex-nowrap`). **RE-SHOT mobile → title fully readable, actions below, no overflow, no
+  console errors** (the GUIDE's forms/UI re-shoot gate). GUARD: +3 source-scan in reminder-card-mobile-stack.test.ts
+  (stacks flex-col→sm:flex-row; NOT the old unconditional single-row; action cluster flex-wrap). Non-vacuous (revert
+  to single-row → all 3 RED; verified firsthand, restored). Seeded reminders cleaned up (DB back to 0); servers
+  killed (ports down). FE validate:local GREEN (svelte-check 0, build, 860 pass / 80 files, +3). cov: be 88.92% (~)
+  / fe 89.11% (~). **The eyes-on vein delivered a genuine fix on its LAST un-swept route** — the multi-button action
+  cluster at mobile width was invisible to every prior sweep (those routes lack a 5-button card row) + to unit tests.
+  (bug→247 — a REAL defect fixed. All 5 core routes now eyes-on-swept [dash/analytics C239, expenses C241,
+  vehicle-detail C242, settings C243, reminders C247]; the visual vein is now genuinely complete.)
 - **C246 (infra cadence: untracked-test sweep + coverage re-measure — both flat at the ~89% ceiling, the correct gated-stretch signal)** —
   Balance recompute (cycle 246): ONLY gated-feature over budget; bug + infra tied at threshold (3/3, 6/6). Coverage
   was last MEASURED C231 (15 cycles ago); the C232–C245 stretch added +15 FE tests carried as estimates, so a real
