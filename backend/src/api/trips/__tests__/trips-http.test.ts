@@ -147,6 +147,62 @@ describe('POST /api/v1/trips (create)', () => {
   });
 });
 
+// C216 (guard): the SECOND half of D2's promise — "a trip's end reading drives the mileage-reminder axis".
+// C213 wired recheckMileageReminders into the trip POST + pinned that getCurrentOdometer reflects the
+// reading, but never asserted a mileage reminder actually FIRES when a trip crosses its milestone. A C216
+// bug-scout verified the full chain end-to-end firsthand (POST trip → createFromTrip → getCurrentOdometer →
+// recheck → notification); this pins it so a regression in the trip→odometer→recheck wiring goes red — and
+// a control that a BELOW-milestone trip fires nothing (no false notification).
+describe('a trip crossing a mileage-reminder milestone fires the notification (D2 end-to-end, C216)', () => {
+  /** Seed a mileage-axis reminder due at `dueOdometer` for one vehicle (raw — the mileage API is partial). */
+  function seedMileageReminder(id: string, vehicleId: string, dueOdometer: number): void {
+    ctx.sqlite.run(
+      `INSERT INTO reminders (id, user_id, name, type, action_mode, frequency, trigger_mode,
+         interval_mileage, next_due_odometer, start_date, next_due_date, is_active)
+       VALUES (?, ?, 'Oil change', 'notification', 'automatic', 'mileage', 'mileage', 5000, ?, 0, NULL, 1)`,
+      [id, ctx.user.id, dueOdometer]
+    );
+    ctx.sqlite.run(`INSERT INTO reminder_vehicles (reminder_id, vehicle_id) VALUES (?, ?)`, [
+      id,
+      vehicleId,
+    ]);
+  }
+  const notifCount = (reminderId: string): number =>
+    (
+      ctx.sqlite
+        .query('SELECT COUNT(*) AS n FROM reminder_notifications WHERE reminder_id = ?')
+        .get(reminderId) as { n: number }
+    ).n;
+
+  test('a trip whose endOdometer reaches the milestone fires exactly one notification', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    seedMileageReminder('rm-due', vehicleId, 10000);
+    expect(notifCount('rm-due')).toBe(0);
+
+    const res = await ctx.authed(
+      'POST',
+      '/api/v1/trips',
+      VALID(vehicleId, { startOdometer: 9000, endOdometer: 10500 })
+    );
+    expect(res.status).toBe(201);
+    // The trip's 10500 reading fed getCurrentOdometer → recheck fired the 10000 milestone.
+    expect(notifCount('rm-due')).toBe(1);
+  });
+
+  test('a trip BELOW the milestone fires nothing (no false notification)', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
+    seedMileageReminder('rm-far', vehicleId, 10000);
+
+    const res = await ctx.authed(
+      'POST',
+      '/api/v1/trips',
+      VALID(vehicleId, { startOdometer: 8000, endOdometer: 9500 })
+    );
+    expect(res.status).toBe(201);
+    expect(notifCount('rm-far')).toBe(0); // 9500 < 10000 → not yet due
+  });
+});
+
 // C214 (guard — CHARACTERIZATION of the CURRENT trips↔odometer lifecycle, escalated to Angelo). The D2
 // linkage (C213) writes an odometer entry on trip CREATE, but that entry has NO lifecycle tie back to its
 // trip: editing the trip's endOdometer or deleting the trip leaves the original odometer reading in place,

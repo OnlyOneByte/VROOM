@@ -791,6 +791,15 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C216 — D2's "a trip drives the mileage-reminder axis", end-to-end.** A C216 bug-scout (bug 5/3
+> over) verified firsthand the second half of D2's promise: a trip whose endOdometer crosses a mileage
+> reminder's milestone FIRES the notification (POST → createFromTrip → getCurrentOdometer → recheck →
+> processMileageReminder). CLEAN — works. GAP closed: C213 only pinned that getCurrentOdometer reflects the
+> reading, never that the reminder fires. +2 in trips-http.test.ts (a milestone-crossing trip fires exactly one
+> notification; a below-milestone trip fires nothing). Non-vacuous (remove the recheck call → only the
+> fires-one case RED). D2 now certified end-to-end on BOTH halves (feeds currentOdometer C213/C215 + drives the
+> mileage axis C216). Don't re-add.
+
 > **GUARDED C215 — the D2 trip→odometer dedup: manual-entry case + the local-day window.** A C215 bug-scout
 > (bug 4/3 over, cold-vein lifted by C212/C213) probed the two D2 dedup edges C213 didn't cover, found both
 > CLEAN firsthand: a trip dedups against a MANUALLY-logged same-day-same-reading odometer entry (D2's actual

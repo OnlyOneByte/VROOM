@@ -137,12 +137,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 213 |
 | deep-review | 5 | 213 |
-| guard | 6 | 215 |
+| guard | 6 | 216 |
 | bug | 3 | 211 |
 | arch | 5 | 212 |
 | infra | 6 | 209 |
 
-Current cycle: **215**
+Current cycle: **216**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -161,6 +161,22 @@ Current cycle: **215**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C216 (bug-scout on D2's "drives mileage reminders" claim [CLEAN — fires end-to-end] → guard: pin trip→milestone notification)** —
+  Balance recompute (cycle 216): bug most-starved + over budget (5/3 = 1.67×). Cold-vein: C214/C215 were test-only,
+  so the last prod-logic change is C213 (createFromTrip + the trip-POST recheck wiring) — a real scout target.
+  C215 certified the DEDUP half of D2; this scouted the OTHER half — my C213 commit CLAIMED the linkage "drives
+  maintenance mileage reminders" (I wired recheckMileageReminders into the POST) but I NEVER tested end-to-end that
+  a trip crossing a mileage milestone actually FIRES the reminder. Probed firsthand: seeded a mileage reminder due
+  at 10000, POSTed a trip end=10500 → exactly ONE notification fired (POST → createFromTrip → getCurrentOdometer
+  reflects 10500 → recheck → processMileageReminder emits the milestone). **CLEAN — the full D2 promise (both
+  halves) works.** Per the GUIDE (clean scout → record + pivot to guard; bug drove, the artifact is the guard),
+  closed the gap: the end-to-end "a trip fires a maintenance mileage reminder" claim was UNPINNED (C213 only
+  asserted getCurrentOdometer reflects the reading, never that the reminder fires). +2 in trips-http.test.ts: a
+  trip reaching the milestone fires exactly one notification; a BELOW-milestone trip fires nothing (no false
+  positive). Non-vacuous (remove the recheck call from the POST → ONLY the fires-one case RED, the control stays
+  green; verified firsthand). Test-only → no shot. validate:local GREEN (tsc 0, musl 21 warn baseline, 1903 pass /
+  0 fail, +2, build bundled). **D2 is now certified end-to-end on BOTH halves: feeds currentOdometer (C213/C215) +
+  drives the mileage-reminder axis (C216).** cov: be ~88.5%+ (~) / fe 88.73% (~). (Bug stays 211 — scout clean, no fix; guard→216.)
 - **C215 (bug-scout on the C213 D2 dedup edges [CLEAN — manual-entry + tz-boundary verified] → guard: pin the manual-dedup + local-day window)** —
   Balance recompute (cycle 215): bug most-starved + over budget (4/3 = 1.33×). Cold-vein LIFTED — C212/C213 added
   fresh prod logic (trip-summary + createFromTrip) since the C211 fix → a real scout. Probed the two adversarial D2
