@@ -757,6 +757,17 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **SCOUTED C294 — the NATIVE CSV-import parse path (import-csv.ts — export→re-import round-trip, NORTH_STAR #1) certified
+> CLEAN firsthand → dry.** Picked a not-yet-audited subsystem (per the C293 bug-row reword) distinct from foreign-mapping
+> (C279) + restore coerceRow (C280). Certified: parseAmount/Mileage/Volume strict Number()+finite/integer/range guards;
+> the thousands-separator round-trip hazard DEBUNKED (export writes amount as a raw number → String(number) canonical, so
+> Number() re-import is faithful — the C280 conclusion on the native path); parseDate date-only builds LOCAL + echo-checks
+> (#23/#59), full-ISO absolute-instant; round-trip FIELD-complete (12 export cols, 10 consumed; currency+createdAt
+> export-only-metadata; pinned drift-proof by export-import-column-contract.test.ts, verified non-vacuous); the #102
+> ambiguous-vehicle + #137 non-fuel-clear + electric-kWh + csv: idempotency all intact. NO defect; 25 tests + column
+> contract + no-utc-import-date + full round-trip. Recorded dry + pivot. The foreign-data trio (mapping C279 / coerceRow
+> C280 / native import C294) is fully swept. Don't re-scout import-csv.
+
 > **FIXED C291 — validateUniqueConstraints (the #127/C428 pre-wipe cross-row check) covered only 2 of 5 DB-level UNIQUE
 > indexes on backed-up tables → extended to the 3 missed composite indexes, closing a live empty-account data-loss gap.**
 > The #127 invariant is "catch EVERY DB-level UNIQUE index before the replace-mode wipe" but the check only covered

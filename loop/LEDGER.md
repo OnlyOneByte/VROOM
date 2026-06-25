@@ -233,11 +233,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 227 |
 | deep-review | 5 | 290 |
 | guard | 6 | 289 |
-| bug | 3 | 291 |
+| bug | 3 | 294 |
 | arch | 5 | 292 |
 | infra | 6 | 293 |
 
-Current cycle: **293**
+Current cycle: **294**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,34 @@ Current cycle: **293**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C294 (bug-scout DRY: the NATIVE CSV-import parse path [import-csv.ts — the export→re-import round-trip, NORTH_STAR #1 crown jewel] certified CLEAN firsthand → dry, pivot fast, no manufactured test)** —
+  Balance recompute (cycle 294): nothing strictly OVER budget; among non-gated categories bug most-starved (3/3,
+  1.00×). Applied the C293-refreshed bug-row guidance — prefer a NOT-YET-AUDITED subsystem over re-checking a closed
+  family. The backup/restore subsystem was just deeply worked (C290–C293), so picked a fresh reachable
+  data-correctness surface: the NATIVE CSV-import parse path (import-csv.ts buildImportPlan/parseRow — the export→
+  re-import round-trip, distinct from the foreign-mapping path [C279] and restore coerceRow [C280] already scouted).
+  CERTIFIED CLEAN FIRSTHAND across every invariant: (1) parseAmount/parseMileage/parseVolume use strict Number() +
+  Number.isFinite/isInteger + range guards (blank→null for optionals, ≤0 + >maxAmount rejected); cells are .trim()ed in
+  makeCellGetter. (2) PROBED the thousands-separator round-trip hazard (the #124/#209 class): the export serializes
+  amount as a RAW JS number → csv-stringify writes String(number) = ALWAYS canonical .-decimal (the routes.ts:516
+  "numbers pass through untouched" comment confirmed), so parseAmount Number() round-trips VROOM-own export faithfully
+  — no 1,234.56→NaN hazard on the native path (same conclusion as C280 for coerceRow). (3) parseDate: a date-only cell
+  builds in LOCAL time via buildLocalDate WITH a part echo-check (the #23/#59 family — "2024-13-45" → clean Invalid
+  date, not a silent roll-forward), full-ISO keeps absolute-instant via new Date; shared with the mapping path so they
+  cannot drift. (4) round-trip FIELD COMPLETENESS: export writes 12 columns, import consumes 10 — the 2 unconsumed
+  (currency, createdAt) are deliberately export-only metadata; PINNED drift-proof by export-import-column-contract.test.ts
+  which source-scans the importer get() reads + imports the REAL EXPORT_COLUMNS const (verified non-vacuous: ≥8-read +
+  liveness assertions). (5) the #102 ambiguous-vehicle guard (name→≥2 vehicles → null → clear error, never
+  silently-pick-last), the #137 non-fuel-field clear (clearImportedFuelFields nulls stray mileage/volume/fuelType so a
+  foreign odometer on a maintenance row cannot poison getCurrentOdometer), the electric kWh-in-volume handling (0 kWh
+  correctly rejected), and the deterministic csv: idempotency key (re-import = no-op) all intact. NO fresh defect;
+  comprehensively guarded (25 import-csv tests + the column-contract + no-utc-import-date + full create→export→import
+  round-trip asserting every field). Per the C99/C204 discipline recorded dry + pivoted fast, no manufactured test
+  (covered). Verify: audit only — no source touched, both suites green (1942 BE / 868 FE). Docs-only. cov: be 89.28% /
+  fe 89.43% (~). (bug→294. The native CSV-import parse path is CERTIFIED CLEAN — round-trip field-complete + money/date/
+  unit-coercion all guarded; don't re-scout it. The data-correctness foreign-data trio is now fully swept: foreign
+  mapping [C279], restore coerceRow [C280], native CSV import [C294]. NEXT bug cycle: another un-audited subsystem or
+  record dry on first recheck.)
 - **C293 (infra coverage-cadence MEASURED [BE re-measure triggered by the C291/C292 backup.ts touches] + GUIDE freshness: BE func +0.29, sweep CLEAN, bug-row + coverage standing-truth refreshed)** —
   Balance recompute (cycle 293): nothing strictly OVER budget; among non-gated categories infra most-starved (5/6,
   0.83×) — and a genuine leverage trigger: C291 (+4 tests) + C292 (dedup) both touched backend/src/api/sync/backup.ts
