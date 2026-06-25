@@ -21,6 +21,9 @@
 	let trips = $state<Trip[]>([]);
 	let vehicles = $state<Vehicle[]>([]);
 	let summary = $state<TripSummary | null>(null);
+	// Total trips across all pages (the summary counts ALL trips, so the list must not silently show only
+	// page 1 while the summary says more — the dashboard/expenses "page-1-masquerades-as-all" class).
+	let totalCount = $state(0);
 
 	let distLabel = $derived(getDistanceUnitLabel(settingsStore.unitPreferences.distanceUnit, true));
 	// vehicleId -> display name, so each trip card can name its vehicle (graceful fallback if deleted).
@@ -37,12 +40,16 @@
 		isLoading = true;
 		loadError = null;
 		try {
+			// Request the max page (100) so the read-only list shows as much as one fetch allows; the
+			// "Showing N of M" footer below surfaces any remainder rather than silently truncating (a full
+			// paginator lands with the T6b-2 form cycle). The summary counts ALL trips regardless.
 			const [tripPage, vehicleList, tripSummary] = await Promise.all([
-				tripApi.list(),
+				tripApi.list({ limit: 100 }),
 				vehicleApi.getVehicles(),
 				tripApi.getSummary()
 			]);
 			trips = tripPage.data;
+			totalCount = tripPage.pagination.totalCount;
 			vehicles = vehicleList;
 			summary = tripSummary;
 		} catch (error) {
@@ -172,5 +179,13 @@
 				</CardNs.Card>
 			{/each}
 		</div>
+
+		<!-- Surface any trips beyond this page (the list requests up to 100; the summary counts ALL). Without
+		     this, a >100-trip user would see the summary count exceed the visible cards with no explanation. -->
+		{#if trips.length < totalCount}
+			<p class="text-center text-sm text-muted-foreground" data-testid="trip-list-truncation">
+				Showing {trips.length.toLocaleString()} of {totalCount.toLocaleString()} trips
+			</p>
+		{/if}
 	{/if}
 </div>

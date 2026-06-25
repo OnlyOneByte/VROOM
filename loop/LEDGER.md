@@ -145,11 +145,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 220 |
 | deep-review | 5 | 213 |
 | guard | 6 | 219 |
-| bug | 3 | 211 |
+| bug | 3 | 221 |
 | arch | 5 | 212 |
 | infra | 6 | 217 |
 
-Current cycle: **220**
+Current cycle: **221**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -168,6 +168,23 @@ Current cycle: **220**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C221 (bug: FIX a REAL silent-truncation defect on the C220 trips list page — self-introduced, caught same-arc)** —
+  Balance recompute (cycle 221): bug most-starved (10/3 = 3.33×). **Cold-vein LIFTED — C220 added a fresh prod
+  surface (the trips list page) no scout had touched** → a real scout. Probed it firsthand: the page calls
+  `tripApi.list()` (route default limit=20, paginated) but read only `tripPage.data` + rendered NO paginator,
+  while the Mileage Summary card reads `getSummary()` = ALL trips. **REAL DEFECT (I introduced it C220): a user
+  with >20 trips sees the summary count ALL (e.g. "Trips: 25 / Total: <all-mi>") but only 20 cards below, with
+  NO signal — silent truncation + a visible count mismatch (the dashboard/expenses page-1-masquerades-as-all
+  class).** FE-only UX correctness, NOT a product-semantics call → fixed: request the MAX page (limit:100) +
+  capture `pagination.totalCount` + render a "Showing N of M trips" footer when `trips.length < totalCount` (a
+  full paginator lands with the T6b-2 form cycle; 100 covers virtually every real fleet without it). Eyes-on:
+  re-shot /trips (the 2-trip seed) — no regression, summary intact, footer correctly ABSENT at 2-of-2 (not
+  truncated); svelte-check 0, no console errors. The triggered footer (>100 trips) is a trivial conditional
+  verified by type-check + the no-regression render (impractical to seed 100 rows). FE validate:local GREEN
+  (826 pass / 0 fail). cov: be 88.92% (~) / fe ~88.7% (~). **This is the loop as designed again: C220's fresh
+  UI surface made the bug vein live, and the very next scout caught a self-introduced data-visibility defect
+  before a many-trip user hit it.** REMAINING T6b-2: the create/edit form + e2e. (Bug last-touched advances to
+  221 — a real fix.)
 - **C220 (bug-scout SATURATED → highest-leverage open item: trips T6b-1 — the EYES-ON trips list page + summary card)** —
   Balance recompute (cycle 220): bug most-starved (9/3 = 3.0×) but C219 was test-only + the C218 trip-api surface was
   scouted clean (C219) → no fresh prod logic, a 6th trips-surface guard is ceremony → dry, recorded. arch (8/5) +

@@ -653,6 +653,15 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **CLOSED C221 — REAL silent-truncation defect on the C220 trips list page (self-introduced, caught same-arc).**
+> A C221 bug-scout on the FRESH C220 list page found it called `tripApi.list()` (route default limit=20) + read
+> only `tripPage.data` with NO paginator, while the Mileage Summary card reads `getSummary()` = ALL trips → a
+> >20-trip user saw the summary count exceed the 20 visible cards with no signal (the page-1-masquerades-as-all
+> class). FE-only UX correctness fix: request the max page (limit:100) + capture totalCount + a "Showing N of M
+> trips" footer when truncated (full paginator deferred to T6b-2). Eyes-on re-shot — no regression, footer
+> correctly absent at 2-of-2. FE validate green (826). Don't re-fix. (The loop as designed: C220's fresh UI made
+> the bug vein live; the next scout caught the self-introduced defect.)
+
 > **🚩 ESCALATED C214 (semantics call, NOT auto-fixed — characterization-pinned, awaiting Angelo) — the
 > trips↔odometer EDIT/DELETE lifecycle.** The C213 D2 linkage writes an odometer entry on trip CREATE, but it
 > has NO lifecycle tie back: editing a trip's endOdometer (fat-finger 5000→500) or deleting the trip leaves the
