@@ -1607,6 +1607,14 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 > NOT delete, do NOT self-wire. (The lesson: "exported + no consumer" is necessary-but-not-sufficient for cruft —
 > check the spec for ratified-ahead-of-need surface first.)
 
+> **SWEPT C245 — full backend dead-code sweep, NO genuine dead code.** Scanned every exported `src/utils/*.ts`
+> fn for non-test/non-defining-file refs. 7 candidates, all verified firsthand as NOT dead: calculateMPG/
+> calculateMilesPerKwh/getSocketIp/neutralizeCsvCell (same-file-used, test-exported); buildTripSummaryByMonth
+> (C237 ratified-surface); `_clearKeyCache` (intentional `_`-prefixed encryption test-seam); denormalizeCsvCell
+> (CSV import-inverse, prod-unused state PINNED by the C401-escalated apostrophe-round-trip decision). The
+> analytics builders that a broken-glob pass false-flagged are all live (imported by analytics/repository.ts).
+> No dead code to remove. Future arch cycles: don't re-sweep utils dead-code (clean as of C245). Don't re-scout.
+
 > **SCOUTED C244 — no churn warranted (4 candidates, all fail the bar).** (1) FE `|| undefined` filter-drop —
 > already behind shared buildQueryString; per-site drops are intentional (reminder-api keeps isActive:false). (2)
 > `findByIdAndUserId` — only trips+expenses byte-identical (vehicles is reversed-arg findByUserIdAndId, reminders

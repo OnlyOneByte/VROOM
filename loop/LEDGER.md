@@ -161,10 +161,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 244 |
 | guard | 6 | 242 |
 | bug | 3 | 243 |
-| arch | 5 | 235 |
+| arch | 5 | 245 |
 | infra | 6 | 240 |
 
-Current cycle: **244**
+Current cycle: **245**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -183,6 +183,24 @@ Current cycle: **244**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C245 (arch: a FRESH vein — full backend dead-code sweep → NO genuine dead code [every candidate is used / a test-seam / escalation-pending]; recorded)** —
+  Balance recompute (cycle 245): arch most-starved + over budget (10/5 = 2.0×). The dedup-helper veins are ruled
+  (C235/C244); rather than a 3rd near-identical "no churn" record, scouted a vein NOT yet swept: genuine DEAD CODE
+  (unused exports — a real NORTH_STAR #6 cleanup, behavior-preserving). Swept every exported `src/utils/*.ts`
+  function for non-test, non-defining-file references. Initial broken-glob pass false-flagged the analytics builders
+  (buildAmortizationSchedule etc.) — VERIFIED firsthand they're live (imported by analytics/repository.ts), the
+  "0 refs" was a grep bug not reality. Corrected sweep surfaced 7 candidates; verified EACH firsthand: calculateMPG/
+  calculateMilesPerKwh/getSocketIp/neutralizeCsvCell are SAME-FILE-used (exported for tests but consumed internally);
+  buildTripSummaryByMonth is C237-confirmed ratified-surface; `_clearKeyCache` is an intentional `_`-prefixed
+  test-only seam (resets the encryption key-cache between cases); `denormalizeCsvCell` is the CSV import-side inverse
+  whose prod-unused state is PINNED by the C401-escalated apostrophe-round-trip data-contract decision (deleting it
+  would discard escalation surface). **NO genuine dead code — every candidate is used, an intentional test seam, or
+  escalation-pending.** (Also firsthand-checked whether denormalizeCsvCell being prod-unused is a latent CSV-import
+  round-trip bug → it's the SAME C401-gated apostrophe contract, characterization-pinned, Angelo's call — not a fresh
+  bug to chase.) Recorded "no churn warranted" — now backed by a COMPLETE dead-code sweep (a first-time artifact:
+  future arch cycles can skip re-scanning utils for dead code). No code change → no validate/shot (doc-only). cov: be
+  88.92% (~) / fe 89.11% (~). (arch→245. C232–C245 = 14 gated/dry cycles; the dead-code vein is now also swept clean,
+  joining pure-logic bugs + the visual sweep + dedup-helpers as worked-through. Net-new code awaits an Angelo gate.)
 - **C244 (arch scout → NO churn [2 candidates, both sweep/rule-of-two] → deep-review: CERTIFY the FE↔BE error-envelope contract CLEAN on both sides)** —
   Balance recompute (cycle 244): arch most-starved + over budget (9/5 = 1.8×; deep-review 6/5 = 1.2× also over).
   Took ARCH, scouted 4 dedup candidates firsthand: (1) FE `|| undefined` filter-drop — already behind the shared
