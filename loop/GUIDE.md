@@ -22,7 +22,11 @@ script → `bash loop/push.sh`. Stay silent unless a blocker / product call / ph
    many special cases — git commits, screenshots, builds, multi-step probes all use it.
 2. **Commits:** write `/tmp/vroom-commit.sh` (`set -eo pipefail`, `cd` repo,
    `env -u GIT_SSH_COMMAND git -c user.name='angryang' -c user.email='22626742+OnlyOneByte@users.noreply.github.com'`,
-   ONE path per `git add`, single-quoted `-m` with no `$`/backtick/`!`), run it, then `bash loop/push.sh`.
+   ONE path per `git add`, single-quoted `-m` with no `$`/backtick/`!`/**apostrophe**), run it, then `bash loop/push.sh`.
+   The APOSTROPHE bites most (C277): a single-quoted `-m '…'` body CANNOT contain a literal `'` — it ends the
+   string, the shell word-splits the rest, and `git commit` dies with `pathspec '…' did not match` (the add
+   already ran, so HEAD is unchanged + the files stay staged → just re-commit with a clean message). Write the
+   body apostrophe-free: `the X body` not `X's body`, `do not` not `don't`, `cannot` not `can't`.
    NEVER attempt inline `git commit` — it is always declined.
 3. **Verify gate before "done":** backend `bun run validate:local` (tsc + musl-biome + bun test +
    build); frontend `npm run validate:local`. Biome = the **musl** binary (the "biome broken" note

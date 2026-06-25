@@ -2149,6 +2149,12 @@ baseline), refresh `BRANCH_REVIEW.md` grouped by theme so the eventual PR stays 
 > ~89.3 BE / ~89.1 FE) + fixed the BRANCH_REVIEW mention (gitignored, not a PR artifact). Docs-only, behavior-preserving.
 > So a fresh session won't waste cycles re-scouting exhausted surfaces. NEXT coverage cadence ~C272.
 
+> **RAN C278 (GUIDE hardening — not the coverage cadence).** C277's commit failed firsthand on an apostrophe in the
+> -m body (single-quoted -m can't contain a literal '). GUIDE rule 2 listed $/backtick/! but OMITTED the apostrophe —
+> added it + the why (single-quote termination) + the recovery (add already ran, files staged, just re-commit clean)
+> + the rewrite idiom ("the X body" not "X's body"). Docs-only, the GUIDE-freshness vein (like C267). NEXT coverage
+> cadence ~C282.
+
 > **RAN C272 (coverage cadence; last ran C262).** Untracked-test sweep CLEAN both sides (56 .meshclaw.e2e.ts
 > gitignored BY DESIGN); the C271 dark-mode guard CONFIRMED TRACKED (survives merge). Tree clean; no orphan dev
 > servers (the pgrep vite false-positive again — precise check confirmed :5173 down); branch 126 ahead / 0 behind,

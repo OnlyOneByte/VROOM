@@ -219,9 +219,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 276 |
 | bug | 3 | 277 |
 | arch | 5 | 275 |
-| infra | 6 | 272 |
+| infra | 6 | 278 |
 
-Current cycle: **277**
+Current cycle: **278**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -240,6 +240,20 @@ Current cycle: **277**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C278 (infra: harden the GUIDE commit rule with the APOSTROPHE hazard that broke C277 — a real this-session operating-manual gap)** —
+  Balance recompute (cycle 278): nothing strictly OVER budget; infra most-starved non-gated (6/6, AT budget). The
+  coverage cadence is not due (~C282), so didn't re-run it prematurely. Took a JUSTIFIED loop-tooling fix: C277's
+  commit FAILED firsthand on an apostrophe in the -m body ("no-utc-date-input's body") — a single-quoted -m '…' can't
+  contain a literal ' (it ends the string, the shell word-splits the rest, git dies with `pathspec '…' did not
+  match`). GUIDE rule 2 listed `$`/backtick/`!` as the forbidden chars but OMITTED the apostrophe — an incomplete
+  manual rule that caused a real wasted step this session (had to rewrite the commit script apostrophe-free). FIX:
+  added `apostrophe` to rule 2's forbidden list + a 3-line explanation of WHY (the single-quote-termination mechanism)
+  + the RECOVERY (the add already ran → HEAD unchanged + files staged → just re-commit clean) + the rewrite idiom
+  ("the X body" not "X's body", "do not" not "don't"). This is the GUIDE-freshness infra vein (like C267) — encoding a
+  this-session-proven failure mode into the operating manual so a future cycle (or fresh session) doesn't re-hit it.
+  Behavior-preserving (docs only — no source, no test). Verify: single-file markdown change, both suites green at C276
+  (1935 BE / 866 FE), no validate needed. cov: be 89.27% / fe 89.11% (~). (infra→278. The commit rule is now complete
+  on the quoting hazards. NEXT coverage cadence ~C282.)
 - **C277 (bug-scout DRY [insurance effectiveMonthlyPremium clean] → pivot attempt CORRECTED my own C276 mis-filing: collectSourceFiles is a rule-of-TWO, not three — NOT a convergence target)** —
   Balance recompute (cycle 277): bug was the sole over-budget category (4/3 = 1.33×). Did ONE fresh firsthand scout on
   an unscanned money path: insurance effectiveMonthlyPremium (analytics-charts.ts:210 — the #8/#69 premium money
