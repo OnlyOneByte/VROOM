@@ -159,12 +159,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 227 |
 | deep-review | 5 | 238 |
-| guard | 6 | 239 |
+| guard | 6 | 241 |
 | bug | 3 | 234 |
 | arch | 5 | 235 |
 | infra | 6 | 240 |
 
-Current cycle: **240**
+Current cycle: **241**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -183,6 +183,25 @@ Current cycle: **240**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C241 (eyes-on bug scout on /expenses [CLEAN] → guard: pin the FAB bottom-clearance correspondence)** —
+  Balance recompute (cycle 241): bug most-starved + over budget (7/3 = 2.33×; arch 6/5 = 1.2× also over). Continued
+  the C239 eyes-on bug-scout vein on a FRESH un-shot route: /expenses (the highest-traffic, most overflow/state-prone
+  surface — split rows, filters, table). Booted + minted auth + shot DESKTOP + MOBILE + Read both. FINDINGS: header/
+  filters/table all render clean (no overflow, no console errors); the split row (Feb-1 "Deluxe car wash - split"
+  $60 + Split badge + expand chevron + 2 vehicles) + tags + category icons + pagination + Expense Overview ($606.30/9)
+  all well-formed. NOTED the fixed "Add Expense" FAB visually overlapping rows in the FULL-PAGE shot — INVESTIGATED
+  firsthand rather than filing: floating-action-button.svelte is `position: fixed` (bottom-4…right-4, sm:bottom-8), so
+  the overlap is the fixed-in-full-page-capture artifact, NOT a live defect — AND the expenses page wraps content in
+  `pb-24` (line 363) specifically to clear it. Audited ALL 4 FAB pages (expenses/insurance/vehicles[id]/dashboard):
+  every one has pb-24; reminders/trips use header buttons (no FAB, no clearance needed). **Clean scout — no fresh
+  bug** (the FAB pattern is correct + consistent). Per the GUIDE (clean scout → record + pivot to a guard), pinned
+  the certified invariant, which had NO test: +3 source-scan guards in fab-bottom-clearance.test.ts (every route
+  .svelte importing FloatingActionButton must carry a pb-{16..40} clearance, else its fixed FAB permanently occludes
+  the last row — a NORTH_STAR #3 reachability defect a headless e2e wouldn't catch; +live-scan + FAB-actually-used
+  vacuity floors). Non-vacuous (strip the expenses pb-24 → the guard REDs; verified firsthand, restored). Servers
+  killed (ports down, no orphans). FE validate:local GREEN (svelte-check 0, build, 853 pass / 78 files, +3). cov: be
+  88.92% (~) / fe 89.11%+ (~). (guard→241; bug stays 234 — eyes-on scout clean, no fix. Two un-shot core routes swept
+  clean now [C239 dashboard+analytics, C241 expenses]; settings/reminders/vehicle-detail remain for future bug cycles.)
 - **C240 (bug scout via the eyes-on vein → the lead [#140] was STALE doc-drift, NOT open → infra: reconcile CLAUDE.md's stale bug-list against the live BACKLOG)** —
   Balance recompute (cycle 240): bug most-starved + over budget (6/3 = 2.0×). Followed the C239 eyes-on bug-scout vein
   to its strongest lead: #140 (LeaseMetricsCard annual-vs-total), which CLAUDE.md's bug list flags as OPEN — "a clean

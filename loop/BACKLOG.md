@@ -878,6 +878,16 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **CERTIFIED + GUARDED C241 — the FloatingActionButton bottom-clearance correspondence (eyes-on /expenses scout
+> → clean → guard).** A C241 eyes-on shot /expenses desktop+mobile: header/filters/table/split-row all render
+> clean (no overflow/console errors). The fixed "Add Expense" FAB overlapping rows in the full-page shot is the
+> fixed-in-full-page-capture artifact, NOT a defect — the page wraps content in pb-24 to clear it, and ALL 4 FAB
+> pages (expenses/insurance/vehicles[id]/dashboard) are consistent. Pinned the invariant (was untested): +3
+> source-scan guards in fab-bottom-clearance.test.ts (any route importing FloatingActionButton must carry a
+> pb-{16..40} clearance, else the fixed FAB permanently occludes the last row — NORTH_STAR #3). Non-vacuous (strip
+> a page's pb-24 → REDs). Eyes-on bug vein: C239 swept dashboard+analytics, C241 expenses — settings/reminders/
+> vehicle-detail remain for future bug cycles. Don't re-guard.
+
 > **CERTIFIED + GUARDED C239 — the analytics FuelStatsTab empty-data four-state gate (eyes-on scout → clean →
 > guard).** A C239 eyes-on bug-scout shot /analytics desktop+mobile on the seeded user (fillups all 2024, env
 > clock 2026 → the default this-year range is genuinely empty): the tab renders "No fuel data yet" EmptyState
