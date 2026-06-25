@@ -170,11 +170,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 227 |
 | deep-review | 5 | 244 |
 | guard | 6 | 242 |
-| bug | 3 | 247 |
+| bug | 3 | 248 |
 | arch | 5 | 245 |
 | infra | 6 | 246 |
 
-Current cycle: **247**
+Current cycle: **248**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -193,6 +193,24 @@ Current cycle: **247**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C248 (bug scout: hunt the C247 mobile-occlusion CLASS for siblings → none reachable [verified firsthand]; clean)** —
+  Balance recompute (cycle 248): nothing strictly over budget except gated-feature → highest-leverage open item =
+  scout the C247 occlusion class (`justify-between` row + a `flex-shrink-0` action cluster beside a `min-w-0`
+  truncate title, no mobile stack) for SIBLINGS — a real bug-hunt directly leveraging the fresh C247 finding.
+  Grep-scouted 11 candidates with the combo; narrowed to the genuinely-risky multi-button clusters: PolicyCard
+  (1 icon button), ClaimsSection (3 icon buttons), DueRemindersCard (text-right amount, not actions). VERIFIED
+  firsthand via shot: booted + minted auth + shot /insurance mobile (2 seeded policies) → PolicyCard renders CLEAN
+  ("State Farm / Policy #SF123456789" title fully readable beside the Expired badge + single gear icon; no
+  occlusion — the 1-icon cluster leaves ample room). Then SEEDED a long-description claim + re-shot to exercise
+  ClaimsSection's 3-icon row. KEY DISTINCTION from C247: these clusters are `size="icon" h-7 w-7` ICON-ONLY buttons
+  (~28px each; 3-icon ≈ 100px) vs reminders' 5 WIDE TEXT buttons (Serviced/Pause, ~280px) — so they leave ~230px
+  for the title on a 360px phone, which truncates gracefully rather than collapsing to a sliver. **No reachable
+  sibling defect — the C247 occlusion required the wide-text-button cluster width specifically; the icon-cluster
+  cards are below the threshold.** Clean scout. Cleaned up the seeded claim (back to 0); servers killed (ports
+  down). No code change → no validate (scout was read/shot-only; the C247 guard already pins the one real instance).
+  cov: be 88.92% (~) / fe 89.11% (~). (bug→248 — a real fresh-surface scout, clean. LESSON recorded in BACKLOG: the
+  occlusion class is bounded to WIDE-text-button action clusters; icon-only clusters [PolicyCard/ClaimsSection] are
+  safe — future cycles needn't re-chase them.)
 - **C247 (eyes-on bug scout on /reminders [SEEDED] → FOUND + FIXED a real mobile-occlusion defect [NORTH_STAR #3])** —
   Balance recompute (cycle 247): bug most-starved + over budget (4/3 = 1.33×). Took the one un-shot core route C243
   deferred (/reminders, 0 seeded reminders) — now exercisable by SEEDING via the API. Booted + minted auth + seeded

@@ -677,6 +677,14 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **SCOUTED C248 — the C247 mobile-occlusion CLASS has NO reachable sibling (verified firsthand).** Grep found 11
+> cards with the `justify-between` + `flex-shrink-0` + `min-w-0 truncate` combo; the multi-button candidates
+> (PolicyCard, ClaimsSection) were shot firsthand on /insurance mobile (incl. a seeded long-description claim):
+> both render CLEAN. KEY: those clusters are `size="icon" h-7 w-7` ICON-ONLY buttons (3-icon ≈ 100px) vs reminders'
+> 5 WIDE TEXT buttons (~280px) — they leave ~230px for the title on a 360px phone, which truncates gracefully. The
+> occlusion class is BOUNDED to wide-text-button action clusters; icon-only clusters are safe. Future cycles
+> needn't re-chase PolicyCard/ClaimsSection for this. Don't re-scout.
+
 > **CLOSED C247 — REAL mobile-occlusion defect on the /reminders card (NORTH_STAR #3), found on the LAST
 > un-swept route.** A C247 eyes-on scout SEEDED 3 reminders via the API (the route had 0, deferred C243) + shot
 > mobile: the card was a single `flex items-start justify-between` row with a `min-w-0` title beside a
