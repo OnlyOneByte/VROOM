@@ -185,12 +185,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 227 |
 | deep-review | 5 | 255 |
-| guard | 6 | 251 |
+| guard | 6 | 256 |
 | bug | 3 | 253 |
 | arch | 5 | 252 |
 | infra | 6 | 254 |
 
-Current cycle: **255**
+Current cycle: **256**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -209,6 +209,30 @@ Current cycle: **255**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C256 (guard: cover the un-tested odometer HISTORY route via the C250/C251 filter-branch pattern — odometer/routes.ts 87→100% line, real new covered SOURCE)** —
+  Balance recompute (cycle 256): nothing strictly over budget except the gated feature (227, parked); bug AT
+  threshold (3/3, not over). Per the C248 convention took the highest-leverage open item = the ONE vein still
+  yielding real covered-SOURCE gains (the C254 infra measure proved BE moved +0.12 from it): the C250/C251
+  filter-branch coverage pattern (cover a clean reachable route path a repo-unit-test can't reach, NOT theater).
+  This is a guard cycle (251→256) and it advances the standing 90% goal — strictly higher-leverage than a
+  not-forced dry bug scout. FOUND via per-file BE coverage: odometer/routes.ts was 87.27% line / 91.67% func with
+  the uncovered block at 70-83 = the **GET /:vehicleId/history** route handler. Its repo method getHistory (the
+  UNION-ALL of expenses.mileage + odometer_entries) IS unit/property-tested (odometer-history.property.test.ts
+  drives the repo directly), but the ROUTE — the ownership gate + clampPagination + buildPaginatedResponse envelope
+  — was NEVER driven by an HTTP test (the only odometer route with zero route-level coverage). NEW
+  odometer-history-route.test.ts (+4, createTestApp harness, the update-route.test.ts pattern): seeds a manual
+  entry + a fuel expense-with-mileage → GET /history asserts the unified DESC-ordered {odometer,source,sourceId}
+  shape merges BOTH sources; the empty-vehicle envelope; limit-truncates-and-flips-hasMore; an unowned vehicleId →
+  404 (ownership gate, no cross-tenant leak). NOT theater — drives the REAL route stack end-to-end (the C181/C229
+  lesson). VERIFIED the gain firsthand: odometer/routes.ts 87.27→100% line / 91.67→100% func (the 70-83 block
+  dropped from uncovered); overall BE 89.04→89.15% line / 88.54→88.62% func — 3rd clean covered-SOURCE pick via the
+  filter-branch vein (after C250 expenses-summary, C251 reminders-list). Caught my own body-double-read (the C228
+  class of self-error: an `await res.text()` in an assert MESSAGE consumed the body before json(res) → ERR_BODY_
+  ALREADY_USED; switched to JSON.stringify(body) after parse). Verify: BE validate:local GREEN — tsc 0, musl
+  whole-tree clean (21-warn baseline, 0 errors), 1930 pass / 0 fail (+4), build bundled. Backend-only (route HTTP
+  test) → no shot. cov: be 89.15% (MEASURED, +0.11 line) / fe 89.11% (~). (guard→256. The C250/C251 filter-branch
+  vein now has 3 clean picks — more route/repo low-spots may remain [odometer/routes now 100%]; next guard cycle
+  can pull the per-file table again for the next plain reachable gap.)
 - **C255 (deep-review SATURATED: certified the trips feature arc's data-safety + correctness invariants CLEAN against source — no fresh defect, all already-guarded)** —
   Balance recompute (cycle 255): nothing strictly over budget except the gated feature (227, parked). Per the C248
   convention took the highest-leverage open item = the most-starved non-gated category, deep-review (5/5, AT budget,

@@ -934,6 +934,16 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **COVERED C256 — the un-tested odometer HISTORY route, via the C250/C251 filter-branch pattern (real new
+> covered SOURCE, not theater).** Per-file BE coverage flagged odometer/routes.ts at 87.27% line / 91.67% func with
+> the GET /:vehicleId/history handler (70-83) uncovered: its repo method getHistory (UNION of expenses.mileage +
+> odometer_entries) is property-tested at the REPO layer, but the ROUTE (ownership gate + clampPagination +
+> buildPaginatedResponse) had zero HTTP coverage. +4 in a new odometer-history-route.test.ts (createTestApp): merges
+> both sources DESC-ordered; empty-vehicle envelope; limit-truncates-flips-hasMore; unowned→404. VERIFIED:
+> odometer/routes.ts 87.27→100% line / 91.67→100% func; overall BE 89.04→89.15% line. 3rd clean filter-branch pick
+> (after C250 expenses-summary, C251 reminders-list). The vein still has picks — next guard cycle: re-pull the
+> per-file table for the next plain reachable route/repo gap. Don't re-cover odometer routes (now 100%).
+
 > **SCOUTED C249 — guard surface SATURATED for the current (gated) prod-logic; no manufactured test.** 4
 > candidates, all already covered: /trips in route-smoke a11y (line 72); trips pagination over-max rejection
 > (inherited from the C232 clampedPaginationFields guard — re-testing duplicates it); the C247 reminders
