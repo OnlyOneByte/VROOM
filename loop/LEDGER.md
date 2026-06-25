@@ -137,12 +137,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 213 |
 | deep-review | 5 | 213 |
-| guard | 6 | 214 |
+| guard | 6 | 215 |
 | bug | 3 | 211 |
 | arch | 5 | 212 |
 | infra | 6 | 209 |
 
-Current cycle: **214**
+Current cycle: **215**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -161,6 +161,22 @@ Current cycle: **214**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C215 (bug-scout on the C213 D2 dedup edges [CLEAN — manual-entry + tz-boundary verified] → guard: pin the manual-dedup + local-day window)** —
+  Balance recompute (cycle 215): bug most-starved + over budget (4/3 = 1.33×). Cold-vein LIFTED — C212/C213 added
+  fresh prod logic (trip-summary + createFromTrip) since the C211 fix → a real scout. Probed the two adversarial D2
+  dedup edges my C213 tests DIDN'T cover: (1) does a trip dedup against a MANUALLY-logged odometer entry (D2's
+  actual "user also logged it manually" double-count scenario, not just trip→trip)? (2) the dedup window — is it a
+  genuine LOCAL-calendar-day (R5) or a UTC slice with a midnight off-by-one (the gold tz seam #87/#106)? **Both
+  CLEAN firsthand:** manual-entry dedup works (createFromTrip returns null against a manual same-day-same-reading
+  row), and the window uses getFullYear/Month/Date (local day) — two readings straddling UTC-midnight correctly
+  resolve to distinct local days. No defect. Per the GUIDE (clean scout → record + pivot to guard; bug drove but
+  the artifact is a guard), closed the gap: D2's RAISON D'ÊTRE (dedup vs a manual log) + the local-day window were
+  UNPINNED (C213 only tested trip→trip). +2 in create-from-trip.test.ts: manual-entry same-day-same-reading dedups
+  (via repo.create note=null then createFromTrip → null, count stays 1); local-day window (same-local-day dedups,
+  next-local-day inserts — host-TZ-relative so it holds in any runner zone). Non-vacuous (neuter the dedup → all 3
+  dedup tests RED incl. the manual case; verified firsthand). Test-only → no shot. validate:local GREEN (tsc 0,
+  musl 21 warn baseline, 1901 pass / 0 fail, +2, build bundled). cov: be ~88.5%+ (~) / fe 88.73% (~). (Bug stays
+  211 — scout clean, no fix; guard→215.)
 - **C214 (guard: characterization-pin the trips↔odometer EDIT/DELETE lifecycle + ESCALATE the semantics call to Angelo)** —
   Balance recompute (cycle 214): guard most-starved + the ONLY strictly over-budget category (7/6 = 1.17×; bug
   3/3 at threshold, rest under). Took guard — but probed for a GENUINE invariant first (not ceremony). The C213 D2

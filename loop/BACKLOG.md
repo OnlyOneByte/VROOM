@@ -791,6 +791,15 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C215 — the D2 trip→odometer dedup: manual-entry case + the local-day window.** A C215 bug-scout
+> (bug 4/3 over, cold-vein lifted by C212/C213) probed the two D2 dedup edges C213 didn't cover, found both
+> CLEAN firsthand: a trip dedups against a MANUALLY-logged same-day-same-reading odometer entry (D2's actual
+> double-count scenario, not just trip→trip), and the dedup window is a genuine LOCAL calendar day (getFullYear/
+> Month/Date), so a UTC-midnight straddle resolves to distinct local days (no #87/#106 off-by-one). GAP closed:
+> D2's raison d'être (dedup vs a manual log) + the local-day window were unpinned. +2 in create-from-trip.test.ts
+> (manual-entry dedup; same-local-day dedups / next-local-day inserts, host-TZ-relative). Non-vacuous (neuter the
+> dedup → all 3 dedup tests RED). Don't re-add.
+
 > **GUARDED C207 — the trips vehicle-delete CASCADE, end-to-end (NORTH_STAR #2).** A C207 bug-scout traced the
 > vehicle-delete route firsthand: it reaps photos for expense+odometer children before the FK-cascade (photos have
 > no FK → orphan risk, the #C404/#34 class). Verified CLEAN that `trip` is NOT a photo-upload entity type (absent

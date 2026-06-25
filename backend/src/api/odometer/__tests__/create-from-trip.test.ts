@@ -112,4 +112,50 @@ describe('OdometerRepository.createFromTrip (D2)', () => {
     const created = await repo.createFromTrip(base());
     expect(created, 'our insert is not blocked by a foreign user row').not.toBeNull();
   });
+
+  // C215 (guard): D2's WHOLE POINT is "avoid the divergent double-count when the user ALSO logs odometer
+  // manually". The C213 tests only covered trip→trip dedup; this pins the actual scenario — a trip dedups
+  // against a MANUALLY-created entry (the normal odometer create path, note=null) for the same (vehicle,
+  // day, reading). A regression that only deduped trip-origin entries would silently double-count here.
+  test('dedups against a MANUALLY-logged same-day-same-reading entry (the D2 double-count scenario)', async () => {
+    // The user already logged 5000 today via the regular odometer create (no provenance note).
+    await repo.create({
+      vehicleId: VEHICLE_ID,
+      userId: USER_ID,
+      odometer: 5000,
+      recordedAt: new Date('2024-06-20T09:00:00.000Z'),
+      note: null,
+    });
+    // A trip that same day at the same reading must NOT add a second odometer entry.
+    const fromTrip = await repo.createFromTrip(
+      base({ recordedAt: new Date('2024-06-20T18:00:00.000Z') })
+    );
+    expect(fromTrip, 'a trip reading matching a manual entry dedups').toBeNull();
+    expect(countEntries()).toBe(1);
+  });
+
+  // C215 (guard): the dedup window is the LOCAL calendar day (getFullYear/Month/Date), matching R5's
+  // local-day semantics — NOT a UTC day. Two readings straddling UTC-midnight on the same local day dedup;
+  // and the cross-day case inserts. Pins that the window can't silently regress to a UTC slice (the #87/#106
+  // date-seam class). (Asserted relative to the host TZ so it holds regardless of the runner's zone.)
+  test('the dedup window is the LOCAL calendar day, not a UTC slice (R5)', async () => {
+    const first = new Date('2024-06-20T12:00:00.000Z');
+    await repo.createFromTrip(base({ recordedAt: first }));
+    // Same LOCAL day as `first`, a few hours later → dedup (one entry).
+    const sameLocalDay = new Date(first.getFullYear(), first.getMonth(), first.getDate(), 23, 0, 0);
+    const dup = await repo.createFromTrip(base({ recordedAt: sameLocalDay }));
+    expect(dup, 'same local day + same reading dedups').toBeNull();
+    // The NEXT local day at the same reading is a distinct observation → inserts.
+    const nextLocalDay = new Date(
+      first.getFullYear(),
+      first.getMonth(),
+      first.getDate() + 1,
+      1,
+      0,
+      0
+    );
+    const next = await repo.createFromTrip(base({ recordedAt: nextLocalDay }));
+    expect(next, 'next local day inserts').not.toBeNull();
+    expect(countEntries()).toBe(2);
+  });
 });
