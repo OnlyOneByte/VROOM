@@ -1906,6 +1906,16 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 ### arch
 *(reliably DRY per the archive. Run a fresh dedup scout; if nothing clean surfaces, record "no churn warranted" + pivot. Obey the arch rules above.)*
 
+> **NO CHURN C297 — resolveProviderState ↔ consumeOAuthState ruled a DIVERGENT dedup target (recorded fast).** The C296
+> auth audit surfaced the C39-noted lead: the provider OAuth callback keeps its own inline state-consume
+> (resolveProviderState) separate from the shared consumeOAuthState. The consume KERNEL (get→flow-check→delete) is
+> shared, but resolveProviderState carries 3 deliberate divergences (the !code cancellation branch, returnTo read+threaded
+> from the entry BEFORE validation into BOTH error+success shapes, a PKCE codeVerifier assert). A clean extraction would
+> lose the entry returnTo on the error path → cancelled/invalid_state would fall back to the default redirect, an
+> OBSERVABLE change on an UNTESTED path (the property test covers only success). Per the arch rules (behavior-preserving
+> AND test-anchored), changing untested behavior is not a clean dedup → C277 rule-of-two-plus-divergent. Don't re-scout
+> resolveProviderState. The only production-source touch since the C292 dedup is C296 (a single clean helper, not a dup).
+
 > **DEDUP C292 — converged the C291 self-introduced dupCheck/dupCheckComposite pair in validateUniqueConstraints
 > (backup.ts) into ONE helper, −16 LOC, behavior-identical.** The C286 FAST-DRY precondition correctly did NOT fire (C291
 > threaded fresh source), so scouted whether C291 created a self-dup — it did: C291 added a composite-key

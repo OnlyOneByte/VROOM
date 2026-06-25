@@ -234,10 +234,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 296 |
 | guard | 6 | 295 |
 | bug | 3 | 294 |
-| arch | 5 | 292 |
+| arch | 5 | 297 |
 | infra | 6 | 293 |
 
-Current cycle: **296**
+Current cycle: **297**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,29 @@ Current cycle: **296**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C297 (arch NO CHURN, recorded FAST: the only fresh dedup candidate [resolveProviderState ↔ consumeOAuthState, surfaced by the C296 auth audit] is a DIVERGENT target — clean extraction would change an UNTESTED behavior; ruled below-bar per the C277 rule-of-two-plus-divergent pattern)** —
+  Balance recompute (cycle 297): nothing strictly OVER budget; bug + arch tied at 1.00× (3/3, 5/5), so a highest-leverage
+  pick. Took arch on a concrete lead the C296 auth audit surfaced (fresh in context): the C39 comment in auth/routes.ts
+  flags that the PROVIDER OAuth callback keeps its OWN inline state-consume (resolveProviderState) separate from the
+  shared consumeOAuthState (the C39/C38 extraction). Assessed it firsthand as a dedup target. The single-use-consume
+  KERNEL is genuinely shared (get → flowType-check → delete-on-failure → delete-on-success ≡ consumeOAuthState(store,
+  state, provider)), BUT resolveProviderState carries THREE genuine divergences the C39 author DELIBERATELY kept inline
+  (the comment says so): (1) the !code OAUTH-CANCELLATION branch (returns error:cancelled — consumeOAuthState has no code
+  concept); (2) it reads + threads returnTo from the entry BEFORE validation, returning it in BOTH the error AND success
+  shapes; (3) a PKCE codeVerifier runtime assertion. The decisive blocker: a clean extraction (entry =
+  consumeOAuthState(...); if !entry return invalid_state) would LOSE access to the entry returnTo on the error path →
+  the cancelled/invalid_state redirect would fall back to the default /settings/providers instead of the entry returnTo
+  — an OBSERVABLE behavior change on a path that is NOT test-anchored (the provider-oauth-session property test exercises
+  only success paths; its _returnTo args are unused). Per the arch rules (behavior-preserving AND test-anchored), a
+  refactor that changes an untested behavior is NOT a clean dedup → it is the C277 rule-of-two-plus-divergent pattern.
+  Confirmed firsthand this is the ONLY fresh candidate: git log over production-src since the C292 dedup shows the only
+  touch is C296 (the checkLinkConflicts export+DI — a single clean helper, not a duplicate). Recorded no-churn-warranted
+  + pivot, FAST — did not force the dedup (manufacturing churn / changing untested behavior is worse than the small
+  overlap). Verify: audit only — no source touched, both suites green (1949 BE / 868 FE). Docs-only. cov: be 89.28% /
+  fe 89.43% (~). (arch→297. resolveProviderState is firsthand-ruled DIVERGENT [returnTo-on-error + cancellation + PKCE,
+  deliberately inline per C39] — do NOT re-scout it as a dedup target; if the provider flow is ever refactored to make
+  returnTo-on-error testable, the consume kernel COULD then converge, but not before. The dedup vein is dry until a
+  fresh feature surface threads new duplicate code.)
 - **C296 (deep-review: the AUTH subsystem certified firsthand — consumeOAuthState + validateAndRefreshSession already fully guarded [no re-cert] — found + pinned the ONE un-guarded load-bearing security invariant: the checkLinkConflicts account-takeover boundary, via a minimal repo-DI refactor + a mutation-verified guard)** —
   Balance recompute (cycle 296): deep-review was the SOLE over-budget category (6/5 = 1.20×). The vein is saturated
   across trips/repos/TCO/offline-sync/CSV-import/provider-config/backup-round-trip, so picked a NOT-YET-CERTIFIED
