@@ -2179,6 +2179,15 @@ baseline), refresh `BRANCH_REVIEW.md` grouped by theme so the eventual PR stays 
 > + the rewrite idiom ("the X body" not "X's body"). Docs-only, the GUIDE-freshness vein (like C267). NEXT coverage
 > cadence ~C282.
 
+> **RAN C282 (coverage cadence; last ran C272).** Untracked-test sweep CLEAN both sides (56 .meshclaw.e2e.ts
+> gitignored BY DESIGN); the C275 collect-svelte-files helper + C276 meta-guard CONFIRMED TRACKED (survive merge).
+> Tree clean; no orphan dev servers (precise pgrep: no bun / no vite); branch 136 ahead / 0 behind, PR-ready. Coverage
+> RE-MEASURED: BE 89.28% line / 88.70% func (1935 pass) — FLAT vs C272 (no BE source since). FE 89.17% line / 81.4%
+> branch (866 pass, +3 vs C272 = the C276 meta-guard) — slightly UP (C275 helper + C276 added covered test-infra
+> lines). Both at/above the ~89% structural ceiling, both green. NEXT cadence ~C292. SIGNAL: all self-directed veins
+> firsthand-saturated; durable artifacts now come only from a fresh axis / real friction / a self-dup the loop creates;
+> net-new feature SOURCE Angelo-gated.
+
 > **RAN C272 (coverage cadence; last ran C262).** Untracked-test sweep CLEAN both sides (56 .meshclaw.e2e.ts
 > gitignored BY DESIGN); the C271 dark-mode guard CONFIRMED TRACKED (survives merge). Tree clean; no orphan dev
 > servers (the pgrep vite false-positive again — precise check confirmed :5173 down); branch 126 ahead / 0 behind,

@@ -29,6 +29,22 @@
 > (C155 email-fix / C157 resolveNewUser / C158 unlink-route) + the C159 offline needs-attention helpers
 > (pure+covered) added covered lines; FE crossed 88.4 line (a fresh high). Structural ceiling holds (DI/OAuth/SQL
 > BE + effect/DOM FE). NEXT ~C171.**
+> **C282 (infra cadence MEASURED): BE 89.28% line / 88.70% func (1935 pass / 353 files) — FLAT vs C272 (no BE
+> source changed since; C273–C281 were FE-guard/dedup/audit/docs cycles). FE 89.17% line / 89.26% func / 81.4%
+> branch / 87.0% stmts (866 pass / 82 files) — slightly UP vs C272 (89.11/89.23/81.34/86.99): the C275 shared
+> collect-svelte-files helper + the C276 no-duplicate-file-walker meta-guard added covered test-infra lines
+> (1326→1334 lines, 920→928 branches). Both hold at/above the ~89% structural ceiling, both green. Untracked-test
+> sweep CLEAN both sides (the 56 .meshclaw.e2e.ts gitignored BY DESIGN); the C275 helper + C276 meta-guard CONFIRMED
+> TRACKED (git ls-files _helpers/) → survive merge. Tree clean; no live orphan dev servers (precise pgrep: no bun /
+> no vite). Branch 136 ahead / 0 behind origin/main, PR-ready. The C272→C282 stretch (C273 bug-dry, C274 offline-sync
+> deep-review, C275 collectSvelteFiles convergence [-48 LOC], C276 meta-guard, C277 mis-filing self-correction, C278
+> GUIDE apostrophe-hardening, C279 CSV-import deep-review, C280 coerceRow bug-dry, C281 arch no-churn) added 2 real
+> code artifacts (C275 dedup + C276 guard) + 4 firsthand certifications (offline-sync, CSV-import, coerceRow, +
+> getCrossVehicle C273) + a self-correction + a GUIDE fix — productive within the gate, coverage flat-to-slightly-up
+> by design. BRANCH_REVIEW.md gitignored → no refresh artifact. NEXT cadence ~C292. STANDING SIGNAL: all self-directed
+> veins firsthand-saturated (per the C267-refreshed GUIDE); durable artifacts now come only from a fresh axis (dark
+> mode C268–C271), a real friction (C278), or a genuine self-dup the loop's own work creates (C275); net-new feature
+> SOURCE stays Angelo-gated.**
 > **C272 (infra cadence MEASURED): BE 89.27% line / 88.69% func (1935 pass / 353 files) — FLAT vs C262 (no BE
 > source changed since; C263–C271 were FE-guard/audit/docs/eyes-on cycles). FE 89.11% line / 89.23% func / 81.34%
 > branch / 86.99% stmts (863 pass / 81 files) — line/branch/stmts FLAT vs C262, +3 tests (the C271
@@ -219,9 +235,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 276 |
 | bug | 3 | 280 |
 | arch | 5 | 281 |
-| infra | 6 | 278 |
+| infra | 6 | 282 |
 
-Current cycle: **281**
+Current cycle: **282**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
