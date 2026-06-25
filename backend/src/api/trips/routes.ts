@@ -96,7 +96,11 @@ routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   return c.json({ success: true, data: trip });
 });
 
-// PUT /api/v1/trips/:id — update (ownership-checked; the R2 refine fires only when both odometers present).
+// PUT /api/v1/trips/:id — update (ownership-checked). R2 must hold on the EFFECTIVE merged pair, not just
+// the request body: updateTripSchema's refine fires only when BOTH odometers are present in the body, so a
+// partial PUT sending only one (e.g. endOdometer below the STORED startOdometer) would otherwise persist an
+// inverted pair — distance clamps to 0, a phantom 0-mile trip (#109 "refine doesn't survive partial" / #130
+// "validate the merged state, not the request"). Re-check against the existing row before writing.
 routes.put(
   '/:id',
   zValidator('param', commonSchemas.idParam),
@@ -106,7 +110,20 @@ routes.put(
     const { id } = c.req.valid('param');
     const data = c.req.valid('json');
 
-    await validateTripOwnership(id, user.id);
+    const existing = await validateTripOwnership(id, user.id);
+
+    // The merged odometer pair = the request value where sent, else the stored value.
+    const start = data.startOdometer ?? existing.startOdometer;
+    const end = data.endOdometer ?? existing.endOdometer;
+    if (end < start) {
+      return c.json(
+        {
+          success: false,
+          error: 'endOdometer must be greater than or equal to startOdometer',
+        },
+        400
+      );
+    }
 
     const updated = await tripRepository.update(id, data);
     return c.json({ success: true, data: updated, message: 'Trip updated' });

@@ -207,6 +207,59 @@ describe('PUT /api/v1/trips/:id', () => {
     expect(res.status).toBe(400);
   });
 
+  // C211 (bug): a PARTIAL PUT must be validated against the EFFECTIVE merged pair, not just the body. The
+  // updateTripSchema refine fires only when BOTH odometers are present, so sending ONLY endOdometer below
+  // the STORED startOdometer (or ONLY startOdometer above the stored end) bypassed R2 and persisted an
+  // inverted pair → tripDistance clamps to 0, a phantom 0-mile trip (#109/#130 class). The route now
+  // re-checks the merged pair against the existing row.
+  test('rejects a partial PUT of ONLY endOdometer below the STORED startOdometer (#109/#130, 400)', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    const created = await ctx.authed(
+      'POST',
+      '/api/v1/trips',
+      VALID(vehicleId, { startOdometer: 1000, endOdometer: 1080 })
+    );
+    const { data } = await json<DataEnvelope<{ id: string }>>(created);
+
+    const res = await ctx.authed('PUT', `/api/v1/trips/${data.id}`, { endOdometer: 500 });
+    expect(res.status).toBe(400);
+    // The inverted value was NOT persisted — the stored pair is untouched.
+    const row = ctx.sqlite
+      .query('SELECT start_odometer, end_odometer FROM trips WHERE id = ?')
+      .get(data.id) as { start_odometer: number; end_odometer: number };
+    expect(row.start_odometer).toBe(1000);
+    expect(row.end_odometer).toBe(1080);
+  });
+
+  test('rejects a partial PUT of ONLY startOdometer above the STORED endOdometer (#109/#130, 400)', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    const created = await ctx.authed(
+      'POST',
+      '/api/v1/trips',
+      VALID(vehicleId, { startOdometer: 1000, endOdometer: 1080 })
+    );
+    const { data } = await json<DataEnvelope<{ id: string }>>(created);
+
+    const res = await ctx.authed('PUT', `/api/v1/trips/${data.id}`, { startOdometer: 5000 });
+    expect(res.status).toBe(400);
+  });
+
+  test('ACCEPTS a valid partial PUT of ONLY endOdometer above the stored start (no false reject)', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    const created = await ctx.authed(
+      'POST',
+      '/api/v1/trips',
+      VALID(vehicleId, { startOdometer: 1000, endOdometer: 1080 })
+    );
+    const { data } = await json<DataEnvelope<{ id: string }>>(created);
+
+    // 1200 >= stored start 1000 → valid; must NOT be falsely rejected by the merged-pair check.
+    const res = await ctx.authed('PUT', `/api/v1/trips/${data.id}`, { endOdometer: 1200 });
+    const body = await json<DataEnvelope<{ endOdometer: number }>>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.data.endOdometer).toBe(1200);
+  });
+
   test('a foreign trip update is 404 (no cross-tenant write)', async () => {
     const { tripId } = seedForeignTrip();
     const res = await ctx.authed('PUT', `/api/v1/trips/${tripId}`, { note: 'hijack' });

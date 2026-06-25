@@ -138,11 +138,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 210 |
 | deep-review | 5 | 208 |
 | guard | 6 | 207 |
-| bug | 3 | 173 |
+| bug | 3 | 211 |
 | arch | 5 | 205 |
 | infra | 6 | 209 |
 
-Current cycle: **210**
+Current cycle: **211**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -161,6 +161,24 @@ Current cycle: **210**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C211 (bug: FIX a REAL write-path validation-asymmetry defect on the C210 trips PUT — the cold vein is LIVE again)** —
+  Balance recompute (cycle 211): bug most-starved (38/3 = 12.67×). **The cold-vein precondition NO LONGER holds —
+  C210 added fresh prod logic (trips routes + validation), so a scout on that surface is a REAL scout.** Scouted
+  exactly the GUIDE's gold seam (write-path validation ASYMMETRY) on the new PUT path, with a throwaway probe:
+  `PUT {endOdometer:500}` on a trip stored start=1000/end=1080 → **200 + persisted start=1000/end=500, an INVERTED
+  pair.** REAL DEFECT (I introduced it C210): updateTripSchema's R2 refine fires only when BOTH odometers are in
+  the body, so a PARTIAL PUT touching one odometer bypasses R2 against the STORED value (#109 "refine doesn't
+  survive partial" + #130 "validate the merged state, not the request" class). Impact: tripDistance=max(0,end−start)
+  clamps the inverted pair to 0 → a phantom 0-mile trip in T5 analytics + a nonsensical record the create path
+  rejects. FIX: the PUT handler re-checks the EFFECTIVE merged pair (request value ?? stored value) against R2
+  before writing, using the row validateTripOwnership already returns → 400 on an inverted merge. GUARD: +3 in
+  trips-http.test.ts — only-endOdometer-below-stored-start → 400 + stored pair untouched; only-startOdometer-
+  above-stored-end → 400; a VALID only-endOdometer-above-start → 200 (no false reject). Non-vacuous (neuter the
+  merged-pair check → exactly those 2 invert cases RED, the valid case stays green; verified firsthand). Backend
+  validate:local GREEN (tsc 0, musl 21 warn baseline, 1876 pass / 0 fail, +3, build bundled). Backend-only → no
+  shot. **This is the loop as designed: C210's fresh feature surface made the bug vein LIVE, and the scout caught a
+  self-introduced defect before any user hit it — bug's last-touched genuinely advances to 211 (a real fix).** cov:
+  be ~88.5%+ (~) / fe 88.73% (~). REMAINING trips: T5 analytics, then T6 eyes-on.
 - **C210 (bug-scout DRY → feature: trips-location T3 — routes + Zod validation, 6 endpoints)** —
   Balance recompute (cycle 210): bug most-starved (37/3 = 12.33×) but the trips surfaces are certified
   (C203/C204/C207/C208) + no fresh non-trips prod logic → scout dry, recorded. NOTHING strictly over budget

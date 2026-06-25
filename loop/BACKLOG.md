@@ -640,6 +640,18 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **CLOSED C211 — REAL write-path validation-asymmetry defect on the C210 trips PUT (the gold seam, self-
+> introduced + caught same-arc).** A C211 bug-scout — LIVE again because C210 added fresh trips routes/validation
+> — probed the GUIDE's gold seam (write-path asymmetry) on the new PUT and found it firsthand: `PUT {endOdometer:
+> 500}` on a trip stored start=1000/end=1080 returned 200 and PERSISTED an inverted pair. Cause: updateTripSchema's
+> R2 refine fires only when BOTH odometers are in the body, so a partial PUT touching one bypassed R2 against the
+> STORED value (#109 refine-doesn't-survive-partial + #130 validate-the-merged-state class). Impact: tripDistance=
+> max(0,end−start) clamps to 0 → a phantom 0-mile trip in T5 + a record the create path rejects. FIX: the PUT
+> handler re-checks the EFFECTIVE merged pair (request ?? stored) against R2 before writing (using the row
+> validateTripOwnership returns). +3 guards in trips-http.test.ts (both invert directions → 400 + a valid partial
+> → 200, no false reject); non-vacuous (neuter → the 2 invert cases RED). The #109/#130 within-tenant-integrity
+> class now closed on the trips update path. Don't re-fix.
+
 > **CLOSED C137 — REAL a11y defect (button-name critical) on BOTH odometer forms; a FRESH vein broke the
 > cold-scout drought.** The cold pure-logic precondition (git diff C85..HEAD empty) only rules out regressions in
 > CHANGED code, not PRE-EXISTING debt. Scouted NORTH_STAR #3 ("passes axe"): route-smoke enforces a11yClean on the
