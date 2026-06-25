@@ -231,13 +231,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 227 |
-| deep-review | 5 | 301 |
+| deep-review | 5 | 307 |
 | guard | 6 | 306 |
 | bug | 3 | 305 |
 | arch | 5 | 304 |
 | infra | 6 | 303 |
 
-Current cycle: **306**
+Current cycle: **307**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,30 @@ Current cycle: **306**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C307 (deep-review: the restore EXECUTION FK-ordering [insertBackupData — the last un-certified leg of the backup→restore crown jewel] certified CLEAN firsthand — every child table inserted AFTER its parents, the one excluded-parent FK handled by a filter, foreign_keys=ON makes it load-bearing)** —
+  Balance recompute (cycle 307): deep-review was the SOLE over-budget category (6/5 = 1.20×). The vein is saturated
+  across nine subsystems (C303 GUIDE list), but one genuinely-un-certified load-bearing leg of the backup→restore crown
+  jewel remained: the restore EXECUTION (restore.ts insertBackupData FK-ORDERING). C290 certified backup/validation +
+  the ref-coverage guard, C295 the unique-constraint guard — but NOT that the insert ORDER respects FK dependencies
+  (with foreign_keys=ON, a child inserted before its parent throws → aborts a valid restore, NORTH_STAR #1). CERTIFIED
+  CLEAN FIRSTHAND by cross-checking the 16-table insert sequence against the C290 getTableConfig().foreignKeys map:
+  EVERY child is inserted AFTER all its non-user FK parents — vehicles(1) → financing/expenses/odometer/trips(→veh) +
+  insurancePolicies(3) → insuranceTerms(→pol) → insuranceTermVehicles(→terms,veh) → insuranceClaims(→pol,terms,veh);
+  reminders(7) → reminderVehicles(→rem,veh) + reminderNotifications(→rem); photos(15) → photoRefs(→photos). The order is
+  FK-topologically sound. The ONE excluded-parent FK (photoRefs→userProviders, never backed up since it holds encrypted
+  creds) is handled by a FILTER: insertBackupData queries the local user_providers + keeps ONLY refs whose providerId
+  exists (restore.ts:561-572), so a restored ref pointing at an absent provider cannot FK-violate. VERIFIED foreign_keys
+  = ON is active in the production connection (connection.ts:28) → the ordering + filter are genuinely load-bearing, not
+  cosmetic. NO fresh defect; comprehensively guarded — restore-junction-refs + claims/trips/maintenance/theme-preference
+  -roundtrip (per-table round-trips through the REAL insert under foreign_keys=ON, so a broken order fails them) +
+  restore-replace-delete-ordering (the delete-side FK mirror) + restore-providers (the photoRefs filter path) + the C209
+  restore-table-coverage (every registry table inserted) + unified-restore. Re-pinning would be the C266 trap → recorded
+  the firsthand certification, no manufactured test. Verify: audit only — no source touched, both suites green (1949 BE
+  / 868 FE). Docs-only. cov: be 89.29% / fe 89.43% (~). (deep-review→307. The backup→restore crown jewel is now CERTIFIED
+  END-TO-END across ALL legs: backup serialize/validate + ref-coverage [C290], unique-constraint coverage [C295], AND
+  restore-execution FK-ordering [C307]. Don't re-audit. Deep-review saturated across TEN subsystems now [the nine + restore
+  -execution]; NEXT deep-review needs a fresh feature surface [gated] or record saturated + pivot — the un-audited list is
+  effectively EXHAUSTED.)
 - **C306 (guard scout SATURATED, recorded: the C299-flagged import-mapping-presets.ts [85.71% func] is 100% LINE-covered with all 3 exported fns tested — the func shortfall is a v8 artifact, NOT a reachable un-pinned invariant; presetToMapping zero-consumer is the C260 ratified-surface case, not cruft)** —
   Balance recompute (cycle 306): deep-review + guard tied at 1.00× (5/5, 6/6); guard most-starved by absolute count
   (6 > 5). Guard is marked SATURATED, so per discipline did ONE fresh scout before recording — the standout sub-100% pure

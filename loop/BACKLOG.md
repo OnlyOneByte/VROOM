@@ -213,6 +213,17 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > (.meshclaw-tools/) so the knob is a local capability gain, not a committed artifact — the cert is the committed value.
 > A future eyes-on cycle could extend to /analytics + /vehicles/[id] dark if a fresh concern arises; no defect here.
 
+> **CERTIFIED C307 — the restore EXECUTION FK-ordering (insertBackupData) CLEAN firsthand — the last un-certified leg of
+> the backup→restore crown jewel.** Cross-checked the 16-table insert sequence against the C290 getTableConfig FK map:
+> EVERY child is inserted AFTER its non-user parents (vehicles→financing/expenses/odometer/trips; policies→terms→
+> termVehicles→claims; reminders→reminderVehicles/notifications; photos→photoRefs) — FK-topologically sound. The one
+> excluded-parent FK (photoRefs→userProviders, never backed up) is handled by a filter (keeps only refs whose providerId
+> exists locally, restore.ts:561). foreign_keys=ON is active (connection.ts:28) → load-bearing. NO defect; guarded by
+> restore-junction-refs + per-table roundtrips (real insert under foreign_keys=ON) + restore-replace-delete-ordering +
+> restore-providers + C209 table-coverage. The crown jewel is now certified END-TO-END: backup+validate+ref-coverage
+> (C290) + unique-constraint (C295) + restore-execution FK-order (C307). Deep-review saturated across TEN subsystems;
+> the un-audited list is effectively exhausted. Don't re-audit.
+
 > **CERTIFIED C301 — the financing computeBalance chain (the headline loan-balance figure) CLEAN firsthand.** Formula =
 > Math.max(0, originalAmount − SUM(payments)) — clamps at 0 (the #27/#92 siblings depend on it); payment predicate sums
 > expenses WHERE sourceType=financing AND sourceId IN (ids), 2 queries no N+1. THE load-bearing question (neither query
