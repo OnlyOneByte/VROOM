@@ -204,6 +204,18 @@ cycles record + pivot to guard/deep-review/arch/infra until a gate clears.**)*
 re-audit a data-safety write path, certify it CLEAN against source, and leave a merge-surviving guard.
 Don't trust agent "HIGH" findings — verify firsthand (the archive logged many debunked false-positives).)*
 
+> **SWEPT C260 — the repo-layer dead-code sweep (the C252/C259 follow-on) is COMPLETE + clean.** Scouted all 9
+> src/api/*/repository.ts for zero-caller exported methods. A naive grep flagged 6; firsthand verification (the C333
+> "agent-HIGH-often-false" discipline) debunked all — getUserUnits/getAllVehicleUnits/findByClientId are called via
+> `this.` (the grep missed this-calls). A broadened sweep left 3 PROD-UNREFERENCED-BUT-TESTED methods (analytics
+> getVehicleUnits + insurance getCurrentTermDates/getActiveInsurancePolicyId). Per the C237 caution these are NOT cruft:
+> getVehicleUnits is the singular sibling of the heavily-used getUserUnits + getAllVehicleUnits trio (the #94 backbone),
+> tested, a coherent parallel API; the insurance pair are tested domain reads. UNLIKE C259's findByVehicleId (zero refs
+> incl. tests, never wired, no spec) these have DEDICATED tests = ratified-ahead-of-need surface. LEFT them. The C252
+> "extend dead-code sweep to all repos" follow-on is DISCHARGED (2 genuine removals total: financing C252 + reminders
+> C259). Don't re-sweep the repo layer. LESSON: "zero refs incl. tests + never wired" = cruft (C259); "zero prod-caller
+> but TESTED + coherent-sibling-API" = ratified surface (C260) — the test is the C237 intent signal.
+
 > **SATURATED C255 — the trips feature arc's data-safety + correctness invariants are certified CLEAN against
 > source, all already-guarded (no fresh defect, no manufactured guard).** Audited the freshest net-new surface
 > (the trips arc C202–C233) firsthand: (1) D2 dedup createFromTrip [userId-scoped + LOCAL-day window, pinned

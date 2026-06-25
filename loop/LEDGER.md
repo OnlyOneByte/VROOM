@@ -184,13 +184,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 227 |
-| deep-review | 5 | 255 |
+| deep-review | 5 | 260 |
 | guard | 6 | 256 |
 | bug | 3 | 257 |
 | arch | 5 | 259 |
 | infra | 6 | 254 |
 
-Current cycle: **259**
+Current cycle: **260**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -209,6 +209,30 @@ Current cycle: **259**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C260 (deep-review: complete the repo-layer dead-code sweep [the C252 follow-on] — every other zero-prod-caller method is TESTED ratified-ahead-of-need surface, NOT cruft; audit-only, no removal)** —
+  Balance recompute (cycle 260): nothing strictly OVER budget; three AT threshold (deep-review 5/5, bug 3/3, infra
+  6/6). Per C248 took the highest-leverage of the tied — deep-review (bug is documented dry; infra cadence ran C254,
+  premature at 6 cycles). The fresh subsystems (trips C255, theming C201/server-sync/fouc/registry all certified) are
+  audited, so directed the deep-review at COMPLETING the C252/C259 follow-on: "extend the dead-code sweep to ALL
+  src/api/*/repository.ts". SCOUTED all 9 repos for zero-caller exported methods. A naive `.method(` grep flagged 6,
+  but FIRSTHAND verification (the C333 "agent-HIGH-often-false" discipline) DEBUNKED all: getUserUnits/getAllVehicleUnits
+  (called via `this.` at 6+ analytics sites each — the grep missed this-calls), findByClientId (this.findByClientId in
+  createIdempotent:262/272). A broadened sweep (sync methods + this-calls, prod-callers only) left 3 PROD-UNREFERENCED-
+  BUT-TESTED methods: analytics getVehicleUnits + insurance getCurrentTermDates/getActiveInsurancePolicyId. Per the
+  C237 CAUTION (the load-bearing lesson — "exported + no consumer is necessary-but-not-sufficient for cruft; check
+  intent first"), verified each firsthand: getVehicleUnits is the SINGULAR sibling of the heavily-used getUserUnits +
+  getAllVehicleUnits unit-conversion trio (the #94 fleet-unit fix backbone), shares resolveUnitsOrDefault, has its own
+  test — a coherent tested parallel API, the natural call site for a future per-vehicle analytics view; the insurance
+  pair are tested coherent domain reads. UNLIKE C259's findByVehicleId (ZERO refs incl. tests, never wired, no spec)
+  these 3 have DEDICATED tests pinning their contract = deliberately-maintained ratified-ahead-of-need surface, NOT
+  cruft. Deleting them would discard tested surface + break their tests (churn, GUIDE-forbidden). LEFT them.
+  VERDICT: the repo-layer dead-code sweep is now COMPLETE + clean — the C252/C259 class is closed across all 9 repos
+  (2 genuine removals [financing findActiveFinancing C252, reminders findByVehicleId C259]; every other zero-prod-caller
+  method is tested ratified surface). No code change. Verify: audit only — BE suite green at C259 (1935 pass), no
+  source touched. Docs-only. cov: be 89.27% / fe 89.11% (~). (deep-review→260. The C252 follow-on is DISCHARGED — don't
+  re-sweep the repo layer for dead code; the 3 prod-unreferenced-but-tested methods are RATIFIED, not delete-candidates.
+  LESSON: distinguish "zero refs incl. tests + never wired + no spec" [C259 cruft] from "zero prod-caller but TESTED +
+  coherent-sibling-API" [C260 ratified surface] — the test is the intent signal C237 says to check.)
 - **C259 (arch: remove dead code reminderRepository.findByVehicleId — zero callers, contract confirmed clean, the C251/C252 dead-code class; behavior-preserving)** —
   Balance recompute (cycle 259): nothing strictly over budget except the gated feature (227, parked). Per the C248
   convention took the highest-leverage open item = the guard filter-branch coverage vein (C250/C251/C256/C257, the
