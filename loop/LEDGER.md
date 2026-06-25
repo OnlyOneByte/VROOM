@@ -233,11 +233,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 227 |
 | deep-review | 5 | 301 |
 | guard | 6 | 300 |
-| bug | 3 | 302 |
+| bug | 3 | 305 |
 | arch | 5 | 304 |
 | infra | 6 | 303 |
 
-Current cycle: **304**
+Current cycle: **305**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,33 @@ Current cycle: **304**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C305 (bug-scout DRY: the insurance premium materialization hook [effectiveTermCost + createTermExpenses/updateTermExpenses — the term→TCO money path, #57/#69 family] certified CLEAN firsthand → dry, pivot fast, no manufactured test)** —
+  Balance recompute (cycle 305): nothing strictly OVER budget; bug most-starved by ratio (3/3, 1.00×). Per the
+  C293-refreshed bug-row guidance, scouted a not-yet-rechecked money-facing surface: the insurance premium
+  materialization hook (insurance/hooks.ts — how a term totalCost/monthlyCost becomes the split expense rows TCO sums;
+  the #57 orphan-cleanup + #69 monthly-term family touched deletion/analytics, but the materialization MATH was not
+  certified this window). CERTIFIED CLEAN FIRSTHAND: (1) effectiveTermCost — explicit totalCost>0 wins, else
+  monthlyCost × monthKeysInRange(start,end).length (#69), else 0; SYMMETRIC with effectiveMonthlyPremium (same
+  month-count, the C266-noted symmetry). (2) monthKeysInRange null-guard: a monthly term with NULL endDate →
+  monthKeysInRange(start,null) → [] → cost 0 → createTermExpenses no-ops (the totalCost<=0 gate) → materializes NOTHING
+  (sensible — an unbounded premium cannot be summed; it still shows in analytics via the direct monthlyCost read). NO
+  infinite span/loop, NO phantom cost. The span is LOCAL-time inclusive (cursor/last built (y,m,1), while cursor<=last —
+  the #87/cycle-211 date-tz discipline). (3) createTermExpenses → an even split across covered vehicles via
+  createSplitExpense (the C302-certified conservation applies), category=financial, tags=['insurance'],
+  sourceType='insurance_term', sourceId=termId. (4) updateTermExpenses → deleteBySource('insurance_term', termId,
+  userId) [userId-scoped] THEN re-create — the #57 delete-then-recreate (no stale/dup rows). (5) #69 NO-DOUBLE-COUNT:
+  two disjoint readers of one cost — analytics reads term.monthlyCost directly, TCO sums the materialized rows, never
+  both. (6) errors are caught + logged but non-fatal (the term is already persisted). NO fresh defect; comprehensively
+  guarded by premium-expense-hook.test.ts (drives the REAL hook → createSplitExpense/deleteBySource → reads sqlite rows:
+  even-split per vehicle + source_type/tags, the NON-EVEN $100/3 conservation [C382, the C302 invariant at the insurance
+  layer], term-update delete-then-recreate, update-to-0 removal, AND the #69 monthly-only 13-month-span → $1300 path
+  with the no-double-count symmetry) + month-keys-in-range + effective-monthly-premium + cross-tenant-idor. Per the
+  C99/C204 discipline recorded dry + pivoted fast, no manufactured test (covered). Verify: audit only — no source
+  touched, both suites green (1949 BE / 868 FE). Docs-only. cov: be 89.29% / fe 89.43% (~). (bug→305. The insurance
+  premium materialization chain is CERTIFIED — totalCost/monthlyCost symmetric + null-endDate safe + split-conserving +
+  delete-then-recreate scoped + #69 no-double-count; don't re-scout hooks.ts. The insurance-cost-into-TCO path is now
+  certified across materialization [C305] + the C266 effectiveTermCost/effectiveMonthlyPremium symmetry. NEXT bug cycle:
+  another un-audited subsystem or record dry on first recheck — the un-audited list is nearly empty.)
 - **C304 (arch NO CHURN, recorded FAST via the C286 precondition: ZERO production-source commits since C300, and C300 itself was a dead-code REMOVAL [subtracts, introduces no dup] → the self-dup/dedup vein is structurally dry)** —
   Balance recompute (cycle 304): nothing strictly OVER budget; among non-gated categories arch most-starved (4/5, 0.80×).
   Applied the C286 FAST-DRY PRECONDITION firsthand: a dedup target requires FRESHLY-THREADED duplicate production source,

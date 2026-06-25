@@ -782,6 +782,16 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **SCOUTED C305 — the insurance premium materialization hook (effectiveTermCost + createTermExpenses/updateTermExpenses
+> — the term→TCO money path, #57/#69 family) certified CLEAN firsthand → dry.** Certified: effectiveTermCost (totalCost>0
+> else monthlyCost×months, symmetric with effectiveMonthlyPremium); monthKeysInRange null-endDate → [] → cost 0 →
+> no-op (an unbounded monthly term materializes NOTHING, no infinite span; still shows in analytics via direct
+> monthlyCost); even-split via createSplitExpense (C302 conservation); update = deleteBySource(userId-scoped) +
+> recreate (#57); #69 no-double-count (analytics reads monthlyCost, TCO sums rows, disjoint); errors non-fatal. NO
+> defect; pinned by premium-expense-hook.test.ts (real hook → sqlite rows: even + non-even $100/3 conservation + #69
+> 13-month $1300 + delete-recreate + update-to-0) + month-keys-in-range + effective-monthly-premium. Recorded dry +
+> pivot. Don't re-scout hooks.ts.
+
 > **SCOUTED C302 — the split-expense allocation math (computeAllocations even/absolute/percentage — NORTH_STAR #1 "legs
 > sum to header") certified CLEAN firsthand → dry.** The #56/#108/#113/#146 fixes hardened the split-sibling ANALYTICS
 > overcount; this scouted the CORE allocation conservation. Certified: computeEvenSplit cents-exact
