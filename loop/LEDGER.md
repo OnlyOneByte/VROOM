@@ -218,10 +218,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 274 |
 | guard | 6 | 271 |
 | bug | 3 | 273 |
-| arch | 5 | 270 |
+| arch | 5 | 275 |
 | infra | 6 | 272 |
 
-Current cycle: **274**
+Current cycle: **275**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -240,6 +240,25 @@ Current cycle: **274**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C275 (arch: CONVERGED the byte-identical `collectSvelteFiles` source-scan walker [rule-of-FOUR] onto a shared test-helper — the genuine dedup the C271 guard tipped; behavior-preserving, net −48 LOC)** —
+  Balance recompute (cycle 275): nothing strictly OVER budget; arch most-starved non-gated (5/5, over next cycle).
+  Rather than a no-churn record, scouted the self-dup vector (GUIDE) on a target the C271 dark-clash guard may have
+  tipped: the recursive `collectSvelteFiles(dir, acc)` walker in the FE source-scan GUARD suite. FOUND a genuine
+  rule-of-FOUR — BYTE-IDENTICAL in no-interpolated-arbitrary-class, no-hardcoded-currency, no-theme-clashing-colors
+  (C271), fab-bottom-clearance (verified all 4 bodies char-for-char identical, the C212/C244 check-before-converge
+  discipline; UNLIKE the C270 createExpense quad which DIVERGED). The C271 guard was the 3rd→4th copy that crossed the
+  rule-of-three bar (the C205 "the new addition tips it to three" pattern). CONVERGED: extracted to
+  `__tests__/_helpers/collect-svelte-files.ts` (pure, node:fs/path only, exports `collectSvelteFiles`); each caller
+  imports it, drops its local declaration + the now-unused `readdirSync` from its node:fs import (kept readFileSync),
+  + keeps its OWN SRC_ROOT (depends on each file's import.meta.url depth — correctly NOT moved). The helper has NO
+  `.test.` suffix so vitest's `src/**/*.{test,spec}.{js,ts}` include doesn't collect it as a test (confirmed: file
+  count stayed 81). BEHAVIOR-PRESERVING: same 4 guards, same assertions, 863 pass / 81 files UNCHANGED, svelte-check 0
+  errors (no unused-import — join still used for SRC_ROOT), build OK. Net −48 dup LOC (4×~11-line walker → 1 shared) /
+  +1 source of truth. Verify: FE validate:local GREEN. Test-helper extraction (no prod source, no UI) → no shot. cov:
+  be 89.27% / fe 89.11% (~ — test-infra dedup, no module logic changed). (arch→275. The source-scan walker is now ONE
+  helper — a FUTURE source-scan guard imports it instead of re-declaring [extends the C271 dark-clash + any new guard].
+  This was a REAL rule-of-four [byte-identical], the right arch pick — contrast C270's below-bar divergent quad. NEXT
+  arch: re-scout fresh-authored code for self-dups, else record no-churn + pivot.)
 - **C274 (deep-review: the OFFLINE-SYNC round-trip [NORTH_STAR #1 crown-jewel "offline writes never drop"] certified CLEAN firsthand — no fresh defect, every historical fix intact + guarded)** —
   Balance recompute (cycle 274): deep-review was the sole over-budget category (6/5 = 1.2×). Per the C267 GUIDE
   deep-review is saturated across the audited subsystems (trips C255, repos C260, TCO C266), so picked the most

@@ -1809,6 +1809,15 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 > lines gone), overall BE 89.23→89.27%. FOLLOW-ON (the C252 note): the "extend dead-code sweep to all repository.ts"
 > advances — financing (C252) + reminders (C259) done; next arch can scout the remaining repos for zero-caller methods.
 
+> **✅ CONVERGED C275 — the byte-identical `collectSvelteFiles` source-scan walker (rule-of-FOUR) onto a shared
+> test-helper.** The recursive .svelte walker was BYTE-IDENTICAL in 4 source-scan guards (no-interpolated-arbitrary-class,
+> no-hardcoded-currency, no-theme-clashing-colors [C271], fab-bottom-clearance) — the C271 dark-clash guard tipped it
+> past rule-of-three (the C205 pattern). Extracted to __tests__/_helpers/collect-svelte-files.ts (pure, no .test. suffix
+> so vitest doesn't collect it); each caller imports it, drops its local copy + the now-unused readdirSync, keeps its
+> own SRC_ROOT (import.meta.url-depth-dependent). Behavior-preserving: 863 pass UNCHANGED, svelte-check 0, net −48 LOC.
+> A REAL rule-of-four (byte-identical) — contrast the C270 createExpense quad (divergent, below-bar). A future
+> source-scan guard imports the helper instead of re-declaring. Don't re-scout this walker.
+
 > **NO CHURN C270 — the 4-file `createExpense` test-helper quad is a rule-of-FOUR with 4 DIVERGENT signatures, below
 > the bar.** Scouted the self-dup vector: 4 expenses test files (summary-http, expenses-http, export-csv, C257
 > vehicle-stats-route) each declare a local route-POST createExpense + no shared expense seeder exists. But firsthand

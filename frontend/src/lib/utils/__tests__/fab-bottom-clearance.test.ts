@@ -17,27 +17,15 @@
  * Runs in the fast unit suite (no browser, no server).
  */
 
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
+import { collectSvelteFiles } from './_helpers/collect-svelte-files';
 
 // This file lives at src/lib/utils/__tests__/, so src/ is three levels up; routes/ is under it.
 const SRC_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const ROUTES_ROOT = join(SRC_ROOT, 'routes');
-
-function collectSvelteFiles(dir: string, acc: string[] = []): string[] {
-	for (const entry of readdirSync(dir, { withFileTypes: true })) {
-		const full = join(dir, entry.name);
-		if (entry.isDirectory()) {
-			if (entry.name === 'node_modules' || entry.name === '.svelte-kit') continue;
-			collectSvelteFiles(full, acc);
-		} else if (entry.name.endsWith('.svelte')) {
-			acc.push(full);
-		}
-	}
-	return acc;
-}
 
 // Imports the FAB (by component name or the module path — either form counts).
 const USES_FAB = /FloatingActionButton|common\/floating-action-button/;

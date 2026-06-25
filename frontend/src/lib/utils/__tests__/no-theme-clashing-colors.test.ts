@@ -27,10 +27,11 @@
  * Runs in the fast unit suite (`npm test`) — no browser, no server.
  */
 
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
+import { collectSvelteFiles } from './_helpers/collect-svelte-files';
 
 // This file lives at src/lib/utils/__tests__/, so src/ is three dirs up from __tests__'s parent.
 const SRC_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -49,19 +50,6 @@ const ALLOWLIST = new Set<string>([
 // included so a scrim like `bg-black/50` matches (it lives on the allowlist).
 const THEME_CLASH =
 	/(?<!dark:)\b(?:bg|text|border)-(?:white|black|gray-\d+|slate-\d+|zinc-\d+|neutral-\d+)(?:\/\d+)?\b/;
-
-function collectSvelteFiles(dir: string, acc: string[] = []): string[] {
-	for (const entry of readdirSync(dir, { withFileTypes: true })) {
-		const full = join(dir, entry.name);
-		if (entry.isDirectory()) {
-			if (entry.name === 'node_modules' || entry.name === '.svelte-kit') continue;
-			collectSvelteFiles(full, acc);
-		} else if (entry.name.endsWith('.svelte')) {
-			acc.push(full);
-		}
-	}
-	return acc;
-}
 
 describe('no theme-clashing hardcoded colors in components (dark-mode / NORTH_STAR #3 class guard)', () => {
 	const files = collectSvelteFiles(SRC_ROOT);
