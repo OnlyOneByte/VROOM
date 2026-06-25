@@ -793,6 +793,15 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **SCOUTED C308 — createFromTrip (the trip→odometer write feeding getCurrentOdometer, the C298 backbone) certified CLEAN
+> firsthand → dry.** The C214 EDIT/DELETE lifecycle is Angelo-gated, but the CREATE write is loop-scoutable. Certified:
+> same-day dedup window [dayStart,nextDay) on the LOCAL calendar day (#87 date-tz); exact-reading grain (idempotent
+> re-submit + manual/trip same-observation collapse); userId-SCOPED dedup (a foreign user's matching row does NOT
+> suppress this write); validated create() delegate with note ?? 'From trip'. NO defect; pinned by create-from-trip.test.ts
+> (dedup→null, different-reading/different-day inserts, foreign-user scope, the D2 manual-entry double-count dedup, the
+> C215 local-day window). Recorded dry + pivot. The trips→odometer→getCurrentOdometer chain is certified across the READ
+> (C298) AND the trip-CREATE write (C308). Don't re-scout createFromTrip.
+
 > **SCOUTED C305 — the insurance premium materialization hook (effectiveTermCost + createTermExpenses/updateTermExpenses
 > — the term→TCO money path, #57/#69 family) certified CLEAN firsthand → dry.** Certified: effectiveTermCost (totalCost>0
 > else monthlyCost×months, symmetric with effectiveMonthlyPremium); monthKeysInRange null-endDate → [] → cost 0 →

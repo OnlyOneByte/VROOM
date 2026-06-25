@@ -233,11 +233,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 227 |
 | deep-review | 5 | 307 |
 | guard | 6 | 306 |
-| bug | 3 | 305 |
+| bug | 3 | 308 |
 | arch | 5 | 304 |
 | infra | 6 | 303 |
 
-Current cycle: **307**
+Current cycle: **308**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,26 @@ Current cycle: **307**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C308 (bug-scout DRY: createFromTrip [the trip→odometer write feeding getCurrentOdometer — the C298 backbone] certified CLEAN firsthand → dry, pivot fast, no manufactured test)** —
+  Balance recompute (cycle 308): nothing strictly OVER budget; bug most-starved by ratio (3/3, 1.00×). Per the
+  C293-refreshed bug-row guidance, scouted a not-yet-rechecked reachable surface: createFromTrip (odometer/repository.ts:48
+  — a trip's end reading writes an odometer_entries row that feeds getCurrentOdometer [certified C298] → mileage reminders
+  + lease-overage). The C214 EDIT/DELETE lifecycle is Angelo-gated, but the CREATE write is loop-scoutable. CERTIFIED
+  CLEAN FIRSTHAND: (1) same-day dedup window [dayStart, nextDay) on the LOCAL calendar day of recordedAt (R5 local-day,
+  built (y,m,d) in local time — the #87 date-tz discipline), so a trip + a manual reading on the same day at the same
+  value collapse to ONE observation; (2) the dedup SELECT keys on vehicleId AND userId AND odometer AND within-day → an
+  exact-reading grain (idempotent trip re-submit dedups; two genuinely-different same-day readings both insert); (3) the
+  dedup is userId-SCOPED — a FOREIGN user's same-(vehicle,day,reading) row does NOT suppress this user's write (no
+  cross-tenant dedup leak); (4) delegates to the validated create() with note ?? 'From trip'. NO fresh defect;
+  comprehensively guarded by create-from-trip.test.ts (basic create feeds getCurrentOdometer, default note, same-(veh,day,
+  reading)→null dedup, different-reading-same-day inserts, same-reading-different-day inserts, the userId-scoped foreign-row
+  case, the D2 manual-entry double-count dedup [a trip dedups against a manually-logged entry], + the C215 local-calendar
+  -day window). Per the C99/C204 discipline recorded dry + pivoted fast, no manufactured test (covered). Verify: audit
+  only — no source touched, both suites green (1949 BE / 868 FE). Docs-only. cov: be 89.29% / fe 89.43% (~). (bug→308.
+  createFromTrip CREATE is CERTIFIED — local-day dedup + exact-reading grain + userId-scoped + validated delegate; don't
+  re-scout it. The trips→odometer→getCurrentOdometer chain is now certified across the READ [C298] AND the trip-CREATE
+  write [C308]; the C214 EDIT/DELETE lifecycle stays Angelo-gated. The un-audited reachable surface list is now
+  effectively EXHAUSTED — NEXT bug cycle record dry on first recheck unless a fresh feature surface lands.)
 - **C307 (deep-review: the restore EXECUTION FK-ordering [insertBackupData — the last un-certified leg of the backup→restore crown jewel] certified CLEAN firsthand — every child table inserted AFTER its parents, the one excluded-parent FK handled by a filter, foreign_keys=ON makes it load-bearing)** —
   Balance recompute (cycle 307): deep-review was the SOLE over-budget category (6/5 = 1.20×). The vein is saturated
   across nine subsystems (C303 GUIDE list), but one genuinely-un-certified load-bearing leg of the backup→restore crown
