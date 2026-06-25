@@ -656,26 +656,13 @@ export class BackupService {
    */
   private validateUniqueConstraints(backup: ParsedBackupData): string[] {
     const errors: string[] = [];
+    // One composite-key dup detector for ALL the DB-level UNIQUE indexes. A row is SKIPPED if ANY
+    // keyed column is null, because SQLite treats a NULL in an indexed column as DISTINCT (and the
+    // partial indexes are `WHERE <col> IS NOT NULL`) — so such a row can never collide. A single-column
+    // index is just the one-element case: `[String(v)].join(sep) === String(v)` with the identical
+    // null-skip, so this subsumes the former scalar dupCheck byte-for-byte (C292 dedup of the C291
+    // self-introduced sibling — the scalar variant was a strict special case of this one).
     const dupCheck = (
-      rows: Record<string, unknown>[] | undefined,
-      field: string,
-      label: string
-    ): void => {
-      const seen = new Set<string>();
-      for (const row of rows ?? []) {
-        const v = row[field];
-        if (v == null) continue; // the unique index is partial (WHERE <field> IS NOT NULL)
-        const key = String(v);
-        if (seen.has(key)) {
-          errors.push(`Duplicate ${label} "${key}" — backup violates a unique constraint`);
-        }
-        seen.add(key);
-      }
-    };
-    // Composite-key variant for multi-column unique indexes. SQLite treats a NULL in ANY indexed
-    // column as DISTINCT (and the partial mileage index is `WHERE due_odometer IS NOT NULL`), so a
-    // row missing any keyed field is skipped — it can never collide. Mirrors dupCheck's null skip.
-    const dupCheckComposite = (
       rows: Record<string, unknown>[] | undefined,
       fields: string[],
       label: string
@@ -691,18 +678,18 @@ export class BackupService {
         seen.add(key);
       }
     };
-    dupCheck(backup.expenses, 'clientId', 'expense clientId');
-    dupCheck(backup.vehicles, 'licensePlate', 'vehicle licensePlate');
+    dupCheck(backup.expenses, ['clientId'], 'expense clientId'); // expenses_user_client_idx
+    dupCheck(backup.vehicles, ['licensePlate'], 'vehicle licensePlate'); // vehicles_user_license_plate_idx
     // The remaining DB-level UNIQUE indexes on backed-up + restored tables (C291 — the #127/C428 leg
     // those two checks missed): a duplicate on any of these survives per-row + referential validation,
     // then throws on the colliding INSERT after the replace-mode wipe → empty account (C151 footgun).
-    dupCheckComposite(backup.photoRefs, ['photoId', 'providerId'], 'photoRef photo+provider'); // pr_photo_provider_idx
-    dupCheckComposite(
+    dupCheck(backup.photoRefs, ['photoId', 'providerId'], 'photoRef photo+provider'); // pr_photo_provider_idx
+    dupCheck(
       backup.reminderNotifications,
       ['reminderId', 'dueDate'],
       'reminderNotification reminder+dueDate'
     ); // rn_reminder_due_idx (time axis; null dueDate → distinct)
-    dupCheckComposite(
+    dupCheck(
       backup.reminderNotifications,
       ['reminderId', 'dueOdometer'],
       'reminderNotification reminder+dueOdometer'

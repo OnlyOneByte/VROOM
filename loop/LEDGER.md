@@ -234,10 +234,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 290 |
 | guard | 6 | 289 |
 | bug | 3 | 291 |
-| arch | 5 | 286 |
+| arch | 5 | 292 |
 | infra | 6 | 288 |
 
-Current cycle: **291**
+Current cycle: **292**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,26 @@ Current cycle: **291**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C292 (arch dedup — REAL self-dup the loop just created: C291 added dupCheckComposite alongside the scalar dupCheck, which is its strict one-element special case; converged the two into ONE helper, behavior-identical, −16 LOC)** —
+  Balance recompute (cycle 292): arch was the ONLY category strictly OVER budget (6/5 = 1.20×). Applied the C286
+  FAST-DRY PRECONDITION: production source DID change since the last source commit (C291 touched backup.ts), so the
+  dedup vein is NOT structurally dry this cycle — checked whether C291 introduced a self-dup (the C258/C275 pattern: the
+  loop own recent work creating a convergence target). It DID: C291 added a composite-key dupCheckComposite(rows,
+  fields[], label) helper to validateUniqueConstraints ALONGSIDE the pre-existing scalar dupCheck(rows, field, label).
+  PROVED FIRSTHAND the scalar is a STRICT special case of the composite: for a single-element field array,
+  `[String(v)].join(sep) === String(v)` and the null-skip is identical (`values.some(v=>v==null)` with one element ≡
+  `v==null`), across all value types incl. null/undefined/0/false/'' — so dupCheck(rows, f, label) ≡
+  dupCheckComposite(rows, [f], label) BYTE-FOR-BYTE (same key, same error template/label). CONVERGED: removed the scalar
+  dupCheck, renamed dupCheckComposite → dupCheck (the now-single helper), routed the 2 scalar callers
+  (expenses.clientId, vehicles.licensePlate) through it with a one-element array. Behavior-preserving + test-anchored:
+  the existing C291 #127 suite (all 6 dup-check tests — 2 scalar clientId/licensePlate + 4 composite) stays GREEN
+  unchanged, which IS the proof the one-element case is identical. Net −16 LOC. Verify: BE bun run validate:local GREEN
+  (tsc + check:musl clean + 1942 pass / 0 fail [UNCHANGED vs C291 — same test count, behavior-preserving] + build
+  bundled). No FE source touched. cov: be 89.27% / fe 89.43% (~ — a pure within-function dedup, no coverage delta;
+  full re-measure next infra cadence ~C298). (arch→292. The validateUniqueConstraints helper is now single-sourced — do
+  not re-split it. STANDING: this is the C258/C275 self-dup pattern — when a cycle adds a generalization alongside the
+  special case it subsumes, the NEXT arch cycle converges them; the FAST-DRY precondition correctly did NOT fire here
+  because C291 threaded fresh source. With C292 converged, the dedup vein is dry again until the next feature surface.)
 - **C291 (bug FIX — REAL defect: validateUniqueConstraints [the #127/C428 pre-wipe cross-row check] covered only 2 of the 5 DB-level UNIQUE indexes on backed-up tables; extended it to the 3 missed composite indexes → closes a live empty-account data-loss gap)** —
   Balance recompute (cycle 291): bug was the ONLY category strictly OVER budget (4/3 = 1.33×; arch tied at budget 5/5
   but not over). The GUIDE marks bug SATURATED, so per discipline did ONE fresh firsthand scout on a NOT-YET-RECHECKED

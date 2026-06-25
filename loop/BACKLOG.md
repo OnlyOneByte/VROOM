@@ -1872,6 +1872,16 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 ### arch
 *(reliably DRY per the archive. Run a fresh dedup scout; if nothing clean surfaces, record "no churn warranted" + pivot. Obey the arch rules above.)*
 
+> **DEDUP C292 — converged the C291 self-introduced dupCheck/dupCheckComposite pair in validateUniqueConstraints
+> (backup.ts) into ONE helper, −16 LOC, behavior-identical.** The C286 FAST-DRY precondition correctly did NOT fire (C291
+> threaded fresh source), so scouted whether C291 created a self-dup — it did: C291 added a composite-key
+> dupCheckComposite alongside the scalar dupCheck, which is its STRICT one-element special case
+> (`[String(v)].join(sep) === String(v)`, identical null-skip). PROVED equivalence firsthand across all value types, then
+> removed the scalar helper + routed its 2 callers (clientId/licensePlate) through the unified composite helper with a
+> one-element array. Test-anchored: the C291 #127 suite (6 dup-check tests) stays GREEN unchanged = the proof. BE
+> validate:local GREEN (1942 pass). The C258/C275 self-dup pattern again — when a cycle adds a generalization alongside
+> the special case it subsumes, the NEXT arch cycle converges them. Now single-sourced; don't re-split.
+
 > **SWEPT C264 — NO CHURN: the FE lib/utils export surface is clean (the C260 dead-code pattern, FE side).** Every
 > prior dead-code sweep was BACKEND-only (C245 utils, C252/C259/C260 repos); this scouted the never-swept FE lib/utils
 > exports for zero non-test importers. The grep flagged 13, but firsthand verification (the C260/C333 over-flag
