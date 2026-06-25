@@ -201,11 +201,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 227 |
 | deep-review | 5 | 268 |
 | guard | 6 | 263 |
-| bug | 3 | 265 |
+| bug | 3 | 269 |
 | arch | 5 | 264 |
 | infra | 6 | 267 |
 
-Current cycle: **268**
+Current cycle: **269**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -224,6 +224,29 @@ Current cycle: **268**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C269 (bug-scout EYES-ON DARK, the C239–C247 visual-sweep vein on the fresh dark axis: /vehicles/[id] Overview + Finance-tab certified CLEAN — the densest money surface, no defect)** —
+  Balance recompute (cycle 269): bug was the sole over-budget category (4/3 = 1.33×). The SOURCE-audit bug surface is
+  saturated, but C268 opened a FRESH eyes-on axis (dark mode) + shot only 2 of ~9 routes — the densest contrast-prone
+  surfaces (vehicle-detail money cards, charts) were UNSHOT in dark. This IS the C239–C247 "shoot un-shot routes for
+  NORTH_STAR #3 defects pure-logic tests miss" bug vein, on a new axis — a dark-contrast breakage on the money cards
+  would be a REAL defect. Booted (regress START_SERVERS=1 RESET_DB=1), minted auth, shot + Read 2 dark surfaces on the
+  seeded Toyota Camry (has financing): (1) /vehicles/[id] OVERVIEW desktop dark — tab bar, Vehicle Info card, Insurance
+  Policies (State Farm, Expired badge, $1,200/$200-mo term, edit/delete/Renew icons), 3 stat cards ($426.30/$0.00/
+  $213.15), Mileage&Fuel stats (25,850 mi / 850 driven / 26.7 gal / $97.80 / 24.6 mi/gal / $0.12 per mi) — ALL readable,
+  good contrast, colored icons legible, white Add-Expense FAB strong-contrast, NO black-on-black/overflow. (2) FINANCE
+  TAB desktop dark (CLICK_TEXT=Finance — the densest money surface) — Next Payment hero $372.86 (Due in 20 days, Jul 15
+  2026, Monthly·Loan·4.5% APR, green accent border), Payment Progress 0% (Original/Paid/Remaining $20k/$0/$20k), 4 metric
+  cards (Principal-vs-Interest, Payments 0/60, Estimated Payoff Jul 25 2031 [the C265-certified addMonthsClamped date
+  rendering correctly], Total Cost $22,371.63 / 12% over principal — blue/amber/purple/red icons all legible on dark),
+  Amortization Schedule (Principal/Interest green/amber legend), No-Payment-History empty state — FLAWLESS. The empty
+  chart areas (both surfaces) are the known C242 IO-gate artifact, NOT dark defects. DARK MODE now certified CLEAN across
+  4 surfaces (C268 dashboard-desktop + expenses-mobile; C269 vehicle-overview + finance-tab) — the financial money cards
+  the highest-value confirmation. NO defect. Verify: eyes-on (2 PNGs Read) + status 200 + zero consoleErrors both shots;
+  servers torn down (:3001/:5173 confirmed down). No source touched → both suites green at C262 (1935 BE / 860 FE). cov:
+  be 89.27% / fe 89.11% (~). (bug→269: the scout DID happen + found the densest money surface clean in dark. Dark axis is
+  now well-swept [4 surfaces incl. the money-dense finance tab]; future dark sweeps could hit /analytics + /insurance +
+  /settings if a fresh concern arises, but the contrast/overflow pattern is consistent + clean. NEXT bug cycle: the dark
+  axis is largely swept too — record dry + pivot unless a fresh feature/axis opens.)
 - **C268 (deep-review EYES-ON: DARK MODE certified CLEAN on /dashboard desktop + /expenses mobile — a surface the light-only C239–C247 sweep NEVER verified; + a durable THEME=dark harness knob)** —
   Balance recompute (cycle 268): nothing strictly OVER budget. Per C248 took the highest-leverage open item. The
   SOURCE-audit veins are all firsthand-saturated (C267 documented this), but ONE eyes-on surface was NEVER verified:

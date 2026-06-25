@@ -719,6 +719,17 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **SCOUTED C269 — DARK-MODE eyes-on sweep (the C239–C247 visual-sweep vein on the fresh dark axis): /vehicles/[id]
+> Overview + Finance-tab certified CLEAN, no defect.** C268 opened the dark axis (2 routes); this swept the densest
+> contrast-prone surface — vehicle-detail money cards. Shot+Read /vehicles/[id] Overview (Vehicle Info + Insurance +
+> stat/mileage cards) + the Finance tab (Next Payment hero $372.86, Payment Progress, 4 metric cards incl. Estimated
+> Payoff Jul 25 2031 [the C265 addMonthsClamped date], Amortization legend, empty-state) in dark desktop — ALL readable,
+> good contrast, colored icons legible, FAB strong-contrast, NO black-on-black/overflow. Empty chart areas = the known
+> C242 IO-gate artifact. Dark mode now CLEAN across 4 surfaces (C268 dashboard+expenses-mobile, C269 vehicle-overview+
+> finance). NO defect. The dark axis is largely swept (incl. the money-dense finance tab); future dark sweeps could hit
+> /analytics+/insurance+/settings but the contrast pattern is consistent + clean. NEXT bug cycle record dry + pivot
+> unless a fresh feature/axis opens.
+
 > **SCOUTED C265 — the FE money-facing financing-calculations surface certified CLEAN firsthand → recorded dry + pivoted (no manufactured test).**
 > Bug over budget (4/3). Prior scouts this run were all BE (C253/C257/C261), so scouted FE financing-calculations.ts
 > (the #92/#99/#110/#115/#117/#330 money-date family's home). CLEAN: calculateNextPaymentDate/calculatePayoffDate/
