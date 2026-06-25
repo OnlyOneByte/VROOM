@@ -232,12 +232,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 227 |
 | deep-review | 5 | 290 |
-| guard | 6 | 289 |
+| guard | 6 | 295 |
 | bug | 3 | 294 |
 | arch | 5 | 292 |
 | infra | 6 | 293 |
 
-Current cycle: **294**
+Current cycle: **295**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,28 @@ Current cycle: **294**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C295 (guard: added backup-unique-constraint-coverage.test.ts — the symmetric sibling of the C290 ref-validation guard — pinning that validateUniqueConstraints stays complete vs schema drift; closes the LAST un-guarded leg of the #127/C428 pre-wipe net)** —
+  Balance recompute (cycle 295): deep-review + guard tied at 1.00× (5/5, 6/6); guard most-starved by absolute count
+  (6 > 5). The GUIDE marks guard SATURATED, but there is a GENUINE merge-surviving guard that completes the C290–C292
+  backup arc: C291 extended validateUniqueConstraints from 2 to all 5 DB-level UNIQUE indexes on backed-up tables, and
+  C290 added a drift guard for the ref-VALIDATION leg — but NOTHING pinned the UNIQUE-constraint leg against schema
+  drift. A future migration adding a 6th unique index to a backed-up table would pass every existing test while
+  validateUniqueConstraints silently fails to cover it → re-opens the exact empty-account #127 gap C291 closed (the
+  replace-mode wipe commits, then the colliding INSERT throws, C151 no-rollback). Added
+  backup-unique-constraint-coverage.test.ts: RUNTIME-enumerates each backed-up table unique index via drizzle
+  getTableConfig().indexes (filtered to config.unique), drops the single-user-constant userId prefix (a `(user_id, X)`
+  partial unique reduces to validating X — exactly what the check does), and asserts a dupCheck(backup.<key>, [...],
+  …) call covers every non-userId constrained column; + an anti-vacuity test pinning the known 5-index set so a drizzle
+  API change cannot make it pass trivially. MUTATION-TESTED non-vacuous: removing the photoRefs dupCheck dispatch makes
+  it FAIL loudly (photoRefs.pr_photo_provider_idx → needs dupCheck(backup.photoRefs, [photoId, providerId], …));
+  restoring → green. Hit + fixed a check:musl noExcessiveCognitiveComplexity error (28 > 15) on the nested-loop test by
+  extracting dupCheckFieldSets + indexIsChecked helpers (the C228 class — caught by the whole-tree check). Verify: BE
+  bun run validate:local GREEN (tsc + check:musl clean + 1944 pass / 0 fail [+2 vs C293] + build bundled). No FE source
+  touched. cov: be 89.28% / fe 89.43% (~ — a source-scan guard over existing backup.ts, adds covered test lines not new
+  covered SOURCE; full re-measure ~C303). (guard→295. The #127/C428 pre-wipe-validation net is now drift-proof across
+  BOTH legs — FK ref-validation [C290] AND cross-row UNIQUE [C295]; the backup round-trip crown jewel is guarded across
+  ALL its dimensions [serialize/populate/insert/summary/probe C208/C209 + ref-validation C290 + unique-constraint C295].
+  Don't re-scout. The C290→C291→C292→C294→C295 backup arc is fully discharged.)
 - **C294 (bug-scout DRY: the NATIVE CSV-import parse path [import-csv.ts — the export→re-import round-trip, NORTH_STAR #1 crown jewel] certified CLEAN firsthand → dry, pivot fast, no manufactured test)** —
   Balance recompute (cycle 294): nothing strictly OVER budget; among non-gated categories bug most-starved (3/3,
   1.00×). Applied the C293-refreshed bug-row guidance — prefer a NOT-YET-AUDITED subsystem over re-checking a closed

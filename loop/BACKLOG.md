@@ -1107,6 +1107,17 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C295 — backup-unique-constraint-coverage.test.ts: the symmetric sibling of the C290 ref-validation drift
+> guard, pinning that validateUniqueConstraints stays complete vs schema drift.** C291 extended the check to all 5
+> DB-level UNIQUE indexes on backed-up tables; C290 guarded the ref-validation leg — but NOTHING pinned the
+> unique-constraint leg, so a future migration adding a 6th unique index would silently re-open the #127 empty-account
+> gap. The guard runtime-enumerates each backed-up table unique index (drizzle getTableConfig().indexes, drops the
+> single-user-constant userId prefix) + asserts a dupCheck(backup.<key>, […]) covers every non-userId column, + an
+> anti-vacuity pin of the known 5-index set. Mutation-tested non-vacuous (removing the photoRefs dupCheck fails it).
+> Fixed a check:musl complexity error on the nested loop by extracting dupCheckFieldSets/indexIsChecked. BE
+> validate:local GREEN (1944 pass). The #127/C428 pre-wipe net is now drift-proof across BOTH legs (FK C290 + UNIQUE
+> C295); the C290→C295 backup round-trip arc is fully discharged. Don't re-scout.
+
 > **COVERED C283 — the themes-css.ts sort comparator (themes-css 85.71→100% line), via the C250/C251 reachable-branch
 > pattern.** generateThemesCss + nonDefaultThemeIds .sort((a,b)=>a.id.localeCompare(b.id)) (themes-css.ts:50/65) was
 > uncovered only because the existing tests drove ONE synthetic theme (a 0/1-element sort never compares) — NOT because
