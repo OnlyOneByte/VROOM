@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Car, CircleAlert, MapPin, Route } from '@lucide/svelte';
+	import { Car, CircleAlert, MapPin, Plus, Route } from '@lucide/svelte';
 	import { tripApi } from '$lib/services/trip-api';
 	import { vehicleApi } from '$lib/services/vehicle-api';
 	import type { Trip, TripSummary, Vehicle } from '$lib/types';
@@ -11,10 +11,12 @@
 	import { settingsStore } from '$lib/stores/settings.svelte';
 	import { appStore } from '$lib/stores/app.svelte';
 	import { Badge } from '$lib/components/ui/badge';
+	import { Button } from '$lib/components/ui/button';
 	import * as CardNs from '$lib/components/ui/card';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import EmptyState from '$lib/components/common/empty-state.svelte';
 	import PageHeader from '$lib/components/common/page-header.svelte';
+	import TripForm from '$lib/components/trips/TripForm.svelte';
 
 	let isLoading = $state(true);
 	let loadError = $state<string | null>(null);
@@ -52,6 +54,15 @@
 	const tripDistLabel = (vehicleId: string): string =>
 		vehicleDistLabels.get(vehicleId) ?? distLabel;
 
+	// Create form (dialog) state. Edit/delete entry points are deliberately deferred until Angelo rules
+	// the C214 trips↔odometer EDIT/DELETE lifecycle (editing endOdometer / deleting a trip currently
+	// leaves a stale linked odometer entry) — creating a trip is fully decided (D2 linkage, C213).
+	let formOpen = $state(false);
+
+	function openCreate() {
+		formOpen = true;
+	}
+
 	async function load() {
 		isLoading = true;
 		loadError = null;
@@ -88,7 +99,14 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<PageHeader title="Trips" description="Track mileage and trips across your vehicles" />
+	<PageHeader title="Trips" description="Track mileage and trips across your vehicles">
+		{#snippet actions()}
+			<Button onclick={openCreate} disabled={vehicles.length === 0}>
+				<Plus class="mr-2 h-4 w-4" />
+				Log Trip
+			</Button>
+		{/snippet}
+	</PageHeader>
 
 	{#if isLoading}
 		<div class="space-y-3">
@@ -120,6 +138,12 @@
 			{#snippet description()}
 				Log trips with their start and end odometer and a purpose (business, personal, commute) to
 				build a mileage-reimbursement report and feed your vehicle's odometer history.
+			{/snippet}
+			{#snippet action()}
+				<Button onclick={openCreate} disabled={vehicles.length === 0}>
+					<Plus class="mr-2 h-4 w-4" />
+					Log Trip
+				</Button>
 			{/snippet}
 		</EmptyState>
 	{:else}
@@ -204,4 +228,6 @@
 			</p>
 		{/if}
 	{/if}
+
+	<TripForm bind:open={formOpen} {vehicles} onSaved={load} />
 </div>

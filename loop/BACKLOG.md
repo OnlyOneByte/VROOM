@@ -66,10 +66,14 @@ trip POST writes a deduped odometer entry at endOdometer/tripDate (createFromTri
 maintenance-reminder + lease-overage axis. **The trips BACKEND is GENUINELY complete (T1–T5 + D2).** T6a FE DATA LAYER
 DONE (C218): trip types + trip-api.ts (the C149/C163 pattern, +14 unit tests). T6b-1 LIST PAGE + summary card
 DONE + EYES-ON VERIFIED (C220): real /trips read-only page (four-states + R4 Mileage Summary card + per-trip
-cards), shot DESKTOP+MOBILE + Read — summary math correct, no mobile overflow, no console errors. **REMAINING:
-T6b-2** — the create/edit trip FORM (ReminderForm-style dialog → tripApi.create/update + R2 client guard) + the
-FE→BE→DB e2e (feature-DoD); the list is read-only until the form lands (then the New-Trip button + empty-state CTA).
-Standing D3 follow-on: persist the business-mileage rate (userPreferences column + per-trip override) — its
+cards), shot DESKTOP+MOBILE + Read — summary math correct, no mobile overflow, no console errors. T6b-2 CREATE
+FORM DONE + EYES-ON VERIFIED (C227): TripForm.svelte (dialog → tripApi.create) + pure trip-form-validation.ts
+(presence + R2 + R5 future-LOCAL-DAY guard mirroring C226; +12 tests) + a "Log Trip" PageHeader action +
+empty-state CTA; shot the open dialog DESKTOP+MOBILE + Read (clean, no mobile overflow, today-date default) + an
+E2E today-dated POST through the live stack succeeded. **REMAINING: T6b-3 EDIT/DELETE — DEFERRED to the C214
+ruling** (editing endOdometer / deleting a trip leaves a stale linked odometer entry — Angelo's trips↔odometer
+lifecycle call; CREATE shipped because it's fully decided via D2/C213). The card-level edit/delete buttons land
+once C214 is ruled. Standing D3 follow-on: persist the business-mileage rate (userPreferences column + per-trip override) — its
 own schema/migration+backup-coverage slice, NOT yet built. money-cents-migration UNSTARTED — its T1+T2 are a "land-together" data-safety core (schema-flip
 + backup version-bump/shim) that should land in a single coherent cycle, NOT split across starvation cycles,
 else the schema is cents while the pipeline still writes floats (NORTH_STAR #1). So the next feature cycles

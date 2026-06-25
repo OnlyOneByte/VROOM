@@ -148,14 +148,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 220 |
+| feature | 4 | 227 |
 | deep-review | 5 | 223 |
 | guard | 6 | 225 |
 | bug | 3 | 226 |
 | arch | 5 | 222 |
 | infra | 6 | 224 |
 
-Current cycle: **226**
+Current cycle: **227**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -174,6 +174,27 @@ Current cycle: **226**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C227 (feature: trips-location T6b-2 — the CREATE trip form, eyes-on verified; EDIT/DELETE deferred to the C214 ruling)** —
+  Balance recompute (cycle 227): feature most-starved + over budget (7/4 = 1.75×; arch 5/5 at threshold, rest
+  under). Built the trips create form (the clean loop-buildable feature increment, de-risked by C226's today-date
+  fix). SCOPE DISCIPLINE: the spec's T6b-2 says "create/EDIT form," but the C214 trips↔odometer EDIT/DELETE
+  lifecycle is Angelo-GATED ("Do NOT build until ruled" — editing endOdometer / deleting a trip leaves a stale
+  linked odometer entry). Creating a trip is fully DECIDED (D2 linkage built+pinned C213, zero gate entanglement),
+  so I shipped CREATE-only this cycle; the edit/delete entry points wait for the C214 ruling (which shapes what
+  edit does to the odometer entry). NOT self-authoring a gated call. Built: `TripForm.svelte` (ReminderForm-style
+  dialog → tripApi.create) + a PURE `trip-form-validation.ts` (vehicle/odometer presence + R2 end>=start +
+  R5 future-LOCAL-DAY guard mirroring the C226 backend fix — the C125/C201 testable-validator pattern), wired into
+  the list page via a "Log Trip" PageHeader action + an empty-state CTA + onSaved=load. Per-vehicle unit label on
+  the odometer fields; purpose/date default business/today. EYES-ON (UI work → the GUIDE gate): booted servers
+  detached, minted auth, shot the open dialog DESKTOP + MOBILE + Read both PNGs — clean layout, NO mobile
+  horizontal overflow (NORTH_STAR #3), footer stacks on mobile, date defaults to today (Jun 25 2026 — the exact
+  C226-fixed case), no console errors. E2E: POSTed a TODAY-dated trip through the live FE→BE→DB stack → 201
+  (the pre-C226 400 is gone), verified it listed, then cleaned it up (DB back to 3 trips). Killed servers (no
+  orphans; ports down). +12 unit tests (trip-form-validation.test.ts: presence, R2 incl. equal-allowed boundary,
+  R5 today-passes/tomorrow-fails computed off `now`, length bounds). FE validate:local GREEN (svelte-check 0,
+  build, 838 pass, +12). cov: be 88.92% (~) / fe ~88.9% (~, the new pure validator fully covered + the wired page
+  — re-measure due at the ~C234 infra cadence). (feature→227. trips T6b-2 CREATE done; T6b-3 EDIT/DELETE deferred
+  to C214.)
 - **C226 (bug: FIX a REAL date/tz future-guard defect on the C210 trips CREATE/PUT — today-as-noon-local 400'd as "future")** —
   Balance recompute (cycle 226): bug most-starved + over budget (5/3 = 1.67×) — ahead of feature (6/4 = 1.5×).
   Per the GUIDE, ran a fresh-surface scout on the soon-to-be-form-backed create-date path (the trips FE is the

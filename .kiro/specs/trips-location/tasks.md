@@ -98,9 +98,19 @@
     shot /trips DESKTOP + MOBILE + Read both PNGs** — summary math correct (210/2/135/105), newest-first order,
     NO mobile horizontal overflow (NORTH_STAR #3), no console errors, no auth bounce. FE validate:local GREEN
     (svelte-check 0, build, 826 pass).
-  - [ ] **REMAINING T6b-2:** the create/edit trip FORM (ReminderForm-style dialog → tripApi.create/update;
-    vehicle + odometer-pair + purpose + date + optional locations/note; R2 client guard) + the FE→BE→DB e2e
-    (feature-DoD). The list page is read-only for now (the New-Trip button lands with the form).
+  - [x] **T6b-2 CREATE form DONE + EYES-ON VERIFIED (C227):** `TripForm.svelte` (ReminderForm-style dialog →
+    tripApi.create) + a pure `trip-form-validation.ts` (vehicle/odometer presence + R2 end>=start + R5
+    future-LOCAL-DAY guard mirroring the C226 backend fix; +12 unit tests). Wired into the list page: a
+    "Log Trip" PageHeader action + an empty-state CTA + the dialog with onSaved=load. Per-vehicle unit label
+    on the odometer fields; purpose/date default to business/today. **Eyes-on: booted servers, shot the open
+    dialog DESKTOP + MOBILE + Read both PNGs** (clean, no mobile overflow, footer stacks, date defaults to
+    today=Jun 25 2026 — the exact C226-fixed case) + an E2E POST of a TODAY-dated trip through the live
+    FE→BE→DB stack succeeded (was the pre-C226 400). FE validate:local GREEN (838 pass).
+  - [ ] **REMAINING T6b-3 — EDIT + DELETE (DEFERRED to the C214 ruling):** the card-level edit/delete entry
+    points + the updateTripSchema-backed edit mode. Editing endOdometer / deleting a trip currently leaves a
+    STALE linked odometer entry (the trips↔odometer EDIT/DELETE lifecycle — Angelo's C214 product call,
+    characterization-pinned). Creating is fully decided (D2 linkage, C213) so the create form ships now; the
+    mutate entry points land once Angelo rules C214 (the chosen model shapes what edit/delete do to the entry).
 
 ## Build-order note
 Once T0 clears, T1–T5 are a clean backend-first arc the loop can drive across several `feature` cycles
