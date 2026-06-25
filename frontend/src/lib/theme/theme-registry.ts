@@ -14,7 +14,14 @@
  * guard are built to accept it with zero structural change (add one ThemeDefinition).
  */
 
-import type { ThemeDefinition, ThemeTokens } from './theme-types';
+import type { ThemeDefinition, ThemeTokenKey, ThemeTokens } from './theme-types';
+
+/**
+ * The default swatch strip the picker card previews when a theme does not specify its own. These four
+ * tokens read well as a representative 4-color preview for any palette (brand, accent, surface, ink). A
+ * theme MAY override `swatch` for a more characterful preview; most reuse this. Order is presentation-only.
+ */
+const DEFAULT_SWATCH: ThemeTokenKey[] = ['primary', 'accent', 'background', 'foreground'];
 
 /** `default` light palette — VERBATIM from app.css `:root` (C185). Do not edit by hand; mirror app.css. */
 const DEFAULT_LIGHT: ThemeTokens = {
@@ -92,8 +99,7 @@ const DEFAULT_THEME: ThemeDefinition = {
   id: 'default',
   label: 'Default',
   description: "VROOM's classic look — clean neutrals with a calm accent.",
-  // A representative strip the picker card previews. Order is presentation-only.
-  swatch: ['primary', 'accent', 'background', 'foreground'],
+  swatch: DEFAULT_SWATCH,
   source: 'builtin',
   light: DEFAULT_LIGHT,
   dark: DEFAULT_DARK,
@@ -182,7 +188,7 @@ const BLUEPRINT_THEME: ThemeDefinition = {
   id: 'blueprint',
   label: 'Blueprint',
   description: 'Engineering schematic — cyan on deep navy, a backlit drafting table.',
-  swatch: ['primary', 'accent', 'background', 'foreground'],
+  swatch: DEFAULT_SWATCH,
   source: 'builtin',
   light: BLUEPRINT_LIGHT,
   dark: BLUEPRINT_DARK,
