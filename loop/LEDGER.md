@@ -233,11 +233,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 227 |
 | deep-review | 5 | 301 |
 | guard | 6 | 300 |
-| bug | 3 | 298 |
+| bug | 3 | 302 |
 | arch | 5 | 300 |
 | infra | 6 | 299 |
 
-Current cycle: **301**
+Current cycle: **302**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,27 @@ Current cycle: **301**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C302 (bug-scout DRY: the split-expense allocation math [computeAllocations even/absolute/percentage — the NORTH_STAR #1 "legs sum to header" money invariant] certified CLEAN firsthand → dry, pivot fast, no manufactured test)** —
+  Balance recompute (cycle 302): bug was the ONLY category strictly OVER budget (4/3 = 1.33×). Per the C293-refreshed
+  bug-row guidance, scouted a not-yet-rechecked money-facing surface: split-service.ts computeAllocations (87.50% func in
+  the C299 report) — the per-vehicle allocation of a split total. The #56/#108/#113/#146 fixes hardened the split-sibling
+  ANALYTICS overcount; this scouted the CORE allocation (does Σlegs === total, no penny lost/created — the NORTH_STAR #1
+  "legs sum to header" invariant). CERTIFIED CLEAN FIRSTHAND: (1) computeEvenSplit is cents-exact —
+  totalCents=round(total*100), baseCents=floor(totalCents/n), remainderCents distributed +1¢ to the first k vehicles → Σ
+  = baseCents*n + remainderCents = totalCents EXACTLY (e.g. $10/3 → 334+333+333); (2) computePercentageSplit floors each
+  NON-last leg then assigns the remainder (max(0, round(total−runningTotal))) to the LAST → Σ = total, clamped ≥0; (3)
+  absolute passes a.amount verbatim — SAFE because the WRITE boundary refineSplitConfig (validation.ts:99) enforces BOTH
+  invariants: percentage sum = 100 (±0.001) AND absolute sum = totalAmount (±0.001), so computeAllocations never sees a
+  mismatched config; (4) totalAmount is cents-quantized at the schema (centsAmount transform, the #141 fix) so
+  groupTotal == Σsiblings exactly. NO fresh defect; comprehensively guarded by split-service.property.test.ts Property 1
+  (Allocation sum invariant — a PROPERTY-BASED fast-check test asserting Σallocations === totalAmount across randomized
+  even/absolute/percentage configs, the strongest possible pin) + split-validation-schema.test.ts (the refinement).
+  Re-pinning with an example test would be strictly weaker than the existing property test → recorded dry + pivoted fast
+  per the C99/C204 discipline, no manufactured test. Verify: audit only — no source touched, both suites green (1949 BE /
+  868 FE). Docs-only. cov: be 89.29% / fe 89.43% (~). (bug→302. The split-allocation money math is CERTIFIED — cents-exact
+  conservation by construction + write-boundary sum-enforcement + cents-quantization, property-pinned; don't re-scout
+  computeAllocations. The split-sibling family is now closed across BOTH the analytics overcount [#56/#108/#113/#146] AND
+  the allocation conservation [C302]. NEXT bug cycle: another un-audited subsystem or record dry on first recheck.)
 - **C301 (deep-review: the financing computeBalance chain [the headline loan-balance figure] certified CLEAN firsthand — the Math.max(0,…) clamp + owned-id read scope + the write-guard-protected payment predicate; cross-tenant safety is a sound consequence of the #62/#109/#125/#145 link-integrity class)** —
   Balance recompute (cycle 301): deep-review + bug tied at 1.00× (5/5, 3/3); deep-review most-starved by absolute count
   (5 > 3). The vein is saturated across trips/repos/TCO/offline-sync/CSV-import/provider-config/backup-round-trip/

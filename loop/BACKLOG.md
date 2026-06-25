@@ -782,6 +782,16 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **SCOUTED C302 — the split-expense allocation math (computeAllocations even/absolute/percentage — NORTH_STAR #1 "legs
+> sum to header") certified CLEAN firsthand → dry.** The #56/#108/#113/#146 fixes hardened the split-sibling ANALYTICS
+> overcount; this scouted the CORE allocation conservation. Certified: computeEvenSplit cents-exact
+> (baseCents*n+remainder=totalCents); computePercentageSplit floors non-last + remainder-to-last (Σ=total, clamped ≥0);
+> absolute verbatim — SAFE because refineSplitConfig (validation.ts:99) enforces BOTH percentage-sum-100 AND
+> absolute-sum-total (±0.001); totalAmount cents-quantized (#141 centsAmount). NO defect; pinned by
+> split-service.property.test.ts Property 1 (a property-based Σallocations===total invariant — stronger than any example).
+> Recorded dry + pivot. The split-sibling family is closed across BOTH analytics overcount AND allocation conservation.
+> Don't re-scout computeAllocations.
+
 > **SCOUTED C298 — getCurrentOdometer (the cross-category odometer-read backbone for mileage reminders + lease-overage)
 > certified CLEAN firsthand → dry.** The #76/#130/#137/#244 fixes hardened the WRITE side (clearing stray mileage on
 > non-fuel rows); this scouted the READ aggregation (MAX over expenses.mileage UNION odometer_entries.odometer).
