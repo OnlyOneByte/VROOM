@@ -232,12 +232,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 313 |
 | deep-review | 5 | 314 |
-| guard | 6 | 306 |
+| guard | 6 | 315 |
 | bug | 3 | 311 |
 | arch | 5 | 310 |
 | infra | 6 | 312 |
 
-Current cycle: **314**
+Current cycle: **315**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,18 @@ Current cycle: **314**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C315 (GUARD theming: pinned the layout→themes.css wiring — the one line that makes a registered theme actually paint)** —
+  Balance recompute (cycle 315): guard most-starved over budget (9 starved, budget 6, 1.5×). Normally saturated, but C313's
+  fresh source (themes.css + blueprint) opened a real vein. Found the ONE unguarded wiring line: themes.css (the generated
+  `:root[data-theme=<id>]` blocks) is imported only at +layout.svelte:21. Drop it in a refactor and the head-script still
+  sets data-theme="blueprint" but no matching CSS is bundled → EVERY non-default theme silently renders as default — and
+  byte-freshness / registry-integrity / contrast / distinctness ALL stay green (file/registry/values are all fine; only the
+  wiring is gone). Added a wiring source-scan to themes-css.test.ts (the C190/C201 cross-file idiom): +layout.svelte must
+  import BOTH themes.css and app.css. NON-VACUOUS — proven firsthand by stripping the themes.css import (guard went RED),
+  reverted clean. Verify: FE validate:local GREEN (920 tests, +2 vs C314). BE untouched. Committed 07c3754, pushed (branch
+  171 ahead / 0 behind). cov: be 89.29% / fe 89.43% (~ — test-side). (guard→315. The theming engine is now guarded across
+  ALL five dimensions: byte-freshness + registry-integrity + contrast[D4] + distinctness + layout-wiring. NEXT high-leverage:
+  feature T10 picker [eyes-on now meaningful] OR bug [4 starved, over budget].)
 - **C314 (DEEP-REVIEW theming: audited the engine now that C313 shipped the first REAL non-default theme; GUARDED the registered-but-inert-theme gap firsthand)** —
   Balance recompute (cycle 314): deep-review most-starved over budget (7 starved, budget 5, 1.4×). Normally saturated
   across 10 subsystems — but C313 added genuinely fresh source (the first non-default theme), so the audit is real, not a
