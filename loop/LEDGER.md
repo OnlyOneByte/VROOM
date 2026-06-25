@@ -232,12 +232,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 227 |
 | deep-review | 5 | 285 |
-| guard | 6 | 283 |
+| guard | 6 | 289 |
 | bug | 3 | 287 |
 | arch | 5 | 286 |
 | infra | 6 | 288 |
 
-Current cycle: **288**
+Current cycle: **289**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,28 @@ Current cycle: **288**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C289 (guard: the wired formatMonthTick axis callback — chart-formatters.ts last uncovered seam — pinned firsthand via its real monthlyXAxisProps(...).format wiring; 84.21→100% func / 88.23→100% line)** —
+  Balance recompute (cycle 289): nothing strictly OVER budget; among non-gated categories guard most-starved (6/6, AT
+  threshold). The GUIDE marks guard SATURATED, but per discipline did ONE fresh firsthand scout before recording — and
+  the C288 coverage report surfaced a GENUINE reachable gap: chart-formatters.ts was the lowest-covered pure-util FE
+  file (84.21% func / 88.23% line), its ONLY uncovered code being `formatMonthTick` (lines 50-52). It is NOT exported,
+  so its sole reachable seam is the `monthlyXAxisProps(...).format` callback layerchart invokes for every monthly-chart
+  x-tick (fuel-efficiency trend, year-end, fuel charts). The existing C436 test asserted `typeof ...format ===
+  'function'` but NEVER CALLED it — so the function body (a real-Date → "Mon" render + the non-Date/Invalid-Date → ''
+  guard its covered sibling formatDateTick carries) was untested; a dropped guard would surface a literal "Invalid Date"
+  tick label on every monthly chart with nothing to catch it. PROBED the exact contract firsthand (real Date 2024-02
+  → "Mar"; garbage Date / 42 / null / undefined → '') THEN extended the monthlyXAxisProps describe to drive the REAL
+  wired callback (`const format = monthlyXAxisProps(6).format; format(...)`) — NOT a re-implementation (the C181/C229
+  theater trap), it exercises the actual non-exported function through its real seam. Verify: FE `npm run
+  validate:local` GREEN (svelte-check + build + 868 vitest pass, +1 vs C288 867). Coverage RE-MEASURED: chart-formatters.ts
+  84.21→100% func / 88.23→100% line; FE overall 89.3→89.43% line / 89.79→90.05% func (crossed 90% func) / 81.4→81.75%
+  branch / 87.12→87.3% stmts. The residual chart-formatters branch (line 104 = parseMonthToDate `?? '0'`/`?? '1'`
+  nullish fallbacks, unreachable via a well-formed "YYYY-MM" string) is a genuine v8 artifact — pinning it would be
+  theater, left. No BE source touched (BE unchanged 89.27%). cov: be 89.27% / fe 89.43% (MEASURED). (guard→289. The
+  chart-formatters axis-callback family is now FULLY covered [all 3 ticks + both composite seams + the wired
+  formatMonthTick]; don't re-scout it. The filter/wired-seam coverage vein still yields when a NEW report surfaces an
+  untested REACHABLE seam — but the remaining sub-100% FE files [auth-api DI-bound, sync-manager timer-bound,
+  calculations eyes-on] are structural; NEXT guard cycle record saturated on first recheck + pivot unless a fresh report gap appears.)
 - **C288 (infra coverage cadence; last ran C282: untracked-test sweep CLEAN both sides, coverage RE-MEASURED flat-to-up, GUIDE standing-truth freshened to the C288 numbers)** —
   Balance recompute (cycle 288): nothing strictly OVER budget; among non-gated categories infra was most-starved
   (6/6, AT threshold) — and the coverage cadence (last ran C282) was due. Ran the full branch-hygiene sweep: (1)

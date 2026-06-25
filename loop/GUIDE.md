@@ -84,10 +84,10 @@ never a bare `.trim()`.
 | **infra** | live (the one always-productive vein) | ~every 10 cycles: untracked-`*.test.ts` sweep + coverage re-measure (update the LEDGER cov: baseline) + this GUIDE/doc-freshness pass. (BRANCH_REVIEW.md is gitignored — NOT in the PR, no refresh artifact.) |
 
 ## Standing truths (don't re-discover these)
-- **Coverage 90% is NOT loop-closable** (RE-MEASURED C288: 89.27% BE line / 88.68% func [1935 pass] · 89.3% FE
-  line / 89.79% func / 81.4% branch [867 pass] — the structural ceiling, UP from the stale ~86/~84 via the
-  C250–C257 filter-branch covered-source climb; FLAT vs C282 [BE no source since C259, FE +1 = the C283 sort test]).
-  BE gaps are
+- **Coverage 90% is NOT loop-closable** (RE-MEASURED C289: 89.27% BE line / 88.68% func [1935 pass] · 89.43% FE
+  line / 90.05% func / 81.75% branch [868 pass] — the structural ceiling, UP from the stale ~86/~84 via the
+  C250–C257 filter-branch covered-source climb; BE flat since C259 [no source], FE crept up C283/C289 [+sort test
+  +the wired formatMonthTick axis-callback pin, chart-formatters.ts → 100%]). BE gaps are
   DI/singleton/OAuth + catch/DatabaseError tails; FE gaps are eyes-on components + DOM/timer + apiClient-wrapper
   theater. `cov:` tag every LEDGER entry; re-measure on cycles that touch a module. The filter-branch vein that
   drove the climb is now SATURATED (C261/C263) — don't expect further movement without new feature SOURCE.
