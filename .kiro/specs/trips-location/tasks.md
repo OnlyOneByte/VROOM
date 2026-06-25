@@ -83,6 +83,15 @@
 - [ ] **T6 — Frontend (eyes-on tail, R6).** trips list + form + summary card + `trip-api.ts` client (the
   C149/C163 service pattern); four-states + a11y + mobile; then the FE→BE→DB e2e (feature-DoD). **Playwright-
   sandbox-blocked in the loop → lands "code-complete, eyes-on pending"** like maintenance T9 / import T4–6.
+  - [x] **T6a — FE data layer DONE (C218):** `src/lib/types/trip.ts` (Trip / TripPurpose [== backend
+    TRIP_PURPOSES] / TripSummary [== buildTripSummary output] / MilesByPurpose + the `tripDistance` clamp
+    mirror) + barrel-exported; `src/lib/services/trip-api.ts` (the C149/C163 pattern over the C210/C212 routes:
+    list [paginated + vehicleId/purpose filter-drop], getSummary [vehicleId+rate], getByVehicle, getById,
+    create, update, delete). +14 unit tests (trip-api.test.ts: exact URL/payload per method, filter-drop, the
+    summary rate param, + the tripDistance clamp). FE validate:local GREEN (825 pass, +12). NO eyes-on needed
+    for the data layer. **REMAINING T6b: the eyes-on COMPONENTS** — trips list page + ReminderForm-style trip
+    form + the mileage-summary card, four-states/a11y/mobile, then the e2e (Playwright-gated → code-complete,
+    eyes-on-pending).
 
 ## Build-order note
 Once T0 clears, T1–T5 are a clean backend-first arc the loop can drive across several `feature` cycles

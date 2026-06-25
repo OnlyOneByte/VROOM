@@ -142,14 +142,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 213 |
+| feature | 4 | 218 |
 | deep-review | 5 | 213 |
 | guard | 6 | 216 |
 | bug | 3 | 211 |
 | arch | 5 | 212 |
 | infra | 6 | 217 |
 
-Current cycle: **217**
+Current cycle: **218**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -168,6 +168,22 @@ Current cycle: **217**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C218 (bug-scout DRY [saturated] → feature: trips T6a — the FE data layer [trip types + trip-api.ts])** —
+  Balance recompute (cycle 218): bug most-starved (7/3 = 2.33×) but the trips surface is scout-saturated (5
+  consecutive, no prod change since C213) → dry, recorded. Next over-budget = FEATURE (5/4 = 1.25×, edging arch's
+  6/5 = 1.2×). Built the FIRST slice of trips T6 (the only remaining trips task) that needs NO eyes-on — the FE
+  DATA LAYER: `src/lib/types/trip.ts` (Trip / TripPurpose [identical to the backend TRIP_PURPOSES] / TripSummary
+  [== buildTripSummary output] / MilesByPurpose + a `tripDistance` clamp mirror), barrel-exported; and
+  `src/lib/services/trip-api.ts` (the C149/C163 service pattern over the C210/C212 routes: list [paginated +
+  vehicleId/purpose filter-drop], getSummary [vehicleId+rate], getByVehicle/getById/create/update/delete). This
+  is the foundation the eyes-on T6 components build on, fully unit-testable WITHOUT Playwright. +14 tests
+  (trip-api.test.ts: exact URL/payload per method via mocked apiClient — guards a wrong-segment typo — + the
+  filter-drop on empty vehicleId, the summary rate param, + the tripDistance clamp). FE validate:local GREEN
+  (svelte-check 0, build, 825 pass / 0 fail, +12) — the FIRST FE-coverage movement since the trips arc began
+  (it had been backend-only). Data layer (no UI component) → no shot. cov: be 88.92% (~, untouched) / fe ~88.7%+
+  (~, new service+types module unit-covered; re-measure next cadence ~C227). REMAINING T6b: the eyes-on
+  COMPONENTS (list page + trip form + summary card, four-states/a11y/mobile, then the e2e — Playwright-gated,
+  lands code-complete-eyes-on-pending). (Bug stays 211 — scout dry.)
 - **C217 (bug-scout SATURATED [trips surface, 5 consecutive] → record dry → infra: cadence sweep + coverage re-measure)** —
   Balance recompute (cycle 217): bug most-starved + over budget (6/3 = 2.0×). Cold-vein: C214/C215/C216 were all
   test-only, so the last prod change is C213 — and the trips/D2 surface has now been scouted FIVE consecutive
