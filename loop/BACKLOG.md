@@ -1541,12 +1541,15 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 ### arch
 *(reliably DRY per the archive. Run a fresh dedup scout; if nothing clean surfaces, record "no churn warranted" + pivot. Obey the arch rules above.)*
 
-> **ARCH CANDIDATE (filed C236) — `buildTripSummaryByMonth` is dead code.** Exported + unit-tested
-> (trip-summary.ts:79, the C212 R5 monthly-bucket builder) but has NO production consumer (no route/FE calls it;
-> built speculatively for a "later monthly trip view" that never landed). NORTH_STAR #6 dead-code per arch rules.
-> A future arch cycle: either DELETE it (+ its tests) as cruft, OR confirm it's imminent planned surface and leave
-> a note. Deferred from C236 (that cycle had just done arch C235; removing a tested+exported fn is its own judged
-> increment). Not urgent — it's inert, not a correctness risk.
+> **NOT-CRUFT (re-classified C237, correcting the C236 note) — `buildTripSummaryByMonth` is RATIFIED design
+> surface authored ahead of its endpoint, NOT deletable dead code.** C236 filed it as a delete-candidate; a C237
+> firsthand spec read CORRECTS that: design.md §5 explicitly specs "Month bucketing via `toMonthKey` on local
+> `tripDate` (R5)" + requirements R5 says "the rollup buckets by local month" — so the per-month builder IS
+> ratified R4/R5 surface, just unwired (no monthly ENDPOINT is tasked yet, like D3 rate-persistence was deferred).
+> Deleting it would discard ratified design surface; WIRING a monthly endpoint is untasked feature scope (gated,
+> can't self-author). **Correct action: LEAVE IT (covered + inert), pending a future monthly-trip-view task** — do
+> NOT delete, do NOT self-wire. (The lesson: "exported + no consumer" is necessary-but-not-sufficient for cruft —
+> check the spec for ratified-ahead-of-need surface first.)
 
 > **SCOUTED C235 — no churn warranted (2 candidates, both fail the bar).** (1) `error instanceof Error ?
 > error.message : String(error)` (59 occurrences) — a helper ALREADY EXISTS (`extractErrorMessage`,

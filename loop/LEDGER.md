@@ -162,9 +162,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 236 |
 | bug | 3 | 234 |
 | arch | 5 | 235 |
-| infra | 6 | 231 |
+| infra | 6 | 237 |
 
-Current cycle: **236**
+Current cycle: **237**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -183,6 +183,25 @@ Current cycle: **236**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C237 (feature gated; bug/deep-review/arch scouts all DRY → infra: correct a mis-filed backlog record + record the dry scouts)** —
+  Balance recompute (cycle 237): ONLY feature over budget (10/4) + FULLY GATED → record + pivot. Nothing else
+  strictly over budget; bug + infra tied at threshold (3/3, 6/6). Took the highest-leverage HONEST work after
+  scouting the candidates firsthand and finding them all dry/mis-scoped: (1) **dead-code candidate** —
+  `buildTripSummaryByMonth` (C236-filed as deletable cruft): a firsthand spec read REFUTED that — design.md §5 specs
+  "Month bucketing via toMonthKey (R5)" + R5 says "the rollup buckets by local month", so it's RATIFIED design
+  surface ahead of its (untasked) endpoint, NOT cruft. Deleting it discards ratified surface; wiring an endpoint is
+  untasked feature scope (gated). → CORRECTED the backlog note to "leave it, pending a monthly-view task; do not
+  delete/self-wire" (a wrong record is a future-cycle landmine — a later arch cycle would've wrongly deleted ratified
+  surface). (2) **bug scout — delete-path family**: certified firsthand that insurance/expenses/odometer deletes all
+  run cleanup-BEFORE-primary (safe ordering, no C233-class sibling — if cleanup throws, the primary never commits, no
+  orphaned-500); the C233/C234 best-effort class is closed. DRY. (3) **deep-review — money precision round-trip**:
+  certified coerceRow's money path is sound + covered (backup.test 123.45→123.45 + the 1,234.56 thousands-sep fix;
+  claims-roundtrip 1234.56; csv-special-chars 49.99) — the strict Number()+comma-strip parse (C209). DRY. No clean
+  net-new code increment exists this cycle that isn't gated or manufactured — so the increment is the record
+  correction + scout documentation (loop hygiene, infra's domain). No source change → no validate/shot (LEDGER+BACKLOG
+  doc-only). cov: be 88.92% (~) / fe 89.11% (~). (infra→237. The gated stretch continues: C232–C237 = 6 cycles where
+  the most-starved category is gated/dry. The loop stays PR-ready + scouts honestly; net-new code awaits a gate. The
+  highest-leverage unblock remains money-cents sequencing — escalated C232, still the only specced loop-buildable feature.)
 - **C236 (feature gated → highest-leverage open item = guard: characterization-anchor the trips cross-fleet #94 unit-pooling)** —
   Balance recompute (cycle 236): ONLY feature is over budget (9/4 = 2.25×) and it's FULLY GATED → record + pivot.
   Nothing else strictly over budget → highest-leverage open UN-GATED item. Scouted firsthand: buildTripSummaryByMonth
