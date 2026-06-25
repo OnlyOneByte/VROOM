@@ -218,10 +218,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 279 |
 | guard | 6 | 276 |
 | bug | 3 | 280 |
-| arch | 5 | 275 |
+| arch | 5 | 281 |
 | infra | 6 | 278 |
 
-Current cycle: **280**
+Current cycle: **281**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -240,6 +240,23 @@ Current cycle: **280**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C281 (arch NO CHURN WARRANTED — 2 self-dup candidates scouted firsthand, both fail the bar: no BE walker dup; the SRC_ROOT idiom is a per-file-depth constant that can't cleanly converge)** —
+  Balance recompute (cycle 281): arch was the sole over-budget category (6/5 = 1.2×). Arch is at its structural floor
+  (dead-code sweep complete both sides C260/C264; FE collectSvelteFiles converged C275; collectSourceFiles is the
+  below-bar C277 record). Scouted the fresh self-dup vector (the GUIDE vector, the C275/C258 pattern) on 2 dimensions,
+  both firsthand-verified BELOW the bar: (1) BACKEND walker dup — grepped all backend/src *.test.ts for a recursive
+  readdirSync/collect/walk file-walker (the parallel to the FE collectSvelteFiles family); ZERO matches — the BE
+  source-scan guards read specific known files directly, no recursive tree-walk to converge. (2) the
+  `SRC_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..','..','..')` line is byte-identical across 7 guards —
+  superficially a rule-of-seven — but CANNOT cleanly converge: import.meta.url resolves to the CALLING module, so a
+  shared SRC_ROOT constant would resolve to the helper's location (wrong depth); the only extraction is a thin
+  `srcRoot(import.meta.url)` wrapper each caller still passes its own import.meta.url to — saving ~0 while adding an
+  import + indirection (the C212/C244 thin-wrapper-below-the-bar / manufactured-churn case). Recorded "no churn
+  warranted" + pivot (arch rule 5); did NOT manufacture an extraction. Verify: audit only — no source touched, both
+  suites green at C276 (1935 BE / 866 FE). Docs-only. cov: be 89.27% / fe 89.11% (~). (arch→281. Both self-dup
+  dimensions are documented below-bar non-targets — don't re-scout the BE walker [none exists] or the SRC_ROOT idiom
+  [per-file-depth, can't share]. Arch stays at its structural floor; NEXT arch record no-churn fast + pivot unless a
+  fresh feature surface adds genuinely-threadable duplicate code.)
 - **C280 (bug-scout DRY: the backup coerceRow numeric coercion [#209/#68 restore-coercion family] certified CLEAN firsthand — the suspected EU-decimal corruption is NOT reachable via VROOM own round-trip)** —
   Balance recompute (cycle 280): nothing strictly OVER budget; bug + arch tied AT threshold (3/3, 5/5). Per C248 took
   bug (the over-budget-discipline driver) on a fresh safety-critical path not scouted this run: backup coerceRow

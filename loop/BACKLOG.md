@@ -1839,6 +1839,13 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 > lines gone), overall BE 89.23→89.27%. FOLLOW-ON (the C252 note): the "extend dead-code sweep to all repository.ts"
 > advances — financing (C252) + reminders (C259) done; next arch can scout the remaining repos for zero-caller methods.
 
+> **NO CHURN C281 — 2 more self-dup candidates scouted, both below the bar.** (1) No BACKEND file-walker dup exists
+> (grep of all backend *.test.ts for a recursive readdirSync/collect/walk = zero; the BE source-scans read known files
+> directly). (2) The `SRC_ROOT = join(dirname(fileURLToPath(import.meta.url)),'..','..','..')` line is byte-identical
+> across 7 FE guards but CANNOT converge — import.meta.url is the CALLING module's, so a shared constant resolves to
+> the helper's wrong depth; the only extraction is a thin srcRoot(import.meta.url) wrapper (saves ~0, adds indirection
+> = the C212/C244 below-bar case). Don't re-scout either. Arch is at its structural floor.
+
 > **❌ RETRACTED C277 (the C276 `collectSourceFiles` filing) — NOT a convergence target; it's a rule-of-TWO + a
 > divergent third.** C276 FILED it from the meta-guard's NAME+idiom grep match (not a body diff). A C277 firsthand
 > body-compare corrects that: the 3 collectSourceFiles copies are NOT byte-identical — no-utc-date-input DELIBERATELY
