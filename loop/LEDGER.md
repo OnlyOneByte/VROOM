@@ -29,6 +29,16 @@
 > (C155 email-fix / C157 resolveNewUser / C158 unlink-route) + the C159 offline needs-attention helpers
 > (pure+covered) added covered lines; FE crossed 88.4 line (a fresh high). Structural ceiling holds (DI/OAuth/SQL
 > BE + effect/DOM FE). NEXT ~C171.**
+> **C246 (infra cadence MEASURED): BE 88.92% line / 88.44% func (1920 pass) — FLAT vs C231 (BE untouched since
+> C234; C235–C245 were FE/docs/scouts). FE 89.11% line / 89.23% func / 81.34% branch / 86.99% stmts (857 pass /
+> 79 files) — line + func FLAT vs C231, branch −0.09 / stmts −0.06 (v8 rounding noise: the +15 FE tests since C231
+> [C238 trip-api error-propagation +4, C239 fuel-empty-state +4, C241 FAB-clearance +3, C242 chart-gate +4] are
+> SOURCE-SCAN / contract guards that read EXISTING files — they add covered test lines, not new covered SOURCE
+> branches, the expected guard-cycle signature). Both hold at the ~89% structural ceiling, both green. Untracked-
+> test sweep CLEAN both sides; tree clean; no live orphan dev servers (ports down); branch 100 ahead / 0 behind
+> origin/main, PR-ready. The 14-cycle gated/dry stretch (C232–C245) added 0 new covered SOURCE surface (every
+> increment was a guard/cert/doc on existing code — by design, since net-new feature code is Angelo-gated), so
+> flat coverage is the CORRECT signal, not a regression. NEXT cadence ~C256.**
 > **C231 (infra cadence MEASURED): BE 88.92% line / 88.43% func (1910 pass) — line FLAT vs C224, func UP +0.30
 > (88.13→88.43) from the C225 CSRF-guard + C228 optional-null cert + C229 commonSchemas dedup adding covered
 > helper lines. FE 89.11% line / 89.23% func / 81.43% branch / 87.05% stmts (842 pass) — UP +0.26 line / +0.08
@@ -162,9 +172,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 242 |
 | bug | 3 | 243 |
 | arch | 5 | 245 |
-| infra | 6 | 240 |
+| infra | 6 | 246 |
 
-Current cycle: **245**
+Current cycle: **246**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -183,6 +193,20 @@ Current cycle: **245**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C246 (infra cadence: untracked-test sweep + coverage re-measure — both flat at the ~89% ceiling, the correct gated-stretch signal)** —
+  Balance recompute (cycle 246): ONLY gated-feature over budget; bug + infra tied at threshold (3/3, 6/6). Coverage
+  was last MEASURED C231 (15 cycles ago); the C232–C245 stretch added +15 FE tests carried as estimates, so a real
+  re-measure was due (infra's domain). (1) UNTRACKED-TEST SWEEP: CLEAN both sides (no untracked *.test.ts / e2e — the
+  bun filesystem-discovery merge-loss risk). (2) TREE: clean, no stray files; ports 3001/5173 down (no orphans).
+  (3) COVERAGE RE-MEASURED: **BE 88.92% line / 88.44% func (1920 pass) — FLAT vs C231** (BE untouched since C234);
+  **FE 89.11% line / 89.23% func / 81.34% branch / 86.99% stmts (857 pass / 79 files) — line+func FLAT, branch/stmts
+  −0.09/−0.06 v8 noise**. The flat reading is the CORRECT signal: every C232–C245 increment was a guard/cert/doc on
+  EXISTING code (source-scan + contract tests read existing files → covered test lines, not new covered SOURCE
+  branches — the guard-cycle signature), because net-new feature code is Angelo-gated. Both hold at the ~89%
+  structural ceiling, both green. (4) BRANCH: 100 ahead / 0 behind origin/main, PR-ready. No source change → no shot;
+  no validate beyond the coverage runs (both green). cov: be 88.92% / fe 89.11% (MEASURED). NEXT cadence ~C256.
+  (infra→246. C232–C246 = 15 gated/dry cycles; the loop is at documented steady-state — certifying/recording on a
+  pristine branch, 0 new covered surface possible until a gate clears. Money-cents sequencing the top unblock, C237.)
 - **C245 (arch: a FRESH vein — full backend dead-code sweep → NO genuine dead code [every candidate is used / a test-seam / escalation-pending]; recorded)** —
   Balance recompute (cycle 245): arch most-starved + over budget (10/5 = 2.0×). The dedup-helper veins are ruled
   (C235/C244); rather than a 3rd near-identical "no churn" record, scouted a vein NOT yet swept: genuine DEAD CODE
