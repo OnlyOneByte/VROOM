@@ -54,9 +54,22 @@
   Round-trip test: trips-roundtrip.test.ts (+4) — a fully-populated trip survives ZIP export→replace-restore
   field-for-field; NULL optionals round-trip as null; 3 purposes survive; a trip naming an absent vehicle is
   REJECTED pre-wipe (validateTripRefs fires). NORTH_STAR #1. validate:local green (1836 pass).
-- [ ] **T5 — Mileage-summary analytics (R4).** `getTripSummary` (per-vehicle + cross-fleet: miles-by-purpose,
-  business-$ at the D3 rate, count, avg; div-guarded). Property/characterization tests (sum-by-purpose =
-  total; business-$ = businessMiles × rate; empty → zeros not NaN).
+- [x] **T5 — Mileage-summary analytics (R4). ✅ DONE (C212).** Implemented as a PURE builder
+  `buildTripSummary(trips, rate)` in `src/utils/trip-summary.ts` (DB-free — avoids the C77 analytics-repo
+  singleton trap; the route fetches trips via tripRepository then calls it): tripCount, totalMiles,
+  milesByPurpose (all 4 D4 keys always present), averageTripMiles (div-guarded count>0), businessMiles +
+  businessMileageValue (= businessMiles × rate), rate echoed. Distance via the shared `tripDistance` clamp
+  (inverted pair → 0). + `buildTripSummaryByMonth` (R5 local-month bucketing via toMonthKey). Wired
+  `GET /api/v1/trips/summary?vehicleId&rate` (registered BEFORE /:id; optional vehicleId scopes + ownership-
+  checks, else cross-fleet). **SCOPE NOTE / FOLLOW-ON (D3): the business-mileage rate is a QUERY PARAM
+  (default 0), NOT a stored field — D3 ratified "a default rate in userPreferences + optional per-trip
+  override", but C202 added NO rate column (the §7 note flagged it as a separate slice). Adding a
+  `userPreferences.businessMileageRate` column is its own schema/migration + backup-coverage slice (the
+  T1↔T4 coupling); deferred so T5 ships the correct math now. The FE T6 can pass a rate; persistence is the
+  follow-on.** Tests: trip-summary.test.ts (+9 incl. a fast-check property: Σ milesByPurpose == totalMiles,
+  businessMileageValue == businessMiles × rate, empty → zeros-not-NaN, inverted-pair-clamps-0, unknown-
+  purpose→other) + 4 HTTP cases (cross-fleet/vehicle-scoped/unowned-404/empty-zeros). validate:local GREEN
+  (1889 pass). **The trips BACKEND arc (T1–T5) is COMPLETE; only T6 (eyes-on FE) remains.**
 - [ ] **T6 — Frontend (eyes-on tail, R6).** trips list + form + summary card + `trip-api.ts` client (the
   C149/C163 service pattern); four-states + a11y + mobile; then the FE→BE→DB e2e (feature-DoD). **Playwright-
   sandbox-blocked in the loop → lands "code-complete, eyes-on pending"** like maintenance T9 / import T4–6.

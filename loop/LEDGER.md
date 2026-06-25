@@ -135,14 +135,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 210 |
+| feature | 4 | 212 |
 | deep-review | 5 | 208 |
 | guard | 6 | 207 |
 | bug | 3 | 211 |
-| arch | 5 | 205 |
+| arch | 5 | 212 |
 | infra | 6 | 209 |
 
-Current cycle: **211**
+Current cycle: **212**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -161,6 +161,28 @@ Current cycle: **211**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C212 (arch scout → NO churn warranted [rule-of-two only] → feature: trips-location T5 — mileage-summary analytics; trips BACKEND COMPLETE)** —
+  Balance recompute (cycle 212): arch most-starved over-budget (7/5 = 1.4×; nothing else over). Ran a fresh arch
+  dedup scout firsthand on the C210 trips routes: the `listQuerySchema` {limit/offset + CONFIG.maxPageSize +
+  clampPagination} form is a rule-of-TWO (odometer + trips ONLY — expenses/analytics use richer, different query
+  schemas), and the pre-existing `commonSchemas.pagination` is SEMANTICALLY DIVERGENT (.default(50)/.default(0) +
+  hardcoded max(100) vs the no-default CONFIG.maxPageSize form) so converging onto it would CHANGE clamp/default
+  behavior — the manufactured-churn trap the GUIDE forbids. clampPagination + validateVehicleOwnership are already
+  shared. **A rule-of-two needing a newly-authored shared schema is below the rule-of-three bar → recorded "no churn
+  warranted" + pivoted** to the highest-leverage open item = trips T5. Built `buildTripSummary(trips, rate)` as a
+  PURE builder in src/utils/trip-summary.ts (DB-free — sidesteps the C77 analytics-repo singleton trap; the route
+  fetches via tripRepository then calls it): tripCount, totalMiles, milesByPurpose (all 4 D4 keys present),
+  averageTripMiles (div-guarded), businessMiles + businessMileageValue (=miles×rate), + buildTripSummaryByMonth (R5
+  toMonthKey buckets). Wired GET /api/v1/trips/summary?vehicleId&rate (registered BEFORE /:id; optional vehicleId
+  scopes+ownership-checks, else cross-fleet). **SCOPE NOTE (D3): the business rate is a QUERY PARAM (default 0), NOT
+  a stored field — D3 ratified a userPreferences rate column + per-trip override, but C202 added none (the §7 note
+  flagged it). Adding userPreferences.businessMileageRate is its own schema/migration+backup-coverage slice (the
+  T1↔T4 coupling) — DEFERRED so T5 ships the correct math now; the rate's STORAGE is the clean follow-on. NOT
+  self-authored.** Tests: trip-summary.test.ts (+9, incl. a fast-check property Σ-by-purpose==total +
+  businessMileageValue==miles×rate + empty→zeros-not-NaN + inverted→0 + unknown-purpose→other) + 4 HTTP
+  (cross-fleet/vehicle-scoped/unowned-404/empty-zeros). validate:local GREEN (tsc 0, musl 21 warn baseline, 1889
+  pass / 0 fail, +13, build bundled). Backend-only (UI is T6) → no shot. **THE TRIPS BACKEND ARC (T1–T5) IS
+  COMPLETE; only T6 (eyes-on FE) remains.** cov: be ~88.5%+ (~, new builder+route fully covered) / fe 88.73% (~).
 - **C211 (bug: FIX a REAL write-path validation-asymmetry defect on the C210 trips PUT — the cold vein is LIVE again)** —
   Balance recompute (cycle 211): bug most-starved (38/3 = 12.67×). **The cold-vein precondition NO LONGER holds —
   C210 added fresh prod logic (trips routes + validation), so a scout on that surface is a REAL scout.** Scouted

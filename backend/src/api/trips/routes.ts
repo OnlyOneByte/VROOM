@@ -19,6 +19,7 @@ import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { changeTracker, requireAuth } from '../../middleware';
 import { buildPaginatedResponse, clampPagination } from '../../utils/pagination';
+import { buildTripSummary } from '../../utils/trip-summary';
 import {
   commonSchemas,
   validateTripOwnership,
@@ -34,6 +35,14 @@ const listQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).optional(),
   vehicleId: z.string().min(1).optional(),
   purpose: z.enum(TRIP_PURPOSES).optional(),
+});
+
+const summaryQuerySchema = z.object({
+  // Optional vehicle scope (else cross-fleet) + the business-mileage reimbursement rate ($/mile, R4/D3).
+  // The rate is a query param (NOT a stored field yet — its persistence is a separate schema slice, §7);
+  // default 0 → the businessMileageValue is 0 until a rate is supplied / the preferences field lands.
+  vehicleId: z.string().min(1).optional(),
+  rate: z.coerce.number().min(0).optional(),
 });
 
 routes.use('*', requireAuth);
@@ -73,6 +82,24 @@ routes.get('/', zValidator('query', listQuerySchema), async (c) => {
   });
 
   return c.json(buildPaginatedResponse(data, totalCount, limit, offset));
+});
+
+// GET /api/v1/trips/summary — the mileage-summary rollup (R4): miles-by-purpose, business-$ at the supplied
+// rate, count, avg. Optional vehicleId scopes to one vehicle (ownership-checked), else cross-fleet. MUST be
+// registered BEFORE /:id so the literal 'summary' segment isn't captured as a trip id.
+routes.get('/summary', zValidator('query', summaryQuerySchema), async (c) => {
+  const user = c.get('user');
+  const { vehicleId, rate } = c.req.valid('query');
+
+  if (vehicleId) {
+    await validateVehicleOwnership(vehicleId, user.id);
+  }
+  const trips = vehicleId
+    ? await tripRepository.findByVehicle(vehicleId, user.id)
+    : await tripRepository.findByUserId(user.id);
+
+  const summary = buildTripSummary(trips, rate ?? 0);
+  return c.json({ success: true, data: summary });
 });
 
 // GET /api/v1/vehicles/:id/trips is mounted here as /vehicle/:vehicleId (app.ts routes the vehicles-trips

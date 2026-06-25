@@ -179,6 +179,73 @@ describe('GET /api/v1/trips/vehicle/:vehicleId', () => {
   });
 });
 
+describe('GET /api/v1/trips/summary (T5 mileage rollup)', () => {
+  test('cross-fleet summary with the business-$ at the supplied rate', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    await ctx.authed(
+      'POST',
+      '/api/v1/trips',
+      VALID(vehicleId, { startOdometer: 1000, endOdometer: 1100, purpose: 'business' })
+    );
+    await ctx.authed(
+      'POST',
+      '/api/v1/trips',
+      VALID(vehicleId, { startOdometer: 2000, endOdometer: 2030, purpose: 'personal' })
+    );
+
+    const res = await ctx.authed('GET', '/api/v1/trips/summary?rate=0.5');
+    const body =
+      await json<
+        DataEnvelope<{
+          totalMiles: number;
+          businessMiles: number;
+          businessMileageValue: number;
+          milesByPurpose: Record<string, number>;
+        }>
+      >(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.data.totalMiles).toBe(130);
+    expect(body.data.businessMiles).toBe(100);
+    expect(body.data.businessMileageValue).toBeCloseTo(50, 5); // 100 × 0.5
+    expect(body.data.milesByPurpose.personal).toBe(30);
+  });
+
+  test('summary scoped to a vehicle counts only that vehicle’s trips', async () => {
+    const v1 = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    const v2 = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
+    await ctx.authed(
+      'POST',
+      '/api/v1/trips',
+      VALID(v1, { startOdometer: 0, endOdometer: 100, purpose: 'business' })
+    );
+    await ctx.authed(
+      'POST',
+      '/api/v1/trips',
+      VALID(v2, { startOdometer: 0, endOdometer: 999, purpose: 'business' })
+    );
+
+    const res = await ctx.authed('GET', `/api/v1/trips/summary?vehicleId=${v1}`);
+    const body = await json<DataEnvelope<{ totalMiles: number; tripCount: number }>>(res);
+    expect(res.status).toBe(200);
+    expect(body.data.tripCount).toBe(1);
+    expect(body.data.totalMiles).toBe(100); // v2's 999 excluded
+  });
+
+  test('summary on an UNOWNED vehicle is 404 (no cross-tenant rollup)', async () => {
+    const { vehicleId } = seedForeignTrip();
+    const res = await ctx.authed('GET', `/api/v1/trips/summary?vehicleId=${vehicleId}`);
+    expect(res.status).toBe(404);
+  });
+
+  test('empty fleet → zeros, not NaN', async () => {
+    const res = await ctx.authed('GET', '/api/v1/trips/summary');
+    const body = await json<DataEnvelope<{ totalMiles: number; averageTripMiles: number }>>(res);
+    expect(res.status).toBe(200);
+    expect(body.data.totalMiles).toBe(0);
+    expect(body.data.averageTripMiles).toBe(0);
+  });
+});
+
 describe('PUT /api/v1/trips/:id', () => {
   test('updates an owned trip', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
