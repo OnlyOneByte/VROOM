@@ -204,6 +204,18 @@ cycles record + pivot to guard/deep-review/arch/infra until a gate clears.**)*
 re-audit a data-safety write path, certify it CLEAN against source, and leave a merge-surviving guard.
 Don't trust agent "HIGH" findings — verify firsthand (the archive logged many debunked false-positives).)*
 
+> **SATURATED C255 — the trips feature arc's data-safety + correctness invariants are certified CLEAN against
+> source, all already-guarded (no fresh defect, no manufactured guard).** Audited the freshest net-new surface
+> (the trips arc C202–C233) firsthand: (1) D2 dedup createFromTrip [userId-scoped + LOCAL-day window, pinned
+> create-from-trip.test.ts]; (2) getCurrentOdometer [MAX-across-sources by value, #48 belt-and-braces, pinned
+> get-current-odometer.test.ts]; (3) tripDistance [max(0,end−start) R2/#46, never stored, property-tested]; (4)
+> backup table coverage [3 SCHEMA-derived drift guards + createBackup-keys]; (5) restore coverage [insert ≡ probe ≡
+> ImportSummary, the #93/C441 symmetry]; (6) trips conflict-probe [VERIFIED non-vacuous — directly probed, not a
+> false child-exemption]; (7) trips value round-trip [trips-roundtrip.test.ts]. Verdict: airtight, no code change.
+> Like the bug cold-vein, the certification surfaces are worked through in the gated stretch — don't re-audit these
+> 7; NEXT deep-review needs a fresh feature surface (Angelo-gated) or a not-yet-audited shipped subsystem, else
+> record saturated + pivot.
+
 > **CERTIFIED + FIXED C201 — the anti-FOUC head-script now pre-paints the THEME-ID axis, not just dark/light
 > (NORTH_STAR #3, no-FOUC).** A C201 deep-review of the just-built theming engine (pivot from a provably-dry bug
 > cold-vein, 20th consecutive) certified the token-contract chain (C181/C185/C186), the registry≡app.css guard, the

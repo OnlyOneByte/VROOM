@@ -184,13 +184,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 227 |
-| deep-review | 5 | 250 |
+| deep-review | 5 | 255 |
 | guard | 6 | 251 |
 | bug | 3 | 253 |
 | arch | 5 | 252 |
 | infra | 6 | 254 |
 
-Current cycle: **254**
+Current cycle: **255**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -209,6 +209,35 @@ Current cycle: **254**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C255 (deep-review SATURATED: certified the trips feature arc's data-safety + correctness invariants CLEAN against source — no fresh defect, all already-guarded)** —
+  Balance recompute (cycle 255): nothing strictly over budget except the gated feature (227, parked). Per the C248
+  convention took the highest-leverage open item = the most-starved non-gated category, deep-review (5/5, AT budget,
+  goes over next cycle). A deep-review = certify a load-bearing invariant firsthand against source. Picked the
+  RECENT feature surface (the trips arc C202–C233 — the freshest net-new code, the right place to find an
+  un-certified invariant). AUDITED FIRSTHAND, all CLEAN + already guarded (the deep-review analog of a dry
+  bug-scout — the value is the certification, NOT a manufactured redundant guard):
+  (1) **D2 dedup** (odometer/repository.ts createFromTrip) — the (vehicleId, LOCAL-calendar-day, reading) dedup
+  probe is userId-scoped + local-day-windowed (getFullYear/Month/Date, not a UTC slice — the #87/#106 seam); pinned
+  by create-from-trip.test.ts (trip→trip, trip→MANUAL [the actual double-count scenario], userId-scope, local-day
+  window, cross-day). (2) **getCurrentOdometer** — MAX(odometer) across both sources by VALUE, userId+vehicle-scoped
+  both legs (#48 belt-and-braces), NULL-mileage ignored, zero≠absent; pinned by get-current-odometer.test.ts (8
+  cases incl. cross-tenant #48). (3) **tripDistance** — the shared max(0,end−start) clamp (R2/#46), never stored
+  (a later correction can't desync); pinned by trip-summary.test.ts (property + inverted-pair). (4) **backup table
+  coverage** — backup-table-coverage.test.ts has 3 SCHEMA-DERIVED drift guards (every schema table backed-up-or-
+  excluded; registry≡filename-map; OPTIONAL⊆map) so a new table like trips can't be silently omitted; + the
+  createBackup-keys guard (populate≡registry). (5) **restore coverage** — restore-table-coverage.test.ts has 3
+  registry-derived guards (every backed-up table is INSERTED; every insert is conflict-PROBED or a documented
+  child-of-probed-parent [the #93/C441 reminders-trap symmetry]; ImportSummary has a count field per key). (6)
+  **trips conflict-probe** — VERIFIED firsthand it's NON-vacuous: restore.ts:370 probes trips by inArray(id) scoped
+  to userId via the shared loop (line 377), reporting a clean conflict (NOT the #93 raw-UNIQUE throw) — and trips is
+  DIRECTLY probed (not falsely relying on a child-exemption like reminders did pre-C441). (7) **trips value
+  round-trip** — trips-roundtrip.test.ts already certifies the CSV export→restore value survival. VERDICT: the
+  trips arc is airtight end-to-end; no defect, no code change, no new guard (every invariant is already pinned —
+  manufacturing one would be churn against the arch-rule-5 / GUIDE "don't manufacture" discipline). Verify: no
+  source touched (audit only); BE suite was green at C254 (1926 pass). cov: be 89.04% / fe 89.11% (~ — no module
+  touched). (deep-review→255. SATURATED on the trips arc — don't re-audit these 7 surfaces. NEXT deep-review needs
+  a FRESH feature surface [Angelo-gated] or a not-yet-audited shipped subsystem; like the bug cold-vein, the
+  certification surfaces are worked through in the gated stretch — record saturated + pivot if forced.)
 - **C253 (bug-scout DRY → pivot to guard: certify the trips-summary money-RATE boundary clean + pin it at the HTTP stack)** —
   Balance recompute (cycle 253): excluding the gated feature (last 227, Angelo-blocked), bug was most-starved + over
   budget (5/3 = 1.67×; infra 7/6 = 1.17× also over, but bug is more starved). The pure-logic/visual/write-path/IDOR/
