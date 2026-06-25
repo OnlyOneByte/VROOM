@@ -878,6 +878,14 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **CERTIFIED + GUARDED C238 — trip-api error PROPAGATION (the loadError/toast contract).** trip-api wrappers
+> are thin passthroughs with NO try/catch + apiClient throws ApiError on non-2xx, so a server error MUST reach
+> the caller — the /trips list page's loadError four-state (error pane, NOT "No trips yet" masquerade) + the
+> TripForm catch→toast both depend on a rejected promise. The wiring tests covered only the resolved path;
+> propagation was unpinned (sibling reminder-api/expense-api DO pin rejects.toThrow). +4 in trip-api.test.ts
+> (list/getSummary/create/delete reject with the ApiError). Non-vacuous (inject swallow-and-return-[] into list()
+> → only the list-propagation test REDs). Don't re-guard.
+
 > **ANCHORED C236 — the trips cross-fleet #94 unit-pooling (escalation-anchor, the #148/C102 pattern).** The
 > cross-fleet trips summary pools tripDistance across vehicles while odometers are stored per-vehicle-unit (R2),
 > so a mixed mi+km fleet pools mi+km into one unlabeled scalar — the ALREADY-escalated #94 class (C223 filed it;

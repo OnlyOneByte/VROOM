@@ -9,6 +9,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { Trip, TripSummary } from '$lib/types';
 import { tripDistance } from '$lib/types';
+import { ApiError } from '$lib/utils/error-handling';
 
 const get = vi.fn();
 const post = vi.fn();
@@ -145,6 +146,45 @@ describe('tripApi CRUD wiring', () => {
 		del.mockResolvedValueOnce(undefined);
 		await tripApi.delete('t1');
 		expect(del).toHaveBeenCalledWith('/api/v1/trips/t1');
+	});
+});
+
+// C238 deep-review cert: trip-api wrappers are thin passthroughs with NO try/catch — an apiClient ApiError
+// (non-2xx) must PROPAGATE to the caller, NOT be swallowed into a resolved empty value. The whole FE error
+// discipline downstream depends on this: the /trips list page's `loadError` four-state (it shows the error
+// pane, NOT the "No trips yet" empty state, on a fetch failure — the masquerade-as-data-loss guard) and the
+// TripForm's catch→"Failed to log trip" toast both assume a rejected promise. The wiring tests above only
+// cover the resolved path; nothing pinned that a server error reaches the caller. If a future refactor added
+// a swallow-and-return-[] to trip-api, the list page would silently render "No trips yet" on a 500 with NO
+// failing test. These pin the propagation across the read + both mutate verbs (the reminder-api/expense-api
+// rejects.toThrow pattern). Vacuity floor: each asserts the SAME ApiError instance/message escapes.
+describe('tripApi propagates apiClient errors (does not swallow — the loadError/toast contract)', () => {
+	test('list rejects when getPaginated throws (→ the list page error pane, not empty state)', async () => {
+		getPaginated.mockRejectedValueOnce(new ApiError('Server unavailable', 503));
+		await expect(tripApi.list()).rejects.toThrow('Server unavailable');
+	});
+
+	test('getSummary rejects when get throws (→ the summary card does not silently zero)', async () => {
+		get.mockRejectedValueOnce(new ApiError('Server error', 500));
+		await expect(tripApi.getSummary()).rejects.toThrow('Server error');
+	});
+
+	test('create rejects when post throws (→ the TripForm catch fires its failure toast)', async () => {
+		post.mockRejectedValueOnce(new ApiError('Validation failed', 400));
+		await expect(
+			tripApi.create({
+				vehicleId: 'v1',
+				startOdometer: 1000,
+				endOdometer: 1080,
+				purpose: 'business',
+				tripDate: '2024-06-20T12:00:00.000Z'
+			})
+		).rejects.toThrow('Validation failed');
+	});
+
+	test('delete rejects when delete throws (→ a failed delete is not silently treated as success)', async () => {
+		del.mockRejectedValueOnce(new ApiError('Trip not found', 404));
+		await expect(tripApi.delete('nope')).rejects.toThrow('Trip not found');
 	});
 });
 

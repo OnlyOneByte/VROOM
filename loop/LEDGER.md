@@ -158,13 +158,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 227 |
-| deep-review | 5 | 233 |
+| deep-review | 5 | 238 |
 | guard | 6 | 236 |
 | bug | 3 | 234 |
 | arch | 5 | 235 |
 | infra | 6 | 237 |
 
-Current cycle: **237**
+Current cycle: **238**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -183,6 +183,24 @@ Current cycle: **237**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C238 (bug scout provably DRY → pivot to deep-review: certify + guard trip-api error PROPAGATION [the loadError/toast contract])** —
+  Balance recompute (cycle 238): bug most-starved + over budget (4/3 = 1.33×; deep-review 5/5 at threshold). Per the
+  GUIDE, ran one fresh bug scout firsthand: probed the two unscouted trips read seams (the summary cross-fleet
+  full-fetch + GET /vehicle/:id unpaginated) — both DESIGN choices (the summary MUST aggregate all rows; per-vehicle
+  full-read mirrors odometer/expense), not defects; and the PUT-doesn't-touch-the-odometer-entry behavior is the
+  C214-PINNED independent-observation (gated, not a fresh bug). **Provably dry** — no fresh feature surface since C230
+  (the form, fully scouted C233/C234), so the GUIDE's "bug fixes now come only from a fresh feature surface or an
+  Angelo-unblocked call" holds → recorded + pivoted. DEEP-REVIEW: certified the trip-api error-propagation invariant.
+  trip-api wrappers are thin passthroughs with NO try/catch, and apiClient throws ApiError on non-2xx — so a server
+  error MUST propagate to the caller. The whole downstream FE error discipline depends on it: the /trips list page's
+  loadError four-state (shows the error pane, NOT "No trips yet" — the masquerade-as-data-loss guard) + the TripForm
+  catch→toast both assume a rejected promise. The trip-api.test wiring tests only covered the RESOLVED path; nothing
+  pinned propagation (the sibling reminder-api/expense-api tests DO pin rejects.toThrow). GUARD: +4 in trip-api.test.ts
+  (list/getSummary/create/delete each reject with the ApiError when apiClient throws). Non-vacuous (inject a
+  swallow-and-return-[] into list() → ONLY the list-propagation test REDs; verified firsthand, restored). Test-only →
+  no shot. FE validate:local GREEN (svelte-check 0, build, 846 pass, +4). cov: be 88.92% (~) / fe 89.11%+ (~, trip-api
+  error branches now exercised). (deep-review→238; bug stays 234 — scout dry, no fix. The C232–C238 gated/dry stretch
+  continues; net-new code still awaits an Angelo gate, status re-sent C237.)
 - **C237 (feature gated; bug/deep-review/arch scouts all DRY → infra: correct a mis-filed backlog record + record the dry scouts)** —
   Balance recompute (cycle 237): ONLY feature over budget (10/4) + FULLY GATED → record + pivot. Nothing else
   strictly over budget; bug + infra tied at threshold (3/3, 6/6). Took the highest-leverage HONEST work after
