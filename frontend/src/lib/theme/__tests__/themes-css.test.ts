@@ -111,3 +111,26 @@ describe('checked-in themes.css is in sync with the registry (T7 freshness guard
     }
   });
 });
+
+/**
+ * WIRING GUARD — the root layout must IMPORT themes.css, else the generated `:root[data-theme="<id>"]`
+ * blocks are never in the bundle and EVERY non-default theme silently renders as default (the head-script
+ * sets `data-theme`, but no matching CSS exists to key into). This is invisible to every other theming
+ * guard: byte-freshness (the file is fine), registry-integrity (the registry is fine), contrast +
+ * distinctness (the token values are fine) — all stay GREEN while themes are dead in the running app. The
+ * only thing standing between "registered" and "actually paints" is this one import line; pin it (the
+ * C190/C201 cross-file source-scan idiom on the layout↔css coupling). app.css is checked as the sibling
+ * (both are load-bearing layout-level imports; losing either is a visual regression no unit test sees).
+ */
+describe('themes.css is wired into the app via the root layout (T7 wiring guard)', () => {
+  const LAYOUT = readFileSync(`${process.cwd()}/src/routes/+layout.svelte`, 'utf8');
+
+  test('+layout.svelte imports the generated themes.css', () => {
+    // A drop of this line ships every non-default theme as a silent default clone in the real app.
+    expect(LAYOUT).toMatch(/import\s+['"]\$lib\/theme\/themes\.css['"]/);
+  });
+
+  test('+layout.svelte still imports app.css (the default look the bare :root serves)', () => {
+    expect(LAYOUT).toMatch(/import\s+['"][.\/]*app\.css['"]/);
+  });
+});
