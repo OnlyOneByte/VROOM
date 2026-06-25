@@ -878,6 +878,16 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **CERTIFIED + GUARDED C239 — the analytics FuelStatsTab empty-data four-state gate (eyes-on scout → clean →
+> guard).** A C239 eyes-on bug-scout shot /analytics desktop+mobile on the seeded user (fillups all 2024, env
+> clock 2026 → the default this-year range is genuinely empty): the tab renders "No fuel data yet" EmptyState
+> correctly (NOT ~10 N/A cards / broken chart), and the "$0.00 YTD / N-A mi-gal" is correct date-scoping, not a
+> bug. Pinned the certified gate (no analytics component-test harness): +4 source-scan guards in
+> fuel-stats-empty-state.test.ts — hasFuelData derived + its conservative OR-of-three (fillup currentYear/
+> previousYear OR totalDistance) + the !hasFuelData→EmptyState branch + the loading/error/empty/data four-state.
+> Non-vacuous (neuter the gate → REDs). NOTE: the eyes-on visual/state sweep of un-shot routes is a FRESH
+> bug-scout vein now that pure-logic is exhausted — future bug cycles can shoot a different core route. Don't re-guard.
+
 > **CERTIFIED + GUARDED C238 — trip-api error PROPAGATION (the loadError/toast contract).** trip-api wrappers
 > are thin passthroughs with NO try/catch + apiClient throws ApiError on non-2xx, so a server error MUST reach
 > the caller — the /trips list page's loadError four-state (error pane, NOT "No trips yet" masquerade) + the

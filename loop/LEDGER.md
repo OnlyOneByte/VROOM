@@ -159,12 +159,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 227 |
 | deep-review | 5 | 238 |
-| guard | 6 | 236 |
+| guard | 6 | 239 |
 | bug | 3 | 234 |
 | arch | 5 | 235 |
 | infra | 6 | 237 |
 
-Current cycle: **238**
+Current cycle: **239**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -183,6 +183,26 @@ Current cycle: **238**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C239 (bug scout via the EYES-ON unblock [fresh vein] → clean cert → guard: pin the analytics fuel empty-state gate)** —
+  Balance recompute (cycle 239): bug most-starved + over budget (5/3 = 1.67×). The pure-logic trips bug surface is
+  exhausted (C238 dry), but the eyes-on unblock opens a bug-scout vein NOT used this session: a visual/a11y/state
+  sweep of a core NON-trips route (a real NORTH_STAR #3 defect — mobile overflow, broken state, NaN — wouldn't show
+  in unit tests). Booted servers + minted auth + shot the dashboard AND analytics, DESKTOP + MOBILE, + Read all PNGs.
+  FINDINGS: dashboard mobile 2×2 stat grid clean (no overflow, no console errors, $606.30 all-time correct);
+  analytics shows "YTD Spending $0.00" + "Avg mi/gal N/A" + "No fuel data yet" — INVESTIGATED firsthand: NOT a defect,
+  it's the seeded-2024-data-viewed-in-2026 artifact (the env clock is 2026-06-25; analytics quick-stats/fuel default
+  to a this-year range, and all seeded fillups are 2024 → legitimately empty; the dashboard's $606.30 is all-time).
+  The analytics empty-fuel state renders CORRECTLY — a clean four-state EmptyState ("No fuel data yet" + Log-a-Fill-up
+  CTA), NOT ~10 N/A cards or a broken/NaN chart. **Clean scout — no fresh bug** (the date-scoping is correct calendar
+  behavior). Per the GUIDE (clean scout → record + pivot to a guard), pinned the certified invariant: FuelStatsTab's
+  `hasFuelData` four-state gate had NO test (no analytics component-test harness here). +4 source-scan guards in
+  fuel-stats-empty-state.test.ts (hasFuelData derived; its CONSERVATIVE OR-of-three [fillup currentYear/previousYear
+  OR totalDistance — never hide real data]; the `!hasFuelData → EmptyState` branch before the grid; the full
+  loading/error+Retry/empty/data four-state). Non-vacuous (neuter the `!hasFuelData` branch → the gate test REDs;
+  verified firsthand, restored). Servers killed (ports down, no orphans). FE validate:local GREEN (svelte-check 0,
+  build, 850 pass / 77 files, +4). cov: be 88.92% (~) / fe 89.11%+ (~). (guard→239; bug stays 234 — the eyes-on scout
+  was clean, no fix. The eyes-on bug-scout vein [visual/state sweeps of un-shot routes] is a fresh source for future
+  bug cycles now that pure-logic is exhausted.)
 - **C238 (bug scout provably DRY → pivot to deep-review: certify + guard trip-api error PROPAGATION [the loadError/toast contract])** —
   Balance recompute (cycle 238): bug most-starved + over budget (4/3 = 1.33×; deep-review 5/5 at threshold). Per the
   GUIDE, ran one fresh bug scout firsthand: probed the two unscouted trips read seams (the summary cross-fleet
