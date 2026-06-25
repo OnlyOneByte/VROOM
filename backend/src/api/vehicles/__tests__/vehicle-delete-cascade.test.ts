@@ -105,6 +105,35 @@ describe('vehicle deletion cascades photo cleanup to dependent entities', () => 
     ).toBe(0);
   });
 
+  // trips-location (C202 schema + C207 cascade guard): trips.vehicle_id is ON DELETE cascade (migration
+  // 0007; the raw-SQL cascade is unit-pinned in migration-0007.test.ts). This pins it END-TO-END through the
+  // REAL vehicle-delete ROUTE — a trip is gone after its vehicle is deleted (no orphaned trip rows leaking
+  // into analytics / the mileage-summary, NORTH_STAR #2). Trips are NOT a photo-upload entity type (the
+  // C207 bug-scout verified `trip` is absent from the photo allowlist + ENTITY_TO_CATEGORY, so the
+  // photo-cleanup block correctly needs no trips leg; the C452 guard above keeps that drift-proof if trip
+  // photos are ever added). Seed the trip directly (no create route until T3 — the cascade is FK-level).
+  test('deleting a vehicle CASCADE-removes its trips (no orphaned trip rows)', async () => {
+    const vehicleId = await seedVehicle();
+    ctx.sqlite.run(
+      `INSERT INTO trips (id, vehicle_id, user_id, start_odometer, end_odometer, purpose, trip_date)
+       VALUES ('trip-casc', ?, ?, 1000, 1080, 'business', 1700000000)`,
+      [vehicleId, ctx.user.id]
+    );
+    const tripCount = (vid: string): number =>
+      (
+        ctx.sqlite.query('SELECT COUNT(*) AS n FROM trips WHERE vehicle_id = ?').get(vid) as {
+          n: number;
+        }
+      ).n;
+    expect(tripCount(vehicleId)).toBe(1);
+
+    const del = await ctx.authed('DELETE', `/api/v1/vehicles/${vehicleId}`);
+    expect(del.status, await del.text()).toBe(200);
+
+    // The vehicle's trip is FK-cascade-deleted — no orphan survives the delete.
+    expect(tripCount(vehicleId), 'trip rows should cascade away with their vehicle').toBe(0);
+  });
+
   test("deleting a vehicle removes its odometer entries' photo rows (no orphans)", async () => {
     const vehicleId = await seedVehicle();
 

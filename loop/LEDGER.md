@@ -131,12 +131,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 206 |
 | deep-review | 5 | 201 |
-| guard | 6 | 204 |
+| guard | 6 | 207 |
 | bug | 3 | 173 |
 | arch | 5 | 205 |
 | infra | 6 | 200 |
 
-Current cycle: **206**
+Current cycle: **207**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -155,6 +155,23 @@ Current cycle: **206**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C207 (bug-scout on the trips vehicle-delete cascade [CLEAN — no trip-photo orphan + already drift-guarded] → guard: pin the trips cascade end-to-end)** —
+  Balance recompute (cycle 207): bug most-starved (34/3 = 11.33×). C206 added genuinely fresh prod logic
+  (TripRepository) so a scout isn't ceremony — but I already tested that surface comprehensively (12 tests). Scouted
+  the higher-value uncertified question: is the new `trips` table correctly handled by every cross-cutting
+  table-enumerating system? Traced the VEHICLE-DELETE route firsthand — it explicitly reaps photos for `expense` +
+  `odometer_entry` children BEFORE the FK-cascade (photos have NO FK → a pure cascade would orphan photo rows + leak
+  provider bytes, the #C404/#34 class). Key scout question: CAN a trip have photos? **Verified CLEAN: `trip` is NOT a
+  photo-upload entity type** (the validateEntityOwnership allowlist = vehicle/insurance_policy/insurance_claim/
+  expense/odometer_entry; trips are free-text-only v1, D5) — so the photo-cleanup block correctly needs no trips leg,
+  and the **C452 symmetry guard already keeps that drift-proof** (if `trip` is ever added to ENTITY_TO_CATEGORY
+  without a cleanup call, C452 goes RED automatically). No defect. Per the GUIDE (clean scout → record + pivot to
+  guard, bug drives but the artifact is a guard), closed the ONE genuine gap: the live invariant "deleting a vehicle
+  FK-cascades its trips away" was unit-pinned at the raw-SQL level (migration-0007) but NOT through the real HTTP
+  vehicle-delete ROUTE. +1 in vehicle-delete-cascade.test.ts (the natural home, alongside the expense/odometer
+  cascade tests): seed a trip → DELETE the vehicle via the real route → assert zero trip rows survive (no orphan
+  leaking into analytics/mileage-summary, NORTH_STAR #2). validate:local GREEN (1853 pass / 0 fail, +1). Test-only →
+  no shot. cov: be ~88.4% (~) / fe 88.73% (~). (Bug stays 173 — scout clean, no fix; guard→207.)
 - **C206 (bug-scout DRY → feature: trips-location T2 — TripRepository + validateTripOwnership)** —
   Balance recompute (cycle 206): bug most-starved (33/3 = 11×) but the trips surfaces are certified (C203 ZIP +
   C204 Sheets) and no fresh prod logic landed since C202 → scout dry, recorded. NOTHING else strictly over budget

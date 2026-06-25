@@ -747,6 +747,16 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C207 — the trips vehicle-delete CASCADE, end-to-end (NORTH_STAR #2).** A C207 bug-scout traced the
+> vehicle-delete route firsthand: it reaps photos for expense+odometer children before the FK-cascade (photos have
+> no FK → orphan risk, the #C404/#34 class). Verified CLEAN that `trip` is NOT a photo-upload entity type (absent
+> from the validateEntityOwnership allowlist + ENTITY_TO_CATEGORY; trips are free-text-only v1, D5), so the
+> photo-cleanup block correctly needs no trips leg — and the C452 symmetry guard already keeps that drift-proof (a
+> future `trip` in ENTITY_TO_CATEGORY without a cleanup call → C452 RED). No defect. GAP closed: the live invariant
+> "deleting a vehicle FK-cascades its trips away" was raw-SQL-pinned (migration-0007) but not through the real HTTP
+> route. +1 in vehicle-delete-cascade.test.ts: seed a trip → DELETE the vehicle via the route → assert zero trip
+> rows survive (no orphan leaking into analytics / the mileage-summary). Don't re-add.
+
 > **GUARDED C204 — the trips GOOGLE SHEETS round-trip (NORTH_STAR #1, the C193 distinct-serializer lesson).** A
 > C204 bug-scout (bug 31/3 over budget) VERIFIED FIRSTHAND that a trip survives the Sheets export→read path — a
 > DISTINCT serializer from the ZIP/CSV path C203 pinned (formatValue→grid→parseValue, where parseValue re-coerces
