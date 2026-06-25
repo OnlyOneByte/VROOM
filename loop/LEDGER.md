@@ -235,9 +235,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 289 |
 | bug | 3 | 291 |
 | arch | 5 | 292 |
-| infra | 6 | 288 |
+| infra | 6 | 293 |
 
-Current cycle: **292**
+Current cycle: **293**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,27 @@ Current cycle: **292**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C293 (infra coverage-cadence MEASURED [BE re-measure triggered by the C291/C292 backup.ts touches] + GUIDE freshness: BE func +0.29, sweep CLEAN, bug-row + coverage standing-truth refreshed)** —
+  Balance recompute (cycle 293): nothing strictly OVER budget; among non-gated categories infra most-starved (5/6,
+  0.83×) — and a genuine leverage trigger: C291 (+4 tests) + C292 (dedup) both touched backend/src/api/sync/backup.ts
+  since the C288 measure, so a BE re-measure is warranted per the GUIDE re-measure-on-module-touch rule. Ran the sweep:
+  (1) untracked-file sweep CLEAN — git status --untracked-files=all shows ZERO untracked; (2) no orphan dev servers
+  (ss -ltnp: no :3001/:5173 listeners); (3) Coverage RE-MEASURED: BE 89.28% line / 88.97% func (1942 pass / 0 fail /
+  239 files) — line +0.01 / func +0.29 vs C288 (89.27/88.68): the C291 +4 validateUniqueConstraints tests lifted
+  backup.ts (now 91.18% line / 79.01% func) AND the C292 dedup removed an uncovered redundant scalar helper (both push
+  func up). FE UNCHANGED at 89.43% line / 90.05% func / 81.75% branch (868 pass) — no FE source touched since C289, so
+  not re-run (carried forward, the C262/C272 pattern). Both hold above the ~89% structural ceiling, both green. (4)
+  DOC-FRESHNESS: refreshed TWO stale GUIDE spots — (a) the coverage standing-truth (C289 → C293 numbers + the BE func
+  movement provenance); (b) the Category-veins BUG row, which said flatly "record dry on the FIRST recheck + pivot" —
+  but the C290→C291 arc DISPROVED that as a blanket rule: a fresh firsthand scout of a NOT-YET-AUDITED shipped subsystem
+  (the backup→restore round-trip) surfaced a REAL data-loss gap (#127 leg) with NO gate clearing. Reworded the row to
+  "record dry on a SWEPT surface, but prefer scouting an un-audited subsystem over re-checking a closed family when bug
+  is over budget." Tree clean; branch 147 ahead / 0 behind, PR-ready. Verify: docs-only (GUIDE ×2 + this LEDGER +
+  balance table + BACKLOG infra note); no source touched, both suites green. cov: be 89.28% / fe 89.43% (MEASURED BE,
+  FE carried). (infra→293. NEXT cadence ~C303. The C290→C291→C292 arc [deep-review found the FK gap → bug fixed the
+  cross-row-UNIQUE gap, threading a helper → arch converged the resulting self-dup] is a clean illustration of the loop
+  finding + fixing + tidying real work on the backup crown jewel even under the feature-gate — the most productive
+  3-cycle stretch since the dark-mode axis. STANDING SIGNAL holds: net-new feature SOURCE Angelo-gated.)
 - **C292 (arch dedup — REAL self-dup the loop just created: C291 added dupCheckComposite alongside the scalar dupCheck, which is its strict one-element special case; converged the two into ONE helper, behavior-identical, −16 LOC)** —
   Balance recompute (cycle 292): arch was the ONLY category strictly OVER budget (6/5 = 1.20×). Applied the C286
   FAST-DRY PRECONDITION: production source DID change since the last source commit (C291 touched backup.ts), so the

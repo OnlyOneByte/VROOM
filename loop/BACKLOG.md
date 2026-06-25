@@ -2250,6 +2250,16 @@ baseline), refresh `BRANCH_REVIEW.md` grouped by theme so the eventual PR stays 
 > + the rewrite idiom ("the X body" not "X's body"). Docs-only, the GUIDE-freshness vein (like C267). NEXT coverage
 > cadence ~C282.
 
+> **RAN C293 (coverage cadence — BE re-measure triggered by the C291/C292 backup.ts touches; last full cadence C288).**
+> Untracked-file sweep CLEAN (zero untracked); no orphan dev servers (ss -ltnp: :3001/:5173 down); branch 147 ahead / 0
+> behind, PR-ready. Coverage RE-MEASURED: BE 89.28% line / 88.97% func (1942 pass) — line +0.01 / func +0.29 vs C288
+> (the C291 +4 validateUniqueConstraints tests + the C292 dedup removing an uncovered redundant helper). FE UNCHANGED
+> 89.43% line / 90.05% func (868 pass, no FE source since C289 — carried forward, not re-run). Both above the ~89%
+> ceiling, both green. Refreshed TWO stale GUIDE spots: the coverage standing-truth (→ C293 numbers) + the Category-veins
+> BUG row (the C290→C291 arc disproved "always record dry" — an un-audited subsystem still yielded a real fix). NEXT
+> cadence ~C303. SIGNAL: net-new feature SOURCE Angelo-gated; the C290–C292 backup-crown-jewel arc was the most
+> productive non-gated stretch since dark mode.
+
 > **RAN C288 (coverage cadence; last ran C282).** Untracked-test sweep CLEAN both sides — `git status
 > --untracked-files=all` shows ZERO untracked files (the 56 .meshclaw.e2e.ts gitignored BY DESIGN; nothing the loop
 > authored is at merge risk). No orphan dev servers (the pgrep bun/vite false-positive again — the matches were the

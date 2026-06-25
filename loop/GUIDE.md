@@ -77,17 +77,18 @@ never a bare `.trim()`.
 | Category | State | What still pays off |
 |---|---|---|
 | **feature** | UNBLOCKED via shot.sh but ALL tails GATED | the 3 eyes-on tails + every other feature is Angelo-gated (money-cents sequencing, C214 trips↔odometer lifecycle, `instrument` palette, vehicle-sharing). Record gated + pivot until a gate clears. |
-| **bug** | **SATURATED (C253/C257/C261/C265)** | write-path asymmetry / date-tz / money-calc all swept BE (trips-summary, expenses, settings/sync/vehicles repos) + FE (financing-calculations — the #92/#99/#110/#117/#330 family closed + BE↔FE-consistent). Record dry on the FIRST recheck + pivot. |
+| **bug** | **SATURATED on the SWEPT surfaces (C253/C257/C261/C265), but a NOT-YET-AUDITED subsystem can still yield a real fix (C291)** | write-path asymmetry / date-tz / money-calc all swept BE (trips-summary, expenses, settings/sync/vehicles repos) + FE (financing-calculations — the #92/#99/#110/#117/#330 family closed). Record dry on the FIRST recheck of a SWEPT surface + pivot. BUT: the C290→C291 arc showed a fresh firsthand scout of an un-audited shipped subsystem (the backup→restore round-trip) surfaced a REAL data-loss gap (validateUniqueConstraints covered only 2 of 5 backed-up UNIQUE indexes, #127 leg) with NO gate clearing — so when bug is over budget, prefer scouting a subsystem NOT on the swept-list over re-checking a closed family. |
 | **deep-review** | **SATURATED (C255/C260/C266)** | trips arc, repo layer, + the TCO chain (Property 14 + #27/#28, the most invariant-protected surface) all certified CLEAN. VERIFY firsthand — agent "HIGH" findings are often false (C21/C60/C333). Needs a fresh/un-audited subsystem; else record saturated + pivot. |
 | **guard** | **SATURATED both sides (C261/C263)** | the C250/C251/C256/C257 filter-branch vein took the reachable plain-repo/route gaps; remaining sub-100% is v8 artifacts + DEV-gated catch + apiClient-wrapper THEATER (C181/C229) + DOM/timer-bound. Don't manufacture a vacuous/theater test — record saturated + pivot. |
 | **arch** | **DRY; dead-code sweep COMPLETE both sides (C260 BE repos + C264 FE lib/utils)** | behavior-preserving test-anchored ONE small dedup. The fresh vector is SELF-INTRODUCED dups in code authored last cycles (C222 capitalize, C258 PaginatedEnvelope, C275 collectSvelteFiles). **FAST-DRY PRECONDITION (C286):** at cycle start, if `git log` over production-src (backend/src+frontend/src `*.ts`, EXCLUDING tests/`__tests__`) shows NO commit since the last source-touching cycle, the dedup vein is STRUCTURALLY dry (nothing newly threaded) → record no-churn FAST + pivot, don't re-scout. Already-ruled below-bar: createExpense quad (C270 divergent), collectSourceFiles (C277 rule-of-2+divergent), BE walker (C281 none), SRC_ROOT (C281 per-file-depth). Don't manufacture churn. |
 | **infra** | live (the one always-productive vein) | ~every 10 cycles: untracked-`*.test.ts` sweep + coverage re-measure (update the LEDGER cov: baseline) + this GUIDE/doc-freshness pass. (BRANCH_REVIEW.md is gitignored — NOT in the PR, no refresh artifact.) |
 
 ## Standing truths (don't re-discover these)
-- **Coverage 90% is NOT loop-closable** (RE-MEASURED C289: 89.27% BE line / 88.68% func [1935 pass] · 89.43% FE
-  line / 90.05% func / 81.75% branch [868 pass] — the structural ceiling, UP from the stale ~86/~84 via the
-  C250–C257 filter-branch covered-source climb; BE flat since C259 [no source], FE crept up C283/C289 [+sort test
-  +the wired formatMonthTick axis-callback pin, chart-formatters.ts → 100%]). BE gaps are
+- **Coverage 90% is NOT loop-closable** (RE-MEASURED C293: 89.28% BE line / 88.97% func [1942 pass] · 89.43% FE
+  line / 90.05% func / 81.75% branch [868 pass, C289] — the structural ceiling, UP from the stale ~86/~84 via the
+  C250–C257 filter-branch covered-source climb; BE func +0.29 vs C288 [the C291 +4 validateUniqueConstraints tests
+  + the C292 dedup removing an uncovered redundant helper], FE crept up C283/C289 [+sort test +the wired
+  formatMonthTick axis-callback pin, chart-formatters.ts → 100%]). BE gaps are
   DI/singleton/OAuth + catch/DatabaseError tails; FE gaps are eyes-on components + DOM/timer + apiClient-wrapper
   theater. `cov:` tag every LEDGER entry; re-measure on cycles that touch a module. The filter-branch vein that
   drove the climb is now SATURATED (C261/C263) — don't expect further movement without new feature SOURCE.
