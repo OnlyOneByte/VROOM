@@ -202,10 +202,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 260 |
 | guard | 6 | 263 |
 | bug | 3 | 261 |
-| arch | 5 | 259 |
+| arch | 5 | 264 |
 | infra | 6 | 262 |
 
-Current cycle: **263**
+Current cycle: **264**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -224,6 +224,28 @@ Current cycle: **263**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C264 (arch: NO CHURN WARRANTED — extend the dead-code sweep to the FE lib/utils export surface [the C260 pattern, FE side]; clean, no genuine dead export, no removal)** —
+  Balance recompute (cycle 264): nothing strictly OVER budget; bug + arch tied AT threshold (3/3, 5/5). Per C248 took
+  the highest-leverage — arch over the dry bug vein (C261), with a GENUINELY un-scouted surface: every dead-code sweep
+  so far (C245 utils, C252/C259/C260 repos) was BACKEND-only; the FE lib/ export surface had NEVER been swept. Applied
+  the C260 pattern FE-side: scanned all src/lib/utils/*.ts exported symbols for zero non-test importers. The grep
+  flagged 13 — but per the C260/C333 discipline (the grep over-flags module-internal calls, the `this.`-equivalent
+  false positive) VERIFIED EACH FIRSTHAND: (1) auth.ts's 5 flagged exports (publicRoutes/authRedirectRoutes/
+  isPublicRoute/isProtectedRoute/requireAuth) — the route-guard module IS live (handleRouteProtection consumed by
+  +layout.svelte:161); isProtectedRoute/isPublicRoute/publicRoutes/authRedirectRoutes are all called INTERNALLY by
+  handleRouteProtection (lines 35/40/58/65) — over-flagged. requireAuth is the ONLY true zero-consumer, but it has a
+  dedicated test (auth.test.ts) → C260 ratified surface, not C259 cruft. (2) offline-storage saveOfflineExpenses (7
+  internal refs)/clearSyncedExpenses (2)/clearNeedsAttention (2) — all called within offline-storage.ts + tested (the
+  #79/#162 needs-attention lifecycle). (3) units ELECTRIC_FUEL_TYPES (2 internal + 2 tests), chart-colors
+  getCategoryLabel (2 internal + test) — module-internal + tested. (4) createLoadState (the C105 design-gated
+  zero-adopter) + shouldTriggerRecurringExpenses/RECURRING_TRIGGER_TS_KEY (the C128 recurring-expenses gate) — known
+  ratified surface. VERDICT: zero genuine FE dead exports — every flag is internal-use (over-flagged) or tested-ratified
+  (the C237/C260 distinction). No-churn-warranted (arch rule 5); the value is the firsthand certification. The dead-code
+  audit is now COMPLETE across BOTH sides (BE repos C260 + FE lib/utils C264; 2 genuine removals total, C252+C259). No
+  code change. Verify: audit only — no source touched, both suites green at C262 (1935 BE / 860 FE). Docs-only. cov: be
+  89.27% / fe 89.11% (~). (arch→264. The FE lib/utils dead-export surface is CLEAN — don't re-scout. The dead-code vein
+  is now exhausted both sides. NEXT arch: re-scout freshly-authored code for self-dups [the C258 pattern], else record
+  no-churn + pivot.)
 - **C263 (guard SATURATED — FE pure-logic branch gaps verified firsthand as artifacts / theater / structural-ceiling; no clean guard, recorded + no manufactured test [the C249 discipline])** —
   Balance recompute (cycle 263): guard was the sole over-budget category (7/6 = 1.17×). Guard is documented largely
   worked-through (filter-branch vein saturated C261), but it was FORCED over budget, so per the C249 discipline made a

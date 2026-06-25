@@ -1723,6 +1723,16 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 ### arch
 *(reliably DRY per the archive. Run a fresh dedup scout; if nothing clean surfaces, record "no churn warranted" + pivot. Obey the arch rules above.)*
 
+> **SWEPT C264 — NO CHURN: the FE lib/utils export surface is clean (the C260 dead-code pattern, FE side).** Every
+> prior dead-code sweep was BACKEND-only (C245 utils, C252/C259/C260 repos); this scouted the never-swept FE lib/utils
+> exports for zero non-test importers. The grep flagged 13, but firsthand verification (the C260/C333 over-flag
+> discipline) found ZERO genuine dead exports: auth.ts's route-guards are live (handleRouteProtection → +layout.svelte:161;
+> isPublicRoute/isProtectedRoute/publicRoutes called internally); offline-storage saveOfflineExpenses/clearSyncedExpenses/
+> clearNeedsAttention are module-internal + tested (#79/#162); units ELECTRIC_FUEL_TYPES + chart-colors getCategoryLabel
+> internal + tested; createLoadState (C105 design-gated) + shouldTriggerRecurringExpenses (C128) ratified. requireAuth is
+> the lone true zero-consumer but is tested → C260 ratified surface, not cruft. The dead-code audit is now COMPLETE both
+> sides (BE C260 + FE C264; 2 removals total C252/C259). Don't re-scout FE lib/utils dead exports.
+
 > **✅ REMOVED C259 — `reminderRepository.findByVehicleId` dead code (the C251/C252 dead-code class).** Pulled per-file
 > BE coverage for a filter-branch guard pick; the one "reachable" reminders/repository.ts low-spot (findByVehicleId,
 > line 272) was actually DEAD: exhaustive grep = ZERO callers (the only `.findByVehicleId` uses are on financing/
