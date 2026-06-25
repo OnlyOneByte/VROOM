@@ -233,11 +233,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 227 |
 | deep-review | 5 | 307 |
 | guard | 6 | 306 |
-| bug | 3 | 308 |
+| bug | 3 | 311 |
 | arch | 5 | 310 |
 | infra | 6 | 309 |
 
-Current cycle: **310**
+Current cycle: **311**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,28 @@ Current cycle: **310**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C311 (bug-scout DRY: the fuel-stats period aggregation [getFuelStats/buildFuelStatsFromData — the This/Last Month/Year dashboard+fuel-tab cards, the #85/#86/#18/#94 family] certified CLEAN firsthand → dry, pivot fast, no manufactured test)** —
+  Balance recompute (cycle 311): nothing strictly OVER budget; bug most-starved by ratio (3/3, 1.00×). Per the
+  C293-refreshed bug-row guidance, scouted a not-yet-rechecked money-facing surface: getFuelStats /
+  buildFuelStatsFromData (analytics/repository.ts:1541 — the This/Last Month/Year fuel cards; the #85/#86 calendar-vs-range
+  + #18/#108 split-sibling-COUNT + #94 mixed-unit-pooling family). CERTIFIED CLEAN FIRSTHAND: (1) This/Last MONTH is
+  CALENDAR-correct — inCurrentMonth matches BOTH getMonth() AND getFullYear() (the #86 fix that stopped folding prior
+  years' same-month into "This Month" over a multi-year 'all' range), and inPrevMonth rolls to the previous YEAR when now
+  is January (prevMonth = currentMonth===0 ? 11 : −1; prevMonthYear adjusts); (2) split-sibling COUNT uses the shared
+  isFillup predicate (C403) → only volume-bearing rows count, so a split fillup's volume=null siblings do NOT inflate the
+  count (#18/#108); the volume/cost SUMS use `?? 0` (null contributes 0 — always correct); (3) #94 convert-before-pool:
+  skipConversion gates the common single-unit fast-path, else per-vehicle convert for BOTH distance
+  (computeConvertedTotalDistance) AND volume (convertRowVolume current + volumeByVehicle prev-year) so a mixed mi+km /
+  gal+L fleet never pools across units (NORTH_STAR #2); (4) prevRange is a symmetric prior window of equal length
+  (start−(end−start), end:start). NO fresh defect; comprehensively guarded by DEDICATED tests — fuel-stats-calendar-month
+  (the #86 month+year + Jan roll-back), fuel-stats.property (property-based invariants), fuel-stats-fleet-distance-pooling
+  + no-unconverted-fleet-pooling + skip-conversion-dispatch-orientation (the #94 convert-before-pool, both axes + the
+  dispatch), analytics-routes-http (route integration). Per the C99/C204 discipline recorded dry + pivoted fast, no
+  manufactured test (covered). Verify: audit only — no source touched, both suites green (1949 BE / 868 FE). Docs-only.
+  cov: be 89.29% / fe 89.43% (~). (bug→311. getFuelStats is CERTIFIED — calendar-month + split-count + #94 pooling all
+  clean + dedicated-test-pinned; don't re-scout it. The #85/#86/#18/#94 fuel-stats family is closed. The un-audited
+  reachable surface list is EXHAUSTED — bug fixes now require a fresh feature surface [gated]; NEXT bug cycle record dry
+  on first recheck.)
 - **C310 (arch NO CHURN, recorded FAST via the C286 precondition: STILL zero production-source commits since C300 [same structural state as C304] → the dedup vein remains structurally dry)** —
   Balance recompute (cycle 310): arch was the ONLY category strictly OVER budget (6/5 = 1.20×). Applied the C286
   FAST-DRY PRECONDITION firsthand: `git log` over backend/src + frontend/src .ts EXCLUDING tests/__tests__ since C300

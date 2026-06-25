@@ -793,6 +793,15 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **SCOUTED C311 — the fuel-stats period aggregation (getFuelStats/buildFuelStatsFromData — the This/Last Month/Year
+> cards, the #85/#86/#18/#94 family) certified CLEAN firsthand → dry.** Certified: This/Last MONTH calendar-correct
+> (matches getMonth() AND getFullYear(), the #86 prior-year-fold fix + Jan roll-back); split-sibling COUNT via the shared
+> isFillup (volume=null siblings don't inflate, #18/#108; sums use ?? 0); #94 convert-before-pool with skipConversion
+> fast-path for BOTH distance + volume (mixed mi+km/gal+L safe); symmetric prevRange. NO defect; pinned by DEDICATED
+> tests — fuel-stats-calendar-month (#86 + Jan roll-back), fuel-stats.property, fuel-stats-fleet-distance-pooling +
+> no-unconverted-fleet-pooling + skip-conversion-dispatch-orientation (#94), analytics-routes-http. Recorded dry +
+> pivot. The #85/#86/#18/#94 fuel-stats family is closed. Don't re-scout getFuelStats.
+
 > **SCOUTED C308 — createFromTrip (the trip→odometer write feeding getCurrentOdometer, the C298 backbone) certified CLEAN
 > firsthand → dry.** The C214 EDIT/DELETE lifecycle is Angelo-gated, but the CREATE write is loop-scoutable. Certified:
 > same-day dedup window [dayStart,nextDay) on the LOCAL calendar day (#87 date-tz); exact-reading grain (idempotent
