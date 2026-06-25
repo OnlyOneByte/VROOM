@@ -204,6 +204,15 @@ cycles record + pivot to guard/deep-review/arch/infra until a gate clears.**)*
 re-audit a data-safety write path, certify it CLEAN against source, and leave a merge-surviving guard.
 Don't trust agent "HIGH" findings — verify firsthand (the archive logged many debunked false-positives).)*
 
+> **CERTIFIED C268 — DARK MODE renders CLEAN (the eyes-on surface the light-only C239–C247 sweep never verified).**
+> The theming engine shipped + the visual sweep shot routes, but ALL in the default/light look. Added an additive
+> THEME=dark knob to shot.mjs (colorScheme → the store's 'system' mode → .dark class; verified the chain firsthand),
+> booted, + shot+Read /dashboard DESKTOP + /expenses MOBILE in dark: both CLEAN — correct dark bg/cards/light-text,
+> readable stat cards + filters + FAB (C241 clearance holds), NO overflow, NO black-on-black; the empty mid-page chart
+> cards are the known C242 IO-gate artifact, not a dark defect. DARK MODE CERTIFIED. NOTE: shot.mjs is gitignored
+> (.meshclaw-tools/) so the knob is a local capability gain, not a committed artifact — the cert is the committed value.
+> A future eyes-on cycle could extend to /analytics + /vehicles/[id] dark if a fresh concern arises; no defect here.
+
 > **SATURATED C266 — the TCO computation chain (the product's headline money figure) certified CLEAN firsthand; every
 > load-bearing invariant already pinned.** Audited getVehicleTCO → categorizeTCOExpenses → computeTCOTotal against
 > source: the #27 double-count exclusion (priced→financing-rows excluded / unpriced→counted), #28 year-scoping

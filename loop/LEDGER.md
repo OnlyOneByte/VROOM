@@ -199,13 +199,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 227 |
-| deep-review | 5 | 266 |
+| deep-review | 5 | 268 |
 | guard | 6 | 263 |
 | bug | 3 | 265 |
 | arch | 5 | 264 |
 | infra | 6 | 267 |
 
-Current cycle: **267**
+Current cycle: **268**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -224,6 +224,28 @@ Current cycle: **267**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C268 (deep-review EYES-ON: DARK MODE certified CLEAN on /dashboard desktop + /expenses mobile — a surface the light-only C239–C247 sweep NEVER verified; + a durable THEME=dark harness knob)** —
+  Balance recompute (cycle 268): nothing strictly OVER budget. Per C248 took the highest-leverage open item. The
+  SOURCE-audit veins are all firsthand-saturated (C267 documented this), but ONE eyes-on surface was NEVER verified:
+  DARK MODE. The theming engine (T1–T9) shipped + the C239–C247 visual sweep shot routes, but ALL in the default/light
+  look — a dark render's contrast/overflow/broken-state defects (NORTH_STAR #3) are real + invisible to unit tests.
+  ENABLED it: added an additive `THEME=dark|light` knob to shot.mjs (sets Playwright's context colorScheme → the
+  store's 'system' mode resolves via matchMedia('prefers-color-scheme:dark') → the .dark class paints; verified the
+  store chain firsthand at theme.svelte.ts:14/28/38 — colorScheme alone suffices, no localStorage seeding). Booted
+  (regress START_SERVERS=1 RESET_DB=1), minted auth, shot + Read TWO surfaces: (1) /dashboard DESKTOP dark — dark bg/
+  cards/light-text correct, all 4 stat cards (2 vehicles / $606.30 / $303.15 / 1 financing) readable, fleet cards +
+  Recent Activity + Upcoming Reminders ("Nothing due soon") + Recurring Costs empty-state all clean, NO overflow, NO
+  black-on-black/white-on-white; the empty mid-page chart cards are the KNOWN C242 IO-gate artifact (headless full-page
+  never scrolls LayerChart into a measured viewport), NOT a dark defect. (2) /expenses MOBILE dark — title/subtitle
+  readable, Import/Export CSV outlined, Search&Filters card (search/vehicle-dropdown/tags) good contrast, the white
+  "Add Expense" FAB strong-contrast (the C241 clearance holds in dark+mobile), NO horizontal overflow. DARK MODE
+  CERTIFIED CLEAN. Verify: eyes-on (2 PNGs Read) + status 200 + zero consoleErrors both shots; servers torn down after
+  (ports :3001/:5173 confirmed down). NOTE: shot.mjs lives in the gitignored .meshclaw-tools/ (untracked by design,
+  CLAUDE.md) → the knob is a LOCAL capability gain, not a committed artifact; this cycle's committed value is the
+  eyes-on CERTIFICATION recorded here + BACKLOG. No source touched (FE/BE unchanged) → both suites green at C262 (1935
+  BE / 860 FE). cov: be 89.27% / fe 89.11% (~). (deep-review→268. Dark mode is now an eyes-on-able + verified-clean
+  surface — the THEME knob persists locally for future dark sweeps. The 2 shot surfaces are certified; a future
+  eyes-on cycle could extend to /analytics + /vehicles/[id] dark if a fresh concern arises, but no defect found here.)
 - **C267 (infra: refresh the stale GUIDE operating manual — encode the C253–C266 firsthand-verified vein saturation + correct the coverage numbers, so future cycles don't re-scout exhausted surfaces)** —
   Balance recompute (cycle 267): nothing strictly OVER budget; infra most-starved non-gated (5/6). Took a genuinely
   high-leverage, non-churn infra increment: the GUIDE's "Category veins" table was MATERIALLY STALE — it still said
