@@ -85,7 +85,19 @@ picks the sequencing. So feature cycles have NO clean un-gated work right now (t
 picker gated on the `instrument` palette, vehicle-sharing gated, money-cents gated on this) → feature-over-budget
 cycles record + pivot to guard/deep-review/arch/infra until a gate clears.**)*
 
-0. **Theming engine** — **GREENLIT & BUILD-UNBLOCKED (Angelo ratified D1–D7 ✅, 2026-06-24 parallel agent).**
+0. **Theming engine — PHASE 4 NOW UNBLOCKED (Angelo 2026-06-25): theme SET ratified = `default` + 5 priority
+   themes `blueprint`/`bento`/`vaporwave`/`cyberpunk`/`aurora` (distilled from the ryang.dev artifact mocks); the
+   remaining ryang.dev mocks (editorial/tui/y2k/neobrutalist/solarpunk/claymorphism/brutalist/zine) are FILL-IN work
+   the loop may register when feature has spare cycles or is awaiting an Angelo decision. `instrument` DROPPED (its
+   mock never materialized). D4 (AA) stays a HARD gate, now enforced by a COMPUTED WCAG-contrast guard
+   (theme-contrast.test.ts, C313) since rendered eyes-on is gated on the T10 picker; D7 token-only HOLDS — so
+   vaporwave/cyberpunk ship as PALETTES, not CRT/neon EFFECTS (texture/effects = a separate future spec). RECIPE per
+   theme (one feature cycle each): distill the mock → 32-token oklch both variants → AA-tune until theme-contrast
+   passes → add the ThemeDefinition to THEME_REGISTRY → regenerate themes.css → the registry-integrity + byte-fresh +
+   contrast guards auto-cover it (zero structural change). ✅ `blueprint` REGISTERED + AA-PASSED (C313, lowest pair
+   5.77). NEXT theming cycle: T10 the /settings picker UI (now 2 themes → eyes-on becomes meaningful) OR register the
+   next palette (bento/vaporwave/cyberpunk/aurora) by the recipe.**
+   _(Original 2026-06-24 greenlight + Phase 1–3 build log retained below for grounding.)_ **GREENLIT & BUILD-UNBLOCKED (Angelo ratified D1–D7 ✅, 2026-06-24 parallel agent).**
    `.kiro/specs/theming-engine/`. A first-class theming engine: a registry of built-in themes (the existing
    look + the explored "Instrument Cluster" / "Garage Journal" looks, productized), a `/settings` picker with
    live preview, persistence via a new `userPreferences.themePreference` + a localStorage mirror, backup

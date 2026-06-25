@@ -230,14 +230,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 227 |
+| feature | 4 | 313 |
 | deep-review | 5 | 307 |
 | guard | 6 | 306 |
 | bug | 3 | 311 |
 | arch | 5 | 310 |
 | infra | 6 | 312 |
 
-Current cycle: **312**
+Current cycle: **313**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,26 @@ Current cycle: **312**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C313 (FEATURE theming Phase 4 UNBLOCKED by Angelo 2026-06-25: registered the first non-default theme `blueprint` + added the D4 WCAG-AA contrast hard-gate guard)** —
+  Balance recompute (cycle 313): feature most-starved AND over budget (86 starved, budget 4) — and Angelo cleared its
+  gate this session (ratified default + 5 priority themes: blueprint/bento/vaporwave/cyberpunk/aurora, rest as fill-in;
+  `instrument` dropped). So feature is now genuinely actionable, not gated. Picked the cleanest first increment:
+  register `blueprint` (Angelo's first-listed, "strong homelab fit") into THEME_REGISTRY — a pure-data ThemeDefinition
+  the engine was explicitly built (C185) to accept with zero structural change. Distilled the ryang.dev blueprint mock
+  (cyan-on-navy schematic) into VROOM's 32-token oklch set for BOTH variants (dark = native look; light = a "whiteprint",
+  navy ink on pale drafting-paper blue). D4 (a11y AA) is a HARD gate and rendered eyes-on is still gated on the T10
+  picker — so the rigorous stand-in is a COMPUTED WCAG contrast check: built an oklch→linear-sRGB→WCAG-luminance
+  converter (validated white/black=21.00, default-light fg/bg=19.89 = matches its known-AA shipping status), AA-tuned the
+  palette until all 22 fg/bg pairs (×2 variants) clear 4.5 (lowest 5.77, first-pass). Regenerated themes.css from the
+  registry (byte-freshness guard covers it). NEW theme-contrast.test.ts = the durable merge-surviving D4 artifact
+  (NORTH_STAR #5): re-derives contrast from oklch token values + asserts every text pair ≥ AA for EVERY registered theme,
+  so blueprint AND every future theme is gated; non-vacuous (a known low-contrast pair correctly fails). The existing
+  registry-integrity + themes-css guards auto-covered blueprint (no missing/stray key, byte-fresh). Verify: FE
+  validate:local GREEN (type-check + build + 916 tests, up from 868 — the new guard + auto-covered theme). BE untouched
+  (frontend-only). Committed 4fab8b2, pushed (branch 167 ahead / 0 behind, PR-ready). cov: be 89.29% / fe 89.43% (~ — FE
+  test COUNT up but the new lines are test-side; the picker UI [T10] is where covered FE SOURCE will move). (feature→313.
+  NEXT theming task: T10 the /settings picker UI [now has 2 themes to pick → eyes-on becomes meaningful], or register
+  the next palette [bento/vaporwave/cyberpunk/aurora] by the same distill→AA-tune→guard recipe.)
 - **C312 (PHASE BOUNDARY + infra GUIDE-freshness: discovered the standing nudge's "3 feature tails are shootable" premise is STALE — all three signed-off specs are COMPLETE; escalated to Angelo + corrected the stale GUIDE feature framing)** —
   Balance recompute (cycle 312): feature was nominally most-starved (85 over budget) and the nudge says the 3 tails are
   "shootable" — so I checked them firsthand against the specs' tasks.md before treating feature as actionable. FINDING:
