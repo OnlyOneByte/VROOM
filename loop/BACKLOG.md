@@ -213,6 +213,19 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > (.meshclaw-tools/) so the knob is a local capability gain, not a committed artifact — the cert is the committed value.
 > A future eyes-on cycle could extend to /analytics + /vehicles/[id] dark if a fresh concern arises; no defect here.
 
+> **CERTIFIED C290 — the BACKUP→RESTORE round-trip crown jewel (NORTH_STAR #1) CLEAN firsthand + closed the ONE
+> drift-guard gap.** Certified the table-coverage completeness: 19 physical sqliteTables = 16 in TABLE_SCHEMA_MAP + 3
+> EXCLUDED_BY_DESIGN (users/user_providers/sessions), exact, no drift since C208. The four existing guards
+> (backup-table-coverage C208, restore-table-coverage C209, backup-createbackup-keys, sheets-header-coverage) all GREEN +
+> non-vacuous. Audited validateReferentialIntegrity: every backed-up FK-bearing table has a matching validator; PROBED +
+> DEBUNKED a hypothesized userPreferences/syncState vehicle-FK gap firsthand (a schema.ts regex over-capture into the
+> adjacent relations() block — runtime drizzle getTableConfig proves both are userId-PK-only). Found + closed the one META
+> gap: NOTHING pinned ref-VALIDATION coverage (a future FK-bearing table could pass all 4 guards yet lack a validator →
+> corrupt backup PASSES → replace-mode wipe commits → raw FK throw mid-tx [C151] → account EMPTY, the #127/C428 FK
+> variant). Added backup-ref-validation-coverage.test.ts (the FIFTH guard, runtime-FK-introspection-derived, mutation-tested
+> non-vacuous). The round-trip is now guarded across ALL FIVE dimensions. Don't re-audit. Deep-review saturated across
+> trips/repos/TCO/offline-sync/CSV-import/provider-config/backup-round-trip; next needs a fresh feature surface (gated).
+
 > **CERTIFIED C285 — the storage-provider config-validation fail-fast path (#103/#123) CLEAN firsthand.** Audited
 > providers/routes.ts: ONE shared validateStorageProviderConfig (the C416 dedup) wired into BOTH create
 > (resolveProviderCredentials, #103/C349) AND PUT (#123/C416). The create/PUT gate `!endpoint||!bucket||!region` is

@@ -231,13 +231,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 227 |
-| deep-review | 5 | 285 |
+| deep-review | 5 | 290 |
 | guard | 6 | 289 |
 | bug | 3 | 287 |
 | arch | 5 | 286 |
 | infra | 6 | 288 |
 
-Current cycle: **289**
+Current cycle: **290**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,36 @@ Current cycle: **289**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C290 (deep-review: the BACKUP→RESTORE round-trip crown jewel [NORTH_STAR #1] certified CLEAN firsthand + closed the ONE drift-guard gap — added a FIFTH guard pinning referential-integrity-validation coverage)** —
+  Balance recompute (cycle 290): nothing strictly OVER budget; deep-review + bug tied at 1.00× (5/5, 3/3), deep-review
+  most-starved by absolute count. The GUIDE marks deep-review SATURATED across trips/repos/TCO/offline-sync/CSV-import/
+  provider-config — so picked a NOT-YET-CERTIFIED subsystem: the backup→restore round-trip TABLE-COVERAGE completeness
+  (NORTH_STAR #1 crown jewel — backup round-trips EVERY table; a missed table = silent data loss). CERTIFIED FIRSTHAND:
+  (1) the schema-vs-map coverage HOLDS — 19 physical sqliteTables = 16 in TABLE_SCHEMA_MAP + 3 EXCLUDED_BY_DESIGN
+  (users/user_providers/sessions); exact, no drift since the C208 guard. (2) the FOUR existing drift guards
+  (backup-table-coverage C208 [serialize+populate], restore-table-coverage C209 [insert+ImportSummary+conflict-probe
+  symmetry], backup-createbackup-keys, sheets-header-coverage) all GREEN + non-vacuous (14 pass). (3) audited
+  validateReferentialIntegrity firsthand: every backed-up table with a non-user FK has a matching validator. PROBED a
+  hypothesized gap (userPreferences/syncState appeared to carry a vehicles FK) and DEBUNKED it firsthand (the C333
+  agent-HIGH-often-false discipline applied to my OWN hypothesis): a naive schema.ts regex over-captured past the table
+  body into the adjacent relations() block; runtime drizzle getTableConfig().foreignKeys proves BOTH are userId-PK-only,
+  no child FK, correctly need no validator. (4) Found the ONE genuine META-gap: the 4 existing guards pin
+  serialize/populate/insert/summary/probe but NOTHING pinned ref-VALIDATION coverage — a future FK-bearing table added
+  to backup+restore+summary (passing all 4) but lacking a ref-validator would let a corrupt backup with a dangling FK
+  PASS validation → the replace-mode WIPE commits → the insert throws a raw FK error mid-tx (the C151 async-tx-no-rollback
+  footgun) → account left EMPTY (the #127/C428 data-loss class, FK variant). Closed it: added
+  backup-ref-validation-coverage.test.ts (the FIFTH guard) — derives the needs-a-validator set at RUNTIME from drizzle FK
+  introspection (excluding FKs to the 3 non-backed-up parents, incl. photoRefs→user_providers deliberately un-validated
+  since encrypted creds are never exported), asserts each such table is referenced as backup.<key> in
+  validateReferentialIntegrity, + an anti-vacuity test + a userId-PK-only-tables-need-no-validator pin. MUTATION-TESTED:
+  removing the validateTripRefs dispatch makes it FAIL loudly (trips [FK → vehicles]); restoring makes it pass — NOT
+  theater. Verify: BE bun run validate:local GREEN (tsc + check:musl[1 formatter reflow on the new file fixed via
+  check:musl:fix, the C228 class] + 1938 pass / 0 fail [+3 vs C288 1935] + build bundled). No FE source touched. cov: be
+  89.27% / fe 89.43% (~ — new test is a source-scan over existing backup.ts, adds covered test lines not new covered
+  SOURCE branches, the guard-cycle signature; BE module coverage unchanged). (deep-review→290. The backup round-trip
+  crown jewel is now certified CLEAN + guarded across ALL FIVE dimensions [serialize/populate/insert/summary/probe/
+  ref-validation]; don't re-audit it. The deep-review vein is saturated across trips/repos/TCO/offline-sync/CSV-import/
+  provider-config/backup-round-trip; NEXT deep-review needs a fresh feature surface [Angelo-gated] or record saturated + pivot.)
 - **C289 (guard: the wired formatMonthTick axis callback — chart-formatters.ts last uncovered seam — pinned firsthand via its real monthlyXAxisProps(...).format wiring; 84.21→100% func / 88.23→100% line)** —
   Balance recompute (cycle 289): nothing strictly OVER budget; among non-gated categories guard most-starved (6/6, AT
   threshold). The GUIDE marks guard SATURATED, but per discipline did ONE fresh firsthand scout before recording — and
