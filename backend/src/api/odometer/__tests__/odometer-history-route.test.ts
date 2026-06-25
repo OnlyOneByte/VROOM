@@ -23,6 +23,7 @@ import {
   createTestApp,
   type DataEnvelope,
   json,
+  type PaginatedEnvelope,
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { seedVehicle as seedVehicleShared } from '../../../test-helpers/seed';
@@ -43,12 +44,6 @@ interface HistoryRow {
   source: 'expense' | 'manual';
   sourceId: string;
   note: string | null;
-}
-
-interface PaginatedEnvelope<T> {
-  success?: boolean;
-  data: T[];
-  pagination: { totalCount: number; limit: number; offset: number; hasMore: boolean };
 }
 
 /** Create a manual odometer entry via the real POST route; returns its id. */

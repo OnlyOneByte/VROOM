@@ -1690,6 +1690,16 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 ### arch
 *(reliably DRY per the archive. Run a fresh dedup scout; if nothing clean surfaces, record "no churn warranted" + pivot. Obey the arch rules above.)*
 
+> **✅ CONVERGED C258 — my own C256-introduced duplicate `PaginatedEnvelope` type onto the shared harness export
+> (the C222/C23 self-drift class).** C256's odometer-history-route.test.ts re-declared `interface PaginatedEnvelope<T>`
+> locally when http-client.ts:48 already EXPORTS it (+ expenses-http.test.ts imports it). Dropped the local
+> re-declaration + its unused `success?`, imported the shared type. The shared type was genuinely INCOMPLETE (omitted
+> `hasMore`, which buildPaginatedResponse always returns) → completed it with `hasMore: boolean` (additive; expenses-http
+> only reads totalCount, nothing breaks). One faithful source of truth. Behavior-preserving: tsc 0, 1935 pass UNCHANGED.
+> Net −5 dup LOC. LESSON (re-confirmed): when a guard/bug cycle adds a test file, the NEXT arch scout should check it
+> for a re-implemented shared type/helper (C222 capitalize, C258 PaginatedEnvelope) — the freshest self-drift vector.
+> Don't re-scout these. seedVehicle vein stays exhausted (C199).
+
 > **NOT-CRUFT (re-classified C237, correcting the C236 note) — `buildTripSummaryByMonth` is RATIFIED design
 > surface authored ahead of its endpoint, NOT deletable dead code.** C236 filed it as a delete-candidate; a C237
 > firsthand spec read CORRECTS that: design.md §5 explicitly specs "Month bucketing via `toMonthKey` on local

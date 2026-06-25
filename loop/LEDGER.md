@@ -187,10 +187,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 255 |
 | guard | 6 | 256 |
 | bug | 3 | 257 |
-| arch | 5 | 252 |
+| arch | 5 | 258 |
 | infra | 6 | 254 |
 
-Current cycle: **257**
+Current cycle: **258**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -209,6 +209,23 @@ Current cycle: **257**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C258 (arch: converge my own C256-introduced duplicate PaginatedEnvelope type onto the shared harness export + complete that shared type — behavior-preserving, the C222/C23 self-drift class)** —
+  Balance recompute (cycle 258): arch was the sole over-budget category (6/5 = 1.2×; nothing else over except gated
+  feature). Arch is near its structural floor, so per the C23 lesson scouted the FRESHEST drift vector — the test
+  files I authored last cycles. FOUND a genuine self-introduced dup (the C222/C23 class, "my own new code is the
+  likeliest dup"): my C256 odometer-history-route.test.ts RE-DECLARED `interface PaginatedEnvelope<T>` locally, when
+  the harness (test-helpers/http-client.ts:48) already EXPORTS that interface + other tests (expenses-http.test.ts)
+  import it from there. CONVERGED (rule: route a re-implementation onto the existing shared definition, like C222
+  capitalize): dropped the local re-declaration + its unused `success?` field, imported `type PaginatedEnvelope`
+  from the harness. KEY: the shared type was genuinely INCOMPLETE — it omitted `hasMore`, which buildPaginatedResponse
+  ALWAYS returns (pagination.ts:53) and my odometer test reads — so I completed the shared export with
+  `hasMore: boolean` (accurate to the real route contract; purely additive — expenses-http only reads
+  pagination.totalCount, a subset, so nothing breaks). Now ONE faithful source of truth for the list envelope shape.
+  Behavior-preserving: tsc 0 (the completed type checks against every consumer), 1935 pass / 0 fail UNCHANGED, whole-
+  tree musl clean. Net −5 dup LOC / +1 accurate shared field. Verify: BE validate:local GREEN. Test-helper + test-only
+  → no shot. cov: be 89.23% / fe 89.11% (~ — types are erased; no runtime change). (arch→258. The seedVehicle vein is
+  exhausted [C199]; this was a fresh self-introduced dup, the right kind of arch pick — small, behavior-preserving,
+  test-anchored. NEXT arch cycle: re-scout fresh-authored code for self-dups, else record no-churn + pivot.)
 - **C257 (bug-scout DRY → pivot to guard: certify expenses/repository.ts read/filter surface CLEAN + pin the untested getPerVehicleStats dashboard route — repo 79→86.55% line)** —
   Balance recompute (cycle 257): bug was the sole over-budget category (4/3 = 1.33×; arch AT 5/5, not over). The
   pure-logic/visual/write-path veins are documented exhausted, so per the C95/C204 discipline did ONE fresh firsthand
