@@ -160,11 +160,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 227 |
 | deep-review | 5 | 238 |
 | guard | 6 | 242 |
-| bug | 3 | 234 |
+| bug | 3 | 243 |
 | arch | 5 | 235 |
 | infra | 6 | 240 |
 
-Current cycle: **242**
+Current cycle: **243**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -183,6 +183,27 @@ Current cycle: **242**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C243 (eyes-on bug scout on /settings [CLEAN] → the eyes-on visual-sweep vein is now SATURATED; recorded, no manufactured guard)** —
+  Balance recompute (cycle 243): bug most-starved + over budget (9/3 = 3.0×; arch 8/5 = 1.6× also over). Took the
+  4th + last data-bearing core route on the C239 eyes-on bug vein: /settings (the most form-heavy remaining —
+  storage-provider config, theme picker, unit prefs). Booted + minted auth + shot DESKTOP + MOBILE + Read both.
+  FINDINGS: profile card, Appearance/Theme (light/dark/system, System selected — the base picker; the instrument/
+  garage-journal palettes are the Angelo-gated T10 part), Unit Preferences (all 4 selects populated: Miles /
+  Gallons(US) / kWh / USD), Install-App PWA card, Storage Providers (Download/Restore, Default-Photo-Source "Not
+  configured", "No storage providers configured" empty state + Add Provider) — ALL render clean, four-states
+  correct, no overflow, no console errors. **Clean scout — no fresh bug.** Checked for a clean guard to add (the
+  C239/C241/C242 pattern): the settings STORE/API/state are ALREADY well-guarded (settings-api +
+  settings-restore-from-provider + settings-state-contract + settings-error-clearing, 4 test files), so a settings
+  guard would be MANUFACTURED churn (the GUIDE forbids it). **Recorded the clean scout WITHOUT a manufactured
+  artifact** — the honest GUIDE-sanctioned bug outcome ("one fresh-surface scout, then record + pivot if dry").
+  **THE EYES-ON VISUAL-SWEEP VEIN IS NOW SATURATED:** all 4 data-bearing core routes swept clean (C239 dash+
+  analytics, C241 expenses, C242 vehicle-detail, C243 settings); only /reminders remains un-shot but needs seeded
+  reminders (heavier) + its surface mirrors covered ones. No source change → no validate/shot beyond the scout
+  shots (both clean). cov: be 88.92% (~) / fe 89.11% (~). (bug→243 — a real fresh-surface scout happened, clean;
+  per the C204 convention the scout counts even when no defect. LESSON: when a clean scout finds the surface ALSO
+  already-guarded, recording the clean scout IS the increment — don't manufacture a redundant guard. The loop's
+  eyes-on bug vein has now done its job across the app; future bug cycles need a fresh feature surface or an
+  Angelo-unblocked gate — same exhaustion the pure-logic surface hit, now reached on the visual surface too.)
 - **C242 (eyes-on bug scout on /vehicles/[id] [CLEAN — blank charts = headless 0×0-gate artifact, NOT a defect] → guard: pin ChartCard's visibility-gate)** —
   Balance recompute (cycle 242): bug most-starved + over budget (8/3 = 2.67×; arch 7/5 = 1.4× also over). Continued
   the C239/C241 eyes-on bug-scout vein on a fresh data-bearing route: /vehicles/[id] (the seeded loan vehicle —

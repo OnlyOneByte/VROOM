@@ -677,6 +677,15 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **VEIN STATUS (C243): the eyes-on visual-sweep bug vein is now SATURATED.** The C239 unblock opened a fresh
+> bug-scout vein (shoot un-shot routes for NORTH_STAR #3 defects pure-logic/unit tests miss). Across C239–C243 all
+> 4 data-bearing core routes were swept + Read desktop+mobile, ALL CLEAN: dashboard+analytics (C239), expenses
+> (C241), vehicle-detail (C242), settings (C243). Each clean scout that had an UNGUARDED invariant left a guard
+> (C239 fuel-empty-state, C241 FAB-clearance, C242 chart-gate); C243 found settings ALSO already-guarded → recorded
+> clean, no manufactured guard. Only /reminders remains un-shot (needs seeded reminders; surface mirrors covered
+> ones). So like the pure-logic surface before it, the VISUAL surface is now worked through — future bug cycles
+> need a FRESH feature surface or an Angelo-unblocked gate, else they're dry scouts. Don't re-sweep these 4 routes.
+
 > **CLOSED C234 — the C233 best-effort-contract class's SIBLING on the vehicle-delete path (500-after-delete +
 > skipped #88/#97 cleanup).** Scouting the C233 lead found two UNGUARDED secondaries `await`ed AFTER
 > `vehicleRepository.delete()`: `pruneSplitConfigsForDeletedVehicle` (#88) + `deactivateVehicleless` (#97).
