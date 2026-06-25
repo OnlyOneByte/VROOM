@@ -64,9 +64,11 @@ as a separate D3 schema slice (NOT self-authored). **D2 odometer-linkage DONE (C
 that the RATIFIED D2 ("a trip feeds currentOdometer") had no task and was silently skipped across T1–T5; now a
 trip POST writes a deduped odometer entry at endOdometer/tripDate (createFromTrip) so it drives the
 maintenance-reminder + lease-overage axis. **The trips BACKEND is GENUINELY complete (T1–T5 + D2).** T6a FE DATA LAYER
-DONE (C218): trip types (Trip/TripPurpose/TripSummary/tripDistance) + trip-api.ts (the C149/C163 pattern,
-+14 unit tests) — no eyes-on needed. **REMAINING: T6b eyes-on COMPONENTS** (trips list page + trip form +
-mileage-summary card, four-states/a11y/mobile + e2e — Playwright-gated, lands code-complete-eyes-on-pending).
+DONE (C218): trip types + trip-api.ts (the C149/C163 pattern, +14 unit tests). T6b-1 LIST PAGE + summary card
+DONE + EYES-ON VERIFIED (C220): real /trips read-only page (four-states + R4 Mileage Summary card + per-trip
+cards), shot DESKTOP+MOBILE + Read — summary math correct, no mobile overflow, no console errors. **REMAINING:
+T6b-2** — the create/edit trip FORM (ReminderForm-style dialog → tripApi.create/update + R2 client guard) + the
+FE→BE→DB e2e (feature-DoD); the list is read-only until the form lands (then the New-Trip button + empty-state CTA).
 Standing D3 follow-on: persist the business-mileage rate (userPreferences column + per-trip override) — its
 own schema/migration+backup-coverage slice, NOT yet built. money-cents-migration UNSTARTED — its T1+T2 are a "land-together" data-safety core (schema-flip
 + backup version-bump/shim) that should land in a single coherent cycle, NOT split across starvation cycles,

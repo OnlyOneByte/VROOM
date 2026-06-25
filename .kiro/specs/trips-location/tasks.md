@@ -89,9 +89,18 @@
     list [paginated + vehicleId/purpose filter-drop], getSummary [vehicleId+rate], getByVehicle, getById,
     create, update, delete). +14 unit tests (trip-api.test.ts: exact URL/payload per method, filter-drop, the
     summary rate param, + the tripDistance clamp). FE validate:local GREEN (825 pass, +12). NO eyes-on needed
-    for the data layer. **REMAINING T6b: the eyes-on COMPONENTS** — trips list page + ReminderForm-style trip
-    form + the mileage-summary card, four-states/a11y/mobile, then the e2e (Playwright-gated → code-complete,
-    eyes-on-pending).
+    for the data layer.
+  - [x] **T6b-1 — trips LIST page + mileage-summary card DONE + EYES-ON VERIFIED (C220):** replaced the
+    `/trips` "Coming Soon" stub with a real read-only list page driving `tripApi.list()` + `tripApi.getSummary()`,
+    full four-states (loading Skeleton / error+Retry / EmptyState / data), the R4 Mileage Summary card
+    (Total/Trips/Business/Avg), and per-trip cards (purpose Badge, derived distance via tripDistance, odometer
+    range, date, vehicle name, locations, note). **Eyes-on: booted servers, seeded 2 trips via the real API,
+    shot /trips DESKTOP + MOBILE + Read both PNGs** — summary math correct (210/2/135/105), newest-first order,
+    NO mobile horizontal overflow (NORTH_STAR #3), no console errors, no auth bounce. FE validate:local GREEN
+    (svelte-check 0, build, 826 pass).
+  - [ ] **REMAINING T6b-2:** the create/edit trip FORM (ReminderForm-style dialog → tripApi.create/update;
+    vehicle + odometer-pair + purpose + date + optional locations/note; R2 client guard) + the FE→BE→DB e2e
+    (feature-DoD). The list page is read-only for now (the New-Trip button lands with the form).
 
 ## Build-order note
 Once T0 clears, T1–T5 are a clean backend-first arc the loop can drive across several `feature` cycles

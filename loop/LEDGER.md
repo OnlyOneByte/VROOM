@@ -142,14 +142,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 218 |
+| feature | 4 | 220 |
 | deep-review | 5 | 213 |
 | guard | 6 | 219 |
 | bug | 3 | 211 |
 | arch | 5 | 212 |
 | infra | 6 | 217 |
 
-Current cycle: **219**
+Current cycle: **220**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -168,6 +168,23 @@ Current cycle: **219**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C220 (bug-scout SATURATED → highest-leverage open item: trips T6b-1 — the EYES-ON trips list page + summary card)** —
+  Balance recompute (cycle 220): bug most-starved (9/3 = 3.0×) but C219 was test-only + the C218 trip-api surface was
+  scouted clean (C219) → no fresh prod logic, a 6th trips-surface guard is ceremony → dry, recorded. arch (8/5) +
+  deep-review (7/5) also over BUT both dry on the saturated trips backend (arch's only candidates are the
+  INTENTIONAL BE↔FE tripDistance/TRIP_PURPOSES cross-runtime mirrors — no shared module to converge). Per the GUIDE
+  ("else the highest-leverage open item"), took the unambiguous winner: **trips T6b** (greenlit, the last trips task,
+  explicitly shootable now). Built T6b-1 — replaced the `/trips` "Coming Soon" stub with a REAL read-only list page:
+  drives tripApi.list() + tripApi.getSummary(), full FOUR-STATES (loading Skeleton / error+Retry / EmptyState /
+  data), the R4 Mileage Summary card (Total/Trips/Business/Avg), per-trip cards (purpose Badge + derived distance via
+  tripDistance + odometer range + date + vehicle name + locations + note). **EYES-ON VERIFIED (the GUIDE gate):
+  booted servers, seeded 2 trips via the real API, shot /trips DESKTOP + MOBILE, Read both PNGs** — summary math
+  correct (135+75=210 total / 2 trips / 135 business / 105 avg), newest-first order, NO mobile horizontal overflow
+  (NORTH_STAR #3), no console errors, no auth bounce, kit-consistent (PageHeader/Card/Badge/Skeleton/EmptyState). FE
+  validate:local GREEN (svelte-check 0 errors, build, 826 pass / 0 fail). Servers killed after (no orphans).
+  REMAINING T6b-2: the create/edit FORM (ReminderForm-style → tripApi.create/update + R2 client guard) + the e2e;
+  the list is read-only until the form lands. cov: be 88.92% (~) / fe ~88.7% (~, route component — eyes-on + route-
+  smoke covered, not a unit add). This is the first SHOT-VERIFIED UI increment of the trips arc. (Bug stays 211.)
 - **C219 (bug-scout on the C218 trip-api [CLEAN — rate=0 query survival verified] → guard: pin the explicit-zero rate)** —
   Balance recompute (cycle 219): bug most-starved + over budget (8/3 = 2.67×). Cold-vein LIFTED — C218 added a
   FRESH FE surface (trip-api.ts + trip types) the prior scouts never touched → a real scout. Probed the
