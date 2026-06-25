@@ -160,11 +160,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 227 |
 | deep-review | 5 | 233 |
 | guard | 6 | 232 |
-| bug | 3 | 230 |
+| bug | 3 | 234 |
 | arch | 5 | 229 |
 | infra | 6 | 231 |
 
-Current cycle: **233**
+Current cycle: **234**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -183,6 +183,26 @@ Current cycle: **233**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C234 (feature gated → pivot to bug: FIX the C233 best-effort-contract class's SIBLING on the vehicle-delete path)** —
+  Balance recompute (cycle 234): feature most-starved (7/4 = 1.75×) but FULLY GATED (money-cents escalated/parked
+  C232, trips T6b-3 gated on C214, theming + vehicle-sharing gated) → record + pivot (C232/C233 discipline). Next-
+  most-starved actionable = bug (4/3 = 1.33×). Per the GUIDE, scouted the FRESH lead C233 opened — the "best-effort
+  but unguarded secondary write after the primary persist" class. Swept all such route sites firsthand: the recheck
+  sites are internally guarded (C42); the insurance/vehicle photo-cleanup + deleteBySource run cleanup-BEFORE-primary
+  (atomic, no orphan-with-500); the reminders-delete clearSource is already try/caught — BUT the VEHICLE DELETE has
+  two UNGUARDED secondaries AFTER the primary delete: `pruneSplitConfigsForDeletedVehicle` (#88) +
+  `deactivateVehicleless` (#97), both `await`ed post-`vehicleRepository.delete()`. FAULT-INJECTED a throw firsthand →
+  **500 response, but the vehicle is already deleted (0 rows)** → the FE shows "failed to delete", the user retries
+  (a confusing 404), AND the #88/#97 normalization those calls exist for NEVER RAN → the exact orphaned-split-leg
+  (FK-violation next trigger) + vehicleless-active-reminder states they prevent. Same clean-correctness class as
+  C233 (the cleanups are conceptually best-effort — the delete is the user's intent, the DB cascade already ran, and
+  the next /trigger re-runs the same normalization so a missed pass self-heals — not a semantics call). FIX: wrapped
+  the two post-delete cleanups in a log+swallow try/catch, returning the earned 200. GUARD: +1 in
+  vehicle-delete-cascade.test.ts (fault-inject deactivateVehicleless throw → still 200 + vehicle deleted). Non-vacuous
+  (revert the try/catch → the guard REDs at 500; verified firsthand, restored). Backend-only → no shot. validate:local
+  GREEN (tsc 0, musl 21 warn baseline, 1919 pass / 0 fail, +1, build bundled, whole-tree clean). cov: be 88.92%+ (~,
+  the catch branch now covered) / fe 89.11% (~). **The C233 best-effort-contract class is now closed on BOTH the
+  trip-create + vehicle-delete paths; the swept siblings (recheck/insurance/reminders) were already correct.** (bug→234.)
 - **C233 (feature gated → pivot to deep-review: FIX a real best-effort-contract violation on the trip CREATE D2 side-effects)** —
   Balance recompute (cycle 233): feature most-starved + over budget (6/4 = 1.5×) but FULLY GATED — money-cents
   escalated/parked (C232, awaiting Angelo's sequencing pick), trips T6b-3 gated on C214, theming picker gated on

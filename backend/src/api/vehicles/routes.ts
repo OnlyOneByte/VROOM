@@ -8,6 +8,7 @@ import type { ApiResponse } from '../../errors';
 import { ConflictError, NotFoundError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { getPeriodStartDate, sortExpensesByDate } from '../../utils/calculations';
+import { logger } from '../../utils/logger';
 import {
   mergeUnitPreferences,
   partialUnitPreferencesSchema,
@@ -302,16 +303,30 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
 
   await vehicleRepository.delete(id);
 
-  // #88: the reminder_vehicles junction cascades, but a reminder's `expenseSplitConfig` JSON blob is NOT
-  // FK-managed — its leg for the deleted vehicle lingers, so the next trigger builds a split sibling for
-  // the dead vehicleId → an FK violation that leaves the surviving legs half-committed (C151 footgun).
-  // Prune the deleted leg + renormalize FIRST (clears the blob when <2 legs remain).
-  await reminderRepository.pruneSplitConfigsForDeletedVehicle(user.id, id);
+  // Post-delete reminder cleanups (#88 + #97). These run AFTER the vehicle is already deleted (the DB
+  // FK-cascade has already dropped the reminder_vehicles junction rows), so they're best-effort: the
+  // delete the user asked for is DONE, and a cleanup hiccup must NOT 500 a successful delete — that would
+  // show "failed", prompt a retry (→ a confusing 404), AND leave the very states these calls prevent
+  // (orphaned split-config legs / vehicleless active reminders) un-fixed because the throw skipped them.
+  // The next reminder /trigger re-runs the same normalization, so a missed pass self-heals. (C234, the
+  // C233 best-effort-contract class on the vehicle-delete path.) Log + swallow; return the earned 200.
+  try {
+    // #88: the reminder_vehicles junction cascades, but a reminder's `expenseSplitConfig` JSON blob is NOT
+    // FK-managed — its leg for the deleted vehicle lingers, so the next trigger builds a split sibling for
+    // the dead vehicleId → an FK violation that leaves the surviving legs half-committed (C151 footgun).
+    // Prune the deleted leg + renormalize FIRST (clears the blob when <2 legs remain).
+    await reminderRepository.pruneSplitConfigsForDeletedVehicle(user.id, id);
 
-  // #97: the reminder_vehicles junction rows cascade away with the vehicle, but a reminder whose
-  // sole/last vehicle was this one is left active with ZERO vehicles — the trigger skips it
-  // 'no_vehicles' forever with no user signal. Deactivate any such now-vehicleless active reminder.
-  await reminderRepository.deactivateVehicleless(user.id);
+    // #97: the reminder_vehicles junction rows cascade away with the vehicle, but a reminder whose
+    // sole/last vehicle was this one is left active with ZERO vehicles — the trigger skips it
+    // 'no_vehicles' forever with no user signal. Deactivate any such now-vehicleless active reminder.
+    await reminderRepository.deactivateVehicleless(user.id);
+  } catch (error) {
+    logger.error('Post-delete reminder cleanup failed (vehicle already deleted)', {
+      vehicleId: id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   return c.json({
     success: true,

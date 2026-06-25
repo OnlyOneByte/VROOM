@@ -677,6 +677,18 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **CLOSED C234 — the C233 best-effort-contract class's SIBLING on the vehicle-delete path (500-after-delete +
+> skipped #88/#97 cleanup).** Scouting the C233 lead found two UNGUARDED secondaries `await`ed AFTER
+> `vehicleRepository.delete()`: `pruneSplitConfigsForDeletedVehicle` (#88) + `deactivateVehicleless` (#97).
+> Fault-injected firsthand: a throw → 500 but the vehicle is already deleted (0 rows) → FE shows "failed", retry
+> 404s, AND the orphaned-split-leg / vehicleless-reminder normalization never ran (the exact states #88/#97
+> prevent). Clean fix (best-effort by intent — the delete is done, the next /trigger self-heals the normalization;
+> not a semantics call): wrapped the two cleanups in a log+swallow try/catch, returning the earned 200. +1 guard
+> in vehicle-delete-cascade.test.ts (fault-inject → still 200 + vehicle deleted); non-vacuous (revert → 500 RED).
+> The best-effort-contract class is now closed on BOTH trip-create + vehicle-delete; swept siblings
+> (odometer/expense recheck = C42-guarded, insurance/reminder = cleanup-before-primary or already try/caught) were
+> correct. Don't re-fix.
+
 > **CLOSED C233 — best-effort-contract violation on the trip CREATE D2 side-effects (a 500 + duplicate-on-retry
 > class), found by a deep-review.** The trip POST comments its D2 side-effects "best-effort … never fails the
 > create", but only recheckMileageReminders is internally guarded (C42); `odometerRepository.createFromTrip` is a

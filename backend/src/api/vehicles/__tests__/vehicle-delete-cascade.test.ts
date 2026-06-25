@@ -447,3 +447,37 @@ describe('C452 — every photo-bearing entity type is reaped on vehicle-delete O
     expect(ENTITY_TO_CATEGORY.vehicle).toBeDefined();
   });
 });
+
+// ---------------------------------------------------------------------------
+// C234 deep-review fix: the post-delete reminder cleanups (#88 pruneSplitConfigsForDeletedVehicle + #97
+// deactivateVehicleless) run AFTER vehicleRepository.delete() commits + the DB FK-cascade has already
+// dropped the reminder_vehicles junction. They were `await`ed UNGUARDED, so a hiccup in either 500'd a
+// delete whose vehicle was already gone → the FE shows "failed", the user retries (a confusing 404), AND
+// the very normalization #88/#97 exist for never ran. They're best-effort (the next /trigger re-runs the
+// same normalization, so a missed pass self-heals); the route now wraps them in a log+swallow try/catch.
+// This pins that contract: a cleanup throw must NOT fail the (completed) delete. (The C233 best-effort-
+// contract class — sibling of the trip-create createFromTrip fix.)
+describe('C234 — a post-delete reminder-cleanup throw does NOT fail the (completed) vehicle delete', () => {
+  test('deactivateVehicleless throwing still returns 200 + the vehicle is deleted', async () => {
+    const vehicleId = await seedVehicle();
+    const { reminderRepository } = await import('../../reminders/repository');
+    const original = reminderRepository.deactivateVehicleless.bind(reminderRepository);
+    // Simulate a DB hiccup in the post-delete cleanup (after the vehicle + junction are already gone).
+    reminderRepository.deactivateVehicleless = async () => {
+      throw new Error('simulated cleanup hiccup');
+    };
+    try {
+      const del = await ctx.authed('DELETE', `/api/v1/vehicles/${vehicleId}`);
+      expect(del.status, await del.text()).toBe(200);
+      // The delete the user asked for is DONE despite the cleanup failure (no orphaned 500).
+      const n = (
+        ctx.sqlite.query('SELECT COUNT(*) AS n FROM vehicles WHERE id = ?').get(vehicleId) as {
+          n: number;
+        }
+      ).n;
+      expect(n).toBe(0);
+    } finally {
+      reminderRepository.deactivateVehicleless = original;
+    }
+  });
+});
