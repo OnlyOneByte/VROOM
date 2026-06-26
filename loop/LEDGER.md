@@ -234,10 +234,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 321 |
 | guard | 6 | 322 |
 | bug | 3 | 320 |
-| arch | 5 | 317 |
+| arch | 5 | 324 |
 | infra | 6 | 319 |
 
-Current cycle: **323**
+Current cycle: **324**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,20 @@ Current cycle: **323**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C324 (ARCH dedup: extracted defineBuiltinTheme factory — converged the per-theme ThemeDefinition boilerplate the C313/C323 palettes repeat)** —
+  Balance recompute (cycle 324): arch most-starved over budget (7 starved, budget 5, 1.4×). C286 fast-dry precondition:
+  production source DID change since arch's last touch (C317) — C318 picker + C320 fix + C323 bento. Found the self-dup:
+  each ThemeDefinition literal repeats `swatch: DEFAULT_SWATCH, source: 'builtin'` + the fixed 5-field shape (3× now, with
+  vaporwave/cyberpunk/aurora queued to repeat it 3 MORE times — the steepest-payoff moment to converge, before the dup
+  triples). Extracted defineBuiltinTheme({id,label,description,light,dark, swatch?}) — one call per theme; swatch stays
+  OPTIONAL (defaults to DEFAULT_SWATCH, a theme may still override per the C322 contract). Concrete payoff: makes
+  builtin+default-swatch the UN-FORGETTABLE default so a future palette registration can not omit source:'builtin' or
+  mis-shape the object (a real footgun the metadata guard would catch only after the fact). Behavior-preserving (the factory
+  returns the identical resolved object), test-anchored: registry-integrity/metadata/contrast/distinctness guards exercise
+  every theme and stay GREEN (956 tests UNCHANGED — the refactor signature). The C222/C258/C275/C292/C317 self-introduced-
+  dup-convergence pattern. Verify: FE validate:local GREEN. BE untouched. Committed 183312d, pushed (branch 190 ahead / 0
+  behind). cov: be 89.29% / fe 89.46% (~). (arch→324. The next 3 palettes now register via a single defineBuiltinTheme call
+  each — even less boilerplate. NEXT: register vaporwave [feature, highest-leverage open item].)
 - **C323 (FEATURE theming: registered the bento theme — 2nd Angelo palette, eyes-on verified; the C313 recipe proven repeatable)** —
   Balance recompute (cycle 323): feature over budget (5 starved, budget 4, 1.25×) AND the highest-leverage open item —
   the balance self-correction predicted at C322 landed exactly. Registered `bento` (2nd of the 5 Angelo palettes) by the
