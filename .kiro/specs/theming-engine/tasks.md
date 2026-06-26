@@ -115,7 +115,9 @@
       click → `themeStore.setTheme(id)` → instant live re-skin. Sits beside the `light|dark|system`
       ThemeCard. Empty-safe (registry always has default), mobile-first. Guarded: swatch-key crash (C320),
       metadata contract (C322). Eyes-on confirmed via picker-click (C340).
-- [~] **T11** Per-theme eyes-on. **VERIFIED METHOD (learned the hard way C338→C340 — READ THIS):** the ONLY
+- [x] **T11 DONE (C340/C341/C342)** Per-theme eyes-on — ALL 8 non-default themes genuinely picker-verified
+      (hash-distinct + Read): cyberpunk/aurora/solarpunk (C340), tui (C341), blueprint/bento/vaporwave/editorial
+      (C342). The C338 visual-unconfirmed backlog is fully cleared. **VERIFIED METHOD (learned the hard way C338→C340):** the ONLY
       reliable way to eyes-on a theme is to **drive the real picker**, NOT to inject `vroom-theme-id` into
       storageState/localStorage. WHY: on settings hydrate, `theme.svelte.ts reconcileServerTheme` (T9/C195
       "server wins") RESETS the theme-id to the server's `themePreference`; the seeded demo user has none →
