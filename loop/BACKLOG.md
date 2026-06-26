@@ -835,8 +835,11 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > THEME_ID knob, but a DOM probe post-hydrate showed dataTheme=null + vroom-theme-id LS reset to "default" + computed tokens
 > = default. theme.svelte.ts reconcileServerTheme (T9/C195 "server wins") resets the theme-id to the server themePreference
 > on settingsStore.load(); the seeded demo user has none → reconciles to default → every shot renders default. TWO items:
->   (A) HARNESS: a faithful theme eyes-on must DRIVE THE REAL PICKER (shot.mjs CLICK_TEXT the theme card) OR set the seeded
->       user's SERVER themePreference before shooting — injecting localStorage alone is reverted.
+>   (A) HARNESS ✅ SOLVED (C340): a faithful theme eyes-on DRIVES THE REAL PICKER — CLICK_SELECTOR="button[aria-label='Use
+>       the <Label> theme']" shot.sh /settings (the click runs setTheme() AFTER the reconcile, so it sticks) + md5sum to
+>       assert distinct. C340 hash-proved cyberpunk/aurora/solarpunk render distinct + visibly re-skin (selected ring +
+>       sidebar/FAB accent). Method documented in theming-engine/tasks.md T11. Walking all 8×{light,dark} via this recipe
+>       (~2-3/cycle) clears the visual-unconfirmed backlog. Injecting localStorage alone is STILL reverted (see B).
 >   (B) 🚩 POSSIBLE PRODUCT BUG (Angelo-gated reconcile-semantics call, escalated C339): "server wins" clobbers a local
 >       theme selection to `default` when the server value is UNSET — a real user could pick a theme, reload, lose it. Fix
 >       mirrors the #129 ruling (sync only if server value non-empty, never overwrite with empty) but changes reconcile
