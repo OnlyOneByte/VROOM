@@ -911,10 +911,100 @@ const Y2K_THEME: ThemeDefinition = defineBuiltinTheme({
 });
 
 /**
+ * `neobrutalist` light palette — the mock's stark hard-edged look: off-white paper, near-black INK borders
+ * (border/input = the ink token, the thick-outline signature as a TOKEN), an electric-blue brand, a loud
+ * yellow accent. Distilled from the ryang.dev neobrutalist mock into VROOM's 32 tokens, AA-tuned (every
+ * fg/bg pair clears WCAG AA 4.5 — theme-contrast.test.ts). D7 token-only (no hard drop-shadow / offset
+ * effects — the palette + the ink-colored borders only).
+ */
+const NEOBRUTALIST_LIGHT: ThemeTokens = {
+  background: 'oklch(0.97 0.01 95)',
+  foreground: 'oklch(0.18 0.02 270)',
+  card: 'oklch(1 0 0)',
+  'card-foreground': 'oklch(0.18 0.02 270)',
+  popover: 'oklch(1 0 0)',
+  'popover-foreground': 'oklch(0.18 0.02 270)',
+  primary: 'oklch(0.5 0.22 264)',
+  'primary-foreground': 'oklch(0.99 0.005 95)',
+  secondary: 'oklch(0.92 0.03 95)',
+  'secondary-foreground': 'oklch(0.22 0.02 270)',
+  muted: 'oklch(0.93 0.02 95)',
+  'muted-foreground': 'oklch(0.42 0.02 270)',
+  accent: 'oklch(0.85 0.12 95)',
+  'accent-foreground': 'oklch(0.24 0.05 90)',
+  destructive: 'oklch(0.52 0.22 27)',
+  warning: 'oklch(0.55 0.13 75)',
+  border: 'oklch(0.18 0.02 270)',
+  input: 'oklch(0.18 0.02 270)',
+  ring: 'oklch(0.5 0.22 264)',
+  'chart-1': 'oklch(0.5 0.22 264)',
+  'chart-2': 'oklch(0.55 0.2 25)',
+  'chart-3': 'oklch(0.55 0.16 145)',
+  'chart-4': 'oklch(0.6 0.17 60)',
+  'chart-5': 'oklch(0.5 0.2 320)',
+  sidebar: 'oklch(0.95 0.02 95)',
+  'sidebar-foreground': 'oklch(0.18 0.02 270)',
+  'sidebar-primary': 'oklch(0.5 0.22 264)',
+  'sidebar-primary-foreground': 'oklch(0.99 0.005 95)',
+  'sidebar-accent': 'oklch(0.85 0.12 95)',
+  'sidebar-accent-foreground': 'oklch(0.24 0.05 90)',
+  'sidebar-border': 'oklch(0.18 0.02 270)',
+  'sidebar-ring': 'oklch(0.5 0.22 264)',
+};
+
+/**
+ * `neobrutalist` dark palette — hard near-black canvas with WHITE ink borders (the inverted thick-outline)
+ * + the same loud electric-blue brand and yellow accent. AA-tuned exactly like the light variant
+ * (theme-contrast.test.ts).
+ */
+const NEOBRUTALIST_DARK: ThemeTokens = {
+  background: 'oklch(0.16 0.01 270)',
+  foreground: 'oklch(0.97 0.01 95)',
+  card: 'oklch(0.2 0.015 270)',
+  'card-foreground': 'oklch(0.97 0.01 95)',
+  popover: 'oklch(0.2 0.015 270)',
+  'popover-foreground': 'oklch(0.97 0.01 95)',
+  primary: 'oklch(0.7 0.18 264)',
+  'primary-foreground': 'oklch(0.15 0.02 270)',
+  secondary: 'oklch(0.27 0.02 270)',
+  'secondary-foreground': 'oklch(0.97 0.01 95)',
+  muted: 'oklch(0.26 0.015 270)',
+  'muted-foreground': 'oklch(0.72 0.02 95)',
+  accent: 'oklch(0.85 0.16 95)',
+  'accent-foreground': 'oklch(0.2 0.05 90)',
+  destructive: 'oklch(0.62 0.23 18)',
+  warning: 'oklch(0.82 0.14 85)',
+  border: 'oklch(0.97 0.01 95)',
+  input: 'oklch(0.4 0.02 270)',
+  ring: 'oklch(0.7 0.18 264)',
+  'chart-1': 'oklch(0.7 0.18 264)',
+  'chart-2': 'oklch(0.7 0.2 25)',
+  'chart-3': 'oklch(0.78 0.16 145)',
+  'chart-4': 'oklch(0.82 0.16 60)',
+  'chart-5': 'oklch(0.72 0.18 320)',
+  sidebar: 'oklch(0.13 0.01 270)',
+  'sidebar-foreground': 'oklch(0.97 0.01 95)',
+  'sidebar-primary': 'oklch(0.7 0.18 264)',
+  'sidebar-primary-foreground': 'oklch(0.15 0.02 270)',
+  'sidebar-accent': 'oklch(0.85 0.16 95)',
+  'sidebar-accent-foreground': 'oklch(0.2 0.05 90)',
+  'sidebar-border': 'oklch(0.97 0.01 95)',
+  'sidebar-ring': 'oklch(0.7 0.18 264)',
+};
+
+const NEOBRUTALIST_THEME: ThemeDefinition = defineBuiltinTheme({
+  id: 'neobrutalist',
+  label: 'Neobrutalist',
+  description: 'Stark hard-edged — electric blue and loud yellow with ink borders.',
+  light: NEOBRUTALIST_LIGHT,
+  dark: NEOBRUTALIST_DARK,
+});
+
+/**
  * Every built-in theme by id. `default` is the always-present identity theme (R8 fallback target). The
  * Angelo-approved v1 set (default + 5: blueprint/bento/vaporwave/cyberpunk/aurora) is COMPLETE; solarpunk/
- * editorial/tui/y2k are fill-ins from the ryang.dev mocks. Each theme is a single defineBuiltinTheme call —
- * zero structural change; further fill-ins (neobrutalist/claymorphism/brutalist/zine) drop in the same way.
+ * editorial/tui/y2k/neobrutalist are fill-ins from the ryang.dev mocks. Each theme is a single
+ * defineBuiltinTheme call — zero structural change; further fill-ins (claymorphism/brutalist/zine) drop in the same way.
  */
 export const THEME_REGISTRY: Record<string, ThemeDefinition> = {
   default: DEFAULT_THEME,
@@ -927,6 +1017,7 @@ export const THEME_REGISTRY: Record<string, ThemeDefinition> = {
   editorial: EDITORIAL_THEME,
   tui: TUI_THEME,
   y2k: Y2K_THEME,
+  neobrutalist: NEOBRUTALIST_THEME,
 };
 
 /** The id every unknown/absent selection resolves to (R8). */
