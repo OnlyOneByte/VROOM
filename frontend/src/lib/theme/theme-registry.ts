@@ -23,6 +23,29 @@ import type { ThemeDefinition, ThemeTokenKey, ThemeTokens } from './theme-types'
  */
 const DEFAULT_SWATCH: ThemeTokenKey[] = ['primary', 'accent', 'background', 'foreground'];
 
+/**
+ * Factory for a built-in {@link ThemeDefinition} — converges the per-theme boilerplate every palette repeats
+ * (`source: 'builtin'` + the default swatch + the fixed field shape). Each new built-in theme is one call
+ * with its id/label/description + light/dark maps; `swatch` is OPTIONAL (defaults to {@link DEFAULT_SWATCH},
+ * a theme may still pass its own for a characterful preview). This makes "builtin + default swatch" the
+ * un-forgettable default so a future palette registration can not omit `source` or mis-shape the object.
+ */
+function defineBuiltinTheme(
+  def: Pick<ThemeDefinition, 'id' | 'label' | 'description' | 'light' | 'dark'> & {
+    swatch?: ThemeTokenKey[];
+  }
+): ThemeDefinition {
+  return {
+    id: def.id,
+    label: def.label,
+    description: def.description,
+    swatch: def.swatch ?? DEFAULT_SWATCH,
+    source: 'builtin',
+    light: def.light,
+    dark: def.dark,
+  };
+}
+
 /** `default` light palette — VERBATIM from app.css `:root` (C185). Do not edit by hand; mirror app.css. */
 const DEFAULT_LIGHT: ThemeTokens = {
   background: 'oklch(1 0 0)',
@@ -95,15 +118,13 @@ const DEFAULT_DARK: ThemeTokens = {
   'sidebar-ring': 'oklch(0.552 0.016 285.938)',
 };
 
-const DEFAULT_THEME: ThemeDefinition = {
+const DEFAULT_THEME: ThemeDefinition = defineBuiltinTheme({
   id: 'default',
   label: 'Default',
   description: "VROOM's classic look — clean neutrals with a calm accent.",
-  swatch: DEFAULT_SWATCH,
-  source: 'builtin',
   light: DEFAULT_LIGHT,
   dark: DEFAULT_DARK,
-};
+});
 
 /**
  * `blueprint` light palette — an engineering "whiteprint": navy ink on pale drafting-paper blue. Distilled
@@ -184,15 +205,13 @@ const BLUEPRINT_DARK: ThemeTokens = {
   'sidebar-ring': 'oklch(0.7 0.12 235)',
 };
 
-const BLUEPRINT_THEME: ThemeDefinition = {
+const BLUEPRINT_THEME: ThemeDefinition = defineBuiltinTheme({
   id: 'blueprint',
   label: 'Blueprint',
   description: 'Engineering schematic — cyan on deep navy, a backlit drafting table.',
-  swatch: DEFAULT_SWATCH,
-  source: 'builtin',
   light: BLUEPRINT_LIGHT,
   dark: BLUEPRINT_DARK,
-};
+});
 
 /**
  * `bento` light palette — a clean bento-light: soft-grey canvas, white card panels, the mock's violet/blue
@@ -273,15 +292,13 @@ const BENTO_DARK: ThemeTokens = {
   'sidebar-ring': 'oklch(0.55 0.2 266)',
 };
 
-const BENTO_THEME: ThemeDefinition = {
+const BENTO_THEME: ThemeDefinition = defineBuiltinTheme({
   id: 'bento',
   label: 'Bento',
   description: 'Modular dashboard — charcoal panels with violet and blue accents.',
-  swatch: DEFAULT_SWATCH,
-  source: 'builtin',
   light: BENTO_LIGHT,
   dark: BENTO_DARK,
-};
+});
 
 /**
  * Every built-in theme by id. `default` is the always-present identity theme (R8 fallback target).
