@@ -231,13 +231,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 334 |
-| deep-review | 5 | 338 |
+| deep-review | 5 | 339 |
 | guard | 6 | 336 |
 | bug | 3 | 337 |
 | arch | 5 | 334 |
 | infra | 6 | 335 |
 
-Current cycle: **338**
+Current cycle: **339**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,7 +256,27 @@ Current cycle: **338**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
-- **C338 (DEEP-REVIEW → 🚩 INTEGRITY FINDING: the theming eyes-on harness does NOT apply the theme-id; prior "re-skin verified" claims C313-C334 were UNRELIABLE; escalated, no false claim)** —
+- **C339 (DEEP-REVIEW root-cause: the C338 finding is DEEPER than the harness — the app REVERTS the theme to `default` on hydrate [server-wins reconcile]; fixed shot.mjs groundwork + escalated the real product question)** —
+  Balance recompute (cycle 339): feature was nominally most-starved (5/4) but registering another fill-in would knowingly
+  reproduce the C338 unverifiable-claim problem → OVERRODE to the C338 top item (fix the eyes-on harness, then re-verify).
+  Fixed shot.mjs: added a THEME_ID env knob that addInitScripts localStorage['vroom-theme-id'] + <html data-theme> pre-paint
+  (gitignored harness — local capability). It STILL rendered default (3 themes byte-identical 8ed6a8). Wrote a DOM PROBE
+  (read the live page post-hydrate) — DECISIVE: dataTheme=null (my injected attr REMOVED), vroom-theme-id LS="default" (my
+  injected value OVERWRITTEN), computed --primary/--background = DEFAULT dark, themes.css IS loaded (blocks exist, never
+  selected). ROOT CAUSE (sharper than C338's "harness only"): the theme-id does NOT survive hydration — theme.svelte.ts
+  reconcileServerTheme (T9/C195 "server wins") resets vroom-theme-id to the server themePreference on settingsStore.load();
+  the seeded demo user has no server themePreference → reconciles to `default` → every shot renders default regardless of
+  injected state. TWO fallouts: (1) HARNESS — a faithful theme eyes-on must DRIVE THE REAL PICKER (click the card) or set
+  the seeded user's SERVER themePreference first; injecting localStorage alone is reverted. (2) 🚩 POSSIBLE REAL PRODUCT BUG
+  (escalated, NOT auto-fixed — reconcile-semantics/data call): "server wins" clobbers a local theme selection to default
+  when the server value is UNSET — a real user could pick a theme, reload, lose it. The fix MIRRORS Angelo's #129 ruling
+  (sync only if stored empty, never overwrite) but changes reconcile semantics → product call. CODE+GUARD layer still solid
+  (tokens/CSS correct). ACTION: committed the shot.mjs THEME_ID groundwork (necessary, kept) + escalated the corrected
+  diagnosis via send_message + recorded here; did NOT touch reconcileServerTheme. Verify: investigation + harness only,
+  suites unchanged green (1118), branch green/PR-ready 219. cov: be 89.29% / fe 89.59% (~). (deep-review→339. The C338
+  harness item is HALF-DONE [THEME_ID knob lands the attr, but the APP reverts it]; the real unblock is Angelo's call on the
+  reconcile-when-server-unset semantics. Until then theme eyes-on must drive the picker UI. The C313-C334 themes remain
+  code+guard-verified, visual-UNCONFIRMED.)
   Balance recompute (cycle 338): deep-review most-starved over budget (6/5). Picked the C332-deferred work: eyes-on the 4
   remaining cool-theme LIGHT variants (bento/vaporwave/cyberpunk/aurora) with the C332 hash-verify discipline. The
   hash-verify CAUGHT A DEEPER PROBLEM: all 4 light dashboards rendered BYTE-IDENTICAL (5a2ef8) despite genuinely distinct
