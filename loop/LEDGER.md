@@ -232,12 +232,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 318 |
 | deep-review | 5 | 321 |
-| guard | 6 | 315 |
+| guard | 6 | 322 |
 | bug | 3 | 320 |
 | arch | 5 | 317 |
 | infra | 6 | 319 |
 
-Current cycle: **321**
+Current cycle: **322**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,19 @@ Current cycle: **321**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C322 (GUARD: pin the ThemePickerCard metadata contract — non-empty label + description + valid-key swatch per theme)** —
+  Balance recompute (cycle 322): guard most-starved over budget (7 starved, budget 6, 1.17×) — forced pick. The engine is
+  guarded across 5 token/CSS dimensions, but the picker (C318) renders METADATA (label/description/swatch) and that contract
+  was UNGUARDED. TypeScript types them string/ThemeTokenKey[] — which admit '' and [] — so a theme shipped with an empty
+  label/description or empty swatch renders a BLANK/broken picker card, and every existing guard stays GREEN (they inspect
+  token VALUES only, never presentation metadata). Verified the gap firsthand (zero existing assertions on
+  label/description/swatch). Added per-theme metadata assertions (non-empty label, non-empty description, non-empty swatch of
+  VALID token keys) for EVERY registered theme, so a future palette (bento/…) with a typo'd/omitted field trips the suite,
+  not the user's settings page. NON-VACUOUS — emptying blueprint's label turns it RED, proven firsthand + restored. Verify:
+  FE validate:local GREEN (927 tests, +6 = 3 checks × 2 themes). BE untouched. Committed 362ddd6, pushed (branch 185 ahead /
+  0 behind). cov: be 89.29% / fe 89.46% (~). (guard→322. The picker is now guarded on BOTH the crash axis [C320 each-key] AND
+  the data-contract axis [C322 metadata]; the theming surface is comprehensively hardened. NEXT: register bento by the C313
+  recipe — every theming guard [contrast/distinctness/wiring/byte-fresh/metadata/swatch-key] now auto-covers a new palette.)
 - **C321 (DEEP-REVIEW: ThemePickerCard logic certified CLEAN firsthand; documented ONE known-non-defect, no manufactured guard)** —
   Balance recompute (cycle 321): deep-review most-starved over budget (7 starved, budget 5, 1.4×) — FORCED over the shinier
   feature/bento pick, exactly what balance is for. The one not-yet-deep-reviewed fresh surface is the C318 picker LOGIC
