@@ -76,12 +76,13 @@ Don't run the 6-budget recompute in BUILD mode — it's wasted work when the que
 3. **Eyes-on batching.** Booting the dev server (`regress.sh START_SERVERS=1`) is the expensive part.
    When ≥2 UI surfaces need a shot, boot ONCE and shoot them all in the same cycle; don't pay a fresh
    boot per surface. Pairs naturally with a feature's T6 + any pending eyes-on debt.
-4. **Parallel disjoint slices (bounded — `spawn_run` 400s here, so this is for the human-run or
-   future-unblocked case; DOCUMENT the opportunity, don't force it).** `schema.ts` + the single test
-   DB serialize most BACKEND work, so naive fan-out conflicts. The ONE safe parallel pair is a
-   **frontend** cycle (guard/eyes-on, never touches schema) running beside a **backend** feature
-   slice — disjoint files. When `spawn_run` is available, that pair is a real 2× on those cycles;
-   until then, just sequence them adjacent so context is warm.
+4. **PARALLELISM via `spawn_run` — maximize work per cycle; don't block on minor stuff (the C-reset
+   reform; `spawn_run` re-verified WORKING 2026-06-26).** The loop is no longer one-increment-serial.
+   Each cycle, after picking the primary increment, ALSO fan out the independent work that would
+   otherwise idle-wait. See the PARALLELISM section below for the safe-vs-unsafe matrix — the hard rule
+   is **subagents must write DISJOINT file sets** (the shared `schema.ts` + single test DB serialize
+   backend writes), and the MAIN cycle integrates + runs the ONE verify gate. Fan out reads/scouts/
+   drafts freely (they don't write); fan out writes only when the file sets provably don't overlap.
 
 ## Execution rules (the hard-won ones — violating these wastes a cycle)
 1. **Inline shell that EXECUTES is permission-denied** (node, npx, git commit, compound greps).
@@ -98,7 +99,9 @@ Don't run the 6-budget recompute in BUILD mode — it's wasted work when the que
 3. **Verify gate before "done":** backend `bun run validate:local` (tsc + musl-biome + bun test +
    build); frontend `npm run validate:local`. Biome = the **musl** binary (the "biome broken" note
    is outdated). After edits, `bun run check:musl:fix` then re-validate. Green build is the FLOOR.
-4. **`spawn_run` returns HTTP 400 every cycle here — do deep-reviews INLINE.** Don't burn a turn re-trying it.
+4. **`spawn_run` WORKS (re-verified 2026-06-26 — the old "HTTP 400, do everything inline" note was
+   STALE).** Use subagents to maximize work per cycle — see the PARALLELISM section below. The loop
+   is no longer single-threaded; don't block the cycle on serial busywork a subagent can do in parallel.
 
 ## EYES-ON IS UNBLOCKED (the big change — stop logging "Playwright-blocked")
 "Playwright sandbox-denied" was a 200-cycle MISDIAGNOSIS. chromium-1223 is installed and
@@ -215,6 +218,53 @@ loop slowly gets faster without a human re-tuning it. THREE mechanisms:
 > meta-review, committed with a `loop(meta):` prefix so the self-improvement history is greppable. (c)
 > If a self-edit would change the QUALITY BAR (skip a verify class, drop a guard discipline), that is a
 > direction call → flag Angelo, don't self-authorize. Velocity edits are in-bounds; quality-floor edits are not.
+
+## PARALLELISM — use subagents to maximize work per cycle (the 2026-06-26 reform)
+`spawn_run` works here (probe-verified). A cycle is no longer "one serial increment"; it's "one
+INTEGRATED increment, with independent work fanned out to subagents in parallel." The orchestrator (you,
+the main loop) stays the single writer-of-record + the single committer + the single verify-gate runner.
+**Don't block the cycle on minor serial busywork a subagent can do alongside the main work.**
+
+**The hard constraint (why naive fan-out corrupts):** parallel subagents share ONE working tree + ONE
+branch. Two agents editing `schema.ts` (or any same file), or two backend agents both driving the test
+DB, RACE — last-writer-wins clobbers, half-applied edits, merge garbage. So the rule is **partition by
+file set**: subagents that WRITE must touch provably-disjoint files; everything that only READS can fan
+out freely.
+
+**SAFE to fan out (do this liberally — it's free throughput):**
+- **Reads / scouts / audits** — "is subsystem X still saturated?", "grep for zero-caller exports",
+  "does route Y appear in the IDOR sweep?", a deep-review READ of a subsystem. They produce findings, not
+  writes; the main loop acts on the report. (This is the old rule-4 "deep-reviews inline" — now parallel.)
+- **Drafts the main loop integrates** — "draft the migration SQL for money-cents T1", "draft the test
+  cases for helper Z". The subagent returns text; YOU apply + verify it. No write race.
+- **Independent verification** — spawn N skeptics to refute a claimed fix from different angles before you
+  trust it (adversarial verify); spawn a critic on a freshly-shot UI PNG while you write the next slice.
+- **A FRONTEND slice ‖ a BACKEND slice** — the one safe parallel WRITE pair: FE (`frontend/src`, never
+  touches `schema.ts`/test DB) beside BE (`backend/src`) — disjoint trees. Real ~2× on those cycles.
+- **Eyes-on batch** — one subagent boots the server + shoots all pending UI surfaces while you build.
+
+**UNSAFE — keep SERIAL on the main loop (never fan out as parallel writes):**
+- Two agents touching the SAME file or both editing `schema.ts` / a migration.
+- Two BACKEND agents both running the in-memory test DB / createTestApp harness concurrently.
+- The COMMIT + `loop/push.sh` (ONE committer, always the main loop — never a subagent).
+- The VERIFY gate (`validate:local`) — run it ONCE on the main loop over the integrated result, not
+  per-subagent (a subagent's local green doesn't prove the merged tree is green).
+
+**Orchestration pattern each cycle:**
+1. Pick the primary increment (BUILD-queue slice or MAINTAIN pick).
+2. Identify independent work that would otherwise idle-wait (scouts, the OTHER-tree slice, drafts, a
+   UI shot, the next-slice research) → `spawn_run` it (pass a `tasks` array for true parallel).
+3. Do the primary increment yourself while they run; collect the `[Subagent completion event]`s.
+4. INTEGRATE everything into the working tree (you are the single writer); resolve any overlap.
+5. ONE verify gate over the integrated result → ONE commit (apostrophe-free `-m`, never `git add`
+   LEDGER/BACKLOG) → `bash loop/push.sh`.
+6. LEDGER: tag the cycle `yield:` by the BEST work landed; note `parallel: N agents` so the META-REVIEW
+   can see the throughput multiplier working.
+
+**Scale the fan-out to the work, not to a fixed number** — a deep maintenance cycle might spawn 3
+scouts; a clean BUILD slice might spawn 0 (nothing independent to do). Don't spawn for spawning's sake;
+spawn when there is REAL independent work that would otherwise serialize. If `spawn_run` ever DOES error
+again, fall back to inline + note it — don't burn the cycle retrying.
 
 ## Halt
 STOP sentinel or `autonudge_stop`. No DoD — the loop improves VROOM indefinitely; branch stays
