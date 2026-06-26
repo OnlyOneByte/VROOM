@@ -71,7 +71,11 @@
 						</span>
 					{/if}
 					<div class="flex gap-1" aria-hidden="true">
-						{#each swatchColors(theme) as color (color)}
+						<!-- Key by INDEX, not color value: the swatch is a static, never-reordered, presentation-only
+						     strip, and a minimalist/monochrome theme can legitimately resolve two swatch tokens to the
+						     SAME color (e.g. background === card) — keying on (color) would throw Svelte's
+						     each_key_duplicate at runtime and crash the whole picker for that theme. -->
+						{#each swatchColors(theme) as color, i (i)}
 							<span
 								class="h-6 w-6 rounded-md border border-border/50"
 								style={`background:${color}`}
