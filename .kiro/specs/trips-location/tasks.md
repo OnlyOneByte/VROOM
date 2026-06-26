@@ -119,8 +119,15 @@
 > question the create-only path left open: what happens to that linked entry on trip EDIT/DELETE. Angelo
 > ratified the hierarchy below — it is now DECIDED, not gated. D3 (business-rate persistence) ratified with it.
 
-- [ ] **T7 — Trip EDIT/DELETE odometer-lifecycle (backend, the C214 ruling).** Implement the ratified
-  hierarchy in `TripRepository` (+ routes/validation), each leg with tests + a cross-tenant ownership guard:
+- [x] **T7 — Trip EDIT/DELETE odometer-lifecycle (backend, the C214 ruling). ✅ DONE (post-reset C3).**
+  `OdometerRepository.deleteLinkedTripEntry` (matches the createFromTrip dedup key + the `From trip`
+  provenance marker → never touches a manual reading); `DELETE /trips/:id?keepOdometer` (default KEEP,
+  =false also removes the linked entry + rechecks reminders); `PUT /trips/:id` re-syncs the linked entry
+  when endOdometer/tripDate change. Flipped the pending C214 characterization tests to the ratified
+  behavior + added the T7 block (keep-default / opt-in-remove / manual-reading-safety / edit-re-sync-no-orphan).
+  Full backend suite 1954 pass; validate:local GREEN. (Case 2 — delete the in-trip odometer entry → it is a
+  normal odometerEntries row, removed via the existing odometer DELETE route; the in-trip surface is T6b-3 FE.)
+  Implemented the ratified hierarchy in `TripRepository` (+ routes/validation), each leg with tests + a cross-tenant ownership guard:
   1. **Delete a trip → PROMPT keep-or-delete the linked odometer entry.** The backend supports BOTH outcomes:
      `DELETE /trips/:id?keepOdometer=true|false` (or a body flag) — `false` also deletes the linked
      `odometerEntries` row (matched by the C213 createFromTrip dedup key: vehicle + tripDate + endOdometer),
