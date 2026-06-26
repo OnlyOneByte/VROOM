@@ -100,14 +100,13 @@ cycles record + pivot to guard/deep-review/arch/infra until a gate clears.**)*
    swatch strips + selected ring + setTheme(id) live re-skin; shot the picker (Default + Blueprint render correctly) + the
    blueprint dashboard re-skin (status 200, zero console errors). The engine is now USER-REACHABLE; picker logic certified
    (C321), crash-guarded (C320 each-key) + metadata-guarded (C322).
-   ✅ **`bento` (C323) + `vaporwave` (C327) REGISTERED + AA-PASSED + EYES-ON.** 3 of 5 palettes done
-   (blueprint/bento/vaporwave); the recipe is PROVEN REPEATABLE + now uses the C324 defineBuiltinTheme factory (one call per
-   theme). All guards auto-cover each new theme (985 tests). Each shot verified: picker grid + the dark dashboard re-skin
-   (status 200, zero console errors). **2 PALETTES LEFT: cyberpunk, then aurora — by the distill→AA-tune→defineBuiltinTheme→
-   regenerate recipe (each a clean ~1-cycle feature, immediately user-visible via the picker). After all 5: T11 per-theme
-   dashboard eyes-on ×{light,dark} OR T12 axe a11y gate. PENDING guard item (C325-surfaced): extend the distinctness guard to
-   ALL PAIRS (currently only checks vs default — two non-default themes could collide undetected). The fill-in ryang.dev
-   mocks (editorial/tui/y2k/neobrutalist/solarpunk/claymorphism/brutalist/zine) remain available when feature has spare cycles.**
+   ✅ **`bento` (C323) + `vaporwave` (C327) + `cyberpunk` (C329) REGISTERED + AA-PASSED + EYES-ON.** 4 of 5 palettes done
+   (blueprint/bento/vaporwave/cyberpunk); the recipe uses the C324 defineBuiltinTheme factory (one call per theme). All
+   guards auto-cover each new theme incl. the C328 all-pairs distinctness (1015 tests). Each shot verified: picker grid + the
+   dark dashboard re-skin (status 200, zero console errors). **1 PALETTE LEFT: aurora — by the distill→AA-tune→
+   defineBuiltinTheme→regenerate recipe (completes the Angelo-approved 5-theme set). After aurora: T11 per-theme dashboard
+   eyes-on ×{light,dark} OR T12 axe a11y gate. The fill-in ryang.dev mocks (editorial/tui/y2k/neobrutalist/solarpunk/
+   claymorphism/brutalist/zine) remain available when feature has spare cycles. The all-pairs-distinctness guard is DONE (C328).**
    _(Original 2026-06-24 greenlight + Phase 1–3 build log retained below for grounding.)_ **GREENLIT & BUILD-UNBLOCKED (Angelo ratified D1–D7 ✅, 2026-06-24 parallel agent).**
    `.kiro/specs/theming-engine/`. A first-class theming engine: a registry of built-in themes (the existing
    look + the explored "Instrument Cluster" / "Garage Journal" looks, productized), a `/settings` picker with
