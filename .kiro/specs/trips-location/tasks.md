@@ -142,12 +142,16 @@
      desynced value. Pin: edit endOdometer → linked entry reflects the new reading, no orphan left behind.
   Tests: per-leg repository + HTTP (keepOdometer both ways; in-trip entry delete; edit re-sync; ownership-miss
   = 404 #80). `validate:local` green. This backend slice UNBLOCKS T6b-3 (the FE wiring above).
-- [ ] **T8 — D3 business-mileage rate persistence (RATIFIED: default-in-prefs + per-trip override).** Add a
-  `userPreferences.businessMileageRate` column (additive migration, the C174 themePreference pattern +
-  backup-coverage guard) as the DEFAULT rate; keep the existing `getSummary?rate=` query param as the
-  effective override input. (A per-TRIP override field is a thin additive follow-on; v1 wires the prefs
-  default + the summary consuming it when no explicit rate is passed.) Tests: migration (default/backfill),
-  settings PUT/GET round-trip (the C179 bounded-field pattern), backup round-trip; `validate:local` green.
+- [x] **T8 — D3 business-mileage rate persistence. ✅ DONE (post-reset C4).** Added
+  `userPreferences.businessMileageRate` (real NOT NULL DEFAULT 0; additive migration 0008, the C174
+  themePreference pattern) as the DEFAULT rate; the settings PUT/GET wires a bounded field
+  (z.number().min(0).max(100), the #82 per-field merge via restUpdates); the trip mileage-summary uses it
+  when no explicit `?rate=` override is passed (D3: default-in-prefs + per-request override). SHEET_HEADERS
+  updated → the backup coverage guard stays green; the CSV round-trip rides the schema-derived column.
+  Tests: migration-0008 (shape/backfill-to-0/fractional-0.67) + business-mileage-rate HTTP (default 0,
+  PUT/GET round-trip, per-field merge both ways, negative+>100 reject, summary-uses-stored-rate,
+  ?rate=-override-wins, pre-T8 0 preserved). validate:local GREEN, 1965 pass. (A per-TRIP override field
+  remains a thin additive follow-on if ever wanted; v1 ships the prefs default + summary fallback.)
 
 ## Build-order note
 Once T0 clears, T1–T5 are a clean backend-first arc the loop can drive across several `feature` cycles
