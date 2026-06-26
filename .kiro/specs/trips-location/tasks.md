@@ -106,13 +106,16 @@
     dialog DESKTOP + MOBILE + Read both PNGs** (clean, no mobile overflow, footer stacks, date defaults to
     today=Jun 25 2026 — the exact C226-fixed case) + an E2E POST of a TODAY-dated trip through the live
     FE→BE→DB stack succeeded (was the pre-C226 400). FE validate:local GREEN (838 pass).
-  - [ ] **T6b-3 — EDIT + DELETE entry points (FE eyes-on tail; depends on T7 backend lifecycle below).**
-    Card-level edit/delete actions + the `updateTripSchema`-backed edit mode in `TripForm`. The trips↔odometer
-    lifecycle semantics they invoke are DECIDED (C214, below) + implemented in the T7 backend slice; this task
-    is the FE wiring: an edit button → the form in edit mode (pre-hydrated, the C132 hydration-path care), a
-    delete button → a confirm dialog that ALSO asks the keep-or-delete-linked-odometer question (C214 case 1).
-    Eyes-on: boot → shot the edit dialog + the delete-confirm DESKTOP+MOBILE + Read; drive a real edit + a real
-    delete through the live stack (the C230 fill+submit discipline, not a render-only shot). Lands after T7.
+  - [x] **T6b-3 — EDIT + DELETE entry points (FE eyes-on tail). ✅ DONE (post-reset C5).** Per-card edit
+    (pencil) + delete (trash) buttons on the trips list; TripForm gained an EDIT mode (hydrates from the trip
+    — the C68 blank-form footgun avoided, vehicle shown read-only since it is immutable R1, submits via
+    tripApi.update); a delete-confirm AlertDialog surfaces the C214 keep-or-delete-linked-odometer choice (a
+    checkbox CHECKED by default = the non-destructive default, matching the backend). trip-api.delete takes
+    keepOdometer + passes `?keepOdometer=false` only on opt-out. EYES-ON: booted + seeded a trip + shot the
+    list (edit/delete buttons render), the edit dialog (fully hydrated — Start 1000/End 1080/Business/Jun 20
+    2024/"Client visit", date round-trips correctly), and the delete-confirm (keep checkbox + explanatory copy)
+    — 3 distinct hashes, zero console errors, Read all three. FE validate:local GREEN (1277). The T7 backend
+    cascade it invokes is unit-tested. **The trips-location feature is now COMPLETE (T1–T8 + T6b-3).**
 
 ### C214 trips↔odometer lifecycle — RATIFIED by Angelo (2026-06-25). Build-unblocked.
 > The D2 linkage (a trip writes a deduped `odometerEntries` row, createFromTrip/C213) created a lifecycle
