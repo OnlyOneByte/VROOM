@@ -231,13 +231,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 346 |
-| deep-review | 5 | 342 |
+| deep-review | 5 | 348 |
 | guard | 6 | 345 |
 | bug | 3 | 347 |
 | arch | 5 | 342 |
 | infra | 6 | 344 |
 
-Current cycle: **347**
+Current cycle: **348**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,26 @@ Current cycle: **347**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C348 (DEEP-REVIEW: picker swatch previews are VARIANT-AWARE — eyes-on certified + durable guard)** —
+  Balance recompute (cycle 348): deep-review + arch TIED over budget (both 6/5, +1). Tiebreak to deep-review: arch is
+  structurally dry per the C286 fast-dry precondition — the only production-src change since C342 was C346 y2k (the existing
+  defineBuiltinTheme factory, pure data, no new dedup vector). The freshest un-certified theming slice: the picker SWATCH PREVIEW
+  variant-correctness. Prior eyes-on (C340/C342) verified the APPLIED theme re-skins, but NEVER that the picker's own swatch
+  PREVIEWS switch to each theme's DARK-variant colors in dark mode — a real correctness contract (the preview must not LIE about
+  what applying a theme yields). Traced firsthand: swatchColors reads theme[variant] (line 40) where variant =
+  resolveVariant(mode, systemPref()) (line 35), mode = themeStore.current — logically sound. EYES-ON CERTIFIED (shot /settings
+  desktop in BOTH THEME=light and THEME=dark, Read both): the Default card's lead swatch square INVERTS black↔white (light primary
+  oklch(0.21) → dark primary oklch(0.92)), blueprint/cyberpunk shift hue+lightness — the previews track the active mode, do NOT
+  lie. CLEAN, no defect. Per the dry-but-certify deep-review pattern, left the durable artifact: the variant-aware swatch
+  resolution was COMPLETELY unguarded — a regression to a hardcoded theme.light would make every dark-mode preview lie, invisible
+  to all existing guards AND to a single-mode shot. GUARD: +2 in themes-css.test.ts (the C25/C190 picker source-scan idiom) —
+  pins (1) swatchColors indexes the DYNAMIC theme[variant] not a literal theme.light/theme.dark, (2) variant derives from
+  resolveVariant(mode,…) over themeStore.current. NON-VACUITY PROVEN: hardcoded the picker to theme.light → RED with the precise
+  diagnostic; reverted. Verify: FE validate:local GREEN — type-check 0, build OK, 1274 tests pass (+2 vs C347's 1272). Eyes-on
+  performed (the cert); test-only code change. cov: be 89.29% line / 88.70% func (~ unchanged, no BE) · fe 89.61% line / 90.07%
+  func (~ — pure guard, adds covered TEST lines not new covered SOURCE branches). (deep-review→348. The picker is now certified +
+  guarded on preview-variant-correctness. Theming deep-review surface: applied-reskin [C340/C342], chart-contrast [C347], now
+  preview-variant [C348] all certified. Standing frontier unchanged: the gated queue [C333/C339/C343] + the 4 Tier-2 specs.)
 - **C347 (BUG scout DRY → durable guard: codify the C343 chart-series 3:1 graphical-contrast invariant for all non-default themes)** —
   Balance recompute (cycle 347): bug most-starved over budget (4/3, 1.33×; deep-review + arch both AT budget 5/5, others under).
   Per the GUIDE the bug surface is saturated on swept ground; a real fix now comes only from a fresh feature surface — the

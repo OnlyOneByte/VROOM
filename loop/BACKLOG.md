@@ -105,7 +105,7 @@ cycles record + pivot to guard/deep-review/arch/infra until a gate clears.**)*
    (theme-contrast.test.ts), ALL all-pairs-distinct (C328), ALL eyes-on (picker grid + dark dashboard re-skin, status 200,
    zero console errors). Guarded across 6 dimensions (contrast/distinctness-vs-default/all-pairs/byte-fresh/integrity/
    metadata + layout-wiring + swatch-key-safety + dark-orientation + picker-mount-reachability [C345] + chart-series
-   3:1 graphical-contrast [C347]). 1272 tests.
+   3:1 graphical-contrast [C347] + picker-swatch-variant-awareness [C348]). 1274 tests.
    **THE THEMING FEATURE IS DONE.** 10 themes registered (default + blueprint/bento/vaporwave/cyberpunk/aurora + the
    solarpunk/editorial/tui/y2k [C346] fill-ins). OPTIONAL remaining polish (not
    gating): T11 per-theme dashboard eyes-on ×{light,dark}; T12 axe a11y gate; the remaining fill-in ryang.dev mocks

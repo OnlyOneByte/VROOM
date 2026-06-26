@@ -185,3 +185,38 @@ describe('ThemePickerCard swatch loop is keyed crash-safely (index, not color)',
     expect(PICKER).not.toMatch(/#each\s+swatchColors\(theme\)\s+as\s+color\s*\(color\)/);
   });
 });
+
+/**
+ * SWATCH VARIANT-AWARENESS GUARD — each theme's swatch preview must resolve from the variant (light|dark)
+ * the user is ACTUALLY in, not a hardcoded one. The whole point of the preview is to not LIE about what
+ * applying a theme yields: in dark mode the swatch must show that theme's DARK tokens (e.g. default's
+ * primary inverts from near-black oklch(0.21) in light to near-white oklch(0.92) in dark). Certified
+ * firsthand eyes-on C348 (shot /settings in light AND dark — the Default swatch's lead square inverts
+ * black↔white, blueprint/cyberpunk shift hue+lightness), but NOTHING guards the resolution: a regression
+ * to `theme.light` (or `theme.dark`) would make every off-mode preview lie, and it is invisible to a
+ * single-mode shot, to byte-freshness (themes.css is fine), and to the swatch-key guard above. This pins
+ * the two-link reactive chain in ThemePickerCard.svelte:
+ *   1. swatchColors reads `theme[variant]` — the DYNAMIC variant, not a literal `theme.light`/`theme.dark`,
+ *   2. `variant` is derived from resolveVariant(mode, …) over the store's active mode (themeStore.current).
+ * Source-scan idiom (C25/C190), applied to the picker's preview-correctness contract.
+ */
+describe('ThemePickerCard swatch previews are variant-aware (C348 preview-correctness guard)', () => {
+  const PICKER = readFileSync(
+    `${process.cwd()}/src/lib/components/settings/cards/ThemePickerCard.svelte`,
+    'utf8'
+  );
+
+  test('swatchColors indexes the DYNAMIC variant (theme[variant]), not a hardcoded theme.light/theme.dark', () => {
+    // The token map must be read via the computed `variant`, so the preview tracks the active mode.
+    expect(PICKER).toMatch(/const\s+tokens\s*=\s*theme\[variant\]/);
+    // And must NOT regress to a literal variant that would freeze every preview to one mode.
+    expect(PICKER).not.toMatch(/const\s+tokens\s*=\s*theme\.(light|dark)\b/);
+  });
+
+  test('the variant is derived from resolveVariant over the active mode (not a constant)', () => {
+    // variant = resolveVariant(mode, systemPref()) where mode tracks themeStore.current — so flipping
+    // light/dark (or the OS pref under `system`) re-resolves which variant the swatches preview.
+    expect(PICKER).toMatch(/variant\s*=\s*\$derived\(\s*resolveVariant\(\s*mode\s*,/);
+    expect(PICKER).toMatch(/mode\s*=\s*\$derived\(\s*themeStore\.current\s*\)/);
+  });
+});
