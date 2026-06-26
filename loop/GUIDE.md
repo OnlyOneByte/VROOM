@@ -1,15 +1,15 @@
 # LOOP GUIDE — VROOM autonomous dev (read FIRST, every cycle)
 
-> _PR-green override (2026-06-21) LIFTED 2026-06-23: the PR was squash-merged to main; the branch
-> was reset onto fresh origin/main (force-push authorized by Angelo). Normal balance-table rotation
-> resumes. The C146 npm-ci CI fix, the merged loop work, and Angelo's 2026-06-23 decisions are all
-> on main now._
+> _Loop reset 2026-06-26 (post-C350): read-path was 9,731 lines → LEDGER + BACKLOG archived to
+> `loop/archive/*-C1-C350.md`, cycle counter reset to C1, balance table to 0. Branch ~243 commits ahead
+> of origin/main, PR-ready (doc hygiene, NOT a code reset). The C349 velocity reform (MODE / BUILD QUEUE /
+> META-LOOP, below) is now the operating model._
 
-> Distilled from C1–C338+. NORTH_STAR.md = vision + quality bar. BACKLOG.md = ranked queue.
-> LEDGER.md = per-cycle log + balance table. This file = HOW to run a cycle well.
-> Read order: GUIDE → NORTH_STAR → BACKLOG (open work only) → LEDGER balance table. The C1–C467
-> history was archived 2026-06-16 to `loop/archive/` (LEDGER + BACKLOG) — consult it only to check
-> "was X already done / certified clean?", never as part of a normal cycle. This guide is the manual.
+> NORTH_STAR.md = vision + quality bar. BACKLOG.md = BUILD QUEUE + open gated steers. LEDGER.md =
+> per-cycle log + balance table. This file = HOW to run a cycle well.
+> Read order: GUIDE → NORTH_STAR → BACKLOG (open work only) → LEDGER (balance table + last ~3 entries).
+> The C1–C350 history is in `loop/archive/` (the earlier C1–C467 arc too) — consult it ONLY to check
+> "was X already done / certified clean / what was #N's grounding?", never as part of a normal cycle.
 
 ## The one-line loop
 Pick MODE (below) → pick ONE increment → do it, verified → update LEDGER (bump last-touched +
@@ -102,12 +102,14 @@ bash /tmp/<boot>.sh            # START_SERVERS=1 RESET_DB=1 bash .meshclaw-tools
 bash .meshclaw-tools/shot.sh /<route> [mobile|desktop] /tmp/out.png   # then Read the PNG
 ```
 Anonymous shot: point `AUTH_STATE` at a NONEXISTENT path (NOT `/dev/null` — that crashes the
-JSON parse); shot.mjs falls back to anonymous, the `/me` 401 is expected. **The three signed-off
-feature tails are now ALL COMPLETE (verified C312 against the specs' tasks.md — every task `[x]`):
-maintenance T9 (C1), import-trackers T0–T6 (through C153, eyes-on confirmed), recurring-expenses
-T0–T8 (eyes-on confirmed).** So eyes-on is the loop-closable mechanism (boot → shoot → Read →
-critique → fix → re-shoot) for periodic deep-UI-review + any FUTURE gated feature once greenlit —
-but there is NO open signed-off feature work left; every remaining feature is Angelo-gated.
+JSON parse); shot.mjs falls back to anonymous, the `/me` 401 is expected. Eyes-on is the
+loop-closable mechanism (boot → shoot → Read → critique → fix → re-shoot) for any feature's UI tail +
+periodic deep-UI-review. **Theme eyes-on needs the PICKER-DRIVE method (C340):** injecting localStorage
+alone is reverted by reconcileServerTheme on hydrate (the C339(B) gated bug) — instead
+`CLICK_SELECTOR="button[aria-label='Use the <Label> theme']" shot.sh /settings` so setTheme() runs AFTER
+the reconcile + sticks; md5sum to assert distinct renders. The 3 ORIGINAL signed-off features
+(maintenance / import-trackers / recurring-expenses) are ALL COMPLETE + eyes-on; the LIVE feature work is
+now the BUILD QUEUE (money-cents → trips T6-gated → theming-picker-gated → sharing-blocked).
 
 **Blank CHARTS in a full-page screenshot are a known ARTIFACT, not a defect (C242).** ChartCard gates chart
 children behind `gate.visible` (createVisibilityWatch — IntersectionObserver + a MutationObserver on the
@@ -207,4 +209,4 @@ loop slowly gets faster without a human re-tuning it. THREE mechanisms:
 
 ## Halt
 STOP sentinel or `autonudge_stop`. No DoD — the loop improves VROOM indefinitely; branch stays
-PR-ready. Human opens the PR.
+PR-ready (~243 commits ahead at the 2026-06-26 reset). Human opens the PR.
