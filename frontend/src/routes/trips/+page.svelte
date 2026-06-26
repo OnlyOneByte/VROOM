@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Car, CircleAlert, MapPin, Plus, Route } from '@lucide/svelte';
+	import { Car, CircleAlert, MapPin, Pencil, Plus, Route, Trash2 } from '@lucide/svelte';
 	import { tripApi } from '$lib/services/trip-api';
 	import { vehicleApi } from '$lib/services/vehicle-api';
 	import type { Trip, TripSummary, Vehicle } from '$lib/types';
@@ -13,6 +13,8 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import * as CardNs from '$lib/components/ui/card';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog';
+	import { Checkbox } from '$lib/components/ui/checkbox';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import EmptyState from '$lib/components/common/empty-state.svelte';
 	import PageHeader from '$lib/components/common/page-header.svelte';
@@ -32,9 +34,7 @@
 	// product-gated/escalated — out of scope here).
 	let distLabel = $derived(getDistanceUnitLabel(settingsStore.unitPreferences.distanceUnit, true));
 	// vehicleId -> display name, so each trip card can name its vehicle (graceful fallback if deleted).
-	let vehicleNames = $derived(
-		new Map(vehicles.map((v) => [v.id, getVehicleDisplayName(v)]))
-	);
+	let vehicleNames = $derived(new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)])));
 	// vehicleId -> THAT vehicle's distance label. Trip odometers are stored same-unit-as-the-vehicle (R2),
 	// so a per-trip card must label distance by its OWN vehicle's distanceUnit, NOT the global setting —
 	// else a km vehicle's trips read "mi" for a mixed-fleet user (NORTH_STAR #2, the per-vehicle-units
@@ -42,7 +42,7 @@
 	// (or its prefs) is absent — the `unitPreferences ?? settingsStore` graceful-default idiom.
 	let vehicleDistLabels = $derived(
 		new Map(
-			vehicles.map((v) => [
+			vehicles.map(v => [
 				v.id,
 				getDistanceUnitLabel(
 					(v.unitPreferences ?? settingsStore.unitPreferences).distanceUnit,
@@ -54,13 +54,47 @@
 	const tripDistLabel = (vehicleId: string): string =>
 		vehicleDistLabels.get(vehicleId) ?? distLabel;
 
-	// Create form (dialog) state. Edit/delete entry points are deliberately deferred until Angelo rules
-	// the C214 trips↔odometer EDIT/DELETE lifecycle (editing endOdometer / deleting a trip currently
-	// leaves a stale linked odometer entry) — creating a trip is fully decided (D2 linkage, C213).
+	// Create/edit form (dialog) state. The C214 trips↔odometer EDIT/DELETE lifecycle is now RATIFIED +
+	// shipped (T7 backend): editing re-syncs the linked odometer entry; deleting prompts keep-or-delete.
 	let formOpen = $state(false);
+	let editingTrip = $state<Trip | null>(null);
 
 	function openCreate() {
+		editingTrip = null;
 		formOpen = true;
+	}
+
+	function openEdit(trip: Trip) {
+		editingTrip = trip;
+		formOpen = true;
+	}
+
+	// Delete-confirm dialog state + the C214 keep-or-delete-linked-odometer choice. Default KEEP (matches
+	// the backend non-destructive default — the linked reading may be part of the user's odometer history).
+	let deleteTarget = $state<Trip | null>(null);
+	let keepOdometer = $state(true);
+	let isDeleting = $state(false);
+
+	function openDelete(trip: Trip) {
+		deleteTarget = trip;
+		keepOdometer = true; // reset to the safe default each time
+	}
+
+	async function confirmDelete() {
+		const target = deleteTarget;
+		if (!target) return;
+		isDeleting = true;
+		try {
+			await tripApi.delete(target.id, keepOdometer);
+			appStore.addNotification({ type: 'success', message: 'Trip deleted' });
+			deleteTarget = null;
+			await load();
+		} catch (error) {
+			if (import.meta.env.DEV) console.error('Failed to delete trip:', error);
+			appStore.addNotification({ type: 'error', message: 'Failed to delete trip' });
+		} finally {
+			isDeleting = false;
+		}
 	}
 
 	async function load() {
@@ -160,7 +194,8 @@
 					<div>
 						<p class="text-xs text-muted-foreground">Total</p>
 						<p class="text-lg font-semibold">
-							{summary.totalMiles.toLocaleString()} <span class="text-sm font-normal">{distLabel}</span>
+							{summary.totalMiles.toLocaleString()}
+							<span class="text-sm font-normal">{distLabel}</span>
 						</p>
 					</div>
 					<div>
@@ -211,9 +246,33 @@
 								<p class="text-sm text-muted-foreground">{trip.note}</p>
 							{/if}
 						</div>
-						<div class="flex shrink-0 items-center gap-1 text-sm text-muted-foreground">
-							<Car class="h-4 w-4" aria-hidden="true" />
-							<span class="truncate">{vehicleNames.get(trip.vehicleId) ?? 'Vehicle'}</span>
+						<div class="flex shrink-0 flex-col items-end gap-2">
+							<div class="flex items-center gap-1 text-sm text-muted-foreground">
+								<Car class="h-4 w-4" aria-hidden="true" />
+								<span class="max-w-32 truncate"
+									>{vehicleNames.get(trip.vehicleId) ?? 'Vehicle'}</span
+								>
+							</div>
+							<div class="flex items-center gap-1">
+								<Button
+									variant="ghost"
+									size="icon"
+									class="h-8 w-8"
+									aria-label="Edit trip"
+									onclick={() => openEdit(trip)}
+								>
+									<Pencil class="h-4 w-4" />
+								</Button>
+								<Button
+									variant="ghost"
+									size="icon"
+									class="h-8 w-8 text-destructive hover:text-destructive"
+									aria-label="Delete trip"
+									onclick={() => openDelete(trip)}
+								>
+									<Trash2 class="h-4 w-4" />
+								</Button>
+							</div>
 						</div>
 					</CardNs.CardContent>
 				</CardNs.Card>
@@ -229,5 +288,39 @@
 		{/if}
 	{/if}
 
-	<TripForm bind:open={formOpen} {vehicles} onSaved={load} />
+	<TripForm bind:open={formOpen} {vehicles} trip={editingTrip} onSaved={load} />
+
+	<!-- Delete-confirm with the C214 keep-or-delete-linked-odometer choice. Controlled open (bound to
+	     deleteTarget) so the per-card Delete button drives it without a per-row trigger element. -->
+	<AlertDialog.Root
+		open={deleteTarget !== null}
+		onOpenChange={o => {
+			if (!o) deleteTarget = null;
+		}}
+	>
+		<AlertDialog.Content>
+			<AlertDialog.Header>
+				<AlertDialog.Title>Delete this trip?</AlertDialog.Title>
+				<AlertDialog.Description>
+					This removes the trip from your mileage log. This cannot be undone.
+				</AlertDialog.Description>
+			</AlertDialog.Header>
+			<label class="flex items-start gap-3 rounded-md border p-3 text-sm">
+				<Checkbox bind:checked={keepOdometer} aria-label="Keep the linked odometer reading" />
+				<span>
+					<span class="font-medium">Keep the linked odometer reading</span>
+					<span class="block text-muted-foreground">
+						This trip added a reading to the vehicle's odometer history. Leave this checked to keep
+						it, or uncheck to remove that reading too.
+					</span>
+				</span>
+			</label>
+			<AlertDialog.Footer>
+				<AlertDialog.Cancel disabled={isDeleting}>Cancel</AlertDialog.Cancel>
+				<Button variant="destructive" disabled={isDeleting} onclick={confirmDelete}>
+					{isDeleting ? 'Deleting…' : 'Delete Trip'}
+				</Button>
+			</AlertDialog.Footer>
+		</AlertDialog.Content>
+	</AlertDialog.Root>
 </div>

@@ -73,8 +73,14 @@ export const tripApi = {
 		return apiClient.put<Trip>(`/api/v1/trips/${id}`, data);
 	},
 
-	async delete(id: string): Promise<void> {
-		await apiClient.delete(`/api/v1/trips/${id}`);
+	/**
+	 * Delete a trip. The C214 lifecycle: the trip's create wrote a linked odometer entry (D2), so the
+	 * caller chooses whether to KEEP it (default — non-destructive) or remove it with the trip. Passes
+	 * `?keepOdometer=false` ONLY when the user opts to remove the linked entry; absent → the backend keeps.
+	 */
+	async delete(id: string, keepOdometer = true): Promise<void> {
+		const qs = keepOdometer ? '' : '?keepOdometer=false';
+		await apiClient.delete(`/api/v1/trips/${id}${qs}`);
 	}
 };
 

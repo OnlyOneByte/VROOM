@@ -14,7 +14,7 @@
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
 	import { getDistanceUnitLabel } from '$lib/utils/units';
 	import { settingsStore } from '$lib/stores/settings.svelte';
-	import { TRIP_PURPOSES, type TripPurpose, type Vehicle } from '$lib/types';
+	import { TRIP_PURPOSES, type Trip, type TripPurpose, type Vehicle } from '$lib/types';
 	import {
 		parseOdometer,
 		validateTripFields,
@@ -25,11 +25,15 @@
 	interface Props {
 		open: boolean;
 		vehicles: Vehicle[];
-		/** Called after a successful create so the parent can refetch. */
+		/** Called after a successful create/update so the parent can refetch. */
 		onSaved: () => void;
+		/** When set, the form is in EDIT mode: hydrate from this trip + submit via update (C214/T6b-3). */
+		trip?: Trip | null;
 	}
 
-	let { open = $bindable(), vehicles, onSaved }: Props = $props();
+	let { open = $bindable(), vehicles, onSaved, trip = null }: Props = $props();
+
+	let isEdit = $derived(!!trip);
 
 	// Form fields. The odometer fields bind to `<input type="number">`, which Svelte coerces to a NUMBER
 	// (or null when cleared) — so they're typed `string | number | null` even though seeded ''; parseOdometer
@@ -49,29 +53,44 @@
 	// The distance-unit label of the selected vehicle (trip odometers are stored same-unit-as-the-vehicle,
 	// R2) — falls back to the global pref when no vehicle is resolved yet (the per-vehicle-units idiom).
 	let unitLabel = $derived.by(() => {
-		const v = vehicles.find((veh) => veh.id === vehicleId);
+		const v = vehicles.find(veh => veh.id === vehicleId);
 		return getDistanceUnitLabel(
 			(v?.unitPreferences ?? settingsStore.unitPreferences).distanceUnit,
 			true
 		);
 	});
 
-	// Re-seed the form whenever it opens, so each create starts blank (defaulting to the only vehicle when
-	// the user owns exactly one + today's date). Keyed on `open` so reopening after cancel resets cleanly.
+	// Re-seed the form whenever it opens. EDIT mode (a `trip` prop) HYDRATES from the existing row (the C68
+	// blank-edit-form data-loss footgun — a never-populated field must not silently wipe on save); CREATE
+	// mode starts blank (defaulting to the only vehicle when the user owns exactly one + today's date).
+	// Keyed on `open` so reopening after cancel resets cleanly.
 	let lastOpen = $state(false);
 	$effect(() => {
 		if (open === lastOpen) return;
 		lastOpen = open;
 		if (!open) return;
 		errors = {};
-		vehicleId = vehicles.length === 1 && vehicles[0] ? vehicles[0].id : '';
-		startOdometer = '';
-		endOdometer = '';
-		purpose = 'business';
-		tripDate = toDateInputValue(new Date());
-		startLocation = '';
-		endLocation = '';
-		note = '';
+		if (trip) {
+			vehicleId = trip.vehicleId;
+			startOdometer = trip.startOdometer;
+			endOdometer = trip.endOdometer;
+			purpose = trip.purpose;
+			// Stored as a noon-local ISO instant; toDateInputValue reads the LOCAL calendar day (the #87/#138
+			// round-trip discipline — a bare .slice(0,10) would shift the date back a day for +TZ users).
+			tripDate = toDateInputValue(new Date(trip.tripDate));
+			startLocation = trip.startLocation ?? '';
+			endLocation = trip.endLocation ?? '';
+			note = trip.note ?? '';
+		} else {
+			vehicleId = vehicles.length === 1 && vehicles[0] ? vehicles[0].id : '';
+			startOdometer = '';
+			endOdometer = '';
+			purpose = 'business';
+			tripDate = toDateInputValue(new Date());
+			startLocation = '';
+			endLocation = '';
+			note = '';
+		}
 	});
 
 	function currentForm(): TripFormData {
@@ -98,8 +117,7 @@
 
 		isSubmitting = true;
 		try {
-			await tripApi.create({
-				vehicleId,
+			const payload = {
 				startOdometer: startValue,
 				endOdometer: endValue,
 				purpose,
@@ -108,13 +126,24 @@
 				startLocation: startLocation.trim() || undefined,
 				endLocation: endLocation.trim() || undefined,
 				note: note.trim() || undefined
-			});
-			appStore.addNotification({ type: 'success', message: 'Trip logged' });
+			};
+			if (trip) {
+				// EDIT: vehicleId is immutable on a trip (R1 — the trip belongs to its vehicle); send only the
+				// editable fields. The backend re-syncs the linked odometer entry when endOdometer/date change (T7).
+				await tripApi.update(trip.id, payload);
+				appStore.addNotification({ type: 'success', message: 'Trip updated' });
+			} else {
+				await tripApi.create({ vehicleId, ...payload });
+				appStore.addNotification({ type: 'success', message: 'Trip logged' });
+			}
 			open = false;
 			onSaved();
 		} catch (error) {
-			if (import.meta.env.DEV) console.error('Failed to create trip:', error);
-			appStore.addNotification({ type: 'error', message: 'Failed to log trip' });
+			if (import.meta.env.DEV) console.error('Failed to save trip:', error);
+			appStore.addNotification({
+				type: 'error',
+				message: trip ? 'Failed to update trip' : 'Failed to log trip'
+			});
 		} finally {
 			isSubmitting = false;
 		}
@@ -124,7 +153,7 @@
 <Dialog.Root bind:open>
 	<Dialog.Content class="sm:max-w-lg max-h-[90vh] overflow-y-auto">
 		<Dialog.Header>
-			<Dialog.Title>Log a Trip</Dialog.Title>
+			<Dialog.Title>{isEdit ? 'Edit Trip' : 'Log a Trip'}</Dialog.Title>
 			<Dialog.Description>
 				Record a trip's start and end odometer, purpose, and date. The end reading also updates the
 				vehicle's odometer history.
@@ -132,7 +161,7 @@
 		</Dialog.Header>
 
 		<form
-			onsubmit={(e) => {
+			onsubmit={e => {
 				e.preventDefault();
 				handleSubmit();
 			}}
@@ -143,11 +172,19 @@
 				<Label for="trip-vehicle">Vehicle *</Label>
 				{#if vehicles.length === 0}
 					<p class="text-sm text-muted-foreground">Add a vehicle first to log a trip.</p>
+				{:else if isEdit}
+					<!-- A trip's vehicle is immutable (R1 — it belongs to its vehicle); show it read-only in edit. -->
+					<Input
+						id="trip-vehicle"
+						value={getVehicleDisplayName(vehicles.find(v => v.id === vehicleId)) ?? 'Vehicle'}
+						disabled
+					/>
 				{:else}
 					<Select.Root type="single" bind:value={vehicleId}>
 						<Select.Trigger id="trip-vehicle" class="w-full" aria-invalid={!!errors.vehicleId}>
 							{vehicleId
-								? (getVehicleDisplayName(vehicles.find((v) => v.id === vehicleId)) ?? 'Select a vehicle')
+								? (getVehicleDisplayName(vehicles.find(v => v.id === vehicleId)) ??
+									'Select a vehicle')
 								: 'Select a vehicle'}
 						</Select.Trigger>
 						<Select.Content>
@@ -267,9 +304,9 @@
 				<Button type="submit" disabled={isSubmitting || vehicles.length === 0}>
 					{#if isSubmitting}
 						<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
-						Logging…
+						{isEdit ? 'Saving…' : 'Logging…'}
 					{:else}
-						Log Trip
+						{isEdit ? 'Save Trip' : 'Log Trip'}
 					{/if}
 				</Button>
 			</Dialog.Footer>
