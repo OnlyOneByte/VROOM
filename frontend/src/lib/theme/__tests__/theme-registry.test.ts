@@ -161,4 +161,29 @@ describe('THEME_REGISTRY integrity + default ≡ app.css (T5)', () => {
       }
     }
   });
+
+  // DARK-IS-DARKER orientation: every theme's DARK variant must actually be darker than its LIGHT variant.
+  // Each theme is authored as defineBuiltinTheme({light: X_LIGHT, dark: X_DARK}); swapping those two args (or
+  // pasting a light palette into the dark slot) is a plausible copy-paste mistake that ships a "dark mode"
+  // which is actually light. EVERY other guard stays green: contrast passes (each variant is independently
+  // AA-clean), all-pairs distinctness passes (still distinct), metadata passes — only a human toggling dark
+  // mode would notice. This pins the orientation on two inverting anchors: background L (dark < light) AND
+  // foreground L (dark > light — the text inverts too). Parses the leading oklch lightness from each token.
+  const oklchL = (v: string): number => {
+    const m = v.match(/oklch\(\s*([\d.]+)/);
+    return m ? Number(m[1]) : Number.NaN;
+  };
+  describe.each(Object.values(THEME_REGISTRY))('theme "$id" dark variant is darker than light', (theme) => {
+    test('dark.background is darker than light.background', () => {
+      const lightL = oklchL(theme.light.background);
+      const darkL = oklchL(theme.dark.background);
+      expect(Number.isNaN(lightL) || Number.isNaN(darkL), `${theme.id} background L unparseable`).toBe(false);
+      expect(darkL, `${theme.id}: dark.background L (${darkL}) must be < light.background L (${lightL}) — variants likely swapped`).toBeLessThan(lightL);
+    });
+    test('dark.foreground is lighter than light.foreground (text inverts)', () => {
+      const lightL = oklchL(theme.light.foreground);
+      const darkL = oklchL(theme.dark.foreground);
+      expect(darkL, `${theme.id}: dark.foreground L (${darkL}) must be > light.foreground L (${lightL}) — variants likely swapped`).toBeGreaterThan(lightL);
+    });
+  });
 });
