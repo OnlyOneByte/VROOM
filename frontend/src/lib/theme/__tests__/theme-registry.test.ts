@@ -17,7 +17,12 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { DEFAULT_THEME_ID, THEME_REGISTRY } from '../theme-registry';
-import { THEME_TOKEN_KEYS, type ThemeTokenKey, type ThemeTokens } from '../theme-types';
+import {
+  THEME_TOKEN_KEYS,
+  type ThemeDefinition,
+  type ThemeTokenKey,
+  type ThemeTokens,
+} from '../theme-types';
 
 const APP_CSS = readFileSync(`${process.cwd()}/src/app.css`, 'utf8');
 
@@ -128,5 +133,32 @@ describe('THEME_REGISTRY integrity + default ≡ app.css (T5)', () => {
         expect(allowed.has(key), `${theme.id} swatch references unknown token key ${key}`).toBe(true);
       }
     });
+  });
+
+  // CROSS-THEME DISTINCTNESS (all pairs): the per-theme guard above only checks each theme vs `default`. It
+  // would NOT catch two NON-default themes being byte-identical — e.g. a future palette registered by
+  // copy-pasting an existing one and forgetting to edit the token maps (the steepest risk now: each new
+  // theme IS authored by cloning a prior X_LIGHT/X_DARK block). Such a clone would ship two picker cards that
+  // paint identically — green under contrast/metadata/byte-freshness (the values are individually valid) and
+  // green under the vs-default guard (it differs from default, just not from its twin). This pins that EVERY
+  // PAIR of registered themes differs in at least one token in at least one variant. Surfaced firsthand C325.
+  test('no two registered themes are byte-identical (all-pairs distinctness)', () => {
+    const all = Object.values(THEME_REGISTRY);
+    for (let i = 0; i < all.length; i++) {
+      for (let j = i + 1; j < all.length; j++) {
+        const a = all[i] as ThemeDefinition;
+        const b = all[j] as ThemeDefinition;
+        const sameLight = THEME_TOKEN_KEYS.every(
+          (k) => a.light[k as ThemeTokenKey] === b.light[k as ThemeTokenKey]
+        );
+        const sameDark = THEME_TOKEN_KEYS.every(
+          (k) => a.dark[k as ThemeTokenKey] === b.dark[k as ThemeTokenKey]
+        );
+        expect(
+          sameLight && sameDark,
+          `themes "${a.id}" and "${b.id}" are byte-identical (a clone — one was likely copy-pasted without editing its tokens)`
+        ).toBe(false);
+      }
+    }
   });
 });
