@@ -235,9 +235,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 322 |
 | bug | 3 | 325 |
 | arch | 5 | 324 |
-| infra | 6 | 319 |
+| infra | 6 | 326 |
 
-Current cycle: **325**
+Current cycle: **326**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,20 @@ Current cycle: **325**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C326 (INFRA cadence: FE coverage RE-MEASURE [replacing the C319-carried ~] + untracked-test sweep CLEAN)** —
+  Balance recompute (cycle 326): infra most-starved over budget (7 starved, budget 6) — only over-budget category. A real
+  re-measure was due: since C319 the C320 fix + C322 metadata guard + C323 bento + C324 factory added ~36 tests + net-new
+  source (defineBuiltinTheme + bento data). RE-MEASURED FE (vitest --coverage): **89.49% line / 87.36% stmts / 90.07% func /
+  81.78% branch (956 tests / 83 files)** — line +0.03 / func +0.02 vs C319's 89.46/90.05 (the bento data + the
+  defineBuiltinTheme factory are exercised by every per-theme guard → a slight covered-source uptick; theme engine files
+  stay well-covered: resolve-theme 100% line, theme.svelte 100% line). BE UNCHANGED at 89.29% line / 88.70% func —
+  confirmed no backend/src commit this session (newest is C300, pre-session). Untracked-test sweep CLEAN: zero untracked
+  unit tests (.meshclaw.e2e.ts gitignored BY DESIGN); all theme guard files tracked (C319-confirmed, no new untracked
+  since). Tree clean, branch PR-ready. Doc-only cadence. Verify: measurement-only, suites green (956 FE). cov: be 89.29%
+  line / 88.70% func · fe 89.49% line / 90.07% func (MEASURED, not ~). (infra→326. The C313–C326 theming arc is fully
+  measured + swept. The all-pairs-distinctness guard [surfaced C325] is the next guard-cycle item; vaporwave the next
+  feature. NOTE: 14 cycles all on theming — the small-increment veins are saturating; net-new frontier needs the Tier-2
+  specs drafted [Angelo-gated] or the remaining 3 palettes.)
 - **C325 (BUG-scout DRY: C323 bento + C324 factory certified CLEAN firsthand → no defect; surfaced a guard-gap for the NEXT guard cycle)** —
   Balance recompute (cycle 325): bug most-starved over budget (5 starved, budget 3, 1.67×). Scouted the fresh source since
   the last bug cycle (C320): C323 bento + C324 defineBuiltinTheme factory. Certified CLEAN firsthand via a runtime probe of
