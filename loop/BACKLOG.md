@@ -819,6 +819,16 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **🚩 OPEN ANGELO-GATED (escalated C333) — PWA theme-color meta does NOT follow the selected theme.** applyTheme
+> (theme.svelte.ts:52-55) sets the `<meta name="theme-color">` tint to a HARD-CODED brand hex by MODE only (#2563eb
+> light / #1a1a2e dark), ignoring themeId. Deferred at C191/T8 as "moot until a non-default theme ships" + flagged to
+> Angelo — but 6 non-default themes now ship (C313-C331), so the deferral precondition is FALSE: a user on cyberpunk/
+> solarpunk gets the wrong PWA status-bar tint (default VROOM blue, not their theme color). NOT auto-fixed (visible
+> browser chrome + 2 product decisions): (1) which token drives the tint — `--primary` (brand) / `--background` (seamless)
+> / keep-mode-only; (2) oklch→hex conversion (meta needs hex; the C313 contrast tool's oklch→sRGB converter can emit a
+> clamped hex, but out-of-gamut neon tokens [vaporwave magenta, cyberpunk cyan] clamp slightly — acceptable?). Once Angelo
+> rules: a ~3-line applyTheme change + extend theme-fouc-contract / a new guard. LOW-sev (cosmetic chrome, not data).
+>
 > **SCOUTED C311 — the fuel-stats period aggregation (getFuelStats/buildFuelStatsFromData — the This/Last Month/Year
 > cards, the #85/#86/#18/#94 family) certified CLEAN firsthand → dry.** Certified: This/Last MONTH calendar-correct
 > (matches getMonth() AND getFullYear(), the #86 prior-year-fold fix + Jan roll-back); split-sibling COUNT via the shared
