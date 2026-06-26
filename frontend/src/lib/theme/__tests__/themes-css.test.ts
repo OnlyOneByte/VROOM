@@ -214,9 +214,12 @@ describe('ThemePickerCard swatch previews are variant-aware (C348 preview-correc
   });
 
   test('the variant is derived from resolveVariant over the active mode (not a constant)', () => {
-    // variant = resolveVariant(mode, systemPref()) where mode tracks themeStore.current — so flipping
-    // light/dark (or the OS pref under `system`) re-resolves which variant the swatches preview.
+    // variant = resolveVariant(mode, getSystemTheme()) where mode tracks themeStore.current — so flipping
+    // light/dark (or the OS pref under `system`) re-resolves which variant the swatches preview. The OS arm
+    // routes through the SHARED getSystemTheme (C349) so the preview resolves `system` exactly as applyTheme.
     expect(PICKER).toMatch(/variant\s*=\s*\$derived\(\s*resolveVariant\(\s*mode\s*,/);
     expect(PICKER).toMatch(/mode\s*=\s*\$derived\(\s*themeStore\.current\s*\)/);
+    // The `system`-mode OS resolution must route through the shared store helper, not a local copy.
+    expect(PICKER).toMatch(/resolveVariant\(\s*mode\s*,\s*getSystemTheme\(\)\s*\)/);
   });
 });

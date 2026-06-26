@@ -23,7 +23,14 @@ function getStoredThemeId(): string {
 	return localStorage.getItem(THEME_ID_KEY) || DEFAULT_THEME_ID;
 }
 
-function getSystemTheme(): 'light' | 'dark' {
+/**
+ * Resolve the OS color-scheme preference to a concrete variant. The SINGLE source of truth for "what does
+ * `system` mean right now" — used by applyTheme (the APPLIED theme) AND imported by ThemePickerCard for its
+ * swatch PREVIEW (so the preview under `system` mode resolves the exact same variant the apply will use;
+ * two copies could drift on the media query or the SSR default → the preview would lie, the C348 coupling).
+ * SSR-safe: `browser` is false on the server → `'light'` (the lightest-surface default).
+ */
+export function getSystemTheme(): 'light' | 'dark' {
 	if (!browser) return 'light';
 	return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }

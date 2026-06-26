@@ -12,9 +12,9 @@
 		CardHeader,
 		CardTitle
 	} from '$lib/components/ui/card';
-	import { themeStore } from '$lib/stores/theme.svelte';
+	import { getSystemTheme, themeStore } from '$lib/stores/theme.svelte';
 	import { THEME_REGISTRY } from '$lib/theme/theme-registry';
-	import { resolveVariant, type ResolvedVariant } from '$lib/theme/resolve-theme';
+	import { resolveVariant } from '$lib/theme/resolve-theme';
 	import type { ThemeDefinition } from '$lib/theme/theme-types';
 	import { cn } from '$lib/utils';
 
@@ -25,14 +25,10 @@
 	let activeId = $derived(themeStore.themeId);
 	let mode = $derived(themeStore.current);
 
-	// Resolve the OS preference for `system` mode so each swatch previews the variant the user actually sees.
-	function systemPref(): ResolvedVariant {
-		if (typeof window === 'undefined') return 'light';
-		return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-	}
-
-	// The concrete variant (light|dark) the previews should show, tracking the active mode.
-	let variant = $derived(resolveVariant(mode, systemPref()));
+	// The concrete variant (light|dark) the previews should show, tracking the active mode. Under `system`
+	// the OS preference is resolved by the SAME getSystemTheme the store's applyTheme uses (single source of
+	// truth — so the preview can never disagree with what applying the theme will actually render, C349).
+	let variant = $derived(resolveVariant(mode, getSystemTheme()));
 
 	// Each theme's own swatch colors, resolved from ITS definition (not the live CSS vars, which only
 	// reflect the active theme). Values are the raw oklch strings from the registry → safe inline styles.

@@ -18,7 +18,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { themeStore } from '../theme.svelte';
+import { getSystemTheme, themeStore } from '../theme.svelte';
 
 const STORAGE_KEY = 'vroom-theme-preference';
 
@@ -102,5 +102,33 @@ describe('themeStore.setPreference — system resolves against the OS preference
 		mockSystemDark(true);
 		themeStore.setPreference('system');
 		expect(htmlIsDark()).toBe(true);
+	});
+});
+
+/**
+ * C349 (arch) — getSystemTheme is the SINGLE OS-color-scheme resolver, now SHARED by the store's applyTheme
+ * AND ThemePickerCard's swatch preview (was duplicated as a private `systemPref()` copy in the picker). It
+ * was only ever driven transitively through setPreference('system'); these pin its OWN contract directly so
+ * the now-shared helper is anchored (arch rule 3 — characterize before consolidating). The picker imports
+ * THIS function, so a regression to its media query or SSR default trips here, protecting the C348
+ * preview-vs-applied coupling (both resolve `system` through the same code → they cannot disagree).
+ */
+describe('getSystemTheme — the shared OS color-scheme resolver (C349 dedup anchor)', () => {
+	test('returns "dark" when the OS prefers dark', () => {
+		mockSystemDark(true);
+		expect(getSystemTheme()).toBe('dark');
+	});
+
+	test('returns "light" when the OS prefers light', () => {
+		mockSystemDark(false);
+		expect(getSystemTheme()).toBe('light');
+	});
+
+	test('queries the prefers-color-scheme: dark media query (not some other signal)', () => {
+		const spy = vi.mocked(window.matchMedia);
+		spy.mockClear();
+		mockSystemDark(true);
+		getSystemTheme();
+		expect(spy).toHaveBeenCalledWith('(prefers-color-scheme: dark)');
 	});
 });

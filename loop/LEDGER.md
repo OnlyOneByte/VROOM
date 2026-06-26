@@ -234,10 +234,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 348 |
 | guard | 6 | 345 |
 | bug | 3 | 347 |
-| arch | 5 | 342 |
+| arch | 5 | 349 |
 | infra | 6 | 344 |
 
-Current cycle: **348**
+Current cycle: **349**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,28 @@ Current cycle: **348**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C349 (ARCH: converge the duplicated OS-color-scheme resolver — picker systemPref() → the shared store getSystemTheme)** —
+  Balance recompute (cycle 349): arch the ONLY over-budget category (7/5, +2). Per the C286 fast-dry precondition the recent
+  stretch is structurally dry for SELF-introduced dups (only C346 y2k touched production-src, via the existing factory). But arch
+  was +2 over, so scouted for a genuine PRE-EXISTING dedup before recording no-churn — and found one with a CONCRETE payoff tied to
+  exactly what C348 certified. Two sites computed the OS dark-preference identically: the store's getSystemTheme (theme.svelte.ts)
+  and the picker's private systemPref() (ThemePickerCard.svelte) — same matchMedia('(prefers-color-scheme: dark)') + same
+  SSR→'light' fallback. NOT mere churn (rule 5): under `system` mode the picker's swatch PREVIEW (C348) and the store's APPLIED
+  theme each resolved the variant through their OWN copy — if one drifted (media query / SSR default) the preview would LIE about
+  what applying yields (the exact C348 preview-vs-reality coupling). FIX: exported getSystemTheme from the store as the single
+  source of truth; the picker imports it + dropped its systemPref copy (also dropped the now-unused ResolvedVariant import). The
+  store's `browser`-guarded SSR default is the project-canonical signal (the picker's `typeof window === undefined` was equivalent
+  in effect). Arch rule 3 (characterize before consolidating): getSystemTheme was only driven transitively via
+  setPreference('system') — added +3 DIRECT tests (theme-store.test.ts: OS=dark→dark, OS=light→light, queries the exact
+  prefers-color-scheme media query). Updated the C348 variant-awareness guard to pin the new shared-helper call shape
+  (resolveVariant(mode, getSystemTheme())). Arch rule 4 (behavior-preserving, UI-touching → shot before/after): re-shot /settings
+  light → BYTE-IDENTICAL to the C348 baseline (eb9acca…== eb9acca…), zero console errors — no pixel moved. Verify: FE
+  validate:local GREEN — type-check 0 (svelte-check accepts the cross-module import), build OK, 1277 tests pass (+3 vs C348's 1274,
+  the getSystemTheme characterization). cov: be 89.29% line / 88.70% func (~ unchanged, no BE) · fe 89.61% line / 90.07% func (~ —
+  LOC down by one duplicated fn, one source of truth for OS resolution; the +3 pin the newly-shared helper directly). (arch→349.
+  The C348 preview-vs-applied coupling is now STRUCTURALLY guaranteed [shared code cannot disagree], not just guarded. Self-dup
+  surface stays dry; the next arch needs a fresh feature surface. Standing frontier unchanged: gated queue [C333/C339/C343] + the
+  4 Tier-2 specs.)
 - **C348 (DEEP-REVIEW: picker swatch previews are VARIANT-AWARE — eyes-on certified + durable guard)** —
   Balance recompute (cycle 348): deep-review + arch TIED over budget (both 6/5, +1). Tiebreak to deep-review: arch is
   structurally dry per the C286 fast-dry precondition — the only production-src change since C342 was C346 y2k (the existing
