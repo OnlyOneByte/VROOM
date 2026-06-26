@@ -838,8 +838,10 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 >   (A) HARNESS ✅ SOLVED (C340): a faithful theme eyes-on DRIVES THE REAL PICKER — CLICK_SELECTOR="button[aria-label='Use
 >       the <Label> theme']" shot.sh /settings (the click runs setTheme() AFTER the reconcile, so it sticks) + md5sum to
 >       assert distinct. C340 hash-proved cyberpunk/aurora/solarpunk render distinct + visibly re-skin (selected ring +
->       sidebar/FAB accent). Method documented in theming-engine/tasks.md T11. Walking all 8×{light,dark} via this recipe
->       (~2-3/cycle) clears the visual-unconfirmed backlog. Injecting localStorage alone is STILL reverted (see B).
+>       sidebar/FAB accent). Method documented in theming-engine/tasks.md T11. ✅ BACKLOG CLEARED (C342): all 8 non-default
+>       themes now genuinely picker-verified (C340 cyberpunk/aurora/solarpunk + C341 tui + C342 blueprint/bento/vaporwave/
+>       editorial), hash-distinct + Read. The C338 false-pass thread is FULLY RESOLVED; the downgraded eyes-on claims are
+>       RESTORED. Injecting localStorage alone is STILL reverted (see B) — picker-drive is the standing method for new themes.
 >   (B) 🚩 POSSIBLE PRODUCT BUG (Angelo-gated reconcile-semantics call, escalated C339): "server wins" clobbers a local
 >       theme selection to `default` when the server value is UNSET — a real user could pick a theme, reload, lose it. Fix
 >       mirrors the #129 ruling (sync only if server value non-empty, never overwrite with empty) but changes reconcile
