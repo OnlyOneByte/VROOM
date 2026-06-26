@@ -233,11 +233,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 341 |
 | deep-review | 5 | 342 |
 | guard | 6 | 336 |
-| bug | 3 | 337 |
+| bug | 3 | 343 |
 | arch | 5 | 342 |
 | infra | 6 | 335 |
 
-Current cycle: **342**
+Current cycle: **343**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,7 +256,20 @@ Current cycle: **342**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
-- **C342 (ARCH fast-dry → DEEP-REVIEW: picker-verified the last 4 themes → the C338 visual-unconfirmed backlog is FULLY CLEARED; all 8 themes genuinely eyes-on)** —
+- **C343 (BUG-scout: chart-N vs card contrast — found 3 LOW pairs, all in the PRE-EXISTING `default` palette [not theming-introduced]; new themes CLEAN; filed Angelo-gated, not auto-fixed)** —
+  Balance recompute (cycle 343): bug most-starved over budget (6/3, 2.0×). Scouted a not-yet-checked invariant on the theme
+  surface: chart-1..5 vs card contrast (WCAG graphical-object 3:1 — analytics chart series must be distinguishable). Checked
+  all 9 themes × 2 variants × 5 charts firsthand: 3 pairs fall below 3:1 — default/light/chart-4 (1.72), default/light/
+  chart-5 (2.15), default/dark/chart-1 (2.60). KEY: ALL 3 are in `default`, and verified firsthand they are the VERBATIM
+  app.css originals (chart-4 oklch(0.828 0.189 84.429) etc.) — VROOM's long-shipped chart palette mirrored per the C185
+  default≡app.css identity contract. So this is PRE-EXISTING (not introduced by any theming cycle), and the 8 NEW themes
+  (blueprint/bento/vaporwave/cyberpunk/aurora/solarpunk/editorial/tui) all PASS ≥3:1. NOT auto-fixed: changing default's
+  chart tokens is a visual/product call on the shipped look AND would break the C185 default≡app.css guard. No manufactured
+  guard (a 3:1 chart-contrast assertion would be RED-on-arrival against the locked default — useless until the product
+  decision). Filed as a low-sev Angelo-gated item. Verify: scout-only, suites unchanged green (1149). cov: be 89.29% / fe
+  89.59% (~). (bug→343. Finding: default's chart-4/5 [light] + chart-1 [dark] are <3:1 vs card — low-sev legibility on the
+  ORIGINAL palette, pre-theming; the new themes are clean. The theming color surface is now scouted on text [C313], primary
+  non-text [C337], AND chart [C343] contrast. NEXT: rotation; standing frontier = C339 reconcile call + chart-contrast call + 4 Tier-2 specs.)
   Balance recompute (cycle 342): arch most-starved (8/5, 1.6×). C286 fast-dry check: the ONLY prod-src since arch's last
   touch (C334) is theme-registry DATA via the C324 factory — no new logic/dedup vector → recorded no-churn FAST + pivoted to
   the highest-leverage doable item: clear the C338 visual-unconfirmed backlog. C340 verified cyberpunk/aurora/solarpunk;
