@@ -100,13 +100,17 @@ cycles record + pivot to guard/deep-review/arch/infra until a gate clears.**)*
    swatch strips + selected ring + setTheme(id) live re-skin; shot the picker (Default + Blueprint render correctly) + the
    blueprint dashboard re-skin (status 200, zero console errors). The engine is now USER-REACHABLE; picker logic certified
    (C321), crash-guarded (C320 each-key) + metadata-guarded (C322).
-   ✅ **`bento` (C323) + `vaporwave` (C327) + `cyberpunk` (C329) REGISTERED + AA-PASSED + EYES-ON.** 4 of 5 palettes done
-   (blueprint/bento/vaporwave/cyberpunk); the recipe uses the C324 defineBuiltinTheme factory (one call per theme). All
-   guards auto-cover each new theme incl. the C328 all-pairs distinctness (1015 tests). Each shot verified: picker grid + the
-   dark dashboard re-skin (status 200, zero console errors). **1 PALETTE LEFT: aurora — by the distill→AA-tune→
-   defineBuiltinTheme→regenerate recipe (completes the Angelo-approved 5-theme set). After aurora: T11 per-theme dashboard
-   eyes-on ×{light,dark} OR T12 axe a11y gate. The fill-in ryang.dev mocks (editorial/tui/y2k/neobrutalist/solarpunk/
-   claymorphism/brutalist/zine) remain available when feature has spare cycles. The all-pairs-distinctness guard is DONE (C328).**
+   ⭐ **THE v1 THEME SET IS COMPLETE (C330):** default + 5 — `blueprint` (C313) / `bento` (C323) / `vaporwave` (C327) /
+   `cyberpunk` (C329) / `aurora` (C330) — ALL registered via the C324 defineBuiltinTheme factory, ALL AA-tuned
+   (theme-contrast.test.ts), ALL all-pairs-distinct (C328), ALL eyes-on (picker grid + dark dashboard re-skin, status 200,
+   zero console errors). Guarded across 6 dimensions (contrast/distinctness-vs-default/all-pairs/byte-fresh/integrity/
+   metadata + layout-wiring + swatch-key-safety). 1044 tests. **THE THEMING FEATURE IS DONE.** OPTIONAL remaining polish (not
+   gating): T11 per-theme dashboard eyes-on ×{light,dark}; T12 axe a11y gate; the fill-in ryang.dev mocks (editorial/tui/y2k/
+   neobrutalist/solarpunk/claymorphism/brutalist/zine) each a 1-call defineBuiltinTheme when feature is over budget.
+   **⚠️ LOOP SIGNAL: with theming COMPLETE, there is NO self-authorizable net-new feature SOURCE left. The next genuine
+   frontier is the 4 Angelo-approved-but-UNDRAFTED Tier-2 specs — vehicle-sharing (D3 rework to granular caps) /
+   local-accounts / admin-panel / ai-provider (VLM+LLM BYO). Until Angelo drafts/greenlights those, the loop returns to
+   maintenance-rotation (review/guard/bug/arch/infra) on the now-hardened theming + existing surfaces.**
    _(Original 2026-06-24 greenlight + Phase 1–3 build log retained below for grounding.)_ **GREENLIT & BUILD-UNBLOCKED (Angelo ratified D1–D7 ✅, 2026-06-24 parallel agent).**
    `.kiro/specs/theming-engine/`. A first-class theming engine: a registry of built-in themes (the existing
    look + the explored "Instrument Cluster" / "Garage Journal" looks, productized), a `/settings` picker with
