@@ -244,9 +244,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 345 |
 | bug | 3 | 347 |
 | arch | 5 | 349 |
-| infra | 6 | 344 |
+| infra | 6 | 350 |
 
-Current cycle: **349**
+Current cycle: **350**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -265,6 +265,22 @@ Current cycle: **349**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C350 (INFRA cadence: full coverage RE-MEASURE both sides [BE re-measured, not carried ~] + untracked-test sweep CLEAN)** —
+  Balance recompute (cycle 350): nothing strictly OVER budget; three AT budget (feature 4/4, bug 3/3, infra 6/6). Picked infra —
+  the coverage cadence is genuinely DUE (6 cycles since C344) and the FE suite grew 1149→1277 (the C345–C349 theming guard/dedup
+  arc), so the carried baseline was stale; a bug scout would be dry + another fill-in is low marginal value. RE-MEASURED BOTH
+  (not a carried ~): **FE 89.63% line / 90.07% func / 81.78% branch / 87.52% stmts (1277 tests / 83 files)** — line +0.02 vs C344's
+  89.61 (the C345 picker-mount + C347 chart-graphical + C348 variant-aware + C349 getSystemTheme-dedup guards/tests fan out over
+  new token+helper data; func flat at 90.07, branch flat). **BE 89.30% line / 89.32% func (1949 pass / 0 fail)** — flat vs the
+  C309 reading (no backend/src touched C310–C349, an all-frontend/theming + docs stretch). NOTE: BE func is reported here at the
+  bun-NATIVE aggregate 89.32% (matching the C309 method), reconciling the `88.70%` the recent entries carried (that was the older
+  file-MEAN method — same suite, different aggregation; flagged so future cadence entries do not read it as a regression).
+  Untracked-test sweep CLEAN both sides (no untracked unit/spec tests; the .meshclaw.e2e.ts harness is gitignored BY DESIGN). Tree
+  clean; branch 243 ahead / 0 behind origin/main, PR-ready. Doc-only cadence. Verify: measurement-only, both suites green (FE 1277
+  / BE 1949). cov: be 89.30% line / 89.32% func · fe 89.63% line / 90.07% func (MEASURED). (infra→350. Both hold at the ~89% BE /
+  ~89.6% FE structural ceiling; the theming arc moved FE line +0.20 since C289 purely via guard fan-out over new token data, BE
+  flat with no source touched. Standing frontier unchanged: the Angelo-gated queue [C333/C339/C343] + the 4 Tier-2 specs — the
+  loop is in healthy steady-state on the hardened theming + existing surfaces; the high-leverage work needs Angelo.)
 - **C349 (ARCH: converge the duplicated OS-color-scheme resolver — picker systemPref() → the shared store getSystemTheme)** —
   Balance recompute (cycle 349): arch the ONLY over-budget category (7/5, +2). Per the C286 fast-dry precondition the recent
   stretch is structurally dry for SELF-introduced dups (only C346 y2k touched production-src, via the existing factory). But arch
