@@ -235,9 +235,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 336 |
 | bug | 3 | 343 |
 | arch | 5 | 342 |
-| infra | 6 | 335 |
+| infra | 6 | 344 |
 
-Current cycle: **343**
+Current cycle: **344**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,7 +256,16 @@ Current cycle: **343**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
-- **C343 (BUG-scout: chart-N vs card contrast — found 3 LOW pairs, all in the PRE-EXISTING `default` palette [not theming-introduced]; new themes CLEAN; filed Angelo-gated, not auto-fixed)** —
+- **C344 (INFRA cadence: FE coverage RE-MEASURE [replacing the C335-carried ~] + untracked-test sweep CLEAN)** —
+  Balance recompute (cycle 344): infra most-starved over budget (9/6, 1.5×). Re-measure due: since C335 the C341 tui fill-in
+  added +31 tests (1118→1149). RE-MEASURED FE: **89.61% line / 87.5% stmts / 90.07% func / 81.78% branch (1149 tests / 83
+  files)** — line +0.02 vs C335's 89.59 (tui token data exercised by the per-theme guard fan-out; func flat at 90.07). BE
+  UNCHANGED 89.29% line / 88.70% func — no backend/src commit this session (newest C300, pre-session). Untracked-test sweep
+  CLEAN. Tree clean, branch PR-ready. Doc-only cadence. Verify: measurement-only, suites green (1149). cov: be 89.29% line /
+  88.70% func · fe 89.61% line / 90.07% func (MEASURED). (infra→344. The theming arc C313-C343 is fully measured + swept;
+  FE line crept 89.43→89.61 across the arc purely from the per-theme guard fan-out over new token data. Standing frontier:
+  the Angelo-gated queue [C333 PWA theme-color / C339 reconcile-server-unset / C343 default chart-contrast] + the 4 Tier-2
+  specs. 8 themes all eyes-on-verified; the loop is in healthy steady-state on fill-ins + rotation.)
   Balance recompute (cycle 343): bug most-starved over budget (6/3, 2.0×). Scouted a not-yet-checked invariant on the theme
   surface: chart-1..5 vs card contrast (WCAG graphical-object 3:1 — analytics chart series must be distinguishable). Checked
   all 9 themes × 2 variants × 5 charts firsthand: 3 pairs fall below 3:1 — default/light/chart-4 (1.72), default/light/
