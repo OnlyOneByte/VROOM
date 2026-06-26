@@ -38,6 +38,16 @@ const listQuerySchema = z.object({
   purpose: z.enum(TRIP_PURPOSES).optional(),
 });
 
+// C214 trip-delete: keepOdometer chooses whether the linked odometer entry survives the trip delete.
+// z.coerce.boolean treats any non-empty string as true, so parse the literal 'false' EXPLICITLY and default
+// to KEEP (true) when the param is absent — the non-destructive default (never silently drop odometer data).
+const deleteQuerySchema = z.object({
+  keepOdometer: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => v !== 'false'),
+});
+
 const summaryQuerySchema = z.object({
   // Optional vehicle scope (else cross-fleet) + the business-mileage reimbursement rate ($/mile, R4/D3).
   // The rate is a query param (NOT a stored field yet — its persistence is a separate schema slice, §7);
@@ -179,20 +189,94 @@ routes.put(
     }
 
     const updated = await tripRepository.update(id, data);
+
+    // C214 lifecycle (case 3): editing the trip's odometer/date must RE-SYNC the linked odometer entry
+    // (D2/createFromTrip) so getCurrentOdometer + the mileage-reminder axis never read a desynced value.
+    // Only when the linkage key actually moved (endOdometer or tripDate changed): remove the stale
+    // trip-provenance entry at the OLD key, then re-create at the NEW (deduped — a no-op if the user already
+    // has a manual reading there). Best-effort: the trip update already committed, so a side-effect hiccup
+    // must not 500 a successful edit (mirrors the create path's swallow-and-log, C233).
+    const endChanged = data.endOdometer !== undefined && data.endOdometer !== existing.endOdometer;
+    const dateChanged =
+      data.tripDate !== undefined && data.tripDate.getTime() !== existing.tripDate.getTime();
+    if (endChanged || dateChanged) {
+      try {
+        await odometerRepository.deleteLinkedTripEntry({
+          vehicleId: existing.vehicleId,
+          userId: user.id,
+          odometer: existing.endOdometer,
+          recordedAt: existing.tripDate,
+        });
+        await odometerRepository.createFromTrip({
+          vehicleId: existing.vehicleId,
+          userId: user.id,
+          odometer: end,
+          recordedAt: data.tripDate ?? existing.tripDate,
+        });
+        await reminderTriggerService.recheckMileageReminders(user.id, existing.vehicleId);
+      } catch (error) {
+        logger.error('Trip-edit linked-odometer re-sync failed (trip already updated)', {
+          tripId: id,
+          vehicleId: existing.vehicleId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
     return c.json({ success: true, data: updated, message: 'Trip updated' });
   }
 );
 
 // DELETE /api/v1/trips/:id — tenant-safe delete (keys on id AND userId; false → 404).
-routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
-  const user = c.get('user');
-  const { id } = c.req.valid('param');
+// C214 lifecycle: a trip's create wrote a linked odometer entry (D2/createFromTrip). On delete the user
+// chooses whether to KEEP that entry (it may now be part of their odometer history) or remove it with the
+// trip. `?keepOdometer=true|false`; the DEFAULT is KEEP (the non-destructive default — never silently drop
+// odometer history; the FE delete-confirm surfaces the choice, T6b-3). keepOdometer=false also removes the
+// trip-provenance entry at the trip's (vehicle, day, endOdometer) key — never a manual reading (the marker
+// match in deleteLinkedTripEntry). The linked-entry removal happens AFTER the trip delete succeeds and is
+// best-effort: the trip is already gone, so an odometer-cleanup hiccup must not 500 a successful delete.
+routes.delete(
+  '/:id',
+  zValidator('param', commonSchemas.idParam),
+  zValidator('query', deleteQuerySchema),
+  async (c) => {
+    const user = c.get('user');
+    const { id } = c.req.valid('param');
+    const { keepOdometer } = c.req.valid('query');
 
-  const deleted = await tripRepository.deleteByIdAndUserId(id, user.id);
-  if (!deleted) {
-    return c.json({ success: false, error: 'Trip not found' }, 404);
+    // Read the trip BEFORE deleting so we have its (vehicle, endOdometer, tripDate) to find the linked entry.
+    const existing = await tripRepository.findByIdAndUserId(id, user.id);
+    if (!existing) {
+      return c.json({ success: false, error: 'Trip not found' }, 404);
+    }
+
+    const deleted = await tripRepository.deleteByIdAndUserId(id, user.id);
+    if (!deleted) {
+      // Lost a race (deleted between read and delete) — still a 404, same as a miss.
+      return c.json({ success: false, error: 'Trip not found' }, 404);
+    }
+
+    if (keepOdometer === false) {
+      try {
+        await odometerRepository.deleteLinkedTripEntry({
+          vehicleId: existing.vehicleId,
+          userId: user.id,
+          odometer: existing.endOdometer,
+          recordedAt: existing.tripDate,
+        });
+        // The removed reading may have been the max → recheck mileage reminders against the new current.
+        await reminderTriggerService.recheckMileageReminders(user.id, existing.vehicleId);
+      } catch (error) {
+        logger.error('Trip-delete linked-odometer cleanup failed (trip already deleted)', {
+          tripId: id,
+          vehicleId: existing.vehicleId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    return c.json({ success: true, message: 'Trip deleted' });
   }
-  return c.json({ success: true, message: 'Trip deleted' });
-});
+);
 
 export { routes };

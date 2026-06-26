@@ -82,8 +82,56 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
       userId: entry.userId,
       odometer: entry.odometer,
       recordedAt: entry.recordedAt,
-      note: entry.note ?? 'From trip',
+      note: entry.note ?? OdometerRepository.TRIP_PROVENANCE_NOTE,
     });
+  }
+
+  /**
+   * The provenance marker createFromTrip stamps on a trip-derived entry. The trips↔odometer lifecycle
+   * (C214) keys on this so it ONLY ever touches an entry a trip created — never a manual reading the user
+   * logged at the same (vehicle, day, value). Single source of truth, shared by createFromTrip's default
+   * note and deleteLinkedTripEntry's match predicate.
+   */
+  static readonly TRIP_PROVENANCE_NOTE = 'From trip';
+
+  /**
+   * Delete the odometer entry a trip created (the C214 trips↔odometer lifecycle: trip-delete with
+   * keepOdometer=false, and the re-sync leg's "remove the stale entry" step). Matches the EXACT key
+   * createFromTrip wrote: same vehicle + owner + reading + LOCAL calendar day of `recordedAt`, AND the
+   * `note = 'From trip'` provenance marker — so a user's MANUAL reading at the same (vehicle, day, value)
+   * is never collateral-deleted (it lacks the marker). Returns the count removed (0 when the user had
+   * deduped the trip onto a pre-existing manual entry — createFromTrip returned null then, so there is no
+   * trip-owned row to remove, which is correct: the manual reading stays). Tenant-scoped (userId in the
+   * predicate, the #52/C109 discipline).
+   */
+  async deleteLinkedTripEntry(entry: {
+    vehicleId: string;
+    userId: string;
+    odometer: number;
+    recordedAt: Date;
+  }): Promise<number> {
+    const dayStart = new Date(
+      entry.recordedAt.getFullYear(),
+      entry.recordedAt.getMonth(),
+      entry.recordedAt.getDate()
+    );
+    const nextDay = new Date(dayStart);
+    nextDay.setDate(nextDay.getDate() + 1);
+
+    const removed = await this.db
+      .delete(odometerEntries)
+      .where(
+        and(
+          eq(odometerEntries.vehicleId, entry.vehicleId),
+          eq(odometerEntries.userId, entry.userId),
+          eq(odometerEntries.odometer, entry.odometer),
+          eq(odometerEntries.note, OdometerRepository.TRIP_PROVENANCE_NOTE),
+          gte(odometerEntries.recordedAt, dayStart),
+          lt(odometerEntries.recordedAt, nextDay)
+        )
+      )
+      .returning();
+    return removed.length;
   }
 
   /**

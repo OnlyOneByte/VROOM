@@ -326,14 +326,12 @@ describe('a trip crossing a mileage-reminder milestone fires the notification (D
   });
 });
 
-// C214 (guard — CHARACTERIZATION of the CURRENT trips↔odometer lifecycle, escalated to Angelo). The D2
-// linkage (C213) writes an odometer entry on trip CREATE, but that entry has NO lifecycle tie back to its
-// trip: editing the trip's endOdometer or deleting the trip leaves the original odometer reading in place,
-// so getCurrentOdometer keeps the stale value (the #76/#244 stray-reading-poisons-currentOdometer class on
-// the maintenance-reminder + lease-overage axes). Whether that's correct (independent-observation model) or
-// a bug (owned-child model needing a source-link schema slice) is a SEMANTICS decision filed with Angelo
-// (send_message C214). These tests PIN today's behavior so it's explicit + can't silently drift; when the
-// decision lands, the chosen fix flips the relevant assertion RED (the #148/C102 escalation-anchor pattern).
+// C214 (T7 — the RATIFIED trips↔odometer lifecycle, was the pending characterization). Angelo ruled
+// (2026-06-25): editing a trip's endOdometer/tripDate RE-SYNCS the linked odometer entry; deleting a trip
+// PROMPTS keep-or-delete (non-destructive default = KEEP). These tests previously pinned the pre-ruling
+// "independent-observation" behavior as an escalation anchor; they now assert the ratified semantics (the
+// #148/C102 anchor-flips-on-ruling pattern, discharged). The keepOdometer=false path + the manual-reading
+// safety + the re-sync no-orphan invariant are pinned in the "C214 trips↔odometer lifecycle (T7)" block above.
 const odoCount = (ctx: TestApp, vehicleId: string): number =>
   (
     ctx.sqlite
@@ -343,8 +341,8 @@ const odoCount = (ctx: TestApp, vehicleId: string): number =>
     }
   ).n;
 
-describe('trips↔odometer lifecycle on EDIT/DELETE (C214 characterization — pending Angelo)', () => {
-  test('editing a trip’s endOdometer does NOT update the linked odometer entry (independent-observation, today)', async () => {
+describe('trips↔odometer lifecycle on EDIT/DELETE (C214 ratified, T7)', () => {
+  test('editing a trip’s endOdometer RE-SYNCS the linked odometer entry (currentOdometer tracks the correction)', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const created = await ctx.authed(
       'POST',
@@ -362,13 +360,13 @@ describe('trips↔odometer lifecycle on EDIT/DELETE (C214 characterization — p
     expect(put.status).toBe(200);
 
     const { odometerRepository } = await import('../../odometer/repository');
-    // TODAY: the original 5000 odometer entry lingers; getCurrentOdometer still reads 5000. (If Angelo
-    // chooses the owned-child model, this becomes 500 + this assertion flips.)
+    // RATIFIED (C214 case 3): the stale 5000 entry is removed + a fresh linked entry written at 500, so
+    // getCurrentOdometer reflects the correction (no #76/#244 stray-reading poison on the reminder axis).
     expect(odoCount(ctx, vehicleId)).toBe(1);
-    expect(await odometerRepository.getCurrentOdometer(vehicleId, ctx.user.id)).toBe(5000);
+    expect(await odometerRepository.getCurrentOdometer(vehicleId, ctx.user.id)).toBe(500);
   });
 
-  test('deleting a trip does NOT remove the linked odometer entry (independent-observation, today)', async () => {
+  test('deleting a trip (default) KEEPS the linked odometer entry (non-destructive default, C214 case 1)', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const created = await ctx.authed(
       'POST',
@@ -382,8 +380,8 @@ describe('trips↔odometer lifecycle on EDIT/DELETE (C214 characterization — p
     expect(del.status).toBe(200);
 
     const { odometerRepository } = await import('../../odometer/repository');
-    // TODAY: the odometer entry survives the trip delete (a point-in-time observation). (Owned-child model
-    // would cascade it away → 0 + null.)
+    // RATIFIED default = KEEP: the odometer entry survives the trip delete (the user keeps odometer history).
+    // The keepOdometer=false opt-in removal is pinned in the T7 block above.
     expect(odoCount(ctx, vehicleId)).toBe(1);
     expect(await odometerRepository.getCurrentOdometer(vehicleId, ctx.user.id)).toBe(5000);
   });
@@ -745,5 +743,109 @@ describe('DELETE /api/v1/trips/:id', () => {
   test('requires auth (401 anon)', async () => {
     const res = await ctx.anon('GET', '/api/v1/trips');
     expect(res.status).toBe(401);
+  });
+});
+
+/**
+ * C214 trips↔odometer lifecycle (T7) — the ratified delete/edit semantics for the D2 linked odometer entry.
+ * A trip create writes a deduped `odometer_entries` row at (vehicle, tripDate-day, endOdometer) stamped
+ * note='From trip' (createFromTrip). These pin what delete + edit do to THAT row:
+ *   1. delete trip, default → KEEP the linked entry (non-destructive default).
+ *   2. delete trip ?keepOdometer=false → ALSO remove the linked entry.
+ *   3. ?keepOdometer=false must NEVER remove a MANUAL reading at the same (vehicle, day, value) — only the
+ *      'From trip' provenance row.
+ *   4. edit endOdometer → RE-SYNC: the linked entry moves to the new reading, no stale orphan left.
+ */
+describe('C214 trips↔odometer lifecycle (T7)', () => {
+  /** Count the trip-provenance odometer entries for a vehicle at a given reading. */
+  function linkedEntryCount(vehicleId: string, odometer: number): number {
+    const row = ctx.sqlite
+      .query(
+        `SELECT COUNT(*) AS n FROM odometer_entries WHERE vehicle_id = ? AND odometer = ? AND note = 'From trip'`
+      )
+      .get(vehicleId, odometer) as { n: number };
+    return row.n;
+  }
+
+  test('create writes the linked odometer entry (D2 baseline for this block)', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    await ctx.authed('POST', '/api/v1/trips', VALID(vehicleId, { endOdometer: 1080 }));
+    expect(linkedEntryCount(vehicleId, 1080)).toBe(1);
+  });
+
+  test('delete trip (default) KEEPS the linked odometer entry (non-destructive default)', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    const created = await ctx.authed(
+      'POST',
+      '/api/v1/trips',
+      VALID(vehicleId, { endOdometer: 1080 })
+    );
+    const { data } = await json<DataEnvelope<{ id: string }>>(created);
+    expect(linkedEntryCount(vehicleId, 1080)).toBe(1);
+
+    const res = await ctx.authed('DELETE', `/api/v1/trips/${data.id}`);
+    expect(res.status).toBe(200);
+    // The trip is gone but the odometer entry survives (the user keeps their odometer history).
+    expect(linkedEntryCount(vehicleId, 1080)).toBe(1);
+  });
+
+  test('delete trip ?keepOdometer=false ALSO removes the linked odometer entry', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    const created = await ctx.authed(
+      'POST',
+      '/api/v1/trips',
+      VALID(vehicleId, { endOdometer: 1080 })
+    );
+    const { data } = await json<DataEnvelope<{ id: string }>>(created);
+    expect(linkedEntryCount(vehicleId, 1080)).toBe(1);
+
+    const res = await ctx.authed('DELETE', `/api/v1/trips/${data.id}?keepOdometer=false`);
+    expect(res.status).toBe(200);
+    expect(linkedEntryCount(vehicleId, 1080)).toBe(0);
+  });
+
+  test('?keepOdometer=false does NOT remove a MANUAL reading at the same (vehicle, day, value)', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    // A manual odometer entry at 1080 on the trip's day — distinct provenance (note != 'From trip').
+    await ctx.authed('POST', `/api/v1/odometer/${vehicleId}`, {
+      odometer: 1080,
+      recordedAt: '2024-06-20T13:30:00.000Z',
+      note: 'manual log',
+    });
+    // The trip create DEDUPES onto that same (vehicle, day, value) → no 'From trip' row is written.
+    const created = await ctx.authed(
+      'POST',
+      '/api/v1/trips',
+      VALID(vehicleId, { endOdometer: 1080 })
+    );
+    const { data } = await json<DataEnvelope<{ id: string }>>(created);
+    expect(linkedEntryCount(vehicleId, 1080)).toBe(0); // no trip-provenance row (deduped)
+
+    const res = await ctx.authed('DELETE', `/api/v1/trips/${data.id}?keepOdometer=false`);
+    expect(res.status).toBe(200);
+    // The MANUAL reading is untouched — keepOdometer=false only removes a 'From trip' row.
+    const manual = ctx.sqlite
+      .query(
+        `SELECT COUNT(*) AS n FROM odometer_entries WHERE vehicle_id = ? AND odometer = 1080 AND note = 'manual log'`
+      )
+      .get(vehicleId) as { n: number };
+    expect(manual.n).toBe(1);
+  });
+
+  test('edit endOdometer RE-SYNCS the linked entry (moves to the new reading, no stale orphan)', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    const created = await ctx.authed(
+      'POST',
+      '/api/v1/trips',
+      VALID(vehicleId, { endOdometer: 1080 })
+    );
+    const { data } = await json<DataEnvelope<{ id: string }>>(created);
+    expect(linkedEntryCount(vehicleId, 1080)).toBe(1);
+
+    const res = await ctx.authed('PUT', `/api/v1/trips/${data.id}`, { endOdometer: 1200 });
+    expect(res.status).toBe(200);
+    // The stale entry at the old reading is gone; a fresh linked entry exists at the new reading.
+    expect(linkedEntryCount(vehicleId, 1080)).toBe(0);
+    expect(linkedEntryCount(vehicleId, 1200)).toBe(1);
   });
 });
