@@ -848,4 +848,44 @@ describe('C214 trips↔odometer lifecycle (T7)', () => {
     expect(linkedEntryCount(vehicleId, 1080)).toBe(0);
     expect(linkedEntryCount(vehicleId, 1200)).toBe(1);
   });
+
+  // The DATE-change re-sync leg (the `dateChanged` arm of the PUT handler) — implemented but the C5/T7
+  // block only exercised the endOdometer arm. A trip-date edit must MOVE the linked odometer entry to the
+  // new calendar day: the old-day trip-provenance entry is removed, a fresh one lands on the new day (same
+  // reading). If the re-sync mis-keyed the delete (it keys on the OLD recordedAt/odometer), the old entry
+  // would orphan on the old day → getHistory shows a phantom reading on a date the trip no longer has.
+  test('edit tripDate RE-SYNCS the linked entry to the new day (no orphan on the old day)', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    // Trip on 2024-06-20 at reading 1080.
+    const created = await ctx.authed(
+      'POST',
+      '/api/v1/trips',
+      VALID(vehicleId, { endOdometer: 1080, tripDate: '2024-06-20T13:30:00.000Z' })
+    );
+    const { data } = await json<DataEnvelope<{ id: string }>>(created);
+
+    /** trip-provenance entries for this vehicle on a given local calendar day (YYYY-MM-DD). */
+    const linkedOnDay = (day: string): number => {
+      const start = Math.floor(new Date(`${day}T00:00:00`).getTime() / 1000);
+      const end = start + 86400;
+      return (
+        ctx.sqlite
+          .query(
+            `SELECT COUNT(*) AS n FROM odometer_entries WHERE vehicle_id = ? AND note = 'From trip' AND recorded_at >= ? AND recorded_at < ?`
+          )
+          .get(vehicleId, start, end) as { n: number }
+      ).n;
+    };
+    expect(linkedOnDay('2024-06-20')).toBe(1);
+
+    // Move the trip to 2024-06-25 (reading unchanged) — the linkage key's DATE moved.
+    const res = await ctx.authed('PUT', `/api/v1/trips/${data.id}`, {
+      tripDate: '2024-06-25T13:30:00.000Z',
+    });
+    expect(res.status).toBe(200);
+    // The old-day entry is gone; exactly one trip-provenance entry now sits on the new day (still 1080).
+    expect(linkedOnDay('2024-06-20')).toBe(0);
+    expect(linkedOnDay('2024-06-25')).toBe(1);
+    expect(linkedEntryCount(vehicleId, 1080)).toBe(1); // still exactly one such reading, just re-dated
+  });
 });
