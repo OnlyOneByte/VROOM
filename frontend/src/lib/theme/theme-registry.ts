@@ -195,14 +195,104 @@ const BLUEPRINT_THEME: ThemeDefinition = {
 };
 
 /**
+ * `bento` light palette — a clean bento-light: soft-grey canvas, white card panels, the mock's violet/blue
+ * accent family. Distilled from the ryang.dev bento mock (a modular dark dashboard) into VROOM's 32 tokens,
+ * AA-tuned (every fg/bg pair clears WCAG AA 4.5 — theme-contrast.test.ts).
+ */
+const BENTO_LIGHT: ThemeTokens = {
+  background: 'oklch(0.97 0.005 265)',
+  foreground: 'oklch(0.22 0.02 265)',
+  card: 'oklch(1 0 0)',
+  'card-foreground': 'oklch(0.22 0.02 265)',
+  popover: 'oklch(1 0 0)',
+  'popover-foreground': 'oklch(0.22 0.02 265)',
+  primary: 'oklch(0.52 0.2 266)',
+  'primary-foreground': 'oklch(0.99 0.005 265)',
+  secondary: 'oklch(0.94 0.01 265)',
+  'secondary-foreground': 'oklch(0.3 0.02 265)',
+  muted: 'oklch(0.94 0.01 265)',
+  'muted-foreground': 'oklch(0.45 0.02 265)',
+  accent: 'oklch(0.9 0.05 300)',
+  'accent-foreground': 'oklch(0.3 0.04 300)',
+  destructive: 'oklch(0.52 0.22 27)',
+  warning: 'oklch(0.55 0.13 75)',
+  border: 'oklch(0.88 0.01 265)',
+  input: 'oklch(0.88 0.01 265)',
+  ring: 'oklch(0.52 0.2 266)',
+  'chart-1': 'oklch(0.52 0.2 266)',
+  'chart-2': 'oklch(0.55 0.18 300)',
+  'chart-3': 'oklch(0.52 0.15 150)',
+  'chart-4': 'oklch(0.6 0.15 85)',
+  'chart-5': 'oklch(0.55 0.13 200)',
+  sidebar: 'oklch(0.95 0.008 265)',
+  'sidebar-foreground': 'oklch(0.22 0.02 265)',
+  'sidebar-primary': 'oklch(0.52 0.2 266)',
+  'sidebar-primary-foreground': 'oklch(0.99 0.005 265)',
+  'sidebar-accent': 'oklch(0.9 0.05 300)',
+  'sidebar-accent-foreground': 'oklch(0.3 0.04 300)',
+  'sidebar-border': 'oklch(0.88 0.01 265)',
+  'sidebar-ring': 'oklch(0.52 0.2 266)',
+};
+
+/**
+ * `bento` dark palette — the mock's native modular-dashboard look: charcoal canvas, lifted card panels, an
+ * indigo-blue brand + violet accent. AA-tuned exactly like the light variant (theme-contrast.test.ts).
+ */
+const BENTO_DARK: ThemeTokens = {
+  background: 'oklch(0.17 0.012 265)',
+  foreground: 'oklch(0.95 0.01 265)',
+  card: 'oklch(0.21 0.014 265)',
+  'card-foreground': 'oklch(0.95 0.01 265)',
+  popover: 'oklch(0.21 0.014 265)',
+  'popover-foreground': 'oklch(0.95 0.01 265)',
+  primary: 'oklch(0.55 0.2 266)',
+  'primary-foreground': 'oklch(0.98 0.01 265)',
+  secondary: 'oklch(0.27 0.015 265)',
+  'secondary-foreground': 'oklch(0.95 0.01 265)',
+  muted: 'oklch(0.27 0.015 265)',
+  'muted-foreground': 'oklch(0.72 0.02 265)',
+  accent: 'oklch(0.7 0.13 300)',
+  'accent-foreground': 'oklch(0.18 0.02 300)',
+  destructive: 'oklch(0.62 0.21 25)',
+  warning: 'oklch(0.8 0.13 80)',
+  border: 'oklch(0.3 0.016 265)',
+  input: 'oklch(0.3 0.016 265)',
+  ring: 'oklch(0.55 0.2 266)',
+  'chart-1': 'oklch(0.7 0.15 266)',
+  'chart-2': 'oklch(0.75 0.13 300)',
+  'chart-3': 'oklch(0.78 0.16 150)',
+  'chart-4': 'oklch(0.82 0.13 85)',
+  'chart-5': 'oklch(0.7 0.13 200)',
+  sidebar: 'oklch(0.15 0.012 265)',
+  'sidebar-foreground': 'oklch(0.95 0.01 265)',
+  'sidebar-primary': 'oklch(0.55 0.2 266)',
+  'sidebar-primary-foreground': 'oklch(0.98 0.01 265)',
+  'sidebar-accent': 'oklch(0.27 0.015 265)',
+  'sidebar-accent-foreground': 'oklch(0.95 0.01 265)',
+  'sidebar-border': 'oklch(0.3 0.016 265)',
+  'sidebar-ring': 'oklch(0.55 0.2 266)',
+};
+
+const BENTO_THEME: ThemeDefinition = {
+  id: 'bento',
+  label: 'Bento',
+  description: 'Modular dashboard — charcoal panels with violet and blue accents.',
+  swatch: DEFAULT_SWATCH,
+  source: 'builtin',
+  light: BENTO_LIGHT,
+  dark: BENTO_DARK,
+};
+
+/**
  * Every built-in theme by id. `default` is the always-present identity theme (R8 fallback target).
- * Additional Angelo-approved themes (bento, vaporwave, cyberpunk, aurora, …) are appended here as their
+ * Additional Angelo-approved themes (vaporwave, cyberpunk, aurora, …) are appended here as their
  * AA-tuned palettes land — each is a single additive ThemeDefinition; the registry/emitter/guards need
  * zero structural change to absorb one.
  */
 export const THEME_REGISTRY: Record<string, ThemeDefinition> = {
   default: DEFAULT_THEME,
   blueprint: BLUEPRINT_THEME,
+  bento: BENTO_THEME,
 };
 
 /** The id every unknown/absent selection resolves to (R8). */
