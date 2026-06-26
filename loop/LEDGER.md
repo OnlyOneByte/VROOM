@@ -231,13 +231,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 334 |
-| deep-review | 5 | 339 |
+| deep-review | 5 | 340 |
 | guard | 6 | 336 |
 | bug | 3 | 337 |
 | arch | 5 | 334 |
 | infra | 6 | 335 |
 
-Current cycle: **339**
+Current cycle: **340**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,7 +256,24 @@ Current cycle: **339**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
-- **C339 (DEEP-REVIEW root-cause: the C338 finding is DEEPER than the harness — the app REVERTS the theme to `default` on hydrate [server-wins reconcile]; fixed shot.mjs groundwork + escalated the real product question)** —
+- **C340 (DEEP-REVIEW: SOLVED the theming eyes-on method [picker-drive] + GENUINELY re-verified the re-skin — integrity restored on the C338/C339 thread)** —
+  Balance recompute (cycle 340): feature most-starved (6/4) but registering a fill-in is the BLOCKED pick (C338/C339:
+  can't trust its eyes-on yet). Per don't-force-a-blocked-pick, took the C339 path-(A): prove a WORKING eyes-on method +
+  re-verify for real. KEY INSIGHT: clicking the picker card runs setTheme() AFTER the load-time reconcile, so the theme
+  STICKS on that page (no reload to re-trigger the server-wins reset). RECIPE: CLICK_SELECTOR="button[aria-label='Use the
+  <Label> theme']" shot.sh /settings → md5sum + assert distinct. RESULT: cyberpunk/aurora/solarpunk produced 3 DISTINCT
+  hashes (ec072f / 30cd45 / 0570ab) — and Read confirmed each: the clicked theme's card shows the selected ring+check AND
+  the sidebar icons + Save-Settings FAB switch to that theme's accent (cyberpunk cyan vs aurora blue-violet). So the engine
+  GENUINELY RE-SKINS — the C313-C334 CODE was correct all along; only my PRIOR verification method was flawed. Recorded the
+  VERIFIED METHOD durably in the tracked theming-engine/tasks.md T11 (drive the picker, NOT inject localStorage which
+  reconcile reverts; always hash-verify distinct) + marked T10 DONE. This RESTORES integrity to the thread: themes are now
+  re-classifiable from "visual-UNCONFIRMED" to picker-verifiable, ~2-3 per cycle. Verify: investigation + tracked-doc only
+  (shot.mjs gitignored), suites unchanged green (1118), branch green/PR-ready 221. cov: be 89.29% / fe 89.59% (~).
+  (deep-review→340. The C338 eyes-on harness item is SOLVED [path A picker-drive works + is documented]. REMAINING: (1)
+  walk all 8 themes × {light,dark} via the recipe to fully clear the visual-unconfirmed backlog; (2) the
+  reconcile-when-server-unset product call [BACKLOG bug 🚩] still open — if Angelo rules "skip overwrite when server empty",
+  the storageState/?theme path ALSO works + a real user's theme persists across reload. Net: theming verification is
+  trustworthy again.)
   Balance recompute (cycle 339): feature was nominally most-starved (5/4) but registering another fill-in would knowingly
   reproduce the C338 unverifiable-claim problem → OVERRODE to the C338 top item (fix the eyes-on harness, then re-verify).
   Fixed shot.mjs: added a THEME_ID env knob that addInitScripts localStorage['vroom-theme-id'] + <html data-theme> pre-paint
