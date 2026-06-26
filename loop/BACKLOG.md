@@ -848,6 +848,15 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 >       semantics → NOT auto-fixed. Until Angelo rules, theme eyes-on uses path (A).
 > The C313-C334 themes remain code+guard-verified, visual-UNCONFIRMED until a picker-driven re-verify lands.
 >
+> **OPEN ANGELO-GATED (low-sev, found C343) — `default` palette chart colors fall below WCAG graphical 3:1 vs card.**
+> default/light chart-4 (1.72) + chart-5 (2.15) + default/dark chart-1 (2.60) are below the 3:1 graphical-object threshold
+> against the card surface — analytics chart series are low-contrast on the ORIGINAL palette. PRE-EXISTING (verbatim app.css
+> per the C185 default≡app.css identity contract), NOT introduced by any theming cycle; all 8 new themes PASS ≥3:1. NOT
+> auto-fixed: re-tuning the shipped chart tokens is a visual/product call AND breaks the C185 default≡app.css guard (which
+> intentionally locks default to app.css). Fix path if Angelo wants it: bump app.css chart-4/5 (light) + chart-1 (dark)
+> toward ≥3:1 + mirror into the registry default + (optionally) add a chart-contrast guard (which would be red-on-arrival
+> until then). Low priority — chart legibility, not data.
+>
 > **🚩 OPEN ANGELO-GATED (escalated C333) — PWA theme-color meta does NOT follow the selected theme.** applyTheme
 > (theme.svelte.ts:52-55) sets the `<meta name="theme-color">` tint to a HARD-CODED brand hex by MODE only (#2563eb
 > light / #1a1a2e dark), ignoring themeId. Deferred at C191/T8 as "moot until a non-default theme ships" + flagged to
