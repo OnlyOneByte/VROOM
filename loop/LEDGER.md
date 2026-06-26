@@ -230,14 +230,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 318 |
+| feature | 4 | 323 |
 | deep-review | 5 | 321 |
 | guard | 6 | 322 |
 | bug | 3 | 320 |
 | arch | 5 | 317 |
 | infra | 6 | 319 |
 
-Current cycle: **322**
+Current cycle: **323**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,23 @@ Current cycle: **322**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C323 (FEATURE theming: registered the bento theme — 2nd Angelo palette, eyes-on verified; the C313 recipe proven repeatable)** —
+  Balance recompute (cycle 323): feature over budget (5 starved, budget 4, 1.25×) AND the highest-leverage open item —
+  the balance self-correction predicted at C322 landed exactly. Registered `bento` (2nd of the 5 Angelo palettes) by the
+  C313 recipe: distilled the ryang.dev bento mock (charcoal canvas #0f1115 / lifted panels #171a21 / violet #c4b5fd + blue
+  #60a5fa + green accents / indigo→blue CTA) into VROOM's 32 tokens — DARK = native modular-dashboard, LIGHT = clean
+  bento-light (soft-grey canvas, white cards, same accent family). AA-tuned: first pass had 2 fails (dark primary-foreground
+  3.56 — white on the 0.62 indigo-blue), darkened the dark primary 0.62→0.55 → all 22 pairs PASS (lowest 4.79). Appended one
+  BENTO_THEME ThemeDefinition (reusing DEFAULT_SWATCH per C317) + regenerated themes.css. ALL 7 theming guards
+  auto-covered it with ZERO structural change (contrast/distinctness/integrity/byte-fresh/metadata + resolver/store loops):
+  956 tests, +29 vs C322's 927 — the guard fan-out firing on the new theme exactly as designed. EYES-ON: shot /settings →
+  picker now renders 3 cards (Default/Blueprint/Bento) with correct per-theme swatches + descriptions, 3-up reflow clean;
+  seeded bento+dark → shot /dashboard → FULL re-skin in charcoal/violet/blue, status 200, ZERO console errors, no FOUC, no
+  black-on-black (the dramatic dark variant the C318 light-whiteprint shot could not show — proves the C316 dark cascade
+  live). Verify: FE validate:local GREEN (956 tests). BE untouched. Committed 0088a2f (theme) + a250409 (themes.css), pushed
+  (branch 188 ahead / 0 behind). cov: be 89.29% / fe 89.46% (~ — themes are data + .svelte, eyes-on-covered). (feature→323.
+  The recipe is now PROVEN REPEATABLE [blueprint C313 → bento C323]. 3 palettes left: vaporwave, cyberpunk, aurora — each a
+  clean feature cycle. NEXT feature cycle: register vaporwave.)
 - **C322 (GUARD: pin the ThemePickerCard metadata contract — non-empty label + description + valid-key swatch per theme)** —
   Balance recompute (cycle 322): guard most-starved over budget (7 starved, budget 6, 1.17×) — forced pick. The engine is
   guarded across 5 token/CSS dimensions, but the picker (C318) renders METADATA (label/description/swatch) and that contract
