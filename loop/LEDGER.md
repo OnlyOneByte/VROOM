@@ -231,13 +231,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 331 |
-| deep-review | 5 | 321 |
+| deep-review | 5 | 332 |
 | guard | 6 | 328 |
 | bug | 3 | 325 |
 | arch | 5 | 324 |
 | infra | 6 | 326 |
 
-Current cycle: **331**
+Current cycle: **332**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,24 @@ Current cycle: **331**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C332 (DEEP-REVIEW T11: blueprint-LIGHT variant eyes-on certified CLEAN firsthand + caught a real eyes-on HARNESS footgun [byte-identical false-pass])** —
+  Balance recompute (cycle 332): deep-review most-starved over budget (11/5, 2.2×) — and GENUINELY not saturated this time:
+  every theme's DARK variant was eyes-on'd (+ solarpunk light), but the LIGHT variants of the 5 cool themes were only
+  COMPUTED AA-clean, never visually verified (a light variant can pass AA yet look washed-out / near-invisible primary — an
+  aesthetic defect computation cannot catch). Booted + shot two cool-theme light dashboards. CAUGHT A HARNESS FOOTGUN: the
+  first run produced TWO BYTE-IDENTICAL PNGs (md5 match) — a false pass; my shell seed() function did not reliably rewrite
+  the shared /tmp/auth-light.json between shots, so both rendered the SAME theme. Did NOT claim a result; diagnosed via a
+  decisive hash check — default-light vs blueprint-light with UNIQUE per-theme seed files → DIFFERENT hashes (72979f vs
+  41a19), proving (a) theme-switch works, (b) the first run had rendered DEFAULT for both (verified nothing). Re-shot
+  correctly: blueprint-LIGHT (hash-confirmed distinct from default) Read + certified CLEAN — a legible "whiteprint" (pale
+  drafting-paper canvas with a cool blue tint vs default neutral, navy ink fully legible, no washed-out/invisible elements,
+  no overflow, zero console errors). The subtle-but-real difference from default is the intended aesthetic; computed AA-pass
+  confirmed by eyes. NO aesthetic defect. HARNESS LESSON (durable): eyes-on of multiple themes in one boot MUST use a UNIQUE
+  AUTH_STATE file per theme + hash-verify the PNGs differ — a byte-identical pair is a false pass, not a clean result.
+  Verify: eyes-on only, suites unchanged green (1073). Doc-only (the cert + the harness lesson are the value). cov: be
+  89.29% / fe 89.49% (~). (deep-review→332. blueprint-light CERTIFIED; the other 4 cool-theme light variants [bento/vaporwave/
+  cyberpunk/aurora] remain computed-AA-clean but not-yet-eyes-on — a future deep-review using the corrected per-file harness.
+  HONEST: only ONE light variant verified this cycle, not all — did not overclaim.)
 - **C331 (FEATURE theming: registered the solarpunk FILL-IN theme — first warm palette, eyes-on verified; Angelo pre-authorized the fill-ins)** —
   Balance recompute (cycle 331): deep-review (10/5) + bug (6/3) + arch (7/5) all over budget but all SATURATED/dry on the
   only fresh surface (theming — deep-review certified C327, bug scouted C325, arch converged C324; the C327-C330 palettes are
