@@ -52,16 +52,24 @@ Don't run the 6-budget recompute in BUILD mode — it's wasted work when the que
 > Keep this list current as the live build plan. The loop POPS the top unblocked slice instead of
 > re-deciding feature order every cycle (that re-derivation was a per-cycle tax). Re-rank only when a
 > slice finishes or a gate clears. Greenlit 2026-06-24; ordered by Angelo (money-cents first, C349).
-1. **money-cents-migration** — `.kiro/specs/money-cents-migration/tasks.md`. FIRST: it is the ONLY
-   greenlit feature with NO eyes-on tail (runs to DONE in-loop) AND it is data-safety-critical.
-   HARD ORDER: T1+T2 (schema/migration + backup version-bump/shim) land together BEFORE T3–T6.
-2. **trips-location** — `.kiro/specs/trips-location/tasks.md`. T1–T5 backend (one slice/cycle), T6 eyes-on.
-3. **theming-engine** — `.kiro/specs/theming-engine/tasks.md` (Angelo-approved D1–D7). Token-only
-   swap; T1 = userPreferences.themePreference column + migration. Pure token swap, default ≡ today byte-for-byte.
+1. **money-cents-migration** — `.kiro/specs/money-cents-migration/tasks.md`. **⛔ HELD on an Angelo
+   SEQUENCING confirm (escalated post-reset C1, still unanswered C8).** The spec line "T1+T2 before T3–T6,
+   one task per cycle" is INFEASIBLE: T1 (flip the 14 money cols real→integer + CAST*100) cannot pass
+   validate:local alone while the read/write path + money-math suites still use dollar-floats — the branch
+   only re-greens once the conversion is END-TO-END. Angelo's earlier ruling was "T1–T7 in ONE never-broken
+   commit". DO NOT START until he confirms atomic-vs-incremental (recommend atomic). Stays #1 (only greenlit
+   feature with no eyes-on tail + data-safety-critical) but is BLOCKED, not buildable.
+2. ~~**trips-location**~~ — ✅ **COMPLETE (post-reset C3–C5: T1–T8 + T6b-3).** C214 odometer-lifecycle (T7) +
+   D3 rate (T8) backend + the FE edit/delete eyes-on tail, all shipped + guarded (C6 date-resync, C7 backup
+   round-trip). Don't re-pick.
+3. ~~**theming-engine**~~ — ✅ **COMPLETE (pre-reset: engine + 10 themes + picker, guarded 10 dimensions).** Don't re-pick.
 4. **vehicle-sharing** — `.kiro/specs/vehicle-sharing/tasks.md` (T0 NOT yet ratified — BLOCKED until
    Angelo clears its gate; highest cross-tenant risk, so it waits). Skip until unblocked.
 - Then the Angelo-approved bug/arch decisions (2026-06-23): #100 json_patch atomic, #79 offline-park,
   seedVehicle convergence (incremental), createLoadState (design-doc-first), #129 already done C155.
+> **QUEUE STATE (post-reset C8): DRAINED of buildable work** — #2/#3 done, #1 held on Angelo (money-cents
+> sequencing), #4 gated (vehicle-sharing T0). Until a gate clears the loop is correctly in MAINTAIN mode
+> (harden the shipped trips backend + existing surfaces). money-cents is the single highest-leverage unblock.
 
 ## VELOCITY RULES (the C349 reform — don't pay waste the loop already learned to skip)
 1. **Conditional verify (skip the full gate on doc-only cycles).** `validate:local` (tsc+biome+test+
