@@ -233,11 +233,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 323 |
 | deep-review | 5 | 321 |
 | guard | 6 | 322 |
-| bug | 3 | 320 |
+| bug | 3 | 325 |
 | arch | 5 | 324 |
 | infra | 6 | 319 |
 
-Current cycle: **324**
+Current cycle: **325**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,19 @@ Current cycle: **324**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C325 (BUG-scout DRY: C323 bento + C324 factory certified CLEAN firsthand → no defect; surfaced a guard-gap for the NEXT guard cycle)** —
+  Balance recompute (cycle 325): bug most-starved over budget (5 starved, budget 3, 1.67×). Scouted the fresh source since
+  the last bug cycle (C320): C323 bento + C324 defineBuiltinTheme factory. Certified CLEAN firsthand via a runtime probe of
+  the live registry: (1) CROSS-THEME distinctness — no PAIR of themes is byte-identical (blueprint ≠ bento in both
+  variants), so bento is genuinely its own palette; (2) the factory produces a correct shape for all 3 themes —
+  source==='builtin' + a non-empty swatch of valid keys for every theme (the swatch ?? DEFAULT_SWATCH edge is sound: all
+  current themes omit swatch → default applies). NO defect in either C323 or C324. Did NOT manufacture a test (the
+  don't-manufacture-on-dry-scout discipline, C316/C308 precedent). SURFACED (for the NEXT guard cycle, NOT mis-filed as a
+  bug): the C314 distinctness guard only checks each theme vs `default` — it would NOT catch two NON-default themes being
+  byte-identical (a future copy-paste cloning vaporwave from bento). Today it is verified fine, but with 3 palettes queued
+  that is a reachable footgun → a clean guard-category item (extend distinctness to all pairs). Verify: no source touched,
+  suites green (956 FE). cov: be 89.29% / fe 89.46% (~). (bug→325. The C320 each-key + C322 metadata + C323/C324 surfaces are
+  all certified clean. NEXT guard cycle: the cross-theme all-pairs distinctness guard. NEXT feature: register vaporwave.)
 - **C324 (ARCH dedup: extracted defineBuiltinTheme factory — converged the per-theme ThemeDefinition boilerplate the C313/C323 palettes repeat)** —
   Balance recompute (cycle 324): arch most-starved over budget (7 starved, budget 5, 1.4×). C286 fast-dry precondition:
   production source DID change since arch's last touch (C317) — C318 picker + C320 fix + C323 bento. Found the self-dup:
