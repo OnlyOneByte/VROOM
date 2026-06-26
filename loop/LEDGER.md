@@ -233,11 +233,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 318 |
 | deep-review | 5 | 314 |
 | guard | 6 | 315 |
-| bug | 3 | 316 |
+| bug | 3 | 320 |
 | arch | 5 | 317 |
 | infra | 6 | 319 |
 
-Current cycle: **319**
+Current cycle: **320**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,20 @@ Current cycle: **319**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C320 (BUG FIX: ThemePickerCard swatch loop keyed on the color VALUE — a reachable Svelte each_key_duplicate runtime crash on a future dup-color palette)** —
+  Balance recompute (cycle 320): bug most-starved over budget by ratio (4 starved, budget 3, 1.33×). Scouted the fresh
+  source since the last bug cycle (C316) — C318's ThemePickerCard. Found a REAL latent defect: the swatch strip rendered
+  `{#each swatchColors(theme) as color (color)}`, keying on the resolved color string. A minimalist/monochrome theme can
+  legitimately resolve two swatch tokens to the SAME color (e.g. background===card), and Svelte throws each_key_duplicate
+  at RUNTIME on a keyed each with a repeated key — crashing the entire picker for that theme. Latent today (both current
+  themes have 4 distinct swatch colors → GREEN), but reachable the instant a future palette (bento/vaporwave/cyberpunk/
+  aurora) ships a dup — i.e. it would crash on the VERY NEXT queued feature work. FIX: key by INDEX (the swatch is a static,
+  never-reordered, presentation-only strip — index is the correct crash-proof key; behavior-identical for distinct colors).
+  GUARD (NORTH_STAR #5): source-scan in themes-css.test.ts pinning the index-key contract + forbidding the (color) regression
+  (the C25/C45 one-edit-fix→source-scan idiom); NON-VACUOUS — reverting to (color) keying turns it RED, proven firsthand.
+  Verify: FE validate:local GREEN (921 tests, +1). BE untouched. Committed 4687a60 (fix) + 72327c1 (guard), pushed (branch
+  181 ahead / 0 behind). cov: be 89.29% / fe 89.46% (~). (bug→320. This pre-empts a crash the next palette-registration
+  cycle would otherwise hit. The picker is now crash-safe for any palette. NEXT: register bento by the C313 recipe.)
 - **C319 (INFRA cadence: coverage RE-MEASURE [replacing the carried `~` tags] + untracked-test sweep + tracked-survival check)** —
   Balance recompute (cycle 319): infra most-starved over budget (7 starved, budget 6) — and a real re-measure was due:
   every cov: tag C313–C318 was carried-forward `~`, while 6 cycles added theme tests + the picker. RE-MEASURED FE
