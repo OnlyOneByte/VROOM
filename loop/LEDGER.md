@@ -230,14 +230,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 323 |
+| feature | 4 | 327 |
 | deep-review | 5 | 321 |
 | guard | 6 | 322 |
 | bug | 3 | 325 |
 | arch | 5 | 324 |
 | infra | 6 | 326 |
 
-Current cycle: **326**
+Current cycle: **327**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,22 @@ Current cycle: **326**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C327 (FEATURE theming: registered the vaporwave theme — 3rd Angelo palette, eyes-on verified, via the C324 factory)** —
+  Balance recompute (cycle 327): deep-review was the over-budget pick (6/5, 1.2×) — but per the GUIDE don't-force-a-blocked-pick
+  + deep-review-saturation rules, the theming surface is fully certified (picker logic C321, distinctness C314, cascade C316)
+  and there is NO not-yet-audited fresh subsystem (14 cycles all theming). Recorded deep-review SATURATED + pivoted to the
+  highest-leverage open item: register vaporwave (the standing top feature item) — real product progress over a 3rd thin doc
+  cycle. Distilled the ryang.dev CRT/vaporwave mock (purple-magenta canvas #2b1055→#7b2d8e / neon pink #ff2d95 / cyan #5cf3ff /
+  gold) into VROOM's 32 tokens — DARK native neon-on-purple, LIGHT a soft-lavender vaporwave-light. D7 token-only: the
+  PALETTE, not the scanline/glow EFFECTS. AA-tuned: 2 first-pass fails (dark primary-foreground 4.04 — white on the 0.62
+  neon-magenta), nudged the dark primary 0.62→0.57 → all 22 pairs PASS (lowest 4.69). Registered via ONE defineBuiltinTheme
+  call (the C324 factory — minimal boilerplate) + regenerated themes.css. ALL guards auto-covered it: 985 tests (+29 vs C326
+  956). EYES-ON: shot /settings → picker renders 4 cards (Default/Blueprint/Bento/Vaporwave) with correct magenta/cyan
+  vaporwave swatch + description, clean reflow; seeded vaporwave+dark → shot /dashboard → FULL re-skin on deep purple-magenta
+  with magenta primary + cyan accents, status 200, ZERO console errors, no FOUC. Verify: FE validate:local GREEN (985). BE
+  untouched. Committed 16e61a9 (theme) + 50ad775 (themes.css), pushed (branch 195 ahead / 0 behind). cov: be 89.29% / fe
+  89.49% (~ — themes are data + .svelte). (feature→327. 3 of 5 palettes done [blueprint/bento/vaporwave]. 2 LEFT: cyberpunk,
+  aurora. NEXT feature cycle: register cyberpunk. The all-pairs-distinctness guard [C325-surfaced] remains the next guard item.)
 - **C326 (INFRA cadence: FE coverage RE-MEASURE [replacing the C319-carried ~] + untracked-test sweep CLEAN)** —
   Balance recompute (cycle 326): infra most-starved over budget (7 starved, budget 6) — only over-budget category. A real
   re-measure was due: since C319 the C320 fix + C322 metadata guard + C323 bento + C324 factory added ~36 tests + net-new
