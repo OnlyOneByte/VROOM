@@ -301,15 +301,102 @@ const BENTO_THEME: ThemeDefinition = defineBuiltinTheme({
 });
 
 /**
+ * `vaporwave` light palette — a soft-lavender vaporwave-light: pale magenta canvas, the neon-magenta brand,
+ * a cyan accent. Distilled from the ryang.dev CRT/vaporwave mock into VROOM's 32 tokens, AA-tuned (every
+ * fg/bg pair clears WCAG AA 4.5 — theme-contrast.test.ts). D7 token-only: the palette, not scanline/glow effects.
+ */
+const VAPORWAVE_LIGHT: ThemeTokens = {
+  background: 'oklch(0.97 0.02 320)',
+  foreground: 'oklch(0.28 0.12 320)',
+  card: 'oklch(0.99 0.01 320)',
+  'card-foreground': 'oklch(0.28 0.12 320)',
+  popover: 'oklch(0.99 0.01 320)',
+  'popover-foreground': 'oklch(0.28 0.12 320)',
+  primary: 'oklch(0.55 0.25 350)',
+  'primary-foreground': 'oklch(0.99 0.01 320)',
+  secondary: 'oklch(0.93 0.04 320)',
+  'secondary-foreground': 'oklch(0.35 0.12 320)',
+  muted: 'oklch(0.93 0.04 320)',
+  'muted-foreground': 'oklch(0.47 0.1 320)',
+  accent: 'oklch(0.9 0.08 220)',
+  'accent-foreground': 'oklch(0.34 0.12 230)',
+  destructive: 'oklch(0.52 0.22 25)',
+  warning: 'oklch(0.55 0.13 75)',
+  border: 'oklch(0.88 0.04 320)',
+  input: 'oklch(0.88 0.04 320)',
+  ring: 'oklch(0.55 0.25 350)',
+  'chart-1': 'oklch(0.55 0.25 350)',
+  'chart-2': 'oklch(0.55 0.15 220)',
+  'chart-3': 'oklch(0.6 0.15 90)',
+  'chart-4': 'oklch(0.5 0.18 300)',
+  'chart-5': 'oklch(0.55 0.2 20)',
+  sidebar: 'oklch(0.95 0.03 320)',
+  'sidebar-foreground': 'oklch(0.28 0.12 320)',
+  'sidebar-primary': 'oklch(0.55 0.25 350)',
+  'sidebar-primary-foreground': 'oklch(0.99 0.01 320)',
+  'sidebar-accent': 'oklch(0.9 0.08 220)',
+  'sidebar-accent-foreground': 'oklch(0.34 0.12 230)',
+  'sidebar-border': 'oklch(0.88 0.04 320)',
+  'sidebar-ring': 'oklch(0.55 0.25 350)',
+};
+
+/**
+ * `vaporwave` dark palette — the mock's native look: a deep purple-magenta canvas, neon-magenta brand, cyan
+ * accent, gold/pink charts. AA-tuned exactly like the light variant (theme-contrast.test.ts).
+ */
+const VAPORWAVE_DARK: ThemeTokens = {
+  background: 'oklch(0.22 0.11 310)',
+  foreground: 'oklch(0.95 0.04 320)',
+  card: 'oklch(0.26 0.12 308)',
+  'card-foreground': 'oklch(0.95 0.04 320)',
+  popover: 'oklch(0.26 0.12 308)',
+  'popover-foreground': 'oklch(0.95 0.04 320)',
+  primary: 'oklch(0.57 0.26 350)',
+  'primary-foreground': 'oklch(0.99 0.01 320)',
+  secondary: 'oklch(0.32 0.12 305)',
+  'secondary-foreground': 'oklch(0.95 0.04 320)',
+  muted: 'oklch(0.3 0.1 305)',
+  'muted-foreground': 'oklch(0.8 0.08 320)',
+  accent: 'oklch(0.45 0.13 230)',
+  'accent-foreground': 'oklch(0.95 0.05 220)',
+  destructive: 'oklch(0.62 0.23 18)',
+  warning: 'oklch(0.82 0.14 85)',
+  border: 'oklch(0.42 0.14 330)',
+  input: 'oklch(0.4 0.13 320)',
+  ring: 'oklch(0.7 0.2 200)',
+  'chart-1': 'oklch(0.68 0.24 350)',
+  'chart-2': 'oklch(0.78 0.16 200)',
+  'chart-3': 'oklch(0.85 0.15 90)',
+  'chart-4': 'oklch(0.7 0.18 300)',
+  'chart-5': 'oklch(0.75 0.18 20)',
+  sidebar: 'oklch(0.19 0.1 312)',
+  'sidebar-foreground': 'oklch(0.95 0.04 320)',
+  'sidebar-primary': 'oklch(0.57 0.26 350)',
+  'sidebar-primary-foreground': 'oklch(0.99 0.01 320)',
+  'sidebar-accent': 'oklch(0.45 0.13 230)',
+  'sidebar-accent-foreground': 'oklch(0.95 0.05 220)',
+  'sidebar-border': 'oklch(0.42 0.14 330)',
+  'sidebar-ring': 'oklch(0.7 0.2 200)',
+};
+
+const VAPORWAVE_THEME: ThemeDefinition = defineBuiltinTheme({
+  id: 'vaporwave',
+  label: 'Vaporwave',
+  description: 'Retro-future neon — magenta and cyan on deep purple.',
+  light: VAPORWAVE_LIGHT,
+  dark: VAPORWAVE_DARK,
+});
+
+/**
  * Every built-in theme by id. `default` is the always-present identity theme (R8 fallback target).
- * Additional Angelo-approved themes (vaporwave, cyberpunk, aurora, …) are appended here as their
- * AA-tuned palettes land — each is a single additive ThemeDefinition; the registry/emitter/guards need
- * zero structural change to absorb one.
+ * Additional Angelo-approved themes (cyberpunk, aurora) are appended here as their AA-tuned palettes land —
+ * each is a single defineBuiltinTheme call; the registry/emitter/guards need zero structural change.
  */
 export const THEME_REGISTRY: Record<string, ThemeDefinition> = {
   default: DEFAULT_THEME,
   blueprint: BLUEPRINT_THEME,
   bento: BENTO_THEME,
+  vaporwave: VAPORWAVE_THEME,
 };
 
 /** The id every unknown/absent selection resolves to (R8). */
