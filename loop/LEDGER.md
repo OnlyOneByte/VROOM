@@ -230,14 +230,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 327 |
+| feature | 4 | 329 |
 | deep-review | 5 | 321 |
 | guard | 6 | 328 |
 | bug | 3 | 325 |
 | arch | 5 | 324 |
 | infra | 6 | 326 |
 
-Current cycle: **328**
+Current cycle: **329**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,21 @@ Current cycle: **328**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C329 (FEATURE theming: registered the cyberpunk theme — 4th Angelo palette, eyes-on verified, via the C324 factory)** —
+  Balance recompute (cycle 329): deep-review (8/5) + bug (4/3) both over budget but both SATURATED on the only fresh surface
+  (theming, certified C327/C328) — a 3rd dry doc cycle would be low-integrity filler. Per don't-force-a-blocked-pick, pivoted
+  to the highest-leverage open item: register cyberpunk. Distilled the ryang.dev cyberpunk mock (near-black slate #06080d /
+  neon cyan #00e5ff / magenta #ff2e88 / amber #ffb302) into VROOM's 32 tokens — DARK native near-black/cyan-led, LIGHT a
+  pale blue-grey cyberpunk-light. D7 token-only (no scanline/chromatic-aberration EFFECTS). AA-tuned: 2 first-pass fails
+  (dark ACCENT this time — white on the 0.62 magenta accent = 3.92), darkened the dark accent 0.62→0.55 → all 22 pairs PASS.
+  Registered via ONE defineBuiltinTheme call + regenerated themes.css. ALL guards auto-covered it incl. the C328 all-pairs
+  distinctness (cyberpunk verified ≠ the other 4): 1015 tests (+29 vs C328 986). EYES-ON: shot /settings → picker renders 5
+  cards (Default/Blueprint/Bento/Vaporwave/Cyberpunk) with correct cyan/magenta cyberpunk swatch, clean reflow; seeded
+  cyberpunk+dark → shot /dashboard → FULL re-skin on near-black slate with neon-cyan primary (the darkest/grittiest of the
+  4, visibly distinct from vaporwave purple), status 200, ZERO console errors, no FOUC. Verify: FE validate:local GREEN
+  (1015). BE untouched. Committed f9b29e5 (theme) + e9dfdb0 (themes.css), pushed (branch 200 ahead / 0 behind). cov: be
+  89.29% / fe 89.49% (~). (feature→329. 4 of 5 palettes done [blueprint/bento/vaporwave/cyberpunk]. 1 LEFT: aurora. NEXT
+  feature cycle: register aurora — completes the Angelo-approved 5-theme set.)
 - **C328 (GUARD: extended theme distinctness to ALL PAIRS — the C325-surfaced gap; de-risks the cyberpunk/aurora registrations)** —
   Balance recompute (cycle 328): deep-review was the over-budget pick (7/5) but was certified SATURATED C327 (no fresh
   subsystem). Per don't-force-a-blocked-pick, pivoted to the concrete queued guard item (NOT filler): the all-pairs
