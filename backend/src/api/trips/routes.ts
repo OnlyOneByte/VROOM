@@ -211,12 +211,25 @@ routes.put(
       data.tripDate !== undefined && data.tripDate.getTime() !== existing.tripDate.getTime();
     if (endChanged || dateChanged) {
       try {
-        await odometerRepository.deleteLinkedTripEntry({
+        // N:1 guard (#C214-N1): only remove the stale OLD-key entry if no OTHER trip still maps to it (the
+        // dedup means trips at the same (vehicle, day, reading) share one entry — removing it on this edit
+        // would orphan a survivor at the old key). Always re-create at the NEW key (deduped — a no-op if a
+        // reading already sits there), so this trip's own moved reading is represented.
+        const othersAtOld = await tripRepository.countOthersAtOdometerKey({
+          excludeTripId: id,
           vehicleId: existing.vehicleId,
           userId: user.id,
-          odometer: existing.endOdometer,
-          recordedAt: existing.tripDate,
+          endOdometer: existing.endOdometer,
+          tripDate: existing.tripDate,
         });
+        if (othersAtOld === 0) {
+          await odometerRepository.deleteLinkedTripEntry({
+            vehicleId: existing.vehicleId,
+            userId: user.id,
+            odometer: existing.endOdometer,
+            recordedAt: existing.tripDate,
+          });
+        }
         await odometerRepository.createFromTrip({
           vehicleId: existing.vehicleId,
           userId: user.id,
@@ -268,14 +281,26 @@ routes.delete(
 
     if (keepOdometer === false) {
       try {
-        await odometerRepository.deleteLinkedTripEntry({
+        // N:1 guard (#C214-N1): createFromTrip DEDUPS, so multiple trips at the same (vehicle, day, reading)
+        // SHARE one linked entry. Only remove it if NO OTHER trip still maps to that key — else this delete
+        // would orphan a surviving trip's odometer reading. (The just-deleted trip is excluded by id.)
+        const others = await tripRepository.countOthersAtOdometerKey({
+          excludeTripId: id,
           vehicleId: existing.vehicleId,
           userId: user.id,
-          odometer: existing.endOdometer,
-          recordedAt: existing.tripDate,
+          endOdometer: existing.endOdometer,
+          tripDate: existing.tripDate,
         });
-        // The removed reading may have been the max → recheck mileage reminders against the new current.
-        await reminderTriggerService.recheckMileageReminders(user.id, existing.vehicleId);
+        if (others === 0) {
+          await odometerRepository.deleteLinkedTripEntry({
+            vehicleId: existing.vehicleId,
+            userId: user.id,
+            odometer: existing.endOdometer,
+            recordedAt: existing.tripDate,
+          });
+          // The removed reading may have been the max → recheck mileage reminders against the new current.
+          await reminderTriggerService.recheckMileageReminders(user.id, existing.vehicleId);
+        }
       } catch (error) {
         logger.error('Trip-delete linked-odometer cleanup failed (trip already deleted)', {
           tripId: id,

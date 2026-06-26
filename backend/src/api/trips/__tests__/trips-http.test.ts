@@ -888,4 +888,39 @@ describe('C214 trips↔odometer lifecycle (T7)', () => {
     expect(linkedOnDay('2024-06-25')).toBe(1);
     expect(linkedEntryCount(vehicleId, 1080)).toBe(1); // still exactly one such reading, just re-dated
   });
+
+  // #C214-N1 (bug, found + fixed C10): createFromTrip DEDUPS, so two trips at the same (vehicle, day,
+  // reading) SHARE one linked odometer entry. Deleting ONE with keepOdometer=false must NOT remove the
+  // shared entry while the OTHER trip still references it — else the survivor's odometer reading is silently
+  // orphaned (getCurrentOdometer → null). The route now removes the entry only when no other trip maps to it.
+  test('keepOdometer=false on one of TWO trips sharing a key KEEPS the shared entry (no orphan, #C214-N1)', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    // Two trips, same vehicle + same day + same endOdometer → ONE shared linked entry (dedup).
+    const a = await ctx.authed('POST', '/api/v1/trips', VALID(vehicleId, { endOdometer: 1080 }));
+    await ctx.authed('POST', '/api/v1/trips', VALID(vehicleId, { endOdometer: 1080 }));
+    const { data: tripA } = await json<DataEnvelope<{ id: string }>>(a);
+    expect(linkedEntryCount(vehicleId, 1080)).toBe(1); // dedup → one shared entry
+
+    // Delete trip A with keepOdometer=false — trip B still references the key, so the entry must survive.
+    const res = await ctx.authed('DELETE', `/api/v1/trips/${tripA.id}?keepOdometer=false`);
+    expect(res.status).toBe(200);
+    expect(linkedEntryCount(vehicleId, 1080)).toBe(1); // NOT orphaned — survivor keeps its reading
+
+    const { odometerRepository } = await import('../../odometer/repository');
+    expect(await odometerRepository.getCurrentOdometer(vehicleId, ctx.user.id)).toBe(1080);
+  });
+
+  test('keepOdometer=false on the LAST trip at a key DOES remove the shared entry (no survivor)', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
+    const a = await ctx.authed('POST', '/api/v1/trips', VALID(vehicleId, { endOdometer: 1080 }));
+    const b = await ctx.authed('POST', '/api/v1/trips', VALID(vehicleId, { endOdometer: 1080 }));
+    const { data: tripA } = await json<DataEnvelope<{ id: string }>>(a);
+    const { data: tripB } = await json<DataEnvelope<{ id: string }>>(b);
+
+    // Delete A (keep): B still references → entry stays. Then delete B (remove): now no trip maps → gone.
+    await ctx.authed('DELETE', `/api/v1/trips/${tripA.id}?keepOdometer=false`);
+    expect(linkedEntryCount(vehicleId, 1080)).toBe(1);
+    await ctx.authed('DELETE', `/api/v1/trips/${tripB.id}?keepOdometer=false`);
+    expect(linkedEntryCount(vehicleId, 1080)).toBe(0); // last reference removed → entry cleaned up
+  });
 });

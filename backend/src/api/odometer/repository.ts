@@ -27,6 +27,21 @@ export interface OdometerHistoryResult {
   totalCount: number;
 }
 
+/**
+ * The half-open `[dayStart, nextDay)` window on the LOCAL calendar day of `recordedAt` (R5 local-day
+ * semantics). The single source of truth for the trip↔odometer dedup key's DATE component: createFromTrip
+ * (write) and deleteLinkedTripEntry (remove) MUST compute the IDENTICAL window or a delete would miss the
+ * entry the create wrote (orphan) — and the TripRepository same-key reference count (#C214-N1) must use the
+ * SAME window so "is another trip on this day?" agrees with "what day did createFromTrip dedup on?". Exported
+ * (not a private static) so the trips repo shares it too — one window definition across all three call sites.
+ */
+export function localDayWindow(recordedAt: Date): { dayStart: Date; nextDay: Date } {
+  const dayStart = new Date(recordedAt.getFullYear(), recordedAt.getMonth(), recordedAt.getDate());
+  const nextDay = new Date(dayStart);
+  nextDay.setDate(nextDay.getDate() + 1);
+  return { dayStart, nextDay };
+}
+
 export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdometerEntry> {
   constructor(db: AppDatabase) {
     super(db, odometerEntries);
@@ -35,24 +50,6 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
   /** IDs of all manual odometer entries for a vehicle (for cascade cleanup). */
   async findIdsByVehicleId(vehicleId: string): Promise<string[]> {
     return this.findIdsByColumn(odometerEntries.vehicleId, vehicleId);
-  }
-
-  /**
-   * The half-open `[dayStart, nextDay)` window on the LOCAL calendar day of `recordedAt` (R5 local-day
-   * semantics). The single source of truth for the trip↔odometer dedup key's date component — createFromTrip
-   * (write) and deleteLinkedTripEntry (remove) MUST compute the IDENTICAL window or a delete would miss the
-   * entry the create wrote (orphan), so they share this helper rather than each inlining the date math (the
-   * C214 coupling: the two sides of one key). Pure; no DB access.
-   */
-  private static localDayWindow(recordedAt: Date): { dayStart: Date; nextDay: Date } {
-    const dayStart = new Date(
-      recordedAt.getFullYear(),
-      recordedAt.getMonth(),
-      recordedAt.getDate()
-    );
-    const nextDay = new Date(dayStart);
-    nextDay.setDate(nextDay.getDate() + 1);
-    return { dayStart, nextDay };
   }
 
   /**
@@ -72,7 +69,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
   }): Promise<OdometerEntry | null> {
     // Same-day window [startOfDay, nextDay) on the LOCAL calendar day of recordedAt (R5 local-day
     // semantics) — a trip and a manual reading on the same day at the same value are the same observation.
-    const { dayStart, nextDay } = OdometerRepository.localDayWindow(entry.recordedAt);
+    const { dayStart, nextDay } = localDayWindow(entry.recordedAt);
 
     const existing = await this.db
       .select({ id: odometerEntries.id })
@@ -122,7 +119,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
     odometer: number;
     recordedAt: Date;
   }): Promise<number> {
-    const { dayStart, nextDay } = OdometerRepository.localDayWindow(entry.recordedAt);
+    const { dayStart, nextDay } = localDayWindow(entry.recordedAt);
 
     const removed = await this.db
       .delete(odometerEntries)

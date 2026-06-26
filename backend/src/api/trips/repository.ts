@@ -10,12 +10,13 @@
  * analytics layers (T3/T5) to share one source of truth.
  */
 
-import { and, count, desc, eq } from 'drizzle-orm';
+import { and, count, desc, eq, gte, lt, ne } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { NewTrip, Trip } from '../../db/schema';
 import { trips } from '../../db/schema';
 import { BaseRepository } from '../../utils/repository';
+import { localDayWindow } from '../odometer/repository';
 
 /** Derived trip distance: driven miles, clamped at 0 (R2, the #46 negative-guard). Never stored. */
 export function tripDistance(trip: Pick<Trip, 'startOdometer' | 'endOdometer'>): number {
@@ -40,6 +41,39 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
       .where(and(eq(trips.id, id), eq(trips.userId, userId)))
       .limit(1);
     return row ?? null;
+  }
+
+  /**
+   * Count OTHER trips (excluding `excludeTripId`) that map to the SAME trip↔odometer dedup key — same
+   * vehicle + owner + endOdometer + LOCAL calendar day of tripDate. The C214 lifecycle removes the linked
+   * odometer entry on a keepOdometer=false delete (and the edit re-sync), but createFromTrip DEDUPS, so two
+   * trips at the same (vehicle, day, reading) SHARE one entry (N:1). Removing it while another trip still
+   * references it orphans that survivor's odometer reading (#C214-N1, found C10). The route uses this to
+   * remove the shared entry ONLY when no other trip still maps to it. Uses the SAME localDayWindow as
+   * createFromTrip/deleteLinkedTripEntry so "another trip on this day" agrees with the dedup's day. Tenant-scoped.
+   */
+  async countOthersAtOdometerKey(args: {
+    excludeTripId: string;
+    vehicleId: string;
+    userId: string;
+    endOdometer: number;
+    tripDate: Date;
+  }): Promise<number> {
+    const { dayStart, nextDay } = localDayWindow(args.tripDate);
+    const [result] = await this.db
+      .select({ count: count() })
+      .from(trips)
+      .where(
+        and(
+          eq(trips.userId, args.userId),
+          eq(trips.vehicleId, args.vehicleId),
+          eq(trips.endOdometer, args.endOdometer),
+          ne(trips.id, args.excludeTripId),
+          gte(trips.tripDate, dayStart),
+          lt(trips.tripDate, nextDay)
+        )
+      );
+    return result?.count ?? 0;
   }
 
   /**
