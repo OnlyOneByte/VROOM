@@ -44,7 +44,7 @@ export const vehicles = sqliteTable(
     nickname: text('nickname'),
     vin: text('vin'),
     initialMileage: integer('initial_mileage'),
-    purchasePrice: real('purchase_price'),
+    purchasePrice: integer('purchase_price'), // money: integer CENTS (migration 0009)
     purchaseDate: integer('purchase_date', { mode: 'timestamp' }),
     unitPreferences: text('unit_preferences', { mode: 'json' })
       .$type<UnitPreferences>()
@@ -77,19 +77,19 @@ export const vehicleFinancing = sqliteTable(
       .references(() => vehicles.id, { onDelete: 'cascade' }),
     financingType: text('financing_type').notNull().default('loan'), // 'loan' | 'lease' | 'own'
     provider: text('provider').notNull(), // Lender name, leasing company, or dealer
-    originalAmount: real('original_amount').notNull(),
-    apr: real('apr'), // For loans, null for leases/own
+    originalAmount: integer('original_amount').notNull(), // money: integer CENTS (migration 0009)
+    apr: real('apr'), // For loans, null for leases/own — a PERCENT, stays real (NOT money)
     termMonths: integer('term_months').notNull(),
     startDate: integer('start_date', { mode: 'timestamp' }).notNull(),
     // Payment Configuration
-    paymentAmount: real('payment_amount').notNull(),
+    paymentAmount: integer('payment_amount').notNull(), // money: integer CENTS (migration 0009)
     paymentFrequency: text('payment_frequency').notNull().default('monthly'), // 'monthly' | 'bi-weekly' | 'weekly' | 'custom'
     paymentDayOfMonth: integer('payment_day_of_month'), // For monthly (1-31)
     paymentDayOfWeek: integer('payment_day_of_week'), // For weekly (0-6, Sunday=0)
     // Lease-specific fields
-    residualValue: real('residual_value'), // End-of-lease buyout price
-    mileageLimit: integer('mileage_limit'), // Annual mileage limit for leases
-    excessMileageFee: real('excess_mileage_fee'), // Per-mile fee over limit
+    residualValue: integer('residual_value'), // money: integer CENTS (migration 0009) — End-of-lease buyout price
+    mileageLimit: integer('mileage_limit'), // Annual mileage limit for leases (a MILEAGE count, NOT money)
+    excessMileageFee: integer('excess_mileage_fee'), // money: integer CENTS (migration 0009) — Per-mile fee over limit
     // Status
     isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
     endDate: integer('end_date', { mode: 'timestamp' }), // Payoff date or lease end date
@@ -136,15 +136,15 @@ export const insuranceTerms = sqliteTable(
     endDate: integer('end_date', { mode: 'timestamp' }).notNull(),
     policyNumber: text('policy_number'),
     coverageDescription: text('coverage_description'),
-    deductibleAmount: real('deductible_amount'),
-    coverageLimit: real('coverage_limit'),
+    deductibleAmount: integer('deductible_amount'), // money: integer CENTS (migration 0009)
+    coverageLimit: integer('coverage_limit'), // money: integer CENTS (migration 0009) — a dollar cap, not a %
     agentName: text('agent_name'),
     agentPhone: text('agent_phone'),
     agentEmail: text('agent_email'),
-    totalCost: real('total_cost'),
-    monthlyCost: real('monthly_cost'),
+    totalCost: integer('total_cost'), // money: integer CENTS (migration 0009)
+    monthlyCost: integer('monthly_cost'), // money: integer CENTS (migration 0009)
     premiumFrequency: text('premium_frequency'),
-    paymentAmount: real('payment_amount'),
+    paymentAmount: integer('payment_amount'), // money: integer CENTS (migration 0009)
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   },
@@ -190,7 +190,7 @@ export const insuranceClaims = sqliteTable(
     claimType: text('claim_type').notNull(), // collision | theft | weather | vandalism | other
     description: text('description'),
     status: text('status').notNull().default('filed'), // filed | in_progress | settled | denied
-    payoutAmount: real('payout_amount'),
+    payoutAmount: integer('payout_amount'), // money: integer CENTS (migration 0009)
     faultDesignation: text('fault_designation'), // at_fault | not_at_fault | shared | null
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
@@ -222,8 +222,8 @@ export const expenses = sqliteTable(
     description: text('description'),
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-    expenseAmount: real('expense_amount').notNull(),
-    volume: real('volume'),
+    expenseAmount: integer('expense_amount').notNull(), // money: integer CENTS (migration 0009)
+    volume: real('volume'), // gallons / kWh — a QUANTITY, stays real (NOT money)
     fuelType: text('fuel_type'),
     missedFillup: integer('missed_fillup', { mode: 'boolean' }).notNull().default(false),
     // Direct user ownership — eliminates vehicles JOIN for user-scoped queries
@@ -232,8 +232,8 @@ export const expenses = sqliteTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     // NULL for standalone expenses, shared UUID for split siblings
     groupId: text('group_id'),
-    // Pre-split total amount, same on all siblings in a group
-    groupTotal: real('group_total'),
+    // Pre-split total amount, same on all siblings in a group — money: integer CENTS (migration 0009)
+    groupTotal: integer('group_total'),
     // Split method: 'even' | 'absolute' | 'percentage'
     splitMethod: text('split_method'),
     // Source tracking — nullable, server-set only (e.g., 'reminder', 'import', 'api')
@@ -504,7 +504,7 @@ export const reminders = sqliteTable(
     nextDueDate: integer('next_due_date', { mode: 'timestamp' }),
     expenseCategory: text('expense_category'),
     expenseTags: text('expense_tags', { mode: 'json' }).$type<string[]>(),
-    expenseAmount: real('expense_amount'), // total amount, required when type='expense' + actionMode='automatic'
+    expenseAmount: integer('expense_amount'), // money: integer CENTS (migration 0009) — total amount, required when type='expense' + actionMode='automatic'
     expenseDescription: text('expense_description'),
     expenseSplitConfig: text('expense_split_config', { mode: 'json' }).$type<ReminderSplitConfig>(),
     isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),

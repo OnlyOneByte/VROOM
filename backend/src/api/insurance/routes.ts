@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { parseClampedInt } from '../../utils/calculations';
+import { insuranceClaimToApi, insuranceTermToApi } from '../../utils/money';
 import { validateInsuranceOwnership, validateVehicleOwnership } from '../../utils/validation';
 import { expenseRepository } from '../expenses/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
@@ -19,6 +20,20 @@ import {
 } from './validation';
 
 const routes = new Hono();
+
+/**
+ * T6 display edge for an insurance policy API object: convert each embedded term's money columns
+ * (deductibleAmount/coverageLimit/totalCost/monthlyCost/paymentAmount) from integer CENTS → dollars.
+ * The policy row itself carries no money; only its `terms[]` do. Pure, shallow per term.
+ */
+function policyToApi<T extends Record<string, unknown>>(policy: T): T {
+  const terms = policy.terms;
+  if (!Array.isArray(terms)) return policy;
+  return {
+    ...policy,
+    terms: terms.map((t) => insuranceTermToApi(t as Record<string, unknown>)),
+  };
+}
 
 const idParamSchema = z.object({
   id: z.string().min(1, 'Insurance policy ID is required'),
@@ -72,7 +87,8 @@ routes.use('*', changeTracker);
 routes.get('/', async (c) => {
   const user = c.get('user');
   const policies = await insurancePolicyRepository.findByUserId(user.id);
-  return c.json({ success: true, data: policies, count: policies.length });
+  // T6 display edge: each policy's embedded term money cents → dollars.
+  return c.json({ success: true, data: policies.map(policyToApi), count: policies.length });
 });
 
 // GET /api/v1/insurance/expiring-soon — expiring policies
@@ -86,7 +102,14 @@ routes.get('/expiring-soon', async (c) => {
   const now = new Date();
   const endDate = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
   const terms = await insurancePolicyRepository.findExpiringTerms(now, endDate, user.id, limit);
-  return c.json({ success: true, data: terms, count: terms.length, daysAhead, limit });
+  // T6 display edge: these are bare term rows (money cents → dollars).
+  return c.json({
+    success: true,
+    data: terms.map((t) => insuranceTermToApi(t)),
+    count: terms.length,
+    daysAhead,
+    limit,
+  });
 });
 
 // GET /api/v1/insurance/vehicles/:vehicleId/policies — policies for a vehicle
@@ -98,7 +121,7 @@ routes.get(
     const { vehicleId } = c.req.valid('param');
     await validateVehicleOwnership(vehicleId, user.id);
     const policies = await insurancePolicyRepository.findByVehicleId(vehicleId);
-    return c.json({ success: true, data: policies, count: policies.length });
+    return c.json({ success: true, data: policies.map(policyToApi), count: policies.length });
   }
 );
 
@@ -125,7 +148,7 @@ routes.post('/', zValidator('json', createPolicySchema), async (c) => {
   }
 
   return c.json(
-    { success: true, data: policy, message: 'Insurance policy created successfully' },
+    { success: true, data: policyToApi(policy), message: 'Insurance policy created successfully' },
     201
   );
 });
@@ -135,7 +158,7 @@ routes.get('/:id', zValidator('param', idParamSchema), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
   const policy = await validateInsuranceOwnership(id, user.id);
-  return c.json({ success: true, data: policy });
+  return c.json({ success: true, data: policyToApi(policy) });
 });
 
 // PUT /api/v1/insurance/:id — update policy
@@ -151,7 +174,7 @@ routes.put(
     const policy = await insurancePolicyRepository.update(id, data, user.id);
     return c.json({
       success: true,
-      data: policy,
+      data: policyToApi(policy),
       message: 'Insurance policy updated successfully',
     });
   }
@@ -213,7 +236,10 @@ routes.post(
       userId: user.id,
     });
 
-    return c.json({ success: true, data: policy, message: 'Term added successfully' }, 201);
+    return c.json(
+      { success: true, data: policyToApi(policy), message: 'Term added successfully' },
+      201
+    );
   }
 );
 
@@ -245,7 +271,11 @@ routes.put(
       });
     }
 
-    return c.json({ success: true, data: policy, message: 'Term updated successfully' });
+    return c.json({
+      success: true,
+      data: policyToApi(policy),
+      message: 'Term updated successfully',
+    });
   }
 );
 
@@ -259,7 +289,7 @@ routes.delete('/:id/terms/:termId', zValidator('param', termParamsSchema), async
   await expenseRepository.deleteBySource('insurance_term', termId, user.id);
 
   const policy = await insurancePolicyRepository.deleteTerm(id, termId, user.id);
-  return c.json({ success: true, data: policy, message: 'Term deleted successfully' });
+  return c.json({ success: true, data: policyToApi(policy), message: 'Term deleted successfully' });
 });
 
 // --- Claims (filed against a policy) ---
@@ -270,7 +300,12 @@ routes.get('/:id/claims', zValidator('param', idParamSchema), async (c) => {
   const { id } = c.req.valid('param');
   await validateInsuranceOwnership(id, user.id);
   const claims = await insuranceClaimRepository.findByPolicyId(id);
-  return c.json({ success: true, data: claims, count: claims.length });
+  // T6 display edge: each claim's payoutAmount cents → dollars.
+  return c.json({
+    success: true,
+    data: claims.map((cl) => insuranceClaimToApi(cl)),
+    count: claims.length,
+  });
 });
 
 // POST /api/v1/insurance/:id/claims — file a claim
@@ -287,7 +322,10 @@ routes.post(
     // only proved policy ownership, and the repo writes these FKs verbatim.
     await validateClaimRefs(data, id, user.id);
     const claim = await insuranceClaimRepository.create(id, data);
-    return c.json({ success: true, data: claim, message: 'Claim filed successfully' }, 201);
+    return c.json(
+      { success: true, data: insuranceClaimToApi(claim), message: 'Claim filed successfully' },
+      201
+    );
   }
 );
 
@@ -304,7 +342,11 @@ routes.put(
     // Re-validate a CHANGED vehicleId/termId link (mirror the create-path guard).
     await validateClaimRefs(updates, id, user.id);
     const claim = await insuranceClaimRepository.update(id, claimId, updates);
-    return c.json({ success: true, data: claim, message: 'Claim updated successfully' });
+    return c.json({
+      success: true,
+      data: insuranceClaimToApi(claim),
+      message: 'Claim updated successfully',
+    });
   }
 );
 

@@ -1,0 +1,14 @@
+UPDATE `vehicles` SET `purchase_price` = CAST(ROUND(`purchase_price` * 100) AS INTEGER) WHERE `purchase_price` IS NOT NULL;--> statement-breakpoint
+UPDATE `vehicle_financing` SET `original_amount` = CAST(ROUND(`original_amount` * 100) AS INTEGER) WHERE `original_amount` IS NOT NULL;--> statement-breakpoint
+UPDATE `vehicle_financing` SET `payment_amount` = CAST(ROUND(`payment_amount` * 100) AS INTEGER) WHERE `payment_amount` IS NOT NULL;--> statement-breakpoint
+UPDATE `vehicle_financing` SET `residual_value` = CAST(ROUND(`residual_value` * 100) AS INTEGER) WHERE `residual_value` IS NOT NULL;--> statement-breakpoint
+UPDATE `vehicle_financing` SET `excess_mileage_fee` = CAST(ROUND(`excess_mileage_fee` * 100) AS INTEGER) WHERE `excess_mileage_fee` IS NOT NULL;--> statement-breakpoint
+UPDATE `insurance_terms` SET `deductible_amount` = CAST(ROUND(`deductible_amount` * 100) AS INTEGER) WHERE `deductible_amount` IS NOT NULL;--> statement-breakpoint
+UPDATE `insurance_terms` SET `coverage_limit` = CAST(ROUND(`coverage_limit` * 100) AS INTEGER) WHERE `coverage_limit` IS NOT NULL;--> statement-breakpoint
+UPDATE `insurance_terms` SET `total_cost` = CAST(ROUND(`total_cost` * 100) AS INTEGER) WHERE `total_cost` IS NOT NULL;--> statement-breakpoint
+UPDATE `insurance_terms` SET `monthly_cost` = CAST(ROUND(`monthly_cost` * 100) AS INTEGER) WHERE `monthly_cost` IS NOT NULL;--> statement-breakpoint
+UPDATE `insurance_terms` SET `payment_amount` = CAST(ROUND(`payment_amount` * 100) AS INTEGER) WHERE `payment_amount` IS NOT NULL;--> statement-breakpoint
+UPDATE `insurance_claims` SET `payout_amount` = CAST(ROUND(`payout_amount` * 100) AS INTEGER) WHERE `payout_amount` IS NOT NULL;--> statement-breakpoint
+UPDATE `expenses` SET `expense_amount` = CAST(ROUND(`expense_amount` * 100) AS INTEGER) WHERE `expense_amount` IS NOT NULL;--> statement-breakpoint
+UPDATE `expenses` SET `group_total` = CAST(ROUND(`group_total` * 100) AS INTEGER) WHERE `group_total` IS NOT NULL;--> statement-breakpoint
+UPDATE `reminders` SET `expense_amount` = CAST(ROUND(`expense_amount` * 100) AS INTEGER) WHERE `expense_amount` IS NOT NULL;

@@ -3,6 +3,18 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { requireAuth } from '../../middleware';
 import { validateVehicleOwnership } from '../../utils/validation';
+import {
+  analyticsSummaryToApi,
+  crossVehicleToApi,
+  financingToApi,
+  fuelAdvancedToApi,
+  fuelStatsToApi,
+  insuranceToApi,
+  quickStatsToApi,
+  vehicleExpensesToApi,
+  vehicleTcoToApi,
+  yearEndToApi,
+} from './api-transform';
 import { analyticsRepository } from './repository';
 
 const routes = new Hono();
@@ -49,7 +61,7 @@ routes.get('/summary', zValidator('query', dateRangeQuerySchema), async (c) => {
   const user = c.get('user');
   const { startDate, endDate } = c.req.valid('query');
   const data = await analyticsRepository.getSummary(user.id, { start: startDate, end: endDate });
-  return c.json({ success: true, data });
+  return c.json({ success: true, data: analyticsSummaryToApi(data) });
 });
 
 // GET /api/v1/analytics/quick-stats
@@ -57,7 +69,7 @@ routes.get('/quick-stats', zValidator('query', dateRangeQuerySchema), async (c) 
   const user = c.get('user');
   const { startDate, endDate } = c.req.valid('query');
   const data = await analyticsRepository.getQuickStats(user.id, { start: startDate, end: endDate });
-  return c.json({ success: true, data });
+  return c.json({ success: true, data: quickStatsToApi(data) });
 });
 
 // GET /api/v1/analytics/fuel-stats
@@ -74,7 +86,7 @@ routes.get('/fuel-stats', zValidator('query', dateRangeVehicleQuerySchema), asyn
     { start: startDate, end: endDate },
     vehicleId
   );
-  return c.json({ success: true, data });
+  return c.json({ success: true, data: fuelStatsToApi(data) });
 });
 
 // GET /api/v1/analytics/cross-vehicle
@@ -85,21 +97,21 @@ routes.get('/cross-vehicle', zValidator('query', dateRangeQuerySchema), async (c
     start: startDate,
     end: endDate,
   });
-  return c.json({ success: true, data });
+  return c.json({ success: true, data: crossVehicleToApi(data) });
 });
 
 // GET /api/v1/analytics/financing
 routes.get('/financing', async (c) => {
   const user = c.get('user');
   const data = await analyticsRepository.getFinancing(user.id);
-  return c.json({ success: true, data });
+  return c.json({ success: true, data: financingToApi(data) });
 });
 
 // GET /api/v1/analytics/insurance
 routes.get('/insurance', async (c) => {
   const user = c.get('user');
   const data = await analyticsRepository.getInsurance(user.id);
-  return c.json({ success: true, data });
+  return c.json({ success: true, data: insuranceToApi(data) });
 });
 
 // GET /api/v1/analytics/fuel-advanced
@@ -116,7 +128,7 @@ routes.get('/fuel-advanced', zValidator('query', dateRangeVehicleQuerySchema), a
     { start: startDate, end: endDate },
     vehicleId
   );
-  return c.json({ success: true, data });
+  return c.json({ success: true, data: fuelAdvancedToApi(data) });
 });
 
 // GET /api/v1/analytics/vehicle-health
@@ -134,7 +146,7 @@ routes.get('/vehicle-tco', zValidator('query', yearVehicleQuerySchema), async (c
   const { vehicleId, year } = c.req.valid('query');
   await validateVehicleOwnership(vehicleId, user.id);
   const data = await analyticsRepository.getVehicleTCO(user.id, vehicleId, year);
-  return c.json({ success: true, data });
+  return c.json({ success: true, data: vehicleTcoToApi(data) });
 });
 
 // GET /api/v1/analytics/vehicle-expenses
@@ -149,7 +161,7 @@ routes.get(
       start: startDate,
       end: endDate,
     });
-    return c.json({ success: true, data });
+    return c.json({ success: true, data: vehicleExpensesToApi(data) });
   }
 );
 
@@ -159,7 +171,7 @@ routes.get('/year-end', zValidator('query', yearQuerySchema), async (c) => {
   const { year } = c.req.valid('query');
   const currentYear = year ?? new Date().getFullYear();
   const data = await analyticsRepository.getYearEnd(user.id, currentYear);
-  return c.json({ success: true, data });
+  return c.json({ success: true, data: yearEndToApi(data) });
 });
 
 // GET /api/v1/analytics/fuel-efficiency

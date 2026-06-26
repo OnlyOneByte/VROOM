@@ -15,6 +15,7 @@ import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { EXPENSE_CATEGORIES, isElectricFuelType } from '../../db/types';
 import { denormalizeCsvCell } from '../../utils/csv-safety';
+import { dollarsToCents } from '../../utils/money';
 import { buildLocalDate } from './local-date';
 
 /** A vehicle the importing user owns — the ONLY rows we'll attach expenses to. */
@@ -88,14 +89,19 @@ function makeCellGetter(record: Record<string, string>): CellGetter {
   return (k: string) => denormalizeCsvCell((record[k] ?? '').trim());
 }
 
-/** Required positive money amount within the configured max. */
+/**
+ * Required positive money amount within the configured max, returned as integer CENTS
+ * (money-cents-migration T3). The CSV import path bypasses the Zod money validators — its parsed amount
+ * is inserted verbatim into expenses.expenseAmount — so it must apply the SAME dollars→cents conversion
+ * the Zod input edge does. The maxAmount bound checks the DOLLAR value the user typed (before scaling).
+ */
 function parseAmount(raw: string): { value: number } | { error: string } {
   const amount = Number(raw);
   if (!raw || !Number.isFinite(amount) || amount <= 0) {
     return { error: `Invalid amount "${raw}"` };
   }
   if (amount > EXP.maxAmount) return { error: `Amount exceeds the ${EXP.maxAmount} maximum` };
-  return { value: amount };
+  return { value: dollarsToCents(amount) };
 }
 
 /** Optional non-negative integer mileage (blank → null). */

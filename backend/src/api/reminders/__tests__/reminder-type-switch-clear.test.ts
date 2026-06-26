@@ -66,7 +66,7 @@ describe('reminder type switch clears expense-template fields (clear-field class
     const before = reminderRow(id);
     expect(before.type).toBe('expense');
     expect(before.expense_category).toBe('financial');
-    expect(before.expense_amount).toBe(125.5);
+    expect(before.expense_amount).toBe(12550); // $125.50 → 12550 cents (money-cents-migration)
 
     // Switch to notification, sending the expense fields as null (exactly what
     // ReminderForm submits on a notification edit).
@@ -110,6 +110,6 @@ describe('reminder type switch clears expense-template fields (clear-field class
     const after = reminderRow(id);
     expect(after.type).toBe('expense');
     expect(after.expense_category).toBe('maintenance');
-    expect(after.expense_amount).toBe(80);
+    expect(after.expense_amount).toBe(8000); // $80 → 8000 cents (money-cents-migration)
   });
 });

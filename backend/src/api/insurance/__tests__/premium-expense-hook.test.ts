@@ -112,11 +112,11 @@ describe('insurance premium → expense hook lifecycle', () => {
 
     const rows = autoExpensesForTerm(termId);
     expect(rows).toHaveLength(2); // one sibling per covered vehicle
-    // Even split of 1200 across 2 → 600 each (integer-cents largest-remainder).
+    // $1200 in → 120000 cents stored (money-cents-migration); even split across 2 → 60000 each.
     const total = rows.reduce((s, r) => s + r.expense_amount, 0);
-    expect(total).toBeCloseTo(1200, 2);
+    expect(total).toBe(120000);
     for (const r of rows) {
-      expect(r.expense_amount).toBeCloseTo(600, 2);
+      expect(r.expense_amount).toBe(60000);
       expect(r.category).toBe('financial');
       expect(r.tags ?? '').toContain('insurance');
       expect(r.source_type).toBe('insurance_term');
@@ -141,13 +141,14 @@ describe('insurance premium → expense hook lifecycle', () => {
     const rows = autoExpensesForTerm(termId);
     expect(rows).toHaveLength(3);
 
-    // Sum in integer cents to assert EXACT (not approximate) conservation — no lost/invented cent.
-    const totalCents = rows.reduce((s, r) => s + Math.round(r.expense_amount * 100), 0);
+    // expense_amount is ALREADY integer cents (money-cents-migration) — sum directly to assert EXACT
+    // conservation (no lost/invented cent). $100 in → 10000 cents.
+    const totalCents = rows.reduce((s, r) => s + r.expense_amount, 0);
     expect(totalCents).toBe(10000); // exactly $100.00
 
-    // Largest-remainder: two legs at 33.33, one at 33.34 (the remainder cent). Each leg is a real,
+    // Largest-remainder: two legs at 3333, one at 3334 (the remainder cent). Each leg is a real,
     // near-equal share — never a 0 or a >total leg.
-    const cents = rows.map((r) => Math.round(r.expense_amount * 100)).sort((a, b) => a - b);
+    const cents = rows.map((r) => r.expense_amount).sort((a, b) => a - b);
     expect(cents).toEqual([3333, 3333, 3334]);
     expect(new Set(rows.map((r) => r.vehicle_id))).toEqual(new Set([v1, v2, v3]));
   });
@@ -164,7 +165,7 @@ describe('insurance premium → expense hook lifecycle', () => {
 
     const rows = autoExpensesForTerm(termId);
     expect(rows).toHaveLength(1); // one covered vehicle → one sibling
-    expect(rows[0]!.expense_amount).toBeCloseTo(1300, 2); // 100/mo × 13 months
+    expect(rows[0]!.expense_amount).toBe(130000); // $100/mo × 13 months = $1300 → 130000 cents
     expect(rows[0]!.category).toBe('financial');
     expect(rows[0]!.tags ?? '').toContain('insurance');
     expect(rows[0]!.source_type).toBe('insurance_term');
@@ -191,7 +192,7 @@ describe('insurance premium → expense hook lifecycle', () => {
     expect(res.status, JSON.stringify(body)).toBe(201);
     const rows = autoExpensesForTerm(body.data.terms[0]!.id);
     expect(rows).toHaveLength(1);
-    expect(rows[0]!.expense_amount).toBeCloseTo(1200, 2); // totalCost, not 100×13
+    expect(rows[0]!.expense_amount).toBe(120000); // totalCost $1200 → 120000 cents, not 100×13
   });
 
   test('updating the term cost regenerates the auto-expenses at the new amount', async () => {
@@ -199,7 +200,7 @@ describe('insurance premium → expense hook lifecycle', () => {
     const { policyId, termId } = await createPolicy([v1], 1000);
     const before = autoExpensesForTerm(termId);
     expect(before).toHaveLength(1);
-    expect(before[0]!.expense_amount).toBeCloseTo(1000, 2);
+    expect(before[0]!.expense_amount).toBe(100000); // $1000 → 100000 cents
     const beforeId = before[0]!.id;
 
     const res = await ctx.authed('PUT', `/api/v1/insurance/${policyId}/terms/${termId}`, {
@@ -209,7 +210,7 @@ describe('insurance premium → expense hook lifecycle', () => {
 
     const after = autoExpensesForTerm(termId);
     expect(after).toHaveLength(1);
-    expect(after[0]!.expense_amount).toBeCloseTo(1500, 2);
+    expect(after[0]!.expense_amount).toBe(150000); // $1500 → 150000 cents
     // Regenerated (delete-by-source + recreate), not mutated in place.
     expect(after[0]!.id).not.toBe(beforeId);
   });

@@ -95,7 +95,7 @@ describe('reminder delete cascade (recurring-expenses T3 — keep history, sever
     for (const r of rows) {
       expect(r.source_type).toBeNull();
       expect(r.source_id).toBeNull();
-      expect(r.expense_amount).toBeCloseTo(125.5, 2);
+      expect(r.expense_amount).toBe(12550); // $125.50 → 12550 cents (money-cents-migration)
     }
 
     // And nothing is still linked to the (now-deleted) reminder.

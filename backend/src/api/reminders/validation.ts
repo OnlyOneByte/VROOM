@@ -1,7 +1,12 @@
 import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { EXPENSE_CATEGORIES } from '../../db/types';
-import { splitConfigSchema, splitConfigVehicleIds } from '../expenses/validation';
+import { moneyDollarsToCents } from '../../utils/money';
+import {
+  splitConfigSchema,
+  splitConfigStructuralSchema,
+  splitConfigVehicleIds,
+} from '../expenses/validation';
 
 const reminderTypeSchema = z.enum(['expense', 'notification']);
 const frequencySchema = z.enum(['weekly', 'monthly', 'yearly', 'custom']);
@@ -48,7 +53,11 @@ const reminderBaseSchema = z.object({
     .array(z.string().min(1).max(CONFIG.validation.reminder.tagMaxLength))
     .max(CONFIG.validation.reminder.maxTags)
     .nullish(),
-  expenseAmount: z.number().positive().max(CONFIG.validation.reminder.maxExpenseAmount).nullish(),
+  // money (T5): client sends DOLLARS, store integer CENTS. .max() bound checks the DOLLAR value
+  // pre-transform; .nullish() passes null (clear) / undefined (unchanged) through untransformed.
+  expenseAmount: moneyDollarsToCents((n) =>
+    n.positive().max(CONFIG.validation.reminder.maxExpenseAmount)
+  ).nullish(),
   expenseDescription: z.string().max(CONFIG.validation.reminder.descriptionMaxLength).nullish(),
   expenseSplitConfig: splitConfigSchema.nullish(),
 });
@@ -199,3 +208,32 @@ export const updateReminderSchema = reminderBaseSchema.partial().superRefine((da
   refineSplitConfig(data, ctx);
   refineMileageTrigger(data, ctx);
 });
+
+/**
+ * A TRANSFORM-FREE structural twin of createReminderSchema for the PUT merge gate (money-cents-migration
+ * T5). The reminder PUT route re-parses a merged {...existing(stored CENTS), ...partialUpdate(parsed
+ * CENTS)} object purely to reject structurally-invalid intermediate states. createReminderSchema carries
+ * the dollars→cents transform on expenseAmount (+ the nested split allocation amounts), so re-parsing
+ * ALREADY-cents data through it would DOUBLE-convert AND re-check the `.max($10k)` DOLLAR bound against a
+ * cents value (a latent 400 for any reminder ≥ $10k on every update). This twin overrides expenseAmount to
+ * a plain non-negative number (no transform, no dollar-domain max — the value is already validated cents)
+ * and uses the transform-free splitConfigStructuralSchema. Same cross-field refinements. Validation-only —
+ * its parsed output is discarded; the route persists the field-merged cents values directly.
+ */
+const reminderMergeGateSchema = reminderBaseSchema
+  .extend({
+    expenseAmount: z.number().nonnegative().nullish(),
+    expenseSplitConfig: splitConfigStructuralSchema.nullish(),
+  })
+  .superRefine((data, ctx) => {
+    refineCustomFrequency(data, ctx);
+    refineExpenseType(data, ctx);
+    refineDateRange(data, ctx);
+    refineSplitConfig(data, ctx);
+    refineMileageTrigger(data, ctx);
+  });
+
+/** Structural re-validation for the PUT merge gate — see reminderMergeGateSchema. Throws on invalid. */
+export function assertMergedReminderValid(merged: unknown): void {
+  reminderMergeGateSchema.parse(merged);
+}

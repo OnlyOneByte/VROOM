@@ -10,7 +10,7 @@ import { describe, expect, test } from 'bun:test';
 import { getTableColumns } from 'drizzle-orm';
 import { createInsertSchema } from 'drizzle-zod';
 import fc from 'fast-check';
-import { TABLE_SCHEMA_MAP } from '../../../config';
+import { CONFIG, TABLE_SCHEMA_MAP } from '../../../config';
 import {
   expenses,
   insuranceClaims,
@@ -205,9 +205,20 @@ describe('coerceRow: Numeric columns', () => {
   });
 
   test('real string coerces to float', () => {
-    const row = buildMinimalStringRow(expenses, { expenseAmount: '123.45' });
+    // volume (gal/kWh) is the REAL-affinity numeric column. expenseAmount is now an INTEGER cents column
+    // (money-cents-migration), so a decimal string there ROUNDS (covered separately below) — volume is the
+    // column that still exercises the float-preserving REAL coerce branch.
+    const row = buildMinimalStringRow(expenses, { volume: '123.45' });
     const result = coerceRow(row, expenses);
-    expect(result.expenseAmount).toBe(123.45);
+    expect(result.volume).toBe(123.45);
+  });
+
+  test('money INTEGER column rounds a decimal string (cents are whole — money-cents-migration)', () => {
+    // expenseAmount is integer CENTS post-0009; a 2.0.0 backup stores whole-cent integers. A stray decimal
+    // (e.g. a hand-edited CSV) rounds to the nearest whole cent, never truncates.
+    const row = buildMinimalStringRow(expenses, { expenseAmount: '1234.56' });
+    const result = coerceRow(row, expenses);
+    expect(result.expenseAmount).toBe(1235);
   });
 
   test('empty numeric coerces to null', () => {
@@ -246,16 +257,18 @@ describe('coerceRow: Numeric columns', () => {
   });
 
   test('#68 REAL: a thousands-separated amount keeps its full value (not parseFloat-truncated)', () => {
-    const row = buildMinimalStringRow(expenses, { expenseAmount: '1,234.56' });
+    // volume is the REAL-affinity column (expenseAmount is now integer cents); the comma-aware strict
+    // parse it guards still applies to every REAL column the Sheets restore reads as FORMATTED_VALUE.
+    const row = buildMinimalStringRow(expenses, { volume: '1,234.56' });
     const result = coerceRow(row, expenses);
-    expect(result.expenseAmount).toBe(1234.56); // was 1 under parseFloat — the bug
+    expect(result.volume).toBe(1234.56); // was 1 under parseFloat — the bug
   });
 
   test('#68 REAL: a plain integer-valued amount (CSV round-trip) is unchanged', () => {
     // The CSV path writes a raw number with no separators — confirm the fix didn't regress it.
-    const row = buildMinimalStringRow(expenses, { expenseAmount: '50' });
+    const row = buildMinimalStringRow(expenses, { volume: '50' });
     const result = coerceRow(row, expenses);
-    expect(result.expenseAmount).toBe(50);
+    expect(result.volume).toBe(50);
   });
 });
 
@@ -373,7 +386,11 @@ describe('coerceRow: empty NOT NULL columns with a static default fall back to t
 describe('validateBackupData: acceptance', () => {
   test('valid parsed backup passes validation', () => {
     const backup: ParsedBackupData = {
-      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      metadata: {
+        version: CONFIG.backup.currentVersion,
+        timestamp: new Date().toISOString(),
+        userId: 'u1',
+      },
       vehicles: [coerceRow(buildMinimalStringRow(vehicles, { userId: 'u1' }), vehicles)],
       expenses: [
         coerceRow(
@@ -414,7 +431,11 @@ describe('validateBackupData: acceptance', () => {
       photos
     );
     const backup: ParsedBackupData = {
-      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      metadata: {
+        version: CONFIG.backup.currentVersion,
+        timestamp: new Date().toISOString(),
+        userId: 'u1',
+      },
       vehicles: [vehicle],
       expenses: [],
       financing: [],
@@ -445,7 +466,11 @@ describe('validateBackupData: acceptance', () => {
 describe('validateBackupData: cross-row unique constraints (#127)', () => {
   function backupWith(over: Partial<ParsedBackupData>): ParsedBackupData {
     return {
-      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      metadata: {
+        version: CONFIG.backup.currentVersion,
+        timestamp: new Date().toISOString(),
+        userId: 'u1',
+      },
       vehicles: [],
       expenses: [],
       financing: [],
@@ -611,7 +636,11 @@ describe('validateBackupData: cross-row unique constraints (#127)', () => {
 describe('validateBackupData: referential integrity', () => {
   test('expense referencing non-existent vehicle fails', () => {
     const backup: ParsedBackupData = {
-      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      metadata: {
+        version: CONFIG.backup.currentVersion,
+        timestamp: new Date().toISOString(),
+        userId: 'u1',
+      },
       vehicles: [],
       expenses: [coerceRow(buildMinimalStringRow(expenses, { vehicleId: 'ghost' }), expenses)],
       financing: [],
@@ -632,7 +661,11 @@ describe('validateBackupData: referential integrity', () => {
   test('term-vehicle junction row referencing non-existent term fails', () => {
     const v = coerceRow(buildMinimalStringRow(vehicles, { userId: 'u1' }), vehicles);
     const backup: ParsedBackupData = {
-      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      metadata: {
+        version: CONFIG.backup.currentVersion,
+        timestamp: new Date().toISOString(),
+        userId: 'u1',
+      },
       vehicles: [v],
       expenses: [],
       financing: [],
@@ -653,7 +686,11 @@ describe('validateBackupData: referential integrity', () => {
   test('term-vehicle junction row referencing non-existent vehicle fails', () => {
     const ins = coerceRow(buildMinimalStringRow(insurancePolicies), insurancePolicies);
     const backup: ParsedBackupData = {
-      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      metadata: {
+        version: CONFIG.backup.currentVersion,
+        timestamp: new Date().toISOString(),
+        userId: 'u1',
+      },
       vehicles: [],
       expenses: [],
       financing: [],
@@ -676,7 +713,11 @@ describe('validateBackupData: referential integrity', () => {
   test('insurance claim referencing a known policy passes (round-trips)', () => {
     const ins = coerceRow(buildMinimalStringRow(insurancePolicies), insurancePolicies);
     const backup: ParsedBackupData = {
-      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      metadata: {
+        version: CONFIG.backup.currentVersion,
+        timestamp: new Date().toISOString(),
+        userId: 'u1',
+      },
       vehicles: [],
       expenses: [],
       financing: [],
@@ -709,7 +750,11 @@ describe('validateBackupData: referential integrity', () => {
 
   test('insurance claim referencing a non-existent policy fails', () => {
     const backup: ParsedBackupData = {
-      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      metadata: {
+        version: CONFIG.backup.currentVersion,
+        timestamp: new Date().toISOString(),
+        userId: 'u1',
+      },
       vehicles: [],
       expenses: [],
       financing: [],
@@ -739,7 +784,11 @@ describe('validateBackupData: referential integrity', () => {
       photos
     );
     const backup: ParsedBackupData = {
-      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      metadata: {
+        version: CONFIG.backup.currentVersion,
+        timestamp: new Date().toISOString(),
+        userId: 'u1',
+      },
       vehicles: [],
       expenses: [],
       financing: [],
@@ -763,7 +812,11 @@ describe('validateBackupData: referential integrity', () => {
       photos
     );
     const backup: ParsedBackupData = {
-      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      metadata: {
+        version: CONFIG.backup.currentVersion,
+        timestamp: new Date().toISOString(),
+        userId: 'u1',
+      },
       vehicles: [],
       expenses: [],
       financing: [],
@@ -784,7 +837,11 @@ describe('validateBackupData: referential integrity', () => {
   test('rejects photoRef referencing non-existent photo', () => {
     const v = coerceRow(buildMinimalStringRow(vehicles, { userId: 'u1' }), vehicles);
     const backup: ParsedBackupData = {
-      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      metadata: {
+        version: CONFIG.backup.currentVersion,
+        timestamp: new Date().toISOString(),
+        userId: 'u1',
+      },
       vehicles: [v],
       expenses: [],
       financing: [],
@@ -817,7 +874,11 @@ describe('validateBackupData: referential integrity', () => {
       photos
     );
     const backup: ParsedBackupData = {
-      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      metadata: {
+        version: CONFIG.backup.currentVersion,
+        timestamp: new Date().toISOString(),
+        userId: 'u1',
+      },
       vehicles: [v],
       expenses: [],
       financing: [],
@@ -848,7 +909,11 @@ describe('validateBackupData: referential integrity', () => {
       odometerEntries
     );
     const backup: ParsedBackupData = {
-      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      metadata: {
+        version: CONFIG.backup.currentVersion,
+        timestamp: new Date().toISOString(),
+        userId: 'u1',
+      },
       vehicles: [],
       expenses: [],
       financing: [],
@@ -888,7 +953,11 @@ describe('validateBackupData: referential integrity', () => {
     test(`${label} row referencing a non-existent vehicle fails with its exact label (C205 convergence)`, () => {
       const row = coerceRow(buildMinimalStringRow(table, { vehicleId: 'ghost' }), table);
       const base: ParsedBackupData = {
-        metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+        metadata: {
+          version: CONFIG.backup.currentVersion,
+          timestamp: new Date().toISOString(),
+          userId: 'u1',
+        },
         vehicles: [],
         expenses: [],
         financing: [],
@@ -1026,7 +1095,11 @@ describe('Property 9: Backup round-trip for tracking flags', () => {
           vehicles
         );
         const backup: ParsedBackupData = {
-          metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+          metadata: {
+            version: CONFIG.backup.currentVersion,
+            timestamp: new Date().toISOString(),
+            userId: 'u1',
+          },
           vehicles: [vehicle],
           expenses: [],
           financing: [],
@@ -1140,7 +1213,11 @@ describe('coerceRow: unitPreferences JSON column on vehicles', () => {
       vehicles
     );
     const backup: ParsedBackupData = {
-      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      metadata: {
+        version: CONFIG.backup.currentVersion,
+        timestamp: new Date().toISOString(),
+        userId: 'u1',
+      },
       vehicles: [vehicle],
       expenses: [],
       financing: [],

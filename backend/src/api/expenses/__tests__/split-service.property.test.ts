@@ -29,11 +29,9 @@ const vehicleIdsArb = fc
   .uniqueArray(vehicleIdArb, { minLength: 1, maxLength: 10 })
   .filter((ids) => ids.length >= 1);
 
-/** Positive dollar amount (0.01 – 100 000), rounded to cents */
-const positiveAmountArb = fc
-  .double({ min: 0.01, max: 100_000, noNaN: true })
-  .map((v) => Math.round(v * 100) / 100)
-  .filter((v) => v >= 0.01);
+/** Positive money amount in integer CENTS (1 – 10_000_000 = $0.01 – $100k). money-cents-migration:
+ * computeAllocations is now cents-native, so totalAmount + allocation amounts are integer cents. */
+const positiveAmountArb = fc.integer({ min: 1, max: 10_000_000 }).filter((v) => v >= 1);
 
 /** Even split config */
 const evenConfigArb: fc.Arbitrary<SplitConfig> = vehicleIdsArb.map((vehicleIds) => ({
@@ -49,7 +47,7 @@ const evenConfigArb: fc.Arbitrary<SplitConfig> = vehicleIdsArb.map((vehicleIds) 
 const absoluteConfigArb = (totalAmount: number): fc.Arbitrary<SplitConfig> =>
   vehicleIdsArb.chain((vehicleIds) => {
     const n = vehicleIds.length;
-    const totalCents = Math.round(totalAmount * 100);
+    const totalCents = totalAmount; // totalAmount is ALREADY integer cents (money-cents-migration)
     return fc
       .array(fc.integer({ min: 1, max: 10000 }), { minLength: n, maxLength: n })
       .map((weights) => {
@@ -63,7 +61,7 @@ const absoluteConfigArb = (totalAmount: number): fc.Arbitrary<SplitConfig> =>
         }
         const allocations = vehicleIds.map((vehicleId, i) => ({
           vehicleId,
-          amount: cents[i] / 100,
+          amount: cents[i], // integer cents
         }));
         return { method: 'absolute' as const, allocations };
       });
@@ -103,7 +101,7 @@ describe('Property 1: Allocation sum invariant', () => {
       fc.property(evenConfigArb, positiveAmountArb, (config, totalAmount) => {
         const result = service.computeAllocations(config, totalAmount);
         const sum = result.reduce((s, a) => s + a.amount, 0);
-        expect(Math.round(sum * 100) / 100).toBe(totalAmount);
+        expect(sum).toBe(totalAmount); // exact integer cents (money-cents-migration)
       }),
       { numRuns: 100 }
     );
@@ -116,7 +114,7 @@ describe('Property 1: Allocation sum invariant', () => {
         ([config, totalAmount]) => {
           const result = service.computeAllocations(config, totalAmount);
           const sum = result.reduce((s, a) => s + a.amount, 0);
-          expect(Math.round(sum * 100) / 100).toBe(totalAmount);
+          expect(sum).toBe(totalAmount); // exact integer cents (money-cents-migration)
         }
       ),
       { numRuns: 100 }
@@ -128,7 +126,7 @@ describe('Property 1: Allocation sum invariant', () => {
       fc.property(percentageConfigArb, positiveAmountArb, (config, totalAmount) => {
         const result = service.computeAllocations(config, totalAmount);
         const sum = result.reduce((s, a) => s + a.amount, 0);
-        expect(Math.round(sum * 100) / 100).toBe(totalAmount);
+        expect(sum).toBe(totalAmount); // exact integer cents (money-cents-migration)
       }),
       { numRuns: 100 }
     );
@@ -147,8 +145,8 @@ describe('Property 2: Even split fairness', () => {
         const amounts = result.map((a) => a.amount);
         const maxAmt = Math.max(...amounts);
         const minAmt = Math.min(...amounts);
-        const diff = Math.round((maxAmt - minAmt) * 100) / 100;
-        expect(diff).toBeLessThanOrEqual(0.01);
+        // Integer cents now: even-split legs differ by at most 1 CENT (largest-remainder).
+        expect(maxAmt - minAmt).toBeLessThanOrEqual(1);
       }),
       { numRuns: 100 }
     );
@@ -229,6 +227,8 @@ describe('Property 4: Absolute split passthrough', () => {
 // NOT re-validate; only the route's Zod refinement gates the sum-to-100 invariant).
 // ---------------------------------------------------------------------------
 describe('C287: percentage split penny-residue + over-100% clamp', () => {
+  // money-cents-migration: totalAmount is integer CENTS, so $100 = 10000 cents. The penny-residue
+  // semantics are unchanged — they now play out in whole cents (floor(33% of 10000) = 3333, last = 3334).
   test('the LAST vehicle absorbs the rounding residue (33/33/34 of $100, exact sum)', () => {
     const result = service.computeAllocations(
       {
@@ -239,11 +239,11 @@ describe('C287: percentage split penny-residue + over-100% clamp', () => {
           { vehicleId: 'v-3', percentage: 34 },
         ],
       },
-      100
+      10000 // $100 in cents
     );
-    // First two are floor(33% of 100) = 33.00 each; the last carries the remainder = 34.00.
-    expect(result.map((a) => a.amount)).toEqual([33, 33, 34]);
-    expect(result.reduce((s, a) => s + a.amount, 0)).toBeCloseTo(100, 6);
+    // First two are floor(33% of 10000) = 3300 each; the last carries the remainder = 3400.
+    expect(result.map((a) => a.amount)).toEqual([3300, 3300, 3400]);
+    expect(result.reduce((s, a) => s + a.amount, 0)).toBe(10000);
   });
 
   test('thirds of a non-divisible total: floor the firsts, last absorbs the cents (sum exact)', () => {
@@ -256,20 +256,19 @@ describe('C287: percentage split penny-residue + over-100% clamp', () => {
           { vehicleId: 'v-3', percentage: 33.34 },
         ],
       },
-      100
+      10000 // $100 in cents
     );
-    // floor(33.33) = 33.33, floor(33.33) = 33.33, last = 100 - 66.66 = 33.34.
-    expect(result[0].amount).toBeCloseTo(33.33, 6);
-    expect(result[1].amount).toBeCloseTo(33.33, 6);
-    expect(result[2].amount).toBeCloseTo(33.34, 6);
-    expect(result.reduce((s, a) => s + a.amount, 0)).toBeCloseTo(100, 6);
+    // floor(33.33% of 10000) = 3333, floor(33.33%) = 3333, last = 10000 - 6666 = 3334.
+    expect(result[0].amount).toBe(3333);
+    expect(result[1].amount).toBe(3333);
+    expect(result[2].amount).toBe(3334);
+    expect(result.reduce((s, a) => s + a.amount, 0)).toBe(10000);
   });
 
   test('a config whose NON-LAST percentages exceed 100 clamps the last vehicle to 0 (no negative amount)', () => {
-    // 60% + 60% + 10% of $100. The pure fn does NOT re-validate (the route's Zod sum=100 refinement
-    // does), so the first two floored legs already run the total to 120 BEFORE the last leg — its
-    // remainder (100-120=-20) must clamp to 0, never a negative allocation. (The clamp only triggers
-    // when the non-last legs alone overshoot the total, since only the last leg takes the remainder.)
+    // 60% + 60% + 10% of $100 (10000 cents). The pure fn does NOT re-validate (the route's Zod sum=100
+    // refinement does), so the first two floored legs already run the total to 12000 cents BEFORE the last
+    // leg — its remainder (10000-12000=-2000) must clamp to 0, never a negative allocation.
     const result = service.computeAllocations(
       {
         method: 'percentage',
@@ -279,11 +278,11 @@ describe('C287: percentage split penny-residue + over-100% clamp', () => {
           { vehicleId: 'v-3', percentage: 10 },
         ],
       },
-      100
+      10000 // $100 in cents
     );
-    expect(result[0].amount).toBeCloseTo(60, 6);
-    expect(result[1].amount).toBeCloseTo(60, 6);
-    expect(result[2].amount).toBe(0); // clamped, not -20
+    expect(result[0].amount).toBe(6000);
+    expect(result[1].amount).toBe(6000);
+    expect(result[2].amount).toBe(0); // clamped, not -2000
     expect(result.every((a) => a.amount >= 0)).toBe(true);
   });
 });
@@ -388,7 +387,7 @@ const dbPercentageConfigArb: fc.Arbitrary<SplitConfig> = dbVehicleIdsArb.chain((
 const dbAbsoluteConfigArb = (totalAmount: number): fc.Arbitrary<SplitConfig> =>
   dbVehicleIdsArb.chain((vehicleIds) => {
     const n = vehicleIds.length;
-    const totalCents = Math.round(totalAmount * 100);
+    const totalCents = totalAmount; // totalAmount is ALREADY integer cents (money-cents-migration)
     return fc
       .array(fc.integer({ min: 1, max: 10000 }), { minLength: n, maxLength: n })
       .map((weights) => {
@@ -401,7 +400,7 @@ const dbAbsoluteConfigArb = (totalAmount: number): fc.Arbitrary<SplitConfig> =>
         }
         const allocations = vehicleIds.map((vehicleId, i) => ({
           vehicleId,
-          amount: cents[i] / 100,
+          amount: cents[i], // integer cents
         }));
         return { method: 'absolute' as const, allocations };
       });
@@ -526,7 +525,7 @@ describe('Property 3 (Design): Split amounts sum to groupTotal', () => {
           const groupId = createId();
           const splitMethod = config.method;
           const date = new Date(2024, 5, 15);
-          const totalCents = Math.round(totalAmount * 100);
+          // totalAmount is integer cents (money-cents-migration); siblings re-sum to it EXACTLY.
 
           const siblings = await db.transaction(async (tx) => {
             return service.createSiblings(tx, {
@@ -540,15 +539,15 @@ describe('Property 3 (Design): Split amounts sum to groupTotal', () => {
             });
           });
 
-          // Verify from returned objects — exact to the cent.
+          // Verify from returned objects — exact integer-cent equality.
           const returnedSum = siblings.reduce((s, sib) => s + (sib.expenseAmount ?? 0), 0);
-          expect(Math.round(returnedSum * 100)).toBe(totalCents);
+          expect(returnedSum).toBe(totalAmount);
 
-          // Verify from DB read — the float round-trip must still re-sum to the cent.
+          // Verify from DB read — integer cents round-trip exactly.
           const dbSiblings = await db.select().from(expenses).where(eq(expenses.groupId, groupId));
 
           const dbSum = dbSiblings.reduce((s, row) => s + (row.expenseAmount ?? 0), 0);
-          expect(Math.round(dbSum * 100)).toBe(totalCents);
+          expect(dbSum).toBe(totalAmount);
         }
       ),
       { numRuns: 100 }

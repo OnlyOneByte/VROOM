@@ -259,21 +259,21 @@ describe('#57-class — a term-cost UPDATE replaces its auto-created premium exp
     const policyId = body.data.id;
     const termId = body.data.terms[0].id;
 
-    // The premium expense materialized: 2 even-split siblings summing to 1200.
+    // The premium expense materialized: 2 even-split siblings summing to 120000c ($1200) — money-cents.
     const before = premiumExpenses(termId);
     expect(before.count).toBe(2);
-    expect(before.total).toBe(1200);
+    expect(before.total).toBe(120000);
 
-    // UPDATE the term's totalCost → the hook must delete the old siblings + re-create at 1800.
+    // UPDATE the term's totalCost → the hook must delete the old siblings + re-create at $1800.
     const upd = await ctx.authed('PUT', `/api/v1/insurance/${policyId}/terms/${termId}`, {
       totalCost: 1800,
       vehicleCoverage: { vehicleIds: [v1, v2] },
     });
     expect(upd.status, await upd.text()).toBeLessThan(300);
 
-    // No stale siblings linger; the premium now tracks the NEW cost exactly (still 2 siblings → 1800).
+    // No stale siblings linger; the premium now tracks the NEW cost exactly (still 2 siblings → 180000c).
     const after = premiumExpenses(termId);
     expect(after.count).toBe(2);
-    expect(after.total).toBe(1800);
+    expect(after.total).toBe(180000);
   });
 });

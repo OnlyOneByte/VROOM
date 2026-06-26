@@ -99,7 +99,7 @@ describe('expense-reminder trigger (auto-creates financial records)', () => {
     const first = rows[0]!;
     // The expense carries the reminder's template, not defaults.
     expect(first.category).toBe('financial');
-    expect(first.expense_amount).toBe(125.5);
+    expect(first.expense_amount).toBe(12550); // $125.50 template → 12550 cents (money-cents-migration)
     expect(first.vehicle_id).toBe(vehicleId);
     expect(first.source_type).toBe('reminder');
     expect(first.source_id).toBe(reminderId);
@@ -244,15 +244,15 @@ describe('expense-reminder trigger — split materialization (recurring-expenses
       const g = r.group_id ?? 'none';
       byGroup.set(g, [...(byGroup.get(g) ?? []), r]);
     }
-    // Every group: 2 siblings, $50 each, summing to the $100 template, both source-linked.
+    // Every group: 2 siblings, 5000c each, summing to the 10000c ($100) template, both source-linked.
     for (const siblings of byGroup.values()) {
       expect(siblings).toHaveLength(2);
       const sum = siblings.reduce((s, r) => s + r.expense_amount, 0);
-      expect(sum).toBeCloseTo(100, 2);
+      expect(sum).toBe(10000); // $100 → 10000 cents
       for (const r of siblings) {
-        expect(r.expense_amount).toBeCloseTo(50, 2);
+        expect(r.expense_amount).toBe(5000);
         expect(r.split_method).toBe('even');
-        expect(r.group_total).toBeCloseTo(100, 2);
+        expect(r.group_total).toBe(10000);
         expect(r.source_type).toBe('reminder');
         expect(r.source_id).toBe(reminderId);
       }
@@ -289,11 +289,11 @@ describe('expense-reminder trigger — split materialization (recurring-expenses
     for (const siblings of byGroup.values()) {
       expect(siblings).toHaveLength(2);
       const sum = siblings.reduce((s, r) => s + r.expense_amount, 0);
-      expect(sum).toBeCloseTo(200, 2);
-      // v1 gets 75% = 150, v2 gets 25% = 50.
+      expect(sum).toBe(20000); // $200 → 20000 cents
+      // v1 gets 75% = 15000c, v2 gets 25% = 5000c.
       const byVehicle = new Map(siblings.map((r) => [r.vehicle_id, r.expense_amount]));
-      expect(byVehicle.get(v1)).toBeCloseTo(150, 2);
-      expect(byVehicle.get(v2)).toBeCloseTo(50, 2);
+      expect(byVehicle.get(v1)).toBe(15000);
+      expect(byVehicle.get(v2)).toBe(5000);
       for (const r of siblings) {
         expect(r.split_method).toBe('percentage');
         expect(r.source_id).toBe(reminderId);

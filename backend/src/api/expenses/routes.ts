@@ -13,6 +13,7 @@ import {
 import { ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { neutralizeCsvRow } from '../../utils/csv-safety';
+import { centsToDollars, expenseToApi, moneyDollarsToCents } from '../../utils/money';
 import { buildPaginatedResponse, clampPagination } from '../../utils/pagination';
 import {
   commonSchemas,
@@ -65,7 +66,9 @@ const baseExpenseSchema = createInsertSchema(expensesTable, {
     .optional()
     .default([]),
   category: expenseCategorySchema,
-  expenseAmount: z.number().positive('Expense amount must be positive'),
+  // money: client sends DOLLARS, store integer CENTS (money-cents-migration T3). volume is NOT money
+  // (gallons/kWh) — it stays a plain number.
+  expenseAmount: moneyDollarsToCents((n) => n.positive('Expense amount must be positive')),
   volume: z.number().positive('Volume must be positive').nullable().optional(),
   date: z.coerce.date(),
   mileage: z.number().int().min(0, 'Mileage cannot be negative').nullable().optional(),
@@ -284,10 +287,11 @@ routes.post('/split', zValidator('json', createSplitExpenseSchema), async (c) =>
   return c.json(
     {
       success: true,
+      // T6 display edge: each sibling's money + the group total cents → dollars.
       data: {
-        siblings,
+        siblings: siblings.map(expenseToApi),
         groupId: first.groupId,
-        groupTotal: first.groupTotal,
+        groupTotal: centsToDollars(first.groupTotal),
         splitMethod: first.splitMethod,
       },
       message: 'Split expense created successfully',
@@ -330,9 +334,9 @@ routes.put(
     return c.json({
       success: true,
       data: {
-        siblings,
+        siblings: siblings.map(expenseToApi),
         groupId: first.groupId,
-        groupTotal: first.groupTotal,
+        groupTotal: centsToDollars(first.groupTotal),
         splitMethod: first.splitMethod,
       },
       message: 'Split expense updated successfully',
@@ -354,9 +358,9 @@ routes.get('/split/:id', zValidator('param', commonSchemas.idParam), async (c) =
   return c.json({
     success: true,
     data: {
-      siblings,
+      siblings: siblings.map(expenseToApi),
       groupId: first.groupId,
-      groupTotal: first.groupTotal,
+      groupTotal: centsToDollars(first.groupTotal),
       splitMethod: first.splitMethod,
     },
   });
@@ -412,7 +416,15 @@ routes.get(
     const user = c.get('user');
     const { recentDays } = c.req.valid('query');
     const stats = await expenseRepository.getPerVehicleStats(user.id, recentDays);
-    return c.json({ success: true, data: stats });
+    // T6 display edge: totalAmount/recentAmount are cents sums → dollars for the dashboard cards.
+    return c.json({
+      success: true,
+      data: stats.map((s) => ({
+        ...s,
+        totalAmount: centsToDollars(s.totalAmount),
+        recentAmount: centsToDollars(s.recentAmount),
+      })),
+    });
   }
 );
 
@@ -437,7 +449,22 @@ routes.get('/summary', zValidator('query', summaryQuerySchema), async (c) => {
     period,
   });
 
-  return c.json({ success: true, data: summary });
+  // T6 display edge: every money field in the summary is cents-denominated (sums + the monthlyAverage
+  // cents/month) → dollars for the FE. counts/periods/categories are untouched.
+  return c.json({
+    success: true,
+    data: {
+      ...summary,
+      totalAmount: centsToDollars(summary.totalAmount),
+      monthlyAverage: centsToDollars(summary.monthlyAverage),
+      recentAmount: centsToDollars(summary.recentAmount),
+      categoryBreakdown: summary.categoryBreakdown.map((r) => ({
+        ...r,
+        amount: centsToDollars(r.amount),
+      })),
+      monthlyTrend: summary.monthlyTrend.map((r) => ({ ...r, amount: centsToDollars(r.amount) })),
+    },
+  });
 });
 
 // GET /api/expenses/export - Download all matching expenses as CSV.
@@ -520,7 +547,9 @@ routes.get('/export', zValidator('query', exportQuerySchema), async (c) => {
       date: e.date instanceof Date ? e.date.toISOString() : e.date,
       vehicle: vehicleName.get(e.vehicleId) ?? 'Unknown Vehicle',
       category: e.category,
-      amount: e.expenseAmount,
+      // T6 display edge: expenseAmount is stored CENTS; the human-facing export CSV emits DOLLARS so it
+      // stays the faithful round-trip target for the import path (import-csv parseAmount → dollarsToCents).
+      amount: centsToDollars(e.expenseAmount),
       currency,
       mileage: e.mileage ?? '',
       volume: e.volume ?? '',
@@ -705,7 +734,8 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
   return c.json(
     {
       success: true,
-      data: createdExpense,
+      // T6 display edge: stored cents → dollars so the FE Expense.amount contract is unchanged.
+      data: expenseToApi(createdExpense),
       message: 'Expense created successfully',
     },
     201
@@ -738,7 +768,8 @@ routes.get('/', zValidator('query', expenseQuerySchema), async (c) => {
 
   const { limit, offset } = clampPagination(query);
 
-  return c.json(buildPaginatedResponse(data, totalCount, limit, offset));
+  // T6 display edge: each row's money cents → dollars before the paginated envelope.
+  return c.json(buildPaginatedResponse(data.map(expenseToApi), totalCount, limit, offset));
 });
 
 // GET /api/expenses/:id - Get specific expense
@@ -746,7 +777,7 @@ routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
   const expense = await validateExpenseOwnership(id, user.id);
-  return c.json({ success: true, data: expense });
+  return c.json({ success: true, data: expenseToApi(expense) });
 });
 
 // PUT /api/expenses/:id - Update expense
@@ -810,7 +841,7 @@ routes.put(
 
     return c.json({
       success: true,
-      data: updatedExpense,
+      data: expenseToApi(updatedExpense),
       message: 'Expense updated successfully',
     });
   }

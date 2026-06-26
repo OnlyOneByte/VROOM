@@ -3,7 +3,7 @@
  */
 
 import { and, eq, inArray } from 'drizzle-orm';
-import { TABLE_SCHEMA_MAP } from '../../config';
+import { CONFIG, TABLE_SCHEMA_MAP } from '../../config';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import {
@@ -28,7 +28,7 @@ import {
 import { SyncError, SyncErrorCode } from '../../errors';
 import type { BackupConfig, ParsedBackupData } from '../../types';
 import { preferencesRepository } from '../settings/repository';
-import { backupService, coerceRow } from './backup';
+import { backupService, coerceRow, isPreCentsBackup } from './backup';
 
 type DrizzleTransaction = Parameters<Parameters<AppDatabase['transaction']>[0]>[0];
 
@@ -185,15 +185,28 @@ class RestoreService {
     const sheetsService = await createSheetsServiceForProvider(providerId, userId);
     const sheetData = await sheetsService.readSpreadsheetData(sheetsSpreadsheetId);
 
+    // A pre-cents (version < 2.0.0) Sheets backup stored money as DOLLAR floats; under the post-0009
+    // integer-cents schema they must be ×100-shimmed during coercion or coerceRow's integer branch
+    // 100×-undercounts them (design §4, NORTH_STAR #1 — the same fail-closed-default + recovery-shim
+    // contract as the ZIP path in backup.parseZipBackup).
+    const shimMoneyToCents = isPreCentsBackup(sheetData.metadata?.version);
+
     // Coerce Sheets data using schema-aware column types
     for (const [key, table] of Object.entries(TABLE_SCHEMA_MAP)) {
       const data = sheetData[key as keyof typeof sheetData];
       if (Array.isArray(data)) {
         // biome-ignore lint/suspicious/noExplicitAny: Dynamic key assignment on parsed backup data
         (sheetData as Record<string, any>)[key] = data.map((row: Record<string, unknown>) =>
-          coerceRow(row, table)
+          coerceRow(row, table, { shimMoneyToCents })
         );
       }
+    }
+
+    // After a successful shim the in-memory data IS the cents (2.0.0) format → upgrade the version so
+    // validateBackupData (fail-closes on a version mismatch) accepts the recovered backup. A version we
+    // cannot shim leaves it untouched → fail-closed.
+    if (shimMoneyToCents) {
+      sheetData.metadata = { ...sheetData.metadata, version: CONFIG.backup.currentVersion };
     }
 
     if (sheetData.metadata.userId !== userId) {

@@ -54,6 +54,41 @@ export interface ValidationResult {
   errors: string[];
 }
 
+/**
+ * The money columns that became integer-CENTS in migration 0009 (money-cents-migration §1), keyed by
+ * their CAMELCASE drizzle field name (coerceRow + the CSV headers use the field name, not the snake_case
+ * db column). A pre-cents backup (metadata.version < 2.0.0) stored these as DOLLAR floats; restoring it
+ * into the cents schema must ×100 them, or coerceRow's INTEGER branch would `Math.round('12.34')` = 12
+ * cents = $0.12, a silent 100× corruption (design §4, NORTH_STAR #1). A flat field-name set is safe:
+ * coerceRow processes ONE table at a time, and no NON-money column shares any of these names (apr/volume/
+ * businessMileageRate — the excluded reals — are all distinctly named).
+ */
+export const MONEY_CENTS_FIELDS = new Set<string>([
+  'purchasePrice', // vehicles
+  'originalAmount', // vehicleFinancing
+  'paymentAmount', // vehicleFinancing + insuranceTerms (both money)
+  'residualValue', // vehicleFinancing
+  'excessMileageFee', // vehicleFinancing
+  'deductibleAmount', // insuranceTerms
+  'coverageLimit', // insuranceTerms
+  'totalCost', // insuranceTerms
+  'monthlyCost', // insuranceTerms
+  'payoutAmount', // insuranceClaims
+  'expenseAmount', // expenses + reminders (both money)
+  'groupTotal', // expenses
+]);
+
+/**
+ * A backup written under a schema where money was DOLLAR floats (everything before the 2.0.0 cents
+ * schema). Such a backup must have its money columns ×100-shimmed on restore. Compares the MAJOR
+ * version: anything < 2 is pre-cents. A version >= the current major we cannot shim (a future format) is
+ * NOT pre-cents — it falls through to validateBackupData's fail-closed version check.
+ */
+export function isPreCentsBackup(version: string | undefined): boolean {
+  const major = Number.parseInt(String(version ?? '').split('.')[0], 10);
+  return Number.isFinite(major) && major < 2;
+}
+
 // biome-ignore lint/suspicious/noExplicitAny: Zod schema type is complex
 const TABLE_SCHEMAS: Record<string, z.ZodObject<any>> = {};
 for (const [key, table] of Object.entries(TABLE_SCHEMA_MAP)) {
@@ -68,9 +103,18 @@ for (const [key, table] of Object.entries(TABLE_SCHEMA_MAP)) {
  * so the backup pipeline works regardless of the underlying database.
  */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Column type coercion requires checking multiple column types
-export function coerceRow(row: Record<string, unknown>, table: Table): Record<string, unknown> {
+export function coerceRow(
+  row: Record<string, unknown>,
+  table: Table,
+  options?: { shimMoneyToCents?: boolean }
+): Record<string, unknown> {
   const columns = getTableColumns(table);
   const coerced: Record<string, unknown> = { ...row };
+  // Pre-cents (version < 2.0.0) backup: its money columns are DOLLAR floats but the post-0009 schema
+  // declares them integer, so they route through the INTEGER branch below and would `Math.round('12.34')`
+  // = 12 cents = $0.12 (a silent 100× loss). When this flag is set, the INTEGER branch ×100s a money
+  // field instead (design §4 shim). A 2.0.0+ backup already stores cents → no shim (flag false).
+  const shimMoneyToCents = options?.shimMoneyToCents ?? false;
 
   // Dialect-agnostic column type sets — add PG types here when adding PostgreSQL support
   const BOOLEAN_TYPES = new Set(['SQLiteBoolean', 'PgBoolean']);
@@ -134,7 +178,17 @@ export function coerceRow(row: Record<string, unknown>, table: Table): Record<st
       // rejects a "12abc" tail to NaN → null, matching the existing garbage→null contract). Round so a
       // Sheets "12345.0" / a stray decimal lands on a whole number rather than truncating.
       const num = Number(strVal.replace(/,/g, ''));
-      coerced[columnName] = Number.isNaN(num) ? null : Math.round(num);
+      if (Number.isNaN(num)) {
+        coerced[columnName] = null;
+      } else if (shimMoneyToCents && MONEY_CENTS_FIELDS.has(columnName)) {
+        // Pre-cents backup: this money value is DOLLARS (e.g. 12.34). Scale to integer cents (1234),
+        // ROUND-before-int exactly like the 0009 migration (12.34*100 = 1233.9999… would truncate to
+        // 1233 without the round). This is the design §4 recovery path: an old backup round-trips
+        // CORRECTLY instead of becoming $0.12.
+        coerced[columnName] = Math.round(num * 100);
+      } else {
+        coerced[columnName] = Math.round(num);
+      }
     } else if (REAL_TYPES.has(col.columnType)) {
       // Same thousands-separator hazard: parseFloat("1,234.56") stops at the comma → 1. Strip grouping
       // commas + a strict whole-string parse (Number() → NaN on a garbage tail → null).
@@ -408,7 +462,11 @@ export class BackupService {
       .where(eq(reminderNotifications.userId, userId));
 
     return {
-      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId },
+      metadata: {
+        version: CONFIG.backup.currentVersion,
+        timestamp: new Date().toISOString(),
+        userId,
+      },
       vehicles: userVehicles,
       expenses: userExpenses,
       financing: userFinancing,
@@ -520,6 +578,14 @@ export class BackupService {
 
     const metadata = JSON.parse(metadataEntry.getData().toString('utf-8')) as BackupMetadata;
 
+    // A pre-cents (version < 2.0.0) backup stored money as DOLLAR floats; the post-0009 schema declares
+    // those columns integer, so they must be ×100-shimmed to CENTS during coercion or coerceRow's integer
+    // branch silently 100×-undercounts them (design §4). After a successful shim the in-memory data IS in
+    // the cents (2.0.0) format, so its version is upgraded to match — that is what lets validateBackupData
+    // (which fail-closes on a version mismatch) accept this recovered backup. A version we can NOT shim
+    // (a future major) leaves the version untouched → validateBackupData rejects it (fail-closed default).
+    const shimMoneyToCents = isPreCentsBackup(metadata.version);
+
     const getCSVData = (fileName: string): Record<string, unknown>[] => {
       const entry = zip.getEntry(fileName);
       if (!entry) return [];
@@ -530,9 +596,15 @@ export class BackupService {
     for (const [key, filename] of Object.entries(TABLE_FILENAME_MAP)) {
       const table = TABLE_SCHEMA_MAP[key];
       const rawRows = getCSVData(filename);
-      const coercedRows = table ? rawRows.map((row) => this.coerceCSVRow(row, table)) : rawRows;
+      const coercedRows = table
+        ? rawRows.map((row) => this.coerceCSVRow(row, table, shimMoneyToCents))
+        : rawRows;
       // biome-ignore lint/suspicious/noExplicitAny: Dynamic key assignment
       parsedData[key as keyof ParsedBackupData] = coercedRows as any;
+    }
+
+    if (shimMoneyToCents) {
+      parsedData.metadata = { ...metadata, version: CONFIG.backup.currentVersion };
     }
 
     return parsedData;
@@ -549,8 +621,12 @@ export class BackupService {
       quote: '"',
     }) as Record<string, string>[];
   }
-  private coerceCSVRow(row: Record<string, unknown>, table: Table): Record<string, unknown> {
-    return coerceRow(row, table);
+  private coerceCSVRow(
+    row: Record<string, unknown>,
+    table: Table,
+    shimMoneyToCents = false
+  ): Record<string, unknown> {
+    return coerceRow(row, table, { shimMoneyToCents });
   }
 
   validateBackupData(backup: ParsedBackupData): ValidationResult {

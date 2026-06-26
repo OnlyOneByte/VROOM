@@ -102,7 +102,7 @@ describe('backup → restore round-trip preserves insurance claims', () => {
     expect(row.vehicle_id).toBe(vehicleId);
     expect(row.claim_type).toBe('collision');
     expect(row.status).toBe('settled');
-    expect(row.payout_amount).toBe(1234.56);
+    expect(row.payout_amount).toBe(123456); // $1234.56 → 123456 cents (money-cents-migration)
     expect(row.fault_designation).toBe('not_at_fault');
     expect(row.description).toBe('Rear-ended at a light');
   });

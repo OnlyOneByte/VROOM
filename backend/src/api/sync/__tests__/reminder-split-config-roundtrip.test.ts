@@ -46,12 +46,22 @@ describe('backup → restore round-trip preserves a reminder expenseSplitConfig 
     const vehB = await seedVehicle(ctx, { make: 'Honda', model: 'M', year: 2022 });
 
     // A two-vehicle ABSOLUTE split — allocations is an array of objects, so its JSON body carries
-    // the commas + quotes that stress the CSV quote-escaping. Amounts sum to expenseAmount (120).
+    // the commas + quotes that stress the CSV quote-escaping. Amounts (DOLLARS sent) sum to expenseAmount.
     const splitConfig = {
       method: 'absolute' as const,
       allocations: [
         { vehicleId: vehA, amount: 70 },
         { vehicleId: vehB, amount: 50 },
+      ],
+    };
+    // money-cents-migration: the reminder's expenseSplitConfig allocation amounts are dollars→cents at the
+    // input edge (splitConfigSchema's absoluteAllocationSchema.transform), so the PERSISTED blob holds cents.
+    // The round-trip must preserve THAT (cents) blob byte-for-byte through CSV export+restore.
+    const storedConfig = {
+      method: 'absolute' as const,
+      allocations: [
+        { vehicleId: vehA, amount: 7000 },
+        { vehicleId: vehB, amount: 5000 },
       ],
     };
 
@@ -67,11 +77,11 @@ describe('backup → restore round-trip preserves a reminder expenseSplitConfig 
     });
     expect(created.status, await created.text()).toBe(201);
 
-    // Pre-condition: the config persisted as a real nested object (not stringified-twice / null).
+    // Pre-condition: the config persisted as a real nested object (not stringified-twice / null), in cents.
     const before = reminderRows();
     expect(before).toHaveLength(1);
     const reminderId = before[0].id; // shape-independent: read the persisted row's id.
-    expect(JSON.parse(before[0].expense_split_config ?? 'null')).toEqual(splitConfig);
+    expect(JSON.parse(before[0].expense_split_config ?? 'null')).toEqual(storedConfig);
 
     // Real export (CSV serialize, JSON.stringify the object) → real restore (CSV parse, coerceRow
     // JSON.parse). Import the singletons dynamically so they bind to the harness DB.
@@ -91,7 +101,7 @@ describe('backup → restore round-trip preserves a reminder expenseSplitConfig 
     expect(after[0].id).toBe(reminderId);
     const restored = JSON.parse(after[0].expense_split_config ?? 'null');
     expect(restored, 'nested expenseSplitConfig round-trips intact through CSV').toEqual(
-      splitConfig
+      storedConfig
     );
   });
 

@@ -4,6 +4,7 @@ import { CONFIG } from '../../config';
 import type { NewReminder, Reminder } from '../../db/schema';
 import { ValidationError } from '../../errors';
 import { changeTracker, rateLimiter, requireAuth } from '../../middleware';
+import { centsToDollars, expenseToApi, reminderToApi } from '../../utils/money';
 import {
   commonSchemas,
   validateReminderOwnership,
@@ -14,9 +15,22 @@ import { odometerRepository } from '../odometer/repository';
 import { recurringCostSummary } from './reminder-cost';
 import { reminderRepository } from './repository';
 import { advanceReminderDueDate, reminderTriggerService } from './trigger-service';
-import { createReminderSchema, updateReminderSchema } from './validation';
+import {
+  assertMergedReminderValid,
+  createReminderSchema,
+  updateReminderSchema,
+} from './validation';
 
 const routes = new Hono();
+
+/**
+ * T6 display edge for a ReminderWithVehicles response ({ reminder, vehicleIds }): convert the nested
+ * reminder's expenseAmount from integer CENTS → dollars. vehicleIds + the rest pass through. Used at
+ * every reminder list/get/create/update return (the money lives under `.reminder`).
+ */
+function reminderWithVehiclesToApi<T extends { reminder: Record<string, unknown> }>(row: T): T {
+  return { ...row, reminder: reminderToApi(row.reminder) };
+}
 
 /**
  * Resolve the server-derived mileage fields for a create/update (T4, D4). For a mileage/both
@@ -92,7 +106,11 @@ const triggerRateLimiter = rateLimiter({
 routes.post('/trigger', triggerRateLimiter, async (c) => {
   const user = c.get('user');
   const result = await reminderTriggerService.processOverdueReminders(user.id);
-  return c.json({ success: true, data: result });
+  // T6 display edge: the trigger materializes expense rows (cents) → dollars for the FE contract.
+  return c.json({
+    success: true,
+    data: { ...result, createdExpenses: result.createdExpenses.map(expenseToApi) },
+  });
 });
 
 // GET /recurring-cost — the monthly recurring run-rate across the user's active expense reminders
@@ -102,7 +120,11 @@ routes.get('/recurring-cost', async (c) => {
   const user = c.get('user');
   const expenseReminders = await reminderRepository.findByUserId(user.id, { type: 'expense' });
   const summary = recurringCostSummary(expenseReminders.map((r) => r.reminder));
-  return c.json({ success: true, data: summary });
+  // T6 display edge: monthlyTotal is a cents-derived run-rate → dollars for the FE widget.
+  return c.json({
+    success: true,
+    data: { ...summary, monthlyTotal: centsToDollars(summary.monthlyTotal) },
+  });
 });
 
 // POST /:id/mark-serviced — re-arm a reminder after a service (D3). A static suffix segment, so it
@@ -146,13 +168,13 @@ routes.post(
       // endDate bounds the reminder, not just the time axis) and return it inactive, not a forward date.
       if (reminder.endDate && nextDue > reminder.endDate) {
         await reminderRepository.deactivate(id);
-        return c.json({ success: true, data: { ...reminder, isActive: false } });
+        return c.json({ success: true, data: reminderToApi({ ...reminder, isActive: false }) });
       }
       fields.nextDueDate = nextDue;
     }
 
     const updated = await reminderRepository.markServiced(id, user.id, fields);
-    return c.json({ success: true, data: updated });
+    return c.json({ success: true, data: reminderToApi(updated) });
   }
 );
 
@@ -194,7 +216,7 @@ routes.post('/', zValidator('json', createReminderSchema), async (c) => {
     vehicleIds
   );
 
-  return c.json({ success: true, data: result }, 201);
+  return c.json({ success: true, data: reminderWithVehiclesToApi(result) }, 201);
 });
 
 // GET / — list reminders
@@ -210,7 +232,7 @@ routes.get('/', async (c) => {
   if (isActiveParam !== undefined) filters.isActive = isActiveParam === 'true';
 
   const reminders = await reminderRepository.findByUserId(user.id, filters);
-  return c.json({ success: true, data: reminders });
+  return c.json({ success: true, data: reminders.map(reminderWithVehiclesToApi) });
 });
 
 // GET /:id — get single reminder
@@ -220,7 +242,7 @@ routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
 
   const result = await validateReminderOwnership(id, user.id);
 
-  return c.json({ success: true, data: result });
+  return c.json({ success: true, data: reminderWithVehiclesToApi(result) });
 });
 
 // GET /:id/expenses — the expense rows this reminder has materialized (recurring-expenses T6 backend:
@@ -232,7 +254,9 @@ routes.get('/:id/expenses', zValidator('param', commonSchemas.idParam), async (c
   await validateReminderOwnership(id, user.id);
 
   const materialized = await expenseRepository.findBySource('reminder', id, user.id);
-  return c.json({ success: true, data: materialized });
+  // T6 display edge: these materialized expense rows are now CENTS (T5 made the reminder expenseAmount +
+  // trigger-service materialization cents-native), so convert → dollars for the FE contract.
+  return c.json({ success: true, data: materialized.map(expenseToApi) });
 });
 
 // PUT /:id — update reminder
@@ -260,8 +284,11 @@ routes.put(
       vehicleIds: partialUpdate.vehicleIds ?? existing.vehicleIds,
     };
 
-    // Re-validate merged result to prevent invalid intermediate states
-    createReminderSchema.parse(merged);
+    // Re-validate merged result to prevent invalid intermediate states. Uses the TRANSFORM-FREE gate
+    // (assertMergedReminderValid): `merged` mixes the existing row (already integer CENTS) with the parsed
+    // partial update (also cents), so re-parsing through createReminderSchema would double-convert the
+    // money + reject a ≥$10k reminder on the dollar .max() bound (money-cents-migration T5).
+    assertMergedReminderValid(merged);
 
     const { vehicleIds: mergedVehicleIds, ...reminderFields } = partialUpdate;
     const updateFields: Partial<NewReminder> = { ...reminderFields };
@@ -294,7 +321,7 @@ routes.put(
       mergedVehicleIds
     );
 
-    return c.json({ success: true, data: result });
+    return c.json({ success: true, data: reminderWithVehiclesToApi(result) });
   }
 );
 

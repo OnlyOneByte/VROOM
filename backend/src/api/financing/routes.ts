@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { vehicleFinancing } from '../../db/schema';
 import { changeTracker, requireAuth } from '../../middleware';
+import { centsToDollars, financingToApi, moneyDollarsToCents } from '../../utils/money';
 import {
   commonSchemas,
   validateFinancingOwnership,
@@ -26,7 +27,9 @@ const baseFinancingSchema = createInsertSchema(vehicleFinancing, {
       CONFIG.validation.financing.providerMaxLength,
       `Provider must be ${CONFIG.validation.financing.providerMaxLength} characters or less`
     ),
-  originalAmount: z.number().min(0.01, 'Original amount must be greater than 0'),
+  // money: client sends DOLLARS, store integer CENTS (T3). The .min(0.01) bound checks the DOLLAR value
+  // (0.01 = 1 cent) before the transform scales it. apr is a PERCENT — NOT money, stays a plain number.
+  originalAmount: moneyDollarsToCents((n) => n.min(0.01, 'Original amount must be greater than 0')),
   apr: z
     .number()
     .min(0, 'APR cannot be negative')
@@ -44,7 +47,7 @@ const baseFinancingSchema = createInsertSchema(vehicleFinancing, {
       `Term cannot exceed ${CONFIG.validation.financing.maxTermMonths} months`
     ),
   startDate: z.coerce.date(),
-  paymentAmount: z.number().min(0.01, 'Payment amount must be greater than 0'),
+  paymentAmount: moneyDollarsToCents((n) => n.min(0.01, 'Payment amount must be greater than 0')),
   paymentDayOfMonth: z
     .number()
     .int()
@@ -57,9 +60,10 @@ const baseFinancingSchema = createInsertSchema(vehicleFinancing, {
     .min(CONFIG.validation.financing.minDayOfWeek)
     .max(CONFIG.validation.financing.maxDayOfWeek)
     .optional(),
-  residualValue: z.number().min(0).optional(),
+  // money (T3): residualValue + excessMileageFee → cents. mileageLimit is a MILEAGE count, NOT money.
+  residualValue: moneyDollarsToCents((n) => n.min(0)).optional(),
   mileageLimit: z.number().int().min(0).optional(),
-  excessMileageFee: z.number().min(0).optional(),
+  excessMileageFee: moneyDollarsToCents((n) => n.min(0)).optional(),
 });
 
 const createFinancingSchema = baseFinancingSchema.omit({
@@ -86,6 +90,19 @@ async function enrichWithBalance(
   return withComputedBalance(financing, computedBalance);
 }
 
+/**
+ * T6 display edge for a financing API object: convert the stored money columns AND the derived
+ * `computedBalance` from integer CENTS → dollars. `eligibleForPayoff` is already computed on the cents
+ * balance (isEligibleForPayoff, threshold in cents), so it is correct and copied through unchanged.
+ * Use at every financing route return that emits a raw/enriched financing row.
+ */
+function financingRowToApi<T extends Record<string, unknown>>(row: T): T {
+  const withMoney = financingToApi(row);
+  return typeof withMoney.computedBalance === 'number'
+    ? { ...withMoney, computedBalance: centsToDollars(withMoney.computedBalance) }
+    : withMoney;
+}
+
 // GET /api/vehicles/:vehicleId/financing - Get financing details for a vehicle
 routes.get(
   '/vehicles/:vehicleId/financing',
@@ -105,7 +122,7 @@ routes.get(
     }
 
     const enriched = await enrichWithBalance(financingData);
-    return c.json({ success: true, data: enriched });
+    return c.json({ success: true, data: financingRowToApi(enriched) });
   }
 );
 
@@ -168,7 +185,7 @@ routes.post(
       });
       return c.json({
         success: true,
-        data: updatedFinancing,
+        data: financingRowToApi(updatedFinancing),
         message: 'Financing updated successfully',
       });
     }
@@ -178,7 +195,11 @@ routes.post(
       vehicleId,
     });
     return c.json(
-      { success: true, data: createdFinancing, message: 'Financing created successfully' },
+      {
+        success: true,
+        data: financingRowToApi(createdFinancing),
+        message: 'Financing created successfully',
+      },
       201
     );
   }
@@ -191,7 +212,10 @@ routes.patch(
   zValidator(
     'json',
     z.object({
-      paymentAmount: z.number().min(0.01, 'Payment amount must be greater than 0'),
+      // money (T3): the PATCH payment-amount endpoint mirrors the create schema's cents transform.
+      paymentAmount: moneyDollarsToCents((n) =>
+        n.min(0.01, 'Payment amount must be greater than 0')
+      ),
     })
   ),
   async (c) => {
@@ -206,7 +230,7 @@ routes.patch(
     });
     return c.json({
       success: true,
-      data: updated,
+      data: financingRowToApi(updated),
       message: 'Payment amount updated successfully',
     });
   }
@@ -222,7 +246,7 @@ routes.put('/:financingId/payoff', zValidator('param', financingParamsSchema), a
 
   return c.json({
     success: true,
-    data: updated,
+    data: financingRowToApi(updated),
     message: 'Financing marked as paid off',
   });
 });

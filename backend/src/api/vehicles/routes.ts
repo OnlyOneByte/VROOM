@@ -10,6 +10,12 @@ import { changeTracker, requireAuth } from '../../middleware';
 import { getPeriodStartDate, sortExpensesByDate } from '../../utils/calculations';
 import { logger } from '../../utils/logger';
 import {
+  centsToDollars,
+  financingToApi,
+  moneyDollarsToCents,
+  vehicleToApi,
+} from '../../utils/money';
+import {
   mergeUnitPreferences,
   partialUnitPreferencesSchema,
   unitPreferencesSchema,
@@ -69,7 +75,11 @@ const baseVehicleSchema = createInsertSchema(vehiclesTable, {
     )
     .optional(),
   initialMileage: z.number().int().min(0, 'Initial mileage cannot be negative').optional(),
-  purchasePrice: z.number().min(0, 'Purchase price cannot be negative').optional(),
+  // money (T3): client sends DOLLARS, store integer CENTS. The update schema re-derives this via
+  // baseVehicleSchema.shape.purchasePrice.nullish(), so the transform propagates to both create + update.
+  purchasePrice: moneyDollarsToCents((n) =>
+    n.min(0, 'Purchase price cannot be negative')
+  ).optional(),
   purchaseDate: z.coerce.date().optional(),
 });
 
@@ -124,6 +134,29 @@ routes.use('*', changeTracker);
 routes.route('/:vehicleId/photos', photoRoutes);
 
 /**
+ * T6 display edge for a vehicle API object: convert the vehicle's own money (purchasePrice) AND its
+ * embedded financing (money columns + the derived computedBalance) from integer CENTS → dollars. A
+ * vehicle row may carry a nested `financing` object (enriched with computedBalance/eligibleForPayoff);
+ * eligibleForPayoff is computed on the cents balance so it is copied through unchanged. Pure, shallow.
+ */
+function vehicleRowToApi<T extends Record<string, unknown>>(row: T): T {
+  const v = vehicleToApi(row);
+  const fin = v.financing as Record<string, unknown> | null | undefined;
+  if (fin && typeof fin === 'object') {
+    const finApi = financingToApi(fin);
+    const balance = finApi.computedBalance;
+    return {
+      ...v,
+      financing:
+        typeof balance === 'number'
+          ? { ...finApi, computedBalance: centsToDollars(balance) }
+          : finApi,
+    };
+  }
+  return v;
+}
+
+/**
  * Assert a license plate is free within THIS user's fleet (plate uniqueness is per-user, not global —
  * see findByLicensePlate + migration 0005, the #80 fix). One source of truth for the create + update
  * checks (C289 dedup): the conflict message + the per-user-scoped lookup lived in two hand-rolled
@@ -163,10 +196,12 @@ routes.get('/', async (c) => {
     return v;
   });
 
-  const response: ApiResponse<typeof enrichedVehicles> = {
+  // T6 display edge: vehicle purchasePrice + embedded financing money/balance cents → dollars.
+  const apiVehicles = enrichedVehicles.map(vehicleRowToApi);
+  const response: ApiResponse<typeof apiVehicles> = {
     success: true,
-    data: enrichedVehicles,
-    message: `Found ${enrichedVehicles.length} vehicle${enrichedVehicles.length !== 1 ? 's' : ''}`,
+    data: apiVehicles,
+    message: `Found ${apiVehicles.length} vehicle${apiVehicles.length !== 1 ? 's' : ''}`,
   };
 
   return c.json(response);
@@ -197,7 +232,7 @@ routes.post('/', zValidator('json', createVehicleSchema), async (c) => {
 
   const response: ApiResponse<typeof createdVehicle> = {
     success: true,
-    data: createdVehicle,
+    data: vehicleRowToApi(createdVehicle),
     message: 'Vehicle created successfully',
   };
 
@@ -232,7 +267,7 @@ routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
 
   const response: ApiResponse<typeof responseData> = {
     success: true,
-    data: responseData,
+    data: vehicleRowToApi(responseData),
   };
 
   return c.json(response);
@@ -273,7 +308,7 @@ routes.put(
 
     return c.json({
       success: true,
-      data: updatedVehicle,
+      data: vehicleRowToApi(updatedVehicle),
       message: 'Vehicle updated successfully',
     });
   }

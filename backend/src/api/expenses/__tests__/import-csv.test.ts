@@ -146,7 +146,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     const [row] = listExpensesRaw();
     expect(row, 'the round-tripped expense exists').toBeDefined();
     expect(row?.category).toBe('fuel');
-    expect(row?.expense_amount).toBeCloseTo(52.4, 2);
+    expect(row?.expense_amount).toBe(5240); // $52.40 → 5240 cents in the raw DB row (money-cents-migration)
     expect(row?.vehicle_id).toBe(vehicleId); // resolved back by vehicle NAME
     expect(row?.mileage).toBe(31234);
     expect(row?.volume).toBeCloseTo(11.5, 2);

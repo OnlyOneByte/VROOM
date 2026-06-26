@@ -6,8 +6,9 @@ import type { SplitConfig } from './validation';
 
 export class ExpenseSplitService {
   /**
-   * Compute per-vehicle amounts from a split config and total.
-   * Pure function — no DB access.
+   * Compute per-vehicle amounts (integer CENTS) from a split config and total.
+   * `totalAmount` is integer CENTS (money-cents-migration T5 — the input edge already converted
+   * dollars→cents); allocation amounts in an `absolute` config are likewise cents. Pure — no DB.
    */
   computeAllocations(
     config: SplitConfig,
@@ -28,23 +29,29 @@ export class ExpenseSplitService {
 
   private computeEvenSplit(
     vehicleIds: string[],
-    totalAmount: number
+    totalCents: number
   ): Array<{ vehicleId: string; amount: number }> {
+    // money-cents-migration (T5): `totalCents` arrives as integer CENTS (the input edge already
+    // converted dollars→cents), so this is now NATIVE integer arithmetic — no `*100` in, no `/100` out.
+    // The largest-remainder distribution (baseCents + 1 for the first `remainderCents` legs) was already
+    // the cents-correct algorithm; it now operates directly on the stored unit, so Σlegs == totalCents EXACTLY.
     const n = vehicleIds.length;
-    const totalCents = Math.round(totalAmount * 100);
     const baseCents = Math.floor(totalCents / n);
     const remainderCents = totalCents - baseCents * n;
 
     return vehicleIds.map((vehicleId, i) => ({
       vehicleId,
-      amount: (baseCents + (i < remainderCents ? 1 : 0)) / 100,
+      amount: baseCents + (i < remainderCents ? 1 : 0),
     }));
   }
 
   private computePercentageSplit(
     allocations: Array<{ vehicleId: string; percentage: number }>,
-    totalAmount: number
+    totalCents: number
   ): Array<{ vehicleId: string; amount: number }> {
+    // money-cents-migration (T5): `totalCents` is integer CENTS. Each leg is `floor(totalCents *
+    // percentage / 100)` — `percentage` is a non-money ratio, so the result is cents — and the LAST leg
+    // takes the exact integer remainder so Σlegs == totalCents EXACTLY (no float remainder, no `/100`).
     const result: Array<{ vehicleId: string; amount: number }> = [];
     let runningTotal = 0;
     const lastIndex = allocations.length - 1;
@@ -54,10 +61,10 @@ export class ExpenseSplitService {
       let amount: number;
 
       if (i === lastIndex) {
-        // Assign remainder to last vehicle, clamped to zero to prevent negative amounts from rounding
-        amount = Math.max(0, Math.round((totalAmount - runningTotal) * 100) / 100);
+        // Assign the exact remaining cents to the last vehicle, clamped to ≥ 0.
+        amount = Math.max(0, totalCents - runningTotal);
       } else {
-        amount = Math.floor(((totalAmount * percentage) / 100) * 100) / 100;
+        amount = Math.floor((totalCents * percentage) / 100);
       }
 
       runningTotal += amount;
