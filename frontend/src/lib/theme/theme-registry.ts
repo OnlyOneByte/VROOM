@@ -736,10 +736,97 @@ const EDITORIAL_THEME: ThemeDefinition = defineBuiltinTheme({
 });
 
 /**
+ * `tui` light palette — a paper-terminal: cream canvas, dark-amber brand, teal-green accent. Distilled from
+ * the ryang.dev terminal/TUI mock into VROOM's 32 tokens, AA-tuned (theme-contrast.test.ts). D7 token-only
+ * (no box-drawing/monospace layout — the palette only).
+ */
+const TUI_LIGHT: ThemeTokens = {
+  background: 'oklch(0.96 0.01 95)',
+  foreground: 'oklch(0.24 0.02 90)',
+  card: 'oklch(0.99 0.006 95)',
+  'card-foreground': 'oklch(0.24 0.02 90)',
+  popover: 'oklch(0.99 0.006 95)',
+  'popover-foreground': 'oklch(0.24 0.02 90)',
+  primary: 'oklch(0.52 0.1 85)',
+  'primary-foreground': 'oklch(0.99 0.006 95)',
+  secondary: 'oklch(0.92 0.02 95)',
+  'secondary-foreground': 'oklch(0.3 0.02 90)',
+  muted: 'oklch(0.92 0.02 95)',
+  'muted-foreground': 'oklch(0.45 0.02 90)',
+  accent: 'oklch(0.88 0.06 165)',
+  'accent-foreground': 'oklch(0.34 0.08 165)',
+  destructive: 'oklch(0.52 0.22 25)',
+  warning: 'oklch(0.55 0.13 75)',
+  border: 'oklch(0.86 0.015 95)',
+  input: 'oklch(0.86 0.015 95)',
+  ring: 'oklch(0.52 0.1 85)',
+  'chart-1': 'oklch(0.52 0.1 85)',
+  'chart-2': 'oklch(0.5 0.12 165)',
+  'chart-3': 'oklch(0.5 0.13 240)',
+  'chart-4': 'oklch(0.52 0.16 350)',
+  'chart-5': 'oklch(0.5 0.14 140)',
+  sidebar: 'oklch(0.94 0.012 95)',
+  'sidebar-foreground': 'oklch(0.24 0.02 90)',
+  'sidebar-primary': 'oklch(0.52 0.1 85)',
+  'sidebar-primary-foreground': 'oklch(0.99 0.006 95)',
+  'sidebar-accent': 'oklch(0.88 0.06 165)',
+  'sidebar-accent-foreground': 'oklch(0.34 0.08 165)',
+  'sidebar-border': 'oklch(0.86 0.015 95)',
+  'sidebar-ring': 'oklch(0.52 0.1 85)',
+};
+
+/**
+ * `tui` dark palette — the mock's native terminal look: near-black canvas, amber brand, teal-green accent,
+ * blue/pink/green charts (the heatmap hues). AA-tuned exactly like the light variant (theme-contrast.test.ts).
+ */
+const TUI_DARK: ThemeTokens = {
+  background: 'oklch(0.16 0.004 90)',
+  foreground: 'oklch(0.9 0.02 95)',
+  card: 'oklch(0.2 0.005 90)',
+  'card-foreground': 'oklch(0.9 0.02 95)',
+  popover: 'oklch(0.2 0.005 90)',
+  'popover-foreground': 'oklch(0.9 0.02 95)',
+  primary: 'oklch(0.8 0.12 85)',
+  'primary-foreground': 'oklch(0.18 0.01 90)',
+  secondary: 'oklch(0.27 0.006 90)',
+  'secondary-foreground': 'oklch(0.9 0.02 95)',
+  muted: 'oklch(0.25 0.005 90)',
+  'muted-foreground': 'oklch(0.7 0.02 95)',
+  accent: 'oklch(0.5 0.1 165)',
+  'accent-foreground': 'oklch(0.97 0.02 160)',
+  destructive: 'oklch(0.62 0.21 25)',
+  warning: 'oklch(0.8 0.13 80)',
+  border: 'oklch(0.32 0.006 90)',
+  input: 'oklch(0.3 0.006 90)',
+  ring: 'oklch(0.8 0.12 85)',
+  'chart-1': 'oklch(0.8 0.12 85)',
+  'chart-2': 'oklch(0.72 0.13 165)',
+  'chart-3': 'oklch(0.68 0.13 240)',
+  'chart-4': 'oklch(0.68 0.15 350)',
+  'chart-5': 'oklch(0.75 0.15 140)',
+  sidebar: 'oklch(0.13 0.004 90)',
+  'sidebar-foreground': 'oklch(0.9 0.02 95)',
+  'sidebar-primary': 'oklch(0.8 0.12 85)',
+  'sidebar-primary-foreground': 'oklch(0.18 0.01 90)',
+  'sidebar-accent': 'oklch(0.5 0.1 165)',
+  'sidebar-accent-foreground': 'oklch(0.97 0.02 160)',
+  'sidebar-border': 'oklch(0.32 0.006 90)',
+  'sidebar-ring': 'oklch(0.8 0.12 85)',
+};
+
+const TUI_THEME: ThemeDefinition = defineBuiltinTheme({
+  id: 'tui',
+  label: 'Terminal',
+  description: 'Text-mode terminal — amber and green on near-black.',
+  light: TUI_LIGHT,
+  dark: TUI_DARK,
+});
+
+/**
  * Every built-in theme by id. `default` is the always-present identity theme (R8 fallback target). The
- * Angelo-approved v1 set (default + 5: blueprint/bento/vaporwave/cyberpunk/aurora) is COMPLETE; `solarpunk`
- * + `editorial` are fill-ins from the ryang.dev mocks. Each theme is a single defineBuiltinTheme call — zero
- * structural change; further fill-ins (tui/y2k/neobrutalist/claymorphism/brutalist/zine) drop in the same way.
+ * Angelo-approved v1 set (default + 5: blueprint/bento/vaporwave/cyberpunk/aurora) is COMPLETE; solarpunk/
+ * editorial/tui are fill-ins from the ryang.dev mocks. Each theme is a single defineBuiltinTheme call — zero
+ * structural change; further fill-ins (y2k/neobrutalist/claymorphism/brutalist/zine) drop in the same way.
  */
 export const THEME_REGISTRY: Record<string, ThemeDefinition> = {
   default: DEFAULT_THEME,
@@ -750,6 +837,7 @@ export const THEME_REGISTRY: Record<string, ThemeDefinition> = {
   aurora: AURORA_THEME,
   solarpunk: SOLARPUNK_THEME,
   editorial: EDITORIAL_THEME,
+  tui: TUI_THEME,
 };
 
 /** The id every unknown/absent selection resolves to (R8). */
