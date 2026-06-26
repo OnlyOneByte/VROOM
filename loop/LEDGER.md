@@ -232,12 +232,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 334 |
 | deep-review | 5 | 332 |
-| guard | 6 | 328 |
+| guard | 6 | 336 |
 | bug | 3 | 333 |
 | arch | 5 | 334 |
 | infra | 6 | 335 |
 
-Current cycle: **335**
+Current cycle: **336**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,20 @@ Current cycle: **335**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C336 (GUARD: pin DARK-IS-DARKER orientation per theme — catch a swapped light/dark variant map)** —
+  Balance recompute (cycle 336): guard most-starved over budget (8/6, 1.33×). Scouted for a genuinely UNGUARDED invariant
+  (not a re-confirm) and found one: NOTHING verifies a theme's dark variant is actually darker than its light variant.
+  Each theme is authored defineBuiltinTheme({light: X_LIGHT, dark: X_DARK}) — swapping those args (or pasting a light
+  palette into the dark slot) ships a "dark mode" that is actually LIGHT, and EVERY existing guard stays green (contrast:
+  each variant independently AA-clean; all-pairs distinctness: still distinct; metadata: fine) — only a human toggling dark
+  mode would notice. Verified the gap firsthand (zero existing lightness assertions; all 8 themes currently satisfy it,
+  dark bg L 0.14-0.22 vs light bg L 0.95-1.0). Added a per-theme orientation guard on TWO inverting anchors: dark.background
+  L < light.background L AND dark.foreground L > light.foreground L (text inverts too). NON-VACUOUS — swapping aurora
+  light<->dark fails BOTH anchors with a "variants likely swapped" diagnostic, proven firsthand + restored. Verify: FE
+  validate:local GREEN (1118 tests, +16 = 2 anchors x 8 themes). BE untouched. Committed 0798c86, pushed (branch 216 ahead /
+  0 behind). cov: be 89.29% / fe 89.59% (~). (guard→336. Theme guard surface now 7 dimensions: contrast/distinctness-vs-
+  default/all-pairs/byte-fresh/integrity/metadata/dark-orientation + layout-wiring + swatch-key. NEXT: fill-in palette
+  [feature] or the rotation; the C333 PWA theme-color call + 4 Tier-2 specs remain the Angelo-gated frontier.)
 - **C335 (INFRA cadence: FE coverage RE-MEASURE [replacing the C326-carried ~] + untracked-test sweep CLEAN)** —
   Balance recompute (cycle 335): infra most-starved over budget (9/6, 1.5×). A real re-measure was due: since C326 the C331
   solarpunk + C334 editorial fill-ins added +29 tests (1073→1102) + net-new theme data. RE-MEASURED FE (vitest --coverage):
