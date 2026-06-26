@@ -52,13 +52,12 @@ Don't run the 6-budget recompute in BUILD mode — it's wasted work when the que
 > Keep this list current as the live build plan. The loop POPS the top unblocked slice instead of
 > re-deciding feature order every cycle (that re-derivation was a per-cycle tax). Re-rank only when a
 > slice finishes or a gate clears. Greenlit 2026-06-24; ordered by Angelo (money-cents first, C349).
-1. **money-cents-migration** — `.kiro/specs/money-cents-migration/tasks.md`. **⛔ HELD on an Angelo
-   SEQUENCING confirm (escalated post-reset C1, still unanswered C8).** The spec line "T1+T2 before T3–T6,
-   one task per cycle" is INFEASIBLE: T1 (flip the 14 money cols real→integer + CAST*100) cannot pass
-   validate:local alone while the read/write path + money-math suites still use dollar-floats — the branch
-   only re-greens once the conversion is END-TO-END. Angelo's earlier ruling was "T1–T7 in ONE never-broken
-   commit". DO NOT START until he confirms atomic-vs-incremental (recommend atomic). Stays #1 (only greenlit
-   feature with no eyes-on tail + data-safety-critical) but is BLOCKED, not buildable.
+1. ~~**money-cents-migration**~~ — ✅ **DONE + SHIPPED (C19, commit 705b794, pushed).** Built ATOMIC
+   T1–T7 in ONE branch-green commit (Angelo's confirmed ruling, saved lesson 2026-06-26 — the
+   "one-task-per-cycle" spec line was infeasible, as the C1 escalation predicted). 36 files: money is
+   integer CENTS end-to-end, dollars only at the input edge (Zod dollarsToCents) + response edge
+   (per-entity *ToApi + analytics/api-transform). Data-safety gate: backup 2.0.0 + version-gated ×100
+   restore shim. Both validate:local green; FE dollar contract unchanged. Don't re-pick.
 2. ~~**trips-location**~~ — ✅ **COMPLETE (post-reset C3–C5: T1–T8 + T6b-3).** C214 odometer-lifecycle (T7) +
    D3 rate (T8) backend + the FE edit/delete eyes-on tail, all shipped + guarded (C6 date-resync, C7 backup
    round-trip). Don't re-pick.
@@ -67,9 +66,10 @@ Don't run the 6-budget recompute in BUILD mode — it's wasted work when the que
    Angelo clears its gate; highest cross-tenant risk, so it waits). Skip until unblocked.
 - Then the Angelo-approved bug/arch decisions (2026-06-23): #100 json_patch atomic, #79 offline-park,
   seedVehicle convergence (incremental), createLoadState (design-doc-first), #129 already done C155.
-> **QUEUE STATE (post-reset C8): DRAINED of buildable work** — #2/#3 done, #1 held on Angelo (money-cents
-> sequencing), #4 gated (vehicle-sharing T0). Until a gate clears the loop is correctly in MAINTAIN mode
-> (harden the shipped trips backend + existing surfaces). money-cents is the single highest-leverage unblock.
+> **QUEUE STATE (C19): FULLY DRAINED of buildable work** — #1 money-cents ✅ DONE+shipped, #2 trips ✅ DONE,
+> #3 theming ✅ DONE, #4 vehicle-sharing GATED (Angelo must ratify T0/D1–D8). The loop is now in MAINTAIN
+> mode until a gate clears. vehicle-sharing T0 is the single highest-leverage unblock; flag Angelo if every
+> maintenance vein is saturated. ~25-cycle META-REVIEW due ~C25.
 
 ## VELOCITY RULES (the C349 reform — don't pay waste the loop already learned to skip)
 1. **Conditional verify (skip the full gate on doc-only cycles).** `validate:local` (tsc+biome+test+
