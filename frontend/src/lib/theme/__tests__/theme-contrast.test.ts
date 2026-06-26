@@ -10,7 +10,7 @@
  */
 
 import { describe, expect, test } from 'vitest';
-import { THEME_REGISTRY } from '../theme-registry';
+import { DEFAULT_THEME_ID, THEME_REGISTRY } from '../theme-registry';
 import type { ThemeTokenKey, ThemeTokens } from '../theme-types';
 
 /** Parse an `oklch(L C H[/ a%])` string. Alpha is ignored — contrast is computed on the opaque color. */
@@ -100,5 +100,39 @@ describe('every built-in theme clears WCAG AA on text pairs (D4 hard gate)', () 
   // Non-vacuity floor: a deliberately bad pair must FAIL, proving the assertion can fail.
   test('a known low-contrast pair is correctly rejected (non-vacuous)', () => {
     expect(contrast('oklch(0.7 0 0)', 'oklch(0.75 0 0)')).toBeLessThan(AA_NORMAL);
+  });
+});
+
+/**
+ * CHART-SERIES GRAPHICAL CONTRAST (WCAG 1.4.11, 3:1) — every NON-default theme's chart-1..5 must clear 3:1
+ * against the surface they render on (`card` — analytics charts live in ChartCard). The TEXT_PAIRS gate
+ * above deliberately excludes chart tokens (they carry no text), but a chart SERIES is a graphical object a
+ * user must distinguish from its background, so the relevant bar is the 3:1 non-text threshold, not 4.5.
+ *
+ * WHY this guard exists (C343 + C346/C347): the C343 scout established firsthand that all 8 then-shipped
+ * non-default themes clear 3:1 chart-vs-card, and ONLY `default` falls below on three tokens — but `default`
+ * is the VERBATIM app.css palette locked by the C185 identity contract (changing it breaks that guard + is
+ * an Angelo-gated product call on the shipped look), so it is EXCLUDED here. Nothing enforced the property
+ * for NEW themes: the C346 y2k fill-in (and the remaining neobrutalist/claymorphism/brutalist/zine) could
+ * ship a pale chart token below 3:1 and NO guard would catch it (contrast checks only text pairs; metadata/
+ * distinctness/byte-freshness check structure, not chart legibility). This codifies the C343 invariant so a
+ * future low-contrast chart token trips RED before merge — the durable artifact from the C347 bug-dry scout.
+ */
+const CHART_KEYS: readonly ThemeTokenKey[] = ['chart-1', 'chart-2', 'chart-3', 'chart-4', 'chart-5'];
+const AA_GRAPHICAL = 3.0;
+const nonDefaultThemes = Object.values(THEME_REGISTRY).filter((t) => t.id !== DEFAULT_THEME_ID);
+
+describe('every NON-default theme clears WCAG 3:1 on chart series vs card (C347 graphical gate)', () => {
+  describe.each(nonDefaultThemes)('theme "$id"', (theme) => {
+    describe.each(['light', 'dark'] as const)('%s variant', (variant) => {
+      const tokens = theme[variant] as ThemeTokens;
+      test.each(CHART_KEYS)('%s on card ≥ 3:1', (chart) => {
+        const ratio = contrast(tokens[chart], tokens.card);
+        expect(
+          ratio,
+          `${theme.id}.${variant}: ${chart} on card = ${ratio.toFixed(2)}:1 (need ≥ ${AA_GRAPHICAL} — a chart series must be distinguishable from its surface)`
+        ).toBeGreaterThanOrEqual(AA_GRAPHICAL);
+      });
+    });
   });
 });

@@ -104,7 +104,8 @@ cycles record + pivot to guard/deep-review/arch/infra until a gate clears.**)*
    `cyberpunk` (C329) / `aurora` (C330) — ALL registered via the C324 defineBuiltinTheme factory, ALL AA-tuned
    (theme-contrast.test.ts), ALL all-pairs-distinct (C328), ALL eyes-on (picker grid + dark dashboard re-skin, status 200,
    zero console errors). Guarded across 6 dimensions (contrast/distinctness-vs-default/all-pairs/byte-fresh/integrity/
-   metadata + layout-wiring + swatch-key-safety + dark-orientation + picker-mount-reachability [C345]). 1182 tests.
+   metadata + layout-wiring + swatch-key-safety + dark-orientation + picker-mount-reachability [C345] + chart-series
+   3:1 graphical-contrast [C347]). 1272 tests.
    **THE THEMING FEATURE IS DONE.** 10 themes registered (default + blueprint/bento/vaporwave/cyberpunk/aurora + the
    solarpunk/editorial/tui/y2k [C346] fill-ins). OPTIONAL remaining polish (not
    gating): T11 per-theme dashboard eyes-on ×{light,dark}; T12 axe a11y gate; the remaining fill-in ryang.dev mocks
@@ -853,11 +854,12 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > **OPEN ANGELO-GATED (low-sev, found C343) — `default` palette chart colors fall below WCAG graphical 3:1 vs card.**
 > default/light chart-4 (1.72) + chart-5 (2.15) + default/dark chart-1 (2.60) are below the 3:1 graphical-object threshold
 > against the card surface — analytics chart series are low-contrast on the ORIGINAL palette. PRE-EXISTING (verbatim app.css
-> per the C185 default≡app.css identity contract), NOT introduced by any theming cycle; all 8 new themes PASS ≥3:1. NOT
-> auto-fixed: re-tuning the shipped chart tokens is a visual/product call AND breaks the C185 default≡app.css guard (which
-> intentionally locks default to app.css). Fix path if Angelo wants it: bump app.css chart-4/5 (light) + chart-1 (dark)
-> toward ≥3:1 + mirror into the registry default + (optionally) add a chart-contrast guard (which would be red-on-arrival
-> until then). Low priority — chart legibility, not data.
+> per the C185 default≡app.css identity contract), NOT introduced by any theming cycle; all 9 NON-default themes PASS ≥3:1.
+> NOW ENFORCED for non-default themes (C347): theme-contrast.test.ts asserts chart-N vs card ≥3:1 for every non-default theme
+> (default EXCLUDED — it is C185-locked). So this gated item is scoped PURELY to `default`: NOT auto-fixed because re-tuning the
+> shipped chart tokens is a visual/product call AND breaks the C185 default≡app.css guard. Fix path if Angelo wants it: bump
+> app.css chart-4/5 (light) + chart-1 (dark) toward ≥3:1, mirror into the registry default, then drop default from the C347
+> guard's exclusion. Low priority — chart legibility, not data.
 >
 > **🚩 OPEN ANGELO-GATED (escalated C333) — PWA theme-color meta does NOT follow the selected theme.** applyTheme
 > (theme.svelte.ts:52-55) sets the `<meta name="theme-color">` tint to a HARD-CODED brand hex by MODE only (#2563eb

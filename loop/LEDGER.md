@@ -233,11 +233,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 346 |
 | deep-review | 5 | 342 |
 | guard | 6 | 345 |
-| bug | 3 | 343 |
+| bug | 3 | 347 |
 | arch | 5 | 342 |
 | infra | 6 | 344 |
 
-Current cycle: **346**
+Current cycle: **347**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,28 @@ Current cycle: **346**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C347 (BUG scout DRY → durable guard: codify the C343 chart-series 3:1 graphical-contrast invariant for all non-default themes)** —
+  Balance recompute (cycle 347): bug most-starved over budget (4/3, 1.33×; deep-review + arch both AT budget 5/5, others under).
+  Per the GUIDE the bug surface is saturated on swept ground; a real fix now comes only from a fresh feature surface — the
+  freshest is the theming engine. Scouted it FIRSTHAND: (1) the store theme.svelte.ts — its only real issues (C333 PWA
+  theme-color, C339 reconcile-server-unset) are already escalated + Angelo-gated, NOT auto-fixable; (2) resolve-theme.ts — pure,
+  total, never-throws, comprehensively tested (R8 fallback + prototype-pollution covered); (3) the app.html anti-FOUC head-script
+  — mirrors applyTheme on BOTH axes, comprehensively pinned by theme-fouc-contract.test.ts (C190 dark + C201 theme-id); (4) the
+  C346 y2k theme I added last cycle — checked all 10 chart-vs-card pairs firsthand, ALL clear 3:1 (no regression I introduced).
+  Bug scout DRY (no defect; the real ones are gated). Per the C201/C203/C204 dry-scout pattern, pivoted to the durable artifact:
+  C343 established firsthand that every non-default theme should clear WCAG 1.4.11 graphical 3:1 on chart-1..5 vs card (a chart
+  SERIES is a graphical object a user must distinguish from its surface) — all 9 hold it, ONLY `default` fails (3 tokens), and
+  default is the C185-locked verbatim app.css palette (excluded — fixing it is the gated product call). But NOTHING enforced the
+  property: theme-contrast.test.ts deliberately checks only TEXT pairs (chart tokens carry no text), so a future fill-in
+  (neobrutalist/claymorphism/brutalist/zine) could ship a pale chart token <3:1 and no guard would catch it. GUARD: +90 in
+  theme-contrast.test.ts (9 non-default themes × 2 variants × 5 chart keys) asserting chart-N vs card ≥ 3:1, EXCLUDING default
+  (C185-locked). NON-VACUITY PROVEN: set y2k.light chart-5 to a near-white oklch(0.95 ...) → RED at 1.16:1 with the precise
+  diagnostic; reverted (both registry + regenerated themes.css back to committed, zero diff). Verify: FE validate:local GREEN —
+  type-check 0, build OK, 1272 tests pass (+90 vs C346's 1182, the chart-graphical fan-out). Test-only (no source/UI change → no
+  shot). cov: be 89.29% line / 88.70% func (~ unchanged, no BE) · fe 89.61% line / 90.07% func (~ — pure guard, adds covered
+  TEST lines not new covered SOURCE branches). (bug→347. The chart-legibility invariant is now enforced for every current + future
+  non-default theme. default's <3:1 chart tokens remain the C343 Angelo-gated item [locked by C185]. Standing frontier unchanged:
+  the gated queue [C333/C339/C343] + the 4 Tier-2 specs.)
 - **C346 (FEATURE: register the `y2k` fill-in theme — Frutiger-Aero magenta/cyan; eyes-on verified)** —
   Balance recompute (cycle 346): feature most-starved over budget (5/4, 1.25×; bug at-budget 3/3, others under). The
   Angelo-approved v1 set (default + 5) is COMPLETE; he authorized fill-ins from the ryang.dev mocks "if there is extra time."
