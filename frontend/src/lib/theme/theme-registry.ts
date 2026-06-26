@@ -562,9 +562,97 @@ const AURORA_THEME: ThemeDefinition = defineBuiltinTheme({
 });
 
 /**
+ * `solarpunk` light palette — the mock's native warm look: cream/sand canvas, moss-green brand, clay accent,
+ * warm-brown text. The first WARM/organic theme (the v1 set is all cool/neon). Distilled from the ryang.dev
+ * solarpunk mock into VROOM's 32 tokens, AA-tuned (theme-contrast.test.ts). D7 token-only.
+ */
+const SOLARPUNK_LIGHT: ThemeTokens = {
+  background: 'oklch(0.95 0.02 95)',
+  foreground: 'oklch(0.3 0.03 75)',
+  card: 'oklch(0.99 0.01 95)',
+  'card-foreground': 'oklch(0.3 0.03 75)',
+  popover: 'oklch(0.99 0.01 95)',
+  'popover-foreground': 'oklch(0.3 0.03 75)',
+  primary: 'oklch(0.52 0.12 135)',
+  'primary-foreground': 'oklch(0.99 0.01 95)',
+  secondary: 'oklch(0.9 0.03 95)',
+  'secondary-foreground': 'oklch(0.34 0.04 75)',
+  muted: 'oklch(0.9 0.03 95)',
+  'muted-foreground': 'oklch(0.46 0.04 80)',
+  accent: 'oklch(0.88 0.06 70)',
+  'accent-foreground': 'oklch(0.38 0.08 60)',
+  destructive: 'oklch(0.52 0.2 28)',
+  warning: 'oklch(0.6 0.13 70)',
+  border: 'oklch(0.86 0.03 90)',
+  input: 'oklch(0.86 0.03 90)',
+  ring: 'oklch(0.52 0.12 135)',
+  'chart-1': 'oklch(0.52 0.12 135)',
+  'chart-2': 'oklch(0.55 0.11 70)',
+  'chart-3': 'oklch(0.5 0.1 170)',
+  'chart-4': 'oklch(0.55 0.14 40)',
+  'chart-5': 'oklch(0.5 0.13 330)',
+  sidebar: 'oklch(0.93 0.025 95)',
+  'sidebar-foreground': 'oklch(0.3 0.03 75)',
+  'sidebar-primary': 'oklch(0.52 0.12 135)',
+  'sidebar-primary-foreground': 'oklch(0.99 0.01 95)',
+  'sidebar-accent': 'oklch(0.88 0.06 70)',
+  'sidebar-accent-foreground': 'oklch(0.38 0.08 60)',
+  'sidebar-border': 'oklch(0.86 0.03 90)',
+  'sidebar-ring': 'oklch(0.52 0.12 135)',
+};
+
+/**
+ * `solarpunk` dark palette — a night-garden: deep warm-brown/olive canvas, moss-green brand, muted clay
+ * accent. AA-tuned exactly like the light variant (theme-contrast.test.ts).
+ */
+const SOLARPUNK_DARK: ThemeTokens = {
+  background: 'oklch(0.22 0.02 75)',
+  foreground: 'oklch(0.92 0.03 90)',
+  card: 'oklch(0.26 0.025 75)',
+  'card-foreground': 'oklch(0.92 0.03 90)',
+  popover: 'oklch(0.26 0.025 75)',
+  'popover-foreground': 'oklch(0.92 0.03 90)',
+  primary: 'oklch(0.68 0.14 135)',
+  'primary-foreground': 'oklch(0.2 0.03 90)',
+  secondary: 'oklch(0.32 0.03 75)',
+  'secondary-foreground': 'oklch(0.92 0.03 90)',
+  muted: 'oklch(0.3 0.025 75)',
+  'muted-foreground': 'oklch(0.74 0.04 85)',
+  accent: 'oklch(0.5 0.1 60)',
+  'accent-foreground': 'oklch(0.97 0.02 90)',
+  destructive: 'oklch(0.62 0.21 28)',
+  warning: 'oklch(0.78 0.14 75)',
+  border: 'oklch(0.36 0.03 75)',
+  input: 'oklch(0.34 0.03 75)',
+  ring: 'oklch(0.68 0.14 135)',
+  'chart-1': 'oklch(0.7 0.14 135)',
+  'chart-2': 'oklch(0.72 0.13 70)',
+  'chart-3': 'oklch(0.7 0.11 170)',
+  'chart-4': 'oklch(0.72 0.15 40)',
+  'chart-5': 'oklch(0.68 0.13 330)',
+  sidebar: 'oklch(0.19 0.02 75)',
+  'sidebar-foreground': 'oklch(0.92 0.03 90)',
+  'sidebar-primary': 'oklch(0.68 0.14 135)',
+  'sidebar-primary-foreground': 'oklch(0.2 0.03 90)',
+  'sidebar-accent': 'oklch(0.5 0.1 60)',
+  'sidebar-accent-foreground': 'oklch(0.97 0.02 90)',
+  'sidebar-border': 'oklch(0.36 0.03 75)',
+  'sidebar-ring': 'oklch(0.68 0.14 135)',
+};
+
+const SOLARPUNK_THEME: ThemeDefinition = defineBuiltinTheme({
+  id: 'solarpunk',
+  label: 'Solarpunk',
+  description: 'Warm and organic — moss green and clay on cream.',
+  light: SOLARPUNK_LIGHT,
+  dark: SOLARPUNK_DARK,
+});
+
+/**
  * Every built-in theme by id. `default` is the always-present identity theme (R8 fallback target). The
- * Angelo-approved v1 set is COMPLETE (default + 5: blueprint/bento/vaporwave/cyberpunk/aurora). Further
- * fill-in themes from the ryang.dev mocks are each a single defineBuiltinTheme call — zero structural change.
+ * Angelo-approved v1 set (default + 5: blueprint/bento/vaporwave/cyberpunk/aurora) is COMPLETE; `solarpunk`
+ * is the first fill-in from the ryang.dev mocks. Each theme is a single defineBuiltinTheme call — zero
+ * structural change; further fill-ins (editorial/tui/y2k/neobrutalist/claymorphism/brutalist/zine) drop in the same way.
  */
 export const THEME_REGISTRY: Record<string, ThemeDefinition> = {
   default: DEFAULT_THEME,
@@ -573,6 +661,7 @@ export const THEME_REGISTRY: Record<string, ThemeDefinition> = {
   vaporwave: VAPORWAVE_THEME,
   cyberpunk: CYBERPUNK_THEME,
   aurora: AURORA_THEME,
+  solarpunk: SOLARPUNK_THEME,
 };
 
 /** The id every unknown/absent selection resolves to (R8). */
