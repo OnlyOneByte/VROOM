@@ -475,9 +475,96 @@ const CYBERPUNK_THEME: ThemeDefinition = defineBuiltinTheme({
 });
 
 /**
- * Every built-in theme by id. `default` is the always-present identity theme (R8 fallback target).
- * The last Angelo-approved theme (aurora) is appended here as its AA-tuned palette lands — a single
- * defineBuiltinTheme call; the registry/emitter/guards need zero structural change.
+ * `aurora` light palette — a clean aurora-light: near-white canvas, the aurora-blue brand, a teal accent.
+ * Distilled from the ryang.dev Glass/Aurora mock into VROOM's 32 tokens, AA-tuned (theme-contrast.test.ts).
+ * D7 token-only: the palette, not the gradient-mesh / backdrop-blur effects.
+ */
+const AURORA_LIGHT: ThemeTokens = {
+  background: 'oklch(0.98 0.01 265)',
+  foreground: 'oklch(0.24 0.05 265)',
+  card: 'oklch(1 0 0)',
+  'card-foreground': 'oklch(0.24 0.05 265)',
+  popover: 'oklch(1 0 0)',
+  'popover-foreground': 'oklch(0.24 0.05 265)',
+  primary: 'oklch(0.52 0.18 265)',
+  'primary-foreground': 'oklch(0.99 0.005 265)',
+  secondary: 'oklch(0.94 0.02 265)',
+  'secondary-foreground': 'oklch(0.3 0.05 265)',
+  muted: 'oklch(0.94 0.02 265)',
+  'muted-foreground': 'oklch(0.46 0.04 265)',
+  accent: 'oklch(0.88 0.08 180)',
+  'accent-foreground': 'oklch(0.32 0.08 200)',
+  destructive: 'oklch(0.52 0.22 25)',
+  warning: 'oklch(0.55 0.13 75)',
+  border: 'oklch(0.88 0.02 265)',
+  input: 'oklch(0.88 0.02 265)',
+  ring: 'oklch(0.52 0.18 265)',
+  'chart-1': 'oklch(0.52 0.18 265)',
+  'chart-2': 'oklch(0.52 0.18 300)',
+  'chart-3': 'oklch(0.55 0.13 180)',
+  'chart-4': 'oklch(0.5 0.16 230)',
+  'chart-5': 'oklch(0.55 0.17 330)',
+  sidebar: 'oklch(0.96 0.015 265)',
+  'sidebar-foreground': 'oklch(0.24 0.05 265)',
+  'sidebar-primary': 'oklch(0.52 0.18 265)',
+  'sidebar-primary-foreground': 'oklch(0.99 0.005 265)',
+  'sidebar-accent': 'oklch(0.88 0.08 180)',
+  'sidebar-accent-foreground': 'oklch(0.32 0.08 200)',
+  'sidebar-border': 'oklch(0.88 0.02 265)',
+  'sidebar-ring': 'oklch(0.52 0.18 265)',
+};
+
+/**
+ * `aurora` dark palette — the mock's native look: a deep-navy canvas with an aurora-blue brand + teal
+ * accent (the gradient-mesh hues as solid tokens). AA-tuned exactly like the light variant (theme-contrast.test.ts).
+ */
+const AURORA_DARK: ThemeTokens = {
+  background: 'oklch(0.18 0.04 265)',
+  foreground: 'oklch(0.92 0.02 265)',
+  card: 'oklch(0.23 0.045 265)',
+  'card-foreground': 'oklch(0.92 0.02 265)',
+  popover: 'oklch(0.23 0.045 265)',
+  'popover-foreground': 'oklch(0.92 0.02 265)',
+  primary: 'oklch(0.66 0.16 265)',
+  'primary-foreground': 'oklch(0.16 0.04 265)',
+  secondary: 'oklch(0.3 0.04 265)',
+  'secondary-foreground': 'oklch(0.92 0.02 265)',
+  muted: 'oklch(0.28 0.035 265)',
+  'muted-foreground': 'oklch(0.74 0.03 265)',
+  accent: 'oklch(0.7 0.13 180)',
+  'accent-foreground': 'oklch(0.18 0.04 200)',
+  destructive: 'oklch(0.62 0.22 20)',
+  warning: 'oklch(0.82 0.14 85)',
+  border: 'oklch(0.34 0.04 265)',
+  input: 'oklch(0.32 0.04 265)',
+  ring: 'oklch(0.66 0.16 265)',
+  'chart-1': 'oklch(0.7 0.15 265)',
+  'chart-2': 'oklch(0.72 0.16 300)',
+  'chart-3': 'oklch(0.78 0.13 180)',
+  'chart-4': 'oklch(0.7 0.15 230)',
+  'chart-5': 'oklch(0.75 0.15 330)',
+  sidebar: 'oklch(0.15 0.04 265)',
+  'sidebar-foreground': 'oklch(0.92 0.02 265)',
+  'sidebar-primary': 'oklch(0.66 0.16 265)',
+  'sidebar-primary-foreground': 'oklch(0.16 0.04 265)',
+  'sidebar-accent': 'oklch(0.7 0.13 180)',
+  'sidebar-accent-foreground': 'oklch(0.18 0.04 200)',
+  'sidebar-border': 'oklch(0.34 0.04 265)',
+  'sidebar-ring': 'oklch(0.66 0.16 265)',
+};
+
+const AURORA_THEME: ThemeDefinition = defineBuiltinTheme({
+  id: 'aurora',
+  label: 'Aurora',
+  description: 'Premium glass — aurora blue and teal on deep navy.',
+  light: AURORA_LIGHT,
+  dark: AURORA_DARK,
+});
+
+/**
+ * Every built-in theme by id. `default` is the always-present identity theme (R8 fallback target). The
+ * Angelo-approved v1 set is COMPLETE (default + 5: blueprint/bento/vaporwave/cyberpunk/aurora). Further
+ * fill-in themes from the ryang.dev mocks are each a single defineBuiltinTheme call — zero structural change.
  */
 export const THEME_REGISTRY: Record<string, ThemeDefinition> = {
   default: DEFAULT_THEME,
@@ -485,6 +572,7 @@ export const THEME_REGISTRY: Record<string, ThemeDefinition> = {
   bento: BENTO_THEME,
   vaporwave: VAPORWAVE_THEME,
   cyberpunk: CYBERPUNK_THEME,
+  aurora: AURORA_THEME,
 };
 
 /** The id every unknown/absent selection resolves to (R8). */
