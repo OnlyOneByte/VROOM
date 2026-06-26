@@ -230,14 +230,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 334 |
+| feature | 4 | 341 |
 | deep-review | 5 | 340 |
 | guard | 6 | 336 |
 | bug | 3 | 337 |
 | arch | 5 | 334 |
 | infra | 6 | 335 |
 
-Current cycle: **340**
+Current cycle: **341**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,7 +256,19 @@ Current cycle: **340**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
-- **C340 (DEEP-REVIEW: SOLVED the theming eyes-on method [picker-drive] + GENUINELY re-verified the re-skin — integrity restored on the C338/C339 thread)** —
+- **C341 (FEATURE theming: registered the tui [Terminal] fill-in — first feature using the C340 trustworthy eyes-on method, GENUINELY verified)** —
+  Balance recompute (cycle 341): feature most-starved over budget (7/4, 1.75×). Registering a fill-in is NO LONGER blocked —
+  C340 established the working picker-drive eyes-on. Registered `tui` (Terminal): near-black terminal canvas, amber primary,
+  teal-green accent — the only amber-led + pure-black-terminal theme, distinct from all 8. LIGHT a paper-terminal. D7
+  token-only. AA-tuned: 2 first-pass fails (dark teal accent 3.47), darkened 0.6→0.5 → all 22 pairs PASS. Registered via ONE
+  defineBuiltinTheme call + regenerated themes.css. ALL guards auto-covered incl. C328 all-pairs + C336 dark-orientation:
+  1149 tests (+31). EYES-ON via the C340 PICKER-DRIVE method (the FIRST feature to use it): CLICK_SELECTOR the Terminal card
+  → setTheme runs post-reconcile → HASH-VERIFIED distinct from default (bb2736 ≠ cf25b7) → Read: picker shows 9 cards,
+  Terminal SELECTED (ring+check) + Save-Settings FAB & sidebar accents shifted to tui amber. GENUINELY verified (not the
+  C338-class false-pass). Verify: FE validate:local GREEN (1149). BE untouched. Committed 8000c6a (theme) + c1d48e6
+  (themes.css), pushed (branch 227 ahead / 0 behind). cov: be 89.29% / fe 89.59% (~). (feature→341. 8 non-default themes now
+  [5 Angelo + solarpunk/editorial/tui]. The C340 method makes every future palette genuinely verifiable. Remaining fill-ins:
+  y2k/neobrutalist/claymorphism/brutalist/zine. Standing frontier = the C339 reconcile-server-unset product call + 4 Tier-2 specs.)
   Balance recompute (cycle 340): feature most-starved (6/4) but registering a fill-in is the BLOCKED pick (C338/C339:
   can't trust its eyes-on yet). Per don't-force-a-blocked-pick, took the C339 path-(A): prove a WORKING eyes-on method +
   re-verify for real. KEY INSIGHT: clicking the picker card runs setTheme() AFTER the load-time reconcile, so the theme
