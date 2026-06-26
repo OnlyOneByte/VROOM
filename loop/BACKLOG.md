@@ -104,7 +104,8 @@ cycles record + pivot to guard/deep-review/arch/infra until a gate clears.**)*
    `cyberpunk` (C329) / `aurora` (C330) — ALL registered via the C324 defineBuiltinTheme factory, ALL AA-tuned
    (theme-contrast.test.ts), ALL all-pairs-distinct (C328), ALL eyes-on (picker grid + dark dashboard re-skin, status 200,
    zero console errors). Guarded across 6 dimensions (contrast/distinctness-vs-default/all-pairs/byte-fresh/integrity/
-   metadata + layout-wiring + swatch-key-safety). 1044 tests. **THE THEMING FEATURE IS DONE.** OPTIONAL remaining polish (not
+   metadata + layout-wiring + swatch-key-safety + dark-orientation + picker-mount-reachability [C345]). 1151 tests.
+   **THE THEMING FEATURE IS DONE.** OPTIONAL remaining polish (not
    gating): T11 per-theme dashboard eyes-on ×{light,dark}; T12 axe a11y gate; the fill-in ryang.dev mocks (editorial/tui/y2k/
    neobrutalist/solarpunk/claymorphism/brutalist/zine) each a 1-call defineBuiltinTheme when feature is over budget.
    **⚠️ LOOP SIGNAL: with theming COMPLETE, there is NO self-authorizable net-new feature SOURCE left. The next genuine

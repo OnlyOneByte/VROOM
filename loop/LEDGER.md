@@ -232,12 +232,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 341 |
 | deep-review | 5 | 342 |
-| guard | 6 | 336 |
+| guard | 6 | 345 |
 | bug | 3 | 343 |
 | arch | 5 | 342 |
 | infra | 6 | 344 |
 
-Current cycle: **344**
+Current cycle: **345**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,26 @@ Current cycle: **344**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C345 (GUARD: picker-mount reachability guard on the theming engine — the one un-pinned "feature is reachable" coupling)** —
+  Balance recompute (cycle 345): guard most-starved over budget (9/6, 1.5×; feature at-budget 4/4, others under). GUIDE marks
+  guard SATURATED on the OLD surfaces, but the theming engine (8 themes + picker + store wiring) landed THIS session = a
+  genuinely fresh feature surface. Hunted for a real non-theater gap, NOT a re-scan. FOUND one: themes-css.test.ts already
+  pins that themes.css is wired into +layout.svelte (the CSS reaches the bundle), and the swatch-key + metadata + registry +
+  contrast + distinctness guards all pin token VALUES — but NOTHING pinned that `<ThemePickerCard />` is actually MOUNTED in
+  settings/+page.svelte. That single mount line (the import + the tag) is the ONLY thing between "engine built + CSS shipped"
+  and "a user can switch themes": drop it and the whole theming feature silently vanishes from the UI while EVERY existing
+  guard stays GREEN (registry intact, css byte-fresh, layout import intact, the picker component renders fine in isolation).
+  The EXACT sibling of the existing themes.css↔+layout wiring guard, on the one route↔component coupling it misses. GUARD:
+  +2 in themes-css.test.ts (the C190/C201 cross-file source-scan idiom) — source-scans settings/+page.svelte for the
+  ThemePickerCard import AND the `<ThemePickerCard />` tag (importing without mounting is just as dead). NON-VACUITY PROVEN:
+  removed the tag → the tag guard goes RED with the precise diagnostic (the import guard correctly stays green — orthogonal),
+  reverted → green. Verify: FE validate:local GREEN — type-check 0, build OK, 1151 tests pass (+2 vs C344's 1149, exactly the
+  two new guards). Frontend-only source-scan (no BE, no app logic touched → no shot needed). cov: be 89.29% line / 88.70% func
+  (~ unchanged, no BE touched) · fe 89.61% line / 90.07% func (~ — pure source-scan guard, adds covered TEST lines not new
+  covered SOURCE branches, the expected guard-cycle signature). (guard→345. The theming engine is now reachability-guarded on
+  BOTH couplings that no value-inspecting guard sees: themes.css→layout [C189/T7] + picker→settings-page [C345]. Standing
+  frontier unchanged: the Angelo-gated queue [C333 PWA theme-color / C339 reconcile-server-unset / C343 default chart-contrast]
+  + the 4 Tier-2 specs. Loop in healthy steady-state.)
 - **C344 (INFRA cadence: FE coverage RE-MEASURE [replacing the C335-carried ~] + untracked-test sweep CLEAN)** —
   Balance recompute (cycle 344): infra most-starved over budget (9/6, 1.5×). Re-measure due: since C335 the C341 tui fill-in
   added +31 tests (1118→1149). RE-MEASURED FE: **89.61% line / 87.5% stmts / 90.07% func / 81.78% branch (1149 tests / 83

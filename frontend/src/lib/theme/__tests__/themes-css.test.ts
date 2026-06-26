@@ -136,6 +136,34 @@ describe('themes.css is wired into the app via the root layout (T7 wiring guard)
 });
 
 /**
+ * PICKER-MOUNT WIRING GUARD — the settings route must actually RENDER <ThemePickerCard />, else the entire
+ * theming engine is user-UNREACHABLE (no way to pick a non-default theme) while EVERY other guard stays
+ * green: registry-integrity (the registry is fine), themes.css byte-freshness + layout-import (the CSS is
+ * fine), contrast/distinctness/metadata (the token values are fine), and even the picker component's own
+ * logic tests (it renders fine — in isolation). This is the EXACT sibling of the themes.css↔+layout wiring
+ * guard above: that pins the CSS reaches the bundle; this pins the picker reaches the page. The one mount
+ * line on settings/+page.svelte (the `import` + the `<ThemePickerCard />` tag) is all that stands between
+ * "engine built + CSS shipped" and "a user can switch themes" — drop it and the feature silently vanishes
+ * from the UI with a fully-green suite. Pin both the import and the tag (the C190/C201 cross-file
+ * source-scan idiom on the route↔component coupling).
+ */
+describe('ThemePickerCard is mounted on the settings route (picker-reachability guard)', () => {
+  const SETTINGS = readFileSync(`${process.cwd()}/src/routes/settings/+page.svelte`, 'utf8');
+
+  test('settings/+page.svelte imports ThemePickerCard', () => {
+    // A drop of this import makes the whole theming feature unreachable from the UI.
+    expect(SETTINGS).toMatch(
+      /import\s+ThemePickerCard\s+from\s+['"]\$lib\/components\/settings\/cards\/ThemePickerCard\.svelte['"]/
+    );
+  });
+
+  test('settings/+page.svelte renders the <ThemePickerCard /> tag', () => {
+    // Importing without mounting is just as dead as not importing — pin the actual render.
+    expect(SETTINGS).toMatch(/<ThemePickerCard\s*\/>/);
+  });
+});
+
+/**
  * SWATCH-KEY SAFETY GUARD — the ThemePickerCard swatch loop must key by INDEX, never by the color value.
  * The swatch is a static, never-reordered, presentation-only strip, and a minimalist/monochrome theme can
  * legitimately resolve two swatch tokens to the SAME color (e.g. `background === card`). Svelte throws
