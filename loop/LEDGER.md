@@ -232,12 +232,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 327 |
 | deep-review | 5 | 321 |
-| guard | 6 | 322 |
+| guard | 6 | 328 |
 | bug | 3 | 325 |
 | arch | 5 | 324 |
 | infra | 6 | 326 |
 
-Current cycle: **327**
+Current cycle: **328**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,18 @@ Current cycle: **327**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C328 (GUARD: extended theme distinctness to ALL PAIRS — the C325-surfaced gap; de-risks the cyberpunk/aurora registrations)** —
+  Balance recompute (cycle 328): deep-review was the over-budget pick (7/5) but was certified SATURATED C327 (no fresh
+  subsystem). Per don't-force-a-blocked-pick, pivoted to the concrete queued guard item (NOT filler): the all-pairs
+  cross-theme distinctness guard I surfaced firsthand C325. The C314 per-theme guard only checks each theme vs `default` — it
+  would NOT catch two NON-default themes being byte-identical, the steepest risk now since each new palette is authored by
+  CLONING a prior X_LIGHT/X_DARK block; a clone that forgets to edit its tokens ships two picker cards painting identically,
+  GREEN under contrast/metadata/byte-freshness + the vs-default guard. Added an all-pairs test: every PAIR of registered
+  themes must differ in ≥1 token in ≥1 variant. NON-VACUOUS — cloning vaporwave<-bento turns it RED with the exact "byte-
+  identical (a clone)" diagnostic, proven firsthand + restored. Directly de-risks the 2 remaining palette registrations.
+  Verify: FE validate:local GREEN (986 tests, +1). BE untouched. Committed 56a20ba, pushed (branch 197 ahead / 0 behind).
+  cov: be 89.29% / fe 89.49% (~). (guard→328. Theme distinctness now guarded BOTH vs-default [C314] AND all-pairs [C328];
+  the theming guard surface is comprehensive. 3/5 palettes done. NEXT feature: register cyberpunk.)
 - **C327 (FEATURE theming: registered the vaporwave theme — 3rd Angelo palette, eyes-on verified, via the C324 factory)** —
   Balance recompute (cycle 327): deep-review was the over-budget pick (6/5, 1.2×) — but per the GUIDE don't-force-a-blocked-pick
   + deep-review-saturation rules, the theming surface is fully certified (picker logic C321, distinctness C314, cascade C316)
