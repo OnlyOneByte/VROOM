@@ -388,15 +388,103 @@ const VAPORWAVE_THEME: ThemeDefinition = defineBuiltinTheme({
 });
 
 /**
+ * `cyberpunk` light palette — a clean cyberpunk-light: pale blue-grey canvas, the cyan brand, a magenta
+ * accent. Distilled from the ryang.dev cyberpunk mock into VROOM's 32 tokens, AA-tuned (theme-contrast.test.ts).
+ * D7 token-only: the palette, not the scanline/chromatic-aberration effects.
+ */
+const CYBERPUNK_LIGHT: ThemeTokens = {
+  background: 'oklch(0.97 0.01 220)',
+  foreground: 'oklch(0.2 0.03 240)',
+  card: 'oklch(0.99 0.005 220)',
+  'card-foreground': 'oklch(0.2 0.03 240)',
+  popover: 'oklch(0.99 0.005 220)',
+  'popover-foreground': 'oklch(0.2 0.03 240)',
+  primary: 'oklch(0.5 0.13 205)',
+  'primary-foreground': 'oklch(0.99 0.005 220)',
+  secondary: 'oklch(0.93 0.02 220)',
+  'secondary-foreground': 'oklch(0.28 0.03 240)',
+  muted: 'oklch(0.93 0.02 220)',
+  'muted-foreground': 'oklch(0.45 0.03 235)',
+  accent: 'oklch(0.9 0.07 350)',
+  'accent-foreground': 'oklch(0.35 0.12 350)',
+  destructive: 'oklch(0.52 0.22 25)',
+  warning: 'oklch(0.55 0.13 75)',
+  border: 'oklch(0.87 0.02 225)',
+  input: 'oklch(0.87 0.02 225)',
+  ring: 'oklch(0.5 0.13 205)',
+  'chart-1': 'oklch(0.5 0.13 205)',
+  'chart-2': 'oklch(0.55 0.22 350)',
+  'chart-3': 'oklch(0.6 0.15 80)',
+  'chart-4': 'oklch(0.52 0.13 160)',
+  'chart-5': 'oklch(0.52 0.16 280)',
+  sidebar: 'oklch(0.95 0.015 220)',
+  'sidebar-foreground': 'oklch(0.2 0.03 240)',
+  'sidebar-primary': 'oklch(0.5 0.13 205)',
+  'sidebar-primary-foreground': 'oklch(0.99 0.005 220)',
+  'sidebar-accent': 'oklch(0.9 0.07 350)',
+  'sidebar-accent-foreground': 'oklch(0.35 0.12 350)',
+  'sidebar-border': 'oklch(0.87 0.02 225)',
+  'sidebar-ring': 'oklch(0.5 0.13 205)',
+};
+
+/**
+ * `cyberpunk` dark palette — the mock's native look: near-black slate canvas, neon-cyan brand, magenta
+ * accent, amber warning. AA-tuned exactly like the light variant (theme-contrast.test.ts).
+ */
+const CYBERPUNK_DARK: ThemeTokens = {
+  background: 'oklch(0.16 0.02 240)',
+  foreground: 'oklch(0.9 0.03 220)',
+  card: 'oklch(0.2 0.025 240)',
+  'card-foreground': 'oklch(0.9 0.03 220)',
+  popover: 'oklch(0.2 0.025 240)',
+  'popover-foreground': 'oklch(0.9 0.03 220)',
+  primary: 'oklch(0.8 0.16 205)',
+  'primary-foreground': 'oklch(0.18 0.03 240)',
+  secondary: 'oklch(0.28 0.03 240)',
+  'secondary-foreground': 'oklch(0.9 0.03 220)',
+  muted: 'oklch(0.26 0.025 240)',
+  'muted-foreground': 'oklch(0.72 0.04 225)',
+  accent: 'oklch(0.55 0.24 350)',
+  'accent-foreground': 'oklch(0.98 0.01 350)',
+  destructive: 'oklch(0.62 0.23 18)',
+  warning: 'oklch(0.82 0.16 80)',
+  border: 'oklch(0.32 0.04 235)',
+  input: 'oklch(0.3 0.035 238)',
+  ring: 'oklch(0.8 0.16 205)',
+  'chart-1': 'oklch(0.8 0.16 205)',
+  'chart-2': 'oklch(0.65 0.24 350)',
+  'chart-3': 'oklch(0.82 0.16 80)',
+  'chart-4': 'oklch(0.7 0.15 160)',
+  'chart-5': 'oklch(0.7 0.16 280)',
+  sidebar: 'oklch(0.13 0.02 240)',
+  'sidebar-foreground': 'oklch(0.9 0.03 220)',
+  'sidebar-primary': 'oklch(0.8 0.16 205)',
+  'sidebar-primary-foreground': 'oklch(0.18 0.03 240)',
+  'sidebar-accent': 'oklch(0.55 0.24 350)',
+  'sidebar-accent-foreground': 'oklch(0.98 0.01 350)',
+  'sidebar-border': 'oklch(0.32 0.04 235)',
+  'sidebar-ring': 'oklch(0.8 0.16 205)',
+};
+
+const CYBERPUNK_THEME: ThemeDefinition = defineBuiltinTheme({
+  id: 'cyberpunk',
+  label: 'Cyberpunk',
+  description: 'Night-city terminal — neon cyan and magenta on near-black slate.',
+  light: CYBERPUNK_LIGHT,
+  dark: CYBERPUNK_DARK,
+});
+
+/**
  * Every built-in theme by id. `default` is the always-present identity theme (R8 fallback target).
- * Additional Angelo-approved themes (cyberpunk, aurora) are appended here as their AA-tuned palettes land —
- * each is a single defineBuiltinTheme call; the registry/emitter/guards need zero structural change.
+ * The last Angelo-approved theme (aurora) is appended here as its AA-tuned palette lands — a single
+ * defineBuiltinTheme call; the registry/emitter/guards need zero structural change.
  */
 export const THEME_REGISTRY: Record<string, ThemeDefinition> = {
   default: DEFAULT_THEME,
   blueprint: BLUEPRINT_THEME,
   bento: BENTO_THEME,
   vaporwave: VAPORWAVE_THEME,
+  cyberpunk: CYBERPUNK_THEME,
 };
 
 /** The id every unknown/absent selection resolves to (R8). */
