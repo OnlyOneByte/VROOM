@@ -649,10 +649,97 @@ const SOLARPUNK_THEME: ThemeDefinition = defineBuiltinTheme({
 });
 
 /**
+ * `editorial` light palette — the mock's native magazine look: cream paper, near-black ink, a crimson
+ * accent, warm-grey muted. A warm-NEUTRAL palette whose signature is the crimson. Distilled from the
+ * ryang.dev editorial mock into VROOM's 32 tokens, AA-tuned (theme-contrast.test.ts). D7 token-only.
+ */
+const EDITORIAL_LIGHT: ThemeTokens = {
+  background: 'oklch(0.97 0.012 85)',
+  foreground: 'oklch(0.22 0.005 60)',
+  card: 'oklch(0.99 0.008 85)',
+  'card-foreground': 'oklch(0.22 0.005 60)',
+  popover: 'oklch(0.99 0.008 85)',
+  'popover-foreground': 'oklch(0.22 0.005 60)',
+  primary: 'oklch(0.5 0.17 27)',
+  'primary-foreground': 'oklch(0.99 0.008 85)',
+  secondary: 'oklch(0.92 0.014 85)',
+  'secondary-foreground': 'oklch(0.3 0.01 60)',
+  muted: 'oklch(0.92 0.014 85)',
+  'muted-foreground': 'oklch(0.45 0.015 70)',
+  accent: 'oklch(0.9 0.03 40)',
+  'accent-foreground': 'oklch(0.4 0.13 30)',
+  destructive: 'oklch(0.5 0.2 27)',
+  warning: 'oklch(0.58 0.13 70)',
+  border: 'oklch(0.87 0.014 80)',
+  input: 'oklch(0.87 0.014 80)',
+  ring: 'oklch(0.5 0.17 27)',
+  'chart-1': 'oklch(0.5 0.17 27)',
+  'chart-2': 'oklch(0.5 0.08 60)',
+  'chart-3': 'oklch(0.5 0.1 140)',
+  'chart-4': 'oklch(0.55 0.12 250)',
+  'chart-5': 'oklch(0.5 0.13 310)',
+  sidebar: 'oklch(0.95 0.014 85)',
+  'sidebar-foreground': 'oklch(0.22 0.005 60)',
+  'sidebar-primary': 'oklch(0.5 0.17 27)',
+  'sidebar-primary-foreground': 'oklch(0.99 0.008 85)',
+  'sidebar-accent': 'oklch(0.9 0.03 40)',
+  'sidebar-accent-foreground': 'oklch(0.4 0.13 30)',
+  'sidebar-border': 'oklch(0.87 0.014 80)',
+  'sidebar-ring': 'oklch(0.5 0.17 27)',
+};
+
+/**
+ * `editorial` dark palette — a warm-charcoal newsprint: dark warm-grey canvas, cream ink, the crimson brand.
+ * AA-tuned exactly like the light variant (theme-contrast.test.ts).
+ */
+const EDITORIAL_DARK: ThemeTokens = {
+  background: 'oklch(0.21 0.008 60)',
+  foreground: 'oklch(0.93 0.012 85)',
+  card: 'oklch(0.25 0.009 60)',
+  'card-foreground': 'oklch(0.93 0.012 85)',
+  popover: 'oklch(0.25 0.009 60)',
+  'popover-foreground': 'oklch(0.93 0.012 85)',
+  primary: 'oklch(0.62 0.18 27)',
+  'primary-foreground': 'oklch(0.18 0.01 60)',
+  secondary: 'oklch(0.31 0.01 60)',
+  'secondary-foreground': 'oklch(0.93 0.012 85)',
+  muted: 'oklch(0.29 0.009 60)',
+  'muted-foreground': 'oklch(0.74 0.014 80)',
+  accent: 'oklch(0.5 0.12 30)',
+  'accent-foreground': 'oklch(0.96 0.02 85)',
+  destructive: 'oklch(0.62 0.21 27)',
+  warning: 'oklch(0.78 0.14 75)',
+  border: 'oklch(0.35 0.01 60)',
+  input: 'oklch(0.33 0.01 60)',
+  ring: 'oklch(0.62 0.18 27)',
+  'chart-1': 'oklch(0.68 0.18 27)',
+  'chart-2': 'oklch(0.72 0.08 60)',
+  'chart-3': 'oklch(0.7 0.12 140)',
+  'chart-4': 'oklch(0.7 0.13 250)',
+  'chart-5': 'oklch(0.68 0.14 310)',
+  sidebar: 'oklch(0.18 0.008 60)',
+  'sidebar-foreground': 'oklch(0.93 0.012 85)',
+  'sidebar-primary': 'oklch(0.62 0.18 27)',
+  'sidebar-primary-foreground': 'oklch(0.18 0.01 60)',
+  'sidebar-accent': 'oklch(0.5 0.12 30)',
+  'sidebar-accent-foreground': 'oklch(0.96 0.02 85)',
+  'sidebar-border': 'oklch(0.35 0.01 60)',
+  'sidebar-ring': 'oklch(0.62 0.18 27)',
+};
+
+const EDITORIAL_THEME: ThemeDefinition = defineBuiltinTheme({
+  id: 'editorial',
+  label: 'Editorial',
+  description: 'Magazine print — crimson and ink on cream paper.',
+  light: EDITORIAL_LIGHT,
+  dark: EDITORIAL_DARK,
+});
+
+/**
  * Every built-in theme by id. `default` is the always-present identity theme (R8 fallback target). The
  * Angelo-approved v1 set (default + 5: blueprint/bento/vaporwave/cyberpunk/aurora) is COMPLETE; `solarpunk`
- * is the first fill-in from the ryang.dev mocks. Each theme is a single defineBuiltinTheme call — zero
- * structural change; further fill-ins (editorial/tui/y2k/neobrutalist/claymorphism/brutalist/zine) drop in the same way.
+ * + `editorial` are fill-ins from the ryang.dev mocks. Each theme is a single defineBuiltinTheme call — zero
+ * structural change; further fill-ins (tui/y2k/neobrutalist/claymorphism/brutalist/zine) drop in the same way.
  */
 export const THEME_REGISTRY: Record<string, ThemeDefinition> = {
   default: DEFAULT_THEME,
@@ -662,6 +749,7 @@ export const THEME_REGISTRY: Record<string, ThemeDefinition> = {
   cyberpunk: CYBERPUNK_THEME,
   aurora: AURORA_THEME,
   solarpunk: SOLARPUNK_THEME,
+  editorial: EDITORIAL_THEME,
 };
 
 /** The id every unknown/absent selection resolves to (R8). */
