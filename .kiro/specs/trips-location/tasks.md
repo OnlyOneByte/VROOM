@@ -106,15 +106,46 @@
     dialog DESKTOP + MOBILE + Read both PNGs** (clean, no mobile overflow, footer stacks, date defaults to
     today=Jun 25 2026 — the exact C226-fixed case) + an E2E POST of a TODAY-dated trip through the live
     FE→BE→DB stack succeeded (was the pre-C226 400). FE validate:local GREEN (838 pass).
-  - [ ] **REMAINING T6b-3 — EDIT + DELETE (DEFERRED to the C214 ruling):** the card-level edit/delete entry
-    points + the updateTripSchema-backed edit mode. Editing endOdometer / deleting a trip currently leaves a
-    STALE linked odometer entry (the trips↔odometer EDIT/DELETE lifecycle — Angelo's C214 product call,
-    characterization-pinned). Creating is fully decided (D2 linkage, C213) so the create form ships now; the
-    mutate entry points land once Angelo rules C214 (the chosen model shapes what edit/delete do to the entry).
+  - [ ] **T6b-3 — EDIT + DELETE entry points (FE eyes-on tail; depends on T7 backend lifecycle below).**
+    Card-level edit/delete actions + the `updateTripSchema`-backed edit mode in `TripForm`. The trips↔odometer
+    lifecycle semantics they invoke are DECIDED (C214, below) + implemented in the T7 backend slice; this task
+    is the FE wiring: an edit button → the form in edit mode (pre-hydrated, the C132 hydration-path care), a
+    delete button → a confirm dialog that ALSO asks the keep-or-delete-linked-odometer question (C214 case 1).
+    Eyes-on: boot → shot the edit dialog + the delete-confirm DESKTOP+MOBILE + Read; drive a real edit + a real
+    delete through the live stack (the C230 fill+submit discipline, not a render-only shot). Lands after T7.
+
+### C214 trips↔odometer lifecycle — RATIFIED by Angelo (2026-06-25). Build-unblocked.
+> The D2 linkage (a trip writes a deduped `odometerEntries` row, createFromTrip/C213) created a lifecycle
+> question the create-only path left open: what happens to that linked entry on trip EDIT/DELETE. Angelo
+> ratified the hierarchy below — it is now DECIDED, not gated. D3 (business-rate persistence) ratified with it.
+
+- [ ] **T7 — Trip EDIT/DELETE odometer-lifecycle (backend, the C214 ruling).** Implement the ratified
+  hierarchy in `TripRepository` (+ routes/validation), each leg with tests + a cross-tenant ownership guard:
+  1. **Delete a trip → PROMPT keep-or-delete the linked odometer entry.** The backend supports BOTH outcomes:
+     `DELETE /trips/:id?keepOdometer=true|false` (or a body flag) — `false` also deletes the linked
+     `odometerEntries` row (matched by the C213 createFromTrip dedup key: vehicle + tripDate + endOdometer),
+     `true` leaves it. The FE delete-confirm (T6b-3) surfaces the choice; the backend default when the param
+     is absent is **keep** (the non-destructive default — never silently drop odometer history).
+  2. **Delete the odometer entry that lives WITHIN a trip → delete the linked entry.** (The in-trip odometer
+     view's delete affordance removes the linked `odometerEntries` row directly; this is the symmetric case to
+     1 but scoped to the entry, not the trip — the trip row itself is unaffected.)
+  3. **Edit the odometer entry within a trip → edit the linked entry.** A trip `update` that changes
+     `endOdometer`/`tripDate` re-syncs the linked `odometerEntries` row (re-run the createFromTrip upsert on
+     the new key; remove the stale one) so `getCurrentOdometer` + the mileage-reminder axis never read a
+     desynced value. Pin: edit endOdometer → linked entry reflects the new reading, no orphan left behind.
+  Tests: per-leg repository + HTTP (keepOdometer both ways; in-trip entry delete; edit re-sync; ownership-miss
+  = 404 #80). `validate:local` green. This backend slice UNBLOCKS T6b-3 (the FE wiring above).
+- [ ] **T8 — D3 business-mileage rate persistence (RATIFIED: default-in-prefs + per-trip override).** Add a
+  `userPreferences.businessMileageRate` column (additive migration, the C174 themePreference pattern +
+  backup-coverage guard) as the DEFAULT rate; keep the existing `getSummary?rate=` query param as the
+  effective override input. (A per-TRIP override field is a thin additive follow-on; v1 wires the prefs
+  default + the summary consuming it when no explicit rate is passed.) Tests: migration (default/backfill),
+  settings PUT/GET round-trip (the C179 bounded-field pattern), backup round-trip; `validate:local` green.
 
 ## Build-order note
 Once T0 clears, T1–T5 are a clean backend-first arc the loop can drive across several `feature` cycles
 (each independently verifiable via `validate:local`), exactly like the recurring-expenses / import-trackers
-backends. Only T6 needs the eyes-on harness. This makes trips a GOOD unblock candidate — most of it is
-loop-buildable, unlike the three in-flight features whose backends are already done and only have eyes-on
-tails left.
+backends. T7 (C214 lifecycle) + T8 (D3 rate) are now DECIDED backend slices (one per cycle); only T6 (incl.
+the T6b-3 edit/delete FE wiring, which depends on T7) needs the eyes-on harness. This makes trips a GOOD
+unblock candidate — most of it is loop-buildable, unlike the three in-flight features whose backends are
+already done and only have eyes-on tails left.
