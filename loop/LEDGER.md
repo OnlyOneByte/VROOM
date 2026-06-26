@@ -230,14 +230,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 331 |
+| feature | 4 | 334 |
 | deep-review | 5 | 332 |
 | guard | 6 | 328 |
 | bug | 3 | 333 |
-| arch | 5 | 324 |
+| arch | 5 | 334 |
 | infra | 6 | 326 |
 
-Current cycle: **333**
+Current cycle: **334**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,23 @@ Current cycle: **333**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C334 (ARCH fast-dry → pivot to FEATURE: registered the editorial fill-in theme, eyes-on + hash-verified)** —
+  Balance recompute (cycle 334): arch most-starved over budget (10/5, 2.0×). Ran the C286 fast-dry precondition: every
+  production-source commit since arch's last touch (C324) is a defineBuiltinTheme CALL + token-map DATA (C327-C331 palettes)
+  — no new logic, no new dup vector (the C324 factory already converged the boilerplate). So arch is GENUINELY FAST-DRY →
+  recorded no-churn + pivoted to the highest-leverage open item: a fill-in palette (Angelo pre-authorized). Registered
+  `editorial` — a warm-NEUTRAL cream/crimson magazine palette, signature = the crimson accent (distinct from solarpunk
+  moss-green + the cool themes). LIGHT native cream paper; DARK warm-charcoal newsprint. D7 token-only. AA-tuned: ALL 22
+  pairs PASS first try (lowest 4.75). Registered via ONE defineBuiltinTheme call + regenerated themes.css. ALL guards
+  auto-covered it incl. C328 all-pairs (editorial ≠ the other 7): 1102 tests (+29). EYES-ON with the C332-CORRECTED harness
+  (unique AUTH_STATE file + hash-verify): shot /settings → picker renders 8 cards (the 7 + Editorial) with cream/crimson
+  swatch; seeded editorial+light (unique seed file) → shot /dashboard → HASH-VERIFIED distinct from default-light (5a2ef8 ≠
+  72979f, proving the theme applied) → Read: warm cream-paper canvas + crimson primary, clean, status 200, zero console
+  errors. Verify: FE validate:local GREEN (1102). BE untouched. Committed 98eb48d (theme) + fc40e20 (themes.css), pushed
+  (branch 213 ahead / 0 behind). cov: be 89.29% / fe 89.49% (~). (arch→334 [no-churn] + feature→334 [editorial]. 7
+  non-default themes now [5 Angelo set + solarpunk + editorial]. Remaining fill-ins: tui/y2k/neobrutalist/claymorphism/
+  brutalist/zine. The net-new non-theming frontier is still the 4 Angelo-gated Tier-2 specs [undrafted] + the C333 PWA
+  theme-color product call.)
 - **C333 (BUG-scout: found a now-REACHABLE PWA theme-color staleness — escalated as a product/chrome call, did NOT auto-fix)** —
   Balance recompute (cycle 333): bug most-starved over budget (8/3, 2.67×). Scouted a surface whose PRECONDITION JUST CHANGED:
   the PWA theme-color meta tag. At C191/T8 applyTheme's theme-color set was deferred as "moot until a non-default theme
