@@ -98,6 +98,22 @@ export const reminderToApi = <T extends Record<string, unknown>>(row: T) =>
   mapMoney(row, REMINDER_MONEY_FIELDS as readonly (keyof T)[]);
 
 /**
+ * A financing API object's money fields cents→dollars, INCLUDING the derived `computedBalance`
+ * (`withComputedBalance` adds it = originalAmount − Σ payments, all cents). `eligibleForPayoff` is
+ * computed on the cents balance upstream, so it is copied through unchanged. ONE source of truth for the
+ * financing display edge: the financing route returns this directly AND the vehicles route embeds it under
+ * `vehicle.financing`, so the same field-set + computedBalance conversion was hand-rolled at both (C14) —
+ * a divergence would show a different loan balance on the financing page vs the vehicle card (NORTH_STAR #2).
+ * `computedBalance` is converted only when present + numeric (a raw create/replace row has no balance yet).
+ */
+export function financingWithBalanceToApi<T extends Record<string, unknown>>(row: T): T {
+  const withMoney = financingToApi(row);
+  return typeof withMoney.computedBalance === 'number'
+    ? { ...withMoney, computedBalance: centsToDollars(withMoney.computedBalance) }
+    : withMoney;
+}
+
+/**
  * A Zod schema that accepts a DOLLAR money amount from the client and transforms it to integer cents,
  * so the stored/validated value is already cents. Compose the numeric bound checks (`.positive()`,
  * `.min()`, `.max()`) on the BASE z.number() BEFORE the transform — they validate the dollar value the

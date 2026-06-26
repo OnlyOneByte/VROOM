@@ -9,12 +9,7 @@ import { ConflictError, NotFoundError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { getPeriodStartDate, sortExpensesByDate } from '../../utils/calculations';
 import { logger } from '../../utils/logger';
-import {
-  centsToDollars,
-  financingToApi,
-  moneyDollarsToCents,
-  vehicleToApi,
-} from '../../utils/money';
+import { financingWithBalanceToApi, moneyDollarsToCents, vehicleToApi } from '../../utils/money';
 import {
   mergeUnitPreferences,
   partialUnitPreferencesSchema,
@@ -142,16 +137,10 @@ routes.route('/:vehicleId/photos', photoRoutes);
 function vehicleRowToApi<T extends Record<string, unknown>>(row: T): T {
   const v = vehicleToApi(row);
   const fin = v.financing as Record<string, unknown> | null | undefined;
+  // The embedded financing (money + derived computedBalance) goes through the SHARED
+  // financingWithBalanceToApi — identical to what the financing route returns (C22 dedup of the C14 self-dup).
   if (fin && typeof fin === 'object') {
-    const finApi = financingToApi(fin);
-    const balance = finApi.computedBalance;
-    return {
-      ...v,
-      financing:
-        typeof balance === 'number'
-          ? { ...finApi, computedBalance: centsToDollars(balance) }
-          : finApi,
-    };
+    return { ...v, financing: financingWithBalanceToApi(fin) };
   }
   return v;
 }

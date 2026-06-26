@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { vehicleFinancing } from '../../db/schema';
 import { changeTracker, requireAuth } from '../../middleware';
-import { centsToDollars, financingToApi, moneyDollarsToCents } from '../../utils/money';
+import { financingWithBalanceToApi, moneyDollarsToCents } from '../../utils/money';
 import {
   commonSchemas,
   validateFinancingOwnership,
@@ -90,18 +90,10 @@ async function enrichWithBalance(
   return withComputedBalance(financing, computedBalance);
 }
 
-/**
- * T6 display edge for a financing API object: convert the stored money columns AND the derived
- * `computedBalance` from integer CENTS → dollars. `eligibleForPayoff` is already computed on the cents
- * balance (isEligibleForPayoff, threshold in cents), so it is correct and copied through unchanged.
- * Use at every financing route return that emits a raw/enriched financing row.
- */
-function financingRowToApi<T extends Record<string, unknown>>(row: T): T {
-  const withMoney = financingToApi(row);
-  return typeof withMoney.computedBalance === 'number'
-    ? { ...withMoney, computedBalance: centsToDollars(withMoney.computedBalance) }
-    : withMoney;
-}
+// T6 display edge for a financing API object (money cols + the derived computedBalance, cents→dollars) is
+// the shared financingWithBalanceToApi (utils/money.ts) — one source of truth with the vehicles route's
+// embedded-financing conversion (C22 dedup of the C14 self-dup). Aliased locally to keep the call sites terse.
+const financingRowToApi = financingWithBalanceToApi;
 
 // GET /api/vehicles/:vehicleId/financing - Get financing details for a vehicle
 routes.get(
