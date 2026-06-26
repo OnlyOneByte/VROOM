@@ -12,7 +12,16 @@
 > **COVERAGE TREND (loop-improvement #4): end every cycle-log entry with a `cov:` tag** —
 > `cov: be <pct>% / fe <pct>%`. Carry the prior numbers forward + mark `~` if you didn't
 > re-measure this cycle; re-measure (`bun test --coverage` / vitest `--coverage`) on guard/arch/bug
-> cycles that touch a module. Goal 90% both (structural ceiling ~87% BE / ~86% FE — the remaining gap
+> cycles that touch a module.
+>
+> **VELOCITY SIGNAL (C349 meta-loop): ALSO end every entry with a `yield:` tag** —
+> `yield: <product|test|doc|dry>` (product = changed prod source; test = guard/char test only;
+> doc = loop/spec/docs only; dry = scouted-nothing-pivoted). The META-REVIEW (~every 25 cycles, an
+> infra sub-cadence — see GUIDE "META-LOOP") reads the last ~25 `yield:` tags: a >40% dry/doc ratio =
+> maintenance-spin → drop to MAINTAIN cadence or flag Angelo for the next greenlight; a twice-recurring
+> avoidable misstep = a PROCESS bug → fix it with ONE `loop(meta):` GUIDE edit. ALSO pick MODE first
+> (BUILD vs MAINTAIN, GUIDE top): in BUILD mode pop the next BUILD QUEUE slice (WIP=1), skip the 6-budget recompute.
+> Goal 90% both (structural ceiling ~87% BE / ~86% FE — the remaining gap
 > is OAuth/DI-bound BE [auth routes, provider services, backup-orchestrator, db connection] + eyes-on FE
 > components). **RE-MEASURED C97 (infra cadence): BE 87.47% line / 87.20% func (file-mean, 1703 pass); FE
 > 86.35% line / 87.68% func / 78.78% branch (v8, 735 pass) — BE line UNCHANGED vs C90, func +0.01 (the C94 CORS/CSRF
