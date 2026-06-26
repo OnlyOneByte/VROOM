@@ -231,13 +231,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 318 |
-| deep-review | 5 | 314 |
+| deep-review | 5 | 321 |
 | guard | 6 | 315 |
 | bug | 3 | 320 |
 | arch | 5 | 317 |
 | infra | 6 | 319 |
 
-Current cycle: **320**
+Current cycle: **321**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,26 @@ Current cycle: **320**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C321 (DEEP-REVIEW: ThemePickerCard logic certified CLEAN firsthand; documented ONE known-non-defect, no manufactured guard)** —
+  Balance recompute (cycle 321): deep-review most-starved over budget (7 starved, budget 5, 1.4×) — FORCED over the shinier
+  feature/bento pick, exactly what balance is for. The one not-yet-deep-reviewed fresh surface is the C318 picker LOGIC
+  (C320 was a bug-scout that caught the each-key crash but never certified the rest). Certified firsthand: (1) themes =
+  Object.values(THEME_REGISTRY) is EMPTY-SAFE (registry always has default; static synchronous registry → only the data
+  four-state is reachable, no loading/error); (2) swatchColors does theme[variant] then swatch.map(key=>tokens[key]) —
+  tokens is a complete ThemeTokens map (registry-integrity C314) + swatch is typed ThemeTokenKey[] → every lookup resolves
+  to a real oklch string, never background:undefined (double-safe: TS + the C314 guard); (3) selected-state activeId =
+  $derived(themeStore.themeId) + onclick→setTheme reactively re-renders the ring; (4) mode reactivity: a light/dark switch
+  via the sibling ThemeCard updates themeStore.current → mode derived → variant recomputes → swatches re-render; (5) the
+  C320 each-key crash is fixed + guarded. ONE FINDING (minor, cosmetic, NON-defect): variant = $derived(resolveVariant(mode,
+  systemPref())) reads window.matchMedia().matches, which is NOT a tracked reactive source — so in `system` mode, if the OS
+  theme flips WHILE /settings is open, the LIVE app re-skins correctly (the store's own matchMedia listener fires
+  applyTheme) but the DECORATIVE aria-hidden swatch previews stay on the old variant until the next interaction re-runs the
+  derived. Transient, self-healing, aria-hidden, rare-triggered. Per the don't-manufacture/don't-over-engineer discipline
+  (adding a matchMedia listener + lifecycle to a settings card for a self-healing decorative preview is not warranted), did
+  NOT add code — certified the picker CLEAN on all load-bearing invariants + recorded the staleness as a documented
+  known-non-defect (trivial future fix if Angelo wants it). Doc-only cycle (the C316/C266 precedent). Verify: no source
+  touched, suites green (921 FE). cov: be 89.29% / fe 89.46% (~). (deep-review→321. The picker is now certified across
+  logic [C321] + crash-safety [C320] + the engine across all 5 dimensions [C313-C317]. NEXT: register bento by the C313 recipe.)
 - **C320 (BUG FIX: ThemePickerCard swatch loop keyed on the color VALUE — a reachable Svelte each_key_duplicate runtime crash on a future dup-color palette)** —
   Balance recompute (cycle 320): bug most-starved over budget by ratio (4 starved, budget 3, 1.33×). Scouted the fresh
   source since the last bug cycle (C316) — C318's ThemePickerCard. Found a REAL latent defect: the swatch strip rendered
