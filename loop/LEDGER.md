@@ -231,13 +231,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 334 |
-| deep-review | 5 | 332 |
+| deep-review | 5 | 338 |
 | guard | 6 | 336 |
 | bug | 3 | 337 |
 | arch | 5 | 334 |
 | infra | 6 | 335 |
 
-Current cycle: **337**
+Current cycle: **338**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,7 +256,26 @@ Current cycle: **337**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
-- **C337 (BUG-scout DRY: primary-vs-background non-text contrast certified CLEAN across all 8 themes → no defect, no manufactured guard)** —
+- **C338 (DEEP-REVIEW → 🚩 INTEGRITY FINDING: the theming eyes-on harness does NOT apply the theme-id; prior "re-skin verified" claims C313-C334 were UNRELIABLE; escalated, no false claim)** —
+  Balance recompute (cycle 338): deep-review most-starved over budget (6/5). Picked the C332-deferred work: eyes-on the 4
+  remaining cool-theme LIGHT variants (bento/vaporwave/cyberpunk/aurora) with the C332 hash-verify discipline. The
+  hash-verify CAUGHT A DEEPER PROBLEM: all 4 light dashboards rendered BYTE-IDENTICAL (5a2ef8) despite genuinely distinct
+  primary tokens (bento hue 266 / cyberpunk 205 / editorial 27). A single-boot cyberpunk-light shot ALSO produced 5a2ef8 —
+  so it is NOT a multi-theme-per-boot timing bug. ROOT CAUSE (read shot.mjs:28-31): the THEME knob ONLY sets
+  ctxOpts.colorScheme (the OS dark/light MODE) — it NEVER applies data-theme, and never addInitScripts vroom-theme-id; it
+  relies solely on storageState localStorage, which is NOT reliably driving the rendered palette pre-paint. DECISIVE
+  CROSS-CHECK: the prior "verified" DARK PNGs cp-dash (C329 cyberpunk) + au-dash (C330 aurora) are ALSO byte-identical to
+  each other (c022c4). CONCLUSION (honest): my C313-C334 "eyes-on verified: full re-skin" claims mostly showed the
+  light/dark MODE change, NOT the per-theme palette — the visual confirmations OVERSTATED what they proved. WHAT REMAINS
+  SOLID: the code + the unit/guard layer (contrast text+non-text, all-pairs distinctness, dark-orientation, byte-fresh
+  themes.css, registry-integrity — all on REAL token values; CSS blocks correctly generated) — the themes are almost
+  certainly correct in a real browser; it is the VISUAL method that was unreliable. ACTION: did NOT commit any "verified"
+  claim; ESCALATED to Angelo via send_message; filed the harness-fix item in BACKLOG. Did NOT silently self-correct +
+  re-verify in one breath (it touches how ~15 cycles were reported). Verify: investigation-only, suites unchanged green
+  (1118), branch green + PR-ready at 217. cov: be 89.29% / fe 89.59% (~). (deep-review→338. 🚩 The theming eyes-on claims
+  C313-C334 are DOWNGRADED to "code+guard-verified, visual-UNCONFIRMED" pending the shot.mjs data-theme fix. NEXT highest-
+  value: fix shot.mjs to apply data-theme [addInitScript vroom-theme-id + set the attr pre-paint], then genuinely re-verify
+  one theme end-to-end. This is now the top theming item, above any new fill-in.)
   Balance recompute (cycle 337): bug most-starved over budget (4/3, 1.33×) — only over-budget category. Scouted a specific
   not-yet-checked invariant: the contrast guard pins primary-FOREGROUND vs primary (is the button LABEL legible) but
   NOTHING checks primary vs BACKGROUND (is the filled button VISIBLE against the page — WCAG non-text 3:1 for UI component
