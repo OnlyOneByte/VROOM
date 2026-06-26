@@ -134,3 +134,26 @@ describe('themes.css is wired into the app via the root layout (T7 wiring guard)
     expect(LAYOUT).toMatch(/import\s+['"][.\/]*app\.css['"]/);
   });
 });
+
+/**
+ * SWATCH-KEY SAFETY GUARD — the ThemePickerCard swatch loop must key by INDEX, never by the color value.
+ * The swatch is a static, never-reordered, presentation-only strip, and a minimalist/monochrome theme can
+ * legitimately resolve two swatch tokens to the SAME color (e.g. `background === card`). Svelte throws
+ * `each_key_duplicate` at runtime on a keyed `{#each ... (color)}` with a repeated key — crashing the whole
+ * picker for that theme. Nothing else catches this: the two current themes happen to have 4 distinct swatch
+ * colors, so it is GREEN today and only trips when a future palette (bento/vaporwave/…) ships a dup. This
+ * source-scan pins the index-key contract (the C25/C45 one-edit-fix → source-scan idiom on a .svelte loop).
+ */
+describe('ThemePickerCard swatch loop is keyed crash-safely (index, not color)', () => {
+  const PICKER = readFileSync(
+    `${process.cwd()}/src/lib/components/settings/cards/ThemePickerCard.svelte`,
+    'utf8'
+  );
+
+  test('the swatch {#each} keys by index, not by the (possibly-duplicate) color value', () => {
+    // Must be `as color, i (i)` — NOT `as color (color)` which throws each_key_duplicate on a dup color.
+    expect(PICKER).toMatch(/#each\s+swatchColors\(theme\)\s+as\s+color\s*,\s*i\s*\(i\)/);
+    // And must NOT regress to keying on the color value.
+    expect(PICKER).not.toMatch(/#each\s+swatchColors\(theme\)\s+as\s+color\s*\(color\)/);
+  });
+});
