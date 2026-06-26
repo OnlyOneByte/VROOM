@@ -233,11 +233,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 331 |
 | deep-review | 5 | 332 |
 | guard | 6 | 328 |
-| bug | 3 | 325 |
+| bug | 3 | 333 |
 | arch | 5 | 324 |
 | infra | 6 | 326 |
 
-Current cycle: **332**
+Current cycle: **333**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,7 +256,20 @@ Current cycle: **332**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
-- **C332 (DEEP-REVIEW T11: blueprint-LIGHT variant eyes-on certified CLEAN firsthand + caught a real eyes-on HARNESS footgun [byte-identical false-pass])** —
+- **C333 (BUG-scout: found a now-REACHABLE PWA theme-color staleness — escalated as a product/chrome call, did NOT auto-fix)** —
+  Balance recompute (cycle 333): bug most-starved over budget (8/3, 2.67×). Scouted a surface whose PRECONDITION JUST CHANGED:
+  the PWA theme-color meta tag. At C191/T8 applyTheme's theme-color set was deferred as "moot until a non-default theme
+  ships" + flagged to Angelo. Verified firsthand (theme.svelte.ts:52-55): the meta is still set to a HARD-CODED brand hex by
+  MODE only (#2563eb light / #1a1a2e dark), ignoring themeId. With 6 non-default themes now shipped (C313-C331), that
+  deferral precondition is FALSE — so a user on cyberpunk/solarpunk gets the wrong PWA status-bar tint (default VROOM blue,
+  not their theme's color). This is a REAL reachable inconsistency, BUT it changes visible browser CHROME + was already an
+  escalated Angelo design sub-part + the fix carries 2 genuine decisions (which token drives the tint: --primary vs
+  --background vs keep-mode-only; AND oklch→hex conversion with an out-of-gamut clamp question for neon tokens). Per the
+  GUIDE product-call rule (don't auto-fix a displayed-chrome/semantics change), ESCALATED to Angelo + pivoted — did NOT
+  self-author the fix. NO code change. Verify: scout-only, suites unchanged green (1073). cov: be 89.29% / fe 89.49% (~).
+  (bug→333. The theme-color-follows-theme fix is now an OPEN Angelo-gated product item [the C191 deferral is live as of the
+  multi-theme ship]. The pure-logic theming bug vein is otherwise dry. NEXT: arch [9/5, over] — but C324 already converged
+  the theme dup + palettes are factory calls; likely fast-dry. OR a fill-in palette [feature].)
   Balance recompute (cycle 332): deep-review most-starved over budget (11/5, 2.2×) — and GENUINELY not saturated this time:
   every theme's DARK variant was eyes-on'd (+ solarpunk light), but the LIGHT variants of the 5 cool themes were only
   COMPUTED AA-clean, never visually verified (a light variant can pass AA yet look washed-out / near-invisible primary — an
