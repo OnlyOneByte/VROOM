@@ -233,11 +233,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 334 |
 | deep-review | 5 | 332 |
 | guard | 6 | 336 |
-| bug | 3 | 333 |
+| bug | 3 | 337 |
 | arch | 5 | 334 |
 | infra | 6 | 335 |
 
-Current cycle: **336**
+Current cycle: **337**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,20 @@ Current cycle: **336**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C337 (BUG-scout DRY: primary-vs-background non-text contrast certified CLEAN across all 8 themes → no defect, no manufactured guard)** —
+  Balance recompute (cycle 337): bug most-starved over budget (4/3, 1.33×) — only over-budget category. Scouted a specific
+  not-yet-checked invariant: the contrast guard pins primary-FOREGROUND vs primary (is the button LABEL legible) but
+  NOTHING checks primary vs BACKGROUND (is the filled button VISIBLE against the page — WCAG non-text 3:1 for UI component
+  boundaries). An AA-tune that darkened a primary toward the canvas could yield a legible-but-near-invisible button.
+  Verified firsthand across all 8 themes × 2 variants via the oklch contrast tool: ALL pass non-text 3:1; worst is
+  vaporwave/dark at 3.70 (comfortably > 3.0). So every filled primary is visibly distinct from its page; the C313-C334
+  AA-tuning sank no primary into its background. NO defect. Did NOT manufacture a guard (guard was just exercised C336; a
+  non-text-contrast assertion is a NEW guard-category item not a bug, and is borderline-vacuous at the comfortable 3.70
+  margin — recorded as a possible future guard, not mis-filed here). Clean dry scout (C316/C325 precedent). Verify:
+  scout-only, suites unchanged green (1118). cov: be 89.29% / fe 89.59% (~). (bug→337. The theming color surface is now
+  certified on BOTH text contrast [C313 guard] AND non-text primary/bg visibility [C337 scout]. The pure-logic theming bug
+  vein is dry; next real bug needs a fresh feature surface or an Angelo steer. NEXT: arch/feature on the rotation; standing
+  frontier = C333 PWA theme-color call + 4 Tier-2 specs.)
 - **C336 (GUARD: pin DARK-IS-DARKER orientation per theme — catch a swapped light/dark variant map)** —
   Balance recompute (cycle 336): guard most-starved over budget (8/6, 1.33×). Scouted for a genuinely UNGUARDED invariant
   (not a re-confirm) and found one: NOTHING verifies a theme's dark variant is actually darker than its light variant.
