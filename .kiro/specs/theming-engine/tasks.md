@@ -110,15 +110,24 @@
       (svelte-check 0, 808 pass). **Phase 3 (store generalization + wiring, T8–T9) is COMPLETE.**
 
 ## Phase 4 — picker UI (eyes-on)
-- [ ] **T10** `/settings` ThemeSection — a responsive grid of theme cards (compose `Card`+`Badge`+ring
-      from the kit per `DesignSystem.md`; NO bespoke controls): label, description, swatch strip,
-      selected-state ring; click → `themeStore.setTheme(id)` → instant live re-skin. Surface the
-      `light|dark|system` segmented control alongside. Four-states (static registry → empty-safe),
-      mobile-first, axe-clean. **Eyes-on:** shot the picker; switch theme → whole-page re-skin captured.
-- [ ] **T11** Per-theme eyes-on. Screenshot the **dashboard** rendered in EACH shipped theme ×
-      {light, dark} (the `shot.mjs` + a `?theme=` dev override or the picker). Confirm: full re-skin,
-      readable, four-states intact, no mobile overflow. (NORTH_STAR #3 — a UI capability isn't done
-      until the real FE→BE→DB→render round trip is eyes-on.)
+- [x] **T10 DONE (C318)** `/settings` ThemeSection — ThemePickerCard.svelte: responsive grid of theme cards
+      (kit `Card` + ring, no bespoke controls), label/description/swatch strip, selected-state ring;
+      click → `themeStore.setTheme(id)` → instant live re-skin. Sits beside the `light|dark|system`
+      ThemeCard. Empty-safe (registry always has default), mobile-first. Guarded: swatch-key crash (C320),
+      metadata contract (C322). Eyes-on confirmed via picker-click (C340).
+- [~] **T11** Per-theme eyes-on. **VERIFIED METHOD (learned the hard way C338→C340 — READ THIS):** the ONLY
+      reliable way to eyes-on a theme is to **drive the real picker**, NOT to inject `vroom-theme-id` into
+      storageState/localStorage. WHY: on settings hydrate, `theme.svelte.ts reconcileServerTheme` (T9/C195
+      "server wins") RESETS the theme-id to the server's `themePreference`; the seeded demo user has none →
+      every injected theme reverts to `default` → all screenshots render identically (the C338 false-pass:
+      ~15 cycles of "re-skin verified" shots were really just the dark/light MODE changing, not the palette).
+      THE WORKING RECIPE (C340, hash-proven distinct): boot servers → mint auth → `CLICK_SELECTOR="button[aria-label='Use the <Label> theme']" bash .meshclaw-tools/shot.sh /settings desktop /tmp/x.png`
+      (the click runs setTheme() AFTER reconcile, so it sticks on that page) → ALWAYS `md5sum` the PNGs and
+      assert they DIFFER across themes (a byte-identical pair = false pass, not a clean result). C340 proved
+      cyberpunk/aurora/solarpunk produce 3 distinct hashes + visibly distinct selected-ring + sidebar/FAB
+      accents. REMAINING: walk all 8 themes × {light,dark} via this recipe + Read each (incremental, ~2-3
+      per cycle); + the reconcile-when-server-unset product call (BACKLOG bug 🚩) which, if fixed, also lets
+      a `?theme=`/storageState path work. (NORTH_STAR #3 — not "done" until the real round trip is eyes-on.)
 
 ## Phase 5 — a11y gate (the hard R10/D4 gate) + E2E
 - [ ] **T12** Theme a11y gate. Extend `/dev/gallery` (a theme switcher / `?theme=` override) +
