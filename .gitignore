@@ -125,3 +125,8 @@ BRANCH_REVIEW.md
 .meshclaw-tools/
 # local node22+bun toolchain pin, not part of the product
 mise.local.toml
+# loop bookkeeping — churns every cycle (LEDGER 210 / BACKLOG 163 commits over C1-C350); local-only
+# steering scratchpads, NOT product. GUIDE.md + NORTH_STAR.md stay tracked (stable manual + vision).
+# Full pre-reset history preserved in loop/archive/*-C1-C350.md (tracked).
+loop/LEDGER.md
+loop/BACKLOG.md

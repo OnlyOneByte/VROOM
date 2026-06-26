@@ -16,6 +16,15 @@ Pick MODE (below) → pick ONE increment → do it, verified → update LEDGER (
 `cov:` + `yield:` tags) → commit via script → `bash loop/push.sh`. Stay silent unless a blocker /
 product call / phase boundary.
 
+> **LEDGER.md + BACKLOG.md are GITIGNORED (2026-06-26) — local-only steering scratchpads, NOT in git.**
+> They churned 373 commits over C1–C350 (pure bookkeeping noise blowing up the branch). You STILL
+> read + update them every cycle exactly as before — they just never get committed. **In the commit
+> script, NEVER `git add loop/LEDGER.md` or `loop/BACKLOG.md`** — they are ignored, so `git add` would
+> error out and (under `set -eo pipefail`) ABORT the whole commit. Only `git add` real product files +
+> the tracked loop docs (GUIDE.md / NORTH_STAR.md / archive/) when those actually change. Their content
+> still matters (it steers the loop) — it just lives on disk, not in history. The pre-reset history is
+> preserved in the tracked `loop/archive/*-C1-C350.md`.
+
 ## MODE — pick this FIRST, every cycle (the C349 velocity reform)
 The starvation-budget rotation optimizes for BALANCE; that is the wrong objective when there is
 approved build work queued. So branch on state:
