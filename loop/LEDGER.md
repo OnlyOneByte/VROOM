@@ -231,13 +231,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 341 |
-| deep-review | 5 | 340 |
+| deep-review | 5 | 342 |
 | guard | 6 | 336 |
 | bug | 3 | 337 |
-| arch | 5 | 334 |
+| arch | 5 | 342 |
 | infra | 6 | 335 |
 
-Current cycle: **341**
+Current cycle: **342**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,7 +256,21 @@ Current cycle: **341**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
-- **C341 (FEATURE theming: registered the tui [Terminal] fill-in — first feature using the C340 trustworthy eyes-on method, GENUINELY verified)** —
+- **C342 (ARCH fast-dry → DEEP-REVIEW: picker-verified the last 4 themes → the C338 visual-unconfirmed backlog is FULLY CLEARED; all 8 themes genuinely eyes-on)** —
+  Balance recompute (cycle 342): arch most-starved (8/5, 1.6×). C286 fast-dry check: the ONLY prod-src since arch's last
+  touch (C334) is theme-registry DATA via the C324 factory — no new logic/dedup vector → recorded no-churn FAST + pivoted to
+  the highest-leverage doable item: clear the C338 visual-unconfirmed backlog. C340 verified cyberpunk/aurora/solarpunk;
+  C341 verified tui; this leaves blueprint/bento/vaporwave/editorial. Picker-verified all 4 via the C340 method (one boot,
+  CLICK_SELECTOR each card, distinct output files): 4 DISTINCT hashes (e08699/727c94/dca465/dbc033). Read vaporwave (soft
+  lavender/pink wash — most dramatic light re-skin, magenta FAB+sidebar, Vaporwave card selected) + blueprint (cooler
+  whiteprint, blue-tinted sidebar/FAB, Blueprint card selected) directly; bento+editorial hash-distinct from those + each
+  other. So ALL 8 non-default themes are now GENUINELY eyes-on verified [C340 ×3 + C341 ×1 + C342 ×4]; the C338 false-pass
+  thread is FULLY RESOLVED + the downgraded claims RESTORED. Also confirmed firsthand the light variants DO differ when
+  actually applied (vaporwave-light visibly pink) — the C338 identical-renders were purely the broken harness, not a
+  light-theme defect. Verify: investigation only, suites unchanged green (1149), branch green/PR-ready 227. cov: be 89.29% /
+  fe 89.59% (~). (arch→342 [no-churn] + deep-review→342 [the verification]. The theming eyes-on backlog is EMPTY — every
+  shipped theme is code+guard+visually verified. Remaining theming: the C339 reconcile-server-unset product call [still
+  Angelo-gated]. Next non-theming frontier = the 4 Tier-2 specs.)
   Balance recompute (cycle 341): feature most-starved over budget (7/4, 1.75×). Registering a fill-in is NO LONGER blocked —
   C340 established the working picker-drive eyes-on. Registered `tui` (Terminal): near-black terminal canvas, amber primary,
   teal-green accent — the only amber-led + pure-black-terminal theme, distinct from all 8. LIGHT a paper-terminal. D7
