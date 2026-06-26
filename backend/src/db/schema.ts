@@ -313,6 +313,13 @@ export const userPreferences = sqliteTable('user_preferences', {
   // nothing changes until a user picks another theme. The light/dark *mode* stays device-local
   // (localStorage) by current convention (D2); only the theme *id* is persisted/synced here.
   themePreference: text('theme_preference').notNull().default('default'),
+  // trips-location D3 (T8): the DEFAULT business-mileage reimbursement rate in $/mile (e.g. 0.67). The trip
+  // mileage-summary uses it when no explicit ?rate= override is passed (a per-trip override is a thin
+  // additive follow-on). Fully additive — existing rows backfill 0 (= today's behavior: businessValue 0
+  // until a rate is set). A RATE, not a stored money AMOUNT, so it stays `real` (naturally fractional) and
+  // is out of scope for the money-cents integer migration (which covers the 14 money-amount columns); the
+  // business $ it produces is computed at display time (design.md §7) and inherits money handling there.
+  businessMileageRate: real('business_mileage_rate').notNull().default(0),
   autoBackupEnabled: integer('auto_backup_enabled', { mode: 'boolean' }).notNull().default(false),
   backupFrequency: text('backup_frequency').notNull().default('weekly'), // 'daily' | 'weekly' | 'monthly'
   syncOnInactivity: integer('sync_on_inactivity', { mode: 'boolean' }).notNull().default(true),

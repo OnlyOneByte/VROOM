@@ -57,6 +57,13 @@
       "when": 1782340462679,
       "tag": "0007_previous_ikaris",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1782503441067,
+      "tag": "0008_awesome_avengers",
+      "breakpoints": true
     }
   ]
 }

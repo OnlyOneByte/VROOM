@@ -174,6 +174,7 @@ export const SHEET_HEADERS = {
     'unitPreferences',
     'currencyUnit',
     'themePreference',
+    'businessMileageRate',
     'autoBackupEnabled',
     'backupFrequency',
     'syncOnInactivity',

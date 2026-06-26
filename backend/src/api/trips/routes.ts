@@ -27,6 +27,7 @@ import {
 } from '../../utils/validation';
 import { odometerRepository } from '../odometer/repository';
 import { reminderTriggerService } from '../reminders/trigger-service';
+import { preferencesRepository } from '../settings/repository';
 import { tripRepository } from './repository';
 import { createTripSchema, TRIP_PURPOSES, updateTripSchema } from './validation';
 
@@ -134,7 +135,16 @@ routes.get('/summary', zValidator('query', summaryQuerySchema), async (c) => {
     ? await tripRepository.findByVehicle(vehicleId, user.id)
     : await tripRepository.findByUserId(user.id);
 
-  const summary = buildTripSummary(trips, rate ?? 0);
+  // D3 (T8): an explicit ?rate= is the per-request OVERRIDE; absent it, fall back to the user's stored
+  // default businessMileageRate (preferences). Only fetch prefs when no override was given (avoid the read
+  // on the override path). undefined→0 keeps the pre-T8 behavior for a brand-new user with no rate set.
+  let effectiveRate = rate;
+  if (effectiveRate === undefined) {
+    const prefs = await preferencesRepository.getOrCreate(user.id);
+    effectiveRate = prefs.businessMileageRate ?? 0;
+  }
+
+  const summary = buildTripSummary(trips, effectiveRate);
   return c.json({ success: true, data: summary });
 });
 

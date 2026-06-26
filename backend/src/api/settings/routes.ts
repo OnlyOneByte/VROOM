@@ -228,6 +228,12 @@ const updateSettingsSchema = baseSettingsSchema
     // The resolver (T6) treats an unknown id as `default`, so an arbitrary <=64-char value is safe to
     // store; the cap is a storage/abuse bound, not an allow-list (custom themes are a future seam, D6).
     themePreference: z.string().min(1).max(64).optional(),
+    // trips-location D3 (T8): the DEFAULT business-mileage rate ($/mile). createInsertSchema would accept
+    // the real column unbounded; pin an explicit non-negative, sanely-capped constraint (a reimbursement
+    // rate is well under $100/mile — the cap is an abuse bound). Routed through the same row-level merge
+    // (...restUpdates → repository.update), so a partial PUT persists it without touching sibling fields
+    // (the #82 discipline). 0 = the additive default (no business value until a rate is set).
+    businessMileageRate: z.number().min(0).max(100).optional(),
   })
   .partial();
 
