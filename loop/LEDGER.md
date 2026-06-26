@@ -230,14 +230,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 341 |
+| feature | 4 | 346 |
 | deep-review | 5 | 342 |
 | guard | 6 | 345 |
 | bug | 3 | 343 |
 | arch | 5 | 342 |
 | infra | 6 | 344 |
 
-Current cycle: **345**
+Current cycle: **346**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,27 @@ Current cycle: **345**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C346 (FEATURE: register the `y2k` fill-in theme — Frutiger-Aero magenta/cyan; eyes-on verified)** —
+  Balance recompute (cycle 346): feature most-starved over budget (5/4, 1.25×; bug at-budget 3/3, others under). The
+  Angelo-approved v1 set (default + 5) is COMPLETE; he authorized fill-ins from the ryang.dev mocks "if there is extra time."
+  Registered `y2k` (the next fill-in) via the established C324 defineBuiltinTheme recipe — a Frutiger-Aero / Y2K chrome look:
+  bubblegum-magenta brand + electric-cyan accent + indigo ink on a cool blue-white canvas (light) / deep-indigo canvas with
+  a cyan brand + magenta accent (dark). RECIPE followed exactly: distilled the mock → 32-token oklch ×2 variants → PRE-VALIDATED
+  the candidate palette against the exact D4 contrast math (/tmp/y2k-aa-check.mjs mirrors theme-contrast.test.ts) BEFORE editing
+  the registry → all 22 text pairs cleared AA 4.5 on the FIRST pass (no red-build iteration) + dark-orientation holds → added the
+  single defineBuiltinTheme call + the registry entry → regenerated themes.css from THEME_REGISTRY (2 y2k blocks, 23053 bytes).
+  Every guard auto-covered it with ZERO structural change (the describe.each(THEME_REGISTRY) fan-out): contrast ×22, all-pairs
+  distinctness, distinctness-vs-default, registry-integrity, byte-freshness, metadata, dark-orientation — all GREEN. EYES-ON
+  (the C340 picker-drive method, since reconcileServerTheme reverts injected LS): booted servers → minted auth → CLICK_SELECTOR
+  "Use the Y2K theme" shot /settings + a default control → md5sum DISTINCT (y2k 11a879… ≠ default 5d77da…), status 200, zero
+  console errors → Read /tmp/y2k-shot.png: the magenta brand runs throughout (header icon, sidebar accent, Save-Settings +
+  Add-Provider buttons, Connected badge) on the cool canvas, and the Y2K picker card shows its selected magenta ring + checkmark
+  + magenta/cyan/white swatch. A genuine distinct re-skin. Verify: FE validate:local GREEN — type-check 0, build OK, 1182 tests
+  pass (+31 vs C345's 1151, the y2k fan-out across the per-theme guards). Frontend-only (no BE touched). cov: be 89.29% line /
+  88.70% func (~ unchanged, no BE) · fe 89.61% line / 90.07% func (~ — new theme = token DATA exercised by existing guards, not
+  new covered SOURCE branches). (feature→346. 10 themes now registered [default + 9]; remaining fill-ins: neobrutalist/
+  claymorphism/brutalist/zine. Standing frontier unchanged: the Angelo-gated queue [C333/C339/C343] + the 4 Tier-2 specs. The
+  highest-value work still needs Angelo. Loop healthy on fill-ins + rotation.)
 - **C345 (GUARD: picker-mount reachability guard on the theming engine — the one un-pinned "feature is reachable" coupling)** —
   Balance recompute (cycle 345): guard most-starved over budget (9/6, 1.5×; feature at-budget 4/4, others under). GUIDE marks
   guard SATURATED on the OLD surfaces, but the theming engine (8 themes + picker + store wiring) landed THIS session = a

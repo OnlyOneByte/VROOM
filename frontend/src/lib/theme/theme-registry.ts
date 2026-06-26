@@ -823,10 +823,98 @@ const TUI_THEME: ThemeDefinition = defineBuiltinTheme({
 });
 
 /**
+ * `y2k` light palette — a Frutiger-Aero / Y2K chrome look: cool blue-white canvas, bubblegum-magenta brand,
+ * electric-cyan accent, an indigo ink. Distilled from the ryang.dev Y2K mock into VROOM's 32 tokens, AA-tuned
+ * (every fg/bg pair clears WCAG AA 4.5 — theme-contrast.test.ts, the D4 hard gate). D7 token-only (the
+ * palette, not the glossy-bevel / lens-flare effects).
+ */
+const Y2K_LIGHT: ThemeTokens = {
+  background: 'oklch(0.98 0.015 220)',
+  foreground: 'oklch(0.25 0.06 285)',
+  card: 'oklch(1 0 0)',
+  'card-foreground': 'oklch(0.25 0.06 285)',
+  popover: 'oklch(1 0 0)',
+  'popover-foreground': 'oklch(0.25 0.06 285)',
+  primary: 'oklch(0.55 0.23 350)',
+  'primary-foreground': 'oklch(0.99 0.01 340)',
+  secondary: 'oklch(0.93 0.045 330)',
+  'secondary-foreground': 'oklch(0.3 0.07 320)',
+  muted: 'oklch(0.93 0.03 250)',
+  'muted-foreground': 'oklch(0.45 0.05 285)',
+  accent: 'oklch(0.9 0.08 205)',
+  'accent-foreground': 'oklch(0.33 0.11 235)',
+  destructive: 'oklch(0.52 0.22 25)',
+  warning: 'oklch(0.55 0.13 75)',
+  border: 'oklch(0.86 0.035 240)',
+  input: 'oklch(0.86 0.035 240)',
+  ring: 'oklch(0.55 0.23 350)',
+  'chart-1': 'oklch(0.55 0.23 350)',
+  'chart-2': 'oklch(0.55 0.16 205)',
+  'chart-3': 'oklch(0.55 0.16 135)',
+  'chart-4': 'oklch(0.5 0.18 285)',
+  'chart-5': 'oklch(0.6 0.15 90)',
+  sidebar: 'oklch(0.96 0.02 220)',
+  'sidebar-foreground': 'oklch(0.25 0.06 285)',
+  'sidebar-primary': 'oklch(0.55 0.23 350)',
+  'sidebar-primary-foreground': 'oklch(0.99 0.01 340)',
+  'sidebar-accent': 'oklch(0.9 0.08 205)',
+  'sidebar-accent-foreground': 'oklch(0.33 0.11 235)',
+  'sidebar-border': 'oklch(0.86 0.035 240)',
+  'sidebar-ring': 'oklch(0.55 0.23 350)',
+};
+
+/**
+ * `y2k` dark palette — a translucent-tech-noir: deep indigo canvas, electric-cyan brand, magenta accent, the
+ * candy chart hues. AA-tuned exactly like the light variant (theme-contrast.test.ts).
+ */
+const Y2K_DARK: ThemeTokens = {
+  background: 'oklch(0.17 0.03 275)',
+  foreground: 'oklch(0.94 0.025 220)',
+  card: 'oklch(0.21 0.035 275)',
+  'card-foreground': 'oklch(0.94 0.025 220)',
+  popover: 'oklch(0.21 0.035 275)',
+  'popover-foreground': 'oklch(0.94 0.025 220)',
+  primary: 'oklch(0.78 0.15 200)',
+  'primary-foreground': 'oklch(0.16 0.03 250)',
+  secondary: 'oklch(0.28 0.04 275)',
+  'secondary-foreground': 'oklch(0.94 0.025 220)',
+  muted: 'oklch(0.26 0.035 275)',
+  'muted-foreground': 'oklch(0.74 0.04 230)',
+  accent: 'oklch(0.5 0.2 350)',
+  'accent-foreground': 'oklch(0.97 0.02 340)',
+  destructive: 'oklch(0.62 0.23 18)',
+  warning: 'oklch(0.82 0.14 85)',
+  border: 'oklch(0.33 0.04 270)',
+  input: 'oklch(0.31 0.04 270)',
+  ring: 'oklch(0.78 0.15 200)',
+  'chart-1': 'oklch(0.72 0.2 350)',
+  'chart-2': 'oklch(0.8 0.15 200)',
+  'chart-3': 'oklch(0.8 0.18 135)',
+  'chart-4': 'oklch(0.7 0.16 285)',
+  'chart-5': 'oklch(0.85 0.15 90)',
+  sidebar: 'oklch(0.14 0.03 275)',
+  'sidebar-foreground': 'oklch(0.94 0.025 220)',
+  'sidebar-primary': 'oklch(0.78 0.15 200)',
+  'sidebar-primary-foreground': 'oklch(0.16 0.03 250)',
+  'sidebar-accent': 'oklch(0.5 0.2 350)',
+  'sidebar-accent-foreground': 'oklch(0.97 0.02 340)',
+  'sidebar-border': 'oklch(0.33 0.04 270)',
+  'sidebar-ring': 'oklch(0.78 0.15 200)',
+};
+
+const Y2K_THEME: ThemeDefinition = defineBuiltinTheme({
+  id: 'y2k',
+  label: 'Y2K',
+  description: 'Frutiger-Aero chrome — bubblegum magenta and electric cyan.',
+  light: Y2K_LIGHT,
+  dark: Y2K_DARK,
+});
+
+/**
  * Every built-in theme by id. `default` is the always-present identity theme (R8 fallback target). The
  * Angelo-approved v1 set (default + 5: blueprint/bento/vaporwave/cyberpunk/aurora) is COMPLETE; solarpunk/
- * editorial/tui are fill-ins from the ryang.dev mocks. Each theme is a single defineBuiltinTheme call — zero
- * structural change; further fill-ins (y2k/neobrutalist/claymorphism/brutalist/zine) drop in the same way.
+ * editorial/tui/y2k are fill-ins from the ryang.dev mocks. Each theme is a single defineBuiltinTheme call —
+ * zero structural change; further fill-ins (neobrutalist/claymorphism/brutalist/zine) drop in the same way.
  */
 export const THEME_REGISTRY: Record<string, ThemeDefinition> = {
   default: DEFAULT_THEME,
@@ -838,6 +926,7 @@ export const THEME_REGISTRY: Record<string, ThemeDefinition> = {
   solarpunk: SOLARPUNK_THEME,
   editorial: EDITORIAL_THEME,
   tui: TUI_THEME,
+  y2k: Y2K_THEME,
 };
 
 /** The id every unknown/absent selection resolves to (R8). */
