@@ -828,9 +828,20 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > REMAIN SOLID (contrast/distinctness/all-pairs/dark-orientation/byte-fresh/integrity on real token values) — the themes are
 > almost certainly correct; only the VISUAL confirmation overstated. FIX: shot.mjs must `addInitScript(() => { localStorage
 > .setItem('vroom-theme-id', id); document.documentElement.setAttribute('data-theme', id); })` (a THEME_ID env knob), THEN
-> hash-verify a re-shot theme differs from default AND from another theme. After the fix: genuinely re-verify the shipped
-> themes (the C313-C334 visual claims are downgraded to "code+guard-verified, visual-UNCONFIRMED" until then). This is the
-> TOP theming priority — above any new fill-in palette.
+> hash-verify a re-shot theme differs from default AND from another theme. This is the TOP theming priority — above any new
+> fill-in palette.
+>
+> **C339 UPDATE — root cause is DEEPER than the harness; the app REVERTS the theme on hydrate.** shot.mjs NOW has the
+> THEME_ID knob, but a DOM probe post-hydrate showed dataTheme=null + vroom-theme-id LS reset to "default" + computed tokens
+> = default. theme.svelte.ts reconcileServerTheme (T9/C195 "server wins") resets the theme-id to the server themePreference
+> on settingsStore.load(); the seeded demo user has none → reconciles to default → every shot renders default. TWO items:
+>   (A) HARNESS: a faithful theme eyes-on must DRIVE THE REAL PICKER (shot.mjs CLICK_TEXT the theme card) OR set the seeded
+>       user's SERVER themePreference before shooting — injecting localStorage alone is reverted.
+>   (B) 🚩 POSSIBLE PRODUCT BUG (Angelo-gated reconcile-semantics call, escalated C339): "server wins" clobbers a local
+>       theme selection to `default` when the server value is UNSET — a real user could pick a theme, reload, lose it. Fix
+>       mirrors the #129 ruling (sync only if server value non-empty, never overwrite with empty) but changes reconcile
+>       semantics → NOT auto-fixed. Until Angelo rules, theme eyes-on uses path (A).
+> The C313-C334 themes remain code+guard-verified, visual-UNCONFIRMED until a picker-driven re-verify lands.
 >
 > **🚩 OPEN ANGELO-GATED (escalated C333) — PWA theme-color meta does NOT follow the selected theme.** applyTheme
 > (theme.svelte.ts:52-55) sets the `<meta name="theme-color">` tint to a HARD-CODED brand hex by MODE only (#2563eb
