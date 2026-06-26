@@ -106,4 +106,27 @@ describe('THEME_REGISTRY integrity + default ≡ app.css (T5)', () => {
       });
     });
   }
+
+  // PICKER METADATA CONTRACT: the ThemePickerCard (C318) renders each theme's `label`, `description`, and
+  // `swatch` strip. TypeScript types these as `string` / `ThemeTokenKey[]`, but `string` admits '' and an
+  // array admits [] — a theme shipped with an empty label/description or an empty swatch renders a BLANK or
+  // broken picker card (no name, no preview), and every other guard (contrast/distinctness/wiring/byte-
+  // freshness) stays GREEN because they only inspect token VALUES, never the presentation metadata. This
+  // pins the non-empty + valid-key contract for EVERY registered theme so a future palette (bento/…) with a
+  // typo'd or omitted field trips here, not in the user's settings page.
+  describe.each(Object.values(THEME_REGISTRY))('theme "$id" picker metadata', (theme) => {
+    test('has a non-empty label', () => {
+      expect(theme.label.trim().length, `${theme.id} has an empty label`).toBeGreaterThan(0);
+    });
+    test('has a non-empty description', () => {
+      expect(theme.description.trim().length, `${theme.id} has an empty description`).toBeGreaterThan(0);
+    });
+    test('has a non-empty swatch of valid token keys', () => {
+      expect(theme.swatch.length, `${theme.id} has an empty swatch strip`).toBeGreaterThan(0);
+      const allowed = new Set<string>(THEME_TOKEN_KEYS);
+      for (const key of theme.swatch) {
+        expect(allowed.has(key), `${theme.id} swatch references unknown token key ${key}`).toBe(true);
+      }
+    });
+  });
 });
