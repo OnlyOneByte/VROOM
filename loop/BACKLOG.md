@@ -819,6 +819,19 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **🚩 TOP THEMING ITEM (C338 integrity finding) — the eyes-on harness does NOT apply data-theme, so the theming
+> "re-skin verified" claims C313-C334 are UNRELIABLE.** shot.mjs's THEME knob (shot.mjs:28-31) only sets ctxOpts.colorScheme
+> (OS dark/light MODE); it never applies `data-theme` to <html> and never addInitScripts `vroom-theme-id` — it relies on
+> storageState localStorage, which does NOT reliably drive the rendered palette pre-paint. PROOF: all 4 non-default LIGHT
+> dashboards render byte-identical (5a2ef8) despite distinct primaries; cyberpunk-dark (C329) + aurora-dark (C330) PNGs are
+> byte-identical (c022c4). So past "full re-skin" shots showed the MODE change, not the theme palette. CODE + GUARD LAYER
+> REMAIN SOLID (contrast/distinctness/all-pairs/dark-orientation/byte-fresh/integrity on real token values) — the themes are
+> almost certainly correct; only the VISUAL confirmation overstated. FIX: shot.mjs must `addInitScript(() => { localStorage
+> .setItem('vroom-theme-id', id); document.documentElement.setAttribute('data-theme', id); })` (a THEME_ID env knob), THEN
+> hash-verify a re-shot theme differs from default AND from another theme. After the fix: genuinely re-verify the shipped
+> themes (the C313-C334 visual claims are downgraded to "code+guard-verified, visual-UNCONFIRMED" until then). This is the
+> TOP theming priority — above any new fill-in palette.
+>
 > **🚩 OPEN ANGELO-GATED (escalated C333) — PWA theme-color meta does NOT follow the selected theme.** applyTheme
 > (theme.svelte.ts:52-55) sets the `<meta name="theme-color">` tint to a HARD-CODED brand hex by MODE only (#2563eb
 > light / #1a1a2e dark), ignoring themeId. Deferred at C191/T8 as "moot until a non-default theme ships" + flagged to
