@@ -28,7 +28,7 @@ import {
 import { SyncError, SyncErrorCode } from '../../errors';
 import type { BackupConfig, ParsedBackupData } from '../../types';
 import { preferencesRepository } from '../settings/repository';
-import { backupService, coerceRow, isPreCentsBackup } from './backup';
+import { backupService, coerceRow } from './backup';
 
 type DrizzleTransaction = Parameters<Parameters<AppDatabase['transaction']>[0]>[0];
 
@@ -185,29 +185,24 @@ class RestoreService {
     const sheetsService = await createSheetsServiceForProvider(providerId, userId);
     const sheetData = await sheetsService.readSpreadsheetData(sheetsSpreadsheetId);
 
-    // A pre-cents (version < 2.0.0) Sheets backup stored money as DOLLAR floats; under the post-0009
-    // integer-cents schema they must be ×100-shimmed during coercion or coerceRow's integer branch
-    // 100×-undercounts them (design §4, NORTH_STAR #1 — the same fail-closed-default + recovery-shim
-    // contract as the ZIP path in backup.parseZipBackup).
-    const shimMoneyToCents = isPreCentsBackup(sheetData.metadata?.version);
-
-    // Coerce Sheets data using schema-aware column types
+    // money-cents-migration data-safety: the Google Sheet is a LIVE mirror of the DB — every backup
+    // overwrites it from raw db.select() rows, so its money cells ALWAYS reflect the CURRENT schema
+    // (integer cents post-0009). The Sheets format persists NO metadata version (readSpreadsheetData
+    // hardcodes a placeholder), so the version-gated ×100 shim used on the versioned ZIP path is BOTH
+    // unnecessary AND unsafe here: gating on the placeholder always fired → a current cents sheet got
+    // ×100'd to a 100× OVER-value on every restore (the C20 deep-review bug). Coerce WITHOUT the shim —
+    // the sheet is cents-native, identical to the DB — and stamp the in-memory metadata to the current
+    // version so validateBackupData (which fail-closes on a version mismatch) accepts it.
     for (const [key, table] of Object.entries(TABLE_SCHEMA_MAP)) {
       const data = sheetData[key as keyof typeof sheetData];
       if (Array.isArray(data)) {
         // biome-ignore lint/suspicious/noExplicitAny: Dynamic key assignment on parsed backup data
         (sheetData as Record<string, any>)[key] = data.map((row: Record<string, unknown>) =>
-          coerceRow(row, table, { shimMoneyToCents })
+          coerceRow(row, table)
         );
       }
     }
-
-    // After a successful shim the in-memory data IS the cents (2.0.0) format → upgrade the version so
-    // validateBackupData (fail-closes on a version mismatch) accepts the recovered backup. A version we
-    // cannot shim leaves it untouched → fail-closed.
-    if (shimMoneyToCents) {
-      sheetData.metadata = { ...sheetData.metadata, version: CONFIG.backup.currentVersion };
-    }
+    sheetData.metadata = { ...sheetData.metadata, version: CONFIG.backup.currentVersion };
 
     if (sheetData.metadata.userId !== userId) {
       throw new SyncError(SyncErrorCode.VALIDATION_ERROR, 'Spreadsheet belongs to different user');
