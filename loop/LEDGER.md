@@ -230,14 +230,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 330 |
+| feature | 4 | 331 |
 | deep-review | 5 | 321 |
 | guard | 6 | 328 |
 | bug | 3 | 325 |
 | arch | 5 | 324 |
 | infra | 6 | 326 |
 
-Current cycle: **330**
+Current cycle: **331**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,23 @@ Current cycle: **330**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C331 (FEATURE theming: registered the solarpunk FILL-IN theme — first warm palette, eyes-on verified; Angelo pre-authorized the fill-ins)** —
+  Balance recompute (cycle 331): deep-review (10/5) + bug (6/3) + arch (7/5) all over budget but all SATURATED/dry on the
+  only fresh surface (theming — deep-review certified C327, bug scouted C325, arch converged C324; the C327-C330 palettes are
+  factory calls + data, no new prod-src dup). Per don't-force-a-blocked-pick + "else highest-leverage open item", picked a
+  FILL-IN palette — which Angelo PRE-AUTHORIZED ("if there is extra time… the loop can implement any of the rest"). A 6th
+  selectable theme is real user value, not a marginal doc cycle. Registered `solarpunk` — the only WARM/organic mock
+  (cream/sand canvas, moss-green #6e9447 primary, clay #a8783c accent, warm-brown text), maximally distinct from the 5
+  cool/neon themes. LIGHT native warm cream; DARK a night-garden warm-brown/olive. D7 token-only. AA-tuned: 2 first-pass
+  fails (dark clay accent 3.71), darkened the dark accent 0.6→0.5 → all 22 pairs PASS. Registered via ONE defineBuiltinTheme
+  call + regenerated themes.css. ALL guards auto-covered it incl. C328 all-pairs (solarpunk ≠ the other 6): 1073 tests (+29).
+  EYES-ON: shot /settings → picker renders 7 cards (the 6 + Solarpunk) with the warm moss/clay swatch; seeded solarpunk+light
+  → shot /dashboard → FULL re-skin on warm cream with moss-green primary (a calm organic look, distinctly warmer than every
+  other theme), status 200, ZERO console errors. Verify: FE validate:local GREEN (1073). BE untouched. Committed 844d213
+  (theme) + 58744b7 (themes.css), pushed (branch 206 ahead / 0 behind). cov: be 89.29% / fe 89.49% (~). (feature→331. 6
+  non-default themes now [5 Angelo set + solarpunk fill-in]. More fill-ins available [editorial/tui/y2k/neobrutalist/
+  claymorphism/brutalist/zine] each a 1-call cycle when feature is over budget. The net-new FEATURE frontier beyond fill-ins
+  is still the 4 Angelo-gated Tier-2 specs [undrafted].)
 - **C330 (FEATURE theming: registered the aurora theme — 5th + FINAL Angelo palette, eyes-on verified; the v1 theme set is COMPLETE)** —
   Balance recompute (cycle 330): deep-review (9/5) + bug (5/3) + arch (6/5) all over budget but all SATURATED/dry on the only
   fresh surface (theming; deep-review certified C327, arch dup converged C324, bug scouted C325). Per don't-force-a-blocked-pick,
