@@ -38,6 +38,24 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
   }
 
   /**
+   * The half-open `[dayStart, nextDay)` window on the LOCAL calendar day of `recordedAt` (R5 local-day
+   * semantics). The single source of truth for the trip↔odometer dedup key's date component — createFromTrip
+   * (write) and deleteLinkedTripEntry (remove) MUST compute the IDENTICAL window or a delete would miss the
+   * entry the create wrote (orphan), so they share this helper rather than each inlining the date math (the
+   * C214 coupling: the two sides of one key). Pure; no DB access.
+   */
+  private static localDayWindow(recordedAt: Date): { dayStart: Date; nextDay: Date } {
+    const dayStart = new Date(
+      recordedAt.getFullYear(),
+      recordedAt.getMonth(),
+      recordedAt.getDate()
+    );
+    const nextDay = new Date(dayStart);
+    nextDay.setDate(nextDay.getDate() + 1);
+    return { dayStart, nextDay };
+  }
+
+  /**
    * Create an odometer entry derived from another signal (a trip's end reading — trips-location D2,
    * "reuse the odometer linkage"), DEDUPED by (vehicleId, calendar-day of recordedAt, odometer value):
    * if an entry already exists for the same vehicle + same local day + same reading, skip the insert and
@@ -54,13 +72,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
   }): Promise<OdometerEntry | null> {
     // Same-day window [startOfDay, nextDay) on the LOCAL calendar day of recordedAt (R5 local-day
     // semantics) — a trip and a manual reading on the same day at the same value are the same observation.
-    const dayStart = new Date(
-      entry.recordedAt.getFullYear(),
-      entry.recordedAt.getMonth(),
-      entry.recordedAt.getDate()
-    );
-    const nextDay = new Date(dayStart);
-    nextDay.setDate(nextDay.getDate() + 1);
+    const { dayStart, nextDay } = OdometerRepository.localDayWindow(entry.recordedAt);
 
     const existing = await this.db
       .select({ id: odometerEntries.id })
@@ -110,13 +122,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
     odometer: number;
     recordedAt: Date;
   }): Promise<number> {
-    const dayStart = new Date(
-      entry.recordedAt.getFullYear(),
-      entry.recordedAt.getMonth(),
-      entry.recordedAt.getDate()
-    );
-    const nextDay = new Date(dayStart);
-    nextDay.setDate(nextDay.getDate() + 1);
+    const { dayStart, nextDay } = OdometerRepository.localDayWindow(entry.recordedAt);
 
     const removed = await this.db
       .delete(odometerEntries)
