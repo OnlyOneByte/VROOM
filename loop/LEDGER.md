@@ -230,14 +230,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 329 |
+| feature | 4 | 330 |
 | deep-review | 5 | 321 |
 | guard | 6 | 328 |
 | bug | 3 | 325 |
 | arch | 5 | 324 |
 | infra | 6 | 326 |
 
-Current cycle: **329**
+Current cycle: **330**
 
 > **NOTE (C204): bug has now been the over-budget driver for 4 consecutive cycles (C201–C204) but produced
 > a fix only when a fresh surface existed (C202's trips pipeline). C201/C203/C204 all recorded the scout +
@@ -256,6 +256,26 @@ Current cycle: **329**
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
+- **C330 (FEATURE theming: registered the aurora theme — 5th + FINAL Angelo palette, eyes-on verified; the v1 theme set is COMPLETE)** —
+  Balance recompute (cycle 330): deep-review (9/5) + bug (5/3) + arch (6/5) all over budget but all SATURATED/dry on the only
+  fresh surface (theming; deep-review certified C327, arch dup converged C324, bug scouted C325). Per don't-force-a-blocked-pick,
+  pivoted to the highest-leverage open item: register aurora — the 5th + final palette. Distilled the ryang.dev Glass/Aurora
+  mock (deep-navy #0b1020 / aurora glows blue #5b8cff + purple #c45bff + teal #2dd4bf) into VROOM's 32 tokens — DARK native
+  navy + aurora-blue brand + teal accent, LIGHT a near-white aurora-light. D7 token-only (no gradient-mesh/backdrop-blur
+  EFFECTS). AA-tuned: ALL 22 pairs PASS first try (lowest 5.56 — the 0.66 dark primary + dark text gave headroom). Registered
+  via ONE defineBuiltinTheme call + regenerated themes.css. ALL guards auto-covered it incl. C328 all-pairs (aurora ≠ the
+  other 5): 1044 tests (+29 vs C329 1015). EYES-ON: shot /settings → picker renders 6 cards in a clean 3×2 grid
+  (Default/Blueprint/Bento/Vaporwave/Cyberpunk/Aurora) with correct blue/teal aurora swatch; seeded aurora+dark → shot
+  /dashboard → FULL re-skin on deep-navy with aurora-blue primary (softer premium tone, distinct from cyberpunk near-black +
+  vaporwave purple), status 200, ZERO console errors, no FOUC. Verify: FE validate:local GREEN (1044). BE untouched. Committed
+  807ecd3 (theme) + c28131d (themes.css), pushed (branch 203 ahead / 0 behind). cov: be 89.29% / fe 89.49% (~).
+  **(feature→330. ⭐ THE ANGELO-APPROVED v1 THEME SET IS COMPLETE: default + 5 [blueprint/bento/vaporwave/cyberpunk/aurora],
+  all AA-tuned + all-pairs-distinct + eyes-on, guarded across 6 dimensions. The theming feature is DONE.** Remaining theming:
+  T11 per-theme dashboard eyes-on ×{light,dark} [optional polish] OR T12 axe a11y gate [optional]; fill-in ryang.dev mocks
+  available when feature is over budget. **The bigger signal: with theming complete, the loop is OUT of self-authorizable
+  net-new feature SOURCE — the next genuine frontier is the 4 Angelo-gated Tier-2 specs [vehicle-sharing rework / local-accounts
+  / admin-panel / ai-provider], all UNDRAFTED. Recommend Angelo draft/greenlight those, else the loop returns to
+  maintenance-rotation on the now-hardened theming + existing surfaces.)**
 - **C329 (FEATURE theming: registered the cyberpunk theme — 4th Angelo palette, eyes-on verified, via the C324 factory)** —
   Balance recompute (cycle 329): deep-review (8/5) + bug (4/3) both over budget but both SATURATED on the only fresh surface
   (theming, certified C327/C328) — a 3rd dry doc cycle would be low-integrity filler. Per don't-force-a-blocked-pick, pivoted
