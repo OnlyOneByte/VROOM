@@ -172,3 +172,60 @@ describe('expense READ widening — shared per-vehicle reads (T5b-3)', () => {
     expect(list.data[0]?.expenseAmount).toBe(33);
   });
 });
+
+describe('expense CSV export widening — shared per-vehicle export (T5b-3b)', () => {
+  test('an accepted VIEWER exports the shared vehicle CSV (owner-stamped rows + the OWNER vehicle name)', async () => {
+    const [vehicleId] = await shareWithExpense('viewer');
+
+    const res = await asB('GET', `/api/v1/expenses/export?vehicleId=${vehicleId}`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toContain('text/csv');
+    const csv = await res.text();
+    // The owner-stamped $75 maintenance row is present (proving owner-scope, not an empty invitee export).
+    expect(csv).toContain('maintenance');
+    expect(csv).toContain('75');
+    // The vehicle NAME column resolves from the OWNER's fleet (the invitee's own fleet lacks this
+    // vehicle) — "2021 Shared Car", never "Unknown Vehicle".
+    expect(csv).toContain('2021 Shared Car');
+    expect(csv).not.toContain('Unknown Vehicle');
+  });
+
+  test('a STRANGER (no share) is denied the per-vehicle export (existence-hiding 404)', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Private', model: 'Car', year: 2021 });
+    await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'misc',
+      expenseAmount: 10,
+      date: '2024-06-02T00:00:00.000Z',
+    });
+    expect((await asB('GET', `/api/v1/expenses/export?vehicleId=${vehicleId}`)).status).toBe(404);
+  });
+
+  test('the CROSS-FLEET export (no vehicleId) stays acting-user-scoped — B export excludes the shared vehicle', async () => {
+    await shareWithExpense('editor');
+    // B exports their WHOLE fleet (no vehicleId) — the shared vehicle's owner-stamped rows are NOT B's,
+    // so they must not appear. B owns nothing here, so the export has only the header row.
+    const res = await asB('GET', '/api/v1/expenses/export');
+    expect(res.status).toBe(200);
+    const csv = await res.text();
+    expect(csv).not.toContain('2021 Shared Car');
+    expect(csv).not.toContain('maintenance');
+
+    // And the OWNER's own cross-fleet export still includes it (it stayed on A's books).
+    const ownerCsv = await (await ctx.authed('GET', '/api/v1/expenses/export')).text();
+    expect(ownerCsv).toContain('2021 Shared Car');
+  });
+
+  test('the owner exporting their OWN vehicle is unchanged (owner === acting)', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Owned', model: 'Car', year: 2022 });
+    await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'misc',
+      expenseAmount: 12,
+      date: '2024-06-03T00:00:00.000Z',
+    });
+    const res = await ctx.authed('GET', `/api/v1/expenses/export?vehicleId=${vehicleId}`);
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain('2022 Owned Car');
+  });
+});
