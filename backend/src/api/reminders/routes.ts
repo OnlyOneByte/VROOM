@@ -2,9 +2,10 @@ import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { CONFIG } from '../../config';
 import type { NewReminder, Reminder } from '../../db/schema';
-import { ValidationError } from '../../errors';
+import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, rateLimiter, requireAuth } from '../../middleware';
 import { centsToDollars, expenseToApi, reminderToApi } from '../../utils/money';
+import { requireVehicleRead, resolveVehicleOwnerId } from '../../utils/sharing';
 import {
   commonSchemas,
   validateReminderOwnership,
@@ -231,7 +232,24 @@ routes.get('/', async (c) => {
   if (type) filters.type = type;
   if (isActiveParam !== undefined) filters.isActive = isActiveParam === 'true';
 
-  const reminders = await reminderRepository.findByUserId(user.id, filters);
+  // vehicle-sharing T7 READ widening (design §2.1 rule 3, the reminders analogue of T5b-3). A reminder
+  // is userId-OWNED with a multi-vehicle junction, so reminders for a shared vehicle belong to the
+  // OWNER's books. When the request filters by a specific vehicleId, gate via requireVehicleRead (owner |
+  // accepted viewer/editor | 404) and list the OWNER's reminders linked to that vehicle (findByUserId
+  // INNER-JOINs the junction, so the vehicleId filter pins it to exactly that vehicle's reminders — the
+  // owner cannot leak reminders on OTHER vehicles). Without a vehicleId filter, the list STAYS
+  // acting-user-owned (cross-fleet: a shared vehicle's reminders live on the owner's surface, so the
+  // invitee sees them only via ?vehicleId — no foreign rows in the all-reminders list). The WRITE paths
+  // (POST/PUT/DELETE) keep the strict validateVehicleIdsOwned for now — T7b widens those.
+  let listUserId = user.id;
+  if (vehicleId) {
+    await requireVehicleRead(vehicleId, user.id);
+    const ownerId = await resolveVehicleOwnerId(vehicleId);
+    if (!ownerId) throw new NotFoundError('Vehicle');
+    listUserId = ownerId;
+  }
+
+  const reminders = await reminderRepository.findByUserId(listUserId, filters);
   return c.json({ success: true, data: reminders.map(reminderWithVehiclesToApi) });
 });
 
