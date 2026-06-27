@@ -94,13 +94,21 @@
           GUARD FOLLOW-UP (C104): +2 provenance forge-vector tests pinning that a client-supplied `createdBy`
           in the POST body is IGNORED on BOTH paths (owner-create → stays NULL; editor-create → stamped the
           acting editor, never the forged id) — so a future schema refactor that reopened the forge fails here.
-    - [ ] **T5b-2b — split-expense WRITE widening (`POST/PUT/DELETE /expenses/split`).** DEFERRED from T5b-2
-          (WIP=1, one verified slice): the split path is a deeper rework — siblings span MULTIPLE vehicles
-          (potentially different owners) and `createSiblings` stamps ONE `userId`, so owner-stamp per sibling
-          is a repository-layer change + a product question (can an editor split a cost ACROSS a shared and an
-          owned vehicle?). Currently SAFE — the split route gates on `assertVehiclesOwned` (must own EVERY
-          vehicle), so a shared editor is cleanly denied (no IDOR, pinned by the existing C115 split IDOR
-          entry). Resume after T5b-3.
+    - [x] **T5b-2b — split-expense WRITE widening (`POST/PUT/DELETE /expenses/split`) (C473, 2026-06-27).**
+          The deeper rework, resolved as a direct corollary of the ratified §2.1 model (NOT re-escalated —
+          the product fork was clean-cut). New `requireSplitWriteAccess` (routes.ts) gates EVERY config
+          vehicle through the share seam (`requireVehicleWrite` per vehicle, owner|editor|404) and enforces
+          the **single-owner invariant**: because a split group carries ONE `userId` across all siblings, the
+          vehicle set must resolve to one owner — a cross-owner split (shared + owned, or two owners) is
+          rejected (ValidationError 400). Every sibling is owner-stamped `userId=OWNER` + `createdBy=acting
+          editor` (NULL when owner authors). createSiblings threads `createdBy`; createSplitExpense/
+          updateSplitExpense take `ownerId`/`createdBy` (default self/NULL → non-shared byte-identical).
+          PUT/DELETE/GET load the group UNSCOPED via new `getSplitGroupAccessInfo` then authorize on the
+          seam (write to mutate; read for GET — a viewer may read, not write); all repo reads/writes scope to
+          the resolved owner id. SHIPPED its IDOR entries same cycle: new shared-split-write.test.ts (8 cases:
+          editor single+multi same-owner stamp, owner self-split NULL, cross-owner reject, viewer-denied,
+          editor PUT/DELETE, viewer GET) + a T5b-2b entry in cross-tenant-idor.test.ts (viewer reads-not-
+          writes, cross-owner denied, no leak). validate:local green (2109 pass [+8], 0 fail). Commit 16693c1.
     - [x] **T5b-3 — expense READ widening (list/single/summary) (C94, 2026-06-27).** The three per-vehicle
           reads — GET `/expenses?vehicleId`, GET `/expenses/:id`, GET `/expenses/summary?vehicleId` — flipped
           `validateVehicleOwnership`/`validateExpenseOwnership` → `requireVehicleRead` (owner | accepted
