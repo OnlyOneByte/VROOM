@@ -521,6 +521,56 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     expect(stillB.data.make).toBe('B');
   });
 
+  // vehicle-sharing T5b-3 (expense READ widening — the C108-C116 IDOR discipline for the read seam).
+  // The per-vehicle reads moved from validateVehicleOwnership/validateExpenseOwnership →
+  // requireVehicleRead (owner | accepted viewer | accepted editor). This pins the read widening did not
+  // over-open: a NON-shared third party is still denied the per-vehicle list / single / summary with the
+  // existence-hiding 404; and an accepted VIEWER who legitimately READS the shared vehicle still cannot
+  // WRITE it (read access never implies write — the requireVehicleRead vs requireVehicleWrite split).
+  test('expense READ (T5b-3): a third party is denied per-vehicle reads; a viewer reads but cannot write', async () => {
+    const vid = await idOf(
+      await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
+    );
+    const eid = await idOf(
+      await asB('POST', '/api/v1/expenses', {
+        vehicleId: vid,
+        category: 'misc',
+        expenseAmount: 42,
+        date: '2024-06-01T00:00:00.000Z',
+      })
+    );
+
+    // (1) THIRD PARTY — A has NO share: every per-vehicle read is denied (existence-hiding 404).
+    expectDenied(await ctx.authed('GET', `/api/v1/expenses?vehicleId=${vid}`), 'third-party list');
+    expectDenied(await ctx.authed('GET', `/api/v1/expenses/${eid}`), 'third-party single read');
+    expectDenied(
+      await ctx.authed('GET', `/api/v1/expenses/summary?vehicleId=${vid}`),
+      'third-party summary'
+    );
+
+    // (2) VIEWER — B shares vid with A as viewer; A accepts. A can READ the shared vehicle but a WRITE
+    // is still denied (requireVehicleRead grants read; requireVehicleWrite denies a viewer — same 404).
+    const shareId = await idOf(
+      await asB('POST', '/api/v1/shares', {
+        vehicleId: vid,
+        email: ctx.user.email,
+        level: 'viewer',
+      })
+    );
+    expect((await ctx.authed('POST', `/api/v1/shares/${shareId}/accept`)).status).toBe(200);
+    expect(
+      (await ctx.authed('GET', `/api/v1/expenses?vehicleId=${vid}`)).status,
+      'viewer can read the shared vehicle list'
+    ).toBe(200);
+    expect((await ctx.authed('GET', `/api/v1/expenses/${eid}`)).status, 'viewer single read').toBe(
+      200
+    );
+    expectDenied(
+      await ctx.authed('PUT', `/api/v1/expenses/${eid}`, { expenseAmount: 1 }),
+      'viewer write still denied after read grant'
+    );
+  });
+
   // vehicle-sharing T12 (enriched /received). The "shared with me" list now JOINs the vehicle + owner
   // to label each row — so the join must stay scoped to sharedWithId === acting: an invitee must see
   // ONLY shares addressed to THEM, never another tenant's received invites. B invites A; A's /received
