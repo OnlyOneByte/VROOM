@@ -318,10 +318,9 @@
             artifact (the FIRST shot rendered + proved the gating; the fix is a trivial `&& isOwner` mirror of the
             shot-verified Share/edit gating). The backend enforces every denial regardless — this is
             defense-in-depth UX.
-      - [~] **T12b-3c — read-only shared INSURANCE view — SPLIT into (a) BE claims-read [DONE C475] + (b) FE
-            read-only variant + eyes-on [next].** A viewer currently sees no insurance on a shared vehicle (the
-            whole tab is owner-gated, C100). To show it read-only needs: (a) widen the claims sub-reads + (b) a
-            read-only PolicyList/PolicyCard/ClaimsSection variant. Was SAFE (hidden, not broken) the whole time.
+      - [x] **T12b-3c — read-only shared INSURANCE view — DONE (a) BE claims-read [C475] + (b) FE read-only
+            variant + eyes-on [C476].** A viewer now sees insurance on a shared vehicle READ-ONLY (was wholly
+            owner-gated, C100). Both halves shipped.
         - [x] **(a) — claims-read widening + blast-radius (C475, 2026-06-27).** `GET /insurance/:id/claims`
               flipped `validateInsuranceOwnership` → a new `requirePolicyReadVehicles` gate: the OWNER always
               reads; a NON-owner reads the policy claims only if they hold accepted-share READ access to AT LEAST
@@ -334,15 +333,23 @@
               sees only the shared-vehicle claim with owner-other + unattributed dropped, owner sees all, editor
               reads, stranger-404, pending-404) + a T12b-3c IDOR entry (third party with no covered-vehicle share
               denied the claims list). validate:local green (2121 pass [+6], 0 fail). Commit 9f18b75.
-        - [ ] **(b) — FE read-only insurance variant + eyes-on (next).** A read-only InsuranceTab path for a
-              viewer: render PolicyList/PolicyCard/PolicyTermCard/ClaimsSection/DocumentViewer with every mutate
-              affordance hidden (Add-Policy, Edit-policy, Edit/Delete/Renew-term, File/Edit/Delete-claim, Upload/
-              Delete-document — the 10 affordances scouted C475), un-gate the tab for a non-owner in read-only
-              mode (it is `isOwner`-gated today on the [id] page), and boot+shoot a viewer session to confirm the
-              read-only insurance renders with NO mutate chrome + no console errors. Backend already enforces
-              every denial (defense-in-depth UX). Reads used: getPoliciesForVehicle (T8b) + getClaims (this slice)
-              + getEntityDocuments. The per-vehicle policies LIST read (T8b) + claims read (this slice) are both
-              live, so the FE has all the data it needs.
+        - [x] **(b) — FE read-only insurance variant + eyes-on (C476, 2026-06-27).** Threaded a `readOnly` prop
+              (default false → every owner call site byte-unchanged) through InsuranceTab → PolicyList →
+              PolicyCard → {PolicyTermCard, TermHistory, ClaimsSection, DocumentViewer}; readOnly hides all 10
+              mutate affordances. The [id] page passes `readOnly={!isOwner}` + now lazy-loads the tab for a
+              non-owner. EYES-ON (booted stack, seeded an accepted viewer + policy/term/claim, shot AS THE
+              VIEWER) surfaced + closed TWO real four-states gaps unit tests could not: (1) the policy/claim
+              DocumentViewer fires GET /photos/insurance_*/:id (NOT widened) → hidden in read-only mode; (2)
+              loadPhotos() fired the owner-only vehicle-photos read on mount despite the carousel being
+              isOwner-gated → await loadVehicle() first, fetch photos owner-only. Final viewer shot: ZERO console
+              errors, read-only insurance + mileage/fuel stats render, no mutate chrome. Plus a BE sibling
+              (commit 7705917): GET /vehicles/:id/stats was the one per-vehicle read the viewer page still fired
+              owner-only (T8a missed it — it lives in vehicles/routes.ts) → widened to requireVehicleRead +
+              owner-scope, +4 tests + an IDOR entry. FE validate:local green (svelte-check 0, build, 1327); BE
+              green (2125 pass). Commits 7705917 (BE stats) + c1fecc5 (FE).
+        > NOTE: insurance DOCUMENT reads (GET /photos/insurance_policy|claim/:id) remain owner-only — a viewer
+        > sees policy terms + claims, NOT attachments. A future slice could widen them (with the §6.4 photo
+        > blast-radius) if shared document visibility is wanted; deferred as out-of-scope + low-value.
 - [x] **T13 — Lifecycle round-trip (C59, 2026-06-27).** Shipped as a TRACKED HTTP-harness round-trip
       (`shared-fleet-list.test.ts`, +2 tests) NOT an untracked browser e2e — rationale: (a) GUIDE standing
       truth "source-scan/harness guards > untracked e2e for merge survival" (a `*.meshclaw.e2e.ts` is gitignored
