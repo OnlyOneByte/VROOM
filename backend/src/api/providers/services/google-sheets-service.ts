@@ -62,6 +62,7 @@ export const SHEET_HEADERS = {
     'id',
     'vehicleId',
     'userId',
+    'createdBy',
     'clientId',
     'tags',
     'category',
