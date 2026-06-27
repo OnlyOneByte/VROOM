@@ -13,6 +13,7 @@
 	import RecentActivityCard from '$lib/components/dashboard/RecentActivityCard.svelte';
 	import DueRemindersCard from '$lib/components/dashboard/DueRemindersCard.svelte';
 	import RecurringCostCard from '$lib/components/dashboard/RecurringCostCard.svelte';
+	import SharedWithMeCard from '$lib/components/dashboard/SharedWithMeCard.svelte';
 	import VehicleCarousel from '$lib/components/dashboard/VehicleCarousel.svelte';
 	import PeriodSelector from '$lib/components/common/period-selector.svelte';
 	import { handleErrorWithNotification } from '$lib/utils/error-handling';
@@ -306,6 +307,12 @@
 			activeFinancing={stats.activeFinancing}
 			{isLoading}
 		/>
+
+		<!-- Pending vehicle-share invitations (T12b). Self-fetching + self-hiding: renders nothing
+		     unless an invite is pending or its load failed. Outside the totalVehicles>0 gate on purpose
+		     — a brand-new user with no vehicles can still be invited (a shared vehicle may be their
+		     first). Accepting refreshes the dashboard so the new vehicle appears (fleet widening, T12b-2). -->
+		<SharedWithMeCard onAccepted={loadDashboardData} />
 
 		<!-- Vehicle Carousel -->
 		{#if stats.totalVehicles > 0}
