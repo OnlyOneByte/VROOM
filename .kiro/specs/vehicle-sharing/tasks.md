@@ -58,15 +58,26 @@
         vehicleShareRepository.findAcceptedAccessForUser (owner-name join, accepted-only). 5 tests:
         accepted appears+annotated, pending/declined/non-shared do NOT appear, owned rows carry no
         annotation. Green (2037 pass).
-  - [ ] **T5b — expense read+write widening — BLOCKED on Angelo's architecture call.** The spec's
-        "flip validateVehicleOwnership → requireVehicleRead/Write" does NOT work for expenses: the whole
-        expense read/write/backup/TCO model is `expenses.userId`-keyed, NOT vehicleId-keyed. A naive flip
-        (a) returns ZERO rows for a shared editor (findPaginated({userId})) and (b) would stamp an editor's
-        created expense with the EDITOR's userId → it vanishes from the owner's backup/TCO + double-counts.
-        D6-v1 (acting-user stamp) really means: stamp shared-created rows userId=OWNER + add a `createdBy`
-        column (migration 0011) + rework expense reads to resolve shared-vehicle access by vehicleId. Money
-        table + migration + highest cross-tenant risk → escalated (options: owner-stamp+createdBy / defer
-        editor-write to v2 / other). Build resumes on the ruling; design.md gets the chosen model first.
+  - [~] **T5b — expense read+write widening — UNBLOCKED (Angelo ruled option (a) owner-stamp + createdBy,
+        2026-06-27).** The model is now in design.md §2.1 (the money-data-safety core). Decomposed into
+        verified one-per-cycle slices, each shipping its `cross-tenant-idor.test.ts` entries:
+    - [x] **T5b-0 — design.md §2.1 (the ratified model) + this decomposition (C91, 2026-06-27).** Mapped
+          every userId-keyed read/write/backup site across expenses/odometer/reminders (3 scouts); wrote the
+          owner-stamp + createdBy + read-by-vehicleId model + the getCurrentOdometer owner-scope fix + the
+          build order into design.md. Confirmed the backup path is already owner-keyed end-to-end (C54) and
+          the vehicleShares schema header already declares the owner-stamp intent → the migration realizes an
+          already-documented decision. Docs-only (no source). NEXT slice: T5b-1.
+    - [ ] **T5b-1 — migration 0011 (additive `created_by`).** `ALTER TABLE expenses ADD COLUMN created_by`
+          text → users.id (nullable; NULL = legacy/self sentinel). Pure additive (no rebuild — strip any
+          db:generate destructive bundle like 0010; write the snapshot). +schema type + migration-0011 test
+          (column exists, nullable, existing rows survive with NULL, additive/no __new_ scaffold).
+    - [ ] **T5b-2 — expense WRITE widening.** POST/PUT/DELETE `/expenses` flip `validateVehicleOwnership`
+          → `requireVehicleWrite`; on create, stamp `userId = resolved owner` + `createdBy = acting`; split
+          route too. IDOR: third-party-denied, viewer-write-denied, editor-other-vehicle-denied,
+          editor-owner-action-denied (owner-only stays strict).
+    - [ ] **T5b-3 — expense READ widening.** Per-vehicle expense list/summary for a shared vehicle resolves
+          via `requireVehicleRead` + queries by `vehicleId` (owner-stamped rows); cross-fleet dashboard
+          aggregates STAY acting-user-owned-only (no double-count). IDOR entries.
 - [ ] **T6 — odometer** read+write → the resolver; IDOR entries. **BLOCKED — folds into the T5b ruling
       (C53 verified): odometer is userId-stamped on create + userId-scoped on every read
       (findByVehicleIdPaginated/getHistory/getCurrentOdometer all AND eq(userId), validateOdometerOwnership
