@@ -108,8 +108,24 @@
       EYES-ON VERIFIED: booted servers, shot the vehicle page (Share button present in header) + drove the
       dialog open (CLICK_SELECTOR) → Read both PNGs: dialog renders correctly with form + empty-state, zero
       console errors. Frontend validate:local green (svelte-check 0 err, build, 1325 pass).
-- [ ] **T12 — "Shared with me"** section + pending-invite accept/decline; fleet cards badged
-      "shared by <name>"; viewer sees NO edit affordances (mirror the `requireVehicleWrite` denial in UI).
+- [~] **T12 — SPLIT into T12a (DONE C56) + T12b (FE UI, next).** The invitee surface needs a human label
+      per row, but `GET /received` returned bare share rows (FK IDs only) and T5a's fleet widening is
+      ACCEPTED-only — so a still-PENDING invite could not resolve its vehicle/owner. Backend-first split:
+  - [x] **T12a — enrich `GET /shares/received` (C56, 2026-06-27).** `findReceivedByUser` now inner-joins
+        vehicles + users and returns a `ReceivedShare` (raw row + `vehicleName` [nickname else "year make
+        model"] + `sharedBy` [owner displayName, matching T5a `sharedAccess.sharedBy`]). Join columns are the
+        SHARE's own vehicle/owner, where-clause stays `sharedWithId`-scoped → no cross-tenant widening. FE
+        `ReceivedShare` type + `listReceived(): Promise<ReceivedShare[]>` in lockstep. Tests: +2 enrichment
+        cases (pending row label = "2021 Honda Civic" + `sharedBy` = owner not invitee; nickname wins) + an
+        IDOR entry (the C108-C116 discipline: `/received` stays invitee-scoped through the join). Both
+        validate:local green (BE 2045 pass [+3], FE 1325 pass, svelte-check 0 err).
+  - [ ] **T12b — the "Shared with me" UI (eyes-on).** Dashboard "Shared with me" section listing pending
+        invites with accept/decline (via `shareApi.accept`/`decline` + the T12a-enriched `vehicleName`/
+        `sharedBy`); fleet cards (VehicleCarousel) badged "shared by <name>" via the T5a `sharedAccess`
+        annotation (wire `getVehicles({includeShared:true})` + add `sharedAccess?` to the FE `Vehicle` type +
+        the `vehicleOverviews` projection + a Badge mirroring the "Financed" one); viewer sees NO edit
+        affordances (mirror the `requireVehicleWrite` denial in UI). Eyes-on: boot + shot the dashboard with a
+        seeded pending invite + an accepted shared vehicle.
 - [ ] **T13 — Round-trip E2E** (`vehicle-sharing.meshclaw.e2e.ts`): owner invites → invitee accepts →
       invitee sees+edits (as editor) the shared vehicle's expenses → owner revokes → access gone. Self-cleaning.
 
