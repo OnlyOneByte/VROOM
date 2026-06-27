@@ -242,6 +242,65 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     expectDenied(await ctx.authed('GET', `/api/v1/odometer/${vid}`), 'GET odometer list');
   });
 
+  // vehicle-sharing T6 (odometer READ+WRITE widening — the C108-C116 IDOR discipline). The odometer
+  // read/write gates moved from validateVehicleOwnership/validateOdometerOwnership → requireVehicleRead/
+  // Write. This pins the widening did not over-open: a NON-shared third party is still denied every
+  // read+write (existence-hiding 404), and an accepted VIEWER who legitimately READS the shared vehicle
+  // still cannot WRITE it (the requireVehicleRead vs requireVehicleWrite split). Here B owns the vehicle.
+  test('odometer (T6): a third party is denied read+write; a viewer reads but cannot write', async () => {
+    const vid = await idOf(
+      await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
+    );
+    const oid = await idOf(
+      await asB('POST', `/api/v1/odometer/${vid}`, {
+        odometer: 31000,
+        recordedAt: '2024-06-02T00:00:00.000Z',
+      })
+    );
+    const createBody = { odometer: 32000, recordedAt: '2024-06-03T00:00:00.000Z' };
+
+    // (1) THIRD PARTY — A has NO share: every read + write is denied (existence-hiding 404).
+    expectDenied(await ctx.authed('GET', `/api/v1/odometer/${vid}`), 'third-party list');
+    expectDenied(await ctx.authed('GET', `/api/v1/odometer/${vid}/history`), 'third-party history');
+    expectDenied(await ctx.authed('GET', `/api/v1/odometer/entry/${oid}`), 'third-party single');
+    expectDenied(
+      await ctx.authed('POST', `/api/v1/odometer/${vid}`, createBody),
+      'third-party create'
+    );
+    expectDenied(
+      await ctx.authed('PUT', `/api/v1/odometer/${oid}`, { odometer: 1 }),
+      'third-party update'
+    );
+    expectDenied(await ctx.authed('DELETE', `/api/v1/odometer/${oid}`), 'third-party delete');
+
+    // (2) VIEWER — B shares vid with A as viewer; A accepts. A can READ but every WRITE is denied 404.
+    const shareId = await idOf(
+      await asB('POST', '/api/v1/shares', {
+        vehicleId: vid,
+        email: ctx.user.email,
+        level: 'viewer',
+      })
+    );
+    expect((await ctx.authed('POST', `/api/v1/shares/${shareId}/accept`)).status).toBe(200);
+    expect(
+      (await ctx.authed('GET', `/api/v1/odometer/${vid}`)).status,
+      'viewer can read the shared vehicle odometer list'
+    ).toBe(200);
+    expect((await ctx.authed('GET', `/api/v1/odometer/entry/${oid}`)).status).toBe(200);
+    expectDenied(await ctx.authed('POST', `/api/v1/odometer/${vid}`, createBody), 'viewer create');
+    expectDenied(
+      await ctx.authed('PUT', `/api/v1/odometer/${oid}`, { odometer: 1 }),
+      'viewer update'
+    );
+    expectDenied(await ctx.authed('DELETE', `/api/v1/odometer/${oid}`), 'viewer delete');
+
+    // B's reading survived every denied write — unchanged value.
+    const stillThere = await asB('GET', `/api/v1/odometer/entry/${oid}`);
+    const body = await json<DataEnvelope<{ odometer: number }>>(stillThere);
+    expect(stillThere.status).toBe(200);
+    expect(body.data.odometer).toBe(31000);
+  });
+
   test("reminder: A cannot GET/PUT/DELETE B's reminder", async () => {
     const vid = await idOf(
       await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
