@@ -1,4 +1,4 @@
-import type { CreateShareRequest, ShareLevel, VehicleShare } from '$lib/types';
+import type { CreateShareRequest, ReceivedShare, ShareLevel, VehicleShare } from '$lib/types';
 import { apiClient } from './api-client';
 
 /**
@@ -34,8 +34,8 @@ export const shareApi = {
 	},
 
 	// --- invitee side (T4) ---
-	async listReceived(): Promise<VehicleShare[]> {
-		return apiClient.get<VehicleShare[]>('/api/v1/shares/received');
+	async listReceived(): Promise<ReceivedShare[]> {
+		return apiClient.get<ReceivedShare[]>('/api/v1/shares/received');
 	},
 
 	async accept(id: string): Promise<VehicleShare> {

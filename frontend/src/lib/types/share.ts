@@ -27,6 +27,18 @@ export interface CreateShareRequest {
 }
 
 /**
+ * A share RECEIVED by an invitee, as returned by `GET /api/v1/shares/received` (T12). The backend
+ * enriches the raw share row with the vehicle's display name + the owner's name so the "Shared with
+ * me" surface can label a still-PENDING invite (which the accepted-only fleet widening cannot show).
+ */
+export interface ReceivedShare extends VehicleShare {
+	/** nickname, else "year make model". */
+	vehicleName: string;
+	/** The owner's display name (matches T5a's SharedAccess.sharedBy). */
+	sharedBy: string;
+}
+
+/**
  * The `sharedAccess` annotation a vehicle row carries when it appears in the fleet list via
  * `GET /api/v1/vehicles?include=shared` (T5a): which level the acting user has + who shared it.
  * Present ONLY on shared rows; an owned vehicle has no `sharedAccess`.
