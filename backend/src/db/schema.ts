@@ -577,6 +577,46 @@ export const reminderNotifications = sqliteTable(
   })
 );
 
+// Vehicle sharing (migration 0010, vehicle-sharing T1; Angelo ratified D1-D8 2026-06-27).
+// An OWNER grants another existing VROOM user scoped access to ONE of their vehicles. This is the
+// ONLY widening of cross-userId access in VROOM (NORTH_STAR #2) — every read/write route that opts a
+// shared vehicle in routes through utils/sharing.ts (T2), never raw. IDs are text/cuid2 to match
+// users.id + vehicles.id (the design draft said integer — corrected to the live schema). All three
+// FKs cascade so a deleted vehicle/owner/invitee drops the share row (D8); shared-CREATED expense
+// rows are owner-userId-stamped and are NOT touched by this cascade (real cost history stays).
+export const vehicleShares = sqliteTable(
+  'vehicle_shares',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    vehicleId: text('vehicle_id')
+      .notNull()
+      .references(() => vehicles.id, { onDelete: 'cascade' }), // revoke-on-vehicle-delete (D8)
+    ownerId: text('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }), // denormalized for the owner-side list query
+    sharedWithId: text('shared_with_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }), // the invitee
+    level: text('level').notNull(), // 'viewer' | 'editor' (Zod enum at the route)
+    status: text('status').notNull().default('pending'), // 'pending'|'accepted'|'declined'|'revoked'
+    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    // One ACTIVE share per (vehicle, invitee). Partial (WHERE status IN pending/accepted) so a
+    // declined/revoked row does NOT block re-inviting the same user to the same vehicle later.
+    activeShareIdx: uniqueIndex('vehicle_shares_active_idx')
+      .on(table.vehicleId, table.sharedWithId)
+      .where(sql`status in ('pending','accepted')`),
+    // Invitee-side "shared with me" lookup (by invitee + status).
+    sharedWithIdx: index('vehicle_shares_shared_with_idx').on(table.sharedWithId, table.status),
+    // Owner-side "shares I granted" lookup.
+    ownerIdx: index('vehicle_shares_owner_idx').on(table.ownerId),
+  })
+);
+
 // Export types for use in application
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -639,3 +679,6 @@ export type NewReminderVehicle = typeof reminderVehicles.$inferInsert;
 
 export type ReminderNotification = typeof reminderNotifications.$inferSelect;
 export type NewReminderNotification = typeof reminderNotifications.$inferInsert;
+
+export type VehicleShare = typeof vehicleShares.$inferSelect;
+export type NewVehicleShare = typeof vehicleShares.$inferInsert;

@@ -29,7 +29,19 @@ import * as schema from '../../../db/schema';
 //   users         — the account identity itself; restore stamps rows onto the requesting user.
 //   userProviders — encrypted storage credentials; never exported (see backup.ts validatePhotoRefEntries note).
 //   sessions      — ephemeral auth sessions; restoring them would be meaningless/unsafe.
-const EXCLUDED_BY_DESIGN = new Set<string>(['users', 'user_providers', 'sessions']);
+//   vehicle_shares — TEMPORARY (vehicle-sharing T1, 2026-06-27): the table ships schema-first; its
+//     backup wiring is a SEPARATE spec task (T9, design §4/D7 — owner-side export only, with the
+//     blast-radius guard that an invitee export must NOT pull the owner's shares). Wiring it into the
+//     registry here would force a userId-scoped createBackup() query (guard B couples them) WITHOUT
+//     T9's round-trip + blast-radius tests proving the cross-tenant scoping — which this feature's
+//     discipline forbids. The table is empty until T3 lands routes, so there is no data-loss window.
+//     T9 MUST move vehicle_shares OUT of this set and INTO TABLE_SCHEMA_MAP+TABLE_FILENAME_MAP+createBackup().
+const EXCLUDED_BY_DESIGN = new Set<string>([
+  'users',
+  'user_providers',
+  'sessions',
+  'vehicle_shares',
+]);
 
 /** Every physical table NAME defined in the Drizzle schema. */
 function allSchemaTableNames(): string[] {
