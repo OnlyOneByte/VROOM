@@ -11,7 +11,6 @@ import type { BackupConfig, StorageConfig } from '../../types';
 import {
   mergeUnitPreferences,
   partialUnitPreferencesSchema,
-  unitPreferencesSchema,
 } from '../../utils/unit-preferences-schema';
 import { preferencesRepository, syncStateRepository } from './repository';
 

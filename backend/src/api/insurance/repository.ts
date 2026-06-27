@@ -3,12 +3,7 @@ import { and, between, desc, eq, inArray } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { InsurancePolicy, InsuranceTerm } from '../../db/schema';
-import {
-  insurancePolicies,
-  insuranceTerms,
-  insuranceTermVehicles,
-  vehicles,
-} from '../../db/schema';
+import { insurancePolicies, insuranceTerms, insuranceTermVehicles } from '../../db/schema';
 import type { DrizzleTransaction } from '../../db/types';
 import { DatabaseError, NotFoundError } from '../../errors';
 import { logger } from '../../utils/logger';

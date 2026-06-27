@@ -3,7 +3,7 @@ import { and, asc, desc, eq, gte, inArray, lte, type SQL, sql } from 'drizzle-or
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { Expense, NewExpense, SplitMethod } from '../../db/schema';
-import { expenses, photos, vehicles } from '../../db/schema';
+import { expenses, photos } from '../../db/schema';
 import { formatYearMonth, toDateTimeString } from '../../db/sql-helpers';
 import { DatabaseError, NotFoundError } from '../../errors';
 import { getPeriodStartDate } from '../../utils/calculations';

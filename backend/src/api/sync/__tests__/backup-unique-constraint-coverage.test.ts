@@ -112,7 +112,7 @@ describe('backup unique-constraint coverage (drift guard — cycle 295)', () => 
   test('the introspection actually finds the known unique indexes (anti-vacuity)', () => {
     // If getTableConfig().indexes ever stops reporting unique indexes (a drizzle API change), the
     // coverage test above would pass vacuously (nothing to check). Pin the known set so it cannot.
-    const all = Object.entries(TABLE_SCHEMA_MAP).flatMap(([key, table]) =>
+    const all = Object.entries(TABLE_SCHEMA_MAP).flatMap(([, table]) =>
       uniqueIndexesFor(table).map((ix) => `${getTableName(table)}:${ix.name}`)
     );
     // The 5 unique indexes C291 enumerated on backed-up tables.
