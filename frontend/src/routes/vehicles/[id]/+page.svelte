@@ -28,7 +28,7 @@
 	import FinanceTab from '$lib/components/vehicles/FinanceTab.svelte';
 	import OdometerTab from '$lib/components/vehicles/OdometerTab.svelte';
 	// Lazy-loaded InsuranceTab — only import when overview tab has been viewed
-	let InsuranceTab = $state<Component<{ vehicleId: string }> | null>(null);
+	let InsuranceTab = $state<Component<{ vehicleId: string; readOnly?: boolean }> | null>(null);
 	let hasLoadedInsurance = $state(false);
 	import { categoryLabels } from '$lib/utils/expense-helpers';
 	import { getCategoryColor as getCategoryChartColor } from '$lib/utils/chart-colors';
@@ -171,10 +171,11 @@
 		return vehicleApi.getPhotoThumbnailUrl(vehicleId, cover.id);
 	});
 
-	// Lazy-load InsuranceTab when overview tab is active and page has loaded — OWNER ONLY (the tab is
-	// owner-managed + fires not-yet-widened claims reads; see the render-site gate below, T12b-3b/C100).
+	// Lazy-load InsuranceTab when overview tab is active and page has loaded. T12b-3c: loaded for a
+	// shared viewer/editor too (read-only) now that the per-vehicle policies LIST (T8b) AND the claims
+	// sub-reads (C475) are both widened to shared read; the render-site passes `readOnly={!isOwner}`.
 	$effect(() => {
-		if (!isLoading && isOwner && !hasLoadedInsurance && activeTab === 'overview') {
+		if (!isLoading && !hasLoadedInsurance && activeTab === 'overview') {
 			hasLoadedInsurance = true;
 			import('$lib/components/insurance/InsuranceTab.svelte').then(m => {
 				InsuranceTab = m.default;
@@ -182,9 +183,18 @@
 		}
 	});
 
-	// Load data on mount — vehicle, photos, summary, and fuel efficiency in parallel
+	// Load data on mount. T12b-3c: the vehicle PHOTOS read (GET /photos/vehicle/:id) is owner-only
+	// server-side AND the photo carousel is already isOwner-gated (T12b-3b), so for a shared viewer/
+	// editor the fetch is pure waste that only produces a "vehicle not found" error toast (a
+	// four-states violation). Load the vehicle FIRST to establish isOwner, then fetch photos only for
+	// the owner; summary + fuel-efficiency are shared-readable (T5b-3 / T8a) so they fire for everyone.
 	onMount(async () => {
-		await Promise.all([loadVehicle(), loadPhotos(), loadSummary(), loadFuelEfficiency()]);
+		await loadVehicle();
+		await Promise.all([
+			...(isOwner ? [loadPhotos()] : []),
+			loadSummary(),
+			loadFuelEfficiency()
+		]);
 		// Load stats after initial data is loaded
 		if (vehicle) {
 			await loadVehicleStats();
@@ -432,15 +442,14 @@
 					/>
 				</div>
 
-				<!-- Insurance Summary (lazy-loaded). Owner-ONLY for now: the InsuranceTab surfaces
-				     owner-only mutations (add/edit/renew/delete policy, file claim, upload documents — all
-				     strict validateInsuranceOwnership server-side) AND fires claims sub-reads that are not
-				     widened for a shared invitee (T8b widened only the per-vehicle policies LIST). Showing it
-				     to a viewer rendered owner affordances + "insurance policy not found" errors (eyes-on
-				     C100). Gate to the owner until a dedicated read-only shared insurance view is built
-				     (tracked as T12b-3c). -->
-				{#if InsuranceTab && isOwner}
-					<InsuranceTab {vehicleId} />
+				<!-- Insurance Summary (lazy-loaded). T12b-3c: shown to a shared viewer/editor in READ-ONLY
+				     mode (readOnly={!isOwner}) — the per-vehicle policies LIST (T8b) + the claims sub-reads
+				     (C475) are both widened to shared read, and the InsuranceTab tree hides every mutate
+				     affordance (add/edit/renew/delete policy + term, file/edit/delete claim, upload/delete
+				     document) when readOnly. Insurance WRITES stay owner-only server-side (validateInsurance-
+				     Ownership denies BOTH viewer and editor), so readOnly tracks !isOwner, not !canWrite. -->
+				{#if InsuranceTab}
+					<InsuranceTab {vehicleId} readOnly={!isOwner} />
 				{/if}
 
 				{#if summaryLoadError && !isLoadingStats}
