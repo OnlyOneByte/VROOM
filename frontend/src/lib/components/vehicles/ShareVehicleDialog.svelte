@@ -10,6 +10,7 @@
 	import { toast } from 'svelte-sonner';
 	import { shareApi } from '$lib/services/share-api';
 	import { ApiError } from '$lib/utils/error-handling';
+	import { shareLevelLabel } from '$lib/utils/share-helpers';
 	import type { ShareLevel, VehicleShare } from '$lib/types';
 
 	interface Props {
@@ -30,8 +31,6 @@
 	let isLoading = $state(false);
 	let loadError = $state<string | null>(null);
 	let shares = $state<VehicleShare[]>([]);
-
-	const levelLabel = (l: ShareLevel) => (l === 'editor' ? 'Editor' : 'Viewer');
 
 	// Load the owner's granted shares whenever the dialog opens for a vehicle, filtered to this one
 	// (the API returns shares across ALL my vehicles — scope client-side to the vehicle in view). Keyed
@@ -66,7 +65,7 @@
 		inviting = true;
 		try {
 			await shareApi.invite({ vehicleId, email: email.trim(), level });
-			toast.success(`Invited ${email.trim()} as ${levelLabel(level).toLowerCase()}`);
+			toast.success(`Invited ${email.trim()} as ${shareLevelLabel(level).toLowerCase()}`);
 			email = '';
 			level = 'viewer';
 			await load();
@@ -84,7 +83,7 @@
 		if (next === share.level) return;
 		try {
 			await shareApi.changeLevel(share.id, next);
-			toast.success(`Changed to ${levelLabel(next).toLowerCase()}`);
+			toast.success(`Changed to ${shareLevelLabel(next).toLowerCase()}`);
 			await load();
 		} catch {
 			toast.error('Could not change the level. Try again.');
@@ -131,7 +130,7 @@
 				<Label for="share-level">Access level</Label>
 				<Select.Root type="single" bind:value={level}>
 					<Select.Trigger id="share-level" class="w-full">
-						{levelLabel(level)}
+						{shareLevelLabel(level)}
 					</Select.Trigger>
 					<Select.Content>
 						<Select.Item value="viewer" label="Viewer">Viewer — can view only</Select.Item>
@@ -182,7 +181,7 @@
 										class="h-8 w-[110px]"
 										aria-label="Change access level for {share.sharedWithId}"
 									>
-										{levelLabel(share.level)}
+										{shareLevelLabel(share.level)}
 									</Select.Trigger>
 									<Select.Content>
 										<Select.Item value="viewer" label="Viewer">Viewer</Select.Item>
