@@ -399,6 +399,39 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     );
   });
 
+  // vehicle-sharing T8a (per-vehicle analytics READ widening — the C108-C116 IDOR discipline). The six
+  // vehicle-scoped analytics routes moved from validateVehicleOwnership → requireVehicleRead + owner-scope.
+  // This pins the widening did not over-open: a NON-shared third party is denied every per-vehicle
+  // analytics route (existence-hiding 404). An accepted viewer reading them is covered in
+  // shared-analytics-read.test.ts; here B owns the vehicle and A has no share.
+  test('analytics per-vehicle read (T8a): a third party is denied every vehicle-scoped analytics route', async () => {
+    const vid = await idOf(
+      await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
+    );
+    // Seed a fuel expense so the routes have data to (not) leak.
+    await asB('POST', '/api/v1/expenses', {
+      vehicleId: vid,
+      category: 'fuel',
+      expenseAmount: 50,
+      volume: 10,
+      mileage: 30000,
+      fuelType: 'Regular',
+      date: '2024-06-01T00:00:00.000Z',
+    });
+    const range = 'startDate=1704067200&endDate=1735689600';
+    const routes = [
+      `/api/v1/analytics/fuel-stats?${range}&vehicleId=${vid}`,
+      `/api/v1/analytics/fuel-advanced?${range}&vehicleId=${vid}`,
+      `/api/v1/analytics/fuel-efficiency?vehicleId=${vid}`,
+      `/api/v1/analytics/vehicle-health?vehicleId=${vid}`,
+      `/api/v1/analytics/vehicle-tco?vehicleId=${vid}`,
+      `/api/v1/analytics/vehicle-expenses?${range}&vehicleId=${vid}`,
+    ];
+    for (const route of routes) {
+      expectDenied(await ctx.authed('GET', route), `third-party analytics ${route}`);
+    }
+  });
+
   test("photo: A cannot list/upload to B's vehicle via the generic photo route", async () => {
     const vid = await idOf(
       await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
