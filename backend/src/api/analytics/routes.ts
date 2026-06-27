@@ -1,8 +1,9 @@
 import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { NotFoundError } from '../../errors';
 import { requireAuth } from '../../middleware';
-import { validateVehicleOwnership } from '../../utils/validation';
+import { requireVehicleRead, resolveVehicleOwnerId } from '../../utils/sharing';
 import {
   analyticsSummaryToApi,
   crossVehicleToApi,
@@ -56,6 +57,22 @@ export const yearVehicleQuerySchema = z.object({
 // Apply auth middleware to all analytics routes
 routes.use('*', requireAuth);
 
+/**
+ * vehicle-sharing T8a: resolve the userId an analytics query for `vehicleId` must scope by. Gates via
+ * requireVehicleRead (owner | accepted viewer/editor | 404 — existence-hiding for a stranger), then
+ * returns the vehicle OWNER's id: per-vehicle analytics scope expenses by (vehicleId, userId), and a
+ * shared vehicle's rows are OWNER-stamped (T5b-2), so an invitee querying their own id would see an
+ * empty chart. The vehicleId+ownerId pin means only THAT vehicle's rows surface (no leak of the owner's
+ * other vehicles). For an owner this resolves to themselves (unchanged). The cross-fleet analytics
+ * (summary/quick-stats/cross-vehicle/financing/insurance/year-end — no vehicleId) stay acting-user-scoped.
+ */
+async function resolveVehicleScope(vehicleId: string, actingUserId: string): Promise<string> {
+  await requireVehicleRead(vehicleId, actingUserId);
+  const ownerId = await resolveVehicleOwnerId(vehicleId);
+  if (!ownerId) throw new NotFoundError('Vehicle');
+  return ownerId;
+}
+
 // GET /api/v1/analytics/summary
 routes.get('/summary', zValidator('query', dateRangeQuerySchema), async (c) => {
   const user = c.get('user');
@@ -77,12 +94,12 @@ routes.get('/fuel-stats', zValidator('query', dateRangeVehicleQuerySchema), asyn
   const user = c.get('user');
   const { startDate, endDate, vehicleId } = c.req.valid('query');
 
-  if (vehicleId) {
-    await validateVehicleOwnership(vehicleId, user.id);
-  }
+  // T8a: a per-vehicle fuel-stats query widens to shared READ, scoped to the vehicle OWNER's books;
+  // the cross-fleet form (no vehicleId) stays acting-user-scoped.
+  const scopeId = vehicleId ? await resolveVehicleScope(vehicleId, user.id) : user.id;
 
   const data = await analyticsRepository.getFuelStats(
-    user.id,
+    scopeId,
     { start: startDate, end: endDate },
     vehicleId
   );
@@ -119,12 +136,11 @@ routes.get('/fuel-advanced', zValidator('query', dateRangeVehicleQuerySchema), a
   const user = c.get('user');
   const { startDate, endDate, vehicleId } = c.req.valid('query');
 
-  if (vehicleId) {
-    await validateVehicleOwnership(vehicleId, user.id);
-  }
+  // T8a: per-vehicle → shared READ scoped to the OWNER; cross-fleet (no vehicleId) → acting-user.
+  const scopeId = vehicleId ? await resolveVehicleScope(vehicleId, user.id) : user.id;
 
   const data = await analyticsRepository.getFuelAdvanced(
-    user.id,
+    scopeId,
     { start: startDate, end: endDate },
     vehicleId
   );
@@ -135,8 +151,9 @@ routes.get('/fuel-advanced', zValidator('query', dateRangeVehicleQuerySchema), a
 routes.get('/vehicle-health', zValidator('query', vehicleIdQuerySchema), async (c) => {
   const user = c.get('user');
   const { vehicleId } = c.req.valid('query');
-  await validateVehicleOwnership(vehicleId, user.id);
-  const data = await analyticsRepository.getVehicleHealth(user.id, vehicleId);
+  // T8a: vehicle-health widens to shared READ, scoped to the vehicle OWNER's books.
+  const scopeId = await resolveVehicleScope(vehicleId, user.id);
+  const data = await analyticsRepository.getVehicleHealth(scopeId, vehicleId);
   return c.json({ success: true, data });
 });
 
@@ -144,8 +161,9 @@ routes.get('/vehicle-health', zValidator('query', vehicleIdQuerySchema), async (
 routes.get('/vehicle-tco', zValidator('query', yearVehicleQuerySchema), async (c) => {
   const user = c.get('user');
   const { vehicleId, year } = c.req.valid('query');
-  await validateVehicleOwnership(vehicleId, user.id);
-  const data = await analyticsRepository.getVehicleTCO(user.id, vehicleId, year);
+  // T8a: vehicle-TCO widens to shared READ, scoped to the vehicle OWNER's books.
+  const scopeId = await resolveVehicleScope(vehicleId, user.id);
+  const data = await analyticsRepository.getVehicleTCO(scopeId, vehicleId, year);
   return c.json({ success: true, data: vehicleTcoToApi(data) });
 });
 
@@ -156,8 +174,9 @@ routes.get(
   async (c) => {
     const user = c.get('user');
     const { vehicleId, startDate, endDate } = c.req.valid('query');
-    await validateVehicleOwnership(vehicleId, user.id);
-    const data = await analyticsRepository.getVehicleExpenses(user.id, vehicleId, {
+    // T8a: vehicle-expenses widens to shared READ, scoped to the vehicle OWNER's books.
+    const scopeId = await resolveVehicleScope(vehicleId, user.id);
+    const data = await analyticsRepository.getVehicleExpenses(scopeId, vehicleId, {
       start: startDate,
       end: endDate,
     });
@@ -179,12 +198,11 @@ routes.get('/fuel-efficiency', zValidator('query', fuelEfficiencyQuerySchema), a
   const user = c.get('user');
   const { vehicleId } = c.req.valid('query');
 
-  // If vehicleId provided, verify user owns the vehicle
-  if (vehicleId) {
-    await validateVehicleOwnership(vehicleId, user.id);
-  }
+  // T8a: a per-vehicle fuel-efficiency trend widens to shared READ scoped to the OWNER; the fleet form
+  // (no vehicleId) stays acting-user-scoped.
+  const scopeId = vehicleId ? await resolveVehicleScope(vehicleId, user.id) : user.id;
 
-  const fuelEfficiencyTrend = await analyticsRepository.getFuelEfficiencyTrend(user.id, vehicleId);
+  const fuelEfficiencyTrend = await analyticsRepository.getFuelEfficiencyTrend(scopeId, vehicleId);
 
   return c.json({ success: true, data: { fuelEfficiencyTrend } });
 });
