@@ -11,9 +11,13 @@
 
 	interface Props {
 		vehicle: Vehicle;
+		/** vehicle-sharing T12b-3b: editing vehicle info is owner-only (server keeps strict
+		 *  validateVehicleOwnership on PUT /vehicles/:id). Default true so every existing owner
+		 *  call site is unchanged; the [id] page passes the resolved capability. */
+		isOwner?: boolean;
 	}
 
-	let { vehicle }: Props = $props();
+	let { vehicle, isOwner = true }: Props = $props();
 </script>
 
 <Card>
@@ -23,14 +27,16 @@
 				<Car class="h-5 w-5" />
 				Vehicle Information
 			</CardTitle>
-			<Button
-				variant="outline"
-				size="icon"
-				href={resolve(paramRoutes.vehicleEdit, { id: vehicle.id })}
-				aria-label="Edit vehicle"
-			>
-				<Settings class="h-5 w-5" />
-			</Button>
+			{#if isOwner}
+				<Button
+					variant="outline"
+					size="icon"
+					href={resolve(paramRoutes.vehicleEdit, { id: vehicle.id })}
+					aria-label="Edit vehicle"
+				>
+					<Settings class="h-5 w-5" />
+				</Button>
+			{/if}
 		</div>
 	</CardHeader>
 	<CardContent>
