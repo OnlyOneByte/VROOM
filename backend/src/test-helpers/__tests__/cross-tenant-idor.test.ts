@@ -432,6 +432,33 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     }
   });
 
+  // vehicle-sharing T8b (per-vehicle insurance READ widening — the C108-C116 IDOR discipline). The
+  // GET /insurance/vehicles/:vehicleId/policies route moved from validateVehicleOwnership →
+  // requireVehicleRead + a blast-radius narrow. This pins the widening did not over-open: a NON-shared
+  // third party is denied the per-vehicle policies list (existence-hiding 404). The blast-radius
+  // narrowing for an accepted invitee (no leak of the owner's other vehicles) is covered positively in
+  // shared-insurance-read.test.ts. Here B owns the vehicle + policy; A has no share.
+  test('insurance per-vehicle read (T8b): a third party is denied the vehicle-scoped policies list', async () => {
+    const vid = await idOf(
+      await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
+    );
+    const policyRes = await asB('POST', '/api/v1/insurance', {
+      company: 'B Mutual',
+      terms: [
+        {
+          startDate: '2024-01-01T00:00:00.000Z',
+          endDate: '2025-01-01T00:00:00.000Z',
+          vehicleCoverage: { vehicleIds: [vid] },
+        },
+      ],
+    });
+    expect(policyRes.status).toBeLessThan(300);
+    expectDenied(
+      await ctx.authed('GET', `/api/v1/insurance/vehicles/${vid}/policies`),
+      'third-party insurance per-vehicle list'
+    );
+  });
+
   test("photo: A cannot list/upload to B's vehicle via the generic photo route", async () => {
     const vid = await idOf(
       await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
