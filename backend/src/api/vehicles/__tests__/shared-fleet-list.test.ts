@@ -184,3 +184,54 @@ describe('vehicle-sharing T13 — invite → accept → appears → revoke → g
     expect(row?.sharedAccess?.level).toBe('editor');
   });
 });
+
+/**
+ * vehicle-sharing T12b-3 (BE) — the single-vehicle GET /vehicles/:id widens to shared READ and returns a
+ * `sharedAccess { level, sharedBy }` annotation for a NON-owner, so the FE [id] page can gate its edit
+ * affordances by level (a viewer sees no edit/delete/share; an editor sees write affordances; the owner
+ * sees everything). Before this, GET /:id was owner-only (findByIdWithAccess scopes to vehicles.userId),
+ * so a shared invitee 404'd and the detail page could not load at all. Pins: viewer/editor load the
+ * shared vehicle annotated with their level; the owner response carries NO sharedAccess; a stranger and a
+ * pending (un-accepted) invite both 404 (existence-hiding).
+ */
+describe('vehicle-sharing T12b-3 (BE) — GET /vehicles/:id shared-read + level annotation', () => {
+  test('an accepted VIEWER loads the shared vehicle, annotated sharedAccess.level=viewer', async () => {
+    const [vehicleId, shareId] = await shareWithB('viewer');
+    expect((await asB('POST', `/api/v1/shares/${shareId}/accept`)).status).toBe(200);
+
+    const res = await asB('GET', `/api/v1/vehicles/${vehicleId}`);
+    const body = await json<DataEnvelope<VehicleRow>>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.data.id).toBe(vehicleId);
+    expect(body.data.sharedAccess?.level).toBe('viewer');
+    expect(body.data.sharedAccess?.sharedBy).toBe(ctx.user.displayName);
+  });
+
+  test('an accepted EDITOR loads it annotated sharedAccess.level=editor', async () => {
+    const [vehicleId, shareId] = await shareWithB('editor');
+    expect((await asB('POST', `/api/v1/shares/${shareId}/accept`)).status).toBe(200);
+    const body = await json<DataEnvelope<VehicleRow>>(
+      await asB('GET', `/api/v1/vehicles/${vehicleId}`)
+    );
+    expect(body.data.sharedAccess?.level).toBe('editor');
+  });
+
+  test('the OWNER response carries NO sharedAccess annotation (unchanged owner path)', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Owned', model: 'Car', year: 2021 });
+    const body = await json<DataEnvelope<VehicleRow>>(
+      await ctx.authed('GET', `/api/v1/vehicles/${vehicleId}`)
+    );
+    expect(body.data.id).toBe(vehicleId);
+    expect(body.data.sharedAccess).toBeUndefined();
+  });
+
+  test('a STRANGER (no share) gets 404, and a PENDING invite also 404s (existence-hiding)', async () => {
+    // Pending: invited but not accepted → the resolver grants nothing → 404.
+    const [pendingVehicle] = await shareWithB('viewer'); // invited, NOT accepted
+    expect((await asB('GET', `/api/v1/vehicles/${pendingVehicle}`)).status).toBe(404);
+
+    // Stranger: a vehicle A owns with no share to B at all.
+    const privateVehicle = await seedVehicle(ctx, { make: 'Private', model: 'Car', year: 2021 });
+    expect((await asB('GET', `/api/v1/vehicles/${privateVehicle}`)).status).toBe(404);
+  });
+});
