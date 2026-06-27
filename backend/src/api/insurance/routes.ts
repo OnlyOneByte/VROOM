@@ -1,11 +1,11 @@
 import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { ValidationError } from '../../errors';
+import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { parseClampedInt } from '../../utils/calculations';
 import { insuranceClaimToApi, insuranceTermToApi } from '../../utils/money';
-import { requireVehicleRead } from '../../utils/sharing';
+import { requireVehicleRead, resolveVehicleAccess } from '../../utils/sharing';
 import { validateInsuranceOwnership, validateVehicleOwnership } from '../../utils/validation';
 import { expenseRepository } from '../expenses/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
@@ -64,6 +64,36 @@ function narrowPolicyToVehicle<
     termVehicleCoverage: policy.termVehicleCoverage.filter((c) => c.vehicleId === vehicleId),
     vehicleIds: policy.vehicleIds.filter((v) => v === vehicleId),
   };
+}
+
+/**
+ * vehicle-sharing T12b-3c — resolve READ access to a POLICY for a shared invitee. A policy has no
+ * single vehicle (it can span several of the owner's vehicles via its terms' coverage junction), and
+ * the claims route is policy-keyed, but a share grants access PER VEHICLE. So: the OWNER always reads
+ * (validateInsuranceOwnership); a NON-owner reads the policy only if they hold read access to AT LEAST
+ * ONE vehicle the policy covers. Returns the set of vehicleIds the acting user may read (for the
+ * blast-radius claim narrow) — empty for the owner (a sentinel meaning "no narrowing, see all"). A
+ * non-owner with no covered-vehicle access gets a 404 (existence-hiding, #80), exactly like the
+ * per-vehicle policies route. Mirrors design §6.4: a share must never pull the owner's OTHER vehicles
+ * (or unattributed claims) into the invitee's view.
+ */
+async function requirePolicyReadVehicles(
+  policyId: string,
+  userId: string
+): Promise<{ isOwner: boolean; readableVehicleIds: Set<string> }> {
+  const policy = await insurancePolicyRepository.findById(policyId);
+  // Existence-hiding: a missing policy and a policy you cannot see are indistinguishable (404).
+  if (!policy) throw new NotFoundError('Insurance policy');
+  if (policy.userId === userId) return { isOwner: true, readableVehicleIds: new Set() };
+
+  // Non-owner: keep only the covered vehicles this user may READ (accepted share or — impossible here —
+  // ownership). If none, they have no business reading this policy at all → 404.
+  const readableVehicleIds = new Set<string>();
+  for (const vehicleId of policy.vehicleIds) {
+    if (await resolveVehicleAccess(vehicleId, userId)) readableVehicleIds.add(vehicleId);
+  }
+  if (readableVehicleIds.size === 0) throw new NotFoundError('Insurance policy');
+  return { isOwner: false, readableVehicleIds };
 }
 
 const idParamSchema = z.object({
@@ -335,13 +365,20 @@ routes.delete('/:id/terms/:termId', zValidator('param', termParamsSchema), async
 routes.get('/:id/claims', zValidator('param', idParamSchema), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
-  await validateInsuranceOwnership(id, user.id);
+  // vehicle-sharing T12b-3c READ widening: owner | accepted viewer/editor on a covered vehicle | 404.
+  const { isOwner, readableVehicleIds } = await requirePolicyReadVehicles(id, user.id);
   const claims = await insuranceClaimRepository.findByPolicyId(id);
+  // Blast-radius (design §6.4): the OWNER sees every claim; a NON-owner sees ONLY claims attributed to
+  // a vehicle they may read. A claim with no vehicleId (unattributed) or one on the owner's OTHER
+  // vehicle is dropped for a shared invitee — never reveal claims about vehicles outside the share.
+  const scoped = isOwner
+    ? claims
+    : claims.filter((cl) => cl.vehicleId !== null && readableVehicleIds.has(cl.vehicleId));
   // T6 display edge: each claim's payoutAmount cents → dollars.
   return c.json({
     success: true,
-    data: claims.map((cl) => insuranceClaimToApi(cl)),
-    count: claims.length,
+    data: scoped.map((cl) => insuranceClaimToApi(cl)),
+    count: scoped.length,
   });
 });
 

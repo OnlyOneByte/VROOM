@@ -604,6 +604,43 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     );
   });
 
+  // vehicle-sharing T12b-3c (insurance CLAIMS READ widening). GET /insurance/:id/claims moved from
+  // validateInsuranceOwnership → a policy-read gate (owner | accepted share on a covered vehicle) + a
+  // §6.4 blast-radius claim narrow. This pins the widening did not over-open: a third party with NO
+  // share to ANY of the policy's covered vehicles is denied the claims list (existence-hiding 404).
+  // The positive narrowing (a viewer sees only the shared vehicle's claims) lives in
+  // shared-insurance-read.test.ts. B owns the vehicle + policy + claim; A has no share.
+  test('insurance claims read (T12b-3c): a third party is denied a policy claims list', async () => {
+    const vid = await idOf(
+      await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
+    );
+    const pid = await idOf(
+      await asB('POST', '/api/v1/insurance', {
+        company: 'B Mutual',
+        terms: [
+          {
+            startDate: '2024-01-01T00:00:00.000Z',
+            endDate: '2025-01-01T00:00:00.000Z',
+            vehicleCoverage: { vehicleIds: [vid] },
+          },
+        ],
+      })
+    );
+    expect(
+      (
+        await asB('POST', `/api/v1/insurance/${pid}/claims`, {
+          claimDate: '2024-06-01T00:00:00.000Z',
+          claimType: 'collision',
+          vehicleId: vid,
+        })
+      ).status
+    ).toBeLessThan(300);
+    expectDenied(
+      await ctx.authed('GET', `/api/v1/insurance/${pid}/claims`),
+      'third-party insurance claims list'
+    );
+  });
+
   test("photo: A cannot list/upload to B's vehicle via the generic photo route", async () => {
     const vid = await idOf(
       await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })

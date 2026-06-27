@@ -178,3 +178,107 @@ describe('insurance per-vehicle READ widening + blast-radius (T8b)', () => {
     expect((await asB('GET', `/api/v1/insurance/vehicles/${vehicleId}/policies`)).status).toBe(404);
   });
 });
+
+interface ClaimRow {
+  id: string;
+  vehicleId: string | null;
+}
+
+/** Create a multi-vehicle policy (term covers vehicleA + vehicleB), returning the policy id. */
+async function createTwoVehiclePolicy(vehicleA: string, vehicleB: string): Promise<string> {
+  const res = await ctx.authed('POST', '/api/v1/insurance', {
+    company: 'Claims Mutual',
+    terms: [
+      {
+        startDate: '2024-01-01T00:00:00.000Z',
+        endDate: '2025-01-01T00:00:00.000Z',
+        vehicleCoverage: { vehicleIds: [vehicleA, vehicleB] },
+      },
+    ],
+  });
+  const body = await json<DataEnvelope<{ id: string }>>(res);
+  expect(res.status, JSON.stringify(body)).toBe(201);
+  return body.data.id;
+}
+
+/** File a claim against a policy as the OWNER (A), optionally attributed to a vehicle. */
+async function fileClaim(policyId: string, claimType: string, vehicleId?: string): Promise<string> {
+  const res = await ctx.authed('POST', `/api/v1/insurance/${policyId}/claims`, {
+    claimDate: '2024-06-01T00:00:00.000Z',
+    claimType,
+    ...(vehicleId ? { vehicleId } : {}),
+  });
+  const body = await json<DataEnvelope<{ id: string }>>(res);
+  expect(res.status, JSON.stringify(body)).toBe(201);
+  return body.data.id;
+}
+
+describe('insurance claims READ widening + blast-radius (T12b-3c)', () => {
+  test('a viewer sees ONLY claims attributed to the shared vehicle (owner OTHER-vehicle + unattributed dropped)', async () => {
+    const vehicleA = await seedVehicle(ctx, { make: 'Shared', model: 'CarA', year: 2021 });
+    const vehicleB = await seedVehicle(ctx, { make: 'Private', model: 'CarB', year: 2022 });
+    const policyId = await createTwoVehiclePolicy(vehicleA, vehicleB);
+    const claimA = await fileClaim(policyId, 'collision', vehicleA); // on the shared vehicle
+    await fileClaim(policyId, 'theft', vehicleB); // on the owner's OTHER (private) vehicle
+    await fileClaim(policyId, 'weather'); // unattributed (no vehicleId)
+    await acceptShare(vehicleA, 'viewer');
+
+    const res = await asB('GET', `/api/v1/insurance/${policyId}/claims`);
+    const body = await json<DataEnvelope<ClaimRow[]>>(res);
+    expect(res.status).toBe(200);
+    // Only the shared-vehicle claim is visible — never the vehicleB claim, never the unattributed one.
+    expect(body.data.length).toBe(1);
+    expect(body.data[0]!.id).toBe(claimA);
+    expect(body.data[0]!.vehicleId).toBe(vehicleA);
+  });
+
+  test('the OWNER reading the same policy sees ALL claims (no narrowing)', async () => {
+    const vehicleA = await seedVehicle(ctx, { make: 'OwnA', model: 'CarA', year: 2021 });
+    const vehicleB = await seedVehicle(ctx, { make: 'OwnB', model: 'CarB', year: 2022 });
+    const policyId = await createTwoVehiclePolicy(vehicleA, vehicleB);
+    await fileClaim(policyId, 'collision', vehicleA);
+    await fileClaim(policyId, 'theft', vehicleB);
+    await fileClaim(policyId, 'weather'); // unattributed
+
+    const body = await json<DataEnvelope<ClaimRow[]>>(
+      await ctx.authed('GET', `/api/v1/insurance/${policyId}/claims`)
+    );
+    expect(body.data.length).toBe(3); // owner sees every claim
+  });
+
+  test('an EDITOR may also read the shared vehicle claims (read is granted to viewer|editor|owner)', async () => {
+    const vehicleA = await seedVehicle(ctx, { make: 'Shared', model: 'CarA', year: 2021 });
+    const vehicleB = await seedVehicle(ctx, { make: 'Private', model: 'CarB', year: 2022 });
+    const policyId = await createTwoVehiclePolicy(vehicleA, vehicleB);
+    const claimA = await fileClaim(policyId, 'collision', vehicleA);
+    await fileClaim(policyId, 'theft', vehicleB);
+    await acceptShare(vehicleA, 'editor');
+
+    const body = await json<DataEnvelope<ClaimRow[]>>(
+      await asB('GET', `/api/v1/insurance/${policyId}/claims`)
+    );
+    expect(body.data.length).toBe(1);
+    expect(body.data[0]!.id).toBe(claimA);
+  });
+
+  test('a STRANGER (no share to any covered vehicle) is denied the claims list (existence-hiding 404)', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'NoShare', model: 'Car', year: 2021 });
+    const policyId = await createTwoVehiclePolicy(
+      vehicleId,
+      await seedVehicle(ctx, { make: 'NoShare2', model: 'Car', year: 2022 })
+    );
+    await fileClaim(policyId, 'collision', vehicleId);
+    expect((await asB('GET', `/api/v1/insurance/${policyId}/claims`)).status).toBe(404);
+  });
+
+  test('a PENDING (un-accepted) invite grants no claims read (still 404)', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Pending', model: 'Car', year: 2021 });
+    const policyId = await createTwoVehiclePolicy(
+      vehicleId,
+      await seedVehicle(ctx, { make: 'Pending2', model: 'Car', year: 2022 })
+    );
+    await fileClaim(policyId, 'collision', vehicleId);
+    await ctx.authed('POST', '/api/v1/shares', { vehicleId, email: bEmail, level: 'viewer' });
+    expect((await asB('GET', `/api/v1/insurance/${policyId}/claims`)).status).toBe(404);
+  });
+});
