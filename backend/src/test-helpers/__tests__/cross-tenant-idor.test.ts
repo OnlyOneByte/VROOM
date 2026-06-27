@@ -710,16 +710,21 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
       })
     );
 
-    // (1) THIRD PARTY — A has NO share: every per-vehicle read is denied (existence-hiding 404).
+    // (1) THIRD PARTY — A has NO share: every per-vehicle read is denied (existence-hiding 404), incl.
+    // the CSV export (T5b-3b widened it to shared-read, so the third-party denial must hold there too).
     expectDenied(await ctx.authed('GET', `/api/v1/expenses?vehicleId=${vid}`), 'third-party list');
     expectDenied(await ctx.authed('GET', `/api/v1/expenses/${eid}`), 'third-party single read');
     expectDenied(
       await ctx.authed('GET', `/api/v1/expenses/summary?vehicleId=${vid}`),
       'third-party summary'
     );
+    expectDenied(
+      await ctx.authed('GET', `/api/v1/expenses/export?vehicleId=${vid}`),
+      'third-party export'
+    );
 
-    // (2) VIEWER — B shares vid with A as viewer; A accepts. A can READ the shared vehicle but a WRITE
-    // is still denied (requireVehicleRead grants read; requireVehicleWrite denies a viewer — same 404).
+    // (2) VIEWER — B shares vid with A as viewer; A accepts. A can READ the shared vehicle (incl. export)
+    // but a WRITE is still denied (requireVehicleRead grants read; requireVehicleWrite denies a viewer).
     const shareId = await idOf(
       await asB('POST', '/api/v1/shares', {
         vehicleId: vid,
@@ -735,6 +740,10 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     expect((await ctx.authed('GET', `/api/v1/expenses/${eid}`)).status, 'viewer single read').toBe(
       200
     );
+    expect(
+      (await ctx.authed('GET', `/api/v1/expenses/export?vehicleId=${vid}`)).status,
+      'viewer can export the shared vehicle'
+    ).toBe(200);
     expectDenied(
       await ctx.authed('PUT', `/api/v1/expenses/${eid}`, { expenseAmount: 1 }),
       'viewer write still denied after read grant'
