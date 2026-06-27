@@ -143,10 +143,11 @@
       owner-only-gated (T7/T8 surfaces) — so the call-site threading lands with T7/T8 when those widen; touching
       them now would break WIP=1.** +shared-odometer.test.ts (4 cases: editor-create owner-stamp on the RAW
       stored row, viewer reads list/history/entry, editor PUT+DELETE userId-stable, viewer-denied-untouched) +
-      cross-tenant-idor.test.ts (+1: third-party read+write denied, viewer-reads-but-cannot-write). NOTE:
-      validateOdometerOwnership is now a DEAD export (its last caller was this file) — left for an arch cleanup
-      cycle (removing it touches validation.ts + a test). Backend validate:local green (2069 pass [+5], 0 fail,
-      drift guards green).
+      cross-tenant-idor.test.ts (+1: third-party read+write denied, viewer-reads-but-cannot-write). Backend
+      validate:local green (2069 pass [+5], 0 fail, drift guards green). FOLLOW-UP (C102, DONE): the T6 widening
+      made `validateOdometerOwnership` a dead export — removed it + its orphaned odometerRepository/OdometerEntry
+      imports from validation.ts (behavior-preserving; the 404 paths stay covered by update-route.test.ts + the
+      IDOR sweep).
 - [x] **T7 — reminder per-vehicle READ widening (C96, 2026-06-27).** `GET /reminders?vehicleId=<shared>`
       flipped its flat `findByUserId(acting)` scope → `requireVehicleRead(vehicleId, acting)` + list the
       OWNER's reminders for that vehicle (`resolveVehicleOwnerId` → `findByUserId(owner, {vehicleId})`; the
