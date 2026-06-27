@@ -425,14 +425,14 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     expect(stillUnread.is_read).toBe(0);
   });
 
-  // vehicle-sharing T7 (reminder per-vehicle READ widening — the C108-C116 IDOR discipline). The
-  // GET /reminders?vehicleId list moved from a flat userId scope to requireVehicleRead + owner-scoped
-  // listing. This pins the widening did not over-open: a NON-shared third party is denied the
-  // per-vehicle list (existence-hiding 404). The WRITE paths are NOT widened in T7 (a reminder spans
-  // multiple vehicles → owner-stamp is a distinct T7b slice), so an accepted EDITOR still cannot create
-  // a reminder on the shared vehicle (validateVehicleIdsOwned stays strict) — proven here so the read
-  // widening is not mistaken for a write grant. Here B owns the vehicle.
-  test('reminder per-vehicle read (T7): a third party is denied the vehicle-scoped list; write stays owner-only', async () => {
+  // vehicle-sharing T7 + T7b (reminder per-vehicle READ + WRITE widening — the C108-C116 IDOR
+  // discipline). T7 widened the GET ?vehicleId list (requireVehicleRead + owner-scope); T7b widened the
+  // WRITE paths (POST/PUT/DELETE/mark-serviced) to requireReminderVehiclesWrite (owner | accepted editor
+  // on every vehicle, single-owner set, owner-stamp). This pins the widening did not over-open: a
+  // NON-shared third party is denied the per-vehicle list AND every write; an accepted EDITOR may write
+  // (owner-stamped); a VIEWER may read but NOT write (the requireVehicleRead vs requireVehicleWrite
+  // split); and a cross-owner reminder is rejected. Here B owns the vehicle.
+  test('reminder per-vehicle (T7/T7b): third party denied; editor writes (owner-stamped); viewer reads not writes; cross-owner rejected', async () => {
     const vid = await idOf(
       await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
     );
@@ -443,37 +443,105 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
       startDate: '2024-06-01T00:00:00.000Z',
       vehicleIds: [vid],
     });
+    const bReminderId = (await json<DataEnvelope<{ reminder: { id: string } }>>(created)).data
+      .reminder.id;
     expect(created.status).toBe(201);
 
-    // (1) THIRD PARTY — A has NO share: the per-vehicle reminder list is denied (existence-hiding 404).
+    // (1) THIRD PARTY — A has NO share: the per-vehicle list AND every write are denied (404).
     expectDenied(await ctx.authed('GET', `/api/v1/reminders?vehicleId=${vid}`), 'third-party list');
+    expectDenied(
+      await ctx.authed('POST', '/api/v1/reminders', {
+        name: 'A on B',
+        type: 'notification',
+        frequency: 'monthly',
+        startDate: '2024-06-02T00:00:00.000Z',
+        vehicleIds: [vid],
+      }),
+      'third-party create'
+    );
+    expectDenied(
+      await ctx.authed('PUT', `/api/v1/reminders/${bReminderId}`, { name: 'x' }),
+      'third-party PUT'
+    );
+    expectDenied(
+      await ctx.authed('DELETE', `/api/v1/reminders/${bReminderId}`),
+      'third-party DELETE'
+    );
 
-    // (2) B shares vid with A as EDITOR; A accepts. A can now LIST the shared vehicle's reminders…
-    const shareId = await idOf(
+    // (2) VIEWER — B shares vid with A as viewer; A accepts. A can READ the list but every WRITE is 404.
+    const viewerShareId = await idOf(
+      await asB('POST', '/api/v1/shares', {
+        vehicleId: vid,
+        email: ctx.user.email,
+        level: 'viewer',
+      })
+    );
+    expect((await ctx.authed('POST', `/api/v1/shares/${viewerShareId}/accept`)).status).toBe(200);
+    expect(
+      (await ctx.authed('GET', `/api/v1/reminders?vehicleId=${vid}`)).status,
+      'viewer can read the shared vehicle reminders'
+    ).toBe(200);
+    expectDenied(
+      await ctx.authed('POST', '/api/v1/reminders', {
+        name: 'viewer create',
+        type: 'notification',
+        frequency: 'monthly',
+        startDate: '2024-06-02T00:00:00.000Z',
+        vehicleIds: [vid],
+      }),
+      'viewer create'
+    );
+    expectDenied(
+      await ctx.authed('PUT', `/api/v1/reminders/${bReminderId}`, { name: 'x' }),
+      'viewer PUT'
+    );
+    expectDenied(
+      await ctx.authed('POST', `/api/v1/reminders/${bReminderId}/mark-serviced`),
+      'viewer mark-serviced'
+    );
+
+    // (3) EDITOR — B re-shares as editor (revoke+re-invite). A can now CREATE on the shared vehicle, and
+    // the reminder is OWNER-stamped (userId = B), so it rides B's books, not A's.
+    await asB('DELETE', `/api/v1/shares/${viewerShareId}`);
+    const editorShareId = await idOf(
       await asB('POST', '/api/v1/shares', {
         vehicleId: vid,
         email: ctx.user.email,
         level: 'editor',
       })
     );
-    expect((await ctx.authed('POST', `/api/v1/shares/${shareId}/accept`)).status).toBe(200);
-    expect(
-      (await ctx.authed('GET', `/api/v1/reminders?vehicleId=${vid}`)).status,
-      'editor can read the shared vehicle reminders'
-    ).toBe(200);
-
-    // …but WRITE stays owner-only (T7b not yet shipped) — creating a reminder on the shared vehicle is
-    // still rejected (validateVehicleIdsOwned: the vehicle is not in A's owned fleet).
-    expectDenied(
-      await ctx.authed('POST', '/api/v1/reminders', {
-        name: 'A reminder on B vehicle',
-        type: 'notification',
-        frequency: 'monthly',
-        startDate: '2024-06-02T00:00:00.000Z',
-        vehicleIds: [vid],
-      }),
-      'editor create reminder on shared vehicle (write still owner-only)'
+    expect((await ctx.authed('POST', `/api/v1/shares/${editorShareId}/accept`)).status).toBe(200);
+    const editorCreate = await ctx.authed('POST', '/api/v1/reminders', {
+      name: 'editor create on shared',
+      type: 'notification',
+      frequency: 'monthly',
+      startDate: '2024-06-02T00:00:00.000Z',
+      vehicleIds: [vid],
+    });
+    expect(editorCreate.status, 'editor create now allowed (T7b)').toBe(201);
+    const editorRid = (await json<DataEnvelope<{ reminder: { id: string } }>>(editorCreate)).data
+      .reminder.id;
+    const stamped = ctx.sqlite
+      .query('SELECT user_id FROM reminders WHERE id = ?')
+      .get(editorRid) as { user_id: string };
+    expect(stamped.user_id, 'editor-created reminder is owner-stamped (B), not the actor (A)').toBe(
+      bId
     );
+
+    // (4) CROSS-OWNER — A owns their own vehicle; a reminder spanning A's own + B's shared vehicle
+    // cannot stamp one owner → rejected (400), no silent cross-tenant write.
+    const aOwn = await idOf(
+      await ctx.authed('POST', '/api/v1/vehicles', { make: 'A', model: 'Car', year: 2022 })
+    );
+    const cross = await ctx.authed('POST', '/api/v1/reminders', {
+      name: 'cross-owner',
+      type: 'notification',
+      frequency: 'monthly',
+      startDate: '2024-06-03T00:00:00.000Z',
+      vehicleIds: [aOwn, vid],
+    });
+    expect(cross.status, 'cross-owner reminder denied').toBeGreaterThanOrEqual(400);
+    expect(cross.status).toBeLessThan(500);
   });
 
   // vehicle-sharing T8a (per-vehicle analytics READ widening — the C108-C116 IDOR discipline). The six

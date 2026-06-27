@@ -133,18 +133,31 @@ describe('reminder READ widening — per-vehicle list (T7)', () => {
     expect((await asB('GET', `/api/v1/reminders?vehicleId=${vehicleId}`)).status).toBe(404);
   });
 
-  test('WRITE stays owner-only (T7b not yet shipped): an accepted EDITOR cannot create a reminder on the shared vehicle', async () => {
+  test('WRITE: an accepted EDITOR CAN now create a reminder on the shared vehicle (T7b shipped) — owner-stamped; a VIEWER cannot', async () => {
     const [vehicleId] = await shareWithReminder('editor');
-    // POST /reminders gates on validateVehicleIdsOwned (strict ownership), so an editor is rejected
-    // (the vehicle is not in B's owned fleet). This pins that the READ widening did NOT leak into WRITE.
-    const res = await asB('POST', '/api/v1/reminders', {
+    // T7b widened POST /reminders to requireReminderVehiclesWrite: an accepted editor may create a
+    // reminder on the shared vehicle, and it is OWNER-stamped (userId = A, not the acting editor B), so
+    // it rides the owner's books + surfaces. (Full owner-stamp + materialization behavior is pinned in
+    // shared-reminder-write.test.ts; this just confirms the read-test's old deny has flipped.)
+    const editorRes = await asB('POST', '/api/v1/reminders', {
       name: 'Editor reminder',
       type: 'notification',
       frequency: 'monthly',
       startDate: '2024-06-02T00:00:00.000Z',
       vehicleIds: [vehicleId],
     });
-    expect(res.status).toBeGreaterThanOrEqual(400);
-    expect(res.status).toBeLessThan(500);
+    expect(editorRes.status, 'editor create now allowed (T7b)').toBe(201);
+
+    // A VIEWER, by contrast, is still denied every write (the requireVehicleRead vs requireVehicleWrite
+    // split) — 404 existence-hiding.
+    const [viewerVehicleId] = await shareWithReminder('viewer');
+    const viewerRes = await asB('POST', '/api/v1/reminders', {
+      name: 'Viewer reminder',
+      type: 'notification',
+      frequency: 'monthly',
+      startDate: '2024-06-02T00:00:00.000Z',
+      vehicleIds: [viewerVehicleId],
+    });
+    expect(viewerRes.status, 'viewer create denied').toBe(404);
   });
 });

@@ -165,6 +165,23 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
   }
 
   /**
+   * vehicle-sharing T7b: find a reminder by id UNSCOPED (no userId filter), with its vehicleIds. The
+   * share-aware write routes (PUT/DELETE/mark-serviced) load the reminder this way FIRST — a reminder
+   * on a shared vehicle is OWNER-stamped (userId = vehicle owner, T7b), so the old userId-scoped
+   * findByIdAndUserId would 404 a shared editor on a reminder they can legitimately mutate. The caller
+   * then authorizes via the share seam on the reminder's vehicleIds (requireVehicleWrite) and scopes
+   * all subsequent repo reads/writes to the reminder's stamped userId (the owner). Returns null when
+   * the reminder does not exist (caller → 404, existence-hiding).
+   */
+  async findByIdWithVehicles(id: string): Promise<ReminderWithVehicles | null> {
+    const result = await this.db.select().from(reminders).where(eq(reminders.id, id)).limit(1);
+    const reminder = result[0];
+    if (!reminder) return null;
+    const vehicleIds = await this.getVehicleIds(id);
+    return { reminder, vehicleIds };
+  }
+
+  /**
    * Find all overdue active reminders for a user (nextDueDate <= now).
    */
   async findOverdue(userId: string, now: Date): Promise<ReminderWithVehicles[]> {
