@@ -160,9 +160,31 @@
           vehicle set is entirely ONE owner's" + owner-stamp userId = that owner. Currently SAFE — the WRITE
           paths keep strict validateVehicleIdsOwned (a shared editor is cleanly denied, pinned by the T7 write
           IDOR entry). Resume after T8, or escalate the multi-owner fork to Angelo if it is not clean-cut.
-- [ ] **T8 — insurance + analytics READ** → `requireVehicleRead`; IDOR entries. (Owner-only actions —
-      delete vehicle, financing/purchase-price edit, share management — KEEP strict `validateVehicleOwnership`,
-      verified denied for an editor.)
+- [~] **T8 — insurance + analytics READ → `requireVehicleRead`.** SPLIT into T8a (analytics, DONE C97) +
+      T8b (insurance, next). Owner-only actions (delete vehicle, financing/purchase-price edit, share
+      management) KEEP strict `validateVehicleOwnership` — verified denied for an editor (the T5b-2
+      editor-owner-action IDOR entry).
+    - [x] **T8a — per-vehicle analytics READ widening (C97, 2026-06-27).** The six vehicle-scoped analytics
+          routes (fuel-stats, fuel-advanced, fuel-efficiency, vehicle-health, vehicle-tco, vehicle-expenses)
+          flipped `validateVehicleOwnership` → a shared `resolveVehicleScope(vehicleId, acting)` helper
+          (requireVehicleRead → owner | viewer | editor | 404, then returns the OWNER's id). Per-vehicle
+          analytics scope expenses by (vehicleId, userId) and shared rows are OWNER-stamped (T5b-2), so the
+          query runs against the OWNER's books (an invitee's own id would yield an empty chart); the
+          vehicleId+ownerId pin means only THAT vehicle's rows surface. CROSS-FLEET analytics
+          (summary/quick-stats/cross-vehicle/financing/insurance/year-end — no vehicleId) STAY
+          acting-user-scoped, untouched. +shared-analytics-read.test.ts (6 cases: viewer+editor read all six,
+          stranger-404 all six, pending-404, TCO surfaces the owner-stamped expense [owner-scope not empty],
+          owner-self-unchanged) + cross-tenant-idor.test.ts (+1: third-party denied all six). Backend
+          validate:local green (2083 pass [+7], 0 fail, drift guards green).
+    - [ ] **T8b — insurance per-vehicle READ widening (`GET /insurance/vehicles/:vehicleId/policies`).**
+          DEFERRED from T8 (WIP=1): a wrinkle the analytics/expense reads did not have — `findByVehicleId`
+          returns the WHOLE policy (incl. its OTHER terms/vehicles' coverage), so widening it to a shared
+          invitee could leak the owner's coverage on vehicles NOT shared with them (a multi-vehicle policy
+          spanning shared + unshared cars). The fix likely filters the returned terms/coverage to the shared
+          vehicle only — a repository-shape change, not a one-line gate flip. Plus the analytics `/insurance`
+          cross-fleet route is acting-user-scoped (correct, no change). Currently SAFE — the per-vehicle
+          policies route keeps strict `validateVehicleOwnership` (an invitee 404s). Resume after T12b-3, or
+          escalate the leak-scope decision to Angelo if the per-vehicle coverage filter is not clean-cut.
 
 ## Phase 4 — backup / restore (R7, NORTH_STAR #1)
 - [x] **T9 — `vehicle_shares` round-trip (C54, 2026-06-27).** Wired the table end-to-end through BOTH
