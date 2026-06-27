@@ -129,3 +129,76 @@ describe('PUT /api/v1/shares/:id — change level; DELETE — revoke (R5/D8)', (
     expect((await ctx.authed('DELETE', '/api/v1/shares/nope')).status).toBe(404);
   });
 });
+
+describe('invitee side — /received, accept, decline (T4, R2/R5)', () => {
+  // Mint a real session for the invitee B so we can act AS B (accept/decline are sharedWithId-scoped).
+  async function asInvitee(method: string, path: string, body?: unknown): Promise<Response> {
+    const { lucia } = await import('../../auth/lucia');
+    const session = await lucia.createSession(bId, {});
+    const sc = lucia.createSessionCookie(session.id);
+    const headers: Record<string, string> = {
+      Cookie: `${sc.name}=${sc.value}`,
+      'Sec-Fetch-Site': 'same-origin',
+    };
+    let init: RequestInit = { method, headers };
+    if (body !== undefined) {
+      headers['Content-Type'] = 'application/json';
+      init = { ...init, body: JSON.stringify(body) };
+    }
+    return ctx.app.request(path, init);
+  }
+
+  test('invitee sees a pending invite in /received, accepts it → accepted', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
+    const created = await json<DataEnvelope<Share>>(await invite(vehicleId, bEmail, 'viewer'));
+
+    const recv = await json<DataEnvelope<Share[]>>(
+      await asInvitee('GET', '/api/v1/shares/received')
+    );
+    expect(recv.data.length).toBe(1);
+    expect(recv.data[0].id).toBe(created.data.id);
+    expect(recv.data[0].status).toBe('pending');
+
+    const acc = await asInvitee('POST', `/api/v1/shares/${created.data.id}/accept`);
+    const accBody = await json<DataEnvelope<Share>>(acc);
+    expect(acc.status, JSON.stringify(accBody)).toBe(200);
+    expect(accBody.data.status).toBe('accepted');
+  });
+
+  test('invitee declines a pending invite → declined, and slot frees for re-invite', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
+    const created = await json<DataEnvelope<Share>>(await invite(vehicleId, bEmail, 'viewer'));
+
+    const dec = await asInvitee('POST', `/api/v1/shares/${created.data.id}/decline`);
+    expect(dec.status).toBe(200);
+
+    // Declining freed the active slot → owner can re-invite.
+    expect((await invite(vehicleId, bEmail, 'editor')).status).toBe(201);
+  });
+
+  test('invitee self-removes an ACCEPTED share via decline', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
+    const created = await json<DataEnvelope<Share>>(await invite(vehicleId, bEmail, 'editor'));
+    expect((await asInvitee('POST', `/api/v1/shares/${created.data.id}/accept`)).status).toBe(200);
+
+    const dec = await asInvitee('POST', `/api/v1/shares/${created.data.id}/decline`);
+    expect(dec.status).toBe(200);
+    // No longer in the invitee's received list (declined is filtered out).
+    const recv = await json<DataEnvelope<Share[]>>(
+      await asInvitee('GET', '/api/v1/shares/received')
+    );
+    expect(recv.data.length).toBe(0);
+  });
+
+  test('accepting a non-pending (already declined) share → 409', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
+    const created = await json<DataEnvelope<Share>>(await invite(vehicleId, bEmail, 'viewer'));
+    expect((await asInvitee('POST', `/api/v1/shares/${created.data.id}/decline`)).status).toBe(200);
+    expect((await asInvitee('POST', `/api/v1/shares/${created.data.id}/accept`)).status).toBe(409);
+  });
+
+  test('accept/decline on a nonexistent share → 404', async () => {
+    expect((await asInvitee('POST', '/api/v1/shares/nope/accept')).status).toBe(404);
+    expect((await asInvitee('POST', '/api/v1/shares/nope/decline')).status).toBe(404);
+  });
+});

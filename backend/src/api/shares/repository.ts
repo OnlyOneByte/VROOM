@@ -60,6 +60,20 @@ export class VehicleShareRepository extends BaseRepository<VehicleShare, NewVehi
     return row ?? null;
   }
 
+  /**
+   * Shares RECEIVED by an invitee — the invitee-side "shared with me" list (T4). Returns pending +
+   * accepted only (declined/revoked are inert history the invitee should not see surfaced). Ordered
+   * oldest-first to match the owner-side list.
+   */
+  async findReceivedByUser(sharedWithId: string): Promise<VehicleShare[]> {
+    const rows = await this.db
+      .select()
+      .from(vehicleShares)
+      .where(eq(vehicleShares.sharedWithId, sharedWithId))
+      .orderBy(vehicleShares.createdAt);
+    return rows.filter((r) => r.status === 'pending' || r.status === 'accepted');
+  }
+
   /** A single share scoped to its INVITEE — the backing read for accept / decline (T4). */
   async findByIdAndSharedWith(id: string, sharedWithId: string): Promise<VehicleShare | null> {
     const [row] = await this.db

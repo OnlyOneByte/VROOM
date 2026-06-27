@@ -1,5 +1,5 @@
 import { zValidator } from '@hono/zod-validator';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { getDb } from '../../db/connection';
@@ -136,6 +136,66 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
 
   await vehicleShareRepository.update(id, { status: 'revoked', updatedAt: new Date() });
   return c.json({ success: true, message: 'Share revoked' });
+});
+
+// ---------------------------------------------------------------------------
+// Invitee-side endpoints (T4). Every action is scoped to `sharedWithId === acting` — only the invitee
+// can act on their OWN invite (a third party gets the same 404 a nonexistent share does, R2/R6).
+// ---------------------------------------------------------------------------
+
+// GET /api/v1/shares/received — invites/grants TO me (pending + accepted). R5.
+routes.get('/received', async (c) => {
+  const user = c.get('user');
+  const shares = await vehicleShareRepository.findReceivedByUser(user.id);
+  const response: ApiResponse<VehicleShare[]> = {
+    success: true,
+    data: shares.map(shareToApi),
+    message: `Found ${shares.length} share${shares.length !== 1 ? 's' : ''}`,
+  };
+  return c.json(response);
+});
+
+// POST /api/v1/shares/:id/accept — invitee accepts a PENDING invite (→ accepted). R2.
+routes.post('/:id/accept', zValidator('param', commonSchemas.idParam), async (c) => {
+  const user = c.get('user');
+  const { id } = c.req.valid('param');
+
+  // Scope by sharedWithId: only the invitee can accept; anyone else gets the same 404 (existence-hiding).
+  const share = await vehicleShareRepository.findByIdAndSharedWith(id, user.id);
+  if (!share) {
+    throw new NotFoundError('Share');
+  }
+  // Only a PENDING invite can be accepted — a declined/revoked one is inert, an accepted one is a no-op
+  // that should not silently "re-activate" something the owner may have since revoked. Reject non-pending.
+  if (share.status !== 'pending') {
+    throw new ConflictError('This invitation is no longer pending');
+  }
+
+  const updated = await vehicleShareRepository.update(id, {
+    status: 'accepted',
+    updatedAt: new Date(),
+  });
+  return c.json({ success: true, data: shareToApi(updated), message: 'Invitation accepted' });
+});
+
+// POST /api/v1/shares/:id/decline — invitee declines a pending invite OR self-removes an accepted
+// share (both → declined; D5/R5). Frees the partial-unique active slot so the owner can re-invite. R2.
+routes.post('/:id/decline', zValidator('param', commonSchemas.idParam), async (c) => {
+  const user = c.get('user');
+  const { id } = c.req.valid('param');
+
+  const share = await vehicleShareRepository.findByIdAndSharedWith(id, user.id);
+  if (!share) {
+    throw new NotFoundError('Share');
+  }
+  // Decline works from pending (reject the invite) OR accepted (self-remove). An already
+  // declined/revoked share is inert — nothing to do (reject as a conflict so the client is not misled).
+  if (share.status !== 'pending' && share.status !== 'accepted') {
+    throw new ConflictError('This share is no longer active');
+  }
+
+  await vehicleShareRepository.update(id, { status: 'declined', updatedAt: new Date() });
+  return c.json({ success: true, message: 'Share declined' });
 });
 
 export { routes };

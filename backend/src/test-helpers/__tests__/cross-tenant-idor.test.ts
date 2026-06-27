@@ -348,4 +348,35 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     expect(row?.level).toBe('viewer');
     expect(row?.status).toBe('pending');
   });
+
+  // vehicle-sharing T4 (invitee-side accept/decline). These are sharedWithId-scoped: ONLY the invitee
+  // can act on their own invite. Here B owns the vehicle and invites A, so A is the invitee — the OWNER
+  // B (not the invitee) must NOT be able to accept or decline the invite it sent (that is A's call).
+  test('shares: the owner (non-invitee) cannot accept/decline an invite it sent', async () => {
+    const vid = await idOf(
+      await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
+    );
+    const shareId = await idOf(
+      await asB('POST', '/api/v1/shares', {
+        vehicleId: vid,
+        email: ctx.user.email, // invite A (the invitee)
+        level: 'viewer',
+      })
+    );
+
+    // B is the owner, NOT the invitee — accept/decline are scoped to sharedWithId === acting, so B
+    // gets the same 404 a stranger does (existence-hiding); only A may accept/decline.
+    expectDenied(
+      await asB('POST', `/api/v1/shares/${shareId}/accept`),
+      'accept as owner (non-invitee)'
+    );
+    expectDenied(
+      await asB('POST', `/api/v1/shares/${shareId}/decline`),
+      'decline as owner (non-invitee)'
+    );
+
+    // The invite is untouched — still pending — and A (the real invitee) CAN accept it.
+    const acc = await ctx.authed('POST', `/api/v1/shares/${shareId}/accept`);
+    expect(acc.status, 'the real invitee A can accept').toBe(200);
+  });
 });
