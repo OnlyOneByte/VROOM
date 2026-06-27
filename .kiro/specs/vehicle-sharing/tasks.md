@@ -98,9 +98,27 @@
           owned vehicle?). Currently SAFE — the split route gates on `assertVehiclesOwned` (must own EVERY
           vehicle), so a shared editor is cleanly denied (no IDOR, pinned by the existing C115 split IDOR
           entry). Resume after T5b-3.
-    - [ ] **T5b-3 — expense READ widening.** Per-vehicle expense list/summary for a shared vehicle resolves
-          via `requireVehicleRead` + queries by `vehicleId` (owner-stamped rows); cross-fleet dashboard
-          aggregates STAY acting-user-owned-only (no double-count). IDOR entries.
+    - [x] **T5b-3 — expense READ widening (list/single/summary) (C94, 2026-06-27).** The three per-vehicle
+          reads — GET `/expenses?vehicleId`, GET `/expenses/:id`, GET `/expenses/summary?vehicleId` — flipped
+          `validateVehicleOwnership`/`validateExpenseOwnership` → `requireVehicleRead` (owner | accepted
+          viewer | accepted editor | 404). Because shared rows are OWNER-stamped (T5b-2), the per-vehicle
+          query is scoped to `resolveVehicleOwnerId(vehicleId)` (the owner whose books back the vehicle) — so
+          a shared invitee sees that vehicle's owner-stamped rows; the owner+vehicleId pin means the owner
+          cannot leak OTHER vehicles through it. CROSS-FLEET reads (no vehicleId) STAY acting-user-owned-only
+          (the shared vehicle's costs belong to the OWNER's dashboard → no double-count, no foreign rows in
+          the invitee's all-vehicles list). GET /:id loads UNSCOPED then requireVehicleRead (existence-hiding
+          404 for a stranger). Removed the now-dead validateExpenseOwnership import. +shared-expense-read.test.ts
+          (5 cases: viewer reads list/single/summary; cross-fleet isolation both sides; stranger-404;
+          pending-not-yet-accepted-404; owner-self-unchanged) + cross-tenant-idor.test.ts (+1: third-party
+          per-vehicle reads denied + viewer-reads-but-cannot-write). Backend validate:local green (2064 pass
+          [+6], 0 fail, drift guards green).
+    - [ ] **T5b-3b — expense EXPORT (CSV) READ widening (`GET /expenses/export`).** DEFERRED from T5b-3
+          (WIP=1): the export still uses strict `validateVehicleOwnership` + builds a vehicleName map / currency
+          from `vehicleRepository.findByUserId(acting)` + `preferencesRepository.getByUserId(acting)`. Widening it
+          to a shared vehicle needs the owner-scoped findAll AND the OWNER's vehicle-name/currency context (an
+          invitee exporting the shared vehicle should see the owner's vehicle label + the row currency) — a
+          distinct wrinkle from the JSON reads. Currently SAFE (an invitee export of a shared vehicleId 404s,
+          same as pre-T5b). Resume after T6, or fold into the T8 read-family.
 - [ ] **T6 — odometer** read+write → the resolver; IDOR entries. **BLOCKED — folds into the T5b ruling
       (C53 verified): odometer is userId-stamped on create + userId-scoped on every read
       (findByVehicleIdPaginated/getHistory/getCurrentOdometer all AND eq(userId), validateOdometerOwnership
