@@ -20,11 +20,7 @@ import {
   requireVehicleWrite,
   resolveVehicleOwnerId,
 } from '../../utils/sharing';
-import {
-  commonSchemas,
-  validateFuelExpenseData,
-  validateVehicleOwnership,
-} from '../../utils/validation';
+import { commonSchemas, validateFuelExpenseData } from '../../utils/validation';
 import { financingRepository } from '../financing/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
 import { reminderTriggerService } from '../reminders/trigger-service';
@@ -526,13 +522,23 @@ routes.get('/export', zValidator('query', exportQuerySchema), async (c) => {
   const user = c.get('user');
   const { vehicleId, category, startDate, endDate, search, tags } = c.req.valid('query');
 
+  // vehicle-sharing T5b-3b: a per-vehicle CSV export widens to shared READ, scoped to the vehicle
+  // OWNER's books (the owner-stamp model — rows are owner-stamped, so the acting invitee's own userId
+  // would export an empty file). requireVehicleRead 404s a viewer/stranger; resolveVehicleOwnerId then
+  // yields the owner. A CROSS-FLEET export (no vehicleId) stays acting-user-scoped (unchanged) — a
+  // shared vehicle's rows belong to the owner's export, not the invitee's all-vehicles dump.
+  let exportUserId = user.id;
   if (vehicleId) {
-    await validateVehicleOwnership(vehicleId, user.id);
+    await requireVehicleRead(vehicleId, user.id);
+    const ownerId = await resolveVehicleOwnerId(vehicleId);
+    if (!ownerId) throw new NotFoundError('Vehicle');
+    exportUserId = ownerId;
   }
 
-  const [rows, vehicles, prefs] = await Promise.all([
+  const isSharedExport = exportUserId !== user.id;
+  const [rows, vehicles, sharedVehicles, prefs] = await Promise.all([
     expenseRepository.findAll({
-      userId: user.id,
+      userId: exportUserId,
       vehicleId,
       category,
       startDate,
@@ -541,7 +547,11 @@ routes.get('/export', zValidator('query', exportQuerySchema), async (c) => {
       tags,
     }),
     vehicleRepository.findByUserId(user.id),
-    // Read-only: an export must not create a preferences row as a side effect.
+    // For a shared per-vehicle export the row's vehicle is OWNED BY ANOTHER user, so the acting user's
+    // own fleet (above) does NOT contain it — fetch the shared vehicle by id for the human name column.
+    isSharedExport && vehicleId ? vehicleRepository.findByIds([vehicleId]) : Promise.resolve([]),
+    // Read-only: an export must not create a preferences row as a side effect. Currency stays the ACTING
+    // user's preference (they are downloading their own file in their own locale), not the owner's.
     preferencesRepository.getByUserId(user.id),
   ]);
 
@@ -550,7 +560,10 @@ routes.get('/export', zValidator('query', exportQuerySchema), async (c) => {
   const currency = prefs?.currencyUnit || 'USD';
 
   const vehicleName = new Map(
-    vehicles.map((v) => [v.id, v.nickname || `${v.year} ${v.make} ${v.model}`])
+    [...vehicles, ...sharedVehicles].map((v) => [
+      v.id,
+      v.nickname || `${v.year} ${v.make} ${v.model}`,
+    ])
   );
 
   // neutralizeCsvRow guards every string cell against spreadsheet formula
