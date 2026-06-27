@@ -34,9 +34,15 @@
       nonexistent matrix + a lying-ownerId-no-elevation guard). NO gate-widening yet (T3+ wire routes). Green.
 
 ## Phase 2 — share-management routes
-- [ ] **T3 — `/api/v1/shares` router (owner side).** POST invite (`validateVehicleOwnership` + invitee
-      lookup by email + the C151 validate-before-insert), GET `/granted`, PUT `:id` level-change, DELETE
-      `:id` revoke. Each cross-tenant-idor.test.ts entry in the same cycle (non-owner invite/revoke denied).
+- [x] **T3 — `/api/v1/shares` router (owner side) (C50, 2026-06-27).** New `api/shares/` repository
+      (VehicleShareRepository: findActiveForVehicleAndUser dup-gate, findByOwner list, findByIdAndOwner +
+      findByIdAndSharedWith scoped reads) + router mounted at /api/v1/shares: POST invite
+      (validateVehicleOwnership → invitee-by-email lookup [D4 existing-user-only] → self-invite reject →
+      dup-active 409, all BEFORE the insert per C151), GET /granted, PUT :id level-change, DELETE :id revoke
+      (status→revoked, frees the partial-unique slot for re-invite). Owner-only throughout (strict
+      validateVehicleOwnership / ownerId-scoped reads → 404 never 403). Tests: shares-routes.test.ts (10
+      cases, happy + reject paths) + a `shares` entry in cross-tenant-idor.test.ts (A cannot invite to B's
+      vehicle nor change/revoke a share B granted; B's share untouched). validate:local green (2026 pass).
 - [ ] **T4 — invitee side.** GET `/received`, POST `:id/accept`, POST `:id/decline` (only
       `sharedWithId === acting`; accepted→self-remove). IDOR entries: a third party can't accept/decline
       someone else's invite.
