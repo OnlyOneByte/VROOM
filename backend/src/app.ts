@@ -23,6 +23,7 @@ import { routes as photoRoutes } from './api/photos/routes';
 import { routes as providerRoutes } from './api/providers/routes';
 import { routes as reminderRoutes } from './api/reminders/routes';
 import { routes as settingsRoutes } from './api/settings/routes';
+import { routes as shareRoutes } from './api/shares/routes';
 import { routes as syncRoutes } from './api/sync/routes';
 import { routes as tripRoutes } from './api/trips/routes';
 import { routes as vehicleRoutes } from './api/vehicles/routes';
@@ -153,6 +154,7 @@ app.route('/api/v1/sync', syncRoutes);
 app.route('/api/v1/analytics', analyticsRoutes);
 app.route('/api/v1/reminders', reminderRoutes);
 app.route('/api/v1/trips', tripRoutes);
+app.route('/api/v1/shares', shareRoutes);
 
 // Backward compatibility: Redirect /api/* to /api/v1/* (except /api root)
 app.use('/api/*', async (c, next) => {

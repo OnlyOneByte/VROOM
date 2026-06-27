@@ -299,4 +299,53 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
       'GET photos for B vehicle'
     );
   });
+
+  // vehicle-sharing T3 (owner-side share management). The share IS the cross-tenant feature, so the
+  // owner-side endpoints must reject every NON-owner: A cannot invite to B's vehicle, and A cannot
+  // change-level / revoke a share that B granted (A is at most the invitee, never the manager). B
+  // owns the vehicle + grants the share TO A here, so a real share row exists with B as owner; A
+  // managing it via the owner endpoints must 404 (existence-hiding, scoped by vehicle_shares.ownerId).
+  test("shares: A cannot invite to B's vehicle, nor manage a share B granted", async () => {
+    const vid = await idOf(
+      await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
+    );
+
+    // A cannot invite anyone to B's vehicle (owner-only; 404 existence-hiding, not 403).
+    expectDenied(
+      await ctx.authed('POST', '/api/v1/shares', {
+        vehicleId: vid,
+        email: 'whoever@test.com',
+        level: 'viewer',
+      }),
+      'POST share to B vehicle'
+    );
+
+    // B legitimately shares its vehicle WITH A (so a real share row exists, owner = B).
+    const shareRes = await asB('POST', '/api/v1/shares', {
+      vehicleId: vid,
+      email: ctx.user.email,
+      level: 'viewer',
+    });
+    const shareId = await idOf(shareRes);
+
+    // A is the INVITEE, not the owner — A must NOT be able to change the level or revoke via the
+    // owner-side endpoints (those are scoped to vehicle_shares.ownerId === acting → 404 for A).
+    expectDenied(
+      await ctx.authed('PUT', `/api/v1/shares/${shareId}`, { level: 'editor' }),
+      'PUT share level as non-owner'
+    );
+    expectDenied(
+      await ctx.authed('DELETE', `/api/v1/shares/${shareId}`),
+      'DELETE share as non-owner'
+    );
+
+    // And the share is untouched — B still lists it as a viewer-level pending share.
+    const granted = await asB('GET', '/api/v1/shares/granted');
+    const body =
+      await json<DataEnvelope<Array<{ id: string; level: string; status: string }>>>(granted);
+    expect(granted.status).toBe(200);
+    const row = body.data.find((s) => s.id === shareId);
+    expect(row?.level).toBe('viewer');
+    expect(row?.status).toBe('pending');
+  });
 });
