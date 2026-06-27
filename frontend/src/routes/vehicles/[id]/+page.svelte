@@ -4,7 +4,7 @@
 	import { routes, paramRoutes } from '$lib/routes';
 	import { parseMonthToDate } from '$lib/utils/chart-formatters';
 	import { onMount, type Component } from 'svelte';
-	import { Plus, FileText, Download, CircleAlert } from '@lucide/svelte';
+	import { Plus, FileText, Download, CircleAlert, Users } from '@lucide/svelte';
 	import FloatingActionButton from '$lib/components/common/floating-action-button.svelte';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
 	import { Button } from '$lib/components/ui/button';
@@ -17,6 +17,7 @@
 	import FuelEfficiencyTrendChart from '$lib/components/charts/FuelEfficiencyTrendChart.svelte';
 	import { AppPieChart } from '$lib/components/charts';
 	import VehicleHeader from '$lib/components/vehicles/VehicleHeader.svelte';
+	import ShareVehicleDialog from '$lib/components/vehicles/ShareVehicleDialog.svelte';
 	import VehiclePhotoCarousel from '$lib/components/vehicles/VehiclePhotoCarousel.svelte';
 	import MediaCaptureDialog from '$lib/components/common/MediaCaptureDialog.svelte';
 	import VehicleInfoCard from '$lib/components/vehicles/VehicleInfoCard.svelte';
@@ -89,6 +90,9 @@
 	// Photos state
 	let vehiclePhotos = $state<Photo[]>([]);
 	let showUploadDialog = $state(false);
+
+	// Share dialog (vehicle-sharing T11) — owner invites/manages access to this vehicle.
+	let shareOpen = $state(false);
 
 	// Filters and search
 	let searchTerm = $state('');
@@ -377,7 +381,14 @@
 {:else if vehicle}
 	<div class="space-y-6 pb-24">
 		<!-- Header -->
-		<VehicleHeader {vehicle} displayName={vehicleDisplayName} {coverPhotoUrl} />
+		<div class="flex items-start justify-between gap-4">
+			<VehicleHeader {vehicle} displayName={vehicleDisplayName} {coverPhotoUrl} />
+			<Button variant="outline" size="sm" onclick={() => (shareOpen = true)} class="shrink-0">
+				<Users class="mr-2 h-4 w-4" />
+				Share
+			</Button>
+		</div>
+		<ShareVehicleDialog bind:open={shareOpen} {vehicleId} vehicleName={vehicleDisplayName} />
 
 		<!-- Tabs Navigation -->
 		<Tabs bind:value={activeTab} class="space-y-6">
