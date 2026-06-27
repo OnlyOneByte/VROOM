@@ -67,10 +67,15 @@
           build order into design.md. Confirmed the backup path is already owner-keyed end-to-end (C54) and
           the vehicleShares schema header already declares the owner-stamp intent → the migration realizes an
           already-documented decision. Docs-only (no source). NEXT slice: T5b-1.
-    - [ ] **T5b-1 — migration 0011 (additive `created_by`).** `ALTER TABLE expenses ADD COLUMN created_by`
-          text → users.id (nullable; NULL = legacy/self sentinel). Pure additive (no rebuild — strip any
-          db:generate destructive bundle like 0010; write the snapshot). +schema type + migration-0011 test
-          (column exists, nullable, existing rows survive with NULL, additive/no __new_ scaffold).
+    - [x] **T5b-1 — migration 0011 (additive `created_by`) (C92, 2026-06-27).** `ALTER TABLE expenses ADD
+          created_by text REFERENCES users(id)` (nullable; NULL = legacy/self sentinel). db:generate produced
+          a CLEAN single-ALTER — no destructive bundle this time (the 0010 snapshot healed the 0009 diff gap
+          that caused the C48 bundle), snapshot + journal idx 11 written. Schema-derived backup paths (CSV +
+          coerceRow) auto-carry it; added `createdBy` to the hand-maintained Sheets header array (the
+          sheets-header-coverage drift guard fired + is now green). migration-0011 test: 4 cases (column
+          exists, nullable, created_by stampable distinct from user_id [editor-on-shared case], additive/no
+          __new_ scaffold). +createdBy:null in 3 Expense-literal test fixtures (tsc-required). Backend
+          validate:local green (2051 pass [+4], 0 fail, all drift guards green). NEXT: T5b-2 expense WRITE.
     - [ ] **T5b-2 — expense WRITE widening.** POST/PUT/DELETE `/expenses` flip `validateVehicleOwnership`
           → `requireVehicleWrite`; on create, stamp `userId = resolved owner` + `createdBy = acting`; split
           route too. IDOR: third-party-denied, viewer-write-denied, editor-other-vehicle-denied,
