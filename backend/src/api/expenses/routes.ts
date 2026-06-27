@@ -10,15 +10,18 @@ import {
   EXPENSE_CATEGORY_DESCRIPTIONS,
   EXPENSE_CATEGORY_LABELS,
 } from '../../db/types';
-import { ValidationError } from '../../errors';
+import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { neutralizeCsvRow } from '../../utils/csv-safety';
 import { centsToDollars, expenseToApi, moneyDollarsToCents } from '../../utils/money';
 import { buildPaginatedResponse, clampPagination } from '../../utils/pagination';
-import { requireVehicleWrite, resolveVehicleOwnerId } from '../../utils/sharing';
+import {
+  requireVehicleRead,
+  requireVehicleWrite,
+  resolveVehicleOwnerId,
+} from '../../utils/sharing';
 import {
   commonSchemas,
-  validateExpenseOwnership,
   validateFuelExpenseData,
   validateVehicleOwnership,
 } from '../../utils/validation';
@@ -444,13 +447,20 @@ routes.get('/summary', zValidator('query', summaryQuerySchema), async (c) => {
   const user = c.get('user');
   const { vehicleId, period } = c.req.valid('query');
 
-  // If vehicleId provided, verify user owns the vehicle
+  // vehicle-sharing T5b-3: per-vehicle summary widens to shared READ access, scoped to the vehicle
+  // OWNER's books (the owner-stamp model — see the GET / list note); cross-fleet summary (no
+  // vehicleId) stays acting-user-owned only (no double-count). requireVehicleRead 404s a viewer/
+  // stranger; resolveVehicleOwnerId then yields the owner whose rows back this vehicle.
+  let summaryUserId = user.id;
   if (vehicleId) {
-    await validateVehicleOwnership(vehicleId, user.id);
+    await requireVehicleRead(vehicleId, user.id);
+    const ownerId = await resolveVehicleOwnerId(vehicleId);
+    if (!ownerId) throw new NotFoundError('Vehicle');
+    summaryUserId = ownerId;
   }
 
   const summary = await expenseRepository.getSummary({
-    userId: user.id,
+    userId: summaryUserId,
     vehicleId,
     period,
   });
@@ -770,13 +780,26 @@ routes.get('/', zValidator('query', expenseQuerySchema), async (c) => {
   const user = c.get('user');
   const query = c.req.valid('query');
 
-  // If vehicleId filter is provided, verify user owns the vehicle
+  // vehicle-sharing T5b-3: READ widening (design §2.1 rule 3). Two distinct shapes:
+  //  - PER-VEHICLE (?vehicleId=…): gate via requireVehicleRead (owner | accepted viewer/editor | 404).
+  //    Because shared-created rows are OWNER-stamped (userId == vehicle owner, T5b-2), a shared
+  //    invitee querying their OWN userId would see NOTHING for the shared vehicle — so scope the query
+  //    to the vehicle OWNER's userId. With both vehicleId AND ownerId pinned, the result is exactly
+  //    that one vehicle's rows (the owner cannot leak their OTHER vehicles through this — vehicleId
+  //    filters them out), and an owner reading their own vehicle is unchanged (owner === acting).
+  //  - CROSS-FLEET (no vehicleId): stays acting-user-owned only — a shared vehicle's costs belong to
+  //    the OWNER's dashboard, NOT the invitee's, so no double-count and no foreign rows leak into the
+  //    invitee's all-vehicles list. The invitee sees a shared vehicle's costs ONLY via ?vehicleId.
+  let listUserId = user.id;
   if (query.vehicleId) {
-    await validateVehicleOwnership(query.vehicleId, user.id);
+    await requireVehicleRead(query.vehicleId, user.id);
+    const ownerId = await resolveVehicleOwnerId(query.vehicleId);
+    if (!ownerId) throw new NotFoundError('Vehicle');
+    listUserId = ownerId;
   }
 
   const { data, totalCount } = await expenseRepository.findPaginated({
-    userId: user.id,
+    userId: listUserId,
     vehicleId: query.vehicleId,
     category: query.category,
     startDate: query.startDate,
@@ -799,7 +822,13 @@ routes.get('/', zValidator('query', expenseQuerySchema), async (c) => {
 routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
-  const expense = await validateExpenseOwnership(id, user.id);
+  // vehicle-sharing T5b-3: load the (owner-stamped) row UNSCOPED, then authorize via the vehicle's
+  // READ access — owner | accepted viewer | accepted editor. A stranger gets the same NotFoundError
+  // (existence-hiding) the absent-row branch throws, so a shared invitee can read a single shared-
+  // vehicle expense while a non-shared third party cannot distinguish "not yours" from "does not exist".
+  const expense = await expenseRepository.findById(id);
+  if (!expense) throw new NotFoundError('Expense');
+  await requireVehicleRead(expense.vehicleId, user.id);
   return c.json({ success: true, data: expenseToApi(expense) });
 });
 
