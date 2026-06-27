@@ -8,17 +8,23 @@
 > independently verified via `bun run validate:local`.
 
 ## Phase 0 — sign-off (gates everything)
-- [ ] **T0 — Angelo ratifies D1–D8** (requirements.md). In particular confirm: D1 (is vehicle-sharing the
-      right horizon feature to build now, vs theming-engine / money-cents / trips — all specced + awaiting
-      sign-off), D2 (invite by existing-user email only, no external invites in v1), D3 (viewer|editor
-      levels), D4 (owner-only actions stay strict), D6 (existence-hiding 404-not-403), D7 (pending-invite
-      backup re-creation), D8 (revoke-on-delete cascade). **BUILD UNBLOCKS only on explicit approval.**
-      If Angelo prefers a different horizon feature, this spec is shelved (not discarded).
+- [x] **T0 — Angelo ratified D1–D8 (2026-06-27).** All as RECOMMENDED in requirements.md: D2 per-vehicle,
+      D3 viewer|editor, D4 existing-user-email invite, D5 explicit accept/decline, D6 acting-user stamp
+      (v1), D7 backup re-creates **ACCEPTED grants only** (NOT pending invites — Angelo's explicit pick),
+      D8 revoke/delete cascade drops the share but KEEPS shared-created cost rows. D1 = yes, build now.
+      **BUILD UNBLOCKED.** (Slack ratification 2026-06-27; the gate is cleared, Phase 1+ proceeds.)
 
 ## Phase 1 — schema + access model (the data-safety core; land before any gate-widening)
-- [ ] **T1 — Migration 0006 + schema.** Additive `vehicle_shares` table + the partial-unique active-share
-      index + the two lookup indexes (design §1). +schema types. No backfill. Mirror `migration-0004.test.ts`:
-      table exists, FKs cascade, partial-unique rejects a dup active share but allows re-invite after decline.
+- [x] **T1 — Migration 0010 + schema (C48, 2026-06-27).** Additive `vehicle_shares` table + partial-unique
+      active-share index + 2 lookup indexes (design §1). +schema types (VehicleShare/NewVehicleShare). IDs are
+      text/cuid2 (design said integer — CORRECTED to live schema: users.id + vehicles.id are text). Migration
+      number is **0010** not 0006 (0006-0009 landed since the draft). CAUGHT + STRIPPED a data-loss footgun:
+      db:generate bundled destructive rebuilds of 6 existing tables (drizzle diffing off the 0009 snapshot gap
+      — money-cents left REAL affinity + wrote no snapshot); kept only the additive vehicle_shares SQL, kept
+      the regenerated snapshot (records integer affinity, fixes the drift for future migrations). migration-0010
+      test (7 cases): table+indexes exist, all 3 FKs cascade, partial-unique rejects dup-active but allows
+      re-invite after decline/revoke, additive (existing rows survive, no __new_ scaffold). Backup guard: parked
+      vehicle_shares in EXCLUDED_BY_DESIGN with a pending-T9 marker. Both validate:local green.
 - [ ] **T2 — `utils/sharing.ts` access resolver.** `resolveVehicleAccess` + `requireVehicleRead` /
       `requireVehicleWrite` (design §2): owner via `vehicles.userId`; else the accepted share's level; else
       null → **404 (never 403)**. Pure-ish (db + ids in). Unit + HTTP-harness tested: owner→full, accepted
@@ -44,7 +50,9 @@
       verified denied for an editor.)
 
 ## Phase 4 — backup / restore (R7, NORTH_STAR #1)
-- [ ] **T9 — `vehicle_shares` round-trip.** Join the table-coverage maps (both source-scan guards) +
+- [ ] **T9 — `vehicle_shares` round-trip.** FIRST move `vehicle_shares` OUT of `EXCLUDED_BY_DESIGN` in
+      `backup-table-coverage.test.ts` (T1 parked it there with a pending-T9 marker — the table shipped
+      schema-first; backup wiring is THIS task). Join the table-coverage maps (both source-scan guards) +
       `validateReferentialIntegrity` (vehicleId→vehicles, owner/sharedWith→users). Owner export includes
       granted shares; the invitee export must NOT pull the owner's vehicle/shares (blast-radius test, §6.4).
       Round-trip: seed → export → wipe → restore → identical (D7 decides pending re-creation).
