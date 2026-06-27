@@ -22,6 +22,7 @@ import {
   trips,
   userPreferences,
   vehicleFinancing,
+  vehicleShares,
   vehicles,
 } from '../../../db/schema';
 import { SyncError, SyncErrorCode } from '../../../errors';
@@ -237,6 +238,16 @@ export const SHEET_HEADERS = {
     'createdAt',
     'updatedAt',
   ],
+  vehicleShares: [
+    'id',
+    'vehicleId',
+    'ownerId',
+    'sharedWithId',
+    'level',
+    'status',
+    'createdAt',
+    'updatedAt',
+  ],
 } as const satisfies Record<string, readonly string[]>;
 
 /**
@@ -265,6 +276,7 @@ export const SHEET_NAMES = [
   'Reminder Vehicles',
   'Reminder Notifications',
   'Trips',
+  'Vehicle Shares',
 ] as const;
 
 /**
@@ -546,6 +558,14 @@ export class GoogleSheetsService {
     // Query trips directly by userId (userId-stamped, like photos)
     const userTrips = await db.select().from(trips).where(eq(trips.userId, userId));
 
+    // Query the ACCEPTED shares this user GRANTED (vehicle-sharing T9, D7 + §6.4 blast-radius: ownerId
+    // scope means an invitee never exports the owner's shares; accepted-only so restore re-creates exactly
+    // what is exported).
+    const userVehicleShares = await db
+      .select()
+      .from(vehicleShares)
+      .where(and(eq(vehicleShares.ownerId, userId), eq(vehicleShares.status, 'accepted')));
+
     // Pair each canonical sheet title with the rows + headers it backs up. Order MUST match SHEET_NAMES:
     // the atomic swap sets each tab's `index` from this array's position, so it has to mirror the
     // spreadsheet's original create order or the backup's tabs would reshuffle every run.
@@ -599,6 +619,7 @@ export class GoogleSheetsService {
           headers: SHEET_HEADERS.reminderNotifications,
         },
         { title: 'Trips', rows: userTrips, headers: SHEET_HEADERS.trips },
+        { title: 'Vehicle Shares', rows: userVehicleShares, headers: SHEET_HEADERS.vehicleShares },
       ];
 
     await this.writeAllSheetsAtomically(spreadsheetId, tables);
@@ -751,6 +772,7 @@ export class GoogleSheetsService {
     reminderVehicles: Record<string, unknown>[];
     reminderNotifications: Record<string, unknown>[];
     trips: Record<string, unknown>[];
+    vehicleShares: Record<string, unknown>[];
   }> {
     const [
       vehiclesData,
@@ -769,6 +791,7 @@ export class GoogleSheetsService {
       reminderVehiclesData,
       reminderNotificationsData,
       tripsData,
+      vehicleSharesData,
     ] = await Promise.all([
       this.readSheetData(spreadsheetId, 'Vehicles!A:Z'),
       this.readSheetData(spreadsheetId, 'Expenses!A:Z'),
@@ -787,6 +810,8 @@ export class GoogleSheetsService {
       this.readSheetData(spreadsheetId, 'Reminder Notifications!A:Z').catch(() => []),
       // Trips tab absent in pre-trips-location backups → tolerate a missing tab (OPTIONAL_BACKUP_FILES).
       this.readSheetData(spreadsheetId, 'Trips!A:Z').catch(() => []),
+      // Vehicle Shares tab absent in pre-sharing backups → tolerate a missing tab (OPTIONAL_BACKUP_FILES).
+      this.readSheetData(spreadsheetId, 'Vehicle Shares!A:Z').catch(() => []),
     ]);
 
     const vehicleRecords = this.parseSheetData(vehiclesData);
@@ -805,6 +830,7 @@ export class GoogleSheetsService {
     const reminderVehiclesRecords = this.parseSheetData(reminderVehiclesData);
     const reminderNotificationsRecords = this.parseSheetData(reminderNotificationsData);
     const tripsRecords = this.parseSheetData(tripsData);
+    const vehicleSharesRecords = this.parseSheetData(vehicleSharesData);
 
     const userId = vehicleRecords.length > 0 ? (vehicleRecords[0].userId as string) : '';
 
@@ -826,6 +852,7 @@ export class GoogleSheetsService {
       reminderVehicles: reminderVehiclesRecords,
       reminderNotifications: reminderNotificationsRecords,
       trips: tripsRecords,
+      vehicleShares: vehicleSharesRecords,
     };
   }
 

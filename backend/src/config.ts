@@ -20,6 +20,7 @@ import {
   trips,
   userPreferences,
   vehicleFinancing,
+  vehicleShares,
   vehicles,
 } from './db/schema';
 import type { Environment } from './types';
@@ -279,6 +280,7 @@ export const TABLE_SCHEMA_MAP: Record<string, Table> = {
   reminderVehicles: reminderVehicles,
   reminderNotifications: reminderNotifications,
   trips: trips,
+  vehicleShares: vehicleShares,
 };
 
 export const TABLE_FILENAME_MAP: Record<string, string> = {
@@ -298,6 +300,7 @@ export const TABLE_FILENAME_MAP: Record<string, string> = {
   reminderVehicles: 'reminder_vehicles.csv',
   reminderNotifications: 'reminder_notifications.csv',
   trips: 'trips.csv',
+  vehicleShares: 'vehicle_shares.csv',
 };
 
 export function getBackupTableKeys(): string[] {
@@ -321,6 +324,7 @@ export const OPTIONAL_BACKUP_FILES = new Set([
   'reminder_vehicles.csv',
   'reminder_notifications.csv',
   'trips.csv',
+  'vehicle_shares.csv',
 ]);
 
 export function getRequiredBackupFiles(): string[] {

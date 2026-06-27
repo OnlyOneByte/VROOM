@@ -154,6 +154,11 @@ export interface BackupData {
   // Optional: absent in backups predating the trips-location feature (trips-location T4); the restore
   // path treats trips.csv as OPTIONAL_BACKUP_FILES so an older backup without it still restores.
   trips?: import('./db/schema').Trip[];
+  // Optional: absent in backups predating vehicle-sharing (T9). The OWNER's backup carries the ACCEPTED
+  // grants they made (D7 — pending/declined/revoked are NOT exported); the invitee's backup never
+  // contains the owner's shares (createBackup scopes by ownerId). Restore re-stamps ownerId to the
+  // importer and skips a grant whose invitee user is absent (cross-instance restore — no FK abort).
+  vehicleShares?: import('./db/schema').VehicleShare[];
 }
 
 export interface ParsedBackupData {
@@ -174,6 +179,7 @@ export interface ParsedBackupData {
   reminderVehicles?: Record<string, unknown>[];
   reminderNotifications?: Record<string, unknown>[];
   trips?: Record<string, unknown>[];
+  vehicleShares?: Record<string, unknown>[];
 }
 
 // Backup provider types

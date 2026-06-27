@@ -34,6 +34,7 @@ import {
   trips,
   userPreferences,
   vehicleFinancing,
+  vehicleShares,
   vehicles,
 } from '../../db/schema';
 import { ValidationError } from '../../errors';
@@ -461,6 +462,15 @@ export class BackupService {
       .from(reminderNotifications)
       .where(eq(reminderNotifications.userId, userId));
 
+    // vehicle-sharing T9 (R7/D7/D8 §6.4): export the ACCEPTED shares this user GRANTED (ownerId === me).
+    // Scoping by ownerId is the blast-radius guarantee — an invitee (who is sharedWithId, never ownerId)
+    // gets NONE of the owner's shares in their own backup. D7: only accepted grants are exported (pending/
+    // declined/revoked are not re-created on restore), so the backup carries exactly what restore re-creates.
+    const userVehicleShares = await db
+      .select()
+      .from(vehicleShares)
+      .where(and(eq(vehicleShares.ownerId, userId), eq(vehicleShares.status, 'accepted')));
+
     return {
       metadata: {
         version: CONFIG.backup.currentVersion,
@@ -483,6 +493,7 @@ export class BackupService {
       reminderVehicles: userReminderVehicles,
       reminderNotifications: userReminderNotifications,
       trips: userTrips,
+      vehicleShares: userVehicleShares,
     };
   }
 
@@ -671,6 +682,7 @@ export class BackupService {
     return errors;
   }
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: a flat fan-out of per-table FK validators (one spread each); the count is breadth, not nesting — splitting it would only obscure the one-validator-per-table structure
   private validateReferentialIntegrity(backup: ParsedBackupData): string[] {
     const userIds = new Set([backup.metadata.userId]);
     const vehicleIds = new Set(backup.vehicles.map((v) => String(v.id)));
@@ -696,6 +708,7 @@ export class BackupService {
       ...this.validateClaimRefs(backup.insuranceClaims ?? [], policyIds, termIds, vehicleIds),
       ...this.validateOdometerRefs(backup.odometer ?? [], vehicleIds),
       ...this.validateTripRefs(backup.trips ?? [], vehicleIds),
+      ...this.validateShareRefs(backup.vehicleShares ?? [], vehicleIds, userIds),
       ...this.validatePhotoRefs(backup.photos ?? [], {
         vehicleIds,
         expenseIds,
@@ -770,6 +783,9 @@ export class BackupService {
       ['reminderId', 'dueOdometer'],
       'reminderNotification reminder+dueOdometer'
     ); // rn_reminder_odo_idx (mileage axis; partial WHERE due_odometer IS NOT NULL)
+    // vehicle_shares_active_idx (partial WHERE status in pending/accepted). Export is accepted-only, so
+    // every exported row is "active" → a dup on (vehicleId, sharedWithId) would collide on restore.
+    dupCheck(backup.vehicleShares, ['vehicleId', 'sharedWithId'], 'vehicleShare vehicle+invitee');
     return errors;
   }
 
@@ -816,6 +832,31 @@ export class BackupService {
     vehicleIds: Set<string>
   ): string[] {
     return this.validateVehicleFkRefs(financingList, vehicleIds, 'Financing');
+  }
+
+  /**
+   * Referential check for vehicle_shares (vehicle-sharing T9). A share row owns via vehicleId (must be a
+   * vehicle in this same backup) AND its ownerId must be the backup creator (the only userId in a single-
+   * user backup) — a share naming another owner would be cross-tenant garbage. The sharedWithId (invitee)
+   * is deliberately NOT validated here: that user is NOT part of the owner's backup (users aren't backed
+   * up), so its absence is expected; the RESTORE path skips a grant whose invitee is missing rather than
+   * failing validation (a cross-instance restore legitimately may not have the invitee).
+   */
+  private validateShareRefs(
+    shareList: Record<string, unknown>[],
+    vehicleIds: Set<string>,
+    userIds: Set<string>
+  ): string[] {
+    const errors: string[] = [];
+    for (const share of shareList) {
+      if (!vehicleIds.has(String(share.vehicleId))) {
+        errors.push(`Vehicle share ${share.id} references non-existent vehicle`);
+      }
+      if (!userIds.has(String(share.ownerId))) {
+        errors.push(`Vehicle share ${share.id} references a non-owner`);
+      }
+    }
+    return errors;
   }
 
   private validateInsuranceRefs(insuranceList: Record<string, unknown>[]): string[] {

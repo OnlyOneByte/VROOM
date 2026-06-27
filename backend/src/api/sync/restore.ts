@@ -22,7 +22,9 @@ import {
   trips,
   userPreferences,
   userProviders,
+  users,
   vehicleFinancing,
+  vehicleShares,
   vehicles,
 } from '../../db/schema';
 import { SyncError, SyncErrorCode } from '../../errors';
@@ -56,6 +58,7 @@ export interface ImportSummary {
   userPreferences: number;
   syncState: number;
   trips: number;
+  vehicleShares: number;
 }
 
 export interface RestoreResponse {
@@ -110,6 +113,7 @@ class RestoreService {
       userPreferences: parsedBackup.userPreferences?.length ?? 0,
       syncState: parsedBackup.syncState?.length ?? 0,
       trips: parsedBackup.trips?.length ?? 0,
+      vehicleShares: parsedBackup.vehicleShares?.length ?? 0,
     };
 
     if (mode === 'preview') {
@@ -234,6 +238,7 @@ class RestoreService {
       userPreferences: sheetData.userPreferences?.length ?? 0,
       syncState: sheetData.syncState?.length ?? 0,
       trips: (sheetData as ParsedBackupData).trips?.length ?? 0,
+      vehicleShares: (sheetData as ParsedBackupData).vehicleShares?.length ?? 0,
     };
 
     if (mode === 'preview') {
@@ -378,6 +383,17 @@ class RestoreService {
         name: 'trips',
         scope: eq(trips.userId, userId),
         idColumn: trips.id,
+        idField: 'id' as const,
+      },
+      {
+        // vehicle_shares is owner-owned (ownerId) with its OWN id PK. Probe it directly so a merge-restore
+        // id collision is a clean conflict, not a raw UNIQUE-PK throw (#93/C300 class). Scoped by ownerId
+        // (the importer is the owner — restore re-stamps ownerId to userId, matching this scope).
+        data: data.vehicleShares ?? [],
+        table: vehicleShares,
+        name: 'vehicle_shares',
+        scope: eq(vehicleShares.ownerId, userId),
+        idColumn: vehicleShares.id,
         idField: 'id' as const,
       },
     ];
@@ -542,6 +558,24 @@ class RestoreService {
       await tx
         .insert(trips)
         .values(this.stampUserId(data.trips, userId) as (typeof trips.$inferInsert)[]);
+    }
+    // Insert vehicle_shares AFTER vehicles (vehicle-sharing T9). Re-stamp ownerId to the importer (the
+    // backup's owner == the importer; same chokepoint as stampUserId). The sharedWithId (invitee) FKs
+    // users — that user is NOT in the backup, so on a CROSS-INSTANCE restore it may be absent; inserting
+    // it would FK-violate and abort the WHOLE restore (the #127/C151 data-loss class). So filter to grants
+    // whose invitee EXISTS in this DB; a share to an absent user is silently skipped (the owner can re-invite
+    // once that user joins). Same-instance restore (the common case) keeps every grant.
+    if ((data.vehicleShares?.length ?? 0) > 0) {
+      const existingUserRows = await tx.select({ id: users.id }).from(users);
+      const knownUserIds = new Set(existingUserRows.map((u) => u.id));
+      const insertableShares = (data.vehicleShares ?? [])
+        .filter((s) => knownUserIds.has(String(s.sharedWithId)))
+        .map((s) => ({ ...s, ownerId: userId }));
+      if (insertableShares.length > 0) {
+        await tx
+          .insert(vehicleShares)
+          .values(insertableShares as (typeof vehicleShares.$inferInsert)[]);
+      }
     }
     // Insert user preferences and sync state
     if (data.userPreferences?.length > 0) {
