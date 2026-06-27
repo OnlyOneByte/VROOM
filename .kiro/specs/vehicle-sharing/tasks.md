@@ -67,8 +67,13 @@
         column (migration 0011) + rework expense reads to resolve shared-vehicle access by vehicleId. Money
         table + migration + highest cross-tenant risk → escalated (options: owner-stamp+createdBy / defer
         editor-write to v2 / other). Build resumes on the ruling; design.md gets the chosen model first.
-- [ ] **T6 — odometer** read+write → the resolver; IDOR entries.
-- [ ] **T7 — reminders** read+write → the resolver; IDOR entries.
+- [ ] **T6 — odometer** read+write → the resolver; IDOR entries. **BLOCKED — folds into the T5b ruling
+      (C53 verified): odometer is userId-stamped on create + userId-scoped on every read
+      (findByVehicleIdPaginated/getHistory/getCurrentOdometer all AND eq(userId), validateOdometerOwnership
+      checks entry.userId). Same model problem as expenses → same fix → same ruling.**
+- [ ] **T7 — reminders** read+write → the resolver; IDOR entries. **BLOCKED — folds into the T5b ruling
+      (C53 verified): a reminder is a userId-OWNED row (reminders.userId) with a vehicle JUNCTION, not a
+      vehicleId-owned row; widening it to a shared editor is the same userId-vs-vehicleId rework. Same ruling.**
 - [ ] **T8 — insurance + analytics READ** → `requireVehicleRead`; IDOR entries. (Owner-only actions —
       delete vehicle, financing/purchase-price edit, share management — KEEP strict `validateVehicleOwnership`,
       verified denied for an editor.)
@@ -82,7 +87,13 @@
       Round-trip: seed → export → wipe → restore → identical (D7 decides pending re-creation).
 
 ## Phase 5 — frontend (eyes-on tail; Playwright-gated → "code-complete, eyes-on pending")
-- [ ] **T10 — `share-api.ts` client** (the C149/C163 service pattern) + types.
+- [x] **T10 — `share-api.ts` client + types (C53, 2026-06-27).** Pulled FORWARD (out of phase order) as
+      the one cleanly-unblocked sharing slice while T5b-T8 await Angelo's expense-model ruling — it depends
+      only on the stable T3/T4 routes. `types/share.ts` (VehicleShare, ShareLevel/Status, CreateShareRequest,
+      SharedAccess) + barrel export; `services/share-api.ts` (the C149/C163 pattern): owner invite/listGranted/
+      changeLevel/revoke + invitee listReceived/accept/decline (thin envelope pass-throughs; no money fields →
+      no transform). 7-case test mirrors reminder-api.test (mocked apiClient, asserts URL+body+passthrough).
+      Frontend validate:local green (svelte-check 0 err, build, 1325 pass). No UI yet (T11/T12) → no eyes-on.
 - [ ] **T11 — Share dialog** on the vehicle page (owner: email + level + current-shares list with
       revoke/level-change). Four-states + a11y + mobile.
 - [ ] **T12 — "Shared with me"** section + pending-invite accept/decline; fleet cards badged
