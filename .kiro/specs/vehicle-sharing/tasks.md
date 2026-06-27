@@ -91,6 +91,9 @@
           create, re-share — owner-only stays strict `validateVehicleOwnership`). +shared-expense-write.test.ts
           (5 cases): editor-create owner-stamp, owner-create self-NULL, editor PUT+DELETE, viewer-denied-untouched,
           cross-owner-reassign-rejected. Backend validate:local green (2058 pass [+7], 0 fail, drift guards green).
+          GUARD FOLLOW-UP (C104): +2 provenance forge-vector tests pinning that a client-supplied `createdBy`
+          in the POST body is IGNORED on BOTH paths (owner-create → stays NULL; editor-create → stamped the
+          acting editor, never the forged id) — so a future schema refactor that reopened the forge fails here.
     - [ ] **T5b-2b — split-expense WRITE widening (`POST/PUT/DELETE /expenses/split`).** DEFERRED from T5b-2
           (WIP=1, one verified slice): the split path is a deeper rework — siblings span MULTIPLE vehicles
           (potentially different owners) and `createSiblings` stamps ONE `userId`, so owner-stamp per sibling
