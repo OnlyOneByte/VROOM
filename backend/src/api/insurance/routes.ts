@@ -5,6 +5,7 @@ import { ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { parseClampedInt } from '../../utils/calculations';
 import { insuranceClaimToApi, insuranceTermToApi } from '../../utils/money';
+import { requireVehicleRead } from '../../utils/sharing';
 import { validateInsuranceOwnership, validateVehicleOwnership } from '../../utils/validation';
 import { expenseRepository } from '../expenses/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
@@ -32,6 +33,36 @@ function policyToApi<T extends Record<string, unknown>>(policy: T): T {
   return {
     ...policy,
     terms: terms.map((t) => insuranceTermToApi(t as Record<string, unknown>)),
+  };
+}
+
+/**
+ * vehicle-sharing T8b blast-radius filter (design §6.4: "a share must never pull the owner's OTHER
+ * vehicles into the invitee's view"). `findByVehicleId` returns the WHOLE policy — all its terms, the
+ * full termVehicleCoverage junction, and the deduped vehicleIds across ALL terms — because a policy can
+ * span several of the owner's vehicles. For a NON-owner viewing a SHARED vehicle that would leak the
+ * owner's other vehicles' ids + their coverage. So when the acting user is not the owner, narrow the
+ * policy to the shared vehicle ONLY: drop terms that do not cover it, filter the coverage rows to it,
+ * and reduce vehicleIds to just it. The OWNER (owner-read) gets the full policy unchanged — this only
+ * narrows a shared invitee's view, never the owner's. Pure; returns a shallow-narrowed copy.
+ */
+function narrowPolicyToVehicle<
+  T extends {
+    terms: Array<{ id: string }>;
+    termVehicleCoverage: Array<{ termId: string; vehicleId: string }>;
+    vehicleIds: string[];
+  },
+>(policy: T, vehicleId: string): T {
+  // Terms that actually cover the shared vehicle (via the junction).
+  const coveredTermIds = new Set(
+    policy.termVehicleCoverage.filter((c) => c.vehicleId === vehicleId).map((c) => c.termId)
+  );
+  return {
+    ...policy,
+    terms: policy.terms.filter((t) => coveredTermIds.has(t.id)),
+    // Only this vehicle's coverage rows — never reveal which OTHER vehicles a term covers.
+    termVehicleCoverage: policy.termVehicleCoverage.filter((c) => c.vehicleId === vehicleId),
+    vehicleIds: policy.vehicleIds.filter((v) => v === vehicleId),
   };
 }
 
@@ -119,9 +150,15 @@ routes.get(
   async (c) => {
     const user = c.get('user');
     const { vehicleId } = c.req.valid('param');
-    await validateVehicleOwnership(vehicleId, user.id);
+    // vehicle-sharing T8b READ widening: owner | accepted viewer/editor | 404 (existence-hiding).
+    const access = await requireVehicleRead(vehicleId, user.id);
     const policies = await insurancePolicyRepository.findByVehicleId(vehicleId);
-    return c.json({ success: true, data: policies.map(policyToApi), count: policies.length });
+    // Blast-radius (design §6.4): for a NON-owner, narrow each policy to the shared vehicle only so the
+    // owner's OTHER vehicles (other terms + their coverage + ids) never leak. The owner sees the full
+    // policy unchanged. findByVehicleId already returns only policies that cover THIS vehicle.
+    const scoped =
+      access.role === 'owner' ? policies : policies.map((p) => narrowPolicyToVehicle(p, vehicleId));
+    return c.json({ success: true, data: scoped.map(policyToApi), count: scoped.length });
   }
 );
 
