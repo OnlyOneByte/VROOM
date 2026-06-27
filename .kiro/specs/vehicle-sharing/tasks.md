@@ -215,6 +215,11 @@
       grant whose invitee user is absent (cross-instance) rather than FK-aborting the whole restore. 5-case
       round-trip test (round-trip / D7 accepted-only / invitee-blast-radius / cross-instance-skip). All 4
       drift guards green. validate:local green (2042 pass).
+      GUARD FOLLOW-UP (C105): +created-by-roundtrip.test.ts (2 cases) — the T5b-1 `expenses.created_by`
+      provenance column (migration 0011) is schema-derived through coerceRow but had NO round-trip test;
+      NORTH_STAR #1 (no silent loss) + the owner-stamp model both depend on it surviving export→wipe→restore.
+      Pins: an editor-authored shared expense keeps user_id=OWNER AND created_by=editor byte-for-byte; an
+      owner-self expense keeps created_by NULL (not coerced to "" or 0 by coerceRow). Merge-surviving.
 
 ## Phase 5 — frontend (eyes-on tail; Playwright-gated → "code-complete, eyes-on pending")
 - [x] **T10 — `share-api.ts` client + types (C53, 2026-06-27).** Pulled FORWARD (out of phase order) as
