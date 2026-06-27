@@ -15,8 +15,17 @@ import { and, eq } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { NewVehicleShare, VehicleShare } from '../../db/schema';
-import { vehicleShares } from '../../db/schema';
+import { users, vehicleShares } from '../../db/schema';
 import { BaseRepository } from '../../utils/repository';
+
+/** An ACCEPTED grant TO a user: which vehicle, at what level, owned (and shared) by whom. */
+export interface AcceptedShareAccess {
+  shareId: string;
+  vehicleId: string;
+  level: string;
+  ownerId: string;
+  ownerName: string;
+}
 
 /** A share is "active" (occupies the partial-unique slot) while pending or accepted. */
 export const ACTIVE_SHARE_STATUSES = ['pending', 'accepted'] as const;
@@ -72,6 +81,28 @@ export class VehicleShareRepository extends BaseRepository<VehicleShare, NewVehi
       .where(eq(vehicleShares.sharedWithId, sharedWithId))
       .orderBy(vehicleShares.createdAt);
     return rows.filter((r) => r.status === 'pending' || r.status === 'accepted');
+  }
+
+  /**
+   * The ACCEPTED grants TO a user — the shared-fleet widening (T5a, GET /vehicles?include=shared).
+   * Joins the owner's display name so a shared vehicle card can render "shared by <name>" without an
+   * N+1. Accepted-only (pending/declined/revoked grant no fleet visibility).
+   */
+  async findAcceptedAccessForUser(sharedWithId: string): Promise<AcceptedShareAccess[]> {
+    const rows = await this.db
+      .select({
+        shareId: vehicleShares.id,
+        vehicleId: vehicleShares.vehicleId,
+        level: vehicleShares.level,
+        ownerId: vehicleShares.ownerId,
+        ownerName: users.displayName,
+      })
+      .from(vehicleShares)
+      .innerJoin(users, eq(users.id, vehicleShares.ownerId))
+      .where(
+        and(eq(vehicleShares.sharedWithId, sharedWithId), eq(vehicleShares.status, 'accepted'))
+      );
+    return rows;
   }
 
   /** A single share scoped to its INVITEE — the backing read for accept / decline (T4). */

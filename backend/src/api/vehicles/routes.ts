@@ -23,6 +23,7 @@ import { odometerRepository } from '../odometer/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
 import { reminderRepository } from '../reminders/repository';
 import { preferencesRepository } from '../settings/repository';
+import { vehicleShareRepository } from '../shares/repository';
 import { photoRoutes } from './photo-routes';
 import { vehicleRepository } from './repository';
 
@@ -164,20 +165,52 @@ async function assertLicensePlateAvailable(
   }
 }
 
-// GET /api/vehicles - List user's vehicles (including shared)
-routes.get('/', async (c) => {
+// GET /api/vehicles - List the user's own vehicles. With ?include=shared, ALSO append vehicles shared
+// TO the user via an ACCEPTED share (vehicle-sharing T5a, R3). Shared rows carry a `sharedAccess`
+// annotation ({ level, sharedBy }) so the fleet UI can badge "shared by X" and gate edit affordances by
+// level; owned rows are unchanged (no annotation). The widening is READ-ONLY + additive — it does not
+// touch the expense read/write model (T5b, the editor-write widening, is escalated to Angelo).
+const listVehiclesQuerySchema = z.object({
+  include: z.enum(['shared']).optional(),
+});
+routes.get('/', zValidator('query', listVehiclesQuerySchema), async (c) => {
   const user = c.get('user');
+  const { include } = c.req.valid('query');
 
   const userVehicles = await vehicleRepository.findByUserId(user.id);
 
+  // ?include=shared: fetch the vehicles the user has ACCEPTED-share access to (owned by others) and
+  // annotate each with its access level + owner name. Resolved via the shares repo (accepted-only).
+  let sharedRows: Array<
+    (typeof userVehicles)[number] & {
+      sharedAccess: { level: string; sharedBy: string };
+    }
+  > = [];
+  if (include === 'shared') {
+    const grants = await vehicleShareRepository.findAcceptedAccessForUser(user.id);
+    if (grants.length > 0) {
+      const byVehicleId = new Map(grants.map((g) => [g.vehicleId, g]));
+      const sharedVehicles = await vehicleRepository.findByIds([...byVehicleId.keys()]);
+      sharedRows = sharedVehicles.map((v) => {
+        const g = byVehicleId.get(v.id);
+        return {
+          ...v,
+          sharedAccess: { level: g?.level ?? 'viewer', sharedBy: g?.ownerName ?? 'Unknown' },
+        };
+      });
+    }
+  }
+
+  const allVehicles = [...userVehicles, ...sharedRows];
+
   // Enrich financing with computed balance. Batch all balances in two queries
   // (computeBalances) instead of an N+1 over each financed vehicle.
-  const financingIds = userVehicles
+  const financingIds = allVehicles
     .map((v) => v.financing?.id)
     .filter((id): id is string => id !== undefined);
   const balances = await financingRepository.computeBalances(financingIds);
 
-  const enrichedVehicles = userVehicles.map((v) => {
+  const enrichedVehicles = allVehicles.map((v) => {
     if (v.financing) {
       const computedBalance = balances.get(v.financing.id) ?? 0;
       return { ...v, financing: withComputedBalance(v.financing, computedBalance) };
