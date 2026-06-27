@@ -226,10 +226,18 @@ export const expenses = sqliteTable(
     volume: real('volume'), // gallons / kWh — a QUANTITY, stays real (NOT money)
     fuelType: text('fuel_type'),
     missedFillup: integer('missed_fillup', { mode: 'boolean' }).notNull().default(false),
-    // Direct user ownership — eliminates vehicles JOIN for user-scoped queries
+    // Direct user ownership — eliminates vehicles JOIN for user-scoped queries.
+    // For a SHARED-created row (an editor logged a cost on someone else's vehicle, vehicle-sharing
+    // T5b owner-stamp model) this is the vehicle OWNER's id — so the row rides the owner's backup/TCO
+    // and counts once. The actual author is recorded in `createdBy`.
     userId: text('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
+    // PROVENANCE — who physically entered the row (vehicle-sharing T5b, migration 0011). Differs from
+    // `userId` only for an editor-created shared row (createdBy = editor, userId = owner). NULL =
+    // legacy/self-created (treat as createdBy === userId). onDelete SET NULL: this is provenance, not
+    // ownership — deleting the author must NOT delete the owner's cost-history row.
+    createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
     // NULL for standalone expenses, shared UUID for split siblings
     groupId: text('group_id'),
     // Pre-split total amount, same on all siblings in a group — money: integer CENTS (migration 0009)
