@@ -7,6 +7,7 @@
 	import { toast } from 'svelte-sonner';
 	import { shareApi } from '$lib/services/share-api';
 	import { ApiError } from '$lib/utils/error-handling';
+	import { shareLevelLabel } from '$lib/utils/share-helpers';
 	import type { ReceivedShare } from '$lib/types';
 
 	interface Props {
@@ -24,8 +25,6 @@
 	let loadError = $state<string | null>(null);
 	let pending = $state<ReceivedShare[]>([]);
 	let acting = $state<string | null>(null); // the share id mid accept/decline (disables its buttons)
-
-	const levelLabel = (l: string) => (l === 'editor' ? 'Editor' : 'Viewer');
 
 	onMount(load);
 
@@ -114,7 +113,7 @@
 						<div class="min-w-0 flex-1">
 							<div class="flex items-center gap-2 flex-wrap">
 								<span class="text-sm font-medium truncate">{share.vehicleName}</span>
-								<Badge variant="secondary" class="text-xs">{levelLabel(share.level)}</Badge>
+								<Badge variant="secondary" class="text-xs">{shareLevelLabel(share.level)}</Badge>
 							</div>
 							<p class="text-xs text-muted-foreground mt-1">Shared by {share.sharedBy}</p>
 						</div>
