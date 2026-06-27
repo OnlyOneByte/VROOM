@@ -39,6 +39,9 @@ interface Share {
   sharedWithId: string;
   level: string;
   status: string;
+  // Present only on the enriched /received rows (T12); optional so the owner-side Share shape reuses it.
+  vehicleName?: string;
+  sharedBy?: string;
 }
 
 async function invite(
@@ -163,6 +166,38 @@ describe('invitee side — /received, accept, decline (T4, R2/R5)', () => {
     const accBody = await json<DataEnvelope<Share>>(acc);
     expect(acc.status, JSON.stringify(accBody)).toBe(200);
     expect(accBody.data.status).toBe('accepted');
+  });
+
+  // T12: a PENDING invite is invisible to the accepted-only fleet widening (T5a), so /received must
+  // itself carry the human label — the vehicle's display name + who shared it (the owner A here).
+  test('a PENDING /received row is enriched with vehicleName + sharedBy (T12)', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
+    await invite(vehicleId, bEmail, 'viewer');
+
+    const recv = await json<DataEnvelope<Share[]>>(
+      await asInvitee('GET', '/api/v1/shares/received')
+    );
+    expect(recv.data.length).toBe(1);
+    const row = recv.data[0]!;
+    expect(row.status).toBe('pending');
+    // "year make model" (no nickname seeded) + the OWNER A's displayName, not the invitee B's.
+    expect(row.vehicleName).toBe('2021 Honda Civic');
+    expect(row.sharedBy).toBe(ctx.user.displayName);
+  });
+
+  test('a vehicle nickname is used for /received vehicleName when present (T12)', async () => {
+    const vehicleId = await seedVehicle(ctx, {
+      make: 'Honda',
+      model: 'Civic',
+      year: 2021,
+      nickname: 'Daily Driver',
+    });
+    await invite(vehicleId, bEmail, 'editor');
+
+    const recv = await json<DataEnvelope<Share[]>>(
+      await asInvitee('GET', '/api/v1/shares/received')
+    );
+    expect(recv.data[0]!.vehicleName).toBe('Daily Driver');
   });
 
   test('invitee declines a pending invite → declined, and slot frees for re-invite', async () => {

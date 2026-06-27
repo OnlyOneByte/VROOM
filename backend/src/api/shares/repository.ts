@@ -15,7 +15,7 @@ import { and, eq } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { NewVehicleShare, VehicleShare } from '../../db/schema';
-import { users, vehicleShares } from '../../db/schema';
+import { users, vehicleShares, vehicles } from '../../db/schema';
 import { BaseRepository } from '../../utils/repository';
 
 /** An ACCEPTED grant TO a user: which vehicle, at what level, owned (and shared) by whom. */
@@ -25,6 +25,20 @@ export interface AcceptedShareAccess {
   level: string;
   ownerId: string;
   ownerName: string;
+}
+
+/**
+ * A share RECEIVED by an invitee, enriched for the "Shared with me" surface (T12). The raw share row
+ * carries only foreign-key IDs; a PENDING invitee has no other way to resolve them (the T5a fleet
+ * widening is ACCEPTED-only, so a pending invite's vehicle is otherwise invisible). So `/received`
+ * joins through to the vehicle's display name + the owner's display name — exactly the columns the
+ * invitee needs to render "Honda Civic — shared by Alice" without an N+1 follow-up read.
+ */
+export interface ReceivedShare extends VehicleShare {
+  /** nickname, else "year make model" — mirrors the FE getVehicleDisplayName helper. */
+  vehicleName: string;
+  /** The owner's display name (users.displayName), matching T5a's sharedAccess.sharedBy. */
+  sharedBy: string;
 }
 
 /** A share is "active" (occupies the partial-unique slot) while pending or accepted. */
@@ -70,17 +84,34 @@ export class VehicleShareRepository extends BaseRepository<VehicleShare, NewVehi
   }
 
   /**
-   * Shares RECEIVED by an invitee — the invitee-side "shared with me" list (T4). Returns pending +
-   * accepted only (declined/revoked are inert history the invitee should not see surfaced). Ordered
-   * oldest-first to match the owner-side list.
+   * Shares RECEIVED by an invitee — the invitee-side "shared with me" list (T4/T12). Returns pending +
+   * accepted only (declined/revoked are inert history the invitee should not see surfaced), ordered
+   * oldest-first to match the owner-side list. Joins the vehicle + owner so a pending invite renders a
+   * human label without an N+1; the join columns are the SHARE's own vehicle/owner (still scoped by
+   * sharedWithId), so it widens no cross-tenant read — the invitee already knows it was shared with them.
    */
-  async findReceivedByUser(sharedWithId: string): Promise<VehicleShare[]> {
+  async findReceivedByUser(sharedWithId: string): Promise<ReceivedShare[]> {
     const rows = await this.db
-      .select()
+      .select({
+        share: vehicleShares,
+        nickname: vehicles.nickname,
+        make: vehicles.make,
+        model: vehicles.model,
+        year: vehicles.year,
+        ownerName: users.displayName,
+      })
       .from(vehicleShares)
+      .innerJoin(vehicles, eq(vehicles.id, vehicleShares.vehicleId))
+      .innerJoin(users, eq(users.id, vehicleShares.ownerId))
       .where(eq(vehicleShares.sharedWithId, sharedWithId))
       .orderBy(vehicleShares.createdAt);
-    return rows.filter((r) => r.status === 'pending' || r.status === 'accepted');
+    return rows
+      .filter((r) => r.share.status === 'pending' || r.share.status === 'accepted')
+      .map((r) => ({
+        ...r.share,
+        vehicleName: r.nickname ?? `${r.year} ${r.make} ${r.model}`,
+        sharedBy: r.ownerName,
+      }));
   }
 
   /**

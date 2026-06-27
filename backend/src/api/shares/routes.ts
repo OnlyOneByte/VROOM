@@ -8,7 +8,7 @@ import type { ApiResponse } from '../../errors';
 import { ConflictError, NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { commonSchemas, validateVehicleOwnership } from '../../utils/validation';
-import { vehicleShareRepository } from './repository';
+import { type ReceivedShare, vehicleShareRepository } from './repository';
 
 /**
  * Vehicle-sharing — OWNER-side share-management routes (T3, `/api/v1/shares`). The owner invites
@@ -143,13 +143,15 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
 // can act on their OWN invite (a third party gets the same 404 a nonexistent share does, R2/R6).
 // ---------------------------------------------------------------------------
 
-// GET /api/v1/shares/received — invites/grants TO me (pending + accepted). R5.
+// GET /api/v1/shares/received — invites/grants TO me (pending + accepted), each enriched with the
+// vehicle's display name + the owner's name so the "Shared with me" surface (T12) can render a human
+// label even for a still-PENDING invite (which the accepted-only fleet widening cannot surface). R5.
 routes.get('/received', async (c) => {
   const user = c.get('user');
   const shares = await vehicleShareRepository.findReceivedByUser(user.id);
-  const response: ApiResponse<VehicleShare[]> = {
+  const response: ApiResponse<ReceivedShare[]> = {
     success: true,
-    data: shares.map(shareToApi),
+    data: shares,
     message: `Found ${shares.length} share${shares.length !== 1 ? 's' : ''}`,
   };
   return c.json(response);

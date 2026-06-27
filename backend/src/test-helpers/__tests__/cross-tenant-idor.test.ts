@@ -379,4 +379,33 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     const acc = await ctx.authed('POST', `/api/v1/shares/${shareId}/accept`);
     expect(acc.status, 'the real invitee A can accept').toBe(200);
   });
+
+  // vehicle-sharing T12 (enriched /received). The "shared with me" list now JOINs the vehicle + owner
+  // to label each row — so the join must stay scoped to sharedWithId === acting: an invitee must see
+  // ONLY shares addressed to THEM, never another tenant's received invites. B invites A; A's /received
+  // shows that one row, B's /received shows none (B is the owner, not an invitee of anything here).
+  test('shares: /received is scoped to the acting invitee even with the vehicle+owner join (T12)', async () => {
+    const vid = await idOf(
+      await asB('POST', '/api/v1/vehicles', { make: 'Subaru', model: 'Outback', year: 2023 })
+    );
+    await idOf(
+      await asB('POST', '/api/v1/shares', {
+        vehicleId: vid,
+        email: ctx.user.email, // invite A
+        level: 'viewer',
+      })
+    );
+
+    // A (the invitee) sees exactly the one share addressed to A, enriched with B's vehicle + B's name.
+    const aRecv = await json<DataEnvelope<Array<{ sharedWithId: string; vehicleName?: string }>>>(
+      await ctx.authed('GET', '/api/v1/shares/received')
+    );
+    expect(aRecv.data.length).toBe(1);
+    expect(aRecv.data[0]!.sharedWithId).toBe(ctx.user.id);
+    expect(aRecv.data[0]!.vehicleName).toBe('2023 Subaru Outback');
+
+    // B is the OWNER, not an invitee — B's /received is empty (the join did not leak its own grant in).
+    const bRecv = await json<DataEnvelope<unknown[]>>(await asB('GET', '/api/v1/shares/received'));
+    expect(bRecv.data.length).toBe(0);
+  });
 });
