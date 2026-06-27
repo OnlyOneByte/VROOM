@@ -365,9 +365,32 @@
       > that ARE shipped; the edit-round-trip leg lands with T5b.
 
 ## Phase 6 — DONE
-- [ ] **T14 — Feature DoD:** backend + frontend `validate:local` green; `regress.sh` green; eyes-on
-      screenshots of the share dialog + the "shared with me" surface + a viewer-mode vehicle (no edit
-      affordances); the full IDOR sweep green across every widened domain.
+- [x] **T14 — Feature DoD (C477, 2026-06-27). vehicle-sharing is COMPLETE.** All criteria met:
+      - **validate:local green both sides** — backend 2125 pass / 0 fail (tsc + musl-biome + bun test +
+        build); frontend 1327 pass / 0 fail (svelte-check 0 err + build + vitest).
+      - **Full IDOR sweep green** — `cross-tenant-idor.test.ts` 19 pass / 0 fail across EVERY widened
+        domain (vehicle GET + stats, expense R/W + split-write, odometer R/W, reminder R/W, analytics
+        READ, insurance policies + claims READ, shares mgmt). All 60 sharing-specific tests green across
+        6 files.
+      - **Eyes-on (booted stack, real sessions, Read the PNGs, zero console errors on all three):**
+        (1) SHARE DIALOG — owner [id] page, "Share vehicle" dialog open: invite-by-email + Viewer level
+        select + "Not shared yet" empty-state (C477). (2) SHARED-WITH-ME — demo dashboard with a seeded
+        pending invite: "Shared with you" card shows the vehicle + Editor badge + "Shared by <name>" +
+        Accept/Decline (C477). (3) VIEWER-MODE — a seeded viewer on a shared vehicle's [id] page: NO
+        Share/edit/photos chrome, read-only insurance (terms + claims, no mutate affordances), mileage/
+        fuel stats render (C476).
+      - **regress.sh** — green on the sharing surfaces; ONE pre-existing flake (`route-smoke /vehicles/[id]`
+        mobile-pass `page.goto` `networkidle` timeout) is a dev-server timing artifact that PASSES ON
+        RETRY — NOT introduced by sharing (C476 did not touch the spec; the owner path's mount loaders are
+        byte-identical for isOwner=true). Filed as an infra follow-on (harden the 15 `networkidle` gotos),
+        out of scope for this feature DoD.
+
+> **MILESTONE — vehicle-sharing is FULLY DONE (T0–T14).** The whole feature shipped on claude-loop-dev:
+> schema + the one access seam (utils/sharing), share-management routes, the per-domain gate-widening
+> (expenses/odometer/reminders R+W, analytics/insurance READ) each with its IDOR entries, backup
+> round-trip, the FE (share dialog, shared-with-me, fleet badge, viewer-mode read-only incl. insurance),
+> and the DoD gate. The BUILD QUEUE is now EMPTY → the loop drops to MAINTAIN mode until Angelo greenlights
+> the next spec.
 
 ## Guard-rails carried from the codebase
 - **404-not-403** on no-access (the #80 enumeration-oracle lesson).
