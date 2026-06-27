@@ -10,6 +10,7 @@ import { changeTracker, requireAuth } from '../../middleware';
 import { getPeriodStartDate, sortExpensesByDate } from '../../utils/calculations';
 import { logger } from '../../utils/logger';
 import { financingWithBalanceToApi, moneyDollarsToCents, vehicleToApi } from '../../utils/money';
+import { resolveVehicleAccess } from '../../utils/sharing';
 import {
   mergeUnitPreferences,
   partialUnitPreferencesSchema,
@@ -261,15 +262,42 @@ routes.post('/', zValidator('json', createVehicleSchema), async (c) => {
   return c.json(response, 201);
 });
 
-// GET /api/vehicles/:id - Get specific vehicle (with shared access)
+// GET /api/vehicles/:id - Get specific vehicle (owner OR shared viewer/editor).
+// vehicle-sharing T12b-3 (BE): the single-vehicle GET widens to shared READ via the resolver seam, and
+// returns a `sharedAccess { level, sharedBy }` annotation for a NON-owner (the same shape the fleet-list
+// ?include=shared path emits) so the FE [id] page can gate its edit affordances by level — a VIEWER sees
+// no edit/delete/share controls, an EDITOR sees expense/odometer write affordances but NOT the owner-only
+// ones (delete vehicle, financing, share management, which stay strict server-side). An OWNER response is
+// unchanged (no sharedAccess). A stranger gets the same 404 (existence-hiding) as a missing vehicle.
 routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
 
-  const vehicle = await vehicleRepository.findByIdWithAccess(id, user.id);
+  // Resolve access first: owner | viewer | editor | null. Null → 404 (never 403, the #80 oracle rule).
+  const access = await resolveVehicleAccess(id, user.id);
+  if (!access) {
+    throw new NotFoundError('Vehicle');
+  }
+
+  // Load the vehicle. For the OWNER this is their own row (findByIdWithAccess returns owner-only); for a
+  // shared invitee load by id (access already proven via the resolver), so the editor/viewer sees the row.
+  const vehicle =
+    access.role === 'owner'
+      ? await vehicleRepository.findByIdWithAccess(id, user.id)
+      : ((await vehicleRepository.findByIds([id]))[0] ?? null);
 
   if (!vehicle) {
     throw new NotFoundError('Vehicle');
+  }
+
+  // For a NON-owner, attach the sharedAccess annotation (level + owner displayName) — the same shape the
+  // ?include=shared fleet list emits. Resolved from the accepted-grants list (accepted-only, carries the
+  // owner name); the resolver already proved an accepted share exists, so the find is a label lookup.
+  let sharedAccess: { level: string; sharedBy: string } | undefined;
+  if (access.role !== 'owner') {
+    const grants = await vehicleShareRepository.findAcceptedAccessForUser(user.id);
+    const grant = grants.find((g) => g.vehicleId === id);
+    sharedAccess = { level: grant?.level ?? access.role, sharedBy: grant?.ownerName ?? 'Unknown' };
   }
 
   // Enrich financing with computed balance so the frontend can show progress
@@ -278,6 +306,7 @@ routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
       computedBalance?: number;
       eligibleForPayoff?: boolean;
     };
+    sharedAccess?: { level: string; sharedBy: string };
   } = vehicle;
   if (vehicle.financing) {
     const computedBalance = await financingRepository.computeBalance(vehicle.financing.id);
@@ -285,6 +314,9 @@ routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
       ...vehicle,
       financing: withComputedBalance(vehicle.financing, computedBalance),
     };
+  }
+  if (sharedAccess) {
+    responseData = { ...responseData, sharedAccess };
   }
 
   const response: ApiResponse<typeof responseData> = {
