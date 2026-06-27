@@ -62,14 +62,24 @@ Don't run the 6-budget recompute in BUILD mode — it's wasted work when the que
    D3 rate (T8) backend + the FE edit/delete eyes-on tail, all shipped + guarded (C6 date-resync, C7 backup
    round-trip). Don't re-pick.
 3. ~~**theming-engine**~~ — ✅ **COMPLETE (pre-reset: engine + 10 themes + picker, guarded 10 dimensions).** Don't re-pick.
-4. **vehicle-sharing** — `.kiro/specs/vehicle-sharing/tasks.md` (T0 NOT yet ratified — BLOCKED until
-   Angelo clears its gate; highest cross-tenant risk, so it waits). Skip until unblocked.
+4. **vehicle-sharing** — `.kiro/specs/vehicle-sharing/tasks.md` — **T0 RATIFIED C48; built through T13
+   (C48–C59).** DONE + shipped: T0–T4 (schema/resolver/routes), T5a (fleet-list read widening), T9 (backup
+   round-trip), T10–T11 + T12a/T12b-1/T12b-2 (FE client + Share dialog + Shared-with-you invites card +
+   fleet "shared by" badge), T13 (tracked lifecycle round-trip incl the D8 revoke→gone leg). **REMAINING is
+   ALL gated on Angelo's T5b expense read/write-model ruling** (Slack ts 1782524200): T5b/T6/T7/T8 (the
+   editor-WRITE gate-widening on the userId-keyed expense/odometer/reminder tables — a naive resolver-flip
+   mis-stamps money rows), T12b-3 (viewer-no-edit on the [id] page — needs the single-vehicle GET to widen
+   to shared-read + return the level, the T8 family), and the T13 edit-round-trip leg. Do NOT re-pick the
+   gated slices; do NOT re-escalate (escalated once per the gated-loop protocol).
 - Then the Angelo-approved bug/arch decisions (2026-06-23): #100 json_patch atomic, #79 offline-park,
   seedVehicle convergence (incremental), createLoadState (design-doc-first), #129 already done C155.
-> **QUEUE STATE (C19): FULLY DRAINED of buildable work** — #1 money-cents ✅ DONE+shipped, #2 trips ✅ DONE,
-> #3 theming ✅ DONE, #4 vehicle-sharing GATED (Angelo must ratify T0/D1–D8). The loop is now in MAINTAIN
-> mode until a gate clears. vehicle-sharing T0 is the single highest-leverage unblock; flag Angelo if every
-> maintenance vein is saturated. ~25-cycle META-REVIEW due ~C25.
+> **QUEUE STATE (C59 — after the sharing build arc): the buildable sharing work is DRAINED; what's left is
+> T5b-RULING-GATED.** money-cents ✅, trips ✅, theming ✅, vehicle-sharing ✅ through T13 (T5b/T6/T7/T8 +
+> T12b-3 + T13-edit-leg all wait on the one expense-model ruling). With no unblocked BUILD item, the loop
+> drops to MAINTAIN until Angelo rules on T5b. Per the gated-loop protocol, each nudge → cheap new-surface
+> check (git log over backend/src+frontend/src + the spec for a T5b ruling commit/steer) → work it if real,
+> else a ONE-LINE `yield: dry` record + pivot; do NOT manufacture an audit per cycle, do NOT re-escalate.
+> META-REVIEW ran C59 (this edit); next due ~C84.
 
 ## VELOCITY RULES (the C349 reform — don't pay waste the loop already learned to skip)
 1. **Conditional verify (skip the full gate on doc-only cycles).** `validate:local` (tsc+biome+test+
