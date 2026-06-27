@@ -43,9 +43,12 @@
       validateVehicleOwnership / ownerId-scoped reads → 404 never 403). Tests: shares-routes.test.ts (10
       cases, happy + reject paths) + a `shares` entry in cross-tenant-idor.test.ts (A cannot invite to B's
       vehicle nor change/revoke a share B granted; B's share untouched). validate:local green (2026 pass).
-- [ ] **T4 — invitee side.** GET `/received`, POST `:id/accept`, POST `:id/decline` (only
-      `sharedWithId === acting`; accepted→self-remove). IDOR entries: a third party can't accept/decline
-      someone else's invite.
+- [x] **T4 — invitee side (C51, 2026-06-27).** GET `/received` (pending+accepted shares TO me),
+      POST `:id/accept` (pending→accepted; non-pending→409), POST `:id/decline` (pending→declined OR
+      accepted→self-remove; frees the active slot for re-invite). ALL scoped to `sharedWithId === acting`
+      → a non-invitee gets 404 (existence-hiding). Repo: findReceivedByUser. Tests: +6 invitee cases in
+      shares-routes.test.ts (received/accept/decline/self-remove/non-pending-409/404) + an IDOR entry (the
+      OWNER, a non-invitee, cannot accept/decline the invite it sent; the real invitee can). Green (2032 pass).
 
 ## Phase 3 — gate-widening (ONE domain per cycle; each ships its IDOR entries)
 - [ ] **T5 — expenses** read+write routes: `validateVehicleOwnership` → `requireVehicleRead/Write`.
