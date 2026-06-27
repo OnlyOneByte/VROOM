@@ -51,9 +51,22 @@
       OWNER, a non-invitee, cannot accept/decline the invite it sent; the real invitee can). Green (2032 pass).
 
 ## Phase 3 — gate-widening (ONE domain per cycle; each ships its IDOR entries)
-- [ ] **T5 — expenses** read+write routes: `validateVehicleOwnership` → `requireVehicleRead/Write`.
-      `GET /vehicles?include=shared` widens the fleet list to owner ∪ accepted-shared. IDOR: viewer-write
-      denied, editor-other-vehicle denied.
+- [~] **T5 — SPLIT into T5a (DONE C52) + T5b (ESCALATED to Angelo, Slack ts 1782524200).**
+  - [x] **T5a — `GET /vehicles?include=shared` fleet-list widening (C52, 2026-06-27).** Read-only +
+        additive: an ACCEPTED share appends the owner's vehicle to the invitee's fleet, annotated
+        `sharedAccess { level, sharedBy }`; owner ∪ accepted-shared. Repo: vehicleRepository.findByIds +
+        vehicleShareRepository.findAcceptedAccessForUser (owner-name join, accepted-only). 5 tests:
+        accepted appears+annotated, pending/declined/non-shared do NOT appear, owned rows carry no
+        annotation. Green (2037 pass).
+  - [ ] **T5b — expense read+write widening — BLOCKED on Angelo's architecture call.** The spec's
+        "flip validateVehicleOwnership → requireVehicleRead/Write" does NOT work for expenses: the whole
+        expense read/write/backup/TCO model is `expenses.userId`-keyed, NOT vehicleId-keyed. A naive flip
+        (a) returns ZERO rows for a shared editor (findPaginated({userId})) and (b) would stamp an editor's
+        created expense with the EDITOR's userId → it vanishes from the owner's backup/TCO + double-counts.
+        D6-v1 (acting-user stamp) really means: stamp shared-created rows userId=OWNER + add a `createdBy`
+        column (migration 0011) + rework expense reads to resolve shared-vehicle access by vehicleId. Money
+        table + migration + highest cross-tenant risk → escalated (options: owner-stamp+createdBy / defer
+        editor-write to v2 / other). Build resumes on the ruling; design.md gets the chosen model first.
 - [ ] **T6 — odometer** read+write → the resolver; IDOR entries.
 - [ ] **T7 — reminders** read+write → the resolver; IDOR entries.
 - [ ] **T8 — insurance + analytics READ** → `requireVehicleRead`; IDOR entries. (Owner-only actions —
