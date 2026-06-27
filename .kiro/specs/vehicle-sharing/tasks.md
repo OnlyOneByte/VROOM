@@ -119,13 +119,25 @@
         cases (pending row label = "2021 Honda Civic" + `sharedBy` = owner not invitee; nickname wins) + an
         IDOR entry (the C108-C116 discipline: `/received` stays invitee-scoped through the join). Both
         validate:local green (BE 2045 pass [+3], FE 1325 pass, svelte-check 0 err).
-  - [ ] **T12b — the "Shared with me" UI (eyes-on).** Dashboard "Shared with me" section listing pending
-        invites with accept/decline (via `shareApi.accept`/`decline` + the T12a-enriched `vehicleName`/
-        `sharedBy`); fleet cards (VehicleCarousel) badged "shared by <name>" via the T5a `sharedAccess`
-        annotation (wire `getVehicles({includeShared:true})` + add `sharedAccess?` to the FE `Vehicle` type +
-        the `vehicleOverviews` projection + a Badge mirroring the "Financed" one); viewer sees NO edit
-        affordances (mirror the `requireVehicleWrite` denial in UI). Eyes-on: boot + shot the dashboard with a
-        seeded pending invite + an accepted shared vehicle.
+  - [~] **T12b — SPLIT into T12b-1 (invites card, DONE C57) + T12b-2 (fleet widening, next).**
+    - [x] **T12b-1 — "Shared with you" pending-invites card (C57, 2026-06-27).** `SharedWithMeCard.svelte`
+          on the dashboard (below the stats cards): a self-fetching, self-hiding notification widget listing
+          PENDING invites via the T12a-enriched `GET /received` — each row shows `vehicleName` + an
+          Editor/Viewer badge + "Shared by `sharedBy`" + Accept/Decline (`shareApi.accept`/`decline`, toast the
+          backend message via ApiError). Renders nothing unless an invite is pending or the load failed
+          (compact retry card) → the common dashboard is unchanged. Mounted OUTSIDE the `totalVehicles>0` gate
+          (a new user can be invited before owning anything); accepting fires `onAccepted` to refresh the
+          dashboard. EYES-ON VERIFIED (C230 drive-the-action): seeded a pending share, shot desktop + mobile
+          (renders both, no overflow), DROVE Accept → DB flipped pending→accepted + toast + card self-hid +
+          fleet refreshed; confirmed plain /vehicles does NOT leak the shared vehicle; zero console errors. FE
+          validate:local green (svelte-check 0 err, build, 1325 pass).
+    - [ ] **T12b-2 — fleet widening + "shared by" badge + viewer-no-edit (eyes-on).** Wire
+          `getVehicles({includeShared:true})` (append `?include=shared`) + add `sharedAccess?: SharedAccess` to
+          the FE `Vehicle` type + thread it through the dashboard `vehicleOverviews` projection +
+          `VehicleCarousel`'s local `VehicleOverview` → badge a shared card "shared by `<name>`" (mirror the
+          "Financed" Badge). Viewer-level shared vehicles show NO edit affordances on the [id] page (mirror the
+          `requireVehicleWrite` 404 denial in UI). Eyes-on: shot the dashboard with an accepted shared vehicle
+          present + a viewer-mode [id] page.
 - [ ] **T13 — Round-trip E2E** (`vehicle-sharing.meshclaw.e2e.ts`): owner invites → invitee accepts →
       invitee sees+edits (as editor) the shared vehicle's expenses → owner revokes → access gone. Self-cleaning.
 
