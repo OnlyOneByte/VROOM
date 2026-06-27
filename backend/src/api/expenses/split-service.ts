@@ -92,6 +92,11 @@ export class ExpenseSplitService {
       description?: string;
       sourceType?: string;
       sourceId?: string;
+      // vehicle-sharing T5b-2b: provenance of a shared-editor-created split (design §2.1 rule 2).
+      // `userId` is the vehicle OWNER (owner-stamp); `createdBy` records the actual author — the
+      // acting editor when they are not the owner, else NULL (the legacy/self sentinel). Omitted ⇒
+      // NULL, so an owner-authored split is byte-identical to pre-T5b-2b.
+      createdBy?: string | null;
     }
   ): Promise<Expense[]> {
     const siblings: Expense[] = [];
@@ -102,6 +107,7 @@ export class ExpenseSplitService {
         vehicleId: allocation.vehicleId,
         expenseAmount: allocation.amount,
         userId: params.userId,
+        createdBy: params.createdBy ?? null,
         groupId: params.groupId,
         groupTotal: params.groupTotal,
         splitMethod: params.splitMethod,

@@ -229,6 +229,25 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   }
 
   /**
+   * vehicle-sharing T5b-2b: the split group's distinct vehicleIds + its owner-stamped `userId`, read
+   * UNSCOPED (by groupId alone). The share-aware split routes call this FIRST to discover which
+   * vehicles to gate through `requireVehicleWrite/Read` — exactly as the single-expense write path
+   * loads the (owner-stamped) row unscoped via `findById` before authorizing on its vehicle. Every
+   * sibling carries the same `userId` (the owner-stamp invariant), so `ownerId` is taken from row 0;
+   * returns null when the group does not exist (caller → 404, existence-hiding).
+   */
+  async getSplitGroupAccessInfo(
+    groupId: string
+  ): Promise<{ vehicleIds: string[]; ownerId: string } | null> {
+    const rows = await this.db
+      .select({ vehicleId: expenses.vehicleId, userId: expenses.userId })
+      .from(expenses)
+      .where(eq(expenses.groupId, groupId));
+    if (rows.length === 0) return null;
+    return { vehicleIds: [...new Set(rows.map((r) => r.vehicleId))], ownerId: rows[0].userId };
+  }
+
+  /**
    * Find an expense by its offline idempotency key, scoped to a user.
    * Returns null if no row with that clientId exists for the user.
    */
@@ -646,11 +665,16 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       sourceType?: string;
       sourceId?: string;
     },
-    userId: string
+    userId: string,
+    // vehicle-sharing T5b-2b: the row-stamp owner (design §2.1 — every sibling's `userId`) and the
+    // actual author (`createdBy`). The route resolves these from the share seam and asserts the
+    // single-owner invariant + WRITE access BEFORE calling, so the repo no longer re-runs the strict
+    // owner-only `validateVehicleOwnership`. Default ownerId=userId / createdBy=null keeps a
+    // non-shared caller (and existing unit tests that pass only `userId`) byte-identical to pre-T5b-2b.
+    ownerId: string = userId,
+    createdBy: string | null = null
   ): Promise<Expense[]> {
     try {
-      await this.validateVehicleOwnership(data.splitConfig, userId);
-
       const allocations = expenseSplitService.computeAllocations(
         data.splitConfig,
         data.totalAmount
@@ -662,7 +686,8 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
 
         return expenseSplitService.createSiblings(tx, {
           groupId,
-          userId,
+          userId: ownerId,
+          createdBy,
           splitMethod,
           groupTotal: data.totalAmount,
           allocations,
@@ -746,7 +771,13 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   async updateSplitExpense(
     groupId: string,
     data: { splitConfig: SplitConfig; totalAmount?: number },
-    userId: string
+    userId: string,
+    // vehicle-sharing T5b-2b: provenance of the regenerated siblings. The route resolves the stamp
+    // owner (passed as `userId` — the group is owner-stamped, so the `groupOwnedBy` read below matches)
+    // and the acting author. `validateVehicleOwnership(config, userId)` then enforces the NEW vehicle
+    // set is entirely the owner's (the single-owner invariant for a shared editor). Default null keeps
+    // a non-shared caller identical to pre-T5b-2b.
+    createdBy: string | null = null
   ): Promise<Expense[]> {
     const oldSiblings = await this.db
       .select()
@@ -801,6 +832,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
         const newSiblings = await expenseSplitService.createSiblings(tx, {
           groupId,
           userId,
+          createdBy,
           splitMethod,
           groupTotal: totalAmount,
           allocations,

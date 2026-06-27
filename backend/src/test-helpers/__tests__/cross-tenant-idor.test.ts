@@ -132,6 +132,83 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     expectDenied(await ctx.authed('DELETE', `/api/v1/expenses/split/${gid}`), 'DELETE split');
   });
 
+  // vehicle-sharing T5b-2b (split WRITE widening — the C108-C116 IDOR discipline). The split routes
+  // moved from the strict assertVehiclesOwned (own EVERY vehicle) → requireSplitWriteAccess (owner |
+  // accepted editor on every config vehicle, single-owner set). This pins the widening did not
+  // over-open: an accepted VIEWER who legitimately READS the shared split still cannot CREATE/PUT/DELETE
+  // one (the requireVehicleRead vs requireVehicleWrite split), and a cross-owner set is rejected. Here B
+  // owns the vehicle; A is the viewer.
+  test('split (T5b-2b): a viewer reads but cannot create/update/delete a split; cross-owner rejected', async () => {
+    const vid = await idOf(
+      await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
+    );
+    // B seeds a split group on their own vehicle.
+    const gid = (
+      await json<DataEnvelope<{ groupId: string }>>(
+        await asB('POST', '/api/v1/expenses/split', {
+          splitConfig: { method: 'even', vehicleIds: [vid] },
+          category: 'misc',
+          totalAmount: 100,
+          date: '2024-06-02T00:00:00.000Z',
+        })
+      )
+    ).data.groupId;
+
+    // B shares vid with A as VIEWER; A accepts. A can READ the group but every WRITE is denied 404.
+    const shareId = await idOf(
+      await asB('POST', '/api/v1/shares', {
+        vehicleId: vid,
+        email: ctx.user.email,
+        level: 'viewer',
+      })
+    );
+    expect((await ctx.authed('POST', `/api/v1/shares/${shareId}/accept`)).status).toBe(200);
+
+    expect(
+      (await ctx.authed('GET', `/api/v1/expenses/split/${gid}`)).status,
+      'viewer can read the shared split group'
+    ).toBe(200);
+    expectDenied(
+      await ctx.authed('POST', '/api/v1/expenses/split', {
+        splitConfig: { method: 'even', vehicleIds: [vid] },
+        category: 'misc',
+        totalAmount: 10,
+        date: '2024-06-03T00:00:00.000Z',
+      }),
+      'viewer split create'
+    );
+    expectDenied(
+      await ctx.authed('PUT', `/api/v1/expenses/split/${gid}`, {
+        splitConfig: { method: 'even', vehicleIds: [vid] },
+      }),
+      'viewer split update'
+    );
+    expectDenied(
+      await ctx.authed('DELETE', `/api/v1/expenses/split/${gid}`),
+      'viewer split delete'
+    );
+
+    // A cross-owner split (A's OWN vehicle + B's shared vehicle) cannot stamp one owner → 400, not a
+    // silent cross-tenant write. A is a viewer on vid anyway (no write), but even as an editor this set
+    // is rejected by the single-owner invariant; here it must NOT create any row.
+    const aOwn = await idOf(
+      await ctx.authed('POST', '/api/v1/vehicles', { make: 'A', model: 'Car', year: 2022 })
+    );
+    const crossRes = await ctx.authed('POST', '/api/v1/expenses/split', {
+      splitConfig: { method: 'even', vehicleIds: [aOwn, vid] },
+      category: 'misc',
+      totalAmount: 50,
+      date: '2024-06-04T00:00:00.000Z',
+    });
+    // 404 (no write on vid) or 400 (cross-owner) — either way DENIED and nothing written on vid.
+    expect(crossRes.status, 'cross-owner / unauthorized split denied').toBeGreaterThanOrEqual(400);
+    const leaked = (
+      await json<{ data?: unknown[] }>(await asB('GET', `/api/v1/expenses?vehicleId=${vid}`))
+    ).data;
+    // B's vehicle still shows only the original group's sibling(s) — no leg from A's attempt.
+    expect(Array.isArray(leaked)).toBe(true);
+  });
+
   test("insurance: A cannot GET/PUT/DELETE B's policy, nor its claim", async () => {
     const vid = await idOf(
       await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })

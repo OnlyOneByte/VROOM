@@ -237,6 +237,46 @@ async function assertSplitFinancingSourceValid(
   }
 }
 
+/**
+ * vehicle-sharing T5b-2b: authorize a split WRITE across its full vehicle set + resolve the owner-stamp.
+ * The split path is the multi-vehicle analogue of the single-expense T5b-2 write: a sibling lands on
+ * EACH config vehicle, so the acting user must hold WRITE access (owner | accepted editor) to EVERY one
+ * — `requireVehicleWrite` per vehicle is the single denial gate (a stranger / viewer / editor-on-another-
+ * vehicle all get the same 404, existence-hiding). The owner-stamp model (design §2.1) keys each row's
+ * `userId` to the vehicle OWNER, but a split group carries ONE `userId` across all siblings, so the set
+ * must resolve to a SINGLE owner: a shared editor may split a cost across several vehicles only when they
+ * ALL belong to one owner (the clean-cut resolution of the multi-owner fork named in the T5b-2b/§2.1
+ * notes — a cross-owner split would have to stamp two different userIds into one group and would relocate
+ * cost across two users' books). `createdBy` records the actual author (the editor, or NULL when they are
+ * the owner — the legacy/self sentinel). Returns the resolved stamp for the repository.
+ *
+ * Pre-sharing behavior is preserved exactly: when every vehicle is the acting user's own, the loop
+ * resolves ownerId === acting and createdBy === null (byte-identical to the old assertVehiclesOwned path).
+ */
+async function requireSplitWriteAccess(
+  splitConfig: SplitConfig,
+  actingUserId: string
+): Promise<{ ownerId: string; createdBy: string | null }> {
+  const vehicleIds = splitConfigVehicleIds(splitConfig);
+  let ownerId: string | undefined;
+  for (const vehicleId of vehicleIds) {
+    // WRITE gate per sibling vehicle (owner | accepted editor | 404). REPLACES the strict
+    // assertVehiclesOwned so a shared editor can split onto the owner's vehicle.
+    await requireVehicleWrite(vehicleId, actingUserId);
+    const vehicleOwner = await resolveVehicleOwnerId(vehicleId);
+    if (!vehicleOwner) throw new NotFoundError('Vehicle'); // requireVehicleWrite already 404'd absent
+    if (ownerId === undefined) {
+      ownerId = vehicleOwner;
+    } else if (ownerId !== vehicleOwner) {
+      // A split spanning two owners cannot satisfy the single-`userId`-per-group owner-stamp invariant.
+      throw new ValidationError('A split cannot span vehicles owned by different users');
+    }
+  }
+  // splitConfig schemas guarantee ≥1 vehicle, so ownerId is always set here.
+  if (ownerId === undefined) throw new ValidationError('Split has no vehicles');
+  return { ownerId, createdBy: ownerId === actingUserId ? null : actingUserId };
+}
+
 // Exported so the query-contract (search/limit/tags coercion) can be unit-tested
 // at the route boundary without standing up a server.
 export const expenseQuerySchema = z.object({
@@ -283,7 +323,11 @@ routes.post('/split', zValidator('json', createSplitExpenseSchema), async (c) =>
   // the 'financing' literal; the shared helper validates per vehicle (no-op for a source-less split).
   await assertSplitFinancingSourceValid(data.sourceType, data.sourceId, data.splitConfig);
 
-  const siblings = await expenseRepository.createSplitExpense(data, user.id);
+  // vehicle-sharing T5b-2b: WRITE access to EVERY sibling vehicle + the single owner-stamp (owner |
+  // accepted editor on each; a cross-owner set is rejected). Replaces the strict owner-only check the
+  // repo used to run, so a shared editor can create a split on the owner's vehicle(s).
+  const { ownerId, createdBy } = await requireSplitWriteAccess(data.splitConfig, user.id);
+  const siblings = await expenseRepository.createSplitExpense(data, user.id, ownerId, createdBy);
   const first = siblings[0];
   if (!first?.groupId || first.groupTotal == null || !first.splitMethod) {
     throw new ValidationError('Split expense creation returned invalid data');
@@ -323,14 +367,38 @@ routes.put(
     // financing-source class on the split-UPDATE path the per-vehicle check missed). Re-validate the
     // carried link against the new vehicles before regenerating. getSplitExpense is userId-scoped (404s
     // a non-owned/absent group); a source-less split is a no-op.
-    const existing = await expenseRepository.getSplitExpense(id, user.id);
+    // vehicle-sharing T5b-2b: the group is owner-stamped, so load it UNSCOPED (by groupId) and
+    // authorize via the share seam — a userId-scoped read would 404 a shared editor on a group they
+    // can legitimately edit. requireSplitWriteAccess gates BOTH the existing vehicle set (the editor
+    // must currently have write on what they're regenerating) AND, separately below, the NEW set.
+    const groupInfo = await expenseRepository.getSplitGroupAccessInfo(id);
+    if (!groupInfo) throw new NotFoundError('Split expense');
+    const existingConfig: SplitConfig = { method: 'even', vehicleIds: groupInfo.vehicleIds };
+    await requireSplitWriteAccess(existingConfig, user.id);
+    // The NEW vehicle set must also be writable by the editor AND resolve to the SAME single owner as
+    // the group's existing owner-stamp — otherwise the regenerated siblings would relocate the group's
+    // cost onto a different user's books (the owner-stamp invariant: one userId across the group).
+    const { ownerId: newOwnerId, createdBy } = await requireSplitWriteAccess(
+      data.splitConfig,
+      user.id
+    );
+    if (newOwnerId !== groupInfo.ownerId) {
+      throw new ValidationError('A split cannot be moved to a vehicle owned by a different user');
+    }
+
+    const existing = await expenseRepository.getSplitExpense(id, groupInfo.ownerId);
     await assertSplitFinancingSourceValid(
       existing[0]?.sourceType ?? undefined,
       existing[0]?.sourceId ?? undefined,
       data.splitConfig
     );
 
-    const siblings = await expenseRepository.updateSplitExpense(id, data, user.id);
+    const siblings = await expenseRepository.updateSplitExpense(
+      id,
+      data,
+      groupInfo.ownerId,
+      createdBy
+    );
     const first = siblings[0];
     if (!first?.groupId || first.groupTotal == null || !first.splitMethod) {
       throw new ValidationError('Split expense update returned invalid data');
@@ -354,7 +422,17 @@ routes.get('/split/:id', zValidator('param', commonSchemas.idParam), async (c) =
   const user = c.get('user');
   const { id } = c.req.valid('param');
 
-  const siblings = await expenseRepository.getSplitExpense(id, user.id);
+  // vehicle-sharing T5b-3 (split READ): load the owner-stamped group UNSCOPED, then authorize READ on
+  // every sibling vehicle (owner | accepted viewer/editor). A viewer MAY read a shared split; a
+  // stranger gets the same 404 the absent-group branch throws (existence-hiding). Read the rows under
+  // the group's owner id (their stamped userId), not the acting user's.
+  const groupInfo = await expenseRepository.getSplitGroupAccessInfo(id);
+  if (!groupInfo) throw new NotFoundError('Split expense');
+  for (const vehicleId of groupInfo.vehicleIds) {
+    await requireVehicleRead(vehicleId, user.id);
+  }
+
+  const siblings = await expenseRepository.getSplitExpense(id, groupInfo.ownerId);
   const first = siblings[0];
   if (!first?.groupId || first.groupTotal == null || !first.splitMethod) {
     throw new ValidationError('Split expense data is invalid');
@@ -376,14 +454,23 @@ routes.delete('/split/:id', zValidator('param', commonSchemas.idParam), async (c
   const user = c.get('user');
   const { id } = c.req.valid('param');
 
+  // vehicle-sharing T5b-2b (split DELETE): load the owner-stamped group UNSCOPED, then authorize WRITE
+  // on every sibling vehicle (owner | accepted editor; viewer/stranger get the same 404). An editor
+  // may delete a shared split. All subsequent repo reads/writes are scoped to the group's OWNER id
+  // (the rows' stamped userId), and photo cleanup likewise — expense photos validate via the owner's
+  // userId, so passing the acting editor would 404 the cleanup.
+  const groupInfo = await expenseRepository.getSplitGroupAccessInfo(id);
+  if (!groupInfo) throw new NotFoundError('Split expense');
+  await requireSplitWriteAccess({ method: 'even', vehicleIds: groupInfo.vehicleIds }, user.id);
+
   // Clean each sibling expense's photos (provider files + refs + rows) BEFORE the
   // group delete. deleteSplitExpense already removes the photo DB rows in its
   // transaction, but NOT the external storage files or photo_refs — so without
   // this those would leak. Cleaning here makes the repo's row-delete a no-op.
-  const siblingIds = await expenseRepository.findIdsByGroupId(id, user.id);
-  await deletePhotosForEntities('expense', siblingIds, user.id);
+  const siblingIds = await expenseRepository.findIdsByGroupId(id, groupInfo.ownerId);
+  await deletePhotosForEntities('expense', siblingIds, groupInfo.ownerId);
 
-  await expenseRepository.deleteSplitExpense(id, user.id);
+  await expenseRepository.deleteSplitExpense(id, groupInfo.ownerId);
 
   return c.json({ success: true, message: 'Split expense deleted successfully' });
 });
