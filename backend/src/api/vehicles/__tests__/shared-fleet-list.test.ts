@@ -119,3 +119,68 @@ describe('GET /vehicles?include=shared — fleet-list widening (T5a, R3)', () =>
     expect(owned?.sharedAccess).toBeUndefined();
   });
 });
+
+/**
+ * vehicle-sharing T13 — the full lifecycle round-trip through the REAL stack, as a TRACKED HTTP-harness
+ * test (not an untracked browser e2e). The browser FE→render legs are already eyes-on-verified (T12b-1
+ * drove accept; T12b-2 shot the "shared by" fleet badge), and the GUIDE's standing truth is "source-scan
+ * guards > untracked e2e for merge survival" — an untracked *.meshclaw.e2e.ts vanishes on merge, and a
+ * browser spec cannot even set up the OWNER (auth is OAuth-only, no HTTP signup). So the durable artifact
+ * is this lifecycle assertion. It walks the exact T13 sequence — owner invites → invitee accepts (vehicle
+ * appears in the invitee fleet) → owner REVOKES → vehicle is GONE from the fleet — closing the D8
+ * revoke→gone-from-fleet leg, which no existing test pinned (shares-routes pins revoke→slot-freed only).
+ */
+describe('vehicle-sharing T13 — invite → accept → appears → revoke → gone (lifecycle, D8)', () => {
+  test('the owner revoking an ACCEPTED share removes the vehicle from the invitee fleet', async () => {
+    // 1. Owner A shares a vehicle with invitee B; B accepts.
+    const [vehicleId, shareId] = await shareWithB('editor');
+    expect((await asB('POST', `/api/v1/shares/${shareId}/accept`)).status).toBe(200);
+
+    // 2. The accepted vehicle is now in B's shared fleet, annotated.
+    const afterAccept = await json<DataEnvelope<VehicleRow[]>>(
+      await asB('GET', '/api/v1/vehicles?include=shared')
+    );
+    const accepted = afterAccept.data.find((v) => v.id === vehicleId);
+    expect(accepted, 'accepted vehicle is in the invitee fleet').toBeDefined();
+    expect(accepted?.sharedAccess?.level).toBe('editor');
+
+    // 3. Owner A revokes the share (D8 — the DELETE flips status to revoked).
+    expect((await ctx.authed('DELETE', `/api/v1/shares/${shareId}`)).status).toBe(200);
+
+    // 4. The vehicle is GONE from B's fleet — a revoked grant confers NO fleet visibility (the leg
+    //    no prior test pinned). B's owned fleet is unaffected (B never owned it).
+    const afterRevoke = await json<DataEnvelope<VehicleRow[]>>(
+      await asB('GET', '/api/v1/vehicles?include=shared')
+    );
+    expect(
+      afterRevoke.data.find((v) => v.id === vehicleId),
+      'revoked vehicle must disappear from the invitee fleet'
+    ).toBeUndefined();
+  });
+
+  test('a re-invite after revoke, re-accepted, brings the vehicle BACK to the invitee fleet', async () => {
+    // The slot frees on revoke (partial-unique excludes revoked), so the owner can re-share the same
+    // vehicle with the same invitee — the full reversible lifecycle, not a one-way door.
+    const [vehicleId, shareId] = await shareWithB('viewer');
+    await asB('POST', `/api/v1/shares/${shareId}/accept`);
+    await ctx.authed('DELETE', `/api/v1/shares/${shareId}`); // revoke → gone
+
+    // Re-invite (a fresh share row), B re-accepts.
+    const reinvite = await ctx.authed('POST', '/api/v1/shares', {
+      vehicleId,
+      email: bEmail,
+      level: 'editor',
+    });
+    const reBody = await json<DataEnvelope<{ id: string }>>(reinvite);
+    expect(reinvite.status, JSON.stringify(reBody)).toBe(201);
+    expect((await asB('POST', `/api/v1/shares/${reBody.data.id}/accept`)).status).toBe(200);
+
+    const back = await json<DataEnvelope<VehicleRow[]>>(
+      await asB('GET', '/api/v1/vehicles?include=shared')
+    );
+    const row = back.data.find((v) => v.id === vehicleId);
+    expect(row, 'the re-accepted vehicle returns to the invitee fleet').toBeDefined();
+    // The new grant's level (editor) is reflected, not the revoked one's (viewer).
+    expect(row?.sharedAccess?.level).toBe('editor');
+  });
+});
