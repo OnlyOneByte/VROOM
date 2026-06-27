@@ -37,6 +37,7 @@ function makeChargeExpense(overrides: {
     description: null,
     missedFillup: overrides.missedFillup ?? false,
     userId: 'test-user',
+    createdBy: null,
     groupId: null,
     groupTotal: null,
     splitMethod: null,
