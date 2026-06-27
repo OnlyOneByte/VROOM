@@ -62,24 +62,26 @@ Don't run the 6-budget recompute in BUILD mode — it's wasted work when the que
    D3 rate (T8) backend + the FE edit/delete eyes-on tail, all shipped + guarded (C6 date-resync, C7 backup
    round-trip). Don't re-pick.
 3. ~~**theming-engine**~~ — ✅ **COMPLETE (pre-reset: engine + 10 themes + picker, guarded 10 dimensions).** Don't re-pick.
-4. **vehicle-sharing** — `.kiro/specs/vehicle-sharing/tasks.md` — **T0 RATIFIED C48; built through T13
-   (C48–C59).** DONE + shipped: T0–T4 (schema/resolver/routes), T5a (fleet-list read widening), T9 (backup
-   round-trip), T10–T11 + T12a/T12b-1/T12b-2 (FE client + Share dialog + Shared-with-you invites card +
-   fleet "shared by" badge), T13 (tracked lifecycle round-trip incl the D8 revoke→gone leg). **REMAINING is
-   ALL gated on Angelo's T5b expense read/write-model ruling** (Slack ts 1782524200): T5b/T6/T7/T8 (the
-   editor-WRITE gate-widening on the userId-keyed expense/odometer/reminder tables — a naive resolver-flip
-   mis-stamps money rows), T12b-3 (viewer-no-edit on the [id] page — needs the single-vehicle GET to widen
-   to shared-read + return the level, the T8 family), and the T13 edit-round-trip leg. Do NOT re-pick the
-   gated slices; do NOT re-escalate (escalated once per the gated-loop protocol).
-- Then the Angelo-approved bug/arch decisions (2026-06-23): #100 json_patch atomic, #79 offline-park,
-  seedVehicle convergence (incremental), createLoadState (design-doc-first), #129 already done C155.
-> **QUEUE STATE (C59 — after the sharing build arc): the buildable sharing work is DRAINED; what's left is
-> T5b-RULING-GATED.** money-cents ✅, trips ✅, theming ✅, vehicle-sharing ✅ through T13 (T5b/T6/T7/T8 +
-> T12b-3 + T13-edit-leg all wait on the one expense-model ruling). With no unblocked BUILD item, the loop
-> drops to MAINTAIN until Angelo rules on T5b. Per the gated-loop protocol, each nudge → cheap new-surface
-> check (git log over backend/src+frontend/src + the spec for a T5b ruling commit/steer) → work it if real,
-> else a ONE-LINE `yield: dry` record + pivot; do NOT manufacture an audit per cycle, do NOT re-escalate.
-> META-REVIEW ran C59 (this edit); next due ~C84.
+4. **vehicle-sharing** — `.kiro/specs/vehicle-sharing/tasks.md` — **T0 RATIFIED C48; T5b ruled (a) C91; the
+   read-widening arc shipped C92–C102.** DONE + shipped: T0–T4, T5a, T9, T10–T13 (the C48–C59 arc), then the
+   FULL editor-model: T5b-1 migration 0011 createdBy (C92), T5b-2 expense WRITE owner-stamp (C93), T5b-3 +
+   T5b-3b expense READ incl. CSV export (C94/C101), T6 odometer (C95), T7 reminder READ (C96), T8a analytics
+   + T8b insurance READ w/ §6.4 blast-radius (C97/C98), T12b-3a vehicle-GET shared-read+level (C99) + T12b-3b
+   FE viewer-mode gating, eyes-on (C100), validateOdometerOwnership dead-export cleanup (C102). **The backend
+   READ-widening family is COMPLETE across all 7 read surfaces; the [id]-page viewer-mode FE is eyes-on-done.**
+   REMAINING (C102): two MULTI-vehicle WRITE slices — T5b-2b split-expense + T7b reminders — **ESCALATED to
+   Angelo C102 (Slack ts 1782544031)** because a multi-vehicle write can span DIFFERENT owners and the row
+   group keys on one userId (a/b/c options: same-owner-only / owner-only / defer-past-v1). Do NOT re-escalate
+   (once per condition). Plus the non-gated T12b-3c (read-only shared insurance: widen GET /insurance/:id/claims
+   + a read-only PolicyList — self-rated low-value) and T14 feature-DoD (once the write ruling lands).
+> **QUEUE STATE (C102): vehicle-sharing is ~90% shipped — all reads + single-entity writes + viewer-mode FE
+> done.** money-cents ✅, trips ✅, theming ✅, vehicle-sharing through T12b-3b ✅. The ONLY gated work is the
+> two multi-vehicle WRITE slices (escalated C102, awaiting Angelo's a/b/c). Buildable-now non-gated: T12b-3c
+> (low-value) + the infra cadence. When the write ruling lands → build it, then T14 DoD. Until then, per the
+> gated-loop protocol: cheap new-surface check each nudge (git log + the spec + a ruling commit), build the
+> non-gated remainder OR the infra cadence if a real surface exists, else ONE-LINE `yield: dry` + pivot; do
+> NOT re-escalate, do NOT manufacture an audit per cycle.
+> META-REVIEW ran C103 (this edit, the slipped ~C84/C108 one); next due ~C128.
 
 ## VELOCITY RULES (the C349 reform — don't pay waste the loop already learned to skip)
 1. **Conditional verify (skip the full gate on doc-only cycles).** `validate:local` (tsc+biome+test+
