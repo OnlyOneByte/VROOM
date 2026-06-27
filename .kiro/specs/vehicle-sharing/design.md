@@ -59,6 +59,53 @@ async function requireVehicleWrite(db, vehicleId, userId): Promise<Access>  // o
 - Existing read/write routes change from `validateVehicleOwnership(...)` to `requireVehicleRead/Write(...)`
   ONE DOMAIN PER SLICE (expenses, then odometer, then reminders, then insurance-read, then analytics-read).
 
+### §2.1 — The editor-WRITE model (T5b; RATIFIED by Angelo 2026-06-27 = option (a) owner-stamp + createdBy)
+> THE money-data-safety core of the whole feature. Ratified after the T5b escalation. The naive
+> "flip the gate" is WRONG because expenses/odometer/reminders are **`userId`-keyed** (reads filter
+> `eq(userId)`, creates stamp the acting user, backup/TCO query by `userId`). A shared editor stamping
+> their OWN userId would make the row vanish from the owner's backup+TCO and double-count cross-fleet.
+> The ratified model fixes this with two coordinated rules:
+
+1. **OWNER-STAMP on shared-created rows (the load-bearing rule).** When an EDITOR (non-owner) creates an
+   expense / odometer / reminder on a shared vehicle, the row's `userId` is stamped with the **vehicle
+   OWNER's** id (resolved via `resolveVehicleAccess` → the owner is `vehicles.userId`), NOT the editor's.
+   Consequence (all desirable, and all already assumed by the C54 backup design + the `vehicleShares`
+   schema header): the row rides the OWNER's backup, counts once in the OWNER's TCO, and stays on
+   revoke/delete as real cost history. An OWNER creating on their own vehicle is unchanged (stamps self).
+
+2. **`createdBy` column (migration 0011, additive) records the ACTUAL author.** New nullable
+   `created_by` text column → `users.id` (no cascade delete of the row; SET NULL or leave dangling-safe —
+   it is provenance, not ownership). `userId` = whose vehicle/books the row belongs to (owner);
+   `createdBy` = who physically entered it (editor or owner). NULL `createdBy` ⇒ legacy/self-created
+   (treat as `createdBy == userId`). Backfill: existing rows get `created_by = user_id` is NOT required —
+   NULL is the legacy sentinel, so the migration is pure additive `ALTER TABLE ADD COLUMN` (no rebuild,
+   avoids the C15/0004 cascade-wipe footgun; write the snapshot so 0012 diffs clean).
+
+3. **READS must resolve shared access by `vehicleId`, not `userId` (the rework).** Because shared-created
+   rows are stamped `userId=owner`, a shared editor querying their OWN list (`findPaginated({userId:me})`)
+   will NOT see the shared vehicle's expenses. So the per-vehicle read routes (expense list/summary,
+   odometer history/getCurrentOdometer, reminders) gate via `requireVehicleRead(vehicleId, acting)` and
+   then query **by `vehicleId`** (the row's `userId` is the owner, which the editor is allowed to read for
+   that vehicle). The cross-fleet/dashboard aggregates (`getPerVehicleStats`, `getSummary`) stay
+   `userId`-scoped = the acting user's OWNED books only — a shared vehicle's costs belong to the OWNER's
+   dashboard, NOT the editor's (the editor sees them only when viewing that specific shared vehicle). This
+   keeps TCO/analytics correct on BOTH sides with no double-count.
+
+4. **`getCurrentOdometer` cross-user fix.** It MAX-UNIONs expenses.mileage + odometer rows scoped
+   `vehicle_id = ? AND user_id = ?`. For a shared vehicle every row is owner-stamped, so scope that read
+   by the **owner's** userId (resolved from the share), not the acting editor's — else the editor's
+   newly-entered reading (also owner-stamped) is the only one visible and lease/mileage math breaks.
+
+5. **Owner-only actions remain STRICT.** Delete-vehicle, financing/purchase-price edit, and
+   share-management keep `validateVehicleOwnership` (owner===acting). An editor passing `requireVehicleWrite`
+   must NOT reach them — verified by an `editor-owner-action-denied` IDOR entry.
+
+**Build order (one verified slice/cycle, each shipping its `cross-tenant-idor.test.ts` entries):**
+T5b-1 migration 0011 (additive `created_by` + schema type + migration test) → T5b-2 expense WRITE
+(POST/PUT/DELETE via `requireVehicleWrite`, owner-stamp + `createdBy`, IDOR) → T5b-3 expense READ
+(list/summary by vehicleId for shared, IDOR) → T6 odometer (write+read+getCurrentOdometer owner-scope) →
+T7 reminders → T8 insurance/analytics READ + viewer-no-edit (T12b-3). Each is green→green; never commit red.
+
 ## §3 — Routes (`/api/v1/shares`, new router) + the gate-widening
 **New share-management endpoints:**
 | Method | Path | Who | Action |
