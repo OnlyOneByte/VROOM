@@ -122,6 +122,44 @@ describe('expense WRITE widening — owner-stamp + createdBy (T5b-2)', () => {
     expect(row.created_by).toBeNull(); // self-created → NULL legacy/self sentinel, identical to pre-T5b
   });
 
+  // PROVENANCE FORGE-VECTOR GUARD (T5b-2 hardening, C104): `createdBy` is SERVER-controlled — the create
+  // schema OMITS it from client input and the handler computes it (acting-when-editor, else NULL). A
+  // client must NOT be able to claim a different author by putting `createdBy` in the POST body. These
+  // pin that the forged value is IGNORED on BOTH paths, so a future schema refactor (re-adding the field,
+  // or dropping createInsertSchema) that silently reopened the forge would fail here. The body carries an
+  // extra `createdBy` via a cast — the schema strips unknown keys, this just proves it at the wire level.
+  test('a forged createdBy in the OWNER create body is IGNORED (stays NULL, not the forged id)', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Owned', model: 'Car', year: 2022 });
+    const res = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'misc',
+      expenseAmount: 9,
+      date: '2024-06-08T00:00:00.000Z',
+      createdBy: 'forged-author-id',
+    } as Record<string, unknown>);
+    const body = await json<DataEnvelope<{ id: string }>>(res);
+    expect(res.status, JSON.stringify(body)).toBe(201);
+    const row = storedRow(body.data.id);
+    expect(row.user_id).toBe(ctx.user.id);
+    expect(row.created_by).toBeNull(); // forged value dropped — owner self-create is the NULL sentinel
+  });
+
+  test('a forged createdBy in an EDITOR create body is IGNORED (stamped the acting editor, not the forged id)', async () => {
+    const vehicleId = await shareAccepted('editor');
+    const res = await asB('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'misc',
+      expenseAmount: 9,
+      date: '2024-06-09T00:00:00.000Z',
+      createdBy: 'forged-author-id',
+    } as Record<string, unknown>);
+    const body = await json<DataEnvelope<{ id: string }>>(res);
+    expect(res.status, JSON.stringify(body)).toBe(201);
+    const row = storedRow(body.data.id);
+    expect(row.user_id).toBe(ctx.user.id); // owner-stamped
+    expect(row.created_by).toBe(bId); // the ACTING editor B — never the forged id
+  });
+
   test('an EDITOR can PUT and DELETE a cost row on the shared vehicle (D3 editor capability)', async () => {
     const vehicleId = await shareAccepted('editor');
     // Owner A creates the row; the editor B then edits + deletes it.
