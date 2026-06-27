@@ -94,3 +94,23 @@ export async function requireVehicleWrite(
   if (!access || access.role === 'viewer') throw new NotFoundError('Vehicle');
   return access; // owner | editor
 }
+
+/**
+ * The vehicle OWNER's userId (vehicles.userId) — the value a shared-created row's `userId` is stamped
+ * with under the T5b owner-stamp model (design §2.1). For an OWNER writing their own vehicle this
+ * equals the acting user; for an EDITOR it is the other (owner) user, so the row rides the OWNER's
+ * backup/TCO + counts once (and `createdBy` records the editor as the actual author). Returns null
+ * only if the vehicle does not exist — callers gate on `requireVehicleWrite` FIRST (which 404s an
+ * absent/unwritable vehicle), so a successful write path always resolves a real owner id.
+ */
+export async function resolveVehicleOwnerId(
+  vehicleId: string,
+  db: AppDatabase = getDb()
+): Promise<string | null> {
+  const owned = await db
+    .select({ userId: vehicles.userId })
+    .from(vehicles)
+    .where(eq(vehicles.id, vehicleId))
+    .limit(1);
+  return owned[0]?.userId ?? null;
+}
