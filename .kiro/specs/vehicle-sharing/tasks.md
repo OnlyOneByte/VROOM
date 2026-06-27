@@ -160,10 +160,9 @@
           vehicle set is entirely ONE owner's" + owner-stamp userId = that owner. Currently SAFE — the WRITE
           paths keep strict validateVehicleIdsOwned (a shared editor is cleanly denied, pinned by the T7 write
           IDOR entry). Resume after T8, or escalate the multi-owner fork to Angelo if it is not clean-cut.
-- [~] **T8 — insurance + analytics READ → `requireVehicleRead`.** SPLIT into T8a (analytics, DONE C97) +
-      T8b (insurance, next). Owner-only actions (delete vehicle, financing/purchase-price edit, share
-      management) KEEP strict `validateVehicleOwnership` — verified denied for an editor (the T5b-2
-      editor-owner-action IDOR entry).
+- [x] **T8 — insurance + analytics READ → `requireVehicleRead` (DONE: T8a C97 + T8b C98).** Owner-only
+      actions (delete vehicle, financing/purchase-price edit, share management) KEEP strict
+      `validateVehicleOwnership` — verified denied for an editor (the T5b-2 editor-owner-action IDOR entry).
     - [x] **T8a — per-vehicle analytics READ widening (C97, 2026-06-27).** The six vehicle-scoped analytics
           routes (fuel-stats, fuel-advanced, fuel-efficiency, vehicle-health, vehicle-tco, vehicle-expenses)
           flipped `validateVehicleOwnership` → a shared `resolveVehicleScope(vehicleId, acting)` helper
@@ -176,15 +175,20 @@
           stranger-404 all six, pending-404, TCO surfaces the owner-stamped expense [owner-scope not empty],
           owner-self-unchanged) + cross-tenant-idor.test.ts (+1: third-party denied all six). Backend
           validate:local green (2083 pass [+7], 0 fail, drift guards green).
-    - [ ] **T8b — insurance per-vehicle READ widening (`GET /insurance/vehicles/:vehicleId/policies`).**
-          DEFERRED from T8 (WIP=1): a wrinkle the analytics/expense reads did not have — `findByVehicleId`
-          returns the WHOLE policy (incl. its OTHER terms/vehicles' coverage), so widening it to a shared
-          invitee could leak the owner's coverage on vehicles NOT shared with them (a multi-vehicle policy
-          spanning shared + unshared cars). The fix likely filters the returned terms/coverage to the shared
-          vehicle only — a repository-shape change, not a one-line gate flip. Plus the analytics `/insurance`
-          cross-fleet route is acting-user-scoped (correct, no change). Currently SAFE — the per-vehicle
-          policies route keeps strict `validateVehicleOwnership` (an invitee 404s). Resume after T12b-3, or
-          escalate the leak-scope decision to Angelo if the per-vehicle coverage filter is not clean-cut.
+    - [x] **T8b — insurance per-vehicle READ widening + blast-radius (C98, 2026-06-27).**
+          `GET /insurance/vehicles/:vehicleId/policies` flipped `validateVehicleOwnership` →
+          `requireVehicleRead` (owner | viewer | editor | 404). The flagged wrinkle was REAL +
+          clean-cut (no escalation needed): `findByVehicleId` returns the WHOLE policy (all terms + the
+          full termVehicleCoverage junction + vehicleIds deduped across ALL terms), so a NON-owner would
+          see the owner's OTHER vehicles. Applied design §6.4 blast-radius via a pure `narrowPolicyToVehicle`
+          helper: for a non-owner, drop terms not covering the shared vehicle + filter coverage rows + reduce
+          vehicleIds to just it; the OWNER (access.role==='owner') gets the full policy UNCHANGED (narrows only
+          a shared invitee's view, never the owner's — behavior-preserving for the existing owner path). The
+          analytics `/insurance` cross-fleet route stays acting-user-scoped (untouched). +shared-insurance-read.test.ts
+          (5 cases: multi-vehicle policy narrowed for a viewer [no leak of the other vehicle], OWNER sees the
+          full policy, a term covering ONLY the other vehicle is dropped, stranger-404, pending-404) +
+          cross-tenant-idor.test.ts (+1: third-party per-vehicle policies list denied). Backend validate:local
+          green (2089 pass [+6], 0 fail, drift guards green).
 
 ## Phase 4 — backup / restore (R7, NORTH_STAR #1)
 - [x] **T9 — `vehicle_shares` round-trip (C54, 2026-06-27).** Wired the table end-to-end through BOTH
