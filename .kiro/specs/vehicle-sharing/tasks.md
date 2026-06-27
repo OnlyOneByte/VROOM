@@ -79,12 +79,18 @@
       verified denied for an editor.)
 
 ## Phase 4 — backup / restore (R7, NORTH_STAR #1)
-- [ ] **T9 — `vehicle_shares` round-trip.** FIRST move `vehicle_shares` OUT of `EXCLUDED_BY_DESIGN` in
-      `backup-table-coverage.test.ts` (T1 parked it there with a pending-T9 marker — the table shipped
-      schema-first; backup wiring is THIS task). Join the table-coverage maps (both source-scan guards) +
-      `validateReferentialIntegrity` (vehicleId→vehicles, owner/sharedWith→users). Owner export includes
-      granted shares; the invitee export must NOT pull the owner's vehicle/shares (blast-radius test, §6.4).
-      Round-trip: seed → export → wipe → restore → identical (D7 decides pending re-creation).
+- [x] **T9 — `vehicle_shares` round-trip (C54, 2026-06-27).** Wired the table end-to-end through BOTH
+      backup paths: config maps (TABLE_SCHEMA_MAP/FILENAME_MAP/OPTIONAL) + BackupData/ParsedBackupData types
+      + createBackup query (ZIP) + google-sheets-service (SHEET_HEADERS/SHEET_NAMES + export query/fan-out +
+      readback) + validateReferentialIntegrity (validateShareRefs: vehicleId→vehicles, ownerId→creator;
+      sharedWithId deliberately NOT validated — invitee not in backup) + validateUniqueConstraints
+      (active-share dup) + restore FK-ordered insert + conflict-probe + ImportSummary (both paths). Moved
+      vehicle_shares OUT of EXCLUDED_BY_DESIGN (T1 park discharged). DATA-SAFETY decisions: D7 = export
+      ACCEPTED grants only (createBackup filters status='accepted'); §6.4 blast-radius = ownerId scope so an
+      invitee never exports the owner's shares; #127-safe = restore re-stamps ownerId to importer + SKIPS a
+      grant whose invitee user is absent (cross-instance) rather than FK-aborting the whole restore. 5-case
+      round-trip test (round-trip / D7 accepted-only / invitee-blast-radius / cross-instance-skip). All 4
+      drift guards green. validate:local green (2042 pass).
 
 ## Phase 5 — frontend (eyes-on tail; Playwright-gated → "code-complete, eyes-on pending")
 - [x] **T10 — `share-api.ts` client + types (C53, 2026-06-27).** Pulled FORWARD (out of phase order) as
