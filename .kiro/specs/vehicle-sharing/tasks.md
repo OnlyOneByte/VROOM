@@ -268,14 +268,29 @@
             cases in shared-fleet-list.test.ts (viewer/editor annotated, owner-no-annotation, stranger+pending
             both 404). Backend validate:local green (2093 pass [+4], 0 fail). NOTE: the existing GET-vehicle IDOR
             entry still passes (a non-shared third party 404s — the widening grants ONLY accepted shares).
-      - [ ] **T12b-3b — FE: gate the [id] edit affordances by level (eyes-on).** Thread `vehicle.sharedAccess?.level`
-            into VehicleHeader + children: a VIEWER sees NO edit/delete/share/odometer-write/finance-edit
-            affordances; an EDITOR sees expense+odometer write but NOT the owner-only ones (delete vehicle,
-            financing, share management). There is zero gating infra today (no canEdit/level prop — each affordance
-            gates at its own call site), so this is a real FE slice + a Playwright eyes-on (seed an accepted
-            viewer share, shoot the [id] page as the invitee, confirm the edit chrome is absent). The backend
-            already enforces every denial (owner-only stays strict; editor-write via requireVehicleWrite) — this
-            is defense-in-depth UX, not the security boundary.
+      - [x] **T12b-3b — FE: gate the [id] edit affordances by level (C100, 2026-06-27, eyes-on).** Derived two
+            capabilities on the [id] page from `vehicle.sharedAccess`: `isOwner` (no annotation → owned) and
+            `canWrite` (owner OR editor). Gated every affordance by call site: Share button + dialog (isOwner),
+            VehicleInfoCard edit (isOwner prop), VehiclePhotoCarousel upload/delete/set-cover (isOwner prop),
+            FinanceTab → NextPaymentCard Record/Change-payment (isOwner prop), CSV export (isOwner), the empty-state
+            Add-Expense + FAB (canWrite), ExpensesTable Edit links + delete (canWrite prop — delete suppressed by
+            nulling onDelete so all 4 `{#if onDelete}` gates hide), OdometerTab Add/Edit/Delete (canWrite prop).
+            All props default true so every existing owner call site is unchanged. EYES-ON (C230 drive-the-view):
+            booted servers, seeded an accepted VIEWER share to a second user + minted their session, shot the [id]
+            page as the viewer → confirmed Share/edit/photos chrome ABSENT. The shot SURFACED a real gap: the
+            InsuranceTab was ungated (showed Add-Policy/edit/renew/file-claim + "insurance policy not found" errors
+            — T8b widened only the per-vehicle policies LIST, not the claims sub-reads), so gated the whole tab +
+            its lazy-load to `isOwner` (a read-only shared insurance view is deferred as T12b-3c). FE validate:local
+            green (svelte-check 0 err, build, 1327 tests). The viewer-session backend read is verified 200 via
+            direct API (curl); the re-shot to confirm the insurance fix flaked on a known shot-harness cookie
+            artifact (the FIRST shot rendered + proved the gating; the fix is a trivial `&& isOwner` mirror of the
+            shot-verified Share/edit gating). The backend enforces every denial regardless — this is
+            defense-in-depth UX.
+      - [ ] **T12b-3c — read-only shared INSURANCE view (deferred).** A viewer currently sees no insurance on a
+            shared vehicle (the whole tab is owner-gated, C100). To show it read-only needs: (a) widen the claims
+            sub-reads (GET /insurance/:id/claims) to shared read with the §6.4 blast-radius narrow, and (b) a
+            read-only PolicyList/PolicyCard variant (no Add/Edit/Renew/Delete/File-Claim/Upload). Currently SAFE
+            (hidden, not broken). Low priority — the per-vehicle policies LIST read is already widened (T8b).
 - [x] **T13 — Lifecycle round-trip (C59, 2026-06-27).** Shipped as a TRACKED HTTP-harness round-trip
       (`shared-fleet-list.test.ts`, +2 tests) NOT an untracked browser e2e — rationale: (a) GUIDE standing
       truth "source-scan/harness guards > untracked e2e for merge survival" (a `*.meshclaw.e2e.ts` is gitignored
