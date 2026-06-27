@@ -235,3 +235,56 @@ describe('vehicle-sharing T12b-3 (BE) — GET /vehicles/:id shared-read + level 
     expect((await asB('GET', `/api/v1/vehicles/${privateVehicle}`)).status).toBe(404);
   });
 });
+
+interface StatsEnvelope {
+  fuelExpenseCount: number;
+  currentOdometer: number | null;
+}
+
+describe('vehicle-sharing T12b-3c (BE) — GET /vehicles/:id/stats shared-read', () => {
+  test('an accepted VIEWER reads the shared vehicle stats, OWNER-scoped (sees the owner-stamped fuel data)', async () => {
+    const [vehicleId, shareId] = await shareWithB('viewer');
+    expect((await asB('POST', `/api/v1/shares/${shareId}/accept`)).status).toBe(200);
+    // The OWNER logs a fuel fill-up; an editor/viewer's per-vehicle stats must reflect the OWNER's books.
+    await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'fuel',
+      expenseAmount: 50,
+      volume: 10,
+      mileage: 30000,
+      fuelType: 'Regular',
+      date: '2024-06-01T00:00:00.000Z',
+    });
+
+    const res = await asB('GET', `/api/v1/vehicles/${vehicleId}/stats?period=all`);
+    const body = await json<DataEnvelope<StatsEnvelope>>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    // Owner-scoped: the viewer's own id has no rows, so a non-empty count proves owner-scope is active.
+    expect(body.data.fuelExpenseCount).toBe(1);
+    expect(body.data.currentOdometer).toBe(30000);
+  });
+
+  test('an accepted EDITOR also reads the shared vehicle stats', async () => {
+    const [vehicleId, shareId] = await shareWithB('editor');
+    expect((await asB('POST', `/api/v1/shares/${shareId}/accept`)).status).toBe(200);
+    expect((await asB('GET', `/api/v1/vehicles/${vehicleId}/stats?period=all`)).status).toBe(200);
+  });
+
+  test('a STRANGER and a PENDING invite both get 404 (existence-hiding, did not over-open)', async () => {
+    const [pendingVehicle] = await shareWithB('viewer'); // invited, NOT accepted
+    expect((await asB('GET', `/api/v1/vehicles/${pendingVehicle}/stats?period=all`)).status).toBe(
+      404
+    );
+    const privateVehicle = await seedVehicle(ctx, { make: 'Private', model: 'Car', year: 2021 });
+    expect((await asB('GET', `/api/v1/vehicles/${privateVehicle}/stats?period=all`)).status).toBe(
+      404
+    );
+  });
+
+  test('the OWNER stats path is unchanged (reads own vehicle)', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Owned', model: 'Car', year: 2021 });
+    expect((await ctx.authed('GET', `/api/v1/vehicles/${vehicleId}/stats?period=all`)).status).toBe(
+      200
+    );
+  });
+});

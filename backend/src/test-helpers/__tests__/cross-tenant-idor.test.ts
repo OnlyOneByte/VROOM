@@ -80,6 +80,12 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
       'PUT vehicle'
     );
     expectDenied(await ctx.authed('DELETE', `/api/v1/vehicles/${vid}`), 'DELETE vehicle');
+    // vehicle-sharing T12b-3c: the per-vehicle stats read widened owner-only → requireVehicleRead.
+    // Pin it did not over-open: a non-shared third party is still denied (existence-hiding 404).
+    expectDenied(
+      await ctx.authed('GET', `/api/v1/vehicles/${vid}/stats?period=all`),
+      'GET vehicle stats'
+    );
 
     // And the row is untouched: B still reads it with its real values.
     const stillThere = await asB('GET', `/api/v1/vehicles/${vid}`);

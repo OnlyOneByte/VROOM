@@ -10,7 +10,11 @@ import { changeTracker, requireAuth } from '../../middleware';
 import { getPeriodStartDate, sortExpensesByDate } from '../../utils/calculations';
 import { logger } from '../../utils/logger';
 import { financingWithBalanceToApi, moneyDollarsToCents, vehicleToApi } from '../../utils/money';
-import { resolveVehicleAccess } from '../../utils/sharing';
+import {
+  requireVehicleRead,
+  resolveVehicleAccess,
+  resolveVehicleOwnerId,
+} from '../../utils/sharing';
 import {
   mergeUnitPreferences,
   partialUnitPreferencesSchema,
@@ -438,13 +442,25 @@ routes.get(
     const { id } = c.req.valid('param');
     const { period } = c.req.valid('query');
 
-    // Verify vehicle exists and belongs to user
-    const vehicle = await validateVehicleOwnership(id, user.id);
+    // vehicle-sharing T12b-3c: per-vehicle stats READ widening — owner | accepted viewer/editor | 404
+    // (the sibling of the T8a analytics reads; this stat card on the [id] overview was the one
+    // per-vehicle read the viewer-mode page still fired owner-only). Shared rows are OWNER-stamped, so
+    // scope the fuel-expense + odometer queries to the OWNER's books (an invitee's own id → empty).
+    const access = await requireVehicleRead(id, user.id);
+    const ownerId =
+      access.role === 'owner' ? user.id : ((await resolveVehicleOwnerId(id)) ?? user.id);
+    const vehicle =
+      access.role === 'owner'
+        ? await vehicleRepository.findByIdWithAccess(id, user.id)
+        : ((await vehicleRepository.findByIds([id]))[0] ?? null);
+    if (!vehicle) {
+      throw new NotFoundError('Vehicle');
+    }
 
-    // Get all fuel expenses for this vehicle
+    // Get all fuel expenses for this vehicle (OWNER-scoped — shared rows ride the owner's books).
     const fuelExpenses = await expenseRepository.findAll({
       vehicleId: id,
-      userId: user.id,
+      userId: ownerId,
       category: 'fuel',
     });
 
@@ -472,7 +488,7 @@ routes.get(
     // (the D2 helper the mileage trigger uses) — period-independent by design, so a
     // consumer that needs the vehicle's true odometer (lease overage, loan miles-used)
     // can use it instead of the period-scoped stat. Additive: currentMileage is unchanged.
-    const currentOdometer = await odometerRepository.getCurrentOdometer(id, user.id);
+    const currentOdometer = await odometerRepository.getCurrentOdometer(id, ownerId);
 
     return c.json({
       success: true,
