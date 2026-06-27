@@ -348,6 +348,57 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     expect(stillUnread.is_read).toBe(0);
   });
 
+  // vehicle-sharing T7 (reminder per-vehicle READ widening — the C108-C116 IDOR discipline). The
+  // GET /reminders?vehicleId list moved from a flat userId scope to requireVehicleRead + owner-scoped
+  // listing. This pins the widening did not over-open: a NON-shared third party is denied the
+  // per-vehicle list (existence-hiding 404). The WRITE paths are NOT widened in T7 (a reminder spans
+  // multiple vehicles → owner-stamp is a distinct T7b slice), so an accepted EDITOR still cannot create
+  // a reminder on the shared vehicle (validateVehicleIdsOwned stays strict) — proven here so the read
+  // widening is not mistaken for a write grant. Here B owns the vehicle.
+  test('reminder per-vehicle read (T7): a third party is denied the vehicle-scoped list; write stays owner-only', async () => {
+    const vid = await idOf(
+      await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
+    );
+    const created = await asB('POST', '/api/v1/reminders', {
+      name: 'B reminder',
+      type: 'notification',
+      frequency: 'monthly',
+      startDate: '2024-06-01T00:00:00.000Z',
+      vehicleIds: [vid],
+    });
+    expect(created.status).toBe(201);
+
+    // (1) THIRD PARTY — A has NO share: the per-vehicle reminder list is denied (existence-hiding 404).
+    expectDenied(await ctx.authed('GET', `/api/v1/reminders?vehicleId=${vid}`), 'third-party list');
+
+    // (2) B shares vid with A as EDITOR; A accepts. A can now LIST the shared vehicle's reminders…
+    const shareId = await idOf(
+      await asB('POST', '/api/v1/shares', {
+        vehicleId: vid,
+        email: ctx.user.email,
+        level: 'editor',
+      })
+    );
+    expect((await ctx.authed('POST', `/api/v1/shares/${shareId}/accept`)).status).toBe(200);
+    expect(
+      (await ctx.authed('GET', `/api/v1/reminders?vehicleId=${vid}`)).status,
+      'editor can read the shared vehicle reminders'
+    ).toBe(200);
+
+    // …but WRITE stays owner-only (T7b not yet shipped) — creating a reminder on the shared vehicle is
+    // still rejected (validateVehicleIdsOwned: the vehicle is not in A's owned fleet).
+    expectDenied(
+      await ctx.authed('POST', '/api/v1/reminders', {
+        name: 'A reminder on B vehicle',
+        type: 'notification',
+        frequency: 'monthly',
+        startDate: '2024-06-02T00:00:00.000Z',
+        vehicleIds: [vid],
+      }),
+      'editor create reminder on shared vehicle (write still owner-only)'
+    );
+  });
+
   test("photo: A cannot list/upload to B's vehicle via the generic photo route", async () => {
     const vid = await idOf(
       await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
