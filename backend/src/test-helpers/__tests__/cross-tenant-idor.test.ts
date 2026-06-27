@@ -380,6 +380,147 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     expect(acc.status, 'the real invitee A can accept').toBe(200);
   });
 
+  // vehicle-sharing T5b-2 (expense WRITE widening — the C108-C116 IDOR discipline for the owner-stamp
+  // model). The write gate moved from strict validateVehicleOwnership to requireVehicleWrite (owner OR
+  // accepted editor). This pins that the WIDENING did not over-open: every NON-writer is still denied
+  // with the existence-hiding 404 — a third party with no share, a VIEWER (read-only), and an editor
+  // acting on a vehicle they were NOT shared. Here B owns the vehicle; A is the foreign session that B
+  // may share with at a given level. (The positive owner-stamp behavior is in shared-expense-write.test.ts.)
+  test('expense WRITE (T5b-2): a third party, a viewer, and an editor-on-another-vehicle are all denied', async () => {
+    const vid = await idOf(
+      await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
+    );
+    const eid = await idOf(
+      await asB('POST', '/api/v1/expenses', {
+        vehicleId: vid,
+        category: 'misc',
+        expenseAmount: 42,
+        date: '2024-06-01T00:00:00.000Z',
+      })
+    );
+    const createBody = {
+      vehicleId: vid,
+      category: 'misc',
+      expenseAmount: 7,
+      date: '2024-06-02T00:00:00.000Z',
+    };
+
+    // (1) THIRD PARTY — A has NO share on B's vehicle: create/update/delete all 404 (existence-hiding).
+    expectDenied(await ctx.authed('POST', '/api/v1/expenses', createBody), 'third-party create');
+    expectDenied(
+      await ctx.authed('PUT', `/api/v1/expenses/${eid}`, { expenseAmount: 9999 }),
+      'third-party update'
+    );
+    expectDenied(await ctx.authed('DELETE', `/api/v1/expenses/${eid}`), 'third-party delete');
+
+    // (2) VIEWER — B shares the vehicle with A as VIEWER (read-only) and A accepts. A can READ but every
+    // WRITE is denied with the SAME 404 (requireVehicleWrite denies a viewer with no capability oracle).
+    const viewerShareId = await idOf(
+      await asB('POST', '/api/v1/shares', {
+        vehicleId: vid,
+        email: ctx.user.email,
+        level: 'viewer',
+      })
+    );
+    expect((await ctx.authed('POST', `/api/v1/shares/${viewerShareId}/accept`)).status).toBe(200);
+    expectDenied(await ctx.authed('POST', '/api/v1/expenses', createBody), 'viewer create');
+    expectDenied(
+      await ctx.authed('PUT', `/api/v1/expenses/${eid}`, { expenseAmount: 9999 }),
+      'viewer update'
+    );
+    expectDenied(await ctx.authed('DELETE', `/api/v1/expenses/${eid}`), 'viewer delete');
+
+    // (3) EDITOR-ON-ANOTHER-VEHICLE — even promoted to EDITOR on vid, A must not be able to write to a
+    // DIFFERENT B vehicle A was never shared (the resolver is per-vehicle, not a blanket B-access grant).
+    expect((await asB('PUT', `/api/v1/shares/${viewerShareId}`, { level: 'editor' })).status).toBe(
+      200
+    );
+    const otherVid = await idOf(
+      await asB('POST', '/api/v1/vehicles', { make: 'B2', model: 'Other', year: 2023 })
+    );
+    expectDenied(
+      await ctx.authed('POST', '/api/v1/expenses', {
+        vehicleId: otherVid,
+        category: 'misc',
+        expenseAmount: 7,
+        date: '2024-06-03T00:00:00.000Z',
+      }),
+      'editor create on a non-shared B vehicle'
+    );
+
+    // B's original expense survived every denied write — untouched amount, still B's row.
+    const stillThere = await asB('GET', `/api/v1/expenses/${eid}`);
+    const body = await json<DataEnvelope<{ expenseAmount: number }>>(stillThere);
+    expect(stillThere.status).toBe(200);
+    expect(body.data.expenseAmount).toBe(42);
+  });
+
+  // vehicle-sharing T5b-2 (editor-owner-action-denied — design §2.1 rule 5 + §6.3). An accepted EDITOR
+  // PASSES requireVehicleWrite (it can write EXPENSES on the shared vehicle), but the OWNER-ONLY actions
+  // must keep the STRICT validateVehicleOwnership: requireVehicleWrite is NOT sufficient for them. Prove
+  // a real accepted editor (A, shared editor on B's vehicle) still cannot delete/edit the vehicle, create
+  // financing on it, or manage its shares — each owner-only route 404s the editor (existence-hiding).
+  test('expense WRITE (T5b-2): an accepted editor still cannot reach OWNER-ONLY actions on the shared vehicle', async () => {
+    const vid = await idOf(
+      await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
+    );
+    // B shares vid with A as EDITOR; A accepts → A has accepted editor WRITE access to vid.
+    const shareId = await idOf(
+      await asB('POST', '/api/v1/shares', {
+        vehicleId: vid,
+        email: ctx.user.email,
+        level: 'editor',
+      })
+    );
+    expect((await ctx.authed('POST', `/api/v1/shares/${shareId}/accept`)).status).toBe(200);
+
+    // Sanity: the editor CAN write an expense (the widened capability) — so the denials below are
+    // specifically the owner-only boundary, not a blanket no-access.
+    expect(
+      (
+        await ctx.authed('POST', '/api/v1/expenses', {
+          vehicleId: vid,
+          category: 'misc',
+          expenseAmount: 3,
+          date: '2024-06-07T00:00:00.000Z',
+        })
+      ).status
+    ).toBe(201);
+
+    // OWNER-ONLY, still strict validateVehicleOwnership → 404 for the editor:
+    expectDenied(
+      await ctx.authed('PUT', `/api/v1/vehicles/${vid}`, { make: 'Hacked' }),
+      'editor edit vehicle'
+    );
+    expectDenied(await ctx.authed('DELETE', `/api/v1/vehicles/${vid}`), 'editor delete vehicle');
+    expectDenied(
+      await ctx.authed('POST', `/api/v1/financing/vehicles/${vid}/financing`, {
+        financingType: 'loan',
+        provider: 'X',
+        originalAmount: 1000,
+        termMonths: 12,
+        startDate: '2024-01-01T00:00:00.000Z',
+        paymentAmount: 100,
+        paymentFrequency: 'monthly',
+      }),
+      'editor create financing'
+    );
+    expectDenied(
+      await ctx.authed('POST', '/api/v1/shares', {
+        vehicleId: vid,
+        email: 'someone-else@test.com',
+        level: 'viewer',
+      }),
+      'editor manage shares (re-share)'
+    );
+
+    // B's vehicle survived: still B's make, still owned by B.
+    const stillB = await json<DataEnvelope<{ make: string }>>(
+      await asB('GET', `/api/v1/vehicles/${vid}`)
+    );
+    expect(stillB.data.make).toBe('B');
+  });
+
   // vehicle-sharing T12 (enriched /received). The "shared with me" list now JOINs the vehicle + owner
   // to label each row — so the join must stay scoped to sharedWithId === acting: an invitee must see
   // ONLY shares addressed to THEM, never another tenant's received invites. B invites A; A's /received
