@@ -169,17 +169,24 @@
       reminders, cross-fleet isolation both sides, stranger-404, pending-not-accepted-404, AND write-stays-
       owner-only) + cross-tenant-idor.test.ts (+1: third-party per-vehicle list denied + editor-reads-but-
       write-still-owner-only). Backend validate:local green (2076 pass [+7], 0 fail, drift guards green).
-    - [ ] **T7b — reminder WRITE widening (POST/PUT/DELETE /reminders + mark-serviced).** DEFERRED from T7
-          (WIP=1): a reminder is userId-OWNED with a MULTI-vehicle junction + auto-materializes expense rows,
-          so the owner-stamp carries genuine forks the single-vehicle expense/odometer model did not: (a) which
-          owner stamps a reminder spanning vehicles of DIFFERENT owners? (b) may an editor create a reminder
-          spanning a shared + an owned vehicle (and would its materialized expenses then split across two
-          users' books)? (c) the getCurrentOdometer caller-threading in resolveMileageFields/mark-serviced
-          (reminders/routes.ts) must pass the OWNER's id once writes widen — currently passes acting (still
-          owner-only-gated, so correct today). Likely resolves to "editor may only create a reminder whose
-          vehicle set is entirely ONE owner's" + owner-stamp userId = that owner. Currently SAFE — the WRITE
-          paths keep strict validateVehicleIdsOwned (a shared editor is cleanly denied, pinned by the T7 write
-          IDOR entry). Resume after T8, or escalate the multi-owner fork to Angelo if it is not clean-cut.
+    - [x] **T7b — reminder WRITE widening (POST/PUT/DELETE /reminders + mark-serviced) (C474, 2026-06-27).**
+          The last gated slice — resolved clean-cut (NOT escalated), exactly as the note predicted: the three
+          forks all collapse to "an editor may write a reminder whose vehicle set is entirely ONE owner's,
+          owner-stamp userId = that owner." New `requireReminderVehiclesWrite` (routes.ts) gates EVERY junction
+          vehicle through the share seam (`requireVehicleWrite` per vehicle) + enforces the single-owner
+          invariant (cross-owner → ValidationError 400). The reminder is stamped `userId=OWNER`; (a)+(b) are
+          answered by rejecting a cross-owner set, and (c) resolves FOR FREE — the trigger-service already
+          materializes expenses + reads getCurrentOdometer under `reminder.userId`, so owner-stamping the
+          reminder routes every downstream effect (materialized rows, odometer scope, backup/TCO) to the owner;
+          resolveMileageFields/mark-serviced/clearSource/markServiced now pass the resolved ownerId. PUT/DELETE/
+          mark-serviced load UNSCOPED via new `reminderRepository.findByIdWithVehicles` then authorize on the
+          seam (reminders have NO createdBy column → owner-stamp is userId-only). SHIPPED its IDOR entries same
+          cycle: new shared-reminder-write.test.ts (6 cases: editor create owner-stamp, editor expense-reminder
+          materializes onto OWNER books via /trigger, owner self unchanged, cross-owner rejected, editor PUT/
+          mark-serviced/DELETE, viewer-denied-all) + the T7 read test's write-deny flipped to allow-editor/
+          deny-viewer + a rewritten cross-tenant-idor reminder entry (third-party denied, viewer reads-not-
+          writes, editor writes owner-stamped, cross-owner rejected). validate:local green (2115 pass, 0 fail).
+          Commit 72792b2.
 - [x] **T8 — insurance + analytics READ → `requireVehicleRead` (DONE: T8a C97 + T8b C98).** Owner-only
       actions (delete vehicle, financing/purchase-price edit, share management) KEEP strict
       `validateVehicleOwnership` — verified denied for an editor (the T5b-2 editor-owner-action IDOR entry).
