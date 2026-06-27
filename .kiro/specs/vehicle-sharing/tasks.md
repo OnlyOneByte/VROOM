@@ -318,11 +318,31 @@
             artifact (the FIRST shot rendered + proved the gating; the fix is a trivial `&& isOwner` mirror of the
             shot-verified Share/edit gating). The backend enforces every denial regardless — this is
             defense-in-depth UX.
-      - [ ] **T12b-3c — read-only shared INSURANCE view (deferred).** A viewer currently sees no insurance on a
-            shared vehicle (the whole tab is owner-gated, C100). To show it read-only needs: (a) widen the claims
-            sub-reads (GET /insurance/:id/claims) to shared read with the §6.4 blast-radius narrow, and (b) a
-            read-only PolicyList/PolicyCard variant (no Add/Edit/Renew/Delete/File-Claim/Upload). Currently SAFE
-            (hidden, not broken). Low priority — the per-vehicle policies LIST read is already widened (T8b).
+      - [~] **T12b-3c — read-only shared INSURANCE view — SPLIT into (a) BE claims-read [DONE C475] + (b) FE
+            read-only variant + eyes-on [next].** A viewer currently sees no insurance on a shared vehicle (the
+            whole tab is owner-gated, C100). To show it read-only needs: (a) widen the claims sub-reads + (b) a
+            read-only PolicyList/PolicyCard/ClaimsSection variant. Was SAFE (hidden, not broken) the whole time.
+        - [x] **(a) — claims-read widening + blast-radius (C475, 2026-06-27).** `GET /insurance/:id/claims`
+              flipped `validateInsuranceOwnership` → a new `requirePolicyReadVehicles` gate: the OWNER always
+              reads; a NON-owner reads the policy claims only if they hold accepted-share READ access to AT LEAST
+              ONE vehicle the policy covers (else 404, existence-hiding #80). The §6.4 blast-radius decision was
+              CLEAN-CUT (not escalated) — risk-4 + the ratified T8b `narrowPolicyToVehicle` precedent dictate it
+              mechanically: the route is policy-keyed but a share grants per-VEHICLE, so a shared invitee sees
+              ONLY claims attributed to a vehicle they can read; a claim with `vehicleId=null` (unattributed) or
+              on the owner's OTHER vehicle is dropped; the owner view is unchanged. Strictly additive (a viewer
+              sees no insurance today) + no displayed-$ change. +5 cases in shared-insurance-read.test.ts (viewer
+              sees only the shared-vehicle claim with owner-other + unattributed dropped, owner sees all, editor
+              reads, stranger-404, pending-404) + a T12b-3c IDOR entry (third party with no covered-vehicle share
+              denied the claims list). validate:local green (2121 pass [+6], 0 fail). Commit 9f18b75.
+        - [ ] **(b) — FE read-only insurance variant + eyes-on (next).** A read-only InsuranceTab path for a
+              viewer: render PolicyList/PolicyCard/PolicyTermCard/ClaimsSection/DocumentViewer with every mutate
+              affordance hidden (Add-Policy, Edit-policy, Edit/Delete/Renew-term, File/Edit/Delete-claim, Upload/
+              Delete-document — the 10 affordances scouted C475), un-gate the tab for a non-owner in read-only
+              mode (it is `isOwner`-gated today on the [id] page), and boot+shoot a viewer session to confirm the
+              read-only insurance renders with NO mutate chrome + no console errors. Backend already enforces
+              every denial (defense-in-depth UX). Reads used: getPoliciesForVehicle (T8b) + getClaims (this slice)
+              + getEntityDocuments. The per-vehicle policies LIST read (T8b) + claims read (this slice) are both
+              live, so the FE has all the data it needs.
 - [x] **T13 — Lifecycle round-trip (C59, 2026-06-27).** Shipped as a TRACKED HTTP-harness round-trip
       (`shared-fleet-list.test.ts`, +2 tests) NOT an untracked browser e2e — rationale: (a) GUIDE standing
       truth "source-scan/harness guards > untracked e2e for merge survival" (a `*.meshclaw.e2e.ts` is gitignored
