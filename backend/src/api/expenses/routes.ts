@@ -15,6 +15,7 @@ import { changeTracker, requireAuth } from '../../middleware';
 import { neutralizeCsvRow } from '../../utils/csv-safety';
 import { centsToDollars, expenseToApi, moneyDollarsToCents } from '../../utils/money';
 import { buildPaginatedResponse, clampPagination } from '../../utils/pagination';
+import { requireVehicleWrite, resolveVehicleOwnerId } from '../../utils/sharing';
 import {
   commonSchemas,
   validateExpenseOwnership,
@@ -102,6 +103,11 @@ const createExpenseSchemaBase = baseExpenseSchema.omit({
   createdAt: true,
   updatedAt: true,
   userId: true,
+  // `createdBy` is SERVER-controlled provenance (vehicle-sharing T5b owner-stamp model), not client
+  // input: it is set to the acting editor on a shared-created row and left NULL otherwise. Omitting it
+  // from the input schema (it is an insertable column, so createInsertSchema would otherwise accept it)
+  // closes a forge vector — a caller could not otherwise be stopped from claiming a different author.
+  createdBy: true,
   groupId: true,
   groupTotal: true,
   splitMethod: true,
@@ -695,8 +701,20 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
   // poison getCurrentOdometer (cross-category UNION). For a fuel expense this is a no-op.
   const expenseData = clearFuelFieldsIfNotFuel(body);
 
-  // Verify vehicle exists and belongs to user
-  await validateVehicleOwnership(expenseData.vehicleId, user.id);
+  // vehicle-sharing T5b-2: WRITE access is owner OR an accepted EDITOR (viewer denied with the same
+  // 404 a stranger gets — requireVehicleWrite, the ONE seam). REPLACES the strict
+  // validateVehicleOwnership here so a shared editor can log a cost on the owner's vehicle.
+  await requireVehicleWrite(expenseData.vehicleId, user.id);
+
+  // OWNER-STAMP (design §2.1, ratified option a): the row's userId is the vehicle OWNER's id, NOT the
+  // acting user's — so a shared editor's expense rides the OWNER's backup/TCO and counts once. For an
+  // owner writing their own vehicle this resolves to themselves (unchanged). `createdBy` records who
+  // physically entered it: the acting user when they are NOT the owner (a shared editor), else NULL
+  // (the legacy/self sentinel — keeps owner-authored rows identical to pre-T5b). requireVehicleWrite
+  // already 404'd an absent vehicle, so the owner id is always present here.
+  const ownerId = await resolveVehicleOwnerId(expenseData.vehicleId);
+  if (!ownerId) throw new ValidationError('Vehicle');
+  const createdBy = ownerId === user.id ? null : user.id;
 
   // Validate: a financing source link must point at the vehicle's active financing (shared with PUT, C422).
   await assertFinancingSourceValid(
@@ -716,19 +734,24 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
   // Idempotent create: a retried offline POST with the same clientId returns the
   // original row instead of duplicating it. Plain create when clientId is absent.
   // forceOverwrite (#98): a keep-local conflict resolution APPLIES the edit on collision.
+  // The idempotency key is scoped to the row's userId — now the OWNER — so a shared editor's
+  // retried offline POST de-dupes against the owner's books (the row it actually created).
   const createdExpense = await expenseRepository.createIdempotent(
     {
       ...expenseData,
-      userId: user.id,
+      userId: ownerId,
+      createdBy,
     },
     forceOverwrite ?? false
   );
 
   // D5: a mileaged expense is also a new odometer reading — re-check this vehicle's mileage reminders
-  // so a crossed milestone fires immediately. Only when mileage is present (getCurrentOdometer reads
-  // expenses.mileage); idempotent via the dedup, best-effort (never throws).
+  // so a crossed milestone fires immediately. Scope to the OWNER (the row's userId, the owner-stamp
+  // model): the reminders that track this vehicle belong to the owner, not the editor. Only when
+  // mileage is present (getCurrentOdometer reads expenses.mileage); idempotent via the dedup,
+  // best-effort (never throws).
   if (createdExpense.mileage != null) {
-    await reminderTriggerService.recheckMileageReminders(user.id, createdExpense.vehicleId);
+    await reminderTriggerService.recheckMileageReminders(ownerId, createdExpense.vehicleId);
   }
 
   return c.json(
@@ -789,15 +812,29 @@ routes.put(
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const updateData = c.req.valid('json');
-    const existingExpense = await validateExpenseOwnership(id, user.id);
 
-    // If the edit reassigns the expense to a different vehicle, that vehicle must be the user's
-    // too — mirror the create-path guard (#61). Without this, a PUT could point the (owned) expense
-    // at a vehicleId the user doesn't own: it stays their row but references a non-owned vehicle,
-    // corrupting their analytics attribution (within-tenant — all reads are userId-scoped, so it's
-    // not a cross-tenant leak, but it IS a real integrity gap the create path already prevents).
+    // vehicle-sharing T5b-2: load the row UNSCOPED (it is owner-stamped — a shared editor's row carries
+    // the OWNER's userId, so the old validateExpenseOwnership(id, acting) would 404 the editor's own
+    // edit), then authorize via the vehicle's WRITE access. requireVehicleWrite is the single denial
+    // gate: a stranger (no access), a VIEWER (read-only), and an editor on a DIFFERENT vehicle all get
+    // the same 404 (existence-hiding) — replacing the prior userId-scoped ownership check.
+    const existingExpense = await expenseRepository.findById(id);
+    if (!existingExpense) throw new ValidationError('Expense');
+    await requireVehicleWrite(existingExpense.vehicleId, user.id);
+
+    // If the edit reassigns the expense to a different vehicle, the acting user must have WRITE access
+    // to that vehicle too (the #61 guard, widened to the share seam). Additionally the target vehicle
+    // must have the SAME owner as the current one: the row is owner-stamped (existingExpense.userId IS
+    // the owner), so moving it onto a DIFFERENT owner's vehicle would silently relocate the cost
+    // between two users' books (and break the owner-stamp invariant userId == vehicle owner). A
+    // same-owner reassignment (the only kind possible pre-sharing, when both are the acting user's)
+    // keeps userId correct with no re-stamp; a cross-owner move is rejected.
     if (updateData.vehicleId && updateData.vehicleId !== existingExpense.vehicleId) {
-      await validateVehicleOwnership(updateData.vehicleId, user.id);
+      await requireVehicleWrite(updateData.vehicleId, user.id);
+      const targetOwnerId = await resolveVehicleOwnerId(updateData.vehicleId);
+      if (targetOwnerId !== existingExpense.userId) {
+        throw new ValidationError('Cannot move an expense to a vehicle owned by a different user');
+      }
     }
 
     // A PUT that SETS a financing source link must verify it like the create path does (C422) — else a
@@ -831,12 +868,18 @@ routes.put(
     const updatedExpense = await expenseRepository.update(id, normalizedUpdate);
 
     // D5 (#71): an EDIT can also cross a mileage milestone — e.g. correcting a reading upward past a
-    // reminder's due odometer. The create path rechecks (:573) but the update path did not, so an
+    // reminder's due odometer. The create path rechecks but the update path did not, so an
     // edit-crossed reminder only fired on the next /trigger or login, silently breaking the
     // "fires the moment crossed" guarantee. Mirror the create-path best-effort recheck (never throws,
-    // idempotent via the dedup). Use the UPDATED vehicleId so a reassign rechecks the right vehicle.
+    // idempotent via the dedup). Use the UPDATED vehicleId so a reassign rechecks the right vehicle,
+    // scoped to the row's OWNER (existingExpense.userId — the owner-stamp model; the mileage reminders
+    // for this vehicle belong to the owner, not a shared editor). Reassignment is same-owner only
+    // (asserted above), so the owner is stable across the edit.
     if (updatedExpense.mileage != null) {
-      await reminderTriggerService.recheckMileageReminders(user.id, updatedExpense.vehicleId);
+      await reminderTriggerService.recheckMileageReminders(
+        existingExpense.userId,
+        updatedExpense.vehicleId
+      );
     }
 
     return c.json({
@@ -851,11 +894,19 @@ routes.put(
 routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
-  await validateExpenseOwnership(id, user.id);
 
-  // Clean the expense's receipt photos (provider files + DB) before deleting the
-  // row — the photos table has no FK, so they'd otherwise orphan.
-  await deleteAllPhotosForEntity('expense', id, user.id);
+  // vehicle-sharing T5b-2: load the (owner-stamped) row UNSCOPED, then authorize via the vehicle's
+  // WRITE access — owner or accepted editor; a viewer/stranger gets the same 404 (existence-hiding).
+  // An editor may delete a cost row on a shared vehicle (D3 editor capability).
+  const existingExpense = await expenseRepository.findById(id);
+  if (!existingExpense) throw new ValidationError('Expense');
+  await requireVehicleWrite(existingExpense.vehicleId, user.id);
+
+  // Clean the expense's receipt photos (provider files + DB) before deleting the row — the photos
+  // table has no FK, so they would otherwise orphan. Scope the photo-ownership check to the row's
+  // OWNER (existingExpense.userId — the owner-stamp model): expense photos validate via
+  // expenses.userId, which is the owner, so passing the acting editor would 404 the cleanup.
+  await deleteAllPhotosForEntity('expense', id, existingExpense.userId);
 
   await expenseRepository.delete(id);
   return c.json({ success: true, message: 'Expense deleted successfully' });
