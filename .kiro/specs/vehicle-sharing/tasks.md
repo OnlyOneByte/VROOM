@@ -255,15 +255,27 @@
           an accepted share, shot dashboard desktop + mobile → Subaru Outback appears as a 3rd fleet card badged
           "Shared by Alice Rivera", Total Vehicles stays 2 (owned-only), no overflow, zero console errors. FE
           validate:local green (svelte-check 0 err, build, 1325 pass).
-    - [ ] **T12b-3 — viewer-sees-no-edit on the [id] page — BLOCKED (folds into T5b/T8).** Scouted (C58): the
-          `[id]` page loads via `getVehicle(id)`, the OWNER-only single-vehicle path — it does NOT pass
-          `?include=shared` and `vehicle.sharedAccess` is always undefined there, AND a non-owner shared-read
-          would currently 404 (no `requireVehicleRead` on `GET /vehicles/:id` yet). So gating the edit
-          affordances (VehicleInfoCard edit, odometer/finance/photo mutates, the Share button) by level needs the
-          single-vehicle GET to FIRST widen to shared-read + return the access level — that is the T8 read-widen
-          family on the `requireVehicleRead` seam, gated on Angelo's T5b ruling. There is also zero gating infra
-          today (no `canEdit`/level prop on VehicleHeader or any child — each affordance gates at its own call
-          site). Resume when T5b/T8 land the backend read-widening + level on the detail GET.
+    - [~] **T12b-3 — viewer-sees-no-edit on the [id] page — SPLIT into T12b-3a (BE, DONE C99) + T12b-3b (FE
+          eyes-on, next).** The C58 block (T5b/T8 must land first) is now CLEARED — the read-widening family is
+          fully shipped (T5b-3/T6/T7/T8) and the resolver seam is the production gate.
+      - [x] **T12b-3a — GET /vehicles/:id shared-read + level annotation (C99, 2026-06-27).** The single-vehicle
+            GET widened from owner-only (`findByIdWithAccess` scopes to `vehicles.userId` → an invitee 404'd) to
+            the resolver seam: `resolveVehicleAccess(id, acting)` (owner | viewer | editor | null→404,
+            existence-hiding), then load the row (owner via findByIdWithAccess, shared invitee via findByIds[id]
+            with access already proven) and attach a `sharedAccess { level, sharedBy }` annotation for a
+            NON-owner — the SAME shape the `?include=shared` fleet list emits, so the FE detail page can gate edit
+            affordances by `vehicle.sharedAccess?.level`. The OWNER response is unchanged (no sharedAccess). +4
+            cases in shared-fleet-list.test.ts (viewer/editor annotated, owner-no-annotation, stranger+pending
+            both 404). Backend validate:local green (2093 pass [+4], 0 fail). NOTE: the existing GET-vehicle IDOR
+            entry still passes (a non-shared third party 404s — the widening grants ONLY accepted shares).
+      - [ ] **T12b-3b — FE: gate the [id] edit affordances by level (eyes-on).** Thread `vehicle.sharedAccess?.level`
+            into VehicleHeader + children: a VIEWER sees NO edit/delete/share/odometer-write/finance-edit
+            affordances; an EDITOR sees expense+odometer write but NOT the owner-only ones (delete vehicle,
+            financing, share management). There is zero gating infra today (no canEdit/level prop — each affordance
+            gates at its own call site), so this is a real FE slice + a Playwright eyes-on (seed an accepted
+            viewer share, shoot the [id] page as the invitee, confirm the edit chrome is absent). The backend
+            already enforces every denial (owner-only stays strict; editor-write via requireVehicleWrite) — this
+            is defense-in-depth UX, not the security boundary.
 - [x] **T13 — Lifecycle round-trip (C59, 2026-06-27).** Shipped as a TRACKED HTTP-harness round-trip
       (`shared-fleet-list.test.ts`, +2 tests) NOT an untracked browser e2e — rationale: (a) GUIDE standing
       truth "source-scan/harness guards > untracked e2e for merge survival" (a `*.meshclaw.e2e.ts` is gitignored
