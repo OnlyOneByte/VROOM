@@ -317,3 +317,17 @@ already records the blocked state, and the human will act on the two standing me
 re-engage. Resume re-surfacing ONLY if the human re-engages or a genuinely NEW blocking condition
 arises. (This is the flywheel correcting its own rhythm: the 25-cycle re-surface assumed a responsive
 channel; the evidence is it is not responsive right now, so the cost of re-asking exceeds its value.)
+
+**Meta-review degradation under a sustained gate (learned C228):** once the C153 back-off is active AND
+the gate is unchanged (HEAD/last-prod-src identical, no ruling/steer), the ~25-cycle META-REVIEW has
+nothing left to do that the per-cycle dry pivot is not already doing — the surface check runs every
+cycle, the dry-streak note already tracks the dry-ratio, re-ping is suppressed, and five consecutive
+metas (C128/C153/C178/C203/C228) reached the identical "correct gate-induced no-op" verdict. Writing a
+full ~20-line meta entry each time is itself the bookkeeping churn the META-LOOP warns against. So while
+both conditions hold, the meta-cadence DEGRADES to a one-line confirmation folded into that cycle's dry
+pivot (e.g. "~CNNN meta-cadence: gate unchanged, back-off holds, no stale truth — full review deferred")
+— NOT a fresh full-analysis entry. Resume the FULL META-REVIEW (last-25 yield scan + repeated-waste +
+stale-truth + the at-most-one GUIDE edit) on the FIRST cycle after the gate clears (a ruling/steer/new
+prod-src lands), or immediately if a genuinely new blocking condition or a stale-truth contradiction
+surfaces in the interim. The full review is the right tool when state is moving; under a frozen gate it
+is redundant with the cheap per-cycle check.
