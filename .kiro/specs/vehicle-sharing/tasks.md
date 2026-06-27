@@ -119,10 +119,26 @@
           invitee exporting the shared vehicle should see the owner's vehicle label + the row currency) — a
           distinct wrinkle from the JSON reads. Currently SAFE (an invitee export of a shared vehicleId 404s,
           same as pre-T5b). Resume after T6, or fold into the T8 read-family.
-- [ ] **T6 — odometer** read+write → the resolver; IDOR entries. **BLOCKED — folds into the T5b ruling
-      (C53 verified): odometer is userId-stamped on create + userId-scoped on every read
-      (findByVehicleIdPaginated/getHistory/getCurrentOdometer all AND eq(userId), validateOdometerOwnership
-      checks entry.userId). Same model problem as expenses → same fix → same ruling.**
+- [x] **T6 — odometer read+write widening (C95, 2026-06-27).** The odometer analogue of T5b-2+T5b-3 in ONE
+      slice (tighter surface than expenses — no createdBy migration, no split path). All five routes flipped
+      `validateVehicleOwnership`/`validateOdometerOwnership` → `requireVehicleRead`/`requireVehicleWrite`.
+      WRITE: POST owner-stamps `userId = resolveVehicleOwnerId(vehicle)` (an editor's reading rides the OWNER's
+      books / getCurrentOdometer / mileage); PUT/DELETE load the entry UNSCOPED (owner-stamped → the old
+      userId-scoped check would 404 the editor's edit) then gate on requireVehicleWrite; mileage-recheck +
+      photo-cascade re-scoped to the OWNER's userId. READ: list/history gate via requireVehicleRead + query
+      the OWNER's books (resolveVehicleOwnerId); GET /entry/:id loads UNSCOPED then requireVehicleRead
+      (existence-hiding 404). **NO createdBy column** — odometer rows are not money rows (only the expenses
+      provenance migration 0011 added one), so the owner-stamp is via userId alone (design §2.1 names T6 as
+      owner-SCOPE, not owner-stamp+createdBy). **getCurrentOdometer owner-scope (rule 4): the FUNCTION already
+      scopes by whatever userId it is passed (correct); its 4 callers (reminders routes ×2, trigger-service via
+      reminder.userId, vehicle-detail GET) all currently pass the OWNER's id because those routes are still
+      owner-only-gated (T7/T8 surfaces) — so the call-site threading lands with T7/T8 when those widen; touching
+      them now would break WIP=1.** +shared-odometer.test.ts (4 cases: editor-create owner-stamp on the RAW
+      stored row, viewer reads list/history/entry, editor PUT+DELETE userId-stable, viewer-denied-untouched) +
+      cross-tenant-idor.test.ts (+1: third-party read+write denied, viewer-reads-but-cannot-write). NOTE:
+      validateOdometerOwnership is now a DEAD export (its last caller was this file) — left for an arch cleanup
+      cycle (removing it touches validation.ts + a test). Backend validate:local green (2069 pass [+5], 0 fail,
+      drift guards green).
 - [ ] **T7 — reminders** read+write → the resolver; IDOR entries. **BLOCKED — folds into the T5b ruling
       (C53 verified): a reminder is a userId-OWNED row (reminders.userId) with a vehicle JUNCTION, not a
       vehicleId-owned row; widening it to a shared editor is the same userId-vs-vehicleId rework. Same ruling.**
