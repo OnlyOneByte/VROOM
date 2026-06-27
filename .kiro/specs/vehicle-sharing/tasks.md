@@ -76,10 +76,28 @@
           exists, nullable, created_by stampable distinct from user_id [editor-on-shared case], additive/no
           __new_ scaffold). +createdBy:null in 3 Expense-literal test fixtures (tsc-required). Backend
           validate:local green (2051 pass [+4], 0 fail, all drift guards green). NEXT: T5b-2 expense WRITE.
-    - [ ] **T5b-2 — expense WRITE widening.** POST/PUT/DELETE `/expenses` flip `validateVehicleOwnership`
-          → `requireVehicleWrite`; on create, stamp `userId = resolved owner` + `createdBy = acting`; split
-          route too. IDOR: third-party-denied, viewer-write-denied, editor-other-vehicle-denied,
-          editor-owner-action-denied (owner-only stays strict).
+    - [x] **T5b-2 — expense WRITE widening (single-expense routes) (C93, 2026-06-27).** POST/PUT/DELETE
+          `/expenses/:id` flipped `validateVehicleOwnership`/`validateExpenseOwnership` →
+          `requireVehicleWrite` (the resolver seam's FIRST production consumer — was tested-but-dormant).
+          Owner-stamp realized: on create `userId = resolveVehicleOwnerId(vehicle)` + `createdBy = acting
+          when acting !== owner else NULL` (self/legacy sentinel); PUT/DELETE load the row UNSCOPED (it is
+          owner-stamped, so the old userId-scoped ownership check would 404 the editor's own edit) then gate
+          on `requireVehicleWrite`. Hardened: `createdBy` omitted from the create input schema (server-set
+          provenance, not forgeable); vehicle reassignment is SAME-OWNER-only (a cross-owner move would
+          silently relocate cost between two users' books + break the userId==owner invariant); mileage-
+          recheck + photo-cascade re-scoped to the OWNER's userId. IDOR sweep (cross-tenant-idor.test.ts
+          +2): third-party-denied + viewer-write-denied + editor-other-vehicle-denied (all 404) and
+          editor-owner-action-denied (an accepted editor still 404s on vehicle edit/delete, financing
+          create, re-share — owner-only stays strict `validateVehicleOwnership`). +shared-expense-write.test.ts
+          (5 cases): editor-create owner-stamp, owner-create self-NULL, editor PUT+DELETE, viewer-denied-untouched,
+          cross-owner-reassign-rejected. Backend validate:local green (2058 pass [+7], 0 fail, drift guards green).
+    - [ ] **T5b-2b — split-expense WRITE widening (`POST/PUT/DELETE /expenses/split`).** DEFERRED from T5b-2
+          (WIP=1, one verified slice): the split path is a deeper rework — siblings span MULTIPLE vehicles
+          (potentially different owners) and `createSiblings` stamps ONE `userId`, so owner-stamp per sibling
+          is a repository-layer change + a product question (can an editor split a cost ACROSS a shared and an
+          owned vehicle?). Currently SAFE — the split route gates on `assertVehiclesOwned` (must own EVERY
+          vehicle), so a shared editor is cleanly denied (no IDOR, pinned by the existing C115 split IDOR
+          entry). Resume after T5b-3.
     - [ ] **T5b-3 — expense READ widening.** Per-vehicle expense list/summary for a shared vehicle resolves
           via `requireVehicleRead` + queries by `vehicleId` (owner-stamped rows); cross-fleet dashboard
           aggregates STAY acting-user-owned-only (no double-count). IDOR entries.
