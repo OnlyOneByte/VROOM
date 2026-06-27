@@ -100,8 +100,14 @@
       changeLevel/revoke + invitee listReceived/accept/decline (thin envelope pass-throughs; no money fields →
       no transform). 7-case test mirrors reminder-api.test (mocked apiClient, asserts URL+body+passthrough).
       Frontend validate:local green (svelte-check 0 err, build, 1325 pass). No UI yet (T11/T12) → no eyes-on.
-- [ ] **T11 — Share dialog** on the vehicle page (owner: email + level + current-shares list with
-      revoke/level-change). Four-states + a11y + mobile.
+- [x] **T11 — Share dialog (C55, 2026-06-27).** ShareVehicleDialog.svelte on the vehicle [id] page (a
+      "Share" button in the header opens it): invite-by-email + level Select, + the current-shares list
+      for THIS vehicle (client-filtered from shareApi.listGranted) with per-row level-change Select +
+      revoke, toast on each action surfacing the backend's specific message. Four-states (loading skeleton
+      / error+retry / empty "Not shared yet" / populated) + a11y (labels, aria-label on row controls).
+      EYES-ON VERIFIED: booted servers, shot the vehicle page (Share button present in header) + drove the
+      dialog open (CLICK_SELECTOR) → Read both PNGs: dialog renders correctly with form + empty-state, zero
+      console errors. Frontend validate:local green (svelte-check 0 err, build, 1325 pass).
 - [ ] **T12 — "Shared with me"** section + pending-invite accept/decline; fleet cards badged
       "shared by <name>"; viewer sees NO edit affordances (mirror the `requireVehicleWrite` denial in UI).
 - [ ] **T13 — Round-trip E2E** (`vehicle-sharing.meshclaw.e2e.ts`): owner invites → invitee accepts →
