@@ -131,13 +131,27 @@
           (renders both, no overflow), DROVE Accept → DB flipped pending→accepted + toast + card self-hid +
           fleet refreshed; confirmed plain /vehicles does NOT leak the shared vehicle; zero console errors. FE
           validate:local green (svelte-check 0 err, build, 1325 pass).
-    - [ ] **T12b-2 — fleet widening + "shared by" badge + viewer-no-edit (eyes-on).** Wire
-          `getVehicles({includeShared:true})` (append `?include=shared`) + add `sharedAccess?: SharedAccess` to
-          the FE `Vehicle` type + thread it through the dashboard `vehicleOverviews` projection +
-          `VehicleCarousel`'s local `VehicleOverview` → badge a shared card "shared by `<name>`" (mirror the
-          "Financed" Badge). Viewer-level shared vehicles show NO edit affordances on the [id] page (mirror the
-          `requireVehicleWrite` 404 denial in UI). Eyes-on: shot the dashboard with an accepted shared vehicle
-          present + a viewer-mode [id] page.
+    - [x] **T12b-2 — fleet widening + "shared by" badge (C58, 2026-06-27).** Wired
+          `getVehicles({includeShared:true})` (appends `?include=shared`, optional arg → every existing caller
+          unchanged) + added `sharedAccess?: SharedAccess` to the FE `Vehicle` type + threaded `sharedBy` through
+          the dashboard `vehicleOverviews` projection + `VehicleCarousel`'s local `VehicleOverview` → a shared
+          card shows a top-LEFT "Shared by `<name>`" secondary Badge (Users icon, mirrors + never collides with
+          "Financed"). KEY decision: stats cards (Total Vehicles / Active Financing) + expense totals are
+          owner-scoped on the backend, so a shared vehicle in those counts would contradict the dollar figures —
+          added an `ownedVehicles` derived + pointed stats and the log-fillup preselect at it; only the fleet
+          carousel widened (gate → `vehicleOverviews.length` so a shared-only fleet still shows). EYES-ON: seeded
+          an accepted share, shot dashboard desktop + mobile → Subaru Outback appears as a 3rd fleet card badged
+          "Shared by Alice Rivera", Total Vehicles stays 2 (owned-only), no overflow, zero console errors. FE
+          validate:local green (svelte-check 0 err, build, 1325 pass).
+    - [ ] **T12b-3 — viewer-sees-no-edit on the [id] page — BLOCKED (folds into T5b/T8).** Scouted (C58): the
+          `[id]` page loads via `getVehicle(id)`, the OWNER-only single-vehicle path — it does NOT pass
+          `?include=shared` and `vehicle.sharedAccess` is always undefined there, AND a non-owner shared-read
+          would currently 404 (no `requireVehicleRead` on `GET /vehicles/:id` yet). So gating the edit
+          affordances (VehicleInfoCard edit, odometer/finance/photo mutates, the Share button) by level needs the
+          single-vehicle GET to FIRST widen to shared-read + return the access level — that is the T8 read-widen
+          family on the `requireVehicleRead` seam, gated on Angelo's T5b ruling. There is also zero gating infra
+          today (no `canEdit`/level prop on VehicleHeader or any child — each affordance gates at its own call
+          site). Resume when T5b/T8 land the backend read-widening + level on the detail GET.
 - [ ] **T13 — Round-trip E2E** (`vehicle-sharing.meshclaw.e2e.ts`): owner invites → invitee accepts →
       invitee sees+edits (as editor) the shared vehicle's expenses → owner revokes → access gone. Self-cleaning.
 
