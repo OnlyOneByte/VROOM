@@ -152,8 +152,19 @@
           family on the `requireVehicleRead` seam, gated on Angelo's T5b ruling. There is also zero gating infra
           today (no `canEdit`/level prop on VehicleHeader or any child — each affordance gates at its own call
           site). Resume when T5b/T8 land the backend read-widening + level on the detail GET.
-- [ ] **T13 — Round-trip E2E** (`vehicle-sharing.meshclaw.e2e.ts`): owner invites → invitee accepts →
-      invitee sees+edits (as editor) the shared vehicle's expenses → owner revokes → access gone. Self-cleaning.
+- [x] **T13 — Lifecycle round-trip (C59, 2026-06-27).** Shipped as a TRACKED HTTP-harness round-trip
+      (`shared-fleet-list.test.ts`, +2 tests) NOT an untracked browser e2e — rationale: (a) GUIDE standing
+      truth "source-scan/harness guards > untracked e2e for merge survival" (a `*.meshclaw.e2e.ts` is gitignored
+      → vanishes on merge); (b) a browser spec cannot set up the OWNER side (auth is OAuth-only, no HTTP signup
+      — the second user must be DB-seeded, which the harness does); (c) the FE render legs are already
+      eyes-on-verified (T12b-1 drove Accept, T12b-2 shot the "shared by" badge). Walks the exact T13 sequence:
+      owner invites → invitee accepts → vehicle APPEARS annotated in the invitee fleet → owner REVOKES →
+      vehicle is GONE — closing the **D8 revoke→gone-from-fleet leg that NO prior test pinned** (shares-routes
+      pinned only revoke→slot-freed). +a reversibility test (re-invite after revoke, re-accepted → vehicle
+      returns with the new grant level). Backend validate:local green (2047 pass, +2).
+      > NOTE: the "invitee EDITS the shared vehicle's expenses" leg of the original T13 wording is the T5b
+      > editor-WRITE path — still gated on Angelo's expense-model ruling, so T13 pins the read+lifecycle legs
+      > that ARE shipped; the edit-round-trip leg lands with T5b.
 
 ## Phase 6 — DONE
 - [ ] **T14 — Feature DoD:** backend + frontend `validate:local` green; `regress.sh` green; eyes-on
