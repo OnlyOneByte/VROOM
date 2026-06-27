@@ -275,5 +275,23 @@ spawn when there is REAL independent work that would otherwise serialize. If `sp
 again, fall back to inline + note it — don't burn the cycle retrying.
 
 ## Halt
-STOP sentinel or `autonudge_stop`. No DoD — the loop improves VROOM indefinitely; branch stays
-PR-ready (~243 commits ahead at the 2026-06-26 reset). Human opens the PR.
+No DoD — the loop improves VROOM indefinitely; branch stays PR-ready (~243 commits ahead at the
+2026-06-26 reset). Human opens the PR.
+
+**The agent CANNOT self-halt this session (ground truth, established C27 via `.meshclaw-autopilot/STOP`
+cycle-24 note, re-confirmed C24–C33):** the auto-nudge is fired by the GATEWAY AutoNudgeService, not a
+meshclaw cron. `autonudge_stop` returns `HTTP 403 Forbidden: Failed to look up loop` every call — the
+service has no loop registered to THIS session, so the agent cannot deregister it. The
+`.meshclaw-autopilot/STOP` sentinel is read by a SEPARATE (retired) autopilot system and does NOT reach
+AutoNudgeService. So only the HUMAN can stop the loop, gateway-side (dashboard 🔁 "Stop loop", or
+stop/adjust the AutoNudgeService). Do NOT re-retry `autonudge_stop` each cycle (proven structurally
+broken) and do NOT re-hunt the stop mechanism (this IS the answer).
+
+**Gated-loop protocol (when the BUILD queue is fully gated AND every maintenance vein is saturated):**
+each nudge → (1) cheap new-surface check: `git log -1 -- backend/src frontend/src` for a new prod-src
+commit + the vehicle-sharing T0 checkbox + a human steer commit; (2) if a real new surface appeared →
+work it; else → a ONE-LINE `yield: dry` LEDGER record + nothing else. Do NOT manufacture a fresh audit
+per cycle (that IS the maintenance-spin the META-LOOP warns against — the money migration is 4-axis
+certified C20/C22/C25/C26; veins saturated C23). Escalate to Angelo ONCE per blocking condition (done
+C27, Slack ts 1782518889), not every cycle. The loop legitimately produces near-zero until a human
+clears a gate or stops it.
