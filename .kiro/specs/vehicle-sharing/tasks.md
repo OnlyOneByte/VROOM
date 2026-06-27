@@ -25,11 +25,13 @@
       test (7 cases): table+indexes exist, all 3 FKs cascade, partial-unique rejects dup-active but allows
       re-invite after decline/revoke, additive (existing rows survive, no __new_ scaffold). Backup guard: parked
       vehicle_shares in EXCLUDED_BY_DESIGN with a pending-T9 marker. Both validate:local green.
-- [ ] **T2 — `utils/sharing.ts` access resolver.** `resolveVehicleAccess` + `requireVehicleRead` /
-      `requireVehicleWrite` (design §2): owner via `vehicles.userId`; else the accepted share's level; else
-      null → **404 (never 403)**. Pure-ish (db + ids in). Unit + HTTP-harness tested: owner→full, accepted
-      viewer→read-only, accepted editor→read+write, pending/declined/revoked→no access, non-share third
-      party→404. This is the ONE seam every gate change routes through.
+- [x] **T2 — `utils/sharing.ts` access resolver (C49, 2026-06-27).** `resolveVehicleAccess` +
+      `requireVehicleRead` (owner|viewer|editor or 404) / `requireVehicleWrite` (owner|editor or 404 — viewer
+      DENIED with the same 404, no capability oracle). Owner via `vehicles.userId` (the load-bearing truth, NOT
+      the denormalized share.ownerId); else the ACCEPTED share level; else null → 404 never 403. Optional db
+      handle for testability, singleton default for routes. 13-case unit test drives the real functions vs a
+      migrated throwaway DB (the full owner/viewer/editor × pending/accepted/declined/revoked × stranger/
+      nonexistent matrix + a lying-ownerId-no-elevation guard). NO gate-widening yet (T3+ wire routes). Green.
 
 ## Phase 2 — share-management routes
 - [ ] **T3 — `/api/v1/shares` router (owner side).** POST invite (`validateVehicleOwnership` + invitee
