@@ -182,6 +182,12 @@ never a bare `.trim()`.
 | **infra** | live (the one always-productive vein) | ~every 10 cycles: untracked-`*.test.ts` sweep + coverage re-measure (update the LEDGER cov: baseline) + this GUIDE/doc-freshness pass. **~every 25 cycles ALSO run the META-REVIEW** (read last ~25 `yield:` tags → dry-ratio + repeated-waste + stale-truth check → at most ONE `loop(meta):` GUIDE edit; see META-LOOP §). (BRANCH_REVIEW.md is gitignored — NOT in the PR, no refresh artifact.) |
 
 ## Standing truths (don't re-discover these)
+- **GREP-BEFORE-PICK on any backlog bug (loop(meta) C480).** Before building ANY BACKLOG bug/semantics item,
+  `grep` the named file/symbol to confirm it is ACTUALLY open. The pre-reset CLAUDE.md "bug snapshot" (and the
+  archived backlogs) carry MANY one-liners for bugs that were already fixed in a later cycle — C480 found
+  #148/#129/#94/#85/#30/#69/#79/#88/#97/#339(B) were ALL already shipped (commits + guards) when the "approved
+  queue" still listed them as open. A one-liner is a LEAD, not ground truth; the source is. This is the
+  bug-vein twin of the FAST-DRY precondition: verify the surface before spending a build slice on it.
 - **Coverage 90% is NOT loop-closable** (RE-MEASURED C309: 89.29% BE line / 89.32% func [1949 pass] · 89.43% FE
   line / 90.05% func / 81.75% branch [868 pass, C289] — the structural ceiling, UP from the stale ~86/~84 via the
   C250–C257 filter-branch covered-source climb; BE func +0.31 vs C299 [the C300 dead-code removal took db/types.ts
