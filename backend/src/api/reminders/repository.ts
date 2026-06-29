@@ -52,7 +52,7 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
   /**
    * Insert the reminder→vehicle junction rows inside the caller's transaction. One source of truth
    * for the `for (vehicleId) insert(reminderVehicles)` loop the create + update-replace paths repeated
-   * byte-identically (C326 dedup; mirrors insurance/repository.ts insertJunctionRows). A future change
+   * byte-identically (C326 dedup; mirrors insurance/repository.ts insertJunctionRowsSync). A future change
    * to the junction write (batch insert, a new column) then lands once, not twice.
    */
   private async insertVehicleJunctions(

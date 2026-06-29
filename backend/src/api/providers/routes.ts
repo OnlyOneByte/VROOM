@@ -151,7 +151,20 @@ routes.get('/pending/:nonce', async (c) => {
  * registry uses to instantiate it). This is the seam that lets headless E2E seed
  * a storage provider — and exercise the backup/photo paths — without real OAuth.
  */
-const SUPPORTED_PROVIDER_TYPES = ['google-drive', 's3', 'fake'] as const;
+// The 4 storage/test types + the VLM (vision-LLM, domain:'vlm') receipt-parsing types
+// (vlm-receipt-parsing spec T1). A VLM provider is a NEW DOMAIN in the SAME user_providers system:
+// the api key rides the encrypted `credentials` blob exactly like a storage refreshToken/S3 secret,
+// and `config` carries the non-secret model name + optional baseUrl (self-hosted/compatible endpoint).
+// No schema change — `user_providers` is domain-agnostic. The per-type required-field gate is
+// validateVlmProviderConfig (mirrors validateStorageProviderConfig), shared by CREATE + PUT (#123).
+const VLM_PROVIDER_TYPES = ['openai-compatible', 'anthropic', 'gemini', 'ollama'] as const;
+type VlmProviderType = (typeof VLM_PROVIDER_TYPES)[number];
+const SUPPORTED_PROVIDER_TYPES = ['google-drive', 's3', 'fake', ...VLM_PROVIDER_TYPES] as const;
+
+/** A providerType is a VLM type ⇒ the row's domain must be 'vlm' (and vice-versa). */
+function isVlmProviderType(providerType: string): providerType is VlmProviderType {
+  return (VLM_PROVIDER_TYPES as readonly string[]).includes(providerType);
+}
 
 const createProviderSchema = z.object({
   domain: z.string().min(1, 'Domain is required'),
@@ -237,6 +250,49 @@ function validateStorageProviderConfig(
   }
 }
 
+/**
+ * Reject a VLM-provider row the parser could NEVER instantiate with (vlm-receipt-parsing T1, the
+ * #103/#123 fail-fast-at-create discipline applied to the vlm domain). Split into a config-shape check
+ * and a credentials check so each path validates only the field it touches:
+ *  - CREATE (resolveProviderCredentials) runs BOTH (it has the full config + credentials),
+ *  - PUT runs the config-shape check on a config update and the credentials check on a credentials
+ *    update — so a config-only edit (e.g. changing the model) does NOT falsely demand the apiKey be
+ *    re-sent (it is already stored encrypted).
+ * Rules (design §2): every VLM type needs a `config.model`; a non-ollama type needs `credentials.apiKey`
+ * (ollama/self-hosted may be keyless); a self-hosted/compatible type (ollama OR openai-compatible) needs
+ * a `config.baseUrl`. The api key, when present, is the ONLY secret — it rides the encrypted blob.
+ */
+function validateVlmConfigShape(
+  providerType: string,
+  config: Record<string, unknown> | null
+): void {
+  const cfg = config ?? {};
+  if (!cfg.model || typeof cfg.model !== 'string') {
+    throw new ValidationError('VLM config must include a model name');
+  }
+  if (
+    (providerType === 'ollama' || providerType === 'openai-compatible') &&
+    (!cfg.baseUrl || typeof cfg.baseUrl !== 'string')
+  ) {
+    throw new ValidationError('Self-hosted or OpenAI-compatible VLM requires a base URL');
+  }
+}
+
+function validateVlmCredentials(providerType: string, credentials: Record<string, unknown>): void {
+  if (providerType !== 'ollama' && !credentials.apiKey) {
+    throw new ValidationError('VLM provider requires an API key');
+  }
+}
+
+function validateVlmProviderConfig(
+  providerType: string,
+  config: Record<string, unknown> | null,
+  credentials: Record<string, unknown>
+): void {
+  validateVlmConfigShape(providerType, config);
+  validateVlmCredentials(providerType, credentials);
+}
+
 function resolveProviderCredentials(
   userId: string,
   providerType: string,
@@ -255,6 +311,16 @@ function resolveProviderCredentials(
     return {
       encryptedCredentials: encrypt(JSON.stringify({ refreshToken: pending.refreshToken })),
       resolvedConfig: { ...(config ?? {}), accountEmail: pending.email },
+    };
+  }
+  // VLM (vision-LLM) providers: validate the model/key/baseUrl shape, then encrypt the api key like
+  // any other credential. Same fail-fast-at-create discipline as S3 (the parser can never run without
+  // a model; a non-ollama type can never auth without a key).
+  if (isVlmProviderType(providerType)) {
+    validateVlmProviderConfig(providerType, config, credentials);
+    return {
+      encryptedCredentials: encrypt(JSON.stringify(credentials)),
+      resolvedConfig: config,
     };
   }
   // Fail-fast at CREATE time on a config the provider can never instantiate with (the shared gate,
@@ -284,6 +350,13 @@ routes.post('/', zValidator('json', createProviderSchema), async (c) => {
   // instantiate it, enforced here so prod can never persist a fake row.
   if (body.providerType === 'fake' && !CONFIG.allowFakeStorageProvider) {
     throw new ValidationError('Fake storage provider is not enabled in this environment');
+  }
+
+  // Domain↔type consistency: a VLM type belongs ONLY in the 'vlm' domain and vice-versa. Without this a
+  // malformed row like {domain:'storage', providerType:'anthropic'} (or a vlm-domain row with an s3 type)
+  // could persist + then be mis-routed by the domain-keyed strategy registries. (vlm-receipt-parsing T1.)
+  if (isVlmProviderType(body.providerType) !== (body.domain === 'vlm')) {
+    throw new ValidationError('A VLM provider type requires domain "vlm", and vice-versa');
   }
 
   const { encryptedCredentials, resolvedConfig } = resolveProviderCredentials(
@@ -396,14 +469,25 @@ routes.put(
     if (body.displayName !== undefined) {
       updates.displayName = body.displayName;
     }
+    const existingType = existing[0].providerType;
     if (body.config !== undefined) {
-      // Same fail-fast gate CREATE uses (C416, the #103/C349 sibling): a PUT that swaps an S3 provider's
-      // config to one missing endpoint/bucket/region would otherwise persist a 200 + a bricked row that
-      // throws on every later test/upload/sync. Validate against the EXISTING provider's type.
-      validateStorageProviderConfig(existing[0].providerType, body.config);
+      // Same fail-fast gate CREATE uses (C416, the #103/C349 sibling): a PUT that swaps a provider's
+      // config to an unusable one would otherwise persist a 200 + a bricked row that throws on every
+      // later use. Validate against the EXISTING provider's type. VLM rows get the model/baseUrl shape
+      // check; a config-only edit does NOT require the apiKey (it is already stored encrypted).
+      if (isVlmProviderType(existingType)) {
+        validateVlmConfigShape(existingType, body.config);
+      } else {
+        validateStorageProviderConfig(existingType, body.config);
+      }
       updates.config = body.config;
     }
     if (body.credentials !== undefined) {
+      // A VLM credentials update must still carry an api key for a non-ollama type (the #123 both-paths
+      // discipline — CREATE already enforces this; PUT must not let a key-required type drop to keyless).
+      if (isVlmProviderType(existingType)) {
+        validateVlmCredentials(existingType, body.credentials);
+      }
       updates.credentials = encrypt(JSON.stringify(body.credentials));
     }
 

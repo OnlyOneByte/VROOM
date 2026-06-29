@@ -107,23 +107,11 @@ export class InsurancePolicyRepository {
   }
 
   /**
-   * Insert junction rows for a term's vehicle coverage.
-   */
-  private async insertJunctionRows(
-    tx: DrizzleTransaction,
-    termId: string,
-    vehicleIds: string[]
-  ): Promise<void> {
-    for (const vehicleId of vehicleIds) {
-      await tx.insert(insuranceTermVehicles).values({ termId, vehicleId });
-    }
-  }
-
-  /**
-   * SYNCHRONOUS sibling of insertJunctionRows (#127 class, C504). bun-sqlite is a sync dialect, so the
-   * create/addTerm/updateTerm transactions run their callbacks synchronously for real atomic rollback — an
-   * async callback autocommits each write alone (the C151 footgun), which could leave a term with partial
-   * or zero vehicle coverage (updateTerm wipes coverage then re-inserts). `.run()` executes inline in tx.
+   * Insert junction rows for a term's vehicle coverage — SYNCHRONOUS (#127 class, C504). bun-sqlite is a
+   * sync dialect, so the create/addTerm/updateTerm transactions run their callbacks synchronously for real
+   * atomic rollback — an async callback autocommits each write alone (the C151 footgun), which could leave
+   * a term with partial or zero vehicle coverage (updateTerm wipes coverage then re-inserts). `.run()`
+   * executes inline in tx. (The async sibling was orphaned by the C504 sync conversion + removed C509.)
    */
   private insertJunctionRowsSync(
     tx: DrizzleTransaction,
