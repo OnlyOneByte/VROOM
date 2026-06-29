@@ -64,11 +64,15 @@
       `VlmProvider.extractReceipt` with its provider-specific HTTP + auth header + the shared prompt; a
       MOCKED-fetch unit test each. BLOCKED until Angelo rules D1 (which adapters ship in v1). The registry
       builders currently throw a clear `not implemented yet (T3b, gated on D1)`. Build ONLY the ruled set.
-- [ ] **T4 — `POST /api/v1/receipts/parse`** (design §4): multipart image → enabled-`vlm`-provider resolve
-      (clear 400 if none) → server-side downscale + size cap (D5) → `getVlmProvider().extractReceipt` →
-      strict-schema validate → return the DRAFT, PERSIST NOTHING. Errors honest: no-provider 400,
-      provider failure 502 (the #43/#44 anti-fail-open). HTTP-harness test with a mocked provider: a good
-      receipt → a clean draft; no provider → 400; provider throw → 502; an oversized image → rejected.
+- [x] **T4 — `POST /api/v1/receipts/parse` (C512, commit b85eb13) — structurally FORK-FREE.** `vlm-routes.ts`
+      mounted at `/api/v1/receipts`: multipart image → resolve the enabled `vlm` provider (none → actionable
+      400) → image-type (jpeg/png/webp) + 8MB cap (bodyLimit + post-parse byte check) → `getVlmProvider()
+      .extractReceipt` → `parseExtraction` (fail-closed) → return `{ draft }`, PERSIST NOTHING. Errors honest:
+      no-provider 400, provider failure 502 (anti-fail-open), api key never echoed. Used the recommended D5
+      8MB cap (a tunable const). Server-side downscale is a noted follow-on (needs an image lib; not a
+      correctness gate). GUARD `vlm-parse-route.test.ts` (9 cases, real HTTP harness, adapter fetch stubbed):
+      clean draft + zero rows persisted; fail-closed drop; empty draft; no-provider 400; provider 502; wrong
+      type 400; missing file 400; key not echoed; unauth 401. Green (2187 pass).
 
 ## Phase 3 — frontend (eyes-on tail, R9 — live-VLM + Playwright-blocked → "code-complete, eyes-on pending")
 - [ ] **T5 — `vlm-api.ts` client + the settings provider UI.** `parseReceipt(image, vehicleId?)`; a VLM
