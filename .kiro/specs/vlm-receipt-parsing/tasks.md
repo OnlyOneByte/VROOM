@@ -39,14 +39,17 @@
       PUT keeps the key; ollama-keyless allowed; domain↔type mismatch 400. Reactive fix folded: deleted the
       dead async `insertJunctionRows` (orphaned by the C504 sync conversion, a latent biome error the
       whole-tree check flagged). Backend validate:local GREEN (2146 pass, +10).
-- [ ] **T2 — The strategy registry + the fixed extraction prompt/schema** (`domains/vlm/`, design §3).
-      `vlm-provider.ts` (the `VlmProvider` interface), `registry.ts` (`getVlmProvider(row)`: decrypt →
-      switch on providerType → throw on unknown, mirroring `storage/registry.ts`), and `prompt.ts` (the
-      FIXED extraction instruction + the STRICT response Zod schema: bounded amount/date/category∈the-6/
-      odometer, fail-closed). **Guard:** a `vlm-extraction-schema.test.ts` — a well-formed model JSON maps
-      to a clean draft; a malformed/out-of-range/injection-y response (negative amount, bogus category,
-      embedded "ignore previous instructions") DROPS the bad fields (fail-closed) and never throws into a
-      write. NO live HTTP yet (the adapters' network calls land in T3). Backend validate:local green.
+- [x] **T2 — The strategy registry + the fixed extraction prompt/schema (C510, commit e56eebd).**
+      `domains/vlm/`: `vlm-provider.ts` (the `VlmProvider` interface — adapters are dumb transport),
+      `prompt.ts` (the FIXED `RECEIPT_EXTRACTION_PROMPT` + the STRICT `receiptExtractionSchema` +
+      `parseExtraction`, the fail-closed boundary: every field independently bounded, bad fields DROPPED
+      via per-field salvage, unparseable → empty draft no-throw, unknown keys stripped, money in DOLLARS),
+      and `registry.ts` (`getVlmProvider(row)` decrypt → switch → throw on unknown; `resolveVlmSettings`
+      defense-in-depth re-validate; adapter builders wired + throwing a clear T3-placeholder). **Guard:**
+      `vlm-extraction-schema.test.ts` (22 cases): clean/partial/string/fenced map correctly; negative/zero/
+      NaN/Infinity amount, out-of-set/wrong-case category, malformed date, bad odometer, empty/over-long
+      vendor all DROPPED; one bad field does not nuke the good; injection/garbage → empty draft no-throw;
+      registry decrypt+dispatch+unknown-throw. Backend validate:local GREEN (2168 pass, +22).
 
 ## Phase 2 — the parse route (honors the D1/D2/D5 ruling)
 - [ ] **T3 — The provider adapters** (D1 set; openai-compatible covers OpenAI + Ollama + gateways via
