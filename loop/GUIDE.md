@@ -314,6 +314,16 @@ certified C20/C22/C25/C26; veins saturated C23). Escalate to Angelo ONCE per blo
 C27, Slack ts 1782518889), not every cycle. The loop legitimately produces near-zero until a human
 clears a gate or stops it.
 
+**RE-TEST THE HOLD TRIGGER EACH GATED CYCLE — do not coast on "I am holding" (loop(meta) C512).** A
+gated hold (and a "holding while a user decision is pending" hold especially) must re-verify its OWN
+precondition every nudge: is the gate STILL closed? The C485–C507 streak ran ~10 dry cycles too long
+because the hold coasted AFTER its trigger had cleared — Angelo had ruled the 23 decisions (the gate
+was OPEN: decision 23 greenlit the feature specs to build), but the loop kept dry-pivoting on
+"awaiting his next pick" until C508 re-examined and re-entered BUILD mode. The cheap new-surface check
+in (1) is exactly that re-test; a hold that is not re-derived from a STILL-closed gate each cycle is
+maintenance-spin wearing a "blocked" label. When in doubt whether a decision is still pending, re-read
+the ruling: a settled decision + a pre-authorized queue item = BUILD, not hold.
+
 **Meta-cadence escalation back-off (learned C153):** the sanctioned ~25-cycle re-surface is NOT an
 indefinite heartbeat. After TWO unanswered sanctioned re-surfaces on the SAME blocking condition (the
 live case: the T5b-2b/T7b multi-vehicle-write ruling, escalated C102 + re-surfaced C128, both
