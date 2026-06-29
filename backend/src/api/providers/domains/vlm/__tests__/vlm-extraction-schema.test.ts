@@ -178,13 +178,11 @@ describe('getVlmProvider / resolveVlmSettings — registry dispatch (T2)', () =>
     );
   });
 
-  test('getVlmProvider dispatches by type — adapters are T3 (clear not-implemented error for now)', () => {
-    // The dispatch is wired; the bodies land in T3. Each known type reaches its builder and throws the
-    // explicit T3 placeholder (NOT the unknown-type error), proving the switch routes correctly.
-    expect(() =>
-      getVlmProvider(vlmRow({ providerType: 'anthropic', config: { model: 'claude-3-5-sonnet' } }))
-    ).toThrow(/anthropic.*not implemented yet \(T3\)/);
-    expect(() =>
+  test('getVlmProvider returns a LIVE adapter for openai-compatible + ollama (T3a, fork-free)', () => {
+    // openai-compatible is the common denominator of every D1 option, and ollama reuses the same
+    // /v1/chat/completions adapter (design §3), so both are live regardless of the T0 ruling.
+    expect(getVlmProvider(vlmRow({ providerType: 'openai-compatible' }))).toBeDefined();
+    expect(
       getVlmProvider(
         vlmRow({
           providerType: 'ollama',
@@ -192,6 +190,16 @@ describe('getVlmProvider / resolveVlmSettings — registry dispatch (T2)', () =>
           config: { model: 'llava', baseUrl: 'http://localhost:11434/v1' },
         })
       )
-    ).toThrow(/ollama.*not implemented yet \(T3\)/);
+    ).toBeDefined();
+  });
+
+  test('getVlmProvider still gates the fork-VARIABLE first-party adapters (anthropic/gemini, T3b)', () => {
+    // These depend on the D1 adapter-set ruling — they stay stubbed until it lands.
+    expect(() =>
+      getVlmProvider(vlmRow({ providerType: 'anthropic', config: { model: 'claude-3-5-sonnet' } }))
+    ).toThrow(/anthropic.*not implemented yet \(T3b/);
+    expect(() =>
+      getVlmProvider(vlmRow({ providerType: 'gemini', config: { model: 'gemini-1.5-flash' } }))
+    ).toThrow(/gemini.*not implemented yet \(T3b/);
   });
 });
