@@ -26,15 +26,19 @@
       plumbing is fork-free); T3+ adapters/route honor the D1/D2/D5 ruling.
 
 ## Phase 1 — the VLM provider domain (fork-free; encrypted bring-your-own credential plumbing)
-- [ ] **T1 — `vlm`-domain provider validation + CRUD wiring.** Extend `providers/routes.ts` with a
-      `validateVlmProviderConfig` (mirror `validateStorageProviderConfig`, design §2): a `vlm` row requires
-      a `config.model`; a non-ollama type requires `credentials.apiKey`; a self-hosted/compatible type
-      requires `config.baseUrl`. Wire it into `resolveProviderCredentials` (create) + the PUT handler
-      (the #123 both-paths discipline). The generic CRUD already encrypts + strips secrets + is
-      tenant-scoped — assert that via the existing HTTP harness. **Guard:** a `vlm-provider-config.test.ts`
-      (createTestApp): a `vlm` provider with a key persists with credentials ENCRYPTED (not plaintext in
-      the row) + the GET response STRIPS the key; an incomplete config (no model / no key on a key-required
-      type) 400s at create AND at PUT. Backend validate:local green.
+- [x] **T1 — `vlm`-domain provider validation + CRUD wiring (C509, commit 991b88f).** Extended
+      `providers/routes.ts`: `SUPPORTED_PROVIDER_TYPES` + the 4 `VLM_PROVIDER_TYPES`
+      (openai-compatible/anthropic/gemini/ollama) + an `isVlmProviderType` guard;
+      `validateVlmProviderConfig` SPLIT into `validateVlmConfigShape` + `validateVlmCredentials` (so each
+      path validates only the field it touches), wired into BOTH `resolveProviderCredentials` (create) AND
+      the PUT handler (the #123 both-paths discipline): model required always, apiKey required for
+      non-ollama, baseUrl required for ollama/openai-compatible; a config-only PUT does NOT demand the key
+      (already stored encrypted). + a POST domain↔type consistency guard (a vlm type ⇒ domain:'vlm' and
+      vice-versa). GUARD `vlm-provider-config.test.ts` (12 cases, createTestApp): api key ENCRYPTED in the
+      raw row + STRIPPED from the response; missing model/key/baseUrl 400 at create AND PUT; config-only
+      PUT keeps the key; ollama-keyless allowed; domain↔type mismatch 400. Reactive fix folded: deleted the
+      dead async `insertJunctionRows` (orphaned by the C504 sync conversion, a latent biome error the
+      whole-tree check flagged). Backend validate:local GREEN (2146 pass, +10).
 - [ ] **T2 — The strategy registry + the fixed extraction prompt/schema** (`domains/vlm/`, design §3).
       `vlm-provider.ts` (the `VlmProvider` interface), `registry.ts` (`getVlmProvider(row)`: decrypt →
       switch on providerType → throw on unknown, mirroring `storage/registry.ts`), and `prompt.ts` (the
