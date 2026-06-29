@@ -153,6 +153,8 @@ describe('BackupOrchestrator', () => {
     const result: BackupOrchestratorResult = {
       timestamp: new Date().toISOString(),
       skipped: true,
+      outcome: 'noop',
+      failedProviders: [],
       results: {},
     };
     expect(result.skipped).toBe(true);
@@ -350,6 +352,8 @@ describe('BackupOrchestrator', () => {
     const result: BackupOrchestratorResult = {
       timestamp: new Date().toISOString(),
       status: 'in_progress',
+      outcome: 'noop',
+      failedProviders: [],
       results: {},
     };
     expect(result.status).toBe('in_progress');

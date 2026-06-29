@@ -44,9 +44,16 @@ export class GoogleDriveStrategy implements BackupStrategy {
       capabilities.sheets = await this.executeSheetsSync(context, refreshToken);
     }
 
-    const anySuccess = Object.values(capabilities).some((c) => c.success);
+    // HONEST partial-failure reporting (#43): a provider's backup is `success` ONLY when EVERY
+    // attempted capability (ZIP + Sheets) succeeded. The old `.some()` marked a run successful when
+    // ANY capability worked — so a failed ZIP beside an OK Sheets advanced the sync anchor and the
+    // failed ZIP was NEVER retried (silent backup loss, NORTH_STAR #1). A run with no attempted
+    // capability (neither enabled) is vacuously successful (nothing failed).
+    const attempted = Object.values(capabilities);
+    const failed = attempted.filter((c) => !c.success);
     return {
-      success: anySuccess || Object.keys(capabilities).length === 0,
+      success: failed.length === 0,
+      message: failed.length > 0 ? failed.map((c) => c.message).join('; ') : undefined,
       capabilities,
     };
   }

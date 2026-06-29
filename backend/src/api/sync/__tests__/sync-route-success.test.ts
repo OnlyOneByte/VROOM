@@ -157,6 +157,49 @@ describe('POST /api/v1/sync — success envelope', () => {
   });
 });
 
+// #44 — the route must NOT report 200 when every backup provider failed. Drive the REAL route with a
+// fake failing strategy registered in the registry + a seeded enabled provider (leak-free: overwrite
+// the custom type with a no-op afterwards; real google-drive untouched).
+describe('POST /api/v1/sync — honest HTTP status on backup failure (#44)', () => {
+  test('all providers fail → 502 error envelope (not a 200 false success)', async () => {
+    const { backupStrategyRegistry } = await import('../backup-strategy-registry');
+    const { encrypt } = await import('../../../utils/encryption');
+    backupStrategyRegistry.register('fake-route-fail', {
+      async execute() {
+        return { success: false, message: 'boom', capabilities: { zip: { success: false } } };
+      },
+    });
+    try {
+      ctx.sqlite.run(
+        `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
+         VALUES ('rf', ?, 'storage', 'fake-route-fail', 'Fake', ?, '{}', 'active')`,
+        [ctx.user.id, encrypt(JSON.stringify({ refreshToken: 'x' }))]
+      );
+      ctx.sqlite.run(
+        'INSERT OR REPLACE INTO user_preferences (user_id, backup_config) VALUES (?, ?)',
+        [
+          ctx.user.id,
+          JSON.stringify({
+            providers: { rf: { enabled: true, folderPath: 'B', retentionCount: 5 } },
+          }),
+        ]
+      );
+
+      const res = await ctx.authed('POST', '/api/v1/sync', { syncTypes: ['backup'], force: true });
+      const body = await json<{ success: boolean; error?: { code: string } }>(res);
+      expect(res.status, JSON.stringify(body)).toBe(502);
+      expect(body.success).toBe(false);
+      expect(body.error?.code).toBe('BACKUP_FAILED');
+    } finally {
+      backupStrategyRegistry.register('fake-route-fail', {
+        async execute() {
+          return { success: true, capabilities: {} };
+        },
+      });
+    }
+  });
+});
+
 // C250: the backups download + list-providers route slices were uncovered (sync/routes.ts 139-154,
 // 126-137). Both are PROVIDER-FREE: download reads the user's OWN db data via exportAsZip; the
 // no-providerId list path returns [] when no backup providers are enabled. (The byte/provider-bound
