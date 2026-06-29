@@ -52,10 +52,18 @@
       registry decrypt+dispatch+unknown-throw. Backend validate:local GREEN (2168 pass, +22).
 
 ## Phase 2 — the parse route (honors the D1/D2/D5 ruling)
-- [ ] **T3 — The provider adapters** (D1 set; openai-compatible covers OpenAI + Ollama + gateways via
-      baseUrl, plus anthropic + gemini as ruled). Each implements `VlmProvider.extractReceipt`: the
-      provider-specific HTTP + auth header + the shared prompt. Unit-test each adapter's request shaping +
-      response parsing against a MOCKED fetch (no live key). Honor the D2 self-hosted ruling (baseUrl).
+- [x] **T3a — The OpenAI-compatible adapter (C511, commit 1f2ac97) — FORK-FREE.** `openai-compatible.ts`:
+      `OpenAiCompatibleVlmProvider.extractReceipt` → POST `{baseUrl}/chat/completions` with an image_url
+      data-URL part + the FIXED prompt; dumb transport (returns raw text; parseExtraction validates);
+      temperature 0 + token cap + 30s timeout; Bearer header present-with-key / OMITTED-for-keyless-ollama;
+      non-2xx/network/timeout THROWS (route→502, anti-fail-open); no-content/malformed-JSON → empty string.
+      registry routes BOTH openai-compatible AND ollama here (Ollama speaks the same shape, design §3).
+      GUARD `openai-compatible.test.ts` (12 cases, stubbed fetch). Built ahead of the T0 ruling because
+      openai-compatible is the COMMON DENOMINATOR of every D1 option → zero rework risk. Green (2179 pass).
+- [ ] **T3b — The fork-VARIABLE first-party adapters (anthropic + gemini) — GATED on D1.** Each implements
+      `VlmProvider.extractReceipt` with its provider-specific HTTP + auth header + the shared prompt; a
+      MOCKED-fetch unit test each. BLOCKED until Angelo rules D1 (which adapters ship in v1). The registry
+      builders currently throw a clear `not implemented yet (T3b, gated on D1)`. Build ONLY the ruled set.
 - [ ] **T4 — `POST /api/v1/receipts/parse`** (design §4): multipart image → enabled-`vlm`-provider resolve
       (clear 400 if none) → server-side downscale + size cap (D5) → `getVlmProvider().extractReceipt` →
       strict-schema validate → return the DRAFT, PERSIST NOTHING. Errors honest: no-provider 400,
