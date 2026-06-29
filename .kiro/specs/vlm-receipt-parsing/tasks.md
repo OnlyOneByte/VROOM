@@ -75,9 +75,17 @@
       type 400; missing file 400; key not echoed; unauth 401. Green (2187 pass).
 
 ## Phase 3 — frontend (eyes-on tail, R9 — live-VLM + Playwright-blocked → "code-complete, eyes-on pending")
-- [ ] **T5 — `vlm-api.ts` client + the settings provider UI.** `parseReceipt(image, vehicleId?)`; a VLM
-      provider add/edit section in settings (type + apiKey write-only + model + baseUrl), mirroring the
-      storage-provider UI. Type-check + a client unit test (the C149/C163 service-test pattern).
+- [x] **T5a — `vlm-api.ts` client (C514, commit 3a3679f) — FORK-FREE.** `vlmApi.parseReceipt(image: File)`
+      uploads multipart to the shipped `POST /api/v1/receipts/parse`, unwraps `{ draft }`, returns a
+      `ReceiptDraft` (all fields optional; category ∈ the 6 ExpenseCategory; dollars, never auto-written).
+      Mirrors `expense-api.uploadPhoto`. GUARD `vlm-api.test.ts` (3 cases, mocked apiClient): endpoint +
+      multipart payload + `{draft}` unwrap + empty-draft + error propagation. FE validate:local GREEN (1332
+      vitest pass, +3); prettier + eslint clean. Built ahead of the ruling — a thin wrapper over the
+      contract-fixed route, independent of D1/D3/D4/D5.
+- [ ] **T5b — The VLM-provider settings UI — GATED on D1.** A VLM provider add/edit section in settings
+      (providerType picker + apiKey write-only + model + baseUrl), mirroring the storage-provider UI; reuses
+      `provider-api.ts` (the generic provider CRUD client already exists). The providerType PICKER depends on
+      D1 (which adapters are offered). Eyes-on tail.
 - [ ] **T6 — "Scan receipt" on `ExpenseForm`** (mobile-first `<input capture>`): pick → parse → pre-fill
       → review/edit → submit via the UNCHANGED create path → image attaches via the existing
       `expense_receipts` photo flow (R5). Four-states (loading/error-with-manual-fallback/empty/data) +
