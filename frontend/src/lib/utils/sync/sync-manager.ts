@@ -12,6 +12,7 @@ import {
 	type SyncConfig
 } from './sync-state.svelte';
 import {
+	clearSyncedExpenses,
 	getPendingExpenses,
 	isIncompleteFuelExpense,
 	markExpenseAsSynced,
@@ -107,6 +108,14 @@ class SyncManager {
 		try {
 			const pendingExpenses = getPendingExpenses();
 			const result = await this.syncExpenses(pendingExpenses);
+
+			// #135: reap the rows that successfully synced this run so localStorage does not grow unbounded.
+			// syncExpenses marks each successful row `synced:true` (leaving pending/conflict/needs-attention
+			// rows untouched), and clearSyncedExpenses drops ONLY `synced` rows — so this is safe to run
+			// regardless of the run's overall outcome: a partial run reaps just the synced rows and keeps the
+			// rest for the next attempt. (The legacy syncOfflineExpenses already reaped this way; SyncManager
+			// previously only marked synced and never cleared, so synced rows lingered forever — the #135 leak.)
+			clearSyncedExpenses();
 
 			if (result.success && result.conflicts.length === 0) {
 				lastSyncTime.current = new Date();
