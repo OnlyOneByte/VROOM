@@ -251,24 +251,34 @@ async function resolveNewUser(
 
   // New user transaction with race condition catch
   try {
-    const result = await db.transaction(async (tx) => {
-      const [newUser] = await tx
+    // SYNCHRONOUS transaction (#127 class, C504): bun-sqlite is a sync dialect — an `async` tx callback
+    // returns a pending promise so BEGIN/COMMIT wrap nothing and each `await tx.insert` autocommits alone
+    // (the C151 footgun). New-user signup inserts the users row THEN the auth-provider link; if the second
+    // insert threw under the old async form, the users row stayed committed with NO auth link → an orphan
+    // account that can never log in AND blocks re-signup on the email-unique index. Running synchronously
+    // (.returning().get() / .run() inline, no await) keeps both inserts in ONE real transaction that rolls
+    // back atomically. The UNIQUE-collision catch below is unchanged.
+    const result = db.transaction((tx) => {
+      const newUser = tx
         .insert(users)
         .values({
           email: userInfo.email,
           displayName: userInfo.displayName,
         })
-        .returning();
-      await tx.insert(userProviders).values({
-        userId: newUser.id,
-        domain: 'auth',
-        providerType: authProviderId,
-        providerAccountId: userInfo.providerAccountId,
-        displayName: userInfo.displayName,
-        credentials: '',
-        config: buildAuthProviderConfig(userInfo.email, userInfo.avatarUrl),
-        status: 'active',
-      });
+        .returning()
+        .get();
+      tx.insert(userProviders)
+        .values({
+          userId: newUser.id,
+          domain: 'auth',
+          providerType: authProviderId,
+          providerAccountId: userInfo.providerAccountId,
+          displayName: userInfo.displayName,
+          credentials: '',
+          config: buildAuthProviderConfig(userInfo.email, userInfo.avatarUrl),
+          status: 'active',
+        })
+        .run();
       return { userId: newUser.id };
     });
     return result;

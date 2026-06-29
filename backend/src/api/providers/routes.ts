@@ -77,26 +77,6 @@ async function countUserPhotos(
 }
 
 /**
- * Find photo IDs of a given entity type owned by a specific user,
- * optionally filtered by additional conditions (e.g. missing refs).
- * v2: uses direct photos.user_id instead of multi-branch entity JOINs.
- */
-async function findUserPhotoIds(
-  db: DbInstance,
-  entityType: string,
-  userId: string,
-  extraConditions?: ReturnType<typeof and>
-): Promise<{ id: string }[]> {
-  const conditions = [eq(photos.entityType, entityType), eq(photos.userId, userId)];
-  if (extraConditions) conditions.push(extraConditions);
-
-  return db
-    .select({ id: photos.id })
-    .from(photos)
-    .where(and(...conditions));
-}
-
-/**
  * Count photoRefs for a provider in a given status ('active' | 'failed'), scoped to the
  * given entity types. The synced-vs-failed counts in /sync-status differ ONLY by the status
  * filter, so they share one helper (C92 dedup) rather than two byte-identical joined queries.
@@ -562,7 +542,13 @@ routes.post('/:id/backfill', zValidator('param', commonSchemas.idParam), async (
   }
 
   let created = 0;
-  await db.transaction(async (tx) => {
+  // SYNCHRONOUS transaction (#127 class, C504): the backfill inserts a photoRef per missing photo in a
+  // loop. Under the old `async` callback bun-sqlite committed each insert independently (the C151 footgun),
+  // so a throw mid-loop left a partial backfill committed while the route still 500'd. Running synchronously
+  // (inline `.all()` read + `.run()` inserts, no await) keeps the whole backfill in ONE real transaction
+  // that rolls back atomically. (The find query is inlined here as a sync `.all()` — the async
+  // findUserPhotoIds helper is unchanged for its other callers.)
+  db.transaction((tx) => {
     for (const [category, setting] of Object.entries(providerCategories)) {
       if (!setting?.enabled) continue;
       const entityTypes = CATEGORY_TO_ENTITY_TYPES[category];
@@ -577,15 +563,23 @@ routes.post('/:id/backfill', zValidator('param', commonSchemas.idParam), async (
             .where(and(eq(photoRefs.photoId, photos.id), eq(photoRefs.providerId, id)))
         );
 
-        const missingPhotos = await findUserPhotoIds(tx, entityType, user.id, notExistsClause);
+        const missingPhotos = tx
+          .select({ id: photos.id })
+          .from(photos)
+          .where(
+            and(eq(photos.entityType, entityType), eq(photos.userId, user.id), notExistsClause)
+          )
+          .all();
 
         for (const photo of missingPhotos) {
-          await tx.insert(photoRefs).values({
-            photoId: photo.id,
-            providerId: id,
-            storageRef: '',
-            status: 'pending',
-          });
+          tx.insert(photoRefs)
+            .values({
+              photoId: photo.id,
+              providerId: id,
+              storageRef: '',
+              status: 'pending',
+            })
+            .run();
           created++;
         }
       }

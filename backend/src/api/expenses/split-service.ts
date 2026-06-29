@@ -126,6 +126,58 @@ export class ExpenseSplitService {
 
     return siblings;
   }
+
+  /**
+   * SYNCHRONOUS sibling of createSiblings (#127 class, C504). bun-sqlite is a sync dialect, so the split
+   * create/update transactions run their callbacks synchronously for real atomic rollback — an async
+   * callback autocommits each insert alone (the C151 footgun), which on the update path (delete-then-
+   * reinsert) could irrecoverably lose a split group. `.returning().get()` executes inline inside the
+   * caller's tx. Identical row shape to createSiblings — the two MUST stay in lockstep.
+   */
+  createSiblingsSync(
+    tx: DrizzleTransaction,
+    params: {
+      groupId: string;
+      userId: string;
+      splitMethod: SplitMethod;
+      groupTotal: number;
+      allocations: Array<{ vehicleId: string; amount: number }>;
+      category: string;
+      date: Date;
+      tags?: string[];
+      description?: string;
+      sourceType?: string;
+      sourceId?: string;
+      createdBy?: string | null;
+    }
+  ): Expense[] {
+    const siblings: Expense[] = [];
+
+    for (const allocation of params.allocations) {
+      const newExpense: NewExpense = {
+        id: createId(),
+        vehicleId: allocation.vehicleId,
+        expenseAmount: allocation.amount,
+        userId: params.userId,
+        createdBy: params.createdBy ?? null,
+        groupId: params.groupId,
+        groupTotal: params.groupTotal,
+        splitMethod: params.splitMethod,
+        category: params.category,
+        date: params.date,
+        tags: params.tags ?? null,
+        description: params.description ?? null,
+        missedFillup: false,
+        sourceType: params.sourceType ?? null,
+        sourceId: params.sourceId ?? null,
+      };
+
+      const inserted = tx.insert(expenses).values(newExpense).returning().get();
+      siblings.push(inserted);
+    }
+
+    return siblings;
+  }
 }
 
 export const expenseSplitService = new ExpenseSplitService();
