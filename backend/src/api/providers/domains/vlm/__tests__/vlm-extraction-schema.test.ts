@@ -178,9 +178,9 @@ describe('getVlmProvider / resolveVlmSettings — registry dispatch (T2)', () =>
     );
   });
 
-  test('getVlmProvider returns a LIVE adapter for openai-compatible + ollama (T3a, fork-free)', () => {
-    // openai-compatible is the common denominator of every D1 option, and ollama reuses the same
-    // /v1/chat/completions adapter (design §3), so both are live regardless of the T0 ruling.
+  test('getVlmProvider returns a LIVE adapter for ALL FOUR D1-ruled types (T3a + T3b)', () => {
+    // D1 ruled the full set (2026-06-30): openai-compatible + ollama share the /v1/chat/completions
+    // adapter; anthropic + gemini are their own first-party adapters. All four instantiate now.
     expect(getVlmProvider(vlmRow({ providerType: 'openai-compatible' }))).toBeDefined();
     expect(
       getVlmProvider(
@@ -191,15 +191,11 @@ describe('getVlmProvider / resolveVlmSettings — registry dispatch (T2)', () =>
         })
       )
     ).toBeDefined();
-  });
-
-  test('getVlmProvider still gates the fork-VARIABLE first-party adapters (anthropic/gemini, T3b)', () => {
-    // These depend on the D1 adapter-set ruling — they stay stubbed until it lands.
-    expect(() =>
+    expect(
       getVlmProvider(vlmRow({ providerType: 'anthropic', config: { model: 'claude-3-5-sonnet' } }))
-    ).toThrow(/anthropic.*not implemented yet \(T3b/);
-    expect(() =>
+    ).toBeDefined();
+    expect(
       getVlmProvider(vlmRow({ providerType: 'gemini', config: { model: 'gemini-1.5-flash' } }))
-    ).toThrow(/gemini.*not implemented yet \(T3b/);
+    ).toBeDefined();
   });
 });

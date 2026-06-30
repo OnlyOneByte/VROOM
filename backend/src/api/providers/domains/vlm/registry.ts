@@ -13,6 +13,8 @@
 import type { UserProvider } from '../../../../db/schema';
 import { ValidationError } from '../../../../errors';
 import { decrypt } from '../../../../utils/encryption';
+import { AnthropicVlmProvider } from './anthropic';
+import { GeminiVlmProvider } from './gemini';
 import { OpenAiCompatibleVlmProvider } from './openai-compatible';
 import type { VlmProvider } from './vlm-provider';
 
@@ -47,10 +49,11 @@ export function resolveVlmSettings(row: UserProvider): VlmProviderSettings {
 }
 
 // --- Per-type adapter construction ---
-// Each mirrors storage/registry.ts's build<Type>Provider helpers. The openai-compatible + ollama
-// adapters are LIVE (T3a — fork-free: openai-compatible is the common denominator of every D1 option,
-// and Ollama speaks the same /v1/chat/completions shape per design §3). Anthropic + Gemini are the
-// fork-VARIABLE first-party adapters — they stay stubbed until D1 is ruled (T3b).
+// Each mirrors storage/registry.ts's build<Type>Provider helpers. All four D1-ruled types are LIVE:
+// openai-compatible + ollama share the /v1/chat/completions adapter (T3a; Ollama is keyless self-hosted
+// per design §3), and anthropic + gemini are their own first-party adapters (T3b — D1 ruled the full set
+// in 2026-06-30). The create/PUT gate + resolveVlmSettings already enforced the per-type required fields;
+// these helpers re-assert them defensively before constructing.
 
 function buildOpenAiCompatibleProvider(settings: VlmProviderSettings): VlmProvider {
   if (!settings.baseUrl) {
@@ -63,14 +66,14 @@ function buildAnthropicProvider(settings: VlmProviderSettings): VlmProvider {
   if (!settings.apiKey) {
     throw new ValidationError('Anthropic VLM requires an API key');
   }
-  throw new ValidationError('VLM adapter "anthropic" is not implemented yet (T3b, gated on D1)');
+  return new AnthropicVlmProvider(settings);
 }
 
 function buildGeminiProvider(settings: VlmProviderSettings): VlmProvider {
   if (!settings.apiKey) {
     throw new ValidationError('Gemini VLM requires an API key');
   }
-  throw new ValidationError('VLM adapter "gemini" is not implemented yet (T3b, gated on D1)');
+  return new GeminiVlmProvider(settings);
 }
 
 function buildOllamaProvider(settings: VlmProviderSettings): VlmProvider {
