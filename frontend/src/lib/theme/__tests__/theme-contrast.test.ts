@@ -10,7 +10,7 @@
  */
 
 import { describe, expect, test } from 'vitest';
-import { DEFAULT_THEME_ID, THEME_REGISTRY } from '../theme-registry';
+import { THEME_REGISTRY } from '../theme-registry';
 import type { ThemeTokenKey, ThemeTokens } from '../theme-types';
 
 /** Parse an `oklch(L C H[/ a%])` string. Alpha is ignored — contrast is computed on the opaque color. */
@@ -131,10 +131,15 @@ const CHART_KEYS: readonly ThemeTokenKey[] = [
   'chart-8',
 ];
 const AA_GRAPHICAL = 3.0;
-const nonDefaultThemes = Object.values(THEME_REGISTRY).filter((t) => t.id !== DEFAULT_THEME_ID);
+// #343 (C531): the `default` palette had 3 chart tokens below 3:1 vs card (light chart-4 1.72 + chart-5
+// 2.15, dark chart-1 2.60) — the C343 carve-out that excluded `default` from this gate. Those 3 tokens were
+// re-tuned (a minimal L nudge, hue+chroma preserved) so `default` now clears 3:1 on ALL 8 chart tokens too,
+// and the `default ≡ app.css` identity guard was rebaselined in the SAME commit to the new values. With the
+// carve-out gone, EVERY built-in theme (default included) is now held to the 3:1 chart-vs-card bar.
+const allThemes = Object.values(THEME_REGISTRY);
 
-describe('every NON-default theme clears WCAG 3:1 on chart series vs card (C347 graphical gate)', () => {
-  describe.each(nonDefaultThemes)('theme "$id"', (theme) => {
+describe('every built-in theme clears WCAG 3:1 on chart series vs card (C347 graphical gate, default folded in C531)', () => {
+  describe.each(allThemes)('theme "$id"', (theme) => {
     describe.each(['light', 'dark'] as const)('%s variant', (variant) => {
       const tokens = theme[variant] as ThemeTokens;
       test.each(CHART_KEYS)('%s on card ≥ 3:1', (chart) => {
