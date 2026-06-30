@@ -19,12 +19,13 @@
 > safe-rendered reply, never a security decision.
 
 ## Phase 0 — sign-off (gates the fork-dependent slices)
-- [ ] **T0 — Angelo rules D1–D6** (`requirements.md`). Each has a RECOMMENDED option; an "ACK" takes the
-      recommendation. D1 adapter set (recommend openai-compatible + anthropic + gemini + ollama, mirroring
-      the shipped VLM set), D2 read-only-vs-gated-actions (recommend READ-ONLY hard in v1), D3 history
-      ephemeral-vs-persisted (recommend ephemeral), D4 tool allowlist (recommend the 8 aggregate read
-      tools, no raw-row dumps), D5 streaming-vs-blocking (recommend blocking in v1), D6 caps (recommend
-      K=5 tool calls / T=4 turns + bounded input). **T1–T2 below do NOT depend on T0 and may build first**
+- [x] **T0 — Angelo ACK all recommended (2026-06-30).** D1 = OpenAI-compatible + Anthropic + Gemini + Ollama
+      (the shipped set — all live); D2 = READ-ONLY hard in v1 (no write tool); D3 = ephemeral history (no
+      table); D4 = the 8 aggregate read tools, no raw-row dumps; D5 = blocking in v1 (streaming a fast-follow);
+      D6 = K=5 tool calls / T=4 turns + bounded input. The shipped backend (T1-T4) + T5a already used exactly
+      these recommended values, so **NO rework** — the ruling RATIFIES the built defaults. The FE tail (T5b/T6/
+      T7) is now UNBLOCKED. Do NOT re-escalate (settled). [Original recommended-option text preserved in git
+      history / the C532 LEDGER entry.] **T1–T2 below do NOT depend on T0 and may build first**
       (the provider-domain plumbing + the read-tool wrappers are fork-free); T3+ honors the ruling.
 
 ## Phase 1 — the LLM provider domain (fork-free; encrypted bring-your-own credential plumbing)
