@@ -114,11 +114,24 @@
       opens with the provider picker + name/model/baseUrl/key fields + the correctly-disabled save button,
       zero console errors. No card unit test (DueRemindersCard-class eyes-on convention, matches VLM T5b).
       FE validate:local GREEN (1426 vitest).
-- [ ] **T6 — The assistant chat surface (honors D5).** A `/assistant` route (or dashboard panel): message
-      list + input + send; four-states (loading/error/empty-no-provider/data); reply rendered as SAFE
-      markdown (R8); a one-time privacy disclosure before the first message (R7, the VLM disclosure
-      pattern). Blocking (D5) — spinner while awaiting the reply. Eyes-on: drive a message with a stubbed
-      chat route, assert the bubble renders + toolsUsed shown, zero console errors.
+- [x] **T6 — The assistant chat surface (C541, honors D5).** New `/assistant` route + a `Bot` nav entry
+      (routes.ts + Navigation.svelte, after Trips) + the route-smoke list. The page: a scrollable transcript
+      (user/assistant bubbles with avatars + a sending spinner) + a Textarea input (Enter sends, Shift+Enter
+      newline) + a Send button. Four-states keyed on the provider check: loading (spinner) / error (retry) /
+      empty (no llm provider → "Go to Settings") / data (the chat, with its own idle/sending/send-error+retry
+      lifecycle). Blocking (D5) — a spinner bubble while awaiting the reply. `toolsUsed` rendered as Badges
+      under each assistant reply (transparency). SAFE RENDER (R8): the reply is a PLAIN-TEXT node with
+      `whitespace-pre-wrap break-words` — NEVER `{@html}` — so untrusted model output cannot inject markup;
+      no markdown lib pulled in (the frontend has none; plain text is the safe floor, rich markdown a later
+      enhancement). R7 first-use disclosure: an AlertDialog before the FIRST message (localStorage key
+      `vroom.llm.assistant-disclosed`, the VLM ReceiptScanButton pattern) explaining the question + needed
+      data is sent to the configured provider, read-only, VROOM stores nothing, self-hosted option. History
+      bounded to the last 12 turns (matches the backend SAX-04 cap). EYES-ON (3 captures, zero console
+      errors each): empty-no-provider state (demo user has no llm provider); a DRIVEN data-state send via a
+      stubbed provider-list + stubbed chat POST (asserted: 1 user + 1 assistant bubble, both reply lines
+      render with the preserved newline, the getFuelStats/getFinancingState toolsUsed badges show); and the
+      R7 disclosure dialog opening on the first un-acked send. FE validate:local GREEN (svelte-check 0
+      errors, build, 1426 vitest).
 - [ ] **T7 — Round-trip e2e + DoD.** With a MOCKED llm provider (adapter fetch stubbed to script a
       tool-call then an answer): send a message → assert the orchestrator ran the (stubbed) tool → the
       reply renders. The live-LLM leg stays eyes-on-pending. Feature-DoD: both sides validate:local green,

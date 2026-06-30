@@ -12,7 +12,8 @@
 		Menu,
 		LogOut,
 		MapPin,
-		Bell
+		Bell,
+		Bot
 	} from '@lucide/svelte';
 	import SyncStatusInline from '../sync/SyncStatusInline.svelte';
 	import { syncState, onlineStatus, offlineExpenseQueue } from '$lib/stores/offline.svelte';
@@ -40,7 +41,8 @@
 		{ name: 'Insurance', href: routes.insurance, icon: Shield },
 		{ name: 'Analytics', href: routes.analytics, icon: ChartColumn },
 		{ name: 'Reminders', href: routes.reminders, icon: Bell },
-		{ name: 'Trips', href: routes.trips, icon: MapPin }
+		{ name: 'Trips', href: routes.trips, icon: MapPin },
+		{ name: 'Assistant', href: routes.assistant, icon: Bot }
 	] as const;
 
 	const userNavigation = [{ name: 'Settings', href: routes.settings, icon: Settings }] as const;
