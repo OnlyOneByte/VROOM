@@ -94,10 +94,17 @@
       privacy line. EYES-ON DONE: booted servers, seeded openai-compatible + ollama providers via the real authed
       POST (both 201, credentials stripped), shot /settings desktop — card renders populated + edit/delete, zero
       console errors. FE validate:local GREEN (1332 vitest); prettier+eslint clean.
-- [ ] **T6 — "Scan receipt" on `ExpenseForm`** (mobile-first `<input capture>`): pick → parse → pre-fill
-      → review/edit → submit via the UNCHANGED create path → image attaches via the existing
-      `expense_receipts` photo flow (R5). Four-states (loading/error-with-manual-fallback/empty/data) +
-      the D3 confidence UX as ruled + the R7 first-use privacy disclosure. a11y + mobile, no overflow.
+- [x] **T6 — "Scan receipt" on `ExpenseForm` (C526, commit bc83d05).** ReceiptScanButton.svelte (mobile-first
+      hidden `<input accept=image/* capture=environment>`) wired into ExpenseForm top, create-mode only.
+      pick → vlmApi.parseReceipt → handleReceiptDraft pre-fills (amount dollar-string / date YYYY-MM-DD /
+      odometer→mileage / vendor→description-if-empty / category via selectCategory so side-effects fire);
+      image rides pendingFiles → existing expense_receipts flow on save (R5); user submits the UNCHANGED path.
+      Four-states (idle/loading/error+Try-again fallback/data); D3 ruled-simple (no per-field confidence); R7
+      one-time privacy AlertDialog (localStorage-remembered); ApiError.statusCode → 400 no-provider / 502
+      unreachable messaging. EYES-ON DONE: Playwright drive (stubbed parse) — disclosure shown, then
+      amount=$47.83 / date=Mar 12 2026 / mileage=84231 / category=Fuel (fuel-details expanded) /
+      description=Shell Station all pre-filled + image queued; zero console errors. FE validate:local GREEN
+      (1332 vitest); prettier+eslint clean.
 - [ ] **T7 — Round-trip e2e + DoD.** With a MOCKED vlm provider: pick-image → parse → assert the form
       pre-fills → submit → assert the expense row + the attached receipt photo (the FE→BE→draft→form→
       create seam, NORTH_STAR #3). The live-VLM leg stays eyes-on-pending. Feature-DoD: both sides
