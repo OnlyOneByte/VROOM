@@ -545,6 +545,46 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect(list.data[0]?.description).toBe("'24 road trip fuel");
   });
 
+  test("round-trips a user-typed `'`+trigger description LOSSLESSLY (csv-apostrophe ruling, C527)", async () => {
+    // The C401 data-loss, now CLOSED (ruled 2026-06-30: optimize VROOM-own-export fidelity). A
+    // description the user genuinely typed as a leading apostrophe BEFORE a formula trigger (e.g.
+    // `'=Daily mention`) used to round-trip LOSSY to `=Daily mention` (export left it bare, import
+    // over-stripped the apostrophe). The matched invertible escape (export `'=` → `''=`, import peels
+    // one) makes export → import return the EXACT original. Create → export → delete → import → equal.
+    const vehicleId = await seedCivic('Daily Driver');
+    const userTyped = "'=Daily mention"; // a literal leading ' the user wants to keep, before a trigger
+    const created = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'misc',
+      expenseAmount: 25,
+      date: '2024-06-01T00:00:00.000Z',
+      description: userTyped,
+    });
+    expect(created.status, await created.text()).toBeLessThan(300);
+
+    // Export — the server escapes the user-typed `'=` to `''=` (invertible, still text-safe in Excel).
+    const csv = await (await ctx.authed('GET', '/api/v1/expenses/export')).text();
+    expect(csv).toContain(`''=Daily mention`);
+
+    // Delete the original so the re-import is the only carrier of this description.
+    const list0 = await json<{ data: Array<{ id: string }> }>(
+      await ctx.authed('GET', '/api/v1/expenses?limit=100')
+    );
+    for (const r of list0.data) await ctx.authed('DELETE', `/api/v1/expenses/${r.id}`);
+
+    // Re-import → the description equals the ORIGINAL, apostrophe intact (was the data-loss).
+    const importRes = await ctx.authed('POST', '/api/v1/expenses/import', { csv });
+    const body = await json<ImportResponse>(importRes);
+    expect(importRes.status, JSON.stringify(body)).toBe(200);
+    expect(body.data.imported).toBe(1);
+
+    const list = await json<{ data: Array<{ description: string | null }> }>(
+      await ctx.authed('GET', '/api/v1/expenses?limit=100')
+    );
+    expect(list.data.length).toBe(1);
+    expect(list.data[0]?.description).toBe(userTyped);
+  });
+
   // #137 (C448): a NON-fuel imported row that carries a mileage/volume/fuelType (a foreign tracker like
   // Drivvo/Fuelio logs an odometer on a Service/maintenance entry) must NOT persist those fuel-only fields
   // — the import commit (importExpenses) inserts verbatim, bypassing the clearFuelFieldsIfNotFuel guard the
