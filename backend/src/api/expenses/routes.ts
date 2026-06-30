@@ -82,6 +82,17 @@ const baseExpenseSchema = createInsertSchema(expensesTable, {
     // it — the clear-optional-field class (cycles 82-85). BaseRepository.update
     // writes null through to the column; undefined is still dropped (create omits it).
     .nullish(),
+  // expense-location T2: an OPTIONAL free-text location label (D1 — no GPS). Same shape + clear-on-edit
+  // semantics as description; length-capped at locationMaxLength. createInsertSchema already infers the
+  // column, but this override adds the bound + the .nullish() clear contract (the default would be
+  // .optional()-ish without the cap).
+  location: z
+    .string()
+    .max(
+      CONFIG.validation.expense.locationMaxLength,
+      `Location must be ${CONFIG.validation.expense.locationMaxLength} characters or less`
+    )
+    .nullish(),
   // Manual create/update accepts ONLY 'financing' as a source link — and the POST handler fully
   // validates it (the referenced financing exists, is active, and sourceId matches). 'insurance_term'
   // + 'reminder' expenses are created EXCLUSIVELY by system paths that bypass this route (insurance

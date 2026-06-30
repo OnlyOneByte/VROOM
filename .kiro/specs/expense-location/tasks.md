@@ -32,11 +32,16 @@
       (the schema-vs-Sheets column-coverage assertion — part of R4, pulled in early by the guard). Backend
       validate:local GREEN (2298, +0 net — the column auto-flows through every generic `.select()`; no repo
       change). NEXT: T2 (the create/update Zod field + the round-trip read test).
-- [ ] **T2 — Create + update validation + the round-trip read (honors none directly; fork-free).** Add the
-      optional length-capped `location` to `baseExpenseSchema` (create) — a plain `.nullish()` field that
-      survives `.partial()`, so the update path needs no override. GUARD (expenses route HTTP test): a create
-      WITH location persists + reads back; an edit clearing it → NULL; a create WITHOUT it → NULL. PERSISTS
-      via the unchanged create path; the generic select returns it. Backend validate:local green.
+- [x] **T2 — Create + update validation + the round-trip read (C550, fork-free).** Added an explicit
+      `location` override to `baseExpenseSchema` (createInsertSchema already infers the column; the override
+      adds the `locationMaxLength` cap + the `.nullish()` clear-on-edit contract, mirroring `description`).
+      The POST/PUT handlers spread the validated body (`createIdempotent({ ...expenseData, … })`), so
+      `location` auto-flows into the insert; `clearFuelFieldsIfNotFuel` leaves it untouched; the generic
+      select returns it. GUARD `expense-location-roundtrip.test.ts` (5 cases, HTTP harness): a provided
+      location persists + reads back through the API; a create WITHOUT location → NULL (fully optional); a
+      PUT location:null CLEARS it (the clear-optional-field class); a PUT without location leaves it
+      untouched; an over-cap (201-char) location → 400. Backend validate:local GREEN (2303, +5). NEXT: T3
+      (CSV export/import round-trip — the backup + Sheets paths already auto-covered by T1).
 
 ## Phase 2 — backup / CSV round-trip (R4)
 - [ ] **T3 — CSV export/import + backup round-trip (fork-free).** Add `'location'` to `EXPORT_COLUMNS`
