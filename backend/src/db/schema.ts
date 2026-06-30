@@ -220,6 +220,9 @@ export const expenses = sqliteTable(
     date: integer('date', { mode: 'timestamp' }).notNull(),
     mileage: integer('mileage'),
     description: text('description'),
+    // expense-location T1 (migration 0012): an OPTIONAL free-text location label (e.g. "Shell, Main St").
+    // D1/D5 — free-text only, NO GPS in v1 (mirrors trips.startLocation). Length-capped at the Zod edge.
+    location: text('location'),
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     expenseAmount: integer('expense_amount').notNull(), // money: integer CENTS (migration 0009)

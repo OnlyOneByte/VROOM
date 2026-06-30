@@ -34,6 +34,7 @@ function makeExpense(overrides: {
     volume: overrides.volume,
     fuelType: '87 (Regular)',
     description: null,
+    location: null,
     missedFillup: overrides.missedFillup,
     userId: 'test-user',
     createdBy: null,

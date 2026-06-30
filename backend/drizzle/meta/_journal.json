@@ -85,6 +85,13 @@
       "when": 1782534527999,
       "tag": "0011_quick_red_hulk",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1782600100000,
+      "tag": "0012_expense_location",
+      "breakpoints": true
     }
   ]
 }

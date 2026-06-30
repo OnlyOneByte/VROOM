@@ -215,6 +215,7 @@ export const CONFIG = {
     },
     expense: {
       descriptionMaxLength: 500,
+      locationMaxLength: 200, // expense-location: optional free-text location label cap
       maxAmount: 1_000_000,
       maxTags: 10,
       tagMaxLength: 50,

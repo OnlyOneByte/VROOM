@@ -21,12 +21,17 @@
       regardless of the UX forks); T2+ (the form placement / VLM-mapping / display calls) honor the ruling.
 
 ## Phase 1 — backend (the column + validation; fork-free plumbing)
-- [ ] **T1 — Schema + additive migration (fork-free).** Add `location: text('location')` to the `expenses`
-      table (schema.ts, after `description`) + a `0012_*.sql` additive `ALTER TABLE expenses ADD location text;`
-      (the 0011 class — NOT a rebuild). Add `CONFIG.validation.expense.locationMaxLength` (reuse the
-      description bound, e.g. 200). GUARD: a migration-applies test / the existing schema snapshot; assert
-      the column exists + is nullable. Backend validate:local green (the column auto-flows through every
-      generic `.select()` — no repo change).
+- [x] **T1 — Schema + additive migration (C549, fork-free).** Added `location: text('location')` to the
+      `expenses` table (schema.ts, after `description`) + `0012_expense_location.sql` (`ALTER TABLE expenses
+      ADD location text;`, the 0011 additive class — NOT a rebuild) + the journal entry (idx 12; the runtime
+      `migrate()` reads `_journal.json`). Added `CONFIG.validation.expense.locationMaxLength = 200`. The
+      in-memory harness runs `runMigrations()` on every createTestApp, so the full suite PROVES 0012 applies
+      (2298 pass). Two ripples handled: 3 full-row test fixtures (repository.property + calculations[.property])
+      needed `location: null` (Drizzle infers the column required in the row type); and the
+      `sheets-header-coverage` drift guard correctly FORCED adding `location` to the expenses `SHEET_HEADERS`
+      (the schema-vs-Sheets column-coverage assertion — part of R4, pulled in early by the guard). Backend
+      validate:local GREEN (2298, +0 net — the column auto-flows through every generic `.select()`; no repo
+      change). NEXT: T2 (the create/update Zod field + the round-trip read test).
 - [ ] **T2 — Create + update validation + the round-trip read (honors none directly; fork-free).** Add the
       optional length-capped `location` to `baseExpenseSchema` (create) — a plain `.nullish()` field that
       survives `.partial()`, so the update path needs no override. GUARD (expenses route HTTP test): a create
