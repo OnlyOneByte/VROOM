@@ -13,6 +13,8 @@
 import type { UserProvider } from '../../../../db/schema';
 import { ValidationError } from '../../../../errors';
 import { decrypt } from '../../../../utils/encryption';
+import { AnthropicLlmProvider } from './anthropic';
+import { GeminiLlmProvider } from './gemini';
 import type { LlmProvider } from './llm-provider';
 import { OpenAiCompatibleLlmProvider } from './openai-compatible';
 
@@ -67,10 +69,24 @@ function buildOllamaProvider(settings: LlmProviderSettings): LlmProvider {
   return new OpenAiCompatibleLlmProvider(settings);
 }
 
+function buildAnthropicProvider(settings: LlmProviderSettings): LlmProvider {
+  if (!settings.apiKey) {
+    throw new ValidationError('Anthropic LLM requires an API key');
+  }
+  return new AnthropicLlmProvider(settings);
+}
+
+function buildGeminiProvider(settings: LlmProviderSettings): LlmProvider {
+  if (!settings.apiKey) {
+    throw new ValidationError('Gemini LLM requires an API key');
+  }
+  return new GeminiLlmProvider(settings);
+}
+
 /**
  * Instantiate an LlmProvider from a user_providers row. Decrypts credentials + switches on providerType,
- * throwing on an unknown/non-LLM type (the same shape as vlm/registry.ts's default branch). anthropic +
- * gemini throw a clear T3b-not-yet-implemented ValidationError until that slice wires their adapters.
+ * throwing on an unknown/non-LLM type (the same shape as vlm/registry.ts's default branch). All four
+ * D1-ruled types are LIVE (T3a openai-compatible + ollama; T3b anthropic + gemini).
  */
 export function getLlmProvider(row: UserProvider): LlmProvider {
   const settings = resolveLlmSettings(row);
@@ -81,10 +97,9 @@ export function getLlmProvider(row: UserProvider): LlmProvider {
     case 'ollama':
       return buildOllamaProvider(settings);
     case 'anthropic':
+      return buildAnthropicProvider(settings);
     case 'gemini':
-      throw new ValidationError(
-        `LLM provider type "${row.providerType}" is not yet available (coming in T3b)`
-      );
+      return buildGeminiProvider(settings);
     default:
       throw new ValidationError(`Unsupported LLM provider type: ${row.providerType}`);
   }
