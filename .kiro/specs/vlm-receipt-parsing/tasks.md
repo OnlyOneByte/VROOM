@@ -105,11 +105,22 @@
       amount=$47.83 / date=Mar 12 2026 / mileage=84231 / category=Fuel (fuel-details expanded) /
       description=Shell Station all pre-filled + image queued; zero console errors. FE validate:local GREEN
       (1332 vitest); prettier+eslint clean.
-- [ ] **T7 — Round-trip e2e + DoD.** With a MOCKED vlm provider: pick-image → parse → assert the form
-      pre-fills → submit → assert the expense row + the attached receipt photo (the FE→BE→draft→form→
-      create seam, NORTH_STAR #3). The live-VLM leg stays eyes-on-pending. Feature-DoD: both sides
-      validate:local green, the e2e green, eyes-on the scan flow (boot + shot.sh + Read the PNG), the
-      privacy disclosure present. Tick the feature done.
+- [x] **T7 — Round-trip e2e + DoD (C527).** Two artifacts. (1) DURABLE committed guard
+      `backend/src/api/providers/__tests__/vlm-receipt-roundtrip.test.ts` (3 cases, createTestApp + the
+      adapter fetch STUBBED = the mocked VLM): parse → take the draft → map it as the form does
+      (handleReceiptDraft + handleSubmit + toBackendExpense) → POST /expenses → GET it back; pins the
+      money seam (47.83 dollars→cents→dollars EXACT), odometer→mileage, vendor→description-if-empty,
+      category; re-asserts parse persists NOTHING; partial-draft + vendor-does-not-clobber-typed-desc
+      cases. This is the merge-surviving half (source-scan-guard discipline). (2) EYES-ON untracked e2e
+      `frontend/e2e/vlm-receipt-roundtrip.meshclaw.e2e.ts` (gitignored): the FULL UI seam with the live
+      VLM leg MOCKED via page.route, the photo leg via the fake-storage seam — scan → disclosure
+      (pre-ack) → upload → assert prefill (#amount 47.83 / #mileage 84231 / #description Shell Station /
+      category Fuel / queued image) → user adds volume → confirm via the UNCHANGED create path → assert
+      the expense row persisted (expenseAmount 47.83 / mileage 84231 / category fuel) AND the receipt
+      PHOTO attached (R5, the expense_receipts flow). EYES-ON: booted servers (ALLOW_FAKE_STORAGE=1),
+      drove the scan flow, shot + Read the PNG — every field pre-filled, image queued, "Receipt scanned"
+      toast, ZERO console errors. Both sides validate:local GREEN (BE 2205 pass [+3], FE 1332 vitest).
+      **The VLM receipt-parsing feature is DONE.**
 
 ## Notes
 - **NO schema migration in v1** — `user_providers` is domain-agnostic; a `vlm` row needs no new column
