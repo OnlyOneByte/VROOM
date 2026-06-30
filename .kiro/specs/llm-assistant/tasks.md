@@ -132,11 +132,23 @@
       render with the preserved newline, the getFuelStats/getFinancingState toolsUsed badges show); and the
       R7 disclosure dialog opening on the first un-acked send. FE validate:local GREEN (svelte-check 0
       errors, build, 1426 vitest).
-- [ ] **T7 — Round-trip e2e + DoD.** With a MOCKED llm provider (adapter fetch stubbed to script a
-      tool-call then an answer): send a message → assert the orchestrator ran the (stubbed) tool → the
-      reply renders. The live-LLM leg stays eyes-on-pending. Feature-DoD: both sides validate:local green,
-      the e2e green, eyes-on the chat surface (boot + shot.sh + Read the PNG), the privacy disclosure
-      present, the IDOR/tool-scope guard green. Tick the feature done.
+- [x] **T7 — Round-trip e2e + DoD (C542). ✅ THE FEATURE IS COMPLETE.** Two COMMITTED merge-surviving
+      guards + one untracked eyes-on e2e: (1) `backend/.../assistant-tool-roundtrip.test.ts` (3 cases) — the
+      genuinely-new value over the T4 route test (which runs against an EMPTY DB): drives the REAL
+      orchestrator over a tool with REAL seeded data via a request-body-CAPTURING fetch stub, asserting the
+      tool RESULT is fed BACK to the model (design §4 step d) — listVehicles real rows (Honda/Civic/Tesla)
+      threaded back; getExpenseSummary a seeded $120→12000-cents total; a two-tool conversation threads BOTH
+      results. (2) `frontend/.../assistant-safe-render.test.ts` (2 cases) — a source-scan guard pinning the R8
+      XSS invariant: the assistant surface contains ZERO `{@html}` (untrusted reply renders as a plain-text
+      node), with a stripComments pass so doc-mentions are not false positives. (3) Untracked
+      `frontend/e2e/assistant-chat.meshclaw.e2e.ts` (gitignored, 2 tests, GREEN vs the live dev server):
+      mocks the provider-list + chat POST, drives a real send → asserts the user+assistant bubbles + both
+      reply lines (preserved newline) + the toolsUsed badges render; + the R7 disclosure gates the first
+      send. FEATURE-DoD MET: BE validate:local GREEN (2281 pass, +3), FE validate:local GREEN (1428 pass,
+      +2), the e2e GREEN, eyes-on the chat surface (C541, 3 captures), the R7 privacy disclosure present
+      (C541 + the e2e), the IDOR/tool-scope guard GREEN (T4 IDOR + the T7 round-trip). The live-LLM leg
+      stays eyes-on-pending (needs a real key). **★ ALL 7 SLICES SHIPPED — THE LLM-ASSISTANT FEATURE IS
+      DONE.**
 
 ## Notes
 - **NO schema migration in v1** — `user_providers` is domain-agnostic; an `llm` row needs no new column.
