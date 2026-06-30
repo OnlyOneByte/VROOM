@@ -22,6 +22,7 @@
 	import BackupNowDialog from '$lib/components/settings/storage-provider/backup/BackupDialog.svelte';
 	import UnifiedRestoreDialog from '$lib/components/settings/storage-provider/backup/RestoreDialog.svelte';
 	import PhotoStorageSettings from '$lib/components/settings/cards/StorageProvidersCard.svelte';
+	import VlmProvidersCard from '$lib/components/settings/cards/VlmProvidersCard.svelte';
 	import { fetchLastSyncTime } from '$lib/utils/sync/sync-manager';
 	import { providerApi } from '$lib/services/provider-api';
 	import FormLayout from '$lib/components/common/form-layout.svelte';
@@ -281,6 +282,7 @@
 				onRestore={handleRestoreClick}
 				onDownloadBackup={handleBackup}
 			/>
+			<VlmProvidersCard />
 		</div>
 	{/if}
 
