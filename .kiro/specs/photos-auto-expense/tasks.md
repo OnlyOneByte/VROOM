@@ -60,11 +60,19 @@
       apiClient): the GET endpoint + drafts passthrough; the confirm POST endpoint + the draft→body mapping +
       the crux `clientId=photos:<id>` idempotency key; a different photo → a different clientId (no dedup
       collision); error propagation on both. FE validate:local GREEN (1433 vitest, +5).
-- [ ] **T4 — The "Import from Photos" review surface (honors D5).** An entry point (settings storage card
-      or the expenses header) → the sweep (loading) → a review CHECKLIST (per row: thumbnail + editable
-      draft fields + a vehicle picker + a deselect checkbox; already-imported greyed/excluded) → a batch
-      "Add N expenses" action firing N idempotent creates. Four-states + the D1 disclosure ("reads only the
-      receipts VROOM uploaded to Photos, not your camera roll"). Eyes-on (boot + shot + Read the PNG).
+- [x] **T4 — The "Import from Photos" review surface (C546).** `ImportFromPhotosDialog.svelte` — a
+      `bind:open` dialog opened from the expenses-page header (an "Import from Photos" button beside Import
+      CSV; mirrors the ImportExpensesDialog integration: `{vehicles}` + `onImported={handleImported}`). On
+      open it gates the FIRST sweep behind the R7/D1 AlertDialog (localStorage `vroom.photos.import-disclosed`,
+      the ReceiptScanButton pattern) → photosImportApi.getReceiptDrafts() → maps each draft to an editable
+      REVIEW ROW: a thumbnail (img on thumbnailUrl, ImageOff placeholder on null) + editable amount / date /
+      category / vehicle + an "include" checkbox (a deselected row dims + drops out of the count). The batch
+      "Add N expenses" fires N idempotent confirmDraft calls (clientId=photos:<id>); the count reflects only
+      includable rows (amount>0 + a vehicle). FOUR-STATES: loading (skeletons) / error (retry) / empty ("no
+      new receipts in your VROOM Photos album") / data (the checklist). EYES-ON (boot + 2 Playwright drives +
+      Read, zero console errors each): the data-state checklist (2 rows, "Add 1 expense" correctly excludes
+      the empty-draft row), and the R7 disclosure gating the first open. The live Photos+VLM legs stay
+      eyes-on-pending. FE validate:local GREEN (1433 vitest).
 - [x] **T5 — The OAuth scope expansion (C544, ARCC-cleared C543/§7 + Angelo D2 ACK).** Added
       `https://www.googleapis.com/auth/photoslibrary.readonly.appcreateddata` to the provider-connect scope
       list (`auth/routes.ts` `/providers/connect/google`, alongside `drive.file`). The NARROWEST Photos read
