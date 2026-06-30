@@ -79,10 +79,21 @@
       scope (read-only + app-created-data only). Additive re-consent: the flow already sets `prompt=consent`
       + `access_type=offline`, so existing Drive/Photos users re-grant on next connect; the credential path
       (encrypted `{refreshToken}`) is UNCHANGED. Paired with T1 as the live-read enablement.
-- [ ] **T6 — Round-trip e2e + DoD.** With a MOCKED Photos (`PhotosClient` fake) + a MOCKED VLM: sweep →
-      review → confirm → assert N expenses + their photo links + that a re-run is a no-op (idempotency).
-      The live Photos + VLM legs stay eyes-on-pending. Feature-DoD: both sides validate:local green, the
-      e2e green, eyes-on the review surface, the disclosure present. Tick the feature done.
+- [x] **T6 — Round-trip e2e + DoD (C547). ✅ THE FEATURE IS COMPLETE.** A COMMITTED merge-surviving guard +
+      one untracked eyes-on e2e: (1) `backend/.../photos-import-roundtrip.test.ts` (3 cases, the fake
+      PhotosClient + a stubbed VLM fetch) — sweep → confirm N drafts via the UNCHANGED POST /expenses with
+      `clientId=photos:<id>` → N expenses persist carrying that clientId; a RE-SWEEP after confirm filters
+      the now-imported photos out (the already-imported cross-ref); a RE-CONFIRM of the same clientId is a
+      NO-OP (createIdempotent returns the existing row, count UNCHANGED — the crux of D3/R5). (2) untracked
+      `frontend/e2e/photos-import.meshclaw.e2e.ts` (gitignored, GREEN vs the live dev server) — mocks the
+      stage route + the create, drives the header entry → R7-gated sweep → review checklist (2 rows, "Add 1
+      expense" excludes the empty draft) → confirm → asserts the POST carried `clientId=photos:m-1` + the
+      dialog closed. HONEST CONTRACT: the v1 dedup is the clientId (not an expense_receipts photo-ref row —
+      the import creates the parsed-draft expense; the image stays in Google Photos), exactly as design §3
+      specifies. FEATURE-DoD MET: BE validate:local GREEN (2298, +3), FE GREEN (1433), the e2e GREEN, eyes-on
+      the review surface (C546), the R7 disclosure present (C546), idempotency proven. The live Photos+VLM
+      legs stay eyes-on-pending (need a real Google connection + key). **★ ALL SLICES SHIPPED — THE
+      PHOTOS→AUTO-EXPENSE FEATURE IS DONE.**
 
 ## Notes
 - **NO schema migration in v1** — dedup reuses the `createIdempotent` (userId, clientId) index; the
