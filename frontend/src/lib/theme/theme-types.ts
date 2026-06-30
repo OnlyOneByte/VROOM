@@ -41,6 +41,9 @@ export type ThemeTokenKey =
   | 'chart-3'
   | 'chart-4'
   | 'chart-5'
+  | 'chart-6'
+  | 'chart-7'
+  | 'chart-8'
   | 'destructive'
   | 'foreground'
   | 'input'
@@ -81,6 +84,9 @@ export const THEME_TOKEN_KEYS = [
   'chart-3',
   'chart-4',
   'chart-5',
+  'chart-6',
+  'chart-7',
+  'chart-8',
   'destructive',
   'foreground',
   'input',
