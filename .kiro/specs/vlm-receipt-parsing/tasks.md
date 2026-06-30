@@ -86,10 +86,14 @@
       multipart payload + `{draft}` unwrap + empty-draft + error propagation. FE validate:local GREEN (1332
       vitest pass, +3); prettier + eslint clean. Built ahead of the ruling — a thin wrapper over the
       contract-fixed route, independent of D1/D3/D4/D5.
-- [ ] **T5b — The VLM-provider settings UI — GATED on D1.** A VLM provider add/edit section in settings
-      (providerType picker + apiKey write-only + model + baseUrl), mirroring the storage-provider UI; reuses
-      `provider-api.ts` (the generic provider CRUD client already exists). The providerType PICKER depends on
-      D1 (which adapters are offered). Eyes-on tail.
+- [x] **T5b — The VLM-provider settings UI (C525, commit 8c3cf21).** `VlmProvidersCard.svelte` (mounted on
+      /settings after Storage Providers) + an inline add/edit Dialog; `VLM_PROVIDER_TYPES` constant = the D1 set
+      (openai-compatible + anthropic + gemini + ollama, per-type keyless/needsBaseUrl + default model/baseUrl).
+      Reuses `provider-api.ts` getProviders('vlm')/create/update/delete. API key is WRITE-ONLY (never pre-filled;
+      blank-on-edit keeps the stored key → config-only PUT). canSave mirrors the backend gate. Four-states +
+      privacy line. EYES-ON DONE: booted servers, seeded openai-compatible + ollama providers via the real authed
+      POST (both 201, credentials stripped), shot /settings desktop — card renders populated + edit/delete, zero
+      console errors. FE validate:local GREEN (1332 vitest); prettier+eslint clean.
 - [ ] **T6 — "Scan receipt" on `ExpenseForm`** (mobile-first `<input capture>`): pick → parse → pre-fill
       → review/edit → submit via the UNCHANGED create path → image attaches via the existing
       `expense_receipts` photo flow (R5). Four-states (loading/error-with-manual-fallback/empty/data) +
