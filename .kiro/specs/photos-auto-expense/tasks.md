@@ -52,10 +52,14 @@
       NOTHING; unauth 401. The orchestration + its guard are fork-free (the fake stands in for the live read).
 
 ## Phase 2 — frontend (eyes-on tail, R9)
-- [ ] **T3 — `photos-import-api.ts` client (FORK-FREE).** `getReceiptDrafts() → [{ photoId, draft,
-      thumbnailUrl }]` over the T2 route; reuses `expenseApi.createExpense` per confirmed draft (with
-      `clientId = photos:<mediaItemId>`). GUARD (mocked apiClient — endpoint + the create-per-draft mapping
-      incl. the clientId + error propagation).
+- [x] **T3 — `photos-import-api.ts` client (C545, FORK-FREE).** `photosImportApi.getReceiptDrafts() →
+      ReceiptDraftItem[]` over the T2 GET route + `confirmDraft(photoId, input)` which maps the reviewed
+      draft via `toBackendExpense` then POSTs /expenses with `clientId = photos:<photoId>` spread on (the
+      offline-sync precedent — `toBackendExpense` does not carry the key; mirrors sync-manager.ts:240). Money
+      stays dollars (cents convert at the route boundary). GUARD `photos-import-api.test.ts` (5 cases, mocked
+      apiClient): the GET endpoint + drafts passthrough; the confirm POST endpoint + the draft→body mapping +
+      the crux `clientId=photos:<id>` idempotency key; a different photo → a different clientId (no dedup
+      collision); error propagation on both. FE validate:local GREEN (1433 vitest, +5).
 - [ ] **T4 — The "Import from Photos" review surface (honors D5).** An entry point (settings storage card
       or the expenses header) → the sweep (loading) → a review CHECKLIST (per row: thumbnail + editable
       draft fields + a vehicle picker + a deselect checkbox; already-imported greyed/excluded) → a batch
