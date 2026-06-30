@@ -78,10 +78,19 @@
       between Description and Tags, zero console errors. FE validate:local GREEN (1439 vitest). NEXT: T6
       (e2e + DoD — a create-with-location round-trip through the form + the backend HTTP guard from T2/T3,
       tick the feature DONE).
-- [ ] **T6 — Round-trip e2e + DoD.** A create-with-location → read-back assertion (the committed backend
-      HTTP test from T2/T3 is the merge-surviving guard) + the FE eyes-on (T5). Feature-DoD: both sides
-      validate:local green, the CSV + backup round-trip green, eyes-on the form + the detail display, the
-      column in the backup payload. Tick the feature done.
+- [x] **T6 — Round-trip e2e + DoD (C554). ✅ THE FEATURE IS COMPLETE.** Untracked
+      `frontend/e2e/expense-location.meshclaw.e2e.ts` (gitignored, GREEN vs the dev server) — drives the REAL
+      form: Misc + amount + `#location` → Save → asserts the location PERSISTS (the 📍 detail line shows on
+      the list + survives a reload), closing the T5 D4 visual gap end to end. The committed backend guards
+      (expense-location-roundtrip T2 + expense-location-csv T3) are the merge-surviving net.
+      FEATURE-DoD MET: BE validate:local GREEN (2307), FE GREEN, the e2e GREEN, CSV+backup round-trip green
+      (T3 + schema-derived), eyes-on the form (C553) + the detail display (this e2e), location in the backup
+      payload (T1). **★ ALL SLICES SHIPPED — EXPENSE-LOCATION IS DONE.** DEV-ENV LESSON (recorded): the
+      first eyes-on probe FALSE-FAILED because the dev servers were booted BEFORE migration 0012 existed and
+      `bun --hot` does NOT re-run migrations — the live DB silently dropped the new column. A fresh
+      `START_SERVERS=1` reboot (migrations run at boot) fixed it; the code was correct all along. Built on
+      the D2/D4 recommended defaults; T0 ACK (Slack ts 1782858626) still pending but the feature is fully
+      built on recommended (an ACK now purely ratifies).
 
 ## Notes
 - **NO new table, NO new endpoint, NO money/fuel/split change** — a single additive nullable column.

@@ -133,6 +133,13 @@ bash /tmp/<boot>.sh            # START_SERVERS=1 RESET_DB=1 bash .meshclaw-tools
                                # the latest migration and crashes the backend → 502s → /auth bounce)
 bash .meshclaw-tools/shot.sh /<route> [mobile|desktop] /tmp/out.png   # then Read the PNG
 ```
+**REBOOT THE DEV SERVER AFTER A NEW MIGRATION before eyes-on (C554).** `bun --hot` reloads CODE but does
+NOT re-run migrations — a server booted BEFORE you added migration 000N is serving a DB WITHOUT the new
+column, so an insert silently drops it and an eyes-on probe FALSE-FAILS ("the field didn't persist") even
+though the code is correct. After any schema/migration change, `START_SERVERS=1 bash .meshclaw-tools/
+regress.sh` (or the /tmp boot) so the fresh boot applies it. (The in-process test harness is unaffected —
+it runs runMigrations() per createTestApp; this bites ONLY the long-lived dev server.)
+
 Anonymous shot: point `AUTH_STATE` at a NONEXISTENT path (NOT `/dev/null` — that crashes the
 JSON parse); shot.mjs falls back to anonymous, the `/me` 401 is expected. Eyes-on is the
 loop-closable mechanism (boot → shoot → Read → critique → fix → re-shoot) for any feature's UI tail +
