@@ -232,13 +232,14 @@ describe('getLlmProvider / resolveLlmSettings — registry dispatch (T3a)', () =
     ).toBeInstanceOf(OpenAiCompatibleLlmProvider);
   });
 
-  test('getLlmProvider throws a clear T3b-not-yet placeholder for anthropic + gemini', () => {
-    expect(() =>
+  test('getLlmProvider returns a live adapter for anthropic + gemini (T3b)', () => {
+    // T3b wired both first-party adapters; the registry now resolves all four D1 types live.
+    expect(
       getLlmProvider(llmRow({ providerType: 'anthropic', config: { model: 'claude-3-5-sonnet' } }))
-    ).toThrow(/not yet available/);
-    expect(() =>
+    ).toBeDefined();
+    expect(
       getLlmProvider(llmRow({ providerType: 'gemini', config: { model: 'gemini-1.5-pro' } }))
-    ).toThrow(/not yet available/);
+    ).toBeDefined();
   });
 
   test('getLlmProvider throws on an unknown/non-LLM provider type', () => {
