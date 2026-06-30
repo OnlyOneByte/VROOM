@@ -118,7 +118,18 @@ describe('every built-in theme clears WCAG AA on text pairs (D4 hard gate)', () 
  * distinctness/byte-freshness check structure, not chart legibility). This codifies the C343 invariant so a
  * future low-contrast chart token trips RED before merge — the durable artifact from the C347 bug-dry scout.
  */
-const CHART_KEYS: readonly ThemeTokenKey[] = ['chart-1', 'chart-2', 'chart-3', 'chart-4', 'chart-5'];
+const CHART_KEYS: readonly ThemeTokenKey[] = [
+  'chart-1',
+  'chart-2',
+  'chart-3',
+  'chart-4',
+  'chart-5',
+  // #112: the palette extends to 8 so a ≥6-vehicle fleet gets distinct series colors. The new tokens are
+  // held to the SAME 3:1-vs-card graphical bar as 1-5 (every non-default theme defines all 8).
+  'chart-6',
+  'chart-7',
+  'chart-8',
+];
 const AA_GRAPHICAL = 3.0;
 const nonDefaultThemes = Object.values(THEME_REGISTRY).filter((t) => t.id !== DEFAULT_THEME_ID);
 

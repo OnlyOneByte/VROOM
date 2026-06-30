@@ -43,8 +43,9 @@ describe('Property 8: Category maps completeness', () => {
 		expect(Object.keys(CATEGORY_LABELS).sort()).toEqual([...CATEGORY_ENUM].sort());
 	});
 
-	test('CHART_COLORS has 5 entries all using CSS custom property syntax', () => {
-		expect(CHART_COLORS).toHaveLength(5);
+	test('CHART_COLORS has 8 entries all using CSS custom property syntax', () => {
+		// Extended 5→8 (#112): a ≥6-vehicle fleet gets distinct series colors instead of wrapping to chart-1.
+		expect(CHART_COLORS).toHaveLength(8);
 		for (const color of CHART_COLORS) {
 			expect(color).toMatch(/^var\(--chart-\d\)$/);
 		}
