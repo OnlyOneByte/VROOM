@@ -1,6 +1,7 @@
 import { browser } from '$app/environment';
 import { settingsApi } from '$lib/services/settings-api';
-import { DEFAULT_THEME_ID } from '$lib/theme/theme-registry';
+import { DEFAULT_THEME_ID, THEME_REGISTRY } from '$lib/theme/theme-registry';
+import { oklchToHex } from '$lib/theme/oklch-to-hex';
 
 export type ThemePreference = 'light' | 'dark' | 'system';
 
@@ -36,6 +37,26 @@ export function getSystemTheme(): 'light' | 'dark' {
 }
 
 /**
+ * Fallback PWA status-bar hex by mode — used only when the active theme's surface token cannot be resolved
+ * or converted (an unknown theme id, or a token that does not parse as oklch). These are the historical
+ * hard-coded brand tints, so the meta is never blank.
+ */
+const FALLBACK_THEME_COLOR = { light: '#2563eb', dark: '#1a1a2e' } as const;
+
+/**
+ * Resolve the PWA `theme-color` hex for the ACTIVE theme + resolved mode (#333). The status bar should
+ * blend with the page surface, so this drives the tint from the resolved variant's `background` token in
+ * THEME_REGISTRY, converted oklch→hex (the chrome parser does not reliably honor a raw oklch() in the meta).
+ * An unknown id falls back to `default` (mirrors the R8 graceful-degrade the CSS does); an unconvertible
+ * token falls back to the mode hex — so the meta always carries a valid color.
+ */
+function resolveThemeColor(themeId: string, resolved: 'light' | 'dark'): string {
+	const theme = THEME_REGISTRY[themeId] ?? THEME_REGISTRY[DEFAULT_THEME_ID];
+	const token = theme?.[resolved]?.background;
+	return (token ? oklchToHex(token) : null) ?? FALLBACK_THEME_COLOR[resolved];
+}
+
+/**
  * Apply BOTH theme axes to <html>: the light/dark `mode` (the `dark` class + the PWA theme-color meta) and
  * the theme `id` (the `data-theme` attribute that selects a themes.css block). `default` clears data-theme
  * so app.css's bare :root/.dark serves the identity theme (no redundant attribute). Idempotent.
@@ -53,12 +74,13 @@ function applyTheme(preference: ThemePreference, themeId: string = getStoredThem
 		root.removeAttribute('data-theme');
 	}
 
-	// PWA status-bar tint. NOTE (T8): still the hard-coded brand hex by mode — migrating this to the
-	// RESOLVED theme's brand token is a visible, browser-chrome change (uncapturable by shot.sh + an
-	// oklch-in-meta compat question), flagged to Angelo as a design sub-part. Mode-correct today.
+	// PWA status-bar tint (#333): driven by the ACTIVE theme's surface token (oklch→hex) for the resolved
+	// mode, so the address bar matches the theme the user picked — not a fixed brand hex. Browser chrome is
+	// not shot.sh-capturable; the conversion + this update are unit-tested instead (the eyes-on of the live
+	// address-bar tint is a manual follow-up, not a CI gate).
 	const meta = document.querySelector('meta[name="theme-color"]');
 	if (meta) {
-		meta.setAttribute('content', resolved === 'dark' ? '#1a1a2e' : '#2563eb');
+		meta.setAttribute('content', resolveThemeColor(themeId, resolved));
 	}
 }
 
