@@ -55,14 +55,17 @@
       THE SAFETY CORE — built + tested first. Backend validate:local GREEN.
 
 ## Phase 2 — the adapters + the orchestrator (honors the D1/D5/D6 ruling)
-- [ ] **T3a — The OpenAI-compatible chat+tools adapter (FORK-FREE — the common denominator).**
-      `openai-compatible.ts`: `chat({messages, tools})` → POST `{baseUrl}/chat/completions` with the
-      `tools[]` function schemas; normalizes the response to `{ text?, toolCalls? }`; dumb transport
-      (executes NOTHING; the orchestrator validates+runs); Bearer-with-key / omitted-for-keyless-ollama;
-      non-2xx/network/timeout THROWS (route→502). Covers OpenAI + Ollama + gateways via baseUrl. GUARD
-      `openai-compatible-llm.test.ts` (stubbed fetch — request shape incl. tools[], auth, the text-vs-
-      toolCalls normalization, failure honesty). Built ahead of the T0 ruling — the common denominator of
-      every D1 option, zero rework risk.
+- [x] **T3a — The OpenAI-compatible chat+tools adapter + the registry (C535, commits 6d9d466 + 6537917 + ee9f408).**
+      `openai-compatible.ts`: `chat({messages, tools})` → POST `{baseUrl}/chat/completions` with the `tools[]`
+      function schemas; normalizes the response to `{ text?, toolCalls? }` (tool_calls→toolCalls name+RAW args /
+      content→text / null→text:''); dumb transport (executes NOTHING; the orchestrator validates+runs);
+      Bearer-with-key / omitted-for-keyless-ollama; temp 0; 60s timeout; non-2xx/network/timeout THROWS
+      (route→502). `registry.ts`: `getLlmProvider(row)` decrypt→switch (resolveLlmSettings re-validates) — live
+      for openai-compatible + ollama, a clear T3b-not-yet placeholder for anthropic + gemini, Unsupported for an
+      unknown type. GUARD `openai-compatible-llm.test.ts` (15 cases, stubbed fetch — request shape incl. tools[]
+      + the tool-result wire mapping, auth keyed/keyless, the text-vs-toolCalls normalization, failure honesty,
+      + the registry dispatch/placeholder/unknown). Built ahead of the T0 ruling — the common denominator of
+      every D1 option, zero rework risk. Backend validate:local GREEN (2256 pass, +15).
 - [ ] **T3b — The Anthropic + Gemini chat+tools adapters (honors D1).** `anthropic.ts` (Claude tool-use,
       /v1/messages, x-api-key + anthropic-version) + `gemini.ts` (functionDeclarations, generateContent,
       ?key=). Both mirror the T3a dumb-transport contract, normalizing each provider's tool-call wire shape
