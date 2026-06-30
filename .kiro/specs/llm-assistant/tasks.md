@@ -39,17 +39,20 @@
       create AND PUT; config-only PUT keeps the key; ollama-keyless; a model type accepted in llm + rejected
       in a non-model domain + a storage type rejected in llm; an llm+vlm same-type pair coexist. The vlm
       guard stays GREEN (11 pass — proves behavior-preserving). Backend validate:local GREEN (2233 pass, +12).
-- [ ] **T2 — The read-tool layer + the strategy-registry skeleton (fork-free).** `domains/llm/`:
-      `llm-provider.ts` (the `LlmProvider` chat interface — adapters are dumb transport), `tools.ts` (the
-      FIXED read-only allowlist: each entry = { name, Zod argSchema, run(args, userId) } wrapping an
-      EXISTING userId-scoped seam — `vehicleRepository.findByUserId`, `expenseRepository.getSummary`,
-      `analyticsRepository.getFuelStats/getCrossVehicle/getSummary/getFinancing/getInsurance`,
-      `reminderRepository.findByUserId`), and `registry.ts` (`getLlmProvider(row)` decrypt→switch→throw on
-      unknown; adapter builders throwing a clear T3-placeholder). **GUARD `llm-tools.test.ts`:** each tool
-      runs userId-scoped (a tool invoked with userId A never returns userId B's rows — the IDOR/confused-
-      deputy guard, the load-bearing safety test); a model-supplied `vehicleId` for another user is
-      rejected/scoped via `requireVehicleRead`; the `range` enum is allow-listed (a bad range → Zod
-      reject); every tool returns aggregates (no raw-row dump). This is the safety core — test it FIRST.
+- [x] **T2 — The read-tool layer + the LlmProvider interface (C534, commits b587f9a + ef3d99c + 6d301b9).**
+      `domains/llm/`: `llm-provider.ts` (the `LlmProvider` chat interface — adapters are dumb transport,
+      return normalized `{text?, toolCalls?}`, NEVER execute/trust args) + `tools.ts` (the FIXED read-only
+      allowlist: 8 tools, each = { name, description, Zod argSchema, run(args, userId, nowMs) } wrapping an
+      EXISTING userId-scoped seam — vehicleRepository.findByUserId, expenseRepository.getSummary,
+      analyticsRepository.getFuelStats/getSummary/getCrossVehicle/getFinancing/getInsurance,
+      reminderRepository.findByUserId; the `range` is an allow-listed enum mapped to a bounded {start,end};
+      a model-supplied vehicleId is scope-checked via requireVehicleRead; returns aggregates not raw-row
+      dumps; the allowlist is FROZEN; toolDefinitions emits bounded JSON-schemas). The registry + adapter
+      builders are deferred to T3 (they need the adapter classes). **GUARD `llm-tools.test.ts` (9 cases):**
+      userId-scoping (user A never sees user B's rows); the confused-deputy guard (another user's vehicleId
+      → NotFoundError on getExpenseSummary + getFuelStats); own-vehicle scope allowed; the range enum
+      rejects a bad/injection value; the frozen 8-tool set; bounded JSON-schemas (additionalProperties:false).
+      THE SAFETY CORE — built + tested first. Backend validate:local GREEN.
 
 ## Phase 2 — the adapters + the orchestrator (honors the D1/D5/D6 ruling)
 - [ ] **T3a — The OpenAI-compatible chat+tools adapter (FORK-FREE — the common denominator).**
