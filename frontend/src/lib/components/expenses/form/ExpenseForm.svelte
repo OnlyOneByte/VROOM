@@ -91,6 +91,7 @@
 		charge: '',
 		fuelType: '',
 		description: '',
+		location: '',
 		missedFillup: false
 	});
 
@@ -308,6 +309,7 @@
 			formData.charge = expense.charge?.toString() ?? '';
 			formData.fuelType = expense.fuelType || '';
 			formData.description = expense.description || '';
+			formData.location = expense.location || '';
 			formData.missedFillup = expense.missedFillup ?? false;
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Error loading expense:', error);
@@ -530,6 +532,7 @@
 				charge: formData.charge ? parseFloat(formData.charge) : undefined,
 				fuelType: formData.fuelType || undefined,
 				description: formData.description || undefined,
+				location: formData.location || undefined,
 				currency: currencyUnit,
 				sourceType: sourceType ?? undefined,
 				sourceId: sourceId ?? undefined,
@@ -639,6 +642,7 @@
 					charge: formData.charge ? parseFloat(formData.charge) : undefined,
 					fuelType: formData.fuelType || undefined,
 					description: formData.description || undefined,
+					location: formData.location || undefined,
 					missedFillup: formData.missedFillup
 				};
 
@@ -1254,6 +1258,17 @@
 						bind:value={formData.description}
 						rows={3}
 						placeholder="Add any additional notes..."
+						class="bg-background"
+					/>
+				</div>
+
+				<!-- Location (expense-location D2: a single-line free-text label, no GPS) -->
+				<div class="space-y-2">
+					<Label for="location">Location (Optional)</Label>
+					<Input
+						id="location"
+						bind:value={formData.location}
+						placeholder="e.g. Shell, Main St"
 						class="bg-background"
 					/>
 				</div>

@@ -790,6 +790,11 @@
 									</TableCell>
 									<TableCell class="max-w-[200px]">
 										<div class="truncate text-foreground">{expense.description || '-'}</div>
+										{#if expense.location}
+											<div class="truncate text-xs text-muted-foreground" title={expense.location}>
+												📍 {expense.location}
+											</div>
+										{/if}
 									</TableCell>
 									<TableCell class="text-right font-semibold whitespace-nowrap">
 										{formatCurrency(expense.amount)}

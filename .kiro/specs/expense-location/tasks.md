@@ -67,12 +67,17 @@
       location / omits on create-no-value / sends null on isEdit-empty / absent on non-edit-empty; fromBackend
       copies a present location / leaves it undefined on null. FE validate:local GREEN (1439 vitest, +6).
       NEXT: T5 (the expense-form Location Input + the detail-row display, honors D2/D4).
-- [ ] **T5 — The expense-form Location input + display (honors D2/D4).** Add `formData.location` (init '')
-      + a single-line `Input` labeled "Location (Optional)" beside Description (Description stays the
-      Textarea, D2); load `expense.location ?? ''` on edit; include `location: formData.location || undefined`
-      in each create/edit payload site. Show the value on the expense detail/expanded row where description
-      shows (D4); add it to the CSV export (done T3). Eyes-on (boot + shot the form showing the Location
-      input + a created expense's detail showing the value; Read the PNG; zero console errors).
+- [x] **T5 — The expense-form Location input + display (C553, honors D2/D4).** ExpenseForm: added
+      `formData.location` (init '') + a single-line `Input` labeled "Location (Optional)" placed after the
+      Description Textarea (D2 — Description stays a Textarea, location is a short label); load
+      `expense.location ?? ''` on edit; `location: formData.location || undefined` added to the regular
+      create + edit payload sites (the split-create site is left without location — single-expense-only, the
+      spec cut). D4 display: a small muted "📍 location" line inside the EXISTING Description table cell for
+      standalone expenses (NO new dense-table column; the split GroupRow has no location). EYES-ON (boot +
+      shot /expenses/new + Read): the Location input renders with the "e.g. Shell, Main St" placeholder
+      between Description and Tags, zero console errors. FE validate:local GREEN (1439 vitest). NEXT: T6
+      (e2e + DoD — a create-with-location round-trip through the form + the backend HTTP guard from T2/T3,
+      tick the feature DONE).
 - [ ] **T6 — Round-trip e2e + DoD.** A create-with-location → read-back assertion (the committed backend
       HTTP test from T2/T3 is the merge-surviving guard) + the FE eyes-on (T5). Feature-DoD: both sides
       validate:local green, the CSV + backup round-trip green, eyes-on the form + the detail display, the
