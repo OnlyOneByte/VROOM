@@ -23,6 +23,11 @@
       data)" + recording it in design §7 BEFORE those slices build — Angelo's product ACK does not substitute for
       the governance check (the standing google-photos-provider rule). **T2 (the stage-endpoint ORCHESTRATION) is
       fork-free + buildable now against the `PhotosClient` fake**; T1-live + T5 build after the ARCC check.
+      **✅ ARCC CHECK RAN + CLEARED (2026-06-30, design §7).** search_arcc on the OAuth read-scope expansion
+      returned the OAuth-least-privilege + Auth-Code-grant + SAX-03 token-encryption controls; the design
+      satisfies each (narrowest `appcreateddata` read-only scope, additive to the unchanged Auth-Code flow,
+      encrypted `user_providers` token seam, no new GenAI surface). No blocking finding → **T1-live + T5 are
+      now UNBLOCKED on the ARCC axis.** **T2 SHIPPED (commit 3f162df, on the re-cut branch — pending the push).**
 
 ## Phase 1 — the Photos read capability + the stage endpoint
 - [ ] **T1 — `searchMediaItems` on the Photos provider (honors D2 + the ARCC precondition).** Add
