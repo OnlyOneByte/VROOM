@@ -66,11 +66,16 @@
       + the tool-result wire mapping, auth keyed/keyless, the text-vs-toolCalls normalization, failure honesty,
       + the registry dispatch/placeholder/unknown). Built ahead of the T0 ruling — the common denominator of
       every D1 option, zero rework risk. Backend validate:local GREEN (2256 pass, +15).
-- [ ] **T3b — The Anthropic + Gemini chat+tools adapters (honors D1).** `anthropic.ts` (Claude tool-use,
-      /v1/messages, x-api-key + anthropic-version) + `gemini.ts` (functionDeclarations, generateContent,
-      ?key=). Both mirror the T3a dumb-transport contract, normalizing each provider's tool-call wire shape
-      to the one `ChatResult.toolCalls`. GUARDS: stubbed-fetch request-shape + auth + normalization +
-      failure honesty; registry test updated (all 4 D1 types resolve a live adapter).
+- [x] **T3b — The Anthropic + Gemini chat+tools adapters (C536, commits 279f735 + a47e2d5 + 9a999c0 + db07db9).**
+      `anthropic.ts` (Claude tool-use: /v1/messages, x-api-key + anthropic-version NOT Bearer; system lifted to
+      the top-level field; tools[] input_schema; tool RESULT → user tool_result block; tool_use → toolCalls) +
+      `gemini.ts` (generateContent, key in the ?key= QUERY; system → systemInstruction; assistant→model;
+      tools → [{functionDeclarations}]; tool RESULT → function-role functionResponse; functionCall → toolCalls).
+      Both mirror the T3a dumb-transport contract, normalizing each provider's wire shape to the one
+      `{text?, toolCalls?}`. Registry now resolves all four D1 types LIVE (the T3a placeholder for anthropic/
+      gemini removed). GUARDS: `anthropic-gemini-llm.test.ts` (12 cases — request shape + auth + the wire
+      mapping both ways + normalization + failure honesty) + the T3a registry test flipped (all 4 resolve live).
+      Backend validate:local GREEN (2268 pass, +12).
 - [ ] **T4 — The bounded tool-calling orchestrator + `POST /api/v1/assistant/chat` (honors D2/D5/D6).**
       `orchestrator.ts`: the loop (design §4) — for each turn, call the provider; if toolCalls, for each
       (≤K total): allowlist-check the name → Zod-validate the args → run via the tool under the SESSION
