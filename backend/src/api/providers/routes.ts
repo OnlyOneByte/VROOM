@@ -151,20 +151,33 @@ routes.get('/pending/:nonce', async (c) => {
  * registry uses to instantiate it). This is the seam that lets headless E2E seed
  * a storage provider — and exercise the backup/photo paths — without real OAuth.
  */
-// The 4 storage/test types + the VLM (vision-LLM, domain:'vlm') receipt-parsing types
-// (vlm-receipt-parsing spec T1). A VLM provider is a NEW DOMAIN in the SAME user_providers system:
-// the api key rides the encrypted `credentials` blob exactly like a storage refreshToken/S3 secret,
-// and `config` carries the non-secret model name + optional baseUrl (self-hosted/compatible endpoint).
-// No schema change — `user_providers` is domain-agnostic. The per-type required-field gate is
-// validateVlmProviderConfig (mirrors validateStorageProviderConfig), shared by CREATE + PUT (#123).
-const VLM_PROVIDER_TYPES = ['openai-compatible', 'anthropic', 'gemini', 'ollama'] as const;
-type VlmProviderType = (typeof VLM_PROVIDER_TYPES)[number];
-const SUPPORTED_PROVIDER_TYPES = ['google-drive', 's3', 'fake', ...VLM_PROVIDER_TYPES] as const;
+// The 4 storage/test types + the MODEL (LLM-backed) provider types shared by the `vlm` (vision-LLM,
+// receipt-parsing) AND `llm` (assistant) domains. Both are NEW DOMAINS in the SAME user_providers system:
+// the api key rides the encrypted `credentials` blob exactly like a storage refreshToken/S3 secret, and
+// `config` carries the non-secret model name + optional baseUrl (self-hosted/compatible endpoint). No
+// schema change — `user_providers` is domain-agnostic. The per-type required-field gate is the shared
+// validateModelProviderConfig (mirrors validateStorageProviderConfig), used by CREATE + PUT (#123).
+//
+// The SAME 4 provider-type strings serve both domains (an `anthropic` row is valid in `vlm` OR `llm`); the
+// domain↔type guard keys on the DOMAIN being one of MODEL_DOMAINS, not on a vlm-specific type set. The
+// `vlm`-named aliases below are kept so the vlm-receipt-parsing call sites + tests read unchanged.
+const MODEL_PROVIDER_TYPES = ['openai-compatible', 'anthropic', 'gemini', 'ollama'] as const;
+type ModelProviderType = (typeof MODEL_PROVIDER_TYPES)[number];
+/** The domains whose providers are LLM-backed (a model-type row must live in one of these). */
+const MODEL_DOMAINS = ['vlm', 'llm'] as const;
+const SUPPORTED_PROVIDER_TYPES = ['google-drive', 's3', 'fake', ...MODEL_PROVIDER_TYPES] as const;
 
-/** A providerType is a VLM type ⇒ the row's domain must be 'vlm' (and vice-versa). */
-function isVlmProviderType(providerType: string): providerType is VlmProviderType {
-  return (VLM_PROVIDER_TYPES as readonly string[]).includes(providerType);
+/** A providerType is a model (vlm/llm) type — the row's domain must then be one of MODEL_DOMAINS. */
+function isModelProviderType(providerType: string): providerType is ModelProviderType {
+  return (MODEL_PROVIDER_TYPES as readonly string[]).includes(providerType);
 }
+/** A domain is LLM-backed (vlm or llm). */
+function isModelDomain(domain: string): boolean {
+  return (MODEL_DOMAINS as readonly string[]).includes(domain);
+}
+// Back-compat alias: the vlm-receipt-parsing call sites + the shipped guard test use `isVlmProviderType`.
+// The set is identical (both domains share the 4 model types), so the alias is exact.
+const isVlmProviderType = isModelProviderType;
 
 const createProviderSchema = z.object({
   domain: z.string().min(1, 'Domain is required'),
@@ -251,18 +264,20 @@ function validateStorageProviderConfig(
 }
 
 /**
- * Reject a VLM-provider row the parser could NEVER instantiate with (vlm-receipt-parsing T1, the
- * #103/#123 fail-fast-at-create discipline applied to the vlm domain). Split into a config-shape check
- * and a credentials check so each path validates only the field it touches:
+ * Reject a MODEL-provider row (vlm OR llm) the adapter could NEVER instantiate with (vlm-receipt-parsing
+ * T1 + llm-assistant T1, the #103/#123 fail-fast-at-create discipline). The two domains share an identical
+ * required-field contract (a model name; an api key for non-ollama; a base URL for self-hosted/compatible)
+ * — the api key is the ONLY secret and rides the encrypted blob — so ONE validator serves both (the
+ * llm-assistant T1 dedup). Split into a config-shape check + a credentials check so each path validates
+ * only the field it touches:
  *  - CREATE (resolveProviderCredentials) runs BOTH (it has the full config + credentials),
- *  - PUT runs the config-shape check on a config update and the credentials check on a credentials
- *    update — so a config-only edit (e.g. changing the model) does NOT falsely demand the apiKey be
- *    re-sent (it is already stored encrypted).
- * Rules (design §2): every VLM type needs a `config.model`; a non-ollama type needs `credentials.apiKey`
- * (ollama/self-hosted may be keyless); a self-hosted/compatible type (ollama OR openai-compatible) needs
- * a `config.baseUrl`. The api key, when present, is the ONLY secret — it rides the encrypted blob.
+ *  - PUT runs the config-shape check on a config update and the credentials check on a credentials update
+ *    — so a config-only edit (e.g. changing the model) does NOT falsely demand the apiKey be re-sent (it
+ *    is already stored encrypted).
+ * The error wording stays "VLM" for the model-name + api-key messages so the shipped vlm guard test reads
+ * unchanged; the messages are user-facing on both domains but accurate (both are LLM-backed providers).
  */
-function validateVlmConfigShape(
+function validateModelConfigShape(
   providerType: string,
   config: Record<string, unknown> | null
 ): void {
@@ -278,20 +293,27 @@ function validateVlmConfigShape(
   }
 }
 
-function validateVlmCredentials(providerType: string, credentials: Record<string, unknown>): void {
+function validateModelCredentials(
+  providerType: string,
+  credentials: Record<string, unknown>
+): void {
   if (providerType !== 'ollama' && !credentials.apiKey) {
     throw new ValidationError('VLM provider requires an API key');
   }
 }
 
-function validateVlmProviderConfig(
+function validateModelProviderConfig(
   providerType: string,
   config: Record<string, unknown> | null,
   credentials: Record<string, unknown>
 ): void {
-  validateVlmConfigShape(providerType, config);
-  validateVlmCredentials(providerType, credentials);
+  validateModelConfigShape(providerType, config);
+  validateModelCredentials(providerType, credentials);
 }
+
+// Back-compat aliases for the vlm-receipt-parsing call sites (the set + contract are identical).
+const validateVlmConfigShape = validateModelConfigShape;
+const validateVlmCredentials = validateModelCredentials;
 
 function resolveProviderCredentials(
   userId: string,
@@ -313,11 +335,11 @@ function resolveProviderCredentials(
       resolvedConfig: { ...(config ?? {}), accountEmail: pending.email },
     };
   }
-  // VLM (vision-LLM) providers: validate the model/key/baseUrl shape, then encrypt the api key like
-  // any other credential. Same fail-fast-at-create discipline as S3 (the parser can never run without
-  // a model; a non-ollama type can never auth without a key).
-  if (isVlmProviderType(providerType)) {
-    validateVlmProviderConfig(providerType, config, credentials);
+  // MODEL providers (vlm receipt-parsing + llm assistant): validate the model/key/baseUrl shape, then
+  // encrypt the api key like any other credential. Same fail-fast-at-create discipline as S3 (the adapter
+  // can never run without a model; a non-ollama type can never auth without a key). One gate, both domains.
+  if (isModelProviderType(providerType)) {
+    validateModelProviderConfig(providerType, config, credentials);
     return {
       encryptedCredentials: encrypt(JSON.stringify(credentials)),
       resolvedConfig: config,
@@ -352,11 +374,14 @@ routes.post('/', zValidator('json', createProviderSchema), async (c) => {
     throw new ValidationError('Fake storage provider is not enabled in this environment');
   }
 
-  // Domain↔type consistency: a VLM type belongs ONLY in the 'vlm' domain and vice-versa. Without this a
-  // malformed row like {domain:'storage', providerType:'anthropic'} (or a vlm-domain row with an s3 type)
-  // could persist + then be mis-routed by the domain-keyed strategy registries. (vlm-receipt-parsing T1.)
-  if (isVlmProviderType(body.providerType) !== (body.domain === 'vlm')) {
-    throw new ValidationError('A VLM provider type requires domain "vlm", and vice-versa');
+  // Domain↔type consistency: a MODEL provider type (the 4 shared by vlm + llm) belongs ONLY in a model
+  // domain (vlm or llm) and vice-versa. Without this a malformed row like {domain:'storage',
+  // providerType:'anthropic'} (or a model domain row carrying an s3 type) could persist + then be
+  // mis-routed by the domain-keyed strategy registries. (vlm-receipt-parsing T1 + llm-assistant T1.)
+  if (isModelProviderType(body.providerType) !== isModelDomain(body.domain)) {
+    throw new ValidationError(
+      'A model provider type requires domain "vlm" or "llm", and vice-versa'
+    );
   }
 
   const { encryptedCredentials, resolvedConfig } = resolveProviderCredentials(
