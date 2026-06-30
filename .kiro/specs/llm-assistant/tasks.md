@@ -100,10 +100,20 @@
       `assistant-api.test.ts` (3 cases, mocked apiClient — endpoint + payload + the {reply,toolsUsed} envelope +
       history-defaults-[] + error propagation). FE validate:local GREEN (1426 vitest, +3). **The last fork-free
       slice — T5b/T6 below touch the gated forks (D1/D5), so the FE tail now waits on the T0 ruling.**
-- [ ] **T5b — The LLM-provider settings UI (honors D1).** An `LlmProvidersCard` (or a domain-parameterized
-      generalization of the shipped `VlmProvidersCard`) on /settings: type + apiKey [write-only] + model +
-      baseUrl, the D1 set; reuses `provider-api.ts`. canSave mirrors the backend gate; four-states;
-      eyes-on (boot + shot + Read the PNG).
+- [x] **T5b — The LLM-provider settings UI (C540, honors D1).** `LlmProvidersCard.svelte` on /settings:
+      a clone of the eyes-on-verified `VlmProvidersCard` retargeted to `domain:'llm'` (Bot icon, assistant
+      copy emphasizing READ-ONLY, `llm-*` testids) + a new `LLM_PROVIDER_TYPES` constant (the SAME 4
+      D1 model types as VLM but with chat-model defaults — Ollama `llama3.1` not the VLM vision `llava`,
+      since the assistant needs a TOOL-CALLING text model). Reuses `provider-api.ts` (createProvider with
+      `domain:'llm'`, write-only apiKey, config-only PUT on edit). canSave mirrors the backend gate
+      (name+model required; key required on non-ollama create, blank-keeps-key on edit; baseUrl when
+      needed); four-states (loading/error/empty/data). Mounted on the settings page after the VLM card.
+      Chose a CLONE over a domain-parameterized generalization: keeps this BUILD slice zero-regression on
+      an eyes-on-verified surface; a DRY merge belongs in a later arch cycle with before/after shots.
+      EYES-ON (boot + shot + Read): the Assistant card renders (empty state + Add Provider), the add dialog
+      opens with the provider picker + name/model/baseUrl/key fields + the correctly-disabled save button,
+      zero console errors. No card unit test (DueRemindersCard-class eyes-on convention, matches VLM T5b).
+      FE validate:local GREEN (1426 vitest).
 - [ ] **T6 — The assistant chat surface (honors D5).** A `/assistant` route (or dashboard panel): message
       list + input + send; four-states (loading/error/empty-no-provider/data); reply rendered as SAFE
       markdown (R8); a one-time privacy disclosure before the first message (R7, the VLM disclosure
