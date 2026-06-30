@@ -60,10 +60,14 @@
       registry routes BOTH openai-compatible AND ollama here (Ollama speaks the same shape, design §3).
       GUARD `openai-compatible.test.ts` (12 cases, stubbed fetch). Built ahead of the T0 ruling because
       openai-compatible is the COMMON DENOMINATOR of every D1 option → zero rework risk. Green (2179 pass).
-- [ ] **T3b — The fork-VARIABLE first-party adapters (anthropic + gemini) — GATED on D1.** Each implements
-      `VlmProvider.extractReceipt` with its provider-specific HTTP + auth header + the shared prompt; a
-      MOCKED-fetch unit test each. BLOCKED until Angelo rules D1 (which adapters ship in v1). The registry
-      builders currently throw a clear `not implemented yet (T3b, gated on D1)`. Build ONLY the ruled set.
+- [x] **T3b — The Anthropic + Gemini adapters (C515, commit 2ab2e88).** D1 ruled the full set (Angelo ACK
+      2026-06-30: OpenAI-compatible + Anthropic + Gemini + Ollama). `anthropic.ts` (AnthropicVlmProvider:
+      POST /v1/messages, x-api-key + anthropic-version, base64 image source block) + `gemini.ts`
+      (GeminiVlmProvider: generateContent, ?key= query param, inline_data part). Both mirror the T3a DUMB-
+      transport contract (fixed prompt, raw text out, parseExtraction is the sole validator, non-2xx/network
+      THROWS → 502, missing content → '', temp 0 + token cap, key never logged). registry builders return the
+      live adapters. GUARDS: anthropic.test.ts + gemini.test.ts (stubbed fetch — request shape + auth + failure
+      honesty); registry test updated (all 4 D1 types resolve live). Backend validate:local GREEN (2202 pass, +23).
 - [x] **T4 — `POST /api/v1/receipts/parse` (C512, commit b85eb13) — structurally FORK-FREE.** `vlm-routes.ts`
       mounted at `/api/v1/receipts`: multipart image → resolve the enabled `vlm` provider (none → actionable
       400) → image-type (jpeg/png/webp) + 8MB cap (bodyLimit + post-parse byte check) → `getVlmProvider()
