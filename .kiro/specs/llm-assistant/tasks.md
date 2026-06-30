@@ -76,17 +76,21 @@
       gemini removed). GUARDS: `anthropic-gemini-llm.test.ts` (12 cases — request shape + auth + the wire
       mapping both ways + normalization + failure honesty) + the T3a registry test flipped (all 4 resolve live).
       Backend validate:local GREEN (2268 pass, +12).
-- [ ] **T4 — The bounded tool-calling orchestrator + `POST /api/v1/assistant/chat` (honors D2/D5/D6).**
-      `orchestrator.ts`: the loop (design §4) — for each turn, call the provider; if toolCalls, for each
-      (≤K total): allowlist-check the name → Zod-validate the args → run via the tool under the SESSION
-      userId → feed the result back; cap at T turns; loop-exhausted → an honest bounded reply. Mount
-      `assistant/routes.ts` at `/api/v1/assistant`: requireAuth + rate-limit + body-limit + a bounded
-      message length; resolve the enabled `llm` provider (none→400); return `{ reply, toolsUsed }`; PERSIST
-      NOTHING; key never echoed, message/results never logged. **GUARD `assistant-chat-route.test.ts`
-      (real HTTP harness, adapter fetch stubbed to script a tool-call then a final answer):** a clean
-      tool-call→answer round-trip; an invalid tool name rejected; bad tool args Zod-rejected; the K/T caps
-      enforced (a scripted infinite tool-loop terminates with the honest reply); no-provider 400; provider
-      502; key not echoed; unauth 401; the IDOR guard (a tool result is the session user's data only).
+- [x] **T4 — The bounded tool-calling orchestrator + `POST /api/v1/assistant/chat` (C537, commits 9363c00 +
+      then route/mount + 7502805). Uses the RECOMMENDED D6 caps (K=5/T=4) + blocking D5 — confirm on T0.**
+      `orchestrator.ts` runAssistant: the loop (design §4) — fixed system prompt + bounded history + the user
+      message; each turn calls the dumb adapter; if toolCalls, runOneToolCall enforces the 3 ARCC guards per
+      call [allowlist-check name → Zod-validate args → run under the SESSION userId], capped at K tool calls /
+      T turns; exhaustion → an HONEST bounded reply (never fabricated). Read-only (no write tool). `assistant/
+      routes.ts` mounted at /api/v1/assistant: requireAuth + a zValidator body with SAX-04 caps (message ≤2000,
+      history ≤12 turns, only user/assistant roles from the client); resolve the enabled llm provider (none→400);
+      {reply, toolsUsed}; PERSIST NOTHING; key never echoed; provider failure → 502 (the global rate-limiter
+      already covers request-rate). GUARD `assistant-chat-route.test.ts` (10 cases, HTTP harness + a stateful
+      scripted-fetch stub): clean round-trip; unknown-tool reject; bad-args Zod-reject; the K/T caps terminate a
+      runaway loop with the honest reply; no-provider 400; provider 502; key not echoed; empty-message 400;
+      unauth 401; the IDOR guard (a foreign vehicle never leaks). Refactored runOneToolCall out to keep the loop
+      legible; a justified biome-ignore on the loop complexity (matches the restore/backup-orchestrator precedent).
+      Backend validate:local GREEN (2278 pass, +10). **The ENTIRE BACKEND is now COMPLETE (T1–T4).**
 
 ## Phase 3 — frontend (eyes-on tail, R10 — live-LLM + Playwright-blocked → "code-complete, eyes-on pending")
 - [ ] **T5a — `assistant-api.ts` client (FORK-FREE).** `assistantApi.sendMessage(message, history) →
