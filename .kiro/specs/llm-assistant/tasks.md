@@ -28,14 +28,17 @@
       (the provider-domain plumbing + the read-tool wrappers are fork-free); T3+ honors the ruling.
 
 ## Phase 1 — the LLM provider domain (fork-free; encrypted bring-your-own credential plumbing)
-- [ ] **T1 — `llm`-domain provider validation + CRUD wiring.** Extend `providers/routes.ts`:
-      `SUPPORTED_PROVIDER_TYPES` + the 4 `LLM_PROVIDER_TYPES` + an `isLlmProviderType` guard; generalize
-      the C509 `validateVlmProviderConfig` into a shared model-config validator (model required; apiKey
-      required for non-ollama; baseUrl required for ollama/openai-compatible) that BOTH vlm + llm call
-      (arch dedup, behavior-preserving — characterize vlm first), wired into create + PUT (#123 both-paths
-      discipline) + the domain↔type consistency guard. GUARD `llm-provider-config.test.ts` (createTestApp):
-      api key ENCRYPTED in the raw row + STRIPPED from the response; missing model/key/baseUrl 400 at
-      create AND PUT; config-only PUT keeps the key; ollama-keyless allowed; domain↔type mismatch 400.
+- [x] **T1 — `llm`-domain provider validation + CRUD wiring (C533, commits f85f076 + a032712).** Done via
+      a behavior-preserving generalization of the vlm provider-config layer in `providers/routes.ts`:
+      `VLM_PROVIDER_TYPES`→`MODEL_PROVIDER_TYPES` + `isModelProviderType`; added `MODEL_DOMAINS`=[vlm,llm] +
+      `isModelDomain`; `validateVlm*`→shared `validateModel*` (one model/key/baseUrl gate, wording kept
+      stable); the domain↔type guard now keys on `isModelDomain` (a model type ⇒ domain vlm OR llm; a model
+      domain rejects a storage type) — so the SAME 4 types serve both domains. Back-compat aliases keep the
+      vlm call sites + the C509 guard test unchanged (all symbols internal to routes.ts). GUARD
+      `llm-provider-config.test.ts` (12 cases): key ENCRYPTED + STRIPPED; missing model/key/baseUrl 400 at
+      create AND PUT; config-only PUT keeps the key; ollama-keyless; a model type accepted in llm + rejected
+      in a non-model domain + a storage type rejected in llm; an llm+vlm same-type pair coexist. The vlm
+      guard stays GREEN (11 pass — proves behavior-preserving). Backend validate:local GREEN (2233 pass, +12).
 - [ ] **T2 — The read-tool layer + the strategy-registry skeleton (fork-free).** `domains/llm/`:
       `llm-provider.ts` (the `LlmProvider` chat interface — adapters are dumb transport), `tools.ts` (the
       FIXED read-only allowlist: each entry = { name, Zod argSchema, run(args, userId) } wrapping an
