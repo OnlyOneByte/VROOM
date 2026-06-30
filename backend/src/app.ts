@@ -20,6 +20,7 @@ import { routes as expenseRoutes } from './api/expenses/routes';
 import { routes as financingRoutes } from './api/financing/routes';
 import { routes as insuranceRoutes } from './api/insurance/routes';
 import { routes as odometerRoutes } from './api/odometer/routes';
+import { routes as photoReceiptDraftRoutes } from './api/photos/receipt-drafts-route';
 import { routes as photoRoutes } from './api/photos/routes';
 import { routes as providerRoutes } from './api/providers/routes';
 import { routes as receiptRoutes } from './api/providers/vlm-routes';
@@ -149,6 +150,9 @@ app.route('/api/v1/financing', financingRoutes);
 app.route('/api/v1/expenses', expenseRoutes);
 app.route('/api/v1/insurance', insuranceRoutes);
 app.route('/api/v1/odometer', odometerRoutes);
+// Mount the receipt-draft stage endpoint BEFORE the generic photo routes so its fixed
+// /receipt-drafts path is matched before the /:entityType/:entityId wildcard.
+app.route('/api/v1/photos', photoReceiptDraftRoutes);
 app.route('/api/v1/photos', photoRoutes);
 app.route('/api/v1/providers', providerRoutes);
 app.route('/api/v1/receipts', receiptRoutes);

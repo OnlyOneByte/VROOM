@@ -35,6 +35,12 @@ export interface PhotosAlbum {
   title?: string;
 }
 
+/** One page of a `mediaItems:search` over the app-created data (photos-auto-expense R1). */
+export interface PhotosSearchPage {
+  items: PhotosMediaItem[];
+  nextPageToken?: string;
+}
+
 /**
  * The thin HTTP surface of the Google Photos Library API that this service uses.
  * The real implementation ({@link createRealPhotosClient}) is an OAuth2-authed
@@ -53,6 +59,15 @@ export interface PhotosClient {
   listAlbums(): Promise<PhotosAlbum[]>;
   /** Create an album with the given title. */
   createAlbum(title: string): Promise<PhotosAlbum>;
+  /**
+   * Search media items over the VROOM album / app-created data, one page at a time
+   * (photos-auto-expense R1, the `mediaItems:search` Library API). OPTIONAL: the read needs the
+   * `photoslibrary.readonly.appcreateddata` OAuth scope, which is ARCC-gated + ships in a later
+   * slice (T1-live + T5). Until then the REAL client omits this method and {@link
+   * GooglePhotosService.listReceiptPhotos} reports the read is not enabled; the in-memory fake
+   * implements it so the stage-endpoint orchestration (T2) is fully exercised zero-network.
+   */
+  searchMediaItems?(albumId: string, pageToken?: string): Promise<PhotosSearchPage>;
 }
 
 export class GooglePhotosService {
@@ -104,6 +119,37 @@ export class GooglePhotosService {
   /** Download the bytes of a media item. */
   async download(mediaItemId: string): Promise<Buffer> {
     return this.client.downloadMediaItem(mediaItemId);
+  }
+
+  /**
+   * List up to `maxItems` media items from VROOM's app-created album (photos-auto-expense R1) by
+   * paginating `mediaItems:search`, stopping at the D4 per-run cap. App-created-only by the OAuth
+   * scope (design §1) — this enumerates ONLY the receipts VROOM uploaded, never the camera roll.
+   *
+   * Throws SyncError(AUTH_INVALID) when the client cannot search yet (the read scope is ARCC-gated +
+   * lands in T1-live/T5) — an HONEST failure the route maps to an actionable message, never a fake
+   * empty result (#43/#44/#144 anti-fail-open).
+   */
+  async listReceiptPhotos(maxItems: number): Promise<PhotosMediaItem[]> {
+    if (!this.client.searchMediaItems) {
+      throw new SyncError(
+        SyncErrorCode.AUTH_INVALID,
+        'Reading photos requires the Google Photos read permission, which is not enabled yet'
+      );
+    }
+    const albumId = await this.resolveAlbumId();
+    const items: PhotosMediaItem[] = [];
+    let pageToken: string | undefined;
+    // Bounded loop: stop at the cap OR when the API runs out of pages (no nextPageToken).
+    do {
+      const page = await this.client.searchMediaItems(albumId, pageToken);
+      for (const item of page.items) {
+        items.push(item);
+        if (items.length >= maxItems) return items;
+      }
+      pageToken = page.nextPageToken;
+    } while (pageToken);
+    return items;
   }
 
   /** Cheap connectivity probe — listing albums succeeds when auth is valid. */
