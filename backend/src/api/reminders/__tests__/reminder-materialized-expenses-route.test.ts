@@ -21,6 +21,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -34,17 +35,6 @@ interface ExpenseRow {
   expenseAmount: number;
   sourceType: string | null;
   sourceId: string | null;
-}
-
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Honda',
-    model: 'Civic',
-    year: 2021,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
 }
 
 async function createReminder(over: Record<string, unknown>): Promise<string> {
@@ -65,7 +55,7 @@ async function getMaterialized(reminderId: string): Promise<Response> {
 
 describe('GET /reminders/:id/expenses — materialized expense rows', () => {
   test('an expense reminder returns its materialized, source-linked rows after a trigger', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const reminderId = await createReminder({
       type: 'expense',
       vehicleIds: [vehicleId],
@@ -88,7 +78,7 @@ describe('GET /reminders/:id/expenses — materialized expense rows', () => {
   });
 
   test('a notification reminder (materializes nothing) returns an empty list', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const reminderId = await createReminder({ type: 'notification', vehicleIds: [vehicleId] });
     await ctx.authed('POST', '/api/v1/reminders/trigger');
 
@@ -104,7 +94,7 @@ describe('GET /reminders/:id/expenses — materialized expense rows', () => {
   });
 
   test("another user's reminder is invisible (404, not a cross-tenant read)", async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const reminderId = await createReminder({
       type: 'expense',
       vehicleIds: [vehicleId],

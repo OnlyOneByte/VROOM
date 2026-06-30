@@ -1,4 +1,4 @@
-import type { NativeImportField } from '$lib/types';
+import type { ExpenseCategory, ImportColumnMapping, ImportMappingPreset, NativeImportField } from '$lib/types';
 
 /**
  * Pure helpers for the import-trackers manual-mapping dialog (T4, extracted C38 from
@@ -54,4 +54,35 @@ export function guessManualColumns(headers: string[]): Partial<Record<NativeImpo
 	set('description', 'note', 'description', 'comment');
 	set('tags', 'tag');
 	return guess;
+}
+
+/**
+ * Build the `ImportColumnMapping` the dialog sends for a DETECTED preset (Fuelly/Fuelio/Drivvo), given the
+ * chosen target-vehicle display name + the user's category-remap (foreign word → VROOM category, user
+ * choices win over the preset's own map). Extracted C153 from ImportExpensesDialog.buildMapping so the
+ * preset→mapping construction — in particular the `defaultCategory` passthrough — is unit-testable.
+ *
+ * The `defaultCategory` carry is load-bearing: fuel-tracker presets carry `defaultCategory:'fuel'` (#C148),
+ * and forwarding it here is what makes a detected fuel log (NO category column) preview ready fuel rows
+ * instead of 0-ready "Unknown category". Dropping it silently reverts the feature at the UI layer even with
+ * the backend fix in place — hence the committed guard (the e2e round-trip is gitignored / not in CI).
+ */
+export function buildPresetMapping(
+	preset: ImportMappingPreset,
+	targetVehicleName: string,
+	remap: Record<string, ExpenseCategory>
+): ImportColumnMapping {
+	return {
+		source: preset.id,
+		columns: preset.columns,
+		targetVehicle: targetVehicleName,
+		dateFormat: preset.dateFormat,
+		distanceUnit: preset.distanceUnit,
+		volumeUnit: preset.volumeUnit,
+		// Merge the user's remap over the preset's own categoryMap (user choices win).
+		categoryMap: { ...preset.categoryMap, ...remap },
+		// Carry the preset's defaultCategory (fuel-tracker presets set 'fuel') so a detected fuel log
+		// with NO category column previews ready fuel rows instead of 0-ready "Unknown category" (#C148).
+		defaultCategory: preset.defaultCategory
+	};
 }

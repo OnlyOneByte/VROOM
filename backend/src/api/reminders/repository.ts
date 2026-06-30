@@ -52,7 +52,7 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
   /**
    * Insert the reminder→vehicle junction rows inside the caller's transaction. One source of truth
    * for the `for (vehicleId) insert(reminderVehicles)` loop the create + update-replace paths repeated
-   * byte-identically (C326 dedup; mirrors insurance/repository.ts insertJunctionRows). A future change
+   * byte-identically (C326 dedup; mirrors insurance/repository.ts insertJunctionRowsSync). A future change
    * to the junction write (batch insert, a new column) then lands once, not twice.
    */
   private async insertVehicleJunctions(
@@ -62,6 +62,22 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
   ): Promise<void> {
     for (const vehicleId of vehicleIds) {
       await tx.insert(reminderVehicles).values({ reminderId, vehicleId });
+    }
+  }
+
+  /**
+   * SYNCHRONOUS sibling of insertVehicleJunctions (#127 class, C504). bun-sqlite is a sync dialect, so the
+   * create/update-replace transactions run their callbacks synchronously to get real atomic rollback (an
+   * async callback autocommits each write alone — the C151 footgun, which here could leave a reminder with
+   * NO vehicles, the #97 vehicle-less-but-active state). `.run()` executes inline inside the caller's tx.
+   */
+  private insertVehicleJunctionsSync(
+    tx: DrizzleTransaction,
+    reminderId: string,
+    vehicleIds: string[]
+  ): void {
+    for (const vehicleId of vehicleIds) {
+      tx.insert(reminderVehicles).values({ reminderId, vehicleId }).run();
     }
   }
 
@@ -160,6 +176,23 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     const reminder = result[0];
     if (!reminder) return null;
 
+    const vehicleIds = await this.getVehicleIds(id);
+    return { reminder, vehicleIds };
+  }
+
+  /**
+   * vehicle-sharing T7b: find a reminder by id UNSCOPED (no userId filter), with its vehicleIds. The
+   * share-aware write routes (PUT/DELETE/mark-serviced) load the reminder this way FIRST — a reminder
+   * on a shared vehicle is OWNER-stamped (userId = vehicle owner, T7b), so the old userId-scoped
+   * findByIdAndUserId would 404 a shared editor on a reminder they can legitimately mutate. The caller
+   * then authorizes via the share seam on the reminder's vehicleIds (requireVehicleWrite) and scopes
+   * all subsequent repo reads/writes to the reminder's stamped userId (the owner). Returns null when
+   * the reminder does not exist (caller → 404, existence-hiding).
+   */
+  async findByIdWithVehicles(id: string): Promise<ReminderWithVehicles | null> {
+    const result = await this.db.select().from(reminders).where(eq(reminders.id, id)).limit(1);
+    const reminder = result[0];
+    if (!reminder) return null;
     const vehicleIds = await this.getVehicleIds(id);
     return { reminder, vehicleIds };
   }
@@ -266,26 +299,6 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     }
   }
 
-  /**
-   * Find all reminders associated with a specific vehicle for a user.
-   */
-  async findByVehicleId(vehicleId: string, userId: string): Promise<Reminder[]> {
-    try {
-      const rows = await this.db
-        .select({ reminder: reminders })
-        .from(reminders)
-        .innerJoin(reminderVehicles, eq(reminders.id, reminderVehicles.reminderId))
-        .where(and(eq(reminderVehicles.vehicleId, vehicleId), eq(reminders.userId, userId)));
-      return rows.map((r) => r.reminder);
-    } catch (error) {
-      logger.error('Failed to find reminders for vehicle', {
-        vehicleId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw new DatabaseError('Failed to find reminders for vehicle', error);
-    }
-  }
-
   // --------------------------------------------------------------------------
   // Mutation methods
   // --------------------------------------------------------------------------
@@ -297,11 +310,14 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
    */
   async createWithVehicles(data: NewReminder, vehicleIds: string[]): Promise<ReminderWithVehicles> {
     try {
-      return await transaction(async (tx) => {
-        const result = await tx.insert(reminders).values(data).returning();
-        const reminder = result[0];
+      // SYNCHRONOUS transaction (#127 class, C504): insert the reminder THEN its vehicle-junction rows.
+      // Under the old async callback a throw on the junction insert left the reminder row committed with
+      // zero vehicles (the #97 vehicle-less-but-active state, skipped forever by the trigger). Running
+      // synchronously keeps both in ONE real transaction that rolls back atomically.
+      return transaction((tx) => {
+        const reminder = tx.insert(reminders).values(data).returning().get();
 
-        await this.insertVehicleJunctions(tx, reminder.id, vehicleIds);
+        this.insertVehicleJunctionsSync(tx, reminder.id, vehicleIds);
 
         return { reminder, vehicleIds };
       });
@@ -325,13 +341,19 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     vehicleIds?: string[]
   ): Promise<ReminderWithVehicles> {
     try {
-      return await transaction(async (tx) => {
+      // SYNCHRONOUS transaction (#127 class, C504): the replace path DELETEs all junction rows then
+      // re-inserts them. Under the old async callback a throw on the re-insert left the reminder with its
+      // vehicles deleted and none re-added — the #97 vehicle-less-but-active state, silently. Running
+      // synchronously keeps the verify + update + delete + re-insert in ONE real transaction that rolls
+      // back atomically.
+      return transaction((tx) => {
         // Verify ownership
-        const existing = await tx
+        const existing = tx
           .select()
           .from(reminders)
           .where(and(eq(reminders.id, id), eq(reminders.userId, userId)))
-          .limit(1);
+          .limit(1)
+          .all();
 
         if (existing.length === 0) {
           throw new NotFoundError('Reminder');
@@ -339,29 +361,28 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
 
         // Update reminder fields
         const updateData = { ...data, updatedAt: new Date() };
-        const result = await tx
+        const reminder = tx
           .update(reminders)
           .set(updateData)
           .where(eq(reminders.id, id))
-          .returning();
-
-        const reminder = result[0];
+          .returning()
+          .get();
 
         // Replace junction rows if vehicleIds provided
         if (vehicleIds) {
-          await tx.delete(reminderVehicles).where(eq(reminderVehicles.reminderId, id));
-          await this.insertVehicleJunctions(tx, id, vehicleIds);
+          tx.delete(reminderVehicles).where(eq(reminderVehicles.reminderId, id)).run();
+          this.insertVehicleJunctionsSync(tx, id, vehicleIds);
         }
 
         // Fetch current vehicleIds for the response
         const currentVehicleIds =
           vehicleIds ??
-          (
-            await tx
-              .select({ vehicleId: reminderVehicles.vehicleId })
-              .from(reminderVehicles)
-              .where(eq(reminderVehicles.reminderId, id))
-          ).map((r) => r.vehicleId);
+          tx
+            .select({ vehicleId: reminderVehicles.vehicleId })
+            .from(reminderVehicles)
+            .where(eq(reminderVehicles.reminderId, id))
+            .all()
+            .map((r) => r.vehicleId);
 
         return { reminder, vehicleIds: currentVehicleIds };
       });

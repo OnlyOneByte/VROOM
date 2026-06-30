@@ -43,6 +43,48 @@
       "when": 1781000000000,
       "tag": "0005_license_plate_per_user",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1782318187087,
+      "tag": "0006_mixed_zarek",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1782340462679,
+      "tag": "0007_previous_ikaris",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1782503441067,
+      "tag": "0008_awesome_avengers",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1782600000000,
+      "tag": "0009_money_to_cents",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1782520918582,
+      "tag": "0010_absurd_clint_barton",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1782534527999,
+      "tag": "0011_quick_red_hulk",
+      "breakpoints": true
     }
   ]
 }

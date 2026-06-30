@@ -131,7 +131,7 @@ describe('GoogleDriveStrategy', () => {
     expect(mockCreateOrUpdate).toHaveBeenCalledTimes(1);
   });
 
-  test('partial failure — ZIP fails but Sheets succeeds', async () => {
+  test('partial failure — ZIP fails but Sheets succeeds → strategy reports FAILURE (#43)', async () => {
     mockUpload.mockImplementation(() => Promise.reject(new Error('Upload network error')));
     const result = await strategy.execute(
       createContext({
@@ -144,13 +144,16 @@ describe('GoogleDriveStrategy', () => {
       })
     );
 
-    expect(result.success).toBe(true); // anySuccess = true (sheets succeeded)
+    // HONEST reporting (#43): one failed capability ⇒ the provider's backup is NOT a success, so the
+    // failed ZIP is retried next run instead of being silently abandoned. (Old behavior: success=true.)
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('Upload network error');
     expect(result.capabilities.zip?.success).toBe(false);
     expect(result.capabilities.zip?.message).toContain('Upload network error');
-    expect(result.capabilities.sheets?.success).toBe(true);
+    expect(result.capabilities.sheets?.success).toBe(true); // the OK capability still records success
   });
 
-  test('partial failure — Sheets fails but ZIP succeeds', async () => {
+  test('partial failure — Sheets fails but ZIP succeeds → strategy reports FAILURE (#43)', async () => {
     mockCreateOrUpdate.mockImplementation(() => Promise.reject(new Error('Sheets API error')));
     const result = await strategy.execute(
       createContext({
@@ -163,10 +166,30 @@ describe('GoogleDriveStrategy', () => {
       })
     );
 
-    expect(result.success).toBe(true); // anySuccess = true (zip succeeded)
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('Sheets API error');
     expect(result.capabilities.zip?.success).toBe(true);
     expect(result.capabilities.sheets?.success).toBe(false);
     expect(result.capabilities.sheets?.message).toContain('Sheets API error');
+  });
+
+  test('both capabilities fail → strategy reports failure with both messages joined', async () => {
+    mockUpload.mockImplementation(() => Promise.reject(new Error('Upload network error')));
+    mockCreateOrUpdate.mockImplementation(() => Promise.reject(new Error('Sheets API error')));
+    const result = await strategy.execute(
+      createContext({
+        providerConfig: {
+          enabled: true,
+          folderPath: 'Backups',
+          retentionCount: 10,
+          sheetsSyncEnabled: true,
+        },
+      })
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('Upload network error');
+    expect(result.message).toContain('Sheets API error');
   });
 
   test('null zipBuffer — ZIP sub-capability returns failure', async () => {

@@ -23,6 +23,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -30,17 +31,6 @@ beforeEach(async () => {
   ctx = await createTestApp();
 });
 afterEach(() => ctx.close());
-
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Subaru',
-    model: 'Outback',
-    year: 2020,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
 
 async function addOdometerReading(vehicleId: string, odometer: number): Promise<void> {
   const res = await ctx.authed('POST', `/api/v1/odometer/${vehicleId}`, {
@@ -96,7 +86,7 @@ async function trigger(): Promise<void> {
 
 describe('mileage-reminder trigger (whichever-comes-first, odometer axis)', () => {
   test('current odometer at/over the milestone fires exactly one mileage notification', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2020 });
     await addOdometerReading(vehicleId, 35200); // past the 35000 milestone
     seedMileageReminder('rm1', vehicleId, 35000);
 
@@ -116,7 +106,7 @@ describe('mileage-reminder trigger (whichever-comes-first, odometer axis)', () =
   // 35000 reading is genuinely reachable (a round-number odometer log / a fillup on the milestone).
   // This pins the boundary the docstring claims (`>=`) but no case drove.
   test('current odometer EXACTLY on the milestone fires (the >= boundary, not just strictly over)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2020 });
     await addOdometerReading(vehicleId, 35000); // exactly the 35000 milestone
     seedMileageReminder('rmEq', vehicleId, 35000);
 
@@ -128,7 +118,7 @@ describe('mileage-reminder trigger (whichever-comes-first, odometer axis)', () =
   });
 
   test('current odometer below the milestone fires nothing', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2020 });
     await addOdometerReading(vehicleId, 34000); // below 35000
     seedMileageReminder('rm2', vehicleId, 35000);
 
@@ -138,7 +128,7 @@ describe('mileage-reminder trigger (whichever-comes-first, odometer axis)', () =
   });
 
   test('re-triggering does not duplicate the milestone notification (idempotent, no re-arm)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2020 });
     await addOdometerReading(vehicleId, 36000);
     seedMileageReminder('rm3', vehicleId, 35000);
 
@@ -168,7 +158,7 @@ describe('mileage-reminder trigger (whichever-comes-first, odometer axis)', () =
   });
 
   test('current odometer is the MAX across expense mileage + odometer entries', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2020 });
     // A manual odometer entry below the milestone...
     await addOdometerReading(vehicleId, 34000);
     // ...but a fuel expense whose mileage is past it — the max-by-value should win.
@@ -194,7 +184,7 @@ describe('mileage-reminder trigger (whichever-comes-first, odometer axis)', () =
   // would silently block every future milestone. This pins the distinct-milestone invariant the
   // existing idempotent-re-trigger test (same milestone → still 1) doesn't cover.
   test('a DISTINCT milestone after mark-serviced fires a NEW notification (per-milestone dedup)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2020 });
     await addOdometerReading(vehicleId, 35200); // past the first 35000 milestone
     seedMileageReminder('rm6', vehicleId, 35000);
 
@@ -231,7 +221,7 @@ describe('mileage-reminder trigger (whichever-comes-first, odometer axis)', () =
   // single (reminderId) unique — would silently drop the mileage notification with no other failing
   // test (the existing tests cover each axis in ISOLATION, never the coexistence). Pin it.
   test('a `both` reminder overdue on BOTH axes fires two distinct notifications (time + mileage, no collision)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2020 });
     await addOdometerReading(vehicleId, 36000); // past the 35000 milestone
 
     // A `both`-type reminder: past odometer milestone (35000) AND a past next_due_date (time-overdue).

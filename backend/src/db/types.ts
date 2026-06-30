@@ -45,19 +45,6 @@ export type ReminderSplitConfig =
   | { method: 'absolute'; allocations: { vehicleId: string; amount: number }[] }
   | { method: 'percentage'; allocations: { vehicleId: string; percentage: number }[] };
 
-// Generic type guard generator for string union types
-function createEnumGuard<T extends string>(validValues: readonly T[]) {
-  return (value: string): value is T => validValues.includes(value as T);
-}
-
-// Validation functions - generated using createEnumGuard
-export const isValidPaymentFrequency = createEnumGuard([
-  'monthly',
-  'bi-weekly',
-  'weekly',
-  'custom',
-] as const);
-
 // Electric fuel types — single source of truth for determining charging vs fuel expenses
 export const ELECTRIC_FUEL_TYPES = [
   'Electric',

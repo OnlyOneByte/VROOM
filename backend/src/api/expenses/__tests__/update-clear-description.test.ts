@@ -18,6 +18,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -25,17 +26,6 @@ beforeEach(async () => {
   ctx = await createTestApp();
 });
 afterEach(() => ctx.close());
-
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Honda',
-    model: 'Civic',
-    year: 2021,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
 
 interface ExpenseDb {
   id: string;
@@ -62,7 +52,7 @@ async function createWithDescription(vehicleId: string, description: string): Pr
 
 describe('expense description clear-on-edit (clear-field class, last instance)', () => {
   test('PUT description:null clears a previously-saved description', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const id = await createWithDescription(vehicleId, 'Parking garage downtown');
     expect(descriptionOf(id)).toBe('Parking garage downtown');
 
@@ -74,7 +64,7 @@ describe('expense description clear-on-edit (clear-field class, last instance)',
   });
 
   test('PUT without description leaves the stored value untouched', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const id = await createWithDescription(vehicleId, 'Keep me');
 
     // An unrelated field update must not disturb description (undefined is dropped).
@@ -85,7 +75,7 @@ describe('expense description clear-on-edit (clear-field class, last instance)',
   });
 
   test('create still persists a provided description (no regression)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const id = await createWithDescription(vehicleId, 'Oil change');
     expect(descriptionOf(id)).toBe('Oil change');
   });

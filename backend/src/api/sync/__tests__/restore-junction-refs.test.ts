@@ -22,6 +22,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -30,20 +31,9 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Honda',
-    model: 'Civic',
-    year: 2021,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
-
 describe('restore rejects junction rows that reference out-of-backup ids', () => {
   test('a reminder_vehicles row pointing at a bogus vehicle id is rejected', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
 
     // Create a reminder linked to the vehicle → produces a reminder_vehicles junction row.
     const created = await ctx.authed('POST', '/api/v1/reminders', {
@@ -103,7 +93,7 @@ describe('restore rejects junction rows that reference out-of-backup ids', () =>
   // way as the junction case (the deep-review C246 certified the indirect-ownership model; this is
   // the merge-surviving net on its load-bearing assumption).
   test('a vehicle_financing row pointing at a bogus vehicle id is rejected', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
 
     // Create financing on the vehicle → a vehicle_financing row referencing it.
     const fin = await ctx.authed('POST', `/api/v1/financing/vehicles/${vehicleId}/financing`, {
@@ -159,7 +149,7 @@ describe('restore rejects junction rows that reference out-of-backup ids', () =>
   // Junction + financing refs are pinned; this expense-source ref was NOT. Pins it: tamper an exported
   // expenses.csv to repoint a reminder-sourced expense at a bogus reminder id → restore must reject.
   test('a reminder-sourced expense pointing at a bogus reminder id is rejected', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const created = await ctx.authed('POST', '/api/v1/reminders', {
       name: 'Oil change',
       type: 'notification',
@@ -217,7 +207,7 @@ describe('restore rejects junction rows that reference out-of-backup ids', () =>
   });
 
   test('the untampered backup restores cleanly (control)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const created = await ctx.authed('POST', '/api/v1/reminders', {
       name: 'Oil change',
       type: 'notification',

@@ -48,6 +48,8 @@ export interface ImportColumnMapping {
 	volumeUnit?: VolumeUnit;
 	/** Foreign category word (lower-cased) → VROOM category (D2). Unmatched → `misc` + a note. */
 	categoryMap?: Record<string, ExpenseCategory>;
+	/** Category stamped on a BLANK category cell (D2). Fuel-tracker presets set `fuel`. */
+	defaultCategory?: ExpenseCategory;
 }
 
 /**
@@ -65,4 +67,6 @@ export interface ImportMappingPreset {
 	distanceUnit?: DistanceUnit;
 	volumeUnit?: VolumeUnit;
 	categoryMap?: Record<string, ExpenseCategory>;
+	/** Category for a blank category cell (D2). Fuel trackers have no category column → `fuel`. */
+	defaultCategory?: ExpenseCategory;
 }

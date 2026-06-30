@@ -18,8 +18,15 @@ export const vehicleApi = {
 		return apiClient.get<Vehicle>(`/api/v1/vehicles/${vehicleId}`);
 	},
 
-	async getVehicles(): Promise<Vehicle[]> {
-		return apiClient.get<Vehicle[]>('/api/v1/vehicles');
+	/**
+	 * List the user's vehicles. With `{ includeShared: true }` the response ALSO includes vehicles
+	 * owned by others that have been ACCEPTED-shared with the user (T5a `?include=shared`), each
+	 * carrying a `sharedAccess` annotation. Default (no arg) returns owned vehicles only — every
+	 * existing caller is unchanged.
+	 */
+	async getVehicles(opts?: { includeShared?: boolean }): Promise<Vehicle[]> {
+		const path = opts?.includeShared ? '/api/v1/vehicles?include=shared' : '/api/v1/vehicles';
+		return apiClient.get<Vehicle[]>(path);
 	},
 
 	async createVehicle(data: Partial<Vehicle>): Promise<Vehicle> {

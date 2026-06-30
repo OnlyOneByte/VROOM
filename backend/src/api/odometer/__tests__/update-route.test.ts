@@ -22,6 +22,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle as seedVehicleShared } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -30,12 +31,11 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-async function seedVehicle(make = 'Honda'): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', { make, model: 'Civic', year: 2021 });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
+// This file's fixture is a make-param Honda (default) Civic 2021; converge onto the shared test-helpers/seed
+// seedVehicle (arch convergence, Angelo-approved) via a thin make wrapper preserving the exact prior payload
+// (model 'Civic', year 2021) so behavior is unchanged (the shared default is a Camry).
+const seedVehicle = (make = 'Honda'): Promise<string> =>
+  seedVehicleShared(ctx, { make, model: 'Civic', year: 2021 });
 
 interface OdometerEntry {
   id: string;
@@ -111,10 +111,12 @@ describe('odometer PUT /:id (update contract)', () => {
     expect(row.note).toBe('corrected note');
   });
 
-  // C172 (arch): the 3 inline `findById + entry.userId !== user.id → NotFoundError` guards (GET /entry/:id,
-  // PUT, DELETE) converged onto the shared validateOdometerOwnership helper. These pin the helper's
-  // not-found 404 path at all 3 sites (the anchoring test the C160 audit flagged as missing — odometer
-  // routes had no 404 coverage; the cross-tenant IDOR suite covers the cross-user leg).
+  // The 3 odometer routes (GET /entry/:id, PUT, DELETE) return 404 for a non-existent id. Originally the
+  // inline `findById + entry.userId !== user.id` guard converged onto validateOdometerOwnership (C172);
+  // the vehicle-sharing T6 widening (C95) then replaced that with the resolver seam (load the row UNSCOPED
+  // then requireVehicleRead/Write) + a `!row` NotFoundError, removing validateOdometerOwnership (dead
+  // export pruned C102). These pin the not-found 404 at all 3 sites regardless of the gating mechanism
+  // (the anchoring test the C160 audit flagged as missing; the cross-tenant IDOR suite covers cross-user).
   test('GET /entry/:id returns 404 for a non-existent id', async () => {
     const res = await ctx.authed('GET', '/api/v1/odometer/entry/does-not-exist');
     expect(res.status).toBe(404);

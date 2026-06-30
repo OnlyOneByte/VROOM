@@ -92,7 +92,24 @@ routes.post('/', syncRateLimiter, idempotency({ required: false }), async (c) =>
     );
   }
 
-  return c.json(createSuccessResponse(result, 'Sync completed'));
+  // Honest HTTP status (#44): a backup where every attempted provider failed must NOT report 200.
+  // failed → 502 (upstream provider failure), partial → 207 Multi-Status (some succeeded, some did
+  // not — the failed ones will retry since the sync anchor was not advanced). success/noop → 200.
+  if (result.outcome === 'failed') {
+    return c.json(
+      createErrorResponse('BACKUP_FAILED', 'All backup providers failed', {
+        failedProviders: result.failedProviders,
+        results: result.results,
+      }),
+      502
+    );
+  }
+
+  const message =
+    result.outcome === 'partial'
+      ? `Backup partially failed (${result.failedProviders.join(', ')})`
+      : 'Sync completed';
+  return c.json(createSuccessResponse(result, message), result.outcome === 'partial' ? 207 : 200);
 });
 
 routes.get('/status', async (c) => {

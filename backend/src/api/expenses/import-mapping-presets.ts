@@ -44,6 +44,8 @@ export interface MappingPreset {
   distanceUnit?: DistanceUnit;
   volumeUnit?: VolumeUnit;
   categoryMap?: Record<string, ExpenseCategory>;
+  /** Category for a blank category cell (D2). Fuel trackers have no category column → `fuel`. */
+  defaultCategory?: ExpenseCategory;
 }
 
 /** Lower-case + strip every non-alphanumeric char, so `Odometer (mi)` → `odometermi`. */
@@ -77,6 +79,9 @@ export const MAPPING_PRESETS: MappingPreset[] = [
     distanceUnit: DistanceUnit.MILES,
     volumeUnit: VolumeUnit.GALLONS_US,
     categoryMap: { gas: 'fuel', fuel: 'fuel', service: 'maintenance' },
+    // A Fuelly refuel export has no category column → every row's category cell is blank; default
+    // those to fuel so a detected log produces ready fuel rows instead of 0-ready "Unknown category".
+    defaultCategory: 'fuel',
   },
   {
     id: 'fuelio',
@@ -95,6 +100,8 @@ export const MAPPING_PRESETS: MappingPreset[] = [
     distanceUnit: DistanceUnit.KILOMETERS,
     volumeUnit: VolumeUnit.LITERS,
     categoryMap: { gas: 'fuel', fuel: 'fuel', petrol: 'fuel', service: 'maintenance' },
+    // Fuelio refuel export has no category column → default blank cells to fuel (see Fuelly above).
+    defaultCategory: 'fuel',
   },
   {
     id: 'drivvo',
@@ -120,6 +127,8 @@ export const MAPPING_PRESETS: MappingPreset[] = [
       service: 'maintenance',
       maintenance: 'maintenance',
     },
+    // Drivvo refuelling export has no category column → default blank cells to fuel (see Fuelly above).
+    defaultCategory: 'fuel',
   },
 ];
 
@@ -150,5 +159,6 @@ export function presetToMapping(preset: MappingPreset, targetVehicle?: string): 
     distanceUnit: preset.distanceUnit,
     volumeUnit: preset.volumeUnit,
     categoryMap: preset.categoryMap,
+    defaultCategory: preset.defaultCategory,
   };
 }

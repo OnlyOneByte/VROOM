@@ -29,3 +29,11 @@ test-results/
 playwright-report/
 blob-report/
 .playwright-artifacts-*/
+
+# MeshClaw agent harness — the *.meshclaw.e2e.ts specs, their visual-snapshot
+# baselines, captured screenshots, and the authenticated Playwright config are
+# agent working files, local-only by design (NOT part of the product / not in CI).
+e2e/*.meshclaw.e2e.ts
+e2e/*.meshclaw.e2e.ts-snapshots/
+e2e/__screenshots__/
+playwright.meshclaw.config.ts

@@ -4,7 +4,7 @@
 	import { routes, paramRoutes } from '$lib/routes';
 	import { parseMonthToDate } from '$lib/utils/chart-formatters';
 	import { onMount, type Component } from 'svelte';
-	import { Plus, FileText, Download, CircleAlert } from '@lucide/svelte';
+	import { Plus, FileText, Download, CircleAlert, Users } from '@lucide/svelte';
 	import FloatingActionButton from '$lib/components/common/floating-action-button.svelte';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
 	import { Button } from '$lib/components/ui/button';
@@ -17,6 +17,7 @@
 	import FuelEfficiencyTrendChart from '$lib/components/charts/FuelEfficiencyTrendChart.svelte';
 	import { AppPieChart } from '$lib/components/charts';
 	import VehicleHeader from '$lib/components/vehicles/VehicleHeader.svelte';
+	import ShareVehicleDialog from '$lib/components/vehicles/ShareVehicleDialog.svelte';
 	import VehiclePhotoCarousel from '$lib/components/vehicles/VehiclePhotoCarousel.svelte';
 	import MediaCaptureDialog from '$lib/components/common/MediaCaptureDialog.svelte';
 	import VehicleInfoCard from '$lib/components/vehicles/VehicleInfoCard.svelte';
@@ -27,7 +28,7 @@
 	import FinanceTab from '$lib/components/vehicles/FinanceTab.svelte';
 	import OdometerTab from '$lib/components/vehicles/OdometerTab.svelte';
 	// Lazy-loaded InsuranceTab — only import when overview tab has been viewed
-	let InsuranceTab = $state<Component<{ vehicleId: string }> | null>(null);
+	let InsuranceTab = $state<Component<{ vehicleId: string; readOnly?: boolean }> | null>(null);
 	let hasLoadedInsurance = $state(false);
 	import { categoryLabels } from '$lib/utils/expense-helpers';
 	import { getCategoryColor as getCategoryChartColor } from '$lib/utils/chart-colors';
@@ -90,6 +91,9 @@
 	let vehiclePhotos = $state<Photo[]>([]);
 	let showUploadDialog = $state(false);
 
+	// Share dialog (vehicle-sharing T11) — owner invites/manages access to this vehicle.
+	let shareOpen = $state(false);
+
 	// Filters and search
 	let searchTerm = $state('');
 	let filters = $state<ExpenseFilters>({});
@@ -149,13 +153,27 @@
 		vehicle ? vehicle.nickname || `${vehicle.year} ${vehicle.make} ${vehicle.model}` : ''
 	);
 
+	// vehicle-sharing T12b-3b: gate the edit affordances by the viewer's access level. The single-vehicle
+	// GET returns `sharedAccess { level }` for a NON-owner (undefined for the owner). Two capabilities:
+	//   - isOwner  → owner-ONLY affordances (edit vehicle info, finance, share management, photos, CSV
+	//     export) — all of these stay strict `validateVehicleOwnership` server-side, so a non-owner must
+	//     not see a button that would 404.
+	//   - canWrite → owner OR an accepted EDITOR (expense + odometer add/edit/delete) — widened
+	//     server-side in T5b-2/T6 via `requireVehicleWrite`.
+	// This is defense-in-depth UX: the backend already enforces every denial; hiding the chrome avoids a
+	// viewer clicking an affordance that errors. An owned vehicle carries no `sharedAccess` → isOwner=true.
+	let isOwner = $derived(!vehicle?.sharedAccess);
+	let canWrite = $derived(!vehicle?.sharedAccess || vehicle.sharedAccess.level === 'editor');
+
 	let coverPhotoUrl = $derived.by(() => {
 		const cover = vehiclePhotos.find(p => p.isCover);
 		if (!cover) return null;
 		return vehicleApi.getPhotoThumbnailUrl(vehicleId, cover.id);
 	});
 
-	// Lazy-load InsuranceTab when overview tab is active and page has loaded
+	// Lazy-load InsuranceTab when overview tab is active and page has loaded. T12b-3c: loaded for a
+	// shared viewer/editor too (read-only) now that the per-vehicle policies LIST (T8b) AND the claims
+	// sub-reads (C475) are both widened to shared read; the render-site passes `readOnly={!isOwner}`.
 	$effect(() => {
 		if (!isLoading && !hasLoadedInsurance && activeTab === 'overview') {
 			hasLoadedInsurance = true;
@@ -165,9 +183,18 @@
 		}
 	});
 
-	// Load data on mount — vehicle, photos, summary, and fuel efficiency in parallel
+	// Load data on mount. T12b-3c: the vehicle PHOTOS read (GET /photos/vehicle/:id) is owner-only
+	// server-side AND the photo carousel is already isOwner-gated (T12b-3b), so for a shared viewer/
+	// editor the fetch is pure waste that only produces a "vehicle not found" error toast (a
+	// four-states violation). Load the vehicle FIRST to establish isOwner, then fetch photos only for
+	// the owner; summary + fuel-efficiency are shared-readable (T5b-3 / T8a) so they fire for everyone.
 	onMount(async () => {
-		await Promise.all([loadVehicle(), loadPhotos(), loadSummary(), loadFuelEfficiency()]);
+		await loadVehicle();
+		await Promise.all([
+			...(isOwner ? [loadPhotos()] : []),
+			loadSummary(),
+			loadFuelEfficiency()
+		]);
 		// Load stats after initial data is loaded
 		if (vehicle) {
 			await loadVehicleStats();
@@ -377,7 +404,19 @@
 {:else if vehicle}
 	<div class="space-y-6 pb-24">
 		<!-- Header -->
-		<VehicleHeader {vehicle} displayName={vehicleDisplayName} {coverPhotoUrl} />
+		<div class="flex items-start justify-between gap-4">
+			<VehicleHeader {vehicle} displayName={vehicleDisplayName} {coverPhotoUrl} />
+			<!-- Share management is owner-only (server keeps strict validateVehicleOwnership on /shares). -->
+			{#if isOwner}
+				<Button variant="outline" size="sm" onclick={() => (shareOpen = true)} class="shrink-0">
+					<Users class="mr-2 h-4 w-4" />
+					Share
+				</Button>
+			{/if}
+		</div>
+		{#if isOwner}
+			<ShareVehicleDialog bind:open={shareOpen} {vehicleId} vehicleName={vehicleDisplayName} />
+		{/if}
 
 		<!-- Tabs Navigation -->
 		<Tabs bind:value={activeTab} class="space-y-6">
@@ -392,19 +431,25 @@
 			<TabsContent value="overview" class="space-y-6">
 				<!-- Vehicle Info + Photos: side-by-side on desktop, stacked on mobile -->
 				<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-					<VehicleInfoCard {vehicle} />
+					<VehicleInfoCard {vehicle} {isOwner} />
 					<VehiclePhotoCarousel
 						{vehicleId}
 						photos={vehiclePhotos}
+						{isOwner}
 						onUpload={() => (showUploadDialog = true)}
 						onDelete={handleDeletePhoto}
 						onSetCover={handleSetCover}
 					/>
 				</div>
 
-				<!-- Insurance Summary (lazy-loaded) -->
+				<!-- Insurance Summary (lazy-loaded). T12b-3c: shown to a shared viewer/editor in READ-ONLY
+				     mode (readOnly={!isOwner}) — the per-vehicle policies LIST (T8b) + the claims sub-reads
+				     (C475) are both widened to shared read, and the InsuranceTab tree hides every mutate
+				     affordance (add/edit/renew/delete policy + term, file/edit/delete claim, upload/delete
+				     document) when readOnly. Insurance WRITES stay owner-only server-side (validateInsurance-
+				     Ownership denies BOTH viewer and editor), so readOnly tracks !isOwner, not !canWrite. -->
 				{#if InsuranceTab}
-					<InsuranceTab {vehicleId} />
+					<InsuranceTab {vehicleId} readOnly={!isOwner} />
 				{/if}
 
 				{#if summaryLoadError && !isLoadingStats}
@@ -432,12 +477,15 @@
 							Start tracking expenses for this vehicle to see insights and trends
 						{/snippet}
 						{#snippet action()}
-							<Button
-								href={`${resolve(routes.expenseNew)}?vehicleId=${vehicleId}&returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`}
-							>
-								<Plus class="h-4 w-4 mr-2" />
-								{COMMON_MESSAGES.ADD_EXPENSE}
-							</Button>
+							<!-- Logging an expense is a WRITE (owner or accepted editor) — hide for a viewer. -->
+							{#if canWrite}
+								<Button
+									href={`${resolve(routes.expenseNew)}?vehicleId=${vehicleId}&returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`}
+								>
+									<Plus class="h-4 w-4 mr-2" />
+									{COMMON_MESSAGES.ADD_EXPENSE}
+								</Button>
+							{/if}
 						{/snippet}
 					</EmptyState>
 				{:else}
@@ -507,7 +555,10 @@
 				<CardFull.Root>
 					<CardFull.Header class="flex flex-row items-center justify-between gap-2 space-y-0">
 						<CardFull.Title>All Expenses ({totalCount})</CardFull.Title>
-						{#if totalCount > 0}
+						<!-- CSV export is owner-only: the server /expenses/export keeps strict
+						     validateVehicleOwnership (T5b-3b export-read widening is deferred), so a shared
+						     invitee hitting it would 404. Hide rather than show a button that errors. -->
+						{#if totalCount > 0 && isOwner}
 							<Button variant="outline" size="sm" onclick={handleExportCsv} disabled={isExporting}>
 								<Download class="mr-2 h-4 w-4" />
 								{isExporting ? 'Exporting…' : 'Export CSV'}
@@ -530,6 +581,7 @@
 							<ExpensesTable
 								expenses={filteredExpenses}
 								showVehicleColumn={false}
+								canWrite={canWrite}
 								returnTo={resolve(paramRoutes.vehicle, { id: vehicleId })}
 								onDelete={handleDeleteExpense}
 								emptyTitle={COMMON_MESSAGES.NO_EXPENSES}
@@ -555,13 +607,13 @@
 
 			<!-- Odometer Tab -->
 			<TabsContent value="odometer" class="space-y-6">
-				<OdometerTab {vehicleId} unitPreferences={vehicle?.unitPreferences} />
+				<OdometerTab {vehicleId} {canWrite} unitPreferences={vehicle?.unitPreferences} />
 			</TabsContent>
 
 			<!-- Finance Tab -->
 			<TabsContent value="loan" class="space-y-4 sm:space-y-6">
 				{#if vehicle}
-					<FinanceTab {vehicle} {vehicleId} {vehicleStatsData} />
+					<FinanceTab {vehicle} {vehicleId} {isOwner} {vehicleStatsData} />
 				{/if}
 			</TabsContent>
 		</Tabs>
@@ -595,8 +647,8 @@
 	</EmptyState>
 {/if}
 
-<!-- Floating Action Button -->
-{#if vehicle}
+<!-- Floating Action Button — logging an expense is a WRITE; hide for a viewer (owner/editor only). -->
+{#if vehicle && canWrite}
 	<FloatingActionButton
 		href={`${resolve(routes.expenseNew)}?vehicleId=${vehicleId}&returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`}
 		label={COMMON_MESSAGES.ADD_EXPENSE}

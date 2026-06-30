@@ -10,16 +10,17 @@ import {
   EXPENSE_CATEGORY_DESCRIPTIONS,
   EXPENSE_CATEGORY_LABELS,
 } from '../../db/types';
-import { ValidationError } from '../../errors';
+import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { neutralizeCsvRow } from '../../utils/csv-safety';
+import { centsToDollars, expenseToApi, moneyDollarsToCents } from '../../utils/money';
 import { buildPaginatedResponse, clampPagination } from '../../utils/pagination';
 import {
-  commonSchemas,
-  validateExpenseOwnership,
-  validateFuelExpenseData,
-  validateVehicleOwnership,
-} from '../../utils/validation';
+  requireVehicleRead,
+  requireVehicleWrite,
+  resolveVehicleOwnerId,
+} from '../../utils/sharing';
+import { commonSchemas, validateFuelExpenseData } from '../../utils/validation';
 import { financingRepository } from '../financing/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
 import { reminderTriggerService } from '../reminders/trigger-service';
@@ -65,7 +66,9 @@ const baseExpenseSchema = createInsertSchema(expensesTable, {
     .optional()
     .default([]),
   category: expenseCategorySchema,
-  expenseAmount: z.number().positive('Expense amount must be positive'),
+  // money: client sends DOLLARS, store integer CENTS (money-cents-migration T3). volume is NOT money
+  // (gallons/kWh) — it stays a plain number.
+  expenseAmount: moneyDollarsToCents((n) => n.positive('Expense amount must be positive')),
   volume: z.number().positive('Volume must be positive').nullable().optional(),
   date: z.coerce.date(),
   mileage: z.number().int().min(0, 'Mileage cannot be negative').nullable().optional(),
@@ -99,6 +102,11 @@ const createExpenseSchemaBase = baseExpenseSchema.omit({
   createdAt: true,
   updatedAt: true,
   userId: true,
+  // `createdBy` is SERVER-controlled provenance (vehicle-sharing T5b owner-stamp model), not client
+  // input: it is set to the acting editor on a shared-created row and left NULL otherwise. Omitting it
+  // from the input schema (it is an insertable column, so createInsertSchema would otherwise accept it)
+  // closes a forge vector — a caller could not otherwise be stopped from claiming a different author.
+  createdBy: true,
   groupId: true,
   groupTotal: true,
   splitMethod: true,
@@ -229,6 +237,46 @@ async function assertSplitFinancingSourceValid(
   }
 }
 
+/**
+ * vehicle-sharing T5b-2b: authorize a split WRITE across its full vehicle set + resolve the owner-stamp.
+ * The split path is the multi-vehicle analogue of the single-expense T5b-2 write: a sibling lands on
+ * EACH config vehicle, so the acting user must hold WRITE access (owner | accepted editor) to EVERY one
+ * — `requireVehicleWrite` per vehicle is the single denial gate (a stranger / viewer / editor-on-another-
+ * vehicle all get the same 404, existence-hiding). The owner-stamp model (design §2.1) keys each row's
+ * `userId` to the vehicle OWNER, but a split group carries ONE `userId` across all siblings, so the set
+ * must resolve to a SINGLE owner: a shared editor may split a cost across several vehicles only when they
+ * ALL belong to one owner (the clean-cut resolution of the multi-owner fork named in the T5b-2b/§2.1
+ * notes — a cross-owner split would have to stamp two different userIds into one group and would relocate
+ * cost across two users' books). `createdBy` records the actual author (the editor, or NULL when they are
+ * the owner — the legacy/self sentinel). Returns the resolved stamp for the repository.
+ *
+ * Pre-sharing behavior is preserved exactly: when every vehicle is the acting user's own, the loop
+ * resolves ownerId === acting and createdBy === null (byte-identical to the old assertVehiclesOwned path).
+ */
+async function requireSplitWriteAccess(
+  splitConfig: SplitConfig,
+  actingUserId: string
+): Promise<{ ownerId: string; createdBy: string | null }> {
+  const vehicleIds = splitConfigVehicleIds(splitConfig);
+  let ownerId: string | undefined;
+  for (const vehicleId of vehicleIds) {
+    // WRITE gate per sibling vehicle (owner | accepted editor | 404). REPLACES the strict
+    // assertVehiclesOwned so a shared editor can split onto the owner's vehicle.
+    await requireVehicleWrite(vehicleId, actingUserId);
+    const vehicleOwner = await resolveVehicleOwnerId(vehicleId);
+    if (!vehicleOwner) throw new NotFoundError('Vehicle'); // requireVehicleWrite already 404'd absent
+    if (ownerId === undefined) {
+      ownerId = vehicleOwner;
+    } else if (ownerId !== vehicleOwner) {
+      // A split spanning two owners cannot satisfy the single-`userId`-per-group owner-stamp invariant.
+      throw new ValidationError('A split cannot span vehicles owned by different users');
+    }
+  }
+  // splitConfig schemas guarantee ≥1 vehicle, so ownerId is always set here.
+  if (ownerId === undefined) throw new ValidationError('Split has no vehicles');
+  return { ownerId, createdBy: ownerId === actingUserId ? null : actingUserId };
+}
+
 // Exported so the query-contract (search/limit/tags coercion) can be unit-tested
 // at the route boundary without standing up a server.
 export const expenseQuerySchema = z.object({
@@ -275,7 +323,11 @@ routes.post('/split', zValidator('json', createSplitExpenseSchema), async (c) =>
   // the 'financing' literal; the shared helper validates per vehicle (no-op for a source-less split).
   await assertSplitFinancingSourceValid(data.sourceType, data.sourceId, data.splitConfig);
 
-  const siblings = await expenseRepository.createSplitExpense(data, user.id);
+  // vehicle-sharing T5b-2b: WRITE access to EVERY sibling vehicle + the single owner-stamp (owner |
+  // accepted editor on each; a cross-owner set is rejected). Replaces the strict owner-only check the
+  // repo used to run, so a shared editor can create a split on the owner's vehicle(s).
+  const { ownerId, createdBy } = await requireSplitWriteAccess(data.splitConfig, user.id);
+  const siblings = await expenseRepository.createSplitExpense(data, user.id, ownerId, createdBy);
   const first = siblings[0];
   if (!first?.groupId || first.groupTotal == null || !first.splitMethod) {
     throw new ValidationError('Split expense creation returned invalid data');
@@ -284,10 +336,11 @@ routes.post('/split', zValidator('json', createSplitExpenseSchema), async (c) =>
   return c.json(
     {
       success: true,
+      // T6 display edge: each sibling's money + the group total cents → dollars.
       data: {
-        siblings,
+        siblings: siblings.map(expenseToApi),
         groupId: first.groupId,
-        groupTotal: first.groupTotal,
+        groupTotal: centsToDollars(first.groupTotal),
         splitMethod: first.splitMethod,
       },
       message: 'Split expense created successfully',
@@ -314,14 +367,38 @@ routes.put(
     // financing-source class on the split-UPDATE path the per-vehicle check missed). Re-validate the
     // carried link against the new vehicles before regenerating. getSplitExpense is userId-scoped (404s
     // a non-owned/absent group); a source-less split is a no-op.
-    const existing = await expenseRepository.getSplitExpense(id, user.id);
+    // vehicle-sharing T5b-2b: the group is owner-stamped, so load it UNSCOPED (by groupId) and
+    // authorize via the share seam — a userId-scoped read would 404 a shared editor on a group they
+    // can legitimately edit. requireSplitWriteAccess gates BOTH the existing vehicle set (the editor
+    // must currently have write on what they're regenerating) AND, separately below, the NEW set.
+    const groupInfo = await expenseRepository.getSplitGroupAccessInfo(id);
+    if (!groupInfo) throw new NotFoundError('Split expense');
+    const existingConfig: SplitConfig = { method: 'even', vehicleIds: groupInfo.vehicleIds };
+    await requireSplitWriteAccess(existingConfig, user.id);
+    // The NEW vehicle set must also be writable by the editor AND resolve to the SAME single owner as
+    // the group's existing owner-stamp — otherwise the regenerated siblings would relocate the group's
+    // cost onto a different user's books (the owner-stamp invariant: one userId across the group).
+    const { ownerId: newOwnerId, createdBy } = await requireSplitWriteAccess(
+      data.splitConfig,
+      user.id
+    );
+    if (newOwnerId !== groupInfo.ownerId) {
+      throw new ValidationError('A split cannot be moved to a vehicle owned by a different user');
+    }
+
+    const existing = await expenseRepository.getSplitExpense(id, groupInfo.ownerId);
     await assertSplitFinancingSourceValid(
       existing[0]?.sourceType ?? undefined,
       existing[0]?.sourceId ?? undefined,
       data.splitConfig
     );
 
-    const siblings = await expenseRepository.updateSplitExpense(id, data, user.id);
+    const siblings = await expenseRepository.updateSplitExpense(
+      id,
+      data,
+      groupInfo.ownerId,
+      createdBy
+    );
     const first = siblings[0];
     if (!first?.groupId || first.groupTotal == null || !first.splitMethod) {
       throw new ValidationError('Split expense update returned invalid data');
@@ -330,9 +407,9 @@ routes.put(
     return c.json({
       success: true,
       data: {
-        siblings,
+        siblings: siblings.map(expenseToApi),
         groupId: first.groupId,
-        groupTotal: first.groupTotal,
+        groupTotal: centsToDollars(first.groupTotal),
         splitMethod: first.splitMethod,
       },
       message: 'Split expense updated successfully',
@@ -345,7 +422,17 @@ routes.get('/split/:id', zValidator('param', commonSchemas.idParam), async (c) =
   const user = c.get('user');
   const { id } = c.req.valid('param');
 
-  const siblings = await expenseRepository.getSplitExpense(id, user.id);
+  // vehicle-sharing T5b-3 (split READ): load the owner-stamped group UNSCOPED, then authorize READ on
+  // every sibling vehicle (owner | accepted viewer/editor). A viewer MAY read a shared split; a
+  // stranger gets the same 404 the absent-group branch throws (existence-hiding). Read the rows under
+  // the group's owner id (their stamped userId), not the acting user's.
+  const groupInfo = await expenseRepository.getSplitGroupAccessInfo(id);
+  if (!groupInfo) throw new NotFoundError('Split expense');
+  for (const vehicleId of groupInfo.vehicleIds) {
+    await requireVehicleRead(vehicleId, user.id);
+  }
+
+  const siblings = await expenseRepository.getSplitExpense(id, groupInfo.ownerId);
   const first = siblings[0];
   if (!first?.groupId || first.groupTotal == null || !first.splitMethod) {
     throw new ValidationError('Split expense data is invalid');
@@ -354,9 +441,9 @@ routes.get('/split/:id', zValidator('param', commonSchemas.idParam), async (c) =
   return c.json({
     success: true,
     data: {
-      siblings,
+      siblings: siblings.map(expenseToApi),
       groupId: first.groupId,
-      groupTotal: first.groupTotal,
+      groupTotal: centsToDollars(first.groupTotal),
       splitMethod: first.splitMethod,
     },
   });
@@ -367,14 +454,23 @@ routes.delete('/split/:id', zValidator('param', commonSchemas.idParam), async (c
   const user = c.get('user');
   const { id } = c.req.valid('param');
 
+  // vehicle-sharing T5b-2b (split DELETE): load the owner-stamped group UNSCOPED, then authorize WRITE
+  // on every sibling vehicle (owner | accepted editor; viewer/stranger get the same 404). An editor
+  // may delete a shared split. All subsequent repo reads/writes are scoped to the group's OWNER id
+  // (the rows' stamped userId), and photo cleanup likewise — expense photos validate via the owner's
+  // userId, so passing the acting editor would 404 the cleanup.
+  const groupInfo = await expenseRepository.getSplitGroupAccessInfo(id);
+  if (!groupInfo) throw new NotFoundError('Split expense');
+  await requireSplitWriteAccess({ method: 'even', vehicleIds: groupInfo.vehicleIds }, user.id);
+
   // Clean each sibling expense's photos (provider files + refs + rows) BEFORE the
   // group delete. deleteSplitExpense already removes the photo DB rows in its
   // transaction, but NOT the external storage files or photo_refs — so without
   // this those would leak. Cleaning here makes the repo's row-delete a no-op.
-  const siblingIds = await expenseRepository.findIdsByGroupId(id, user.id);
-  await deletePhotosForEntities('expense', siblingIds, user.id);
+  const siblingIds = await expenseRepository.findIdsByGroupId(id, groupInfo.ownerId);
+  await deletePhotosForEntities('expense', siblingIds, groupInfo.ownerId);
 
-  await expenseRepository.deleteSplitExpense(id, user.id);
+  await expenseRepository.deleteSplitExpense(id, groupInfo.ownerId);
 
   return c.json({ success: true, message: 'Split expense deleted successfully' });
 });
@@ -412,7 +508,15 @@ routes.get(
     const user = c.get('user');
     const { recentDays } = c.req.valid('query');
     const stats = await expenseRepository.getPerVehicleStats(user.id, recentDays);
-    return c.json({ success: true, data: stats });
+    // T6 display edge: totalAmount/recentAmount are cents sums → dollars for the dashboard cards.
+    return c.json({
+      success: true,
+      data: stats.map((s) => ({
+        ...s,
+        totalAmount: centsToDollars(s.totalAmount),
+        recentAmount: centsToDollars(s.recentAmount),
+      })),
+    });
   }
 );
 
@@ -426,18 +530,40 @@ routes.get('/summary', zValidator('query', summaryQuerySchema), async (c) => {
   const user = c.get('user');
   const { vehicleId, period } = c.req.valid('query');
 
-  // If vehicleId provided, verify user owns the vehicle
+  // vehicle-sharing T5b-3: per-vehicle summary widens to shared READ access, scoped to the vehicle
+  // OWNER's books (the owner-stamp model — see the GET / list note); cross-fleet summary (no
+  // vehicleId) stays acting-user-owned only (no double-count). requireVehicleRead 404s a viewer/
+  // stranger; resolveVehicleOwnerId then yields the owner whose rows back this vehicle.
+  let summaryUserId = user.id;
   if (vehicleId) {
-    await validateVehicleOwnership(vehicleId, user.id);
+    await requireVehicleRead(vehicleId, user.id);
+    const ownerId = await resolveVehicleOwnerId(vehicleId);
+    if (!ownerId) throw new NotFoundError('Vehicle');
+    summaryUserId = ownerId;
   }
 
   const summary = await expenseRepository.getSummary({
-    userId: user.id,
+    userId: summaryUserId,
     vehicleId,
     period,
   });
 
-  return c.json({ success: true, data: summary });
+  // T6 display edge: every money field in the summary is cents-denominated (sums + the monthlyAverage
+  // cents/month) → dollars for the FE. counts/periods/categories are untouched.
+  return c.json({
+    success: true,
+    data: {
+      ...summary,
+      totalAmount: centsToDollars(summary.totalAmount),
+      monthlyAverage: centsToDollars(summary.monthlyAverage),
+      recentAmount: centsToDollars(summary.recentAmount),
+      categoryBreakdown: summary.categoryBreakdown.map((r) => ({
+        ...r,
+        amount: centsToDollars(r.amount),
+      })),
+      monthlyTrend: summary.monthlyTrend.map((r) => ({ ...r, amount: centsToDollars(r.amount) })),
+    },
+  });
 });
 
 // GET /api/expenses/export - Download all matching expenses as CSV.
@@ -483,13 +609,23 @@ routes.get('/export', zValidator('query', exportQuerySchema), async (c) => {
   const user = c.get('user');
   const { vehicleId, category, startDate, endDate, search, tags } = c.req.valid('query');
 
+  // vehicle-sharing T5b-3b: a per-vehicle CSV export widens to shared READ, scoped to the vehicle
+  // OWNER's books (the owner-stamp model — rows are owner-stamped, so the acting invitee's own userId
+  // would export an empty file). requireVehicleRead 404s a viewer/stranger; resolveVehicleOwnerId then
+  // yields the owner. A CROSS-FLEET export (no vehicleId) stays acting-user-scoped (unchanged) — a
+  // shared vehicle's rows belong to the owner's export, not the invitee's all-vehicles dump.
+  let exportUserId = user.id;
   if (vehicleId) {
-    await validateVehicleOwnership(vehicleId, user.id);
+    await requireVehicleRead(vehicleId, user.id);
+    const ownerId = await resolveVehicleOwnerId(vehicleId);
+    if (!ownerId) throw new NotFoundError('Vehicle');
+    exportUserId = ownerId;
   }
 
-  const [rows, vehicles, prefs] = await Promise.all([
+  const isSharedExport = exportUserId !== user.id;
+  const [rows, vehicles, sharedVehicles, prefs] = await Promise.all([
     expenseRepository.findAll({
-      userId: user.id,
+      userId: exportUserId,
       vehicleId,
       category,
       startDate,
@@ -498,7 +634,11 @@ routes.get('/export', zValidator('query', exportQuerySchema), async (c) => {
       tags,
     }),
     vehicleRepository.findByUserId(user.id),
-    // Read-only: an export must not create a preferences row as a side effect.
+    // For a shared per-vehicle export the row's vehicle is OWNED BY ANOTHER user, so the acting user's
+    // own fleet (above) does NOT contain it — fetch the shared vehicle by id for the human name column.
+    isSharedExport && vehicleId ? vehicleRepository.findByIds([vehicleId]) : Promise.resolve([]),
+    // Read-only: an export must not create a preferences row as a side effect. Currency stays the ACTING
+    // user's preference (they are downloading their own file in their own locale), not the owner's.
     preferencesRepository.getByUserId(user.id),
   ]);
 
@@ -507,7 +647,10 @@ routes.get('/export', zValidator('query', exportQuerySchema), async (c) => {
   const currency = prefs?.currencyUnit || 'USD';
 
   const vehicleName = new Map(
-    vehicles.map((v) => [v.id, v.nickname || `${v.year} ${v.make} ${v.model}`])
+    [...vehicles, ...sharedVehicles].map((v) => [
+      v.id,
+      v.nickname || `${v.year} ${v.make} ${v.model}`,
+    ])
   );
 
   // neutralizeCsvRow guards every string cell against spreadsheet formula
@@ -520,7 +663,9 @@ routes.get('/export', zValidator('query', exportQuerySchema), async (c) => {
       date: e.date instanceof Date ? e.date.toISOString() : e.date,
       vehicle: vehicleName.get(e.vehicleId) ?? 'Unknown Vehicle',
       category: e.category,
-      amount: e.expenseAmount,
+      // T6 display edge: expenseAmount is stored CENTS; the human-facing export CSV emits DOLLARS so it
+      // stays the faithful round-trip target for the import path (import-csv parseAmount → dollarsToCents).
+      amount: centsToDollars(e.expenseAmount),
       currency,
       mileage: e.mileage ?? '',
       volume: e.volume ?? '',
@@ -666,8 +811,20 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
   // poison getCurrentOdometer (cross-category UNION). For a fuel expense this is a no-op.
   const expenseData = clearFuelFieldsIfNotFuel(body);
 
-  // Verify vehicle exists and belongs to user
-  await validateVehicleOwnership(expenseData.vehicleId, user.id);
+  // vehicle-sharing T5b-2: WRITE access is owner OR an accepted EDITOR (viewer denied with the same
+  // 404 a stranger gets — requireVehicleWrite, the ONE seam). REPLACES the strict
+  // validateVehicleOwnership here so a shared editor can log a cost on the owner's vehicle.
+  await requireVehicleWrite(expenseData.vehicleId, user.id);
+
+  // OWNER-STAMP (design §2.1, ratified option a): the row's userId is the vehicle OWNER's id, NOT the
+  // acting user's — so a shared editor's expense rides the OWNER's backup/TCO and counts once. For an
+  // owner writing their own vehicle this resolves to themselves (unchanged). `createdBy` records who
+  // physically entered it: the acting user when they are NOT the owner (a shared editor), else NULL
+  // (the legacy/self sentinel — keeps owner-authored rows identical to pre-T5b). requireVehicleWrite
+  // already 404'd an absent vehicle, so the owner id is always present here.
+  const ownerId = await resolveVehicleOwnerId(expenseData.vehicleId);
+  if (!ownerId) throw new ValidationError('Vehicle');
+  const createdBy = ownerId === user.id ? null : user.id;
 
   // Validate: a financing source link must point at the vehicle's active financing (shared with PUT, C422).
   await assertFinancingSourceValid(
@@ -687,25 +844,31 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
   // Idempotent create: a retried offline POST with the same clientId returns the
   // original row instead of duplicating it. Plain create when clientId is absent.
   // forceOverwrite (#98): a keep-local conflict resolution APPLIES the edit on collision.
+  // The idempotency key is scoped to the row's userId — now the OWNER — so a shared editor's
+  // retried offline POST de-dupes against the owner's books (the row it actually created).
   const createdExpense = await expenseRepository.createIdempotent(
     {
       ...expenseData,
-      userId: user.id,
+      userId: ownerId,
+      createdBy,
     },
     forceOverwrite ?? false
   );
 
   // D5: a mileaged expense is also a new odometer reading — re-check this vehicle's mileage reminders
-  // so a crossed milestone fires immediately. Only when mileage is present (getCurrentOdometer reads
-  // expenses.mileage); idempotent via the dedup, best-effort (never throws).
+  // so a crossed milestone fires immediately. Scope to the OWNER (the row's userId, the owner-stamp
+  // model): the reminders that track this vehicle belong to the owner, not the editor. Only when
+  // mileage is present (getCurrentOdometer reads expenses.mileage); idempotent via the dedup,
+  // best-effort (never throws).
   if (createdExpense.mileage != null) {
-    await reminderTriggerService.recheckMileageReminders(user.id, createdExpense.vehicleId);
+    await reminderTriggerService.recheckMileageReminders(ownerId, createdExpense.vehicleId);
   }
 
   return c.json(
     {
       success: true,
-      data: createdExpense,
+      // T6 display edge: stored cents → dollars so the FE Expense.amount contract is unchanged.
+      data: expenseToApi(createdExpense),
       message: 'Expense created successfully',
     },
     201
@@ -717,13 +880,26 @@ routes.get('/', zValidator('query', expenseQuerySchema), async (c) => {
   const user = c.get('user');
   const query = c.req.valid('query');
 
-  // If vehicleId filter is provided, verify user owns the vehicle
+  // vehicle-sharing T5b-3: READ widening (design §2.1 rule 3). Two distinct shapes:
+  //  - PER-VEHICLE (?vehicleId=…): gate via requireVehicleRead (owner | accepted viewer/editor | 404).
+  //    Because shared-created rows are OWNER-stamped (userId == vehicle owner, T5b-2), a shared
+  //    invitee querying their OWN userId would see NOTHING for the shared vehicle — so scope the query
+  //    to the vehicle OWNER's userId. With both vehicleId AND ownerId pinned, the result is exactly
+  //    that one vehicle's rows (the owner cannot leak their OTHER vehicles through this — vehicleId
+  //    filters them out), and an owner reading their own vehicle is unchanged (owner === acting).
+  //  - CROSS-FLEET (no vehicleId): stays acting-user-owned only — a shared vehicle's costs belong to
+  //    the OWNER's dashboard, NOT the invitee's, so no double-count and no foreign rows leak into the
+  //    invitee's all-vehicles list. The invitee sees a shared vehicle's costs ONLY via ?vehicleId.
+  let listUserId = user.id;
   if (query.vehicleId) {
-    await validateVehicleOwnership(query.vehicleId, user.id);
+    await requireVehicleRead(query.vehicleId, user.id);
+    const ownerId = await resolveVehicleOwnerId(query.vehicleId);
+    if (!ownerId) throw new NotFoundError('Vehicle');
+    listUserId = ownerId;
   }
 
   const { data, totalCount } = await expenseRepository.findPaginated({
-    userId: user.id,
+    userId: listUserId,
     vehicleId: query.vehicleId,
     category: query.category,
     startDate: query.startDate,
@@ -738,15 +914,22 @@ routes.get('/', zValidator('query', expenseQuerySchema), async (c) => {
 
   const { limit, offset } = clampPagination(query);
 
-  return c.json(buildPaginatedResponse(data, totalCount, limit, offset));
+  // T6 display edge: each row's money cents → dollars before the paginated envelope.
+  return c.json(buildPaginatedResponse(data.map(expenseToApi), totalCount, limit, offset));
 });
 
 // GET /api/expenses/:id - Get specific expense
 routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
-  const expense = await validateExpenseOwnership(id, user.id);
-  return c.json({ success: true, data: expense });
+  // vehicle-sharing T5b-3: load the (owner-stamped) row UNSCOPED, then authorize via the vehicle's
+  // READ access — owner | accepted viewer | accepted editor. A stranger gets the same NotFoundError
+  // (existence-hiding) the absent-row branch throws, so a shared invitee can read a single shared-
+  // vehicle expense while a non-shared third party cannot distinguish "not yours" from "does not exist".
+  const expense = await expenseRepository.findById(id);
+  if (!expense) throw new NotFoundError('Expense');
+  await requireVehicleRead(expense.vehicleId, user.id);
+  return c.json({ success: true, data: expenseToApi(expense) });
 });
 
 // PUT /api/expenses/:id - Update expense
@@ -758,15 +941,29 @@ routes.put(
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const updateData = c.req.valid('json');
-    const existingExpense = await validateExpenseOwnership(id, user.id);
 
-    // If the edit reassigns the expense to a different vehicle, that vehicle must be the user's
-    // too — mirror the create-path guard (#61). Without this, a PUT could point the (owned) expense
-    // at a vehicleId the user doesn't own: it stays their row but references a non-owned vehicle,
-    // corrupting their analytics attribution (within-tenant — all reads are userId-scoped, so it's
-    // not a cross-tenant leak, but it IS a real integrity gap the create path already prevents).
+    // vehicle-sharing T5b-2: load the row UNSCOPED (it is owner-stamped — a shared editor's row carries
+    // the OWNER's userId, so the old validateExpenseOwnership(id, acting) would 404 the editor's own
+    // edit), then authorize via the vehicle's WRITE access. requireVehicleWrite is the single denial
+    // gate: a stranger (no access), a VIEWER (read-only), and an editor on a DIFFERENT vehicle all get
+    // the same 404 (existence-hiding) — replacing the prior userId-scoped ownership check.
+    const existingExpense = await expenseRepository.findById(id);
+    if (!existingExpense) throw new ValidationError('Expense');
+    await requireVehicleWrite(existingExpense.vehicleId, user.id);
+
+    // If the edit reassigns the expense to a different vehicle, the acting user must have WRITE access
+    // to that vehicle too (the #61 guard, widened to the share seam). Additionally the target vehicle
+    // must have the SAME owner as the current one: the row is owner-stamped (existingExpense.userId IS
+    // the owner), so moving it onto a DIFFERENT owner's vehicle would silently relocate the cost
+    // between two users' books (and break the owner-stamp invariant userId == vehicle owner). A
+    // same-owner reassignment (the only kind possible pre-sharing, when both are the acting user's)
+    // keeps userId correct with no re-stamp; a cross-owner move is rejected.
     if (updateData.vehicleId && updateData.vehicleId !== existingExpense.vehicleId) {
-      await validateVehicleOwnership(updateData.vehicleId, user.id);
+      await requireVehicleWrite(updateData.vehicleId, user.id);
+      const targetOwnerId = await resolveVehicleOwnerId(updateData.vehicleId);
+      if (targetOwnerId !== existingExpense.userId) {
+        throw new ValidationError('Cannot move an expense to a vehicle owned by a different user');
+      }
     }
 
     // A PUT that SETS a financing source link must verify it like the create path does (C422) — else a
@@ -800,17 +997,23 @@ routes.put(
     const updatedExpense = await expenseRepository.update(id, normalizedUpdate);
 
     // D5 (#71): an EDIT can also cross a mileage milestone — e.g. correcting a reading upward past a
-    // reminder's due odometer. The create path rechecks (:573) but the update path did not, so an
+    // reminder's due odometer. The create path rechecks but the update path did not, so an
     // edit-crossed reminder only fired on the next /trigger or login, silently breaking the
     // "fires the moment crossed" guarantee. Mirror the create-path best-effort recheck (never throws,
-    // idempotent via the dedup). Use the UPDATED vehicleId so a reassign rechecks the right vehicle.
+    // idempotent via the dedup). Use the UPDATED vehicleId so a reassign rechecks the right vehicle,
+    // scoped to the row's OWNER (existingExpense.userId — the owner-stamp model; the mileage reminders
+    // for this vehicle belong to the owner, not a shared editor). Reassignment is same-owner only
+    // (asserted above), so the owner is stable across the edit.
     if (updatedExpense.mileage != null) {
-      await reminderTriggerService.recheckMileageReminders(user.id, updatedExpense.vehicleId);
+      await reminderTriggerService.recheckMileageReminders(
+        existingExpense.userId,
+        updatedExpense.vehicleId
+      );
     }
 
     return c.json({
       success: true,
-      data: updatedExpense,
+      data: expenseToApi(updatedExpense),
       message: 'Expense updated successfully',
     });
   }
@@ -820,11 +1023,19 @@ routes.put(
 routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
-  await validateExpenseOwnership(id, user.id);
 
-  // Clean the expense's receipt photos (provider files + DB) before deleting the
-  // row — the photos table has no FK, so they'd otherwise orphan.
-  await deleteAllPhotosForEntity('expense', id, user.id);
+  // vehicle-sharing T5b-2: load the (owner-stamped) row UNSCOPED, then authorize via the vehicle's
+  // WRITE access — owner or accepted editor; a viewer/stranger gets the same 404 (existence-hiding).
+  // An editor may delete a cost row on a shared vehicle (D3 editor capability).
+  const existingExpense = await expenseRepository.findById(id);
+  if (!existingExpense) throw new ValidationError('Expense');
+  await requireVehicleWrite(existingExpense.vehicleId, user.id);
+
+  // Clean the expense's receipt photos (provider files + DB) before deleting the row — the photos
+  // table has no FK, so they would otherwise orphan. Scope the photo-ownership check to the row's
+  // OWNER (existingExpense.userId — the owner-stamp model): expense photos validate via
+  // expenses.userId, which is the owner, so passing the acting editor would 404 the cleanup.
+  await deleteAllPhotosForEntity('expense', id, existingExpense.userId);
 
   await expenseRepository.delete(id);
   return c.json({ success: true, message: 'Expense deleted successfully' });

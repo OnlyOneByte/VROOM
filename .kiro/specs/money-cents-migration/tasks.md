@@ -5,9 +5,13 @@
 > unblocked; each independently verified via `bun run validate:local`. T1+T2 are the data-safety core and
 > MUST land before any read/write conversion (else the schema is cents but the pipeline still writes floats).
 
-- [ ] **T0 — Sign-off gate.** Angelo ratifies D1 (the 14-column scope), D2 (export cents vs dollars), D3
-      (old-backup reject + shim), D4 (in-place UPDATE migration shape), D5 (atomic schema version + staged
-      call-site follow-ons). BUILD UNBLOCKS on approval. *(Escalated C146.)*
+- [x] **T0 — Sign-off gate — ✅ GREENLIT by Angelo 2026-06-24.** D1 (the 14-column scope), D2 (export cents
+      vs dollars), D3 (old-backup reject + shim), D4 (in-place UPDATE migration shape), D5 (atomic schema
+      version + staged call-site follow-ons) all ratified at the spec's recommended option. **BUILD
+      UNBLOCKED.** ⚠️ HARD ORDER: T1+T2 (the data-safety core — schema/migration + backup version-bump/shim)
+      MUST land together and BEFORE any T3–T6 call-site conversion, else the schema is cents while the
+      pipeline still writes floats (NORTH_STAR #1 data-corruption). One task per cycle, each green via
+      `validate:local`. *(Escalated C146; greenlit 2026-06-24.)*
 
 ### Data-safety core (land together, before any call-site conversion)
 

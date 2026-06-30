@@ -23,6 +23,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle as seedVehicleShared } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -58,16 +59,11 @@ interface SplitResponse {
   data: { groupId: string; groupTotal: number; splitMethod: string };
 }
 
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Honda',
-    model: 'Civic',
-    year: 2021,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
+// This file's fixture is a no-arg Honda Civic 2021; converge onto the shared test-helpers/seed seedVehicle
+// (arch convergence, Angelo-approved) via a thin wrapper preserving the exact prior make/model/year (the
+// shared default is a Camry). seedVehicleWithFinancing (below) keeps calling this wrapper unchanged.
+const seedVehicle = (): Promise<string> =>
+  seedVehicleShared(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
 
 /** Create an overdue (past startDate => nextDueDate = startDate) expense reminder. */
 async function createOverdueExpenseReminder(vehicleId: string): Promise<string> {

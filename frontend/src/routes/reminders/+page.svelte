@@ -273,7 +273,13 @@
 	{:else}
 		{#snippet reminderCard(item: ReminderWithVehicles, due: boolean)}
 			<CardNs.Card data-testid="reminder-card-{item.reminder.id}">
-				<CardNs.CardContent class="flex items-start justify-between gap-4 py-4">
+				<!-- Stack the title block above the action row on mobile (flex-col), side-by-side only at sm:. A
+					     mileage reminder's action cluster is up to 5 buttons (Serviced+Pause+edit+delete) and is
+					     flex-shrink-0, so on a phone the old single-row justify-between starved the min-w-0 title to
+					     a ~1-char sliver (C247 eyes-on finding, NORTH_STAR #3 occlusion). -->
+					<CardNs.CardContent
+						class="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+					>
 					<div class="flex items-start gap-3 min-w-0">
 						<div class="mt-0.5 {due ? 'text-warning' : 'text-muted-foreground'}">
 							{#if due}
@@ -323,7 +329,7 @@
 							</div>
 						</div>
 					</div>
-					<div class="flex items-center gap-1 flex-shrink-0">
+					<div class="flex items-center gap-1 flex-shrink-0 flex-wrap sm:flex-nowrap">
 						{#if item.reminder.type === 'expense'}
 							<Button
 								variant="ghost"

@@ -3,7 +3,7 @@ import { and, asc, desc, eq, gte, inArray, lte, type SQL, sql } from 'drizzle-or
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { Expense, NewExpense, SplitMethod } from '../../db/schema';
-import { expenses, photos, vehicles } from '../../db/schema';
+import { expenses, photos } from '../../db/schema';
 import { formatYearMonth, toDateTimeString } from '../../db/sql-helpers';
 import { DatabaseError, NotFoundError } from '../../errors';
 import { getPeriodStartDate } from '../../utils/calculations';
@@ -226,6 +226,25 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       .from(expenses)
       .where(this.groupOwnedBy(groupId, userId));
     return rows.map((r) => r.id);
+  }
+
+  /**
+   * vehicle-sharing T5b-2b: the split group's distinct vehicleIds + its owner-stamped `userId`, read
+   * UNSCOPED (by groupId alone). The share-aware split routes call this FIRST to discover which
+   * vehicles to gate through `requireVehicleWrite/Read` — exactly as the single-expense write path
+   * loads the (owner-stamped) row unscoped via `findById` before authorizing on its vehicle. Every
+   * sibling carries the same `userId` (the owner-stamp invariant), so `ownerId` is taken from row 0;
+   * returns null when the group does not exist (caller → 404, existence-hiding).
+   */
+  async getSplitGroupAccessInfo(
+    groupId: string
+  ): Promise<{ vehicleIds: string[]; ownerId: string } | null> {
+    const rows = await this.db
+      .select({ vehicleId: expenses.vehicleId, userId: expenses.userId })
+      .from(expenses)
+      .where(eq(expenses.groupId, groupId));
+    if (rows.length === 0) return null;
+    return { vehicleIds: [...new Set(rows.map((r) => r.vehicleId))], ownerId: rows[0].userId };
   }
 
   /**
@@ -646,23 +665,34 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       sourceType?: string;
       sourceId?: string;
     },
-    userId: string
+    userId: string,
+    // vehicle-sharing T5b-2b: the row-stamp owner (design §2.1 — every sibling's `userId`) and the
+    // actual author (`createdBy`). The route resolves these from the share seam and asserts the
+    // single-owner invariant + WRITE access BEFORE calling, so the repo no longer re-runs the strict
+    // owner-only `validateVehicleOwnership`. Default ownerId=userId / createdBy=null keeps a
+    // non-shared caller (and existing unit tests that pass only `userId`) byte-identical to pre-T5b-2b.
+    ownerId: string = userId,
+    createdBy: string | null = null
   ): Promise<Expense[]> {
     try {
-      await this.validateVehicleOwnership(data.splitConfig, userId);
-
       const allocations = expenseSplitService.computeAllocations(
         data.splitConfig,
         data.totalAmount
       );
       const splitMethod: SplitMethod = data.splitConfig.method;
 
-      return await this.db.transaction(async (tx) => {
+      // SYNCHRONOUS transaction (#127 class, C504): the split insert loop must be atomic — under the old
+      // async callback a throw mid-loop committed a partial split group (siblings summing to less than the
+      // group total, an orphaned invariant-violating group with no idempotency key to recover). Running
+      // synchronously (createSiblingsSync, `.returning().get()` inline) keeps every sibling in ONE real
+      // transaction that rolls back atomically.
+      return this.db.transaction((tx) => {
         const groupId = createId();
 
-        return expenseSplitService.createSiblings(tx, {
+        return expenseSplitService.createSiblingsSync(tx, {
           groupId,
-          userId,
+          userId: ownerId,
+          createdBy,
           splitMethod,
           groupTotal: data.totalAmount,
           allocations,
@@ -746,7 +776,13 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   async updateSplitExpense(
     groupId: string,
     data: { splitConfig: SplitConfig; totalAmount?: number },
-    userId: string
+    userId: string,
+    // vehicle-sharing T5b-2b: provenance of the regenerated siblings. The route resolves the stamp
+    // owner (passed as `userId` — the group is owner-stamped, so the `groupOwnedBy` read below matches)
+    // and the acting author. `validateVehicleOwnership(config, userId)` then enforces the NEW vehicle
+    // set is entirely the owner's (the single-owner invariant for a shared editor). Default null keeps
+    // a non-shared caller identical to pre-T5b-2b.
+    createdBy: string | null = null
   ): Promise<Expense[]> {
     const oldSiblings = await this.db
       .select()
@@ -784,23 +820,31 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       const splitMethod: SplitMethod = data.splitConfig.method;
       const oldSiblingIds = oldSiblings.map((s) => s.id);
 
-      return await this.db.transaction(async (tx) => {
+      // SYNCHRONOUS transaction (#127 class, C504): this is the most dangerous split path — it DELETEs the
+      // old siblings then re-inserts the new set. Under the old async callback a throw between the delete
+      // and the re-insert irrecoverably lost the entire split group (a retry re-reads zero old siblings →
+      // NotFoundError), and a throw on the photo migration orphaned photos pointing at deleted sibling ids.
+      // Running synchronously (.all()/.run()/createSiblingsSync inline) keeps the photo-collect, delete,
+      // re-insert, and photo-migrate in ONE real transaction that rolls back atomically.
+      return this.db.transaction((tx) => {
         // 1. Collect photo IDs from old siblings
-        const oldPhotos = await tx
+        const oldPhotos = tx
           .select({ id: photos.id })
           .from(photos)
-          .where(and(eq(photos.entityType, 'expense'), inArray(photos.entityId, oldSiblingIds)));
+          .where(and(eq(photos.entityType, 'expense'), inArray(photos.entityId, oldSiblingIds)))
+          .all();
 
         const photoIds = oldPhotos.map((p) => p.id);
 
         // 2. Delete old siblings (userId-scoped to match the read above — same predicate for the
         // ownership check and the destructive write; see deleteSplitExpense for the rationale).
-        await tx.delete(expenses).where(this.groupOwnedBy(groupId, userId));
+        tx.delete(expenses).where(this.groupOwnedBy(groupId, userId)).run();
 
         // 3. Insert new siblings with same groupId
-        const newSiblings = await expenseSplitService.createSiblings(tx, {
+        const newSiblings = expenseSplitService.createSiblingsSync(tx, {
           groupId,
           userId,
+          createdBy,
           splitMethod,
           groupTotal: totalAmount,
           allocations,
@@ -814,10 +858,10 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
 
         // 4. Migrate photos to first new sibling
         if (photoIds.length > 0 && newSiblings[0]) {
-          await tx
-            .update(photos)
+          tx.update(photos)
             .set({ entityId: newSiblings[0].id })
-            .where(inArray(photos.id, photoIds));
+            .where(inArray(photos.id, photoIds))
+            .run();
         }
 
         return newSiblings;

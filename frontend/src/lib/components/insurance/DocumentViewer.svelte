@@ -16,9 +16,11 @@
 		// back-compat; ClaimsSection passes 'insurance_claim'.
 		entityId: string;
 		entityType?: string;
+		// T12b-3c: read-only shared view hides upload + per-document delete (documents stay viewable).
+		readOnly?: boolean;
 	}
 
-	let { entityId, entityType = 'insurance_policy' }: Props = $props();
+	let { entityId, entityType = 'insurance_policy', readOnly = false }: Props = $props();
 
 	let documents = $state<Photo[]>([]);
 	let isLoading = $state(true);
@@ -74,15 +76,17 @@
 <div class="space-y-3">
 	<div class="flex items-center justify-between">
 		<h5 class="text-sm font-medium text-foreground">Documents</h5>
-		<Button
-			variant="outline"
-			size="sm"
-			class="h-7 text-xs"
-			onclick={() => (showUploadDialog = true)}
-		>
-			<Upload class="mr-1 h-3 w-3" />
-			Upload
-		</Button>
+		{#if !readOnly}
+			<Button
+				variant="outline"
+				size="sm"
+				class="h-7 text-xs"
+				onclick={() => (showUploadDialog = true)}
+			>
+				<Upload class="mr-1 h-3 w-3" />
+				Upload
+			</Button>
+		{/if}
 	</div>
 
 	{#if isLoading}
@@ -124,18 +128,20 @@
 							<!-- eslint-enable svelte/no-navigation-without-resolve -->
 						</div>
 					{/if}
-					<div
-						class="absolute inset-x-0 bottom-0 flex justify-end bg-gradient-to-t from-black/60 to-transparent p-1.5 opacity-0 transition-opacity group-hover:opacity-100"
-					>
-						<Button
-							variant="destructive"
-							size="sm"
-							class="h-6 text-xs"
-							onclick={() => requestDelete(doc.id)}
+					{#if !readOnly}
+						<div
+							class="absolute inset-x-0 bottom-0 flex justify-end bg-gradient-to-t from-black/60 to-transparent p-1.5 opacity-0 transition-opacity group-hover:opacity-100"
 						>
-							<Trash2 class="h-3 w-3" />
-						</Button>
-					</div>
+							<Button
+								variant="destructive"
+								size="sm"
+								class="h-6 text-xs"
+								onclick={() => requestDelete(doc.id)}
+							>
+								<Trash2 class="h-3 w-3" />
+							</Button>
+						</div>
+					{/if}
 				</div>
 			{/each}
 		</div>

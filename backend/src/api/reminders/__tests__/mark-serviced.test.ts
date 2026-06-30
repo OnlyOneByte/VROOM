@@ -21,6 +21,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -28,17 +29,6 @@ beforeEach(async () => {
   ctx = await createTestApp();
 });
 afterEach(() => ctx.close());
-
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Mazda',
-    model: 'CX-5',
-    year: 2020,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
 
 async function addOdometerReading(vehicleId: string, odometer: number): Promise<void> {
   const res = await ctx.authed('POST', `/api/v1/odometer/${vehicleId}`, {
@@ -88,7 +78,7 @@ async function createMileageReminder(
 
 describe('POST /:id/mark-serviced — re-arm (D3)', () => {
   test('mileage: anchors lastServiceOdometer to current + recomputes nextDueOdometer', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Mazda', model: 'CX-5', year: 2020 });
     const id = await createMileageReminder(vehicleId); // last=30000, next=35000
     expect(reminderRow(id).next_due_odometer).toBe(35000);
 
@@ -104,7 +94,7 @@ describe('POST /:id/mark-serviced — re-arm (D3)', () => {
   });
 
   test('a re-armed mileage reminder that was due is no longer due at the trigger', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Mazda', model: 'CX-5', year: 2020 });
     const id = await createMileageReminder(vehicleId); // next milestone 35000
     await addOdometerReading(vehicleId, 35200); // past it → due
 
@@ -129,7 +119,7 @@ describe('POST /:id/mark-serviced — re-arm (D3)', () => {
   });
 
   test('time: advances nextDueDate one period', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Mazda', model: 'CX-5', year: 2020 });
     // A monthly time reminder; nextDueDate starts at startDate (2024-02-15).
     const created = await ctx.authed('POST', '/api/v1/reminders', {
       name: 'Registration',
@@ -153,7 +143,7 @@ describe('POST /:id/mark-serviced — re-arm (D3)', () => {
   });
 
   test('time: a MULTI-period-overdue reminder advances to a FUTURE due date (not still overdue)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Mazda', model: 'CX-5', year: 2020 });
     // A monthly reminder whose startDate is YEARS in the past → nextDueDate starts many periods
     // overdue. A single one-period advance would leave it still <= now (re-fires immediately); the
     // catch-up loop must land it strictly in the future.
@@ -181,7 +171,7 @@ describe('POST /:id/mark-serviced — re-arm (D3)', () => {
   });
 
   test('time: an EARLY service (nextDueDate already in the FUTURE) advances exactly one period, stays future', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Mazda', model: 'CX-5', year: 2020 });
     // A yearly reminder anchored FAR in the future → nextDueDate is already > now, so the catch-up
     // `while (nextDue <= now)` loop never runs. This is the early-service path (servicing before due,
     // e.g. registering in May for a July-due reminder): schedule-anchored, so it advances ONE period
@@ -214,7 +204,7 @@ describe('POST /:id/mark-serviced — re-arm (D3)', () => {
   });
 
   test('both: moves the mileage milestone AND advances the date', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Mazda', model: 'CX-5', year: 2020 });
     const id = await createMileageReminder(vehicleId, {
       triggerMode: 'both',
       startDate: '2024-02-15T00:00:00.000Z',
@@ -237,7 +227,7 @@ describe('POST /:id/mark-serviced — re-arm (D3)', () => {
   // must instead DEACTIVATE the reminder. Pin it: a monthly reminder with start+end both in the past,
   // serviced now → is_active=0, no future nextDueDate write.
   test('a bounded reminder serviced past its endDate is DEACTIVATED, not re-armed forward (#114)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Mazda', model: 'CX-5', year: 2020 });
     const created = await ctx.authed('POST', '/api/v1/reminders', {
       name: 'Bounded registration',
       type: 'notification',

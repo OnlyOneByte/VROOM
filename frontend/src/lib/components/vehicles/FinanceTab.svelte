@@ -28,9 +28,13 @@
 		vehicle: Vehicle;
 		vehicleId: string;
 		vehicleStatsData: VehicleStats | null;
+		/** vehicle-sharing T12b-3b: financing add/edit/payoff is owner-ONLY (the server keeps strict
+		 *  validateVehicleOwnership on /financing — an editor is NOT enough). A shared invitee sees the
+		 *  finance summary read-only. Default true so the owner [id] tab is unchanged. */
+		isOwner?: boolean;
 	}
 
-	let { vehicle, vehicleId, vehicleStatsData }: Props = $props();
+	let { vehicle, vehicleId, vehicleStatsData, isOwner = true }: Props = $props();
 
 	// Payment state
 	let payments = $state<DerivedPaymentEntry[]>([]);
@@ -135,6 +139,7 @@
 			<NextPaymentCard
 				financing={vehicle.financing}
 				lastPayment={payments.length > 0 ? payments[0] : undefined}
+				{isOwner}
 				recordPaymentHref={`${resolve(routes.expenseNew)}?vehicleId=${vehicleId}&category=financial&financingId=${vehicle.financing.id}&amount=${vehicle.financing.paymentAmount}&returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`}
 				{progressPercentage}
 				onChangePayment={() => (showPaymentPlanner = true)}

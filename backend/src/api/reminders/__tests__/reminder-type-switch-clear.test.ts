@@ -18,6 +18,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -25,17 +26,6 @@ beforeEach(async () => {
   ctx = await createTestApp();
 });
 afterEach(() => ctx.close());
-
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Honda',
-    model: 'Civic',
-    year: 2021,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
 
 interface ReminderRowDb {
   id: string;
@@ -55,7 +45,7 @@ function reminderRow(id: string): ReminderRowDb {
 
 describe('reminder type switch clears expense-template fields (clear-field class)', () => {
   test('expense → notification nulls expense_category / expense_amount / expense_tags', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
 
     // Create an EXPENSE reminder with a populated template (what the cycle-158 form sends).
     const created = await ctx.authed('POST', '/api/v1/reminders', {
@@ -76,7 +66,7 @@ describe('reminder type switch clears expense-template fields (clear-field class
     const before = reminderRow(id);
     expect(before.type).toBe('expense');
     expect(before.expense_category).toBe('financial');
-    expect(before.expense_amount).toBe(125.5);
+    expect(before.expense_amount).toBe(12550); // $125.50 → 12550 cents (money-cents-migration)
 
     // Switch to notification, sending the expense fields as null (exactly what
     // ReminderForm submits on a notification edit).
@@ -100,7 +90,7 @@ describe('reminder type switch clears expense-template fields (clear-field class
   test('notification → expense sets the template fields', async () => {
     // The reverse direction also round-trips (a notification reminder gains a
     // template when promoted to expense).
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const created = await ctx.authed('POST', '/api/v1/reminders', {
       name: 'Rotate tires',
       type: 'notification',
@@ -120,6 +110,6 @@ describe('reminder type switch clears expense-template fields (clear-field class
     const after = reminderRow(id);
     expect(after.type).toBe('expense');
     expect(after.expense_category).toBe('maintenance');
-    expect(after.expense_amount).toBe(80);
+    expect(after.expense_amount).toBe(8000); // $80 → 8000 cents (money-cents-migration)
   });
 });

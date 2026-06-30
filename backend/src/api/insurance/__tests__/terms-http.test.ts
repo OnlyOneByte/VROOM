@@ -16,6 +16,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -23,17 +24,6 @@ beforeEach(async () => {
   ctx = await createTestApp();
 });
 afterEach(() => ctx.close());
-
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Toyota',
-    model: 'Camry',
-    year: 2022,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
 
 interface TermRow {
   id: string;
@@ -76,7 +66,7 @@ async function seedPolicyWithTerm(
 
 describe('insurance term update HTTP route — clear-optional-field semantics', () => {
   test('explicit null clears a term field; omitting it preserves the prior value', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx);
     const { policyId, termId } = await seedPolicyWithTerm(vehicleId);
 
     // Omitting fields preserves them (only policyNumber changes here).
@@ -109,7 +99,7 @@ describe('insurance term update HTTP route — clear-optional-field semantics', 
   });
 
   test('policy notes: explicit null clears it; omitting it preserves', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx);
     const { policyId } = await seedPolicyWithTerm(vehicleId);
 
     // Set notes.
@@ -186,7 +176,7 @@ describe('#84-class — insurance term writes reject a foreign (non-owned) vehic
   });
 
   test('POST /insurance/:id/terms with a foreign vehicleId → 404, no junction row planted', async () => {
-    const ownVehicle = await seedVehicle();
+    const ownVehicle = await seedVehicle(ctx);
     const { policyId } = await seedPolicyWithTerm(ownVehicle);
     seedForeignVehicle('veh-foreign-addterm');
 
@@ -200,7 +190,7 @@ describe('#84-class — insurance term writes reject a foreign (non-owned) vehic
   });
 
   test('PUT /insurance/:id/terms/:termId re-pointing coverage to a foreign vehicleId → 404, original coverage intact', async () => {
-    const ownVehicle = await seedVehicle();
+    const ownVehicle = await seedVehicle(ctx);
     const { policyId, termId } = await seedPolicyWithTerm(ownVehicle);
     seedForeignVehicle('veh-foreign-updateterm');
 
@@ -214,9 +204,9 @@ describe('#84-class — insurance term writes reject a foreign (non-owned) vehic
   });
 
   test('control: a term write with an OWNED vehicleId still succeeds (guard is not over-broad)', async () => {
-    const ownVehicle = await seedVehicle();
+    const ownVehicle = await seedVehicle(ctx);
     const { policyId } = await seedPolicyWithTerm(ownVehicle);
-    const second = await seedVehicle();
+    const second = await seedVehicle(ctx);
 
     const res = await ctx.authed('POST', `/api/v1/insurance/${policyId}/terms`, {
       startDate: '2025-01-01T00:00:00.000Z',
@@ -250,8 +240,8 @@ describe('#57-class — a term-cost UPDATE replaces its auto-created premium exp
   }
 
   test('changing a term totalCost deletes the old premium siblings and re-creates them at the new cost', async () => {
-    const v1 = await seedVehicle();
-    const v2 = await seedVehicle();
+    const v1 = await seedVehicle(ctx);
+    const v2 = await seedVehicle(ctx);
     // A costed term covering TWO vehicles → an even split: 2 siblings summing to totalCost.
     const created = await ctx.authed('POST', '/api/v1/insurance', {
       company: 'Acme Mutual',
@@ -269,21 +259,21 @@ describe('#57-class — a term-cost UPDATE replaces its auto-created premium exp
     const policyId = body.data.id;
     const termId = body.data.terms[0].id;
 
-    // The premium expense materialized: 2 even-split siblings summing to 1200.
+    // The premium expense materialized: 2 even-split siblings summing to 120000c ($1200) — money-cents.
     const before = premiumExpenses(termId);
     expect(before.count).toBe(2);
-    expect(before.total).toBe(1200);
+    expect(before.total).toBe(120000);
 
-    // UPDATE the term's totalCost → the hook must delete the old siblings + re-create at 1800.
+    // UPDATE the term's totalCost → the hook must delete the old siblings + re-create at $1800.
     const upd = await ctx.authed('PUT', `/api/v1/insurance/${policyId}/terms/${termId}`, {
       totalCost: 1800,
       vehicleCoverage: { vehicleIds: [v1, v2] },
     });
     expect(upd.status, await upd.text()).toBeLessThan(300);
 
-    // No stale siblings linger; the premium now tracks the NEW cost exactly (still 2 siblings → 1800).
+    // No stale siblings linger; the premium now tracks the NEW cost exactly (still 2 siblings → 180000c).
     const after = premiumExpenses(termId);
     expect(after.count).toBe(2);
-    expect(after.total).toBe(1800);
+    expect(after.total).toBe(180000);
   });
 });

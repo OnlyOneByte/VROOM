@@ -13,9 +13,13 @@
 
 	interface Props {
 		vehicleId: string;
+		// T12b-3c: a shared viewer/editor sees insurance READ-ONLY (every mutate affordance hidden).
+		// Defaults false so the owner [id]-page call site is byte-unchanged. Insurance writes are
+		// owner-only server-side (validateInsuranceOwnership denies viewer AND editor).
+		readOnly?: boolean;
 	}
 
-	let { vehicleId }: Props = $props();
+	let { vehicleId, readOnly = false }: Props = $props();
 
 	let policies = $state<InsurancePolicy[]>([]);
 	let isLoading = $state(true);
@@ -74,25 +78,33 @@
 		{/snippet}
 		{#snippet title()}No insurance policies{/snippet}
 		{#snippet description()}
-			Add your first insurance policy to track coverage, costs, and documents.
+			{#if readOnly}
+				This vehicle has no insurance policies.
+			{:else}
+				Add your first insurance policy to track coverage, costs, and documents.
+			{/if}
 		{/snippet}
 		{#snippet action()}
-			<Button onclick={handleAddPolicy}>
-				<Plus class="mr-2 h-4 w-4" />
-				Add Policy
-			</Button>
+			{#if !readOnly}
+				<Button onclick={handleAddPolicy}>
+					<Plus class="mr-2 h-4 w-4" />
+					Add Policy
+				</Button>
+			{/if}
 		{/snippet}
 	</EmptyState>
 {:else}
 	<div class="space-y-4">
 		<div class="flex items-center justify-between">
 			<h3 class="text-lg font-semibold text-foreground">Insurance Policies</h3>
-			<Button variant="outline" size="sm" onclick={handleAddPolicy}>
-				<Plus class="mr-2 h-4 w-4" />
-				Add Policy
-			</Button>
+			{#if !readOnly}
+				<Button variant="outline" size="sm" onclick={handleAddPolicy}>
+					<Plus class="mr-2 h-4 w-4" />
+					Add Policy
+				</Button>
+			{/if}
 		</div>
 
-		<PolicyList {policies} onEdit={handleEditPolicy} onRefresh={loadData} />
+		<PolicyList {policies} {readOnly} onEdit={handleEditPolicy} onRefresh={loadData} />
 	</div>
 {/if}

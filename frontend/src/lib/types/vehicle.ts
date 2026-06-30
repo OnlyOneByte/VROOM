@@ -1,3 +1,4 @@
+import type { SharedAccess } from './share.js';
 import type { UnitPreferences } from './settings.js';
 
 export type VehicleType = 'gas' | 'electric' | 'hybrid';
@@ -19,6 +20,13 @@ export interface Vehicle {
 	purchaseDate?: string;
 	financing?: VehicleFinancing;
 	unitPreferences?: UnitPreferences;
+	/**
+	 * Present ONLY on a vehicle owned by someone else and shared with the current user, when fetched
+	 * via `getVehicles({ includeShared: true })` (T5a `?include=shared`). Carries the access level +
+	 * who shared it; an owned vehicle has no `sharedAccess`. Lets the fleet card badge "shared by X"
+	 * and gate edit affordances by level (T12b).
+	 */
+	sharedAccess?: SharedAccess;
 	createdAt: string;
 	updatedAt: string;
 }

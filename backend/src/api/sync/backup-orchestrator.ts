@@ -5,7 +5,11 @@ import type { BackupConfig, ProviderBackupSettings } from '../../types';
 import { decrypt } from '../../utils/encryption';
 import { logger } from '../../utils/logger';
 import { OPERATION_TIMEOUTS, withTimeout } from '../../utils/timeout';
-import type { BackupOrchestratorResult, BackupStrategyResult } from './backup-strategy';
+import type {
+  BackupOrchestratorResult,
+  BackupOutcome,
+  BackupStrategyResult,
+} from './backup-strategy';
 import { backupStrategyRegistry } from './backup-strategy-registry';
 
 const MUTEX_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -62,7 +66,13 @@ export class BackupOrchestrator {
 
     // Mutex check
     if (!acquireMutex(userId)) {
-      return { timestamp, status: 'in_progress', results: {} };
+      return {
+        timestamp,
+        status: 'in_progress',
+        outcome: 'noop',
+        failedProviders: [],
+        results: {},
+      };
     }
 
     try {
@@ -72,7 +82,7 @@ export class BackupOrchestrator {
         const hasChanges = await activityTracker.hasChangesSinceLastSync(userId);
         if (!hasChanges) {
           releaseMutex(userId);
-          return { timestamp, skipped: true, results: {} };
+          return { timestamp, skipped: true, outcome: 'noop', failedProviders: [], results: {} };
         }
       }
 
@@ -88,7 +98,7 @@ export class BackupOrchestrator {
       // No enabled providers
       if (enabledProviders.length === 0) {
         releaseMutex(userId);
-        return { timestamp, results: {} };
+        return { timestamp, outcome: 'noop', failedProviders: [], results: {} };
       }
 
       // Conditional ZIP generation — only if any provider has enabled=true
@@ -145,37 +155,49 @@ export class BackupOrchestrator {
           return { providerId, result: null };
         }
 
-        const result = await withTimeout(
-          strategy.execute({
-            userId,
-            displayName,
+        try {
+          const result = await withTimeout(
+            strategy.execute({
+              userId,
+              displayName,
+              providerId,
+              providerRow,
+              decryptedCredentials,
+              providerConfig,
+              zipBuffer,
+            }),
+            OPERATION_TIMEOUTS.BACKUP,
+            `Backup strategy for ${providerId}`
+          );
+          return { providerId, result };
+        } catch (error) {
+          // A thrown/timed-out strategy is a REAL failure of an attempted provider, not a silent
+          // skip (#44): catch it HERE so the providerId is retained and the run is marked failed.
+          // (Previously the rejection was swallowed in the settled loop → fail-open 200.)
+          const message = error instanceof Error ? error.message : 'Backup strategy failed';
+          logger.warn('Backup strategy threw, marking provider failed', {
             providerId,
-            providerRow,
-            decryptedCredentials,
-            providerConfig,
-            zipBuffer,
-          }),
-          OPERATION_TIMEOUTS.BACKUP,
-          `Backup strategy for ${providerId}`
-        );
-
-        return { providerId, result };
+            error: message,
+          });
+          return { providerId, result: { success: false, message, capabilities: {} } };
+        }
       });
 
       const settled = await Promise.allSettled(strategyPromises);
 
-      // Collect results
+      // Collect results — track BOTH succeeded and failed providers so the run-level outcome is honest.
       const results: Record<string, BackupStrategyResult> = {};
       const updatedConfig = { ...config, providers: { ...config.providers } };
       let anySuccess = false;
+      const failedProviders: string[] = [];
 
       for (const outcome of settled) {
+        // A null result = a provider we never attempted (no strategy registered / no row / undecryptable
+        // credentials). It is a skip, not a backup failure — excluded from the success/failure tally.
         if (outcome.status !== 'fulfilled' || !outcome.value.result) {
-          if (outcome.status === 'fulfilled' && !outcome.value.result) {
-            // Skipped provider (no strategy or no row)
-            continue;
-          }
           if (outcome.status === 'rejected') {
+            // The map body catches its own throws, so a rejection here is unexpected — count it as a
+            // failure rather than swallow it (no providerId available, so it cannot retry-stamp anyway).
             logger.warn('Strategy execution rejected', { error: outcome.reason });
           }
           continue;
@@ -201,12 +223,34 @@ export class BackupOrchestrator {
               sheetsSpreadsheetId: sheetsId,
             };
           }
+        } else {
+          failedProviders.push(providerId);
         }
       }
 
-      // Persist config updates
+      // Honest run-level outcome (#44): failed = every attempted provider failed; partial = a mix;
+      // success = all clean; noop = nothing attempted (no provider produced a result).
+      const attemptedCount = Object.keys(results).length;
+      let runOutcome: BackupOutcome;
+      if (attemptedCount === 0) {
+        runOutcome = 'noop';
+      } else if (failedProviders.length === 0) {
+        runOutcome = 'success';
+      } else if (anySuccess) {
+        runOutcome = 'partial';
+      } else {
+        runOutcome = 'failed';
+      }
+
+      // Persist config updates (succeeded providers always record their lastBackupAt + sheets id so a
+      // partial run does not lose a provider that DID succeed). But the GLOBAL sync/backup anchor only
+      // advances on a fully-clean run — if ANY provider failed, the user still has un-synced changes,
+      // so leaving the anchor un-advanced is what makes the failed provider RETRY next run (#43). A
+      // partial-success that advanced the anchor would strand the failed provider forever.
       if (anySuccess) {
         await preferencesRepository.update(userId, { backupConfig: updatedConfig });
+      }
+      if (runOutcome === 'success') {
         const { syncStateRepository } = await import('../settings/repository');
         // Stamp lastSyncDate from the run's START timestamp (the snapshot anchor — taken before the
         // change-check + ZIP export above), NOT a fresh end-of-run time. A long backup can run for
@@ -218,7 +262,7 @@ export class BackupOrchestrator {
         await syncStateRepository.updateBackupDate(userId);
       }
 
-      return { timestamp, results };
+      return { timestamp, outcome: runOutcome, failedProviders, results };
     } finally {
       releaseMutex(userId);
     }

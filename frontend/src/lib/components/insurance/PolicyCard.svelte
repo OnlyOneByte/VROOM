@@ -24,9 +24,19 @@
 		onEdit: (_policy: InsurancePolicy) => void;
 		onDelete?: (_policyId: string) => void;
 		onRefresh: () => Promise<void>;
+		// T12b-3c: read-only shared view — hide the policy-settings, term edit/delete/renew, claim
+		// file/edit/delete, and document upload/delete affordances.
+		readOnly?: boolean;
 	}
 
-	let { policy, vehicleNames = [], vehicles = [], onEdit, onRefresh }: Props = $props();
+	let {
+		policy,
+		vehicleNames = [],
+		vehicles = [],
+		onEdit,
+		onRefresh,
+		readOnly = false
+	}: Props = $props();
 
 	let expanded = $state(false);
 	let latestTerm = $derived(getLatestTerm(policy.terms));
@@ -76,15 +86,17 @@
 				{#if latestTerm?.endDate}
 					<ExpirationAlert latestTermEnd={latestTerm?.endDate} />
 				{/if}
-				<Button
-					variant="ghost"
-					size="icon"
-					class="h-7 w-7"
-					onclick={() => onEdit(policy)}
-					title="Policy settings"
-				>
-					<Settings class="h-3.5 w-3.5" />
-				</Button>
+				{#if !readOnly}
+					<Button
+						variant="ghost"
+						size="icon"
+						class="h-7 w-7"
+						onclick={() => onEdit(policy)}
+						title="Policy settings"
+					>
+						<Settings class="h-3.5 w-3.5" />
+					</Button>
+				{/if}
 			</div>
 		</div>
 
@@ -95,9 +107,9 @@
 					term={latestTerm}
 					isCurrent={true}
 					{vehicleNames}
-					onEdit={handleEditTerm}
-					onDelete={handleDeleteTerm}
-					onRenew={handleRenew}
+					onEdit={readOnly ? undefined : handleEditTerm}
+					onDelete={readOnly ? undefined : handleDeleteTerm}
+					onRenew={readOnly ? undefined : handleRenew}
 				/>
 			</div>
 		{/if}
@@ -138,19 +150,25 @@
 					{vehicles}
 					termVehicleCoverage={policy.termVehicleCoverage}
 					{onRefresh}
-					onDeleteTerm={handleDeleteTerm}
+					onDeleteTerm={readOnly ? undefined : handleDeleteTerm}
+					{readOnly}
 				/>
 			</div>
 		{/if}
 
-		<!-- Documents (always visible) -->
-		<div class="mt-3 border-t border-border pt-3">
-			<DocumentViewer entityType="insurance_policy" entityId={policy.id} />
-		</div>
+		<!-- Documents. Hidden in the read-only shared view (T12b-3c): the insurance DOCUMENT reads
+		     (GET /photos/insurance_policy/:id) are NOT widened for a shared viewer — only the policies
+		     LIST (T8b) + claims (C475) are — so rendering DocumentViewer would 404 → "policy not found"
+		     error toast. Documents are secondary; a viewer sees policy terms + claims, not attachments. -->
+		{#if !readOnly}
+			<div class="mt-3 border-t border-border pt-3">
+				<DocumentViewer entityType="insurance_policy" entityId={policy.id} />
+			</div>
+		{/if}
 
 		<!-- Claims (always visible) -->
 		<div class="mt-3 border-t border-border pt-3">
-			<ClaimsSection policyId={policy.id} {vehicles} />
+			<ClaimsSection policyId={policy.id} {vehicles} {readOnly} />
 		</div>
 	</CardContent>
 </Card>

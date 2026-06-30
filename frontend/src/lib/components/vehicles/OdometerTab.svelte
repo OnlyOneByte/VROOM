@@ -26,8 +26,14 @@
 	const PAGE_SIZE = 20;
 	const MIN_CHART_POINTS = 2;
 
-	let { vehicleId, unitPreferences }: { vehicleId: string; unitPreferences?: UnitPreferences } =
-		$props();
+	// vehicle-sharing T12b-3b: odometer add/edit/delete are WRITES (owner or accepted editor, widened
+	// server-side in T6 via requireVehicleWrite). A shared VIEWER sees the readings read-only — no Add
+	// Reading button, no per-row edit/delete. Default true so the owner [id] tab is unchanged.
+	let {
+		vehicleId,
+		unitPreferences,
+		canWrite = true
+	}: { vehicleId: string; unitPreferences?: UnitPreferences; canWrite?: boolean } = $props();
 
 	// Resolve distance label from vehicle unitPreferences, falling back to global settings
 	let units = $derived(unitPreferences ?? settingsStore.unitPreferences);
@@ -173,21 +179,25 @@
 			mileage.
 		{/snippet}
 		{#snippet action()}
-			<Button href={resolve(paramRoutes.vehicleOdometerNew, { id: vehicleId })}>
-				<Plus class="h-4 w-4 mr-2" />
-				Add Reading
-			</Button>
+			{#if canWrite}
+				<Button href={resolve(paramRoutes.vehicleOdometerNew, { id: vehicleId })}>
+					<Plus class="h-4 w-4 mr-2" />
+					Add Reading
+				</Button>
+			{/if}
 		{/snippet}
 	</EmptyState>
 {:else}
 	<div class="space-y-6">
-		<!-- Add Reading Button -->
-		<div class="flex justify-end">
-			<Button href={resolve(paramRoutes.vehicleOdometerNew, { id: vehicleId })}>
-				<Plus class="h-4 w-4 mr-2" />
-				Add Reading
-			</Button>
-		</div>
+		<!-- Add Reading Button (write — owner or accepted editor) -->
+		{#if canWrite}
+			<div class="flex justify-end">
+				<Button href={resolve(paramRoutes.vehicleOdometerNew, { id: vehicleId })}>
+					<Plus class="h-4 w-4 mr-2" />
+					Add Reading
+				</Button>
+			</div>
+		{/if}
 
 		<!-- Mileage Over Time Chart -->
 		{#if chartData.length >= MIN_CHART_POINTS}
@@ -247,30 +257,32 @@
 								</div>
 							</div>
 
-							<!-- Edit/Delete buttons -->
-							<div class="flex shrink-0 gap-1">
-								<Button
-									variant="ghost"
-									size="icon"
-									class="h-8 w-8"
-									title="Edit reading"
-									href={resolve(paramRoutes.vehicleOdometerEntryEdit, {
-										id: vehicleId,
-										entryId: entry.id
-									}) + `?returnTo=/vehicles/${vehicleId}`}
-								>
-									<Pencil class="h-3.5 w-3.5" />
-								</Button>
-								<Button
-									variant="ghost"
-									size="icon"
-									class="h-8 w-8 text-destructive hover:text-destructive"
-									title="Delete reading"
-									onclick={() => openDeleteDialog(entry)}
-								>
-									<Trash2 class="h-3.5 w-3.5" />
-								</Button>
-							</div>
+							<!-- Edit/Delete buttons (write — owner or accepted editor; hidden for a viewer) -->
+							{#if canWrite}
+								<div class="flex shrink-0 gap-1">
+									<Button
+										variant="ghost"
+										size="icon"
+										class="h-8 w-8"
+										title="Edit reading"
+										href={resolve(paramRoutes.vehicleOdometerEntryEdit, {
+											id: vehicleId,
+											entryId: entry.id
+										}) + `?returnTo=/vehicles/${vehicleId}`}
+									>
+										<Pencil class="h-3.5 w-3.5" />
+									</Button>
+									<Button
+										variant="ghost"
+										size="icon"
+										class="h-8 w-8 text-destructive hover:text-destructive"
+										title="Delete reading"
+										onclick={() => openDeleteDialog(entry)}
+									>
+										<Trash2 class="h-3.5 w-3.5" />
+									</Button>
+								</div>
+							{/if}
 						</div>
 					{/each}
 				{/if}

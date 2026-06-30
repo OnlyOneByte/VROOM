@@ -23,6 +23,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -35,17 +36,6 @@ interface TriggerResultShape {
   createdExpenses: unknown[];
   notifications: unknown[];
   skipped: Array<{ reminderId: string; reason: string; message?: string }>;
-}
-
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Kia',
-    model: 'Soul',
-    year: 2019,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
 }
 
 /**
@@ -79,7 +69,7 @@ function expenseCount(reminderId: string): number {
 
 describe('C151 — main catch-up loop non-progress guard (completes #13)', () => {
   test('a corrupt top-level frequency is skipped with ZERO duplicate expenses', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Kia', model: 'Soul', year: 2019 });
     seedCorruptExpenseReminder('badfreq', vehicleId, {
       frequency: 'monthy', // typo / corruption — not in the enum
       intervalValue: 1,
@@ -98,7 +88,7 @@ describe('C151 — main catch-up loop non-progress guard (completes #13)', () =>
   });
 
   test('a custom reminder with intervalValue=0 is skipped with ZERO duplicate expenses', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Kia', model: 'Soul', year: 2019 });
     seedCorruptExpenseReminder('zeroiv', vehicleId, {
       frequency: 'custom',
       intervalValue: 0, // a 0 interval can't advance — would re-fire every iteration
@@ -116,7 +106,7 @@ describe('C151 — main catch-up loop non-progress guard (completes #13)', () =>
   });
 
   test('a corrupt reminder does not block a well-formed expense reminder in the same batch', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Kia', model: 'Soul', year: 2019 });
     seedCorruptExpenseReminder('badfreq2', vehicleId, {
       frequency: 'monthy',
       intervalValue: 1,

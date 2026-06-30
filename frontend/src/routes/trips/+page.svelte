@@ -1,9 +1,130 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
-	import { routes } from '$lib/routes';
-	import { MapPin } from '@lucide/svelte';
+	import { onMount } from 'svelte';
+	import { Car, CircleAlert, MapPin, Pencil, Plus, Route, Trash2 } from '@lucide/svelte';
+	import { tripApi } from '$lib/services/trip-api';
+	import { vehicleApi } from '$lib/services/vehicle-api';
+	import type { Trip, TripSummary, Vehicle } from '$lib/types';
+	import { tripDistance } from '$lib/types';
+	import { capitalize, formatDate } from '$lib/utils/formatters';
+	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
+	import { getDistanceUnitLabel } from '$lib/utils/units';
+	import { settingsStore } from '$lib/stores/settings.svelte';
+	import { appStore } from '$lib/stores/app.svelte';
+	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
+	import * as CardNs from '$lib/components/ui/card';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog';
+	import { Checkbox } from '$lib/components/ui/checkbox';
+	import { Skeleton } from '$lib/components/ui/skeleton';
 	import EmptyState from '$lib/components/common/empty-state.svelte';
+	import PageHeader from '$lib/components/common/page-header.svelte';
+	import TripForm from '$lib/components/trips/TripForm.svelte';
+
+	let isLoading = $state(true);
+	let loadError = $state<string | null>(null);
+	let trips = $state<Trip[]>([]);
+	let vehicles = $state<Vehicle[]>([]);
+	let summary = $state<TripSummary | null>(null);
+	// Total trips across all pages (the summary counts ALL trips, so the list must not silently show only
+	// page 1 while the summary says more — the dashboard/expenses "page-1-masquerades-as-all" class).
+	let totalCount = $state(0);
+
+	// The GLOBAL distance label — used ONLY on the cross-fleet Mileage Summary card (which pools all
+	// vehicles' miles via getSummary(); a single label on a mixed mi+km fleet is the #94 pooling class,
+	// product-gated/escalated — out of scope here).
+	let distLabel = $derived(getDistanceUnitLabel(settingsStore.unitPreferences.distanceUnit, true));
+	// vehicleId -> display name, so each trip card can name its vehicle (graceful fallback if deleted).
+	let vehicleNames = $derived(new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)])));
+	// vehicleId -> THAT vehicle's distance label. Trip odometers are stored same-unit-as-the-vehicle (R2),
+	// so a per-trip card must label distance by its OWN vehicle's distanceUnit, NOT the global setting —
+	// else a km vehicle's trips read "mi" for a mixed-fleet user (NORTH_STAR #2, the per-vehicle-units
+	// pattern OdometerTab/LeaseMetricsCard already follow). Falls back to the global pref when the vehicle
+	// (or its prefs) is absent — the `unitPreferences ?? settingsStore` graceful-default idiom.
+	let vehicleDistLabels = $derived(
+		new Map(
+			vehicles.map(v => [
+				v.id,
+				getDistanceUnitLabel(
+					(v.unitPreferences ?? settingsStore.unitPreferences).distanceUnit,
+					true
+				)
+			])
+		)
+	);
+	const tripDistLabel = (vehicleId: string): string =>
+		vehicleDistLabels.get(vehicleId) ?? distLabel;
+
+	// Create/edit form (dialog) state. The C214 trips↔odometer EDIT/DELETE lifecycle is now RATIFIED +
+	// shipped (T7 backend): editing re-syncs the linked odometer entry; deleting prompts keep-or-delete.
+	let formOpen = $state(false);
+	let editingTrip = $state<Trip | null>(null);
+
+	function openCreate() {
+		editingTrip = null;
+		formOpen = true;
+	}
+
+	function openEdit(trip: Trip) {
+		editingTrip = trip;
+		formOpen = true;
+	}
+
+	// Delete-confirm dialog state + the C214 keep-or-delete-linked-odometer choice. Default KEEP (matches
+	// the backend non-destructive default — the linked reading may be part of the user's odometer history).
+	let deleteTarget = $state<Trip | null>(null);
+	let keepOdometer = $state(true);
+	let isDeleting = $state(false);
+
+	function openDelete(trip: Trip) {
+		deleteTarget = trip;
+		keepOdometer = true; // reset to the safe default each time
+	}
+
+	async function confirmDelete() {
+		const target = deleteTarget;
+		if (!target) return;
+		isDeleting = true;
+		try {
+			await tripApi.delete(target.id, keepOdometer);
+			appStore.addNotification({ type: 'success', message: 'Trip deleted' });
+			deleteTarget = null;
+			await load();
+		} catch (error) {
+			if (import.meta.env.DEV) console.error('Failed to delete trip:', error);
+			appStore.addNotification({ type: 'error', message: 'Failed to delete trip' });
+		} finally {
+			isDeleting = false;
+		}
+	}
+
+	async function load() {
+		isLoading = true;
+		loadError = null;
+		try {
+			// Request the max page (100) so the read-only list shows as much as one fetch allows; the
+			// "Showing N of M" footer below surfaces any remainder rather than silently truncating (a full
+			// paginator lands with the T6b-2 form cycle). The summary counts ALL trips regardless.
+			const [tripPage, vehicleList, tripSummary] = await Promise.all([
+				tripApi.list({ limit: 100 }),
+				vehicleApi.getVehicles(),
+				tripApi.getSummary()
+			]);
+			trips = tripPage.data;
+			totalCount = tripPage.pagination.totalCount;
+			vehicles = vehicleList;
+			summary = tripSummary;
+		} catch (error) {
+			if (import.meta.env.DEV) console.error('Failed to load trips:', error);
+			// Persist the failure so we don't fall through to the "No trips yet" empty state — that
+			// masquerades a fetch failure as "you have none" (the dashboard/reminders load-error discipline).
+			loadError = error instanceof Error ? error.message : 'Failed to load trips';
+			appStore.addNotification({ type: 'error', message: 'Failed to load trips' });
+		} finally {
+			isLoading = false;
+		}
+	}
+
+	onMount(load);
 </script>
 
 <svelte:head>
@@ -12,24 +133,194 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div>
-		<h1 class="text-2xl font-bold tracking-tight">Trips</h1>
-		<p class="text-muted-foreground">Track mileage and trips across your vehicles</p>
-	</div>
+	<PageHeader title="Trips" description="Track mileage and trips across your vehicles">
+		{#snippet actions()}
+			<Button onclick={openCreate} disabled={vehicles.length === 0}>
+				<Plus class="mr-2 h-4 w-4" />
+				Log Trip
+			</Button>
+		{/snippet}
+	</PageHeader>
 
-	<EmptyState>
-		{#snippet icon()}
-			<MapPin class="h-12 w-12 text-muted-foreground mb-4" />
-		{/snippet}
-		{#snippet title()}
-			Trips Coming Soon
-		{/snippet}
-		{#snippet description()}
-			Trip tracking features are under development. You'll be able to log trips, track mileage, and
-			analyze driving patterns across your vehicles.
-		{/snippet}
-		{#snippet action()}
-			<Button href={resolve(routes.dashboard)}>Back to Dashboard</Button>
-		{/snippet}
-	</EmptyState>
+	{#if isLoading}
+		<div class="space-y-3">
+			<Skeleton class="h-28 w-full" />
+			{#each Array(3) as _, i (i)}
+				<Skeleton class="h-24 w-full" />
+			{/each}
+		</div>
+	{:else if loadError}
+		<div class="rounded-lg border bg-card p-6">
+			<div class="mb-4 flex items-center gap-3 text-destructive">
+				<CircleAlert class="h-5 w-5" />
+				<p class="font-medium">Failed to load trips</p>
+			</div>
+			<p class="mb-4 text-sm text-muted-foreground">{loadError}</p>
+			<button
+				class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+				onclick={load}>Retry</button
+			>
+		</div>
+	{:else if trips.length === 0}
+		<EmptyState>
+			{#snippet icon()}
+				<MapPin class="h-12 w-12 text-muted-foreground mb-4" />
+			{/snippet}
+			{#snippet title()}
+				No trips yet
+			{/snippet}
+			{#snippet description()}
+				Log trips with their start and end odometer and a purpose (business, personal, commute) to
+				build a mileage-reimbursement report and feed your vehicle's odometer history.
+			{/snippet}
+			{#snippet action()}
+				<Button onclick={openCreate} disabled={vehicles.length === 0}>
+					<Plus class="mr-2 h-4 w-4" />
+					Log Trip
+				</Button>
+			{/snippet}
+		</EmptyState>
+	{:else}
+		<!-- Mileage-summary card (R4): the reimbursement rollup across the listed trips. -->
+		{#if summary}
+			<CardNs.Card data-testid="trip-summary-card">
+				<CardNs.CardHeader class="p-4 sm:p-6">
+					<CardNs.CardTitle class="flex items-center gap-2 text-base sm:text-lg">
+						<Route class="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
+						Mileage Summary
+					</CardNs.CardTitle>
+				</CardNs.CardHeader>
+				<CardNs.CardContent class="grid grid-cols-2 gap-4 p-4 pt-0 sm:grid-cols-4 sm:p-6 sm:pt-0">
+					<div>
+						<p class="text-xs text-muted-foreground">Total</p>
+						<p class="text-lg font-semibold">
+							{summary.totalMiles.toLocaleString()}
+							<span class="text-sm font-normal">{distLabel}</span>
+						</p>
+					</div>
+					<div>
+						<p class="text-xs text-muted-foreground">Trips</p>
+						<p class="text-lg font-semibold">{summary.tripCount}</p>
+					</div>
+					<div>
+						<p class="text-xs text-muted-foreground">Business</p>
+						<p class="text-lg font-semibold">
+							{summary.businessMiles.toLocaleString()}
+							<span class="text-sm font-normal">{distLabel}</span>
+						</p>
+					</div>
+					<div>
+						<p class="text-xs text-muted-foreground">Avg / trip</p>
+						<p class="text-lg font-semibold">
+							{Math.round(summary.averageTripMiles).toLocaleString()}
+							<span class="text-sm font-normal">{distLabel}</span>
+						</p>
+					</div>
+				</CardNs.CardContent>
+			</CardNs.Card>
+		{/if}
+
+		<div class="space-y-3">
+			{#each trips as trip (trip.id)}
+				<CardNs.Card data-testid="trip-card-{trip.id}">
+					<CardNs.CardContent class="flex items-start justify-between gap-4 py-4">
+						<div class="min-w-0 space-y-1">
+							<div class="flex items-center gap-2">
+								<Badge variant="secondary">{capitalize(trip.purpose)}</Badge>
+								<span class="text-sm text-muted-foreground">{formatDate(trip.tripDate)}</span>
+							</div>
+							<p class="font-medium">
+								{tripDistance(trip).toLocaleString()}
+								{tripDistLabel(trip.vehicleId)}
+								<span class="text-sm font-normal text-muted-foreground">
+									({trip.startOdometer.toLocaleString()} → {trip.endOdometer.toLocaleString()})
+								</span>
+							</p>
+							{#if trip.startLocation || trip.endLocation}
+								<p class="flex items-center gap-1 text-sm text-muted-foreground">
+									<MapPin class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+									{trip.startLocation ?? '—'} → {trip.endLocation ?? '—'}
+								</p>
+							{/if}
+							{#if trip.note}
+								<p class="text-sm text-muted-foreground">{trip.note}</p>
+							{/if}
+						</div>
+						<div class="flex shrink-0 flex-col items-end gap-2">
+							<div class="flex items-center gap-1 text-sm text-muted-foreground">
+								<Car class="h-4 w-4" aria-hidden="true" />
+								<span class="max-w-32 truncate"
+									>{vehicleNames.get(trip.vehicleId) ?? 'Vehicle'}</span
+								>
+							</div>
+							<div class="flex items-center gap-1">
+								<Button
+									variant="ghost"
+									size="icon"
+									class="h-8 w-8"
+									aria-label="Edit trip"
+									onclick={() => openEdit(trip)}
+								>
+									<Pencil class="h-4 w-4" />
+								</Button>
+								<Button
+									variant="ghost"
+									size="icon"
+									class="h-8 w-8 text-destructive hover:text-destructive"
+									aria-label="Delete trip"
+									onclick={() => openDelete(trip)}
+								>
+									<Trash2 class="h-4 w-4" />
+								</Button>
+							</div>
+						</div>
+					</CardNs.CardContent>
+				</CardNs.Card>
+			{/each}
+		</div>
+
+		<!-- Surface any trips beyond this page (the list requests up to 100; the summary counts ALL). Without
+		     this, a >100-trip user would see the summary count exceed the visible cards with no explanation. -->
+		{#if trips.length < totalCount}
+			<p class="text-center text-sm text-muted-foreground" data-testid="trip-list-truncation">
+				Showing {trips.length.toLocaleString()} of {totalCount.toLocaleString()} trips
+			</p>
+		{/if}
+	{/if}
+
+	<TripForm bind:open={formOpen} {vehicles} trip={editingTrip} onSaved={load} />
+
+	<!-- Delete-confirm with the C214 keep-or-delete-linked-odometer choice. Controlled open (bound to
+	     deleteTarget) so the per-card Delete button drives it without a per-row trigger element. -->
+	<AlertDialog.Root
+		open={deleteTarget !== null}
+		onOpenChange={o => {
+			if (!o) deleteTarget = null;
+		}}
+	>
+		<AlertDialog.Content>
+			<AlertDialog.Header>
+				<AlertDialog.Title>Delete this trip?</AlertDialog.Title>
+				<AlertDialog.Description>
+					This removes the trip from your mileage log. This cannot be undone.
+				</AlertDialog.Description>
+			</AlertDialog.Header>
+			<label class="flex items-start gap-3 rounded-md border p-3 text-sm">
+				<Checkbox bind:checked={keepOdometer} aria-label="Keep the linked odometer reading" />
+				<span>
+					<span class="font-medium">Keep the linked odometer reading</span>
+					<span class="block text-muted-foreground">
+						This trip added a reading to the vehicle's odometer history. Leave this checked to keep
+						it, or uncheck to remove that reading too.
+					</span>
+				</span>
+			</label>
+			<AlertDialog.Footer>
+				<AlertDialog.Cancel disabled={isDeleting}>Cancel</AlertDialog.Cancel>
+				<Button variant="destructive" disabled={isDeleting} onclick={confirmDelete}>
+					{isDeleting ? 'Deleting…' : 'Delete Trip'}
+				</Button>
+			</AlertDialog.Footer>
+		</AlertDialog.Content>
+	</AlertDialog.Root>
 </div>

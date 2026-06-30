@@ -10,6 +10,7 @@
 	import { getDistanceUnitLabel, getVolumeUnitLabel } from '$lib/utils/units';
 	import { categoryLabels } from '$lib/utils/expense-helpers';
 	import {
+		buildPresetMapping,
 		guessManualColumns,
 		isNativeImportHeaders,
 		parseCsvHeaders
@@ -119,16 +120,10 @@
 		const remap = assignedCategoryMap();
 		const hasRemap = Object.keys(remap).length > 0;
 		if (detectedPreset && targetVehicle) {
-			return {
-				source: detectedPreset.id,
-				columns: detectedPreset.columns,
-				targetVehicle: getVehicleDisplayName(targetVehicle),
-				dateFormat: detectedPreset.dateFormat,
-				distanceUnit: detectedPreset.distanceUnit,
-				volumeUnit: detectedPreset.volumeUnit,
-				// Merge the user's remap over the preset's own categoryMap (user choices win).
-				categoryMap: { ...detectedPreset.categoryMap, ...remap }
-			};
+			// buildPresetMapping (import-mapping-helpers) carries the preset's defaultCategory through —
+			// the #C148 passthrough that makes a detected fuel log (no category column) preview ready
+			// fuel rows. Extracted there so it's committed-test-pinned (the e2e round-trip is gitignored).
+			return buildPresetMapping(detectedPreset, getVehicleDisplayName(targetVehicle), remap);
 		}
 		if (manualMapping && manualColumns.date && manualColumns.amount && manualHasVehicle) {
 			// Drop empty selections so only mapped fields reach the server.

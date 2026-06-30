@@ -5,7 +5,7 @@
  * combining expenses.mileage and odometer_entries.odometer.
  */
 
-import { and, count, desc, eq, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gte, lt, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { NewOdometerEntry, OdometerEntry } from '../../db/schema';
@@ -27,6 +27,21 @@ export interface OdometerHistoryResult {
   totalCount: number;
 }
 
+/**
+ * The half-open `[dayStart, nextDay)` window on the LOCAL calendar day of `recordedAt` (R5 local-day
+ * semantics). The single source of truth for the trip↔odometer dedup key's DATE component: createFromTrip
+ * (write) and deleteLinkedTripEntry (remove) MUST compute the IDENTICAL window or a delete would miss the
+ * entry the create wrote (orphan) — and the TripRepository same-key reference count (#C214-N1) must use the
+ * SAME window so "is another trip on this day?" agrees with "what day did createFromTrip dedup on?". Exported
+ * (not a private static) so the trips repo shares it too — one window definition across all three call sites.
+ */
+export function localDayWindow(recordedAt: Date): { dayStart: Date; nextDay: Date } {
+  const dayStart = new Date(recordedAt.getFullYear(), recordedAt.getMonth(), recordedAt.getDate());
+  const nextDay = new Date(dayStart);
+  nextDay.setDate(nextDay.getDate() + 1);
+  return { dayStart, nextDay };
+}
+
 export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdometerEntry> {
   constructor(db: AppDatabase) {
     super(db, odometerEntries);
@@ -35,6 +50,91 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
   /** IDs of all manual odometer entries for a vehicle (for cascade cleanup). */
   async findIdsByVehicleId(vehicleId: string): Promise<string[]> {
     return this.findIdsByColumn(odometerEntries.vehicleId, vehicleId);
+  }
+
+  /**
+   * Create an odometer entry derived from another signal (a trip's end reading — trips-location D2,
+   * "reuse the odometer linkage"), DEDUPED by (vehicleId, calendar-day of recordedAt, odometer value):
+   * if an entry already exists for the same vehicle + same local day + same reading, skip the insert and
+   * return null (the user may have logged the reading manually too — D2 avoids the divergent double-count).
+   * Returns the created entry on insert. userId-scoped on the dedup probe (the C109/#52 tenant discipline).
+   * `note` defaults to a provenance marker so the unified history shows where the reading came from.
+   */
+  async createFromTrip(entry: {
+    vehicleId: string;
+    userId: string;
+    odometer: number;
+    recordedAt: Date;
+    note?: string;
+  }): Promise<OdometerEntry | null> {
+    // Same-day window [startOfDay, nextDay) on the LOCAL calendar day of recordedAt (R5 local-day
+    // semantics) — a trip and a manual reading on the same day at the same value are the same observation.
+    const { dayStart, nextDay } = localDayWindow(entry.recordedAt);
+
+    const existing = await this.db
+      .select({ id: odometerEntries.id })
+      .from(odometerEntries)
+      .where(
+        and(
+          eq(odometerEntries.vehicleId, entry.vehicleId),
+          eq(odometerEntries.userId, entry.userId),
+          eq(odometerEntries.odometer, entry.odometer),
+          gte(odometerEntries.recordedAt, dayStart),
+          lt(odometerEntries.recordedAt, nextDay)
+        )
+      )
+      .limit(1);
+    if (existing.length > 0) return null; // dedup: same (vehicle, day, reading) already recorded
+
+    return this.create({
+      vehicleId: entry.vehicleId,
+      userId: entry.userId,
+      odometer: entry.odometer,
+      recordedAt: entry.recordedAt,
+      note: entry.note ?? OdometerRepository.TRIP_PROVENANCE_NOTE,
+    });
+  }
+
+  /**
+   * The provenance marker createFromTrip stamps on a trip-derived entry. The trips↔odometer lifecycle
+   * (C214) keys on this so it ONLY ever touches an entry a trip created — never a manual reading the user
+   * logged at the same (vehicle, day, value). Single source of truth, shared by createFromTrip's default
+   * note and deleteLinkedTripEntry's match predicate.
+   */
+  static readonly TRIP_PROVENANCE_NOTE = 'From trip';
+
+  /**
+   * Delete the odometer entry a trip created (the C214 trips↔odometer lifecycle: trip-delete with
+   * keepOdometer=false, and the re-sync leg's "remove the stale entry" step). Matches the EXACT key
+   * createFromTrip wrote: same vehicle + owner + reading + LOCAL calendar day of `recordedAt`, AND the
+   * `note = 'From trip'` provenance marker — so a user's MANUAL reading at the same (vehicle, day, value)
+   * is never collateral-deleted (it lacks the marker). Returns the count removed (0 when the user had
+   * deduped the trip onto a pre-existing manual entry — createFromTrip returned null then, so there is no
+   * trip-owned row to remove, which is correct: the manual reading stays). Tenant-scoped (userId in the
+   * predicate, the #52/C109 discipline).
+   */
+  async deleteLinkedTripEntry(entry: {
+    vehicleId: string;
+    userId: string;
+    odometer: number;
+    recordedAt: Date;
+  }): Promise<number> {
+    const { dayStart, nextDay } = localDayWindow(entry.recordedAt);
+
+    const removed = await this.db
+      .delete(odometerEntries)
+      .where(
+        and(
+          eq(odometerEntries.vehicleId, entry.vehicleId),
+          eq(odometerEntries.userId, entry.userId),
+          eq(odometerEntries.odometer, entry.odometer),
+          eq(odometerEntries.note, OdometerRepository.TRIP_PROVENANCE_NOTE),
+          gte(odometerEntries.recordedAt, dayStart),
+          lt(odometerEntries.recordedAt, nextDay)
+        )
+      )
+      .returning();
+    return removed.length;
   }
 
   /**

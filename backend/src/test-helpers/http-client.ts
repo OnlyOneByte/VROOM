@@ -47,7 +47,7 @@ export interface DataEnvelope<T> {
 /** Paginated list envelope: `{ data: T[]; pagination: { totalCount, ... } }`. */
 export interface PaginatedEnvelope<T> {
   data: T[];
-  pagination: { totalCount: number; limit: number; offset: number };
+  pagination: { totalCount: number; limit: number; offset: number; hasMore: boolean };
 }
 
 export interface TestUser {

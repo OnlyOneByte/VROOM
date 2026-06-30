@@ -13,6 +13,7 @@
 	import RecentActivityCard from '$lib/components/dashboard/RecentActivityCard.svelte';
 	import DueRemindersCard from '$lib/components/dashboard/DueRemindersCard.svelte';
 	import RecurringCostCard from '$lib/components/dashboard/RecurringCostCard.svelte';
+	import SharedWithMeCard from '$lib/components/dashboard/SharedWithMeCard.svelte';
 	import VehicleCarousel from '$lib/components/dashboard/VehicleCarousel.svelte';
 	import PeriodSelector from '$lib/components/common/period-selector.svelte';
 	import { handleErrorWithNotification } from '$lib/utils/error-handling';
@@ -71,17 +72,25 @@
 				totalExpenses: vStats?.totalAmount ?? 0,
 				lastActivity: vStats?.lastActivity ?? null,
 				hasActiveFinancing: v.financing?.isActive || false,
-				coverPhotoUrl
+				coverPhotoUrl,
+				// "shared by X" badge on a vehicle owned by someone else (T12b); undefined for owned.
+				sharedBy: v.sharedAccess?.sharedBy ?? null
 			};
 		});
 	});
 
+	// Vehicles the user OWNS (no sharedAccess annotation). The stats cards + expense totals are
+	// owner-scoped on the backend (getExpenseSummary filters by userId), so counting shared vehicles
+	// in "Total Vehicles"/"Active Financing" would contradict the dollar figures — keep those
+	// owned-only. Only the fleet carousel below widens to include shared vehicles (T12b).
+	let ownedVehicles = $derived(vehicles.filter(v => !v.sharedAccess));
+
 	// Derived: stats for cards — always uses all-time data, unaffected by period selector
 	let stats = $derived.by(() => ({
-		totalVehicles: vehicles.length,
+		totalVehicles: ownedVehicles.length,
 		totalExpenses: allTimeSummary?.totalAmount ?? 0,
 		monthlyAverage: allTimeSummary?.monthlyAverage ?? 0,
-		activeFinancing: vehicles.filter(v => v.financing?.isActive).length
+		activeFinancing: ownedVehicles.filter(v => v.financing?.isActive).length
 	}));
 
 	// Derived: monthly trend chart data from period-filtered summary
@@ -171,7 +180,9 @@
 				loadedReminders,
 				loadedRecurringCost
 			] = await Promise.all([
-				vehicleApi.getVehicles(),
+				// include=shared: the fleet also shows vehicles others have shared with this user (T12b),
+				// each annotated with sharedAccess so the card can badge "shared by X".
+				vehicleApi.getVehicles({ includeShared: true }),
 				expenseApi.getExpenseSummary({ period: 'all' }),
 				selectedPeriod !== 'all'
 					? expenseApi.getExpenseSummary({ period: selectedPeriod })
@@ -237,8 +248,10 @@
 	// form's own vehicle picker (defaults to the first) handles the choice.
 	function handleLogFillup() {
 		const query: Record<string, string> = { category: 'fuel', returnTo: routes.dashboard };
-		if (vehicles.length === 1) {
-			query['vehicleId'] = vehicles[0]!.id;
+		// Preselect only when the user OWNS exactly one vehicle — a fill-up is logged to a vehicle you
+		// can write to, and shared-vehicle writes are still gated (T5b); the form picker handles the rest.
+		if (ownedVehicles.length === 1) {
+			query['vehicleId'] = ownedVehicles[0]!.id;
 		}
 		gotoWithQuery(resolve(routes.expenseNew), query);
 	}
@@ -307,8 +320,16 @@
 			{isLoading}
 		/>
 
-		<!-- Vehicle Carousel -->
-		{#if stats.totalVehicles > 0}
+		<!-- Pending vehicle-share invitations (T12b). Self-fetching + self-hiding: renders nothing
+		     unless an invite is pending or its load failed. Outside the totalVehicles>0 gate on purpose
+		     — a brand-new user with no vehicles can still be invited (a shared vehicle may be their
+		     first). Accepting refreshes the dashboard so the new vehicle appears (fleet widening, T12b-2). -->
+		<SharedWithMeCard onAccepted={loadDashboardData} />
+
+		<!-- Vehicle Carousel — gated on the WIDENED fleet (owned ∪ shared), so a user who owns nothing
+		     yet but has an accepted shared vehicle still sees it (the expense-driven sections below stay
+		     gated on owned vehicles, since their figures are owner-scoped). -->
+		{#if vehicleOverviews.length > 0}
 			<VehicleCarousel vehicles={vehicleOverviews} {isLoading} />
 		{/if}
 

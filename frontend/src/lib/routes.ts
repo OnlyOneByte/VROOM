@@ -32,7 +32,8 @@ export const routes = {
 	termsOfService: '/termsofservice',
 	vehicles: '/vehicles',
 	vehicleNew: '/vehicles/new',
-	reminders: '/reminders'
+	reminders: '/reminders',
+	assistant: '/assistant'
 } as const;
 
 // ── Parameterized routes (require params object for resolve()) ─

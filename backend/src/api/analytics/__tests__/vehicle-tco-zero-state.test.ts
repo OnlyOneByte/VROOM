@@ -22,6 +22,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle as seedVehicleShared } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -38,17 +39,12 @@ interface VehicleTCO {
   costPerMonth: number;
 }
 
-async function seedVehicle(extra: Record<string, unknown> = {}): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Honda',
-    model: 'Civic',
-    year: 2021,
-    ...extra,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
+// This file's fixture is a Honda Civic 2021 with an optional extra-fields bag (purchaseDate/mileage for the
+// TCO zero-state cases); converge onto the shared test-helpers/seed seedVehicle (arch convergence,
+// Angelo-approved) via a thin wrapper passing make/model/year explicitly + forwarding extra (the shared
+// default is a Camry) so behavior is preserved.
+const seedVehicle = (extra: Record<string, unknown> = {}): Promise<string> =>
+  seedVehicleShared(ctx, { make: 'Honda', model: 'Civic', year: 2021, extra });
 
 async function getTCO(vehicleId: string): Promise<VehicleTCO> {
   const res = await ctx.authed('GET', `/api/v1/analytics/vehicle-tco?vehicleId=${vehicleId}`);

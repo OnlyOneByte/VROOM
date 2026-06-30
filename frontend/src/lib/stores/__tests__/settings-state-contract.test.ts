@@ -15,6 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { settingsStore } from '../settings.svelte';
+import { themeStore } from '../theme.svelte';
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
@@ -141,5 +142,38 @@ describe('settings store — state-management contracts (C319)', () => {
 		expect(settingsStore.settings).toBeNull();
 		expect(settingsStore.unitPreferences.distanceUnit).toBe('miles');
 		expect(settingsStore.unitPreferences.volumeUnit).toBe('gallons_us');
+	});
+});
+
+// C196 (guard): the T9 server-wins theme reconcile is WIRED into settingsStore.load(). theme-server-sync
+// .test.ts pins reconcileServerTheme in ISOLATION (calling it directly); nothing drove load() and asserted
+// it actually invokes the reconcile with the fetched settings.themePreference. A refactor dropping that one
+// line from load() would silently break cross-device theme sync (NORTH_STAR #2 cross-device correctness)
+// with every existing test green. This integration test drives the REAL load() → settings-api → fetch
+// (mocked) and asserts the theme store adopted the server value end-to-end.
+describe('settings store load() wires the T9 server-wins theme reconcile (C196)', () => {
+	beforeEach(() => {
+		mockFetch.mockReset();
+		settingsStore.reset();
+		// Singleton theme store: reset its id axis to default so the adopt below is a real change.
+		themeStore.setTheme('default');
+		document.documentElement.removeAttribute('data-theme');
+	});
+
+	it('load() adopts the server themePreference (calls reconcileServerTheme with it)', async () => {
+		mockFetch.mockResolvedValueOnce(okJson({ ...SETTINGS, themePreference: 'instrument' }));
+		await settingsStore.load();
+		// Proves load() invoked reconcileServerTheme(settings.themePreference): the theme store adopted it.
+		expect(themeStore.themeId).toBe('instrument');
+		expect(document.documentElement.getAttribute('data-theme')).toBe('instrument');
+	});
+
+	it('load() with no server themePreference leaves the local theme untouched (no-op reconcile)', async () => {
+		themeStore.setTheme('instrument'); // local mirror set
+		document.documentElement.removeAttribute('data-theme'); // (setTheme set it; clear to observe re-apply)
+		mockFetch.mockResolvedValueOnce(okJson(SETTINGS)); // SETTINGS has no themePreference
+		await settingsStore.load();
+		// reconcile no-ops on an absent server value → the local mirror wins.
+		expect(themeStore.themeId).toBe('instrument');
 	});
 });

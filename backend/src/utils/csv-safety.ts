@@ -22,17 +22,37 @@
 const FORMULA_TRIGGERS = new Set(['=', '+', '-', '@', '\t', '\r']);
 
 /**
- * Neutralize a single cell value. Strings beginning with a formula trigger get a
- * leading `'` (forces text in spreadsheets); everything else — numbers, booleans,
- * null/undefined, empty strings, and strings that don't start with a trigger — is
- * returned unchanged. Only the FIRST character matters: a spreadsheet only treats
- * a cell as a formula when the trigger is the very first character (a leading
- * space or a mid-cell `=` is already inert), so this is both sufficient and
- * minimally intrusive.
+ * True when `s` is a (possibly empty) run of leading apostrophes IMMEDIATELY followed by a formula
+ * trigger — i.e. `'*` + (`=`|`+`|`-`|`@`|TAB|CR) + …. This is the exact shape that needs the
+ * neutralize↔denormalize escape: `=X` (empty run), `'=X` (one-apostrophe run), `''=X`, etc. A value
+ * whose leading apostrophe run is followed by a NON-trigger (`'24 road trip`, `'twas`) does NOT match,
+ * so the hand-authored foreign-CSV leading-apostrophe contract is left untouched (the import side).
+ */
+function isApostropheRunThenTrigger(s: string): boolean {
+  let i = 0;
+  while (i < s.length && s[i] === "'") i++;
+  return i < s.length && FORMULA_TRIGGERS.has(s[i] as string);
+}
+
+/**
+ * Neutralize a single cell value for SPREADSHEET safety AND lossless round-trip. A string that is a
+ * leading apostrophe-run followed by a formula trigger gets ONE more leading `'`; everything else —
+ * numbers, booleans, null/undefined, empty strings, and strings whose run is followed by a non-trigger
+ * — is returned unchanged.
+ *
+ * Two cases the single rule covers:
+ *  - `=HYPERLINK(...)` (no leading `'`) → `'=HYPERLINK(...)`: the OWASP text-prefix that stops a
+ *    spreadsheet from EVALUATING the cell. (Only the first char can start a formula, so this is
+ *    sufficient and minimally intrusive.)
+ *  - `'=Daily` (a value the user genuinely typed with a leading `'` before a trigger) → `''=Daily`:
+ *    the INVERTIBLE escape (vlm/csv-apostrophe ruling, 2026-06-30) so the symmetric importer can
+ *    restore the user's literal leading `'` instead of over-stripping it. Excel still displays
+ *    `''=Daily` as the user's `'=Daily` (a leading `'` forces text and is hidden), so it stays
+ *    both safe and faithful.
  */
 export function neutralizeCsvCell<T>(value: T): T | string {
   if (typeof value !== 'string' || value.length === 0) return value;
-  return FORMULA_TRIGGERS.has(value[0] as string) ? `'${value}` : value;
+  return isApostropheRunThenTrigger(value) ? `'${value}` : value;
 }
 
 /**
@@ -50,33 +70,26 @@ export function neutralizeCsvRow<T extends Record<string, unknown>>(
 }
 
 /**
- * Inverse of `neutralizeCsvCell` — strips the leading `'` that neutralization adds,
- * so a VROOM CSV round-trips faithfully (export → re-import without edits yields the
- * original text). This is the symmetric READ side the `neutralizeCsvCell` doc warns
- * is required for round-trip use.
+ * Inverse of `neutralizeCsvCell` — strips the ONE leading `'` that neutralization adds, so a
+ * VROOM CSV round-trips faithfully (export → re-import without edits yields the original text).
+ * This is the symmetric READ side `neutralizeCsvCell` requires for round-trip use.
  *
- * Strips a leading `'` IMMEDIATELY followed by a formula trigger (`'=`, `'+`, `'-`,
- * `'@`, `'\t`, `'\r`). A value the user genuinely typed starting with an apostrophe +
- * a NON-trigger char (e.g. `'24 road trip`) has a non-trigger second char and is left
- * untouched. Idempotent on already-clean values.
+ * Strips a single leading `'` IFF the value is an apostrophe-run-then-trigger (`'=`, `''=`, `'+`,
+ * `'@`, … — the EXACT shape neutralize prefixes), undoing one neutralization layer:
+ *   `'=SUM(...)`  → `=SUM(...)`   (an exported formula → the user's original)
+ *   `''=Daily`    → `'=Daily`     (an exported user-typed-`'`-before-trigger → the literal `'=Daily`)
  *
- * KNOWN ASYMMETRY (filed C399/C401, escalated — a data-contract direction call, NOT a
- * clean fix): a value the user genuinely typed as `'` + a trigger (e.g. a description
- * `'=mc2 rebate`, or a vehicle nickname `'=Daily`) is NOT escaped on export
- * (neutralizeCsvCell only prefixes when `value[0]` is itself a trigger), yet IS stripped
- * here on import (`value[1]` is a trigger) → it round-trips LOSSY to `=mc2 rebate` /
- * `=Daily` (and a stripped nickname then fails to re-match its vehicle, dropping the
- * whole row). A single-`'` sentinel CANNOT disambiguate a user-typed `'=` from an
- * export-escaped `'=`; the only invertible scheme escapes EVERY leading-`'` on write +
- * strips one on read, which reinterprets hand-authored leading-`'` foreign CSVs (flips
- * the deliberate import-csv.test.ts "preserves a genuinely apostrophe-led description"
- * contract) — so which faithfulness to optimize (VROOM-own-export round-trip vs
- * hand-authored import) is Angelo's call. Pinned by the characterization test in
- * csv-safety.test.ts so the behavior can't drift silently before that decision.
+ * RULED 2026-06-30 (vlm/csv-apostrophe): optimize VROOM-own-export round-trip fidelity. The matched
+ * escape makes neutralize↔denormalize a true inverse for EVERY value, INCLUDING one the user genuinely
+ * typed as `'`+trigger (`'=Daily`) — which the old single-`'` scheme over-stripped to `=Daily` (and a
+ * stripped vehicle nickname then failed to re-match, dropping the whole row). The foreign-import
+ * contract is preserved untouched: a hand-authored leading apostrophe followed by a NON-trigger
+ * (`'24 road trip`, `'twas`) is NOT an apostrophe-run-then-trigger, so it is left exactly as typed.
+ * Idempotent only down to the value's own leading `'` (it peels one neutralization layer per call).
+ * Pinned by csv-safety.test.ts (the round-trip is now lossless) + the import/export round-trip guards.
  */
 export function denormalizeCsvCell(value: string): string {
-  if (value.length >= 2 && value[0] === "'" && FORMULA_TRIGGERS.has(value[1] as string)) {
-    return value.slice(1);
-  }
-  return value;
+  // Require an actual leading `'` to strip (run ≥ 1): a bare formula `=X` (never produced by export —
+  // a hand-authored/foreign cell) has a zero-length run and MUST be preserved, not stripped to `X`.
+  return value[0] === "'" && isApostropheRunThenTrigger(value) ? value.slice(1) : value;
 }

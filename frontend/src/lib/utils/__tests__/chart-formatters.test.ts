@@ -124,6 +124,20 @@ describe('monthlyXAxisProps (monthly time-series axis wiring)', () => {
 		expect(monthlyXAxisProps(3).ticks).toBe(3); // clamped to data
 		expect(typeof monthlyXAxisProps(3).format).toBe('function');
 	});
+
+	test('the wired format callback renders a 3-letter month and guards unknown input', () => {
+		// formatMonthTick is NOT exported — its only reachable seam is this returned callback, which
+		// layerchart invokes for every monthly-chart x-tick. Drive the REAL wired function (not a
+		// re-implementation — the C181/C229 trap): a real Date → "Mar"; a non-Date / Invalid Date →
+		// '' (the same unknown-input guard formatDateTick carries). A dropped guard would surface
+		// "Invalid Date" as a literal tick label on every fuel-efficiency / monthly trend chart.
+		const format = monthlyXAxisProps(6).format;
+		expect(format(new Date(2024, 2, 15))).toBe('Mar');
+		expect(format(new Date('garbage'))).toBe('');
+		expect(format(42)).toBe('');
+		expect(format(null)).toBe('');
+		expect(format(undefined)).toBe('');
+	});
 });
 
 describe('getTrendLineProps (single-point visibility branch)', () => {

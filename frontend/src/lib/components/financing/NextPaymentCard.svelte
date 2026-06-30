@@ -19,6 +19,10 @@
 		recordPaymentHref?: string;
 		progressPercentage?: number;
 		onChangePayment?: () => void;
+		/** vehicle-sharing T12b-3b: the payment actions (Record Payment, Change payment) are owner-only
+		 *  finance management (the server keeps strict validateVehicleOwnership on /financing). A shared
+		 *  invitee sees the next-payment summary read-only. Default true so the owner view is unchanged. */
+		isOwner?: boolean;
 	}
 
 	let {
@@ -26,7 +30,8 @@
 		lastPayment,
 		recordPaymentHref,
 		progressPercentage = 0,
-		onChangePayment
+		onChangePayment,
+		isOwner = true
 	}: Props = $props();
 
 	let minimumPayment = $derived(calculateMinimumPayment(financing));
@@ -164,7 +169,7 @@
 					</div>
 				</div>
 
-				{#if recordPaymentHref || (onChangePayment && financing.financingType === 'loan')}
+				{#if isOwner && (recordPaymentHref || (onChangePayment && financing.financingType === 'loan'))}
 					<div class="flex flex-wrap gap-2">
 						{#if recordPaymentHref}
 							<Button href={recordPaymentHref} class="w-full sm:w-auto">

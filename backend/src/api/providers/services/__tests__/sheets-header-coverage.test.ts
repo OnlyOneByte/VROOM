@@ -22,6 +22,9 @@
  */
 
 import { describe, expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { getTableColumns } from 'drizzle-orm';
 import { TABLE_SCHEMA_MAP } from '../../../../config';
 import { SHEET_HEADERS, SHEET_NAMES } from '../google-sheets-service';
@@ -87,5 +90,48 @@ describe('Google Sheets tab roster (SHEET_NAMES drift guard — C30)', () => {
     const tabCount: number = SHEET_NAMES.length;
     expect(new Set(SHEET_NAMES).size).toBe(tabCount);
     expect(SHEET_NAMES.every((n) => n.trim().length > 0)).toBe(true);
+  });
+});
+
+// C208 (deep-review): the POPULATE step is a THIRD hand-maintained list the prior guards don't cover.
+// `updateSpreadsheetWithUserData` builds a local `tables` array (one `{ title, rows, headers }` per table)
+// that drives the atomic swap — and it's the Sheets analog of the ZIP-side createBackup() populate step
+// (pinned by backup-createbackup-keys.test.ts). A table present in SHEET_NAMES + SHEET_HEADERS (which guards
+// A + C30 enforce) but OMITTED from this array is NOT caught by the round-trip / tab-order tests: createSpreadsheet
+// still makes its (empty) canonical tab from SHEET_NAMES, and the Phase-2 delete+rename loop iterates `tables`
+// so the omitted table's stale/empty canonical tab SURVIVES — `titles === SHEET_NAMES` still passes while that
+// table's real data is silently never written (NORTH_STAR #1 data-loss). A C208 deep-review certified the array
+// is correct + in-order today (incl. the C204 Trips append); this pins it. Source-scan the `tables` array's
+// `title:` literals, in order, and assert they equal SHEET_NAMES — the C172 cross-file-list idiom.
+describe('Google Sheets populate-array coverage (updateSpreadsheetWithUserData ≡ SHEET_NAMES — C208)', () => {
+  const HERE = dirname(fileURLToPath(import.meta.url));
+  const SERVICE_SRC = readFileSync(join(HERE, '..', 'google-sheets-service.ts'), 'utf-8');
+
+  /** The ordered `title: '...'` literals of the `tables` array inside updateSpreadsheetWithUserData. */
+  function populateTitles(): string[] {
+    // Scope to the method body so we don't pick up `title:` from elsewhere (e.g. createSpreadsheet uses
+    // SHEET_NAMES.map, not title literals; the SpreadsheetInfo type has no title-literal). Start at the
+    // method name, end at writeAllSheetsAtomically(...) which immediately follows the array.
+    const start = SERVICE_SRC.indexOf('updateSpreadsheetWithUserData');
+    const end = SERVICE_SRC.indexOf('writeAllSheetsAtomically(spreadsheetId, tables)', start);
+    const body = SERVICE_SRC.slice(start, end > start ? end : undefined);
+    return [...body.matchAll(/title:\s*'([^']+)'/g)].map((m) => m[1]);
+  }
+
+  test('the populate `tables` array names every SHEET_NAMES tab, in the same order', () => {
+    const titles = populateTitles();
+    expect(
+      titles,
+      `The hand-built tables array in updateSpreadsheetWithUserData must list one { title, rows, headers } ` +
+        `entry per SHEET_NAMES tab, in order — an omitted table creates an empty tab whose data is silently ` +
+        `dropped on a Sheets backup (NORTH_STAR #1). Add the missing { title: '<tab>', rows: …, headers: … }:`
+    ).toEqual([...SHEET_NAMES]);
+  });
+
+  test('the scan is non-vacuous (it actually found the populate titles)', () => {
+    // Floor: if the method were renamed / the array reshaped past the regex, the equality test could pass
+    // only by both sides being short — assert we found a realistic number of titles.
+    expect(populateTitles().length).toBe(SHEET_NAMES.length);
+    expect(populateTitles().length).toBeGreaterThanOrEqual(15);
   });
 });

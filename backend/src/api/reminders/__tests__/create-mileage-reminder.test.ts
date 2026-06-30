@@ -21,6 +21,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -28,17 +29,6 @@ beforeEach(async () => {
   ctx = await createTestApp();
 });
 afterEach(() => ctx.close());
-
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Honda',
-    model: 'CR-V',
-    year: 2021,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
 
 async function addOdometerReading(vehicleId: string, odometer: number): Promise<void> {
   const res = await ctx.authed('POST', `/api/v1/odometer/${vehicleId}`, {
@@ -75,7 +65,7 @@ const MILEAGE_BASE = {
 
 describe('create mileage reminder (T4 — API-creatable + derived fields)', () => {
   test('explicit lastServiceOdometer → nextDueOdometer is derived (last + interval)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'CR-V', year: 2021 });
     const res = await ctx.authed('POST', '/api/v1/reminders', {
       ...MILEAGE_BASE,
       triggerMode: 'mileage',
@@ -95,7 +85,7 @@ describe('create mileage reminder (T4 — API-creatable + derived fields)', () =
   });
 
   test('omitted lastServiceOdometer defaults to the vehicle current odometer', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'CR-V', year: 2021 });
     await addOdometerReading(vehicleId, 42000);
 
     const res = await ctx.authed('POST', '/api/v1/reminders', {
@@ -114,7 +104,7 @@ describe('create mileage reminder (T4 — API-creatable + derived fields)', () =
   });
 
   test("a 'both' reminder keeps its time axis (startDate) AND the mileage cache", async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'CR-V', year: 2021 });
     const res = await ctx.authed('POST', '/api/v1/reminders', {
       ...MILEAGE_BASE,
       triggerMode: 'both',
@@ -132,7 +122,7 @@ describe('create mileage reminder (T4 — API-creatable + derived fields)', () =
   });
 
   test('a plain time reminder (default triggerMode) has NULL mileage fields', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'CR-V', year: 2021 });
     const res = await ctx.authed('POST', '/api/v1/reminders', {
       name: 'Registration',
       type: 'notification',
@@ -151,7 +141,7 @@ describe('create mileage reminder (T4 — API-creatable + derived fields)', () =
   });
 
   test('rejects a mileage reminder with no intervalMileage (D4)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'CR-V', year: 2021 });
     const res = await ctx.authed('POST', '/api/v1/reminders', {
       ...MILEAGE_BASE,
       triggerMode: 'mileage',
@@ -163,8 +153,8 @@ describe('create mileage reminder (T4 — API-creatable + derived fields)', () =
   });
 
   test('rejects a mileage reminder linked to more than one vehicle (D4)', async () => {
-    const v1 = await seedVehicle();
-    const v2 = await seedVehicle();
+    const v1 = await seedVehicle(ctx, { make: 'Honda', model: 'CR-V', year: 2021 });
+    const v2 = await seedVehicle(ctx, { make: 'Honda', model: 'CR-V', year: 2021 });
     const res = await ctx.authed('POST', '/api/v1/reminders', {
       ...MILEAGE_BASE,
       triggerMode: 'mileage',
@@ -176,7 +166,7 @@ describe('create mileage reminder (T4 — API-creatable + derived fields)', () =
   });
 
   test('updating intervalMileage recomputes nextDueOdometer', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'CR-V', year: 2021 });
     const created = await ctx.authed('POST', '/api/v1/reminders', {
       ...MILEAGE_BASE,
       triggerMode: 'mileage',

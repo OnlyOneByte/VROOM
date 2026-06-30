@@ -13,12 +13,8 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import {
-  createTestApp,
-  type DataEnvelope,
-  json,
-  type TestApp,
-} from '../../../test-helpers/http-client';
+import { createTestApp, json, type TestApp } from '../../../test-helpers/http-client';
+import { seedVehicle as seedVehicleShared } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -27,17 +23,17 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
+// This file's fixture is a Honda Civic 2021 seeded with initialMileage 10000 (the baseline the
+// currentOdometer cross-source MAX assertions build on); converge onto the shared test-helpers/seed
+// seedVehicle (arch convergence, Angelo-approved), passing make/model/year explicitly + initialMileage
+// through `extra` so the exact prior fixture is preserved (the shared default is a Camry with no mileage).
+const seedVehicle = (): Promise<string> =>
+  seedVehicleShared(ctx, {
     make: 'Honda',
     model: 'Civic',
     year: 2021,
-    initialMileage: 10000,
+    extra: { initialMileage: 10000 },
   });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
 
 async function addFuelExpense(vehicleId: string, mileage: number, isoDate: string): Promise<void> {
   const res = await ctx.authed('POST', '/api/v1/expenses', {

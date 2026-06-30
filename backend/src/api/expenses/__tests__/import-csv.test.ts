@@ -16,6 +16,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -24,17 +25,12 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-async function seedVehicle(nickname: string): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Honda',
-    model: 'Civic',
-    year: 2021,
-    nickname,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
+// Seed the file's fixture vehicle: a Honda Civic 2021 with the given nickname — several tests rely on
+// the exact "2021 Honda Civic" name-match and the #102 same-year/make/model ambiguity, so make/model/year
+// are passed explicitly (the shared seedVehicle default is a Toyota Camry). Converged onto the shared
+// test-helpers/seed seedVehicle (arch convergence, Angelo-approved).
+const seedCivic = (nickname: string) =>
+  seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021, nickname });
 
 async function listExpenses(): Promise<
   Array<{ category: string; expenseAmount: number; date: string }>
@@ -87,7 +83,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
   });
 
   test('round-trips a VROOM export: export → import → rows recreated', async () => {
-    await seedVehicle('Daily Driver');
+    await seedCivic('Daily Driver');
     // Build a CSV in the exact EXPORT_COLUMNS shape the exporter writes.
     const csv = [
       'date,vehicle,category,amount,currency,mileage,volume,fuelType,description,tags,missedFillup,createdAt',
@@ -116,7 +112,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
   // user's backup/restore-via-CSV. Create a fully-populated fuel expense, export it, WIPE the table (avoids
   // the idempotency/duplicate-detection collision), import the exact exported CSV, and read the row back.
   test('a populated fuel expense survives a full create→export→import round-trip with every field intact', async () => {
-    const vehicleId = await seedVehicle('Daily Driver');
+    const vehicleId = await seedCivic('Daily Driver');
     const createRes = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId,
       category: 'fuel',
@@ -150,7 +146,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     const [row] = listExpensesRaw();
     expect(row, 'the round-tripped expense exists').toBeDefined();
     expect(row?.category).toBe('fuel');
-    expect(row?.expense_amount).toBeCloseTo(52.4, 2);
+    expect(row?.expense_amount).toBe(5240); // $52.40 → 5240 cents in the raw DB row (money-cents-migration)
     expect(row?.vehicle_id).toBe(vehicleId); // resolved back by vehicle NAME
     expect(row?.mileage).toBe(31234);
     expect(row?.volume).toBeCloseTo(11.5, 2);
@@ -171,7 +167,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     // single tag can CONTAIN ; or , (rejected at the write boundary), so a delimiter in a cell is
     // ALWAYS a separator, never literal data — splitting is correct, not data loss. Pin both
     // delimiters + the trim, so a regression narrowing the split silently merges two tags into one.
-    await seedVehicle('Daily Driver');
+    await seedCivic('Daily Driver');
     const csv = [
       'date,vehicle,category,amount,currency,mileage,volume,fuelType,description,tags,missedFillup,createdAt',
       '2024-06-01T00:00:00.000Z,Daily Driver,misc,12,USD,,,,Semis,road; trip; toll,false,',
@@ -201,7 +197,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     // missed-fillup row as false — corrupting MPG pairing (a missed fillup means the next interval spans two
     // tanks and must be EXCLUDED from efficiency). The export↔import round-trip test above only used
     // missedFillup=false, so the truthy-parse path was unpinned. Pin both: 'true' → stored 1, 'false' → 0.
-    await seedVehicle('Daily Driver');
+    await seedCivic('Daily Driver');
     const csv = [
       'date,vehicle,category,amount,currency,mileage,volume,fuelType,description,tags,missedFillup,createdAt',
       '2024-06-01T00:00:00.000Z,Daily Driver,fuel,40,USD,30000,10,regular,Missed one,,true,',
@@ -222,7 +218,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
   });
 
   test('imports a BOM-prefixed CSV (Excel/Sheets/Numbers re-save); first column still resolves', async () => {
-    await seedVehicle('Daily Driver');
+    await seedCivic('Daily Driver');
     // Excel / Google Sheets / Numbers prepend a UTF-8 BOM (﻿) when they re-save a
     // CSV as UTF-8. WITHOUT bom:true on the parser the BOM sticks to the FIRST header
     // name, so the `date` column key becomes "﻿date" → record.date is undefined and
@@ -245,7 +241,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
   });
 
   test('a DATE-ONLY cell keeps its calendar day in local time (no UTC-midnight day-shift)', async () => {
-    await seedVehicle('Daily Driver');
+    await seedCivic('Daily Driver');
     // A hand-edited or foreign CSV commonly uses bare YYYY-MM-DD (no time). `new Date('2024-03-15')`
     // parses as UTC midnight, so a user west of UTC would see the expense land on Mar 14 (cycle-6/11).
     // parseDate now builds a date-only value from parts in LOCAL time. We assert the timezone-independent
@@ -266,7 +262,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
   });
 
   test('an OUT-OF-RANGE date-only cell is REJECTED, not silently rolled forward (#59)', async () => {
-    await seedVehicle('Daily Driver');
+    await seedCivic('Daily Driver');
     // `new Date(2024, 12, 45)` ("2024-13-45") never NaNs — it rolls to 2025-02-14. The native parseDate
     // now echo-checks the constructed Y/M/D (the buildLocalDate guard the mapping path had), so an
     // impossible date-only value is rejected with a per-row error instead of importing a wrong date.
@@ -289,7 +285,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
   });
 
   test('a full-ISO timestamp keeps its absolute instant (date-only fix does not regress it)', async () => {
-    await seedVehicle('Daily Driver');
+    await seedCivic('Daily Driver');
     // The date-only branch must NOT capture full ISO values — those name an absolute instant and
     // must round-trip unchanged (our own export writes this form). Asserts the instant is preserved.
     const iso = '2024-06-01T13:30:00.000Z';
@@ -305,7 +301,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
   });
 
   test('re-importing the same file is idempotent (no duplicate rows; cycle 211)', async () => {
-    await seedVehicle('Daily Driver');
+    await seedCivic('Daily Driver');
     const csv = [
       'date,vehicle,category,amount',
       '2024-06-01T00:00:00.000Z,Daily Driver,misc,12.50',
@@ -331,7 +327,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
   });
 
   test('two genuinely identical rows in ONE file both import (occurrence-keyed)', async () => {
-    await seedVehicle('Daily Driver');
+    await seedCivic('Daily Driver');
     // Same content twice — these are two real expenses (e.g. two $10 tolls same day),
     // distinguished by occurrence index, so both must land.
     const csv = [
@@ -349,7 +345,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
   });
 
   test('dryRun validates + reports but writes NOTHING', async () => {
-    await seedVehicle('Daily Driver');
+    await seedCivic('Daily Driver');
     const csv = [
       'date,vehicle,category,amount',
       '2024-06-01T00:00:00.000Z,Daily Driver,misc,12.50',
@@ -367,7 +363,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
   });
 
   test('reports per-row errors (bad category / amount / date) and imports the good ones', async () => {
-    await seedVehicle('Daily Driver');
+    await seedCivic('Daily Driver');
     const csv = [
       'date,vehicle,category,amount',
       '2024-06-01T00:00:00.000Z,Daily Driver,misc,10', // ok
@@ -392,7 +388,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
   });
 
   test("rejects a vehicle name NOT in the user's garage (no cross-tenant attachment)", async () => {
-    await seedVehicle('Daily Driver');
+    await seedCivic('Daily Driver');
     // "Someone Else's Car" is not in this user's fleet — the importer resolves
     // vehicles by name within findByUserId, so it can never attach to a vehicle
     // the user doesn't own (the cycle-145 cross-tenant-write class).
@@ -411,7 +407,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
   });
 
   test('fuel rows missing volume/mileage are rejected (mirrors the create rule)', async () => {
-    await seedVehicle('Daily Driver');
+    await seedCivic('Daily Driver');
     const csv = [
       'date,vehicle,category,amount,mileage,volume',
       '2024-06-01T00:00:00.000Z,Daily Driver,fuel,40,,', // fuel without volume+mileage
@@ -426,7 +422,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
   });
 
   test('matches a vehicle by its "year make model" name too (not just nickname)', async () => {
-    await seedVehicle('Daily Driver'); // Honda Civic 2021
+    await seedCivic('Daily Driver'); // Honda Civic 2021
     const csv = [
       'date,vehicle,category,amount',
       '2024-06-01T00:00:00.000Z,2021 Honda Civic,misc,15',
@@ -442,8 +438,8 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     // Two vehicles share "2021 Honda Civic" (legal — distinct nicknames, no unique constraint).
     // Pre-C344 the name map resolved to the LAST one (silent misattribution, NORTH_STAR #1). Now
     // the row must FAIL with a clear "use distinct nicknames" message — nothing imported.
-    await seedVehicle('Work Car'); // 2021 Honda Civic
-    await seedVehicle('Personal Car'); // 2021 Honda Civic (same year/make/model)
+    await seedCivic('Work Car'); // 2021 Honda Civic
+    await seedCivic('Personal Car'); // 2021 Honda Civic (same year/make/model)
     const csv = [
       'date,vehicle,category,amount',
       '2024-06-01T00:00:00.000Z,2021 Honda Civic,misc,50',
@@ -460,8 +456,8 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
   test('#102: a UNIQUE nickname still resolves even when its year/make/model is shared', async () => {
     // The ambiguity is per-NAME-KEY: the shared "2021 Honda Civic" key is ambiguous, but each
     // car's distinct nickname is not — so importing by nickname must still work.
-    await seedVehicle('Work Car');
-    await seedVehicle('Personal Car');
+    await seedCivic('Work Car');
+    await seedCivic('Personal Car');
     const csv = ['date,vehicle,category,amount', '2024-06-01T00:00:00.000Z,Work Car,misc,50'].join(
       '\n'
     );
@@ -473,7 +469,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
   });
 
   test('400 on an empty CSV (header only, no data rows)', async () => {
-    await seedVehicle('Daily Driver');
+    await seedCivic('Daily Driver');
     const res = await ctx.authed('POST', '/api/v1/expenses/import', {
       csv: 'date,vehicle,category,amount',
     });
@@ -493,7 +489,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     // spreadsheet treats `=...` as text). On re-import the importer must STRIP that
     // prefix symmetrically, else `=SUM(A1:A2)` round-trips to `'=SUM(A1:A2)` — silent
     // corruption (cycle 192 fix). Create → export → import → description identical.
-    const vehicleId = await seedVehicle('Daily Driver');
+    const vehicleId = await seedCivic('Daily Driver');
     const formula = '=SUM(A1:A2) reimbursement';
     const created = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId,
@@ -532,7 +528,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
   test('preserves a genuinely apostrophe-led description (does not over-strip)', async () => {
     // denormalize must only strip `'`+formula-trigger; a user-typed leading
     // apostrophe (followed by a normal char) must survive the import untouched.
-    await seedVehicle('Daily Driver');
+    await seedCivic('Daily Driver');
     const csv = [
       'date,vehicle,category,amount,description',
       "2024-06-01T00:00:00.000Z,Daily Driver,misc,10,'24 road trip fuel",
@@ -549,6 +545,46 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect(list.data[0]?.description).toBe("'24 road trip fuel");
   });
 
+  test("round-trips a user-typed `'`+trigger description LOSSLESSLY (csv-apostrophe ruling, C527)", async () => {
+    // The C401 data-loss, now CLOSED (ruled 2026-06-30: optimize VROOM-own-export fidelity). A
+    // description the user genuinely typed as a leading apostrophe BEFORE a formula trigger (e.g.
+    // `'=Daily mention`) used to round-trip LOSSY to `=Daily mention` (export left it bare, import
+    // over-stripped the apostrophe). The matched invertible escape (export `'=` → `''=`, import peels
+    // one) makes export → import return the EXACT original. Create → export → delete → import → equal.
+    const vehicleId = await seedCivic('Daily Driver');
+    const userTyped = "'=Daily mention"; // a literal leading ' the user wants to keep, before a trigger
+    const created = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'misc',
+      expenseAmount: 25,
+      date: '2024-06-01T00:00:00.000Z',
+      description: userTyped,
+    });
+    expect(created.status, await created.text()).toBeLessThan(300);
+
+    // Export — the server escapes the user-typed `'=` to `''=` (invertible, still text-safe in Excel).
+    const csv = await (await ctx.authed('GET', '/api/v1/expenses/export')).text();
+    expect(csv).toContain(`''=Daily mention`);
+
+    // Delete the original so the re-import is the only carrier of this description.
+    const list0 = await json<{ data: Array<{ id: string }> }>(
+      await ctx.authed('GET', '/api/v1/expenses?limit=100')
+    );
+    for (const r of list0.data) await ctx.authed('DELETE', `/api/v1/expenses/${r.id}`);
+
+    // Re-import → the description equals the ORIGINAL, apostrophe intact (was the data-loss).
+    const importRes = await ctx.authed('POST', '/api/v1/expenses/import', { csv });
+    const body = await json<ImportResponse>(importRes);
+    expect(importRes.status, JSON.stringify(body)).toBe(200);
+    expect(body.data.imported).toBe(1);
+
+    const list = await json<{ data: Array<{ description: string | null }> }>(
+      await ctx.authed('GET', '/api/v1/expenses?limit=100')
+    );
+    expect(list.data.length).toBe(1);
+    expect(list.data[0]?.description).toBe(userTyped);
+  });
+
   // #137 (C448): a NON-fuel imported row that carries a mileage/volume/fuelType (a foreign tracker like
   // Drivvo/Fuelio logs an odometer on a Service/maintenance entry) must NOT persist those fuel-only fields
   // — the import commit (importExpenses) inserts verbatim, bypassing the clearFuelFieldsIfNotFuel guard the
@@ -556,7 +592,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
   // getCurrentOdometer's cross-category MAX(odometer) UNION → wrong reminder firing + inflated lease-overage $.
   // parseRow now nulls the fuel-only fields for a non-fuel category (the #76 transform at the import site).
   test('a non-fuel imported row carrying mileage/volume/fuelType stores them NULL (#137, the #76 import write site)', async () => {
-    await seedVehicle('Daily Driver');
+    await seedCivic('Daily Driver');
     const csv = [
       'date,vehicle,category,amount,currency,mileage,volume,fuelType,description,tags,missedFillup,createdAt',
       // A maintenance row sneaking an odometer + volume + fuelType (the foreign-tracker / hand-edited case).
@@ -579,7 +615,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
   });
 
   test('a genuine fuel imported row KEEPS its mileage/volume/fuelType (no over-clear)', async () => {
-    await seedVehicle('Daily Driver');
+    await seedCivic('Daily Driver');
     const csv = [
       'date,vehicle,category,amount,currency,mileage,volume,fuelType,description,tags,missedFillup,createdAt',
       '2024-06-01T00:00:00.000Z,Daily Driver,fuel,52.40,USD,30000,10,regular,Shell top-up,,false,',

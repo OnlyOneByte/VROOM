@@ -23,18 +23,21 @@ vi.mock('../offline-storage', async () => {
 		loadOfflineExpenses,
 		saveOfflineExpenses: vi.fn(),
 		markExpenseAsSynced: vi.fn(),
+		// #79 (C159): sync-manager now parks permanently-unsyncable rows via this. Stub it (localStorage
+		// side-effect) and assert it's called for a malformed row instead of a retry being scheduled.
+		markExpenseNeedsAttention: vi.fn(),
 		clearSyncedExpenses: vi.fn(),
 		// sync-manager now imports getPendingExpenses from here (C426 dedup). Mirror the real impl
-		// (loadOfflineExpenses().filter(!synced)) over the MOCKED loader so the tests' mockReturnValue
-		// still drives it — re-exporting actual.getPendingExpenses would bind the REAL loader, not this mock.
+		// (loadOfflineExpenses().filter(!synced && !needsAttention)) over the MOCKED loader so the tests'
+		// mockReturnValue still drives it — re-exporting actual.getPendingExpenses would bind the REAL loader.
 		getPendingExpenses: () =>
 			(loadOfflineExpenses() as ReturnType<typeof actual.loadOfflineExpenses>).filter(
-				(e) => !e.synced
+				(e) => !e.synced && !e.needsAttention
 			)
 	};
 });
 
-import { loadOfflineExpenses } from '../offline-storage';
+import { loadOfflineExpenses, markExpenseNeedsAttention } from '../offline-storage';
 
 /** Helper: create a mock Response that apiClient can process */
 function apiOk(data: unknown) {
@@ -338,6 +341,72 @@ describe('Sync Manager', () => {
 			// Both the idempotency key AND the overwrite opt-in govern the outcome (backend applies the edit).
 			expect(body.clientId).toBe('cid-c-1');
 			expect(body.forceOverwrite).toBe(true);
+		});
+	});
+
+	// #79 (C159): a malformed fuel row (no volume/charge, or no mileage — isIncompleteFuelExpense) is
+	// PERMANENTLY unsyncable: it fails the same way every attempt. It must be PARKED as needs-attention
+	// (markExpenseNeedsAttention) — NOT counted as a transient failure + NOT scheduled for retry, so it
+	// stops being silently re-attempted forever. syncExpenses sets result.needsAttention and, because the
+	// row isn't a transient failure, result.success is NOT dragged false by it (nothing to retry).
+	describe('needs-attention parking (#79)', () => {
+		const malformedFuel: OfflineExpense = {
+			id: 'malformed-1',
+			clientId: 'cid-malformed-1',
+			vehicleId: 'vehicle-1',
+			tags: ['fuel'],
+			category: 'fuel',
+			amount: 50.0,
+			date: '2024-01-01',
+			// NO volume/charge AND no mileage → isIncompleteFuelExpense → permanent failure
+			timestamp: Date.now(),
+			synced: false
+		};
+
+		it('parks a malformed fuel row (needsAttention) instead of scheduling a retry', async () => {
+			vi.mocked(loadOfflineExpenses).mockReturnValue([malformedFuel]);
+			// conflict-check GET returns empty (no existing row); the row never reaches a POST — the
+			// incomplete-fuel gate fails it first.
+			mockFetch.mockResolvedValue(apiOk([]));
+
+			const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+			try {
+				const result = await syncManager.syncAll();
+				// Parked, not failed-transiently: surfaced via needsAttention, retryCount untouched.
+				expect(result.needsAttention).toBe(1);
+				expect(result.failed).toBe(0);
+				expect(vi.mocked(markExpenseNeedsAttention)).toHaveBeenCalledWith('malformed-1');
+				expect(syncManager.getRetryCount('malformed-1')).toBe(0); // NO retry tracked
+				// No RETRY-backoff timer scheduled (the 3000ms idle reset is fine; retry delays are 100/200/…).
+				const RETRY_DELAYS = new Set([100, 200, 400, 800]);
+				const retryScheduled = setTimeoutSpy.mock.calls.some(
+					([, delay]) => typeof delay === 'number' && RETRY_DELAYS.has(delay)
+				);
+				expect(retryScheduled, 'a permanent failure must not schedule a retry').toBe(false);
+			} finally {
+				setTimeoutSpy.mockRestore();
+			}
+		});
+
+		// #79 COMPOSITION (C162 deep-review): an ALREADY-parked row (needsAttention=true) is excluded from
+		// getPendingExpenses — so syncAll never feeds it to the sync loop. It must NOT be POSTed, re-checked,
+		// re-counted, or re-parked: a subsequent syncAll over a parked row is a complete no-op for it. This
+		// is what makes "park" actually STOP the infinite re-attempt (the #79 goal) — verified end-to-end
+		// through the public syncAll, not just the helper in isolation.
+		it('an already-parked row is NOT re-attempted by a later syncAll (no POST, no re-count)', async () => {
+			// The mocked getPendingExpenses filters !synced && !needsAttention (mirrors the real impl), so a
+			// parked row simply isn't in the pending set syncAll iterates.
+			vi.mocked(loadOfflineExpenses).mockReturnValue([{ ...malformedFuel, needsAttention: true }]);
+			mockFetch.mockResolvedValue(apiOk([]));
+
+			const result = await syncManager.syncAll();
+
+			expect(result.synced).toBe(0);
+			expect(result.failed).toBe(0);
+			expect(result.needsAttention).toBe(0); // not re-parked — it was never in the loop
+			expect(vi.mocked(markExpenseNeedsAttention)).not.toHaveBeenCalled();
+			expect(mockFetch).not.toHaveBeenCalled(); // no conflict-check GET, no create POST
+			expect(result.success).toBe(true); // nothing pending to fail → a clean success
 		});
 	});
 

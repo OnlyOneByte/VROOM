@@ -162,6 +162,101 @@ describe('GoogleSheetsService.readSpreadsheetData', () => {
     expect(data.vehicles[0].model).toBe('Civic');
     expect(data.metadata.userId).toBe(ctx.user.id);
   });
+
+  // C193 (deep-review): certify the C174 `themePreference` column survives the GOOGLE SHEETS round-trip.
+  // C180 certified the ZIP/CSV path (exportAsZip → restoreFromBackup); the Sheets path is a DISTINCT
+  // serializer (formatValue → grid → parseValue → coerceRow) with its own hazards (parseValue('')→null,
+  // numeric-looking ids), and it was never asserted for themePreference. themePreference rides
+  // SHEET_HEADERS (C174) on export + TABLE_SCHEMA_MAP coerce on restore; this drives the REAL fake-Sheets
+  // create→read chain to prove a non-default theme id makes the full round trip intact (NORTH_STAR #1).
+  test('a non-default themePreference survives the Sheets export→read round-trip (C174/C193)', async () => {
+    await seedVehicle('Honda', 'Civic', 2019); // a vehicle so readSpreadsheetData resolves the userId
+    const { db } = await import('../../../../db/connection');
+    const schema = await import('../../../../db/schema');
+    // Seed the user's prefs row with a NON-default theme (the value that must survive).
+    await db.insert(schema.userPreferences).values({
+      userId: ctx.user.id,
+      themePreference: 'instrument',
+    });
+
+    const svc = makeSvc();
+    const info = await svc.createOrUpdateVroomSpreadsheet(
+      ctx.user.id,
+      'VROOM/Backups',
+      'Demo User'
+    );
+
+    // The exported User Preferences sheet carries the themePreference header + value...
+    const grid = store.spreadsheets.get(info.id)?.values.get('User Preferences');
+    const headerRow = grid?.[0] ?? [];
+    const themeCol = headerRow.indexOf('themePreference');
+    expect(themeCol, 'themePreference column present in the Sheets export').toBeGreaterThanOrEqual(
+      0
+    );
+    expect(grid?.[1]?.[themeCol]).toBe('instrument');
+
+    // ...and it reads back as exactly 'instrument' (formatValue→parseValue leaves the string as-is).
+    const data = await svc.readSpreadsheetData(info.id);
+    expect(data.userPreferences).toHaveLength(1);
+    expect(data.userPreferences[0].themePreference).toBe('instrument');
+  });
+
+  // C204 (bug-scout CLEAN → guard): certify a trip survives the GOOGLE SHEETS round-trip, esp. the
+  // `tripDate` TIMESTAMP column. C202 wired trips into the Sheets export+readback; C203 pinned the ZIP/CSV
+  // path's tripDate — but the Sheets path is a DISTINCT serializer (formatValue → grid → parseValue) with
+  // its own hazards: parseValue re-coerces every cell (numeric-looking → Number, ISO-shaped → new Date()),
+  // so an odometer could come back a number (fine) but a date could in principle be mis-handled. A C204
+  // bug-scout verified firsthand the full create→read chain is clean; this pins it so a future Sheets
+  // serializer change can't silently drop a trip or shift its timestamp (NORTH_STAR #1, the #87 date seam
+  // on the Sheets leg). Distinct from trips-roundtrip.test.ts which guards the ZIP/CSV path.
+  test('a trip (with a non-midnight tripDate) survives the Sheets export→read round-trip (C204)', async () => {
+    const { db } = await import('../../../../db/connection');
+    const schema = await import('../../../../db/schema');
+    const [veh] = await db
+      .insert(schema.vehicles)
+      .values({ userId: ctx.user.id, make: 'Toyota', model: 'Camry', year: 2022 })
+      .returning();
+    // 2024-06-20T13:30:00Z — a non-midnight instant: a date-only truncation or tz shift would move it.
+    const tripDate = new Date(Date.UTC(2024, 5, 20, 13, 30, 0));
+    await db.insert(schema.trips).values({
+      vehicleId: veh.id,
+      userId: ctx.user.id,
+      startOdometer: 24000,
+      endOdometer: 24135,
+      purpose: 'business',
+      tripDate,
+      startLocation: 'Office',
+      note: 'Q2 review',
+    });
+
+    const svc = makeSvc();
+    const info = await svc.createOrUpdateVroomSpreadsheet(
+      ctx.user.id,
+      'VROOM/Backups',
+      'Demo User'
+    );
+
+    // The exported Trips sheet carries the tripDate column as the full ISO instant.
+    const grid = store.spreadsheets.get(info.id)?.values.get('Trips');
+    const headerRow = grid?.[0] ?? [];
+    const dateCol = headerRow.indexOf('tripDate');
+    expect(dateCol, 'tripDate column present in the Sheets export').toBeGreaterThanOrEqual(0);
+    expect(grid?.[1]?.[dateCol]).toBe('2024-06-20T13:30:00.000Z');
+
+    // ...and the whole trip reads back intact — tripDate to the exact instant, odometers as numbers,
+    // the omitted endLocation as null (parseValue('')→null), text fields verbatim.
+    const data = await svc.readSpreadsheetData(info.id);
+    expect(data.trips).toHaveLength(1);
+    const trip = data.trips[0];
+    expect(trip.vehicleId).toBe(veh.id);
+    expect(trip.startOdometer).toBe(24000);
+    expect(trip.endOdometer).toBe(24135);
+    expect(trip.purpose).toBe('business');
+    expect((trip.tripDate as Date).toISOString()).toBe('2024-06-20T13:30:00.000Z');
+    expect(trip.startLocation).toBe('Office');
+    expect(trip.endLocation).toBeNull();
+    expect(trip.note).toBe('Q2 review');
+  });
 });
 
 describe('GoogleSheetsService — formula-injection safety (#36)', () => {

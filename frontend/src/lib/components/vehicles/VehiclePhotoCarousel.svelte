@@ -12,12 +12,15 @@
 	interface Props {
 		vehicleId: string;
 		photos: Photo[];
+		/** vehicle-sharing T12b-3b: photo upload/delete/set-cover are owner-only (the photo routes keep
+		 *  strict ownership server-side). Default true so existing owner call sites are unchanged. */
+		isOwner?: boolean;
 		onUpload: () => void;
 		onDelete: (_photoId: string) => void | Promise<void>;
 		onSetCover: (_photoId: string) => void;
 	}
 
-	let { vehicleId, photos, onUpload, onDelete, onSetCover }: Props = $props();
+	let { vehicleId, photos, isOwner = true, onUpload, onDelete, onSetCover }: Props = $props();
 
 	let hasPhotos = $derived(photos.length > 0);
 	let deletingPhotoId = $state<string | null>(null);
@@ -58,10 +61,12 @@
 <Card.Root>
 	<Card.Header class="flex flex-row items-center justify-between space-y-0 pb-3">
 		<Card.Title class="text-lg font-semibold">Photos</Card.Title>
-		<Button variant="outline" size="sm" onclick={onUpload}>
-			<Upload class="mr-2 h-4 w-4" />
-			Upload
-		</Button>
+		{#if isOwner}
+			<Button variant="outline" size="sm" onclick={onUpload}>
+				<Upload class="mr-2 h-4 w-4" />
+				Upload
+			</Button>
+		{/if}
 	</Card.Header>
 	<Card.Content>
 		{#if hasPhotos}
@@ -86,34 +91,36 @@
 									</div>
 								{/if}
 
-								<div
-									class="absolute inset-x-0 bottom-0 flex items-center justify-end gap-1 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-100 lg:opacity-0 transition-opacity lg:group-hover:opacity-100 lg:group-focus-within:opacity-100"
-								>
-									{#if !photo.isCover}
-										<Button
-											variant="secondary"
-											size="sm"
-											class="h-7 bg-background/80 text-xs backdrop-blur-sm"
-											onclick={() => onSetCover(photo.id)}
-										>
-											<Star class="mr-1 h-3 w-3" />
-											Set as cover
-										</Button>
-									{/if}
-									<Button
-										variant="destructive"
-										size="sm"
-										class="h-7 text-xs"
-										disabled={deletingPhotoId === photo.id}
-										onclick={() => requestDelete(photo.id)}
+								{#if isOwner}
+									<div
+										class="absolute inset-x-0 bottom-0 flex items-center justify-end gap-1 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-100 lg:opacity-0 transition-opacity lg:group-hover:opacity-100 lg:group-focus-within:opacity-100"
 									>
-										{#if deletingPhotoId === photo.id}
-											<LoaderCircle class="h-3 w-3 animate-spin" />
-										{:else}
-											<Trash2 class="h-3 w-3" />
+										{#if !photo.isCover}
+											<Button
+												variant="secondary"
+												size="sm"
+												class="h-7 bg-background/80 text-xs backdrop-blur-sm"
+												onclick={() => onSetCover(photo.id)}
+											>
+												<Star class="mr-1 h-3 w-3" />
+												Set as cover
+											</Button>
 										{/if}
-									</Button>
-								</div>
+										<Button
+											variant="destructive"
+											size="sm"
+											class="h-7 text-xs"
+											disabled={deletingPhotoId === photo.id}
+											onclick={() => requestDelete(photo.id)}
+										>
+											{#if deletingPhotoId === photo.id}
+												<LoaderCircle class="h-3 w-3 animate-spin" />
+											{:else}
+												<Trash2 class="h-3 w-3" />
+											{/if}
+										</Button>
+									</div>
+								{/if}
 							</div>
 						</Carousel.Item>
 					{/each}
@@ -152,10 +159,12 @@
 					<ImagePlus class="h-6 w-6 text-muted-foreground" />
 				</div>
 				<p class="text-sm text-muted-foreground">No photos yet</p>
-				<Button variant="outline" size="sm" class="mt-3" onclick={onUpload}>
-					<Upload class="mr-2 h-4 w-4" />
-					Upload Photos
-				</Button>
+				{#if isOwner}
+					<Button variant="outline" size="sm" class="mt-3" onclick={onUpload}>
+						<Upload class="mr-2 h-4 w-4" />
+						Upload Photos
+					</Button>
+				{/if}
 			</div>
 		{/if}
 	</Card.Content>

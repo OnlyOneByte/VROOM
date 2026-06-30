@@ -18,6 +18,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 interface SummaryBody {
   totalAmount: number;
@@ -32,17 +33,6 @@ beforeEach(async () => {
   ctx = await createTestApp();
 });
 afterEach(() => ctx.close());
-
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Toyota',
-    model: 'Camry',
-    year: 2021,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
 
 async function createExpense(
   vehicleId: string,
@@ -64,7 +54,7 @@ async function createExpense(
 
 describe('GET /expenses/summary — monthly bucketing (unixepoch regression)', () => {
   test('buckets expenses into correct YYYY-MM months and computes a sane average', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2021 });
     // Two expenses in 2026-01, one in 2026-03 → 3-month calendar span (Jan..Mar).
     await createExpense(vehicleId, 100, '2026-01-10T12:00:00.000Z');
     await createExpense(vehicleId, 50, '2026-01-20T12:00:00.000Z');
@@ -93,7 +83,7 @@ describe('GET /expenses/summary — monthly bucketing (unixepoch regression)', (
   });
 
   test('category breakdown buckets by category with correct sums', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2021 });
     await createExpense(vehicleId, 40, '2026-02-01T12:00:00.000Z', 'maintenance');
     await createExpense(vehicleId, 60, '2026-02-02T12:00:00.000Z', 'maintenance');
     await createExpense(vehicleId, 25, '2026-02-03T12:00:00.000Z', 'misc');
@@ -104,5 +94,43 @@ describe('GET /expenses/summary — monthly bucketing (unixepoch regression)', (
     const byCat = Object.fromEntries(s.categoryBreakdown.map((c) => [c.category, c.amount]));
     expect(byCat.maintenance).toBe(100);
     expect(byCat.misc).toBe(25);
+  });
+});
+
+// C250 coverage: every existing summary test calls /summary with NO vehicleId (cross-fleet), so the
+// `if (filters.vehicleId)` scoping branches in expenseRepository.getSummary (repository.ts:466 + 488 — both
+// the period window AND the recent-30d window) + the route's validateVehicleOwnership branch were UNTESTED
+// (the repo sat at 78.82% line). These drive the vehicle-scoped summary through the REAL stack: a 2-vehicle
+// fleet, then ?vehicleId=<v1> must return ONLY v1's totals (v2 excluded), and an UNOWNED vehicleId → 404
+// (the #80 ownership discipline). NOT theater — exercises the real getSummary scoping, not a reimplementation.
+describe('GET /expenses/summary — vehicleId scoping (C250 coverage of the scoped path)', () => {
+  test('?vehicleId scopes totals + category breakdown to that vehicle only', async () => {
+    const v1 = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2021 });
+    const v2 = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2022 });
+    await createExpense(v1, 100, '2026-02-01T12:00:00.000Z', 'maintenance');
+    await createExpense(v1, 40, '2026-02-02T12:00:00.000Z', 'misc');
+    await createExpense(v2, 999, '2026-02-03T12:00:00.000Z', 'maintenance');
+
+    const res = await ctx.authed('GET', `/api/v1/expenses/summary?period=all&vehicleId=${v1}`);
+    const s = (await json<DataEnvelope<SummaryBody>>(res)).data;
+
+    expect(res.status).toBe(200);
+    // Only v1's 100 + 40 — v2's 999 is excluded by the vehicleId-scoped period window (repository.ts:466).
+    expect(s.totalAmount).toBe(140);
+    const byCat = Object.fromEntries(s.categoryBreakdown.map((c) => [c.category, c.amount]));
+    expect(byCat.maintenance).toBe(100); // NOT 100+999
+    expect(byCat.misc).toBe(40);
+  });
+
+  test('a summary scoped to an UNOWNED vehicle is 404 (ownership-checked, #80)', async () => {
+    // Seed a 2nd user + their vehicle via raw SQL; the authed (1st) user must not summarize it.
+    ctx.sqlite.run(
+      `INSERT INTO users (id, email, display_name) VALUES ('u2sum', 'sum@x.com', 'Other')`
+    );
+    ctx.sqlite.run(
+      `INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('v2sum', 'u2sum', 'Honda', 'Civic', 2020)`
+    );
+    const res = await ctx.authed('GET', '/api/v1/expenses/summary?period=all&vehicleId=v2sum');
+    expect(res.status).toBe(404);
   });
 });

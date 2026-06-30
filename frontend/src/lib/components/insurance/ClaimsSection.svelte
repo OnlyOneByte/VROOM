@@ -36,9 +36,11 @@
 		policyId: string;
 		// Vehicles covered by this policy — lets a claim be attributed to one.
 		vehicles?: Vehicle[];
+		// T12b-3c: read-only shared view hides File/Edit/Delete claim (claims + their docs stay viewable).
+		readOnly?: boolean;
 	}
 
-	let { policyId, vehicles = [] }: Props = $props();
+	let { policyId, vehicles = [], readOnly = false }: Props = $props();
 
 	// vehicleId → display name, for showing/selecting the claim's vehicle.
 	let vehicleNameMap = $derived(new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)])));
@@ -208,7 +210,7 @@
 <div class="space-y-3">
 	<div class="flex items-center justify-between">
 		<h5 class="text-sm font-medium text-foreground">Claims</h5>
-		{#if !showForm}
+		{#if !showForm && !readOnly}
 			<Button variant="outline" size="sm" class="h-7 text-xs" onclick={openNew}>
 				<Plus class="mr-1 h-3 w-3" />
 				File Claim
@@ -264,38 +266,43 @@
 								{/if}
 							</div>
 							<div class="flex shrink-0 items-center gap-0.5">
-								<Button
-									variant="ghost"
-									size="icon"
-									class="h-7 w-7"
-									aria-label="Claim documents"
-									onclick={() => toggleDocs(claim.id)}
-								>
-									<Paperclip class="h-3.5 w-3.5" />
-								</Button>
-								<Button
-									variant="ghost"
-									size="icon"
-									class="h-7 w-7"
-									aria-label="Edit claim"
-									onclick={() => openEdit(claim)}
-								>
-									<Pencil class="h-3.5 w-3.5" />
-								</Button>
-								<Button
-									variant="ghost"
-									size="icon"
-									class="h-7 w-7"
-									aria-label="Delete claim"
-									onclick={() => requestDelete(claim.id)}
-								>
-									<Trash2 class="h-3.5 w-3.5 text-destructive" />
-								</Button>
+								{#if !readOnly}
+									<!-- Paperclip toggles the claim DocumentViewer (GET /photos/insurance_claim/:id),
+									     which is NOT widened for a shared viewer (T12b-3c) → hide it read-only, same
+									     reason the policy DocumentViewer is hidden in PolicyCard. -->
+									<Button
+										variant="ghost"
+										size="icon"
+										class="h-7 w-7"
+										aria-label="Claim documents"
+										onclick={() => toggleDocs(claim.id)}
+									>
+										<Paperclip class="h-3.5 w-3.5" />
+									</Button>
+									<Button
+										variant="ghost"
+										size="icon"
+										class="h-7 w-7"
+										aria-label="Edit claim"
+										onclick={() => openEdit(claim)}
+									>
+										<Pencil class="h-3.5 w-3.5" />
+									</Button>
+									<Button
+										variant="ghost"
+										size="icon"
+										class="h-7 w-7"
+										aria-label="Delete claim"
+										onclick={() => requestDelete(claim.id)}
+									>
+										<Trash2 class="h-3.5 w-3.5 text-destructive" />
+									</Button>
+								{/if}
 							</div>
 						</div>
 						{#if expandedDocs.has(claim.id)}
 							<div class="mt-3 border-t border-border pt-3">
-								<DocumentViewer entityType="insurance_claim" entityId={claim.id} />
+								<DocumentViewer entityType="insurance_claim" entityId={claim.id} {readOnly} />
 							</div>
 						{/if}
 					</div>

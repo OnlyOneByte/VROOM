@@ -30,6 +30,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -37,17 +38,6 @@ beforeEach(async () => {
   ctx = await createTestApp();
 });
 afterEach(() => ctx.close());
-
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Honda',
-    model: 'Civic',
-    year: 2021,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
 
 async function createOverdueExpenseReminder(vehicleId: string): Promise<string> {
   const res = await ctx.authed('POST', '/api/v1/reminders', {
@@ -73,7 +63,7 @@ function expenseCountForReminder(reminderId: string): number {
 
 describe('reminder-trigger idempotency (CAS on nextDueDate)', () => {
   test('re-triggering after the due date advanced past now writes no new expense', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const reminderId = await createOverdueExpenseReminder(vehicleId);
 
     await ctx.authed('POST', '/api/v1/reminders/trigger');
@@ -88,7 +78,7 @@ describe('reminder-trigger idempotency (CAS on nextDueDate)', () => {
   });
 
   test('advanceNextDueDateTx is a CAS: a stale expected-date is a silent no-op (0 rows)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const reminderId = await createOverdueExpenseReminder(vehicleId);
 
     // Read the real current nextDueDate (epoch seconds in sqlite).

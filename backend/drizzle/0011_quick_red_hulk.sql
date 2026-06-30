@@ -1,0 +1,1 @@
+ALTER TABLE `expenses` ADD `created_by` text REFERENCES users(id);

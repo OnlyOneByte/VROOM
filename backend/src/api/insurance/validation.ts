@@ -8,6 +8,7 @@
 
 import { z } from 'zod';
 import { CONFIG } from '../../config';
+import { moneyDollarsToCents } from '../../utils/money';
 
 const ins = CONFIG.validation.insurance;
 
@@ -24,15 +25,22 @@ const baseTermFields = {
   endDate: z.coerce.date(),
   policyNumber: z.string().max(ins.policyNumberMaxLength).optional(),
   coverageDescription: z.string().max(ins.coverageDescriptionMaxLength).optional(),
-  deductibleAmount: z.number().positive('Deductible must be positive').optional(),
-  coverageLimit: z.number().positive('Coverage limit must be positive').optional(),
+  // money (T3): client sends DOLLARS, store integer CENTS. coverageLimit is a dollar cap (money), NOT a %.
+  deductibleAmount: moneyDollarsToCents((n) =>
+    n.positive('Deductible must be positive')
+  ).optional(),
+  coverageLimit: moneyDollarsToCents((n) =>
+    n.positive('Coverage limit must be positive')
+  ).optional(),
   agentName: z.string().max(ins.agentNameMaxLength).optional(),
   agentPhone: z.string().max(ins.agentPhoneMaxLength).optional(),
   agentEmail: z.string().email().max(ins.agentEmailMaxLength).optional(),
-  totalCost: z.number().min(0, 'Total cost must be non-negative').optional(),
-  monthlyCost: z.number().min(0, 'Monthly cost must be non-negative').optional(),
+  totalCost: moneyDollarsToCents((n) => n.min(0, 'Total cost must be non-negative')).optional(),
+  monthlyCost: moneyDollarsToCents((n) => n.min(0, 'Monthly cost must be non-negative')).optional(),
   premiumFrequency: z.string().max(ins.premiumFrequencyMaxLength).optional(),
-  paymentAmount: z.number().min(0, 'Payment amount must be non-negative').optional(),
+  paymentAmount: moneyDollarsToCents((n) =>
+    n.min(0, 'Payment amount must be non-negative')
+  ).optional(),
 };
 
 // --- Create term schema (used for adding terms to a policy) ---
@@ -59,15 +67,25 @@ export const updateTermSchema = z
     // JSON.stringify drops `undefined`, so the only "clear this" signal is null.
     policyNumber: z.string().max(ins.policyNumberMaxLength).nullish(),
     coverageDescription: z.string().max(ins.coverageDescriptionMaxLength).nullish(),
-    deductibleAmount: z.number().positive('Deductible must be positive').nullish(),
-    coverageLimit: z.number().positive('Coverage limit must be positive').nullish(),
+    // money (T3): DOLLARS → integer CENTS. .nullish() wraps the transform so null (clear) / undefined
+    // (unchanged) pass through untransformed; only a real number is scaled.
+    deductibleAmount: moneyDollarsToCents((n) =>
+      n.positive('Deductible must be positive')
+    ).nullish(),
+    coverageLimit: moneyDollarsToCents((n) =>
+      n.positive('Coverage limit must be positive')
+    ).nullish(),
     agentName: z.string().max(ins.agentNameMaxLength).nullish(),
     agentPhone: z.string().max(ins.agentPhoneMaxLength).nullish(),
     agentEmail: z.string().email().max(ins.agentEmailMaxLength).nullish(),
-    totalCost: z.number().min(0, 'Total cost must be non-negative').nullish(),
-    monthlyCost: z.number().min(0, 'Monthly cost must be non-negative').nullish(),
+    totalCost: moneyDollarsToCents((n) => n.min(0, 'Total cost must be non-negative')).nullish(),
+    monthlyCost: moneyDollarsToCents((n) =>
+      n.min(0, 'Monthly cost must be non-negative')
+    ).nullish(),
     premiumFrequency: z.string().max(ins.premiumFrequencyMaxLength).nullish(),
-    paymentAmount: z.number().min(0, 'Payment amount must be non-negative').nullish(),
+    paymentAmount: moneyDollarsToCents((n) =>
+      n.min(0, 'Payment amount must be non-negative')
+    ).nullish(),
     vehicleCoverage: termVehicleCoverageSchema.optional(),
   })
   .refine(

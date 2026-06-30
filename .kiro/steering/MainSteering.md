@@ -123,6 +123,16 @@ Routes live in `frontend/src/routes/` and follow SvelteKit file-based routing: `
 - Use Biome for linting and formatting (not ESLint/Prettier). Run `bun run all:fix` which chains `lint:fix`, `format:fix`, and `check:fix`.
 - Database migrations are in `backend/drizzle/`. Generate with `bun run db:generate`, push with `bun run db:push`.
 
+## Money (integer cents — money-cents-migration, migration 0009)
+
+All monetary values are stored AND computed as **integer cents** — the 14 money columns (expenses.expenseAmount/groupTotal, vehicleFinancing.{originalAmount,paymentAmount,residualValue,excessMileageFee}, insuranceTerms.{deductibleAmount,coverageLimit,totalCost,monthlyCost,paymentAmount}, insuranceClaims.payoutAmount, vehicles.purchasePrice, reminders.expenseAmount) are `integer`, NOT `real`. Dollars exist ONLY at two edges; everything in between (sums, splits, balances, analytics) is integer cents.
+
+- **Input edge (dollars → cents):** every money Zod validator wraps the amount in `moneyDollarsToCents` / `dollarsToCents` (`backend/src/utils/money.ts`). The non-Zod CSV import (`parseAmount`) does the same. Never store a client dollar amount without converting.
+- **Display edge (cents → dollars):** convert at the API RESPONSE boundary — per-entity `*ToApi` helpers (`utils/money.ts`) + `api/analytics/api-transform.ts` for analytics. The frontend dollar contract is unchanged; do NOT convert inside repositories or analytics (they read/compute cents).
+- **NOT money** (stay `real`/number): `apr` (%), `volume` (gal/kWh), `businessMileageRate` ($/mile rate), mileage, percentages, normalized scores (e.g. analytics `vehicleRadar` fields). A cost-NAMED analytics field may be a normalized score — check its builder, not its name.
+- **Backup/restore:** backup `currentVersion` is `'2.0.0'` (cents). The ZIP path version-gates a ×100 restore shim for pre-cents (`<2.0.0`) backups (`coerceRow` `shimMoneyToCents`). The Google **Sheets** path has NO persisted version (it is a live cents-native DB mirror) → it must restore WITHOUT the shim. `MONEY_CENTS_FIELDS` (the shim allowlist) is drift-guarded by `money-cents-fields-guard.test.ts`.
+- Adding a new money column? Make it `integer`, add it to `MONEY_CENTS_FIELDS`, add its input transform + display conversion, and update the guard.
+
 ## Code Hygiene
 
 - Floating action buttons (FABs) must use `bg-foreground text-background` — never `bg-gray-900 text-white` or `!text-white` with gradient overrides.

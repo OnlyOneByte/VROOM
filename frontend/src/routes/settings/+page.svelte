@@ -17,10 +17,13 @@
 	import { Avatar, AvatarFallback } from '$lib/components/ui/avatar';
 	import UnitPreferencesCard from '$lib/components/settings/cards/UnitPreferencesCard.svelte';
 	import ThemeCard from '$lib/components/settings/cards/ThemeCard.svelte';
+	import ThemePickerCard from '$lib/components/settings/cards/ThemePickerCard.svelte';
 	import PWAInstallCard from '$lib/components/settings/cards/PwaInstallCard.svelte';
 	import BackupNowDialog from '$lib/components/settings/storage-provider/backup/BackupDialog.svelte';
 	import UnifiedRestoreDialog from '$lib/components/settings/storage-provider/backup/RestoreDialog.svelte';
 	import PhotoStorageSettings from '$lib/components/settings/cards/StorageProvidersCard.svelte';
+	import VlmProvidersCard from '$lib/components/settings/cards/VlmProvidersCard.svelte';
+	import LlmProvidersCard from '$lib/components/settings/cards/LlmProvidersCard.svelte';
 	import { fetchLastSyncTime } from '$lib/utils/sync/sync-manager';
 	import { providerApi } from '$lib/services/provider-api';
 	import FormLayout from '$lib/components/common/form-layout.svelte';
@@ -270,6 +273,7 @@
 			</a>
 
 			<ThemeCard />
+			<ThemePickerCard />
 			<UnitPreferencesCard bind:distanceUnit bind:volumeUnit bind:chargeUnit bind:currencyUnit />
 			<PWAInstallCard />
 			<PhotoStorageSettings
@@ -279,6 +283,8 @@
 				onRestore={handleRestoreClick}
 				onDownloadBackup={handleBackup}
 			/>
+			<VlmProvidersCard />
+			<LlmProvidersCard />
 		</div>
 	{/if}
 
