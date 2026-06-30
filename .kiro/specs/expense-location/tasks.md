@@ -59,11 +59,14 @@
       T4-T6 are the FE tail, honoring the T0 D2/D4 ruling.**
 
 ## Phase 3 — frontend (honors D2/D4 — eyes-on tail)
-- [ ] **T4 — FE type + transformer (honors none directly; fork-free).** Add `Expense.location?: string`
-      (expense.ts) + `BackendExpenseResponse.location?: string | null` + the toBackendExpense block (set when
-      present; explicit `null` on isEdit to clear; omit on create) + the fromBackendExpense passthrough
-      (api-transformer.ts), each mirroring `description`. GUARD: the api-transformer test gains a location
-      both-ways case (incl. the isEdit-null clear). FE validate:local green.
+- [x] **T4 — FE type + transformer (C552, fork-free).** Added `Expense.location?: string` (expense.ts) +
+      `BackendExpenseRequest.location?: string | null` + `BackendExpenseResponse.location?: string | null` +
+      the toBackendExpense block (set when present; explicit `null` on isEdit to clear; omit on create) + the
+      fromBackendExpense passthrough — each mirroring `description` exactly. GUARD
+      `api-transformer-location.test.ts` (6 cases, drives the REAL transformer): toBackend sends a provided
+      location / omits on create-no-value / sends null on isEdit-empty / absent on non-edit-empty; fromBackend
+      copies a present location / leaves it undefined on null. FE validate:local GREEN (1439 vitest, +6).
+      NEXT: T5 (the expense-form Location Input + the detail-row display, honors D2/D4).
 - [ ] **T5 — The expense-form Location input + display (honors D2/D4).** Add `formData.location` (init '')
       + a single-line `Input` labeled "Location (Optional)" beside Description (Description stays the
       Textarea, D2); load `expense.location ?? ''` on edit; include `location: formData.location || undefined`
