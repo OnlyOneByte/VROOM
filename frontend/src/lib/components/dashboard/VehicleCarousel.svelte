@@ -2,7 +2,14 @@
 	import { resolve } from '$app/paths';
 	import { routes, paramRoutes } from '$lib/routes';
 	import { gotoWithQuery } from '$lib/utils/navigation';
-	import { Car, Calendar, TrendingUp, DollarSign, Image as ImageIcon } from '@lucide/svelte';
+	import {
+		Car,
+		Calendar,
+		TrendingUp,
+		DollarSign,
+		Image as ImageIcon,
+		Users
+	} from '@lucide/svelte';
 	import * as Card from '$lib/components/ui/card';
 	import * as Carousel from '$lib/components/ui/carousel';
 	import { Button } from '$lib/components/ui/button';
@@ -20,6 +27,8 @@
 		lastActivity: Date | null;
 		hasActiveFinancing: boolean;
 		coverPhotoUrl?: string | null;
+		/** Owner's display name when this vehicle was shared with the user (T12b); null when owned. */
+		sharedBy?: string | null;
 	}
 
 	interface Props {
@@ -92,6 +101,16 @@
 												class="absolute top-3 right-3 z-20 bg-background/90 backdrop-blur-sm"
 											>
 												Financed
+											</Badge>
+										{/if}
+										{#if vehicle.sharedBy}
+											<!-- Shared-with-me badge (top-LEFT so it never collides with "Financed"). -->
+											<Badge
+												variant="secondary"
+												class="absolute top-3 left-3 z-20 bg-background/90 backdrop-blur-sm inline-flex items-center gap-1"
+											>
+												<Users class="h-3 w-3" aria-hidden="true" />
+												Shared by {vehicle.sharedBy}
 											</Badge>
 										{/if}
 									</div>

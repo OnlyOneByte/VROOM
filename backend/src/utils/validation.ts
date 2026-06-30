@@ -6,11 +6,34 @@
  */
 
 import { z } from 'zod';
+import { CONFIG } from '../config';
+
+/**
+ * The raw `limit`/`offset` field validators for a list endpoint that pairs with `clampPagination`
+ * (utils/pagination.ts). DISTINCT from `commonSchemas.pagination` below: this form is NO-DEFAULT +
+ * caps `limit` at the runtime `CONFIG.pagination.maxPageSize` (not a hardcoded 100), exactly matching
+ * what `clampPagination` re-clamps — so an out-of-range value is rejected at the boundary while an
+ * omitted one falls through to `clampPagination`'s `defaultPageSize`. `commonSchemas.pagination`
+ * instead bakes in `.default(50)`/`.default(0)` + a hardcoded `.max(100)`, which would CHANGE
+ * clamp/default behavior if a clampPagination consumer adopted it (the C212 divergence). Spread into a
+ * route's own `z.object({...})` so it can add endpoint-specific filters (e.g. vehicleId/purpose).
+ */
+const clampedPaginationFields = {
+  limit: z.coerce.number().int().min(1).max(CONFIG.pagination.maxPageSize).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+} as const;
 
 /**
  * Common validation schemas
  */
 export const commonSchemas = {
+  /**
+   * Raw `limit`/`offset` fields for a `clampPagination`-backed list query — spread into a route's
+   * `z.object({ ...commonSchemas.clampedPaginationFields, <filters> })`. See the note on
+   * `clampedPaginationFields` for why this differs from `pagination` (no defaults; runtime max).
+   */
+  clampedPaginationFields,
+
   /**
    * Generic ID validation
    */
@@ -72,16 +95,10 @@ export const commonSchemas = {
 import { expenseRepository } from '../api/expenses/repository';
 import { financingRepository } from '../api/financing/repository';
 import { insurancePolicyRepository } from '../api/insurance/repository';
-import { odometerRepository } from '../api/odometer/repository';
 import { type ReminderWithVehicles, reminderRepository } from '../api/reminders/repository';
+import { tripRepository } from '../api/trips/repository';
 import { vehicleRepository } from '../api/vehicles/repository';
-import type {
-  Expense,
-  InsurancePolicy,
-  OdometerEntry,
-  Vehicle,
-  VehicleFinancing,
-} from '../db/schema';
+import type { Expense, InsurancePolicy, Trip, Vehicle, VehicleFinancing } from '../db/schema';
 import { NotFoundError } from '../errors';
 
 /**
@@ -193,20 +210,18 @@ export async function validateReminderOwnership(
 }
 
 /**
- * Validate that an odometer entry belongs to the user, returning it. The userId-scoped counterpart to
- * the inline `findById` + `entry.userId !== userId` guard the odometer routes repeated 3×; mirrors the
- * validateInsuranceOwnership shape (findById has no userId arg, so re-check the column post-fetch).
- * @throws NotFoundError if the entry is not found or doesn't belong to the user
+ * Validate that a trip belongs to the user, returning it (trips-location T2, the C160 family). Trips own
+ * via a userId column, so the repository's own userId-scoped read is the ownership check — mirrors the
+ * validateReminderOwnership shape (findByIdAndUserId → NotFoundError → return entity). A NotFoundError
+ * (never 403) keeps the #80 enumeration-oracle discipline: a foreign or absent id is indistinguishable.
+ * @throws NotFoundError if the trip is not found or doesn't belong to the user
  */
-export async function validateOdometerOwnership(
-  entryId: string,
-  userId: string
-): Promise<OdometerEntry> {
-  const entry = await odometerRepository.findById(entryId);
-  if (!entry || entry.userId !== userId) {
-    throw new NotFoundError('Odometer entry');
+export async function validateTripOwnership(tripId: string, userId: string): Promise<Trip> {
+  const trip = await tripRepository.findByIdAndUserId(tripId, userId);
+  if (!trip) {
+    throw new NotFoundError('Trip');
   }
-  return entry;
+  return trip;
 }
 
 /**

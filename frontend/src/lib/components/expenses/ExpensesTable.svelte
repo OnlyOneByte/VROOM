@@ -89,6 +89,11 @@
 		expenses: Expense[];
 		vehicles?: Vehicle[];
 		showVehicleColumn?: boolean;
+		/** vehicle-sharing T12b-3b: expense edit/delete are WRITES (owner or accepted editor). A shared
+		 *  VIEWER sees the table read-only. When false, the Edit links are hidden AND `onDelete` is
+		 *  suppressed (so every existing `{#if onDelete}` delete gate hides too). Default true so every
+		 *  existing call site (global expenses page, owner vehicle tab) is unchanged. */
+		canWrite?: boolean;
 		returnTo?: string;
 		onDelete?: (_expense: Expense) => Promise<void>;
 		emptyTitle?: string;
@@ -127,8 +132,9 @@
 		expenses = [],
 		vehicles = [],
 		showVehicleColumn = true,
+		canWrite = true,
 		returnTo = '/expenses',
-		onDelete,
+		onDelete: onDeleteProp,
 		emptyTitle = 'No expenses yet',
 		emptyDescription = 'Start tracking your vehicle expenses to see insights and analytics.',
 		emptyActionLabel = 'Add First Expense',
@@ -147,6 +153,11 @@
 		activeCategory,
 		onCategoryChange
 	}: Props = $props();
+
+	// vehicle-sharing T12b-3b: a VIEWER (canWrite=false) gets NO delete — suppress onDelete so every
+	// `{#if onDelete}` delete-affordance gate (mobile + desktop, standalone + split) hides in one place.
+	// The Edit links are gated separately on `canWrite` at each href site.
+	let onDelete = $derived(canWrite ? onDeleteProp : undefined);
 
 	// O(1) vehicle lookups — avoids an O(n) vehicles.find() per row per render
 	// (getVehicleForExpense is called at several render sites for every expense + child).
@@ -509,7 +520,7 @@
 										{/each}
 									</div>
 								{/if}
-								{#if isSelected}
+								{#if isSelected && canWrite}
 									<div class="flex items-center justify-end gap-1 mt-2">
 										<Button
 											variant="ghost"
@@ -588,7 +599,7 @@
 										{/each}
 									</div>
 								{/if}
-								{#if isSelected}
+								{#if isSelected && canWrite}
 									<div class="flex items-center justify-end gap-1 mt-2">
 										<Button
 											variant="ghost"
@@ -787,16 +798,18 @@
 										<div
 											class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
 										>
-											<Button
-												variant="ghost"
-												size="icon"
-												class="h-8 w-8"
-												href={`${resolve(paramRoutes.expenseEdit, { id: expense.id })}?returnTo=${returnTo}`}
-												title="Edit expense"
-												onclick={e => e.stopPropagation()}
-											>
-												<Pencil class="h-4 w-4" />
-											</Button>
+											{#if canWrite}
+												<Button
+													variant="ghost"
+													size="icon"
+													class="h-8 w-8"
+													href={`${resolve(paramRoutes.expenseEdit, { id: expense.id })}?returnTo=${returnTo}`}
+													title="Edit expense"
+													onclick={e => e.stopPropagation()}
+												>
+													<Pencil class="h-4 w-4" />
+												</Button>
+											{/if}
 											{#if onDelete}
 												<Button
 													variant="ghost"
@@ -872,16 +885,18 @@
 										<div
 											class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
 										>
-											<Button
-												variant="ghost"
-												size="icon"
-												class="h-8 w-8"
-												href={`${resolve(paramRoutes.expenseEdit, { id: row.children[0]?.id ?? '' })}?returnTo=${returnTo}`}
-												title="Edit split expense"
-												onclick={e => e.stopPropagation()}
-											>
-												<Pencil class="h-4 w-4" />
-											</Button>
+											{#if canWrite}
+												<Button
+													variant="ghost"
+													size="icon"
+													class="h-8 w-8"
+													href={`${resolve(paramRoutes.expenseEdit, { id: row.children[0]?.id ?? '' })}?returnTo=${returnTo}`}
+													title="Edit split expense"
+													onclick={e => e.stopPropagation()}
+												>
+													<Pencil class="h-4 w-4" />
+												</Button>
+											{/if}
 											{#if onDelete}
 												{@const isInsuranceLinked = row.tags.includes('insurance')}
 												<Button

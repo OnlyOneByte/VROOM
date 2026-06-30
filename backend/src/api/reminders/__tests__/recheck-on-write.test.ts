@@ -23,6 +23,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -30,17 +31,6 @@ beforeEach(async () => {
   ctx = await createTestApp();
 });
 afterEach(() => ctx.close());
-
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Toyota',
-    model: 'RAV4',
-    year: 2022,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
 
 /** Seed a pure-mileage reminder with the given milestone, linked to one vehicle. */
 function seedMileageReminder(id: string, vehicleId: string, nextDueOdometer: number): void {
@@ -78,7 +68,7 @@ async function addOdometerReading(vehicleId: string, odometer: number): Promise<
 
 describe('mileage re-check on write (D5)', () => {
   test('an odometer reading crossing the milestone fires the notification immediately (no /trigger)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'RAV4', year: 2022 });
     seedMileageReminder('rw1', vehicleId, 35000);
 
     // Just the write — no POST /trigger. The recheck hook should fire it.
@@ -88,7 +78,7 @@ describe('mileage re-check on write (D5)', () => {
   });
 
   test('an odometer reading below the milestone fires nothing', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'RAV4', year: 2022 });
     seedMileageReminder('rw2', vehicleId, 35000);
 
     await addOdometerReading(vehicleId, 34000);
@@ -97,7 +87,7 @@ describe('mileage re-check on write (D5)', () => {
   });
 
   test('a mileaged expense crossing the milestone fires it too', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'RAV4', year: 2022 });
     seedMileageReminder('rw3', vehicleId, 35000);
 
     const res = await ctx.authed('POST', '/api/v1/expenses', {
@@ -114,7 +104,7 @@ describe('mileage re-check on write (D5)', () => {
   });
 
   test('recheck-on-write is idempotent: a later /trigger does not double-fire', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'RAV4', year: 2022 });
     seedMileageReminder('rw4', vehicleId, 35000);
 
     await addOdometerReading(vehicleId, 36000); // recheck fires it
@@ -125,7 +115,7 @@ describe('mileage re-check on write (D5)', () => {
   });
 
   test('a non-mileaged expense write does not fire a mileage reminder', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'RAV4', year: 2022 });
     seedMileageReminder('rw5', vehicleId, 35000);
 
     // An expense with NO mileage — even though the milestone is 35000, no reading exists.
@@ -149,7 +139,7 @@ describe('mileage re-check on write (D5)', () => {
  */
 describe('mileage re-check on UPDATE (D5, #71)', () => {
   test('editing an odometer reading UP across the milestone fires immediately (no /trigger)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'RAV4', year: 2022 });
     seedMileageReminder('ru1', vehicleId, 35000);
 
     // Create a reading BELOW the milestone — fires nothing yet.
@@ -168,7 +158,7 @@ describe('mileage re-check on UPDATE (D5, #71)', () => {
   });
 
   test('editing a mileaged expense UP across the milestone fires immediately', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'RAV4', year: 2022 });
     seedMileageReminder('ru2', vehicleId, 35000);
 
     // A fuel expense BELOW the milestone — fires nothing yet.
@@ -203,7 +193,7 @@ describe('mileage re-check on UPDATE (D5, #71)', () => {
  */
 describe('mileage re-check is NOT run on DELETE (downward change is safe — C284)', () => {
   test('deleting the milestone-crossing reading keeps the already-fired notification (no un-fire, no re-fire)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'RAV4', year: 2022 });
     seedMileageReminder('rd1', vehicleId, 35000);
 
     // A reading across the milestone fires the notification (via the create recheck).

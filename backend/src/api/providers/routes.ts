@@ -77,26 +77,6 @@ async function countUserPhotos(
 }
 
 /**
- * Find photo IDs of a given entity type owned by a specific user,
- * optionally filtered by additional conditions (e.g. missing refs).
- * v2: uses direct photos.user_id instead of multi-branch entity JOINs.
- */
-async function findUserPhotoIds(
-  db: DbInstance,
-  entityType: string,
-  userId: string,
-  extraConditions?: ReturnType<typeof and>
-): Promise<{ id: string }[]> {
-  const conditions = [eq(photos.entityType, entityType), eq(photos.userId, userId)];
-  if (extraConditions) conditions.push(extraConditions);
-
-  return db
-    .select({ id: photos.id })
-    .from(photos)
-    .where(and(...conditions));
-}
-
-/**
  * Count photoRefs for a provider in a given status ('active' | 'failed'), scoped to the
  * given entity types. The synced-vs-failed counts in /sync-status differ ONLY by the status
  * filter, so they share one helper (C92 dedup) rather than two byte-identical joined queries.
@@ -171,7 +151,33 @@ routes.get('/pending/:nonce', async (c) => {
  * registry uses to instantiate it). This is the seam that lets headless E2E seed
  * a storage provider — and exercise the backup/photo paths — without real OAuth.
  */
-const SUPPORTED_PROVIDER_TYPES = ['google-drive', 's3', 'fake'] as const;
+// The 4 storage/test types + the MODEL (LLM-backed) provider types shared by the `vlm` (vision-LLM,
+// receipt-parsing) AND `llm` (assistant) domains. Both are NEW DOMAINS in the SAME user_providers system:
+// the api key rides the encrypted `credentials` blob exactly like a storage refreshToken/S3 secret, and
+// `config` carries the non-secret model name + optional baseUrl (self-hosted/compatible endpoint). No
+// schema change — `user_providers` is domain-agnostic. The per-type required-field gate is the shared
+// validateModelProviderConfig (mirrors validateStorageProviderConfig), used by CREATE + PUT (#123).
+//
+// The SAME 4 provider-type strings serve both domains (an `anthropic` row is valid in `vlm` OR `llm`); the
+// domain↔type guard keys on the DOMAIN being one of MODEL_DOMAINS, not on a vlm-specific type set. The
+// `vlm`-named aliases below are kept so the vlm-receipt-parsing call sites + tests read unchanged.
+const MODEL_PROVIDER_TYPES = ['openai-compatible', 'anthropic', 'gemini', 'ollama'] as const;
+type ModelProviderType = (typeof MODEL_PROVIDER_TYPES)[number];
+/** The domains whose providers are LLM-backed (a model-type row must live in one of these). */
+const MODEL_DOMAINS = ['vlm', 'llm'] as const;
+const SUPPORTED_PROVIDER_TYPES = ['google-drive', 's3', 'fake', ...MODEL_PROVIDER_TYPES] as const;
+
+/** A providerType is a model (vlm/llm) type — the row's domain must then be one of MODEL_DOMAINS. */
+function isModelProviderType(providerType: string): providerType is ModelProviderType {
+  return (MODEL_PROVIDER_TYPES as readonly string[]).includes(providerType);
+}
+/** A domain is LLM-backed (vlm or llm). */
+function isModelDomain(domain: string): boolean {
+  return (MODEL_DOMAINS as readonly string[]).includes(domain);
+}
+// Back-compat alias: the vlm-receipt-parsing call sites + the shipped guard test use `isVlmProviderType`.
+// The set is identical (both domains share the 4 model types), so the alias is exact.
+const isVlmProviderType = isModelProviderType;
 
 const createProviderSchema = z.object({
   domain: z.string().min(1, 'Domain is required'),
@@ -257,6 +263,58 @@ function validateStorageProviderConfig(
   }
 }
 
+/**
+ * Reject a MODEL-provider row (vlm OR llm) the adapter could NEVER instantiate with (vlm-receipt-parsing
+ * T1 + llm-assistant T1, the #103/#123 fail-fast-at-create discipline). The two domains share an identical
+ * required-field contract (a model name; an api key for non-ollama; a base URL for self-hosted/compatible)
+ * — the api key is the ONLY secret and rides the encrypted blob — so ONE validator serves both (the
+ * llm-assistant T1 dedup). Split into a config-shape check + a credentials check so each path validates
+ * only the field it touches:
+ *  - CREATE (resolveProviderCredentials) runs BOTH (it has the full config + credentials),
+ *  - PUT runs the config-shape check on a config update and the credentials check on a credentials update
+ *    — so a config-only edit (e.g. changing the model) does NOT falsely demand the apiKey be re-sent (it
+ *    is already stored encrypted).
+ * The error wording stays "VLM" for the model-name + api-key messages so the shipped vlm guard test reads
+ * unchanged; the messages are user-facing on both domains but accurate (both are LLM-backed providers).
+ */
+function validateModelConfigShape(
+  providerType: string,
+  config: Record<string, unknown> | null
+): void {
+  const cfg = config ?? {};
+  if (!cfg.model || typeof cfg.model !== 'string') {
+    throw new ValidationError('VLM config must include a model name');
+  }
+  if (
+    (providerType === 'ollama' || providerType === 'openai-compatible') &&
+    (!cfg.baseUrl || typeof cfg.baseUrl !== 'string')
+  ) {
+    throw new ValidationError('Self-hosted or OpenAI-compatible VLM requires a base URL');
+  }
+}
+
+function validateModelCredentials(
+  providerType: string,
+  credentials: Record<string, unknown>
+): void {
+  if (providerType !== 'ollama' && !credentials.apiKey) {
+    throw new ValidationError('VLM provider requires an API key');
+  }
+}
+
+function validateModelProviderConfig(
+  providerType: string,
+  config: Record<string, unknown> | null,
+  credentials: Record<string, unknown>
+): void {
+  validateModelConfigShape(providerType, config);
+  validateModelCredentials(providerType, credentials);
+}
+
+// Back-compat aliases for the vlm-receipt-parsing call sites (the set + contract are identical).
+const validateVlmConfigShape = validateModelConfigShape;
+const validateVlmCredentials = validateModelCredentials;
+
 function resolveProviderCredentials(
   userId: string,
   providerType: string,
@@ -275,6 +333,16 @@ function resolveProviderCredentials(
     return {
       encryptedCredentials: encrypt(JSON.stringify({ refreshToken: pending.refreshToken })),
       resolvedConfig: { ...(config ?? {}), accountEmail: pending.email },
+    };
+  }
+  // MODEL providers (vlm receipt-parsing + llm assistant): validate the model/key/baseUrl shape, then
+  // encrypt the api key like any other credential. Same fail-fast-at-create discipline as S3 (the adapter
+  // can never run without a model; a non-ollama type can never auth without a key). One gate, both domains.
+  if (isModelProviderType(providerType)) {
+    validateModelProviderConfig(providerType, config, credentials);
+    return {
+      encryptedCredentials: encrypt(JSON.stringify(credentials)),
+      resolvedConfig: config,
     };
   }
   // Fail-fast at CREATE time on a config the provider can never instantiate with (the shared gate,
@@ -304,6 +372,16 @@ routes.post('/', zValidator('json', createProviderSchema), async (c) => {
   // instantiate it, enforced here so prod can never persist a fake row.
   if (body.providerType === 'fake' && !CONFIG.allowFakeStorageProvider) {
     throw new ValidationError('Fake storage provider is not enabled in this environment');
+  }
+
+  // Domain↔type consistency: a MODEL provider type (the 4 shared by vlm + llm) belongs ONLY in a model
+  // domain (vlm or llm) and vice-versa. Without this a malformed row like {domain:'storage',
+  // providerType:'anthropic'} (or a model domain row carrying an s3 type) could persist + then be
+  // mis-routed by the domain-keyed strategy registries. (vlm-receipt-parsing T1 + llm-assistant T1.)
+  if (isModelProviderType(body.providerType) !== isModelDomain(body.domain)) {
+    throw new ValidationError(
+      'A model provider type requires domain "vlm" or "llm", and vice-versa'
+    );
   }
 
   const { encryptedCredentials, resolvedConfig } = resolveProviderCredentials(
@@ -416,14 +494,25 @@ routes.put(
     if (body.displayName !== undefined) {
       updates.displayName = body.displayName;
     }
+    const existingType = existing[0].providerType;
     if (body.config !== undefined) {
-      // Same fail-fast gate CREATE uses (C416, the #103/C349 sibling): a PUT that swaps an S3 provider's
-      // config to one missing endpoint/bucket/region would otherwise persist a 200 + a bricked row that
-      // throws on every later test/upload/sync. Validate against the EXISTING provider's type.
-      validateStorageProviderConfig(existing[0].providerType, body.config);
+      // Same fail-fast gate CREATE uses (C416, the #103/C349 sibling): a PUT that swaps a provider's
+      // config to an unusable one would otherwise persist a 200 + a bricked row that throws on every
+      // later use. Validate against the EXISTING provider's type. VLM rows get the model/baseUrl shape
+      // check; a config-only edit does NOT require the apiKey (it is already stored encrypted).
+      if (isVlmProviderType(existingType)) {
+        validateVlmConfigShape(existingType, body.config);
+      } else {
+        validateStorageProviderConfig(existingType, body.config);
+      }
       updates.config = body.config;
     }
     if (body.credentials !== undefined) {
+      // A VLM credentials update must still carry an api key for a non-ollama type (the #123 both-paths
+      // discipline — CREATE already enforces this; PUT must not let a key-required type drop to keyless).
+      if (isVlmProviderType(existingType)) {
+        validateVlmCredentials(existingType, body.credentials);
+      }
       updates.credentials = encrypt(JSON.stringify(body.credentials));
     }
 
@@ -472,14 +561,18 @@ async function cleanupStorageConfig(userId: string, providerId: string): Promise
   await preferencesRepository.update(userId, { storageConfig });
 }
 
-// Helper: clean up backup_config when a storage provider is deleted
+// Helper: clean up backup_config when a storage provider is deleted.
+// ATOMIC per #100 (Angelo-decided): instead of read → JS-delete → write (a lost-update race where a
+// concurrent settings merge clobbers this removal, or vice-versa), patch the single key to `null` in one
+// UPDATE. RFC-7386 `json_patch` deletes a key set to null, so `{ providers: { [id]: null } }` removes JUST
+// this provider's backup entry while every sibling provider's settings survive — even under a concurrent
+// write. getOrCreate first so the row exists; the early-return avoids a no-op patch when nothing's there.
 async function cleanupBackupConfig(userId: string, providerId: string): Promise<void> {
   const prefs = await preferencesRepository.getOrCreate(userId);
   if (!prefs.backupConfig?.providers?.[providerId]) return;
-  const updated = { ...prefs.backupConfig };
-  updated.providers = { ...updated.providers };
-  delete updated.providers[providerId];
-  await preferencesRepository.update(userId, { backupConfig: updated });
+  await preferencesRepository.mergeJsonField(userId, 'backupConfig', {
+    providers: { [providerId]: null },
+  });
 }
 
 // DELETE /api/v1/providers/:id — delete provider with cleanup
@@ -558,7 +651,13 @@ routes.post('/:id/backfill', zValidator('param', commonSchemas.idParam), async (
   }
 
   let created = 0;
-  await db.transaction(async (tx) => {
+  // SYNCHRONOUS transaction (#127 class, C504): the backfill inserts a photoRef per missing photo in a
+  // loop. Under the old `async` callback bun-sqlite committed each insert independently (the C151 footgun),
+  // so a throw mid-loop left a partial backfill committed while the route still 500'd. Running synchronously
+  // (inline `.all()` read + `.run()` inserts, no await) keeps the whole backfill in ONE real transaction
+  // that rolls back atomically. (The find query is inlined here as a sync `.all()` — the async
+  // findUserPhotoIds helper is unchanged for its other callers.)
+  db.transaction((tx) => {
     for (const [category, setting] of Object.entries(providerCategories)) {
       if (!setting?.enabled) continue;
       const entityTypes = CATEGORY_TO_ENTITY_TYPES[category];
@@ -573,15 +672,23 @@ routes.post('/:id/backfill', zValidator('param', commonSchemas.idParam), async (
             .where(and(eq(photoRefs.photoId, photos.id), eq(photoRefs.providerId, id)))
         );
 
-        const missingPhotos = await findUserPhotoIds(tx, entityType, user.id, notExistsClause);
+        const missingPhotos = tx
+          .select({ id: photos.id })
+          .from(photos)
+          .where(
+            and(eq(photos.entityType, entityType), eq(photos.userId, user.id), notExistsClause)
+          )
+          .all();
 
         for (const photo of missingPhotos) {
-          await tx.insert(photoRefs).values({
-            photoId: photo.id,
-            providerId: id,
-            storageRef: '',
-            status: 'pending',
-          });
+          tx.insert(photoRefs)
+            .values({
+              photoId: photo.id,
+              providerId: id,
+              storageRef: '',
+              status: 'pending',
+            })
+            .run();
           created++;
         }
       }

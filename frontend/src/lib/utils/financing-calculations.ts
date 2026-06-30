@@ -495,8 +495,14 @@ export function calculateLeaseMetrics(
 		let projectedExcessFee = 0;
 		let isOverMileage = false;
 
-		if (currentMileage !== null && initialMileage !== null && financing.mileageLimit) {
-			mileageUsed = Math.max(0, currentMileage - initialMileage);
+		// A lease with NO recorded starting odometer (the common case — initialMileage null) is treated as
+		// starting at 0, matching the sibling PaymentMetricsGrid Overage card (FinanceTab.svelte: `initialMileage
+		// ?? 0`). Without this coalesce the `!== null` gate skipped the whole block → the burn bar read "0 used /
+		// full allowance left" at a real odometer while the Overage card showed the true driven miles — an
+		// internal contradiction on the same screen (#148, Angelo-decided 2026-06-23: null/zero initial → 0).
+		const startMileage = initialMileage ?? 0;
+		if (currentMileage !== null && financing.mileageLimit) {
+			mileageUsed = Math.max(0, currentMileage - startMileage);
 			const milesPerDay = daysElapsed > 0 ? mileageUsed / daysElapsed : 0;
 			projectedFinalMileage = currentMileage + milesPerDay * daysRemaining;
 			// `totalMileageAllowance` is a DRIVEN-miles budget (annual × years) and `mileageUsed` is driven
@@ -506,7 +512,7 @@ export function calculateLeaseMetrics(
 			// `initialMileage` for any lease signed on a car with miles on it (a used-car lease, or the
 			// odometer not reset) — e.g. a 40k-mile car leased and driven on-pace showed a large phantom
 			// excess fee. (Sibling to #64, which fixed the allowance scaling but left this space mismatch.)
-			const projectedDrivenMiles = Math.max(0, projectedFinalMileage - initialMileage);
+			const projectedDrivenMiles = Math.max(0, projectedFinalMileage - startMileage);
 			projectedExcessMiles = Math.max(0, projectedDrivenMiles - totalMileageAllowance);
 			projectedExcessFee = projectedExcessMiles * (financing.excessMileageFee || 0);
 			isOverMileage = projectedExcessMiles > 0;

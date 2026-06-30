@@ -18,6 +18,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -25,17 +26,6 @@ beforeEach(async () => {
   ctx = await createTestApp();
 });
 afterEach(() => ctx.close());
-
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Mazda',
-    model: '3',
-    year: 2019,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
 
 function reminderRow(id: string): { is_active: number } {
   return ctx.sqlite.query('SELECT is_active FROM reminders WHERE id = ?').get(id) as {
@@ -45,7 +35,7 @@ function reminderRow(id: string): { is_active: number } {
 
 describe('fastForwardPastNow honors endDate (bug #12)', () => {
   test('a lapsed bounded reminder past the catch-up cap is deactivated, not left active', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Mazda', model: '3', year: 2019 });
 
     // Weekly, starting 2024-01-01. maxCatchUp = 12 → the main loop processes ~12 weekly
     // occurrences (through ~2024-03-25) then hits the cap and hands off to fastForwardPastNow.
@@ -81,7 +71,7 @@ describe('fastForwardPastNow honors endDate (bug #12)', () => {
   // the after-loop guard does. Monthly from far past → blows past the 12-occurrence cap into
   // fastForwardPastNow. Pre-fix this stays active (is_active=1); the fix deactivates it.
   test('a bounded reminder whose endDate lands in the period straddling now is deactivated, not advanced past it', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Mazda', model: '3', year: 2019 });
 
     // endDate one second before the server's `now`: it sits inside the final monthly period (which
     // contains now) and at/after the last <=now monthly step (a monthly grid won't land in the last

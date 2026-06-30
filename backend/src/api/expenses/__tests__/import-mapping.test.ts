@@ -309,7 +309,7 @@ describe('applyMapping → buildImportPlan round-trip (the consumable-output pro
     if (!exp) throw new Error('expected a ready row with a resolved expense');
     expect(exp.vehicleId).toBe('veh-1'); // targetVehicle resolved within the user's garage
     expect(exp.category).toBe('fuel'); // 'Gas' → fuel via categoryMap
-    expect(exp.expenseAmount).toBeCloseTo(52.4, 2); // comma decimal normalized
+    expect(exp.expenseAmount).toBe(5240); // "52,40" comma-decimal → $52.40 → 5240 cents (money-cents-migration)
     expect(exp.mileage).toBe(100); // 160.9344 km → 100 mi
     expect(exp.volume).toBeCloseTo(10, 2); // 37.854 L → ~10 US gal
     expect(exp.date.getFullYear()).toBe(2024); // dmy parsed, local day kept

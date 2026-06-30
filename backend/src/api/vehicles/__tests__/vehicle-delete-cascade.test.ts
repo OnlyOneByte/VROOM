@@ -23,6 +23,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle as seedVehicleShared } from '../../../test-helpers/seed';
 import { ENTITY_TO_CATEGORY } from '../../providers/domains/storage/storage-provider';
 
 let ctx: TestApp;
@@ -48,16 +49,10 @@ function photoCount(entityType: string, entityId: string): number {
   return row.n;
 }
 
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Toyota',
-    model: 'Camry',
-    year: 2022,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
+// This file's fixture is the shared default vehicle (Toyota Camry 2022); converge onto the shared
+// test-helpers/seed seedVehicle (arch convergence, Angelo-approved) — no opts needed since the default
+// matches exactly. A thin no-arg wrapper keeps the call sites untouched.
+const seedVehicle = (): Promise<string> => seedVehicleShared(ctx);
 
 async function seedExpense(vehicleId: string): Promise<string> {
   const res = await ctx.authed('POST', '/api/v1/expenses', {
@@ -108,6 +103,35 @@ describe('vehicle deletion cascades photo cleanup to dependent entities', () => 
       photoCount('expense', expenseId),
       'expense photo rows should be cleaned up on direct expense delete'
     ).toBe(0);
+  });
+
+  // trips-location (C202 schema + C207 cascade guard): trips.vehicle_id is ON DELETE cascade (migration
+  // 0007; the raw-SQL cascade is unit-pinned in migration-0007.test.ts). This pins it END-TO-END through the
+  // REAL vehicle-delete ROUTE — a trip is gone after its vehicle is deleted (no orphaned trip rows leaking
+  // into analytics / the mileage-summary, NORTH_STAR #2). Trips are NOT a photo-upload entity type (the
+  // C207 bug-scout verified `trip` is absent from the photo allowlist + ENTITY_TO_CATEGORY, so the
+  // photo-cleanup block correctly needs no trips leg; the C452 guard above keeps that drift-proof if trip
+  // photos are ever added). Seed the trip directly (no create route until T3 — the cascade is FK-level).
+  test('deleting a vehicle CASCADE-removes its trips (no orphaned trip rows)', async () => {
+    const vehicleId = await seedVehicle();
+    ctx.sqlite.run(
+      `INSERT INTO trips (id, vehicle_id, user_id, start_odometer, end_odometer, purpose, trip_date)
+       VALUES ('trip-casc', ?, ?, 1000, 1080, 'business', 1700000000)`,
+      [vehicleId, ctx.user.id]
+    );
+    const tripCount = (vid: string): number =>
+      (
+        ctx.sqlite.query('SELECT COUNT(*) AS n FROM trips WHERE vehicle_id = ?').get(vid) as {
+          n: number;
+        }
+      ).n;
+    expect(tripCount(vehicleId)).toBe(1);
+
+    const del = await ctx.authed('DELETE', `/api/v1/vehicles/${vehicleId}`);
+    expect(del.status, await del.text()).toBe(200);
+
+    // The vehicle's trip is FK-cascade-deleted — no orphan survives the delete.
+    expect(tripCount(vehicleId), 'trip rows should cascade away with their vehicle').toBe(0);
   });
 
   test("deleting a vehicle removes its odometer entries' photo rows (no orphans)", async () => {
@@ -421,5 +445,39 @@ describe('C452 — every photo-bearing entity type is reaped on vehicle-delete O
     // Non-vacuity floor — if the registry were empty/renamed away, the loop above would vacuously pass.
     expect(Object.keys(ENTITY_TO_CATEGORY).length).toBeGreaterThanOrEqual(5);
     expect(ENTITY_TO_CATEGORY.vehicle).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// C234 deep-review fix: the post-delete reminder cleanups (#88 pruneSplitConfigsForDeletedVehicle + #97
+// deactivateVehicleless) run AFTER vehicleRepository.delete() commits + the DB FK-cascade has already
+// dropped the reminder_vehicles junction. They were `await`ed UNGUARDED, so a hiccup in either 500'd a
+// delete whose vehicle was already gone → the FE shows "failed", the user retries (a confusing 404), AND
+// the very normalization #88/#97 exist for never ran. They're best-effort (the next /trigger re-runs the
+// same normalization, so a missed pass self-heals); the route now wraps them in a log+swallow try/catch.
+// This pins that contract: a cleanup throw must NOT fail the (completed) delete. (The C233 best-effort-
+// contract class — sibling of the trip-create createFromTrip fix.)
+describe('C234 — a post-delete reminder-cleanup throw does NOT fail the (completed) vehicle delete', () => {
+  test('deactivateVehicleless throwing still returns 200 + the vehicle is deleted', async () => {
+    const vehicleId = await seedVehicle();
+    const { reminderRepository } = await import('../../reminders/repository');
+    const original = reminderRepository.deactivateVehicleless.bind(reminderRepository);
+    // Simulate a DB hiccup in the post-delete cleanup (after the vehicle + junction are already gone).
+    reminderRepository.deactivateVehicleless = async () => {
+      throw new Error('simulated cleanup hiccup');
+    };
+    try {
+      const del = await ctx.authed('DELETE', `/api/v1/vehicles/${vehicleId}`);
+      expect(del.status, await del.text()).toBe(200);
+      // The delete the user asked for is DONE despite the cleanup failure (no orphaned 500).
+      const n = (
+        ctx.sqlite.query('SELECT COUNT(*) AS n FROM vehicles WHERE id = ?').get(vehicleId) as {
+          n: number;
+        }
+      ).n;
+      expect(n).toBe(0);
+    } finally {
+      reminderRepository.deactivateVehicleless = original;
+    }
   });
 });

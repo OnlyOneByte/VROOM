@@ -114,16 +114,14 @@ describe('presetToMapping → applyMapping (presets feed a valid T1 ColumnMappin
   });
 });
 
-// C32 CHARACTERIZATION (the C31 eyes-on finding, flagged to Angelo): the built-in fuel-log presets map
-// NO category column (Fuelly/Fuelio/Drivvo refuel exports have no category field — they're definitionally
-// all fuel). applyMapping emits a BLANK category cell, and mapCategory deliberately leaves a blank blank
-// (the D2 "never invent a category" rule), so buildImportPlan errors EVERY row "Unknown category" →
-// readyCount 0. Net: a perfectly-detected fuel log imports NOTHING today. These tests PIN that current
-// behavior so the recommended fix (give each fuel preset a defaultCategory:'fuel') is a deliberate,
-// net-flipping change — when it lands, the `category` expectation flips to 'fuel' and readyCount to N,
-// and these tests are the ones to update. (Distinct from the round-trip test in import-mapping.test.ts,
-// which hand-adds a category column to the mapping and so never exercises the REAL presets' gap.)
-describe('MAPPING_PRESETS — category-column gap (C31 finding, characterization)', () => {
+// C148 FIX (Angelo-approved 2026-06-23, was the C31/C32 finding): the built-in fuel-log presets map NO
+// category column (Fuelly/Fuelio/Drivvo refuel exports have no category field — they're definitionally
+// all fuel), so applyMapping emitted a BLANK category cell and buildImportPlan errored EVERY row
+// "Unknown category" → 0 ready. The fix gives each fuel preset `defaultCategory:'fuel'`, which fills ONLY
+// a blank category cell (a NAMED-but-unrecognized word still falls back to misc — the C47 remap path is
+// unchanged). These tests now PIN the fixed behavior: a detected fuel log produces ready `fuel` rows.
+// (The C32 characterization that asserted 0-ready was flipped here when the fix landed.)
+describe('MAPPING_PRESETS — fuel-tracker defaultCategory (C148, Angelo-approved fix)', () => {
   const vehicles: ImportVehicle[] = [
     { id: 'veh-1', make: 'Honda', model: 'Civic', year: 2020, nickname: 'Daily Driver' },
   ];
@@ -141,16 +139,22 @@ describe('MAPPING_PRESETS — category-column gap (C31 finding, characterization
     ].join('\n'),
   };
 
-  test('NONE of the presets map a category column (the root of the gap)', () => {
+  test('NONE of the presets map a category column (why the defaultCategory is needed)', () => {
     for (const preset of MAPPING_PRESETS) {
       expect(
         preset.columns.category,
-        `${preset.id} should have no category column today`
+        `${preset.id} should have no category column`
       ).toBeUndefined();
     }
   });
 
-  test('every preset currently yields 0 ready rows — "Unknown category" (pins the gap end-to-end)', () => {
+  test('every fuel-tracker preset declares defaultCategory: fuel', () => {
+    for (const preset of MAPPING_PRESETS) {
+      expect(preset.defaultCategory, `${preset.id} defaultCategory`).toBe('fuel');
+    }
+  });
+
+  test('every preset now yields READY fuel rows end-to-end (the fix flips 0-ready → fuel)', () => {
     for (const preset of MAPPING_PRESETS) {
       const mapping = presetToMapping(preset, 'Daily Driver');
       const csv = PRESET_ROWS[preset.id];
@@ -161,12 +165,90 @@ describe('MAPPING_PRESETS — category-column gap (C31 finding, characterization
         distanceUnit: DistanceUnit.MILES,
         volumeUnit: VolumeUnit.GALLONS_US,
       });
-      const plan = buildImportPlan(native.csv, vehicles);
+      // applyMapping itself stamps the blank category cell with the preset default.
+      const [, firstRow] = native.csv.split('\n');
+      expect(firstRow.split(',')[2], `${preset.id} native category cell`).toBe('fuel');
 
-      // CURRENT behavior: the row maps + the vehicle resolves, but the blank category fails validation.
-      expect(plan.readyCount, `${preset.id} ready count (pre-defaultCategory fix)`).toBe(0);
-      expect(plan.errorCount, `${preset.id} error count`).toBe(1);
-      expect(plan.rows[0]?.message, `${preset.id} error message`).toMatch(/category/i);
+      const plan = buildImportPlan(native.csv, vehicles);
+      // FIXED behavior: the blank category is defaulted to fuel, so the row validates ready.
+      expect(plan.readyCount, `${preset.id} ready count (post-defaultCategory fix)`).toBe(1);
+      expect(plan.errorCount, `${preset.id} error count`).toBe(0);
+      expect(plan.rows[0]?.expense?.category, `${preset.id} committed category`).toBe('fuel');
     }
+  });
+
+  test('defaultCategory fills ONLY a blank cell — a NAMED-but-unknown word still falls back to misc', () => {
+    // A row that DOES carry a category column with an unrecognized word must NOT be silently coerced
+    // to the default; it stays the misc fallback + is reported as unmapped (the C47/D2 path is intact).
+    const mapping = presetToMapping(MAPPING_PRESETS[0], 'Daily Driver');
+    mapping.columns = { ...mapping.columns, category: 'Cat' };
+    const csv = [
+      'Date,Odometer,Fill Amount,Price,Fuel Type,Notes,Cat',
+      '03/01/2026,30000,9,36.00,Gas,x,Sparkplugs',
+    ].join('\n');
+    const { csv: native, unmappedCategories } = applyMapping(csv, mapping, {
+      distanceUnit: DistanceUnit.MILES,
+      volumeUnit: VolumeUnit.GALLONS_US,
+    });
+    expect(native.split('\n')[1].split(',')[2]).toBe('misc'); // NOT 'fuel'
+    expect(unmappedCategories).toContain('Sparkplugs');
+  });
+});
+
+// C151 DEEP-REVIEW (certify + guard): the C148 `defaultCategory` change composes safely with the import
+// write-path invariants — verified firsthand, no defect. Two previously-untested intersections (the C148
+// tests only covered fuel rows WITH complete volume+mileage):
+//   (1) A blank-category row defaulted to `fuel` that LACKS volume/mileage must NOT slip through — parseRow's
+//       fuel-completeness gate (import-csv.ts:252, mirroring the POST route) still fires → a clean per-row
+//       error, readyCount 0, NO bad insert. The default fills the category cell; it does NOT bypass validation.
+//   (2) `defaultCategory` is schema-typed as any ExpenseCategory. A NON-fuel default (e.g. 'maintenance') on a
+//       row carrying a stray odometer/volume must have those fuel-only fields NULLED by clearImportedFuelFields
+//       (#137/C448, the import mirror of clearFuelFieldsIfNotFuel) so it can't poison getCurrentOdometer's
+//       cross-category MAX(odometer) — exactly as a named-non-fuel row does. The default doesn't create a
+//       fuel-field-leak path. Pins both so a future change to defaultCategory handling can't silently regress
+//       either (drop the line-252 gate → case 1 RED; drop clearImportedFuelFields → case 2 RED).
+describe('defaultCategory × import write-path hygiene (C151 deep-review guard)', () => {
+  const vehicles: ImportVehicle[] = [
+    { id: 'veh-1', make: 'Honda', model: 'Civic', year: 2020, nickname: 'Daily Driver' },
+  ];
+
+  test('a defaulted-fuel row MISSING volume/mileage is a clean per-row error, not a bad insert', () => {
+    // A detected fuel tracker with NO volume column mapped + a row with no fuel data: the default sets
+    // category=fuel, but the fuel-completeness gate must still reject it (no silent partial fuel row).
+    const { csv: native } = applyMapping(
+      ['Date,Odometer,Price', '03/01/2026,30000,36.00'].join('\n'),
+      {
+        source: 'fuelly',
+        columns: { date: 'Date', mileage: 'Odometer', amount: 'Price' }, // deliberately NO volume
+        targetVehicle: 'Daily Driver',
+        dateFormat: 'mdy',
+        defaultCategory: 'fuel',
+      },
+      {}
+    );
+    expect(native.split('\n')[1].split(',')[2]).toBe('fuel'); // the blank cell WAS defaulted to fuel
+    const plan = buildImportPlan(native, vehicles);
+    expect(plan.readyCount).toBe(0);
+    expect(plan.errorCount).toBe(1);
+    expect(plan.rows[0]?.message).toMatch(/fuel/i); // "Fuel rows require fuel amount and mileage"
+  });
+
+  test('a NON-fuel defaultCategory still nulls a stray odometer/volume (no getCurrentOdometer poison)', () => {
+    const { csv: native } = applyMapping(
+      ['Date,Odometer,Volume,Price', '03/01/2026,99999,40,200.00'].join('\n'),
+      {
+        columns: { date: 'Date', mileage: 'Odometer', volume: 'Volume', amount: 'Price' },
+        targetVehicle: 'Daily Driver',
+        dateFormat: 'mdy',
+        defaultCategory: 'maintenance',
+      },
+      {}
+    );
+    const plan = buildImportPlan(native, vehicles);
+    const exp = plan.rows[0]?.expense;
+    expect(plan.readyCount).toBe(1);
+    expect(exp?.category).toBe('maintenance');
+    expect(exp?.mileage).toBeNull(); // stray odometer NULLED (clearImportedFuelFields), not persisted
+    expect(exp?.volume).toBeNull();
   });
 });

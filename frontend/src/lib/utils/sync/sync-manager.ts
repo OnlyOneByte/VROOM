@@ -12,9 +12,11 @@ import {
 	type SyncConfig
 } from './sync-state.svelte';
 import {
+	clearSyncedExpenses,
 	getPendingExpenses,
 	isIncompleteFuelExpense,
 	markExpenseAsSynced,
+	markExpenseNeedsAttention,
 	offlineExpenseToBackend,
 	type OfflineExpense
 } from '../offline-storage';
@@ -40,6 +42,8 @@ interface SyncResult {
 	success: boolean;
 	synced: number;
 	failed: number;
+	/** Count of rows parked as permanently-unsyncable this run (#79) — surfaced, not retried. */
+	needsAttention: number;
 	conflicts: SyncConflict[];
 	errors: string[];
 }
@@ -105,6 +109,14 @@ class SyncManager {
 			const pendingExpenses = getPendingExpenses();
 			const result = await this.syncExpenses(pendingExpenses);
 
+			// #135: reap the rows that successfully synced this run so localStorage does not grow unbounded.
+			// syncExpenses marks each successful row `synced:true` (leaving pending/conflict/needs-attention
+			// rows untouched), and clearSyncedExpenses drops ONLY `synced` rows — so this is safe to run
+			// regardless of the run's overall outcome: a partial run reaps just the synced rows and keeps the
+			// rest for the next attempt. (The legacy syncOfflineExpenses already reaped this way; SyncManager
+			// previously only marked synced and never cleared, so synced rows lingered forever — the #135 leak.)
+			clearSyncedExpenses();
+
 			if (result.success && result.conflicts.length === 0) {
 				lastSyncTime.current = new Date();
 				syncState.current = 'success';
@@ -133,6 +145,7 @@ class SyncManager {
 			success: true,
 			synced: 0,
 			failed: 0,
+			needsAttention: 0,
 			conflicts: [],
 			errors: []
 		};
@@ -152,6 +165,16 @@ class SyncManager {
 						this.retryCount.delete(expense.id);
 					} else if (syncResult.conflict) {
 						result.conflicts.push(syncResult.conflict);
+					} else if (syncResult.permanent) {
+						// #79: a structurally-unsyncable row (e.g. malformed fuel entry) fails the same way every
+						// attempt. PARK it as needs-attention instead of scheduling retries — it drops out of
+						// getPendingExpenses so it's never silently re-attempted again, and is surfaced via
+						// getNeedsAttentionExpenses for the user to fix or discard. NOT counted as a transient
+						// failure (it won't self-resolve), so it doesn't flip result.success on its own.
+						markExpenseNeedsAttention(expense.id);
+						this.retryCount.delete(expense.id);
+						result.needsAttention++;
+						result.errors.push(syncResult.error || 'Entry needs attention');
 					} else {
 						result.failed++;
 						result.errors.push(syncResult.error || 'Unknown error');
@@ -182,6 +205,8 @@ class SyncManager {
 		success: boolean;
 		conflict?: SyncConflict;
 		error?: string;
+		/** True when the failure is structural + self-resolving-impossible (retrying can't help) — #79. */
+		permanent?: boolean;
 	}> {
 		try {
 			const existingExpense = await this.checkForExistingExpense(expense);
@@ -197,8 +222,12 @@ class SyncManager {
 			}
 
 			if (isIncompleteFuelExpense(expense)) {
+				// A malformed fuel row (no volume/charge or no mileage) fails IDENTICALLY on every attempt —
+				// it's permanently unsyncable until the user edits it. Flag it permanent so syncExpenses parks
+				// it (needsAttention) instead of burning retries + silently re-attempting it forever (#79).
 				return {
 					success: false,
+					permanent: true,
 					error:
 						'Fuel expenses require volume/charge and mileage data. Please edit the expense and add the missing information.'
 				};

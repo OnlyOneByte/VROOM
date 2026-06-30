@@ -8,6 +8,13 @@ import type { ApiResponse } from '../../errors';
 import { ConflictError, NotFoundError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { getPeriodStartDate, sortExpensesByDate } from '../../utils/calculations';
+import { logger } from '../../utils/logger';
+import { financingWithBalanceToApi, moneyDollarsToCents, vehicleToApi } from '../../utils/money';
+import {
+  requireVehicleRead,
+  resolveVehicleAccess,
+  resolveVehicleOwnerId,
+} from '../../utils/sharing';
 import {
   mergeUnitPreferences,
   partialUnitPreferencesSchema,
@@ -21,6 +28,7 @@ import { odometerRepository } from '../odometer/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
 import { reminderRepository } from '../reminders/repository';
 import { preferencesRepository } from '../settings/repository';
+import { vehicleShareRepository } from '../shares/repository';
 import { photoRoutes } from './photo-routes';
 import { vehicleRepository } from './repository';
 
@@ -68,7 +76,11 @@ const baseVehicleSchema = createInsertSchema(vehiclesTable, {
     )
     .optional(),
   initialMileage: z.number().int().min(0, 'Initial mileage cannot be negative').optional(),
-  purchasePrice: z.number().min(0, 'Purchase price cannot be negative').optional(),
+  // money (T3): client sends DOLLARS, store integer CENTS. The update schema re-derives this via
+  // baseVehicleSchema.shape.purchasePrice.nullish(), so the transform propagates to both create + update.
+  purchasePrice: moneyDollarsToCents((n) =>
+    n.min(0, 'Purchase price cannot be negative')
+  ).optional(),
   purchaseDate: z.coerce.date().optional(),
 });
 
@@ -123,6 +135,23 @@ routes.use('*', changeTracker);
 routes.route('/:vehicleId/photos', photoRoutes);
 
 /**
+ * T6 display edge for a vehicle API object: convert the vehicle's own money (purchasePrice) AND its
+ * embedded financing (money columns + the derived computedBalance) from integer CENTS → dollars. A
+ * vehicle row may carry a nested `financing` object (enriched with computedBalance/eligibleForPayoff);
+ * eligibleForPayoff is computed on the cents balance so it is copied through unchanged. Pure, shallow.
+ */
+function vehicleRowToApi<T extends Record<string, unknown>>(row: T): T {
+  const v = vehicleToApi(row);
+  const fin = v.financing as Record<string, unknown> | null | undefined;
+  // The embedded financing (money + derived computedBalance) goes through the SHARED
+  // financingWithBalanceToApi — identical to what the financing route returns (C22 dedup of the C14 self-dup).
+  if (fin && typeof fin === 'object') {
+    return { ...v, financing: financingWithBalanceToApi(fin) };
+  }
+  return v;
+}
+
+/**
  * Assert a license plate is free within THIS user's fleet (plate uniqueness is per-user, not global —
  * see findByLicensePlate + migration 0005, the #80 fix). One source of truth for the create + update
  * checks (C289 dedup): the conflict message + the per-user-scoped lookup lived in two hand-rolled
@@ -141,20 +170,52 @@ async function assertLicensePlateAvailable(
   }
 }
 
-// GET /api/vehicles - List user's vehicles (including shared)
-routes.get('/', async (c) => {
+// GET /api/vehicles - List the user's own vehicles. With ?include=shared, ALSO append vehicles shared
+// TO the user via an ACCEPTED share (vehicle-sharing T5a, R3). Shared rows carry a `sharedAccess`
+// annotation ({ level, sharedBy }) so the fleet UI can badge "shared by X" and gate edit affordances by
+// level; owned rows are unchanged (no annotation). The widening is READ-ONLY + additive — it does not
+// touch the expense read/write model (T5b, the editor-write widening, is escalated to Angelo).
+const listVehiclesQuerySchema = z.object({
+  include: z.enum(['shared']).optional(),
+});
+routes.get('/', zValidator('query', listVehiclesQuerySchema), async (c) => {
   const user = c.get('user');
+  const { include } = c.req.valid('query');
 
   const userVehicles = await vehicleRepository.findByUserId(user.id);
 
+  // ?include=shared: fetch the vehicles the user has ACCEPTED-share access to (owned by others) and
+  // annotate each with its access level + owner name. Resolved via the shares repo (accepted-only).
+  let sharedRows: Array<
+    (typeof userVehicles)[number] & {
+      sharedAccess: { level: string; sharedBy: string };
+    }
+  > = [];
+  if (include === 'shared') {
+    const grants = await vehicleShareRepository.findAcceptedAccessForUser(user.id);
+    if (grants.length > 0) {
+      const byVehicleId = new Map(grants.map((g) => [g.vehicleId, g]));
+      const sharedVehicles = await vehicleRepository.findByIds([...byVehicleId.keys()]);
+      sharedRows = sharedVehicles.map((v) => {
+        const g = byVehicleId.get(v.id);
+        return {
+          ...v,
+          sharedAccess: { level: g?.level ?? 'viewer', sharedBy: g?.ownerName ?? 'Unknown' },
+        };
+      });
+    }
+  }
+
+  const allVehicles = [...userVehicles, ...sharedRows];
+
   // Enrich financing with computed balance. Batch all balances in two queries
   // (computeBalances) instead of an N+1 over each financed vehicle.
-  const financingIds = userVehicles
+  const financingIds = allVehicles
     .map((v) => v.financing?.id)
     .filter((id): id is string => id !== undefined);
   const balances = await financingRepository.computeBalances(financingIds);
 
-  const enrichedVehicles = userVehicles.map((v) => {
+  const enrichedVehicles = allVehicles.map((v) => {
     if (v.financing) {
       const computedBalance = balances.get(v.financing.id) ?? 0;
       return { ...v, financing: withComputedBalance(v.financing, computedBalance) };
@@ -162,10 +223,12 @@ routes.get('/', async (c) => {
     return v;
   });
 
-  const response: ApiResponse<typeof enrichedVehicles> = {
+  // T6 display edge: vehicle purchasePrice + embedded financing money/balance cents → dollars.
+  const apiVehicles = enrichedVehicles.map(vehicleRowToApi);
+  const response: ApiResponse<typeof apiVehicles> = {
     success: true,
-    data: enrichedVehicles,
-    message: `Found ${enrichedVehicles.length} vehicle${enrichedVehicles.length !== 1 ? 's' : ''}`,
+    data: apiVehicles,
+    message: `Found ${apiVehicles.length} vehicle${apiVehicles.length !== 1 ? 's' : ''}`,
   };
 
   return c.json(response);
@@ -196,22 +259,49 @@ routes.post('/', zValidator('json', createVehicleSchema), async (c) => {
 
   const response: ApiResponse<typeof createdVehicle> = {
     success: true,
-    data: createdVehicle,
+    data: vehicleRowToApi(createdVehicle),
     message: 'Vehicle created successfully',
   };
 
   return c.json(response, 201);
 });
 
-// GET /api/vehicles/:id - Get specific vehicle (with shared access)
+// GET /api/vehicles/:id - Get specific vehicle (owner OR shared viewer/editor).
+// vehicle-sharing T12b-3 (BE): the single-vehicle GET widens to shared READ via the resolver seam, and
+// returns a `sharedAccess { level, sharedBy }` annotation for a NON-owner (the same shape the fleet-list
+// ?include=shared path emits) so the FE [id] page can gate its edit affordances by level — a VIEWER sees
+// no edit/delete/share controls, an EDITOR sees expense/odometer write affordances but NOT the owner-only
+// ones (delete vehicle, financing, share management, which stay strict server-side). An OWNER response is
+// unchanged (no sharedAccess). A stranger gets the same 404 (existence-hiding) as a missing vehicle.
 routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
 
-  const vehicle = await vehicleRepository.findByIdWithAccess(id, user.id);
+  // Resolve access first: owner | viewer | editor | null. Null → 404 (never 403, the #80 oracle rule).
+  const access = await resolveVehicleAccess(id, user.id);
+  if (!access) {
+    throw new NotFoundError('Vehicle');
+  }
+
+  // Load the vehicle. For the OWNER this is their own row (findByIdWithAccess returns owner-only); for a
+  // shared invitee load by id (access already proven via the resolver), so the editor/viewer sees the row.
+  const vehicle =
+    access.role === 'owner'
+      ? await vehicleRepository.findByIdWithAccess(id, user.id)
+      : ((await vehicleRepository.findByIds([id]))[0] ?? null);
 
   if (!vehicle) {
     throw new NotFoundError('Vehicle');
+  }
+
+  // For a NON-owner, attach the sharedAccess annotation (level + owner displayName) — the same shape the
+  // ?include=shared fleet list emits. Resolved from the accepted-grants list (accepted-only, carries the
+  // owner name); the resolver already proved an accepted share exists, so the find is a label lookup.
+  let sharedAccess: { level: string; sharedBy: string } | undefined;
+  if (access.role !== 'owner') {
+    const grants = await vehicleShareRepository.findAcceptedAccessForUser(user.id);
+    const grant = grants.find((g) => g.vehicleId === id);
+    sharedAccess = { level: grant?.level ?? access.role, sharedBy: grant?.ownerName ?? 'Unknown' };
   }
 
   // Enrich financing with computed balance so the frontend can show progress
@@ -220,6 +310,7 @@ routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
       computedBalance?: number;
       eligibleForPayoff?: boolean;
     };
+    sharedAccess?: { level: string; sharedBy: string };
   } = vehicle;
   if (vehicle.financing) {
     const computedBalance = await financingRepository.computeBalance(vehicle.financing.id);
@@ -228,10 +319,13 @@ routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
       financing: withComputedBalance(vehicle.financing, computedBalance),
     };
   }
+  if (sharedAccess) {
+    responseData = { ...responseData, sharedAccess };
+  }
 
   const response: ApiResponse<typeof responseData> = {
     success: true,
-    data: responseData,
+    data: vehicleRowToApi(responseData),
   };
 
   return c.json(response);
@@ -272,7 +366,7 @@ routes.put(
 
     return c.json({
       success: true,
-      data: updatedVehicle,
+      data: vehicleRowToApi(updatedVehicle),
       message: 'Vehicle updated successfully',
     });
   }
@@ -302,16 +396,30 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
 
   await vehicleRepository.delete(id);
 
-  // #88: the reminder_vehicles junction cascades, but a reminder's `expenseSplitConfig` JSON blob is NOT
-  // FK-managed — its leg for the deleted vehicle lingers, so the next trigger builds a split sibling for
-  // the dead vehicleId → an FK violation that leaves the surviving legs half-committed (C151 footgun).
-  // Prune the deleted leg + renormalize FIRST (clears the blob when <2 legs remain).
-  await reminderRepository.pruneSplitConfigsForDeletedVehicle(user.id, id);
+  // Post-delete reminder cleanups (#88 + #97). These run AFTER the vehicle is already deleted (the DB
+  // FK-cascade has already dropped the reminder_vehicles junction rows), so they're best-effort: the
+  // delete the user asked for is DONE, and a cleanup hiccup must NOT 500 a successful delete — that would
+  // show "failed", prompt a retry (→ a confusing 404), AND leave the very states these calls prevent
+  // (orphaned split-config legs / vehicleless active reminders) un-fixed because the throw skipped them.
+  // The next reminder /trigger re-runs the same normalization, so a missed pass self-heals. (C234, the
+  // C233 best-effort-contract class on the vehicle-delete path.) Log + swallow; return the earned 200.
+  try {
+    // #88: the reminder_vehicles junction cascades, but a reminder's `expenseSplitConfig` JSON blob is NOT
+    // FK-managed — its leg for the deleted vehicle lingers, so the next trigger builds a split sibling for
+    // the dead vehicleId → an FK violation that leaves the surviving legs half-committed (C151 footgun).
+    // Prune the deleted leg + renormalize FIRST (clears the blob when <2 legs remain).
+    await reminderRepository.pruneSplitConfigsForDeletedVehicle(user.id, id);
 
-  // #97: the reminder_vehicles junction rows cascade away with the vehicle, but a reminder whose
-  // sole/last vehicle was this one is left active with ZERO vehicles — the trigger skips it
-  // 'no_vehicles' forever with no user signal. Deactivate any such now-vehicleless active reminder.
-  await reminderRepository.deactivateVehicleless(user.id);
+    // #97: the reminder_vehicles junction rows cascade away with the vehicle, but a reminder whose
+    // sole/last vehicle was this one is left active with ZERO vehicles — the trigger skips it
+    // 'no_vehicles' forever with no user signal. Deactivate any such now-vehicleless active reminder.
+    await reminderRepository.deactivateVehicleless(user.id);
+  } catch (error) {
+    logger.error('Post-delete reminder cleanup failed (vehicle already deleted)', {
+      vehicleId: id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   return c.json({
     success: true,
@@ -334,13 +442,25 @@ routes.get(
     const { id } = c.req.valid('param');
     const { period } = c.req.valid('query');
 
-    // Verify vehicle exists and belongs to user
-    const vehicle = await validateVehicleOwnership(id, user.id);
+    // vehicle-sharing T12b-3c: per-vehicle stats READ widening — owner | accepted viewer/editor | 404
+    // (the sibling of the T8a analytics reads; this stat card on the [id] overview was the one
+    // per-vehicle read the viewer-mode page still fired owner-only). Shared rows are OWNER-stamped, so
+    // scope the fuel-expense + odometer queries to the OWNER's books (an invitee's own id → empty).
+    const access = await requireVehicleRead(id, user.id);
+    const ownerId =
+      access.role === 'owner' ? user.id : ((await resolveVehicleOwnerId(id)) ?? user.id);
+    const vehicle =
+      access.role === 'owner'
+        ? await vehicleRepository.findByIdWithAccess(id, user.id)
+        : ((await vehicleRepository.findByIds([id]))[0] ?? null);
+    if (!vehicle) {
+      throw new NotFoundError('Vehicle');
+    }
 
-    // Get all fuel expenses for this vehicle
+    // Get all fuel expenses for this vehicle (OWNER-scoped — shared rows ride the owner's books).
     const fuelExpenses = await expenseRepository.findAll({
       vehicleId: id,
-      userId: user.id,
+      userId: ownerId,
       category: 'fuel',
     });
 
@@ -368,7 +488,7 @@ routes.get(
     // (the D2 helper the mileage trigger uses) — period-independent by design, so a
     // consumer that needs the vehicle's true odometer (lease overage, loan miles-used)
     // can use it instead of the period-scoped stat. Additive: currentMileage is unchanged.
-    const currentOdometer = await odometerRepository.getCurrentOdometer(id, user.id);
+    const currentOdometer = await odometerRepository.getCurrentOdometer(id, ownerId);
 
     return c.json({
       success: true,

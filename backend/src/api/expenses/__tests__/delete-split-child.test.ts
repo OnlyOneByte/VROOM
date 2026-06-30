@@ -15,12 +15,8 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import {
-  createTestApp,
-  type DataEnvelope,
-  json,
-  type TestApp,
-} from '../../../test-helpers/http-client';
+import { createTestApp, json, type TestApp } from '../../../test-helpers/http-client';
+import { seedVehicle as seedVehicleShared } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -29,12 +25,11 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-async function seedVehicle(make: string): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', { make, model: 'Test', year: 2021 });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
+// This file's fixtures are make-only ("Honda"/"Toyota" with a constant model/year); converge onto the
+// shared seedVehicle (arch convergence, Angelo-approved) via a thin make-param wrapper that preserves the
+// exact prior payload (model 'Test', year 2021) so behavior is unchanged (the shared default is a Camry).
+const seedVehicle = (make: string): Promise<string> =>
+  seedVehicleShared(ctx, { make, model: 'Test', year: 2021 });
 
 interface SplitEnvelope {
   data: { siblings: Array<{ id: string; groupId: string; amount: number }>; groupId: string };

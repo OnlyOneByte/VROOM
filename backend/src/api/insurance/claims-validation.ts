@@ -8,6 +8,7 @@
 
 import { z } from 'zod';
 import { CONFIG } from '../../config';
+import { moneyDollarsToCents } from '../../utils/money';
 
 const ins = CONFIG.validation.insurance;
 
@@ -20,7 +21,8 @@ export const createClaimSchema = z.object({
   claimType: z.enum(CLAIM_TYPES),
   description: z.string().max(ins.coverageDescriptionMaxLength).optional(),
   status: z.enum(CLAIM_STATUSES).optional().default('filed'),
-  payoutAmount: z.number().min(0, 'Payout must be non-negative').optional(),
+  // money (T3): client sends DOLLARS, store integer CENTS.
+  payoutAmount: moneyDollarsToCents((n) => n.min(0, 'Payout must be non-negative')).optional(),
   faultDesignation: z.enum(FAULT_DESIGNATIONS).optional(),
   // Optional links to a specific term / vehicle on the same policy.
   termId: z.string().min(1).optional(),
@@ -37,7 +39,8 @@ export const updateClaimSchema = z
     // only way the client can signal "clear this" is to send `null`.
     description: z.string().max(ins.coverageDescriptionMaxLength).nullish(),
     status: z.enum(CLAIM_STATUSES).optional(),
-    payoutAmount: z.number().min(0, 'Payout must be non-negative').nullish(),
+    // money (T3): DOLLARS → CENTS; .nullish() passes null (clear) / undefined (unchanged) untransformed.
+    payoutAmount: moneyDollarsToCents((n) => n.min(0, 'Payout must be non-negative')).nullish(),
     faultDesignation: z.enum(FAULT_DESIGNATIONS).nullish(),
     termId: z.string().min(1).nullish(),
     vehicleId: z.string().min(1).nullish(),

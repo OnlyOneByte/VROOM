@@ -10,13 +10,17 @@ import { describe, expect, test } from 'bun:test';
 import { getTableColumns } from 'drizzle-orm';
 import { createInsertSchema } from 'drizzle-zod';
 import fc from 'fast-check';
-import { TABLE_SCHEMA_MAP } from '../../../config';
+import { CONFIG, TABLE_SCHEMA_MAP } from '../../../config';
 import {
   expenses,
   insuranceClaims,
   insurancePolicies,
   odometerEntries,
+  photoRefs,
   photos,
+  reminderNotifications,
+  trips,
+  userPreferences,
   vehicleFinancing,
   vehicles,
 } from '../../../db/schema';
@@ -201,9 +205,20 @@ describe('coerceRow: Numeric columns', () => {
   });
 
   test('real string coerces to float', () => {
-    const row = buildMinimalStringRow(expenses, { expenseAmount: '123.45' });
+    // volume (gal/kWh) is the REAL-affinity numeric column. expenseAmount is now an INTEGER cents column
+    // (money-cents-migration), so a decimal string there ROUNDS (covered separately below) — volume is the
+    // column that still exercises the float-preserving REAL coerce branch.
+    const row = buildMinimalStringRow(expenses, { volume: '123.45' });
     const result = coerceRow(row, expenses);
-    expect(result.expenseAmount).toBe(123.45);
+    expect(result.volume).toBe(123.45);
+  });
+
+  test('money INTEGER column rounds a decimal string (cents are whole — money-cents-migration)', () => {
+    // expenseAmount is integer CENTS post-0009; a 2.0.0 backup stores whole-cent integers. A stray decimal
+    // (e.g. a hand-edited CSV) rounds to the nearest whole cent, never truncates.
+    const row = buildMinimalStringRow(expenses, { expenseAmount: '1234.56' });
+    const result = coerceRow(row, expenses);
+    expect(result.expenseAmount).toBe(1235);
   });
 
   test('empty numeric coerces to null', () => {
@@ -242,16 +257,18 @@ describe('coerceRow: Numeric columns', () => {
   });
 
   test('#68 REAL: a thousands-separated amount keeps its full value (not parseFloat-truncated)', () => {
-    const row = buildMinimalStringRow(expenses, { expenseAmount: '1,234.56' });
+    // volume is the REAL-affinity column (expenseAmount is now integer cents); the comma-aware strict
+    // parse it guards still applies to every REAL column the Sheets restore reads as FORMATTED_VALUE.
+    const row = buildMinimalStringRow(expenses, { volume: '1,234.56' });
     const result = coerceRow(row, expenses);
-    expect(result.expenseAmount).toBe(1234.56); // was 1 under parseFloat — the bug
+    expect(result.volume).toBe(1234.56); // was 1 under parseFloat — the bug
   });
 
   test('#68 REAL: a plain integer-valued amount (CSV round-trip) is unchanged', () => {
     // The CSV path writes a raw number with no separators — confirm the fix didn't regress it.
-    const row = buildMinimalStringRow(expenses, { expenseAmount: '50' });
+    const row = buildMinimalStringRow(expenses, { volume: '50' });
     const result = coerceRow(row, expenses);
-    expect(result.expenseAmount).toBe(50);
+    expect(result.volume).toBe(50);
   });
 });
 
@@ -306,13 +323,74 @@ describe('Validation: empty NOT NULL booleans pass after coercion', () => {
 });
 
 // ---------------------------------------------------------------------------
+// coerceRow: NOT NULL columns with a STATIC default (C175 deep-review).
+//
+// An empty/null backup cell for a NOT NULL column carrying a static default must coerce to that DEFAULT,
+// never to null — else the insert throws `NOT NULL constraint failed` and the WHOLE restore aborts (the
+// user can't recover ANY data from their own valid backup, NORTH_STAR #1). Verified firsthand that the
+// pre-fix coerceRow nulled these (the theming-engine C174 `themePreference` add re-surfaced the
+// DatabaseMigrations.md footgun; `currencyUnit`/`backupFrequency`/`unitPreferences`/`syncInactivityMinutes`
+// shared the latent gap). This is the non-boolean sibling of the block above.
+// ---------------------------------------------------------------------------
+
+describe('coerceRow: empty NOT NULL columns with a static default fall back to the default (C175)', () => {
+  // Drive the REAL schema column metadata so this can't drift from the table definition.
+  const cols = getTableColumns(userPreferences) as Record<string, { default?: unknown }>;
+
+  test.each([
+    ['themePreference', 'theme'],
+    ['currencyUnit', 'currency'],
+    ['backupFrequency', 'frequency'],
+  ] as const)('empty %s coerces to its column default (not null) — restore cannot abort', (colName) => {
+    const expected = cols[colName].default;
+    // Sanity: the column genuinely declares a static default (guards against a schema change that drops it).
+    expect(expected, `${colName} must declare a static default`).toBeDefined();
+    for (const empty of ['', 'null', 'NULL', 'undefined']) {
+      const coerced = coerceRow({ userId: 'u1', [colName]: empty }, userPreferences);
+      expect(coerced[colName], `${colName}='${empty}' must fall back to the default`).toBe(
+        expected
+      );
+    }
+    // An entirely ABSENT key (an old backup predating the column) is also safe — left absent so the DB
+    // default applies (it must NOT be forced to null).
+    const absent = coerceRow({ userId: 'u1' }, userPreferences);
+    expect(absent[colName] === undefined || absent[colName] === expected).toBe(true);
+  });
+
+  test('a full userPreferences row of empties coerces to a schema-valid row (whole-row restore survives)', () => {
+    // Every NOT NULL column blank — the worst-case partial/legacy backup. Pre-fix this produced multiple
+    // nulls → NOT NULL violations on insert. Now the insert schema accepts the coerced row.
+    const row = buildMinimalStringRow(userPreferences, {
+      themePreference: '',
+      currencyUnit: '',
+      backupFrequency: '',
+      unitPreferences: '',
+      syncInactivityMinutes: '',
+    });
+    const coerced = coerceRow(row, userPreferences);
+    expect(coerced.themePreference).toBe('default');
+    const schema = createInsertSchema(userPreferences);
+    expect(schema.safeParse(coerced).success).toBe(true);
+  });
+
+  test('a real (non-empty) value is preserved — the fallback is not over-broad', () => {
+    const coerced = coerceRow({ userId: 'u1', themePreference: 'instrument' }, userPreferences);
+    expect(coerced.themePreference).toBe('instrument');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // validateBackupData: well-formed backup passes
 // ---------------------------------------------------------------------------
 
 describe('validateBackupData: acceptance', () => {
   test('valid parsed backup passes validation', () => {
     const backup: ParsedBackupData = {
-      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      metadata: {
+        version: CONFIG.backup.currentVersion,
+        timestamp: new Date().toISOString(),
+        userId: 'u1',
+      },
       vehicles: [coerceRow(buildMinimalStringRow(vehicles, { userId: 'u1' }), vehicles)],
       expenses: [
         coerceRow(
@@ -353,7 +431,11 @@ describe('validateBackupData: acceptance', () => {
       photos
     );
     const backup: ParsedBackupData = {
-      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      metadata: {
+        version: CONFIG.backup.currentVersion,
+        timestamp: new Date().toISOString(),
+        userId: 'u1',
+      },
       vehicles: [vehicle],
       expenses: [],
       financing: [],
@@ -384,7 +466,11 @@ describe('validateBackupData: acceptance', () => {
 describe('validateBackupData: cross-row unique constraints (#127)', () => {
   function backupWith(over: Partial<ParsedBackupData>): ParsedBackupData {
     return {
-      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      metadata: {
+        version: CONFIG.backup.currentVersion,
+        timestamp: new Date().toISOString(),
+        userId: 'u1',
+      },
       vehicles: [],
       expenses: [],
       financing: [],
@@ -454,6 +540,93 @@ describe('validateBackupData: cross-row unique constraints (#127)', () => {
     const result = backupService.validateBackupData(backupWith({ vehicles: [v1, v2] }));
     expect(result.valid).toBe(true);
   });
+
+  // The three COMPOSITE unique indexes the original #127 check missed (C291). Each is a real
+  // CREATE UNIQUE INDEX in the migrations on a backed-up + restored table, so a duplicate survives
+  // per-row + referential validation, then throws on the colliding INSERT AFTER the replace-mode
+  // wipe → empty account (the same #127/C428 / C151-footgun data-loss trigger as clientId/licensePlate).
+  // Each asserts on the SPECIFIC unique-constraint message substring, so a parallel referential error
+  // (the synthetic parent rows aren't all present) cannot make the assertion pass spuriously — the
+  // assertion fires only if THIS unique check produced its error.
+  test('two photoRefs sharing (photoId, providerId) are rejected — pr_photo_provider_idx', () => {
+    const mk = (id: string) =>
+      ({
+        ...coerceRow(buildMinimalStringRow(photoRefs), photoRefs),
+        id,
+        photoId: 'photo-1',
+        providerId: 'provider-1',
+      }) as Record<string, unknown>;
+    const result = backupService.validateBackupData(
+      backupWith({ photoRefs: [mk('pr1'), mk('pr2')] })
+    );
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('photoRef photo+provider'))).toBe(true);
+  });
+
+  test('two reminderNotifications sharing (reminderId, dueDate) are rejected — rn_reminder_due_idx', () => {
+    const due = new Date('2024-03-01T00:00:00Z');
+    const mk = (id: string) =>
+      ({
+        ...coerceRow(
+          buildMinimalStringRow(reminderNotifications, { userId: 'u1' }),
+          reminderNotifications
+        ),
+        id,
+        reminderId: 'rem-1',
+        dueDate: due,
+        dueOdometer: null,
+      }) as Record<string, unknown>;
+    const result = backupService.validateBackupData(
+      backupWith({ reminderNotifications: [mk('rn1'), mk('rn2')] })
+    );
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('reminder+dueDate'))).toBe(true);
+  });
+
+  test('two MILEAGE reminderNotifications sharing (reminderId, dueOdometer) are rejected — rn_reminder_odo_idx', () => {
+    // Mileage rows carry a NULL dueDate (the time index treats them as distinct) but collide on the
+    // partial odometer index. The composite check on (reminderId, dueOdometer) must catch them.
+    const mk = (id: string) =>
+      ({
+        ...coerceRow(
+          buildMinimalStringRow(reminderNotifications, { userId: 'u1' }),
+          reminderNotifications
+        ),
+        id,
+        reminderId: 'rem-1',
+        dueDate: null,
+        dueOdometer: 50000,
+      }) as Record<string, unknown>;
+    const result = backupService.validateBackupData(
+      backupWith({ reminderNotifications: [mk('rn1'), mk('rn2')] })
+    );
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('reminder+dueOdometer'))).toBe(true);
+  });
+
+  test('mileage reminderNotifications at DIFFERENT odometers do NOT trip the unique check (NULL dueDate + distinct dueOdometer)', () => {
+    // Two mileage rows for the same reminder but DIFFERENT odometer milestones: NULL dueDate makes the
+    // time index distinct, and distinct dueOdometer makes the mileage index distinct too → neither
+    // composite check should flag them. Pins that the null-skip + distinct-key path mirrors SQLite
+    // semantics (a regression that keyed nulls as '' would falsely flag the time index here). Asserts
+    // specifically that NO unique-constraint error was produced (a parallel referential error from the
+    // synthetic parent-less reminder is irrelevant to what this test pins).
+    const mk = (id: string, odo: number) =>
+      ({
+        ...coerceRow(
+          buildMinimalStringRow(reminderNotifications, { userId: 'u1' }),
+          reminderNotifications
+        ),
+        id,
+        reminderId: 'rem-1',
+        dueDate: null,
+        dueOdometer: odo,
+      }) as Record<string, unknown>;
+    const result = backupService.validateBackupData(
+      backupWith({ reminderNotifications: [mk('rn1', 50000), mk('rn2', 60000)] })
+    );
+    expect(result.errors.some((e) => e.includes('violates a unique constraint'))).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -463,7 +636,11 @@ describe('validateBackupData: cross-row unique constraints (#127)', () => {
 describe('validateBackupData: referential integrity', () => {
   test('expense referencing non-existent vehicle fails', () => {
     const backup: ParsedBackupData = {
-      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      metadata: {
+        version: CONFIG.backup.currentVersion,
+        timestamp: new Date().toISOString(),
+        userId: 'u1',
+      },
       vehicles: [],
       expenses: [coerceRow(buildMinimalStringRow(expenses, { vehicleId: 'ghost' }), expenses)],
       financing: [],
@@ -484,7 +661,11 @@ describe('validateBackupData: referential integrity', () => {
   test('term-vehicle junction row referencing non-existent term fails', () => {
     const v = coerceRow(buildMinimalStringRow(vehicles, { userId: 'u1' }), vehicles);
     const backup: ParsedBackupData = {
-      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      metadata: {
+        version: CONFIG.backup.currentVersion,
+        timestamp: new Date().toISOString(),
+        userId: 'u1',
+      },
       vehicles: [v],
       expenses: [],
       financing: [],
@@ -505,7 +686,11 @@ describe('validateBackupData: referential integrity', () => {
   test('term-vehicle junction row referencing non-existent vehicle fails', () => {
     const ins = coerceRow(buildMinimalStringRow(insurancePolicies), insurancePolicies);
     const backup: ParsedBackupData = {
-      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      metadata: {
+        version: CONFIG.backup.currentVersion,
+        timestamp: new Date().toISOString(),
+        userId: 'u1',
+      },
       vehicles: [],
       expenses: [],
       financing: [],
@@ -528,7 +713,11 @@ describe('validateBackupData: referential integrity', () => {
   test('insurance claim referencing a known policy passes (round-trips)', () => {
     const ins = coerceRow(buildMinimalStringRow(insurancePolicies), insurancePolicies);
     const backup: ParsedBackupData = {
-      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      metadata: {
+        version: CONFIG.backup.currentVersion,
+        timestamp: new Date().toISOString(),
+        userId: 'u1',
+      },
       vehicles: [],
       expenses: [],
       financing: [],
@@ -561,7 +750,11 @@ describe('validateBackupData: referential integrity', () => {
 
   test('insurance claim referencing a non-existent policy fails', () => {
     const backup: ParsedBackupData = {
-      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      metadata: {
+        version: CONFIG.backup.currentVersion,
+        timestamp: new Date().toISOString(),
+        userId: 'u1',
+      },
       vehicles: [],
       expenses: [],
       financing: [],
@@ -591,7 +784,11 @@ describe('validateBackupData: referential integrity', () => {
       photos
     );
     const backup: ParsedBackupData = {
-      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      metadata: {
+        version: CONFIG.backup.currentVersion,
+        timestamp: new Date().toISOString(),
+        userId: 'u1',
+      },
       vehicles: [],
       expenses: [],
       financing: [],
@@ -615,7 +812,11 @@ describe('validateBackupData: referential integrity', () => {
       photos
     );
     const backup: ParsedBackupData = {
-      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      metadata: {
+        version: CONFIG.backup.currentVersion,
+        timestamp: new Date().toISOString(),
+        userId: 'u1',
+      },
       vehicles: [],
       expenses: [],
       financing: [],
@@ -636,7 +837,11 @@ describe('validateBackupData: referential integrity', () => {
   test('rejects photoRef referencing non-existent photo', () => {
     const v = coerceRow(buildMinimalStringRow(vehicles, { userId: 'u1' }), vehicles);
     const backup: ParsedBackupData = {
-      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      metadata: {
+        version: CONFIG.backup.currentVersion,
+        timestamp: new Date().toISOString(),
+        userId: 'u1',
+      },
       vehicles: [v],
       expenses: [],
       financing: [],
@@ -669,7 +874,11 @@ describe('validateBackupData: referential integrity', () => {
       photos
     );
     const backup: ParsedBackupData = {
-      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      metadata: {
+        version: CONFIG.backup.currentVersion,
+        timestamp: new Date().toISOString(),
+        userId: 'u1',
+      },
       vehicles: [v],
       expenses: [],
       financing: [],
@@ -700,7 +909,11 @@ describe('validateBackupData: referential integrity', () => {
       odometerEntries
     );
     const backup: ParsedBackupData = {
-      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      metadata: {
+        version: CONFIG.backup.currentVersion,
+        timestamp: new Date().toISOString(),
+        userId: 'u1',
+      },
       vehicles: [],
       expenses: [],
       financing: [],
@@ -717,6 +930,57 @@ describe('validateBackupData: referential integrity', () => {
     expect(result.valid).toBe(false);
     expect(result.errors.some((e) => e.includes('non-existent vehicle'))).toBe(true);
   });
+
+  // C205 (arch dedup convergence guard): financing / odometer / trips each own purely via a vehicleId FK,
+  // and their three byte-identical ref-checks were converged onto one shared `validateVehicleFkRefs(rows,
+  // vehicleIds, label)` helper (the C202 trips addition tipped the rule-of-three). The convergence is
+  // behavior-preserving ONLY if each caller still emits its EXACT prior message — a future "simplify the
+  // label" edit to the shared helper could silently change one entity's validation text (which a restore
+  // UI / a log consumer may match on). This drives all THREE through the public validateBackupData with a
+  // bogus vehicleId and asserts the precise per-entity string survives. Non-vacuous: change any label in
+  // the helper's callers and the matching assertion goes RED.
+  const VEHICLE_FK_CASES: {
+    label: string;
+    table: Parameters<typeof getTableColumns>[0];
+    key: keyof ParsedBackupData;
+  }[] = [
+    { label: 'Financing', table: vehicleFinancing, key: 'financing' },
+    { label: 'Odometer entry', table: odometerEntries, key: 'odometer' },
+    { label: 'Trip', table: trips, key: 'trips' },
+  ];
+
+  for (const { label, table, key } of VEHICLE_FK_CASES) {
+    test(`${label} row referencing a non-existent vehicle fails with its exact label (C205 convergence)`, () => {
+      const row = coerceRow(buildMinimalStringRow(table, { vehicleId: 'ghost' }), table);
+      const base: ParsedBackupData = {
+        metadata: {
+          version: CONFIG.backup.currentVersion,
+          timestamp: new Date().toISOString(),
+          userId: 'u1',
+        },
+        vehicles: [],
+        expenses: [],
+        financing: [],
+        insurance: [],
+        insuranceTerms: [],
+        insuranceTermVehicles: [],
+        userPreferences: [],
+        syncState: [],
+        photos: [],
+        odometer: [],
+        photoRefs: [],
+      };
+      const backup: ParsedBackupData = { ...base, [key]: [row] };
+      const result = backupService.validateBackupData(backup);
+      expect(result.valid).toBe(false);
+      // The EXACT message contract each converged caller must still produce: "<Label> <id> references
+      // non-existent vehicle". A regression renaming a caller's label fails only its own case here.
+      expect(
+        result.errors.some((e) => e === `${label} ${row.id} references non-existent vehicle`),
+        `expected the exact "${label} <id> references non-existent vehicle" message; got: ${JSON.stringify(result.errors)}`
+      ).toBe(true);
+    });
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -831,7 +1095,11 @@ describe('Property 9: Backup round-trip for tracking flags', () => {
           vehicles
         );
         const backup: ParsedBackupData = {
-          metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+          metadata: {
+            version: CONFIG.backup.currentVersion,
+            timestamp: new Date().toISOString(),
+            userId: 'u1',
+          },
           vehicles: [vehicle],
           expenses: [],
           financing: [],
@@ -945,7 +1213,11 @@ describe('coerceRow: unitPreferences JSON column on vehicles', () => {
       vehicles
     );
     const backup: ParsedBackupData = {
-      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      metadata: {
+        version: CONFIG.backup.currentVersion,
+        timestamp: new Date().toISOString(),
+        userId: 'u1',
+      },
       vehicles: [vehicle],
       expenses: [],
       financing: [],

@@ -27,6 +27,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle as seedVehicleShared } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -47,17 +48,11 @@ interface FinancingShape {
 }
 
 /** Seed a vehicle, returns its id. */
-async function seedVehicle(nickname: string): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Honda',
-    model: 'Civic',
-    year: 2022,
-    nickname,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
+// This file's fixture is a nickname-required Honda Civic 2022; converge onto the shared test-helpers/seed
+// seedVehicle (arch convergence, Angelo-approved) via a thin wrapper that keeps make/model/year explicit
+// (the shared default is a Camry) so behavior is preserved.
+const seedVehicle = (nickname: string): Promise<string> =>
+  seedVehicleShared(ctx, { make: 'Honda', model: 'Civic', year: 2022, nickname });
 
 /** Attach a loan so the GET returns an enriched record. */
 async function seedLoan(vehicleId: string): Promise<void> {
@@ -129,7 +124,7 @@ describe('GET single financing — enriched contract (FE↔BE drift guard)', () 
  * row exists it reuses it via update(). `isActive` is .optional() in the create schema (a
  * .notNull().default(true) column → drizzle-zod omits it), and the FE financing payload never sends it,
  * so the update LEFT the prior isActive=false → the new active loan was silently dropped from
- * findActiveFinancing + loanBreakdown/analytics + the FE's isActive gate. The fix re-activates (+ clears
+ * the isActive-filtered queries (loanBreakdown/analytics) + the FE's isActive gate. The fix re-activates (+ clears
  * endDate) on the upsert. These pin that contract over the real HTTP stack.
  */
 describe('POST financing upsert — #67 re-activates a paid-off record', () => {

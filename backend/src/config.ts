@@ -17,8 +17,10 @@ import {
   reminders,
   reminderVehicles,
   syncState,
+  trips,
   userPreferences,
   vehicleFinancing,
+  vehicleShares,
   vehicles,
 } from './db/schema';
 import type { Environment } from './types';
@@ -190,7 +192,12 @@ export const CONFIG = {
     // headroom for legit data, far below a nested/crafted bomb. compressedSize 0
     // (an empty/stored entry) is skipped — nothing to inflate.
     maxCompressionRatio: 1000,
-    currentVersion: '1.0.0',
+    // 2.0.0 = the integer-CENTS money schema (migration 0009, money-cents-migration). Bumped from 1.0.0
+    // so a naive restore of a pre-cents (dollar-float) backup FAILS the version check (fail-closed) rather
+    // than silently 100×-corrupting money via coerceRow's integer branch (design §4, NORTH_STAR #1). The
+    // version-gated ×100 shim (restore.ts → coerceRow shimMoneyToCents) is the recovery path that lets an
+    // old backup restore CORRECTLY despite the bump.
+    currentVersion: '2.0.0',
     supportedModes: ['preview', 'replace', 'merge'] as const,
     defaultRetentionCount: 10,
     maxRetentionCount: 50,
@@ -272,6 +279,8 @@ export const TABLE_SCHEMA_MAP: Record<string, Table> = {
   reminders: reminders,
   reminderVehicles: reminderVehicles,
   reminderNotifications: reminderNotifications,
+  trips: trips,
+  vehicleShares: vehicleShares,
 };
 
 export const TABLE_FILENAME_MAP: Record<string, string> = {
@@ -290,6 +299,8 @@ export const TABLE_FILENAME_MAP: Record<string, string> = {
   reminders: 'reminders.csv',
   reminderVehicles: 'reminder_vehicles.csv',
   reminderNotifications: 'reminder_notifications.csv',
+  trips: 'trips.csv',
+  vehicleShares: 'vehicle_shares.csv',
 };
 
 export function getBackupTableKeys(): string[] {
@@ -312,6 +323,8 @@ export const OPTIONAL_BACKUP_FILES = new Set([
   'reminders.csv',
   'reminder_vehicles.csv',
   'reminder_notifications.csv',
+  'trips.csv',
+  'vehicle_shares.csv',
 ]);
 
 export function getRequiredBackupFiles(): string[] {

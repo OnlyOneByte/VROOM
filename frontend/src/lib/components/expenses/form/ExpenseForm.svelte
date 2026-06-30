@@ -36,12 +36,18 @@
 	import TagInput from './TagInput.svelte';
 	import ExpensePhotoSection from './ExpensePhotoSection.svelte';
 	import PendingPhotoPreview from './PendingPhotoPreview.svelte';
+	import ReceiptScanButton from './ReceiptScanButton.svelte';
+	import type { ReceiptDraft } from '$lib/services/vlm-api';
 	import SplitConfigEditor from '../split/SplitConfigEditor.svelte';
 	import { validateExpenseField } from './expense-form-validation';
 	import { Checkbox } from '$lib/components/ui/checkbox';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
 	import { formatCurrency, dateOnlyToISO, toDateInputValue } from '$lib/utils/formatters';
-	import { buildSplitConfig, categoryLabels, resetSplitAllocations } from '$lib/utils/expense-helpers';
+	import {
+		buildSplitConfig,
+		categoryLabels,
+		resetSplitAllocations
+	} from '$lib/utils/expense-helpers';
 	import { extractUniqueTags } from '$lib/utils/expense-filters';
 	import { COMMON_EXPENSE_TAGS } from '$lib/types';
 	import type { ExpenseCategory, ExpenseFormErrors, Vehicle, Expense } from '$lib/types';
@@ -343,6 +349,25 @@
 		}
 	}
 
+	/**
+	 * Apply a VLM receipt-parse draft to the form (T6). Each field is optional + already validated
+	 * server-side (fail-closed), so we set ONLY the fields the draft carries and leave the rest for the
+	 * user. The draft amount is in DOLLARS (formData.amount is a dollar string); date is 'YYYY-MM-DD'
+	 * (the DatePicker's bind format); category routes through selectCategory so its side-effects fire;
+	 * odometer → mileage; vendor → description. The image rides pendingFiles → the existing
+	 * expense_receipts photo flow on save (R5). The user reviews + submits via the UNCHANGED path.
+	 */
+	function handleReceiptDraft(draft: ReceiptDraft, image: File) {
+		if (typeof draft.amount === 'number') formData.amount = String(draft.amount);
+		if (draft.date) formData.date = draft.date;
+		if (typeof draft.odometer === 'number') formData.mileage = String(draft.odometer);
+		if (draft.category) selectCategory(draft.category);
+		// Only fill an EMPTY description — never clobber something the user already typed.
+		if (draft.vendor && !formData.description.trim()) formData.description = draft.vendor;
+		pendingFiles = [...pendingFiles, image];
+		appStore.showSuccess('Receipt scanned — review the details and save.');
+	}
+
 	function selectCategory(categoryValue: string) {
 		formData.category = categoryValue;
 		touched['category'] = true;
@@ -583,7 +608,9 @@
 						// Carry fuelType: the sync transform needs it to keep an electric charge (#66).
 						...(expenseData.fuelType !== undefined && { fuelType: expenseData.fuelType }),
 						// Carry missedFillup: dropping it on sync corrupts consecutive-fillup MPG pairing (#101).
-						...(expenseData.missedFillup !== undefined && { missedFillup: expenseData.missedFillup })
+						...(expenseData.missedFillup !== undefined && {
+							missedFillup: expenseData.missedFillup
+						})
 					});
 
 					requestBackgroundSync('expense-sync');
@@ -769,7 +796,6 @@
 	) {
 		splitAllocations = allocs;
 	}
-
 </script>
 
 <FormLayout>
@@ -930,6 +956,11 @@
 				}}
 				class="rounded-lg border bg-card p-6 space-y-6"
 			>
+				<!-- Scan receipt (create mode only) — pre-fills the fields below from a photo (T6). -->
+				{#if !isEditMode && !isSplit && !isInsuranceManaged}
+					<ReceiptScanButton onDraft={handleReceiptDraft} />
+				{/if}
+
 				<!-- Vehicle Selection -->
 				{#if isSplit}
 					<!-- Split mode: multi-select checkboxes -->

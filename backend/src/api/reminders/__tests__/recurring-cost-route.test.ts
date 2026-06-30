@@ -20,6 +20,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -31,17 +32,6 @@ afterEach(() => ctx.close());
 interface CostSummary {
   count: number;
   monthlyTotal: number;
-}
-
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Honda',
-    model: 'Civic',
-    year: 2021,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
 }
 
 async function createReminder(vehicleId: string, over: Record<string, unknown>): Promise<void> {
@@ -65,7 +55,7 @@ async function getSummary(): Promise<CostSummary> {
 
 describe('GET /reminders/recurring-cost — monthly recurring run-rate', () => {
   test('sums active expense reminders normalized to a monthly rate; ignores notifications', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     // $100/mo monthly + $1200/yr yearly (=$100/mo) → $200/mo across 2 reminders.
     await createReminder(vehicleId, {
       type: 'expense',
@@ -93,7 +83,7 @@ describe('GET /reminders/recurring-cost — monthly recurring run-rate', () => {
   });
 
   test('the summary is user-scoped (no cross-user leak)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     await createReminder(vehicleId, {
       type: 'expense',
       frequency: 'monthly',

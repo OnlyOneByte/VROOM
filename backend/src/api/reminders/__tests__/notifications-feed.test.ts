@@ -18,6 +18,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -25,17 +26,6 @@ beforeEach(async () => {
   ctx = await createTestApp();
 });
 afterEach(() => ctx.close());
-
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Toyota',
-    model: 'Camry',
-    year: 2022,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
 
 interface NotificationRow {
   id: string;
@@ -62,7 +52,7 @@ async function seedFiredNotificationReminder(vehicleId: string): Promise<void> {
 
 describe('reminder notification feed (GET + mark-read)', () => {
   test('lists fired notifications newest-first', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     await seedFiredNotificationReminder(vehicleId);
 
     const res = await ctx.authed('GET', '/api/v1/reminders/notifications');
@@ -82,7 +72,7 @@ describe('reminder notification feed (GET + mark-read)', () => {
   });
 
   test('marking a notification read flips isRead and unreadOnly hides it', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     await seedFiredNotificationReminder(vehicleId);
 
     const listed = await json<DataEnvelope<NotificationRow[]>>(
@@ -120,7 +110,7 @@ describe('reminder notification feed (GET + mark-read)', () => {
   // limit truncated the mileage axis entirely past 100 time notifications). This pins that a mileage
   // notification created AFTER a time notification appears FIRST in the feed.
   test('a mileage notification (dueDate NULL) created later sorts FIRST, not last (#142)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     // Seed a reminder to satisfy the FK, then two notifications directly: a time one created earlier,
     // a mileage one (dueDate NULL, dueOdometer set) created LATER.
     await ctx.authed('POST', '/api/v1/reminders', {

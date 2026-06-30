@@ -19,12 +19,8 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import {
-  createTestApp,
-  type DataEnvelope,
-  json,
-  type TestApp,
-} from '../../../test-helpers/http-client';
+import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -42,13 +38,6 @@ function vehicleRows(): VehicleRowDb[] {
   return ctx.sqlite.query('SELECT id, make FROM vehicles').all() as VehicleRowDb[];
 }
 
-async function seedVehicle(make: string): Promise<string> {
-  const created = await ctx.authed('POST', '/api/v1/vehicles', { make, model: 'X', year: 2021 });
-  const body = await json<DataEnvelope<{ id: string }>>(created);
-  expect(created.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
-
 describe('restore refuses an empty-backup replace (bug #21 silent total-wipe guard)', () => {
   test('replace with a 0-row backup throws and leaves existing data intact', async () => {
     const { backupService } = await import('../backup');
@@ -59,7 +48,7 @@ describe('restore refuses an empty-backup replace (bug #21 silent total-wipe gua
     const emptyZip = await backupService.exportAsZip(ctx.user.id);
 
     // Now seed real data — this is what a silent wipe would destroy.
-    const vehicleId = await seedVehicle('Honda');
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'X', year: 2021 });
     expect(vehicleRows()).toHaveLength(1);
 
     // Pre-fix: this resolved success:true and wiped the vehicle. Post-fix: it throws.
@@ -79,7 +68,7 @@ describe('restore refuses an empty-backup replace (bug #21 silent total-wipe gua
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');
     const emptyZip = await backupService.exportAsZip(ctx.user.id);
-    await seedVehicle('Toyota');
+    await seedVehicle(ctx, { make: 'Toyota', model: 'X', year: 2021 });
 
     const result = await restoreService.restoreFromBackup(ctx.user.id, emptyZip, 'preview');
     expect(result.success).toBe(true);
@@ -92,7 +81,7 @@ describe('restore refuses an empty-backup replace (bug #21 silent total-wipe gua
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');
     const emptyZip = await backupService.exportAsZip(ctx.user.id);
-    const vehicleId = await seedVehicle('Mazda');
+    const vehicleId = await seedVehicle(ctx, { make: 'Mazda', model: 'X', year: 2021 });
 
     const result = await restoreService.restoreFromBackup(ctx.user.id, emptyZip, 'merge');
     expect(result.success).toBe(true);
@@ -107,7 +96,7 @@ describe('restore refuses an empty-backup replace (bug #21 silent total-wipe gua
     const { restoreService } = await import('../restore');
 
     // Seed, then export a backup that DOES carry a row.
-    const vehicleId = await seedVehicle('Subaru');
+    const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'X', year: 2021 });
     const fullZip = await backupService.exportAsZip(ctx.user.id);
 
     const result = await restoreService.restoreFromBackup(ctx.user.id, fullZip, 'replace');

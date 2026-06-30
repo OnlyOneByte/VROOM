@@ -9,9 +9,18 @@
 		vehicles?: Vehicle[];
 		onEdit: (_policy: InsurancePolicy) => void;
 		onRefresh: () => Promise<void>;
+		// T12b-3c: read-only shared view hides every mutate affordance in the policy tree.
+		readOnly?: boolean;
 	}
 
-	let { policies, vehicleNameMap = new Map(), vehicles = [], onEdit, onRefresh }: Props = $props();
+	let {
+		policies,
+		vehicleNameMap = new Map(),
+		vehicles = [],
+		onEdit,
+		onRefresh,
+		readOnly = false
+	}: Props = $props();
 
 	let grouped = $derived(groupPoliciesByActive(policies));
 
@@ -34,6 +43,7 @@
 					{vehicles}
 					{onEdit}
 					{onRefresh}
+					{readOnly}
 				/>
 			{/each}
 		</div>
@@ -49,6 +59,7 @@
 					{vehicles}
 					{onEdit}
 					{onRefresh}
+					{readOnly}
 				/>
 			{/each}
 		</div>

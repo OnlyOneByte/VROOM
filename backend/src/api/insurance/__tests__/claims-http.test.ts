@@ -15,6 +15,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -22,17 +23,6 @@ beforeEach(async () => {
   ctx = await createTestApp();
 });
 afterEach(() => ctx.close());
-
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Toyota',
-    model: 'Camry',
-    year: 2022,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
 
 /** Seed a policy (with one term covering the vehicle) and return its id. */
 async function seedPolicy(vehicleId: string): Promise<string> {
@@ -64,7 +54,7 @@ interface ClaimRow {
 
 describe('insurance claims HTTP routes', () => {
   test('files a claim (201), lists it, updates status, deletes it', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx);
     const policyId = await seedPolicy(vehicleId);
 
     // File a claim.
@@ -107,7 +97,7 @@ describe('insurance claims HTTP routes', () => {
   });
 
   test('clearing an optional field (null) actually clears it; omitting it preserves', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx);
     const policyId = await seedPolicy(vehicleId);
 
     // File a claim with every optional field set.
@@ -154,7 +144,7 @@ describe('insurance claims HTTP routes', () => {
   });
 
   test('rejects an invalid claimType / status (zod enum)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx);
     const policyId = await seedPolicy(vehicleId);
 
     const badType = await ctx.authed('POST', `/api/v1/insurance/${policyId}/claims`, {
@@ -196,7 +186,7 @@ describe('insurance claims HTTP routes', () => {
 // term from a DIFFERENT policy. validateClaimRefs now gates both on create + update.
 describe('insurance claim vehicleId/termId link validation (#84)', () => {
   test('filing a claim with a vehicle the user does NOT own → 404 (ownership gate)', async () => {
-    const ownVehicle = await seedVehicle();
+    const ownVehicle = await seedVehicle(ctx);
     const policyId = await seedPolicy(ownVehicle);
 
     const res = await ctx.authed('POST', `/api/v1/insurance/${policyId}/claims`, {
@@ -208,7 +198,7 @@ describe('insurance claim vehicleId/termId link validation (#84)', () => {
   });
 
   test('filing a claim with a termId NOT on this policy → 400', async () => {
-    const ownVehicle = await seedVehicle();
+    const ownVehicle = await seedVehicle(ctx);
     const policyId = await seedPolicy(ownVehicle);
 
     const res = await ctx.authed('POST', `/api/v1/insurance/${policyId}/claims`, {
@@ -224,7 +214,7 @@ describe('insurance claim vehicleId/termId link validation (#84)', () => {
   });
 
   test('a claim referencing the policy’s OWN vehicle + term is accepted (control, no over-block)', async () => {
-    const ownVehicle = await seedVehicle();
+    const ownVehicle = await seedVehicle(ctx);
     const policyId = await seedPolicy(ownVehicle);
 
     // Pull the policy's real term id.
@@ -245,7 +235,7 @@ describe('insurance claim vehicleId/termId link validation (#84)', () => {
   });
 
   test('a PUT re-pointing a claim at an unowned vehicle → 404', async () => {
-    const ownVehicle = await seedVehicle();
+    const ownVehicle = await seedVehicle(ctx);
     const policyId = await seedPolicy(ownVehicle);
     const filed = await ctx.authed('POST', `/api/v1/insurance/${policyId}/claims`, {
       claimDate: '2024-06-15T00:00:00.000Z',
@@ -265,7 +255,7 @@ describe('insurance claim vehicleId/termId link validation (#84)', () => {
   // a referential-integrity violation: a claim belongs to its own policy's coverage). This pins that
   // the PUT path re-validates termId-on-this-policy, not just vehicle ownership.
   test('a PUT re-pointing a claim at a termId NOT on this policy → 400', async () => {
-    const ownVehicle = await seedVehicle();
+    const ownVehicle = await seedVehicle(ctx);
     const policyId = await seedPolicy(ownVehicle);
     // A SECOND policy with its own term — its term id is valid but foreign to the first policy.
     const otherPolicyId = await seedPolicy(ownVehicle);

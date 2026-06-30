@@ -29,6 +29,9 @@ import * as schema from '../../../db/schema';
 //   users         — the account identity itself; restore stamps rows onto the requesting user.
 //   userProviders — encrypted storage credentials; never exported (see backup.ts validatePhotoRefEntries note).
 //   sessions      — ephemeral auth sessions; restoring them would be meaningless/unsafe.
+// (vehicle_shares WAS temporarily parked here at T1; T9 [C54] wired its owner-side backup round-trip —
+//  createBackup exports the owner's ACCEPTED grants [D7], restore re-stamps ownerId + skips absent
+//  invitees [#127-safe] — so it is now a backed-up table in the registry, no longer excluded.)
 const EXCLUDED_BY_DESIGN = new Set<string>(['users', 'user_providers', 'sessions']);
 
 /** Every physical table NAME defined in the Drizzle schema. */

@@ -15,6 +15,10 @@
 	import { loadOfflineExpenses } from '$lib/utils/offline-storage';
 	import { offlineExpenseQueue } from '$lib/stores/offline.svelte';
 	import '../app.css';
+	// Theming engine (T7): the generated `:root[data-theme="<id>"]` blocks for non-default themes. Imported
+	// right after app.css so a non-default theme paints with zero FOUC + zero token duplication in JS. The
+	// store (T8) sets `data-theme` on <html>; with no data-theme (or "default") app.css's bare :root wins.
+	import '$lib/theme/themes.css';
 
 	import { LoaderCircle } from '@lucide/svelte';
 

@@ -21,6 +21,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -28,17 +29,6 @@ beforeEach(async () => {
   ctx = await createTestApp();
 });
 afterEach(() => ctx.close());
-
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Kia',
-    model: 'Soul',
-    year: 2018,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
 
 interface TriggerResultShape {
   createdExpenses: unknown[];
@@ -70,7 +60,7 @@ function seedCorruptCustomReminder(id: string, vehicleId: string): void {
 
 describe('bug #13 — invalid custom intervalUnit is skipped, never hangs', () => {
   test('a corrupt-intervalUnit reminder is reported in skipped, not an infinite loop', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Kia', model: 'Soul', year: 2018 });
     seedCorruptCustomReminder('bad1', vehicleId);
 
     // If the bug were present this POST would never return (spin in fastForwardPastNow). The fix
@@ -86,7 +76,7 @@ describe('bug #13 — invalid custom intervalUnit is skipped, never hangs', () =
   });
 
   test('a corrupt reminder does not block a well-formed one in the same batch', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Kia', model: 'Soul', year: 2018 });
     seedCorruptCustomReminder('bad2', vehicleId);
 
     // A normal monthly notification reminder, also overdue (startDate in the past).

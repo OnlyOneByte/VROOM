@@ -13,6 +13,8 @@
 		termVehicleCoverage?: TermCoverageRow[];
 		onRefresh?: () => Promise<void>;
 		onDeleteTerm?: (_term: InsuranceTerm) => void;
+		// T12b-3c: read-only shared view hides the past-term edit/delete affordances.
+		readOnly?: boolean;
 	}
 
 	let {
@@ -21,7 +23,8 @@
 		vehicles = [],
 		termVehicleCoverage = [],
 		onRefresh: _onRefresh,
-		onDeleteTerm
+		onDeleteTerm,
+		readOnly = false
 	}: Props = $props();
 
 	let sortedTerms = $derived(sortTermsByEndDateDesc(terms));
@@ -53,8 +56,8 @@
 					term={t}
 					isCurrent={false}
 					vehicleNames={getTermVehicleNames(t.id)}
-					onEdit={handleEdit}
-					onDelete={onDeleteTerm}
+					onEdit={readOnly ? undefined : handleEdit}
+					onDelete={readOnly ? undefined : onDeleteTerm}
 				/>
 			{/each}
 		</div>

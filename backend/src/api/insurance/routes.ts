@@ -1,9 +1,11 @@
 import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { ValidationError } from '../../errors';
+import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { parseClampedInt } from '../../utils/calculations';
+import { insuranceClaimToApi, insuranceTermToApi } from '../../utils/money';
+import { requireVehicleRead, resolveVehicleAccess } from '../../utils/sharing';
 import { validateInsuranceOwnership, validateVehicleOwnership } from '../../utils/validation';
 import { expenseRepository } from '../expenses/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
@@ -19,6 +21,80 @@ import {
 } from './validation';
 
 const routes = new Hono();
+
+/**
+ * T6 display edge for an insurance policy API object: convert each embedded term's money columns
+ * (deductibleAmount/coverageLimit/totalCost/monthlyCost/paymentAmount) from integer CENTS → dollars.
+ * The policy row itself carries no money; only its `terms[]` do. Pure, shallow per term.
+ */
+function policyToApi<T extends Record<string, unknown>>(policy: T): T {
+  const terms = policy.terms;
+  if (!Array.isArray(terms)) return policy;
+  return {
+    ...policy,
+    terms: terms.map((t) => insuranceTermToApi(t as Record<string, unknown>)),
+  };
+}
+
+/**
+ * vehicle-sharing T8b blast-radius filter (design §6.4: "a share must never pull the owner's OTHER
+ * vehicles into the invitee's view"). `findByVehicleId` returns the WHOLE policy — all its terms, the
+ * full termVehicleCoverage junction, and the deduped vehicleIds across ALL terms — because a policy can
+ * span several of the owner's vehicles. For a NON-owner viewing a SHARED vehicle that would leak the
+ * owner's other vehicles' ids + their coverage. So when the acting user is not the owner, narrow the
+ * policy to the shared vehicle ONLY: drop terms that do not cover it, filter the coverage rows to it,
+ * and reduce vehicleIds to just it. The OWNER (owner-read) gets the full policy unchanged — this only
+ * narrows a shared invitee's view, never the owner's. Pure; returns a shallow-narrowed copy.
+ */
+function narrowPolicyToVehicle<
+  T extends {
+    terms: Array<{ id: string }>;
+    termVehicleCoverage: Array<{ termId: string; vehicleId: string }>;
+    vehicleIds: string[];
+  },
+>(policy: T, vehicleId: string): T {
+  // Terms that actually cover the shared vehicle (via the junction).
+  const coveredTermIds = new Set(
+    policy.termVehicleCoverage.filter((c) => c.vehicleId === vehicleId).map((c) => c.termId)
+  );
+  return {
+    ...policy,
+    terms: policy.terms.filter((t) => coveredTermIds.has(t.id)),
+    // Only this vehicle's coverage rows — never reveal which OTHER vehicles a term covers.
+    termVehicleCoverage: policy.termVehicleCoverage.filter((c) => c.vehicleId === vehicleId),
+    vehicleIds: policy.vehicleIds.filter((v) => v === vehicleId),
+  };
+}
+
+/**
+ * vehicle-sharing T12b-3c — resolve READ access to a POLICY for a shared invitee. A policy has no
+ * single vehicle (it can span several of the owner's vehicles via its terms' coverage junction), and
+ * the claims route is policy-keyed, but a share grants access PER VEHICLE. So: the OWNER always reads
+ * (validateInsuranceOwnership); a NON-owner reads the policy only if they hold read access to AT LEAST
+ * ONE vehicle the policy covers. Returns the set of vehicleIds the acting user may read (for the
+ * blast-radius claim narrow) — empty for the owner (a sentinel meaning "no narrowing, see all"). A
+ * non-owner with no covered-vehicle access gets a 404 (existence-hiding, #80), exactly like the
+ * per-vehicle policies route. Mirrors design §6.4: a share must never pull the owner's OTHER vehicles
+ * (or unattributed claims) into the invitee's view.
+ */
+async function requirePolicyReadVehicles(
+  policyId: string,
+  userId: string
+): Promise<{ isOwner: boolean; readableVehicleIds: Set<string> }> {
+  const policy = await insurancePolicyRepository.findById(policyId);
+  // Existence-hiding: a missing policy and a policy you cannot see are indistinguishable (404).
+  if (!policy) throw new NotFoundError('Insurance policy');
+  if (policy.userId === userId) return { isOwner: true, readableVehicleIds: new Set() };
+
+  // Non-owner: keep only the covered vehicles this user may READ (accepted share or — impossible here —
+  // ownership). If none, they have no business reading this policy at all → 404.
+  const readableVehicleIds = new Set<string>();
+  for (const vehicleId of policy.vehicleIds) {
+    if (await resolveVehicleAccess(vehicleId, userId)) readableVehicleIds.add(vehicleId);
+  }
+  if (readableVehicleIds.size === 0) throw new NotFoundError('Insurance policy');
+  return { isOwner: false, readableVehicleIds };
+}
 
 const idParamSchema = z.object({
   id: z.string().min(1, 'Insurance policy ID is required'),
@@ -72,7 +148,8 @@ routes.use('*', changeTracker);
 routes.get('/', async (c) => {
   const user = c.get('user');
   const policies = await insurancePolicyRepository.findByUserId(user.id);
-  return c.json({ success: true, data: policies, count: policies.length });
+  // T6 display edge: each policy's embedded term money cents → dollars.
+  return c.json({ success: true, data: policies.map(policyToApi), count: policies.length });
 });
 
 // GET /api/v1/insurance/expiring-soon — expiring policies
@@ -86,7 +163,14 @@ routes.get('/expiring-soon', async (c) => {
   const now = new Date();
   const endDate = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
   const terms = await insurancePolicyRepository.findExpiringTerms(now, endDate, user.id, limit);
-  return c.json({ success: true, data: terms, count: terms.length, daysAhead, limit });
+  // T6 display edge: these are bare term rows (money cents → dollars).
+  return c.json({
+    success: true,
+    data: terms.map((t) => insuranceTermToApi(t)),
+    count: terms.length,
+    daysAhead,
+    limit,
+  });
 });
 
 // GET /api/v1/insurance/vehicles/:vehicleId/policies — policies for a vehicle
@@ -96,9 +180,15 @@ routes.get(
   async (c) => {
     const user = c.get('user');
     const { vehicleId } = c.req.valid('param');
-    await validateVehicleOwnership(vehicleId, user.id);
+    // vehicle-sharing T8b READ widening: owner | accepted viewer/editor | 404 (existence-hiding).
+    const access = await requireVehicleRead(vehicleId, user.id);
     const policies = await insurancePolicyRepository.findByVehicleId(vehicleId);
-    return c.json({ success: true, data: policies, count: policies.length });
+    // Blast-radius (design §6.4): for a NON-owner, narrow each policy to the shared vehicle only so the
+    // owner's OTHER vehicles (other terms + their coverage + ids) never leak. The owner sees the full
+    // policy unchanged. findByVehicleId already returns only policies that cover THIS vehicle.
+    const scoped =
+      access.role === 'owner' ? policies : policies.map((p) => narrowPolicyToVehicle(p, vehicleId));
+    return c.json({ success: true, data: scoped.map(policyToApi), count: scoped.length });
   }
 );
 
@@ -125,7 +215,7 @@ routes.post('/', zValidator('json', createPolicySchema), async (c) => {
   }
 
   return c.json(
-    { success: true, data: policy, message: 'Insurance policy created successfully' },
+    { success: true, data: policyToApi(policy), message: 'Insurance policy created successfully' },
     201
   );
 });
@@ -135,7 +225,7 @@ routes.get('/:id', zValidator('param', idParamSchema), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
   const policy = await validateInsuranceOwnership(id, user.id);
-  return c.json({ success: true, data: policy });
+  return c.json({ success: true, data: policyToApi(policy) });
 });
 
 // PUT /api/v1/insurance/:id — update policy
@@ -151,7 +241,7 @@ routes.put(
     const policy = await insurancePolicyRepository.update(id, data, user.id);
     return c.json({
       success: true,
-      data: policy,
+      data: policyToApi(policy),
       message: 'Insurance policy updated successfully',
     });
   }
@@ -213,7 +303,10 @@ routes.post(
       userId: user.id,
     });
 
-    return c.json({ success: true, data: policy, message: 'Term added successfully' }, 201);
+    return c.json(
+      { success: true, data: policyToApi(policy), message: 'Term added successfully' },
+      201
+    );
   }
 );
 
@@ -245,7 +338,11 @@ routes.put(
       });
     }
 
-    return c.json({ success: true, data: policy, message: 'Term updated successfully' });
+    return c.json({
+      success: true,
+      data: policyToApi(policy),
+      message: 'Term updated successfully',
+    });
   }
 );
 
@@ -259,7 +356,7 @@ routes.delete('/:id/terms/:termId', zValidator('param', termParamsSchema), async
   await expenseRepository.deleteBySource('insurance_term', termId, user.id);
 
   const policy = await insurancePolicyRepository.deleteTerm(id, termId, user.id);
-  return c.json({ success: true, data: policy, message: 'Term deleted successfully' });
+  return c.json({ success: true, data: policyToApi(policy), message: 'Term deleted successfully' });
 });
 
 // --- Claims (filed against a policy) ---
@@ -268,9 +365,21 @@ routes.delete('/:id/terms/:termId', zValidator('param', termParamsSchema), async
 routes.get('/:id/claims', zValidator('param', idParamSchema), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
-  await validateInsuranceOwnership(id, user.id);
+  // vehicle-sharing T12b-3c READ widening: owner | accepted viewer/editor on a covered vehicle | 404.
+  const { isOwner, readableVehicleIds } = await requirePolicyReadVehicles(id, user.id);
   const claims = await insuranceClaimRepository.findByPolicyId(id);
-  return c.json({ success: true, data: claims, count: claims.length });
+  // Blast-radius (design §6.4): the OWNER sees every claim; a NON-owner sees ONLY claims attributed to
+  // a vehicle they may read. A claim with no vehicleId (unattributed) or one on the owner's OTHER
+  // vehicle is dropped for a shared invitee — never reveal claims about vehicles outside the share.
+  const scoped = isOwner
+    ? claims
+    : claims.filter((cl) => cl.vehicleId !== null && readableVehicleIds.has(cl.vehicleId));
+  // T6 display edge: each claim's payoutAmount cents → dollars.
+  return c.json({
+    success: true,
+    data: scoped.map((cl) => insuranceClaimToApi(cl)),
+    count: scoped.length,
+  });
 });
 
 // POST /api/v1/insurance/:id/claims — file a claim
@@ -287,7 +396,10 @@ routes.post(
     // only proved policy ownership, and the repo writes these FKs verbatim.
     await validateClaimRefs(data, id, user.id);
     const claim = await insuranceClaimRepository.create(id, data);
-    return c.json({ success: true, data: claim, message: 'Claim filed successfully' }, 201);
+    return c.json(
+      { success: true, data: insuranceClaimToApi(claim), message: 'Claim filed successfully' },
+      201
+    );
   }
 );
 
@@ -304,7 +416,11 @@ routes.put(
     // Re-validate a CHANGED vehicleId/termId link (mirror the create-path guard).
     await validateClaimRefs(updates, id, user.id);
     const claim = await insuranceClaimRepository.update(id, claimId, updates);
-    return c.json({ success: true, data: claim, message: 'Claim updated successfully' });
+    return c.json({
+      success: true,
+      data: insuranceClaimToApi(claim),
+      message: 'Claim updated successfully',
+    });
   }
 );
 

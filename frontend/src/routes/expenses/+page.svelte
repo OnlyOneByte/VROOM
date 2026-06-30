@@ -66,7 +66,17 @@
 	// just the current 20-row slice (the table's local filter only narrowed the page).
 	let categoryFilter = $state<string>('');
 
-	let pendingExpenses = $derived(offlineExpenseQueue.current.filter(expense => !expense.synced));
+	// Partition the offline queue three ways. A PARKED row (needsAttention, #79) is unsynced but must NOT
+	// appear in "Pending Sync" — it's not waiting to sync, it's permanently unsyncable until the user fixes
+	// it. Surface it in its own "Needs attention" section so a malformed entry is visible, not silently
+	// stuck (NORTH_STAR #1 — no silent loss). Mirrors getPendingExpenses/getNeedsAttentionExpenses, but over
+	// the reactive in-memory queue so the lists update live as sync parks/clears rows.
+	let pendingExpenses = $derived(
+		offlineExpenseQueue.current.filter(expense => !expense.synced && !expense.needsAttention)
+	);
+	let needsAttentionExpenses = $derived(
+		offlineExpenseQueue.current.filter(expense => !expense.synced && expense.needsAttention)
+	);
 	let syncedExpenses = $derived(offlineExpenseQueue.current.filter(expense => expense.synced));
 
 	// Get all unique tags from expenses
@@ -468,8 +478,10 @@
 		<!-- Offline Expenses Section -->
 		<OfflineExpenseCards
 			{pendingExpenses}
+			{needsAttentionExpenses}
 			{syncedExpenses}
 			onRemovePending={removeOfflineExpense}
+			onRemoveNeedsAttention={removeOfflineExpense}
 		/>
 
 		<!-- Expense List -->

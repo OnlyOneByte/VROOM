@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { NewVehicle, Vehicle, VehicleWithFinancing } from '../../db/schema';
@@ -35,6 +35,25 @@ export class VehicleRepository extends BaseRepository<Vehicle, NewVehicle> {
       });
       throw new DatabaseError(`Failed to find vehicles for user ${userId}`, error);
     }
+  }
+
+  /**
+   * Fetch vehicles by an explicit id set (with financing), NOT userId-scoped — used by the
+   * shared-fleet widening (vehicle-sharing T5a): the caller has already resolved which vehicleIds the
+   * acting user has ACCEPTED-share access to, so this just hydrates those rows. Returns [] for an empty
+   * id list (no query). Order is unspecified; the caller sorts/annotates.
+   */
+  async findByIds(vehicleIds: string[]): Promise<VehicleWithFinancing[]> {
+    if (vehicleIds.length === 0) return [];
+    const result = await this.db
+      .select({ vehicle: vehicles, financing: vehicleFinancing })
+      .from(vehicles)
+      .leftJoin(vehicleFinancing, eq(vehicles.id, vehicleFinancing.vehicleId))
+      .where(inArray(vehicles.id, vehicleIds));
+    return result.map((row) => ({
+      ...row.vehicle,
+      financing: row.financing || undefined,
+    })) as VehicleWithFinancing[];
   }
 
   async findByUserIdAndId(userId: string, vehicleId: string): Promise<Vehicle | null> {

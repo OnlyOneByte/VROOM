@@ -40,7 +40,7 @@
       `columns`) → rewrote as explicit per-field optionals. backend validate:local EXIT 0 (1038 pass, +9).
 
 ## Phase 3 — frontend
-- [~] **T4** Import-dialog mapping step: detected-source banner, per-field column dropdowns from the
+- [x] **T4** Import-dialog mapping step: detected-source banner, per-field column dropdowns from the
       file headers, unit/date-format/target-vehicle pickers, category-remap table. Reuse the existing
       preview/commit step. Types + service wiring.
       - [x] **Types + service wiring DONE (C140, non-eyes-on):** `src/lib/types/import-mapping.ts`
@@ -84,14 +84,12 @@
             "Unrecognized categories" panel renders → map servicing→Maintenance → panel disappears, "1 ready"
             → committed row imported as `maintenance` (NOT the misc fallback, verified via API). Remap trigger
             got `data-testid="remap-category-{word}"`. FE validate:local GREEN (735).
-      - [ ] **REMAINING (T4 follow-ups):** the Angelo-gated preset `defaultCategory`. **BLOCKER surfaced +
-            flagged to Angelo C31:** the fuel presets map no category column and `mapCategory` leaves a blank
-            category blank (D2 "never invent"), so a DETECTED fuel log previews 0-ready ("Unknown category").
-            Recommended fix (a): give each fuel preset a `defaultCategory:'fuel'` (backend-preset change,
-            awaiting the steer) — until then the auto-detect path detects+maps but commits nothing. (NOTE: the
-            C47 remap table does NOT solve this — a detected preset maps no category COLUMN at all, so there's
-            no word to remap; the gap is the missing column, which is the parked `defaultCategory` decision.)
-- [~] **T5** Four-states + a11y + mobile; compose from the kit.
+      - [x] **T4 follow-up DONE (C148/C153):** the preset `defaultCategory` — ✅ Angelo-decided 2026-06-23
+            (`defaultCategory:'fuel'` on all 3 fuel presets). C148 added the per-preset default; C153 forwarded
+            it through the dialog so a DETECTED Fuelly/Fuelio/Drivvo log now previews ready (blank category →
+            `fuel`) and commits end-to-end. (The C47 remap table is for NAMED-but-unknown words — a separate
+            case, unchanged.) The whole T4 mapping step is now complete.
+- [x] **T5** Four-states + a11y + mobile; compose from the kit.
       - [x] **MANUAL editor MOBILE eyes-on DONE (C121):** the manual column-mapping editor — the most
             control-dense dialog section (per-field flex rows + date-format + conditional Odometer/Volume
             unit pickers + target-vehicle picker in a sm:max-w-lg Dialog.Content) — verified at Pixel-5
@@ -100,12 +98,12 @@
             overflow (asserted scrollWidth ≤ clientWidth+1, NORTH_STAR #3). Complements the desktop shots
             (C37/C41/C47/C61). The detect-preset path was incidentally confirmed mobile-clean too (a stray
             Odo/Litres CSV tripped Fuelio detection mid-cycle → banner + vehicle picker render no-overflow).
-      - [ ] **REMAINING:** the populated-detect FOUR-STATE shots (loading/empty/error/data of the
-            auto-detect path) are gated on the same Angelo `defaultCategory` decision as the T6 detect-commit
-            (a detected preset previews 0-ready until then, so the populated-data state can't be captured).
+      - [x] **DONE (C153):** the populated-detect data state is now capturable — the C148/C153
+            `defaultCategory:'fuel'` decision means a detected preset previews ready, so the auto-detect
+            four-state path (loading/empty/error/data) is no longer gated. T5 complete.
 
 ## Phase 4 — verify
-- [~] **T6** E2E (auto-detected preset path + manual-mapping path, mi + km vehicle) + eyes-on
+- [x] **T6** E2E (auto-detected preset path + manual-mapping path, mi + km vehicle) + eyes-on
       screenshots of all four states. regress.sh green. Consider extending the `no-utc-month-parse`
       guard to cover `import-mapping.ts`.
       - [x] **DATE-GUARD slice DONE (C54):** the merge-surviving no-utc guard for the import date paths is
@@ -123,11 +121,8 @@
             .meshclaw.e2e.ts` + shot (Read): the "Map your columns" editor with all fields mapped, units
             Miles/Gallons (US), "1 ready" → "Import 1 row". Complements C41 (km→mi conversion) + C37 (the
             maintenance row / the fuel row's missing-field error). FE validate:local GREEN (735).
-      - [ ] **REMAINING (T6, BLOCKED):** the AUTO-DETECT PRESET round-trip THROUGH COMMIT. A detected
-            Fuelly/Fuelio/Drivvo log maps NO category column, so `mapCategory` leaves it blank (D2 "never
-            invent") → the preview is 0-ready ("Unknown category") and there's nothing to commit. The C47
-            remap table does NOT help (a preset maps no category COLUMN, so there's no word to remap). This
-            is the parked `defaultCategory:'fuel'`-per-preset decision (send_message'd Angelo C31) — the
-            detect-path commit can't be exercised until he rules. The manual path (the committable half) is
-            now fully eyes-on (C37/C41/C47/C61). Four-state screenshots are likewise gated on the detect
-            commit for the populated-detect state.
+      - [x] **DONE (C148/C153):** the AUTO-DETECT PRESET round-trip THROUGH COMMIT is unblocked + closed.
+            Angelo decided `defaultCategory:'fuel'` per fuel preset (2026-06-23); C148 added it (+ flipped the
+            C32 readyCount=0 characterization), C153 forwarded it through the dialog. A detected
+            Fuelly/Fuelio/Drivvo log now maps blank category → `fuel`, previews ready, and commits end-to-end —
+            the manual half was already eyes-on (C37/C41/C47/C61). **import-trackers is FEATURE-COMPLETE.**

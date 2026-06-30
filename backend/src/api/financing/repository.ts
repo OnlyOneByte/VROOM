@@ -6,7 +6,7 @@
  * Balance is computed on read: originalAmount - SUM(financing payment expenses).
  */
 
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { NewVehicleFinancing, VehicleFinancing } from '../../db/schema';
@@ -16,14 +16,16 @@ import { logger } from '../../utils/logger';
 import { BaseRepository } from '../../utils/repository';
 
 /**
- * A computed balance at or below this (in the user's currency) counts as paid off — the small
- * epsilon absorbs float drift so a fully-paid loan reads as eligible, not "$0.003 remaining".
- * One source of truth for the payoff rule: the threshold was hand-inlined as `<= 0.01` at three
- * enrichment sites (vehicles list + single GET, financing GET) — C182 collapsed them onto this.
+ * A computed balance (in integer CENTS — money-cents-migration) at or below this counts as paid off.
+ * Was `0.01` (a one-cent DOLLAR epsilon absorbing binary-float drift). Under integer cents the balance
+ * is EXACT — originalAmount(cents) − Σ payments(cents), clamped ≥ 0 — so there is no sub-cent drift to
+ * absorb; 1 cent is the natural "fully paid" threshold (a balance of exactly 0 or a stray 1-cent rounding
+ * residue both read as paid off). One source of truth for the payoff rule across the three enrichment
+ * sites (vehicles list + single GET, financing GET — C182).
  */
-export const PAYOFF_BALANCE_THRESHOLD = 0.01;
+export const PAYOFF_BALANCE_THRESHOLD = 1;
 
-/** Whether a computed financing balance is small enough to count as paid off (see threshold above). */
+/** Whether a computed financing balance (CENTS) is small enough to count as paid off (see threshold). */
 export function isEligibleForPayoff(computedBalance: number): boolean {
   return computedBalance <= PAYOFF_BALANCE_THRESHOLD;
 }
@@ -60,14 +62,6 @@ export class FinancingRepository extends BaseRepository<VehicleFinancing, NewVeh
       .where(eq(vehicleFinancing.vehicleId, vehicleId))
       .limit(1);
     return result[0] || null;
-  }
-
-  async findActiveFinancing(): Promise<VehicleFinancing[]> {
-    return await this.db
-      .select()
-      .from(vehicleFinancing)
-      .where(eq(vehicleFinancing.isActive, true))
-      .orderBy(asc(vehicleFinancing.startDate));
   }
 
   /**

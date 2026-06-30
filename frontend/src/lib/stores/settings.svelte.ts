@@ -8,6 +8,7 @@ import type {
 	RestoreResult
 } from '../types/index.js';
 import { settingsApi } from '$lib/services/settings-api';
+import { themeStore } from '$lib/stores/theme.svelte';
 import { triggerBlobDownload } from '$lib/utils/download';
 import { extractErrorMessage } from '$lib/utils/error-handling';
 
@@ -47,6 +48,10 @@ function createSettingsStore() {
 			error = null;
 			try {
 				settings = await settingsApi.getSettings();
+				// Theming engine (T9/D2): server-wins reconcile of the theme id. If the server's
+				// themePreference differs from the local mirror (e.g. set on another device), adopt it. The
+				// theme store no-ops when they already agree + never re-pushes (server already has it).
+				themeStore.reconcileServerTheme(settings.themePreference);
 				isLoading = false;
 			} catch (err) {
 				error = extractErrorMessage(err, UNEXPECTED_ERROR);

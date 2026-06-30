@@ -14,6 +14,8 @@ export * from './analytics.js';
 export * from './common.js';
 export * from './reminder.js';
 export * from './import-mapping.js';
+export * from './trip.js';
+export * from './share.js';
 
 // Backend API types — canonical definitions live in $lib/services/api-transformer.ts
 export type { BackendExpenseResponse } from '../services/api-transformer.js';

@@ -237,40 +237,39 @@ describe('updateSplitSchema — shares the same refinement', () => {
   });
 });
 
-// #141 (C458): totalAmount is QUANTIZED to whole cents at the validation boundary. The split's
-// groupTotal is stored from totalAmount while the legs are rounded to cents (Math.round(total*100)) —
-// so a sub-cent total (100.005) used to persist groupTotal=100.005 while the legs summed to 100.01, a
-// stored header disagreeing with Σsiblings (NORTH_STAR #1). Rounding totalAmount to cents makes the
-// header computed from the SAME cent-aligned value as the legs. The UI only sends 2-decimal amounts.
-describe('split totalAmount is quantized to whole cents (#141)', () => {
-  test('a sub-cent totalAmount is rounded to 2 decimals on create', () => {
+// #141 (C458) + money-cents-migration: totalAmount is the dollars→integer-CENTS input edge at the
+// validation boundary (centsAmount = z.number().positive().transform(dollarsToCents)). The split's
+// groupTotal + legs are then all computed in native cents from this SAME value (Σlegs == groupTotal
+// EXACTLY). A sub-cent dollar input rounds to the nearest whole cent (ROUND-before-int), never truncates.
+// The UI only sends 2-decimal dollar amounts; this verifies the dollars→cents conversion.
+describe('split totalAmount is converted to integer cents (#141 / money-cents-migration)', () => {
+  test('a dollar totalAmount with a sub-cent tail rounds to whole cents on create', () => {
     const r = createSplitExpenseSchema.safeParse({
       ...baseCreate,
       splitConfig: { method: 'even', vehicleIds: ['v1', 'v2'] },
       totalAmount: 100.005,
     });
     expect(r.success).toBe(true);
-    // NON-VACUOUS: pre-fix totalAmount passed through as 100.005 (→ stored groupTotal), while the legs
-    // rounded to 100.01. Now it's 100.01, matching what computeEvenSplit derives the legs from.
-    if (r.success) expect(r.data.totalAmount).toBe(100.01);
+    // $100.005 → round(100.005 * 100) = 10001 cents.
+    if (r.success) expect(r.data.totalAmount).toBe(10001);
   });
 
-  test('a sub-cent totalAmount is rounded on update too', () => {
+  test('a dollar totalAmount with a sub-cent tail rounds on update too', () => {
     const r = updateSplitSchema.safeParse({
       splitConfig: { method: 'even', vehicleIds: ['v1', 'v2'] },
       totalAmount: 49.999,
     });
     expect(r.success).toBe(true);
-    if (r.success) expect(r.data.totalAmount).toBe(50);
+    if (r.success) expect(r.data.totalAmount).toBe(5000); // $49.999 → 5000 cents
   });
 
-  test('a clean 2-decimal totalAmount is unchanged (no-op for the UI happy path)', () => {
+  test('a clean 2-decimal dollar totalAmount converts to its exact cent value', () => {
     const r = createSplitExpenseSchema.safeParse({
       ...baseCreate,
       splitConfig: { method: 'even', vehicleIds: ['v1', 'v2'] },
       totalAmount: 100.0,
     });
     expect(r.success).toBe(true);
-    if (r.success) expect(r.data.totalAmount).toBe(100);
+    if (r.success) expect(r.data.totalAmount).toBe(10000); // $100.00 → 10000 cents
   });
 });

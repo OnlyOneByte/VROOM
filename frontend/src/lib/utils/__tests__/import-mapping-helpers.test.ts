@@ -7,7 +7,9 @@
  */
 
 import { describe, expect, test } from 'vitest';
+import type { ImportMappingPreset } from '$lib/types';
 import {
+	buildPresetMapping,
 	guessManualColumns,
 	isNativeImportHeaders,
 	parseCsvHeaders
@@ -90,5 +92,45 @@ describe('guessManualColumns', () => {
 
 	test('an un-guessable header set leaves fields unmapped (no invented columns)', () => {
 		expect(guessManualColumns(['col1', 'col2', 'xyz'])).toEqual({});
+	});
+});
+
+describe('buildPresetMapping (C153 — the dialog sends a detected preset, incl. defaultCategory)', () => {
+	// A Fuelly-shaped preset: NO category column, defaultCategory 'fuel' (the #C148 fix). The dialog must
+	// forward defaultCategory so a detected fuel log previews ready fuel rows, not 0-ready "Unknown category".
+	const fuelly: ImportMappingPreset = {
+		id: 'fuelly',
+		label: 'Fuelly',
+		signature: ['odometer', 'fillamount'],
+		columns: { date: 'Date', mileage: 'Odometer', volume: 'Fill Amount', amount: 'Price' },
+		dateFormat: 'mdy',
+		distanceUnit: 'miles',
+		volumeUnit: 'gallons_us',
+		categoryMap: { gas: 'fuel' },
+		defaultCategory: 'fuel'
+	};
+
+	test('carries the preset defaultCategory through (the #C148 passthrough — load-bearing)', () => {
+		const mapping = buildPresetMapping(fuelly, 'Daily Driver', {});
+		// THE guard: dropping this field silently reverts the feature at the UI layer (detected fuel log
+		// → 0-ready) even with the backend fix in place.
+		expect(mapping.defaultCategory).toBe('fuel');
+		expect(mapping.source).toBe('fuelly');
+		expect(mapping.targetVehicle).toBe('Daily Driver');
+		expect(mapping.columns).toEqual(fuelly.columns);
+		expect(mapping.dateFormat).toBe('mdy');
+		expect(mapping.distanceUnit).toBe('miles');
+		expect(mapping.volumeUnit).toBe('gallons_us');
+	});
+
+	test('the user remap overrides the preset categoryMap (user choices win)', () => {
+		const mapping = buildPresetMapping(fuelly, 'Daily Driver', { gas: 'maintenance' });
+		expect(mapping.categoryMap).toEqual({ gas: 'maintenance' }); // user's 'maintenance' beats preset 'fuel'
+		expect(mapping.defaultCategory).toBe('fuel'); // default still carried
+	});
+
+	test('a preset WITHOUT a defaultCategory yields an undefined one (no invented default)', () => {
+		const noDefault: ImportMappingPreset = { ...fuelly, defaultCategory: undefined };
+		expect(buildPresetMapping(noDefault, 'Daily Driver', {}).defaultCategory).toBeUndefined();
 	});
 });

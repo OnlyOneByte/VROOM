@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { CONFIG } from '../../config';
+import { dollarsToCents } from '../../utils/money';
 
 // ---------------------------------------------------------------------------
 // Tag element — ONE source of truth (C408). A tag may not contain ';' or ',' because the CSV export
@@ -20,16 +21,15 @@ export const tagElementSchema = z
     message: 'Tag cannot contain a semicolon or comma',
   });
 
-// A positive money amount QUANTIZED to whole cents (#141, C458). A split's groupTotal is stored from the
-// raw totalAmount while computeEvenSplit/computePercentageSplit round each leg to whole cents
-// (Math.round(total*100)) — so a sub-cent total (e.g. 100.005) persisted groupTotal=100.005 while the legs
-// summed to 100.01, a stored header that disagrees with Σsiblings (NORTH_STAR #1, violates the "legs sum to
-// groupTotal" invariant). Rounding totalAmount to cents at the boundary makes groupTotal computed from the
-// SAME cent-aligned value as the legs. The UI only ever sends 2-decimal amounts, so this is a no-op there.
-const centsAmount = z
-  .number()
-  .positive('Amount must be positive')
-  .transform((n) => Math.round(n * 100) / 100);
+// A positive DOLLAR money amount → integer CENTS (money-cents-migration T5). Was a quantize-to-whole-cents
+// transform (Math.round(n*100)/100, #141/C458) ensuring groupTotal == Σsiblings; under the cents schema the
+// storage unit IS the integer cent, so the transform is now `dollarsToCents` (Math.round(n*100)). The "legs
+// sum to groupTotal" invariant still holds — split-service now computes legs in native cents from this SAME
+// cent value (largest-remainder / exact-remainder), so Σlegs == groupTotal EXACTLY. The UI sends 2-decimal
+// dollars; this is the input edge. (splitConfigSchema is also nested in the reminder schema — see the
+// reminder merge-gate handling in reminders/validation.ts, which uses a transform-FREE gate to avoid a
+// double-convert on the merge-and-revalidate.)
+const centsAmount = z.number().positive('Amount must be positive').transform(dollarsToCents);
 
 // ---------------------------------------------------------------------------
 // Split Config Schemas (discriminated union on `method`)
@@ -42,7 +42,10 @@ export const evenSplitSchema = z.object({
 
 const absoluteAllocationSchema = z.object({
   vehicleId: z.string().min(1),
-  amount: z.number().min(0, 'Amount must be non-negative'),
+  // money (T5): client sends DOLLARS, store integer CENTS. Becomes a sibling's expenseAmount via
+  // computeAllocations→createSiblings. refineSplitConfig compares Σ amount to totalAmount — both are
+  // post-transform cents, so the "absolute allocations sum to total" check stays unit-consistent.
+  amount: z.number().min(0, 'Amount must be non-negative').transform(dollarsToCents),
 });
 
 export const absoluteSplitSchema = z.object({
@@ -63,6 +66,25 @@ export const percentageSplitSchema = z.object({
 export const splitConfigSchema = z.discriminatedUnion('method', [
   evenSplitSchema,
   absoluteSplitSchema,
+  percentageSplitSchema,
+]);
+
+// A TRANSFORM-FREE twin of splitConfigSchema (absolute `amount` is a plain non-negative number, NOT
+// dollars→cents). For RE-VALIDATION of data that is ALREADY in storage units (cents) — specifically the
+// reminder PUT merge gate (reminders/validation.ts), which re-parses a merged {...existing(cents),
+// ...partialUpdate} object purely as a structural check. Running the cents-transform there would
+// double-convert the already-cents stored allocations. Same shape + discriminated union, no `.transform`.
+const absoluteAllocationStructuralSchema = z.object({
+  vehicleId: z.string().min(1),
+  amount: z.number().min(0, 'Amount must be non-negative'),
+});
+
+export const splitConfigStructuralSchema = z.discriminatedUnion('method', [
+  evenSplitSchema,
+  z.object({
+    method: z.literal('absolute'),
+    allocations: z.array(absoluteAllocationStructuralSchema).min(1),
+  }),
   percentageSplitSchema,
 ]);
 

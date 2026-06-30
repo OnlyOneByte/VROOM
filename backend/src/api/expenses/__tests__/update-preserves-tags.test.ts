@@ -23,6 +23,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -30,17 +31,6 @@ beforeEach(async () => {
   ctx = await createTestApp();
 });
 afterEach(() => ctx.close());
-
-async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', {
-    make: 'Honda',
-    model: 'Fit',
-    year: 2019,
-  });
-  const body = await json<DataEnvelope<{ id: string }>>(res);
-  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-  return body.data.id;
-}
 
 /** Tags column as stored (JSON-encoded array string, or null). */
 function tagsOf(id: string): string[] | null {
@@ -65,7 +55,7 @@ async function createTaggedExpense(vehicleId: string, tags: string[]): Promise<s
 
 describe('expense update preserves tags (.partial() + .default([]) class)', () => {
   test('editing only the amount must NOT wipe the tags', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Fit', year: 2019 });
     const id = await createTaggedExpense(vehicleId, ['business', 'reimbursable']);
     expect(tagsOf(id)).toEqual(['business', 'reimbursable']);
 
@@ -81,7 +71,7 @@ describe('expense update preserves tags (.partial() + .default([]) class)', () =
   });
 
   test('an explicit tags array on update still replaces them (normal edit unaffected)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Fit', year: 2019 });
     const id = await createTaggedExpense(vehicleId, ['old']);
 
     const res = await ctx.authed('PUT', `/api/v1/expenses/${id}`, { tags: ['new', 'fresh'] });
@@ -97,7 +87,7 @@ describe('expense update preserves tags (.partial() + .default([]) class)', () =
 // both built off the same base schema). These pin the rejection + that a normal tag is unaffected.
 describe('#104 — a tag containing the CSV delimiter (; or ,) is rejected, not silently round-trip-split', () => {
   test('CREATE with a semicolon in a tag → 400, nothing persisted', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Fit', year: 2019 });
     const res = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId,
       category: 'misc',
@@ -111,7 +101,7 @@ describe('#104 — a tag containing the CSV delimiter (; or ,) is rejected, not 
   });
 
   test('CREATE with a comma in a tag → 400', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Fit', year: 2019 });
     const res = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId,
       category: 'misc',
@@ -123,7 +113,7 @@ describe('#104 — a tag containing the CSV delimiter (; or ,) is rejected, not 
   });
 
   test('UPDATE that introduces a delimiter tag → 400 (the stored tags survive)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Fit', year: 2019 });
     const id = await createTaggedExpense(vehicleId, ['clean']);
     const res = await ctx.authed('PUT', `/api/v1/expenses/${id}`, { tags: ['a;b'] });
     expect(res.status).toBe(400);
@@ -131,7 +121,7 @@ describe('#104 — a tag containing the CSV delimiter (; or ,) is rejected, not 
   });
 
   test('a normal separator-free tag still creates fine (control)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Fit', year: 2019 });
     const id = await createTaggedExpense(vehicleId, ['road-trip', 'business']);
     expect(tagsOf(id)).toEqual(['road-trip', 'business']);
   });

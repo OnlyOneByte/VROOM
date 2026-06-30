@@ -11,7 +11,6 @@ import type { BackupConfig, StorageConfig } from '../../types';
 import {
   mergeUnitPreferences,
   partialUnitPreferencesSchema,
-  unitPreferencesSchema,
 } from '../../utils/unit-preferences-schema';
 import { preferencesRepository, syncStateRepository } from './repository';
 
@@ -221,6 +220,19 @@ const updateSettingsSchema = baseSettingsSchema
     unitPreferences: partialUnitPreferencesSchema.optional(),
     storageConfig: storageConfigSchema.optional(),
     backupConfig: backupConfigSchema.optional(),
+    // Theming engine (spec T2, D2): the selected theme id. createInsertSchema would accept it as an
+    // UNBOUNDED string (the column is plain text); pin an explicit bounded, non-empty constraint so a
+    // partial PUT can persist it (routed through the existing row-level merge in repository.update — a
+    // field not sent is left untouched, the #82 discipline) while a 5000-char or empty id can't land.
+    // The resolver (T6) treats an unknown id as `default`, so an arbitrary <=64-char value is safe to
+    // store; the cap is a storage/abuse bound, not an allow-list (custom themes are a future seam, D6).
+    themePreference: z.string().min(1).max(64).optional(),
+    // trips-location D3 (T8): the DEFAULT business-mileage rate ($/mile). createInsertSchema would accept
+    // the real column unbounded; pin an explicit non-negative, sanely-capped constraint (a reimbursement
+    // rate is well under $100/mile — the cap is an abuse bound). Routed through the same row-level merge
+    // (...restUpdates → repository.update), so a partial PUT persists it without touching sibling fields
+    // (the #82 discipline). 0 = the additive default (no business value until a rate is set).
+    businessMileageRate: z.number().min(0).max(100).optional(),
   })
   .partial();
 

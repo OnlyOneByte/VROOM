@@ -44,7 +44,7 @@ export const vehicles = sqliteTable(
     nickname: text('nickname'),
     vin: text('vin'),
     initialMileage: integer('initial_mileage'),
-    purchasePrice: real('purchase_price'),
+    purchasePrice: integer('purchase_price'), // money: integer CENTS (migration 0009)
     purchaseDate: integer('purchase_date', { mode: 'timestamp' }),
     unitPreferences: text('unit_preferences', { mode: 'json' })
       .$type<UnitPreferences>()
@@ -77,19 +77,19 @@ export const vehicleFinancing = sqliteTable(
       .references(() => vehicles.id, { onDelete: 'cascade' }),
     financingType: text('financing_type').notNull().default('loan'), // 'loan' | 'lease' | 'own'
     provider: text('provider').notNull(), // Lender name, leasing company, or dealer
-    originalAmount: real('original_amount').notNull(),
-    apr: real('apr'), // For loans, null for leases/own
+    originalAmount: integer('original_amount').notNull(), // money: integer CENTS (migration 0009)
+    apr: real('apr'), // For loans, null for leases/own — a PERCENT, stays real (NOT money)
     termMonths: integer('term_months').notNull(),
     startDate: integer('start_date', { mode: 'timestamp' }).notNull(),
     // Payment Configuration
-    paymentAmount: real('payment_amount').notNull(),
+    paymentAmount: integer('payment_amount').notNull(), // money: integer CENTS (migration 0009)
     paymentFrequency: text('payment_frequency').notNull().default('monthly'), // 'monthly' | 'bi-weekly' | 'weekly' | 'custom'
     paymentDayOfMonth: integer('payment_day_of_month'), // For monthly (1-31)
     paymentDayOfWeek: integer('payment_day_of_week'), // For weekly (0-6, Sunday=0)
     // Lease-specific fields
-    residualValue: real('residual_value'), // End-of-lease buyout price
-    mileageLimit: integer('mileage_limit'), // Annual mileage limit for leases
-    excessMileageFee: real('excess_mileage_fee'), // Per-mile fee over limit
+    residualValue: integer('residual_value'), // money: integer CENTS (migration 0009) — End-of-lease buyout price
+    mileageLimit: integer('mileage_limit'), // Annual mileage limit for leases (a MILEAGE count, NOT money)
+    excessMileageFee: integer('excess_mileage_fee'), // money: integer CENTS (migration 0009) — Per-mile fee over limit
     // Status
     isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
     endDate: integer('end_date', { mode: 'timestamp' }), // Payoff date or lease end date
@@ -136,15 +136,15 @@ export const insuranceTerms = sqliteTable(
     endDate: integer('end_date', { mode: 'timestamp' }).notNull(),
     policyNumber: text('policy_number'),
     coverageDescription: text('coverage_description'),
-    deductibleAmount: real('deductible_amount'),
-    coverageLimit: real('coverage_limit'),
+    deductibleAmount: integer('deductible_amount'), // money: integer CENTS (migration 0009)
+    coverageLimit: integer('coverage_limit'), // money: integer CENTS (migration 0009) — a dollar cap, not a %
     agentName: text('agent_name'),
     agentPhone: text('agent_phone'),
     agentEmail: text('agent_email'),
-    totalCost: real('total_cost'),
-    monthlyCost: real('monthly_cost'),
+    totalCost: integer('total_cost'), // money: integer CENTS (migration 0009)
+    monthlyCost: integer('monthly_cost'), // money: integer CENTS (migration 0009)
     premiumFrequency: text('premium_frequency'),
-    paymentAmount: real('payment_amount'),
+    paymentAmount: integer('payment_amount'), // money: integer CENTS (migration 0009)
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   },
@@ -190,7 +190,7 @@ export const insuranceClaims = sqliteTable(
     claimType: text('claim_type').notNull(), // collision | theft | weather | vandalism | other
     description: text('description'),
     status: text('status').notNull().default('filed'), // filed | in_progress | settled | denied
-    payoutAmount: real('payout_amount'),
+    payoutAmount: integer('payout_amount'), // money: integer CENTS (migration 0009)
     faultDesignation: text('fault_designation'), // at_fault | not_at_fault | shared | null
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
@@ -222,18 +222,26 @@ export const expenses = sqliteTable(
     description: text('description'),
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-    expenseAmount: real('expense_amount').notNull(),
-    volume: real('volume'),
+    expenseAmount: integer('expense_amount').notNull(), // money: integer CENTS (migration 0009)
+    volume: real('volume'), // gallons / kWh — a QUANTITY, stays real (NOT money)
     fuelType: text('fuel_type'),
     missedFillup: integer('missed_fillup', { mode: 'boolean' }).notNull().default(false),
-    // Direct user ownership — eliminates vehicles JOIN for user-scoped queries
+    // Direct user ownership — eliminates vehicles JOIN for user-scoped queries.
+    // For a SHARED-created row (an editor logged a cost on someone else's vehicle, vehicle-sharing
+    // T5b owner-stamp model) this is the vehicle OWNER's id — so the row rides the owner's backup/TCO
+    // and counts once. The actual author is recorded in `createdBy`.
     userId: text('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
+    // PROVENANCE — who physically entered the row (vehicle-sharing T5b, migration 0011). Differs from
+    // `userId` only for an editor-created shared row (createdBy = editor, userId = owner). NULL =
+    // legacy/self-created (treat as createdBy === userId). onDelete SET NULL: this is provenance, not
+    // ownership — deleting the author must NOT delete the owner's cost-history row.
+    createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
     // NULL for standalone expenses, shared UUID for split siblings
     groupId: text('group_id'),
-    // Pre-split total amount, same on all siblings in a group
-    groupTotal: real('group_total'),
+    // Pre-split total amount, same on all siblings in a group — money: integer CENTS (migration 0009)
+    groupTotal: integer('group_total'),
     // Split method: 'even' | 'absolute' | 'percentage'
     splitMethod: text('split_method'),
     // Source tracking — nullable, server-set only (e.g., 'reminder', 'import', 'api')
@@ -308,6 +316,18 @@ export const userPreferences = sqliteTable('user_preferences', {
     .notNull()
     .default(DEFAULT_UNIT_PREFERENCES),
   currencyUnit: text('currency_unit').notNull().default('USD'),
+  // Theming engine (theming-engine spec T1, D2). The user's selected theme id; 'default' reproduces
+  // today's look byte-for-byte, so this is fully additive — existing rows backfill 'default' and
+  // nothing changes until a user picks another theme. The light/dark *mode* stays device-local
+  // (localStorage) by current convention (D2); only the theme *id* is persisted/synced here.
+  themePreference: text('theme_preference').notNull().default('default'),
+  // trips-location D3 (T8): the DEFAULT business-mileage reimbursement rate in $/mile (e.g. 0.67). The trip
+  // mileage-summary uses it when no explicit ?rate= override is passed (a per-trip override is a thin
+  // additive follow-on). Fully additive — existing rows backfill 0 (= today's behavior: businessValue 0
+  // until a rate is set). A RATE, not a stored money AMOUNT, so it stays `real` (naturally fractional) and
+  // is out of scope for the money-cents integer migration (which covers the 14 money-amount columns); the
+  // business $ it produces is computed at display time (design.md §7) and inherits money handling there.
+  businessMileageRate: real('business_mileage_rate').notNull().default(0),
   autoBackupEnabled: integer('auto_backup_enabled', { mode: 'boolean' }).notNull().default(false),
   backupFrequency: text('backup_frequency').notNull().default('weekly'), // 'daily' | 'weekly' | 'monthly'
   syncOnInactivity: integer('sync_on_inactivity', { mode: 'boolean' }).notNull().default(true),
@@ -368,6 +388,39 @@ export const odometerEntries = sqliteTable(
   },
   (table) => ({
     vehicleDateIdx: index('odometer_vehicle_date_idx').on(table.vehicleId, table.recordedAt),
+  })
+);
+
+// Trips table (trips-location T1, spec §1) — manual trip log per vehicle. Mirrors odometerEntries (the
+// closest existing shape). `distance` is NOT stored; it's derived `max(0, endOdometer − startOdometer)` at
+// read time (R2, the #46 clamp) so a later odometer correction can't desync a stored distance. No GPS in v1
+// (D5): startLocation/endLocation are optional free-text labels. The business-mileage rate lives in
+// preferences (display-time), so this table introduces NO float-money column (design §7 — inherits the
+// money-cents migration cleanly).
+export const trips = sqliteTable(
+  'trips',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    vehicleId: text('vehicle_id')
+      .notNull()
+      .references(() => vehicles.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    startOdometer: integer('start_odometer').notNull(),
+    endOdometer: integer('end_odometer').notNull(), // R2: end >= start enforced at Zod; distance derived
+    purpose: text('purpose').notNull(), // 'business' | 'personal' | 'commute' | 'other' (D4)
+    tripDate: integer('trip_date', { mode: 'timestamp' }).notNull(),
+    startLocation: text('start_location'), // D5: free-text label, optional (no GPS in v1)
+    endLocation: text('end_location'),
+    note: text('note'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    vehicleDateIdx: index('trips_vehicle_date_idx').on(table.vehicleId, table.tripDate),
   })
 );
 
@@ -459,7 +512,7 @@ export const reminders = sqliteTable(
     nextDueDate: integer('next_due_date', { mode: 'timestamp' }),
     expenseCategory: text('expense_category'),
     expenseTags: text('expense_tags', { mode: 'json' }).$type<string[]>(),
-    expenseAmount: real('expense_amount'), // total amount, required when type='expense' + actionMode='automatic'
+    expenseAmount: integer('expense_amount'), // money: integer CENTS (migration 0009) — total amount, required when type='expense' + actionMode='automatic'
     expenseDescription: text('expense_description'),
     expenseSplitConfig: text('expense_split_config', { mode: 'json' }).$type<ReminderSplitConfig>(),
     isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
@@ -532,6 +585,46 @@ export const reminderNotifications = sqliteTable(
   })
 );
 
+// Vehicle sharing (migration 0010, vehicle-sharing T1; Angelo ratified D1-D8 2026-06-27).
+// An OWNER grants another existing VROOM user scoped access to ONE of their vehicles. This is the
+// ONLY widening of cross-userId access in VROOM (NORTH_STAR #2) — every read/write route that opts a
+// shared vehicle in routes through utils/sharing.ts (T2), never raw. IDs are text/cuid2 to match
+// users.id + vehicles.id (the design draft said integer — corrected to the live schema). All three
+// FKs cascade so a deleted vehicle/owner/invitee drops the share row (D8); shared-CREATED expense
+// rows are owner-userId-stamped and are NOT touched by this cascade (real cost history stays).
+export const vehicleShares = sqliteTable(
+  'vehicle_shares',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    vehicleId: text('vehicle_id')
+      .notNull()
+      .references(() => vehicles.id, { onDelete: 'cascade' }), // revoke-on-vehicle-delete (D8)
+    ownerId: text('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }), // denormalized for the owner-side list query
+    sharedWithId: text('shared_with_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }), // the invitee
+    level: text('level').notNull(), // 'viewer' | 'editor' (Zod enum at the route)
+    status: text('status').notNull().default('pending'), // 'pending'|'accepted'|'declined'|'revoked'
+    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    // One ACTIVE share per (vehicle, invitee). Partial (WHERE status IN pending/accepted) so a
+    // declined/revoked row does NOT block re-inviting the same user to the same vehicle later.
+    activeShareIdx: uniqueIndex('vehicle_shares_active_idx')
+      .on(table.vehicleId, table.sharedWithId)
+      .where(sql`status in ('pending','accepted')`),
+    // Invitee-side "shared with me" lookup (by invitee + status).
+    sharedWithIdx: index('vehicle_shares_shared_with_idx').on(table.sharedWithId, table.status),
+    // Owner-side "shares I granted" lookup.
+    ownerIdx: index('vehicle_shares_owner_idx').on(table.ownerId),
+  })
+);
+
 // Export types for use in application
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -577,6 +670,9 @@ export type NewSession = typeof sessions.$inferInsert;
 export type OdometerEntry = typeof odometerEntries.$inferSelect;
 export type NewOdometerEntry = typeof odometerEntries.$inferInsert;
 
+export type Trip = typeof trips.$inferSelect;
+export type NewTrip = typeof trips.$inferInsert;
+
 export type Photo = typeof photos.$inferSelect;
 export type NewPhoto = typeof photos.$inferInsert;
 
@@ -591,3 +687,6 @@ export type NewReminderVehicle = typeof reminderVehicles.$inferInsert;
 
 export type ReminderNotification = typeof reminderNotifications.$inferSelect;
 export type NewReminderNotification = typeof reminderNotifications.$inferInsert;
+
+export type VehicleShare = typeof vehicleShares.$inferSelect;
+export type NewVehicleShare = typeof vehicleShares.$inferInsert;
