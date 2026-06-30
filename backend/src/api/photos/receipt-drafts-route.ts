@@ -10,9 +10,10 @@
  * the thin wiring: resolve rows → build the real seams → map failures honestly (no provider → 400; a
  * Photos transport / read-not-enabled failure → 502, never a faked empty result — #43/#44/#144).
  *
- * The live `mediaItems:search` read (the OAuth read scope) is ARCC-gated + ships in a LATER slice
- * (T1-live + T5). Until then GooglePhotosService.listReceiptPhotos throws "not enabled" → this route
- * surfaces a 502 with an actionable message; the orchestration + its guard run against the fake now.
+ * The live `mediaItems:search` read (T1) + its `photoslibrary.readonly.appcreateddata` OAuth scope (T5)
+ * are ARCC-cleared (design §7) and now LIVE: the real PhotosClient implements searchMediaItems and the
+ * connect flow requests the read scope. A Photos transport failure surfaces as a 502 (honest, never a
+ * faked empty); the HTTP guard exercises this path against the in-memory fake (zero-network).
  */
 
 import { and, eq } from 'drizzle-orm';
@@ -54,7 +55,7 @@ async function findEnabledProvider(
 }
 
 /** Build a GooglePhotosService from a google-photos provider row (decrypt refreshToken + cached album). */
-function buildPhotosService(row: UserProvider): GooglePhotosService {
+function buildRealPhotosService(row: UserProvider): GooglePhotosService {
   const credentials = JSON.parse(decrypt(row.credentials)) as Record<string, unknown>;
   const refreshToken = credentials.refreshToken;
   if (typeof refreshToken !== 'string') {
@@ -63,6 +64,20 @@ function buildPhotosService(row: UserProvider): GooglePhotosService {
   const config = (row.config ?? {}) as Record<string, unknown>;
   const albumId = typeof config.albumId === 'string' ? config.albumId : undefined;
   return new GooglePhotosService(refreshToken, undefined, albumId);
+}
+
+/**
+ * How the route builds the Photos service from a provider row. Defaults to the real OAuth2-authed
+ * service; the HTTP-harness test overrides it with a fake-PhotosClient-backed service so the live read
+ * path is exercised ZERO-network (the live `mediaItems:search` itself needs a real Google token, which
+ * the in-process suite cannot mint). This is a USED DI seam — NOT the dead-setter anti-pattern (C464).
+ */
+type PhotosServiceBuilder = (row: UserProvider) => GooglePhotosService;
+let photosServiceBuilder: PhotosServiceBuilder = buildRealPhotosService;
+
+/** Test seam: override the Photos-service builder (pass null to restore the real one). */
+export function setPhotosServiceBuilderForTest(builder: PhotosServiceBuilder | null): void {
+  photosServiceBuilder = builder ?? buildRealPhotosService;
 }
 
 /**
@@ -88,8 +103,8 @@ routes.get('/receipt-drafts', async (c) => {
     );
   }
 
-  // 2) Wire the real seams into the pure orchestration.
-  const photosService = buildPhotosService(photosRow);
+  // 2) Wire the real seams into the pure orchestration (the builder is overridable in tests).
+  const photosService = photosServiceBuilder(photosRow);
   const vlmProvider = getVlmProvider(vlmRow);
   const deps: StageDeps = {
     listReceiptPhotos: (max) => photosService.listReceiptPhotos(max),

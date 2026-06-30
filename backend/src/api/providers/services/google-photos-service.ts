@@ -301,5 +301,25 @@ export function createRealPhotosClient(refreshToken: string): PhotosClient {
       });
       return (await res.json()) as PhotosAlbum;
     },
+
+    async searchMediaItems(albumId, pageToken) {
+      // photos-auto-expense T1: the `mediaItems:search` Library API over VROOM's app-created album.
+      // Requires the `photoslibrary.readonly.appcreateddata` read scope (added to the connect flow, T5);
+      // it returns ONLY items VROOM uploaded — the platform guarantee behind the "narrowest scope" claim.
+      const res = await authedFetch(`${PHOTOS_API}/v1/mediaItems:search`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          albumId,
+          pageSize: 100,
+          ...(pageToken ? { pageToken } : {}),
+        }),
+      });
+      const data = (await res.json()) as {
+        mediaItems?: PhotosMediaItem[];
+        nextPageToken?: string;
+      };
+      return { items: data.mediaItems ?? [], nextPageToken: data.nextPageToken };
+    },
   };
 }

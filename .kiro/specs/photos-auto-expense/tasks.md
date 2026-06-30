@@ -30,12 +30,17 @@
       now UNBLOCKED on the ARCC axis.** **T2 SHIPPED (commit 3f162df, on the re-cut branch — pending the push).**
 
 ## Phase 1 — the Photos read capability + the stage endpoint
-- [ ] **T1 — `searchMediaItems` on the Photos provider (honors D2 + the ARCC precondition).** Add
-      `searchMediaItems(pageToken?)` to `PhotosClient` + `GooglePhotosService.listReceiptPhotos(maxItems)`
-      (the `mediaItems:search` Library API over app-created data, paginated, bounded by the D4 cap) + a
-      `searchMediaItems` capability flag on `GooglePhotosProvider`. GUARD: a zero-network `PhotosClient`
-      fake returns scripted media items; the service paginates + stops at the cap. **Build only after the
-      ARCC clearance + the D2 scope ACK** (the live call needs the read scope).
+- [x] **T1 — `searchMediaItems` on the Photos provider (C544, live read; ARCC-cleared C543/§7).** The
+      `PhotosClient` interface gained the OPTIONAL `searchMediaItems(albumId, pageToken?)` (added T2/C543);
+      this slice implements it on the REAL `createRealPhotosClient` (POST `/v1/mediaItems:search` via the
+      existing `authedFetch`, pageSize 100, maps `{mediaItems, nextPageToken}` → `{items, nextPageToken}`).
+      `GooglePhotosService.listReceiptPhotos(maxItems)` (added C543) paginates it bounded by the D4 cap.
+      The real read needs a Google token the in-process suite cannot mint, so the route HTTP guard injects a
+      fake-PhotosClient-backed service (`setPhotosServiceBuilderForTest`) + the fake's `searchMediaItems`
+      (scripted seeded photos + pagination) to exercise the live-read PATH zero-network — incl. a clean
+      multi-photo sweep, the already-imported filter, and a transport-failure 502 via fault injection. The
+      real transport method is itself uncovered by convention (the sibling real client methods are too).
+      Backend validate:local GREEN (2295 pass).
 - [ ] **T2 — The stage endpoint (FORK-FREE orchestration, buildable now against the fake).**
       `GET /api/v1/photos/receipt-drafts`: resolve the enabled google-photos + vlm providers (none →
       actionable 400); `listReceiptPhotos` → filter out media items already linked to an expense (the
@@ -56,11 +61,12 @@
       draft fields + a vehicle picker + a deselect checkbox; already-imported greyed/excluded) → a batch
       "Add N expenses" action firing N idempotent creates. Four-states + the D1 disclosure ("reads only the
       receipts VROOM uploaded to Photos, not your camera roll"). Eyes-on (boot + shot + Read the PNG).
-- [ ] **T5 — The OAuth scope expansion (ARCC-GATED, honors D2).** Add
-      `photoslibrary.readonly.appcreateddata` to the provider-connect scope list (auth/routes.ts) — the
-      google-photos-provider spec's pending Stage-6 step. Additive re-consent; credential path unchanged.
-      **Ships ONLY after the §7 ARCC review clears + Angelo's D2 ACK.** (This + T1 are the live-scope-
-      dependent slices; T2/T3/T4 build + test against the fake meanwhile.)
+- [x] **T5 — The OAuth scope expansion (C544, ARCC-cleared C543/§7 + Angelo D2 ACK).** Added
+      `https://www.googleapis.com/auth/photoslibrary.readonly.appcreateddata` to the provider-connect scope
+      list (`auth/routes.ts` `/providers/connect/google`, alongside `drive.file`). The NARROWEST Photos read
+      scope (read-only + app-created-data only). Additive re-consent: the flow already sets `prompt=consent`
+      + `access_type=offline`, so existing Drive/Photos users re-grant on next connect; the credential path
+      (encrypted `{refreshToken}`) is UNCHANGED. Paired with T1 as the live-read enablement.
 - [ ] **T6 — Round-trip e2e + DoD.** With a MOCKED Photos (`PhotosClient` fake) + a MOCKED VLM: sweep →
       review → confirm → assert N expenses + their photo links + that a re-run is a no-op (idempotency).
       The live Photos + VLM legs stay eyes-on-pending. Feature-DoD: both sides validate:local green, the
