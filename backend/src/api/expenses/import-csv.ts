@@ -37,6 +37,7 @@ export interface ImportableExpense {
   volume: number | null;
   fuelType: string | null;
   description: string | null;
+  location: string | null;
   tags: string[];
   missedFillup: boolean;
   /**
@@ -243,6 +244,9 @@ function parseRow(
     'Description'
   );
   if ('error' in descriptionResult) return descriptionResult;
+  // expense-location: optional free-text location, same bounded-string shape as description.
+  const locationResult = parseBoundedString(get('location'), EXP.locationMaxLength, 'Location');
+  if ('error' in locationResult) return locationResult;
   // Tags: the export joins with "; ". Accept that plus a plain comma.
   const tagsResult = parseTags(get('tags'));
   if ('error' in tagsResult) return tagsResult;
@@ -279,6 +283,7 @@ function parseRow(
       volume,
       fuelType,
       description: descriptionResult.value,
+      location: locationResult.value,
       tags: tagsResult.value,
       missedFillup,
       // Filled in by buildImportPlan, which has the occurrence counter.
@@ -314,6 +319,7 @@ export function deriveImportClientId(expense: ImportableExpense, occurrence: num
     expense.volume ?? '',
     expense.fuelType ?? '',
     expense.description ?? '',
+    expense.location ?? '',
     expense.tags.join(''),
     expense.missedFillup ? '1' : '0',
     occurrence,

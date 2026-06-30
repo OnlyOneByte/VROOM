@@ -44,13 +44,19 @@
       (CSV export/import round-trip — the backup + Sheets paths already auto-covered by T1).
 
 ## Phase 2 — backup / CSV round-trip (R4)
-- [ ] **T3 — CSV export/import + backup round-trip (fork-free).** Add `'location'` to `EXPORT_COLUMNS`
-      (after `'description'`) + `location: e.location ?? ''` to the export record map. GUARD: an HTTP test —
-      create-with-location → export CSV contains it → native re-import round-trips it EXACTLY. The
-      backup/restore + Sheets-sync paths are schema-derived (`getTableColumns`) → auto-covered; re-run the
-      expense column-coverage round-trip guard + the `sheets-header-coverage` test and assert GREEN (they
-      FAIL if schema and backup/header diverge — so they PROVE the round-trip with no new code, or need
-      `location` added to a pinned header list). Backend validate:local green.
+- [x] **T3 — CSV export/import + backup round-trip (C551, fork-free).** Added `'location'` to
+      `EXPORT_COLUMNS` (after `'description'`) + `location: e.location ?? ''` to the export record map; on the
+      IMPORT side (native VROOM CSV), the importer lists columns by hand, so threaded `location` through the
+      `ImportableExpense` interface + `parseRow` (a `parseBoundedString` at locationMaxLength) + the
+      `deriveImportClientId` content hash (so two rows differing only by location get distinct dedup keys).
+      `importExpenses` spreads the row generically → the column auto-inserts. GUARD
+      `expense-location-csv.test.ts` (3 cases): export CSV header+body carries location; a native CSV with a
+      location column persists it; a re-import is an idempotent no-op (the new column in the hash does not
+      break dedup). + a `location` case added to `import-client-id-field-sensitivity.test.ts` (proves the
+      key flips on a location-only diff — no silent collision). The backup/restore + Sheets paths were
+      already auto-covered (T1: schema-derived getTableColumns + the SHEET_HEADERS thread). Backend
+      validate:local GREEN (2307, +4). **★ ALL THREE FORK-FREE BACKEND SLICES (T1-T3) DONE; the remaining
+      T4-T6 are the FE tail, honoring the T0 D2/D4 ruling.**
 
 ## Phase 3 — frontend (honors D2/D4 — eyes-on tail)
 - [ ] **T4 — FE type + transformer (honors none directly; fork-free).** Add `Expense.location?: string`
