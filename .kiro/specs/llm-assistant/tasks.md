@@ -93,10 +93,12 @@
       Backend validate:local GREEN (2278 pass, +10). **The ENTIRE BACKEND is now COMPLETE (T1–T4).**
 
 ## Phase 3 — frontend (eyes-on tail, R10 — live-LLM + Playwright-blocked → "code-complete, eyes-on pending")
-- [ ] **T5a — `assistant-api.ts` client (FORK-FREE).** `assistantApi.sendMessage(message, history) →
-      { reply, toolsUsed }` over the shipped `POST /api/v1/assistant/chat`. Mirrors the C514 vlm-api
-      pattern. GUARD `assistant-api.test.ts` (mocked apiClient — endpoint + payload + the {reply,toolsUsed}
-      unwrap + error propagation). Thin wrapper over the contract-fixed route; independent of the forks.
+- [x] **T5a — `assistant-api.ts` client (C538, commits f2d2dc8 + the feat).** `assistantApi.sendMessage(message,
+      history) → { reply, toolsUsed }` over the shipped `POST /api/v1/assistant/chat`; AssistantTurn is
+      user/assistant only (tool turns are server-produced). Mirrors the C514 vlm-api pattern; fork-free. GUARD
+      `assistant-api.test.ts` (3 cases, mocked apiClient — endpoint + payload + the {reply,toolsUsed} envelope +
+      history-defaults-[] + error propagation). FE validate:local GREEN (1426 vitest, +3). **The last fork-free
+      slice — T5b/T6 below touch the gated forks (D1/D5), so the FE tail now waits on the T0 ruling.**
 - [ ] **T5b — The LLM-provider settings UI (honors D1).** An `LlmProvidersCard` (or a domain-parameterized
       generalization of the shipped `VlmProvidersCard`) on /settings: type + apiKey [write-only] + model +
       baseUrl, the D1 set; reuses `provider-api.ts`. canSave mirrors the backend gate; four-states;
