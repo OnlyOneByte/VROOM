@@ -13,16 +13,16 @@
 > The model output is UNTRUSTED → the SHIPPED fail-closed `parseExtraction`, never auto-written.
 
 ## Phase 0 — sign-off (gates the dependent slices)
-- [ ] **T0 — Angelo rules D1–D5 + the ARCC precondition** (`requirements.md`). Each fork has a RECOMMENDED
-      option; an "ACK" takes it. D1 app-created-only framing (recommend ship it honestly), D2 the OAuth
-      read-scope expansion (recommend add `appcreateddata`; **ARCC-gated**), D3 dedup via the idempotency
-      index + photo-ref join (recommend; no new table), D4 batch cap (recommend ≤25/run), D5 the per-draft
-      checklist confirm UX (recommend). **ARCC PRECONDITION:** before T1/T5 build (the Photos read + the
-      scope), run a fresh `search_arcc` on "expanding an OAuth read scope to a third party's photo library"
-      + record it in design §7 (the standing google-photos-provider ARCC note). **T2 below is the only
-      slice with NO dependency on T0/ARCC** (the stage-endpoint ORCHESTRATION can be built + unit-tested
-      against the `PhotosClient` fake before the live scope exists); T1 (the real search) + T5 (the scope)
-      wait on the ARCC clearance.
+- [x] **T0 — Angelo ACK all recommended (2026-06-30).** D1 = ship the app-created-only framing honestly
+      (draft the receipts in VROOM's own Photos album, not the camera roll); D2 = add the
+      `photoslibrary.readonly.appcreateddata` OAuth read-scope to the provider-connect flow; D3 = dedup via the
+      `createIdempotent` (userId, clientId=photos:mediaId) index + the photo-ref join (no new table); D4 = ≤25
+      photos/run cap; D5 = the per-draft review checklist. Do NOT re-escalate (settled). **ARCC PRECONDITION
+      STILL STANDS (separate from D2):** the OAuth read-scope expansion (the T1-live search + T5 scope) requires
+      a fresh `search_arcc` on "expanding an OAuth read scope to a third party's photo library (app-created
+      data)" + recording it in design §7 BEFORE those slices build — Angelo's product ACK does not substitute for
+      the governance check (the standing google-photos-provider rule). **T2 (the stage-endpoint ORCHESTRATION) is
+      fork-free + buildable now against the `PhotosClient` fake**; T1-live + T5 build after the ARCC check.
 
 ## Phase 1 — the Photos read capability + the stage endpoint
 - [ ] **T1 — `searchMediaItems` on the Photos provider (honors D2 + the ARCC precondition).** Add
