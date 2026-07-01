@@ -75,18 +75,27 @@
       is per-user (A + B each own their row). Backend validate:local GREEN (2325, +6). **★ THE FORK-FREE BACKEND
       SURFACE IS COMPLETE (T1–T3).** T4 is the trigger hook (honors D2 — the request-driven-trigger fork).
 
-## Phase 2 — backend send hook (honors D2 — the PushSender DI seam)
-- [ ] **T4 — the PushSender seam + `pushService.notifyUser` + the trigger hook.** Define the `PushSender`
-      interface + `PushResult` ({ok|gone|transientError}); the REAL impl wraps `web-push.sendNotification`
-      (404/410→gone); a FAKE impl (records calls, scripts results) + `setPushSenderForTest`. Implement
-      `pushService.notifyUser(userId, payload)` (design §4: findByUser → send → gone:prune /
-      transientError:incrementFailure+reap-past-cap / ok:markSuccess; **wrapped so it NEVER throws**).
-      WIRE the hook: after a `reminder_notifications` row is inserted in BOTH `processNotificationPeriod` (time)
-      and `processMileageReminder` (mileage), fire-and-forget `notifyUser` with `{title,body,tag:reminder.id,
-      url:'/reminders'}`. GUARD: the fake sender fires with the right payload on a notification-creating
-      trigger; a `gone` reaps the row; a `transientError` does NOT throw (the trigger still returns its normal
-      TriggerResult); enabled:false-equivalent (the fake is injected → zero real VAPID). Backend validate:local
-      GREEN. **★ THE BACKEND IS COMPLETE (T1–T4); the remaining T5–T6 are the FE tail.**
+## Phase 2 — backend send (T4 splits: T4a fork-free send/lifecycle · T4b the D2-gated trigger hook)
+- [x] **T4a — the PushSender seam + `pushService.notifyUser` (C559, ea33435, fork-free).** Defined the
+      `PushSender` interface + `PushResult` ({ok|gone|transientError}); the REAL `webPushSender` wraps
+      `web-push.sendNotification` (setVapidDetails once; a WebPushError 404/410→gone, else transientError); a
+      FAKE via `setPushSenderForTest` (the PhotosClient/VLM DI pattern). `notifyUser(userId, payload)` fans out
+      over the user's subscriptions + applies the reaping lifecycle (ok:markSuccess / gone:prune /
+      transientError:incrementFailure + reap past `CONFIG.validation.push.maxConsecutiveFailures` [#135]);
+      **BEST-EFFORT — wrapped so it NEVER throws into the caller + NEVER blocks** (R3). The real transport is
+      skipped when the server has no VAPID keypair (a config gap ≠ a failed send → failureCount untouched); an
+      injected sender always runs. GUARD `push-service.test.ts` (7 cases): ok/gone/transient/cap-reap,
+      many-device fan-out summary, best-effort swallow (a throwing sender does not abort the fan-out), scope.
+      Refactored the per-subscription branch into a helper to stay under the biome complexity bar (the one gate
+      catch this cycle). Backend validate:local GREEN (2332, +7). **This is the fork-free HALF** — the send +
+      lifecycle any caller can invoke.
+- [ ] **T4b — WIRE the trigger-service hook (honors D2 — GATED on T0).** After a `reminder_notifications` row
+      is inserted in BOTH `processNotificationPeriod` (time) and `processMileageReminder` (mileage),
+      fire-and-forget `notifyUser` with `{title,body,tag:reminder.id,url:'/reminders'}` (title/body from the
+      reminder name + due axis). WHERE/WHEN this fires is the D2 request-driven-trigger fork → held for the T0
+      ACK. GUARD: a notification-creating trigger fires notifyUser with the right payload (the fake sender); the
+      trigger still returns its normal TriggerResult even if the push path errors (best-effort, already proven
+      in T4a). **★ THE BACKEND IS COMPLETE at T4b; the remaining T5–T6 are the FE tail (also fork-gated).**
 
 ## Phase 3 — frontend (honors D5/D4 — eyes-on tail)
 - [ ] **T5 — the push-api client + `push.ts` utils + the settings card.** `push-api.ts`
