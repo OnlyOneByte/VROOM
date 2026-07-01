@@ -281,6 +281,11 @@ export const CONFIG = {
       notificationsHistoryLimit: 100,
     },
     settings: { maxBackupRetention: 100, maxSyncInactivityMinutes: 30 },
+    push: {
+      // A subscription that fails this many CONSECUTIVE transient sends is reaped (the #135
+      // reaping-hygiene class): a dead-but-not-410 endpoint should not linger + be retried forever.
+      maxConsecutiveFailures: 5,
+    },
   },
 } as const;
 
