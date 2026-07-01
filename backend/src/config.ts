@@ -285,6 +285,11 @@ export const CONFIG = {
       // A subscription that fails this many CONSECUTIVE transient sends is reaped (the #135
       // reaping-hygiene class): a dead-but-not-410 endpoint should not linger + be retried forever.
       maxConsecutiveFailures: 5,
+      // Cap the push subscriptions ONE user may hold (device rotation is normal — a user replaces
+      // phones/browsers — so a NEW device past the cap EVICTS the oldest rather than being rejected,
+      // keeping the newest N; this also bounds a crafted-endpoint flood to N rows). Generous for a
+      // real multi-device household.
+      maxSubscriptionsPerUser: 20,
     },
   },
 } as const;

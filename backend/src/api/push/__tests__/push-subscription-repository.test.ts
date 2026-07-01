@@ -152,4 +152,73 @@ describe('PushSubscriptionRepository (push-notifications T1)', () => {
     sqliteDb.run(`DELETE FROM users WHERE id = '${USER_A}'`);
     expect(await repo.findByUser(USER_A)).toHaveLength(0);
   });
+
+  test('per-user cap: a flood of distinct endpoints is bounded to maxSubscriptionsPerUser', async () => {
+    const cap = 20; // CONFIG.validation.push.maxSubscriptionsPerUser
+    for (let i = 0; i < cap + 5; i++) {
+      await repo.upsertByEndpoint(USER_A, {
+        endpoint: `https://fcm.googleapis.com/fcm/send/dev-${i}`,
+        p256dh: 'k',
+        auth: 'a',
+      });
+    }
+    expect(await repo.findByUser(USER_A)).toHaveLength(cap); // never exceeds the cap
+  });
+
+  test('under the cap nothing is evicted', async () => {
+    for (let i = 0; i < 3; i++) {
+      await repo.upsertByEndpoint(USER_A, {
+        endpoint: `https://fcm.googleapis.com/fcm/send/u-${i}`,
+        p256dh: 'k',
+        auth: 'a',
+      });
+    }
+    expect(await repo.findByUser(USER_A)).toHaveLength(3);
+  });
+
+  test('device rotation: a NEW device past the cap evicts the OLDEST, keeps the new one', async () => {
+    const cap = 20;
+    // Seed exactly `cap` rows stamped in the DISTANT past (provably older than anything upsert stamps now).
+    for (let i = 0; i < cap; i++) {
+      sqliteDb.run(
+        `INSERT INTO push_subscriptions (id, user_id, endpoint, p256dh, auth, failure_count, created_at)
+         VALUES ('old-${i}', '${USER_A}', 'https://fcm.googleapis.com/fcm/send/old-${i}', 'k', 'a', 0, 1000)`
+      );
+    }
+    expect(await repo.findByUser(USER_A)).toHaveLength(cap);
+
+    // A new device subscribes → count stays at the cap, the NEW endpoint survives, an OLD one was evicted.
+    const newEndpoint = 'https://fcm.googleapis.com/fcm/send/brand-new';
+    await repo.upsertByEndpoint(USER_A, { endpoint: newEndpoint, p256dh: 'k', auth: 'a' });
+
+    const rows = await repo.findByUser(USER_A);
+    expect(rows).toHaveLength(cap);
+    expect(rows.some((r) => r.endpoint === newEndpoint)).toBe(true); // the new device is kept
+    expect(rows.some((r) => r.endpoint === 'https://fcm.googleapis.com/fcm/send/old-0')).toBe(
+      false
+    ); // an old one evicted
+  });
+
+  test('re-subscribe (same endpoint) at the cap does NOT evict — it updates in place', async () => {
+    const cap = 20;
+    for (let i = 0; i < cap; i++) {
+      await repo.upsertByEndpoint(USER_A, {
+        endpoint: `https://fcm.googleapis.com/fcm/send/r-${i}`,
+        p256dh: 'k',
+        auth: 'a',
+      });
+    }
+    expect(await repo.findByUser(USER_A)).toHaveLength(cap);
+    // Re-subscribing an EXISTING endpoint is a conflict-update, not a new row → count unchanged, no eviction.
+    await repo.upsertByEndpoint(USER_A, {
+      endpoint: 'https://fcm.googleapis.com/fcm/send/r-0',
+      p256dh: 'rotated',
+      auth: 'rotated',
+    });
+    const rows = await repo.findByUser(USER_A);
+    expect(rows).toHaveLength(cap);
+    expect(rows.find((r) => r.endpoint === 'https://fcm.googleapis.com/fcm/send/r-0')?.p256dh).toBe(
+      'rotated'
+    );
+  });
 });

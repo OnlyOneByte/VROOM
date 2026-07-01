@@ -1,4 +1,5 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { CONFIG } from '../../config';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { NewPushSubscription, PushSubscription } from '../../db/schema';
@@ -54,7 +55,13 @@ export class PushSubscriptionRepository extends BaseRepository<
           },
         })
         .returning();
-      return result[0] as PushSubscription;
+      const stored = result[0] as PushSubscription;
+      // Hygiene cap: bound the rows one user may hold. Device rotation is normal, so a new device past
+      // the cap EVICTS the user's OLDEST subscriptions (keep the newest N incl. the one just stored)
+      // rather than rejecting a legitimate new phone; this also bounds a crafted-endpoint flood to N
+      // rows. A no-op in the common case (under the cap); only touches rows on overflow.
+      await this.evictOldestBeyondCap(userId);
+      return stored;
     } catch (error) {
       logger.error('Failed to upsert push subscription', {
         userId,
@@ -62,6 +69,23 @@ export class PushSubscriptionRepository extends BaseRepository<
       });
       throw new DatabaseError('Failed to upsert push subscription', error);
     }
+  }
+
+  /**
+   * Enforce CONFIG.validation.push.maxSubscriptionsPerUser: if a user holds more than the cap, delete
+   * their oldest surplus rows (by createdAt asc, id asc as a stable tiebreak) so exactly the newest N
+   * survive. Called after an upsert; a no-op when the user is at/under the cap.
+   */
+  private async evictOldestBeyondCap(userId: string): Promise<void> {
+    const cap = CONFIG.validation.push.maxSubscriptionsPerUser;
+    const rows = await this.db
+      .select({ id: pushSubscriptions.id })
+      .from(pushSubscriptions)
+      .where(eq(pushSubscriptions.userId, userId))
+      .orderBy(asc(pushSubscriptions.createdAt), asc(pushSubscriptions.id));
+    if (rows.length <= cap) return;
+    const surplusIds = rows.slice(0, rows.length - cap).map((r) => r.id);
+    await this.db.delete(pushSubscriptions).where(inArray(pushSubscriptions.id, surplusIds));
   }
 
   /** All of a user's subscriptions (every device). UserId-scoped. */
