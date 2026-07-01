@@ -22,6 +22,7 @@ import webpush, { WebPushError, type PushSubscription as WebPushSubscription } f
 import { CONFIG } from '../../config';
 import type { PushSubscription } from '../../db/schema';
 import { logger } from '../../utils/logger';
+import { isAllowedPushEndpoint } from './push-endpoint';
 import { pushSubscriptionRepository } from './repository';
 
 /** The notification payload the SW renders (design §4). NO PII beyond the reminder text the user authored. */
@@ -63,6 +64,15 @@ function ensureVapidConfigured(): void {
 /** The real sender: encrypts + POSTs via web-push, mapping the HTTP outcome to a PushResult. */
 export const webPushSender: PushSender = {
   async send(subscription, payload) {
+    // Defense-in-depth SSRF guard (ARCC): the subscribe route already rejects a non-allowlisted
+    // endpoint, but NEVER POST to a rogue host even if a row predates that guard (or arrives by another
+    // path) — treat it as permanently gone so the reaping lifecycle prunes it rather than retrying.
+    if (!isAllowedPushEndpoint(subscription.endpoint)) {
+      logger.warn('Push send: refusing a non-allowlisted endpoint host (SSRF guard)', {
+        subscriptionId: subscription.id,
+      });
+      return { kind: 'gone' };
+    }
     ensureVapidConfigured();
     const target: WebPushSubscription = {
       endpoint: subscription.endpoint,

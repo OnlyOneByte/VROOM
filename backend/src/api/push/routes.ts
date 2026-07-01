@@ -19,7 +19,9 @@ import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
+import { ValidationError } from '../../errors';
 import { requireAuth } from '../../middleware';
+import { isAllowedPushEndpoint } from './push-endpoint';
 import { pushSubscriptionRepository } from './repository';
 
 const routes = new Hono();
@@ -76,6 +78,14 @@ routes.get('/vapid-public-key', (c) => {
 routes.post('/subscribe', zValidator('json', subscribeSchema), async (c) => {
   const user = c.get('user');
   const body = c.req.valid('json');
+  // SSRF guard (ARCC SSRF-mitigation): the endpoint is a URL the server will later POST to, so reject
+  // anything but an https URL on a known browser-vendor push host BEFORE storing it — no
+  // metadata/localhost/private-IP/other-scheme/userinfo endpoint ever enters the DB (SAX-04: filter at
+  // the earliest point). A real browser only ever produces such an endpoint; a hand-crafted one is the
+  // attack. 422 (unprocessable) — the request is well-formed JSON but the endpoint is not acceptable.
+  if (!isAllowedPushEndpoint(body.endpoint)) {
+    throw new ValidationError('Unsupported push endpoint.');
+  }
   const stored = await pushSubscriptionRepository.upsertByEndpoint(user.id, {
     endpoint: body.endpoint,
     p256dh: body.keys.p256dh,
