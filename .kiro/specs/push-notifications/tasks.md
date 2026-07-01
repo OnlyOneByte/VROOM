@@ -62,13 +62,18 @@
       invariant that the route NEVER reads the VAPID private key while it DOES serve the public key. ARCC-aligned
       (design §7.1/§7.2): server-only env secret (SAX-05); app CSP already tight, no new egress. Backend
       validate:local GREEN (2319, +5). NEXT: T3.
-- [ ] **T3 — subscribe / unsubscribe routes (the new `push` router).** `POST /api/v1/push/subscribe`
-      (Zod-validate `{endpoint, keys:{p256dh,auth}, userAgent?}` with SAX-04 length caps → `upsertByEndpoint(
-      ctx.userId,…)`, idempotent), `DELETE /api/v1/push/subscribe` (`{endpoint}` → deleteByEndpoint). Mount the
-      router; session-authed; userId = ctx.userId, NEVER the body. GUARD (HTTP harness): subscribe persists +
-      reads back; re-subscribe is idempotent (no dup, failureCount reset); delete is scoped; **an IDOR test —
-      user A cannot read/delete user B's subscription**. Backend validate:local GREEN. **★ T1–T3 = the
-      fork-free backend store; T4 is the trigger hook (honors D2).**
+- [x] **T3 — subscribe / unsubscribe routes (C558, f177d52, fork-free).** Added `POST /api/v1/push/subscribe`
+      (Zod-validates `{endpoint, keys:{p256dh,auth}, userAgent?}` with SAX-04 length caps [endpoint 2000, keys
+      512, userAgent 512] → `upsertByEndpoint(ctx.userId,…)`, idempotent — returns 201 with the row id ONLY, the
+      crypto keys are NEVER echoed) + `DELETE /api/v1/push/subscribe` (`{endpoint}` → deleteByEndpoint, an
+      idempotent no-op on an unknown endpoint) on the push router. Session-authed; userId = ctx.userId, NEVER
+      the body (the endpoint is not a capability). NOT gated on CONFIG.push.enabled — a browser may register
+      regardless of whether THIS server can currently send (the send hook checks enablement at T4). GUARD
+      `subscribe-routes.test.ts` (6 cases, HTTP harness + a 2nd minted user B): POST persists + reads back (201,
+      id only, keys not echoed); POST idempotent; anon→401; malformed body→400; DELETE removes + idempotent
+      no-op; **IDOR — user B cannot delete user A endpoint** (B no-op, A row survives); the same endpoint string
+      is per-user (A + B each own their row). Backend validate:local GREEN (2325, +6). **★ THE FORK-FREE BACKEND
+      SURFACE IS COMPLETE (T1–T3).** T4 is the trigger hook (honors D2 — the request-driven-trigger fork).
 
 ## Phase 2 — backend send hook (honors D2 — the PushSender DI seam)
 - [ ] **T4 — the PushSender seam + `pushService.notifyUser` + the trigger hook.** Define the `PushSender`
