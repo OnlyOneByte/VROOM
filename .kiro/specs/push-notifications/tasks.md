@@ -33,16 +33,22 @@
       ESCALATE to Angelo C555; do NOT re-escalate (C153 back-off).
 
 ## Phase 1 — backend store + config + routes (fork-free additive plumbing)
-- [ ] **T1 — Schema + additive migration 0013 + the repository.** Add `push_subscriptions` (schema.ts, design
-      §1: userId-FK cascade, endpoint, p256dh, auth, userAgent?, failureCount, lastSuccessAt?, createdAt; an
-      (userId) index + a unique (userId,endpoint) index) + `0013_push_subscriptions.sql` (additive CREATE
-      TABLE, the 0011-class — NOT a rebuild) + the journal idx-13 entry (runtime `migrate()` reads
-      `_journal.json`). Add `pushSubscriptionRepository` (upsertByEndpoint / findByUser / deleteByEndpoint /
-      incrementFailure / markSuccess / prune — all userId-scoped). The in-memory harness runs `runMigrations()`
-      per createTestApp, so the suite PROVES 0013 applies. GUARD: a repo round-trip test (upsert→find,
-      idempotent re-subscribe updates not dups, deleteByEndpoint scoped). Watch for the schema-derived backup
-      round-trip + the sheets-header-coverage drift guard (a new table may force a SHEET_HEADERS / backup-
-      coverage thread — handle the ripple like expense-location T1). Backend validate:local GREEN.
+- [x] **T1 — Schema + additive migration 0013 + the repository (C556, 96d73a1, fork-free).** Added
+      `push_subscriptions` (schema.ts, design §1: userId-FK cascade, endpoint, p256dh, auth, userAgent?,
+      failureCount, lastSuccessAt?, createdAt; a `ps_user_idx` (userId) index + a unique `ps_user_endpoint_idx`
+      (userId,endpoint) index) + `0013_push_subscriptions.sql` (additive CREATE TABLE, the 0010-class — NOT a
+      rebuild) + the journal idx-13 entry. Added `pushSubscriptionRepository` (upsertByEndpoint via
+      onConflictDoUpdate on (userId,endpoint) — idempotent re-subscribe, resets failureCount; findByUser /
+      deleteByEndpoint — both userId-scoped; incrementFailure / markSuccess / prune — the reaping lifecycle).
+      GUARD `push-subscription-repository.test.ts` (8 cases) drives the REAL repo against a fresh in-memory DB
+      from the actual migration chain, so it PROVES 0013 applies — round-trip, idempotent re-subscribe (no dup),
+      many devices/user, findByUser userId-scoped, deleteByEndpoint IDOR (user B cannot delete user A endpoint),
+      the reap lifecycle, the user-delete FK cascade. **RIPPLE RESOLVED (the backup-coverage drift guard forces
+      a deliberate decision on any new schema table):** `push_subscriptions` was added to `EXCLUDED_BY_DESIGN`
+      beside `sessions`/`user_providers` — device-ephemeral secrets re-derivable on re-subscribe; a restored
+      stale subscription would push to a dead endpoint (the `sessions` rationale). This CORRECTS the design's
+      "auto-flows into the backup" assumption — it is deliberately NOT backed up (so NO SHEET_HEADERS thread was
+      needed, unlike expense-location T1). Backend validate:local GREEN (2314, +7). NEXT: T2.
 - [ ] **T2 — VAPID config + the public-key route + the `web-push` dep + `vapid:gen`.** Add `web-push` to
       backend/package.json (+ install). Add `CONFIG.push` (design §2: read the 3 env vars; `enabled` = all
       present). `GET /api/v1/push/vapid-public-key` → `{ publicKey }` when enabled, else 503

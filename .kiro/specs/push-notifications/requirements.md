@@ -121,7 +121,10 @@ privacy-first, and degradeable (a self-hoster who sets no VAPID keys simply gets
   browser, never logged. The public key IS public (it is the `applicationServerKey` the browser needs).
 - **A push subscription is user PII** (a device endpoint + crypto keys identifying the user's browser): it is
   a userId-scoped row, cross-tenant-isolated (a user can only read/write/delete their OWN subscriptions —
-  the IDOR discipline), in the backup payload as the user's own data, and never logged.
+  the IDOR discipline), and never logged. It is **NOT backed up** (T1/C556 correction — it joins
+  `sessions`/`user_providers` on the backup `EXCLUDED_BY_DESIGN` list): the keys are device-ephemeral secrets
+  re-derivable on re-subscribe, and a restored stale subscription would push to a dead endpoint — the
+  `sessions` meaningless/unsafe-to-restore rationale. The user re-enables push per-device after a restore.
 - **The service worker is same-origin**; CSP stays tight (no new `connect-src` for delivery — the browser
   push service delivers TO the SW; the SW does not fetch it). The subscribe endpoint is same-origin.
 - **Opt-in only.** No permission prompt auto-fires; the browser permission is requested ONLY on an explicit

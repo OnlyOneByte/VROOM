@@ -50,8 +50,14 @@ push_subscriptions:
 A `pushSubscriptionRepository` (mirrors the reminders repo): `upsertByEndpoint(userId, sub)`,
 `findByUser(userId)`, `deleteByEndpoint(userId, endpoint)`, `incrementFailure(id)` / `markSuccess(id)`,
 `prune(id)`. All methods userId-scoped (the IDOR discipline) — the endpoint alone never authorizes a write.
-The endpoint + keys are the user's own data → included in the backup payload (schema-derived enumeration auto-
-covers it; the round-trip coverage guard pins it so a future backup never silently drops a subscription).
+**NOT backed up (CORRECTED at T1/C556):** the backup-coverage drift guard forces a deliberate decision on
+every new schema table (registry OR `EXCLUDED_BY_DESIGN`), and `push_subscriptions` joins `sessions` /
+`user_providers` on the EXCLUDED list — the endpoint + p256dh/auth keys are DEVICE-EPHEMERAL secrets
+re-derivable by the browser on re-subscribe, and a restored stale subscription would push to a dead endpoint
+in a new environment (the `sessions` "meaningless/unsafe to restore" rationale). The user simply re-enables
+push per-device after a restore; nothing of value is lost. (The earlier draft assumed the column auto-flows
+into the backup — that was wrong; the exclusion is the correct, deterministic follow of the `sessions`
+precedent, not a product fork.)
 
 ## §2 — Backend: VAPID config + the public-key route (T2)
 - `CONFIG.push` (config.ts): `{ vapidPublicKey, vapidPrivateKey, vapidSubject, enabled }` read from env
