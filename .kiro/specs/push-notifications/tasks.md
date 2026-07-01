@@ -49,12 +49,19 @@
       stale subscription would push to a dead endpoint (the `sessions` rationale). This CORRECTS the design's
       "auto-flows into the backup" assumption — it is deliberately NOT backed up (so NO SHEET_HEADERS thread was
       needed, unlike expense-location T1). Backend validate:local GREEN (2314, +7). NEXT: T2.
-- [ ] **T2 — VAPID config + the public-key route + the `web-push` dep + `vapid:gen`.** Add `web-push` to
-      backend/package.json (+ install). Add `CONFIG.push` (design §2: read the 3 env vars; `enabled` = all
-      present). `GET /api/v1/push/vapid-public-key` → `{ publicKey }` when enabled, else 503
-      `PUSH_NOT_CONFIGURED`. A `bun run vapid:gen` script + `.env.example` lines. GUARD: the route returns the
-      public key when configured (test-env stub VAPID) + 503 when not; the private key is NEVER in any response
-      (a source-scan/response-shape assertion). Backend validate:local GREEN.
+- [x] **T2 — VAPID config + the public-key route + the `web-push` dep + `vapid:gen` (C557, b0122f2,
+      fork-free).** Added `web-push@3.6.7` + `@types/web-push` (lockfile churn is only web-push + its transitive
+      deps — no unrelated drift). Added `CONFIG.push` (reads VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY/VAPID_SUBJECT;
+      `enabled` = all three present) — the private key stays server-side (T4 signs with it), NEVER returned by a
+      route. `GET /api/v1/push/vapid-public-key` on the NEW `push` router (mounted /api/v1/push, requireAuth) →
+      `{ publicKey }` when enabled, else **503 `PUSH_NOT_CONFIGURED`** (the R6 honesty degrade, not a 500/blank).
+      `bun run vapid:gen` (src/scripts/gen-vapid-keys.ts) prints a fresh keypair + the .env lines; .env.example
+      documents the 3 vars as optional. GUARD `vapid-public-key-route.test.ts` (4 cases): unconfigured → 503
+      (the harness sets no VAPID env + CONFIG is a process-cached snapshot [the ALLOW_FAKE_STORAGE lesson], so
+      the harness NATURALLY exercises the OFF path — the default deployment state); anon → 401; a source-scan
+      invariant that the route NEVER reads the VAPID private key while it DOES serve the public key. ARCC-aligned
+      (design §7.1/§7.2): server-only env secret (SAX-05); app CSP already tight, no new egress. Backend
+      validate:local GREEN (2319, +5). NEXT: T3.
 - [ ] **T3 — subscribe / unsubscribe routes (the new `push` router).** `POST /api/v1/push/subscribe`
       (Zod-validate `{endpoint, keys:{p256dh,auth}, userAgent?}` with SAX-04 length caps → `upsertByEndpoint(
       ctx.userId,…)`, idempotent), `DELETE /api/v1/push/subscribe` (`{endpoint}` → deleteByEndpoint). Mount the
