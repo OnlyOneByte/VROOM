@@ -157,6 +157,16 @@ AWS-console-centric); the directly-applicable returned guidance + how this desig
    auto-fires; requested only on an explicit toggle, D5); a denied permission is respected (no re-nag); the
    feature is OFF when VAPID is unconfigured; the timing limit is disclosed (D6). The narrowest capability
    (`userVisibleOnly:true` — the standard that forbids silent/background push) is requested.
+5. **SSRF on the subscribe endpoint (ARCC SSRF-mitigation + SAX-04, searched C560).** → **Control:** the
+   subscription `endpoint` is a user-supplied URL the server later POSTs to via web-push — an unvalidated
+   one is a blind SSRF (an authed user could store `http://169.254.169.254/…` metadata / a localhost admin
+   port). `push-endpoint.ts` `isAllowedPushEndpoint` enforces a STRICT positive allowlist: an https URL, no
+   userinfo, host == or a dot-suffixed subdomain of a known browser-vendor push host (fcm.googleapis.com /
+   push.services.mozilla.com / push.apple.com / notify.windows.com). Wired at the subscribe route (reject
+   → 400 BEFORE storing, the earliest point) AND in the sender (defense-in-depth: a non-allowlisted host is
+   treated as `gone` and pruned, never POSTed to). A vendor-domain allowlist is immune to DNS rebinding (a
+   string match on non-attacker-controllable domains, no runtime resolution); an IP-literal host never
+   matches. Found by an adversarial review of the shipped backend (C560) + fixed same-cycle (commit 778efb5).
 
 **VERDICT: CLEARED to build.** The VAPID private key is a server-only env secret on the SAX-05 isolation
 pattern, the SW is same-origin under VROOM's CSP with no new egress, the subscription is a tenant-isolated
@@ -185,3 +195,7 @@ remain a SEPARATE T0 sign-off.
    endpoint never authorizes; an IDOR test pins it.
 8. **iOS / unsupported-browser breakage.** Mitigation: R6 — feature-detect + degrade; the in-app `/reminders`
    feed is the baseline channel where push is unavailable; no console error.
+9. **SSRF via a crafted subscription endpoint** (found by an adversarial review C560). Mitigation: §7.5 —
+   a strict https-only vendor-host allowlist (`isAllowedPushEndpoint`), enforced at the subscribe route
+   (reject before storing) + in the sender (defense-in-depth, prune a rogue host). Shipped 778efb5, guarded
+   by push-endpoint-ssrf.test.ts.
