@@ -628,6 +628,45 @@ export const vehicleShares = sqliteTable(
   })
 );
 
+// Push subscriptions (migration 0013, push-notifications T1). A per-user, per-DEVICE Web Push
+// subscription — the endpoint + the two client crypto keys (p256dh + auth) the W3C Push API returns
+// from pushManager.subscribe(). UserId-scoped (the reminder_notifications shape): a user may have many
+// devices, each one row; FK-cascade so a deleted user drops their subscriptions. NOT a backed-up table
+// (it sits on EXCLUDED_BY_DESIGN beside sessions/user_providers): the keys are device-ephemeral secrets
+// re-derivable client-side, and a restored stale subscription would push to a dead endpoint in a new
+// environment — the same "ephemeral, meaningless/unsafe to restore" rationale as sessions.
+export const pushSubscriptions = sqliteTable(
+  'push_subscriptions',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    // The push-service delivery URL (vendor-specific: fcm.googleapis / web.push.apple / updates.push.services.mozilla …).
+    endpoint: text('endpoint').notNull(),
+    // The client public key (base64url) — half of the message-encryption keypair the SW holds.
+    p256dh: text('p256dh').notNull(),
+    // The client auth secret (base64url) — the other half; together they encrypt the push payload.
+    auth: text('auth').notNull(),
+    // Optional label so the user can recognize a device in a "your devices" list.
+    userAgent: text('user_agent'),
+    // Consecutive transient send failures; a row past a cap is reaped (the #135 reaping-hygiene class).
+    failureCount: integer('failure_count').notNull().default(0),
+    lastSuccessAt: integer('last_success_at', { mode: 'timestamp' }),
+    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    userIdx: index('ps_user_idx').on(table.userId),
+    // Idempotent re-subscribe: the same browser re-subscribing returns the SAME endpoint, so upsert
+    // by (userId, endpoint) — never duplicate a device. Scoped by userId so two users could never
+    // collide on a shared endpoint (they cannot — endpoints are per-subscription — but the scope keeps
+    // the unique key tenant-local, mirroring the rest of VROOM).
+    userEndpointIdx: uniqueIndex('ps_user_endpoint_idx').on(table.userId, table.endpoint),
+  })
+);
+
 // Export types for use in application
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -693,3 +732,6 @@ export type NewReminderNotification = typeof reminderNotifications.$inferInsert;
 
 export type VehicleShare = typeof vehicleShares.$inferSelect;
 export type NewVehicleShare = typeof vehicleShares.$inferInsert;
+
+export type PushSubscription = typeof pushSubscriptions.$inferSelect;
+export type NewPushSubscription = typeof pushSubscriptions.$inferInsert;

@@ -92,6 +92,13 @@
       "when": 1782600100000,
       "tag": "0012_expense_location",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1782700000000,
+      "tag": "0013_push_subscriptions",
+      "breakpoints": true
     }
   ]
 }
