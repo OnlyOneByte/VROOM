@@ -16,6 +16,7 @@
     "db:seed": "bun src/db/init.ts --seed",
     "db:checkpoint": "bun src/db/checkpoint.ts",
     "db:checkpoint:force": "bun src/db/checkpoint.ts --force",
+    "vapid:gen": "bun src/scripts/gen-vapid-keys.ts",
     "test": "bun test",
     "test:repositories": "bun src/test/run-tests.ts",
     "test:auth": "bun src/test/run-auth-tests.ts",
@@ -52,6 +53,7 @@
     "hono": "^4.12.27",
     "lucia": "^3.2.2",
     "oslo": "^1.2.1",
+    "web-push": "^3.6.7",
     "zod": "^4.4.3"
   },
   "overrides": {
@@ -61,6 +63,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.5.1",
     "@types/adm-zip": "^0.5.8",
+    "@types/web-push": "^3.6.4",
     "bun-types": "^1.3.14",
     "drizzle-kit": "^0.31.10",
     "fast-check": "^4.8.0",

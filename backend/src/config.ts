@@ -79,6 +79,17 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((val) => val === '1' || val === 'true'),
+  // Web Push (push-notifications T2). The VAPID keypair is the app-wide push application-server
+  // identity — app-wide (NOT per-user), so it is a deploy secret like SESSION_SECRET, not a
+  // user_providers credential. The PRIVATE key is server-only (never shipped to the browser, never
+  // logged); the PUBLIC key is public-by-design (the applicationServerKey the browser requires).
+  // When any of the three is unset the feature is OFF (CONFIG.push.enabled=false) and the subscribe
+  // UI reports "push not configured on this server" — the in-app reminder feed is unchanged.
+  // Generate a keypair with `bun run vapid:gen`.
+  VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  // The VAPID `sub` claim — a mailto: or https: contact the push service can reach (spec-required).
+  VAPID_SUBJECT: z.string().optional(),
 });
 
 const parseEnv = () => {
@@ -158,6 +169,15 @@ export const CONFIG = {
         : getDefaultCorsOrigins(env.NODE_ENV as Environment),
   },
   logging: { level: env.LOG_LEVEL },
+  // Web Push (push-notifications). `enabled` gates the whole feature: only when all three VAPID
+  // values are present is push wired up. The private key stays here server-side — it is NEVER
+  // exposed by any route (only vapidPublicKey + vapidSubject cross to a response/the wire).
+  push: {
+    vapidPublicKey: env.VAPID_PUBLIC_KEY,
+    vapidPrivateKey: env.VAPID_PRIVATE_KEY,
+    vapidSubject: env.VAPID_SUBJECT,
+    enabled: Boolean(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY && env.VAPID_SUBJECT),
+  },
   pagination: { defaultPageSize: 20, maxPageSize: 100, minPageSize: 1 },
   syncWorker: {
     enabled: env.NODE_ENV !== 'test',
