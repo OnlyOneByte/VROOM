@@ -10,16 +10,40 @@
  * route answers 503 PUSH_NOT_CONFIGURED so the FE can HONESTLY report "push is not configured on this
  * server" and degrade to the in-app reminder feed (R6) — never a blank/opaque failure.
  *
- * (T3 adds POST/DELETE /subscribe on this same router; the send hook + SW handler are T4/T6.)
+ * T3 adds POST/DELETE /subscribe (the store side): a browser persists / removes its Web Push
+ * subscription. Every write is scoped to the SESSION user (ctx.userId, NEVER a body-supplied id — the
+ * endpoint is not a capability, the IDOR discipline). The send hook + SW handler are T4/T6.
  */
 
+import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
+import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { requireAuth } from '../../middleware';
+import { pushSubscriptionRepository } from './repository';
 
 const routes = new Hono();
 
 routes.use('*', requireAuth);
+
+// SAX-04 input caps — a push endpoint URL + the two base64url client keys are all bounded so a
+// malformed/oversized body cannot bloat the row or the later web-push call. Generous but finite.
+const MAX_ENDPOINT_CHARS = 2000;
+const MAX_KEY_CHARS = 512;
+const MAX_USER_AGENT_CHARS = 512;
+
+const subscribeSchema = z.object({
+  endpoint: z.string().min(1, 'endpoint is required').max(MAX_ENDPOINT_CHARS),
+  keys: z.object({
+    p256dh: z.string().min(1, 'keys.p256dh is required').max(MAX_KEY_CHARS),
+    auth: z.string().min(1, 'keys.auth is required').max(MAX_KEY_CHARS),
+  }),
+  userAgent: z.string().max(MAX_USER_AGENT_CHARS).optional(),
+});
+
+const unsubscribeSchema = z.object({
+  endpoint: z.string().min(1, 'endpoint is required').max(MAX_ENDPOINT_CHARS),
+});
 
 /**
  * GET /api/v1/push/vapid-public-key — the app-wide VAPID public key for pushManager.subscribe().
@@ -40,6 +64,39 @@ routes.get('/vapid-public-key', (c) => {
   }
   // Only the PUBLIC key crosses the wire — the private key stays server-side (T4 signs with it).
   return c.json({ success: true, data: { publicKey: CONFIG.push.vapidPublicKey } });
+});
+
+/**
+ * POST /api/v1/push/subscribe — persist this browser's Web Push subscription for the SESSION user.
+ * Idempotent on (userId, endpoint): a re-subscribe from the same browser updates the stored keys +
+ * resets the failure streak rather than inserting a duplicate (the device is alive again). The userId
+ * is ALWAYS ctx.userId — never taken from the body (a subscription is not a cross-user capability).
+ * Body: { endpoint, keys: { p256dh, auth }, userAgent? }.
+ */
+routes.post('/subscribe', zValidator('json', subscribeSchema), async (c) => {
+  const user = c.get('user');
+  const body = c.req.valid('json');
+  const stored = await pushSubscriptionRepository.upsertByEndpoint(user.id, {
+    endpoint: body.endpoint,
+    p256dh: body.keys.p256dh,
+    auth: body.keys.auth,
+    userAgent: body.userAgent ?? null,
+  });
+  // Do NOT echo the stored crypto keys back — the client already holds them; return only the id.
+  return c.json({ success: true, data: { id: stored.id } }, 201);
+});
+
+/**
+ * DELETE /api/v1/push/subscribe — remove this browser's subscription (the unsubscribe path).
+ * Scoped to the session user: the endpoint alone does not authorize — a user can only delete their
+ * OWN subscription. Idempotent (deleting an unknown/foreign endpoint is a clean no-op, not an error).
+ * Body: { endpoint }.
+ */
+routes.delete('/subscribe', zValidator('json', unsubscribeSchema), async (c) => {
+  const user = c.get('user');
+  const { endpoint } = c.req.valid('json');
+  const removed = await pushSubscriptionRepository.deleteByEndpoint(user.id, endpoint);
+  return c.json({ success: true, data: { removed } });
 });
 
 export { routes };
