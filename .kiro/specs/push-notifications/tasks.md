@@ -21,16 +21,16 @@
 >   D1–D6 product/architecture forks remain a SEPARATE T0 sign-off.
 
 ## Phase 0 — sign-off (gates the FORK-DEPENDENT slices; the additive store may build first)
-- [ ] **T0 — Angelo ACK the D1–D6 forks (requirements.md).** D1 = standard VAPID Web Push (self-hostable, no
-      SaaS); D2 = push on the EXISTING request-driven trigger (NOT a new scheduler in v1); D3 = VAPID keypair
-      as an env secret (`VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT`) + a `vapid:gen` helper, OFF when
-      unset; D4 = switch `@vite-pwa/sveltekit` to `injectManifest` + a custom `src/service-worker.ts` + DELETE
-      the dead `static/sw.js`; D5 = a settings opt-in card + first-enable disclosure (no auto-fired prompt);
-      D6 = explicitly disclose the request-driven timing limit (no guaranteed-nudge over-promise). Each has a
-      RECOMMENDED option; ACK takes all. **T1–T3 (the schema + store + routes) are FORK-FREE additive plumbing
-      and MAY build first** (the expense-location precedent — the additive surface built before T0); T4 (the
-      trigger hook payload), T5 (the card copy/disclosure), and T6 (the SW strategy switch) honor the ruling.
-      ESCALATE to Angelo C555; do NOT re-escalate (C153 back-off).
+- [x] **T0 — Angelo ACK the D1–D6 forks — ✅ ACK'd 2026-07-08, ALL recommended.** D1 = standard VAPID Web Push
+      (self-hostable, no SaaS); D2 = push on the EXISTING request-driven trigger (NOT a new scheduler in v1);
+      D3 = VAPID keypair as an env secret (`VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT`) + a `vapid:gen`
+      helper, OFF when unset; D4 = switch `@vite-pwa/sveltekit` to `injectManifest` + a custom
+      `src/service-worker.ts` + DELETE the dead `static/sw.js`; D5 = a settings opt-in card + first-enable
+      disclosure (no auto-fired prompt); D6 = explicitly disclose the request-driven timing limit (no
+      guaranteed-nudge over-promise). **The fork-free backend (T1–T4a + SSRF + cap) was already built to these
+      exact defaults (C556–C561), so the ACK is ZERO-rework — it unblocks T4b (trigger hook) → T5 (settings
+      card) → T6 (SW switch), in order, WIP=1.** Angelo ALSO greenlit Calendar #15 to spec (the last remaining
+      greenlit integration; spec it after push #14 reaches DONE, WIP=1). Original escalation C555; ACK'd here.
 
 ## Phase 1 — backend store + config + routes (fork-free additive plumbing)
 - [x] **T1 — Schema + additive migration 0013 + the repository (C556, 96d73a1, fork-free).** Added
@@ -89,13 +89,21 @@
       Refactored the per-subscription branch into a helper to stay under the biome complexity bar (the one gate
       catch this cycle). Backend validate:local GREEN (2332, +7). **This is the fork-free HALF** — the send +
       lifecycle any caller can invoke.
-- [ ] **T4b — WIRE the trigger-service hook (honors D2 — GATED on T0).** After a `reminder_notifications` row
-      is inserted in BOTH `processNotificationPeriod` (time) and `processMileageReminder` (mileage),
-      fire-and-forget `notifyUser` with `{title,body,tag:reminder.id,url:'/reminders'}` (title/body from the
-      reminder name + due axis). WHERE/WHEN this fires is the D2 request-driven-trigger fork → held for the T0
-      ACK. GUARD: a notification-creating trigger fires notifyUser with the right payload (the fake sender); the
-      trigger still returns its normal TriggerResult even if the push path errors (best-effort, already proven
-      in T4a). **★ THE BACKEND IS COMPLETE at T4b; the remaining T5–T6 are the FE tail (also fork-gated).**
+- [x] **T4b — WIRE the trigger-service hook (honors D2 — T0 ACK'd 2026-07-08).** After a `reminder_notifications`
+      row is inserted in BOTH `processNotificationPeriod` (time) and `processMileageReminder` (mileage), the
+      trigger-service now calls `firePushForNotification(reminder, created)` → `notifyUser(reminder.userId,
+      payloadFromReminder(reminder, created))`. `payloadFromReminder` derives the payload off the ROW (not a
+      guess): `{title:'<name> due', body: dueOdometer!==null ? 'Due at <n> mi' : 'This reminder is now due',
+      tag:reminder.id, url:'/reminders'}` — the mileage/time axis read from which of dueOdometer/dueDate is set;
+      NO PII beyond the user-authored reminder name (design §4). BEST-EFFORT (R3): notifyUser is already wrapped
+      to never throw (T4a), and the hook await-and-swallows so a slow/failing push can neither fail nor stall the
+      sweep; when the server has no VAPID keypair notifyUser is a no-op (config gap ≠ send failure), so this is
+      inert on a never-configured deployment. GUARD `trigger-push-hook.test.ts` (4 cases, real trigger endpoint +
+      the T4a fake-sender DI seam): a TIME notification fires the reminder-derived payload; a MILEAGE notification
+      fires the 'Due at 60,000 mi' body; a THROWING sender does NOT fail the trigger (still 200 + the
+      notification row is still written — the R3 best-effort proof, non-vacuous); nothing-due fires no push.
+      Backend validate:local GREEN (2345 pass, +4; tsc 0, check:musl 0, build). **★ THE BACKEND IS COMPLETE
+      (T1–T4b); the remaining T5–T6 are the FE tail (now unblocked — D5/D4).**
 
 ## Phase 3 — frontend (honors D5/D4 — eyes-on tail)
 - [ ] **T5 — the push-api client + `push.ts` utils + the settings card.** `push-api.ts`
