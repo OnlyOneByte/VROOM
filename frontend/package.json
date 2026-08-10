@@ -60,7 +60,7 @@
 		"fast-check": "^4.9.0",
 		"globals": "^17.9.0",
 		"happy-dom": "^20.11.1",
-		"jsdom": "^29.1.1",
+		"jsdom": "^30.0.1",
 		"layerchart": "2.1.0",
 		"mode-watcher": "^1.1.0",
 		"postcss": "^8.5.26",
