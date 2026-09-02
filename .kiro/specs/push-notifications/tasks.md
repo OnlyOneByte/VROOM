@@ -123,17 +123,27 @@
       shot /settings + read PNG): the card renders the `off` state with the toggle, and clicking it opens
       the disclosure dialog with the request-driven-timing copy WITHOUT firing the permission prompt;
       zero console errors. FE validate:local GREEN (1453 tests, tsc 0, biome 0, build). NEXT: T6.
-- [ ] **T6 — the service-worker push handler + the strategy switch + e2e + DoD (the gated, highest-risk
-      slice — BUILD LAST).** Switch `vite.config.ts` to `strategies:'injectManifest'` + author
-      `src/service-worker.ts` (precacheAndRoute(__WB_MANIFEST) + a `push` listener → showNotification + a
-      `notificationclick` → focus/openWindow('/reminders')). DELETE the dead `static/sw.js`. Verify the FE
-      build emits the SW WITH the push handlers (a build-output assertion / source-scan). EYES-ON: boot + the
-      settings card enable flow renders; the SW registers. An untracked `*.meshclaw.e2e.ts` drives the
-      subscribe toggle + asserts the POST /push/subscribe round-trip (the live cross-vendor push DELIVERY stays
-      eyes-on-pending — it needs a real installed PWA + a real browser push service, like the live-VLM/Photos
-      legs). Feature-DoD: both sides validate:local green, the committed backend guards (T3 IDOR + T4 send
-      hook) are the merge-surviving net, eyes-on the card + the SW build, the privacy disclosure present (T5),
-      the request-driven-timing honesty disclosed (D6). Tick the feature DONE.
+- [x] **T6 — the service-worker push handler + the strategy switch + e2e + DoD (DONE, PR feat/push-notifications-t6).**
+      Switched `vite.config.ts` to `SvelteKitPWA({ strategies:'injectManifest', srcDir:'src',
+      filename:'service-worker.ts', injectManifest:{globPatterns:[…]}, registerType:'autoUpdate', manifest:… })`
+      + authored `src/service-worker.ts` (`precacheAndRoute(self.__WB_MANIFEST)` + `skipWaiting()`/`clientsClaim()`
+      to preserve the autoUpdate precache; a `push` listener → `showNotification(title,{body,icon:'/pwa-192x192.png',
+      tag,data:{url}})` matching the T4b payload; a `notificationclick` listener → focus+navigate an existing tab
+      or `openWindow('/reminders')`). DELETED the dead `static/sw.js` (D4). NOTE: the SW MUST be named
+      `service-worker.ts` (SvelteKit's reserved name) — @vite-pwa/sveltekit injectManifest reads SvelteKit's
+      compiled `output/client/service-worker.js` and injects the manifest into it; and `self.__WB_MANIFEST` must
+      appear verbatim (not via an alias) or workbox's string-based injection fails. GUARD (committed, merge-
+      surviving): `sw-push-handlers.test.ts` source-scans the SW for the push/notificationclick/precache handlers
+      + the vite injectManifest wiring + asserts static/sw.js stays deleted. BUILD-EMITS-HANDLERS proven: the
+      emitted `service-worker.js` contains push/notificationclick/showNotification/openWindow and `self.__WB_MANIFEST`
+      is REPLACED (count 0) with real precache URLs injected. Untracked `push-subscribe.meshclaw.e2e.ts` (gitignored)
+      drives toggle→disclosure→subscribe→POST /push/subscribe 201→"On" — PASSED (2.0s). EYES-ON: app dev-boots
+      cleanly under injectManifest + the settings card renders, zero console errors. FE validate:local GREEN
+      (type-check + lint + build + 1458 tests). The live cross-vendor push DELIVERY stays eyes-on-pending (needs a
+      real installed PWA + browser push service, like the live-VLM/Photos legs). **★ THE FEATURE IS COMPLETE
+      (T0–T6). Feature-DoD met:** both sides green, the committed T3-IDOR/T4-send + T6 SW guards are the merge-
+      surviving net, eyes-on the card + the SW build, the D5 privacy disclosure present (T5), the D6 request-driven-
+      timing honesty disclosed. **Push #14 DONE → next: Calendar #15 SPEC (greenlit, WIP=1-unblocked).**
 
 ## Notes
 - **EXTENDS, does not greenfield** — the notification source (`reminder_notifications`), the userId-scoped-row

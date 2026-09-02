@@ -18,6 +18,21 @@ export default [
 		]
 	},
 	{
+		// The push service worker runs in a WebWorker/ServiceWorker scope, so it references worker
+		// globals (ServiceWorkerGlobalScope, PushEvent, NotificationEvent, WindowClient) the browser
+		// env does not define. Give this one file the serviceworker globals so no-undef resolves them.
+		files: ['src/service-worker.ts'],
+		languageOptions: {
+			globals: {
+				...globals.serviceworker,
+				ServiceWorkerGlobalScope: 'readonly',
+				PushEvent: 'readonly',
+				NotificationEvent: 'readonly',
+				WindowClient: 'readonly'
+			}
+		}
+	},
+	{
 		files: ['**/*.{js,ts,mjs}'],
 		languageOptions: {
 			parser: tsParser,
