@@ -25,6 +25,8 @@ interface BackendExpenseRequest {
 	// `null` on an edit means "clear the description" (the backend schema is
 	// .nullish() and writes null through); omitted/undefined leaves it unchanged.
 	description?: string | null;
+	// expense-location: same clear-on-edit contract as description.
+	location?: string | null;
 	missedFillup?: boolean;
 	sourceType?: string;
 	sourceId?: string;
@@ -57,6 +59,8 @@ export interface BackendExpenseResponse {
 	fuelType?: string;
 	// Nullable column: a real response can carry null (a cleared description).
 	description?: string | null;
+	// expense-location: nullable free-text location (same clear-on-edit semantics as description).
+	location?: string | null;
 	missedFillup?: boolean;
 	sourceType?: string;
 	sourceId?: string;
@@ -112,6 +116,12 @@ export function toBackendExpense(
 		// (Create/offline/sync omit it, matching the historical payload.)
 		backendExpense.description = null;
 	}
+	// expense-location: same set-when-present / clear-on-edit pattern as description.
+	if (frontendExpense.location) {
+		backendExpense.location = frontendExpense.location;
+	} else if (options.isEdit) {
+		backendExpense.location = null;
+	}
 	if (frontendExpense.sourceType) {
 		backendExpense.sourceType = frontendExpense.sourceType;
 	}
@@ -161,6 +171,9 @@ export function fromBackendExpense(backendExpense: BackendExpenseResponse): Expe
 	}
 	if (backendExpense.description) {
 		frontendExpense.description = backendExpense.description;
+	}
+	if (backendExpense.location) {
+		frontendExpense.location = backendExpense.location;
 	}
 	if (backendExpense.groupId) {
 		frontendExpense.groupId = backendExpense.groupId;

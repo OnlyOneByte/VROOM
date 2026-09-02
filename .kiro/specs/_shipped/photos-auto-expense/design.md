@@ -95,19 +95,44 @@ No new table in v1 (D3 reuses the idempotency index + the photo-ref join). The c
 `expense_receipts` photo refs are already covered tables with round-trip guards. `validateReferentialIntegrity`
 is unchanged. If a future "imported_photos ledger" is ruled in, it is its own additive-migration slice.
 
-## §7 — ARCC governance mapping (a fresh search_arcc is a T0 PRECONDITION before §1/§5 build)
+## §7 — ARCC governance mapping (the T0 precondition — CLEARED 2026-06-30)
 This feature READS the user's photos from Google (a scope expansion) + feeds them to an LLM. The standing
-google-photos-provider ARCC note ("query ARCC before the connect/credential path") applies, plus:
-1. **SAX-03 — secrets.** The Google refresh token + VLM key reuse the EXISTING encrypted `user_providers`
-   seam — no new secret store. (Already audited for storage + vlm + the assistant.)
-2. **SAX-06 — PII + third-party scope.** The narrowest possible read scope (`appcreateddata` — only
-   VROOM-uploaded items, never the camera roll); each image goes only to the user's own VLM; no VROOM-side
-   retention beyond the in-memory draft; a connect-time disclosure of exactly what is read.
-3. **The OAuth scope expansion itself** — the explicit ARCC trigger from the google-photos-provider spec.
-   The §1 read-capability + §5 scope slices build ONLY after a fresh `search_arcc` on
-   "expanding an OAuth read scope to a third party's photo library (app-created data)" is run + recorded.
-4. **GenAI untrusted output** — inherited from the VLM feature: the parse is fail-closed + never
-   auto-written (R3/R4). No new GenAI surface beyond reusing `extractReceipt` + `parseExtraction`.
+google-photos-provider ARCC note ("query ARCC before the connect/credential path") applies.
+
+**ARCC RAN 2026-06-30 (C-cycle, alias angryang, sdlcStage authoring)** — query: "expanding an OAuth read
+scope to a third-party photo library (app-created data) + feeding the images to an LLM". The directly-
+applicable returned guidance + how this design satisfies each control:
+
+1. **OAuth least-privilege scope** (cnt_BsJvHZe6PR5FbA — "request only read-only permissions … always
+   request as minimal scope as needed … regularly audit requested scopes"). → **Control:**
+   `photoslibrary.readonly.appcreateddata` is the NARROWEST Google Photos read scope — read-only, and
+   app-created-data-only (it enumerates ONLY items VROOM itself uploaded, never the camera roll / broad
+   library). This is the minimal scope that satisfies the feature; a broader `photoslibrary.readonly` is
+   explicitly NOT requested. The scope list is a small, auditable constant in `auth/routes.ts`.
+2. **Authorization Code grant + server-side secret** (cnt_vtSS0S3iwKjSuk + cnt_BsJvHZe6PR5FbA — prefer
+   Auth-Code grant with PKCE, client-secret stays server-side, use `state` for CSRF, whitelist the
+   redirect URI, never log tokens). → **Control:** the scope is ADDITIVE to VROOM's EXISTING Google
+   connect flow, which already uses the Authorization Code grant with the client secret held server-side
+   (`GOOGLE_CLIENT_SECRET`, never shipped to the browser) + a fixed redirect URI. No grant-type or
+   client-secret-handling change — only one more read scope string. Tokens are never logged (the existing
+   discipline; the adapters log status codes, not credentials).
+3. **SAX-03 / TPSM third-party data handling** (cnt_kh33WnIXMERYXl — encrypt third-party tokens at rest,
+   least-privilege integration, do not share secrets outside a service you control). → **Control:** the
+   Google refresh token reuses the EXISTING AES-256-GCM `user_providers.credentials` seam (already audited
+   for storage + vlm + the assistant) — no new secret store, encrypted at rest, stripped from responses.
+   Each receipt image goes ONLY to the user's own bring-your-own VLM (the user is the data controller); no
+   VROOM-side retention beyond the in-memory draft (D3); a connect-time disclosure states exactly what is
+   read ("only the receipts VROOM uploaded to Photos, not your camera roll").
+4. **GenAI untrusted output** — inherited from the VLM feature: the parse is fail-closed (`parseExtraction`)
+   + never auto-written (R3/R4). No new GenAI surface beyond reusing `extractReceipt` + `parseExtraction`.
+
+**VERDICT: CLEARED to build the §5 scope expansion + the §1 live `mediaItems:search` read.** The expansion
+is the narrowest read-only scope, rides the unchanged Auth-Code-grant + encrypted-token path, and adds no
+new credential-handling or GenAI surface. No blocking finding. (NOTE: a formal TPSM vendor assessment per
+SAX-03 Outcome 6 is an Amazon-internal-production process — N/A to VROOM, a personal self-hosted project
+where the user is their own data controller and Google is already their chosen storage provider; recorded
+for completeness, not a gate.) **T1-live + T5 are now UNBLOCKED on the ARCC axis** (still pending only the
+re-cut branch push so the loop can commit).
 
 ## §8 — Risk register
 1. **The app-created-only limit misread as "scans my camera roll."** Mitigation: D1 ships it AS the honest

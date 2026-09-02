@@ -45,7 +45,7 @@ this loop, then advance to the next item:
 ```
 
 ### Hard rules
-- Work ONLY in `/local/home/angryang/.meshclaw/workspace/VROOM`. Never commit to `main`;
+- Work ONLY in `/local/home/angryang/.kiro/crew/workspace/VROOM`. Never commit to `main`;
   the autonomous loop works on the long-lived `claude-loop-dev` branch (cut off latest
   `origin/main`); a human opens the PR and approves every merge. (One-off task branches may
   still use `feat/<task>`.)

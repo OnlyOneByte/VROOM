@@ -7,6 +7,7 @@ import type { DrizzleTransaction, ReminderSplitConfig } from '../../db/types';
 import { ValidationError } from '../../errors';
 import { expenseSplitService } from '../expenses/split-service';
 import { odometerRepository } from '../odometer/repository';
+import { notifyUser, type PushPayload } from '../push/push-service';
 import type { ReminderWithVehicles } from './repository';
 import { reminderRepository } from './repository';
 
@@ -38,6 +39,35 @@ function pushReminderSkipError(result: TriggerResult, reminderId: string, error:
     reason: 'error',
     message: error instanceof Error ? error.message : 'Unknown error',
   });
+}
+
+/**
+ * Build the Web Push payload for a just-created reminder notification (T4b, design §4). The title
+ * carries the user-authored reminder name; the body names the due axis (mileage vs time). NO PII
+ * beyond the reminder text the user themselves wrote. A mileage notification carries dueOdometer
+ * (dueDate null); a time notification carries dueDate — so the axis is read off the row, not guessed.
+ */
+function payloadFromReminder(reminder: Reminder, notification: ReminderNotification): PushPayload {
+  const body =
+    notification.dueOdometer !== null
+      ? `Due at ${notification.dueOdometer.toLocaleString('en-US')} mi`
+      : 'This reminder is now due';
+  return { title: `${reminder.name} due`, body, tag: reminder.id, url: '/reminders' };
+}
+
+/**
+ * T4b hook (honors D2 — the request-driven-trigger fork, ACK'd 2026-07-08): AFTER a
+ * reminder_notifications row is inserted, nudge the user's push subscriptions. BEST-EFFORT —
+ * notifyUser is wrapped to NEVER throw (T4a/R3) and is await-and-swallowed here (design §4) so a push
+ * can neither fail nor stall the reminder sweep; the in-app notification feed stays the source of
+ * truth and push is a purely additive nudge. When the server has no VAPID keypair notifyUser is a
+ * no-op (config gap ≠ send failure), so this is inert on a deployment that never configured push.
+ */
+async function firePushForNotification(
+  reminder: Reminder,
+  notification: ReminderNotification
+): Promise<void> {
+  await notifyUser(reminder.userId, payloadFromReminder(reminder, notification));
 }
 
 /** Apply anchor-day clamping after advancing month/year on a Date. */
@@ -429,7 +459,10 @@ class ReminderTriggerService {
       reminder.userId,
       reminder.nextDueOdometer
     );
-    if (created) result.notifications.push(created);
+    if (created) {
+      result.notifications.push(created);
+      await firePushForNotification(reminder, created); // T4b (best-effort, never throws)
+    }
   }
 
   private async processReminder(
@@ -470,6 +503,7 @@ class ReminderTriggerService {
       } else {
         const notifResult = await processNotificationPeriod(reminder, nextDue, now);
         result.notifications.push(notifResult.created);
+        await firePushForNotification(reminder, notifResult.created); // T4b (best-effort, never throws)
         nextDue = notifResult.advancedDue;
       }
 

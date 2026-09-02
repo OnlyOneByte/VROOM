@@ -35,6 +35,7 @@ function baseExpense(): ImportableExpense {
     volume: 11.5,
     fuelType: 'Regular',
     description: 'fill up',
+    location: 'Shell, Main St',
     tags: ['road', 'trip'],
     missedFillup: false,
     clientId: '',
@@ -66,6 +67,7 @@ describe('deriveImportClientId — field sensitivity (the import idempotency-key
     { field: 'volume', mutate: (e) => (e.volume = 12) },
     { field: 'fuelType', mutate: (e) => (e.fuelType = 'Premium') },
     { field: 'description', mutate: (e) => (e.description = 'different note') },
+    { field: 'location', mutate: (e) => (e.location = 'Costco, 2nd Ave') },
     { field: 'tags', mutate: (e) => (e.tags = ['highway']) },
     { field: 'missedFillup', mutate: (e) => (e.missedFillup = true) },
   ];
