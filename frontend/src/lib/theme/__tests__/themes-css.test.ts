@@ -131,7 +131,7 @@ describe('themes.css is wired into the app via the root layout (T7 wiring guard)
   });
 
   test('+layout.svelte still imports app.css (the default look the bare :root serves)', () => {
-    expect(LAYOUT).toMatch(/import\s+['"][.\/]*app\.css['"]/);
+    expect(LAYOUT).toMatch(/import\s+['"][./]*app\.css['"]/);
   });
 });
 
