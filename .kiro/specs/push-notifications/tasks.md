@@ -106,15 +106,23 @@
       (T1–T4b); the remaining T5–T6 are the FE tail (now unblocked — D5/D4).**
 
 ## Phase 3 — frontend (honors D5/D4 — eyes-on tail)
-- [ ] **T5 — the push-api client + `push.ts` utils + the settings card.** `push-api.ts`
-      (getVapidPublicKey/subscribe/unsubscribe); `push.ts` beside `pwa.ts` (isPushSupported feature-detect,
-      enablePush = requestPermission→pushManager.subscribe(applicationServerKey)→POST, disablePush =
-      sub.unsubscribe()+DELETE, urlBase64ToUint8Array helper). `PushNotificationsCard.svelte` (settings) — a
-      toggle + a status line (not-supported / not-configured-503 / denied / subscribed / off), the first-enable
-      AlertDialog disclosure (D5 + the D6 timing-honesty copy + off-anytime), localStorage disclosure flag,
-      four-states + a11y + mobile-first. GUARD: a mocked-apiClient client test + the card's state machine.
-      EYES-ON (boot + shot /settings + Read): the card renders each state, zero console errors. FE
-      validate:local GREEN.
+- [x] **T5 — the push-api client + `push.ts` utils + the settings card (DONE, commit 9b05f3a, eyes-on).**
+      `push-api.ts` (getVapidPublicKey/subscribe/unsubscribe — the DELETE carries `{endpoint}` in the
+      body; the 503 surfaces as `ApiError.code==='PUSH_NOT_CONFIGURED'`); `push.ts` beside `pwa.ts`
+      (isPushSupported feature-detect, getNotificationPermission, urlBase64ToUint8Array, enablePush =
+      requestPermission→getVapidPublicKey→pushManager.subscribe(applicationServerKey)→POST returning a
+      discriminated PushEnableOutcome, disablePush = sub.unsubscribe()+DELETE, and the PURE
+      derivePushStatus/pushStatusLabel state machine — D6 timing-honest copy). getExistingSubscription
+      uses `serviceWorker.getRegistration()` NOT `.ready` (which never resolves pre-SW, i.e. dev/pre-T6,
+      and would hang the card's loading spinner). `PushNotificationsCard.svelte` (settings) — a Switch +
+      a status line (not-supported / not-configured-503 / denied / subscribed / off), the D5 first-enable
+      AlertDialog disclosure (localStorage `vroom.push.disclosed`, gates the browser permission prompt) +
+      D6 timing-honesty copy + off-anytime, four-states + a11y. GUARD: `push-api.test.ts` (6 cases,
+      mocked-apiClient: exact endpoints/payloads incl. the DELETE body) + `push.test.ts` (8 cases, the
+      pure state-machine precedence + honest-label asserts). EYES-ON (boot :3001+:5173, VAPID-configured,
+      shot /settings + read PNG): the card renders the `off` state with the toggle, and clicking it opens
+      the disclosure dialog with the request-driven-timing copy WITHOUT firing the permission prompt;
+      zero console errors. FE validate:local GREEN (1453 tests, tsc 0, biome 0, build). NEXT: T6.
 - [ ] **T6 — the service-worker push handler + the strategy switch + e2e + DoD (the gated, highest-risk
       slice — BUILD LAST).** Switch `vite.config.ts` to `strategies:'injectManifest'` + author
       `src/service-worker.ts` (precacheAndRoute(__WB_MANIFEST) + a `push` listener → showNotification + a
