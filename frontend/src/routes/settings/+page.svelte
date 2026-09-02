@@ -19,6 +19,7 @@
 	import ThemeCard from '$lib/components/settings/cards/ThemeCard.svelte';
 	import ThemePickerCard from '$lib/components/settings/cards/ThemePickerCard.svelte';
 	import PWAInstallCard from '$lib/components/settings/cards/PwaInstallCard.svelte';
+	import PushNotificationsCard from '$lib/components/settings/cards/PushNotificationsCard.svelte';
 	import BackupNowDialog from '$lib/components/settings/storage-provider/backup/BackupDialog.svelte';
 	import UnifiedRestoreDialog from '$lib/components/settings/storage-provider/backup/RestoreDialog.svelte';
 	import PhotoStorageSettings from '$lib/components/settings/cards/StorageProvidersCard.svelte';
@@ -276,6 +277,7 @@
 			<ThemePickerCard />
 			<UnitPreferencesCard bind:distanceUnit bind:volumeUnit bind:chargeUnit bind:currencyUnit />
 			<PWAInstallCard />
+			<PushNotificationsCard />
 			<PhotoStorageSettings
 				{isBackingUp}
 				bind:syncInactivityMinutes
