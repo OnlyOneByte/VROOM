@@ -39,6 +39,7 @@ import {
   type TargetUnits,
 } from './import-mapping';
 import { detectSource } from './import-mapping-presets';
+import { FuelioParseError, parseFuelioExport } from './fuelio-import';
 import { expenseRepository } from './repository';
 import {
   createSplitExpenseSchema,
@@ -759,11 +760,25 @@ routes.post('/import', zValidator('json', importBodySchema), async (c) => {
   if (mapping) {
     const target = resolveTargetUnits(mapping.targetVehicle, vehicles);
     try {
-      const result = applyMapping(csv, mapping, target);
-      importCsv = result.csv;
-      unmappedCategories = result.unmappedCategories;
+      if (mapping.source === 'fuelio') {
+        // Fuelio's multi-section export can't pass through the single-header column mapper; its
+        // adapter splits the sections and emits native CSV directly. The flow below is identical.
+        const result = parseFuelioExport(csv, {
+          targetVehicle: mapping.targetVehicle ?? '',
+          targetUnits: target,
+          includeCosts: true,
+        });
+        importCsv = result.csv;
+        unmappedCategories = result.unmappedCategories;
+      } else {
+        const result = applyMapping(csv, mapping, target);
+        importCsv = result.csv;
+        unmappedCategories = result.unmappedCategories;
+      }
     } catch (err) {
-      if (err instanceof CsvMappingError) throw new ValidationError(err.message);
+      if (err instanceof CsvMappingError || err instanceof FuelioParseError) {
+        throw new ValidationError(err.message);
+      }
       throw err;
     }
   }

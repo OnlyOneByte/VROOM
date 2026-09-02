@@ -150,7 +150,7 @@ const NATIVE_HEADER: NativeField[] = [
  * decision; lone-comma-as-THOUSANDS is the ambiguous #24 locale/product call, NOT decided here). A value
  * with neither, or only dots, is returned unchanged.
  */
-function normalizeDecimal(raw: string): string {
+export function normalizeDecimal(raw: string): string {
   const s = raw.trim();
   if (!s) return s;
   const hasDot = s.includes('.');
