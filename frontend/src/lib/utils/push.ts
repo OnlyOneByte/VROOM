@@ -29,7 +29,7 @@ export interface PushStatusInput {
 	/** The server returned a VAPID public key (not the 503 PUSH_NOT_CONFIGURED degrade). */
 	configured: boolean;
 	/** The current Notification permission ('default' | 'granted' | 'denied'). */
-	permission: NotificationPermission;
+	permission: 'default' | 'granted' | 'denied';
 	/** An active browser PushSubscription exists. */
 	subscribed: boolean;
 }
@@ -77,7 +77,7 @@ export function isPushSupported(): boolean {
 }
 
 /** The current Notification permission, or 'default' when unavailable (SSR / unsupported). */
-export function getNotificationPermission(): NotificationPermission {
+export function getNotificationPermission(): 'default' | 'granted' | 'denied' {
 	if (!browser || !('Notification' in window)) return 'default';
 	return Notification.permission;
 }
