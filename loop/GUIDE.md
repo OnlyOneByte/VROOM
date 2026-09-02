@@ -4,6 +4,14 @@
 > `loop/archive/*-C1-C350.md`, cycle counter reset to C1, balance table to 0. Branch ~243 commits ahead
 > of origin/main, PR-ready (doc hygiene, NOT a code reset). The C349 velocity reform (MODE / BUILD QUEUE /
 > META-LOOP, below) is now the operating model._
+>
+> _Trim pass 2026-09-02 (~C964): the read-path had drifted stale + bloated again — this GUIDE still
+> described the ~C102 world, LEDGER was back to 452KB, BACKLOG carried multi-paragraph detail for 8
+> shipped features. Cleaned: the stale duplicated BUILD QUEUE was removed from THIS file (it lives only in
+> BACKLOG now), LEDGER + BACKLOG were archived verbatim to `loop/archive/*-C1-C964.md` and rewritten lean,
+> and the 36 shipped feature specs moved to `.kiro/specs/_shipped/` (only `push-notifications` stays active).
+> STATE AT THE TRIM: every greenlit feature SHIPPED; the only open work is push-notifications #14 T6, then
+> Calendar #15 (greenlit-to-spec). Doc hygiene, NOT a code reset._
 
 > NORTH_STAR.md = vision + quality bar. BACKLOG.md = BUILD QUEUE + open gated steers. LEDGER.md =
 > per-cycle log + balance table. This file = HOW to run a cycle well.
@@ -48,40 +56,11 @@ approved build work queued. So branch on state:
 **Pick rule:** scan BACKLOG for an unblocked build item FIRST. Found one → BUILD. None → MAINTAIN.
 Don't run the 6-budget recompute in BUILD mode — it's wasted work when the queue dictates the pick.
 
-## BUILD QUEUE (the ordered work-list — pop, don't re-derive; WIP=1)
-> Keep this list current as the live build plan. The loop POPS the top unblocked slice instead of
-> re-deciding feature order every cycle (that re-derivation was a per-cycle tax). Re-rank only when a
-> slice finishes or a gate clears. Greenlit 2026-06-24; ordered by Angelo (money-cents first, C349).
-1. ~~**money-cents-migration**~~ — ✅ **DONE + SHIPPED (C19, commit 705b794, pushed).** Built ATOMIC
-   T1–T7 in ONE branch-green commit (Angelo's confirmed ruling, saved lesson 2026-06-26 — the
-   "one-task-per-cycle" spec line was infeasible, as the C1 escalation predicted). 36 files: money is
-   integer CENTS end-to-end, dollars only at the input edge (Zod dollarsToCents) + response edge
-   (per-entity *ToApi + analytics/api-transform). Data-safety gate: backup 2.0.0 + version-gated ×100
-   restore shim. Both validate:local green; FE dollar contract unchanged. Don't re-pick.
-2. ~~**trips-location**~~ — ✅ **COMPLETE (post-reset C3–C5: T1–T8 + T6b-3).** C214 odometer-lifecycle (T7) +
-   D3 rate (T8) backend + the FE edit/delete eyes-on tail, all shipped + guarded (C6 date-resync, C7 backup
-   round-trip). Don't re-pick.
-3. ~~**theming-engine**~~ — ✅ **COMPLETE (pre-reset: engine + 10 themes + picker, guarded 10 dimensions).** Don't re-pick.
-4. **vehicle-sharing** — `.kiro/specs/vehicle-sharing/tasks.md` — **T0 RATIFIED C48; T5b ruled (a) C91; the
-   read-widening arc shipped C92–C102.** DONE + shipped: T0–T4, T5a, T9, T10–T13 (the C48–C59 arc), then the
-   FULL editor-model: T5b-1 migration 0011 createdBy (C92), T5b-2 expense WRITE owner-stamp (C93), T5b-3 +
-   T5b-3b expense READ incl. CSV export (C94/C101), T6 odometer (C95), T7 reminder READ (C96), T8a analytics
-   + T8b insurance READ w/ §6.4 blast-radius (C97/C98), T12b-3a vehicle-GET shared-read+level (C99) + T12b-3b
-   FE viewer-mode gating, eyes-on (C100), validateOdometerOwnership dead-export cleanup (C102). **The backend
-   READ-widening family is COMPLETE across all 7 read surfaces; the [id]-page viewer-mode FE is eyes-on-done.**
-   REMAINING (C102): two MULTI-vehicle WRITE slices — T5b-2b split-expense + T7b reminders — **ESCALATED to
-   Angelo C102 (Slack ts 1782544031)** because a multi-vehicle write can span DIFFERENT owners and the row
-   group keys on one userId (a/b/c options: same-owner-only / owner-only / defer-past-v1). Do NOT re-escalate
-   (once per condition). Plus the non-gated T12b-3c (read-only shared insurance: widen GET /insurance/:id/claims
-   + a read-only PolicyList — self-rated low-value) and T14 feature-DoD (once the write ruling lands).
-> **QUEUE STATE (C102): vehicle-sharing is ~90% shipped — all reads + single-entity writes + viewer-mode FE
-> done.** money-cents ✅, trips ✅, theming ✅, vehicle-sharing through T12b-3b ✅. The ONLY gated work is the
-> two multi-vehicle WRITE slices (escalated C102, awaiting Angelo's a/b/c). Buildable-now non-gated: T12b-3c
-> (low-value) + the infra cadence. When the write ruling lands → build it, then T14 DoD. Until then, per the
-> gated-loop protocol: cheap new-surface check each nudge (git log + the spec + a ruling commit), build the
-> non-gated remainder OR the infra cadence if a real surface exists, else ONE-LINE `yield: dry` + pivot; do
-> NOT re-escalate, do NOT manufacture an audit per cycle.
-> META-REVIEW ran C103 (this edit, the slipped ~C84/C108 one); next due ~C128.
+## BUILD QUEUE — lives in BACKLOG.md (do NOT duplicate it here)
+The ordered build plan (WIP=1; pop the top unblocked slice) is maintained in `loop/BACKLOG.md`, the single
+source of truth for what to build next + the gated steers. Do NOT copy the queue into this file — a copy
+drifts stale (it did, silently, across the whole C102→C964 arc, until the 2026-09-02 trim removed it). Read
+BACKLOG for the live queue. This GUIDE holds only HOW to run a cycle, not WHAT is queued.
 
 ## VELOCITY RULES (the C349 reform — don't pay waste the loop already learned to skip)
 1. **Conditional verify (skip the full gate on doc-only cycles).** `validate:local` (tsc+biome+test+
@@ -146,9 +125,9 @@ loop-closable mechanism (boot → shoot → Read → critique → fix → re-sho
 periodic deep-UI-review. **Theme eyes-on needs the PICKER-DRIVE method (C340):** injecting localStorage
 alone is reverted by reconcileServerTheme on hydrate (the C339(B) gated bug) — instead
 `CLICK_SELECTOR="button[aria-label='Use the <Label> theme']" shot.sh /settings` so setTheme() runs AFTER
-the reconcile + sticks; md5sum to assert distinct renders. The 3 ORIGINAL signed-off features
-(maintenance / import-trackers / recurring-expenses) are ALL COMPLETE + eyes-on; the LIVE feature work is
-now the BUILD QUEUE (money-cents → trips T6-gated → theming-picker-gated → sharing-blocked).
+the reconcile + sticks; md5sum to assert distinct renders. As of the 2026-09-02 trim every greenlit feature
+is SHIPPED + eyes-on; the only open UI tail is push-notifications #14 T6, then the Calendar #15 spec — read
+BACKLOG for the live queue.
 
 **Blank CHARTS in a full-page screenshot are a known ARTIFACT, not a defect (C242).** ChartCard gates chart
 children behind `gate.visible` (createVisibilityWatch — IntersectionObserver + a MutationObserver on the
@@ -181,7 +160,7 @@ never a bare `.trim()`.
 > (gated) or a NOT-YET-AUDITED shipped subsystem (the un-audited list is nearly empty).
 | Category | State | What still pays off |
 |---|---|---|
-| **feature** | the 3 signed-off tails are ALL COMPLETE (C312-verified: maintenance T9 / import-trackers T0–T6 / recurring-expenses T0–T8, every task `[x]`); every REMAINING feature is Angelo-GATED | NO open signed-off feature work left. Gated: money-cents sequencing, C214 trips↔odometer lifecycle, `instrument` palette, vehicle-sharing, + the ~15 product-gated bug items. Record gated + pivot until a gate clears; eyes-on is ready for the next greenlit spec. |
+| **feature** | ALL greenlit features SHIPPED as of the 2026-09-02 trim (money-cents / trips / theming / vehicle-sharing / VLM-receipt / LLM-assistant / Photos→auto-expense / expense-location). | Open work: push-notifications #14 T6 (in flight), then Calendar #15 (greenlit-to-spec, per decision-23 the SPEC step is pre-authorized). See BACKLOG for the live queue. Record gated + pivot until a slice is buildable; eyes-on is ready for the next surface. |
 | **bug** | **SATURATED on the SWEPT surfaces (C253/C257/C261/C265), but a NOT-YET-AUDITED subsystem can still yield a real fix (C291)** | write-path asymmetry / date-tz / money-calc all swept BE (trips-summary, expenses, settings/sync/vehicles repos) + FE (financing-calculations — the #92/#99/#110/#117/#330 family closed). Record dry on the FIRST recheck of a SWEPT surface + pivot. BUT: the C290→C291 arc showed a fresh firsthand scout of an un-audited shipped subsystem (the backup→restore round-trip) surfaced a REAL data-loss gap (validateUniqueConstraints covered only 2 of 5 backed-up UNIQUE indexes, #127 leg) with NO gate clearing — so when bug is over budget, prefer scouting a subsystem NOT on the swept-list over re-checking a closed family. |
 | **deep-review** | **SATURATED across NINE subsystems (C255–C301)** | trips arc (C255), repo layer (C260), TCO chain (C266, Property 14 + #27/#28), offline-sync (C274), CSV-import (C279), provider-config (C285), backup→restore round-trip (C290), auth OAuth core (C296), financing computeBalance (C301) — ALL certified CLEAN firsthand. VERIFY firsthand — agent "HIGH" findings are often false (C21/C60/C333). A fresh certification now needs a genuinely NOT-YET-AUDITED shipped subsystem (the un-audited list is nearly empty); else record saturated + pivot. Don't re-audit any of the nine. |
 | **guard** | **SATURATED both sides (C261/C263)** | the C250/C251/C256/C257 filter-branch vein took the reachable plain-repo/route gaps; remaining sub-100% is v8 artifacts + DEV-gated catch + apiClient-wrapper THEATER (C181/C229) + DOM/timer-bound. Don't manufacture a vacuous/theater test — record saturated + pivot. |
