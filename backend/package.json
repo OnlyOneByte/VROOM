@@ -49,7 +49,7 @@
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "drizzle-zod": "^0.8.3",
-    "googleapis": "^173.0.0",
+    "googleapis": "^176.0.0",
     "hono": "^4.13.5",
     "lucia": "^3.2.2",
     "oslo": "^1.2.1",
@@ -58,7 +58,8 @@
   },
   "overrides": {
     "qs": "^6.15.0",
-    "jws": "^4.0.1"
+    "jws": "^4.0.1",
+    "google-auth-library": "10.5.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.11",
