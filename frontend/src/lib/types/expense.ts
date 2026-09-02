@@ -53,6 +53,7 @@ export interface Expense {
 	charge?: number;
 	fuelType?: string;
 	description?: string;
+	location?: string;
 	missedFillup?: boolean;
 	sourceType?: string;
 	sourceId?: string;

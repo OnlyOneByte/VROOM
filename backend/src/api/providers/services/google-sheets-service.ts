@@ -73,6 +73,7 @@ export const SHEET_HEADERS = {
     'date',
     'mileage',
     'description',
+    'location',
     'groupId',
     'groupTotal',
     'splitMethod',

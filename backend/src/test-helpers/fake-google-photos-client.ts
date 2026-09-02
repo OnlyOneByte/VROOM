@@ -13,6 +13,7 @@ import type {
   PhotosAlbum,
   PhotosClient,
   PhotosMediaItem,
+  PhotosSearchPage,
 } from '../api/providers/services/google-photos-service';
 
 interface StoredMedia {
@@ -72,6 +73,38 @@ export class FakePhotosStore {
     this.albums.set(id, { id, title });
     return id;
   }
+
+  /**
+   * Script the media items `searchMediaItems` returns, in pages of `pageSize` (default: one page).
+   * Each entry becomes a stored media item (id + bytes) so a later download() resolves it. Returns
+   * the created media-item ids in order. Lets a stage-endpoint test drive a multi-photo sweep + the
+   * D4 cap + pagination without any network.
+   */
+  seedSearchablePhotos(
+    specs: Array<{ filename?: string; mimeType?: string; bytes?: Buffer }>,
+    pageSize = specs.length || 1
+  ): string[] {
+    const ids: string[] = [];
+    for (const spec of specs) {
+      const id = this.nextId('media');
+      const mimeType = spec.mimeType ?? 'image/jpeg';
+      this.media.set(id, {
+        id,
+        filename: spec.filename ?? `${id}.jpg`,
+        mimeType,
+        albumId: 'searchable',
+        bytes: spec.bytes ?? Buffer.from(`bytes-${id}`),
+      });
+      ids.push(id);
+    }
+    this.searchPageSize = Math.max(1, pageSize);
+    this.searchableIds = ids;
+    return ids;
+  }
+
+  /** The ordered ids `searchMediaItems` paginates over (set by {@link seedSearchablePhotos}). */
+  searchableIds: string[] = [];
+  searchPageSize = 1;
 }
 
 /** Build a fake {@link PhotosClient} backed by `store`. */
@@ -140,6 +173,27 @@ export function makeFakePhotosClient(store: FakePhotosStore): PhotosClient {
       const album: PhotosAlbum = { id, title };
       store.albums.set(id, album);
       return Promise.resolve(album);
+    },
+
+    searchMediaItems(_albumId, pageToken) {
+      store.maybeFail('searchMediaItems');
+      // pageToken is the offset into the seeded id list (absent → start at 0); page by searchPageSize.
+      const start = pageToken ? Number.parseInt(pageToken, 10) : 0;
+      const end = start + store.searchPageSize;
+      const pageIds = store.searchableIds.slice(start, end);
+      const items: PhotosMediaItem[] = pageIds.map((id) => {
+        const m = store.media.get(id);
+        return {
+          id,
+          filename: m?.filename,
+          baseUrl: `https://photos.fake/${id}`,
+          mimeType: m?.mimeType,
+        } satisfies PhotosMediaItem;
+      });
+      const page: PhotosSearchPage = { items };
+      // Emit a nextPageToken only while more seeded ids remain.
+      if (end < store.searchableIds.length) page.nextPageToken = String(end);
+      return Promise.resolve(page);
     },
   };
 }

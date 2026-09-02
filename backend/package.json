@@ -16,6 +16,7 @@
     "db:seed": "bun src/db/init.ts --seed",
     "db:checkpoint": "bun src/db/checkpoint.ts",
     "db:checkpoint:force": "bun src/db/checkpoint.ts --force",
+    "vapid:gen": "bun src/scripts/gen-vapid-keys.ts",
     "test": "bun test",
     "test:repositories": "bun src/test/run-tests.ts",
     "test:auth": "bun src/test/run-auth-tests.ts",
@@ -48,19 +49,22 @@
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "drizzle-zod": "^0.8.3",
-    "googleapis": "^173.0.0",
+    "googleapis": "^176.0.0",
     "hono": "^4.13.5",
     "lucia": "^3.2.2",
     "oslo": "^1.2.1",
+    "web-push": "^3.6.7",
     "zod": "^4.4.3"
   },
   "overrides": {
     "qs": "^6.15.0",
-    "jws": "^4.0.1"
+    "jws": "^4.0.1",
+    "google-auth-library": "10.5.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.11",
     "@types/adm-zip": "^0.5.8",
+    "@types/web-push": "^3.6.4",
     "bun-types": "^1.4.0",
     "drizzle-kit": "^0.31.10",
     "fast-check": "^4.9.0",

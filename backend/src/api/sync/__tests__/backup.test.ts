@@ -341,21 +341,24 @@ describe('coerceRow: empty NOT NULL columns with a static default fall back to t
     ['themePreference', 'theme'],
     ['currencyUnit', 'currency'],
     ['backupFrequency', 'frequency'],
-  ] as const)('empty %s coerces to its column default (not null) — restore cannot abort', (colName) => {
-    const expected = cols[colName].default;
-    // Sanity: the column genuinely declares a static default (guards against a schema change that drops it).
-    expect(expected, `${colName} must declare a static default`).toBeDefined();
-    for (const empty of ['', 'null', 'NULL', 'undefined']) {
-      const coerced = coerceRow({ userId: 'u1', [colName]: empty }, userPreferences);
-      expect(coerced[colName], `${colName}='${empty}' must fall back to the default`).toBe(
-        expected
-      );
+  ] as const)(
+    'empty %s coerces to its column default (not null) — restore cannot abort',
+    (colName) => {
+      const expected = cols[colName].default;
+      // Sanity: the column genuinely declares a static default (guards against a schema change that drops it).
+      expect(expected, `${colName} must declare a static default`).toBeDefined();
+      for (const empty of ['', 'null', 'NULL', 'undefined']) {
+        const coerced = coerceRow({ userId: 'u1', [colName]: empty }, userPreferences);
+        expect(coerced[colName], `${colName}='${empty}' must fall back to the default`).toBe(
+          expected
+        );
+      }
+      // An entirely ABSENT key (an old backup predating the column) is also safe — left absent so the DB
+      // default applies (it must NOT be forced to null).
+      const absent = coerceRow({ userId: 'u1' }, userPreferences);
+      expect(absent[colName] === undefined || absent[colName] === expected).toBe(true);
     }
-    // An entirely ABSENT key (an old backup predating the column) is also safe — left absent so the DB
-    // default applies (it must NOT be forced to null).
-    const absent = coerceRow({ userId: 'u1' }, userPreferences);
-    expect(absent[colName] === undefined || absent[colName] === expected).toBe(true);
-  });
+  );
 
   test('a full userPreferences row of empties coerces to a schema-valid row (whole-row restore survives)', () => {
     // Every NOT NULL column blank — the worst-case partial/legacy backup. Pre-fix this produced multiple

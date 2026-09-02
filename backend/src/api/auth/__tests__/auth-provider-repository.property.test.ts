@@ -341,7 +341,7 @@ describe('updateProfile', () => {
     // The victim's row is untouched — the userId predicate excluded it.
     const found = await repo.findByProviderIdentity('google', 'other-user-profile');
     expect(found?.displayName).toBe('Victim');
-    expect((found?.config as Record<string, unknown>).email).toBe('victim@test.com');
+    expect((found?.config as Record<string, unknown> | undefined)?.email).toBe('victim@test.com');
   });
 });
 

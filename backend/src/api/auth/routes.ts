@@ -728,6 +728,11 @@ routes.get('/providers/connect/google', requireAuth, async (c) => {
     'profile',
     'email',
     'https://www.googleapis.com/auth/drive.file',
+    // photos-auto-expense T5/D2 (ARCC-cleared, design §7): the NARROWEST Google Photos read scope —
+    // read-only + app-created-data only, so VROOM can enumerate ONLY the receipts it uploaded to its own
+    // album (mediaItems:search, T1), never the user's camera roll. Additive: existing Drive/Photos users
+    // re-consent on next connect (the flow already sets prompt=consent + access_type=offline below).
+    'https://www.googleapis.com/auth/photoslibrary.readonly.appcreateddata',
   ]);
 
   url.searchParams.set('access_type', 'offline');
