@@ -43,9 +43,6 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Generate Drizzle types
-        run: bun run db:generate
-
       - name: Validate code
         run: bun run type-check && bun run check
 
