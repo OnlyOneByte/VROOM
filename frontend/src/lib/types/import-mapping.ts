@@ -2,10 +2,10 @@ import type { ExpenseCategory } from './expense.js';
 import type { DistanceUnit, VolumeUnit } from './settings.js';
 
 /**
- * Frontend types for the import-from-other-trackers mapping step (import-trackers T4/T5).
- * These MIRROR the backend contract (backend `import-mapping.ts` / `import-mapping-presets.ts`):
- * the eyes-on mapping dialog builds an `ImportColumnMapping` from the file's headers (optionally
- * pre-filled by a detected `ImportMappingPreset`) and hands it to `expenseApi.importExpensesCsv`.
+ * Frontend types for the import-from-other-trackers mapping step.
+ * These MIRROR the backend contract (backend `import-mapping.ts`):
+ * the "Migrate from another tracker" settings card builds an `ImportColumnMapping` and hands it to
+ * `expenseApi.importExpensesCsv`.
  * Kept as a standalone domain file so the barrel (`$lib/types`) re-exports them like every other domain.
  */
 
@@ -49,24 +49,5 @@ export interface ImportColumnMapping {
 	/** Foreign category word (lower-cased) → VROOM category (D2). Unmatched → `misc` + a note. */
 	categoryMap?: Record<string, ExpenseCategory>;
 	/** Category stamped on a BLANK category cell (D2). Fuel-tracker presets set `fuel`. */
-	defaultCategory?: ExpenseCategory;
-}
-
-/**
- * A detected tracker preset (the `POST /expenses/import/detect` result, or null → manual mapping).
- * Mirrors the backend `MappingPreset`; the dialog seeds its fields as the editable starting point.
- */
-export interface ImportMappingPreset {
-	id: ImportPresetId;
-	/** Human label for the detected-source banner. */
-	label: string;
-	/** Normalized header tokens that must ALL be present for a file to match. */
-	signature: string[];
-	columns: Partial<Record<NativeImportField, string>>;
-	dateFormat: ImportDateFormat;
-	distanceUnit?: DistanceUnit;
-	volumeUnit?: VolumeUnit;
-	categoryMap?: Record<string, ExpenseCategory>;
-	/** Category for a blank category cell (D2). Fuel trackers have no category column → `fuel`. */
 	defaultCategory?: ExpenseCategory;
 }
