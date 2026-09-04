@@ -127,7 +127,8 @@ export interface ApplyMappingResult {
 export class CsvMappingError extends Error {}
 
 /** Native output column order (the subset `parseRow` consumes). */
-const NATIVE_HEADER: NativeField[] = [
+/** The native VROOM CSV column order. The single source of truth for both emitters. */
+export const NATIVE_HEADER: NativeField[] = [
   'date',
   'vehicle',
   'category',
@@ -231,8 +232,16 @@ function mapCategory(
   return { value: 'misc', unmapped: word };
 }
 
-/** Decimal-normalize then convert a volume into the target's unit (when both units are known). */
-function mapVolume(raw: string, from: VolumeUnit | undefined, to: VolumeUnit | undefined): string {
+/**
+ * Decimal-normalize then convert a volume into the target's unit (when both units are known).
+ * A non-numeric value is passed through verbatim so `buildImportPlan` reports it per-row with the
+ * offending text, rather than being blanked here and reported as a missing field.
+ */
+export function mapVolume(
+  raw: string,
+  from: VolumeUnit | null | undefined,
+  to: VolumeUnit | undefined
+): string {
   const s = normalizeDecimal(raw);
   if (!s) return '';
   const n = Number(s);
@@ -244,10 +253,11 @@ function mapVolume(raw: string, from: VolumeUnit | undefined, to: VolumeUnit | u
 /**
  * Decimal-normalize then convert a mileage into the target's unit, rounded to an integer
  * (native `parseMileage` requires a whole number; the rounding is the documented A1 loss).
+ * Non-numeric input is passed through verbatim — see `mapVolume`.
  */
-function mapMileage(
+export function mapMileage(
   raw: string,
-  from: DistanceUnit | undefined,
+  from: DistanceUnit | null | undefined,
   to: DistanceUnit | undefined
 ): string {
   const s = normalizeDecimal(raw);
@@ -259,11 +269,11 @@ function mapMileage(
 }
 
 /** RFC-4180 cell escaping: quote + double internal quotes when a cell holds `,` `"` or a newline. */
-function csvCell(value: string): string {
+export function csvCell(value: string): string {
   return /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }
 
-function stringifyNative(rows: Record<NativeField, string>[]): string {
+export function stringifyNative(rows: Record<NativeField, string>[]): string {
   const lines = [NATIVE_HEADER.join(',')];
   for (const row of rows) {
     lines.push(NATIVE_HEADER.map((h) => csvCell(row[h] ?? '')).join(','));

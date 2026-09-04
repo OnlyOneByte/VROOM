@@ -27,11 +27,14 @@
 import { parse } from 'csv-parse/sync';
 import type { ExpenseCategory } from '../../db/types';
 import { DistanceUnit, VolumeUnit } from '../../types';
-import { convertDistance, convertVolume } from '../../utils/unit-conversions';
 import {
   type ImportDateFormat,
+  mapMileage,
+  mapVolume,
+  type NativeField,
   normalizeDecimal,
   normalizeForeignDate,
+  stringifyNative,
   type TargetUnits,
 } from './import-mapping';
 
@@ -91,24 +94,7 @@ const FUELIO_COST_CATEGORY_MAP: Record<string, ExpenseCategory> = {
 };
 
 /** The native columns buildImportPlan reads (order is irrelevant — it parses by header name). */
-const NATIVE_HEADER = [
-  'date',
-  'vehicle',
-  'category',
-  'amount',
-  'mileage',
-  'volume',
-  'fuelType',
-  'description',
-  'tags',
-  'missedFillup',
-] as const;
-type NativeRow = Record<(typeof NATIVE_HEADER)[number], string>;
-
-/** RFC-4180 cell escaping (quote + double internal quotes when needed). */
-function csvCell(value: string): string {
-  return /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
-}
+type NativeRow = Record<NativeField, string>;
 
 /** True when the text looks like a Fuelio backup export (has the `## Vehicle` + `## Log` markers). */
 export function isFuelioExport(text: string): boolean {
@@ -185,26 +171,6 @@ function resolveDateFormat(fmt: string | undefined): ImportDateFormat {
   return 'iso'; // unrecognized → iso (parseDate still validates the actual value)
 }
 
-function convertMileage(
-  raw: string,
-  from: DistanceUnit | null,
-  to: DistanceUnit | undefined
-): string {
-  const s = normalizeDecimal(raw);
-  const n = Number(s);
-  if (!s || !Number.isFinite(n)) return '';
-  const dist = from && to ? convertDistance(n, from, to) : n;
-  return String(Math.round(dist));
-}
-
-function convertVol(raw: string, from: VolumeUnit | null, to: VolumeUnit | undefined): string {
-  const s = normalizeDecimal(raw);
-  const n = Number(s);
-  if (!s || !Number.isFinite(n)) return '';
-  const vol = from && to ? convertVolume(n, from, to) : n;
-  return String(Number(vol.toFixed(3)));
-}
-
 /**
  * Emit one native fuel row per `## Log` record. Also returns the units detected from the log
  * header, since the caller reports them and they drive the conversion here.
@@ -229,8 +195,8 @@ function buildLogRows(
     vehicle: opts.targetVehicle,
     category: 'fuel',
     amount: normalizeDecimal(cell(rec, priceKey)),
-    mileage: convertMileage(cell(rec, odoKey), fileDistanceUnit, opts.targetUnits.distanceUnit),
-    volume: convertVol(cell(rec, fuelKey), fileVolumeUnit, opts.targetUnits.volumeUnit),
+    mileage: mapMileage(cell(rec, odoKey), fileDistanceUnit, opts.targetUnits.distanceUnit),
+    volume: mapVolume(cell(rec, fuelKey), fileVolumeUnit, opts.targetUnits.volumeUnit),
     fuelType: '', // Fuelio's numeric FuelType code has no reliable VROOM string mapping (v1: blank).
     description: cell(rec, notesKey),
     tags: '',
@@ -316,10 +282,7 @@ export function parseFuelioExport(text: string, opts: FuelioParseOptions): Fueli
   const fileDistanceUnit = log.fileDistanceUnit;
   const fileVolumeUnit = log.fileVolumeUnit;
 
-  const csv = [
-    NATIVE_HEADER.join(','),
-    ...rows.map((r) => NATIVE_HEADER.map((h) => csvCell(r[h] ?? '')).join(',')),
-  ].join('\n');
+  const csv = stringifyNative(rows);
 
   return {
     csv,
