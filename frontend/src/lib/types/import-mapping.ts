@@ -3,7 +3,7 @@ import type { DistanceUnit, VolumeUnit } from './settings.js';
 
 /**
  * Frontend types for the import-from-other-trackers mapping step.
- * These MIRROR the backend contract (backend `import-mapping.ts` / `import-mapping-presets.ts`):
+ * These MIRROR the backend contract (backend `import-mapping.ts`):
  * the "Migrate from another tracker" settings card builds an `ImportColumnMapping` and hands it to
  * `expenseApi.importExpensesCsv`.
  * Kept as a standalone domain file so the barrel (`$lib/types`) re-exports them like every other domain.
