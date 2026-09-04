@@ -142,3 +142,62 @@ describe('Fuelio → native CSV → buildImportPlan (end-to-end)', () => {
     expect(ferry.expenseAmount).toBe(2500);
   });
 });
+
+describe('cost categories that resolve to no name are still surfaced (never a silent misc)', () => {
+  // A cost row whose CostTypeID is absent from ## CostCategories. Fuelio users delete categories,
+  // which orphans the id on rows that referenced it.
+  const ORPHAN_ID_CSV = `"## Vehicle"
+"Name","DistUnit","FuelUnit","ImportCSVDateFormat"
+"Golf","0","0","yyyy-MM-dd"
+
+"## Log"
+"Data","Odo (km)","Fuel (litres)","Price","Missed"
+"2024-01-05","45210","42.10","68.90",0
+
+"## CostCategories"
+"CostTypeID","Name","priority","color"
+"1","Service","0","#795548"
+
+"## Costs"
+"CostTitle","Date","Odo","CostTypeID","Notes","Cost"
+"Mystery charge","2024-02-01","46000","99","","25.00"
+`;
+
+  // A partial export: costs reference ids, but the CostCategories section is missing entirely.
+  const NO_CATEGORIES_CSV = ORPHAN_ID_CSV.replace(
+    /"## CostCategories"\n"CostTypeID","Name","priority","color"\n"1","Service","0","#795548"\n\n/,
+    ''
+  );
+
+  test('an orphaned CostTypeID lands in misc AND is reported by id', () => {
+    const r = parseFuelioExport(ORPHAN_ID_CSV, {
+      targetVehicle: TARGET_VEHICLE,
+      targetUnits: TARGET_UNITS,
+    });
+    expect(r.costCount).toBe(1);
+    // The whole point: the user is told the row was bucketed, naming the id we could not resolve.
+    expect(r.unmappedCategories).toEqual(['Unknown category 99']);
+
+    const plan = buildImportPlan(r.csv, VEHICLES);
+    const cost = plan.rows.find((row) => row.expense?.description === 'Mystery charge');
+    expect(cost?.status).toBe('ready');
+    expect(cost?.expense?.category).toBe('misc');
+  });
+
+  test('a Costs section with no CostCategories section surfaces every id', () => {
+    const r = parseFuelioExport(NO_CATEGORIES_CSV, {
+      targetVehicle: TARGET_VEHICLE,
+      targetUnits: TARGET_UNITS,
+    });
+    expect(r.costCount).toBe(1);
+    expect(r.unmappedCategories).toEqual(['Unknown category 99']);
+  });
+
+  test('a named-but-unmapped category is still reported by NAME, not by id', () => {
+    const r = parseFuelioExport(FUELIO_CSV, {
+      targetVehicle: TARGET_VEHICLE,
+      targetUnits: TARGET_UNITS,
+    });
+    expect(r.unmappedCategories).toEqual(['Ferry']);
+  });
+});

@@ -231,9 +231,14 @@ function buildCostRows(
 
   const unmapped = new Set<string>();
   const rows = costRecords.map((rec) => {
-    const catName = catById.get(cell(rec, cTypeKey).trim()) ?? '';
+    const typeId = cell(rec, cTypeKey).trim();
+    const catName = catById.get(typeId) ?? '';
     const mapped = FUELIO_COST_CATEGORY_MAP[catName.toLowerCase()];
-    if (!mapped && catName) unmapped.add(catName);
+    // An id that resolves to no name — orphaned CostTypeID, or a partial export with no
+    // `## CostCategories` section — must still be visible. Surfacing only NAMED categories let this
+    // case fall to `misc` unannounced, which is exactly the silent guess the contract forbids.
+    const label = catName || (typeId ? `Unknown category ${typeId}` : '');
+    if (!mapped && label) unmapped.add(label);
     const title = cell(rec, cTitleKey).trim();
     const note = cell(rec, cNotesKey).trim();
     return {
@@ -244,7 +249,7 @@ function buildCostRows(
       mileage: '', // non-fuel: cleared by the native import anyway
       volume: '',
       fuelType: '',
-      description: [title, note].filter(Boolean).join(' — ') || catName,
+      description: [title, note].filter(Boolean).join(' — ') || label,
       tags: '',
       missedFillup: '',
     };
