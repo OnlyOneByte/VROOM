@@ -2,7 +2,7 @@
 	/**
 	 * Migrate data from another tracker (data-migration spec) — a DEDICATED settings surface, distinct
 	 * from the expenses page's own-format CSV re-import. v1 implements the Fuelio standard: the user
-	 * picks a tracker + a target vehicle, uploads the tracker's export file, previews (dryRun), and
+	 * picks a target vehicle, uploads the tracker's export file, previews (dryRun), and
 	 * commits. A Fuelio export is a multi-section file, so this sends `source:'fuelio'` — the backend
 	 * routes it to the Fuelio adapter (splits sections, converts units, maps costs) and then runs the
 	 * same validate/idempotent-commit pipeline as every import.
@@ -26,27 +26,28 @@
 	import { appStore } from '$lib/stores/app.svelte';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
 	import { handleErrorWithNotification } from '$lib/utils/error-handling';
-	import type { ImportColumnMapping, ImportPresetId, Vehicle } from '$lib/types';
+	import type { ImportColumnMapping, Vehicle } from '$lib/types';
 
-	// The trackers this card can migrate from. Fuelio is implemented v1 (multi-section adapter);
-	// others are additive follow-ons that reuse the same preview/commit flow.
-	const TRACKERS: { id: ImportPresetId; label: string }[] = [{ id: 'fuelio', label: 'Fuelio' }];
+	// v1 migrates from Fuelio. A second tracker is an additive follow-on: it reuses this whole
+	// preview/commit flow, and only then is a source picker worth showing.
+	const TRACKER_LABEL = 'Fuelio';
 
 	let vehicles = $state<Vehicle[]>([]);
 	let isLoading = $state(true);
 	let loadError = $state<string | null>(null);
 
 	let dialogOpen = $state(false);
-	let tracker = $state<ImportPresetId>('fuelio');
 	let targetVehicleId = $state('');
 	let fileName = $state<string | null>(null);
 	let csvText = $state('');
 	let preview = $state<ExpenseImportResult | null>(null);
 	let isPreviewing = $state(false);
 	let isImporting = $state(false);
+	// Monotonic token: only the newest preview request may write `preview`. Changing the vehicle while
+	// an earlier request is still in flight would otherwise paint counts for the wrong vehicle.
+	let previewSeq = 0;
 
 	let targetVehicle = $derived(vehicles.find((v) => v.id === targetVehicleId));
-	let trackerLabel = $derived(TRACKERS.find((t) => t.id === tracker)?.label ?? 'Fuelio');
 	let errorRows = $derived(preview?.rows.filter((r) => r.status === 'error') ?? []);
 	let unmappedCategories = $derived(preview?.unmappedCategories ?? []);
 
@@ -65,12 +66,12 @@
 
 	onMount(loadVehicles);
 
-	/** The mapping sent to the import endpoint. For Fuelio the backend adapter owns the parsing, so we
-	 *  only pass the source tag + target vehicle (columns/dateFormat are placeholders the adapter ignores). */
+	/** The mapping sent to the import endpoint. The Fuelio adapter owns the parsing, so we only pass
+	 *  the source tag + target vehicle (columns/dateFormat are placeholders the adapter ignores). */
 	function buildMapping(): ImportColumnMapping | null {
 		if (!targetVehicle) return null;
 		return {
-			source: tracker,
+			source: 'fuelio',
 			columns: {},
 			dateFormat: 'iso',
 			targetVehicle: getVehicleDisplayName(targetVehicle)
@@ -83,14 +84,18 @@
 			preview = null;
 			return;
 		}
+		const seq = ++previewSeq;
 		isPreviewing = true;
 		preview = null;
 		try {
-			preview = await expenseApi.importExpensesCsv(csvText, true, mapping);
+			const result = await expenseApi.importExpensesCsv(csvText, true, mapping);
+			if (seq === previewSeq) preview = result;
 		} catch (err) {
-			handleErrorWithNotification(err, `Could not read that ${trackerLabel} file`);
+			if (seq === previewSeq) {
+				handleErrorWithNotification(err, `Could not read that ${TRACKER_LABEL} file`);
+			}
 		} finally {
-			isPreviewing = false;
+			if (seq === previewSeq) isPreviewing = false;
 		}
 	}
 
@@ -100,6 +105,8 @@
 		if (!file) return;
 		fileName = file.name;
 		csvText = await file.text();
+		// Clear the input so re-picking the SAME file after a cancel still fires a change event.
+		input.value = '';
 		await runPreview();
 	}
 
@@ -115,26 +122,27 @@
 		try {
 			const result = await expenseApi.importExpensesCsv(csvText, false, mapping);
 			appStore.showSuccess(
-				`Migrated ${result.imported} ${result.imported === 1 ? 'entry' : 'entries'} from ${trackerLabel}`
+				`Migrated ${result.imported} ${result.imported === 1 ? 'entry' : 'entries'} from ${TRACKER_LABEL}`
 			);
 			dialogOpen = false;
 		} catch (err) {
-			handleErrorWithNotification(err, `Failed to migrate from ${trackerLabel}`);
+			handleErrorWithNotification(err, `Failed to migrate from ${TRACKER_LABEL}`);
 		} finally {
 			isImporting = false;
 		}
 	}
 
-	// Reset the flow each time the dialog closes so a re-open starts clean.
-	$effect(() => {
-		if (!dialogOpen) {
-			fileName = null;
-			csvText = '';
-			preview = null;
-			isPreviewing = false;
-			isImporting = false;
-		}
-	});
+	/** Start every migration from a clean slate. Bumping the token abandons any request still in
+	 *  flight from a previous open, so its response cannot land in this one. */
+	function openDialog() {
+		fileName = null;
+		csvText = '';
+		preview = null;
+		isPreviewing = false;
+		isImporting = false;
+		previewSeq++;
+		dialogOpen = true;
+	}
 </script>
 
 <Card>
@@ -165,7 +173,7 @@
 			</p>
 		{:else}
 			<div data-testid="migrate-card">
-				<Button variant="outline" onclick={() => (dialogOpen = true)} data-testid="migrate-open">
+				<Button variant="outline" onclick={openDialog} data-testid="migrate-open">
 					<Upload class="mr-2 h-4 w-4" />
 					Migrate from another tracker
 				</Button>
@@ -179,28 +187,13 @@
 		<Dialog.Header>
 			<Dialog.Title>Migrate from another tracker</Dialog.Title>
 			<Dialog.Description>
-				Pick the app you're coming from and the vehicle to import into, then upload its export file.
-				You'll see a preview before anything is saved. Units are converted to your vehicle's units
-				automatically, and amounts import in your configured currency.
+				Pick the vehicle to import into, then upload your {TRACKER_LABEL} export file. You'll see a
+				preview before anything is saved. Units are converted to your vehicle's units automatically,
+				and amounts import in your configured currency.
 			</Dialog.Description>
 		</Dialog.Header>
 
 		<div class="space-y-4">
-			<!-- Tracker -->
-			<div class="space-y-1.5">
-				<label for="migrate-tracker" class="text-xs font-medium text-foreground">From</label>
-				<Select.Root type="single" value={tracker} onValueChange={(v) => (tracker = v as ImportPresetId)}>
-					<Select.Trigger id="migrate-tracker" class="w-full" data-testid="migrate-tracker">
-						{trackerLabel}
-					</Select.Trigger>
-					<Select.Content>
-						{#each TRACKERS as t (t.id)}
-							<Select.Item value={t.id} label={t.label}>{t.label}</Select.Item>
-						{/each}
-					</Select.Content>
-				</Select.Root>
-			</div>
-
 			<!-- Target vehicle -->
 			<div class="space-y-1.5">
 				<label for="migrate-vehicle" class="text-xs font-medium text-foreground">
@@ -227,7 +220,7 @@
 					class="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-border bg-muted/30 px-4 py-6 text-sm text-muted-foreground transition-colors hover:bg-muted/50"
 				>
 					<Upload class="h-5 w-5" />
-					<span>{fileName ?? `Choose your ${trackerLabel} export (.csv)`}</span>
+					<span>{fileName ?? `Choose your ${TRACKER_LABEL} export (.csv)`}</span>
 				</label>
 				<input
 					id="migrate-file"
@@ -243,7 +236,7 @@
 			{#if isPreviewing}
 				<div class="flex items-center justify-center gap-2 py-4 text-sm text-muted-foreground">
 					<LoaderCircle class="h-4 w-4 animate-spin" />
-					Reading your {trackerLabel} file…
+					Reading your {TRACKER_LABEL} file…
 				</div>
 			{:else if preview}
 				<div class="rounded-lg border bg-card p-4" data-testid="migrate-preview">
