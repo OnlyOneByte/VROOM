@@ -8,11 +8,11 @@
  * header-embedded units, `Missed`→missedFillup, and migrating the non-fuel `## Costs` section.
  */
 
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test } from 'bun:test';
 import { DistanceUnit, VolumeUnit } from '../../../types';
 import { convertDistance, convertVolume } from '../../../utils/unit-conversions';
-import { buildImportPlan, type ImportVehicle } from '../import-csv';
 import { isFuelioExport, parseFuelioExport } from '../fuelio-import';
+import { buildImportPlan, type ImportVehicle } from '../import-csv';
 
 // A realistic Fuelio export: metric (km / litres), two fuel rows (one full, one partial+Missed),
 // and two costs (Service → maintenance; Ferry → unmapped → misc).
@@ -53,7 +53,10 @@ describe('isFuelioExport', () => {
 
 describe('parseFuelioExport', () => {
   test('detects the vehicle name and the file units from the headers', () => {
-    const r = parseFuelioExport(FUELIO_CSV, { targetVehicle: TARGET_VEHICLE, targetUnits: TARGET_UNITS });
+    const r = parseFuelioExport(FUELIO_CSV, {
+      targetVehicle: TARGET_VEHICLE,
+      targetUnits: TARGET_UNITS,
+    });
     expect(r.fileVehicleName).toBe('Golf');
     expect(r.fileDistanceUnit).toBe(DistanceUnit.KILOMETERS);
     expect(r.fileVolumeUnit).toBe(VolumeUnit.LITERS);
@@ -69,8 +72,14 @@ describe('parseFuelioExport', () => {
   });
 
   test('is deterministic (same input → identical CSV, so re-import dedups)', () => {
-    const a = parseFuelioExport(FUELIO_CSV, { targetVehicle: TARGET_VEHICLE, targetUnits: TARGET_UNITS });
-    const b = parseFuelioExport(FUELIO_CSV, { targetVehicle: TARGET_VEHICLE, targetUnits: TARGET_UNITS });
+    const a = parseFuelioExport(FUELIO_CSV, {
+      targetVehicle: TARGET_VEHICLE,
+      targetUnits: TARGET_UNITS,
+    });
+    const b = parseFuelioExport(FUELIO_CSV, {
+      targetVehicle: TARGET_VEHICLE,
+      targetUnits: TARGET_UNITS,
+    });
     expect(a.csv).toBe(b.csv);
   });
 
@@ -104,8 +113,13 @@ describe('Fuelio → native CSV → buildImportPlan (end-to-end)', () => {
 
     const full = fuel[0]!; // 2024-01-05, Missed=0
     expect(full.expenseAmount).toBe(6890); // $68.90 → cents
-    expect(full.mileage).toBe(Math.round(convertDistance(45210, DistanceUnit.KILOMETERS, DistanceUnit.MILES)));
-    expect(full.volume).toBeCloseTo(convertVolume(42.1, VolumeUnit.LITERS, VolumeUnit.GALLONS_US), 2);
+    expect(full.mileage).toBe(
+      Math.round(convertDistance(45210, DistanceUnit.KILOMETERS, DistanceUnit.MILES))
+    );
+    expect(full.volume).toBeCloseTo(
+      convertVolume(42.1, VolumeUnit.LITERS, VolumeUnit.GALLONS_US),
+      2
+    );
     expect(full.missedFillup).toBe(false);
 
     const partial = fuel[1]!; // 2024-01-19, Missed=1

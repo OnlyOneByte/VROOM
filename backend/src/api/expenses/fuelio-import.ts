@@ -137,7 +137,7 @@ function splitSections(text: string): Record<string, string> {
 
 /** Parse one section block (header + rows) into records keyed by its header names. */
 function parseBlock(block: string | undefined): Record<string, string>[] {
-  if (!block || !block.trim()) return [];
+  if (!block?.trim()) return [];
   return parse(block, {
     bom: true,
     columns: true,
@@ -150,6 +150,11 @@ function parseBlock(block: string | undefined): Record<string, string>[] {
 /** Find the record key whose name matches `re` (headers carry unit suffixes / `(optional)`). */
 function findKey(record: Record<string, string> | undefined, re: RegExp): string | undefined {
   return record ? Object.keys(record).find((k) => re.test(k)) : undefined;
+}
+
+/** Read a cell by a resolved header key; an unresolved (absent) column reads as empty. */
+function cell(rec: Record<string, string>, key: string | undefined): string {
+  return key ? (rec[key] ?? '') : '';
 }
 
 /** Detect the file's distance unit from the LOG odometer header (`Odo (mi)` / `Odo (km)`). */
@@ -180,7 +185,11 @@ function resolveDateFormat(fmt: string | undefined): ImportDateFormat {
   return 'iso'; // unrecognized → iso (parseDate still validates the actual value)
 }
 
-function convertMileage(raw: string, from: DistanceUnit | null, to: DistanceUnit | undefined): string {
+function convertMileage(
+  raw: string,
+  from: DistanceUnit | null,
+  to: DistanceUnit | undefined
+): string {
   const s = normalizeDecimal(raw);
   const n = Number(s);
   if (!s || !Number.isFinite(n)) return '';
@@ -197,6 +206,87 @@ function convertVol(raw: string, from: VolumeUnit | null, to: VolumeUnit | undef
 }
 
 /**
+ * Emit one native fuel row per `## Log` record. Also returns the units detected from the log
+ * header, since the caller reports them and they drive the conversion here.
+ */
+function buildLogRows(
+  logRecords: Record<string, string>[],
+  opts: FuelioParseOptions,
+  dateFormat: ImportDateFormat
+): { rows: NativeRow[]; fileDistanceUnit: DistanceUnit | null; fileVolumeUnit: VolumeUnit | null } {
+  const first = logRecords[0];
+  const odoKey = findKey(first, /odo/i);
+  const fuelKey = findKey(first, /^fuel\b/i);
+  const dateKey = findKey(first, /^data$|^date$/i);
+  const priceKey = findKey(first, /^price/i); // "Price (optional)" = TOTAL price
+  const notesKey = findKey(first, /note/i);
+  const missedKey = findKey(first, /missed/i);
+  const fileDistanceUnit = detectDistanceUnit(odoKey);
+  const fileVolumeUnit = detectVolumeUnit(fuelKey);
+
+  const rows = logRecords.map((rec) => ({
+    date: normalizeForeignDate(cell(rec, dateKey), dateFormat),
+    vehicle: opts.targetVehicle,
+    category: 'fuel',
+    amount: normalizeDecimal(cell(rec, priceKey)),
+    mileage: convertMileage(cell(rec, odoKey), fileDistanceUnit, opts.targetUnits.distanceUnit),
+    volume: convertVol(cell(rec, fuelKey), fileVolumeUnit, opts.targetUnits.volumeUnit),
+    fuelType: '', // Fuelio's numeric FuelType code has no reliable VROOM string mapping (v1: blank).
+    description: cell(rec, notesKey),
+    tags: '',
+    missedFillup: cell(rec, missedKey).trim() === '1' ? 'true' : '',
+  }));
+  return { rows, fileDistanceUnit, fileVolumeUnit };
+}
+
+/**
+ * Emit one native row per `## Costs` record, resolving CostTypeID → the `## CostCategories` name →
+ * a VROOM category. Names with no mapping fall to `misc` and are surfaced in `unmapped`.
+ */
+function buildCostRows(
+  sections: Record<string, string>,
+  opts: FuelioParseOptions,
+  dateFormat: ImportDateFormat
+): { rows: NativeRow[]; unmapped: Set<string> } {
+  const catById = new Map<string, string>();
+  for (const cat of parseBlock(sections.costcategories)) {
+    const idKey = findKey(cat, /costtypeid|^id$/i);
+    const nmKey = findKey(cat, /^name$/i);
+    if (idKey && nmKey && cat[idKey]) catById.set(cat[idKey].trim(), (cat[nmKey] ?? '').trim());
+  }
+
+  const costRecords = parseBlock(sections.costs);
+  const cFirst = costRecords[0];
+  const cDateKey = findKey(cFirst, /^date$/i);
+  const cTitleKey = findKey(cFirst, /^costtitle$|^title$/i);
+  const cTypeKey = findKey(cFirst, /costtypeid/i);
+  const cCostKey = findKey(cFirst, /^cost$|^amount$/i);
+  const cNotesKey = findKey(cFirst, /note/i);
+
+  const unmapped = new Set<string>();
+  const rows = costRecords.map((rec) => {
+    const catName = catById.get(cell(rec, cTypeKey).trim()) ?? '';
+    const mapped = FUELIO_COST_CATEGORY_MAP[catName.toLowerCase()];
+    if (!mapped && catName) unmapped.add(catName);
+    const title = cell(rec, cTitleKey).trim();
+    const note = cell(rec, cNotesKey).trim();
+    return {
+      date: normalizeForeignDate(cell(rec, cDateKey), dateFormat),
+      vehicle: opts.targetVehicle,
+      category: mapped ?? 'misc',
+      amount: normalizeDecimal(cell(rec, cCostKey)),
+      mileage: '', // non-fuel: cleared by the native import anyway
+      volume: '',
+      fuelType: '',
+      description: [title, note].filter(Boolean).join(' — ') || catName,
+      tags: '',
+      missedFillup: '',
+    };
+  });
+  return { rows, unmapped };
+}
+
+/**
  * Translate a Fuelio backup export into VROOM's native CSV. Throws `FuelioParseError` only when the
  * file has no recognizable Fuelio sections; per-row problems are deferred to `buildImportPlan`.
  */
@@ -209,80 +299,22 @@ export function parseFuelioExport(text: string, opts: FuelioParseOptions): Fueli
   const includeCosts = opts.includeCosts ?? true;
   const sections = splitSections(text);
 
-  const vehicleRecords = parseBlock(sections['vehicle']);
-  const vehicleRec = vehicleRecords[0];
+  const vehicleRec = parseBlock(sections.vehicle)[0];
   const nameKey = findKey(vehicleRec, /^name$/i);
   const fileVehicleName = (nameKey && vehicleRec?.[nameKey]?.trim()) || null;
   const dateFmtKey = findKey(vehicleRec, /importcsvdateformat|dateformat/i);
   const dateFormat = resolveDateFormat(dateFmtKey ? vehicleRec?.[dateFmtKey] : undefined);
 
-  const logRecords = parseBlock(sections['log']);
-  const first = logRecords[0];
-  const odoKey = findKey(first, /odo/i);
-  const fuelKey = findKey(first, /^fuel\b/i);
-  const dateKey = findKey(first, /^data$|^date$/i);
-  const priceKey = findKey(first, /^price/i); // "Price (optional)" = TOTAL price
-  const notesKey = findKey(first, /note/i);
-  const missedKey = findKey(first, /missed/i);
-  const fileDistanceUnit = detectDistanceUnit(odoKey);
-  const fileVolumeUnit = detectVolumeUnit(fuelKey);
-
-  const rows: NativeRow[] = [];
-
-  for (const rec of logRecords) {
-    rows.push({
-      date: normalizeForeignDate(dateKey ? (rec[dateKey] ?? '') : '', dateFormat),
-      vehicle: opts.targetVehicle,
-      category: 'fuel',
-      amount: priceKey ? normalizeDecimal(rec[priceKey] ?? '') : '',
-      mileage: convertMileage(odoKey ? (rec[odoKey] ?? '') : '', fileDistanceUnit, opts.targetUnits.distanceUnit),
-      volume: convertVol(fuelKey ? (rec[fuelKey] ?? '') : '', fileVolumeUnit, opts.targetUnits.volumeUnit),
-      fuelType: '', // Fuelio's numeric FuelType code has no reliable VROOM string mapping (v1: blank).
-      description: notesKey ? (rec[notesKey] ?? '') : '',
-      tags: '',
-      missedFillup: missedKey && (rec[missedKey] ?? '').trim() === '1' ? 'true' : '',
-    });
-  }
-  const logCount = rows.length;
-
-  const unmapped = new Set<string>();
-  let costCount = 0;
-  if (includeCosts) {
-    // CostTypeID → category name, from the ## CostCategories section.
-    const catById = new Map<string, string>();
-    for (const cat of parseBlock(sections['costcategories'])) {
-      const idKey = findKey(cat, /costtypeid|^id$/i);
-      const nmKey = findKey(cat, /^name$/i);
-      if (idKey && nmKey && cat[idKey]) catById.set(cat[idKey].trim(), (cat[nmKey] ?? '').trim());
-    }
-    const costRecords = parseBlock(sections['costs']);
-    const cFirst = costRecords[0];
-    const cDateKey = findKey(cFirst, /^date$/i);
-    const cTitleKey = findKey(cFirst, /^costtitle$|^title$/i);
-    const cTypeKey = findKey(cFirst, /costtypeid/i);
-    const cCostKey = findKey(cFirst, /^cost$|^amount$/i);
-    const cNotesKey = findKey(cFirst, /note/i);
-    for (const rec of costRecords) {
-      const catName = cTypeKey ? (catById.get((rec[cTypeKey] ?? '').trim()) ?? '') : '';
-      const mapped = FUELIO_COST_CATEGORY_MAP[catName.toLowerCase()];
-      if (!mapped && catName) unmapped.add(catName);
-      const title = cTitleKey ? (rec[cTitleKey] ?? '').trim() : '';
-      const note = cNotesKey ? (rec[cNotesKey] ?? '').trim() : '';
-      rows.push({
-        date: normalizeForeignDate(cDateKey ? (rec[cDateKey] ?? '') : '', dateFormat),
-        vehicle: opts.targetVehicle,
-        category: mapped ?? 'misc',
-        amount: cCostKey ? normalizeDecimal(rec[cCostKey] ?? '') : '',
-        mileage: '', // non-fuel: cleared by the native import anyway
-        volume: '',
-        fuelType: '',
-        description: [title, note].filter(Boolean).join(' — ') || catName,
-        tags: '',
-        missedFillup: '',
-      });
-      costCount++;
-    }
-  }
+  const log = buildLogRows(parseBlock(sections.log), opts, dateFormat);
+  const costs = includeCosts
+    ? buildCostRows(sections, opts, dateFormat)
+    : { rows: [] as NativeRow[], unmapped: new Set<string>() };
+  const rows = [...log.rows, ...costs.rows];
+  const logCount = log.rows.length;
+  const costCount = costs.rows.length;
+  const unmapped = costs.unmapped;
+  const fileDistanceUnit = log.fileDistanceUnit;
+  const fileVolumeUnit = log.fileVolumeUnit;
 
   const csv = [
     NATIVE_HEADER.join(','),
