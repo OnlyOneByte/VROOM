@@ -48,7 +48,7 @@
 		"@typescript-eslint/parser": "^8.18.2",
 		"@vite-pwa/assets-generator": "^1.0.2",
 		"@vite-pwa/sveltekit": "^1.1.0",
-		"@vitest/coverage-v8": "^4.1.11",
+		"@vitest/coverage-v8": "^5.0.0",
 		"@vitest/ui": "^4.0.18",
 		"autoprefixer": "^10.5.4",
 		"bits-ui": "^2.19.0",
