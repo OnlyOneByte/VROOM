@@ -26,6 +26,7 @@ import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/pho
 import { reminderTriggerService } from '../reminders/trigger-service';
 import { preferencesRepository } from '../settings/repository';
 import { vehicleRepository } from '../vehicles/repository';
+import { FuelioParseError, parseFuelioExport } from './fuelio-import';
 import {
   buildImportPlan,
   CsvImportError,
@@ -38,7 +39,6 @@ import {
   columnMappingSchema,
   type TargetUnits,
 } from './import-mapping';
-import { detectSource } from './import-mapping-presets';
 import { expenseRepository } from './repository';
 import {
   createSplitExpenseSchema,
@@ -759,11 +759,25 @@ routes.post('/import', zValidator('json', importBodySchema), async (c) => {
   if (mapping) {
     const target = resolveTargetUnits(mapping.targetVehicle, vehicles);
     try {
-      const result = applyMapping(csv, mapping, target);
-      importCsv = result.csv;
-      unmappedCategories = result.unmappedCategories;
+      if (mapping.source === 'fuelio') {
+        // Fuelio's multi-section export can't pass through the single-header column mapper; its
+        // adapter splits the sections and emits native CSV directly. The flow below is identical.
+        const result = parseFuelioExport(csv, {
+          targetVehicle: mapping.targetVehicle ?? '',
+          targetUnits: target,
+          includeCosts: true,
+        });
+        importCsv = result.csv;
+        unmappedCategories = result.unmappedCategories;
+      } else {
+        const result = applyMapping(csv, mapping, target);
+        importCsv = result.csv;
+        unmappedCategories = result.unmappedCategories;
+      }
     } catch (err) {
-      if (err instanceof CsvMappingError) throw new ValidationError(err.message);
+      if (err instanceof CsvMappingError || err instanceof FuelioParseError) {
+        throw new ValidationError(err.message);
+      }
       throw err;
     }
   }
@@ -800,18 +814,6 @@ routes.post('/import', zValidator('json', importBodySchema), async (c) => {
     success: true,
     data: { dryRun: false, imported, duplicates, unmappedCategories, ...summarizeImportPlan(plan) },
   });
-});
-
-// POST /api/expenses/import/detect - identify a known tracker from the uploaded file's headers,
-// so the client can pre-fill the mapping step. Body carries only the header names (not the data).
-// Returns the matched preset (id/label + its default mapping) or null → manual mapping (T3).
-const detectSourceSchema = z.object({
-  headers: z.array(z.string().max(200)).min(1).max(100),
-});
-routes.post('/import/detect', zValidator('json', detectSourceSchema), (c) => {
-  const { headers } = c.req.valid('json');
-  const preset = detectSource(headers);
-  return c.json({ success: true, data: preset });
 });
 
 // POST /api/expenses - Create a new expense
