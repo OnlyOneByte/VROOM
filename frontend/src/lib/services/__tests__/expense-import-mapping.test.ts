@@ -1,18 +1,15 @@
 /**
- * Coverage (C140, import-trackers T4/T5 FE client slice) for the foreign-tracker import methods on
- * expenseApi — the client surface the eyes-on mapping dialog consumes. The backend route already
- * accepts `mapping` (POST /import, T3/C70) and exposes detection (POST /import/detect), but the FE
- * client only sent `{csv, dryRun}` and had no detect method (the C134-class gap). These pin:
+ * Coverage for expenseApi.importExpensesCsv — the client surface the "Migrate from another tracker"
+ * settings card consumes. The backend route accepts an optional `mapping` (POST /import). These pin:
  *  - the native path request is UNCHANGED (no `mapping` key) — backward-compat,
- *  - a foreign import threads the mapping through verbatim,
- *  - detect posts only the header names and passes a preset (or null) through.
+ *  - a foreign import threads the mapping through verbatim (the migration card's Fuelio path).
  *
  * apiClient is mocked (the analytics-api.test.ts pattern) so we assert the exact URL + body the
  * client builds — apiClient.post already unwraps the {success,data} envelope.
  */
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import type { ImportColumnMapping, ImportMappingPreset } from '$lib/types';
+import type { ImportColumnMapping } from '$lib/types';
 import type { ExpenseImportResult } from '../expense-api';
 
 const post = vi.fn();
@@ -80,30 +77,5 @@ describe('expenseApi.importExpensesCsv', () => {
 		expect(body).toEqual({ csv: 'Date,Cost,Car\n…', dryRun: true, mapping });
 		// The dialog reads unmappedCategories to prompt the user to remap (D2).
 		expect(result.unmappedCategories).toEqual(['carwash']);
-	});
-});
-
-describe('expenseApi.detectImportSource', () => {
-	test('posts only the header names and passes a matched preset through', async () => {
-		const preset: ImportMappingPreset = {
-			id: 'fuelly',
-			label: 'Fuelly',
-			signature: ['mpg', 'odometer'],
-			columns: { date: 'Date', amount: 'Cost' },
-			dateFormat: 'mdy'
-		};
-		post.mockResolvedValueOnce(preset);
-
-		const headers = ['Date', 'Cost', 'MPG', 'Odometer'];
-		const result = await expenseApi.detectImportSource(headers);
-
-		expect(post).toHaveBeenCalledWith('/api/v1/expenses/import/detect', { headers });
-		expect(result).toEqual(preset);
-	});
-
-	test('passes a null (unrecognized file → manual mapping) through unchanged', async () => {
-		post.mockResolvedValueOnce(null);
-		const result = await expenseApi.detectImportSource(['Foo', 'Bar']);
-		expect(result).toBeNull();
 	});
 });

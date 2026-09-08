@@ -126,3 +126,25 @@
             C32 readyCount=0 characterization), C153 forwarded it through the dialog. A detected
             Fuelly/Fuelio/Drivvo log now maps blank category → `fuel`, previews ready, and commits end-to-end —
             the manual half was already eyes-on (C37/C41/C47/C61). **import-trackers is FEATURE-COMPLETE.**
+
+## Phase 5 — Fuelio migration correction + dedicated "Migrate from another tracker" card (data-migration)
+- [x] **T7 — real Fuelio format (backend).** T2's `fuelio` preset was written against a hypothetical FLAT
+      CSV; a real Fuelio backup is a 4-section quoted file (`## Vehicle` / `## Log` / `## CostCategories` /
+      `## Costs`) the single-header `csv-parse` path cannot read. Built `fuelio-import.ts`
+      (`parseFuelioExport` / `isFuelioExport` / `FuelioParseError`): splits sections, reads units from the
+      `## Log` header, converts INTO the target vehicle's units, `Missed=1`→missedFillup, maps `## Costs`
+      categories (unmapped→misc, surfaced), and emits native VROOM CSV → the existing `buildImportPlan`
+      (inherits validation, cents, vehicle-resolve, idempotent re-import, atomic commit). `routes.ts`
+      `/import` branches on `mapping.source==='fuelio'`. Reuses the exported `normalizeDecimal` (#124).
+      Fixed `resolveDateFormat` (year-first `yyyy-MM-dd`→iso, was mdy). **9/9 unit tests** incl. the full
+      Fuelio→native→buildImportPlan round-trip. The old flat `fuelio` preset is now unreachable for real
+      files (`detectSource` can't match a `## Vehicle` first line) so it's inert; left as-is.
+- [x] **T8 — dedicated migration card (FE).** `MigrateFromTrackerCard.svelte` on `/settings`: a distinct
+      surface for foreign trackers (migration ≠ the expenses-page native-CSV re-import, which stays — F2a).
+      Tracker select (Fuelio) → required target vehicle → upload export → dryRun preview (ready/error counts,
+      error rows, "imported as Misc" note for unmapped categories) → commit. Sends
+      `{source:'fuelio', columns:{}, dateFormat:'iso', targetVehicle}`; reuses `expenseApi.importExpensesCsv`.
+- [x] **T9 — verify + ship.** BE fuelio test 9/9; FE `validate:local` GREEN (1453). Eyes-on the card + dialog,
+      AND a live round-trip: `migrate-fuelio-roundtrip.meshclaw.e2e.ts` uploads a real multi-section export →
+      preview "4 ready" (+ Ferry→Misc) → commit → asserts exactly 4 rows persist in the DB (set-difference)
+      then self-cleans. **Fuelio migration is FEATURE-COMPLETE.**

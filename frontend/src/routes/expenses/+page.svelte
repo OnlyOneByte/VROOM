@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { routes } from '$lib/routes';
-	import { Calendar, DollarSign, Search, FileText, TrendingUp, X, Car, CircleAlert, Download, Upload, Images } from '@lucide/svelte';
+	import { Calendar, DollarSign, Search, FileText, TrendingUp, X, Car, CircleAlert, Download, Images } from '@lucide/svelte';
 	import { offlineExpenseQueue } from '$lib/stores/offline.svelte';
 	import { removeOfflineExpense } from '$lib/utils/offline-storage';
 	import { settingsStore } from '$lib/stores/settings.svelte';
@@ -28,7 +28,6 @@
 	import ExpenseTagFilter from '$lib/components/expenses/ExpenseTagFilter.svelte';
 	import OfflineExpenseCards from '$lib/components/expenses/OfflineExpenseCards.svelte';
 	import ExpenseOverviewSection from '$lib/components/expenses/ExpenseOverviewSection.svelte';
-	import ImportExpensesDialog from '$lib/components/expenses/ImportExpensesDialog.svelte';
 	import ImportFromPhotosDialog from '$lib/components/expenses/ImportFromPhotosDialog.svelte';
 	import * as Select from '$lib/components/ui/select';
 
@@ -301,9 +300,8 @@
 		}
 	}
 
-	// CSV import (dialog previews then commits). On success, reload from page 0 so
-	// the freshly-imported rows are visible and counts/summary refresh.
-	let importOpen = $state(false);
+	// On import success, reload from page 0 so the freshly-imported rows are visible
+	// and counts/summary refresh.
 	let photosImportOpen = $state(false);
 	function handleImported() {
 		currentOffset = 0;
@@ -369,12 +367,8 @@
 			description="Track and categorize expenses across all vehicles"
 		>
 			{#snippet actions()}
-				<!-- Import is always available — a user with no expenses yet is exactly who
-				     wants to import. Export only makes sense once there's something to export. -->
-				<Button variant="outline" onclick={() => (importOpen = true)}>
-					<Upload class="mr-2 h-4 w-4" />
-					Import CSV
-				</Button>
+				<!-- Import from Photos is always available — a user with no expenses yet is exactly
+				     who wants to import. Export only makes sense once there's something to export. -->
 				<Button variant="outline" onclick={() => (photosImportOpen = true)}>
 					<Images class="mr-2 h-4 w-4" />
 					Import from Photos
@@ -546,7 +540,5 @@
 		ariaLabel="Add expense"
 	/>
 
-	<!-- CSV import dialog (previews via dryRun, then commits) -->
-	<ImportExpensesDialog bind:open={importOpen} {vehicles} onImported={handleImported} />
 	<ImportFromPhotosDialog bind:open={photosImportOpen} {vehicles} onImported={handleImported} />
 {/if}

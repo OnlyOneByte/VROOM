@@ -1,21 +1,16 @@
 /**
  * In-process HTTP tests for the import-trackers ROUTE extension (spec T3): POST /import with an
- * optional `mapping` + POST /import/detect. Proves the foreign-tracker path is BACKWARD-COMPATIBLE
+ * optional `mapping`. Proves the foreign-tracker path is BACKWARD-COMPATIBLE
  * (no mapping → today's native path unchanged), that a mapped file is translated then run through
  * the EXISTING buildImportPlan/dryRun/importExpenses flow (so idempotency/atomicity/tenant-safety
  * are inherited), unit conversion targets the resolved vehicle's units (C60 wiring risk), unmapped
- * categories surface, malformed rows still report per-row, and detect identifies a preset.
+ * categories surface, and malformed rows still report per-row.
  *
  * createTestApp() rewrites env + dynamic-imports DB-bound modules — import only the harness here.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import {
-  createTestApp,
-  type DataEnvelope,
-  json,
-  type TestApp,
-} from '../../../test-helpers/http-client';
+import { createTestApp, json, type TestApp } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
@@ -56,14 +51,16 @@ interface ImportResponse {
   };
 }
 
-// A Fuelio-shaped metric file: dmy dates, km odometer, litres, comma decimals, no vehicle column.
-const FUELIO_CSV = [
+// A FLAT single-header metric fuel log (Fuelly-shaped): dmy dates, km odometer, litres, comma
+// decimals, no vehicle column. NOT a real Fuelio export — those are multi-section (`## Log`) and
+// route to the dedicated adapter instead, so this must not carry `source: 'fuelio'`.
+const FLAT_TRACKER_CSV = [
   'Data,Odo (km),Fuel (litres),Price,Type',
   '15/03/2024,160.9344,37.854,"52,40",Gas',
 ].join('\n');
 
-const FUELIO_MAPPING = {
-  source: 'fuelio',
+const FLAT_TRACKER_MAPPING = {
+  source: 'fuelly',
   columns: {
     date: 'Data',
     mileage: 'Odo (km)',
@@ -94,11 +91,11 @@ describe('POST /import — backward compatibility (no mapping)', () => {
 });
 
 describe('POST /import — foreign-tracker mapping path (T3)', () => {
-  test('a Fuelio metric file maps + converts into a miles/US-gal vehicle and commits', async () => {
+  test('a flat metric fuel log maps + converts into a miles/US-gal vehicle and commits', async () => {
     await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021, nickname: 'Daily Driver' });
     const res = await ctx.authed('POST', '/api/v1/expenses/import', {
-      csv: FUELIO_CSV,
-      mapping: FUELIO_MAPPING,
+      csv: FLAT_TRACKER_CSV,
+      mapping: FLAT_TRACKER_MAPPING,
     });
     const body = await json<ImportResponse>(res);
     expect(res.status, JSON.stringify(body)).toBe(200);
@@ -115,8 +112,8 @@ describe('POST /import — foreign-tracker mapping path (T3)', () => {
   test('dry-run previews the mapped plan without writing', async () => {
     await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021, nickname: 'Daily Driver' });
     const res = await ctx.authed('POST', '/api/v1/expenses/import', {
-      csv: FUELIO_CSV,
-      mapping: FUELIO_MAPPING,
+      csv: FLAT_TRACKER_CSV,
+      mapping: FLAT_TRACKER_MAPPING,
       dryRun: true,
     });
     const body = await json<ImportResponse>(res);
@@ -130,15 +127,15 @@ describe('POST /import — foreign-tracker mapping path (T3)', () => {
     await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021, nickname: 'Daily Driver' });
     const first = await json<ImportResponse>(
       await ctx.authed('POST', '/api/v1/expenses/import', {
-        csv: FUELIO_CSV,
-        mapping: FUELIO_MAPPING,
+        csv: FLAT_TRACKER_CSV,
+        mapping: FLAT_TRACKER_MAPPING,
       })
     );
     expect(first.data.imported).toBe(1);
     const second = await json<ImportResponse>(
       await ctx.authed('POST', '/api/v1/expenses/import', {
-        csv: FUELIO_CSV,
-        mapping: FUELIO_MAPPING,
+        csv: FLAT_TRACKER_CSV,
+        mapping: FLAT_TRACKER_MAPPING,
       })
     );
     expect(second.data.imported).toBe(0);
@@ -268,24 +265,5 @@ describe('POST /import — fuel-tracker defaultCategory commits through the rout
     expect(body.data.readyCount).toBe(1);
     expect(body.data.imported).toBe(0);
     expect((await listExpenses()).length).toBe(0);
-  });
-});
-
-describe('POST /import/detect', () => {
-  test('identifies a Fuelio file from its headers', async () => {
-    const res = await ctx.authed('POST', '/api/v1/expenses/import/detect', {
-      headers: ['Data', 'Odo (km)', 'Fuel (litres)', 'Price'],
-    });
-    const body = await json<DataEnvelope<{ id: string } | null>>(res);
-    expect(res.status, JSON.stringify(body)).toBe(200);
-    expect(body.data?.id).toBe('fuelio');
-  });
-
-  test('returns null for an unknown file (→ manual mapping)', async () => {
-    const res = await ctx.authed('POST', '/api/v1/expenses/import/detect', {
-      headers: ['Date', 'Amount', 'Category'],
-    });
-    const body = await json<DataEnvelope<unknown>>(res);
-    expect(body.data).toBeNull();
   });
 });

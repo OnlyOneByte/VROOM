@@ -3,7 +3,6 @@ import type {
 	ExpenseCategory,
 	ExpenseSummary,
 	ImportColumnMapping,
-	ImportMappingPreset,
 	PaginatedResponse,
 	Photo,
 	SplitConfig,
@@ -185,15 +184,6 @@ export const expenseApi = {
 			// Only include mapping when provided so the native path's request is unchanged.
 			...(mapping ? { mapping } : {})
 		});
-	},
-
-	/**
-	 * Identify a known tracker (Fuelly/Fuelio/Drivvo) from the uploaded file's HEADER names, so the
-	 * mapping dialog can pre-fill (import-trackers T4). Sends only the header strings (never the data).
-	 * Returns the matched preset (its label + default mapping) or null → the user maps manually.
-	 */
-	async detectImportSource(headers: string[]): Promise<ImportMappingPreset | null> {
-		return apiClient.post<ImportMappingPreset | null>('/api/v1/expenses/import/detect', { headers });
 	},
 
 	async getExpenseSummary(params?: ExpenseSummaryParams): Promise<ExpenseSummary> {
