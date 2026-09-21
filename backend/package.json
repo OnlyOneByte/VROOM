@@ -46,7 +46,7 @@
     "arctic": "^3.7.0",
     "csv-parse": "^7.0.2",
     "csv-stringify": "^6.8.3",
-    "dotenv": "^17.4.2",
+    "dotenv": "^18.0.0",
     "drizzle-orm": "^0.45.2",
     "drizzle-zod": "^0.8.3",
     "googleapis": "^176.0.0",
