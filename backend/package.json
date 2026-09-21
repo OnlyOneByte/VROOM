@@ -36,8 +36,8 @@
     "validate:local": "bun run type-check && bun run check:musl && bun test && bun run build"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1130.0",
-    "@aws-sdk/s3-request-presigner": "^3.1130.0",
+    "@aws-sdk/client-s3": "^3.1135.0",
+    "@aws-sdk/s3-request-presigner": "^3.1135.0",
     "@hono/node-server": "^2.1.1",
     "@hono/zod-validator": "^0.9.0",
     "@lucia-auth/adapter-drizzle": "^1.1.0",
@@ -50,11 +50,11 @@
     "drizzle-orm": "^0.45.2",
     "drizzle-zod": "^0.8.3",
     "googleapis": "^176.0.0",
-    "hono": "^4.13.7",
+    "hono": "^4.13.8",
     "lucia": "^3.2.2",
     "oslo": "^1.2.1",
     "web-push": "^3.6.7",
-    "zod": "^4.6.2"
+    "zod": "^4.6.5"
   },
   "overrides": {
     "qs": "^6.15.0",
@@ -62,13 +62,13 @@
     "google-auth-library": "10.5.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.13",
+    "@biomejs/biome": "^2.5.14",
     "@types/adm-zip": "^0.5.8",
     "@types/web-push": "^3.6.4",
     "bun-types": "^1.4.2",
     "drizzle-kit": "^0.31.10",
-    "fast-check": "^4.10.0",
+    "fast-check": "^4.10.1",
     "typescript": "^7.0.2",
-    "yaml": "^2.9.0"
+    "yaml": "^2.9.1"
   }
 }
