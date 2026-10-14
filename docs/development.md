@@ -43,8 +43,8 @@ cd backend  && bun run all:fix && bun run validate
 cd frontend && npm run all:fix && npm run validate
 ```
 
-`all:fix` auto-fixes lint and formatting; `validate` runs lint, format check, type check, and
-tests — the same checks CI runs.
+`all:fix` auto-fixes lint and formatting; `validate` runs lint, format check, type check,
+tests, and the build. CI runs the same steps individually, minus the format check.
 
 E2E tests are separate and need both dev servers running:
 

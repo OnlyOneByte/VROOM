@@ -19,8 +19,9 @@ Coding conventions live in `.kiro/steering/*.md`. Read `MainSteering.md`, `Svelt
 | Tests | `bun test` | `npm run test` |
 | Full gate | `bun run all:fix && bun run validate` | `npm run all:fix && npm run validate` |
 
-`validate` = lint + format + type-check + tests, the same checks CI runs. Run it in every
-subfolder you modified and fix everything it reports, including pre-existing findings.
+`validate` = lint, format, type-check, tests, build. Run it in every subfolder you modified
+and fix everything it reports, including pre-existing findings. CI runs the same steps
+individually, minus the format check.
 
 First-time backend setup: copy `.env.example` to `.env`, then `bun run db:init` (add
 `--seed`, or `bun run db:seed`, for sample data — seeded login is `demo@example.com`).
