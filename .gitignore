@@ -108,25 +108,13 @@ temp/
 ehthumbs.db
 Thumbs.db
 
-# Drizzle (keep backend migrations, ignore frontend drizzle if any)
+# Drizzle (backend migrations are committed; ignore a stray frontend one)
 frontend/drizzle/
-backend/COMPREHENSIVE_IMPROVEMENT_PLAN.md
 
-
+# Design scratch and test artifacts
 analyticsFigma/
 playwright-report/
-RankedTODO.md
 
-# MeshClaw agent working files (not part of the product)
-.meshclaw-autopilot/
+# Local agent working files, not part of the product
 STATUS.md
 BRANCH_REVIEW.md
-# verify-it-works harness (shot.sh/shot.mjs/regress.sh/make-auth-state.ts/auth-state.json) — local-only
-.meshclaw-tools/
-# local node22+bun toolchain pin, not part of the product
-mise.local.toml
-# loop bookkeeping — churns every cycle (LEDGER 210 / BACKLOG 163 commits over C1-C350); local-only
-# steering scratchpads, NOT product. GUIDE.md + NORTH_STAR.md stay tracked (stable manual + vision).
-# Full pre-reset history preserved in loop/archive/*-C1-C350.md (tracked).
-loop/LEDGER.md
-loop/BACKLOG.md

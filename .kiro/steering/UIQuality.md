@@ -96,12 +96,12 @@ equivalents:
 A UI feature is done when ALL are true:
 - [ ] Four states handled (loading / empty / error / populated).
 - [ ] Looks correct at 390px (mobile shot reviewed) AND desktop — no overflow.
-- [ ] `regress.sh` green, including the **axe a11y gate** (no serious/critical).
+- [ ] `npm run test:e2e` green, including the **axe a11y gate** (no serious/critical).
 - [ ] Icon-only controls have `aria-label`; forms have labels + wired errors.
 - [ ] Reuses PageHeader/EmptyState/Skeleton/Button + theme tokens + formatters (no
       hardcoded colors, paths, or number formatting).
 - [ ] Destructive actions confirmed; in-flight mutations disable + spinner.
-- [ ] A new route is added to `e2e/route-smoke.meshclaw.e2e.ts` (smoke + a11y + shots).
+- [ ] A new route has an E2E spec in `frontend/e2e/` (smoke + a11y).
 - [ ] The **UI critic pass** (see below) returned no blocking findings.
 
 ## The UI critic pass (subjective layer axe can't cover)

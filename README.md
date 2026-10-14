@@ -25,7 +25,7 @@ VROOM (Vehicle Record & Organization Of Maintenance) is a self-hostable car cost
 - 📊 Interactive analytics and cost visualization
 - ⛽ Fuel efficiency tracking with fill-up history
 - 💰 Financing and insurance management
-- � Pohoto attachments for receipts and documents
+- 📷 Photo attachments for receipts and documents
 - 🔐 OAuth authentication (Google, GitHub)
 - 💾 Google Drive backup + Google Sheets sync
 - 🐳 Docker-ready self-hosting
@@ -55,7 +55,7 @@ nvm use
 cd backend
 bun install
 cp .env.example .env   # configure OAuth credentials
-bun run db:push
+bun run db:init         # apply migrations (add --seed for sample data)
 bun run dev             # http://localhost:3001
 
 # Frontend (separate terminal)
@@ -81,38 +81,22 @@ See the [Deployment Guide](docs/deployment.md) for full instructions.
 
 ```
 vroom/
-├── backend/              # Bun + Hono API server
-│   ├── src/
-│   │   ├── api/          # Domain modules (auth, vehicles, expenses, financing, insurance, photos, analytics, sync)
-│   │   ├── db/           # Schema, connection, migrations, seeding
-│   │   ├── middleware/    # Auth, rate-limit, error-handler, idempotency, body-limit, activity
-│   │   └── utils/        # Calculations, logger, validation, unit-conversions
-│   └── drizzle/          # SQL migrations
-├── frontend/             # SvelteKit PWA
-│   ├── src/
-│   │   ├── lib/
-│   │   │   ├── components/   # Domain components + shadcn-svelte ui/
-│   │   │   ├── services/     # API client + domain services
-│   │   │   ├── stores/       # Svelte stores (app, auth, offline, settings)
-│   │   │   ├── types/        # TypeScript types
-│   │   │   ├── utils/        # Shared utilities
-│   │   │   ├── constants/    # App constants
-│   │   │   └── hooks/        # Svelte 5 reactive hooks
-│   │   └── routes/           # SvelteKit file-based routing
-│   └── e2e/                  # Playwright E2E tests
-├── docs/                 # Documentation
-│   └── examples/         # Docker Compose, Portainer stack, .env template
-└── .github/workflows/    # CI/CD pipeline
+├── backend/        # Bun + Hono API. One folder per domain under src/api/,
+│                   # each with routes.ts + repository.ts. Migrations in drizzle/.
+├── frontend/       # SvelteKit PWA. Components, services, stores, and utils
+│                   # under src/lib/; file-based routing under src/routes/.
+├── docs/           # Architecture, development, and deployment guides
+│   └── examples/   # Docker Compose, Portainer stack, .env template
+└── .github/        # CI/CD pipeline
 ```
 
 ## Documentation
 
 | Document | Description |
 |---|---|
-| [Architecture](docs/architecture.md) | System design, data flow, and module responsibilities |
-| [Development Guide](docs/development.md) | Local setup, workflow, testing, and code style |
+| [Architecture](docs/architecture.md) | System design, data flow, and the reasoning behind it |
+| [Development Guide](docs/development.md) | Local setup, workflow, and testing |
 | [Deployment Guide](docs/deployment.md) | Docker, self-hosting, reverse proxy, and SSL |
-| [Troubleshooting](docs/troubleshooting.md) | Common issues and solutions |
 
 ## Contributing
 

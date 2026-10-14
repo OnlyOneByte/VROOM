@@ -1,126 +1,81 @@
 # Development Guide
 
-Setup guide for local development and contributing to VROOM.
-
 ## Prerequisites
 
-- [Bun](https://bun.sh/) (backend runtime)
-- Node.js 22+ (see `.nvmrc`)
-- [Kiro IDE](https://kiro.dev/) (recommended — project includes skills, hooks, and MCP servers)
+- [Bun](https://bun.sh/) — backend runtime
+- Node.js 22+ — frontend (see `.nvmrc`)
 
-## Local Setup
+## Setup
 
 ```bash
-# Use correct Node version
 nvm use
 
 # Backend
 cd backend
 bun install
-cp .env.example .env   # configure Google OAuth credentials
-bun run db:push         # apply migrations
+cp .env.example .env   # configure OAuth credentials
+bun run db:init         # apply migrations; add --seed for sample data
 bun run dev             # http://localhost:3001
 
 # Frontend (separate terminal)
 cd frontend
-npm install
+npm ci
 cp .env.example .env    # set PUBLIC_API_URL=http://localhost:3001
 npm run dev             # http://localhost:5173
 ```
 
+Seeded login is `demo@example.com`.
+
+Use `db:init` rather than `db:push`. Init applies the committed migrations in
+`backend/drizzle/`, matching what the server does on startup; `drizzle-kit push` diffs the
+schema onto the database directly and will offer to drop columns.
+
+Install the frontend with `npm ci`, not `npm install`. Re-resolving the lockfile changes
+which `@rolldown/binding-*` platform package gets installed, and the WASM fallback parser
+fails on TypeScript optional parameters in `.svelte` files.
+
 ## Validation
 
-After making changes, run fix then validate in each modified subfolder:
+Run in each subfolder you modified, and fix everything it reports:
 
 ```bash
-# Backend
-cd backend
-bun run all:fix && bun run validate
-
-# Frontend
-cd frontend
-npm run all:fix && npm run validate
+cd backend  && bun run all:fix && bun run validate
+cd frontend && npm run all:fix && npm run validate
 ```
 
-The `validate` script runs linting, format checking, type checking, and tests in sequence.
+`all:fix` auto-fixes lint and formatting; `validate` runs lint, format check, type check, and
+tests — the same checks CI runs.
 
-## Kiro IDE Setup
+E2E tests are separate and need both dev servers running:
 
-VROOM includes a full `.kiro/` configuration with MCP servers, skills, hooks, and steering files. These are automatically loaded when you open the project in Kiro.
-
-### MCP Servers
-
-Configured in `.kiro/settings/mcp.json`. These connect Kiro to external tools:
-
-| Server | Purpose | Auto-approved tools |
-|---|---|---|
-| `svelte` | Svelte 5 / SvelteKit docs lookup and component autofixer | `get_documentation`, `svelte_autofixer` |
-| `shadcn-svelte` | Component registry search, examples, and blocks | `search_components`, `search_examples`, `search_knowledge` |
-| `chrome-devtools` | Live browser debugging via Chrome DevTools Protocol (port 9222) | Navigation, snapshots, clicks, console, network |
-| `sqlite` | Direct read access to the VROOM SQLite database | `read_query`, `list_tables`, `describe_table` |
-| `playwright` | Browser automation for E2E tests (disabled by default) | — |
-
-The Svelte and shadcn-svelte servers use `npx` and auto-install on first use. The SQLite server requires `uvx` (install via `pip install uv` or Homebrew).
-
-To use Chrome DevTools MCP, launch Chrome with remote debugging:
 ```bash
-/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
-  --remote-debugging-port=9222
+cd frontend && npm run test:e2e
 ```
 
-### Skills
+Some unit tests assert on local calendar dates and currently only pass under `TZ=UTC`.
 
+## Conventions
 
-Located in `.kiro/skills/`. These are guided workflows Kiro can invoke for common tasks:
+`.kiro/steering/` holds the project's coding rules — tech stack, Svelte 5 runes patterns,
+API and repository patterns, migrations, testing, design system, and UI quality. Read the
+ones relevant to what you're touching before writing code; they are the authority on style,
+and they are more specific than this guide.
 
-| Skill | What it does |
-|---|---|
-| Add API Endpoint | Walks through creating a new backend domain: routes, repository, frontend service, types, and tests |
-| Add Database Table | End-to-end guide for schema changes: Drizzle table, migration, migration test, backup/restore updates |
-| Add Expense Category | Updates the category enum, all color/label maps, validation, and tests across frontend and backend |
-| Debug Component | Interactive debugging via Chrome DevTools MCP: navigates to a route, checks console/network errors, takes snapshots |
+`.kiro/skills/` holds step-by-step workflows for repetitive multi-file tasks (adding an API
+endpoint, adding a database table, adding an expense category, debugging a component).
 
-To use a skill, describe the task in chat (e.g., "add a new trips API endpoint") and Kiro will activate the matching skill automatically.
+`.kiro/specs/` holds specs for in-flight features as requirements → design → tasks. Specs for
+shipped work are deleted once the code lands; git history keeps them.
 
-### Hooks
+## Editor integration
 
-Located in `.kiro/hooks/`. These run automatically on specific events:
+`.kiro/settings/mcp.json` configures MCP servers for Svelte and shadcn-svelte docs, SQLite
+read access, Chrome DevTools, and Playwright. `.kiro/hooks/` adds on-save and post-task
+automation (autofix, validation, migration reminders, review passes). Both are picked up
+automatically by [Kiro](https://kiro.dev/) and ignored by other editors.
 
-| Hook | Trigger | What it does |
-|---|---|---|
-| Validate After Task | After a spec task completes | Runs `all:fix` + `validate` in modified subfolders |
-| Load Steering Before Task | Before a spec task starts | Reads relevant steering files for the files about to be modified |
-| Semantic Code Review | After any file write | Checks frontend files for hardcoded colors, wrong API layer, stale categories; checks backend files for error handling, middleware, ownership validation |
-| Svelte Autofix on Save | After a `.svelte` file is saved | Runs the Svelte MCP autofixer to catch runes issues and deprecated syntax |
-| Migration Reminder | After `schema.ts` is edited | Reminds to generate migration, review SQL, create test, update backup/restore |
-| Post-Commit Review | Manual trigger | Reviews the last commit diff for code quality issues |
+The Chrome DevTools server expects Chrome on the default debugging port:
 
-### Steering Files
-
-Located in `.kiro/steering/`. These provide project-specific rules that Kiro follows automatically:
-
-| File | Scope |
-|---|---|
-| `MainSteering.md` | Tech stack, Svelte 5 runes, UI components, architecture, code hygiene |
-| `APIConventions.md` | Backend route/repository patterns, error handling, response format |
-| `CodeQualityRules.md` | Frontend-specific quality checks |
-| `DatabaseMigrations.md` | Migration generation, testing, and backup/restore workflow |
-| `BackupRestore.md` | Google Drive backup and restore conventions |
-| `SveltePatterns.md` | Svelte 5 component patterns and anti-patterns |
-| `Testing.md` | Test conventions for Vitest and Playwright |
-| `PWA.md` | Service worker and offline support conventions |
-| `WorkspaceMCPs.md` | Reference for all configured MCP servers and when to use them |
-
-### Specs
-
-Located in `.kiro/specs/`. These are feature specifications with requirements, design, and implementation tasks. Existing specs:
-
-- `ev-charging-support` — EV charging expense tracking
-- `financing-expense-unification` — Merging financing into the expense system
-- `insurance-management` — Insurance policy CRUD
-- `insurance-term-vehicle-coverage` — Multi-vehicle insurance coverage
-- `missed-fillup-mpg-skip` — Skip MPG calculation for missed fill-ups
-- `payment-planner` — Payment planning and scheduling
-- `vehicle-photos` — Vehicle photo management via Google Drive
-
-To create a new spec, ask Kiro to "create a spec for [feature]" and it will scaffold the requirements → design → tasks workflow.
+```bash
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222
+```
