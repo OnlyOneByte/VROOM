@@ -1,5 +1,5 @@
 /**
- * Unit tests for triggerBlobDownload — the browser "save as" helper extracted (C278) from the two
+ * Unit tests for triggerBlobDownload — the browser "save as" helper extracted from the two
  * byte-identical sites (expense-api CSV export + settings-store backup download). Pins the mechanics
  * the dedup must preserve: a same-named anchor is created with the object-URL href + the given
  * download filename, clicked, then the URL is revoked and the anchor removed (no DOM leak).

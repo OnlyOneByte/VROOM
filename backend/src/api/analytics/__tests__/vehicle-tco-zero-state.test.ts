@@ -40,9 +40,9 @@ interface VehicleTCO {
 }
 
 // This file's fixture is a Honda Civic 2021 with an optional extra-fields bag (purchaseDate/mileage for the
-// TCO zero-state cases); converge onto the shared test-helpers/seed seedVehicle (arch convergence,
-// Angelo-approved) via a thin wrapper passing make/model/year explicitly + forwarding extra (the shared
-// default is a Camry) so behavior is preserved.
+// TCO zero-state cases); converge onto the shared test-helpers/seed seedVehicle via a thin wrapper
+// passing make/model/year explicitly + forwarding extra (the shared default is a Camry) so behavior
+// is preserved.
 const seedVehicle = (extra: Record<string, unknown> = {}): Promise<string> =>
   seedVehicleShared(ctx, { make: 'Honda', model: 'Civic', year: 2021, extra });
 

@@ -1,15 +1,15 @@
 /**
- * Characterization of fleet-wide fuel-stats distance pooling (#94, C301 deep-review → bug, ESCALATED).
+ * Characterization of fleet-wide fuel-stats distance pooling (deep-review → bug, ESCALATED).
  *
  * `GET /api/v1/analytics/fuel-stats` with NO vehicleId (the default analytics-summary path) aggregates
  * across ALL of a user's vehicles. `buildFuelStatsFromData` computes `distance.totalDistance` by summing
  * each vehicle's own (max − min) odometer span and `averageCost.best/worstCostPerDistance` as the min/max
  * of the per-pair cost/distance values — both across ALL vehicles, WITHOUT any unit conversion. Vehicles carry per-vehicle
  * `unitPreferences` (vehicles.unit_preferences), so a mi + km fleet pools miles and kilometres into one
- * number and averages $/mi with $/km — a NORTH_STAR #2 (correct-for-everyone) defect on the main analytics
+ * number and averages $/mi with $/km — a (correct-for-everyone) defect on the main analytics
  * view. The per-vehicle CHARTS (computeConvertedTotalDistance) already convert; only these summary SCALARS
  * don't. This is a semantics decision (convert-to-user-global / per-vehicle-only / require vehicleId),
- * ESCALATED to Angelo (#94) — NOT self-fixed. Distinct from #45 (period-scoping).
+ * a deliberate product decision, NOT self-fixed. Distinct from (period-scoping).
  *
  * This pins the CURRENT pooled-sum behavior so the fix has a red→green anchor and the bug can't silently
  * worsen. Both vehicles here share the default unit (the harness seeds no per-vehicle prefs), so the
@@ -17,13 +17,13 @@
  * vehicles' spans (proving no per-vehicle normalization gate exists today). When the fix lands, update
  * this to assert the converted/segmented behavior.
  *
- * C328 (deep-review fan-out): #94 is NOT one scalar — it's a CLASS. The same no-conversion pooling spans
- * the whole fleet-summary + fuel-advanced path: distance (#94, pinned below), VOLUME (volume.currentYear +
- * fillupDetails, gal+L — pinned below as of C328), and the efficiency/volume pooling in
+ * (deep-review fan-out) is NOT one scalar — it's a CLASS. The same no-conversion pooling spans
+ * the whole fleet-summary + fuel-advanced path: distance, VOLUME (volume.currentYear +
+ * fillupDetails, gal+L — pinned below as of), and the efficiency/volume pooling in
  * buildMonthlyConsumption / buildSeasonalEfficiency / buildVehicleRadar / buildDayOfWeekPatterns (mi/gal +
  * km/L). getCrossVehicle (repository.ts:1500/1531) is the correct contrast — it threads vehicleUnitsMap +
  * userUnits and converts per vehicle (convertDistance) BEFORE pooling. The summary builders receive no
- * units. ALL ESCALATED to Angelo as one #94 class — NOT self-fixed (product semantics: convert-to-global /
+ * units. ALL one class, left as a product decision (product semantics: convert-to-global /
  * per-vehicle-only / require vehicleId).
  */
 
@@ -85,7 +85,7 @@ function rangeAll() {
   };
 }
 
-describe('#94 — fleet-wide fuel-stats pools per-vehicle distance by raw summation', () => {
+describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', () => {
   test('totalDistance is the SUM of each vehicle (max − min) span, not pooled across the whole fleet', async () => {
     seedUser(testDb.sqlite, USER);
     seedVehicle(testDb.sqlite, VEH_A);
@@ -96,7 +96,7 @@ describe('#94 — fleet-wide fuel-stats pools per-vehicle distance by raw summat
     // 50_200 − 10_000 = 40_200 (the cross-vehicle pooling hazard this path already avoids). Spans stay
     // under MAX_REASONABLE_MILES_BETWEEN_FILLUPS (1000) + volumes give realistic MPG (A 800/20=40,
     // B 200/5=40) so computeEfficiencyPoint keeps both pairs. Both vehicles use the DEFAULT (miles) unit,
-    // so the C58 #94 fix is a no-op here — the per-vehicle sum is still 1_000 (conversion only bites a
+    // so the fix is a no-op here — the per-vehicle sum is still 1_000 (conversion only bites a
     // MIXED-unit fleet, the next test).
     seedExpense(testDb.sqlite, fillup('a1', VEH_A.id, 10_000, 40, 60, 20));
     seedExpense(testDb.sqlite, fillup('a2', VEH_A.id, 10_800, 40, 30, 20));
@@ -110,9 +110,9 @@ describe('#94 — fleet-wide fuel-stats pools per-vehicle distance by raw summat
     expect(stats.distance.totalDistance).toBe(1_000);
   });
 
-  // #94 FIXED (C58, Angelo-approved "convert-to-user-global BEFORE pooling, mirroring getCrossVehicle"):
+  // FIXED ("convert-to-user-global BEFORE pooling, mirroring getCrossVehicle"):
   // a MIXED-unit fleet now converts each vehicle's distance span to the user's global unit before summing
-  // totalDistance, so miles and kilometres are no longer added raw (NORTH_STAR #2). getFuelStats threads
+  // totalDistance, so miles and kilometres are no longer added raw. getFuelStats threads
   // the real userUnits + vehicleUnitsMap into computeConvertedTotalDistance (was fed no-op placeholders).
   test('a MIXED mi+km fleet converts each span to the user unit before summing (no raw mi+km pool)', async () => {
     seedUser(testDb.sqlite, USER); // user has no prefs → default MILES
@@ -138,14 +138,14 @@ describe('#94 — fleet-wide fuel-stats pools per-vehicle distance by raw summat
     expect(stats.distance.totalDistance).not.toBe(1_000);
   });
 
-  test('volume.currentYear + fillupDetails pool gal/L by RAW summation across the fleet (#94 sibling, C328)', async () => {
+  test('volume.currentYear + fillupDetails pool gal/L by RAW summation across the fleet', async () => {
     // The SAME defect mechanism as distance/cost above, on a DIFFERENT scalar: buildFuelStatsFromData
     // sums every fuel row's `volume` (sumGallons, repository.ts:1357) and derives fillupDetails
     // (avg/min/max volume) across ALL vehicles with NO per-vehicle unit conversion. Volume is stored in
     // each vehicle's own volumeUnit (gal OR L), so a mixed-unit fleet pools gallons with litres into one
-    // headline number — the volume limb of the #94 class the C328 deep-review surfaced (alongside
+    // headline number — the volume limb of the class the deep-review surfaced (alongside
     // buildMonthlyConsumption / buildSeasonalEfficiency / buildVehicleRadar / buildDayOfWeekPatterns,
-    // all on the fleet-summary + fuel-advanced paths. The VOLUME member is now FIXED (C62, Angelo-approved
+    // all on the fleet-summary + fuel-advanced paths. The VOLUME member is now FIXED
     // convert-before-pool); both vehicles share the default unit HERE, so the fix is a no-op and these
     // same-unit numbers are unchanged (the mixed-unit conversion is pinned by the next test).
     seedUser(testDb.sqlite, USER);
@@ -167,9 +167,9 @@ describe('#94 — fleet-wide fuel-stats pools per-vehicle distance by raw summat
     expect(stats.fillupDetails.maxVolume).toBe(20);
   });
 
-  // #94 VOLUME member FIXED (C62, Angelo-approved "convert-to-user-global BEFORE pooling"): a MIXED gal+L
+  // VOLUME member FIXED ("convert-to-user-global BEFORE pooling"): a MIXED gal+L
   // fleet now converts each row's volume to the user's global volume unit before summing the headline
-  // volume + deriving fillupDetails, so gallons and litres are no longer added raw (NORTH_STAR #2).
+  // volume + deriving fillupDetails, so gallons and litres are no longer added raw.
   test('a MIXED gal+L fleet converts each volume to the user unit before pooling (no raw gal+L sum)', async () => {
     seedUser(testDb.sqlite, USER); // user has no prefs → default GALLONS_US
     seedVehicle(testDb.sqlite, VEH_A); // gallons (default)
@@ -198,10 +198,10 @@ describe('#94 — fleet-wide fuel-stats pools per-vehicle distance by raw summat
     expect(stats.fillupDetails.minVolume).toBeCloseTo(5 / 3.785411784, 2);
   });
 
-  // #94 PREV-YEAR sub-member FIXED (C79, the LAST #94 member): volume.previousYear came from a raw SQL
+  // PREV-YEAR sub-member FIXED (the LAST member): volume.previousYear came from a raw SQL
   // SUM(volume) in queryFuelAggregates over the prior equal-length window — cross-vehicle, UN-converted —
   // so a mixed gal+L fleet pooled litres with gallons into the "Last Period" comparison (the prev-year twin
-  // of the C62 current-period fix). queryFuelAggregates now GROUPs the volume SUM BY vehicle, and
+  // of the current-period fix). queryFuelAggregates now GROUPs the volume SUM BY vehicle, and
   // buildFuelStatsFromData converts each vehicle's prev-window sum to the user's global unit before pooling.
   test('volume.previousYear converts each vehicle prev-window sum to the user unit before pooling (mixed gal+L)', async () => {
     seedUser(testDb.sqlite, USER); // default GALLONS_US
@@ -263,17 +263,17 @@ describe('#94 — fleet-wide fuel-stats pools per-vehicle distance by raw summat
     expect(stats.volume.previousYear).not.toBeCloseTo(50, 1); // NOT the raw gal+L SQL pool
   });
 
-  // bug #18 PREV-PERIOD axis (the C97 currentYear guard's missing twin): the "This Period vs Last Period"
+  // bug PREV-PERIOD axis (the currentYear guard's missing twin): the "This Period vs Last Period"
   // fillup comparison computes its two halves through DIFFERENT predicate implementations across two layers —
   // fillups.currentYear is in-memory `fuelRows.filter(isFillup)` (volume != null && volume > 0), while
   // fillups.previousYear is the SQL `COUNT(CASE WHEN volume > 0 THEN 1 END)` in queryFuelAggregates (coupled
   // only by the "matches the isFillup predicate" comment). A split fuel expense creates volume-null siblings
-  // (ExpenseSplitService.createSiblings) that must NOT inflate either count (bug #18). C97's guard pins ONLY
+  // (ExpenseSplitService.createSiblings) that must NOT inflate either count.'s guard pins ONLY
   // the currentYear/in-memory half; nothing exercises the prev-period SQL count's null-exclusion — drop the
   // `CASE WHEN volume > 0` (e.g. plain COUNT(*)) and the prev-period count silently inflates by the split
-  // legs while every test stays green, so "Last Period" over-reports fillups (NORTH_STAR #2). This pins the
+  // legs while every test stays green, so "Last Period" over-reports fillups. This pins the
   // SQL half against the same bug on the prev-window.
-  test('fillups.previousYear excludes volume-null split siblings (bug #18 on the prev-period SQL count)', async () => {
+  test('fillups.previousYear excludes volume-null split siblings (bug on the prev-period SQL count)', async () => {
     seedUser(testDb.sqlite, USER);
     seedVehicle(testDb.sqlite, VEH_A);
     seedVehicle(testDb.sqlite, VEH_B);
@@ -339,12 +339,12 @@ describe('#94 — fleet-wide fuel-stats pools per-vehicle distance by raw summat
     expect(stats.volume.previousYear).toBe(19);
   });
 
-  // #94 MONTHLY-CONSUMPTION member FIXED (C65, same Angelo-approved convert-before-pool direction): the
-  // monthlyConsumption chart series (volume + gas-MPG per month) is the 4th #94 limb — buildMonthlyConsumption
+  // MONTHLY-CONSUMPTION member FIXED (same convert-before-pool direction): the
+  // monthlyConsumption chart series (volume + gas-MPG per month) is the 4th limb — buildMonthlyConsumption
   // pools each row's raw volume into a month AND averages each gas pair's raw efficiency, both across all
   // vehicles with no per-vehicle conversion. getFuelStats now routes a MIXED-unit fleet through
-  // buildConvertedMonthlyConsumption (convertVolume per row + the C64 convertedGasEfficiencyPoints generator),
-  // so a gal+L fleet no longer sums litres into the gallons volume series (NORTH_STAR #2). A same-unit fleet
+  // buildConvertedMonthlyConsumption (convertVolume per row + the convertedGasEfficiencyPoints generator),
+  // so a gal+L fleet no longer sums litres into the gallons volume series. A same-unit fleet
   // still takes the pure builder (skipConversion), so its numbers are unchanged.
   test('monthlyConsumption volume is converted to the user unit before pooling on a MIXED gal+L fleet (no raw gal+L sum)', async () => {
     seedUser(testDb.sqlite, USER); // default GALLONS_US
@@ -377,7 +377,7 @@ describe('#94 — fleet-wide fuel-stats pools per-vehicle distance by raw summat
 
     // A: 800 driven for $40 on the 2nd fillup → $0.05/dist. B: 200 driven for $40 → $0.20/dist.
     // averageCost reports best = min across ALL vehicles' per-pair values ($0.05), worst = max ($0.20).
-    // For a mixed-unit fleet these min/max would silently compare $/mi against $/km (#94) — the values
+    // For a mixed-unit fleet these min/max would silently compare $/mi against $/km — the values
     // aren't normalized to a common unit before the cross-vehicle min/max. Spans < 1000 + volumes →
     // realistic MPG so both pairs survive computeEfficiencyPoint.
     seedExpense(testDb.sqlite, fillup('a1', VEH_A.id, 10_000, 40, 60, 20));
@@ -392,12 +392,12 @@ describe('#94 — fleet-wide fuel-stats pools per-vehicle distance by raw summat
     expect(stats.averageCost.worstCostPerDistance).toBeCloseTo(0.2, 5);
   });
 
-  // #94 SEASONAL-EFFICIENCY member FIXED (C69, same Angelo-approved convert-before-pool direction): the
-  // getFuelAdvanced seasonalEfficiency series (avg gas-MPG per season) is the 4th unit-bearing #94 limb —
+  // SEASONAL-EFFICIENCY member FIXED (same convert-before-pool direction): the
+  // getFuelAdvanced seasonalEfficiency series (avg gas-MPG per season) is the 4th unit-bearing limb —
   // buildSeasonalEfficiency averages each gas pair's RAW efficiency across all vehicles with no per-vehicle
   // conversion. getFuelAdvanced now threads units + routes a MIXED-unit fleet through
-  // buildConvertedSeasonalEfficiency (the C64 convertedGasEfficiencyPoints generator), so a mi/gal + km/L
-  // fleet no longer averages mi/gal with km/L (NORTH_STAR #2). A same-unit fleet still takes the pure builder.
+  // buildConvertedSeasonalEfficiency (the convertedGasEfficiencyPoints generator), so a mi/gal + km/L
+  // fleet no longer averages mi/gal with km/L. A same-unit fleet still takes the pure builder.
   test('seasonal avgEfficiency converts each gas pair to the user unit before pooling on a MIXED mi/gal+km/L fleet', async () => {
     seedUser(testDb.sqlite, USER); // default MILES / GALLONS_US
     seedVehicle(testDb.sqlite, VEH_A); // miles/gallons (default)
@@ -445,9 +445,9 @@ describe('#94 — fleet-wide fuel-stats pools per-vehicle distance by raw summat
     expect(winter?.fillupCount).toBe(4); // unitless — all four volume-bearing rows
   });
 
-  // #94 DAY-OF-WEEK member FIXED (C72, same Angelo-approved convert-before-pool direction): the
+  // DAY-OF-WEEK member FIXED (same convert-before-pool direction): the
   // getFuelAdvanced dayOfWeekPatterns series sums each fillup's volume per weekday across ALL vehicles —
-  // buildDayOfWeekPatterns pooled gal + L raw, skewing avgVolume on a mixed fleet (NORTH_STAR #2).
+  // buildDayOfWeekPatterns pooled gal + L raw, skewing avgVolume on a mixed fleet.
   // getFuelAdvanced now routes a MIXED-unit fleet through buildConvertedDayOfWeekPatterns (per-row
   // convertVolume). fillupCount (a count) + avgCost ($) are unit-free and unchanged; only avgVolume converts.
   test('dayOfWeek avgVolume converts each fillup volume to the user unit before pooling on a MIXED gal+L fleet', async () => {
@@ -498,7 +498,7 @@ describe('#94 — fleet-wide fuel-stats pools per-vehicle distance by raw summat
     expect(monday?.avgCost).toBeCloseTo(50, 5); // $ unchanged (50 each → avg 50)
   });
 
-  // #94 VEHICLE-RADAR member FIXED (C76, the LAST advanced builder): buildVehicleRadar normalizes each
+  // VEHICLE-RADAR member FIXED (the LAST advanced builder): buildVehicleRadar normalizes each
   // vehicle's gas-MPG (and odometer) via min/max ACROSS the fleet. Pre-fix it normalized RAW per-vehicle
   // values, so a km/L vehicle was ranked against an mpg vehicle by bare magnitude → the efficiency ranking
   // could fully INVERT (a more-efficient metric car scored LOWER). getFuelAdvanced now passes per-vehicle

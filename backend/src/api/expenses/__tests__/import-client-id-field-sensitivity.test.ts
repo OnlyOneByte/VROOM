@@ -1,8 +1,8 @@
 /**
- * Deep-review GUARD (C74): the CSV-import idempotency key `deriveImportClientId` is FIELD-SENSITIVE —
+ * Deep-review GUARD: the CSV-import idempotency key `deriveImportClientId` is FIELD-SENSITIVE —
  * every distinguishing field of an imported row participates in the content hash.
  *
- * The key is the crown-jewel data-safety contract of the import path (NORTH_STAR #1): re-importing the same
+ * The key is the crown-jewel data-safety contract of the import path: re-importing the same
  * file is a no-op (each row's deterministic key already exists by createIdempotent's (userId, clientId)
  * unique index), yet two genuinely-different rows must get DISTINCT keys so both land. If a future edit
  * dropped a field from the `content` array (say `tags` or `missedFillup`), two rows differing ONLY in that
@@ -11,14 +11,14 @@
  * compare two rows differing in exactly one field, and deriveImportClientId was module-private with NO direct
  * test — so a dropped-field regression would stay GREEN everywhere. This pins each field's contribution.
  *
- * CERTIFIED FIRSTHAND (C74): every field in the content array (vehicleId, category, expenseAmount,
+ * CERTIFIED FIRSTHAND: every field in the content array (vehicleId, category, expenseAmount,
  * date, mileage, volume, fuelType, description, tags, missedFillup, occurrence) flips the key. Determinism
  * holds (same content + same occurrence → same key). DOCUMENTED NUANCE (not a fix — it's mitigated): the
  * content joins tags with '' so `['a','b']` and `['ab']` share a tags-segment, BUT buildImportPlan's
  * occurrence counter gives within-file collisions distinct occurrence indices → distinct final keys, so the
  * "both rows import" contract holds within a single import (the only place two such rows coexist). Left as-is.
  *
- * Pure (no DB, no network) — drives the REAL exported function, not a re-implementation (the C181/C229
+ * Pure (no DB, no network) — drives the REAL exported function, not a re-implementation (the
  * coverage-theater lesson). Runs in the fast suite.
  */
 

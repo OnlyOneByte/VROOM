@@ -87,7 +87,7 @@ function buildExpenseConditions(filters: ExpenseFilters): SQL[] {
     // `endDate` from the UI is a date-only `YYYY-MM-DD` (the DatePicker), coerced to LOCAL
     // midnight (00:00:00.000) — the START of that day. A bare `lte(date, midnight)` therefore
     // drops every same-day expense not stamped at exactly midnight, so a "through Mar 31" filter
-    // silently hides all of Mar 31 (the C6/C61/C103 local-vs-UTC boundary class, here on the
+    // silently hides all of Mar 31 (the C6/ local-vs-UTC boundary class, here on the
     // most-used list + the CSV export — both route through this one builder). Treat a midnight
     // endDate as INCLUSIVE of the whole local day by extending it to 23:59:59.999 local; a
     // non-midnight endDate (a deliberate full timestamp) is honored as-is.
@@ -106,7 +106,7 @@ function buildExpenseConditions(filters: ExpenseFilters): SQL[] {
   // Escape the LIKE metacharacters (`%` `_` and the escape char `\`) in the user's term so a
   // search for a literal "50%" or "oil_change" matches the TEXT, not a wildcard — without the
   // ESCAPE clause a `%` means "any chars" (over-matches every row) and `_` means "any one char"
-  // (bug #41). Order matters: escape `\` FIRST so we don't double-escape the ones we just added.
+  //  Order matters: escape `\` FIRST so we don't double-escape the ones we just added.
   const search = filters.search?.trim();
   if (search) {
     const escaped = search.toLowerCase().replace(/[\\%_]/g, (ch) => `\\${ch}`);
@@ -184,7 +184,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
    * scope can't drift apart. These methods act on AUTO-MATERIALIZED expenses (reminder/insurance/
    * financing cascade cleanup), so a divergent copy dropping the userId leg would let one user's
    * source-entity delete/deactivate wipe or null ANOTHER user's expenses (a cross-tenant destructive
-   * write — the C109/#57/#62 class). One predicate keeps the boundary in lockstep structurally.
+   * write — the class). One predicate keeps the boundary in lockstep structurally.
    */
   private sourceScope(sourceType: string, sourceId: string, userId: string): SQL | undefined {
     return and(
@@ -213,7 +213,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
    * ownership scope and the deletion scope can never drift apart — a divergent copy that
    * dropped the userId predicate would be a cross-tenant read or (worse) a cross-tenant
    * DELETE. Behavior-identical today (groupId is a server cuid2, single-owner), but this
-   * keeps the C109 defense-in-depth boundary in lockstep structurally instead of by comment.
+   * keeps the defense-in-depth boundary in lockstep structurally instead of by comment.
    */
   private groupOwnedBy(groupId: string, userId: string): SQL | undefined {
     return and(eq(expenses.groupId, groupId), eq(expenses.userId, userId));
@@ -267,11 +267,11 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
    * create. The pre-check + unique index together close the retry race: a concurrent
    * duplicate insert hits the unique constraint, which we recover by re-reading.
    *
-   * `overwrite` (#98, C51): when the caller is a conflict RESOLUTION choosing keep-local (not a blind
+   * `overwrite`: when the caller is a conflict RESOLUTION choosing keep-local (not a blind
    * retry), a (userId, clientId) collision must APPLY the local edit, not silently discard it. With the
    * flag set, an existing row is UPDATED with the new data (preserving its id/userId/clientId/createdAt —
    * clientId/userId are stripped from the patch so the identity + idempotency key never change) instead
-   * of returned unchanged. Default false keeps the plain-retry path a pure no-op (NORTH_STAR #1: a
+   * of returned unchanged. Default false keeps the plain-retry path a pure no-op (: a
    * resolved offline edit is never lost).
    */
   async createIdempotent(data: NewExpense, overwrite = false): Promise<Expense> {
@@ -298,7 +298,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   }
 
   /**
-   * Apply a keep-local overwrite (#98) onto the existing (userId, clientId) row: replace its mutable
+   * Apply a keep-local overwrite onto the existing (userId, clientId) row: replace its mutable
    * fields with the local edit while keeping the identity + idempotency keys IMMUTABLE — clientId/userId
    * are stripped from the patch so they (and the row id/createdAt) never change. ONE source of truth for
    * the overwrite, shared by both createIdempotent collision branches (the pre-check hit + the raced
@@ -645,7 +645,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
    */
   private async validateVehicleOwnership(splitConfig: SplitConfig, userId: string): Promise<void> {
     // splitConfigVehicleIds owns the `even ? vehicleIds : allocations.map(...)` extraction (one source
-    // of truth, C50); assertVehiclesOwned (C376) owns the cross-tenant `userId AND id IN (ids)` query +
+    // of truth); assertVehiclesOwned owns the cross-tenant `userId AND id IN (ids)` query +
     // NotFoundError throw, shared with the insurance term path.
     await assertVehiclesOwned(this.db, splitConfigVehicleIds(splitConfig), userId);
   }
@@ -681,7 +681,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       );
       const splitMethod: SplitMethod = data.splitConfig.method;
 
-      // SYNCHRONOUS transaction (#127 class, C504): the split insert loop must be atomic — under the old
+      // SYNCHRONOUS transaction: the split insert loop must be atomic — under the old
       // async callback a throw mid-loop committed a partial split group (siblings summing to less than the
       // group total, an orphaned invariant-violating group with no idempotency key to recover). Running
       // synchronously (createSiblingsSync, `.returning().get()` inline) keeps every sibling in ONE real
@@ -756,7 +756,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
         // Delete all sibling expense rows. AND the userId scope (not groupId alone): the read above is
         // userId-scoped, so the destructive write must match it — keeping ownership and deletion on the
         // SAME predicate. Behavior-identical today (groupId is a server cuid2, single-owner), but a
-        // defense-in-depth boundary so a future cross-user group can never be cross-deleted (the C109
+        // defense-in-depth boundary so a future cross-user group can never be cross-deleted (the
         // detectConflicts tenant-scope class).
         await tx.delete(expenses).where(this.groupOwnedBy(groupId, userId));
       });
@@ -820,7 +820,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       const splitMethod: SplitMethod = data.splitConfig.method;
       const oldSiblingIds = oldSiblings.map((s) => s.id);
 
-      // SYNCHRONOUS transaction (#127 class, C504): this is the most dangerous split path — it DELETEs the
+      // SYNCHRONOUS transaction: this is the most dangerous split path — it DELETEs the
       // old siblings then re-inserts the new set. Under the old async callback a throw between the delete
       // and the re-insert irrecoverably lost the entire split group (a retry re-reads zero old siblings →
       // NotFoundError), and a throw on the photo migration orphaned photos pointing at deleted sibling ids.

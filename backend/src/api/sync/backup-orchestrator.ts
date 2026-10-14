@@ -20,7 +20,7 @@ const backupMutex = new Map<string, number>();
  * The providers a backup run will fan out to: enabled (ZIP) OR sheetsSyncEnabled. Pure +
  * exported so the orchestrator and its tests share ONE source of truth — previously the test
  * re-implemented this filter locally and asserted against the copy, leaving the real branch
- * uncovered (coverage theater, C181). execute() calls this so the test now pins real code.
+ * uncovered. execute() calls this so the test now pins real code.
  */
 export function filterEnabledProviders(config: BackupConfig): [string, ProviderBackupSettings][] {
   return Object.entries(config.providers).filter(
@@ -172,7 +172,7 @@ export class BackupOrchestrator {
           return { providerId, result };
         } catch (error) {
           // A thrown/timed-out strategy is a REAL failure of an attempted provider, not a silent
-          // skip (#44): catch it HERE so the providerId is retained and the run is marked failed.
+          // skip: catch it HERE so the providerId is retained and the run is marked failed.
           // (Previously the rejection was swallowed in the settled loop → fail-open 200.)
           const message = error instanceof Error ? error.message : 'Backup strategy failed';
           logger.warn('Backup strategy threw, marking provider failed', {
@@ -228,7 +228,7 @@ export class BackupOrchestrator {
         }
       }
 
-      // Honest run-level outcome (#44): failed = every attempted provider failed; partial = a mix;
+      // Honest run-level outcome: failed = every attempted provider failed; partial = a mix;
       // success = all clean; noop = nothing attempted (no provider produced a result).
       const attemptedCount = Object.keys(results).length;
       let runOutcome: BackupOutcome;
@@ -245,7 +245,7 @@ export class BackupOrchestrator {
       // Persist config updates (succeeded providers always record their lastBackupAt + sheets id so a
       // partial run does not lose a provider that DID succeed). But the GLOBAL sync/backup anchor only
       // advances on a fully-clean run — if ANY provider failed, the user still has un-synced changes,
-      // so leaving the anchor un-advanced is what makes the failed provider RETRY next run (#43). A
+      // so leaving the anchor un-advanced is what makes the failed provider RETRY next run. A
       // partial-success that advanced the anchor would strand the failed provider forever.
       if (anySuccess) {
         await preferencesRepository.update(userId, { backupConfig: updatedConfig });
@@ -256,7 +256,7 @@ export class BackupOrchestrator {
         // change-check + ZIP export above), NOT a fresh end-of-run time. A long backup can run for
         // minutes; a data change made mid-run (after the snapshot) must stay "unsynced" so the NEXT
         // backup captures it. Stamping end-of-run would mark that change already-synced and silently
-        // drop it from every future backup (C144 #42). Using the start timestamp (slightly before the
+        // drop it from every future backup. Using the start timestamp (slightly before the
         // actual L85 snapshot) errs safe: at worst a redundant re-backup, never a lost change.
         await syncStateRepository.updateSyncDate(userId, new Date(timestamp));
         await syncStateRepository.updateBackupDate(userId);

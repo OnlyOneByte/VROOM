@@ -1,7 +1,7 @@
 /**
  * Cross-tenant authorization (IDOR) regression guard — through the REAL stack.
  *
- * A read-only audit (cycle 138) found every resource route enforces ownership
+ * A read-only audit found every resource route enforces ownership
  * before read/mutate/delete. This PROVES it with two real Lucia sessions sharing
  * one app/DB: user B creates resources; user A (a foreign session) tries to
  * GET / PUT / DELETE them by id and must be denied (4xx, never 200 with B's data).
@@ -114,7 +114,7 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     );
     expectDenied(await ctx.authed('DELETE', `/api/v1/expenses/${eid}`), 'DELETE expense');
 
-    // C115: the SPLIT routes (PUT/DELETE /split/:id) are state-changing + (groupId, userId)-scoped in the
+    // The SPLIT routes (PUT/DELETE /split/:id) are state-changing + (groupId, userId)-scoped in the
     // repo (updateSplitExpense/deleteSplitExpense throw NotFoundError when the group isn't found for the
     // caller), but the IDOR sweep skipped them. They're destructive (regenerate/delete sibling expense rows
     // + their photos) and money-bearing — a regression to an un-scoped group write would let A rewrite or
@@ -138,7 +138,7 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     expectDenied(await ctx.authed('DELETE', `/api/v1/expenses/split/${gid}`), 'DELETE split');
   });
 
-  // vehicle-sharing T5b-2b (split WRITE widening — the C108-C116 IDOR discipline). The split routes
+  // vehicle-sharing T5b-2b (split WRITE widening — the- IDOR discipline). The split routes
   // moved from the strict assertVehiclesOwned (own EVERY vehicle) → requireSplitWriteAccess (owner |
   // accepted editor on every config vehicle, single-owner set). This pins the widening did not
   // over-open: an accepted VIEWER who legitimately READS the shared split still cannot CREATE/PUT/DELETE
@@ -247,11 +247,11 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
       'PUT policy'
     );
     expectDenied(await ctx.authed('DELETE', `/api/v1/insurance/${pid}`), 'DELETE policy');
-    // C114: TERM routes (PUT/DELETE /:id/terms/:termId) are state-changing, gated on the SAME
+    // TERM routes (PUT/DELETE /:id/terms/:termId) are state-changing, gated on the SAME
     // validateInsuranceOwnership(id) as the policy itself (routes.ts:230/257), but the IDOR sweep
     // skipped them. A cross-tenant term edit/delete would let A mutate B's insurance terms (and their
     // auto-materialized premium expenses via updateTermExpenses/deleteBySource). terms-http.test.ts
-    // (C272) pins the INNER FK defense (a foreign vehicleId in the coverage payload) but always AS the
+    //  pins the INNER FK defense (a foreign vehicleId in the coverage payload) but always AS the
     // policy owner — the policy-level ownership gate on the term routes was never cross-tenant tested.
     expectDenied(
       await ctx.authed('PUT', `/api/v1/insurance/${pid}/terms/${tid}`, { policyNumber: 'HACK' }),
@@ -294,7 +294,7 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
       'PATCH financing'
     );
     expectDenied(await ctx.authed('DELETE', `/api/v1/financing/${fid}`), 'DELETE financing');
-    // C113: PUT /:financingId/payoff is a state-changing route gated on the SAME
+    // PUT /:financingId/payoff is a state-changing route gated on the SAME
     // validateFinancingOwnership (routes.ts:219) as DELETE, but the IDOR sweep skipped it. A
     // cross-tenant payoff would let A mark B's financing paid-off (deactivateFinancing → isActive=0,
     // severs the source link) — a destructive write on B's data. Pin it alongside its siblings.
@@ -325,7 +325,7 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     expectDenied(await ctx.authed('GET', `/api/v1/odometer/${vid}`), 'GET odometer list');
   });
 
-  // vehicle-sharing T6 (odometer READ+WRITE widening — the C108-C116 IDOR discipline). The odometer
+  // vehicle-sharing T6 (odometer READ+WRITE widening — the- IDOR discipline). The odometer
   // read/write gates moved from validateVehicleOwnership/validateOdometerOwnership → requireVehicleRead/
   // Write. This pins the widening did not over-open: a NON-shared third party is still denied every
   // read+write (existence-hiding 404), and an accepted VIEWER who legitimately READS the shared vehicle
@@ -410,11 +410,11 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     );
     expectDenied(await ctx.authed('DELETE', `/api/v1/reminders/${rid}`), 'DELETE reminder');
 
-    // C116 (the LAST known IDOR-sweep gap): PUT /notifications/:id/read is a state-changing route
+    // PUT /notifications/:id/read is a state-changing route
     // gated on markNotificationRead's (id, userId) scope (it throws NotFoundError when no row matches —
     // repository.ts:565), but the sweep never covered it. Raw-seed a notification owned by B (the API
     // only creates these via the trigger), then prove A can't mark B's notification read. Closes the
-    // route-coverage IDOR audit (C108–C116) for every state-changing route.
+    // route-coverage IDOR audit for every state-changing route.
     ctx.sqlite.run(
       `INSERT INTO reminder_notifications (id, reminder_id, user_id, due_date, due_odometer, is_read, created_at)
        VALUES ('n-idor-b', ?, ?, 1700000000, NULL, 0, 1000)`,
@@ -431,7 +431,7 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     expect(stillUnread.is_read).toBe(0);
   });
 
-  // vehicle-sharing T7 + T7b (reminder per-vehicle READ + WRITE widening — the C108-C116 IDOR
+  // vehicle-sharing T7 + T7b (reminder per-vehicle READ + WRITE widening — the- IDOR
   // discipline). T7 widened the GET ?vehicleId list (requireVehicleRead + owner-scope); T7b widened the
   // WRITE paths (POST/PUT/DELETE/mark-serviced) to requireReminderVehiclesWrite (owner | accepted editor
   // on every vehicle, single-owner set, owner-stamp). This pins the widening did not over-open: a
@@ -550,7 +550,7 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     expect(cross.status).toBeLessThan(500);
   });
 
-  // vehicle-sharing T8a (per-vehicle analytics READ widening — the C108-C116 IDOR discipline). The six
+  // vehicle-sharing T8a (per-vehicle analytics READ widening — the- IDOR discipline). The six
   // vehicle-scoped analytics routes moved from validateVehicleOwnership → requireVehicleRead + owner-scope.
   // This pins the widening did not over-open: a NON-shared third party is denied every per-vehicle
   // analytics route (existence-hiding 404). An accepted viewer reading them is covered in
@@ -583,7 +583,7 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     }
   });
 
-  // vehicle-sharing T8b (per-vehicle insurance READ widening — the C108-C116 IDOR discipline). The
+  // vehicle-sharing T8b (per-vehicle insurance READ widening — the- IDOR discipline). The
   // GET /insurance/vehicles/:vehicleId/policies route moved from validateVehicleOwnership →
   // requireVehicleRead + a blast-radius narrow. This pins the widening did not over-open: a NON-shared
   // third party is denied the per-vehicle policies list (existence-hiding 404). The blast-radius
@@ -738,7 +738,7 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     expect(acc.status, 'the real invitee A can accept').toBe(200);
   });
 
-  // vehicle-sharing T5b-2 (expense WRITE widening — the C108-C116 IDOR discipline for the owner-stamp
+  // vehicle-sharing T5b-2 (expense WRITE widening — the- IDOR discipline for the owner-stamp
   // model). The write gate moved from strict validateVehicleOwnership to requireVehicleWrite (owner OR
   // accepted editor). This pins that the WIDENING did not over-open: every NON-writer is still denied
   // with the existence-hiding 404 — a third party with no share, a VIEWER (read-only), and an editor
@@ -879,7 +879,7 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     expect(stillB.data.make).toBe('B');
   });
 
-  // vehicle-sharing T5b-3 (expense READ widening — the C108-C116 IDOR discipline for the read seam).
+  // vehicle-sharing T5b-3 (expense READ widening — the- IDOR discipline for the read seam).
   // The per-vehicle reads moved from validateVehicleOwnership/validateExpenseOwnership →
   // requireVehicleRead (owner | accepted viewer | accepted editor). This pins the read widening did not
   // over-open: a NON-shared third party is still denied the per-vehicle list / single / summary with the

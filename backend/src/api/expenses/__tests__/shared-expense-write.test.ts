@@ -1,9 +1,9 @@
 /**
  * vehicle-sharing T5b-2 — expense WRITE widening through the REAL stack (the money-data-safety core).
  *
- * The editor-WRITE gate-widening on expenses, ratified by Angelo as the OWNER-STAMP model (design
+ * The editor-WRITE gate-widening on expenses, ratified as the OWNER-STAMP model (design
  * §2.1, option a): POST/PUT/DELETE /expenses authorize via `requireVehicleWrite` (owner OR accepted
- * editor; viewer/stranger get the same 404 — existence-hiding, #80) instead of the strict
+ * editor; viewer/stranger get the same 404 — existence-hiding) instead of the strict
  * validateVehicleOwnership. When a shared EDITOR creates a cost on the owner's vehicle, the row is
  * stamped `userId = OWNER` (so it rides the owner's backup/TCO + counts once) while `createdBy`
  * records the editor as the actual author.
@@ -122,7 +122,7 @@ describe('expense WRITE widening — owner-stamp + createdBy (T5b-2)', () => {
     expect(row.created_by).toBeNull(); // self-created → NULL legacy/self sentinel, identical to pre-T5b
   });
 
-  // PROVENANCE FORGE-VECTOR GUARD (T5b-2 hardening, C104): `createdBy` is SERVER-controlled — the create
+  // PROVENANCE FORGE-VECTOR GUARD (T5b-2 hardening): `createdBy` is SERVER-controlled — the create
   // schema OMITS it from client input and the handler computes it (acting-when-editor, else NULL). A
   // client must NOT be able to claim a different author by putting `createdBy` in the POST body. These
   // pin that the forged value is IGNORED on BOTH paths, so a future schema refactor (re-adding the field,

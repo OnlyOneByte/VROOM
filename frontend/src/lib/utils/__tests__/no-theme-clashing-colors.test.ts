@@ -1,13 +1,13 @@
 /**
  * Regression GUARD (committed, travels with the merge) for the THEME-CLASH class —
- * hardcoded Tailwind palette colors in components that break dark mode (NORTH_STAR #3).
+ * hardcoded Tailwind palette colors in components that break dark mode.
  *
  * VROOM theming is a pure token swap on app.css custom properties (theming-engine R1): a
  * component must paint via the semantic theme tokens (bg-background / bg-card / text-foreground /
  * text-muted-foreground / bg-primary / text-primary-foreground / border-border / …), NEVER a
  * fixed palette color (bg-white / text-black / bg-gray-800 / text-slate-200 …). A hardcoded
  * palette color looks fine in the light look it was eyeballed in, then clashes the moment the
- * user switches to dark (white-on-white, black-on-black) — exactly the breakage the C268/C269
+ * user switches to dark (white-on-white, black-on-black) — exactly the breakage the
  * dark-mode eyes-on sweep verified is ABSENT today. That sweep was manual + the per-shot PNGs
  * don't travel; this static scan does, and catches the whole CLASS, not just today's components.
  *
@@ -16,12 +16,12 @@
  * leading `/` opacity modifier is allowed in the MATCH so an intentional scrim like `bg-black/50`
  * is still caught by the regex but lives on the allowlist below.
  *
- * ALLOWLIST — the 5 sites verified firsthand (C271) as intentional + theme-agnostic, NOT clashes:
- *   - button/badge `text-white`: ONLY on the `destructive` variant (white on the fixed red
- *     bg-destructive — deliberate fixed contrast, identical light+dark; the shadcn-svelte
- *     convention). Every other variant uses *-foreground theme tokens.
- *   - dialog/alert-dialog/sheet overlays `bg-black/50`: the modal SCRIM — a semi-transparent
- *     dimming backdrop is theme-agnostic by design (same in light + dark).
+ * ALLOWLIST — the 5 sites verified firsthand as intentional + theme-agnostic, NOT clashes:
+ *  - button/badge `text-white`: ONLY on the `destructive` variant (white on the fixed red
+ *  bg-destructive — deliberate fixed contrast, identical light+dark; the shadcn-svelte
+ *  convention). Every other variant uses *-foreground theme tokens.
+ *  - dialog/alert-dialog/sheet overlays `bg-black/50`: the modal SCRIM — a semi-transparent
+ *  dimming backdrop is theme-agnostic by design (same in light + dark).
  * Any NEW hit is a real regression: route the color through a semantic theme token instead.
  *
  * Runs in the fast unit suite (`npm test`) — no browser, no server.
@@ -36,7 +36,7 @@ import { collectSvelteFiles } from './_helpers/collect-svelte-files';
 // This file lives at src/lib/utils/__tests__/, so src/ is three dirs up from __tests__'s parent.
 const SRC_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
-// Sites verified firsthand (C271) as intentional fixed-contrast / theme-agnostic scrim uses.
+// Sites verified firsthand as intentional fixed-contrast / theme-agnostic scrim uses.
 const ALLOWLIST = new Set<string>([
 	'lib/components/ui/button/button.svelte', // destructive-variant text-white on fixed red
 	'lib/components/ui/badge/badge.svelte', // destructive-variant text-white on fixed red
@@ -51,7 +51,7 @@ const ALLOWLIST = new Set<string>([
 const THEME_CLASH =
 	/(?<!dark:)\b(?:bg|text|border)-(?:white|black|gray-\d+|slate-\d+|zinc-\d+|neutral-\d+)(?:\/\d+)?\b/;
 
-describe('no theme-clashing hardcoded colors in components (dark-mode / NORTH_STAR #3 class guard)', () => {
+describe('no theme-clashing hardcoded colors in components (dark-mode / class guard)', () => {
 	const files = collectSvelteFiles(SRC_ROOT);
 
 	test('the scan actually found .svelte sources (guard is live, not a no-op)', () => {
@@ -73,7 +73,7 @@ describe('no theme-clashing hardcoded colors in components (dark-mode / NORTH_ST
 		}
 		expect(
 			offenders,
-			`Theme-clashing hardcoded color(s) found — these break dark mode (NORTH_STAR #3). Route the ` +
+			`Theme-clashing hardcoded color(s) found — these break dark mode. Route the ` +
 				`color through a semantic theme token (bg-background / bg-card / text-foreground / ` +
 				`text-muted-foreground / bg-primary / *-foreground / border-border …) instead, or — if it is a ` +
 				`genuinely theme-agnostic fixed-contrast/scrim use — add it to the ALLOWLIST with a reason:\n${offenders.join('\n')}`

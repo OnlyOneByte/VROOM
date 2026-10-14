@@ -84,9 +84,9 @@ export function dateOnlyToISO(dateOnly: string | undefined | null): string {
  *
  * Collapses the `new Date(x).toISOString().split('T')[0]` / `.slice(0, 10)` idiom that was
  * hand-repeated across the date-input forms (expense / reminder / vehicle / odometer) + the CSV
- * download filename (C267 extraction).
+ * download filename (extraction).
  *
- * WHY LOCAL, NOT UTC (#87, the NORTH_STAR #2 fix): the old `.toISOString().slice(0,10)` read the UTC
+ * WHY LOCAL, NOT UTC: the old `.toISOString().slice(0,10)` read the UTC
  * calendar date, so it (a) showed TOMORROW for a negative-offset (Americas) user editing late in the
  * day, and (b) BROKE THE ROUND-TRIP for stored dates — `dateOnlyToISO` writes them anchored at NOON
  * LOCAL, and noon-local in a positive offset (e.g. +14) is the PREVIOUS day in UTC, so a vehicle's

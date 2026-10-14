@@ -1,18 +1,18 @@
 /**
- * Guard (C128) for the settings store's `restoreFromProvider` — the provider-path RESTORE method
- * (NORTH_STAR #1 data-safety). Coverage showed lines 142-148 untested: the mode-gated post-restore
+ * Guard for the settings store's `restoreFromProvider` — the provider-path RESTORE method
+ * (data-safety). Coverage showed lines 142-148 untested: the mode-gated post-restore
  * reload + the error-set-and-rethrow failure path were both unpinned in the STORE (settings-api.test.ts
- * pins only the WIRE/body contract; settings-error-clearing.test.ts C308 pins error-CLEAR-on-entry +
+ * pins only the WIRE/body contract; settings-error-clearing.test.ts pins error-CLEAR-on-entry +
  * one error-set case on listAllBackups, never restoreFromProvider).
  *
- * The load-bearing invariants pinned here (the C319/C100 mode-gated-reload class on the provider twin —
- * uploadBackup got this at C100, restoreFromProvider did not):
- *   - a NON-preview restore (replace/merge) must `await this.load()` so the UI reflects the restored
- *     data — a dropped reload leaves STALE pre-restore settings on screen (silent NORTH_STAR #1 footgun).
- *   - a PREVIEW restore must NOT reload (it's a dry-run; reloading would discard the unsaved view).
- *   - a thrown API error must SET `store.error` and RE-THROW (don't swallow a restore failure).
+ * The load-bearing invariants pinned here (the mode-gated-reload class on the provider twin —
+ * uploadBackup got this at, restoreFromProvider did not):
+ *  - a NON-preview restore (replace/merge) must `await this.load()` so the UI reflects the restored
+ *  data — a dropped reload leaves STALE pre-restore settings on screen (silent footgun).
+ *  - a PREVIEW restore must NOT reload (it's a dry-run; reloading would discard the unsaved view).
+ *  - a thrown API error must SET `store.error` and RE-THROW (don't swallow a restore failure).
  *
- * Drives the store through the real settingsApi → apiClient → fetch (mocked), the C308 pattern. The
+ * Drives the store through the real settingsApi → apiClient → fetch (mocked), the pattern. The
  * reload is observed via the EXTRA GET /settings fetch a non-preview restore issues.
  */
 
@@ -51,7 +51,7 @@ function restoreOpts(mode: 'preview' | 'replace' | 'merge') {
 	};
 }
 
-describe('settings store — restoreFromProvider mode-gated reload + error path (C128)', () => {
+describe('settings store — restoreFromProvider mode-gated reload + error path', () => {
 	beforeEach(() => {
 		mockFetch.mockReset();
 		settingsStore.reset();

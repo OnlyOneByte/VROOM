@@ -8,7 +8,7 @@ const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
 // Mock the localStorage-touching offline-storage functions, but keep the REAL
-// offlineExpenseToBackend (C205): it's a pure mapper with no side-effects, and stubbing it
+// offlineExpenseToBackend: it's a pure mapper with no side-effects, and stubbing it
 // would (a) make these tests assert against a fake transform and (b) break the sync paths that
 // now route through it (they'd call `undefined`). importActual pulls in the genuine mapper.
 vi.mock('../offline-storage', async () => {
@@ -17,17 +17,17 @@ vi.mock('../offline-storage', async () => {
 	return {
 		offlineExpenseToBackend: actual.offlineExpenseToBackend,
 		// isIncompleteFuelExpense is a PURE predicate (no localStorage) — pass the REAL impl through like
-		// offlineExpenseToBackend (C205/C444), NOT a stub: stubbing it would make the sync paths skip the
+		// offlineExpenseToBackend, NOT a stub: stubbing it would make the sync paths skip the
 		// genuine fuel-completeness gate and assert against a fake.
 		isIncompleteFuelExpense: actual.isIncompleteFuelExpense,
 		loadOfflineExpenses,
 		saveOfflineExpenses: vi.fn(),
 		markExpenseAsSynced: vi.fn(),
-		// #79 (C159): sync-manager now parks permanently-unsyncable rows via this. Stub it (localStorage
+		// Sync-manager now parks permanently-unsyncable rows via this. Stub it (localStorage
 		// side-effect) and assert it's called for a malformed row instead of a retry being scheduled.
 		markExpenseNeedsAttention: vi.fn(),
 		clearSyncedExpenses: vi.fn(),
-		// sync-manager now imports getPendingExpenses from here (C426 dedup). Mirror the real impl
+		// sync-manager now imports getPendingExpenses from here. Mirror the real impl
 		// (loadOfflineExpenses().filter(!synced && !needsAttention)) over the MOCKED loader so the tests'
 		// mockReturnValue still drives it — re-exporting actual.getPendingExpenses would bind the REAL loader.
 		getPendingExpenses: () =>
@@ -175,7 +175,7 @@ describe('Sync Manager', () => {
 			];
 
 			// The server row carries the BACKEND shape: `expenseAmount` (NOT `amount`), and a fuel row's
-			// volume in `volume`. checkForExistingExpense must map it through fromBackendExpense (#133) —
+			// volume in `volume`. checkForExistingExpense must map it through fromBackendExpense —
 			// pre-fix it returned the row raw, so `amount` was undefined and determineConflictType's
 			// `Math.abs(local.amount - server.amount)` was NaN → amountMatch false → mis-classified
 			// 'modified'. This mock now reflects the REAL backend response so the test is non-vacuous.
@@ -259,7 +259,7 @@ describe('Sync Manager', () => {
 			expect(result).toBe(true);
 		});
 
-		// C270 deep-review: the existing two tests only assert the boolean — not the load-bearing
+		// deep-review: the existing two tests only assert the boolean — not the load-bearing
 		// SIDE EFFECTS of each resolution (the data-safety contract: a user's conflict choice must be
 		// honored exactly). These pin the three uncovered outcomes.
 		function modifiedConflict(): SyncConflict {
@@ -297,7 +297,7 @@ describe('Sync Manager', () => {
 
 		it('keep_local: a FAILED overwrite returns false (the edit survives to retry, not silently lost)', async () => {
 			// The POST rejects — resolveConflict must report failure (the catch→break→return false path)
-			// so the user's local edit stays unresolved rather than being dropped (NORTH_STAR #1).
+			// so the user's local edit stays unresolved rather than being dropped.
 			mockFetch.mockRejectedValueOnce(new Error('network down'));
 
 			const result = await syncManager.resolveConflict(modifiedConflict(), 'keep_local');
@@ -324,12 +324,12 @@ describe('Sync Manager', () => {
 			expect(body.forceOverwrite).toBe(true);
 		});
 
-		// #98 (FIXED C51): keep_local POSTs to /api/v1/expenses with forceOverwrite + the local clientId,
+		// Keep_local POSTs to /api/v1/expenses with forceOverwrite + the local clientId,
 		// and the backend now HONORS forceOverwrite (createExpenseSchema accepts it; createIdempotent
 		// updates the existing (userId, clientId) row in place) — so on a genuine collision the local edit
 		// is APPLIED, not silently dropped. This pins the FE wire contract the fix depends on: the POST
 		// carries BOTH the clientId (idempotency key) AND forceOverwrite=true to the create route.
-		it('#98: keep_local POSTs forceOverwrite + the local clientId to the create route (now a real overwrite)', async () => {
+		it('keep_local POSTs forceOverwrite + the local clientId to the create route (now a real overwrite)', async () => {
 			mockFetch.mockResolvedValueOnce(apiOk({ id: 'server-1' }));
 
 			await syncManager.resolveConflict(modifiedConflict(), 'keep_local');
@@ -344,12 +344,12 @@ describe('Sync Manager', () => {
 		});
 	});
 
-	// #79 (C159): a malformed fuel row (no volume/charge, or no mileage — isIncompleteFuelExpense) is
+	// A malformed fuel row (no volume/charge, or no mileage — isIncompleteFuelExpense) is
 	// PERMANENTLY unsyncable: it fails the same way every attempt. It must be PARKED as needs-attention
 	// (markExpenseNeedsAttention) — NOT counted as a transient failure + NOT scheduled for retry, so it
 	// stops being silently re-attempted forever. syncExpenses sets result.needsAttention and, because the
 	// row isn't a transient failure, result.success is NOT dragged false by it (nothing to retry).
-	describe('needs-attention parking (#79)', () => {
+	describe('needs-attention parking', () => {
 		const malformedFuel: OfflineExpense = {
 			id: 'malformed-1',
 			clientId: 'cid-malformed-1',
@@ -388,10 +388,10 @@ describe('Sync Manager', () => {
 			}
 		});
 
-		// #79 COMPOSITION (C162 deep-review): an ALREADY-parked row (needsAttention=true) is excluded from
+		// COMPOSITION: an ALREADY-parked row (needsAttention=true) is excluded from
 		// getPendingExpenses — so syncAll never feeds it to the sync loop. It must NOT be POSTed, re-checked,
 		// re-counted, or re-parked: a subsequent syncAll over a parked row is a complete no-op for it. This
-		// is what makes "park" actually STOP the infinite re-attempt (the #79 goal) — verified end-to-end
+		// is what makes "park" actually STOP the infinite re-attempt (the goal) — verified end-to-end
 		// through the public syncAll, not just the helper in isolation.
 		it('an already-parked row is NOT re-attempted by a later syncAll (no POST, no re-count)', async () => {
 			// The mocked getPendingExpenses filters !synced && !needsAttention (mirrors the real impl), so a
@@ -472,7 +472,7 @@ describe('Sync Manager', () => {
 			expect(secondCount).toBeLessThanOrEqual(firstCount + 1);
 		});
 
-		// C325 guard: the EXPONENTIAL BACKOFF + the HARD CAP were both unpinned (the existing tests only
+		// guard: the EXPONENTIAL BACKOFF + the HARD CAP were both unpinned (the existing tests only
 		// check the retryCount counter, never the scheduled delay or that scheduling STOPS at the cap).
 		// A regression to a constant/linear delay (retry-storm risk) or an off-by-one cap (retries past
 		// maxRetries, or none at all) would pass the counter tests. Spy on setTimeout to pin the actual
@@ -543,11 +543,11 @@ describe('Sync Manager', () => {
 			}
 		});
 
-		// #121 (C424): a conflict detected ON A RETRY must SURFACE (push to syncConflicts.current + clear
+		// A conflict detected ON A RETRY must SURFACE (push to syncConflicts.current + clear
 		// retryCount), mirroring the main loop. Pre-fix retrySingleExpense acted only on result.success, so
 		// a retry-conflict was silently dropped — no resolver dialog, expense stuck pending. Realistic
 		// trigger: first POST committed but its response was lost → retry's conflict-check now finds the row.
-		it('surfaces a conflict detected during a scheduled RETRY (was silently dropped) — #121', async () => {
+		it('surfaces a conflict detected during a scheduled RETRY (was silently dropped)', async () => {
 			syncConfig.update(config => ({ ...config, maxRetries: 3, retryDelay: 100 }));
 			vi.mocked(loadOfflineExpenses).mockReturnValue([failingExpense('retry-conf-1')]);
 			syncConflicts.current = [];
@@ -576,11 +576,11 @@ describe('Sync Manager', () => {
 			}
 		});
 
-		// C445 (deep-review → bug): an orphaned backoff timer must NOT resurrect an already-resolved
+		// (deep-review → bug) An orphaned backoff timer must NOT resurrect an already-resolved
 		// conflict. retrySingleExpense is detached from retryCount, so a scheduled retry fires even after
 		// the expense was resolved+synced by an interleaving syncAll; without a still-pending re-check it
 		// would re-run the conflict-check, find the committed server row, and re-list the dismissed
-		// conflict (the C424 dedup misses it — resolution already removed it from the live set). The fix
+		// conflict (the dedup misses it — resolution already removed it from the live set). The fix
 		// early-returns when getPendingExpenses() (the !synced source of truth) no longer contains the row.
 		it('an orphaned retry does NOT resurrect a conflict already resolved+synced between schedule and fire', async () => {
 			syncConfig.update(config => ({ ...config, maxRetries: 3, retryDelay: 100 }));
@@ -621,7 +621,7 @@ describe('Sync Manager', () => {
 	});
 });
 
-// determineConflictType (C223 guard) — when an offline expense collides with a server row that
+// determineConflictType — when an offline expense collides with a server row that
 // shares a tag (so checkForExistingExpense FINDS it), the conflict is classified 'duplicate' ONLY
 // when amount + tags + date ALL match; ANY difference → 'modified'. This is the load-bearing
 // data-safety distinction: a 'duplicate' is silently dropped, while 'modified' surfaces the
@@ -643,8 +643,8 @@ describe('Sync Manager — conflict classification (determineConflictType)', () 
 
 	/** Seed one local offline expense + the server row the conflict-check GET returns; run syncAll.
 	 *  The GET returns the BACKEND shape (expenseAmount), which checkForExistingExpense maps through
-	 *  fromBackendExpense (#133) — so the `server.amount` arg is emitted as expenseAmount on the wire,
-	 *  mirroring the real response (a frontend-shaped mock would mask the #133 mapping bug). */
+	 *  fromBackendExpense — so the `server.amount` arg is emitted as expenseAmount on the wire,
+	 *  mirroring the real response (a frontend-shaped mock would mask the mapping bug). */
 	async function classifyAgainst(
 		local: Partial<OfflineExpense>,
 		server: { amount: number; tags: string[]; date: string }

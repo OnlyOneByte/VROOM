@@ -23,7 +23,7 @@ export interface SortableRow {
  * tiebreaker the client sort returned 0 for equal date/amount rows, so ties fell back to
  * JS engine ordering / array-build order (the standalone-then-group concatenation in the
  * table actually reorders same-key rows vs. the server), causing a visible reshuffle on
- * pagination/refresh (bug #4).
+ * pagination/refresh.
  *
  * The id is folded into the raw comparison BEFORE the asc/desc flip, so a single
  * negation carries the tiebreak in the same direction as the server (a naive
@@ -55,7 +55,7 @@ export type SplitAllocationDraft = { vehicleId: string; amount?: number; percent
 
 /**
  * Reset split allocations when the split METHOD changes, for the selected vehicles. ONE source of truth
- * (C415) for the reset both the expense form (ExpenseForm) and the insurance-term form (InsuranceTermForm)
+ *  for the reset both the expense form (ExpenseForm) and the insurance-term form (InsuranceTermForm)
  * ran BYTE-IDENTICAL: 'even' carries no per-vehicle rows (the backend splits evenly via largest-remainder
  * integer cents — see split-service computeEvenSplit); 'absolute' seeds each vehicle at amount 0;
  * 'percentage' seeds an even 100/N split rounded to ONE decimal. The rounding is load-bearing — a divergent
@@ -73,14 +73,14 @@ export function resetSplitAllocations(
 }
 
 /**
- * Build the API `SplitConfig` discriminated union from a form's split state. ONE source of truth (C23)
+ * Build the API `SplitConfig` discriminated union from a form's split state. ONE source of truth
  * for what ExpenseForm and ReminderForm ran near-byte-identical (`buildSplitConfig`): 'even' carries the
  * `vehicleIds` (the backend computes the per-vehicle even split itself); 'absolute'/'percentage' carry the
  * per-vehicle allocations, coalescing a missing draft value to 0 (the editor seeds 0/100-over-N, but a
  * cleared input is `undefined`). `ReminderSplitConfig` is structurally identical to `SplitConfig`, so a
  * reminder caller can assert the return back to its own alias. A divergent copy could drop the
  * coalesce (→ `undefined` in the payload) or mis-map a field, materializing a different per-vehicle split
- * depending on which form created it — the same drift class as resetSplitAllocations (C415).
+ * depending on which form created it — the same drift class as resetSplitAllocations.
  */
 export function buildSplitConfig(
 	method: 'even' | 'absolute' | 'percentage',

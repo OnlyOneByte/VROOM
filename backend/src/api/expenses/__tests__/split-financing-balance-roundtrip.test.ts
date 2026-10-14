@@ -5,17 +5,17 @@
  * drives `repo.computeBalance(...)` DIRECTLY at the repository layer. No test pinned the OBSERVABLE
  * round-trip: that a financing-sourced split expense created/edited through the REAL route stack
  * (POST/PUT /expenses/split → createSplitExpense → DB → GET /vehicles/:id balance-enrich) actually moves
- * the vehicle's DISPLAYED `computedBalance` (NORTH_STAR #1 — the headline loan figure the user sees).
+ * the vehicle's DISPLAYED `computedBalance` (— the headline loan figure the user sees).
  *
- * This is the layer the #147 fix (C2: re-validate the carried financing source on PUT /split) operates
- * on — but the #147 tests assert only the route STATUS (400 reject / 200 accept), never that a VALID
+ * This is the layer the fix (C2: re-validate the carried financing source on PUT /split) operates
+ * on — but the tests assert only the route STATUS (400 reject / 200 accept), never that a VALID
  * financing-sourced split's payment is correctly attributed to the loan and subtracted from the balance.
  * computeBalance sums `expenseAmount WHERE source_type='financing' AND source_id=<loan>` with NO vehicle
  * scope, and the split siblings carry that link, so this pins:
- *   - a financing-sourced split REDUCES the balance by exactly the split's total
- *   - reallocating it (PUT /split, same financed vehicle) keeps the attribution correct (no double-count,
- *     no orphaned payment) — the regenerated siblings still point at the loan
- *   - a SOURCE-LESS split does NOT touch the balance (no spurious attribution)
+ *  - a financing-sourced split REDUCES the balance by exactly the split's total
+ *  - reallocating it (PUT /split, same financed vehicle) keeps the attribution correct (no double-count,
+ *  no orphaned payment) — the regenerated siblings still point at the loan
+ *  - a SOURCE-LESS split does NOT touch the balance (no spurious attribution)
  *
  * Drives the real app over the in-memory DB (createTestApp); keep static imports type-only per the harness.
  */
@@ -71,7 +71,7 @@ async function getBalance(vehicleId: string): Promise<number> {
   return bal as number;
 }
 
-describe('financing-sourced split expense — balance round-trip (C4 guard, #147 purpose)', () => {
+describe('financing-sourced split expense — balance round-trip (C4 guard, purpose)', () => {
   test('a financing-sourced split REDUCES the displayed balance by the split total', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const financingId = await seedFinancing(vehicleId, 20000);
@@ -112,7 +112,7 @@ describe('financing-sourced split expense — balance round-trip (C4 guard, #147
     expect(await getBalance(vehicleId)).toBe(19600);
 
     // Edit the split's total to 500 (same financed vehicle). The regenerated sibling still carries the
-    // financing link (#147: re-validated against the new vehicle set, which is unchanged here), so the
+    // financing link (: re-validated against the new vehicle set, which is unchanged here), so the
     // balance reflects the NEW total — not a double-count (old + new) nor an orphaned old payment.
     const putRes = await ctx.authed('PUT', `/api/v1/expenses/split/${created.data.groupId}`, {
       splitConfig: { method: 'even', vehicleIds: [vehicleId] },

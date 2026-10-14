@@ -4,7 +4,7 @@
  * The T4 route test (assistant-chat-route.test.ts) pins the route/orchestrator CONTRACT — the guards
  * (allowlist, Zod, IDOR), the K/T caps, the 400/502 honesty — but every one of its tool-call cases runs
  * against an EMPTY DB, so it never inspects WHAT the tool returned or that the model actually SAW it.
- * This pins the OTHER half NORTH_STAR #3 cares about: that a read tool, run over REAL seeded data, feeds
+ * This pins the OTHER half cares about: that a read tool, run over REAL seeded data, feeds
  * its real aggregate BACK to the model (design §4 step d) so the grounded answer reflects the user's own
  * numbers — the full FE→BE→tool-loop→reply seam, end to end, without a live LLM or a browser.
  *

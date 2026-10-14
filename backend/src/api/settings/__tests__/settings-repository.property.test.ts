@@ -267,14 +267,14 @@ describe('Independence: preferences and sync state', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Regression (C144 #42): updateSyncDate must stamp lastSyncDate from the SNAPSHOT time, not
+// Regression: updateSyncDate must stamp lastSyncDate from the SNAPSHOT time, not
 // end-of-run — else a data change made DURING a long backup is silently dropped from all future
 // backups. A backup snapshots the DB at T_snap; if it finishes at T_end and stamps lastSyncDate=T_end,
 // an edit at T_edit (T_snap < T_edit < T_end) gets lastDataChangeDate=T_edit < T_end → marked
 // "already synced" forever. Stamping from T_snap keeps that edit "unsynced" for the next run.
 // ---------------------------------------------------------------------------
 
-describe('SyncStateRepository.updateSyncDate snapshot-time semantics (#42)', () => {
+describe('SyncStateRepository.updateSyncDate snapshot-time semantics', () => {
   test('a change made AFTER the snapshot but BEFORE the run stamps still reports unsynced', async () => {
     const tSnap = new Date('2026-01-01T10:00:00.000Z'); // backup snapshot (ZIP generated)
     const tEdit = new Date('2026-01-01T10:02:00.000Z'); // user edits mid-run

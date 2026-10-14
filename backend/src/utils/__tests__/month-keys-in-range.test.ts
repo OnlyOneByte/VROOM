@@ -1,5 +1,5 @@
 /**
- * Regression tests (cycle 14) for monthKeysInRange — the month-bucket walk behind the
+ * Regression tests for monthKeysInRange — the month-bucket walk behind the
  * insurance monthlyPremiumTrend (accumulateMonthlyPremiums).
  *
  * The old code stepped a raw term-start Date with `setMonth(+1)`. From a day-29..31 start
@@ -12,7 +12,7 @@
 import { describe, expect, test } from 'bun:test';
 import { monthKeysInRange } from '../analytics-charts';
 
-describe('monthKeysInRange — no month skipped on end-of-month starts (cycle 14)', () => {
+describe('monthKeysInRange — no month skipped on end-of-month starts', () => {
   test('Jan 31 -> Apr 30 includes February (the setMonth-overshoot regression)', () => {
     const keys = monthKeysInRange(new Date(2024, 0, 31), new Date(2024, 3, 30));
     expect(keys).toEqual(['2024-01', '2024-02', '2024-03', '2024-04']);

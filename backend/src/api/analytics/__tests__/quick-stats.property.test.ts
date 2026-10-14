@@ -245,7 +245,7 @@ describe('Property 3: Fleet health score is bounded weighted average', () => {
     expect(result.fleetHealthScore).toBe(0);
   });
 
-  // C350 (deep-review → guard): pin the FLEET-AGGREGATION semantic computeFleetHealthScore relies on —
+  // Pin the FLEET-AGGREGATION semantic computeFleetHealthScore relies on —
   // a vehicle with NO scorable data is INCLUDED in the mean at its default sub-scores, NOT excluded and
   // NOT zeroed. computeRegularityScore([])=50 + computeMileageScore([])=50 + insurance 0 →
   // round(50*0.4 + 50*0.35 + 0*0.25) = round(37.5) = 38. The existing tests pin bounds/integer/no-vehicles

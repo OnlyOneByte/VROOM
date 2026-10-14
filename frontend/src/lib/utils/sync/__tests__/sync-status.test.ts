@@ -1,10 +1,10 @@
 /**
- * C331 (guard) — pin getSyncStatusInfo, the user-facing sync-indicator derivation.
+ * Pin getSyncStatusInfo, the user-facing sync-indicator derivation.
  *
  * sync/sync-status.ts had ZERO test coverage. It's the centralized logic behind BOTH SyncStatusIndicator
  * and SyncStatusInline (the persistent sync badge), and its branch ORDER is load-bearing: the conditions
  * are evaluated as a PRIORITY CASCADE, not independent flags —
- *   offline  >  conflicts  >  syncing  >  error  >  success  >  pending  >  up-to-date
+ *  offline > conflicts > syncing > error > success > pending > up-to-date
  * so a refactor that reordered the `if`s (or flipped a comparison) would silently surface the WRONG status
  * — e.g. show "Synced" while offline, or hide an unresolved conflict behind a "Syncing…" spinner. These
  * pin every branch's {color, icon, text} AND the precedence between branches that can be true at once

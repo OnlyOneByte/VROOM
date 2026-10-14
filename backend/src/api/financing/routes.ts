@@ -92,7 +92,7 @@ async function enrichWithBalance(
 
 // T6 display edge for a financing API object (money cols + the derived computedBalance, cents→dollars) is
 // the shared financingWithBalanceToApi (utils/money.ts) — one source of truth with the vehicles route's
-// embedded-financing conversion (C22 dedup of the C14 self-dup). Aliased locally to keep the call sites terse.
+// embedded-financing conversion (dedup of the self-dup). Aliased locally to keep the call sites terse.
 const financingRowToApi = financingWithBalanceToApi;
 
 // GET /api/vehicles/:vehicleId/financing - Get financing details for a vehicle
@@ -153,15 +153,15 @@ routes.post(
       // the same vehicle reuses that row, and `isActive` is .optional() in the create schema (it's a
       // .notNull().default(true) column, so drizzle-zod omits it) → the client never sends it → the
       // update would LEAVE isActive=false, silently dropping the new active financing from
-      // the isActive-filtered queries (loanBreakdown/analytics) + the FE's isActive gate (#67). Re-activate
+      // the isActive-filtered queries (loanBreakdown/analytics) + the FE's isActive gate. Re-activate
       // explicitly, mirroring how create() defaults isActive=true. A still-active record stays active
       // (idempotent). endDate is likewise cleared so a stale payoff/lease-end date can't linger.
       //
-      // The cross-type optional fields must ALSO be reset, not merged (C293, the sibling defect to the
-      // #67 reset). `update()` skips `undefined` keys, but these are all `.optional()` in the create
+      // The cross-type optional fields must ALSO be reset, not merged (the sibling defect to the
+      // reset). `update()` skips `undefined` keys, but these are all `.optional()` in the create
       // schema — so switching a vehicle's financing TYPE (lease↔loan) without re-sending the prior
       // type's fields would LEAVE them stale (a `loan` row carrying a lease `mileageLimit`, consumed by
-      // FE lease-metrics + the Sheets export — NORTH_STAR #2). A fresh create() defaults each absent
+      // FE lease-metrics + the Sheets export). A fresh create() defaults each absent
       // nullable column to NULL; the create-or-REPLACE path must produce the same clean row. Coalesce
       // every optional cross-type/schedule field to null so the reused row mirrors a fresh insert.
       const updatedFinancing = await financingRepository.update(existingFinancing.id, {

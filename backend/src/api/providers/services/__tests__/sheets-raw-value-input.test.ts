@@ -1,14 +1,14 @@
 /**
- * Regression GUARD (committed, travels with the merge) for the #36 bug class (fixed C24):
+ * Regression GUARD (committed, travels with the merge) for the bug class:
  * a Google Sheets BACKUP write must use `valueInputOption: 'RAW'`, never 'USER_ENTERED'.
  *
  * USER_ENTERED makes Sheets PARSE each cell as if a human typed it: a value beginning with a
  * formula trigger (`=` `+` `-` `@`) becomes a LIVE formula (injection), and the cell silently
  * round-trips back as the formula RESULT, not the text the user stored — corruption of the user's
- * OWN backup (NORTH_STAR #1). RAW stores the literal string, so backup→restore is byte-exact and
- * inert. The C24 fix flipped the single write site to RAW.
+ * OWN backup. RAW stores the literal string, so backup→restore is byte-exact and
+ * inert. The fix flipped the single write site to RAW.
  *
- * The C24 fake-seam test (google-sheets-service.test.ts) asserts the CURRENT write path sends RAW,
+ * The fake-seam test (google-sheets-service.test.ts) asserts the CURRENT write path sends RAW,
  * but it only drives the one code path that exists today. This SOURCE SCAN is the tree-wide net: it
  * pins that EVERY `valueInputOption:` assignment in the Sheets service is 'RAW', so a future reformat
  * flipping it back, OR a NEW write site added with USER_ENTERED, regresses RED here even if no test
@@ -33,7 +33,7 @@ const SHEETS_SERVICE = join(HERE, '..', 'google-sheets-service.ts');
 // can assert it positively; whitespace-tolerant.
 const VALUE_INPUT_OPTION = /valueInputOption\s*:\s*['"]([^'"]+)['"]/g;
 
-describe('Sheets backup writes use RAW value-input (#36 class guard)', () => {
+describe('Sheets backup writes use RAW value-input', () => {
   test('the scan resolves the real Sheets service file (guard is live, not a no-op)', () => {
     expect(
       readFileSync(SHEETS_SERVICE, 'utf8').length,
@@ -57,7 +57,7 @@ describe('Sheets backup writes use RAW value-input (#36 class guard)', () => {
       offenders,
       `A Sheets backup write uses a non-RAW valueInputOption (${offenders.join(', ')}). USER_ENTERED ` +
         `lets a "=…" cell become a live formula + silently round-trips as the formula result — backup ` +
-        `corruption (#36). Use 'RAW' so cells are stored verbatim.`
+        `corruption. Use 'RAW' so cells are stored verbatim.`
     ).toEqual([]);
   });
 });

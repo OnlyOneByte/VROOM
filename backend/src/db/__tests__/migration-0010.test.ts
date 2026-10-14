@@ -1,16 +1,16 @@
 /**
- * Migration 0010: vehicle_shares (vehicle-sharing T1; Angelo ratified D1-D8 2026-06-27).
+ * Migration 0010: vehicle_shares (vehicle-sharing T1).
  *
  * Purely ADDITIVE — a single CREATE TABLE + three indexes, the 0003/0007 additive class (no backfill,
  * no table rebuild). This test is the proof gate that 0010 is additive AND that the share constraints
  * hold:
- *   - the table + its three indexes exist after the migration,
- *   - all three FKs (vehicle, owner, invitee) cascade-delete the share row (D8),
- *   - the partial-unique active-share index rejects a SECOND pending/accepted share for the same
- *     (vehicle, invitee) but ALLOWS re-inviting after the prior share is declined/revoked (design §1),
- *   - 0010 did NOT rebuild/drop any existing table (the C15 / migration-0004 cascade-wipe footgun:
- *     drizzle-kit tried to bundle 6 table rebuilds off a stale 0009 snapshot; T1 stripped them, and
- *     this test pins that the existing data survives applying 0010).
+ *  - the table + its three indexes exist after the migration,
+ *  - all three FKs (vehicle, owner, invitee) cascade-delete the share row (D8),
+ *  - the partial-unique active-share index rejects a SECOND pending/accepted share for the same
+ *  (vehicle, invitee) but ALLOWS re-inviting after the prior share is declined/revoked (design §1),
+ *  - 0010 did NOT rebuild/drop any existing table (the / migration-0004 cascade-wipe footgun:
+ *  drizzle-kit tried to bundle 6 table rebuilds off a stale 0009 snapshot; T1 stripped them, and
+ *  this test pins that the existing data survives applying 0010).
  *
  * foreign_keys = ON reproduces production (what makes a stray DROP cascade-hazardous).
  */

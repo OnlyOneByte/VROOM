@@ -3,12 +3,12 @@
  * expenses list. No DOM / store / IO coupling, so this is straight input→output.
  *
  * Pins the behavior that's easy to break in a refactor:
- *   - search matches across description / tags / category / amount (as a
- *     SUBSTRING of the stringified amount — "5" matches 5, 50, 15.50), case-insensitively
- *   - category / tags (any-match) / date-range (INCLUSIVE on both ends) filters
- *   - the no-filters fast-path returns the original array reference
- *   - hasActiveFilters mirrors the same predicate
- *   - extractUniqueTags dedups + sorts
+ *  - search matches across description / tags / category / amount (as a
+ *  SUBSTRING of the stringified amount — "5" matches 5, 50, 15.50), case-insensitively
+ *  - category / tags (any-match) / date-range (INCLUSIVE on both ends) filters
+ *  - the no-filters fast-path returns the original array reference
+ *  - hasActiveFilters mirrors the same predicate
+ *  - extractUniqueTags dedups + sorts
  */
 
 import { describe, expect, test } from 'vitest';
@@ -41,7 +41,7 @@ describe('filterExpenses — no filters fast path', () => {
 	});
 
 	test('whitespace-only search does NOT hit the fast path but returns equal contents', () => {
-		// The fast path guards on `!searchTerm`, and '   ' is truthy, so it falls
+		// The fast path guards on `!searchTerm`, and ' ' is truthy, so it falls
 		// through and copies the array; the search itself is skipped because
 		// `searchTerm.trim()` is empty. Result: a NEW array with the same items.
 		const list = [expense({ id: 'a' }), expense({ id: 'b' })];
@@ -123,11 +123,11 @@ describe('filterExpenses — structured filters', () => {
 		).toEqual(['b']);
 	});
 
-	// #106 (C358): the DateRangePicker binds a date-only 'YYYY-MM-DD' (CalendarDate.toString()), and the
+	// The DateRangePicker binds a date-only 'YYYY-MM-DD' (CalendarDate.toString()), and the
 	// old `<= new Date(endDate)` treated that as midnight UTC → an expense ON the chosen end day was
 	// EXCLUDED (off-by-one). The bounds are now LOCAL calendar days with an inclusive end. These pin a
 	// date-picker-shaped range including an expense logged later in the day on the end boundary.
-	describe('#106 — date-picker (YYYY-MM-DD) end boundary is inclusive of the whole day', () => {
+	describe('date-picker (YYYY-MM-DD) end boundary is inclusive of the whole day', () => {
 		// An expense stored at noon-local (how dateOnlyToISO persists a date-only entry) on the end day.
 		const noonOnEndDay = new Date(2024, 5, 15, 12, 0, 0).toISOString(); // 2024-06-15 noon LOCAL
 		const dayList = [
@@ -136,7 +136,7 @@ describe('filterExpenses — structured filters', () => {
 			expense({ id: 'after', date: new Date(2024, 5, 16, 12, 0, 0).toISOString() })
 		];
 
-		test('endDate = the picker day INCLUDES an expense logged that day (was excluded pre-#106)', () => {
+		test('endDate = the picker day INCLUDES an expense logged that day (was excluded pre-)', () => {
 			const out = filterExpenses(dayList, '', { endDate: '2024-06-15' }).map(e => e.id);
 			expect(out).toContain('onEnd'); // the load-bearing assertion
 			expect(out).not.toContain('after');

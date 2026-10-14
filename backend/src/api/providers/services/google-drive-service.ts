@@ -34,11 +34,11 @@ export class GoogleDriveService {
   private drive: drive_v3.Drive;
 
   /**
-   * @param refreshToken  Google OAuth refresh token (ignored when `driveClient` is injected).
-   * @param driveClient   Optional pre-built Drive client. Inject an in-memory fake in tests
-   *                       to exercise the real service logic (folder dedup, path walking,
-   *                       upload/list/delete) with ZERO network and no `mock.module` leakage.
-   *                       Production callers omit it and an OAuth2-authed client is built.
+   * @param refreshToken Google OAuth refresh token (ignored when `driveClient` is injected).
+   * @param driveClient Optional pre-built Drive client. Inject an in-memory fake in tests
+   *  to exercise the real service logic (folder dedup, path walking,
+   *  upload/list/delete) with ZERO network and no `mock.module` leakage.
+   *  Production callers omit it and an OAuth2-authed client is built.
    */
   constructor(refreshToken: string, driveClient?: drive_v3.Drive) {
     if (driveClient) {

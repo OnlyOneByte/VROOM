@@ -52,13 +52,13 @@ interface FakeSpreadsheet {
   values: Map<string, (string | number | boolean)[][]>;
   /**
    * sheet title → the `valueInputOption` the last values.update for it passed. The grid is stored
-   * identically regardless of the option, so a round-trip read can't prove we send RAW (the #36 formula-
+   * identically regardless of the option, so a round-trip read can't prove we send RAW (the formula-
    * injection fix); this captures the option so a guard can assert it directly (RAW vs USER_ENTERED).
    */
   valueInputOptions: Map<string, string | undefined>;
   /**
    * Monotonic sheetId source. Real Sheets never reuses a sheetId; using `sheets.length` would collide
-   * after a delete+rename cycle (the #37 atomic-swap backup deletes old tabs then renames staging ones),
+   * after a delete+rename cycle (the atomic-swap backup deletes old tabs then renames staging ones),
    * so the second backup's addSheet would clash with a surviving id. Counts only ever up.
    */
   nextSheetId: number;
@@ -351,7 +351,7 @@ function applyDeleteSheet(ss: FakeSpreadsheet, req: sheets_v4.Schema$DeleteSheet
 
 /**
  * updateSheetProperties: rename a tab (carrying its grid + value-input option to the new title) and/or
- * reposition it to `index`. The #37 atomic swap renames each staging tab to its canonical title AND sets
+ * reposition it to `index`. The atomic swap renames each staging tab to its canonical title AND sets
  * index to its canonical position so tab order is preserved across backups; honoring index here lets the
  * order assertion exercise that. Reposition = remove from current slot, splice in at `index`.
  */
@@ -385,7 +385,7 @@ function applyRenameSheet(
 /**
  * Apply a spreadsheets.batchUpdate request list in order: addSheet (new empty tab, monotonic id),
  * deleteSheet (drop a tab + its grid), updateSheetProperties (rename a tab, carrying its grid +
- * value-input option to the new title). This is the surface the #37 atomic-swap backup drives
+ * value-input option to the new title). This is the surface the atomic-swap backup drives
  * (stage → delete old + rename staging → canonical, all in one batch).
  */
 function applyBatchRequests(ss: FakeSpreadsheet, requests: sheets_v4.Schema$Request[]): void {

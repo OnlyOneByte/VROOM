@@ -2,12 +2,12 @@
  * Tests for syncOfflineExpenses — the offline-queue → server orchestration that
  * the offline-storage CRUD tests don't touch. This is the branch's namesake and
  * the highest data-loss-stakes path, so it pins the data-safety contract:
- *   - happy path: every pending expense is POSTed (each carrying its idempotency
- *     clientId) and the queue is cleared; syncState ends idle
- *   - PARTIAL failure: when one POST rejects, the already-sent ones are marked
- *     synced (so a retry won't duplicate them), the failed + remaining stay
- *     pending (retried next sync), and syncState goes to 'error' — nothing lost
- *   - a malformed fuel expense (no volume/charge or no mileage) is skipped
+ *  - happy path: every pending expense is POSTed (each carrying its idempotency
+ *  clientId) and the queue is cleared; syncState ends idle
+ *  - PARTIAL failure: when one POST rejects, the already-sent ones are marked
+ *  synced (so a retry won't duplicate them), the failed + remaining stay
+ *  pending (retried next sync), and syncState goes to 'error' — nothing lost
+ *  - a malformed fuel expense (no volume/charge or no mileage) is skipped
  *
  * Uses the REAL offline-storage (round-tripping through the setup's stateful
  * localStorage mock) and mocks only fetch, the way sync-manager.test does.
@@ -114,13 +114,13 @@ describe('syncOfflineExpenses', () => {
 		expect(body.clientId).toBe('cid-ok');
 	});
 
-	// CHARACTERIZATION of the CURRENT behavior of a skipped malformed fuel entry (the #79 finding,
-	// C231 deep-review): a `continue`-skipped entry is never markExpenseAsSynced'd, so the trailing
+	// CHARACTERIZATION of the CURRENT behavior of a skipped malformed fuel entry (the finding,
+	// deep-review): a `continue`-skipped entry is never markExpenseAsSynced'd, so the trailing
 	// clearSyncedExpenses() (which only drops synced===true) leaves it PENDING in the queue — forever,
 	// silently re-skipped on every future sync with no user signal. This pins that stuck-forever
 	// behavior so a fix can't change it unnoticed. The RESOLUTION (drop it / surface an error / move to
-	// a "failed" bucket) is a product call ESCALATED to Angelo (#79) — NOT decided here.
-	it('CHARACTERIZATION (#79): a skipped malformed fuel entry stays stuck in the queue, unsynced', async () => {
+	// a "failed" bucket) is a product call, NOT decided here.
+	it('CHARACTERIZATION: a skipped malformed fuel entry stays stuck in the queue, unsynced', async () => {
 		saveOfflineExpenses([pending('fuel-bad', { category: 'fuel' }), pending('ok')]);
 		mockFetch.mockImplementation(() => Promise.resolve(apiOk()));
 

@@ -4,7 +4,7 @@
  * Adds:
  * - expenses.client_id (nullable TEXT) — offline outbox idempotency key
  * - expenses_user_client_idx (partial UNIQUE index on (user_id, client_id)
- *   WHERE client_id IS NOT NULL)
+ *  WHERE client_id IS NOT NULL)
  */
 
 import { Database } from 'bun:sqlite';

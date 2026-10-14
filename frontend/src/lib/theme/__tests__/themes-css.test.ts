@@ -2,14 +2,14 @@
  * Theming engine T7 — themes.css generator + the checked-in-file freshness guard.
  *
  * Two concerns:
- *   1. GENERATOR CORRECTNESS: for a non-default theme, emit `:root[data-theme="<id>"]` (light) +
- *      `:root[data-theme="<id>"].dark` (dark) blocks declaring EVERY token. Driven with a synthetic theme
- *      so the structure is pinned even while the real registry has only `default` (which is excluded —
- *      app.css owns its bare :root/.dark).
- *   2. CHECKED-IN FRESHNESS: the committed `themes.css` must equal `generateThemesCss(THEME_REGISTRY)`
- *      byte-for-byte. So adding/removing a registry theme without regenerating the file trips this — the
- *      file can't silently drift from the registry (the C25/C170 source-scan idiom, applied to a codegen
- *      artifact). And it pins that the generated file covers exactly the non-default registry ids.
+ *  1. GENERATOR CORRECTNESS: for a non-default theme, emit `:root[data-theme="<id>"]` (light) +
+ *  `:root[data-theme="<id>"].dark` (dark) blocks declaring EVERY token. Driven with a synthetic theme
+ *  so the structure is pinned even while the real registry has only `default` (which is excluded —
+ *  app.css owns its bare :root/.dark).
+ *  2. CHECKED-IN FRESHNESS: the committed `themes.css` must equal `generateThemesCss(THEME_REGISTRY)`
+ *  byte-for-byte. So adding/removing a registry theme without regenerating the file trips this — the
+ *  file can't silently drift from the registry (the source-scan idiom, applied to a codegen
+ *  artifact). And it pins that the generated file covers exactly the non-default registry ids.
  */
 
 import { readFileSync } from 'node:fs';
@@ -79,7 +79,7 @@ describe('themes.css generator (T7)', () => {
   // TWO non-default themes given OUT of id-order: both generateThemesCss (block order) and
   // nonDefaultThemeIds must emit them id-SORTED. This drives the `.sort((a,b) => a.id.localeCompare(b.id))`
   // comparator in BOTH functions (themes-css.ts:50/65) — the existing single-SYNTHETIC tests never compare
-  // two elements, so the comparator was uncovered (the C250/C251 reachable-branch pattern; no `instrument`
+  // two elements, so the comparator was uncovered (the reachable-branch pattern; no `instrument`
   // / no DB / no gate needed). A regression to insertion-order or a reversed comparator turns this RED.
   test('multiple non-default themes are emitted id-sorted (the comparator fires with ≥2)', () => {
     const zz: ThemeDefinition = { ...SYNTHETIC, id: 'zztheme', label: 'ZZ' };
@@ -119,7 +119,7 @@ describe('checked-in themes.css is in sync with the registry (T7 freshness guard
  * guard: byte-freshness (the file is fine), registry-integrity (the registry is fine), contrast +
  * distinctness (the token values are fine) — all stay GREEN while themes are dead in the running app. The
  * only thing standing between "registered" and "actually paints" is this one import line; pin it (the
- * C190/C201 cross-file source-scan idiom on the layout↔css coupling). app.css is checked as the sibling
+ * cross-file source-scan idiom on the layout↔css coupling). app.css is checked as the sibling
  * (both are load-bearing layout-level imports; losing either is a visual regression no unit test sees).
  */
 describe('themes.css is wired into the app via the root layout (T7 wiring guard)', () => {
@@ -144,7 +144,7 @@ describe('themes.css is wired into the app via the root layout (T7 wiring guard)
  * guard above: that pins the CSS reaches the bundle; this pins the picker reaches the page. The one mount
  * line on settings/+page.svelte (the `import` + the `<ThemePickerCard />` tag) is all that stands between
  * "engine built + CSS shipped" and "a user can switch themes" — drop it and the feature silently vanishes
- * from the UI with a fully-green suite. Pin both the import and the tag (the C190/C201 cross-file
+ * from the UI with a fully-green suite. Pin both the import and the tag (the cross-file
  * source-scan idiom on the route↔component coupling).
  */
 describe('ThemePickerCard is mounted on the settings route (picker-reachability guard)', () => {
@@ -170,7 +170,7 @@ describe('ThemePickerCard is mounted on the settings route (picker-reachability 
  * `each_key_duplicate` at runtime on a keyed `{#each ... (color)}` with a repeated key — crashing the whole
  * picker for that theme. Nothing else catches this: the two current themes happen to have 4 distinct swatch
  * colors, so it is GREEN today and only trips when a future palette (bento/vaporwave/…) ships a dup. This
- * source-scan pins the index-key contract (the C25/C45 one-edit-fix → source-scan idiom on a .svelte loop).
+ * source-scan pins the index-key contract (the one-edit-fix → source-scan idiom on a .svelte loop).
  */
 describe('ThemePickerCard swatch loop is keyed crash-safely (index, not color)', () => {
   const PICKER = readFileSync(
@@ -191,16 +191,16 @@ describe('ThemePickerCard swatch loop is keyed crash-safely (index, not color)',
  * the user is ACTUALLY in, not a hardcoded one. The whole point of the preview is to not LIE about what
  * applying a theme yields: in dark mode the swatch must show that theme's DARK tokens (e.g. default's
  * primary inverts from near-black oklch(0.21) in light to near-white oklch(0.92) in dark). Certified
- * firsthand eyes-on C348 (shot /settings in light AND dark — the Default swatch's lead square inverts
+ * firsthand eyes-on (shot /settings in light AND dark — the Default swatch's lead square inverts
  * black↔white, blueprint/cyberpunk shift hue+lightness), but NOTHING guards the resolution: a regression
  * to `theme.light` (or `theme.dark`) would make every off-mode preview lie, and it is invisible to a
  * single-mode shot, to byte-freshness (themes.css is fine), and to the swatch-key guard above. This pins
  * the two-link reactive chain in ThemePickerCard.svelte:
- *   1. swatchColors reads `theme[variant]` — the DYNAMIC variant, not a literal `theme.light`/`theme.dark`,
- *   2. `variant` is derived from resolveVariant(mode, …) over the store's active mode (themeStore.current).
- * Source-scan idiom (C25/C190), applied to the picker's preview-correctness contract.
+ *  1. swatchColors reads `theme[variant]` — the DYNAMIC variant, not a literal `theme.light`/`theme.dark`,
+ *  2. `variant` is derived from resolveVariant(mode, …) over the store's active mode (themeStore.current).
+ * Source-scan idiom, applied to the picker's preview-correctness contract.
  */
-describe('ThemePickerCard swatch previews are variant-aware (C348 preview-correctness guard)', () => {
+describe('ThemePickerCard swatch previews are variant-aware (preview-correctness guard)', () => {
   const PICKER = readFileSync(
     `${process.cwd()}/src/lib/components/settings/cards/ThemePickerCard.svelte`,
     'utf8'
@@ -216,7 +216,7 @@ describe('ThemePickerCard swatch previews are variant-aware (C348 preview-correc
   test('the variant is derived from resolveVariant over the active mode (not a constant)', () => {
     // variant = resolveVariant(mode, getSystemTheme()) where mode tracks themeStore.current — so flipping
     // light/dark (or the OS pref under `system`) re-resolves which variant the swatches preview. The OS arm
-    // routes through the SHARED getSystemTheme (C349) so the preview resolves `system` exactly as applyTheme.
+    // routes through the SHARED getSystemTheme so the preview resolves `system` exactly as applyTheme.
     expect(PICKER).toMatch(/variant\s*=\s*\$derived\(\s*resolveVariant\(\s*mode\s*,/);
     expect(PICKER).toMatch(/mode\s*=\s*\$derived\(\s*themeStore\.current\s*\)/);
     // The `system`-mode OS resolution must route through the shared store helper, not a local copy.

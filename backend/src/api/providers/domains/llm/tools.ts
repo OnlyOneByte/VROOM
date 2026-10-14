@@ -3,18 +3,18 @@
  *
  * The assistant answers questions over the user's OWN car data by calling these tools; the model NEVER
  * touches the DB directly. Every entry is:
- *   - READ-ONLY — no tool mutates anything (v1 is read-only by construction, design §8.1: there is no
- *     model-driven write path to secure);
- *   - userId-SCOPED — `run(args, userId)` takes the userId from the AUTHENTICATED SESSION (the orchestrator
- *     passes `c.get('user').id`), NEVER from a model-supplied argument. No tool arg is a userId/ownerId, so
- *     the model can only ever read the requesting user's own rows (ARCC confused-deputy guard);
- *   - typed + bounded — `args` is a Zod schema; the orchestrator parses the model's raw JSON args through
- *     it BEFORE calling `run`, and passes a typed OBJECT to the existing repo (ARCC AIQi: build queries as
- *     objects, never concatenate model text). An out-of-set `range`/bad arg is rejected, not coerced.
+ *  - READ-ONLY — no tool mutates anything (v1 is read-only by construction, design §8.1: there is no
+ *  model-driven write path to secure);
+ *  - userId-SCOPED — `run(args, userId)` takes the userId from the AUTHENTICATED SESSION (the orchestrator
+ *  passes `c.get('user').id`), NEVER from a model-supplied argument. No tool arg is a userId/ownerId, so
+ *  the model can only ever read the requesting user's own rows (ARCC confused-deputy guard);
+ *  - typed + bounded — `args` is a Zod schema; the orchestrator parses the model's raw JSON args through
+ *  it BEFORE calling `run`, and passes a typed OBJECT to the existing repo (ARCC AIQi: build queries as
+ *  objects, never concatenate model text). An out-of-set `range`/bad arg is rejected, not coerced.
  * A model-supplied `vehicleId` is re-checked via `requireVehicleRead(vehicleId, userId)` (throws
  * NotFoundError on no-access — existence-hiding) so it can never widen scope to another user's vehicle.
  *
- * The tool list itself is fork D4 (Angelo may trim/extend it); the LAYER + its scope discipline are
+ * The tool list itself is fork D4 (it may be trimmed or extended); the LAYER + its scope discipline are
  * fork-free and foundational — T2 ships them so T4's orchestrator has a validated, safe surface to call.
  */
 

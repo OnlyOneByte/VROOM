@@ -271,10 +271,10 @@ async function processSingleRef(
 
     // A revoked/expired token (AUTH_INVALID) or a denied scope (PERMISSION_DENIED) is TERMINAL —
     // retrying it burns backoff cycles and never succeeds. The provider adapters deliberately map
-    // a 401/403 to these codes (#105) "so the user re-connects"; honor that here by jumping
+    // a 401/403 to these codes "so the user re-connects"; honor that here by jumping
     // retryCount straight to the cap so findPendingOrFailed (`retryCount < 3`) stops re-picking it,
     // and prefix the message so the provider-stats `failed` count surfaces "reconnect required"
-    // rather than masquerading as a transient network flake (#144, the #105/#43/#44 family at the
+    // rather than masquerading as a transient network flake (the family at the
     // sync-worker consumer leg).
     const isTerminalAuth =
       isSyncError(error) &&

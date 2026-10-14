@@ -8,8 +8,8 @@
  *  - no google-photos provider → 400 (actionable);
  *  - a google-photos provider but no vlm provider → 400 (actionable);
  *  - both present → a clean multi-photo sweep returns drafts (download → parse → fresh thumbnail), and
- *    an already-imported photo is filtered out (the idempotency cross-ref, D3) — PERSISTS NOTHING;
- *  - a Photos transport failure → 502, the HONEST failure (never a faked empty result, #43/#44/#144);
+ *  an already-imported photo is filtered out (the idempotency cross-ref, D3) — PERSISTS NOTHING;
+ *  - a Photos transport failure → 502, the HONEST failure (never a faked empty result);
  *  - unauth → 401.
  */
 

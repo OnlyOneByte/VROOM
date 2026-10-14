@@ -7,14 +7,14 @@
  * DUMB TRANSPORT (design §3/§4): maps VROOM's ChatMessage[] + ToolDefinition[] into Gemini's wire format
  * and normalizes the response into `{ text?, toolCalls? }`; it NEVER executes a tool or trusts the args —
  * the orchestrator (T4) validates. A non-2xx / network / timeout failure THROWS (the chat route maps it
- * to 502; never a faked success — the #43/#44/#144 anti-fail-open lesson).
+ * to 502; never a faked success — the anti-fail-open lesson).
  *
  * Wire mapping notes:
  *  - Gemini roles are `user` / `model` (assistant→model). A `system` ChatMessage → top-level
- *    `systemInstruction`. Tools → a single `{ functionDeclarations: [...] }` entry.
+ *  `systemInstruction`. Tools → a single `{ functionDeclarations: [...] }` entry.
  *  - A `tool` RESULT goes back as a `function`-role part `{ functionResponse: { name, response } }`.
  *  - A response part may be `text` OR `functionCall { name, args }`; a functionCall → ChatResult.toolCalls
- *    (name + JSON.stringify(args)); otherwise the joined text → ChatResult.text.
+ *  (name + JSON.stringify(args)); otherwise the joined text → ChatResult.text.
  */
 
 import { logger } from '../../../../utils/logger';

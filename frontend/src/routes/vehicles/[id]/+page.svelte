@@ -155,11 +155,11 @@
 
 	// vehicle-sharing T12b-3b: gate the edit affordances by the viewer's access level. The single-vehicle
 	// GET returns `sharedAccess { level }` for a NON-owner (undefined for the owner). Two capabilities:
-	//   - isOwner  → owner-ONLY affordances (edit vehicle info, finance, share management, photos, CSV
-	//     export) — all of these stay strict `validateVehicleOwnership` server-side, so a non-owner must
-	//     not see a button that would 404.
-	//   - canWrite → owner OR an accepted EDITOR (expense + odometer add/edit/delete) — widened
-	//     server-side in T5b-2/T6 via `requireVehicleWrite`.
+	//  - isOwner → owner-ONLY affordances (edit vehicle info, finance, share management, photos, CSV
+	//  export) — all of these stay strict `validateVehicleOwnership` server-side, so a non-owner must
+	//  not see a button that would 404.
+	//  - canWrite → owner OR an accepted EDITOR (expense + odometer add/edit/delete) — widened
+	//  server-side in T5b-2/T6 via `requireVehicleWrite`.
 	// This is defense-in-depth UX: the backend already enforces every denial; hiding the chrome avoids a
 	// viewer clicking an affordance that errors. An owned vehicle carries no `sharedAccess` → isOwner=true.
 	let isOwner = $derived(!vehicle?.sharedAccess);
@@ -173,7 +173,7 @@
 
 	// Lazy-load InsuranceTab when overview tab is active and page has loaded. T12b-3c: loaded for a
 	// shared viewer/editor too (read-only) now that the per-vehicle policies LIST (T8b) AND the claims
-	// sub-reads (C475) are both widened to shared read; the render-site passes `readOnly={!isOwner}`.
+	// sub-reads are both widened to shared read; the render-site passes `readOnly={!isOwner}`.
 	$effect(() => {
 		if (!isLoading && !hasLoadedInsurance && activeTab === 'overview') {
 			hasLoadedInsurance = true;
@@ -442,9 +442,9 @@
 					/>
 				</div>
 
-				<!-- Insurance Summary (lazy-loaded). T12b-3c: shown to a shared viewer/editor in READ-ONLY
-				     mode (readOnly={!isOwner}) — the per-vehicle policies LIST (T8b) + the claims sub-reads
-				     (C475) are both widened to shared read, and the InsuranceTab tree hides every mutate
+				<!-- Insurance Summary (lazy-loaded). Shown to a shared viewer/editor in READ-ONLY
+				     mode (readOnly={!isOwner}) — the per-vehicle policies list and the claims sub-reads
+				     are both widened to shared read, and the InsuranceTab tree hides every mutate
 				     affordance (add/edit/renew/delete policy + term, file/edit/delete claim, upload/delete
 				     document) when readOnly. Insurance WRITES stay owner-only server-side (validateInsurance-
 				     Ownership denies BOTH viewer and editor), so readOnly tracks !isOwner, not !canWrite. -->

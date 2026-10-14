@@ -27,7 +27,7 @@
 
 	// The concrete variant (light|dark) the previews should show, tracking the active mode. Under `system`
 	// the OS preference is resolved by the SAME getSystemTheme the store's applyTheme uses (single source of
-	// truth — so the preview can never disagree with what applying the theme will actually render, C349).
+	// truth — so the preview can never disagree with what applying the theme will actually render).
 	let variant = $derived(resolveVariant(mode, getSystemTheme()));
 
 	// Each theme's own swatch colors, resolved from ITS definition (not the live CSS vars, which only

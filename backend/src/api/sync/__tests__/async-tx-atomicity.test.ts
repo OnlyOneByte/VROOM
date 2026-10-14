@@ -1,20 +1,20 @@
 /**
- * #127-class async-tx atomicity sweep (C504) — the C151 footgun closed across the multi-write repos.
+ * -class async-tx atomicity sweep — the footgun closed across the multi-write repos.
  *
  * bun-sqlite is a SYNCHRONOUS dialect: an `async` transaction() callback returns a pending promise, so
  * bun's BEGIN/COMMIT wrap nothing and each `await tx.*` autocommits independently — a throw mid-callback
- * does NOT roll back earlier writes. C504 converted the 7 genuine multi-write gaps to SYNCHRONOUS
+ * does NOT roll back earlier writes. converted the 7 genuine multi-write gaps to SYNCHRONOUS
  * callbacks (.run()/.all()/.get() inline) so each is now ONE real transaction that rolls back atomically.
  *
  * These guards FORCE a mid-transaction failure and assert NO partial state survives. The forcing function
  * is a junction-row FK violation: reminder_vehicles.vehicleId and insurance_term_vehicles.vehicleId both
  * FK vehicles(id) with PRAGMA foreign_keys=ON, so a junction insert referencing a NON-EXISTENT vehicle
- * throws AFTER the parent row (reminder / term) was inserted in the same callback. Pre-C504 (async) the
- * parent stayed committed (orphan reminder with no vehicles = the #97 state; term with zero coverage);
- * post-C504 (sync) the whole transaction rolls back. Calling the repos DIRECTLY bypasses the route-layer
+ * throws AFTER the parent row (reminder / term) was inserted in the same callback. Pre- (async) the
+ * parent stayed committed (orphan reminder with no vehicles = the state; term with zero coverage);
+ * post- (sync) the whole transaction rolls back. Calling the repos DIRECTLY bypasses the route-layer
  * ownership pre-check, which is exactly what lets the bogus id reach the junction insert.
  *
- * Covers BOTH invocation styles: reminders uses the module-level `transaction()` helper (retyped C504 to
+ * Covers BOTH invocation styles: reminders uses the module-level `transaction()` helper (retyped to
  * accept a sync callback); insurance uses `this.db.transaction(...)` directly.
  */
 
@@ -38,7 +38,7 @@ function insuranceTermCount(): number {
   return r.n;
 }
 
-describe('async-tx atomicity sweep (#127 class, C504)', () => {
+describe('async-tx atomicity sweep', () => {
   test('reminders.createWithVehicles rolls back the reminder when a junction insert FK-fails (transaction() helper path)', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const { reminderRepository } = await import('../../reminders/repository');
@@ -46,7 +46,7 @@ describe('async-tx atomicity sweep (#127 class, C504)', () => {
     expect(reminderCount()).toBe(0);
 
     // One real vehicle + one BOGUS id → the 2nd junction insert FK-violates AFTER the reminder row
-    // inserted in the same sync transaction. Pre-C504 the reminder persisted vehicle-less (#97); now it
+    // inserted in the same sync transaction. Pre- the reminder persisted vehicle-less; now it
     // rolls back.
     let threw = false;
     try {
@@ -66,7 +66,7 @@ describe('async-tx atomicity sweep (#127 class, C504)', () => {
 
     expect(threw, 'the FK violation should surface as a throw').toBe(true);
     // THE ATOMICITY ASSERTION: no orphan reminder row survived the failed create.
-    expect(reminderCount(), 'reminder row rolled back (no #97 vehicle-less orphan)').toBe(0);
+    expect(reminderCount(), 'reminder row rolled back (no vehicle-less orphan)').toBe(0);
   });
 
   test('insurance.create rolls back the policy + terms when a term junction FK-fails (db.transaction path)', async () => {

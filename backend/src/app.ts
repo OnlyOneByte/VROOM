@@ -61,8 +61,8 @@ app.use(
  * - fontSrc: Add CDN domains if using external fonts
  *
  * Example for Google Drive integration:
- *   imgSrc: ["'self'", 'data:', 'https:', 'https://drive.google.com']
- *   connectSrc: ["'self'", 'https://www.googleapis.com']
+ *  imgSrc: ["'self'", 'data:', 'https:', 'https://drive.google.com']
+ *  connectSrc: ["'self'", 'https://www.googleapis.com']
  */
 app.use(
   '*',

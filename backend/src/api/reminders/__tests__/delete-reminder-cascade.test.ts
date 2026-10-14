@@ -1,12 +1,12 @@
 /**
- * recurring-expenses T3 (C104): cascade-safe delete (R4, D2).
+ * recurring-expenses T3: cascade-safe delete (R4, D2).
  *
  * A 'expense'-type reminder auto-materializes real expense rows (sourceType:'reminder',
- * sourceId:reminder.id). Per D2 (ratified C94), deleting the reminder must NOT delete that
+ * sourceId:reminder.id). Per D2 (ratified), deleting the reminder must NOT delete that
  * history — it severs the link via clearSource('reminder', id, userId): the expense rows STAY,
  * their sourceType/sourceId are nulled, and no future materialization occurs (the reminder is
  * gone). This pins that contract through the real route→trigger→delete stack. The clearSource
- * primitive itself was certified C101 (userId-scoped, keeps rows); this pins the WIRING.
+ * primitive itself was certified (userId-scoped, keeps rows); this pins the WIRING.
  *
  * Mirrors trigger-expense.test.ts (createTestApp; static imports to the harness + bun:test).
  */

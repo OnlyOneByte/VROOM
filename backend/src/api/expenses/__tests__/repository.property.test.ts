@@ -167,9 +167,9 @@ function makeExpense(overrides: {
 /**
  * Reference implementation of the filtering/sorting contract that
  * `findFinancingByVehicleId` must satisfy:
- *   - Only expenses with `sourceType === 'financing'`
- *   - Only expenses matching the target `vehicleId`
- *   - Sorted by date ascending
+ *  - Only expenses with `sourceType === 'financing'`
+ *  - Only expenses matching the target `vehicleId`
+ *  - Sorted by date ascending
  */
 function referenceQuery(allExpenses: Expense[], vehicleId: string): Expense[] {
   return allExpenses

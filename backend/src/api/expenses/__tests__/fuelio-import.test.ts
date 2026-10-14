@@ -121,7 +121,7 @@ describe('Fuelio → native CSV → buildImportPlan (end-to-end)', () => {
     const service = costs.find((e) => e?.description?.includes('Oil change'))!;
     expect(service.category).toBe('maintenance'); // Fuelio "Service" → maintenance
     expect(service.expenseAmount).toBe(8900);
-    expect(service.mileage).toBeNull(); // non-fuel row must not carry an odometer (#137)
+    expect(service.mileage).toBeNull(); // non-fuel row must not carry an odometer
     expect(service.volume).toBeNull();
 
     const ferry = costs.find((e) => e?.description?.includes('Ferry'))!;

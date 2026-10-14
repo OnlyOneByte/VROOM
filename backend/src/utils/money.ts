@@ -3,9 +3,9 @@
  *
  * Money is stored + computed as integer CENTS everywhere internally (the 14 columns in design §1, flipped
  * by migration 0009). Dollars exist only at the two edges:
- *   - INPUT edge (client → DB): `dollarsToCents` — a Zod transform on every money input validator (T3).
- *   - DISPLAY edge (DB → client): `centsToDollars` — applied at the API response boundary (T6) so the
- *     frontend's existing dollar contract (`Expense.amount`, …) is UNCHANGED and no eyes-on FE work is needed.
+ *  - INPUT edge (client → DB): `dollarsToCents` — a Zod transform on every money input validator (T3).
+ *  - DISPLAY edge (DB → client): `centsToDollars` — applied at the API response boundary (T6) so the
+ *  frontend's existing dollar contract (`Expense.amount`, …) is UNCHANGED and no eyes-on FE work is needed.
  *
  * ROUND-before-int is mandatory on the way in: `12.34 * 100` is the binary float `1233.9999…`, so a bare
  * `| 0` / `Math.trunc` would store 1233 (a cent low). `Math.round` fixes it (same rule the 0009 migration
@@ -102,8 +102,8 @@ export const reminderToApi = <T extends Record<string, unknown>>(row: T) =>
  * (`withComputedBalance` adds it = originalAmount − Σ payments, all cents). `eligibleForPayoff` is
  * computed on the cents balance upstream, so it is copied through unchanged. ONE source of truth for the
  * financing display edge: the financing route returns this directly AND the vehicles route embeds it under
- * `vehicle.financing`, so the same field-set + computedBalance conversion was hand-rolled at both (C14) —
- * a divergence would show a different loan balance on the financing page vs the vehicle card (NORTH_STAR #2).
+ * `vehicle.financing`, so the same field-set + computedBalance conversion was hand-rolled at both —
+ * a divergence would show a different loan balance on the financing page vs the vehicle card.
  * `computedBalance` is converted only when present + numeric (a raw create/replace row has no balance yet).
  */
 export function financingWithBalanceToApi<T extends Record<string, unknown>>(row: T): T {
@@ -123,8 +123,8 @@ export function financingWithBalanceToApi<T extends Record<string, unknown>>(row
  * that schema with the `.transform(dollarsToCents)` appended. Keeps every money validator a one-liner
  * with its own message/bounds while the cents conversion lives in ONE place.
  *
- *   moneyDollarsToCents((n) => n.positive('Amount must be positive'))           // required positive money
- *   moneyDollarsToCents((n) => n.min(0, 'Cannot be negative')).optional()       // optional, ≥ 0
+ *  moneyDollarsToCents((n) => n.positive('Amount must be positive')) // required positive money
+ *  moneyDollarsToCents((n) => n.min(0, 'Cannot be negative')).optional() // optional, ≥ 0
  */
 export function moneyDollarsToCents(build: (base: z.ZodNumber) => z.ZodNumber = (n) => n) {
   return build(z.number()).transform(dollarsToCents);

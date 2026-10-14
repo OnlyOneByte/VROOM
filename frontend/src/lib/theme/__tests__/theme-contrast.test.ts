@@ -2,7 +2,7 @@
  * Theming engine — the D4 HARD GATE: every built-in theme must clear WCAG AA (4.5:1 normal text) on every
  * foreground/background token pair, in BOTH variants. D4 ("a11y is a hard gate, not best-effort") cannot be
  * verified by an eyes-on screenshot — contrast is a computed property — so this is the canonical, durable,
- * merge-surviving guard (NORTH_STAR #5). It re-derives luminance from the oklch token values themselves, so
+ * merge-surviving guard. It re-derives luminance from the oklch token values themselves, so
  * a future theme (or an edit to an existing one) that ships a low-contrast pair turns this RED before merge.
  *
  * Pure math — oklch → linear sRGB (the same matrix the browser uses) → WCAG relative luminance → ratio. No
@@ -109,14 +109,14 @@ describe('every built-in theme clears WCAG AA on text pairs (D4 hard gate)', () 
  * above deliberately excludes chart tokens (they carry no text), but a chart SERIES is a graphical object a
  * user must distinguish from its background, so the relevant bar is the 3:1 non-text threshold, not 4.5.
  *
- * WHY this guard exists (C343 + C346/C347): the C343 scout established firsthand that all 8 then-shipped
+ * WHY this guard exists: the scout established firsthand that all 8 then-shipped
  * non-default themes clear 3:1 chart-vs-card, and ONLY `default` falls below on three tokens — but `default`
- * is the VERBATIM app.css palette locked by the C185 identity contract (changing it breaks that guard + is
- * an Angelo-gated product call on the shipped look), so it is EXCLUDED here. Nothing enforced the property
- * for NEW themes: the C346 y2k fill-in (and the remaining neobrutalist/claymorphism/brutalist/zine) could
+ * is the VERBATIM app.css palette locked by the identity contract (changing it breaks that guard + is
+ * a product call on the shipped look), so it is EXCLUDED here. Nothing enforced the property
+ * for NEW themes: the y2k fill-in (and the remaining neobrutalist/claymorphism/brutalist/zine) could
  * ship a pale chart token below 3:1 and NO guard would catch it (contrast checks only text pairs; metadata/
- * distinctness/byte-freshness check structure, not chart legibility). This codifies the C343 invariant so a
- * future low-contrast chart token trips RED before merge — the durable artifact from the C347 bug-dry scout.
+ * distinctness/byte-freshness check structure, not chart legibility). This codifies the invariant so a
+ * future low-contrast chart token trips RED before merge — the durable artifact from the bug-dry scout.
  */
 const CHART_KEYS: readonly ThemeTokenKey[] = [
   'chart-1',
@@ -124,21 +124,21 @@ const CHART_KEYS: readonly ThemeTokenKey[] = [
   'chart-3',
   'chart-4',
   'chart-5',
-  // #112: the palette extends to 8 so a ≥6-vehicle fleet gets distinct series colors. The new tokens are
+  // The palette extends to 8 so a ≥6-vehicle fleet gets distinct series colors. The new tokens are
   // held to the SAME 3:1-vs-card graphical bar as 1-5 (every non-default theme defines all 8).
   'chart-6',
   'chart-7',
   'chart-8',
 ];
 const AA_GRAPHICAL = 3.0;
-// #343 (C531): the `default` palette had 3 chart tokens below 3:1 vs card (light chart-4 1.72 + chart-5
-// 2.15, dark chart-1 2.60) — the C343 carve-out that excluded `default` from this gate. Those 3 tokens were
+// The `default` palette had 3 chart tokens below 3:1 vs card (light chart-4 1.72 + chart-5
+// 2.15, dark chart-1 2.60) — the carve-out that excluded `default` from this gate. Those 3 tokens were
 // re-tuned (a minimal L nudge, hue+chroma preserved) so `default` now clears 3:1 on ALL 8 chart tokens too,
 // and the `default ≡ app.css` identity guard was rebaselined in the SAME commit to the new values. With the
 // carve-out gone, EVERY built-in theme (default included) is now held to the 3:1 chart-vs-card bar.
 const allThemes = Object.values(THEME_REGISTRY);
 
-describe('every built-in theme clears WCAG 3:1 on chart series vs card (C347 graphical gate, default folded in C531)', () => {
+describe('every built-in theme clears WCAG 3:1 on chart series vs card (graphical gate, default folded in)', () => {
   describe.each(allThemes)('theme "$id"', (theme) => {
     describe.each(['light', 'dark'] as const)('%s variant', (variant) => {
       const tokens = theme[variant] as ThemeTokens;

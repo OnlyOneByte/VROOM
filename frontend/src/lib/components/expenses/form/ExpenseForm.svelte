@@ -381,7 +381,7 @@
 			sourceId = null;
 		}
 
-		// Clear fuel-only fields when switching AWAY from fuel (#76, mirroring the financing-source
+		// Clear fuel-only fields when switching AWAY from fuel (mirroring the financing-source
 		// reset above). The fuel inputs hide via `showFuelFields`, but their formData values otherwise
 		// PERSIST and ride along on submit — stamping a stale volume/charge/fuelType onto a non-fuel
 		// row (inert in analytics, which filter category='fuel', but a real data-hygiene leak), and a
@@ -608,9 +608,9 @@
 						...(expenseData.mileage !== undefined && { mileage: expenseData.mileage }),
 						...(expenseData.volume !== undefined && { volume: expenseData.volume }),
 						...(expenseData.charge !== undefined && { charge: expenseData.charge }),
-						// Carry fuelType: the sync transform needs it to keep an electric charge (#66).
+						// Carry fuelType: the sync transform needs it to keep an electric charge.
 						...(expenseData.fuelType !== undefined && { fuelType: expenseData.fuelType }),
-						// Carry missedFillup: dropping it on sync corrupts consecutive-fillup MPG pairing (#101).
+						// Carry missedFillup: dropping it on sync corrupts consecutive-fillup MPG pairing.
 						...(expenseData.missedFillup !== undefined && {
 							missedFillup: expenseData.missedFillup
 						})
@@ -656,10 +656,10 @@
 					...(expenseData.mileage !== undefined && { mileage: expenseData.mileage }),
 					...(expenseData.volume !== undefined && { volume: expenseData.volume }),
 					...(expenseData.charge !== undefined && { charge: expenseData.charge }),
-					// Carry fuelType: the sync transform needs it to keep an electric charge (#66).
+					// Carry fuelType: the sync transform needs it to keep an electric charge.
 					...(expenseData.fuelType !== undefined && { fuelType: expenseData.fuelType }),
-					// Carry missedFillup: dropping it on sync corrupts consecutive-fillup MPG pairing (#101).
-					// This error-fallback save mirrors the offline-first save above (#111, C377): the #101
+					// Carry missedFillup: dropping it on sync corrupts consecutive-fillup MPG pairing.
+					// This error-fallback save mirrors the offline-first save above: the
 					// fix landed on that path only, so a fuel fill-up logged with "missed previous" checked
 					// during an online-create FAILURE (timeout/5xx → this catch) silently dropped the flag.
 					...(expenseData.missedFillup !== undefined && { missedFillup: expenseData.missedFillup })
@@ -790,7 +790,7 @@
 	}
 
 	function resetAllocationsForMethod(method: 'even' | 'absolute' | 'percentage') {
-		// resetSplitAllocations is the shared source of truth (C415) — the insurance-term form runs the
+		// resetSplitAllocations is the shared source of truth — the insurance-term form runs the
 		// identical reset, so the 100/N rounded-to-1-decimal percentage seed can't drift between them.
 		splitAllocations = resetSplitAllocations(method, selectedVehicleIds);
 	}

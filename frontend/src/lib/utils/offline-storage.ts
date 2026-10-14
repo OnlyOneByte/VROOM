@@ -33,15 +33,15 @@ export interface OfflineExpense {
 	 * outbox: the sync transform (toBackendExpense) decides volume-vs-charge SOLELY from
 	 * isElectricFuelType(fuelType), so without it an offline ELECTRIC expense's `charge` is
 	 * silently dropped on sync (isElectricFuelType(undefined)=false → the volume-only branch),
-	 * and every synced expense loses its fuelType label (#66, NORTH_STAR #1/#2 data safety).
+	 * and every synced expense loses its fuelType label (data safety).
 	 */
 	fuelType?: string;
 	/**
 	 * Whether this fill-up follows a MISSED one (the user didn't log the previous fill-up). MUST be
 	 * carried in the outbox: calculateAverageMpg pairs CONSECUTIVE fill-ups, and a missedFillup row is
 	 * excluded from pairing — so dropping the flag on sync makes the next pair span a gap it shouldn't,
-	 * computing an inflated/garbage MPG (#101, same offline field-dropout class as #66's fuelType,
-	 * NORTH_STAR #1/#2). The online create path sends it; the offline path must too.
+	 * computing an inflated/garbage MPG (same offline field-dropout class as's fuelType,
+	 * ). The online create path sends it; the offline path must too.
 	 */
 	missedFillup?: boolean;
 	description?: string;
@@ -51,7 +51,7 @@ export interface OfflineExpense {
 	 * Parked because the row is PERMANENTLY unsyncable (a malformed/incomplete entry that fails the same
 	 * way on every attempt — e.g. a fuel row missing volume/charge or mileage, isIncompleteFuelExpense).
 	 * Such a row must NOT be retried forever: it's excluded from getPendingExpenses (so syncAll stops
-	 * re-attempting it) and surfaced via getNeedsAttentionExpenses for the user to fix or discard (#79).
+	 * re-attempting it) and surfaced via getNeedsAttentionExpenses for the user to fix or discard.
 	 * A transient (network/server) failure is NOT flagged — only a structural, self-resolving-impossible one.
 	 */
 	needsAttention?: boolean;
@@ -63,7 +63,7 @@ export interface OfflineExpense {
  *
  * SINGLE SOURCE OF TRUTH for the OfflineExpense → toBackendExpense field mapping. This block was
  * copy-pasted at 3 sync sites (syncOfflineExpenses here + sync-manager's syncSingleExpense and
- * resolveConflict keep_local), and that drift is exactly how #66 happened — `fuelType` was added to
+ * resolveConflict keep_local), and that drift is exactly how happened — `fuelType` was added to
  * the online path but missed in the duplicated offline copies, so an offline electric expense's
  * `charge` silently vanished on sync (toBackendExpense routes charge↔volume SOLELY on fuelType).
  * Collapsing the three copies into one keeps the offline sync payload in lockstep, so a future field
@@ -92,7 +92,7 @@ export function offlineExpenseToBackend(
  * A fuel expense is INCOMPLETE for sync if it carries neither volume nor charge, OR has no mileage —
  * such a row can't yield a usable MPG/mi-kWh pairing and must not be POSTed. SINGLE SOURCE OF TRUTH for
  * this guard: the same predicate was hand-inlined at the two sync sites (syncOfflineExpenses here +
- * sync-manager's syncSingleExpense), the SAME offline↔sync fan-out whose drift caused #66/#101 — so a
+ * sync-manager's syncSingleExpense), the SAME offline↔sync fan-out whose drift caused — so a
  * future tightening (e.g. also requiring fuelType) can't land in one path and silently skip the other.
  * Each caller keeps its OWN action on a match (skip-and-continue vs return-an-error).
  */
@@ -171,20 +171,20 @@ export function removeOfflineExpense(id: string): void {
 	saveOfflineExpenses(updatedExpenses);
 }
 
-// Get pending (unsynced) expenses. EXCLUDES rows parked as needsAttention (#79) — a permanently
+// Get pending (unsynced) expenses. EXCLUDES rows parked as needsAttention — a permanently
 // unsyncable malformed entry must not be silently re-attempted on every syncAll; it's surfaced
 // separately via getNeedsAttentionExpenses for the user to fix/discard.
 export function getPendingExpenses(): OfflineExpense[] {
 	return loadOfflineExpenses().filter(expense => !expense.synced && !expense.needsAttention);
 }
 
-// Rows parked as permanently-unsyncable (#79) — surfaced to the user as "needs attention" (fix or
+// Rows parked as permanently-unsyncable — surfaced to the user as "needs attention" (fix or
 // discard) instead of being retried forever. Unsynced + flagged.
 export function getNeedsAttentionExpenses(): OfflineExpense[] {
 	return loadOfflineExpenses().filter(expense => !expense.synced && expense.needsAttention);
 }
 
-// Park a malformed/unsyncable expense as needs-attention (#79). Idempotent; a parked row drops out of
+// Park a malformed/unsyncable expense as needs-attention. Idempotent; a parked row drops out of
 // getPendingExpenses so the sync loop stops re-attempting it. Clearing the flag (after the user edits
 // it) is `clearNeedsAttention`, which re-admits the row to the pending set.
 export function markExpenseNeedsAttention(id: string): void {
@@ -231,7 +231,7 @@ export async function syncOfflineExpenses(): Promise<void> {
 	try {
 		for (const expense of pendingExpenses) {
 			// Validate fuel expense requirements. A malformed fuel row is PERMANENTLY unsyncable — park it as
-			// needs-attention (#79) instead of `continue`-skipping it every run (the old behavior re-evaluated
+			// needs-attention instead of `continue`-skipping it every run (the old behavior re-evaluated
 			// + silently re-skipped it forever). Parking drops it from getPendingExpenses + surfaces it.
 			if (isIncompleteFuelExpense(expense)) {
 				if (import.meta.env.DEV) {
@@ -243,7 +243,7 @@ export async function syncOfflineExpenses(): Promise<void> {
 				continue;
 			}
 
-			// Transform to backend format using the shared offline→backend mapper (#66 single source).
+			// Transform to backend format using the shared offline→backend mapper (single source).
 			const backendExpense = offlineExpenseToBackend(expense);
 
 			// Send the idempotency key so a retried POST returns the original row.

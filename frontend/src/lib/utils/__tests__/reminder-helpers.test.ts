@@ -11,10 +11,10 @@ import {
 import type { Reminder } from '$lib/types/reminder';
 
 /**
- * Guard for the null-nextDueDate invariant (C22 backend rebuild made next_due_date nullable → C39
+ * Guard for the null-nextDueDate invariant (backend rebuild made next_due_date nullable →
  * frontend). A pure-mileage reminder has nextDueDate=null; the time-due check must treat that as
  * NOT due — never feed it to `new Date(...)`, which yields the 1970 epoch and would mark every
- * mileage reminder wrongly "due". This pins isReminderTimeDue (extracted C48) so a future edit can't
+ * mileage reminder wrongly "due". This pins isReminderTimeDue (extracted) so a future edit can't
  * re-introduce the unguarded deref.
  */
 
@@ -66,7 +66,7 @@ describe('isReminderTimeDue', () => {
 
 	it('a pure-mileage reminder (null nextDueDate) is NEVER time-due — the load-bearing guard', () => {
 		// Without the null guard, `new Date(null)` is the 1970 epoch ≤ now → wrongly "due". This is
-		// the exact crash/wrong-render the C39 nullable-type change introduced at the boundary.
+		// the exact crash/wrong-render the nullable-type change introduced at the boundary.
 		expect(isReminderTimeDue(mk({ triggerMode: 'mileage', nextDueDate: null }), NOW)).toBe(false);
 	});
 });
@@ -114,7 +114,7 @@ describe('frequencyLabel', () => {
 	});
 });
 
-describe('shouldTriggerRecurringExpenses (T5 opportunistic-materialization gate, C128)', () => {
+describe('shouldTriggerRecurringExpenses (T5 opportunistic-materialization gate)', () => {
 	const base = { isAuthed: true, isOnline: true, lastRunMs: null as number | null, now: NOW };
 
 	it('triggers when authed + online + never run before', () => {
@@ -144,7 +144,7 @@ describe('shouldTriggerRecurringExpenses (T5 opportunistic-materialization gate,
 	});
 });
 
-// T5 (C12): the orchestration helper the app-init hook calls — it reads/writes the localStorage
+// T5: the orchestration helper the app-init hook calls — it reads/writes the localStorage
 // debounce timestamp around the pure gate, POSTs the (injected) trigger, and stamps the timestamp ONLY
 // on success. `trigger` is injected so this is unit-testable without the service/network.
 describe('maybeTriggerRecurringExpenses (T5 app-init hook orchestration)', () => {

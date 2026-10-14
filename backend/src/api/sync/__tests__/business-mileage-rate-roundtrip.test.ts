@@ -7,8 +7,8 @@
  * schema-derived (getTableColumns), so businessMileageRate rides along automatically — T8 asserted that
  * INDIRECTLY (the sheets-header-coverage guard proves the HEADER exists). This proves the VALUE actually
  * survives a full backup→restore: a configured reimbursement rate must NOT silently reset to 0 (a
- * NORTH_STAR #1 data-loss — the user's mileage-summary $ would silently zero out after a restore). Mirrors
- * the C180 themePreference round-trip; complements it on the money-adjacent sibling field.
+ * data-loss — the user's mileage-summary $ would silently zero out after a restore). Mirrors
+ * the themePreference round-trip; complements it on the money-adjacent sibling field.
  *
  * createTestApp() rewrites env then dynamic-imports DB-bound modules, so backup/restore are imported
  * dynamically AFTER it (mirrors theme-preference-roundtrip.test.ts).

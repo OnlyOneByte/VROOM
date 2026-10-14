@@ -1,6 +1,6 @@
 /**
  * Unit tests for resetSplitAllocations — the split-method reset shared by ExpenseForm and
- * InsuranceTermForm (extracted C415, the arch dedup of two BYTE-IDENTICAL resetAllocationsForMethod
+ * InsuranceTermForm (extracted, the arch dedup of two BYTE-IDENTICAL resetAllocationsForMethod
  * copies). The forms themselves are eyes-on/Playwright-blocked, so this pure helper IS the
  * merge-surviving net: it pins the per-method shape + the load-bearing 100/N-rounded-to-1-decimal
  * percentage seed, so the two forms can't drift to different per-vehicle splits for the same vehicles.
@@ -49,8 +49,8 @@ describe('resetSplitAllocations', () => {
 
 /**
  * Unit tests for buildSplitConfig — the API-union builder shared by ExpenseForm and ReminderForm
- * (extracted C23, dedup of two near-byte-identical local `buildSplitConfig` copies; ReminderForm's was
- * added C22 with the T4 split, immediately creating the drift vector). Both forms are
+ * (extracted, dedup of two near-byte-identical local `buildSplitConfig` copies; ReminderForm's was
+ * added with the T4 split, immediately creating the drift vector). Both forms are
  * eyes-on/Playwright-blocked, so this pure helper IS the merge-surviving net: it pins the per-method
  * shape + the missing-value→0 coalesce, so the two forms can't drift to a different materialized split
  * for the same state. Pairs with resetSplitAllocations above (the seed) — together they bracket the

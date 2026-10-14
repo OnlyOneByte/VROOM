@@ -37,8 +37,8 @@
 	// (leaseMetrics.mileageUsed = current−initial), so using the annual limit over-reported usage ~Nx on
 	// an N-year lease — e.g. 24k driven on an on-pace 36-mo/12k-yr lease showed "24k/12k, 100% RED" while
 	// this card's own "left" figure (leaseMetrics.mileageRemaining, which already routes through
-	// leaseTotalMileageAllowance) said "12k left" (#140, the #64/#110/#115 annual-vs-total class — the
-	// one card the #115 PaymentMetricsGrid fix missed). ONE source of truth for the whole-lease budget.
+	// leaseTotalMileageAllowance) said "12k left" (the annual-vs-total class — the
+	// one card the PaymentMetricsGrid fix missed). ONE source of truth for the whole-lease budget.
 	let totalMileageAllowance = $derived(leaseTotalMileageAllowance(financing));
 
 	let mileageUsagePercentage = $derived.by(() => {

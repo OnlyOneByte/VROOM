@@ -46,7 +46,7 @@ function defineBuiltinTheme(
   };
 }
 
-/** `default` light palette — VERBATIM from app.css `:root` (C185). Do not edit by hand; mirror app.css. */
+/** `default` light palette — VERBATIM from app.css `:root`. Do not edit by hand; mirror app.css. */
 const DEFAULT_LIGHT: ThemeTokens = {
   background: 'oklch(1 0 0)',
   foreground: 'oklch(0.141 0.005 285.823)',
@@ -85,7 +85,7 @@ const DEFAULT_LIGHT: ThemeTokens = {
   'sidebar-ring': 'oklch(0.705 0.015 286.067)',
 };
 
-/** `default` dark palette — VERBATIM from app.css `.dark` (C185). Do not edit by hand; mirror app.css. */
+/** `default` dark palette — VERBATIM from app.css `.dark`. Do not edit by hand; mirror app.css. */
 const DEFAULT_DARK: ThemeTokens = {
   background: 'oklch(0.141 0.005 285.823)',
   foreground: 'oklch(0.985 0 0)',
@@ -1068,7 +1068,7 @@ const NEOBRUTALIST_THEME: ThemeDefinition = defineBuiltinTheme({
 
 /**
  * Every built-in theme by id. `default` is the always-present identity theme (R8 fallback target). The
- * Angelo-approved v1 set (default + 5: blueprint/bento/vaporwave/cyberpunk/aurora) is COMPLETE; solarpunk/
+ * The v1 set (default + 5: blueprint/bento/vaporwave/cyberpunk/aurora) is COMPLETE; solarpunk/
  * editorial/tui/y2k/neobrutalist are fill-ins from the ryang.dev mocks. Each theme is a single
  * defineBuiltinTheme call — zero structural change; further fill-ins (claymorphism/brutalist/zine) drop in the same way.
  */

@@ -15,7 +15,7 @@ import { CONFIG } from '../config';
  * what `clampPagination` re-clamps — so an out-of-range value is rejected at the boundary while an
  * omitted one falls through to `clampPagination`'s `defaultPageSize`. `commonSchemas.pagination`
  * instead bakes in `.default(50)`/`.default(0)` + a hardcoded `.max(100)`, which would CHANGE
- * clamp/default behavior if a clampPagination consumer adopted it (the C212 divergence). Spread into a
+ * clamp/default behavior if a clampPagination consumer adopted it. Spread into a
  * route's own `z.object({...})` so it can add endpoint-specific filters (e.g. vehicleId/purpose).
  */
 const clampedPaginationFields = {
@@ -210,10 +210,10 @@ export async function validateReminderOwnership(
 }
 
 /**
- * Validate that a trip belongs to the user, returning it (trips-location T2, the C160 family). Trips own
+ * Validate that a trip belongs to the user, returning it (trips-location T2, the family). Trips own
  * via a userId column, so the repository's own userId-scoped read is the ownership check — mirrors the
  * validateReminderOwnership shape (findByIdAndUserId → NotFoundError → return entity). A NotFoundError
- * (never 403) keeps the #80 enumeration-oracle discipline: a foreign or absent id is indistinguishable.
+ * (never 403) keeps the enumeration-oracle discipline: a foreign or absent id is indistinguishable.
  * @throws NotFoundError if the trip is not found or doesn't belong to the user
  */
 export async function validateTripOwnership(tripId: string, userId: string): Promise<Trip> {

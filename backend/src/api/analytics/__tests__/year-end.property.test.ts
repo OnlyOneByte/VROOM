@@ -172,8 +172,8 @@ describe('Property 25: Year-over-year percentage change formula', () => {
 });
 
 // ---------------------------------------------------------------------------
-// FE↔BE response contract-drift guard (loop-improvement #2; C55 /stats, C62 /vehicles list,
-// C68 single-financing, C74 /analytics/insurance — this locks /analytics/year-end). getYearEnd
+// FE↔BE response contract-drift guard (loop-improvement; /stats, /vehicles list,
+// single-financing, /analytics/insurance — this locks /analytics/year-end). getYearEnd
 // hand-assembles an 11-field object literal (repository.ts:1889) with NO type binding to the
 // frontend YearEndResponse (types/analytics.ts:237). The existing Property-24/25 tests pin the
 // MATH (biggest-expense, YoY %) but NOT the key shape, so a dropped/renamed field would silently

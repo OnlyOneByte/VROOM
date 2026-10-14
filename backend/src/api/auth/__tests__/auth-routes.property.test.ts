@@ -21,8 +21,8 @@ describe('Auth routes structural properties', () => {
    * The login callback (validateLoginState) consumes the OAuth state via the shared single-use
    * `consumeOAuthState` helper with the LOGIN flow (expectedFlow `undefined` → entry must have no
    * flowType). The single-use + flow-isolation BEHAVIOR is pinned directly in
-   * consume-oauth-state.test.ts (C39); this just guards the wiring (the validator delegates with the
-   * right flow arg, not a re-inlined copy). Updated C39 when the inline body moved into the helper.
+   * consume-oauth-state.test.ts; this just guards the wiring (the validator delegates with the
+   * right flow arg, not a re-inlined copy). Updated when the inline body moved into the helper.
    */
   test('login callback delegates to consumeOAuthState for the login flow (no flowType)', async () => {
     const routesSource = await Bun.file(`${import.meta.dir}/../routes.ts`).text();

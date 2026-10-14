@@ -1,8 +1,8 @@
 /**
- * Guard for the `.partial()` + `.default()` data-loss class (cycle 34), generalizing the C31
+ * Guard for the `.partial()` + `.default()` data-loss class, generalizing the
  * footgun: a Zod field carrying a `.default(...)` SURVIVES `.partial()` — so an update schema built
  * as `base.partial()` can silently inject that default on an update that OMITS the field, clobbering
- * the stored value. C31 hit this with the reminder `triggerMode: .default('time')` (reverted an
+ * the stored value. hit this with the reminder `triggerMode: .default('time')` (reverted an
  * existing mileage reminder on an unrelated update).
  *
  * The highest-stakes remaining instance is `updateExpenseSchema = createExpenseSchemaBase.omit(...)
@@ -10,8 +10,8 @@
  * survives, editing ANY other field of a tagged expense (e.g. just the amount) would wipe its tags —
  * a silent data loss on the most common edit path. This pins the behavior through the REAL route →
  * repository → DB stack so it can't regress:
- *   - PUT changing only expenseAmount must LEAVE the tags intact (the load-bearing assertion)
- *   - PUT with explicit tags still replaces them (normal edit still works)
+ *  - PUT changing only expenseAmount must LEAVE the tags intact (the load-bearing assertion)
+ *  - PUT with explicit tags still replaces them (normal edit still works)
  *
  * createTestApp() rewrites env + dynamic-imports DB-bound modules; keep imports to harness + bun:test.
  */
@@ -81,11 +81,11 @@ describe('expense update preserves tags (.partial() + .default([]) class)', () =
   });
 });
 
-// C352 (#104): the CSV export joins tags with '; ' and import splits on /[;,]/, so a tag CONTAINING a
+// The CSV export joins tags with '; ' and import splits on /[;,]/, so a tag CONTAINING a
 // semicolon or comma would round-trip into MULTIPLE tags — silent data loss on export→re-import
-// (NORTH_STAR #1). The fix rejects those delimiter chars in a tag at the write boundary (create + update,
+// The fix rejects those delimiter chars in a tag at the write boundary (create + update,
 // both built off the same base schema). These pin the rejection + that a normal tag is unaffected.
-describe('#104 — a tag containing the CSV delimiter (; or ,) is rejected, not silently round-trip-split', () => {
+describe('a tag containing the CSV delimiter (or) is rejected, not silently round-trip-split', () => {
   test('CREATE with a semicolon in a tag → 400, nothing persisted', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Fit', year: 2019 });
     const res = await ctx.authed('POST', '/api/v1/expenses', {

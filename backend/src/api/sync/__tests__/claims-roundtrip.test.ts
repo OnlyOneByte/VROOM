@@ -107,15 +107,15 @@ describe('backup → restore round-trip preserves insurance claims', () => {
     expect(row.description).toBe('Rear-ended at a light');
   });
 
-  // C404 (bug, NORTH_STAR #1 crown jewel): a photo attached to an insurance CLAIM must survive the
+  // (bug, crown jewel) A photo attached to an insurance CLAIM must survive the
   // round-trip. insurance_claim is a real photo-upload target (photos/helpers.ts validateEntityOwnership
   // accepts it; the ClaimsSection UI uploads to it), but validateReferentialIntegrity's photo entity-type
   // map omitted it — so a backup carrying a claim photo failed validation with "unknown entity type:
   // insurance_claim" → valid:false → the WHOLE restore aborted (the user couldn't recover ANY data from
-  // their own valid backup). The original 15-table cert (C366) predated claim photos. Pre-fix this test
+  // their own valid backup). The original 15-table cert predated claim photos. Pre-fix this test
   // throws on restore; post-fix the claim photo round-trips. Seed the photos row directly (the upload
   // route is multipart; the bug is purely in the validator, not the upload path).
-  test('a photo attached to an insurance claim survives the round-trip (does not abort restore) — #C404', async () => {
+  test('a photo attached to an insurance claim survives the round-trip (does not abort restore) — #', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const policyId = await seedPolicy(vehicleId);
 
@@ -181,18 +181,18 @@ describe('backup → restore round-trip preserves insurance claims', () => {
 });
 
 // ---------------------------------------------------------------------------
-// C407 (guard, NORTH_STAR #1 + #5): DRIFT-GUARD for the #C404 class. A photo's entity_type must round-trip
+// (guard, +) DRIFT-GUARD for the # class. A photo's entity_type must round-trip
 // for EVERY type the upload path accepts. The upload allowlist (photos/helpers.ts validateEntityOwnership:
 // vehicle / insurance_policy / insurance_claim / expense / odometer_entry) and the restore validator's
 // entityTypeToIds map (backup.ts validatePhotoRefs) are SEPARATE lists in separate files with no shared
-// source of truth — exactly why insurance_claim drifted out of the validator and broke restore (#C404,
-// the original 15-table cert predated claim photos). The C404 fix added a per-type round-trip for ONE
-// type; a generic "a photo round-trips" test would NOT catch a per-type omission (that's how #C404 slipped
-// past C366). This pins ALL FIVE: drop any type from the validator map → that photo restores as "unknown
+// source of truth — exactly why insurance_claim drifted out of the validator and broke restore (#,
+// the original 15-table cert predated claim photos). The fix added a per-type round-trip for ONE
+// type; a generic "a photo round-trips" test would NOT catch a per-type omission (that's how # slipped
+// past). This pins ALL FIVE: drop any type from the validator map → that photo restores as "unknown
 // entity type" → validateBackupData false → the WHOLE restore aborts → this test goes RED. When a 6th
 // photo target is added to the upload path, this test fails until the validator map (and this list) learn it.
 // ---------------------------------------------------------------------------
-describe('a photo on EVERY upload-accepted entity type survives backup→restore (#C404 drift-guard)', () => {
+describe('a photo on EVERY upload-accepted entity type survives backup→restore (# drift-guard)', () => {
   test('vehicle / insurance_policy / insurance_claim / expense / odometer_entry photos all round-trip', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const policyId = await seedPolicy(vehicleId);
@@ -247,7 +247,7 @@ describe('a photo on EVERY upload-accepted entity type survives backup→restore
     const { restoreService } = await import('../restore');
 
     const zip = await backupService.exportAsZip(ctx.user.id);
-    // RED if any upload-accepted type is missing from the validator's entityTypeToIds map (#C404).
+    // RED if any upload-accepted type is missing from the validator's entityTypeToIds map (#).
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 

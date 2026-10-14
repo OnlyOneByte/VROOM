@@ -1,14 +1,14 @@
 /**
- * Regression GUARD (committed, travels with the merge) for the #87 bug class (C267 extract / C268 fix /
- * C271 residual): converting a Date to the `YYYY-MM-DD` string an `<input type="date">` binds to via
+ * Regression GUARD (committed, travels with the merge) for the bug class (extract / fix /
+ * residual): converting a Date to the `YYYY-MM-DD` string an `<input type="date">` binds to via
  * the UTC calendar date — `new Date(x).toISOString().split('T')[0]` or `.toISOString().slice(0, 10)`.
  *
  * That reads the UTC date, which (a) shows TOMORROW for a negative-offset (Americas) user editing late
  * in the day, and (b) BREAKS the stored-date round-trip — dateOnlyToISO persists date-only values at
  * NOON LOCAL, and noon-local in a positive offset is the PREVIOUS day in UTC, so a saved date reloads
- * one day earlier in the edit form (#87). The fix routes every such conversion through
+ * one day earlier in the edit form. The fix routes every such conversion through
  * `toDateInputValue` (formatters.ts), which reads LOCAL components (getFullYear/getMonth+1/getDate).
- * C267 collapsed 9 sites; C268 made the helper local; C271 caught a residual on the odometer-edit page.
+ * collapsed 9 sites; made the helper local; caught a residual on the odometer-edit page.
  * This pins that no source REINTRODUCES the raw `.toISOString()`-to-date-string antipattern.
  *
  * Scans every .svelte/.ts source (comments stripped) for `.toISOString().split('T')[0]` /
@@ -24,15 +24,15 @@ import { describe, expect, test } from 'vitest';
 const SRC_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
 // The UTC date-input antipattern: an ISO string sliced to its date part to feed a date input.
-//   new Date(x).toISOString().split('T')[0]
-//   new Date(x).toISOString().slice(0, 10)   (whitespace-tolerant on the slice args)
-// toDateInputValue (the fix) builds the string from local getFullYear/getMonth/getDate — no
+//  new Date(x).toISOString().split('T')[0]
+//  new Date(x).toISOString().slice(0, 10) (whitespace-tolerant on the slice args)
+// toDateInputValue builds the string from local getFullYear/getMonth/getDate — no
 // .toISOString() in the chain — so it never matches.
 const UTC_DATE_INPUT = /\.toISOString\(\)\s*\.\s*(?:split\(\s*['"`]T['"`]\s*\)\s*\[\s*0\s*\]|slice\(\s*0\s*,\s*10\s*\))/;
 
-// The SECOND form of the same bug (#131, C437; #138, C449): a stored ISO date STRING field read straight
-// to its date part to feed a date input — `r.startDate.slice(0, 10)` (#131) OR `t.startDate.split('T')[0]`
-// (#138, InsuranceTermForm/ClaimsSection). There is no `.toISOString()` in the chain (the value is ALREADY
+// The SECOND form of the same bug: a stored ISO date STRING field read straight
+// to its date part to feed a date input — `r.startDate.slice(0, 10)` OR `t.startDate.split('T')[0]`
+// (InsuranceTermForm/ClaimsSection). There is no `.toISOString()` in the chain (the value is ALREADY
 // a string), so UTC_DATE_INPUT misses it — exactly how ReminderForm.svelte:116 (the `.slice` form) and the
 // two insurance forms (the `.split('T')[0]` form) each slipped past for hundreds of cycles. Either way the
 // first-10-chars / pre-`T` segment is the UTC calendar date, which for a UTC+13/+14 user is the PREVIOUS
@@ -76,7 +76,7 @@ function collectSourceFiles(dir: string, acc: string[] = []): string[] {
 	return acc;
 }
 
-describe('no UTC date-input formatting (use toDateInputValue — #87 class guard)', () => {
+describe('no UTC date-input formatting (use toDateInputValue — class guard)', () => {
 	const files = collectSourceFiles(SRC_ROOT);
 
 	test('the scan actually found sources (guard is live, not a no-op)', () => {
@@ -104,11 +104,11 @@ describe('no UTC date-input formatting (use toDateInputValue — #87 class guard
 			offenders,
 			`Date-input value built from the UTC calendar date — use toDateInputValue() from ` +
 				`formatters.ts (local getFullYear/getMonth/getDate) so the date is correct in every ` +
-				`timezone and round-trips with dateOnlyToISO (#87):\n${offenders.join('\n')}`
+				`timezone and round-trips with dateOnlyToISO:\n${offenders.join('\n')}`
 		).toEqual([]);
 	});
 
-	test('no source slices a stored ISO date-field STRING to its first 10 chars for a date input (#131)', () => {
+	test('no source slices a stored ISO date-field STRING to its first 10 chars for a date input', () => {
 		const offenders: string[] = [];
 
 		for (const file of files) {
@@ -127,7 +127,7 @@ describe('no UTC date-input formatting (use toDateInputValue — #87 class guard
 		expect(
 			offenders,
 			`A stored ISO date-field string sliced to [0,10) feeds the UTC calendar date to a date input ` +
-				`(#131, the #87 family on the second form) — use toDateInputValue(new Date(field)) so the ` +
+				`(, the family on the second form) — use toDateInputValue(new Date(field)) so the ` +
 				`local date round-trips with dateOnlyToISO in every timezone:\n${offenders.join('\n')}`
 		).toEqual([]);
 	});

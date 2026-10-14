@@ -5,8 +5,8 @@
  * '$' (or rendered a bare number) instead of routing through formatCurrency,
  * so a user whose currencyUnit is EUR/GBP saw the wrong symbol. All those sites
  * now call formatCurrency; these tests pin the behavior it must provide:
- *   - the symbol follows the requested currency (€ / £, never $ for non-USD)
- *   - the optional fractionDigits arg supports fuel price-per-unit (3 decimals)
+ *  - the symbol follows the requested currency (€ / £, never $ for non-USD)
+ *  - the optional fractionDigits arg supports fuel price-per-unit (3 decimals)
  *
  * currency is passed explicitly here, so these tests don't depend on the
  * settings store / DOM.
@@ -116,11 +116,11 @@ describe('dateOnlyToISO', () => {
 });
 
 /**
- * toDateInputValue (C267 extract; #87/C268 — now LOCAL-calendar, the forward partner to dateOnlyToISO).
+ * toDateInputValue (extract; — now LOCAL-calendar, the forward partner to dateOnlyToISO).
  * Host-tz-independent by construction: build the input Date from LOCAL components (new Date(y,m,d,...))
  * and assert the same local y/m/d come back, so the test passes in any timezone the CI runs in.
  */
-describe('toDateInputValue (#87 — LOCAL date → YYYY-MM-DD input value)', () => {
+describe('toDateInputValue (— LOCAL date → YYYY-MM-DD input value)', () => {
 	test('formats a Date to its LOCAL calendar date (zero-padded)', () => {
 		// Local components in → the same local date out, regardless of host offset.
 		expect(toDateInputValue(new Date(2024, 2, 5, 8, 30))).toBe('2024-03-05'); // March = month index 2
@@ -132,7 +132,7 @@ describe('toDateInputValue (#87 — LOCAL date → YYYY-MM-DD input value)', () 
 		expect(toDateInputValue(new Date(2025, 6, 9, 12))).toBe('2025-07-09');
 	});
 
-	test('round-trips with dateOnlyToISO in EVERY timezone (the #87 fix — noon-local anchor)', () => {
+	test('round-trips with dateOnlyToISO in EVERY timezone (the fix — noon-local anchor)', () => {
 		// dateOnlyToISO writes a date-only string at NOON LOCAL; reading it back with LOCAL components
 		// must return the SAME calendar date — the round-trip the old UTC .slice(0,10) broke for
 		// positive-offset users (noon-local is the previous day in UTC there).
@@ -148,7 +148,7 @@ describe('toDateInputValue (#87 — LOCAL date → YYYY-MM-DD input value)', () 
 	});
 });
 
-describe('capitalize (C119 — extracted from 5 hand-rolled sites)', () => {
+describe('capitalize (— extracted from 5 hand-rolled sites)', () => {
 	test('upper-cases the first character, leaving the rest unchanged', () => {
 		expect(capitalize('loan')).toBe('Loan');
 		expect(capitalize('monthly')).toBe('Monthly');
@@ -165,7 +165,7 @@ describe('capitalize (C119 — extracted from 5 hand-rolled sites)', () => {
 	});
 });
 
-describe('formatNumber (C130 — coverage ratchet)', () => {
+describe('formatNumber (— coverage ratchet)', () => {
 	test('formats with the default 2 decimals', () => {
 		expect(formatNumber(1234.5)).toBe('1,234.50');
 	});
@@ -176,7 +176,7 @@ describe('formatNumber (C130 — coverage ratchet)', () => {
 	});
 });
 
-describe('formatDate (C130)', () => {
+describe('formatDate', () => {
 	test('renders a Date as "Mon D, YYYY" (en-US short month)', () => {
 		// Construct at noon local so the calendar day is offset-stable for the assertion.
 		expect(formatDate(new Date(2024, 2, 15, 12))).toBe('Mar 15, 2024');
@@ -189,7 +189,7 @@ describe('formatDate (C130)', () => {
 	});
 });
 
-describe('formatRelativeTime (C130 — branches driven relative to now, host-independent)', () => {
+describe('formatRelativeTime (— branches driven relative to now, host-independent)', () => {
 	const DAY = 1000 * 60 * 60 * 24;
 	const daysAgo = (n: number) => new Date(Date.now() - n * DAY);
 
@@ -206,10 +206,10 @@ describe('formatRelativeTime (C130 — branches driven relative to now, host-ind
 		expect(formatRelativeTime(daysAgo(400))).toBe('1 year ago');
 	});
 
-	// #143 (C462): Math.floor can land on exactly 1 at each bucket's low edge (7-13d → 1 week,
+	// Math.floor can land on exactly 1 at each bucket's low edge (7-13d → 1 week,
 	// 30-59d → 1 month, 365-729d → 1 year). Pre-fix these all rendered a bare "1 weeks/months/years
 	// ago". Pin the SINGULAR form at each boundary (NON-VACUOUS — the old code failed every line here).
-	test('singular grammar at each bucket boundary (#143)', () => {
+	test('singular grammar at each bucket boundary', () => {
 		expect(formatRelativeTime(daysAgo(7))).toBe('1 week ago');
 		expect(formatRelativeTime(daysAgo(13))).toBe('1 week ago');
 		expect(formatRelativeTime(daysAgo(30))).toBe('1 month ago');
@@ -226,7 +226,7 @@ describe('formatRelativeTime (C130 — branches driven relative to now, host-ind
 	});
 });
 
-describe('formatCompactRelativeTime (C130)', () => {
+describe('formatCompactRelativeTime', () => {
 	const MIN = 60000;
 
 	test('null → "Never"', () => {

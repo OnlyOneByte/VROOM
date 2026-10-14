@@ -1,6 +1,6 @@
 /**
  * FE↔BE contract-drift guard for the GET /vehicles list response's enriched
- * `financing` object (loop-improvement #2; C55 locked /stats, this locks /vehicles).
+ * `financing` object (loop-improvement; locked /stats, this locks /vehicles).
  *
  * The list route hand-assembles each financed vehicle: it spreads the repository
  * financing row and INJECTS two computed fields the repository never stores --
@@ -52,7 +52,7 @@ interface VehicleWithFinancing {
 
 /** Seed a vehicle, returns its id. */
 // This file's fixture is a nickname-required Honda Civic 2022; converge onto the shared test-helpers/seed
-// seedVehicle (arch convergence, Angelo-approved) via a thin wrapper that keeps make/model/year explicit
+// seedVehicle  via a thin wrapper that keeps make/model/year explicit
 // (the shared default is a Camry) so behavior is preserved.
 const seedVehicle = (nickname: string): Promise<string> =>
   seedVehicleShared(ctx, { make: 'Honda', model: 'Civic', year: 2022, nickname });
@@ -127,9 +127,9 @@ describe('GET /vehicles list — enriched financing contract (FE↔BE drift guar
     expect(v?.financing).toBeUndefined();
   });
 
-  test('a PAID-OFF (inactive) financing row STILL surfaces on the list, flagged isActive:false (C305 contract pin)', async () => {
+  test('a PAID-OFF (inactive) financing row STILL surfaces on the list, flagged isActive:false', async () => {
     // findByUserId leftJoins vehicleFinancing with NO isActive filter, so a paid-off loan (isActive=false,
-    // its row REUSED by the create-or-replace path per #67/C293, never deleted) still rides along on the
+    // its row REUSED by the create-or-replace path per, never deleted) still rides along on the
     // list — carrying isActive:false. This is BENIGN today: every FE financing consumer (FinanceTab,
     // VehicleForm, lease/payment math) gates on `financing?.isActive`, so a paid-off row is correctly
     // ignored. This pins that contract so the gate stays the source of truth — if a future BE change

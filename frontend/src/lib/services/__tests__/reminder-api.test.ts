@@ -23,7 +23,7 @@ const mockDelete = vi.mocked(apiClient.delete);
 
 // The route returns RAW repository rows (backend shape: `expenseAmount`, un-split `volume`). The
 // wrapper must map each through fromBackendExpense — so the mock returns the BACKEND shape and the
-// assertions check the FRONTEND transform (the C431 fix; pre-fix this method returned the raw rows
+// assertions check the FRONTEND transform (the fix; pre-fix this method returned the raw rows
 // typed as Expense[], so `amount` was undefined + an electric charge stayed in `volume`).
 const mockMaterialized: BackendExpenseResponse[] = [
 	{
@@ -124,9 +124,9 @@ describe('reminderApi.getRecurringCost() (T7 seam)', () => {
 	});
 });
 
-// C163 (guard): cover the remaining 9 reminderApi methods + buildReminderQuery — the module sat ~12% line
-// (the C134 tests above only exercised the T6/T7 seams). Each asserts the exact URL + verb + payload.
-describe('reminderApi — CRUD + trigger + mark-serviced wiring (C163)', () => {
+// Cover the remaining 9 reminderApi methods + buildReminderQuery — the module sat ~12% line
+// (the tests above only exercised the T6/T7 seams). Each asserts the exact URL + verb + payload.
+describe('reminderApi — CRUD + trigger + mark-serviced wiring', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 	});
@@ -176,7 +176,7 @@ describe('reminderApi — CRUD + trigger + mark-serviced wiring (C163)', () => {
 	});
 });
 
-describe('reminderApi.list — buildReminderQuery filter construction (C163)', () => {
+describe('reminderApi.list — buildReminderQuery filter construction', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 	});
@@ -213,7 +213,7 @@ describe('reminderApi.list — buildReminderQuery filter construction (C163)', (
 	});
 });
 
-describe('reminderApi.getNotifications — unreadOnly gating (C163)', () => {
+describe('reminderApi.getNotifications — unreadOnly gating', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 	});

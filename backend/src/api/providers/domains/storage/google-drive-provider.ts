@@ -23,10 +23,10 @@ export class GoogleDriveProvider implements StorageProvider {
   private driveService: GoogleDriveService;
 
   /**
-   * @param refreshToken  Google OAuth refresh token (ignored when `driveService` is injected).
-   * @param driveService  Optional pre-built service. Inject one wired to an in-memory fake
-   *                       Drive client in tests to exercise the REAL provider logic (folder
-   *                       path walk, upload/download/delete) without network or `mock.module`.
+   * @param refreshToken Google OAuth refresh token (ignored when `driveService` is injected).
+   * @param driveService Optional pre-built service. Inject one wired to an in-memory fake
+   *  Drive client in tests to exercise the REAL provider logic (folder
+   *  path walk, upload/download/delete) without network or `mock.module`.
    */
   constructor(refreshToken: string, driveService?: GoogleDriveService) {
     this.driveService = driveService ?? new GoogleDriveService(refreshToken);

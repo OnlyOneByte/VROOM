@@ -63,7 +63,7 @@ const SYMBOL_KEY = 'scn-sidebar';
  * Instantiates a new `SidebarState` instance and sets it in the context.
  *
  * @param props The constructor props for the `SidebarState` class.
- * @returns  The `SidebarState` instance.
+ * @returns The `SidebarState` instance.
  */
 export function setSidebar(props: SidebarStateProps): SidebarState {
 	return setContext(Symbol.for(SYMBOL_KEY), new SidebarState(props));

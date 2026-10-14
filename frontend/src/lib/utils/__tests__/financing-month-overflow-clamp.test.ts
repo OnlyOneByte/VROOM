@@ -1,22 +1,22 @@
 /**
- * C330 — month-overflow CLAMP across the financing date projections (sibling of #90/#91/#92).
+ * Month-overflow CLAMP across the financing date projections.
  *
  * JS `Date.setMonth(getMonth() + n)` rolls a day-of-month overflow into the FOLLOWING month
  * (Aug 31 + 1mo → Oct 1, since Sept has no 31st; May 31 + term → the month after the intended
  * end). Three financing-calculations.ts sites advanced months that way and silently shifted a
  * payment/payoff/lease-end date into the WRONG month for any contract dated on the 29th–31st:
- *   1. calculatePaymentDate (amortization-schedule + extra-payment-impact payoff dates)  [internal]
- *   2. calculateNextPaymentDate (the NextPaymentCard "due" date)  [pinned in next-payment-date.test.ts]
- *   3. calculatePayoffDate, lease path (start + termMonths)  [pinned here]
- * C330 routes all three through the shared `addMonthsClamped`, which detects the rolled day and
+ *  1. calculatePaymentDate (amortization-schedule + extra-payment-impact payoff dates) [internal]
+ *  2. calculateNextPaymentDate (the NextPaymentCard "due" date) [pinned in next-payment-date.test.ts]
+ *  3. calculatePayoffDate, lease path (start + termMonths) [pinned here]
+ * routes all three through the shared `addMonthsClamped`, which detects the rolled day and
  * `setDate(0)`s back to the target month's last day — the same clamp `calculatePayoffDateFromStart`
- * already used inline. These pin the lease-end clamp (the C330 site with zero prior coverage); the
+ * already used inline. These pin the lease-end clamp (the site with zero prior coverage); the
  * monthly next-payment clamp is pinned in next-payment-date.test.ts, and the amortization-preview
  * clamp in payoff-date-from-start.test.ts. NON-VACUOUS: reverting any site to bare setMonth lands the
  * 31st-start dates a month late (RED).
  *
  * Date OBJECTS (not 'YYYY-MM-DD' strings) so getFullYear/getMonth/getDate read in the same frame the
- * fn constructs (the C103/C77 UTC-parse trap).
+ * fn constructs (the UTC-parse trap).
  */
 
 import { describe, expect, test } from 'vitest';
@@ -43,7 +43,7 @@ function makeLease(overrides: Partial<VehicleFinancing> = {}): VehicleFinancing 
 	};
 }
 
-describe('calculatePayoffDate — lease end-date month-overflow clamp (C330)', () => {
+describe('calculatePayoffDate — lease end-date month-overflow clamp', () => {
 	test('May 31 + 36 months clamps to May 31, 2027 (no overflow needed — May has 31 days)', () => {
 		const end = calculatePayoffDate(makeLease({ termMonths: 36 }));
 		expect(end.getFullYear()).toBe(2027);

@@ -1,16 +1,16 @@
 /**
  * Vehicle-sharing access resolver (vehicle-sharing T2; design §2). THE ONE SEAM every shared
  * read/write route routes through — the single widening of cross-userId access in VROOM
- * (NORTH_STAR #2). Keeping it in one place is what makes the IDOR surface auditable: a route either
+ * Keeping it in one place is what makes the IDOR surface auditable: a route either
  * calls the strict `validateVehicleOwnership` (owner-only actions) OR one of these two
  * (shared-readable / shared-writable) — never an ad-hoc ownership check.
  *
  * Access rules (D2/D3, ratified 2026-06-27):
- *   - OWNER: `vehicles.userId === acting` — the load-bearing ownership truth (NOT the denormalized
- *     `vehicle_shares.ownerId`, which exists only for the owner-side list query).
- *   - else an ACCEPTED share to the acting user for THIS vehicle → its level (viewer | editor).
- *   - else null → the caller maps to **404, never 403** (#80 enumeration-oracle: a non-existent
- *     vehicle and a vehicle-you-cannot-see must be indistinguishable — a 403 would confirm existence).
+ *  - OWNER: `vehicles.userId === acting` — the load-bearing ownership truth (NOT the denormalized
+ *  `vehicle_shares.ownerId`, which exists only for the owner-side list query).
+ *  - else an ACCEPTED share to the acting user for THIS vehicle → its level (viewer | editor).
+ *  - else null → the caller maps to **404, never 403** (enumeration-oracle: a non-existent
+ *  vehicle and a vehicle-you-cannot-see must be indistinguishable — a 403 would confirm existence).
  *
  * A pending / declined / revoked share grants NOTHING (only `accepted` counts). A vehicle that does
  * not exist also resolves to null (both lookups miss) → the same 404. Owner-only actions (delete

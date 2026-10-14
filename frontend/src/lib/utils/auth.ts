@@ -9,9 +9,9 @@ import { routes } from '$lib/routes';
 // automatically instead of silently leaking a broken authed shell to logged-out
 // visitors until someone remembers to extend an allowlist. The public set is small
 // and stable (marketing + sign-in + legal); the authed surface is the one that grows.
-//   '/'               — landing page (its own $effect bounces authed users to /dashboard)
-//   '/auth'           — sign-in (login initiation + OAuth callback live under it)
-//   '/privacypolicy', '/termsofservice' — legal pages, footer-linked, must be public
+//  '/' — landing page (its own $effect bounces authed users to /dashboard)
+//  '/auth' — sign-in (login initiation + OAuth callback live under it)
+//  '/privacypolicy', '/termsofservice' — legal pages, footer-linked, must be public
 export const publicRoutes = ['/', '/auth', '/privacypolicy', '/termsofservice'];
 
 // Routes that, when an authenticated user lands on them, redirect to the dashboard

@@ -3,15 +3,15 @@
  *
  * Drives the REAL app over an in-memory DB. Pins the store contract the FE (T5) + the send hook (T4)
  * depend on:
- *   - POST persists a subscription for the SESSION user + reads back via the repo (201, id only —
- *     the crypto keys are never echoed).
- *   - POST is idempotent on (userId, endpoint): a re-subscribe from the same browser updates, never
- *     duplicates.
- *   - DELETE removes the session user's subscription (idempotent — deleting an unknown endpoint is a
- *     clean no-op, not an error).
- *   - IDOR: user B cannot delete user A's subscription via the endpoint alone (the endpoint is not a
- *     capability — the write is scoped to ctx.userId). B's delete is a no-op; A's row survives.
- *   - auth + validation: anon → 401; a malformed body (missing keys) → 400.
+ *  - POST persists a subscription for the SESSION user + reads back via the repo (201, id only —
+ *  the crypto keys are never echoed).
+ *  - POST is idempotent on (userId, endpoint): a re-subscribe from the same browser updates, never
+ *  duplicates.
+ *  - DELETE removes the session user's subscription (idempotent — deleting an unknown endpoint is a
+ *  clean no-op, not an error).
+ *  - IDOR: user B cannot delete user A's subscription via the endpoint alone (the endpoint is not a
+ *  capability — the write is scoped to ctx.userId). B's delete is a no-op; A's row survives.
+ *  - auth + validation: anon → 401; a malformed body (missing keys) → 400.
  *
  * createTestApp() seeds user A; user B is minted on the same DB (the shares-routes.test.ts pattern).
  * These routes do NOT gate on CONFIG.push.enabled — a user may register a subscription regardless of

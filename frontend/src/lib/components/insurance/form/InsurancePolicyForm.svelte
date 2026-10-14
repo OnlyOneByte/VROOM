@@ -40,7 +40,7 @@
 	import FormLayout from '$lib/components/common/form-layout.svelte';
 
 	// Money-field labels show the user's currency symbol, not a hardcoded "$"
-	// (EUR/GBP users would otherwise see the wrong unit). Same class as cycles 74/75.
+	// (EUR/GBP users would otherwise see the wrong unit). Same class as.
 	const currencySymbol = $derived(getCurrencySymbol());
 
 	interface Props {

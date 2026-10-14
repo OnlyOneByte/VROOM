@@ -39,7 +39,7 @@
 	let { policyId, termId, renewFrom, returnTo = '/insurance' }: Props = $props();
 
 	// Money-field labels follow the user's currency symbol, not a hardcoded "$"
-	// (EUR/GBP users would otherwise see the wrong unit). Same class as cycles 74/75.
+	// (EUR/GBP users would otherwise see the wrong unit). Same class as.
 	const currencySymbol = $derived(getCurrencySymbol());
 
 	const isEditMode = !!termId;
@@ -130,8 +130,8 @@
 	});
 
 	function populateFromTerm(source: InsuranceTerm | Partial<InsuranceTerm>) {
-		// Read the stored ISO back as the LOCAL calendar date, NOT a bare UTC `.split('T')[0]` (#138, the
-		// #87/#131 family). The save path persists via dateOnlyToISO → NOON LOCAL, so for a UTC+13/+14 user
+		// Read the stored ISO back as the LOCAL calendar date, NOT a bare UTC `.split('T')[0]` (, the
+		// family). The save path persists via dateOnlyToISO → NOON LOCAL, so for a UTC+13/+14 user
 		// noon-local lands on the prior UTC day and the slice would show the day before — shifting the term
 		// start/end back a day every edit-open. toDateInputValue reads local Y/M/D (the sibling-form fix).
 		if (source.startDate && typeof source.startDate === 'string') {
@@ -168,7 +168,7 @@
 	}
 
 	function resetAllocationsForMethod(method: 'even' | 'absolute' | 'percentage') {
-		// resetSplitAllocations is the shared source of truth (C415) — the expense form runs the identical
+		// resetSplitAllocations is the shared source of truth — the expense form runs the identical
 		// reset, so the 100/N rounded-to-1-decimal percentage seed can't drift between them.
 		splitAllocations = resetSplitAllocations(method, selectedVehicleIds);
 	}
@@ -201,9 +201,9 @@
 	/**
 	 * Build the optional term fields for the request.
 	 * - forEdit=false (add/renew): omit empty fields — there's no value to clear.
-	 * - forEdit=true  (edit): send `null` for an emptied field so the backend
-	 *   CLEARS the column. Omitting it (undefined) would be dropped by
-	 *   JSON.stringify and the repo would keep the old value — silent data loss.
+	 * - forEdit=true (edit): send `null` for an emptied field so the backend
+	 *  CLEARS the column. Omitting it (undefined) would be dropped by
+	 *  JSON.stringify and the repo would keep the old value — silent data loss.
 	 */
 	function buildTermData(forEdit = false): Record<string, unknown> {
 		const data: Record<string, unknown> = {};
@@ -247,7 +247,7 @@
 			if (isEditMode && termId) {
 				// forEdit=true → emptied optionals are sent as null to clear them.
 				await insuranceApi.updateTerm(policyId, termId, {
-					// Persist date-only inputs at NOON LOCAL (#138) so the stored ISO round-trips to the same
+					// Persist date-only inputs at NOON LOCAL so the stored ISO round-trips to the same
 					// calendar day under formatDate in every timezone — the dateOnlyToISO convention every other
 					// date-only form uses (Expense/Reminder/Vehicle/Claims). Raw "YYYY-MM-DD" → z.coerce.date()
 					// → UTC midnight → displayed a day early for Americas users.
@@ -259,7 +259,7 @@
 				appStore.showSuccess('Term updated successfully');
 			} else {
 				await insuranceApi.addTerm(policyId, {
-					// Noon-local persistence (#138) — see the updateTerm note above.
+					// Noon-local persistence — see the updateTerm note above.
 					startDate: dateOnlyToISO(startDate),
 					endDate: dateOnlyToISO(endDate),
 					...buildTermData(),

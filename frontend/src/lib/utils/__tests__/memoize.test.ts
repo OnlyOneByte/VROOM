@@ -1,10 +1,10 @@
 /**
- * Characterization net for the memoize/debounce primitives (guard, C118 — FE coverage ratchet).
+ * Characterization net for the memoize/debounce primitives (guard, — FE coverage ratchet).
  *
  * These two reusable helpers had ZERO direct coverage, yet a bug in either silently corrupts every
  * consumer: memoizeMulti caches expensive calc results (a wrong-key or stale-hit serves wrong data),
  * and debounce collapses rapid calls (a dropped trailing call or a fired-too-early call misbehaves).
- * High-risk pure logic, untested — the C82 class. The C107 reading flagged FRONTEND as the bigger
+ * High-risk pure logic, untested — the class. The reading flagged FRONTEND as the bigger
  * coverage gap; this is a FE guard pick per that steer.
  *
  * Pins: cache hit returns the memoized value WITHOUT re-invoking fn; distinct args → distinct entries;

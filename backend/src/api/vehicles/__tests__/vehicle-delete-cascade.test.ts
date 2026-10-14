@@ -50,7 +50,7 @@ function photoCount(entityType: string, entityId: string): number {
 }
 
 // This file's fixture is the shared default vehicle (Toyota Camry 2022); converge onto the shared
-// test-helpers/seed seedVehicle (arch convergence, Angelo-approved) — no opts needed since the default
+// test-helpers/seed seedVehicle  — no opts needed since the default
 // matches exactly. A thin no-arg wrapper keeps the call sites untouched.
 const seedVehicle = (): Promise<string> => seedVehicleShared(ctx);
 
@@ -105,12 +105,12 @@ describe('vehicle deletion cascades photo cleanup to dependent entities', () => 
     ).toBe(0);
   });
 
-  // trips-location (C202 schema + C207 cascade guard): trips.vehicle_id is ON DELETE cascade (migration
+  // trips-location (schema + cascade guard): trips.vehicle_id is ON DELETE cascade (migration
   // 0007; the raw-SQL cascade is unit-pinned in migration-0007.test.ts). This pins it END-TO-END through the
   // REAL vehicle-delete ROUTE — a trip is gone after its vehicle is deleted (no orphaned trip rows leaking
-  // into analytics / the mileage-summary, NORTH_STAR #2). Trips are NOT a photo-upload entity type (the
-  // C207 bug-scout verified `trip` is absent from the photo allowlist + ENTITY_TO_CATEGORY, so the
-  // photo-cleanup block correctly needs no trips leg; the C452 guard above keeps that drift-proof if trip
+  // into analytics / the mileage-summary). Trips are NOT a photo-upload entity type (the
+  // bug-scout verified `trip` is absent from the photo allowlist + ENTITY_TO_CATEGORY, so the
+  // photo-cleanup block correctly needs no trips leg; the guard above keeps that drift-proof if trip
   // photos are ever added). Seed the trip directly (no create route until T3 — the cascade is FK-level).
   test('deleting a vehicle CASCADE-removes its trips (no orphaned trip rows)', async () => {
     const vehicleId = await seedVehicle();
@@ -159,14 +159,14 @@ describe('vehicle deletion cascades photo cleanup to dependent entities', () => 
   });
 });
 
-// #97 FIXED (C40, Angelo-approved): reminder_vehicles.vehicleId is onDelete:'cascade', so deleting a
+// FIXED: reminder_vehicles.vehicleId is onDelete:'cascade', so deleting a
 // vehicle removes its junction row — but the reminder ROW survives. Pre-fix a reminder linked to ONLY that
 // vehicle was left is_active=1 with ZERO vehicles (the trigger skipped it 'no_vehicles' forever, a silent
 // never-firing orphan still shown active). The vehicle-delete route now calls
 // reminderRepository.deactivateVehicleless(userId) after the delete, flipping any now-vehicleless active
 // reminder to inactive. A MULTI-vehicle reminder is unaffected — it keeps its remaining vehicles + stays
-// active. (This was a characterization test of the buggy state; flipped to the fixed behavior at C40.)
-describe('#97 — a single-vehicle reminder is auto-deactivated when its only vehicle is deleted', () => {
+// active. (This was a characterization test of the buggy state; flipped to the fixed behavior at.)
+describe('a single-vehicle reminder is auto-deactivated when its only vehicle is deleted', () => {
   function reminderRow(id: string): { is_active: number } | null {
     return (
       (ctx.sqlite.query('SELECT is_active FROM reminders WHERE id = ?').get(id) as {
@@ -204,7 +204,7 @@ describe('#97 — a single-vehicle reminder is auto-deactivated when its only ve
     const del = await ctx.authed('DELETE', `/api/v1/vehicles/${vehicleId}`);
     expect(del.status, await del.text()).toBe(200);
 
-    // The junction cascaded away AND the now-vehicleless reminder was deactivated (the #97 fix).
+    // The junction cascaded away AND the now-vehicleless reminder was deactivated.
     expect(junctionCount('rm-orphan')).toBe(0);
     expect(reminderRow('rm-orphan')?.is_active).toBe(0);
 
@@ -232,14 +232,14 @@ describe('#97 — a single-vehicle reminder is auto-deactivated when its only ve
   });
 });
 
-// #88 FIXED (C48, Angelo-approved): a reminder's `expenseSplitConfig` is a JSON blob, NOT FK-managed like
+// FIXED: a reminder's `expenseSplitConfig` is a JSON blob, NOT FK-managed like
 // the reminder_vehicles junction — so when a vehicle is deleted, the junction row cascades but the blob
 // still NAMES the dead vehicleId. On the next trigger createExpenseFromReminder builds a split sibling for
-// that dead id → an FK violation that (the C151 async-tx footgun) leaves the surviving legs half-committed
+// that dead id → an FK violation that (the async-tx footgun) leaves the surviving legs half-committed
 // — a partial/inconsistent expense group every trigger. The vehicle-delete route now calls
 // reminderRepository.pruneSplitConfigsForDeletedVehicle(userId, id) BEFORE deactivateVehicleless: it drops
 // the deleted leg + renormalizes (≥2 legs remain) or clears the blob (<2 → single-vehicle fallback).
-describe('#88 — a deleted vehicle is pruned from reminders’ expenseSplitConfig blob', () => {
+describe('a deleted vehicle is pruned from reminders’ expenseSplitConfig blob', () => {
   /** Seed an EXPENSE reminder with a split-config blob + matching junction rows. */
   function seedSplitReminder(id: string, config: object, vehicleIds: string[]): void {
     ctx.sqlite.run(
@@ -351,14 +351,14 @@ describe('#88 — a deleted vehicle is pruned from reminders’ expenseSplitConf
   });
 });
 
-// C366 deep-review (CERTIFIED CLEAN — pins an unguarded data-safety invariant). insurance_claims.vehicleId
+// deep-review (CERTIFIED CLEAN — pins an unguarded data-safety invariant). insurance_claims.vehicleId
 // is onDelete:'set null' (schema.ts:188), deliberately UNLIKE the cascade FKs above: a claim is a financial/
 // legal record (payoutAmount, claimDate, status) that belongs to its POLICY (policyId cascades), NOT to the
-// vehicle — so deleting a vehicle must PRESERVE the claim with vehicleId nulled, never destroy it (NORTH_STAR
-// #1: no silent loss). Nothing pinned this; a regression flipping that FK to 'cascade' (or a manual cleanup
+// vehicle — so deleting a vehicle must PRESERVE the claim with vehicleId nulled, never destroy it.
+// A regression flipping that FK to 'cascade' (or a manual cleanup
 // that over-deletes) would silently wipe a user's claim history on an unrelated vehicle delete. This anchors
 // survival + the null so such a change turns RED.
-describe('C366 — deleting a vehicle PRESERVES its insurance claims (vehicleId set null, not cascade-deleted)', () => {
+describe('deleting a vehicle PRESERVES its insurance claims (vehicleId set null, not cascade-deleted)', () => {
   function claimRow(
     id: string
   ): { vehicle_id: string | null; policy_id: string; payout_amount: number } | null {
@@ -401,23 +401,23 @@ describe('C366 — deleting a vehicle PRESERVES its insurance claims (vehicleId 
 });
 
 // ---------------------------------------------------------------------------
-// C452 symmetry guard (the C302 restore-table-coverage pattern, on the photo-cascade side). The
+// symmetry guard (the restore-table-coverage pattern, on the photo-cascade side). The
 // vehicle-delete handler HARD-CODES which photo-bearing entity types it reaps (vehicle + expense +
 // odometer_entry — the three above). ENTITY_TO_CATEGORY is the registry of EVERY photo-bearing entity
 // type. The omitted ones (insurance_policy, insurance_claim) are correctly excluded because those
-// entities SURVIVE a vehicle delete (the policy isn't a vehicle child; the claim is set-null, C366) —
+// entities SURVIVE a vehicle delete (the policy isn't a vehicle child; the claim is set-null) —
 // but nothing pins that correspondence. If a future photo-bearing entity type is added that IS a
 // vehicle FK-cascade child (or an existing one's FK flips to cascade) without a matching cleanup call,
-// its photo rows + external bytes silently orphan (the #34/C280 leak class the handler exists to
+// its photo rows + external bytes silently orphan (the leak class the handler exists to
 // prevent) with NO failing test. This makes the correspondence DRIFT-PROOF: every ENTITY_TO_CATEGORY
 // key must be either reaped by the delete handler OR in the documented "survives a vehicle delete" set.
-describe('C452 — every photo-bearing entity type is reaped on vehicle-delete OR documented as surviving', () => {
+describe('every photo-bearing entity type is reaped on vehicle-delete OR documented as surviving', () => {
   const HERE = dirname(fileURLToPath(import.meta.url));
   const VEHICLE_ROUTES_SRC = readFileSync(join(HERE, '..', 'routes.ts'), 'utf-8');
 
   // Photo-bearing entity types that are NOT removed by a vehicle delete (so the handler MUST NOT, and
   // does not, reap their photos here): the policy isn't a vehicle child, and a claim's vehicleId is
-  // ON DELETE SET NULL (C366) — the claim row + its photos survive.
+  // ON DELETE SET NULL — the claim row + its photos survive.
   const SURVIVES_VEHICLE_DELETE = new Set(['insurance_policy', 'insurance_claim']);
 
   test('the vehicle-delete handler cleans photos for exactly the photo-entity types it should', () => {
@@ -437,7 +437,7 @@ describe('C452 — every photo-bearing entity type is reaped on vehicle-delete O
       `Photo-bearing entity type(s) neither reaped by the vehicle-delete handler nor documented as ` +
         `surviving a vehicle delete. If it's a vehicle FK-cascade child, add a deletePhotosForEntities ` +
         `cleanup call in routes.ts delete /:id (its photo rows + external bytes would otherwise orphan, ` +
-        `the #34 leak class); if it survives, add it to SURVIVES_VEHICLE_DELETE:\n${unaccounted.join('\n')}`
+        `the leak class); if it survives, add it to SURVIVES_VEHICLE_DELETE:\n${unaccounted.join('\n')}`
     ).toEqual([]);
   });
 
@@ -449,15 +449,15 @@ describe('C452 — every photo-bearing entity type is reaped on vehicle-delete O
 });
 
 // ---------------------------------------------------------------------------
-// C234 deep-review fix: the post-delete reminder cleanups (#88 pruneSplitConfigsForDeletedVehicle + #97
+// deep-review fix: the post-delete reminder cleanups (pruneSplitConfigsForDeletedVehicle +
 // deactivateVehicleless) run AFTER vehicleRepository.delete() commits + the DB FK-cascade has already
 // dropped the reminder_vehicles junction. They were `await`ed UNGUARDED, so a hiccup in either 500'd a
 // delete whose vehicle was already gone → the FE shows "failed", the user retries (a confusing 404), AND
-// the very normalization #88/#97 exist for never ran. They're best-effort (the next /trigger re-runs the
+// the very normalization exist for never ran. They're best-effort (the next /trigger re-runs the
 // same normalization, so a missed pass self-heals); the route now wraps them in a log+swallow try/catch.
-// This pins that contract: a cleanup throw must NOT fail the (completed) delete. (The C233 best-effort-
+// This pins that contract: a cleanup throw must NOT fail the (completed) delete. (The best-effort-
 // contract class — sibling of the trip-create createFromTrip fix.)
-describe('C234 — a post-delete reminder-cleanup throw does NOT fail the (completed) vehicle delete', () => {
+describe('a post-delete reminder-cleanup throw does NOT fail the (completed) vehicle delete', () => {
   test('deactivateVehicleless throwing still returns 200 + the vehicle is deleted', async () => {
     const vehicleId = await seedVehicle();
     const { reminderRepository } = await import('../../reminders/repository');

@@ -6,12 +6,12 @@
  * derived from the reminder — best-effort (design §4). This drives the REAL trigger endpoint (route →
  * service → repo → DB) with a FAKE PushSender injected via the T4a DI seam, so the whole hook runs
  * ZERO-network with no VAPID keypair. Pins:
- *   - a TIME-axis notification fires notifyUser once with `{title:'<name> due', body:'…now due',
- *     tag:reminder.id, url:'/reminders'}`.
- *   - a MILEAGE-axis notification fires notifyUser with a mileage-worded body ('Due at 60,000 mi').
- *   - it is best-effort: a sender that THROWS does not fail the trigger — the endpoint still 200s and
- *     returns its normal TriggerResult (the notification row is still written).
- *   - no notification created (nothing due) → notifyUser is NOT called.
+ *  - a TIME-axis notification fires notifyUser once with `{title:'<name> due', body:'…now due',
+ *  tag:reminder.id, url:'/reminders'}`.
+ *  - a MILEAGE-axis notification fires notifyUser with a mileage-worded body ('Due at 60,000 mi').
+ *  - it is best-effort: a sender that THROWS does not fail the trigger — the endpoint still 200s and
+ *  returns its normal TriggerResult (the notification row is still written).
+ *  - no notification created (nothing due) → notifyUser is NOT called.
  *
  * Mileage reminders aren't API-creatable (validation is T4), so those seed the reminder row directly
  * via sqlite then drive the real endpoint — the trigger-mileage.test.ts harness pattern. createTestApp

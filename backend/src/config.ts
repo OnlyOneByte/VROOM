@@ -202,7 +202,7 @@ export const CONFIG = {
     // decompressed size so a zip bomb can't inflate to many GB and OOM the
     // process. Generous vs any real backup (CSV text), tiny vs a bomb.
     maxUncompressedSize: 200 * 1024 * 1024,
-    // Per-entry compression-ratio cap (#22): the maxUncompressedSize check sums the
+    // Per-entry compression-ratio cap: the maxUncompressedSize check sums the
     // ZIP-central-directory `size` field, which is ATTACKER-DECLARED — a bomb can lie
     // (declare a small size to pass the sum, then inflate to GB on getData()). The
     // DEFLATE ratio is also bounded (~1032:1 theoretical max per pass), so any entry
@@ -214,7 +214,7 @@ export const CONFIG = {
     maxCompressionRatio: 1000,
     // 2.0.0 = the integer-CENTS money schema (migration 0009, money-cents-migration). Bumped from 1.0.0
     // so a naive restore of a pre-cents (dollar-float) backup FAILS the version check (fail-closed) rather
-    // than silently 100×-corrupting money via coerceRow's integer branch (design §4, NORTH_STAR #1). The
+    // than silently 100×-corrupting money via coerceRow's integer branch (design §4). The
     // version-gated ×100 shim (restore.ts → coerceRow shimMoneyToCents) is the recovery path that lets an
     // old backup restore CORRECTLY despite the bump.
     currentVersion: '2.0.0',
@@ -282,7 +282,7 @@ export const CONFIG = {
     },
     settings: { maxBackupRetention: 100, maxSyncInactivityMinutes: 30 },
     push: {
-      // A subscription that fails this many CONSECUTIVE transient sends is reaped (the #135
+      // A subscription that fails this many CONSECUTIVE transient sends is reaped (the
       // reaping-hygiene class): a dead-but-not-410 endpoint should not linger + be retried forever.
       maxConsecutiveFailures: 5,
       // Cap the push subscriptions ONE user may hold (device rotation is normal — a user replaces
@@ -341,7 +341,7 @@ export function getBackupTableKeys(): string[] {
 // Files that may be absent in older backups (pre-migration). EXPORTED so a drift guard can assert this
 // set is a SUBSET of TABLE_FILENAME_MAP's values — an entry here that drifts from the map (typo, or a map
 // rename) silently makes a genuinely-optional file REQUIRED, so a valid older backup missing it fails
-// restore with "Missing required files" (NORTH_STAR #1: the user can't recover their own backup).
+// restore with "Missing required files" (: the user can't recover their own backup).
 export const OPTIONAL_BACKUP_FILES = new Set([
   'insurance_terms.csv',
   'insurance_term_vehicles.csv',

@@ -1,6 +1,6 @@
 /**
  * TRUE backup → restore round-trip for free-text values containing RFC-4180 special characters
- * (C433 deep-review→guard). Data-safety quality bar #1: no silent loss.
+ * (deep-review→guard). Data-safety quality bar: no silent loss.
  *
  * The CSV backup serializes via csv-stringify (`quoted: true`) and restores via csv-parse — a pairing
  * that IS correct (the library escapes embedded delimiters/quotes/newlines per RFC-4180). But the
@@ -19,7 +19,7 @@
  * apostrophe-free — that's the assertion here, NOT a neutralized form.
  *
  * createTestApp() rewrites env then dynamic-imports the DB-bound backup/restore modules, so they're
- * imported dynamically AFTER createTestApp (the C291/C300 harness pattern).
+ * imported dynamically AFTER createTestApp (the harness pattern).
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';

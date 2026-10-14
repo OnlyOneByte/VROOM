@@ -51,7 +51,7 @@
 	// unit formatters read settingsStore.settings, falling back to USD/imperial when
 	// it's null. Without this, a page that doesn't itself call settingsStore.load()
 	// (e.g. the insurance forms) showed "$" for a EUR/GBP user on a direct/refreshed
-	// load. Loading it here makes the symbol correct everywhere. (cycle 203)
+	// load. Loading it here makes the symbol correct everywhere.
 	async function loadUserSettings() {
 		if (settingsLoaded) return;
 		try {

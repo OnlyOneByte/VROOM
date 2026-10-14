@@ -31,7 +31,7 @@ export interface TriggerResult {
  * `{ reminderId, reason:'error', message }` entry byte-for-byte — collapse them to one source of
  * truth so the skip shape can't drift between the axes. The `'Unknown error'` fallback is kept
  * inline here (NOT routed through extractErrorMessage, whose contract is String(error)) — the
- * deliberate fixed-fallback idiom the C147 helper doc carves out.
+ * deliberate fixed-fallback idiom the helper doc carves out.
  */
 function pushReminderSkipError(result: TriggerResult, reminderId: string, error: unknown): void {
   result.skipped.push({
@@ -86,7 +86,7 @@ function advanceCustom(
   // A non-positive interval can't advance the date: setDate(+0)/setMonth(+0) returns the SAME day, so
   // the catch-up loop in processReminder would re-fire (materializing a duplicate expense) every
   // iteration up to maxCatchUp before any backstop. Zod's positive-int schema blocks this on create/
-  // update, so it only fires on DB corruption / bypass — fail fast (mirrors the bad-unit throw, #13).
+  // update, so it only fires on DB corruption / bypass — fail fast (mirrors the bad-unit throw).
   if (intervalValue <= 0) {
     throw new ValidationError(
       `Invalid reminder intervalValue ${intervalValue} (must be a positive integer)`
@@ -111,7 +111,7 @@ function advanceCustom(
       break;
     default:
       // An unknown intervalUnit must NOT silently no-op: leaving `next` unchanged makes the
-      // catch-up / fast-forward `while (nextDue <= now)` loops spin forever (bug #13). Zod's
+      // catch-up / fast-forward `while (nextDue <= now)` loops spin forever. Zod's
       // intervalUnitSchema blocks bad values on create + update, so this only fires on DB
       // corruption or a validation bypass — fail fast so the caller records a per-reminder skip.
       throw new ValidationError(
@@ -156,7 +156,7 @@ export function computeNextDueDate(
       // through and return `next` UNCHANGED — the catch-up loop then re-fires at the same date,
       // materializing up to maxCatchUp duplicate expenses before fastForwardPastNow's backstop. Zod's
       // frequency enum blocks bad values on create/update; fail fast here so a corrupt reminder
-      // becomes a clean per-reminder skip (mirrors advanceCustom's bad-unit throw — completes #13).
+      // becomes a clean per-reminder skip (mirrors advanceCustom's bad-unit throw — completes).
       throw new ValidationError(
         `Invalid reminder frequency "${frequency}" (expected weekly|monthly|yearly|custom)`
       );
@@ -170,7 +170,7 @@ export function computeNextDueDate(
  * Thin wrapper over computeNextDueDate that binds the four `reminder.*` fields + the stable anchor day
  * (startDate's day-of-month, NOT the possibly-clamped current day — see getAnchorDay) so the catch-up,
  * notification, fast-forward, and mark-serviced re-arm paths can't drift in how they unpack a reminder.
- * Throws (via computeNextDueDate) on a corrupt frequency / non-positive interval — bug #13.
+ * Throws (via computeNextDueDate) on a corrupt frequency / non-positive interval — bug.
  */
 export function advanceReminderDueDate(reminder: Reminder, from: Date): Date {
   return computeNextDueDate(
@@ -256,10 +256,10 @@ function getAnchorDay(reminder: Reminder): number {
 
 /**
  * Has a bounded reminder's next occurrence crossed its endDate? ONE source of truth for the
- * endDate-boundary predicate (C409) that was hand-inlined at four sites here — fastForwardPastNow's
+ * endDate-boundary predicate that was hand-inlined at four sites here — fastForwardPastNow's
  * in-loop + post-loop guards and processReminder's in-loop-break + natural-exit guards. This is THE
- * bug-#12 family the loop kept re-finding (#107/C362 fast-forward exit, #114/C394 mark-serviced,
- * #116/C399 catch-up natural exit): each was a path where the advanced nextDue stepped past endDate
+ * bug- family the loop kept re-finding (fast-forward exit, mark-serviced,
+ * catch-up natural exit): each was a path where the advanced nextDue stepped past endDate
  * but the reminder stayed active. A divergent copy of the predicate (a `>=`/`>` slip, or dropping the
  * `endDate &&` null-guard so a no-end reminder wrongly deactivates) is exactly that class — so the
  * comparison lives in one place. Callers keep their own ACTION (break vs deactivate+return), since the
@@ -276,11 +276,11 @@ async function processExpensePeriod(
   now: Date
 ): Promise<{ created: Expense[]; advancedDue: Date }> {
   // Compute (and validate) the advance BEFORE the insert. computeNextDueDate is a pure function and
-  // throws on a corrupt frequency / non-positive intervalValue (#13 completion). Doing it first means
+  // throws on a corrupt frequency / non-positive intervalValue (completion). Doing it first means
   // a non-advancing reminder throws before ANY expense row is written — zero duplicate rows,
   // guaranteed, independent of the driver's rollback semantics. (better-sqlite3 runs the INSERT
   // synchronously and does NOT roll it back when a throw escapes the async transaction callback, so a
-  // throw *after* createExpenseFromReminder would still leak one persisted dupe — proven by the C151
+  // throw *after* createExpenseFromReminder would still leak one persisted dupe — proven by the
   // regression test that pre-hoist asserted 1, not 0.)
   const advancedDue = advanceReminderDueDate(reminder, nextDue);
   return transaction(async (tx) => {
@@ -319,7 +319,7 @@ async function fastForwardPastNow(reminder: Reminder, currentDue: Date, now: Dat
   const previousDue = currentDue;
   let nextDue = currentDue;
   while (nextDue <= now) {
-    // Bug #12 (C21 audit): honor endDate here too. The main catch-up loop deactivates a bounded
+    // Bug: honor endDate here too. The main catch-up loop deactivates a bounded
     // reminder once nextDue crosses endDate, but a reminder lapsed past maxCatchUp reaches this
     // fast-forward instead — without this check it would advance past now and stay "active" but
     // permanently dormant (never fires, never closes). Deactivate the moment we step past endDate.
@@ -328,7 +328,7 @@ async function fastForwardPastNow(reminder: Reminder, currentDue: Date, now: Dat
       return;
     }
     const advanced = advanceReminderDueDate(reminder, nextDue);
-    // Non-progress backstop (bug #13): this loop is bounded only by the date advancing past `now`,
+    // Non-progress backstop: this loop is bounded only by the date advancing past `now`,
     // so a frequency/intervalUnit that fails to move the date forward would spin forever. advanceCustom
     // now throws on a bad unit, but guard the invariant directly — if the date didn't strictly
     // advance, bail rather than hang the trigger endpoint.
@@ -339,11 +339,11 @@ async function fastForwardPastNow(reminder: Reminder, currentDue: Date, now: Dat
     }
     nextDue = advanced;
   }
-  // Bug #107 (C362 audit): the in-loop endDate check above only inspects values <= now (the while
+  // Bug: the in-loop endDate check above only inspects values <= now (the while
   // guard). The FINAL advance steps `nextDue` PAST now and exits the loop, so that last value is
   // never tested against endDate. A bounded reminder whose endDate falls in the period straddling
   // now (lastStep <= endDate < this final nextDue) would otherwise be written FORWARD of its endDate
-  // yet left active — firing again next trigger (the bug #12 family, here on fast-forward's exit
+  // yet left active — firing again next trigger (the bug family, here on fast-forward's exit
   // boundary). Deactivate instead of advancing past the end date. Mirrors the in-loop guard at :281.
   if (hasReminderEndedBy(reminder, nextDue)) {
     await reminderRepository.deactivate(reminder.id);
@@ -397,7 +397,7 @@ class ReminderTriggerService {
     const result: TriggerResult = { createdExpenses: [], notifications: [], skipped: [] };
     // The candidate query is also best-effort: it throws DatabaseError on failure, and this runs
     // AFTER the odometer/expense write has already persisted — so a query hiccup must NOT propagate
-    // and 500 the (successful) write. Swallow it into a skip and return what we have. (C42 review:
+    // and 500 the (successful) write. Swallow it into a skip and return what we have. (review:
     // the per-reminder try/catch below didn't cover this fetch, so the "never throws" contract was a
     // lie when the DB hiccuped between the write and the recheck.)
     let mileageReminders: ReminderWithVehicles[];
@@ -479,7 +479,7 @@ class ReminderTriggerService {
     // Time axis: a mileage-only reminder has a null next_due_date (T3) — it has no time periods to
     // process here. findOverdue's `next_due_date <= now` already excludes NULL rows via SQL
     // three-valued logic, so this is also the type guard that narrows nextDue to Date below. The
-    // mileage axis is processed separately (C23); a null date here means "no time work to do".
+    // mileage axis is processed separately; a null date here means "no time work to do".
     if (reminder.nextDueDate === null) {
       return;
     }
@@ -490,7 +490,7 @@ class ReminderTriggerService {
 
     while (nextDue <= now && catchUpCount < maxCatchUp) {
       // EndDate check inside the loop — process periods up to endDate, then stop catching up.
-      // Deactivation is handled ONCE after the loop (see the #116 guard below) so the natural
+      // Deactivation is handled ONCE after the loop so the natural
       // exit boundary is covered by the same code — one deactivation site, no duplication.
       if (hasReminderEndedBy(reminder, nextDue)) {
         break;
@@ -510,7 +510,7 @@ class ReminderTriggerService {
       catchUpCount++;
     }
 
-    // Bug #116 (C399 audit): honor endDate at the loop's NATURAL exit too (the #107/#114 bug-#12
+    // Bug: honor endDate at the loop's NATURAL exit too (the bug-
     // family on a third path). The in-loop guard above only inspects nextDue <= now (the while
     // condition); the FINAL advance steps nextDue PAST now and exits the loop under the catch-up cap,
     // so that last value was never tested against endDate. A bounded reminder whose endDate fell

@@ -1,5 +1,5 @@
 /**
- * Migration 0011: expenses.created_by (vehicle-sharing T5b; Angelo ruled option (a) owner-stamp +
+ * Migration 0011: expenses.created_by (vehicle-sharing T5b; the ruling was option (a), owner-stamp +
  * createdBy 2026-06-27).
  *
  * Purely ADDITIVE — a single `ALTER TABLE expenses ADD created_by text REFERENCES users(id)`, the
@@ -8,11 +8,11 @@
  * userId = vehicle owner — the owner-stamp model in design.md §2.1). NULL = legacy/self-created.
  *
  * This test is the proof gate that 0011 is additive AND that the column behaves as designed:
- *   - the column exists after the migration and is NULLABLE (legacy rows + the sentinel),
- *   - an existing expense row survives applying 0011 with created_by = NULL (additive, no rebuild,
- *     no __new_* scaffold — the C15/migration-0004 cascade-wipe footgun the 0010 test also pins),
- *   - created_by can be stamped with a DIFFERENT user than user_id (the editor-on-shared-vehicle case),
- *   - created_by is nullable on insert (the standalone/self-created path leaves it NULL).
+ *  - the column exists after the migration and is NULLABLE (legacy rows + the sentinel),
+ *  - an existing expense row survives applying 0011 with created_by = NULL (additive, no rebuild,
+ *  no __new_* scaffold — the migration-0004 cascade-wipe footgun the 0010 test also pins),
+ *  - created_by can be stamped with a DIFFERENT user than user_id (the editor-on-shared-vehicle case),
+ *  - created_by is nullable on insert (the standalone/self-created path leaves it NULL).
  *
  * foreign_keys = ON reproduces production.
  */

@@ -1,14 +1,14 @@
 /**
- * Behavioral guard (C39 deep-review) for `consumeOAuthState` — the single-use, flow-isolated OAuth-state
+ * Behavioral guard for `consumeOAuthState` — the single-use, flow-isolated OAuth-state
  * consumer extracted from validateLoginState/validateLinkState (auth/routes.ts). The OAuth `state` is the
  * CSRF token of the login/link/provider round-trip; the existing auth-routes.property.test.ts only
  * SOURCE-STRING-scans the validators (it asserts the code CONTAINS `storedData.flowType` / `'auth-link'`),
  * which would pass even if the logic were inverted and never pins the load-bearing CSRF invariants. This
  * pins the actual BEHAVIOR:
- *   1. SINGLE-USE — a consumed state is gone; a replayed callback can't re-consume it.
- *   2. FLOW ISOLATION — a login state (no flowType) is rejected by a link/provider consume and vice-versa.
- *   3. ANTI-FIXATION — a mismatched/unknown/null state is deleted on the failed lookup, never lingers.
- * Certified CLEAN firsthand C39; this is the merge-surviving net.
+ *  1. SINGLE-USE — a consumed state is gone; a replayed callback can't re-consume it.
+ *  2. FLOW ISOLATION — a login state (no flowType) is rejected by a link/provider consume and vice-versa.
+ *  3. ANTI-FIXATION — a mismatched/unknown/null state is deleted on the failed lookup, never lingers.
+ * Certified CLEAN firsthand; this is the merge-surviving net.
  */
 
 import { describe, expect, test } from 'bun:test';

@@ -5,12 +5,12 @@
  * clear-optional-field semantics; this auto-created-FINANCIAL-RECORD lifecycle
  * had no HTTP characterization. Drives the real stack (route → hook →
  * createSplitExpense / deleteBySource → DB) and reads rows off sqlite:
- *   - policy create with a costed, 2-vehicle term → one insurance expense per
- *     vehicle, even-split, tagged 'insurance', source_type='insurance_term'
- *   - term update to a NEW totalCost → old auto-expenses gone, new ones at the
- *     new amount (the delete-by-source + recreate path)
- *   - term update to totalCost 0 → no auto-expenses remain
- *   - term delete → auto-expenses removed
+ *  - policy create with a costed, 2-vehicle term → one insurance expense per
+ *  vehicle, even-split, tagged 'insurance', source_type='insurance_term'
+ *  - term update to a NEW totalCost → old auto-expenses gone, new ones at the
+ *  new amount (the delete-by-source + recreate path)
+ *  - term update to totalCost 0 → no auto-expenses remain
+ *  - term delete → auto-expenses removed
  *
  * createTestApp() rewrites env + dynamic-imports DB-bound modules, so keep static
  * imports to the harness + bun:test.
@@ -33,7 +33,7 @@ beforeEach(async () => {
 afterEach(() => ctx.close());
 
 // This file's fixtures are make-only ("Honda"/"Toyota"/"Mazda" with a constant model/year); converge onto
-// the shared test-helpers/seed seedVehicle (arch convergence, Angelo-approved) via a thin make wrapper that
+// the shared test-helpers/seed seedVehicle  via a thin make wrapper that
 // preserves the exact prior payload (model 'Test', year 2022) so behavior is unchanged.
 const seedVehicle = (make: string): Promise<string> =>
   seedVehicleShared(ctx, { make, model: 'Test', year: 2022 });
@@ -64,7 +64,7 @@ async function createPolicy(
   return { policyId: body.data.id, termId: body.data.terms[0]!.id };
 }
 
-/** Create a policy whose single term is MONTHLY-priced (no totalCost) — the #69 path. */
+/** Create a policy whose single term is MONTHLY-priced (no totalCost) — the path. */
 async function createMonthlyPolicy(
   vehicleIds: string[],
   monthlyCost: number
@@ -125,13 +125,13 @@ describe('insurance premium → expense hook lifecycle', () => {
     expect(new Set(rows.map((r) => r.vehicle_id))).toEqual(new Set([v1, v2]));
   });
 
-  // C382: the materialization splits totalCost EVENLY across N covered vehicles via createSplitExpense's
+  // The materialization splits totalCost EVENLY across N covered vehicles via createSplitExpense's
   // integer-cents largest-remainder algorithm. The existing test uses 1200/2=600 (divides evenly), so the
   // REMAINDER-distribution path — where the per-vehicle legs are NOT all equal but MUST still sum exactly
   // to the total — was unpinned at the HTTP/materialization layer (split-service.property.test.ts covers
   // the pure algorithm, but not the insurance term→expense round-trip). A non-even premium ($100 / 3) is
   // the realistic case: a rounding regression would lose or invent a cent on a user's insurance cost
-  // (NORTH_STAR #1). Pin that 3 siblings sum to EXACTLY 100.00 and the remainder cent lands on one leg.
+  // Pin that 3 siblings sum to EXACTLY 100.00 and the remainder cent lands on one leg.
   test('a NON-EVEN premium split (100 / 3 vehicles) materializes legs that sum to EXACTLY the total', async () => {
     const v1 = await seedVehicle('Honda');
     const v2 = await seedVehicle('Toyota');
@@ -153,13 +153,13 @@ describe('insurance premium → expense hook lifecycle', () => {
     expect(new Set(rows.map((r) => r.vehicle_id))).toEqual(new Set([v1, v2, v3]));
   });
 
-  // #69 (C34): a MONTHLY-only term (monthlyCost, no totalCost) previously created NO expense row, so it
+  // A MONTHLY-only term (monthlyCost, no totalCost) previously created NO expense row, so it
   // showed in analytics (effectiveMonthlyPremium honours monthlyCost) but was ABSENT from TCO's
   // insuranceCost bucket — an under-report. The hook now materializes monthlyCost × the term's month span
   // (the same inclusive month count effectiveMonthlyPremium amortizes a totalCost over → symmetric, no
   // double-count: analytics reads term.monthlyCost directly, never these rows). A 2024-01-01 → 2025-01-01
   // term spans 13 month-keys (inclusive both endpoints), so $100/mo → $1300 materialized.
-  test('#69: a monthly-only term materializes monthlyCost × term-months into TCO-visible expense rows', async () => {
+  test('a monthly-only term materializes monthlyCost × term-months into TCO-visible expense rows', async () => {
     const v1 = await seedVehicle('Honda');
     const { termId } = await createMonthlyPolicy([v1], 100);
 
@@ -171,8 +171,8 @@ describe('insurance premium → expense hook lifecycle', () => {
     expect(rows[0]!.source_type).toBe('insurance_term');
   });
 
-  test('#69: an explicit totalCost still wins over monthlyCost (no change to the costed path)', async () => {
-    // A term with BOTH set uses totalCost verbatim (effectiveTermCost precedence) — pins that the #69
+  test('an explicit totalCost still wins over monthlyCost (no change to the costed path)', async () => {
+    // A term with BOTH set uses totalCost verbatim (effectiveTermCost precedence) — pins that the
     // monthly path doesn't disturb the existing costed-term materialization.
     const v1 = await seedVehicle('Honda');
     const res = await ctx.authed('POST', '/api/v1/insurance', {

@@ -1,24 +1,24 @@
 /**
- * #127 — replace-mode restore is ATOMIC: a mid-insert failure must roll the wipe back, NOT leave the
- * account empty (NORTH_STAR #1, no silent loss).
+ * Replace-mode restore is ATOMIC: a mid-insert failure must roll the wipe back, NOT leave the
+ * account empty (no silent loss).
  *
- * The footgun (C151): drizzle's bun-sqlite dialect is SYNCHRONOUS — it runs the transaction callback
+ * The footgun: drizzle's bun-sqlite dialect is SYNCHRONOUS — it runs the transaction callback
  * inside bun's `client.transaction(() => …)`, which only wraps work that completes synchronously. The
  * old restore callback was `async`, so it returned a pending promise immediately: BEGIN/COMMIT closed
  * around nothing and every `await tx.delete/insert` ran as its OWN autocommit statement. On the replace
- * path that means a throw mid-insert (anything past the C428 cross-row-UNIQUE pre-validate — an `id` PK
+ * path that means a throw mid-insert (anything past the cross-row-UNIQUE pre-validate — an `id` PK
  * collision, an FK violation, an IO error) left the wipe ALREADY COMMITTED and the account WIPED.
  *
  * FIX: the restore transaction callback + deleteUserData/insertBackupData are now SYNCHRONOUS (.run()/
  * .all()), so the wipe + every insert execute inside ONE real transaction that rolls back atomically.
  *
  * This test reproduces a validator-surviving mid-insert failure: it tampers a REAL exported ZIP so
- * `vehicles.csv` carries TWO rows with the SAME id (both with an empty licensePlate, so the C428
+ * `vehicles.csv` carries TWO rows with the SAME id (both with an empty licensePlate, so the
  * dup-check — which skips NULL-keyed rows — passes). validateBackupData accepts it (per-row schema +
- * referential-integrity are fine; the cross-row id collision is NOT one of the two UNIQUE indexes C428
+ * referential-integrity are fine; the cross-row id collision is NOT one of the two UNIQUE indexes
  * guards), then the multi-row `insert(vehicles)` throws `UNIQUE constraint failed: vehicles.id`.
- *   - PRE-FIX: the wipe had autocommitted → the user's ORIGINAL vehicle is gone (total loss).
- *   - POST-FIX: the synchronous transaction rolls back → the original vehicle SURVIVES untouched.
+ *  - PRE-FIX: the wipe had autocommitted → the user's ORIGINAL vehicle is gone (total loss).
+ *  - POST-FIX: the synchronous transaction rolls back → the original vehicle SURVIVES untouched.
  *
  * createTestApp() rewrites env then dynamic-imports the DB-bound modules; keep imports to the harness +
  * import backup/restore dynamically AFTER it so they bind to the throwaway in-memory DB.
@@ -61,7 +61,7 @@ function duplicateVehicleRow(zipBuffer: Buffer): Buffer {
   return zip.toBuffer();
 }
 
-describe('#127 replace-mode restore atomicity — a mid-insert failure rolls the wipe back', () => {
+describe('replace-mode restore atomicity — a mid-insert failure rolls the wipe back', () => {
   test('a backup that throws UNIQUE on vehicles.id during insert leaves the ORIGINAL data intact', async () => {
     // Own one real vehicle.
     const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2021 });
@@ -70,9 +70,9 @@ describe('#127 replace-mode restore atomicity — a mid-insert failure rolls the
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');
 
-    // Real export, then tamper: two vehicles.csv rows with the same id (empty licensePlate → the C428
+    // Real export, then tamper: two vehicles.csv rows with the same id (empty licensePlate → the
     // cross-row UNIQUE pre-validate skips them as NULL-keyed, so validation passes and the throw lands
-    // at INSERT time — exactly the post-validate mid-insert failure #127 is about).
+    // at INSERT time — exactly the post-validate mid-insert failure is about).
     const zip = await backupService.exportAsZip(ctx.user.id);
     const tampered = duplicateVehicleRow(zip);
 

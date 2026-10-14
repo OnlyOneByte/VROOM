@@ -298,8 +298,8 @@ describe('processBatch', () => {
     });
   });
 
-  // C261: the folder-path resolution is wrapped in its OWN try/catch (sync-worker.ts:228-234) so a
-  // storage_config glitch can't strand a photo in `failed` forever (NORTH_STAR #1 — no silent loss).
+  // The folder-path resolution is wrapped in its OWN try/catch (sync-worker.ts:228-234) so a
+  // storage_config glitch can't strand a photo in `failed` forever (— no silent loss).
   // Every other test resolves the path cleanly, leaving this resilience branch unpinned: a throwing
   // resolveProviderFolderPath must be swallowed and the upload must still proceed with an empty pathHint.
   test('path-resolution failure is swallowed — the sync still completes with an empty pathHint', async () => {
@@ -334,7 +334,7 @@ describe('processBatch', () => {
     });
   });
 
-  // C261: an entityType absent from ENTITY_TO_CATEGORY yields an undefined category, so path
+  // An entityType absent from ENTITY_TO_CATEGORY yields an undefined category, so path
   // resolution is SKIPPED entirely (the `if (category)` guard at sync-worker.ts:228) — the sync must
   // still upload with the empty pathHint rather than crash on a missing map entry.
   test('unknown entityType skips path resolution and still uploads (empty pathHint)', async () => {
@@ -419,12 +419,12 @@ describe('processBatch', () => {
     });
   });
 
-  // #144: a revoked/expired token (AUTH_INVALID) is TERMINAL — the provider adapters map a 401/403
-  // to it (#105) "so the user re-connects". The worker must NOT retry it: jump retryCount to the cap
+  // A revoked/expired token (AUTH_INVALID) is TERMINAL — the provider adapters map a 401/403
+  // to it "so the user re-connects". The worker must NOT retry it: jump retryCount to the cap
   // (so findPendingOrFailed's `retryCount < 3` stops re-picking it) + prefix the message so the
   // provider-stats `failed` count means "reconnect required", not a transient flake. Pre-fix this
-  // ref would get retryCount:1 and a bare message + burn 3 backoff cycles. The #105/#43/#44 family.
-  test('parks a ref terminally (no retry) on a TERMINAL auth error (#144)', async () => {
+  // ref would get retryCount:1 and a bare message + burn 3 backoff cycles. The family.
+  test('parks a ref terminally (no retry) on a TERMINAL auth error', async () => {
     const { SyncError, SyncErrorCode } = await import('../../../errors');
     const pendingRef = makePhotoRef({ status: 'pending', retryCount: 0 });
     const activeRef = makeActiveRef();

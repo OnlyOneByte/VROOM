@@ -22,7 +22,7 @@ export const MAX_FILE_SIZE = 10_485_760;
 
 /**
  * Persist the DB side of an upload (photo row + active default ref) AFTER the bytes are already in
- * the provider. #34: the upload is not atomic — if either insert throws (DB error, constraint), the
+ * the provider.: the upload is not atomic — if either insert throws (DB error, constraint), the
  * external object would be orphaned (no DB row → never reconcilable or deletable through the app).
  * Compensate: best-effort delete the just-uploaded object before re-throwing, so a failed upload
  * leaves no provider-side litter. A failed compensating delete is logged (reconcilable) but never
@@ -124,7 +124,7 @@ export async function uploadPhotoForEntity(
     pathHint: folderPath,
   });
 
-  // #34: the upload is not atomic — the bytes now live in the provider, but the photo row + its
+  // The upload is not atomic — the bytes now live in the provider, but the photo row + its
   // active ref are two more writes that can throw (DB error, constraint). On ANY failure after the
   // upload, the external object would be orphaned (no DB row → never reconcilable, never deletable
   // through the app). Compensate: best-effort delete the just-uploaded object before re-throwing, so

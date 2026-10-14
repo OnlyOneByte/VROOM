@@ -107,7 +107,7 @@
 	{#if change != null}
 		<!-- Direction hue lives on the ICON (graphical, exempt); the % TEXT is
 		     text-foreground. chart-2 (#009689) on white is 3.66:1 at text-xs — below
-		     WCAG AA 4.5:1 (cycle 189). text-destructive is dark enough to pass, but
+		     WCAG AA 4.5:1. text-destructive is dark enough to pass, but
 		     keeping the text neutral in both branches is simpler and consistent. -->
 		<span class="inline-flex items-center gap-1 text-xs font-medium text-foreground">
 			{#if change >= 0}

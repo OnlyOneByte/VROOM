@@ -5,7 +5,7 @@
  * Load-bearing contract (R1, inviolable): a theme is a pure VALUE swap on the EXISTING `app.css` custom
  * properties — zero component/markup changes. So `ThemeTokenKey` is EXACTLY the set of per-variant color
  * custom properties `src/app.css` declares in BOTH `:root` (light) and `.dark` (dark). Verified firsthand
- * (C181): those two blocks declare an identical 32-key set; `--radius` is `:root`-only (a variant-invariant
+ *  those two blocks declare an identical 32-key set; `--radius` is `:root`-only (a variant-invariant
  * layout token) and is therefore NOT a themeable per-variant key. A guard in T5 asserts this list still
  * equals the live app.css set so a future token add/remove can't silently desync the engine.
  */
@@ -25,7 +25,7 @@ export type ThemeId = string;
 
 /**
  * Every per-variant themeable token, by its `app.css` custom-property name WITHOUT the leading `--`.
- * EXACTLY the keys declared in both `:root` and `.dark` (C181 census). A `ThemeVariant` must specify all
+ * EXACTLY the keys declared in both `:root` and `.dark` (census). A `ThemeVariant` must specify all
  * of them — a missing key would leave that token at the previously-applied theme's value (a visual leak),
  * which the T5 registry-integrity test forbids.
  */

@@ -202,7 +202,7 @@ describe('StorageProviderRegistry', () => {
       expect(results).toHaveLength(0);
     });
 
-    // C387 (ARCC SAX-05 Outcome-2: "validate tenant context at every data-access boundary; missing
+    // (ARCC SAX-05 Outcome-2: "validate tenant context at every data-access boundary; missing
     // tenant validation in background jobs"): a providerId listed in the user's storageConfig whose
     // ACTUAL row is NOT owned by them (findOwnedProvider's userId-scoped query → []) must be SKIPPED,
     // never returned as a backup target. This is the tenant-isolation invariant that makes the sync
@@ -343,7 +343,7 @@ describe('StorageProviderRegistry', () => {
       );
     });
 
-    // C254: the google-photos + s3 builder validation throws (registry.ts buildGooglePhotosProvider /
+    // The google-photos + s3 builder validation throws (registry.ts buildGooglePhotosProvider /
     // buildS3Provider) were the uncovered createProviderInstance branches — credential/config integrity
     // gates. createProviderInstance only CONSTRUCTS (no network), so these are pure-input tests.
     test('creates GooglePhotosProvider for google-photos type (reuses cached albumId from config)', () => {
@@ -411,16 +411,16 @@ describe('StorageProviderRegistry', () => {
       );
     });
 
-    // C60 deep-review (CERTIFIED CLEAN — pins an unguarded PRODUCTION-SAFETY gate). createProviderInstance
+    // deep-review (CERTIFIED CLEAN — pins an unguarded PRODUCTION-SAFETY gate). createProviderInstance
     // double-gates the `fake` storage provider (registry.ts): it instantiates a FakeStorageProvider ONLY
     // when CONFIG.allowFakeStorageProvider is true (= ALLOW_FAKE_STORAGE set AND NODE_ENV !== production),
     // else throws. The FakeStorageProvider bypasses real storage (in-memory, no bytes leave the process), so
-    // a `fake` row reaching production would silently swallow every backup/photo upload — a NORTH_STAR #1
+    // a `fake` row reaching production would silently swallow every backup/photo upload — a
     // data-loss footgun. The route-create gate is pinned (providers-routes-http.test.ts), but this REGISTRY
     // instantiation gate (a different layer — restore/sync resolve a live provider here, not via the route)
     // was unpinned. The test env has allowFakeStorageProvider=false (NODE_ENV=test, ALLOW_FAKE_STORAGE
     // unset), so this pins the SECURITY-DEFAULT branch directly — no CONFIG mock needed.
-    test('C60: a fake provider is REJECTED when allowFakeStorageProvider is off (the prod-safety default)', () => {
+    test('a fake provider is REJECTED when allowFakeStorageProvider is off (the prod-safety default)', () => {
       const db = createMockDb([]);
       const registry = new StorageProviderRegistry(db as never);
       const fakeRow = { ...baseProvider, providerType: 'fake' };
@@ -430,7 +430,7 @@ describe('StorageProviderRegistry', () => {
       );
     });
 
-    test('C60: the fake gate SHORT-CIRCUITS before decrypt (a fake row with garbage creds still throws the GATE error, not a decrypt/parse error)', () => {
+    test('the fake gate SHORT-CIRCUITS before decrypt (a fake row with garbage creds still throws the GATE error, not a decrypt/parse error)', () => {
       const db = createMockDb([]);
       const registry = new StorageProviderRegistry(db as never);
       // Credentials that would throw on JSON.parse if decrypt ran — proving the gate check runs FIRST,

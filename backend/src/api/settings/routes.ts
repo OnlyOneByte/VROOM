@@ -125,7 +125,7 @@ function mergeStorageConfig(
  * Merge incoming backupConfig with existing, producing a full BackupConfig.
  *
  * MIRRORS mergeStorageConfig — the PUT used to write backupConfig WHOLESALE while storageConfig was
- * merged, an asymmetry that was a silent data-loss trap (NORTH_STAR #1): a client PUT-ing
+ * merged, an asymmetry that was a silent data-loss trap: a client PUT-ing
  * `backupConfig` with only the provider it's editing would WIPE every other provider's backup
  * settings (retentionCount / sheetsSyncEnabled / folderPath). The frontend mitigated by always
  * reconstructing the full providers map (ProviderForm.svelte spreads ...backupConfig.providers), but
@@ -151,7 +151,7 @@ routes.use('*', requireAuth);
 routes.use('*', changeTracker);
 
 // unitPreferencesSchema + partialUnitPreferencesSchema now live in utils/unit-preferences-schema.ts
-// (shared with vehicles/routes.ts — the C238 dedup).
+// (shared with vehicles/routes.ts — the dedup).
 
 // Zod schema for storageConfig validation
 const categorySettingSchema = z.object({
@@ -223,7 +223,7 @@ const updateSettingsSchema = baseSettingsSchema
     // Theming engine (spec T2, D2): the selected theme id. createInsertSchema would accept it as an
     // UNBOUNDED string (the column is plain text); pin an explicit bounded, non-empty constraint so a
     // partial PUT can persist it (routed through the existing row-level merge in repository.update — a
-    // field not sent is left untouched, the #82 discipline) while a 5000-char or empty id can't land.
+    // field not sent is left untouched, the discipline) while a 5000-char or empty id can't land.
     // The resolver (T6) treats an unknown id as `default`, so an arbitrary <=64-char value is safe to
     // store; the cap is a storage/abuse bound, not an allow-list (custom themes are a future seam, D6).
     themePreference: z.string().min(1).max(64).optional(),
@@ -231,7 +231,7 @@ const updateSettingsSchema = baseSettingsSchema
     // the real column unbounded; pin an explicit non-negative, sanely-capped constraint (a reimbursement
     // rate is well under $100/mile — the cap is an abuse bound). Routed through the same row-level merge
     // (...restUpdates → repository.update), so a partial PUT persists it without touching sibling fields
-    // (the #82 discipline). 0 = the additive default (no business value until a rate is set).
+    // 0 = the additive default (no business value until a rate is set).
     businessMileageRate: z.number().min(0).max(100).optional(),
   })
   .partial();

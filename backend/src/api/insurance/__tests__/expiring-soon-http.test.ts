@@ -1,7 +1,7 @@
 /**
  * In-process HTTP tests for GET /api/v1/insurance/expiring-soon — through the REAL stack.
  *
- * #70 (data-correctness, C210): the `days` query param was Number.parseInt'd with NO finite-guard
+ * The `days` query param was Number.parseInt'd with NO finite-guard
  * (unlike its sibling `limit`, guarded right beside it). A non-numeric `?days=` → NaN →
  * `endDate = new Date(now + NaN)` = Invalid Date → the BETWEEN range query silently matched NOTHING,
  * so "expiring soon" falsely reported ZERO expiring policies and the user missed a renewal nag. The
@@ -62,7 +62,7 @@ async function seedSoonExpiringTerm(vehicleId: string): Promise<string> {
   return body.data.terms[0].id;
 }
 
-describe('GET /insurance/expiring-soon — #70 malformed `days` must not silently hide expiring terms', () => {
+describe('GET /insurance/expiring-soon — malformed `days` must not silently hide expiring terms', () => {
   test('the default window finds a ~20-days-out term (baseline)', async () => {
     const vid = await seedVehicle(ctx);
     const termId = await seedSoonExpiringTerm(vid);

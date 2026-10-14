@@ -34,7 +34,7 @@ type DbInstance =
   | Parameters<Parameters<ReturnType<typeof getDb>['transaction']>[0]>[0];
 
 /**
- * Fetch the provider owned by `userId` with id `id`, or throw NotFoundError('Provider') (C123 arch).
+ * Fetch the provider owned by `userId` with id `id`, or throw NotFoundError('Provider').
  * The ownership-check + 404 was hand-repeated byte-identically at 5 route handlers (PATCH/DELETE/
  * health/backfill/sync); each then uses the returned row, so this RETURNS it. Scoped to userId — a
  * provider not owned by the caller is indistinguishable from a missing one (no cross-tenant probe).
@@ -79,7 +79,7 @@ async function countUserPhotos(
 /**
  * Count photoRefs for a provider in a given status ('active' | 'failed'), scoped to the
  * given entity types. The synced-vs-failed counts in /sync-status differ ONLY by the status
- * filter, so they share one helper (C92 dedup) rather than two byte-identical joined queries.
+ * filter, so they share one helper rather than two byte-identical joined queries.
  */
 async function countPhotoRefsByStatus(
   db: DbInstance,
@@ -108,8 +108,8 @@ async function countPhotoRefsByStatus(
 /**
  * Shape a provider row for the API response. The credentials column is deliberately
  * OMITTED — secrets are never returned to the frontend (pinned by providers-routes-http.test.ts,
- * C91). Single source of truth for the GET-list / POST-create / PUT-update responses, which
- * previously hand-assembled this identical 8-field object three times (C92 dedup).
+ * ). Single source of truth for the GET-list / POST-create / PUT-update responses, which
+ * previously hand-assembled this identical 8-field object three times.
  */
 function formatProviderResponse(row: UserProvider) {
   return {
@@ -156,7 +156,7 @@ routes.get('/pending/:nonce', async (c) => {
 // the api key rides the encrypted `credentials` blob exactly like a storage refreshToken/S3 secret, and
 // `config` carries the non-secret model name + optional baseUrl (self-hosted/compatible endpoint). No
 // schema change — `user_providers` is domain-agnostic. The per-type required-field gate is the shared
-// validateModelProviderConfig (mirrors validateStorageProviderConfig), used by CREATE + PUT (#123).
+// validateModelProviderConfig (mirrors validateStorageProviderConfig), used by CREATE + PUT.
 //
 // The SAME 4 provider-type strings serve both domains (an `anthropic` row is valid in `vlm` OR `llm`); the
 // domain↔type guard keys on the DOMAIN being one of MODEL_DOMAINS, not on a vlm-specific type set. The
@@ -244,12 +244,12 @@ routes.get('/', async (c) => {
  */
 /**
  * Reject a storage-provider config that the provider can NEVER instantiate with — an S3 row needs
- * endpoint/bucket/region (buildS3Provider enforces the same at use). ONE source of truth (C416) for that
- * required-field gate, shared by the CREATE path (resolveProviderCredentials) AND the PUT /:id handler:
- * C349 closed this footgun on CREATE, but PUT wrote body.config verbatim, so editing an S3 provider to a
- * config missing a field persisted a 200 + a bricked row that threw on every later test/upload/sync (#123,
- * the #103/C349 sibling on the update path). google-drive resolves its config server-side from the OAuth
- * nonce + google-photos needs only credentials, so neither has a required-config gate here.
+ * endpoint/bucket/region (buildS3Provider enforces the same at use). ONE source of truth for that
+ * required-field gate, shared by the CREATE path (resolveProviderCredentials) AND the PUT /:id
+ * handler. Without it on BOTH, editing an S3 provider to a config missing a field persists a 200 and
+ * a bricked row that throws on every later upload or sync. google-drive resolves its config
+ * server-side from the OAuth nonce and google-photos needs only credentials, so neither has a
+ * required-config gate here.
  */
 function validateStorageProviderConfig(
   providerType: string,
@@ -265,15 +265,15 @@ function validateStorageProviderConfig(
 
 /**
  * Reject a MODEL-provider row (vlm OR llm) the adapter could NEVER instantiate with (vlm-receipt-parsing
- * T1 + llm-assistant T1, the #103/#123 fail-fast-at-create discipline). The two domains share an identical
+ * T1 + llm-assistant T1, the fail-fast-at-create discipline). The two domains share an identical
  * required-field contract (a model name; an api key for non-ollama; a base URL for self-hosted/compatible)
  * — the api key is the ONLY secret and rides the encrypted blob — so ONE validator serves both (the
  * llm-assistant T1 dedup). Split into a config-shape check + a credentials check so each path validates
  * only the field it touches:
  *  - CREATE (resolveProviderCredentials) runs BOTH (it has the full config + credentials),
  *  - PUT runs the config-shape check on a config update and the credentials check on a credentials update
- *    — so a config-only edit (e.g. changing the model) does NOT falsely demand the apiKey be re-sent (it
- *    is already stored encrypted).
+ *  — so a config-only edit (e.g. changing the model) does NOT falsely demand the apiKey be re-sent (it
+ *  is already stored encrypted).
  * The error wording stays "VLM" for the model-name + api-key messages so the shipped vlm guard test reads
  * unchanged; the messages are user-facing on both domains but accurate (both are LLM-backed providers).
  */
@@ -346,7 +346,7 @@ function resolveProviderCredentials(
     };
   }
   // Fail-fast at CREATE time on a config the provider can never instantiate with (the shared gate,
-  // C349/C416) — without it the Zod schema's open `config: z.record(...)` lets a broken S3 row persist
+  // ) — without it the Zod schema's open `config: z.record(...)` lets a broken S3 row persist
   // + auto-populate storageConfig, then EVERY later use throws.
   validateStorageProviderConfig(providerType, config);
   return {
@@ -496,7 +496,7 @@ routes.put(
     }
     const existingType = existing[0].providerType;
     if (body.config !== undefined) {
-      // Same fail-fast gate CREATE uses (C416, the #103/C349 sibling): a PUT that swaps a provider's
+      // Same fail-fast gate CREATE uses: a PUT that swaps a provider's
       // config to an unusable one would otherwise persist a 200 + a bricked row that throws on every
       // later use. Validate against the EXISTING provider's type. VLM rows get the model/baseUrl shape
       // check; a config-only edit does NOT require the apiKey (it is already stored encrypted).
@@ -508,7 +508,7 @@ routes.put(
       updates.config = body.config;
     }
     if (body.credentials !== undefined) {
-      // A VLM credentials update must still carry an api key for a non-ollama type (the #123 both-paths
+      // A VLM credentials update must still carry an api key for a non-ollama type (the both-paths
       // discipline — CREATE already enforces this; PUT must not let a key-required type drop to keyless).
       if (isVlmProviderType(existingType)) {
         validateVlmCredentials(existingType, body.credentials);
@@ -516,10 +516,10 @@ routes.put(
       updates.credentials = encrypt(JSON.stringify(body.credentials));
     }
 
-    // Scope the destructive write on BOTH id AND userId (#63 — the C109/#52 class). The
+    // Scope the destructive write on BOTH id AND userId. The
     // findOwnedProviderOrThrow guard above already proves ownership, so this is behavior-identical
     // today; ANDing userId here keeps the write itself tenant-scoped so a future guard-drop/reorder
-    // can't turn it into a cross-tenant update (mirrors the C155 split + C168/C180 odometer fixes).
+    // can't turn it into a cross-tenant update (mirrors the split + odometer fixes).
     const result = await db
       .update(userProviders)
       .set(updates)
@@ -562,7 +562,7 @@ async function cleanupStorageConfig(userId: string, providerId: string): Promise
 }
 
 // Helper: clean up backup_config when a storage provider is deleted.
-// ATOMIC per #100 (Angelo-decided): instead of read → JS-delete → write (a lost-update race where a
+// ATOMIC per : instead of read → JS-delete → write (a lost-update race where a
 // concurrent settings merge clobbers this removal, or vice-versa), patch the single key to `null` in one
 // UPDATE. RFC-7386 `json_patch` deletes a key set to null, so `{ providers: { [id]: null } }` removes JUST
 // this provider's backup entry while every sibling provider's settings survive — even under a concurrent
@@ -606,7 +606,7 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
     }
   }
 
-  // Delete the provider row — scoped on BOTH id AND userId (#63, the C109/#52 class). Ownership is
+  // Delete the provider row — scoped on BOTH id AND userId. Ownership is
   // already proven by findOwnedProviderOrThrow above, so this is behavior-identical today; the
   // tenant-scoped predicate keeps the destructive write safe under a future guard-drop/reorder.
   await db
@@ -651,8 +651,8 @@ routes.post('/:id/backfill', zValidator('param', commonSchemas.idParam), async (
   }
 
   let created = 0;
-  // SYNCHRONOUS transaction (#127 class, C504): the backfill inserts a photoRef per missing photo in a
-  // loop. Under the old `async` callback bun-sqlite committed each insert independently (the C151 footgun),
+  // SYNCHRONOUS transaction: the backfill inserts a photoRef per missing photo in a
+  // loop. Under the old `async` callback bun-sqlite committed each insert independently,
   // so a throw mid-loop left a partial backfill committed while the route still 500'd. Running synchronously
   // (inline `.all()` read + `.run()` inserts, no await) keeps the whole backfill in ONE real transaction
   // that rolls back atomically. (The find query is inlined here as a sync `.all()` — the async

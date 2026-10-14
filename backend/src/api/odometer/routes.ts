@@ -176,7 +176,7 @@ routes.put(
       updatedAt: new Date(),
     });
 
-    // D5 (#71): editing a reading can cross a mileage milestone (e.g. correcting an odometer upward
+    // D5: editing a reading can cross a mileage milestone (e.g. correcting an odometer upward
     // past a reminder's due value). Mirror the create-path best-effort recheck (never throws,
     // idempotent via the dedup), scoped to the OWNER (existing.userId — the row owner; the mileage
     // reminders for this vehicle belong to the owner, not a shared editor).

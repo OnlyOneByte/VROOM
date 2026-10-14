@@ -12,10 +12,10 @@
  * shared validators in utils/validation.ts — two implementations that can drift,
  * a security-adjacent smell. Before routing the switch through the shared
  * validators (the arch refactor), this pins the OBSERVABLE contract per type:
- *   - own entity            → 200 (gate passes; empty photo list)
- *   - another user's entity → 404 (NotFoundError; never leak existence)
- *   - non-existent entity   → 404
- *   - unknown entity type   → 400 (ValidationError)
+ *  - own entity → 200 (gate passes; empty photo list)
+ *  - another user's entity → 404 (NotFoundError; never leak existence)
+ *  - non-existent entity → 404
+ *  - unknown entity type → 400 (ValidationError)
  * The refactor must keep every one of these green (behavior-preserving).
  * `insurance_claim` is additionally covered end-to-end in
  * insurance/__tests__/claim-photos-http.test.ts; included here for symmetry.

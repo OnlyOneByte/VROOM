@@ -1,5 +1,5 @@
 /**
- * Coverage ratchet (guard, C143) for api-client.ts — the C124 low spot + the most load-bearing FE
+ * Coverage ratchet for api-client.ts — the low spot + the most load-bearing FE
  * module: EVERY API call routes through `request`/`requestFull` here (envelope unwrap, error parsing,
  * header gating, pagination). The sibling service tests all MOCK this module, so its real internals
  * were never exercised. Here we stub global.fetch (the auth.test.ts pattern) and drive the REAL
@@ -197,7 +197,7 @@ describe('withPagination', () => {
 });
 
 // apiClient.raw (api-client.ts:131-132) was UNCOVERED — it's the raw-Response fetch used for file
-// downloads (e.g. the backup-ZIP export, NORTH_STAR #1 data portability). Unlike request(), it does NOT
+// downloads (e.g. the backup-ZIP export, data portability). Unlike request(), it does NOT
 // unwrap the envelope; it returns the Response directly. The load-bearing bits: a relative url is
 // base-prefixed (absolute http(s) passes through), and `credentials: 'include'` is ALWAYS sent so the
 // auth cookie rides along (a dropped credentials = a 401 on every download).

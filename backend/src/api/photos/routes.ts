@@ -22,9 +22,9 @@ const routes = new Hono();
 
 routes.use('*', requireAuth);
 // Stamp lastDataChangeDate on a 2xx photo mutation (upload/delete) so the change re-triggers the
-// next auto-backup (#74): photos + photo_refs ARE in the backup payload (backup.ts), and the
+// next auto-backup: photos + photo_refs ARE in the backup payload (backup.ts), and the
 // orchestrator skips when !hasChangesSinceLastSync — without this, a photo-only change between
-// backups was silently excluded until some OTHER tracked mutation bumped the timestamp (the #42
+// backups was silently excluded until some OTHER tracked mutation bumped the timestamp (the
 // silent-backup-gap class). This was the lone mutating route module missing changeTracker.
 routes.use('*', changeTracker);
 

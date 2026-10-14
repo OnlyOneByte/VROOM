@@ -5,12 +5,12 @@
  * but processOverdueReminders actually CREATING an expense, advancing the due date
  * (so it can't re-fire the same period), and honoring endDate had no test. A bug
  * here silently writes wrong/duplicate money rows, so it's pinned end-to-end:
- *   - an overdue expense reminder → POST /trigger → exactly one expense with the
- *     template's category/amount/tags + source_type='reminder', source_id=reminder
- *   - triggering AGAIN creates no duplicate for the already-processed period
- *     (the nextDueDate advancement is what prevents infinite re-fire)
- *   - endDate bounds catch-up to exactly the occurrences within [start, end],
- *     then deactivates (NOT the ~12 catch-up cap, nor every month up to now)
+ *  - an overdue expense reminder → POST /trigger → exactly one expense with the
+ *  template's category/amount/tags + source_type='reminder', source_id=reminder
+ *  - triggering AGAIN creates no duplicate for the already-processed period
+ *  (the nextDueDate advancement is what prevents infinite re-fire)
+ *  - endDate bounds catch-up to exactly the occurrences within [start, end],
+ *  then deactivates (NOT the ~12 catch-up cap, nor every month up to now)
  *
  * Goes through the REAL stack (route → trigger service → split/insert → DB) and
  * reads rows straight off sqlite. createTestApp() rewrites env + dynamic-imports
@@ -127,17 +127,17 @@ describe('expense-reminder trigger (auto-creates financial records)', () => {
     expect(countAfterSecond).toBe(countAfterFirst);
   });
 
-  // Bug #116 (C399 audit): the #107/#114 bug-#12 endDate family on a THIRD, previously-unfixed path —
+  // Bug: the bug- endDate family on a THIRD, previously-unfixed path —
   // the catch-up loop's NATURAL exit (under the 12-occurrence cap). The in-loop endDate guard only sees
   // nextDue <= now (the while condition); the FINAL advance steps nextDue PAST now and exits, so that
   // last value was never tested against endDate. A bounded reminder whose endDate falls between its last
   // in-window occurrence and that final advance was left is_active=1 with a future nextDueDate — it then
   // inflates GET /reminders/recurring-cost (which gates only on isActive) and stays in the active list
-  // until a LATER trigger lazily closes it. (#107/C362 fixed fastForwardPastNow's exit; #114/C394 fixed
+  // until a LATER trigger lazily closes it. (fixed fastForwardPastNow's exit; fixed
   // mark-serviced; neither touched this natural-exit path — it stays well under the cap, so fastForward
   // is never reached.) Construction: weekly, a handful of weeks of history, endDate ≈ now (so it lands
   // in the straddling period after the last <=now step) — only a few catch-up iterations, well under 12.
-  test('a bounded reminder whose endDate lands at the natural loop exit (under the catch-up cap) is deactivated, not left active (#116)', async () => {
+  test('a bounded reminder whose endDate lands at the natural loop exit (under the catch-up cap) is deactivated, not left active', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
 
     // Dates relative to the server clock so the test is wall-clock-independent. Weekly from 24 days
@@ -189,13 +189,13 @@ describe('expense-reminder trigger (auto-creates financial records)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// recurring-expenses T2 (C102): split-materialization characterization.
+// recurring-expenses T2: split-materialization characterization.
 //
 // An expense-type reminder can carry an expenseSplitConfig (even/percentage/absolute);
 // when it fires, createExpenseFromReminder routes through expenseSplitService.createSiblings
 // (trigger-service.ts:147-163) → ONE sibling row per vehicle, each its own share, sharing a
 // groupId, all stamped sourceType='reminder'/sourceId=reminder. The single-expense path was
-// pinned above (C96); the SPLIT path — the half recurring-expenses T4 (multi-vehicle split in
+// pinned above; the SPLIT path — the half recurring-expenses T4 (multi-vehicle split in
 // the form) materializes through — had no trigger-level test. This pins that the shares are
 // correct, sum to the template amount, and every sibling carries the source link.
 // ---------------------------------------------------------------------------
@@ -303,21 +303,21 @@ describe('expense-reminder trigger — split materialization (recurring-expenses
 });
 
 // ---------------------------------------------------------------------------
-// #88 (C288, ESCALATED — product call): a SPLIT reminder whose expenseSplitConfig names a vehicle
+// A SPLIT reminder whose expenseSplitConfig names a vehicle
 // that was later DELETED can never materialize a COMPLETE split. The reminder_vehicles junction is
 // FK-cascade-cleaned on a vehicle delete, but expenseSplitConfig is a JSON blob (NOT a FK), so the
 // deleted vehicle's id persists in it. On the next trigger, createSiblings inserts an expense whose
 // vehicle_id points at the now-gone vehicle → SQLITE FK violation → the per-reminder try/catch records
 // a "skipped" (surfaced in the result, NOT the UI) → the recurring cost is broken with no user signal
-// (NORTH_STAR #1). SHARPER than first thought: createSiblings inserts siblings one-by-one, and a throw
-// escaping the async tx callback after a prior sync insert does NOT roll it back (the C151 better-sqlite3
+// SHARPER than first thought: createSiblings inserts siblings one-by-one, and a throw
+// escaping the async tx callback after a prior sync insert does NOT roll it back (the better-sqlite3
 // footgun) — so the deleted vehicle NEVER gets a sibling, but a leg for a still-existing vehicle can
 // PERSIST as a partial/inconsistent group (groupTotal says $100 while only one $50 leg landed).
 // This CHARACTERIZES that current behavior (anchor for the real fix — drop+renormalize / deactivate /
-// etc., per Angelo) + pins the load-bearing CONTAINMENT guarantee: the failure does not throw uncaught
+// etc.) + pins the load-bearing CONTAINMENT guarantee: the failure does not throw uncaught
 // and break the whole trigger run / other reminders.
 // ---------------------------------------------------------------------------
-describe('#88: split reminder naming a DELETED vehicle is contained, not a trigger-wide failure (C288 characterization)', () => {
+describe('split reminder naming a DELETED vehicle is contained, not a trigger-wide failure (characterization)', () => {
   test('the deleted vehicle never gets a sibling + the reminder is reported skipped; an independent reminder still fires; run returns 200', async () => {
     const [v1, v2] = await seedTwoVehicles();
     const v3 = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });

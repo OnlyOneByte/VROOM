@@ -7,13 +7,13 @@
  * after the provider OAuth session isolation fix is applied.
  *
  * Property 2: Preservation — Login OAuth callback behavior unchanged
- *   For all login OAuth callback requests (where flowType is absent and returnTo
- *   is absent or points to dashboard), the handler creates or finds a user,
- *   calls lucia.createSession(), sets the session cookie, and redirects.
+ *  For all login OAuth callback requests (where flowType is absent and returnTo
+ *  is absent or points to dashboard), the handler creates or finds a user,
+ *  calls lucia.createSession(), sets the session cookie, and redirects.
  *
  * Property 4: Preservation — Google Sheets sync and restore use provider credentials
- *   For all Google Sheets sync operations, getUserToken() returns a valid
- *   refresh token from user_providers.credentials.
+ *  For all Google Sheets sync operations, getUserToken() returns a valid
+ *  refresh token from user_providers.credentials.
  */
 
 import { Database } from 'bun:sqlite';

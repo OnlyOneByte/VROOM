@@ -4,9 +4,9 @@
  *
  * Two jobs:
  *  1. Precache the built app shell (`precacheAndRoute` + `autoUpdate`) — the same offline behavior the
- *     prior `generateSW` strategy gave; `injectManifest` requires we wire the precache ourselves.
+ *  prior `generateSW` strategy gave; `injectManifest` requires we wire the precache ourselves.
  *  2. Web Push delivery: render a notification from a pushed reminder payload and route a click to the
- *     reminders page. Delivery is browser→SW (no `fetch`), so no new network egress (design §7.2).
+ *  reminders page. Delivery is browser→SW (no `fetch`), so no new network egress (design §7.2).
  *
  * The payload shape matches the backend sender (T4b `payloadFromReminder`): `{ title, body, tag, url }`.
  * Named `service-worker.ts` (SvelteKit's reserved SW entry): SvelteKit compiles it to

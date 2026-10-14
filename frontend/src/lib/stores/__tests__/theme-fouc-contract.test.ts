@@ -1,17 +1,17 @@
 /**
- * C190 (guard) — the app.html anti-FOUC head-script must MIRROR the theme store's dark-mode constants.
+ * The app.html anti-FOUC head-script must MIRROR the theme store's dark-mode constants.
  *
  * app.html runs an inline `<script>` BEFORE first paint that reads the persisted theme from localStorage
  * and sets the `dark` class on <html>, so a dark-mode user doesn't get a white flash on every load
- * (NORTH_STAR #3, no-FOUC). That script is RAW HTML — outside the type system and the store's own tests —
+ * (no-FOUC). That script is RAW HTML — outside the type system and the store's own tests —
  * so it duplicates four load-bearing constants the store owns:
- *   1. the localStorage key (`vroom-theme-preference` = STORAGE_KEY),
- *   2. the `dark` class toggled on <html>,
- *   3. the `system` sentinel (the default when unset),
- *   4. the `(prefers-color-scheme: dark)` media query (how `system` resolves).
+ *  1. the localStorage key (`vroom-theme-preference` = STORAGE_KEY),
+ *  2. the `dark` class toggled on <html>,
+ *  3. the `system` sentinel (the default when unset),
+ *  4. the `(prefers-color-scheme: dark)` media query (how `system` resolves).
  * If the store renames any of these and the head-script isn't updated in lockstep, dark mode silently
  * flashes light on first paint — with NOTHING going red (the store's unit tests can't see app.html). This
- * source-scan pins the contract: it reads BOTH files and asserts they agree on all four. The C25/C170
+ * source-scan pins the contract: it reads BOTH files and asserts they agree on all four. The
  * cross-file source-scan idiom, applied to the one theming constant that lives in two places.
  */
 
@@ -35,7 +35,7 @@ function storeThemeIdKey(): string {
   return m?.[1] ?? '';
 }
 
-describe('app.html anti-FOUC head-script mirrors the theme store (C190 contract guard)', () => {
+describe('app.html anti-FOUC head-script mirrors the theme store', () => {
   test('the head-script reads the SAME localStorage key the store writes', () => {
     const key = storeStorageKey();
     expect(key, 'store STORAGE_KEY is parseable').toBeTruthy();
@@ -70,22 +70,22 @@ describe('app.html anti-FOUC head-script mirrors the theme store (C190 contract 
 });
 
 /**
- * C201 (deep-review) — the head-script must ALSO pre-paint the THEME-ID axis, not just dark/light.
+ * The head-script must ALSO pre-paint the THEME-ID axis, not just dark/light.
  *
  * The store comment (theme.svelte.ts) promises the `vroom-theme-id` mirror exists "so the anti-FOUC
  * head-script (app.html) + the store agree" — but T8 wired only the dark-class axis into app.html. The
  * theme-id axis is a no-op TODAY (default-only registry → applyTheme never sets data-theme), so the gap
  * is invisible; the instant a non-default theme (`instrument`) ships and a user selects it, every load
  * would paint the DEFAULT look until hydration's initialize() runs, then flash to the chosen theme — the
- * exact FOUC NORTH_STAR #3 forbids, on a SECOND axis the dark-class guard above can't see. This pins the
+ * exact FOUC forbids, on a SECOND axis the dark-class guard above can't see. This pins the
  * head-script's data-theme pre-paint against the store's three load-bearing theme-id constants:
- *   1. the mirror key (`vroom-theme-id` = THEME_ID_KEY) the store writes and the head-script must read,
- *   2. the DEFAULT_THEME_ID sentinel that means "no override" (head-script must NOT set data-theme for it),
- *   3. the set-data-theme-on-<html> action (mirrors applyTheme's root.setAttribute('data-theme', id)).
+ *  1. the mirror key (`vroom-theme-id` = THEME_ID_KEY) the store writes and the head-script must read,
+ *  2. the DEFAULT_THEME_ID sentinel that means "no override" (head-script must NOT set data-theme for it),
+ *  3. the set-data-theme-on-<html> action (mirrors applyTheme's root.setAttribute('data-theme', id)).
  * Source-of-truth: THEME_ID_KEY is parsed from the store; DEFAULT_THEME_ID is imported from the registry —
- * so a rename of either trips this unless app.html is updated in lockstep (the C190 cross-file idiom).
+ * so a rename of either trips this unless app.html is updated in lockstep (the cross-file idiom).
  */
-describe('app.html head-script pre-paints the theme-id axis (C201 contract guard)', () => {
+describe('app.html head-script pre-paints the theme-id axis', () => {
   test('the head-script reads the SAME theme-id mirror key the store writes', () => {
     const key = storeThemeIdKey();
     expect(key, 'store THEME_ID_KEY is parseable').toBeTruthy();

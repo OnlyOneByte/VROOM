@@ -1,7 +1,7 @@
 /**
- * HTTP characterization net for the providers routes (C91 — the safety net half of the
- * C90-filed provider-response-formatter dedup; arch rule 3 needs green→green coverage BEFORE
- * the refactor). providers/routes.ts had ZERO HTTP coverage (a C81-named <50% low spot).
+ * HTTP characterization net for the providers routes (— the safety net half of the
+ * -filed provider-response-formatter dedup; arch rule 3 needs green→green coverage BEFORE
+ * the refactor). providers/routes.ts had ZERO HTTP coverage (a-named <50% low spot).
  *
  * This pins the OBSERVABLE CONTRACT the upcoming dedup must preserve — the exact response key
  * shape of the three hand-assembled provider responses (GET list, POST create, PUT update) and
@@ -67,7 +67,7 @@ async function createProvider(
     providerType: 's3',
     displayName: over.displayName ?? 'Test S3 Storage',
     credentials: { accessKeyId: 'AKIA-test', secretAccessKey: 'super-secret-value' },
-    // S3 config must carry endpoint/bucket/region (C349: create-time validation rejects an
+    // S3 config must carry endpoint/bucket/region (: create-time validation rejects an
     // incomplete S3 config rather than persisting a row that throws on first use).
     config: { endpoint: 'https://s3.example.com', bucket: 'b', region: 'us-east-1' },
   });
@@ -91,7 +91,7 @@ describe('POST /api/v1/providers — create', () => {
     });
   });
 
-  test('C349: rejects an S3 create whose config is missing endpoint/bucket/region (400, not a broken 201)', async () => {
+  test('rejects an S3 create whose config is missing endpoint/bucket/region (400, not a broken 201)', async () => {
     // The Zod schema's `config: z.record(...)` is shape-open, so without the create-time guard an S3
     // row with no usable config would persist + auto-populate storageConfig, then throw on EVERY use
     // (test/sync) — a fail-late footgun. Fail-fast at create instead (mirrors buildS3Provider:62).
@@ -108,7 +108,7 @@ describe('POST /api/v1/providers — create', () => {
     expect((await json<DataEnvelope<ProviderResponse[]>>(list)).data).toHaveLength(0);
   });
 
-  test('C349: rejects an S3 create with NO config at all (400)', async () => {
+  test('rejects an S3 create with NO config at all (400)', async () => {
     const res = await ctx.authed('POST', '/api/v1/providers', {
       domain: 'storage',
       providerType: 's3',
@@ -191,7 +191,7 @@ describe('GET /api/v1/providers — list', () => {
 describe('PUT /api/v1/providers/:id — update', () => {
   test('updates displayName + config, returns the exact response key shape (no credentials)', async () => {
     const created = await createProvider({ displayName: 'Before' });
-    // A complete S3 config (the default provider is s3): the C416 gate requires endpoint/bucket/region
+    // A complete S3 config (the default provider is s3): the gate requires endpoint/bucket/region
     // on a config update too, so the happy path must send a full config (not a partial like {changed:true}).
     const newConfig = { endpoint: 'https://s3.example.com', bucket: 'b2', region: 'us-west-2' };
     const res = await ctx.authed('PUT', `/api/v1/providers/${created.id}`, {
@@ -206,11 +206,11 @@ describe('PUT /api/v1/providers/:id — update', () => {
     expect(JSON.stringify(data)).not.toContain('credentials');
   });
 
-  // #123 (C416, the #103/C349 sibling on the UPDATE path): C349 fail-fasts an incomplete S3 config on
+  // fail-fasts an incomplete S3 config on
   // CREATE, but PUT wrote body.config verbatim — so editing an S3 provider to a config missing
   // endpoint/bucket/region persisted a 200 + a bricked row that threw on every later test/upload/sync.
   // The fix shares the CREATE gate (validateStorageProviderConfig) on PUT. NON-VACUOUS: pre-fix this was 200.
-  test('rejects a PUT that swaps an S3 provider to an INCOMPLETE config (400, the #103/C349 sibling)', async () => {
+  test('rejects a PUT that swaps an S3 provider to an INCOMPLETE config (400, the sibling)', async () => {
     const created = await createProvider();
     const res = await ctx.authed('PUT', `/api/v1/providers/${created.id}`, {
       config: { bucket: 'b' }, // missing endpoint + region
@@ -246,7 +246,7 @@ describe('PUT /api/v1/providers/:id — update', () => {
     expect(res.status).toBe(404);
   });
 
-  // C260: the credentials-re-encrypt branch (routes.ts:397-399) was uncovered — the security-sensitive
+  // The credentials-re-encrypt branch (routes.ts:397-399) was uncovered — the security-sensitive
   // one. A PUT carrying new credentials must RE-ENCRYPT them into the column (never store plaintext)
   // and still never echo them in the response.
   test('PUT with new credentials re-encrypts the stored blob (never plaintext, never echoed)', async () => {
@@ -301,17 +301,17 @@ describe('DELETE /api/v1/providers/:id', () => {
 });
 
 /**
- * #63 (C192): the PUT/DELETE destructive writes are scoped on (id AND userId), not id alone. The
+ * The PUT/DELETE destructive writes are scoped on (id AND userId), not id alone. The
  * findOwnedProviderOrThrow guard already 404s a foreign id (the tests above), so this is
  * defense-in-depth — but the write predicate must ALSO be tenant-scoped so a future guard-drop can't
- * become a cross-tenant write (the C109/#52 class, closed at split C155 + odometer C168/C180). Raw-seed
+ * become a cross-tenant write (the class, closed at split + odometer). Raw-seed
  * a FOREIGN user's provider that COEXISTS in the shared DB (a second createTestApp would reset it) and
  * prove our destructive ops can't touch it.
  */
-// C108 (guard): GET /:id/sync-status had ZERO HTTP coverage despite carrying the SAME
+// GET /:id/sync-status had ZERO HTTP coverage despite carrying the SAME
 // findOwnedProviderOrThrow tenant-isolation chokepoint the PUT/DELETE paths pin — but on a READ path. A
 // guard-drop here would leak ANOTHER tenant's per-category photo-sync counts (total/synced/failed) for any
-// provider id (NORTH_STAR #2 isolation), invisible to every existing test. This pins: owned → 200 with the
+// provider id (isolation), invisible to every existing test. This pins: owned → 200 with the
 // 4-category {total,synced,failed} shape; foreign id → 404 (no existence leak); anon → 401.
 describe('GET /api/v1/providers/:id/sync-status — owned read + tenant isolation', () => {
   const SYNC_CATEGORIES = [
@@ -356,7 +356,7 @@ describe('GET /api/v1/providers/:id/sync-status — owned read + tenant isolatio
   });
 });
 
-describe('#63 — provider PUT/DELETE writes are tenant-scoped (foreign row survives)', () => {
+describe('provider PUT/DELETE writes are tenant-scoped (foreign row survives)', () => {
   /** Seed a provider owned by ANOTHER user directly; returns its id. */
   function seedForeignProvider(id: string): void {
     ctx.sqlite.run(

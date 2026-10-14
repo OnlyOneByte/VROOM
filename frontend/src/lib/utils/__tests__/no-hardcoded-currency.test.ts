@@ -4,9 +4,8 @@
  *
  * Money-field labels and chart axis titles must show the user's currency symbol
  * (via getCurrencySymbol / formatCurrency), never a literal "$"/"€"/"£" — otherwise a
- * EUR/GBP user sees the wrong unit. The per-instance E2E guards for this class are
- * UNTRACKED (*.meshclaw.e2e.ts), so they don't survive a merge/fresh checkout; this
- * static source scan does, and catches the whole CLASS, not just the spots already found.
+ * EUR/GBP user sees the wrong unit. A static source scan catches the whole CLASS, not just
+ * the spots already found, and unlike a browser E2E it runs in the fast unit suite.
  *
  * It scans every .svelte source for a currency symbol in a parenthesized label-suffix
  * position — "($)", "(€)", "(£)" — which is exactly the c202 shape ("Deductible ($)").
@@ -59,7 +58,7 @@ describe('no hardcoded currency symbols in user-facing labels (cycle-202 class g
 
 		expect(
 			offenders,
-			`Hardcoded currency symbol(s) in a label suffix — route through getCurrencySymbol()/formatCurrency() so EUR/GBP users see the right unit (cycle 202):\n${offenders.join('\n')}`
+			`Hardcoded currency symbol(s) in a label suffix — route through getCurrencySymbol()/formatCurrency() so EUR/GBP users see the right unit:\n${offenders.join('\n')}`
 		).toEqual([]);
 	});
 

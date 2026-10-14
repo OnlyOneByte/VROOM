@@ -2,14 +2,14 @@
  * Theming engine T5 guard — THEME_REGISTRY integrity + the `default` ≡ app.css identity contract.
  *
  * Two invariants:
- *   1. DEFAULT IS app.css: the `default` theme's light/dark token maps equal the live `src/app.css`
- *      `:root` / `.dark` declarations VALUE-FOR-VALUE. This is what makes `default` a zero-visual-change
- *      identity theme (R1) — and catches baseline drift: an app.css color edit not mirrored in the
- *      registry (or vice-versa) trips this. Source-of-truth: app.css is parsed at test time, not hardcoded.
- *   2. NO MISSING-KEY LEAK: every ThemeDefinition declares EVERY THEME_TOKEN_KEY in BOTH variants. A
- *      partial variant would leave a token at the previously-applied theme's value when switched (a visual
- *      leak) — the resolver/emitter assume a complete map. Applies to `default` today and to every future
- *      theme automatically.
+ *  1. DEFAULT IS app.css: the `default` theme's light/dark token maps equal the live `src/app.css`
+ *  `:root` / `.dark` declarations VALUE-FOR-VALUE. This is what makes `default` a zero-visual-change
+ *  identity theme (R1) — and catches baseline drift: an app.css color edit not mirrored in the
+ *  registry (or vice-versa) trips this. Source-of-truth: app.css is parsed at test time, not hardcoded.
+ *  2. NO MISSING-KEY LEAK: every ThemeDefinition declares EVERY THEME_TOKEN_KEY in BOTH variants. A
+ *  partial variant would leave a token at the previously-applied theme's value when switched (a visual
+ *  leak) — the resolver/emitter assume a complete map. Applies to `default` today and to every future
+ *  theme automatically.
  *
  * Pure source-scan + registry reflection — no DOM, no runtime apply.
  */
@@ -112,7 +112,7 @@ describe('THEME_REGISTRY integrity + default ≡ app.css (T5)', () => {
     });
   }
 
-  // PICKER METADATA CONTRACT: the ThemePickerCard (C318) renders each theme's `label`, `description`, and
+  // PICKER METADATA CONTRACT: the ThemePickerCard renders each theme's `label`, `description`, and
   // `swatch` strip. TypeScript types these as `string` / `ThemeTokenKey[]`, but `string` admits '' and an
   // array admits [] — a theme shipped with an empty label/description or an empty swatch renders a BLANK or
   // broken picker card (no name, no preview), and every other guard (contrast/distinctness/wiring/byte-
@@ -141,7 +141,7 @@ describe('THEME_REGISTRY integrity + default ≡ app.css (T5)', () => {
   // theme IS authored by cloning a prior X_LIGHT/X_DARK block). Such a clone would ship two picker cards that
   // paint identically — green under contrast/metadata/byte-freshness (the values are individually valid) and
   // green under the vs-default guard (it differs from default, just not from its twin). This pins that EVERY
-  // PAIR of registered themes differs in at least one token in at least one variant. Surfaced firsthand C325.
+  // PAIR of registered themes differs in at least one token in at least one variant. Surfaced firsthand.
   test('no two registered themes are byte-identical (all-pairs distinctness)', () => {
     const all = Object.values(THEME_REGISTRY);
     for (let i = 0; i < all.length; i++) {

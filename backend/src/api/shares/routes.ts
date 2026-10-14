@@ -47,7 +47,7 @@ routes.post('/', zValidator('json', inviteSchema), async (c) => {
   const { vehicleId, email, level } = c.req.valid('json');
 
   // Owner-only: the vehicle must be the acting user's own (404 if not — never leaks existence). This is
-  // the C151 validate-before-insert order: every rejection throws BEFORE any row write.
+  // the validate-before-insert order: every rejection throws BEFORE any row write.
   await validateVehicleOwnership(vehicleId, user.id);
 
   // Invitee must be an existing VROOM user (D4 — no email-signup invites in v1).

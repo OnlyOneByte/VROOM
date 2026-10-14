@@ -21,7 +21,7 @@ const routes = new Hono();
 
 /**
  * The session-user shape returned by GET /me and POST /refresh — id/email/displayName plus
- * ISO-or-null timestamps. Extracted (C187) so the two handlers share ONE serializer instead of
+ * ISO-or-null timestamps. Extracted so the two handlers share ONE serializer instead of
  * the byte-identical 5-field block they each inlined; structurally typed so it accepts both the
  * `c.get('user')` row and validateAndRefreshSession's `result.user`. NOTE: deliberately NOT used
  * by PATCH /me (emits only id/email/displayName — no timestamps) or GET /accounts (a different
@@ -184,7 +184,7 @@ async function updateExistingUserProfile(
     displayName: userInfo.displayName,
     avatarUrl: userInfo.avatarUrl,
   });
-  // #129 (C155): DO NOT overwrite the VROOM login identity (users.email) on every login. The old code
+  // DO NOT overwrite the VROOM login identity (users.email) on every login. The old code
   // set email := the provider's CURRENTLY-reported email each time, so a user who changed their
   // Google/GitHub primary email had their VROOM login email silently swapped on the next login (a
   // within-account identity drift, no notice). Sync email ONLY as a first-link BACKFILL — when the
@@ -251,9 +251,9 @@ async function resolveNewUser(
 
   // New user transaction with race condition catch
   try {
-    // SYNCHRONOUS transaction (#127 class, C504): bun-sqlite is a sync dialect — an `async` tx callback
+    // SYNCHRONOUS transaction: bun-sqlite is a sync dialect — an `async` tx callback
     // returns a pending promise so BEGIN/COMMIT wrap nothing and each `await tx.insert` autocommits alone
-    // (the C151 footgun). New-user signup inserts the users row THEN the auth-provider link; if the second
+    //  New-user signup inserts the users row THEN the auth-provider link; if the second
     // insert threw under the old async form, the users row stayed committed with NO auth link → an orphan
     // account that can never log in AND blocks re-signup on the email-unique index. Running synchronously
     // (.returning().get() / .run() inline, no await) keeps both inserts in ONE real transaction that rolls
@@ -296,7 +296,7 @@ async function resolveNewUser(
 }
 
 // --- Auth callback helper: validate OAuth state for link flow ---
-// Single-use + flow-isolated consume via the shared consumeOAuthState (C39); the 'auth-link' flowType
+// Single-use + flow-isolated consume via the shared consumeOAuthState; the 'auth-link' flowType
 // must match, else reject+delete (anti-fixation).
 function validateLinkState(stateParam: string | null) {
   const storedData = consumeOAuthState(oauthStateStore, stateParam, 'auth-link');
@@ -315,7 +315,7 @@ function validateLoginState(stateParam: string | null) {
 // (account_conflict), the SAME user is an idempotent no-op (already_linked), and an unbound identity
 // is free to link (null). EXPORTED + repo-injectable (default = the singleton, so the route call-site
 // is unchanged) so the 3-way decision is unit-testable against a real seeded repo without the
-// getDb-singleton bind (the C77 DI-seam pattern) — a regression here would silently enable linking
+// getDb-singleton bind (the DI-seam pattern) — a regression here would silently enable linking
 // someone else's provider identity to your account.
 export async function checkLinkConflicts(
   authProviderId: string,
@@ -498,7 +498,7 @@ routes.get('/me', async (c) => {
 
   if (!session) {
     // Clear the now-invalid session cookie so the dead token doesn't linger in the browser
-    // (C127/#32a — align with requireAuth + the logout handler; OWASP session-mgmt hygiene per ARCC
+    // (— align with requireAuth + the logout handler; OWASP session-mgmt hygiene per ARCC
     // secure-cookie-handling). The session is already invalid server-side, so this is hygiene, not a
     // replay fix — but it stops the client from re-sending a known-dead cookie on every request.
     deleteCookie(c, lucia.sessionCookieName, {
@@ -593,7 +593,7 @@ routes.post('/refresh', async (c) => {
   const result = await validateAndRefreshSession(sessionId, lucia, c);
 
   if (!result) {
-    // Clear the now-invalid session cookie (C127/#32a — mirror /me + requireAuth + logout).
+    // Clear the now-invalid session cookie (— mirror /me + requireAuth + logout).
     deleteCookie(c, lucia.sessionCookieName, {
       path: '/',
       secure: CONFIG.env === 'production',

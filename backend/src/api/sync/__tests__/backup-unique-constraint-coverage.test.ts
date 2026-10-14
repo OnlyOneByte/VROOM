@@ -1,15 +1,15 @@
 /**
  * UNIQUE-constraint coverage drift guard — the symmetric sibling of backup-ref-validation-coverage
- * (C290), closing the OTHER half of the #127/C428 pre-wipe-validation net.
+ *  closing the OTHER half of the pre-wipe-validation net.
  *
- * #127 (C428) + C291: replace-mode restore WIPES the account, then inserts. A backup row that
+ * +: replace-mode restore WIPES the account, then inserts. A backup row that
  * violates a DB-level UNIQUE index slips past per-row + referential validation, the wipe commits,
  * then the colliding INSERT throws — and bun-sqlite's async-tx callback does NOT roll back the wipe
- * (the C151 footgun), leaving the account EMPTY (NORTH_STAR #1). validateUniqueConstraints is the
- * gate that rejects such a backup BEFORE the wipe. C291 extended it from 2 to all 5 unique indexes
+ *  leaving the account EMPTY. validateUniqueConstraints is the
+ * gate that rejects such a backup BEFORE the wipe. extended it from 2 to all 5 unique indexes
  * currently on backed-up tables. What NOTHING pins is that it STAYS complete: a future migration can
  * add a 6th unique index to a backed-up table and pass every existing test while validateUniqueConstraints
- * silently fails to cover it — re-opening the exact empty-account gap C291 closed.
+ * silently fails to cover it — re-opening the exact empty-account gap closed.
  *
  * This guard makes that coverage drift-proof: it RUNTIME-enumerates each backed-up table's unique
  * indexes from the real Drizzle schema (getTableConfig().indexes, filtered to unique) and asserts
@@ -83,7 +83,7 @@ function indexIsChecked(body: string, key: string, nonUserCols: string[]): boole
   );
 }
 
-describe('backup unique-constraint coverage (drift guard — cycle 295)', () => {
+describe('backup unique-constraint coverage', () => {
   test('validateUniqueConstraints checks every UNIQUE index on every backed-up table', () => {
     const body = uniqueCheckBody();
     const missing: string[] = [];
@@ -104,7 +104,7 @@ describe('backup unique-constraint coverage (drift guard — cycle 295)', () => 
       missing,
       `UNIQUE index(es) on a backed-up table that validateUniqueConstraints does NOT check. A backup ` +
         `with a duplicate on one of these passes validation, then throws a raw UNIQUE error mid-restore ` +
-        `AFTER the replace-mode wipe — leaving the account empty (the #127/C428 / C291 data-loss class). ` +
+        `AFTER the replace-mode wipe — leaving the account empty (the restore-atomicity data-loss class). ` +
         `Add a dupCheck(backup.<key>, [<non-userId cols>], '<label>') call in validateUniqueConstraints:\n${missing.join('\n')}`
     ).toEqual([]);
   });
@@ -115,7 +115,7 @@ describe('backup unique-constraint coverage (drift guard — cycle 295)', () => 
     const all = Object.entries(TABLE_SCHEMA_MAP).flatMap(([, table]) =>
       uniqueIndexesFor(table).map((ix) => `${getTableName(table)}:${ix.name}`)
     );
-    // The 5 unique indexes C291 enumerated on backed-up tables.
+    // The 5 unique indexes enumerated on backed-up tables.
     expect(all).toContain('expenses:expenses_user_client_idx');
     expect(all).toContain('vehicles:vehicles_user_license_plate_idx');
     expect(all).toContain('photo_refs:pr_photo_provider_idx');

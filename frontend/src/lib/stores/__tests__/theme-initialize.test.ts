@@ -1,17 +1,17 @@
 /**
  * Guard for themeStore.initialize() — the on-mount theme bootstrap + the LIVE OS-preference listener
- * (C336 pinned setPreference but DELIBERATELY skipped initialize(), calling it "a one-shot guarded by an
+ * (pinned setPreference but DELIBERATELY skipped initialize(), calling it "a one-shot guarded by an
  * internal flag"; theme.svelte.ts lines 40-55 were uncovered → 60% line / 55% branch).
  *
  * initialize() does three things, and the third is the load-bearing-yet-untested one:
- *   1. idempotency — a second initialize() is a no-op (the `initialized` flag).
- *   2. applies the stored preference on mount + sets `current`.
- *   3. registers a `prefers-color-scheme` change listener that re-applies the theme LIVE when the OS
- *      flips — but ONLY when the stored preference is 'system'. This `if (stored === 'system')` guard is
- *      what makes "System" track the OS in real time while NOT yanking an explicit light/dark user's
- *      theme out from under them when the OS changes. Drop that guard and a 'light' user's page jumps to
- *      dark the moment their OS enters night mode — a real user-facing regression, and setPreference's
- *      tests never exercise the listener so it stays GREEN.
+ *  1. idempotency — a second initialize() is a no-op (the `initialized` flag).
+ *  2. applies the stored preference on mount + sets `current`.
+ *  3. registers a `prefers-color-scheme` change listener that re-applies the theme LIVE when the OS
+ *  flips — but ONLY when the stored preference is 'system'. This `if (stored === 'system')` guard is
+ *  what makes "System" track the OS in real time while NOT yanking an explicit light/dark user's
+ *  theme out from under them when the OS changes. Drop that guard and a 'light' user's page jumps to
+ *  dark the moment their OS enters night mode — a real user-facing regression, and setPreference's
+ *  tests never exercise the listener so it stays GREEN.
  *
  * themeStore is a module SINGLETON with an internal `initialized` flag that latches on the first
  * initialize() and never resets — so only ONE initialize() in this file runs the body + registers the
@@ -55,7 +55,7 @@ function htmlIsDark(): boolean {
 	return document.documentElement.classList.contains('dark');
 }
 
-describe('themeStore.initialize — bootstrap + live OS-preference listener (the C336-skipped one-shot)', () => {
+describe('themeStore.initialize — bootstrap + live OS-preference listener (the-skipped one-shot)', () => {
 	test('mounts the stored preference, registers ONE live listener (idempotent), and the listener honors the system-only guard', () => {
 		// 1. MOUNT: seed a stored 'dark' preference, then the (singleton's only) real initialize().
 		localStorage.setItem(STORAGE_KEY, 'dark');

@@ -1,20 +1,20 @@
 /**
- * Characterization net for the rate-limit middleware (guard, cycle 112).
+ * Characterization net for the rate-limit middleware.
  *
  * The abuse-prevention middleware sat at 60% line — the limit-exceeded 429 path (with its Retry-After
  * + X-RateLimit-* headers, a contract the client may read) and the window-reset path were uncovered.
  * These pin the full contract through a minimal Hono app (the error-handler/idempotency convention),
  * driving requests against a tiny window + limit passed directly to `rateLimiter(config)`:
- *   1. first request opens the window (count=1) and passes,
- *   2. requests UP TO the limit pass; the one OVER returns 429 with the documented headers,
- *   3. a 429's body carries RATE_LIMIT_EXCEEDED + retryAfter,
- *   4. the per-key generator isolates callers (one key's exhaustion doesn't 429 another),
- *   5. once the window elapses (resetTime < now) a fresh window opens and requests pass again.
+ *  1. first request opens the window (count=1) and passes,
+ *  2. requests UP TO the limit pass; the one OVER returns 429 with the documented headers,
+ *  3. a 429's body carries RATE_LIMIT_EXCEEDED + retryAfter,
+ *  4. the per-key generator isolates callers (one key's exhaustion doesn't 429 another),
+ *  5. once the window elapses (resetTime < now) a fresh window opens and requests pass again.
  *
  * `windowMs`/`limit`/`keyGenerator` come from the config ARG (not a frozen CONFIG singleton), so the
  * harness controls them directly. The one CONFIG dependency is `disableRateLimit` (the E2E opt-out):
  * it defaults false in the test process (DISABLE_RATE_LIMIT is set by nothing in the repo), but we
- * GUARD on it so this net can never silently go vacuous (the C77/C91 trap). Each test uses a unique
+ * GUARD on it so this net can never silently go vacuous. Each test uses a unique
  * key prefix since the store is a module-level singleton shared across the process.
  */
 

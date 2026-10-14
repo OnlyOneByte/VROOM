@@ -28,7 +28,7 @@ function getStoredThemeId(): string {
  * Resolve the OS color-scheme preference to a concrete variant. The SINGLE source of truth for "what does
  * `system` mean right now" — used by applyTheme (the APPLIED theme) AND imported by ThemePickerCard for its
  * swatch PREVIEW (so the preview under `system` mode resolves the exact same variant the apply will use;
- * two copies could drift on the media query or the SSR default → the preview would lie, the C348 coupling).
+ * two copies could drift on the media query or the SSR default → the preview would lie, the coupling).
  * SSR-safe: `browser` is false on the server → `'light'` (the lightest-surface default).
  */
 export function getSystemTheme(): 'light' | 'dark' {
@@ -44,7 +44,7 @@ export function getSystemTheme(): 'light' | 'dark' {
 const FALLBACK_THEME_COLOR = { light: '#2563eb', dark: '#1a1a2e' } as const;
 
 /**
- * Resolve the PWA `theme-color` hex for the ACTIVE theme + resolved mode (#333). The status bar should
+ * Resolve the PWA `theme-color` hex for the ACTIVE theme + resolved mode. The status bar should
  * blend with the page surface, so this drives the tint from the resolved variant's `background` token in
  * THEME_REGISTRY, converted oklch→hex (the chrome parser does not reliably honor a raw oklch() in the meta).
  * An unknown id falls back to `default` (mirrors the R8 graceful-degrade the CSS does); an unconvertible
@@ -74,7 +74,7 @@ function applyTheme(preference: ThemePreference, themeId: string = getStoredThem
 		root.removeAttribute('data-theme');
 	}
 
-	// PWA status-bar tint (#333): driven by the ACTIVE theme's surface token (oklch→hex) for the resolved
+	// PWA status-bar tint: driven by the ACTIVE theme's surface token (oklch→hex) for the resolved
 	// mode, so the address bar matches the theme the user picked — not a fixed brand hex. Browser chrome is
 	// not shot.sh-capturable; the conversion + this update are unit-tested instead (the eyes-on of the live
 	// address-bar tint is a manual follow-up, not a CI gate).

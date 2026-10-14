@@ -6,7 +6,7 @@
  * WHY default is excluded: app.css already declares the `default` palette in the bare `:root` / `.dark`
  * blocks (no `data-theme` attribute). So `data-theme` ABSENT (or `="default"`) renders today's look from
  * app.css; a non-default id adds a higher-specificity `:root[data-theme="x"]` override. Generating a
- * `default` block would just duplicate app.css (and risk drift) — the C185 registry≡app.css guard already
+ * `default` block would just duplicate app.css (and risk drift) — the registry≡app.css guard already
  * pins that pair. Hence the generator skips `default`.
  *
  * Pure string builder — no DOM, no fs. The checked-in `themes.css` is produced from this (a guard test

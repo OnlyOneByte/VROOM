@@ -210,7 +210,7 @@
 		if (controlled) return filtered;
 
 		// Sort via the shared comparator, which carries a stable id tiebreaker in the
-		// server's direction (bug #4) so equal date/amount rows don't reshuffle.
+		// server's direction so equal date/amount rows don't reshuffle.
 		filtered.sort((a, b) => compareExpenseRows(a, b, sortBy, sortOrder));
 
 		return filtered;
@@ -273,7 +273,7 @@
 		// collapsed split group sits in the right place among standalone rows; in
 		// controlled mode it re-imposes the server's chosen order onto the grouped view
 		// (consistent, since both use the same field+direction). Via compareExpenseRows
-		// so equal date/amount rows break ties by id in the server's direction (bug #4)
+		// so equal date/amount rows break ties by id in the server's direction
 		// — grouping concatenates standalone-then-group, which would otherwise reshuffle
 		// same-key rows out of the server's order.
 		rows.sort((a, b) => {
@@ -670,7 +670,7 @@
 	<div class="rounded-md border bg-card overflow-hidden">
 		<!-- height MUST be an inline style, not `h-[{scrollHeight}]`: Tailwind only generates
 		     arbitrary-value classes it can see as STATIC literals at build time, so a runtime-
-		     interpolated `h-[600px]` produces no CSS rule (confirmed C14 via DOM probe) — the cap
+		     interpolated `h-[600px]` produces no CSS rule — the cap
 		     + internal scroll never engage and a many-row vehicle grows unbounded. Inline style is
 		     the ChartCard idiom for a dynamic height. -->
 		<ScrollArea class="w-full" style="height: {scrollHeight}">

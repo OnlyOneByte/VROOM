@@ -1,17 +1,17 @@
 /**
- * Characterization net for the idempotency middleware (guard, cycle 105).
+ * Characterization net for the idempotency middleware.
  *
  * This is the double-charge / duplicate-record guard (money-relevant) and sat at 43% coverage —
  * the caching/replay/TTL core was never directly tested (only the required-key 400 path, via
  * sync-route-errors.test.ts at the route level). These tests pin the full contract through a minimal
  * Hono app (the error-handler.test.ts convention), using a per-app counter to observe whether the
  * handler ACTUALLY ran — a replayed cache hit must NOT increment it:
- *   1. method gating — only POST/PUT/DELETE/PATCH are guarded; GET passes through untouched,
- *   2. key gating — missing key throws when required, passes through when optional,
- *   3. cache-hit replay — a duplicate request returns the cached body without re-running the handler,
- *   4. user-scoping — two users sharing one key do NOT collide (the `${userId}:${key}` store key),
- *   5. only-cache-2xx — a 5xx is NOT cached (a transient failure must not be replayed forever),
- *   6. TTL expiry — an entry older than the TTL is dropped, so the handler runs again.
+ *  1. method gating — only POST/PUT/DELETE/PATCH are guarded; GET passes through untouched,
+ *  2. key gating — missing key throws when required, passes through when optional,
+ *  3. cache-hit replay — a duplicate request returns the cached body without re-running the handler,
+ *  4. user-scoping — two users sharing one key do NOT collide (the `${userId}:${key}` store key),
+ *  5. only-cache-2xx — a 5xx is NOT cached (a transient failure must not be replayed forever),
+ *  6. TTL expiry — an entry older than the TTL is dropped, so the handler runs again.
  *
  * The store is a module-level singleton shared across the process, so every test uses a UNIQUE
  * Idempotency-Key to stay isolated.
@@ -148,7 +148,7 @@ describe('idempotency middleware — caching contract', () => {
     expect(getCount()).toBe(2);
   });
 
-  test('a non-JSON 2xx body does NOT 500 and is NOT cached — the dup safely re-runs (C315)', async () => {
+  test('a non-JSON 2xx body does NOT 500 and is NOT cached — the dup safely re-runs', async () => {
     // The middleware clones + JSON-parses the body to cache it. A 2xx NON-JSON response (CSV/binary/
     // 204) would make response.json() THROW, turning a SUCCESSFUL response into a 500 — and a cached
     // non-JSON body couldn't round-trip through the replay c.json() anyway. The guard parses

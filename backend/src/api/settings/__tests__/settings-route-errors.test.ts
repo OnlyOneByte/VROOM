@@ -1,6 +1,6 @@
 /**
- * Characterization tests for settings ROUTE error behavior through the REAL HTTP stack (arch #1
- * part 2c prerequisite — characterize-then-drop, cycle 43).
+ * Characterization tests for settings ROUTE error behavior through the REAL HTTP stack (arch
+ * prerequisite — characterize, then drop.
  *
  * Unlike the sync routes (handleSyncError), the settings handlers hand-roll try/catch that rethrow
  * as AppError with TRANSFORMED messages: GET / masks any error as AppError('Failed to fetch
@@ -49,10 +49,10 @@ describe('settings route error behavior (characterization — pins today before 
     expect(res.status).toBe(400);
     const body = (await json<ErrorBody>(res)) as ErrorBody;
     expect(body.success).toBe(false);
-    // POST-DROP (C50): the hand-rolled try/catch is gone, so the ZodError reaches the central
+    // POST-DROP: the hand-rolled try/catch is gone, so the ZodError reaches the central
     // errorHandler → 400 ValidationError ('Invalid request data'), the standard envelope. Status is
     // unchanged (still 400); only the transformed 'Invalid settings data' message went away. This is
-    // the authorized, reviewed behavior change the C43 characterization flagged.
+    // the authorized, reviewed behavior change the characterization flagged.
     expect(body.error.message, 'post-drop: central errorHandler ZodError message').toBe(
       'Invalid request data'
     );
@@ -84,13 +84,13 @@ describe('settings route error behavior (characterization — pins today before 
 });
 
 /**
- * C277 (guard): the two POST endpoints — /settings/backup + /settings/restore — had ZERO HTTP
+ * The two POST endpoints — /settings/backup + /settings/restore — had ZERO HTTP
  * coverage. /backup has a real observable SIDE EFFECT (syncStateRepository.updateBackupDate writes
  * sync_state.last_backup_date, which a backup-status UI reads), so pin that it persists; both must be
  * auth-gated (the routes.use('*', requireAuth) chain). Reads the DB row via ctx.sqlite to prove the
  * write actually landed (not just a 200).
  */
-describe('settings POST /backup + /restore (C277)', () => {
+describe('settings POST /backup + /restore', () => {
   function backupDateRow(userId: string): { last_backup_date: number | null } | undefined {
     return ctx.sqlite
       .query('SELECT last_backup_date FROM sync_state WHERE user_id = ?')

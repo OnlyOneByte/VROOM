@@ -1,10 +1,10 @@
 /**
- * In-process HTTP tests for the onFinancingDeactivated hook (C85 guard, steered by the C81
+ * In-process HTTP tests for the onFinancingDeactivated hook (guard, steered by the
  * coverage baseline — financing/hooks.ts was at 0% func). The hook is a DATA-INTEGRITY side
  * effect: when financing is paid off (PUT /:id/payoff) or deleted (DELETE /:id), it must SEVER
  * the source link on the financing's auto-generated expenses (clear sourceType/sourceId) while
  * KEEPING the expense rows. Pinned end-to-end through the real routes so the singleton-bound
- * expenseRepository.clearSource runs against the test DB (createTestApp rewrites env — the C68
+ * expenseRepository.clearSource runs against the test DB (createTestApp rewrites env — the
  * pattern). Also pins the best-effort contract: a no-linked-expenses deactivate still succeeds.
  */
 
@@ -25,7 +25,7 @@ beforeEach(async () => {
 afterEach(() => ctx.close());
 
 // This file's fixture is a nickname-required Honda Civic 2022; converge onto the shared test-helpers/seed
-// seedVehicle (arch convergence, Angelo-approved) via a thin wrapper that keeps make/model/year explicit
+// seedVehicle  via a thin wrapper that keeps make/model/year explicit
 // (the shared default is a Camry) so behavior is preserved.
 const seedVehicle = (nickname: string): Promise<string> =>
   seedVehicleShared(ctx, { make: 'Honda', model: 'Civic', year: 2022, nickname });

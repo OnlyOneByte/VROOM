@@ -2,13 +2,13 @@
  * Unit tests for getVehicleDisplayName — the vehicle label helper used across the expenses,
  * reminders, insurance, and dashboard surfaces (8 components + 4 routes).
  *
- * This pins the REAL exported helper. Before C364 the only "coverage" was VehicleManagement.test.ts,
+ * This pins the REAL exported helper. Before the only "coverage" was VehicleManagement.test.ts,
  * which RE-IMPLEMENTS the function as a local arrow and tests that copy — never importing the real
- * export (the C229 coverage-theater anti-pattern: a test that reconstructs a module's logic locally
+ * export (the coverage-theater anti-pattern: a test that reconstructs a module's logic locally
  * is not real coverage). So the load-bearing fallback was unguarded.
  *
  * The invariant that matters: the `!vehicle → 'Unknown Vehicle'` branch is REACHABLE — a split
- * expense, reminder, or insurance term can outlive the vehicle it references (the #88/#97 deleted-
+ * expense, reminder, or insurance term can outlive the vehicle it references (the deleted-
  * vehicle family), and every consumer site relies on this helper to render a safe label instead of
  * dereferencing `.year`/`.make`/`.model` on null. A regression that drops or inverts the falsy guard
  * would crash those surfaces (or mislabel a real vehicle as "Unknown").
@@ -38,7 +38,7 @@ describe('getVehicleDisplayName', () => {
 	});
 
 	// The load-bearing branch: a reference to a vehicle that no longer exists (deleted while a split
-	// expense / reminder / insurance term still points at it — the #88/#97 surface).
+	// expense / reminder / insurance term still points at it — the surface).
 	test('null vehicle → "Unknown Vehicle" (deleted-vehicle fallback, never dereferences null)', () => {
 		expect(getVehicleDisplayName(null)).toBe('Unknown Vehicle');
 	});

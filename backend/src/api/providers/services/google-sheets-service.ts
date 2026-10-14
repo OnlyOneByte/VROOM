@@ -253,11 +253,11 @@ export const SHEET_HEADERS = {
 } as const satisfies Record<string, readonly string[]>;
 
 /**
- * The canonical ordered roster of VROOM sheet TAB titles — ONE source of truth (C30) for the tab set
+ * The canonical ordered roster of VROOM sheet TAB titles — ONE source of truth for the tab set
  * that `createSpreadsheet` (initial tabs) and `ensureRequiredSheets` (backfill missing tabs on an
  * existing spreadsheet) both need. Before this, the 15-tab list was hand-copied in BOTH places (plus the
  * read-range + write fan-out, which pair each title with table-specific logic and stay inline), so adding
- * a 16th table meant editing parallel lists in lockstep — a C161-class drift vector. These are display
+ * a 16th table meant editing parallel lists in lockstep — a-class drift vector. These are display
  * tab TITLES (with spaces), distinct from the `SHEET_HEADERS` keys (camelCase) — kept ordered to match
  * the historical create order so existing spreadsheets are unaffected.
  */
@@ -282,7 +282,7 @@ export const SHEET_NAMES = [
 ] as const;
 
 /**
- * Suffix for the transient per-table tabs used by the atomic backup swap (#37). A backup STAGES every
+ * Suffix for the transient per-table tabs used by the atomic backup swap. A backup STAGES every
  * table's data into `${name}${SHEET_STAGING_SUFFIX}` (leaving the live canonical sheets untouched), and
  * only once ALL staging writes succeed does it commit a single atomic `batchUpdate` that deletes the old
  * canonical sheets and renames the staging tabs into their place. Space-free so it needs no A1 quoting.
@@ -315,9 +315,9 @@ export class GoogleSheetsService {
   private driveService: GoogleDriveService;
 
   /**
-   * @param refreshToken  Google OAuth refresh token (ignored when `clients` is injected).
-   * @param clients       Optional pre-built Sheets + Drive clients (see {@link GoogleSheetsClients}).
-   *                      Production callers omit it and OAuth2-authed clients are built.
+   * @param refreshToken Google OAuth refresh token (ignored when `clients` is injected).
+   * @param clients Optional pre-built Sheets + Drive clients (see {@link GoogleSheetsClients}).
+   *  Production callers omit it and OAuth2-authed clients are built.
    */
   constructor(refreshToken: string, clients?: GoogleSheetsClients) {
     if (clients) {
@@ -628,16 +628,16 @@ export class GoogleSheetsService {
   }
 
   /**
-   * Write every table's data to the backup spreadsheet ATOMICALLY (#37). The previous design cleared
+   * Write every table's data to the backup spreadsheet ATOMICALLY. The previous design cleared
    * then re-wrote each LIVE sheet in place, so a failure mid-run (network blip, 429, the process dying)
    * left a TORN backup — some sheets rewritten, the one that was mid-write emptied by its preceding clear,
-   * the rest stale — on what may be the user's ONLY copy (NORTH_STAR #1 data-loss). This instead:
-   *   1. STAGE — write each table into a fresh `${title}${SHEET_STAGING_SUFFIX}` tab. The live canonical
-   *      sheets are never touched in this phase, so any failure here is harmless: the prior backup is
-   *      fully intact. We clean up the partial staging tabs and rethrow.
-   *   2. COMMIT — once ALL staging writes succeed, ONE `batchUpdate` deletes the old canonical sheets and
-   *      renames each staging tab to its canonical title. Sheets applies a batchUpdate all-or-nothing, so
-   *      a concurrent reader sees either the entire old backup or the entire new one, never a mix.
+   * the rest stale — on what may be the user's ONLY copy (data-loss). This instead:
+   *  1. STAGE — write each table into a fresh `${title}${SHEET_STAGING_SUFFIX}` tab. The live canonical
+   *  sheets are never touched in this phase, so any failure here is harmless: the prior backup is
+   *  fully intact. We clean up the partial staging tabs and rethrow.
+   *  2. COMMIT — once ALL staging writes succeed, ONE `batchUpdate` deletes the old canonical sheets and
+   *  renames each staging tab to its canonical title. Sheets applies a batchUpdate all-or-nothing, so
+   *  a concurrent reader sees either the entire old backup or the entire new one, never a mix.
    * Net effect: the backup is replaced as a single transaction, and the old copy is destroyed only at the
    * instant the new one takes its place.
    */
@@ -727,13 +727,13 @@ export class GoogleSheetsService {
     await this.sheets.spreadsheets.values.update({
       spreadsheetId,
       range: `${sheetName}!A1:${String.fromCharCode(64 + headers.length)}${data.length + 1}`,
-      // RAW (not USER_ENTERED) so every cell is stored VERBATIM as text (#36). USER_ENTERED makes
+      // RAW (not USER_ENTERED) so every cell is stored VERBATIM as text. USER_ENTERED makes
       // Sheets PARSE each cell as if typed: a value beginning with `=`/`+`/`-`/`@` becomes a live
       // formula (formula injection + the cell silently round-trips back as the formula RESULT, not the
-      // user's data — backup corruption of the user's OWN records, NORTH_STAR #1), and it reformats
+      // user's data — backup corruption of the user's OWN records), and it reformats
       // numbers/dates. RAW stores the literal string, so the backup→restore round-trip is byte-exact and
       // injection-inert with NO escaping needed — do NOT add a `'`-prefix escape here (that scheme is for
-      // one-way CSV export; on this round-trip path it reintroduces the C399/C401 apostrophe corruption,
+      // one-way CSV export; on this round-trip path it reintroduces the apostrophe corruption,
       // see csv-safety.ts header). parseValue still does the type coercion symmetrically on read.
       valueInputOption: 'RAW',
       requestBody: { values },

@@ -5,7 +5,7 @@
  * stack — middleware → requireAuth → zValidator → handler → service → repo → DB —
  * which is exactly the layer those bypass.
  *
- * REGRESSION GUARD (STATUS gap #0): an earlier version of this file passed in
+ * REGRESSION GUARD (STATUS gap): an earlier version of this file passed in
  * isolation but 500'd in the full `bun test` suite, because `sync-worker.test.ts`
  * used `mock.module('../../photos/photo-repository', ...)` — a process-global stub
  * that can't be restored, so it leaked a `photoRepository` missing `findByUser`

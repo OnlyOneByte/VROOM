@@ -3,7 +3,7 @@
  *
  * The 14 money columns (design §1) flip from `real` (binary-float dollars) to `integer` (cents). The
  * hand-authored migration converts every stored value in place:
- *   UPDATE <table> SET <col> = CAST(ROUND(<col> * 100) AS INTEGER) WHERE <col> IS NOT NULL;
+ *  UPDATE <table> SET <col> = CAST(ROUND(<col> * 100) AS INTEGER) WHERE <col> IS NOT NULL;
  *
  * ROUND-BEFORE-CAST is mandatory and is the whole point of these tests: `CAST(12.34 * 100 AS INTEGER)`
  * is `1233` (the binary float 12.34*100 = 1233.9999… truncates), not `1234`. The ROUND fixes that. The

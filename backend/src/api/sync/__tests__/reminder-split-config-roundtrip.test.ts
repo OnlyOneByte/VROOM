@@ -1,10 +1,10 @@
 /**
  * TRUE backup → restore round-trip for a reminder's `expenseSplitConfig` — the worst-case
- * NESTED-OBJECT JSON column (C264 deep-review of the backup EXPORT path).
+ * NESTED-OBJECT JSON column (deep-review of the backup EXPORT path).
  *
  * Why this slice specifically: the export/restore TABLE-SET symmetry is airtight — five
  * hand-maintained lists (createBackup keys, TABLE_SCHEMA_MAP, TABLE_FILENAME_MAP, restore
- * insert() calls, ImportSummary fields) are all pinned equal by the C208/C209 drift guards,
+ * insert() calls, ImportSummary fields) are all pinned equal by the drift guards,
  * including the exact `if (table && filename)` silent-skip. What those KEY guards do NOT cover is
  * the per-column VALUE round-trip through convertToCSV's `JSON.stringify(value)` (backup.ts:458)
  * → the real csv-stringify (quoted:true) → csv-parse → coerceRow's `JSON.parse` (the JSON_TYPES
@@ -14,7 +14,7 @@
  * allocations, `"` around every key) that the CSV layer must double-quote and the parser must
  * unwrap losslessly. expenseSplitConfig (a ReminderSplitConfig: { method, allocations:[{...}] })
  * is the deepest such column in the schema — if any layer mangled it, a user's multi-vehicle
- * recurring-cost split would silently corrupt on restore (NORTH_STAR #1, no silent loss).
+ * recurring-cost split would silently corrupt on restore (no silent loss).
  *
  * createTestApp() rewrites process.env then dynamic-imports DB-bound modules, so keep static
  * imports to the harness + bun:test; import backup/restore dynamically AFTER createTestApp.

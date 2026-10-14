@@ -53,9 +53,9 @@ const routes = new Hono();
 // Validation schemas derived from db schema
 const expenseCategorySchema = z.enum(EXPENSE_CATEGORIES);
 
-// tagElementSchema (the #104 separator-rejection + length cap) is the ONE source of truth, now in
-// validation.ts so the split-create schema shares it too (C408); reused here by the create base + the
-// update override (which drops the base `.default([])` to dodge the .partial() clobber, C34/#tags).
+// tagElementSchema (the separator-rejection + length cap) is the ONE source of truth, now in
+// validation.ts so the split-create schema shares it too; reused here by the create base + the
+// update override (which drops the base `.default([])` to dodge the .partial() clobber).
 const baseExpenseSchema = createInsertSchema(expensesTable, {
   tags: z
     .array(tagElementSchema)
@@ -79,7 +79,7 @@ const baseExpenseSchema = createInsertSchema(expensesTable, {
       `Description must be ${CONFIG.validation.expense.descriptionMaxLength} characters or less`
     )
     // .nullish() (not .optional()) so an edit can send description:null to CLEAR
-    // it — the clear-optional-field class (cycles 82-85). BaseRepository.update
+    // it — the clear-optional-field class. BaseRepository.update
     // writes null through to the column; undefined is still dropped (create omits it).
     .nullish(),
   // expense-location T2: an OPTIONAL free-text location label (D1 — no GPS). Same shape + clear-on-edit
@@ -98,7 +98,7 @@ const baseExpenseSchema = createInsertSchema(expensesTable, {
   // + 'reminder' expenses are created EXCLUSIVELY by system paths that bypass this route (insurance
   // hooks via createSplitExpense; the reminder trigger via a direct tx.insert), so accepting them here
   // was pure over-permissiveness: a hand-crafted POST/PUT could forge an UNVALIDATED insurance_term/
-  // reminder link on the caller's own row (#62 — within-tenant integrity: skews source-bucketed
+  // reminder link on the caller's own row (— within-tenant integrity: skews source-bucketed
   // analytics, and a real matching sourceId would cascade-delete the manual expense when its parent is
   // removed). Restricting the enum to 'financing' closes that with zero impact on the system paths.
   sourceType: z.literal('financing').optional(),
@@ -124,7 +124,7 @@ const createExpenseSchemaBase = baseExpenseSchema.omit({
 });
 
 const createExpenseSchema = createExpenseSchemaBase
-  // #98 (C51): conflict-resolution keep-local opt-in. When an offline edit collides with an existing
+  // Conflict-resolution keep-local opt-in. When an offline edit collides with an existing
   // (userId, clientId) row, this flag tells the idempotent create to APPLY the edit (update the row)
   // rather than no-op-return the stored version — so a resolved local edit is never silently lost. A
   // plain retry omits it → the pure idempotent no-op is unchanged. create-only (not on update).
@@ -147,17 +147,17 @@ const createExpenseSchema = createExpenseSchemaBase
 // without this an update that OMITS tags would parse to `{ tags: [] }` and silently WIPE a tagged
 // expense's tags on any unrelated edit (e.g. changing just the amount). Re-declaring it as a plain
 // optional (no default) means an omitted `tags` stays undefined → dropped by the update, preserving
-// the stored value; an explicit array still replaces. (Data-loss class from C31; guarded cycle 34.)
+// the stored value; an explicit array still replaces. (Data-loss class from; guarded.)
 const updateExpenseSchema = createExpenseSchemaBase
   .omit({ clientId: true })
   .partial()
   .extend({
     tags: z.array(tagElementSchema).max(CONFIG.validation.expense.maxTags).optional(),
   })
-  // #109 (C372): mirror the create-path both-or-neither source refine. `.refine()` does NOT survive
+  // Mirror the create-path both-or-neither source refine. `.refine()` does NOT survive
   // `.partial()`/`.omit()` re-derivation, so without re-adding it a PUT could set ONE of the pair —
   // `{ sourceId: 'fin-x' }` (no type) or `{ sourceType: 'financing' }` (no id) — persisting an
-  // ASYMMETRIC source link the create path forbids (the #62/#34 within-tenant integrity class): it
+  // ASYMMETRIC source link the create path forbids (the within-tenant integrity class): it
   // skews source-bucketed analytics, and a half-link with a real sourceId would mis-trigger (or
   // never trigger) the financing cascade-delete cleanup. A PUT supplying NEITHER is fine (a normal
   // edit leaves the row's existing source untouched); supplying BOTH is the validated create-shape.
@@ -174,13 +174,13 @@ const updateExpenseSchema = createExpenseSchemaBase
   );
 
 /**
- * Null the fuel-only columns on a NON-fuel expense write (the server-side mirror of the C226/#76 FE
+ * Null the fuel-only columns on a NON-fuel expense write (the server-side mirror of the FE
  * fix). `validateFuelExpenseData` only enforces the forward direction (a `fuel` expense MUST have
  * volume+mileage) — it never strips fuel fields from a non-fuel write, so a direct API caller (or a
  * future client) could persist a `maintenance`/`misc` row carrying volume/fuelType/missedFillup, and
  * crucially a stray `mileage`, which getCurrentOdometer reads CROSS-CATEGORY (odometer/repository.ts:
  * the UNION has no category filter) → a typo'd mileage on a non-fuel row poisons the reminder/lease
- * odometer axis (#76's verified reachability). For a non-fuel category these four columns are
+ * odometer axis ('s verified reachability). For a non-fuel category these four columns are
  * meaningless, so null them. Only acts when `category` is explicitly present + non-fuel (a PUT that
  * omits category leaves the row's existing category — and its fields — untouched). Returns a shallow
  * copy; never mutates the input. The `charge` field is FE-only (mapped to volume at the API boundary),
@@ -197,7 +197,7 @@ function clearFuelFieldsIfNotFuel<
 >(data: T, effectiveCategory: string | undefined = data.category): T {
   // Key off the EFFECTIVE category, not data.category. On a PUT that changes mileage/volume but omits
   // `category`, data.category is undefined while the row's effective category is the EXISTING one — so
-  // a maintenance row could keep a stray mileage (poisoning getCurrentOdometer cross-category, the #76
+  // a maintenance row could keep a stray mileage (poisoning getCurrentOdometer cross-category, the
   // class). Callers pass the resolved final category; the default keeps the create path's behavior.
   if (effectiveCategory === undefined || effectiveCategory === 'fuel') return data;
   return { ...data, volume: null, fuelType: null, mileage: null, missedFillup: false };
@@ -205,12 +205,12 @@ function clearFuelFieldsIfNotFuel<
 
 /**
  * When an expense write SETS a financing source link, verify it points at the vehicle's ACTIVE financing
- * record. ONE source of truth (C422) for the check the create path enforced inline — the PUT path skipped
+ * record. ONE source of truth for the check the create path enforced inline — the PUT path skipped
  * it, so a `{sourceType:'financing', sourceId:<arbitrary or mismatched id>}` edit persisted verbatim. That
  * link is the exact predicate FinancingRepository.computeBalance sums (originalAmount − SUM(expenseAmount)
  * WHERE source_type='financing' AND source_id=id), so a forged/mismatched link MIS-ATTRIBUTES an expense as
- * a loan payment → understates the displayed balance (NORTH_STAR #1 money figure) + wires the row into the
- * financing cascade-cleanup (the #62 integrity class). Pass `undefined` sourceType (a non-financing or
+ * a loan payment → understates the displayed balance (money figure) + wires the row into the
+ * financing cascade-cleanup (the integrity class). Pass `undefined` sourceType (a non-financing or
  * source-less write) → no-op. The both-or-neither refine guarantees sourceId is present when sourceType is.
  */
 async function assertFinancingSourceValid(
@@ -232,10 +232,10 @@ async function assertFinancingSourceValid(
  * A 'financing'-sourced split must point at the ACTIVE financing of EVERY vehicle it lands on —
  * each sibling is a separate vehicleId and computeBalance sums by (sourceType,sourceId) with NO
  * vehicle scope, so a sibling on a vehicle whose active financing isn't `sourceId` mis-attributes a
- * loan payment → understates that balance (#145/#125, the within-tenant financing-source class).
+ * loan payment → understates that balance (the within-tenant financing-source class).
  * No-op for a source-less split (assertFinancingSourceValid returns early when sourceType !==
  * 'financing'). Shared by POST /split (new config) AND PUT /split (the carried-forward link must be
- * re-checked against the NEW vehicle set — #147, the path the per-vehicle check missed).
+ * re-checked against the NEW vehicle set —, the path the per-vehicle check missed).
  */
 async function assertSplitFinancingSourceValid(
   sourceType: string | undefined,
@@ -329,8 +329,8 @@ routes.post('/split', zValidator('json', createSplitExpenseSchema), async (c) =>
   const user = c.get('user');
   const data = c.req.valid('json');
 
-  // A 'financing'-sourced split must point at the active financing of EACH vehicle it touches (#145,
-  // the #125/C422 financing-source check the split path missed). The schema restricts sourceType to
+  // A 'financing'-sourced split must point at the active financing of EACH vehicle it touches —
+  // the financing-source check the split path once missed. The schema restricts sourceType to
   // the 'financing' literal; the shared helper validates per vehicle (no-op for a source-less split).
   await assertSplitFinancingSourceValid(data.sourceType, data.sourceId, data.splitConfig);
 
@@ -374,7 +374,7 @@ routes.put(
     // schema doesn't expose them — see updateSplitExpense), but the NEW splitConfig may land them on a
     // DIFFERENT vehicle set. computeBalance sums financing payments by (sourceType,sourceId) with no
     // vehicle scope, so reallocating a financing-sourced split onto a vehicle whose active financing
-    // isn't that sourceId mis-attributes a loan payment → understates the balance (#147, the #125/#145
+    // isn't that sourceId mis-attributes a loan payment → understates the balance (the
     // financing-source class on the split-UPDATE path the per-vehicle check missed). Re-validate the
     // carried link against the new vehicles before regenerating. getSplitExpense is userId-scoped (404s
     // a non-owned/absent group); a source-less split is a no-op.
@@ -599,7 +599,7 @@ const exportQuerySchema = z.object({
 // numbers) for portability; a human Vehicle name column for readability.
 // The CSV header set the export writes. EXPORTED so the round-trip guard
 // (export-import-column-contract.test.ts) can assert every key the importer reads is present here —
-// a renamed/dropped column would otherwise silently break the export→re-import round-trip (NORTH_STAR #1)
+// a renamed/dropped column would otherwise silently break the export→re-import round-trip
 // with no test catching it (export + import tests each hard-code their own headers).
 export const EXPORT_COLUMNS = [
   'date',
@@ -655,7 +655,7 @@ routes.get('/export', zValidator('query', exportQuerySchema), async (c) => {
   ]);
 
   // The user's real currency — NOT a hardcoded 'USD'. A EUR/GBP user's export
-  // must label amounts in their own currency (the cycle 74–75 hardcoded-USD class).
+  // must label amounts in their own currency (the hardcoded-USD class).
   const currency = prefs?.currencyUnit || 'USD';
 
   const vehicleName = new Map(
@@ -707,7 +707,7 @@ routes.get('/export', zValidator('query', exportQuerySchema), async (c) => {
 // target of /export). The request carries the CSV TEXT (not a multipart upload) so
 // it rides the same JSON auth/validation path as everything else. Every row is
 // validated and its vehicle resolved to one the USER OWNS by name — never a
-// file-provided id (cross-tenant-write class, cycle 145). dryRun:true validates +
+// file-provided id (the cross-tenant-write class). dryRun:true validates +
 // reports only (the UI previews, then commits); dryRun:false inserts the ready rows.
 // Backward-compatible: when no `mapping` is sent the native VROOM-CSV path runs unchanged;
 // when present, a foreign tracker file is translated to the native shape first (T3).
@@ -751,7 +751,7 @@ routes.post('/import', zValidator('json', importBodySchema), async (c) => {
 
   // Foreign-tracker path (T3): translate to native CSV first, then the EXISTING flow runs
   // unchanged. Unit conversion needs the TARGET vehicle's units — resolve them from the chosen
-  // targetVehicle so values aren't stored unconverted-but-relabeled (the C60-flagged risk). When
+  // targetVehicle so values aren't stored unconverted-but-relabeled (the-flagged risk). When
   // the file has its own vehicle column (no targetVehicle), conversion is skipped: a multi-vehicle
   // file may span differing units, so we don't guess — values pass through and the user is told.
   let importCsv = csv;
@@ -819,10 +819,10 @@ routes.post('/import', zValidator('json', importBodySchema), async (c) => {
 // POST /api/expenses - Create a new expense
 routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
   const user = c.get('user');
-  // Separate the control flag from the row data: forceOverwrite (#98) governs the idempotent-create
+  // Separate the control flag from the row data: forceOverwrite governs the idempotent-create
   // collision behavior, it is NOT a column — keep it out of the inserted/overwritten row.
   const { forceOverwrite, ...body } = c.req.valid('json');
-  // Strip fuel-only fields from a non-fuel create (#76 server-side): a stray mileage would otherwise
+  // Strip fuel-only fields from a non-fuel create (server-side): a stray mileage would otherwise
   // poison getCurrentOdometer (cross-category UNION). For a fuel expense this is a no-op.
   const expenseData = clearFuelFieldsIfNotFuel(body);
 
@@ -841,7 +841,7 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
   if (!ownerId) throw new ValidationError('Vehicle');
   const createdBy = ownerId === user.id ? null : user.id;
 
-  // Validate: a financing source link must point at the vehicle's active financing (shared with PUT, C422).
+  // Validate: a financing source link must point at the vehicle's active financing (shared with PUT).
   await assertFinancingSourceValid(
     expenseData.sourceType,
     expenseData.sourceId,
@@ -858,7 +858,7 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
 
   // Idempotent create: a retried offline POST with the same clientId returns the
   // original row instead of duplicating it. Plain create when clientId is absent.
-  // forceOverwrite (#98): a keep-local conflict resolution APPLIES the edit on collision.
+  // forceOverwrite: a keep-local conflict resolution APPLIES the edit on collision.
   // The idempotency key is scoped to the row's userId — now the OWNER — so a shared editor's
   // retried offline POST de-dupes against the owner's books (the row it actually created).
   const createdExpense = await expenseRepository.createIdempotent(
@@ -897,14 +897,14 @@ routes.get('/', zValidator('query', expenseQuerySchema), async (c) => {
 
   // vehicle-sharing T5b-3: READ widening (design §2.1 rule 3). Two distinct shapes:
   //  - PER-VEHICLE (?vehicleId=…): gate via requireVehicleRead (owner | accepted viewer/editor | 404).
-  //    Because shared-created rows are OWNER-stamped (userId == vehicle owner, T5b-2), a shared
-  //    invitee querying their OWN userId would see NOTHING for the shared vehicle — so scope the query
-  //    to the vehicle OWNER's userId. With both vehicleId AND ownerId pinned, the result is exactly
-  //    that one vehicle's rows (the owner cannot leak their OTHER vehicles through this — vehicleId
-  //    filters them out), and an owner reading their own vehicle is unchanged (owner === acting).
+  //  Because shared-created rows are OWNER-stamped (userId == vehicle owner, T5b-2), a shared
+  //  invitee querying their OWN userId would see NOTHING for the shared vehicle — so scope the query
+  //  to the vehicle OWNER's userId. With both vehicleId AND ownerId pinned, the result is exactly
+  //  that one vehicle's rows (the owner cannot leak their OTHER vehicles through this — vehicleId
+  //  filters them out), and an owner reading their own vehicle is unchanged (owner === acting).
   //  - CROSS-FLEET (no vehicleId): stays acting-user-owned only — a shared vehicle's costs belong to
-  //    the OWNER's dashboard, NOT the invitee's, so no double-count and no foreign rows leak into the
-  //    invitee's all-vehicles list. The invitee sees a shared vehicle's costs ONLY via ?vehicleId.
+  //  the OWNER's dashboard, NOT the invitee's, so no double-count and no foreign rows leak into the
+  //  invitee's all-vehicles list. The invitee sees a shared vehicle's costs ONLY via ?vehicleId.
   let listUserId = user.id;
   if (query.vehicleId) {
     await requireVehicleRead(query.vehicleId, user.id);
@@ -967,7 +967,7 @@ routes.put(
     await requireVehicleWrite(existingExpense.vehicleId, user.id);
 
     // If the edit reassigns the expense to a different vehicle, the acting user must have WRITE access
-    // to that vehicle too (the #61 guard, widened to the share seam). Additionally the target vehicle
+    // to that vehicle too (the guard, widened to the share seam). Additionally the target vehicle
     // must have the SAME owner as the current one: the row is owner-stamped (existingExpense.userId IS
     // the owner), so moving it onto a DIFFERENT owner's vehicle would silently relocate the cost
     // between two users' books (and break the owner-stamp invariant userId == vehicle owner). A
@@ -981,7 +981,7 @@ routes.put(
       }
     }
 
-    // A PUT that SETS a financing source link must verify it like the create path does (C422) — else a
+    // A PUT that SETS a financing source link must verify it like the create path does — else a
     // forged/mismatched sourceId persists + corrupts the displayed loan balance (computeBalance sums this
     // exact link). Keyed on updateData.sourceType so a normal edit (no source fields) is a no-op; validated
     // against the FINAL vehicleId so a simultaneous reassignment checks the right vehicle's financing.
@@ -1002,16 +1002,16 @@ routes.put(
 
     validateFuelExpenseData(finalCategory, finalMileage, finalVolume, finalFuelType);
 
-    // If the EFFECTIVE category is non-fuel, null any fuel-only columns in this write (#76 server-side).
+    // If the EFFECTIVE category is non-fuel, null any fuel-only columns in this write (server-side).
     // Keyed on finalCategory (not updateData.category) so it covers BOTH a fuel→maintenance switch that
     // omits the fuel fields AND a PUT that writes a stray mileage/volume onto an ALREADY-non-fuel row
-    // without resending category (#76 third leg, C434) — either way a stray mileage would poison
+    // without resending category (third leg) — either way a stray mileage would poison
     // getCurrentOdometer cross-category. A genuine fuel edit (finalCategory==='fuel') is untouched.
     const normalizedUpdate = clearFuelFieldsIfNotFuel(updateData, finalCategory);
 
     const updatedExpense = await expenseRepository.update(id, normalizedUpdate);
 
-    // D5 (#71): an EDIT can also cross a mileage milestone — e.g. correcting a reading upward past a
+    // D5: an EDIT can also cross a mileage milestone — e.g. correcting a reading upward past a
     // reminder's due odometer. The create path rechecks but the update path did not, so an
     // edit-crossed reminder only fired on the next /trigger or login, silently breaking the
     // "fires the moment crossed" guarantee. Mirror the create-path best-effort recheck (never throws,

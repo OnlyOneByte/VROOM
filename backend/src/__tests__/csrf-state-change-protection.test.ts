@@ -1,18 +1,18 @@
 /**
- * Behavioral guard (C225) for the CSRF protection on state-changing requests — the RUNTIME complement to
+ * Behavioral guard for the CSRF protection on state-changing requests — the RUNTIME complement to
  * the source-scan in cors-csrf-origin-coupling.test.ts (which pins that cors()+csrf() read the same
  * allowlist, but never exercises an actual rejection).
  *
  * app.ts mounts `csrf({ origin: CONFIG.cors.origins })`, so a POST/PUT/DELETE/PATCH from an untrusted
  * origin (or with a cross-site Sec-Fetch-Site and no allowed Origin) is rejected with a bare 403
- * HTTPException — Hono's CSRF middleware. This is a SECURITY boundary (NORTH_STAR #2 cross-tenant/forgery
+ * HTTPException — Hono's CSRF middleware. This is a SECURITY boundary (cross-tenant/forgery
  * isolation): without it, a malicious page could ride a logged-in user's cookie to mutate their data.
  *
  * Nothing exercised the rejection behaviorally — a regression that dropped/loosened csrf() would leave the
  * source-scan green (if the call still references CONFIG.cors.origins) yet silently stop rejecting. This
  * drives the REAL app: a same-origin DELETE (the harness sets Sec-Fetch-Site: same-origin) succeeds, while
  * the IDENTICAL DELETE with a cross-site Sec-Fetch-Site + a foreign Origin is 403'd. (This also documents
- * why a raw `curl` DELETE without an Origin header 403s — the C225 scout's false-alarm resolution: the
+ * why a raw `curl` DELETE without an Origin header 403s — the scout's false-alarm resolution: the
  * CSRF guard working as intended, not a vehicle-delete bug.)
  *
  * createTestApp() rewrites env + dynamic-imports DB-bound modules, so keep imports to the harness + bun:test.
@@ -29,7 +29,7 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-describe('CSRF protects state-changing requests (C225 behavioral guard)', () => {
+describe('CSRF protects state-changing requests', () => {
   test('a same-origin DELETE succeeds (the harness mirrors a real browser same-origin call)', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     // ctx.authed sets Sec-Fetch-Site: same-origin → passes CSRF, like the real FE.

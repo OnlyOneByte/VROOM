@@ -19,10 +19,10 @@ interface EfficiencyExpense {
 }
 
 /**
- * Sort rows ASCENDING by date, on a COPY (never mutates the input). ONE source of truth (C421) for the
+ * Sort rows ASCENDING by date, on a COPY (never mutates the input). ONE source of truth for the
  * chronological order every PAIRWISE efficiency calc requires — calculateAverageMPG, calculateAverageMilesPerKwh,
  * and the /stats handler each pair CONSECUTIVE rows (current − previous), so an unsorted or wrong-direction
- * input silently mis-pairs into garbage with no error (the #75/C222 class). A divergent inline copy (flipped
+ * input silently mis-pairs into garbage with no error. A divergent inline copy (flipped
  * subtraction, or sorting in place and corrupting the caller's array) reintroduces exactly that. `date` is
  * `Date | string`; new Date() normalizes both.
  */
@@ -38,7 +38,7 @@ export function sortExpensesByDate<T extends { date: Date | string }>(expenses: 
  * Calculate MPG (Miles Per Gallon) from miles driven and fuel consumed
  */
 /**
- * The ONE canonical realistic-efficiency band (#30/C419, Angelo-APPROVED 2026-06-17). Both the
+ * The ONE canonical realistic-efficiency band. Both the
  * per-vehicle stats averages here AND the analytics charts (analytics-charts.ts imports these) gate
  * outliers on the SAME inclusive bounds, so the same car can't show two different averages on the
  * per-vehicle stats card vs the Analytics Fuel Stats card. Matches the documented chart band ([5,100]
@@ -61,18 +61,18 @@ interface MpgPairRow {
 }
 
 /**
- * Average MPG over CONSECUTIVE fill-up pairs of an ALREADY-CHRONOLOGICALLY-SORTED list (C17 dedup).
+ * Average MPG over CONSECUTIVE fill-up pairs of an ALREADY-CHRONOLOGICALLY-SORTED list.
  *
- * The identical pairing loop — skip a pair touching a `missedFillup` (the #66/#101 unlogged-gap rule),
+ * The identical pairing loop — skip a pair touching a `missedFillup` (the unlogged-gap rule),
  * require both odometer readings + the current volume, `mpg = miles/volume`, drop unrealistic values
  * outside (0,150) — was hand-copied in `calculateAverageMPG` (here) and `calculateAverageMpg`
- * (vehicle-stats.ts). C161 recorded that a hand-copied variant of this exact loop once LOST its guard,
+ * (vehicle-stats.ts). recorded that a hand-copied variant of this exact loop once LOST its guard,
  * so the copies are a live bug vector. ONE source of truth.
  *
  * Takes PRE-SORTED rows so each caller keeps its OWN sort contract (calculations.ts via
- * `sortExpensesByDate`; vehicle-stats.ts via a defensive inline date sort, #75) — the dedup is
+ * `sortExpensesByDate`; vehicle-stats.ts via a defensive inline date sort) — the dedup is
  * behavior-preserving, not a sort-policy change. The outlier band is now the CANONICAL [MIN_VALID_MPG,
- * MAX_VALID_MPG] = [5,100] shared with the analytics charts (#30/C419, Angelo-APPROVED 2026-06-17) — it
+ * MAX_VALID_MPG] = [5,100] shared with the analytics charts — it
  * used to be (0,150) here, so the same car showed two different averages on the per-vehicle stats card
  * vs the Analytics Fuel Stats card; unified on the documented [5,100] band.
  */
@@ -92,7 +92,7 @@ export function averageConsecutiveMpg(sortedExpenses: MpgPairRow[]): number | nu
       const miles = current.mileage - previous.mileage;
       const mpg = calculateMPG(miles, current.volume);
 
-      // Filter out unrealistic values, on the canonical [5,100] band shared with analytics (#30/C419).
+      // Filter out unrealistic values, on the canonical [5,100] band shared with analytics.
       if (mpg >= MIN_VALID_MPG && mpg <= MAX_VALID_MPG) {
         mpgValues.push(mpg);
       }
@@ -117,7 +117,7 @@ export function calculateAverageMPG(fuelExpenses: Expense[]): number | null {
   }
 
   // Sort by date to ensure chronological order (sortExpensesByDate — the shared pairwise-order invariant),
-  // then run the shared consecutive-pair MPG average (C17 dedup).
+  // then run the shared consecutive-pair MPG average.
   return averageConsecutiveMpg(sortExpensesByDate(fuelExpenses));
 }
 
@@ -162,7 +162,7 @@ export function calculateAverageMilesPerKwh(chargeExpenses: EfficiencyExpense[])
       const milesPerKwh = calculateMilesPerKwh(miles, current.volume);
 
       // Filter out unrealistic values, on the canonical [1,10] mi/kWh band shared with analytics
-      // (#30/C419, Angelo-APPROVED) — was (0,10) here, diverging from analytics' lower bound of 1.
+      // — was (0,10) here, diverging from analytics' lower bound of 1.
       if (milesPerKwh >= MIN_VALID_MI_KWH && milesPerKwh <= MAX_VALID_MI_KWH) {
         milesPerKwhValues.push(milesPerKwh);
       }
@@ -212,7 +212,7 @@ export function getPeriodStartDate(period: StatsPeriod, now: Date = new Date()):
  *
  * The `Number.parseInt(raw ?? String(fallback), 10)` + `Number.isFinite(x) ? clamp : fallback`
  * idiom was hand-rolled twice in the SAME handler (insurance /expiring-soon `days` and `limit`) —
- * and that copy-paste is exactly how #70 happened: `limit` carried the finite-guard, `days` was
+ * and that copy-paste is exactly how happened: `limit` carried the finite-guard, `days` was
  * written without it, so a non-numeric `?days=` became NaN → an Invalid Date → a silently-empty
  * result. One source of truth so the guard can't be present on one param and forgotten on its
  * sibling. NaN/missing/non-numeric → `fallback`; otherwise clamped to `[min, max]`.
@@ -237,8 +237,8 @@ export function parseClampedInt(
  * `Math.max(...arr)` / `Math.min(...arr)` pass each element as a separate function argument, so a
  * large array (a heavy logger's thousands of fuel/mileage rows over the all-time window — these
  * analytics queries have NO LIMIT) overflows the engine's argument-count cap and throws
- * `RangeError: Maximum call stack size exceeded`, crashing the whole analytics request (NORTH_STAR
- * #1 — the feature breaks for the most-engaged users). Reduce avoids the spread entirely and is
+ * `RangeError: Maximum call stack size exceeded`, crashing the whole analytics request — the
+ * feature breaks for the most-engaged users. Reduce avoids the spread entirely and is
  * O(n) with constant stack. Caller MUST guard emptiness (these return -Infinity/+Infinity on []
  * exactly like Math.max/min, so behavior is identical at every existing call site).
  */

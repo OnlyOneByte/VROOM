@@ -33,7 +33,7 @@ function toFetchBody(body: unknown): globalThis.BodyInit | undefined {
  * (skipped for FormData), sends with `credentials: 'include'`, and on a non-ok response parses the
  * backend `{ error: { message, code, details } }` envelope into a thrown `ApiError`. Returns the
  * ok Response so each caller does its OWN success-body handling (unwrap-data vs raw-JSON). The
- * fetch-setup + error-parsing block was byte-identical across both wrappers (C314 dedup) — one
+ * fetch-setup + error-parsing block was byte-identical across both wrappers — one
  * source of truth so an error-shape fix can't land in one path and be forgotten in the other.
  */
 async function fetchOrThrow(url: string, options: ApiOptions): Promise<Response> {

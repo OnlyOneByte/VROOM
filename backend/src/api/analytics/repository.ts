@@ -63,7 +63,7 @@ export type { FuelEfficiencyPoint } from '../../utils/analytics-charts';
 
 /**
  * How many calendar months of `year` the vehicle was owned, bounded by [ownershipStart, now]
- * (C121/#28). Used to divide a YEAR-scoped TCO total by a matching span instead of full-ownership
+ *  Used to divide a YEAR-scoped TCO total by a matching span instead of full-ownership
  * months. Inclusive of both endpoint months: a vehicle owned all of `year` → 12; bought in July of
  * `year` → 6 (Jul–Dec); a FUTURE year (start after year-end) or one entirely before ownership → 0.
  * Pure (no Date.now() inside — `now` is injected by the caller), so it's host-independent + testable.
@@ -89,7 +89,7 @@ export function monthsBetween(from: Date, to: Date): number {
 }
 
 /**
- * Normalize a date-or-raw-timestamp into a Date (C194 dedup). Drizzle timestamp columns surface as
+ * Normalize a date-or-raw-timestamp into a Date. Drizzle timestamp columns surface as
  * Date, but some rows reach these builders via paths typed loosely (a raw number/string), so the
  * analytics builders defensively coerced with `x instanceof Date ? x : new Date(x)` — hand-repeated at
  * 4 sites (fuel monthly, financing startDate, term start+end). One source of truth; behavior-identical
@@ -100,7 +100,7 @@ export function toDate(value: Date | number | string): Date {
 }
 
 /**
- * The half-open `[Jan 1 of `year`, Jan 1 of `year`+1)` local-time Date boundaries (C216 dedup). The
+ * The half-open `[Jan 1 of `year`, Jan 1 of `year`+1)` local-time Date boundaries. The
  * `new Date(year, 0, 1)` / `new Date(year + 1, 0, 1)` pair was hand-repeated at 3 sites
  * (queryTotalSpending, the year-scoped vehicle-expenses filter, getYearEnd) — each then either feeds
  * `gte(start) + lt(end)` (the half-open year filter) or `Math.floor(.getTime()/1000)` (the DateRange
@@ -237,7 +237,7 @@ export interface FinancingData {
     totalMonthlyPayments: number;
     remainingBalance: number;
     // One month's interest on each loan's CURRENT balance, summed across loans. Renamed from the
-    // misleading `interestPaidYtd` (bug #9): it is neither year-to-date nor actually paid — it's a
+    // misleading `interestPaidYtd`: it is neither year-to-date nor actually paid — it's a
     // forward estimate of this month's interest. True YTD-paid would need a payment-history sum.
     monthlyInterestEstimate: number;
     activeCount: number;
@@ -377,10 +377,10 @@ export class AnalyticsRepository {
 
   /**
    * Resolve a single fetched row's stored unit preferences to a usable value, falling back to the
-   * defaults when the row is absent OR its stored prefs don't parse (C129 dedup of the byte-identical
+   * defaults when the row is absent OR its stored prefs don't parse (dedup of the byte-identical
    * tail shared by getUserUnits + getVehicleUnits). NOTE: this is the FALLBACK-on-bad-prefs semantics;
    * getAllVehicleUnits deliberately does NOT use it — it THROWS on invalid prefs, so folding it in here
-   * would silently swallow a real data error (the C90 inverted-semantics exclusion).
+   * would silently swallow a real data error (the inverted-semantics exclusion).
    */
   private resolveUnitsOrDefault(row: { unitPreferences: unknown } | undefined): UnitPreferences {
     if (!row) return { ...DEFAULT_UNIT_PREFERENCES };
@@ -478,7 +478,7 @@ export class AnalyticsRepository {
   }
 
   /**
-   * Convert ONE fuel row's volume to the user's global volume unit (#94 convert-before-pool). The
+   * Convert ONE fuel row's volume to the user's global volume unit (convert-before-pool). The
    * `row.volume ?? 0` coalesce + the `=== 0` short-circuit (a missing/zero volume converts to 0, never
    * NaN) + the per-vehicle vehicleUnitsFor lookup were hand-repeated at the 3 volume-pooling sites
    * (buildConvertedMonthlyConsumption, buildConvertedDayOfWeekPatterns, the buildFuelStatsFromData
@@ -499,7 +499,7 @@ export class AnalyticsRepository {
 
   /**
    * Build the per-vehicle unit converters buildVehicleRadar applies to its gas-MPG + odometer metrics
-   * before the cross-fleet normalize (#94, C76). Keeps analytics-charts unit-naive: the repository owns the
+   * before the cross-fleet normalize. Keeps analytics-charts unit-naive: the repository owns the
    * convertEfficiency/convertDistance deps + the vehicleUnitsFor fallback; each closure converts a value
    * from THAT vehicle's units to the user's global units (identity when they already match, since the
    * convert fns short-circuit equal from/to). Only built on the mixed-unit (non-skip) branch.
@@ -537,7 +537,7 @@ export class AnalyticsRepository {
    * computeEfficiencyPoint would emit a ~mi/kWh value that, summed into a gas-MPG average labeled mi/gal,
    * drags it down — and worse, convertEfficiency would mis-convert that mi/kWh as if it were mi/gal.
    * Centralizing the gate here means no converted-efficiency builder can silently reintroduce the
-   * #119/#122 (C413) / #126 (C427) gas/charge contamination by forgetting it.
+   * gas/charge contamination by forgetting it.
    */
   private *convertedGasEfficiencyPoints(
     fuelRows: FuelExpenseRow[],
@@ -632,15 +632,15 @@ export class AnalyticsRepository {
   }
 
   /**
-   * Monthly consumption (volume + gas-MPG per month) with per-vehicle unit conversion — the #94 twin of
-   * buildMonthlyConsumption (C65). A mixed gal+L / mi+km fleet must convert each vehicle's volume + each
+   * Monthly consumption (volume + gas-MPG per month) with per-vehicle unit conversion — the twin of
+   * buildMonthlyConsumption. A mixed gal+L / mi+km fleet must convert each vehicle's volume + each
    * gas pair's efficiency to the user's global units BEFORE pooling into a month, else the chart sums
-   * litres into a gallons headline + averages mi/gal with km/L (NORTH_STAR #2). The common single-unit
+   * litres into a gallons headline + averages mi/gal with km/L. The common single-unit
    * fleet still takes the pure builder (skipConversion at the call site); only a mixed fleet reaches here.
    *
    * Mirrors buildMonthlyConsumption's structure exactly (volume map keyed by month, gas-pair efficiency
    * augmenting only volume-seeded months via the `if (entry)` guard, ascending sort, most-recent-12 slice)
-   * — the efficiency limb reuses convertedGasEfficiencyPoints (C64) so the gas/charge gate + band filter
+   * — the efficiency limb reuses convertedGasEfficiencyPoints so the gas/charge gate + band filter
    * stay identical and un-forgettable; the volume limb converts per row via convertVolume.
    */
   private buildConvertedMonthlyConsumption(
@@ -686,14 +686,14 @@ export class AnalyticsRepository {
 
   /**
    * Seasonal gas-MPG (avg efficiency + fillup count per season) with per-vehicle unit conversion — the
-   * #94 twin of buildSeasonalEfficiency (C69). A mixed mi/gal + km/L fleet must convert each gas pair's
+   * twin of buildSeasonalEfficiency. A mixed mi/gal + km/L fleet must convert each gas pair's
    * efficiency to the user's global units BEFORE pooling into a season, else the seasonal average mixes
-   * mi/gal with km/L (NORTH_STAR #2). The common single-unit fleet keeps the pure builder (skipConversion
+   * mi/gal with km/L. The common single-unit fleet keeps the pure builder (skipConversion
    * at the call site); only a mixed fleet reaches here.
    *
    * Mirrors buildSeasonalEfficiency's structure exactly (fillupCount counts only volume-bearing rows via
-   * isFillup — the #108 split-sibling overcount guard, UNITLESS so no conversion; efficiency buckets the
-   * converted gas points by season) — the efficiency limb reuses convertedGasEfficiencyPoints (C64) so the
+   * isFillup — the split-sibling overcount guard, UNITLESS so no conversion; efficiency buckets the
+   * converted gas points by season) — the efficiency limb reuses convertedGasEfficiencyPoints so the
    * gas/charge gate + band filter stay identical and un-forgettable.
    */
   private buildConvertedSeasonalEfficiency(
@@ -703,7 +703,7 @@ export class AnalyticsRepository {
   ): Array<{ season: string; avgEfficiency: number; fillupCount: number }> {
     const seasonData = new Map<string, { effSum: number; effCount: number; fillupCount: number }>();
 
-    // fillupCount: only volume-bearing rows (#108, the #56/#108 split-sibling overcount class). Unitless.
+    // fillupCount: only volume-bearing rows (the split-sibling overcount class). Unitless.
     for (const row of fuelRows) {
       const d = normalizeDate(row.date);
       if (!d) continue;
@@ -742,12 +742,12 @@ export class AnalyticsRepository {
 
   /**
    * Day-of-week fuel patterns (fillup count + avg cost + avg volume per weekday) with per-vehicle VOLUME
-   * conversion — the #94 twin of buildDayOfWeekPatterns (C72). avgVolume sums each fillup's `volume` across
+   * conversion — the twin of buildDayOfWeekPatterns. avgVolume sums each fillup's `volume` across
    * ALL vehicles; volume is stored in each vehicle's own unit (gal OR L), so a mixed gal+L fleet skews the
-   * per-weekday avgVolume (NORTH_STAR #2). fillupCount (a count) and avgCost ($ — currency, not unit-bearing)
+   * per-weekday avgVolume. fillupCount (a count) and avgCost ($ — currency, not unit-bearing)
    * are NOT converted. The common single-unit fleet keeps the pure builder (skipConversion at the call site).
    *
-   * Mirrors buildDayOfWeekPatterns's structure exactly (isFillup-gated count — the #113 split-sibling
+   * Mirrors buildDayOfWeekPatterns's structure exactly (isFillup-gated count — the split-sibling
    * overcount guard; totalCost/totalGallons accumulators; the same DAY_NAMES projection) — only the
    * per-row volume is converted to the user's global unit first, via the shared vehicleUnitsFor + convertVolume.
    */
@@ -944,10 +944,10 @@ export class AnalyticsRepository {
     if (vehicleId) conditions.push(eq(expenses.vehicleId, vehicleId));
     // COUNT only volume-bearing rows so the previous-year fillup count matches the
     // in-memory isFillup predicate in buildFuelStatsFromData (a split fuel sibling has
-    // volume=null and is not a fillup — bug #18). GROUP the volume SUM BY vehicle so the
+    // volume=null and is not a fillup — bug). GROUP the volume SUM BY vehicle so the
     // caller can convert each vehicle's sum to the user's global volume unit BEFORE pooling
     // — a mixed gal+L fleet otherwise sums litres with gallons into the prev-year headline
-    // (#94, NORTH_STAR #2; the prev-year sub-member the C62 current-period fix left, fixed C79).
+    // (the prev-year sub-member the current-period fix left, fixed).
     const rows = await this.db
       .select({
         vehicleId: expenses.vehicleId,
@@ -1135,9 +1135,9 @@ export class AnalyticsRepository {
   ): Promise<FinancingData['loanBreakdown']> {
     // NOTE: do NOT add `&& f.apr` — apr is `.min(0)`-valid, so a 0%-APR dealer-promo loan has apr===0
     // (falsy) and would be silently DROPPED from the breakdown chart, hiding a real active loan's
-    // principal paydown (the #92/#117 0%-APR class, 3rd site). financingType==='loan' already excludes
+    // principal paydown (the 0%-APR class, 3rd site). financingType==='loan' already excludes
     // leases; loan.apr is coalesced to 0 below for the amortization walk (which handles 0% correctly:
-    // interest = balance*0 = 0, all payment goes to principal). #139.
+    // interest = balance*0 = 0, all payment goes to principal)..
     const activeLoans = financingRows.filter((f) => f.isActive && f.financingType === 'loan');
     if (activeLoans.length === 0) return [];
 
@@ -1146,7 +1146,7 @@ export class AnalyticsRepository {
 
     // Resolve each loan's current balance, then hand the pure amortization helper the inputs +
     // the 12 month-key labels. The helper walks each balance down by its principal each month
-    // (bug #10 — balances were previously read but never decremented, so all 12 months were equal).
+    // (bug — balances were previously read but never decremented, so all 12 months were equal).
     const loans = await Promise.all(
       activeLoans.map(async (loan) => ({
         balance: await financingRepository.computeBalance(loan.id),
@@ -1201,7 +1201,7 @@ export class AnalyticsRepository {
         const bEnd = b.endDate instanceof Date ? b.endDate.getTime() : 0;
         if (bEnd !== aEnd) return bEnd - aEnd;
         // Deterministic tiebreak when two terms share an endDate (e.g. a mid-term correction): the
-        // later-STARTING term is the more current one (#50 — without this the pick was DB-row-order
+        // later-STARTING term is the more current one (— without this the pick was DB-row-order
         // dependent / nondeterministic, since the term query has no ORDER BY).
         const aStart = a.startDate instanceof Date ? a.startDate.getTime() : 0;
         const bStart = b.startDate instanceof Date ? b.startDate.getTime() : 0;
@@ -1210,11 +1210,11 @@ export class AnalyticsRepository {
       if (!latestTerm) continue;
 
       // Honour both cost shapes: an explicit monthlyCost, or a lump-sum totalCost amortized
-      // across the term span (bug #8 — `monthlyCost ?? 0` zeroed every totalCost-only term).
+      // across the term span (bug — `monthlyCost ?? 0` zeroed every totalCost-only term).
       const monthlyPremium = effectiveMonthlyPremium(latestTerm);
       const annualPremium = monthlyPremium * 12;
       // Scope the covered vehicles to the LATEST term's junctions — the same term the premium is
-      // computed from (#25). Spanning EVERY term's junctions mis-distributes when coverage changed
+      // computed from. Spanning EVERY term's junctions mis-distributes when coverage changed
       // across terms: if an old term covered {A,B,C} and the latest covers {A}, dividing the latest
       // premium by 3 understates A and invents a phantom premium for the dropped B,C (and inflates
       // costByCarrier.vehicleCount). Aggregate totals are unaffected (added once per policy); this
@@ -1292,7 +1292,7 @@ export class AnalyticsRepository {
     const start = toDate(term.startDate);
     const end = toDate(term.endDate);
     // monthKeysInRange anchors to day-1 per month, so a term starting on day 29-31 no longer
-    // skips a short month (the setMonth-overshoot bug — cycle 14).
+    // skips a short month (the setMonth-overshoot bug).
     for (const key of monthKeysInRange(start, end)) {
       monthlyMap.set(key, (monthlyMap.get(key) ?? 0) + monthlyPremium);
     }
@@ -1334,15 +1334,15 @@ export class AnalyticsRepository {
   /**
    * Assemble the TCO total from the categorized buckets, applying two accounting rules:
    *
-   * - #28 (C121): purchasePrice is a one-time ACQUISITION cost — include it only in the all-time
-   *   (no-`year`) total, never in a year-scoped window (whose expenses are already date-filtered).
-   * - #27 (C154, Angelo-approved option c): the `financingInterest` bucket sums WHOLE financing-sourced
-   *   expense rows — full loan/lease payments (principal + interest), not interest alone (computeBalance
-   *   proves payments retire principal: financing/repository.ts:68). Counting both purchasePrice AND those
-   *   payments double-counts the principal (a $30k car with ~$33k of payments → TCO ≈ $63k). So when
-   *   purchasePrice is counted, EXCLUDE the financing-payment rows (they retire the already-counted price,
-   *   a balance-transfer, not new spend). When purchasePrice is NOT counted (no price, or a year window),
-   *   the financing outflow IS the cost signal for that window, so keep it.
+   * -: purchasePrice is a one-time ACQUISITION cost — include it only in the all-time
+   *  (no-`year`) total, never in a year-scoped window (whose expenses are already date-filtered).
+   * - Option c: the `financingInterest` bucket sums WHOLE financing-sourced
+   *  expense rows — full loan/lease payments (principal + interest), not interest alone (computeBalance
+   *  proves payments retire principal: financing/repository.ts:68). Counting both purchasePrice AND those
+   *  payments double-counts the principal (a $30k car with ~$33k of payments → TCO ≈ $63k). So when
+   *  purchasePrice is counted, EXCLUDE the financing-payment rows (they retire the already-counted price,
+   *  a balance-transfer, not new spend). When purchasePrice is NOT counted (no price, or a year window),
+   *  the financing outflow IS the cost signal for that window, so keep it.
    *
    * Returns `countedFinancingInterest` — the financing value actually included (0 when excluded) — so the
    * caller can report a bucket that matches the total (keeps the breakdown summing: Property 14 / Req 10.2).
@@ -1386,7 +1386,7 @@ export class AnalyticsRepository {
         .select({
           // vehicleId is REQUIRED for the fleet view (no vehicleId arg): without grouping, the
           // date-ordered multi-vehicle list would pair two DIFFERENT cars' consecutive rows and
-          // subtract their odometers → a phantom efficiency point (#54). forEachVehiclePair groups
+          // subtract their odometers → a phantom efficiency point. forEachVehiclePair groups
           // by vehicle first, mirroring the MPG/cost charts (computeMpgAndCostPerMile).
           vehicleId: expenses.vehicleId,
           date: expenses.date,
@@ -1402,7 +1402,7 @@ export class AnalyticsRepository {
       if (rows.length < 2) return [];
       const points: FuelEfficiencyPoint[] = [];
       forEachVehiclePair(rows, (current, previous) => {
-        // gasEfficiencyPoint: the fuel-efficiency TREND is gas MPG — exclude PHEV charge mi/kWh (#126/C427).
+        // gasEfficiencyPoint: the fuel-efficiency TREND is gas MPG — exclude PHEV charge mi/kWh.
         const point = gasEfficiencyPoint(current as FuelRow, previous as FuelRow);
         if (point) points.push(point);
       });
@@ -1557,9 +1557,9 @@ export class AnalyticsRepository {
       // Sort by vehicleId then date for functions that need consecutive same-vehicle pairs
       const fuelRowsByVehicle = sortByVehicleThenDate(fuelRows);
 
-      // #94 (C58): convert each vehicle's distance to the user's global units BEFORE pooling the
+      // Convert each vehicle's distance to the user's global units BEFORE pooling the
       // fleet-wide totalDistance scalar — a mixed mi+km fleet otherwise sums miles with kilometres
-      // (NORTH_STAR #2). Mirrors getCrossVehicle: skip the conversion when every vehicle already
+      // Mirrors getCrossVehicle: skip the conversion when every vehicle already
       // matches the user's units (a no-op for the common single-unit case).
       const skipConversion = this.allVehiclesMatchUnits(vehicleUnitsMap, userUnits);
 
@@ -1606,17 +1606,17 @@ export class AnalyticsRepository {
     // A "fillup" is a fuel PURCHASE — it carries an actual volume. A split fuel expense
     // creates one sibling row per vehicle, but only the amount is split: siblings have
     // volume=null (see ExpenseSplitService.createSiblings). Counting raw rows would inflate
-    // the fillup count by (#vehicles − 1) per split fillup in the cross-fleet view (bug #18).
+    // the fillup count by (#vehicles − 1) per split fillup in the cross-fleet view.
     // Count only volume-bearing rows — the same predicate fillupDetails already uses — so a
     // split fillup counts once and a volume-less row never counts as a fillup. The volume/
     // cost SUMS were always correct (null volume contributes 0); only the COUNTS were wrong.
-    // isFillup is the shared predicate (analytics-charts.ts, C403) — one source of truth.
+    // isFillup is the shared predicate (analytics-charts.ts) — one source of truth.
     const currentYearFillups = fuelRows.filter(isFillup).length;
     const previousYearFillups = prevYearAgg.count;
     // "This/Last Month" are CALENDAR months (the FE labels them so) — match BOTH month AND year.
     // fuelRows spans the whole requested range (default 'all' = multi-year), so a year-less
-    // getMonth() match folded every prior year's same-month fillups into "This Month" (#86,
-    // NORTH_STAR #2 correct-for-everyone). "Last Month" is the calendar month before now, which
+    // getMonth() match folded every prior year's same-month fillups into "This Month".
+    // "Last Month" is the calendar month before now, which
     // rolls into the previous YEAR when now is January.
     const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
     const prevMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
@@ -1631,9 +1631,9 @@ export class AnalyticsRepository {
     const currentMonthFillups = fuelRows.filter((r) => isFillup(r) && inCurrentMonth(r)).length;
     const prevMonthFillups = fuelRows.filter((r) => isFillup(r) && inPrevMonth(r)).length;
 
-    // #94 (C62): convert each row's volume to the user's global volume unit BEFORE pooling, so a mixed
+    // Convert each row's volume to the user's global volume unit BEFORE pooling, so a mixed
     // gal+L fleet no longer sums gallons with litres into the headline volume + fillupDetails
-    // (NORTH_STAR #2). Mirrors the C58 distance member + computeConvertedTotalDistance's per-vehicle
+    // Mirrors the distance member + computeConvertedTotalDistance's per-vehicle
     // pattern; skipConversion short-circuits the common single-unit case (a no-op there).
     const volumeInUserUnits = (row: FuelExpenseRow): number =>
       // skipConversion short-circuits to the raw value (the common single-unit fleet); otherwise the
@@ -1643,10 +1643,10 @@ export class AnalyticsRepository {
     const sumGallons = (rows: FuelExpenseRow[]) =>
       rows.reduce((s, r) => s + volumeInUserUnits(r), 0);
     const currentYearGallons = sumGallons(fuelRows);
-    // #94 (C79, the LAST sub-member): previousYearGallons is now a PER-VEHICLE group-sum from
+    // previousYearGallons is now a PER-VEHICLE group-sum from
     // queryFuelAggregates (volumeByVehicle), so each vehicle's prev-year litres/gallons converts to the
     // user's global volume unit BEFORE pooling — a mixed gal+L fleet no longer sums litres with gallons
-    // into the "Last Period" comparison (the prev-year twin of the C62 current-period fix). skipConversion
+    // into the "Last Period" comparison (the prev-year twin of the current-period fix). skipConversion
     // short-circuits the common single-unit case to a plain sum (a no-op).
     const previousYearGallons = skipConversion
       ? [...prevYearAgg.volumeByVehicle.values()].reduce((s, v) => s + v, 0)
@@ -1680,9 +1680,9 @@ export class AnalyticsRepository {
     // Distance must be summed PER VEHICLE (max-min within each car), then totaled. Pooling
     // every vehicle's odometer readings into one max-min gives garbage for a multi-vehicle
     // user (e.g. a car at 12k mi and one at 95k mi would report ~83k). Delegate to the shared
-    // computeConvertedTotalDistance (C392), now threading the REAL per-vehicle units (#94, C58):
+    // computeConvertedTotalDistance, now threading the REAL per-vehicle units:
     // each vehicle's span is converted to the user's global distance unit BEFORE summing, so a
-    // mixed mi+km fleet no longer pools miles with kilometres (NORTH_STAR #2). skipConversion
+    // mixed mi+km fleet no longer pools miles with kilometres. skipConversion
     // short-circuits the common single-unit case. ONE source of truth for the per-vehicle
     // group→max-min→sum, in lockstep with the year-end + cross-vehicle paths.
     const totalDistance = this.computeConvertedTotalDistance(
@@ -1785,15 +1785,15 @@ export class AnalyticsRepository {
     const maintenanceRows = allExpenses.filter((e) => e.category === 'maintenance');
     return {
       maintenanceTimeline: buildMaintenanceTimeline(maintenanceRows, new Date()),
-      // #94 (C69): a MIXED-unit fleet converts each gas pair's efficiency to the user's global units
-      // BEFORE pooling into a season, so mi/gal and km/L are not averaged raw (NORTH_STAR #2). The common
+      // A MIXED-unit fleet converts each gas pair's efficiency to the user's global units
+      // BEFORE pooling into a season, so mi/gal and km/L are not averaged raw. The common
       // single-unit fleet keeps the pure builder (skipConversion). seasonalEfficiency's fillupCount limb
-      // is unitless; only avgEfficiency needed the convert. (dayOfWeekPatterns volume fixed C72,
-      // vehicleRadar gas-MPG+odometer fixed C76 — the #94 fuel-ADVANCED builders are now all converted.)
+      // is unitless; only avgEfficiency needed the convert. (dayOfWeekPatterns volume fixed,
+      // vehicleRadar gas-MPG+odometer fixed — the fuel-ADVANCED builders are now all converted.)
       seasonalEfficiency: skipConversion
         ? buildSeasonalEfficiency(fuelRowsByVehicle)
         : this.buildConvertedSeasonalEfficiency(fuelRowsByVehicle, vehicleUnitsMap, userUnits),
-      // #94 (C76): vehicleRadar normalizes per-vehicle gas-MPG + odometer ACROSS the fleet; a mixed
+      // vehicleRadar normalizes per-vehicle gas-MPG + odometer ACROSS the fleet; a mixed
       // mi+km/gal+L fleet must convert each vehicle's two unit-bearing metrics to the user's global units
       // BEFORE the min/max normalize, else the ranking inverts (a km/L car scored against mpg). Pass the
       // converters only on the mixed branch; same-unit fleet keeps the raw builder (no-op).
@@ -1805,8 +1805,8 @@ export class AnalyticsRepository {
             vehicleNameMap,
             this.radarUnitConverters(vehicleUnitsMap, userUnits)
           ),
-      // #94 (C72): avgVolume sums each fillup's volume across the fleet; a mixed gal+L fleet must convert
-      // per-vehicle before pooling (NORTH_STAR #2). fillupCount + avgCost ($) are unit-free. Same-unit
+      // avgVolume sums each fillup's volume across the fleet; a mixed gal+L fleet must convert
+      // per-vehicle before pooling. fillupCount + avgCost ($) are unit-free. Same-unit
       // fleet keeps the pure builder.
       dayOfWeekPatterns: skipConversion
         ? buildDayOfWeekPatterns(fuelRows)
@@ -2078,7 +2078,7 @@ export class AnalyticsRepository {
       const { vehicleDetails, totalMonthlyPremiums, totalAnnualPremiums, carrierMap, monthlyMap } =
         this.buildInsuranceDetails(activePolicies, termRows, junctionRows, vehicleNameMap);
 
-      // #51: count only active policies that have at least one term. A TERM-LESS active policy
+      // Count only active policies that have at least one term. A TERM-LESS active policy
       // contributes $0 (buildInsuranceDetails does `if (!latestTerm) continue`), so counting it in
       // activePoliciesCount made the headline internally inconsistent — "N active policies" but the
       // premium totals summed over fewer. Use the SAME has-a-term predicate the premium path gates on.
@@ -2203,7 +2203,7 @@ export class AnalyticsRepository {
             : now;
       // costPerMonth must divide the (windowed) total by a matching span. All-time → purchase→now.
       // Year-scoped → the months of THAT year the vehicle was owned (≤12), so a year-filtered
-      // numerator isn't divided by a full-ownership denominator (#28). Both clamp to ≥1.
+      // numerator isn't divided by a full-ownership denominator. Both clamp to ≥1.
       const ownershipMonths = year
         ? Math.max(1, monthsOwnedInYear(ownershipStart, now, year))
         : Math.max(1, monthsBetween(ownershipStart, now));
@@ -2217,7 +2217,7 @@ export class AnalyticsRepository {
         vehicleName,
         purchasePrice,
         ...costs,
-        // Override the raw bucket with the COUNTED value (0 when excluded under #27 option c) so the
+        // Override the raw bucket with the COUNTED value (0 when excluded under option c) so the
         // returned financingInterest matches what the total includes — keeps the breakdown summing.
         financingInterest: countedFinancingInterest,
         totalCost,

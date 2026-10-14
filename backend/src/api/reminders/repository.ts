@@ -52,7 +52,7 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
   /**
    * Insert the reminder→vehicle junction rows inside the caller's transaction. One source of truth
    * for the `for (vehicleId) insert(reminderVehicles)` loop the create + update-replace paths repeated
-   * byte-identically (C326 dedup; mirrors insurance/repository.ts insertJunctionRowsSync). A future change
+   * byte-identically (dedup; mirrors insurance/repository.ts insertJunctionRowsSync). A future change
    * to the junction write (batch insert, a new column) then lands once, not twice.
    */
   private async insertVehicleJunctions(
@@ -66,10 +66,10 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
   }
 
   /**
-   * SYNCHRONOUS sibling of insertVehicleJunctions (#127 class, C504). bun-sqlite is a sync dialect, so the
+   * SYNCHRONOUS sibling of insertVehicleJunctions. bun-sqlite is a sync dialect, so the
    * create/update-replace transactions run their callbacks synchronously to get real atomic rollback (an
-   * async callback autocommits each write alone — the C151 footgun, which here could leave a reminder with
-   * NO vehicles, the #97 vehicle-less-but-active state). `.run()` executes inline inside the caller's tx.
+   * async callback autocommits each write alone — the footgun, which here could leave a reminder with
+   * NO vehicles, the vehicle-less-but-active state). `.run()` executes inline inside the caller's tx.
    */
   private insertVehicleJunctionsSync(
     tx: DrizzleTransaction,
@@ -256,7 +256,7 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
 
   /**
    * Whether a mileage notification already exists for this reminder + odometer milestone.
-   * App-level guard for the mileage dedup (the C22 partial unique index
+   * App-level guard for the mileage dedup (the partial unique index
    * `(reminderId, dueOdometer) WHERE dueOdometer IS NOT NULL` is the DB backstop). A mileage axis
    * has no auto-re-arm — re-arm is the explicit mark-serviced path — so one notification per
    * milestone is correct, and re-running the trigger must be a no-op.
@@ -310,9 +310,9 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
    */
   async createWithVehicles(data: NewReminder, vehicleIds: string[]): Promise<ReminderWithVehicles> {
     try {
-      // SYNCHRONOUS transaction (#127 class, C504): insert the reminder THEN its vehicle-junction rows.
+      // SYNCHRONOUS transaction: insert the reminder THEN its vehicle-junction rows.
       // Under the old async callback a throw on the junction insert left the reminder row committed with
-      // zero vehicles (the #97 vehicle-less-but-active state, skipped forever by the trigger). Running
+      // zero vehicles (the vehicle-less-but-active state, skipped forever by the trigger). Running
       // synchronously keeps both in ONE real transaction that rolls back atomically.
       return transaction((tx) => {
         const reminder = tx.insert(reminders).values(data).returning().get();
@@ -341,9 +341,9 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     vehicleIds?: string[]
   ): Promise<ReminderWithVehicles> {
     try {
-      // SYNCHRONOUS transaction (#127 class, C504): the replace path DELETEs all junction rows then
+      // SYNCHRONOUS transaction: the replace path DELETEs all junction rows then
       // re-inserts them. Under the old async callback a throw on the re-insert left the reminder with its
-      // vehicles deleted and none re-added — the #97 vehicle-less-but-active state, silently. Running
+      // vehicles deleted and none re-added — the vehicle-less-but-active state, silently. Running
       // synchronously keeps the verify + update + delete + re-insert in ONE real transaction that rolls
       // back atomically.
       return transaction((tx) => {
@@ -443,7 +443,7 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
   }
 
   /**
-   * Deactivate any of the user's ACTIVE reminders that have NO remaining vehicles (#97, C40). When a
+   * Deactivate any of the user's ACTIVE reminders that have NO remaining vehicles. When a
    * vehicle is deleted, its `reminder_vehicles` junction rows cascade away (schema onDelete:cascade), but
    * the reminder ROW survives — a reminder whose sole/last vehicle was the deleted one is left
    * `is_active=1` with zero vehicles, which the trigger then skips `no_vehicles` every run forever with no
@@ -473,11 +473,11 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
   }
 
   /**
-   * Prune a deleted vehicle from every reminder's `expenseSplitConfig` blob and renormalize (#88, C48).
+   * Prune a deleted vehicle from every reminder's `expenseSplitConfig` blob and renormalize.
    * Unlike the reminder_vehicles junction (FK onDelete:cascade), the split-config JSON is NOT FK-managed,
    * so a deleted vehicle's leg lingers in the blob — and on the next trigger `createExpenseFromReminder`
    * builds siblings from the blob's vehicleIds → an INSERT for the dead vehicleId → an FK violation that
-   * (the C151 async-tx footgun) leaves the surviving legs partially committed. Call this BEFORE
+   * (the async-tx footgun) leaves the surviving legs partially committed. Call this BEFORE
    * `deactivateVehicleless` on a vehicle delete: each affected config is pruned via
    * `pruneVehicleFromSplitConfig` (drop the leg, rescale a percentage split, keep absolute amounts) when
    * ≥2 legs remain, else the blob is CLEARED to null so the reminder falls back to the single-vehicle
@@ -558,7 +558,7 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
         // A MILEAGE notification carries dueDate=NULL (its milestone lives in dueOdometer), and NULLs
         // sort LAST under `DESC` — so ordering by dueDate sank every mileage notification beneath every
         // time notification regardless of when it fired, and the limit(100) truncated the mileage axis
-        // entirely for a user with ≥100 time notifications (a just-due service buried/invisible — #142,
+        // entirely for a user with ≥100 time notifications (a just-due service buried/invisible —,
         // feature-disabling for the maintenance-schedule mileage axis). createdAt is non-null on every
         // row ($defaultFn) and is the real "when it fired" order for the feed.
         .where(and(...conditions))

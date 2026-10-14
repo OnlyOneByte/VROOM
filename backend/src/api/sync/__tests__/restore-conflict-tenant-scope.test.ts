@@ -1,11 +1,11 @@
 /**
- * Security regression (C109, bug #20): merge-mode conflict detection must be TENANT-SCOPED.
+ * Security regression: merge-mode conflict detection must be TENANT-SCOPED.
  *
  * `detectConflicts` probed `SELECT * FROM <table> WHERE id IN (backup ids)` with NO ownership
  * filter, then returned the full existing DB row as `localData` in the `conflicts` response. So a
  * merge-mode restore whose row ids COLLIDE with another user's rows leaked that user's full row
  * contents (VIN, amounts, …) back to the importer — a cross-tenant READ leak, the same class as the
- * C145 restore write-stamp. The fix scopes every probe to the importer's own rows (userId column for
+ * restore write-stamp. The fix scopes every probe to the importer's own rows (userId column for
  * vehicles/expenses/insurance/photos; owned-parent FK for financing/photoRefs).
  *
  * This proves it: seed a VICTIM vehicle, then restore (merge) a backup whose vehicle id is tampered
@@ -78,7 +78,7 @@ describe('restore merge conflict detection is tenant-scoped (cross-tenant read g
     // Pre-fix: detectConflicts matched the victim's row and returned it in `conflicts[].localData`
     // — the leak. Post-fix: the probe is scoped to the importer, so the victim's id is NOT seen as a
     // conflict; merge then proceeds to insert and the DB's PK constraint rejects the colliding id
-    // (the C108-audited "PK collision throws + rolls back, no overwrite"). EITHER outcome is secure —
+    // (the-audited "PK collision throws + rolls back, no overwrite"). EITHER outcome is secure —
     // the one thing that must never happen is the victim's row appearing in the response.
     let conflicts: NonNullable<
       Awaited<ReturnType<typeof restoreService.restoreFromBackup>>['conflicts']

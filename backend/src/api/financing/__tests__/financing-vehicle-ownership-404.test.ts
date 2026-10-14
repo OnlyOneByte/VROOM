@@ -1,5 +1,5 @@
 /**
- * Vehicle-ownership 404 guard on the financing GET + POST routes (C294 arch characterization).
+ * Vehicle-ownership 404 guard on the financing GET + POST routes (arch characterization).
  *
  * `GET` and `POST /api/v1/financing/vehicles/:vehicleId/financing` both gate on the vehicle existing
  * AND belonging to the caller before doing any financing work. Financing was the LONE route module
@@ -7,7 +7,7 @@
  * `throw new HTTPException(404, { message: 'Vehicle not found' })`) while every sibling module
  * (expenses/insurance/odometer/analytics/vehicles) uses the shared `validateVehicleOwnership`.
  *
- * This pins the OBSERVABLE 404 (status + message) on both routes so the C294 refactor — swapping the
+ * This pins the OBSERVABLE 404 (status + message) on both routes so the refactor — swapping the
  * inline blocks for `validateVehicleOwnership`, which throws `NotFoundError('Vehicle')` → the same
  * 404 + "Vehicle not found" message via the global error handler — is provably behavior-preserving
  * for every consumer. (The raw error envelope's `code` field shifts from 'HTTPException' to
@@ -31,7 +31,7 @@ afterEach(() => ctx.close());
 
 const MISSING_VEHICLE = 'no-such-vehicle-id';
 
-describe('financing routes 404 when the vehicle is missing / not owned (C294)', () => {
+describe('financing routes 404 when the vehicle is missing / not owned', () => {
   test('GET financing for a nonexistent vehicle → 404 "Vehicle not found"', async () => {
     const res = await ctx.authed('GET', `/api/v1/financing/vehicles/${MISSING_VEHICLE}/financing`);
     expect(res.status).toBe(404);

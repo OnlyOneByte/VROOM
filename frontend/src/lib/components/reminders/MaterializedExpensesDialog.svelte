@@ -27,7 +27,7 @@
 	// Fetch (recurring-expenses T6 "materialized N expenses" view) whenever the dialog opens for a
 	// reminder. Keyed on `open:reminderId` so re-opening a different reminder re-fetches, and closing
 	// then re-opening the same one refreshes. The seam (GET /reminders/:id/expenses → findBySource) is
-	// ownership-checked + user-scoped server-side (C122).
+	// ownership-checked + user-scoped server-side.
 	let lastKey = $state('');
 	$effect(() => {
 		const key = `${open}:${reminderId ?? ''}`;

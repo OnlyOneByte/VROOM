@@ -4,11 +4,11 @@
  * gains/loses a token and this list doesn't track it, a theme variant would either miss a key (a visual
  * leak — the token keeps the previous theme's value) or carry a dead one. This source-scans app.css's
  * `:root` (light) and `.dark` (dark) blocks and pins three invariants:
- *   1. light and dark declare the SAME key set (per-variant parity — every variant must define every key);
- *   2. `THEME_TOKEN_KEYS` equals that set EXACTLY (no missing, no extra);
- *   3. `--radius` (the `:root`-only, variant-invariant layout token) is intentionally EXCLUDED.
+ *  1. light and dark declare the SAME key set (per-variant parity — every variant must define every key);
+ *  2. `THEME_TOKEN_KEYS` equals that set EXACTLY (no missing, no extra);
+ *  3. `--radius` (the `:root`-only, variant-invariant layout token) is intentionally EXCLUDED.
  *
- * Source-scan over the live app.css (the C25/C271 merge-surviving idiom) — no DOM, no runtime theme apply.
+ * Source-scan over the live app.css (the merge-surviving idiom) — no DOM, no runtime theme apply.
  */
 
 import { readFileSync } from 'node:fs';
@@ -61,16 +61,16 @@ describe('THEME_TOKEN_KEYS mirrors the app.css per-variant token set (T4)', () =
 });
 
 /**
- * C186 (deep-review) — the `@theme inline` Tailwind color aliases must reference ONLY engine-managed raw
+ * The `@theme inline` Tailwind color aliases must reference ONLY engine-managed raw
  * tokens. app.css maps each Tailwind color utility via `--color-<x>: var(--<rawToken>)`. The theme engine
  * (T7) swaps the RAW tokens per `data-theme`; a Tailwind utility re-resolves through its `--color-*` alias.
  * So if a `--color-foo: var(--foo)` alias references a raw token NOT in THEME_TOKEN_KEYS, switching themes
  * would leave `--color-foo` resolving to a stale/unmanaged value — a visual leak the registry/token guards
- * can't see. Certified firsthand (C186) that today all 32 color aliases map 1:1 onto the 32 managed keys;
+ * can't see. Certified firsthand that today all 32 color aliases map 1:1 onto the 32 managed keys;
  * this pins it so a NEW Tailwind color alias (a routine app.css edit) can't land without adding its raw
  * token to the engine (THEME_TOKEN_KEYS + the registry).
  */
-describe('@theme inline color aliases reference only engine-managed tokens (C186)', () => {
+describe('@theme inline color aliases reference only engine-managed tokens', () => {
   // The `--color-*: var(--x)` aliases inside the `@theme inline { ... }` block.
   const themeBlock = APP_CSS.match(/@theme[^{]*\{([\s\S]*?)\}/)?.[1] ?? '';
   const aliasedRawTokens = new Set<string>();

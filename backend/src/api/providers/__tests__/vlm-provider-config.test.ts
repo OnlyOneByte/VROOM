@@ -1,15 +1,15 @@
 /**
  * VLM (vision-LLM) provider domain — config validation + encrypted-credential guard (vlm-receipt-parsing
- * T1, C509). A VLM provider is a NEW DOMAIN ('vlm') in the EXISTING domain-agnostic user_providers system:
+ * T1). A VLM provider is a NEW DOMAIN ('vlm') in the EXISTING domain-agnostic user_providers system:
  * the api key rides the encrypted `credentials` blob exactly like a storage refreshToken/S3 secret, and
  * `config` carries the non-secret model name + optional baseUrl. NO schema change.
  *
  * These run through the REAL stack (middleware → requireAuth → zValidator → handler → DB) via the
  * in-process harness, and pin the load-bearing invariants T1 establishes:
  *  - the api key is ENCRYPTED AT REST (the raw user_providers.credentials row is NOT the plaintext key)
- *    and is NEVER echoed in the API response (the formatProviderResponse secret-strip, SAX-03);
- *  - the per-type required-field gate fails FAST at CREATE *and* at PUT (the #103/#123 both-paths
- *    discipline) so a row the parser can never instantiate with can never persist;
+ *  and is NEVER echoed in the API response (the formatProviderResponse secret-strip, SAX-03);
+ *  - the per-type required-field gate fails FAST at CREATE *and* at PUT (the both-paths
+ *  discipline) so a row the parser can never instantiate with can never persist;
  *  - a config-only PUT (changing the model) does NOT falsely demand the apiKey be re-sent;
  *  - domain↔type consistency (a VLM type belongs only in the 'vlm' domain);
  *  - ollama may be keyless (the self-hosted, no-data-leaves-host path).
@@ -136,7 +136,7 @@ describe('POST /api/v1/providers — VLM domain (T1)', () => {
   });
 });
 
-describe('PUT /api/v1/providers/:id — VLM domain (T1, the #123 both-paths gate)', () => {
+describe('PUT /api/v1/providers/:id — VLM domain (T1, the both-paths gate)', () => {
   async function createVlm(): Promise<string> {
     const res = await ctx.authed('POST', '/api/v1/providers', vlmBody());
     expect(res.status).toBe(201);

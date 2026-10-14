@@ -92,7 +92,7 @@ routes.post('/', syncRateLimiter, idempotency({ required: false }), async (c) =>
     );
   }
 
-  // Honest HTTP status (#44): a backup where every attempted provider failed must NOT report 200.
+  // Honest HTTP status: a backup where every attempted provider failed must NOT report 200.
   // failed → 502 (upstream provider failure), partial → 207 Multi-Status (some succeeded, some did
   // not — the failed ones will retry since the sync anchor was not advanced). success/noop → 200.
   if (result.outcome === 'failed') {

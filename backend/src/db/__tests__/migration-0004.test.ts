@@ -1,12 +1,12 @@
 /**
- * Migration 0004: Relax next_due_date / due_date to nullable (cycle 22, T3).
+ * Migration 0004: Relax next_due_date / due_date to nullable (T3).
  *
  * This is the high-risk rebuild deferred from T1. Relaxing the two NOT NULL date columns forces a
  * SQLite table rebuild of both `reminders` and `reminder_notifications`. The naive (drizzle-
  * generated) order drops `reminders` while the child tables (`reminder_vehicles`,
  * `reminder_notifications`) still hold rows — and because both children have ON DELETE CASCADE and
  * `PRAGMA foreign_keys=OFF` is a NO-OP inside the migrator's transaction, that DROP cascades and
- * silently wipes every child row (the C15 lesson). The hand-authored 0004 stashes children in
+ * silently wipes every child row (the lesson). The hand-authored 0004 stashes children in
  * holding tables, empties the live children before the cascade-prone DROP, then refills them.
  *
  * These tests are the proof gate: they apply 0004 with foreign_keys ON inside the same BEGIN/COMMIT

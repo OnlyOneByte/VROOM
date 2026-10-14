@@ -124,9 +124,9 @@
 
 	function openEdit(claim: InsuranceClaim) {
 		editingId = claim.id;
-		// Local calendar date, not a bare UTC `.split('T')[0]` (#138 sibling): the save persists via
+		// Local calendar date, not a bare UTC `.split('T')[0]`: the save persists via
 		// dateOnlyToISO → noon-local, so slicing the UTC date shifts the claim date back a day on edit for
-		// UTC+13/+14 users. toDateInputValue reads local Y/M/D, matching the InsuranceTermForm + #131 fix.
+		// UTC+13/+14 users. toDateInputValue reads local Y/M/D, matching the InsuranceTermForm + fix.
 		claimDate = claim.claimDate ? toDateInputValue(claim.claimDate) : '';
 		vehicleId = claim.vehicleId ?? '';
 		claimType = claim.claimType;

@@ -113,7 +113,7 @@ describe('insurance policy deletion cascades photo cleanup to itself + claims', 
     ).toBe(0);
   });
 
-  // #57 (C167 deep-review): a costed term auto-materializes a premium expense (hooks.createTermExpenses,
+  // A costed term auto-materializes a premium expense (hooks.createTermExpenses,
   // sourceType:'insurance_term'). Expenses link to terms by plain text columns, NOT an FK, so the term
   // cascade-delete leaves the expense ORPHANED (still summed into TCO insurance cost forever) unless the
   // DELETE-policy route deletes it explicitly — which DELETE-term/UPDATE-term did but policy-delete didn't.

@@ -1,13 +1,13 @@
 /**
- * HTTP characterization of GET /api/v1/reminders/recurring-cost (recurring-expenses T7 backend, C116).
+ * HTTP characterization of GET /api/v1/reminders/recurring-cost (recurring-expenses T7 backend).
  *
- * The route exposes the C111 recurringCostSummary over the user's ACTIVE expense reminders, normalized
+ * The route exposes the recurringCostSummary over the user's ACTIVE expense reminders, normalized
  * to a monthly run-rate — the endpoint the T7 dashboard widget (eyes-on) will fetch. Goes through the
  * REAL stack (route → reminderRepository.findByUserId → reminder-cost helper). Pins:
- *   - a $100 monthly + a $1200 yearly expense reminder → count 2, monthlyTotal $200 ($100 + $100/mo),
- *   - a notification reminder contributes nothing (count/total unchanged),
- *   - a fresh user with no reminders → a clean zero,
- *   - the summary is user-scoped (another user's reminders don't leak in).
+ *  - a $100 monthly + a $1200 yearly expense reminder → count 2, monthlyTotal $200 ($100 + $100/mo),
+ *  - a notification reminder contributes nothing (count/total unchanged),
+ *  - a fresh user with no reminders → a clean zero,
+ *  - the summary is user-scoped (another user's reminders don't leak in).
  *
  * createTestApp() rewrites env + dynamic-imports DB-bound modules, so keep static imports to the
  * harness + bun:test.

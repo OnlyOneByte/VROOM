@@ -40,9 +40,9 @@ describe('parseZipBackup zip-bomb guard', () => {
     expect(bombBuffer.length).toBeLessThan(CONFIG.backup.maxFileSize);
 
     // Rejected before inflating — by EITHER pre-inflation guard. An all-zeros bomb is both
-    // over the total-size cap AND absurdly compressible, so the #22 ratio guard (which runs
+    // over the total-size cap AND absurdly compressible, so the ratio guard (which runs
     // first) is what actually catches this shape now; the total-size guard remains the backstop
-    // for a declared-size lie that keeps a plausible ratio (covered by the #22 block below).
+    // for a declared-size lie that keeps a plausible ratio (covered by the block below).
     await expect(backupService.parseZipBackup(bombBuffer)).rejects.toThrow(
       /decompress|compression ratio|zip bomb/i
     );
@@ -66,10 +66,10 @@ describe('parseZipBackup zip-bomb guard', () => {
   });
 });
 
-// #22 (C55): the total-uncompressed sum trusts header.size, which is ATTACKER-DECLARED — a bomb can
+// The total-uncompressed sum trusts header.size, which is ATTACKER-DECLARED — a bomb can
 // declare a small size to pass the sum, then inflate to GB on getData(). The per-entry compression-RATIO
 // cap (compressedSize is the real in-file byte count) catches that before any inflation.
-describe('parseZipBackup compression-ratio guard (#22)', () => {
+describe('parseZipBackup compression-ratio guard', () => {
   test('rejects an entry whose compression ratio exceeds the cap, even when the total size is under the cap', async () => {
     const { backupService } = await import('../backup');
     const { CONFIG } = await import('../../../config');

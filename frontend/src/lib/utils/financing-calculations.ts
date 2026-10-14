@@ -47,7 +47,7 @@ const DEV = import.meta.env.DEV;
  * month (Aug 31 + 1mo → Oct 1, since Sept has no 31st; Jan 31 + 1mo → Mar 3), silently shifting a
  * payment/payoff/lease-end date into the wrong month. This mirrors the clamp `calculatePayoffDateFromStart`
  * already used inline (detect the rolled day → `setDate(0)` to the intended month's last day) and is the
- * ONE source of truth for it across this file (the #90/#91/#92 financing-math defect family). Returns a
+ * ONE source of truth for it across this file (the financing-math defect family). Returns a
  * fresh Date; does not mutate the input.
  */
 function addMonthsClamped(date: Date, months: number): Date {
@@ -110,7 +110,7 @@ function calculateAmortizationScheduleImpl(
 			const interestAmount = remainingBalance * monthlyRate;
 			const principalAmount = Math.min(financing.paymentAmount - interestAmount, remainingBalance);
 
-			// Negative-amortization guard (C161): if the payment doesn't cover the period's interest,
+			// Negative-amortization guard: if the payment doesn't cover the period's interest,
 			// principalAmount is negative and `remainingBalance - principalAmount` would GROW the balance
 			// every period — emitting rows with negative principal + a climbing balance into the displayed
 			// amortization table (and into derivePaymentEntries' totalPrincipalPaid/totalInterestPaid).
@@ -293,9 +293,9 @@ export const calculateAmortizationSchedule = memoizeMulti(calculateAmortizationS
  * Walk a loan balance down month-by-month at a fixed payment, returning the number of months to
  * pay it off and the total interest paid. Stops at `maxMonths` (the runaway guard) or when a
  * payment no longer covers the period's interest (the negative-amortization guard — principal ≤ 0,
- * the same break the displayed schedule uses; C161 records that a hand-copied loop once LOST this
+ * the same break the displayed schedule uses; records that a hand-copied loop once LOST this
  * guard, which is exactly why this is now ONE function). Pure; `monthlyRate` 0 ⇒ interest 0 ⇒ the
- * full payment retires principal (the 0%-APR path, #92). Extracted C299 — `calculateExtraPaymentImpact`
+ * full payment retires principal (the 0%-APR path). Extracted — `calculateExtraPaymentImpact`
  * ran this identical loop twice (original vs. extra payment), the only difference being the payment.
  */
 function simulateAmortization(
@@ -340,7 +340,7 @@ function calculateExtraPaymentImpactImpl(
 		// genuinely shorten the term (monthsSaved > 0) even though interestSaved is $0. The old guard
 		// `!financing.apr || financing.apr <= 0` lumped every 0%-APR loan in with leases and returned a
 		// flat monthsSaved:0, so the PaymentPlannerDialog showed "0 mos" for an interest-free loan where
-		// an extra payment clearly shortens the payoff (#92). The amortization loop below already handles
+		// an extra payment clearly shortens the payoff. The amortization loop below already handles
 		// 0% correctly — monthlyRate 0 → interest 0 → the full payment goes to principal each month — so
 		// the fix is simply to let 0%-APR loans through and compute the rate as 0.
 		if (financing.financingType !== 'loan') {
@@ -385,9 +385,9 @@ function calculateExtraPaymentImpactImpl(
 export const calculateExtraPaymentImpact = memoizeMulti(calculateExtraPaymentImpactImpl);
 
 /**
- * Resolve the odometer reading to use for lease overage / loan miles-used (C157, bug #lease-loan,
- * Angelo-approved C151). Miles-used is inherently ALL-TIME, so it must prefer the canonical all-sources,
- * period-independent `currentOdometer` (GET /stats, C52) over the period-scoped + fuel-only
+ * Resolve the odometer reading to use for lease overage / loan miles-used.
+ * Miles-used is inherently ALL-TIME, so it must prefer the canonical all-sources,
+ * period-independent `currentOdometer` (GET /stats) over the period-scoped + fuel-only
  * `currentMileage` (which shrinks under a 7d/30d stats window and ignores manual odometer entries).
  * Falls back currentOdometer → currentMileage → initialMileage → null. Pure + host-independent so both
  * FinanceTab call sites (PaymentMetricsGrid mileageUsed, LeaseMetricsCard) derive miles identically.
@@ -405,7 +405,7 @@ export function resolveCurrentOdometer(
  * labels it "Annual Mileage Limit" + the schema comment agrees), so the total a lease's driven miles
  * may reach is annual × (termMonths / 12) — e.g. 12,000/yr on a 36-mo lease = 36,000. Comparing
  * lifetime driven miles against the bare ANNUAL number over-reports excess ~Nx on an N-year lease
- * (the #64/#110 annual-vs-total money-math class). termMonths is `.notNull()`; fall back to the annual
+ * (the annual-vs-total money-math class). termMonths is `.notNull()`; fall back to the annual
  * limit (term≈12mo) if it's somehow 0. ONE source of truth — both calculateLeaseMetrics (the projected
  * fee) and calculateLeaseOverage (the current-overage card) route through it.
  */
@@ -418,9 +418,9 @@ export function leaseTotalMileageAllowance(financing: VehicleFinancing): number 
  * The CURRENT lease mileage overage (driven miles already over the whole-lease allowance) and its fee,
  * for the PaymentMetricsGrid "Mileage Overage" card. Distinct from calculateLeaseMetrics's PROJECTED
  * end-of-lease excess: this is the overage as of right now (max(0, driven − total allowance)). Compares
- * the term-scaled total (not the bare annual limit — the #64/#110 bug this card carried) against driven
+ * the term-scaled total (not the bare annual limit — the bug this card carried) against driven
  * miles. `mileageUsed` is driven miles (current − initial), already computed by the caller, so this stays
- * in driven-miles space throughout (the #91 coordinate-space invariant). Returns zeros for a non-lease or
+ * in driven-miles space throughout (the coordinate-space invariant). Returns zeros for a non-lease or
  * a lease with no mileageLimit, so the caller can render unconditionally.
  */
 export function calculateLeaseOverage(
@@ -465,7 +465,7 @@ export function calculateLeaseMetrics(
 		// the term via addMonthsClamped — CALENDAR months, not termMonths×30 days. The old ×30 fallback
 		// ran ~0.4 days short PER month (a 36-mo lease landed ~16 days / half a month early), which
 		// understated daysRemaining → inflated the milesPerDay burn rate → OVER-reported the projected
-		// excess-mileage fee (#110, money-facing per NORTH_STAR #1). addMonthsClamped is the same helper
+		// excess-mileage fee (money-facing per). addMonthsClamped is the same helper
 		// calculatePayoffDate (:254) already uses, so the no-endDate lease and an explicit payoff agree.
 		const endDate = financing.endDate
 			? new Date(financing.endDate)
@@ -484,7 +484,7 @@ export function calculateLeaseMetrics(
 		const monthsRemaining = Math.max(0, Math.ceil(daysRemaining / 30));
 
 		// The WHOLE-LEASE allowance the excess-fee projection compares against is the annual mileageLimit
-		// scaled by the term (#64/#110) — leaseTotalMileageAllowance is the ONE source of truth for it
+		// scaled by the term — leaseTotalMileageAllowance is the ONE source of truth for it
 		// (shared with calculateLeaseOverage, the current-overage card).
 		const totalMileageAllowance = leaseTotalMileageAllowance(financing);
 
@@ -499,7 +499,7 @@ export function calculateLeaseMetrics(
 		// starting at 0, matching the sibling PaymentMetricsGrid Overage card (FinanceTab.svelte: `initialMileage
 		// ?? 0`). Without this coalesce the `!== null` gate skipped the whole block → the burn bar read "0 used /
 		// full allowance left" at a real odometer while the Overage card showed the true driven miles — an
-		// internal contradiction on the same screen (#148, Angelo-decided 2026-06-23: null/zero initial → 0).
+		// internal contradiction on the same screen (null/zero initial → 0).
 		const startMileage = initialMileage ?? 0;
 		if (currentMileage !== null && financing.mileageLimit) {
 			mileageUsed = Math.max(0, currentMileage - startMileage);
@@ -511,7 +511,7 @@ export function calculateLeaseMetrics(
 			// the absolute reading against the driven budget over-reported excess (and the $ fee) by exactly
 			// `initialMileage` for any lease signed on a car with miles on it (a used-car lease, or the
 			// odometer not reset) — e.g. a 40k-mile car leased and driven on-pace showed a large phantom
-			// excess fee. (Sibling to #64, which fixed the allowance scaling but left this space mismatch.)
+			// excess fee. (Sibling to, which fixed the allowance scaling but left this space mismatch.)
 			const projectedDrivenMiles = Math.max(0, projectedFinalMileage - startMileage);
 			projectedExcessMiles = Math.max(0, projectedDrivenMiles - totalMileageAllowance);
 			projectedExcessFee = projectedExcessMiles * (financing.excessMileageFee || 0);

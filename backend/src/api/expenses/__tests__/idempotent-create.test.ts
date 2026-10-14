@@ -118,12 +118,12 @@ describe('createIdempotent', () => {
   });
 });
 
-// #98 (C51): a conflict-resolution keep-local must APPLY the local edit on a (userId, clientId) collision,
-// not silently no-op-return the stored row (NORTH_STAR #1: a resolved offline edit is never lost). The
+// A conflict-resolution keep-local must APPLY the local edit on a (userId, clientId) collision,
+// not silently no-op-return the stored row (: a resolved offline edit is never lost). The
 // pre-fix sync-manager sent forceOverwrite but the backend (a) Zod-stripped it and (b) createIdempotent
 // returned the existing row unchanged. These pin the overwrite path: same row id (in-place update, no
 // duplicate), the local fields applied, and the identity + idempotency keys (id/userId/clientId) immutable.
-describe('createIdempotent — overwrite (keep-local conflict resolution, #98)', () => {
+describe('createIdempotent — overwrite (keep-local conflict resolution)', () => {
   test('overwrite=true on a clientId collision UPDATES the existing row in place (no duplicate)', async () => {
     const first = await repo.createIdempotent(
       expenseInput({
@@ -175,7 +175,7 @@ describe('createIdempotent — overwrite (keep-local conflict resolution, #98)',
     expect(resolved.expenseAmount).toBe(77);
   });
 
-  // C57 NOTE: applyLocalOverwrite strips clientId/userId from the patch, but that strip is DEFENSIVE
+  // NOTE: applyLocalOverwrite strips clientId/userId from the patch, but that strip is DEFENSIVE
   // (belt-and-suspenders), NOT reachable as a mutation through the public API — createIdempotent looks up
   // the row by (data.clientId, data.userId), so when the overwrite branch runs, data.userId already equals
   // the row's owner and data.clientId already equals its key (a foreign userId misses the lookup and takes

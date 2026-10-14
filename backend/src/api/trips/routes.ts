@@ -1,15 +1,15 @@
 /**
  * Trip routes (trips-location T3, design §3).
  *
- *   POST   /api/v1/trips                — create a trip (vehicleId in the body, ownership-checked)
- *   GET    /api/v1/trips                — list the user's trips (paginated; optional vehicleId/purpose filter)
- *   GET    /api/v1/trips/:id            — one trip (ownership-checked)
- *   PUT    /api/v1/trips/:id            — update a trip (ownership-checked; R2 refine survives the partial)
- *   DELETE /api/v1/trips/:id            — delete a trip (tenant-safe deleteByIdAndUserId, the #52 guard)
- *   GET    /api/v1/vehicles/:id/trips   — a vehicle's trips (mounted under the trips router as /vehicle/:vehicleId)
+ *  POST /api/v1/trips — create a trip (vehicleId in the body, ownership-checked)
+ *  GET /api/v1/trips — list the user's trips (paginated; optional vehicleId/purpose filter)
+ *  GET /api/v1/trips/:id — one trip (ownership-checked)
+ *  PUT /api/v1/trips/:id — update a trip (ownership-checked; R2 refine survives the partial)
+ *  DELETE /api/v1/trips/:id — delete a trip (tenant-safe deleteByIdAndUserId, the guard)
+ *  GET /api/v1/vehicles/:id/trips — a vehicle's trips (mounted under the trips router as /vehicle/:vehicleId)
  *
  * Ownership: a CREATE validates the body's vehicleId via validateVehicleOwnership; every mutate/read by trip
- * id goes through validateTripOwnership (NotFound, never 403 — the #80 enumeration discipline). Trips own via
+ * id goes through validateTripOwnership (NotFound, never 403 — the enumeration discipline). Trips own via
  * a userId column, and the repo finders are userId-scoped, so an unowned id is indistinguishable from absent.
  */
 
@@ -39,7 +39,7 @@ const listQuerySchema = z.object({
   purpose: z.enum(TRIP_PURPOSES).optional(),
 });
 
-// C214 trip-delete: keepOdometer chooses whether the linked odometer entry survives the trip delete.
+// trip-delete: keepOdometer chooses whether the linked odometer entry survives the trip delete.
 // z.coerce.boolean treats any non-empty string as true, so parse the literal 'false' EXPLICITLY and default
 // to KEEP (true) when the param is absent — the non-destructive default (never silently drop odometer data).
 const deleteQuerySchema = z.object({
@@ -84,9 +84,9 @@ routes.post('/', zValidator('json', createTripSchema), async (c) => {
   // double-count a manual reading the user also logged. Then recheck mileage reminders (the new reading may
   // cross a milestone), mirroring the odometer route's create path. Both are best-effort — the trip is
   // ALREADY persisted, so a side-effect hiccup must NOT fail the create. recheckMileageReminders is
-  // internally guarded (C42, never throws), but createFromTrip is a plain repo write whose dedup SELECT /
+  // internally guarded (never throws), but createFromTrip is a plain repo write whose dedup SELECT /
   // INSERT CAN throw a DatabaseError — left unguarded, that 500'd a create whose trip row already committed,
-  // so the FE showed "failed" and a retry made a DUPLICATE (C233: the "never fails the create" comment was a
+  // so the FE showed "failed" and a retry made a DUPLICATE (: the "never fails the create" comment was a
   // lie for this leg). Wrap the whole D2 block: log + swallow, return the 201 the persisted trip earned.
   try {
     await odometerRepository.createFromTrip({
@@ -172,7 +172,7 @@ routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
 // PUT /api/v1/trips/:id — update (ownership-checked). R2 must hold on the EFFECTIVE merged pair, not just
 // the request body: updateTripSchema's refine fires only when BOTH odometers are present in the body, so a
 // partial PUT sending only one (e.g. endOdometer below the STORED startOdometer) would otherwise persist an
-// inverted pair — distance clamps to 0, a phantom 0-mile trip (#109 "refine doesn't survive partial" / #130
+// inverted pair — distance clamps to 0, a phantom 0-mile trip ("refine doesn't survive partial" /
 // "validate the merged state, not the request"). Re-check against the existing row before writing.
 routes.put(
   '/:id',
@@ -200,18 +200,18 @@ routes.put(
 
     const updated = await tripRepository.update(id, data);
 
-    // C214 lifecycle (case 3): editing the trip's odometer/date must RE-SYNC the linked odometer entry
+    // lifecycle (case 3): editing the trip's odometer/date must RE-SYNC the linked odometer entry
     // (D2/createFromTrip) so getCurrentOdometer + the mileage-reminder axis never read a desynced value.
     // Only when the linkage key actually moved (endOdometer or tripDate changed): remove the stale
     // trip-provenance entry at the OLD key, then re-create at the NEW (deduped — a no-op if the user already
     // has a manual reading there). Best-effort: the trip update already committed, so a side-effect hiccup
-    // must not 500 a successful edit (mirrors the create path's swallow-and-log, C233).
+    // must not 500 a successful edit (mirrors the create path's swallow-and-log).
     const endChanged = data.endOdometer !== undefined && data.endOdometer !== existing.endOdometer;
     const dateChanged =
       data.tripDate !== undefined && data.tripDate.getTime() !== existing.tripDate.getTime();
     if (endChanged || dateChanged) {
       try {
-        // N:1 guard (#C214-N1): only remove the stale OLD-key entry if no OTHER trip still maps to it (the
+        // N:1 guard (#-N1): only remove the stale OLD-key entry if no OTHER trip still maps to it (the
         // dedup means trips at the same (vehicle, day, reading) share one entry — removing it on this edit
         // would orphan a survivor at the old key). Always re-create at the NEW key (deduped — a no-op if a
         // reading already sits there), so this trip's own moved reading is represented.
@@ -251,7 +251,7 @@ routes.put(
 );
 
 // DELETE /api/v1/trips/:id — tenant-safe delete (keys on id AND userId; false → 404).
-// C214 lifecycle: a trip's create wrote a linked odometer entry (D2/createFromTrip). On delete the user
+// lifecycle: a trip's create wrote a linked odometer entry (D2/createFromTrip). On delete the user
 // chooses whether to KEEP that entry (it may now be part of their odometer history) or remove it with the
 // trip. `?keepOdometer=true|false`; the DEFAULT is KEEP (the non-destructive default — never silently drop
 // odometer history; the FE delete-confirm surfaces the choice, T6b-3). keepOdometer=false also removes the
@@ -281,7 +281,7 @@ routes.delete(
 
     if (keepOdometer === false) {
       try {
-        // N:1 guard (#C214-N1): createFromTrip DEDUPS, so multiple trips at the same (vehicle, day, reading)
+        // N:1 guard (#-N1): createFromTrip DEDUPS, so multiple trips at the same (vehicle, day, reading)
         // SHARE one linked entry. Only remove it if NO OTHER trip still maps to that key — else this delete
         // would orphan a surviving trip's odometer reading. (The just-deleted trip is excluded by id.)
         const others = await tripRepository.countOthersAtOdometerKey({

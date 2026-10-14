@@ -1,13 +1,13 @@
 /**
- * Characterization tests for the global errorHandler + SyncError convergence (arch, cycle 24).
+ * Characterization tests for the global errorHandler + SyncError convergence.
  *
  * Context: the `sync` routes hand-roll try/catch → handleSyncError in every handler. The arch goal
  * is to drop that boilerplate and let the central errorHandler shape SyncErrors instead. That is
  * only safe if the middleware produces a BYTE-IDENTICAL response to handleSyncError for a SyncError
  * — SyncError extends Error (not AppError), so before this cycle it fell through to a generic 500,
  * losing its code→status mapping. These tests pin:
- *   1. every existing errorHandler branch (there was NO prior coverage), and
- *   2. the equivalence handleSyncError(err) === errorHandler(err) for SyncErrors,
+ *  1. every existing errorHandler branch (there was NO prior coverage), and
+ *  2. the equivalence handleSyncError(err) === errorHandler(err) for SyncErrors,
  * so the try/catch removal next cycle can be proven behavior-preserving against this net.
  */
 

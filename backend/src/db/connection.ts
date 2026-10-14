@@ -65,7 +65,7 @@ export function getDb(): typeof db {
  * Transaction wrapper for complex operations. The callback may be SYNCHRONOUS or async: bun-sqlite is a
  * synchronous dialect, and a multi-write transaction that must roll back atomically on a throw MUST use a
  * synchronous callback (an async callback returns a pending promise, so BEGIN/COMMIT wrap nothing and each
- * `await tx.*` autocommits independently — the C151 footgun, see restore.ts / the C504 async-tx sweep).
+ * `await tx.*` autocommits independently — the footgun, see restore.ts / the async-tx sweep).
  * The return type is `T | Promise<T>` so both forms type-check; bun's native `transaction` handles each.
  */
 export async function transaction<T>(

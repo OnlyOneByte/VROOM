@@ -1,16 +1,16 @@
 /**
- * Guard for the settings store's STATE-MANAGEMENT contracts (C319 — settings.svelte.ts was ~12% covered;
- * C308 pinned only the error-clearing invariant). These pin the behaviors the UI depends on:
- *   1. update() replaces `settings` state with the server response + returns it (the unitPreferences /
- *      currency render reads off this), and on failure RE-THROWS (so the caller's await rejects) while
- *      still recording the error.
- *   2. a non-preview restoreFromProvider REFRESHES state via this.load() (a destructive restore changes
- *      the stored settings, so stale in-memory state would mislead — NORTH_STAR #1); a PREVIEW restore
- *      does NOT reload (read-only — no state change to reflect).
- *   3. reset() clears all state (the logout path).
- *   4. the unitPreferences getter falls back to defaults when settings is null.
+ * Guard for the settings store's STATE-MANAGEMENT contracts (— settings.svelte.ts was ~12% covered;
+ * pinned only the error-clearing invariant). These pin the behaviors the UI depends on:
+ *  1. update() replaces `settings` state with the server response + returns it (the unitPreferences /
+ *  currency render reads off this), and on failure RE-THROWS (so the caller's await rejects) while
+ *  still recording the error.
+ *  2. a non-preview restoreFromProvider REFRESHES state via this.load() (a destructive restore changes
+ *  the stored settings, so stale in-memory state would mislead); a PREVIEW restore
+ *  does NOT reload (read-only — no state change to reflect).
+ *  3. reset() clears all state (the logout path).
+ *  4. the unitPreferences getter falls back to defaults when settings is null.
  *
- * Drives the real store → settings-api → apiClient → fetch (mocked), the auth.test.ts / C308 pattern.
+ * Drives the real store → settings-api → apiClient → fetch (mocked), the auth.test.ts / pattern.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -43,7 +43,7 @@ const SETTINGS = {
 	currencyUnit: 'EUR'
 };
 
-describe('settings store — state-management contracts (C319)', () => {
+describe('settings store — state-management contracts', () => {
 	beforeEach(() => {
 		mockFetch.mockReset();
 		settingsStore.reset();
@@ -99,9 +99,9 @@ describe('settings store — state-management contracts (C319)', () => {
 
 	// The uploadBackup twin of the restoreFromProvider reload contract (above). uploadBackup is the
 	// FILE-upload restore path (the more common one — drag a .zip in), and it gates the post-restore
-	// this.load() on `mode !== 'preview'` exactly like restoreFromProvider. C319 pinned the provider
+	// this.load() on `mode !== 'preview'` exactly like restoreFromProvider. pinned the provider
 	// path; this pins the file-upload path so a regression dropping its reload — which would leave the UI
-	// showing STALE pre-restore settings after a replace/merge (NORTH_STAR #1 data-correctness) — goes RED.
+	// showing STALE pre-restore settings after a replace/merge (data-correctness) — goes RED.
 	// (settings-api.test.ts pins uploadBackup's wire/FormData contract, not the store's mode-gated reload.)
 	it('a non-preview uploadBackup REFRESHES state via load() (second fetch = the reload)', async () => {
 		// 1st fetch = the restore upload; 2nd fetch = this.load()'s GET /settings.
@@ -145,13 +145,13 @@ describe('settings store — state-management contracts (C319)', () => {
 	});
 });
 
-// C196 (guard): the T9 server-wins theme reconcile is WIRED into settingsStore.load(). theme-server-sync
+// The T9 server-wins theme reconcile is WIRED into settingsStore.load(). theme-server-sync
 // .test.ts pins reconcileServerTheme in ISOLATION (calling it directly); nothing drove load() and asserted
 // it actually invokes the reconcile with the fetched settings.themePreference. A refactor dropping that one
-// line from load() would silently break cross-device theme sync (NORTH_STAR #2 cross-device correctness)
+// line from load() would silently break cross-device theme sync (cross-device correctness)
 // with every existing test green. This integration test drives the REAL load() → settings-api → fetch
 // (mocked) and asserts the theme store adopted the server value end-to-end.
-describe('settings store load() wires the T9 server-wins theme reconcile (C196)', () => {
+describe('settings store load() wires the T9 server-wins theme reconcile', () => {
 	beforeEach(() => {
 		mockFetch.mockReset();
 		settingsStore.reset();

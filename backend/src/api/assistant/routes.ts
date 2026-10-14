@@ -7,7 +7,7 @@
  * tool call and runs it scoped to the SESSION user. Returns `{ reply, toolsUsed }`. PERSISTS NOTHING
  * (D3 ephemeral — the transcript lives in the client).
  *
- * Error honesty (the #43/#44/#144 anti-fail-open lesson): no configured provider → 400 with an
+ * Error honesty (the anti-fail-open lesson): no configured provider → 400 with an
  * actionable message; a provider transport/HTTP failure → 502 (never a faked reply); a loop that hits
  * its caps without an answer returns a 200 with an HONEST bounded reply (handled in the orchestrator).
  *

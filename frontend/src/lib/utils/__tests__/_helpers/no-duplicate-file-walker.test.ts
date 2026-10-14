@@ -1,21 +1,21 @@
 /**
- * Meta-GUARD (committed) pairing the C275 rule-of-four convergence: the recursive `.svelte` file
+ * Meta-GUARD (committed) pairing the rule-of-four convergence: the recursive `.svelte` file
  * walker (`collectSvelteFiles`) now lives in ONE shared helper (./collect-svelte-files.ts), and the
  * four source-scan guards that used to re-declare it byte-identically (no-hardcoded-currency,
  * no-interpolated-arbitrary-class, no-theme-clashing-colors, fab-bottom-clearance) import it.
  *
  * The drift this pins: a FUTURE source-scan guard is the natural place to copy the `.svelte` walker
  * locally again (it's the obvious "I need to enumerate every .svelte" boilerplate) — silently
- * un-converging C275 back toward five copies. This scan fails the moment any *.test.ts under __tests__
+ * un-converging back toward five copies. This scan fails the moment any *.test.ts under __tests__
  * declares its OWN `function collectSvelteFiles` instead of importing the shared helper.
  *
- * SCOPE (narrow, deliberately): this pins the `collectSvelteFiles` symbol ONLY — the exact thing C275
+ * SCOPE (narrow, deliberately): this pins the `collectSvelteFiles` symbol ONLY — the exact thing
  * converged. It does NOT flag the bare `readdirSync(... withFileTypes)` idiom in general, because a
  * SEPARATE, differently-shaped walker family exists — `collectSourceFiles` (collects .ts + .svelte;
  * in no-native-dialogs / no-utc-date-input / no-utc-month-parse) — which is its OWN un-converged
- * rule-of-three (found C276, FILED as a follow-on arch target, NOT yet deduped). Over-flagging the
- * raw idiom would false-positive on that family + on this guard's own collectTestFiles (the C271
- * over-flag lesson). Keep this guard honest to what C275 actually converged.
+ * rule-of-three (found, FILED as a follow-on arch target, NOT yet deduped). Over-flagging the
+ * raw idiom would false-positive on that family + on this guard's own collectTestFiles (the
+ * over-flag lesson). Keep this guard honest to what actually converged.
  *
  * The shared helper itself (collect-svelte-files.ts) is the ONE sanctioned home, allowlisted below.
  * Pure node:fs/path — runs in the fast unit suite, no browser/server.
@@ -32,9 +32,9 @@ const TESTS_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 // The sole sanctioned home for the walker — the shared helper this guard pairs with.
 const ALLOWLIST = new Set<string>(['_helpers/collect-svelte-files.ts']);
 
-// A local re-declaration of the EXACT symbol C275 converged. Scoped to the name (not the raw
+// A local re-declaration of the EXACT symbol converged. Scoped to the name (not the raw
 // readdir idiom) so it doesn't false-positive on the separate collectSourceFiles family or on
-// this guard's own collectTestFiles (the C271 over-flag lesson).
+// this guard's own collectTestFiles (the over-flag lesson).
 const LOCAL_WALKER_DECL = /function\s+collectSvelteFiles\s*\(/;
 
 function collectTestFiles(dir: string, acc: string[] = []): string[] {
@@ -49,7 +49,7 @@ function collectTestFiles(dir: string, acc: string[] = []): string[] {
 	return acc;
 }
 
-describe('no duplicate .svelte file-walker in the source-scan guard suite (C275 convergence guard)', () => {
+describe('no duplicate .svelte file-walker in the source-scan guard suite (convergence guard)', () => {
 	const files = collectTestFiles(TESTS_ROOT);
 
 	test('the scan actually found .test.ts sources (guard is live, not a no-op)', () => {
@@ -69,7 +69,7 @@ describe('no duplicate .svelte file-walker in the source-scan guard suite (C275 
 		expect(
 			offenders,
 			`Source-scan guard(s) re-declaring the .svelte file-walker locally — this silently un-converges ` +
-				`the C275 dedup. Import { collectSvelteFiles } from './_helpers/collect-svelte-files' (or ` +
+				`the shared walker. Import { collectSvelteFiles } from './_helpers/collect-svelte-files' (or ` +
 				`'../_helpers/...' by depth) instead:\n${offenders.join('\n')}`
 		).toEqual([]);
 	});

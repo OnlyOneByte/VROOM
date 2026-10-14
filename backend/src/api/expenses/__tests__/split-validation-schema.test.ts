@@ -1,5 +1,5 @@
 /**
- * Unit tests for the split-expense validation schemas (C84 guard, steered by the C81 coverage
+ * Unit tests for the split-expense validation schemas (guard, steered by the coverage
  * baseline — expenses/validation.ts was at 50% func / 73% line, the uncovered branches being the
  * financial-correctness REFINEMENTS). These guard real money-math: a percentage split must sum to
  * 100, absolute allocations must sum to the declared total, and source fields are both-or-neither.
@@ -139,13 +139,13 @@ describe('createSplitExpenseSchema — source fields are both-or-neither', () =>
     expect(neither.success).toBe(true);
   });
 
-  // #145 (C465): the manual split route accepts ONLY a 'financing' source link (mirrors the regular
+  // The manual split route accepts ONLY a 'financing' source link (mirrors the regular
   // create) — 'insurance_term'/'reminder' splits come EXCLUSIVELY from system paths that bypass this
   // route. Pre-fix the schema was z.string().optional() → a hand-crafted POST could forge an
   // UNVALIDATED reminder/insurance_term link on the caller's own siblings (skews source-bucketed
   // analytics; a real matching insurance_term sourceId cascade-deletes the manual split when the
   // policy is removed). NON-VACUOUS: pre-fix every line here parsed success:true.
-  test('rejects a non-financing sourceType (reminder / insurance_term / arbitrary string) (#145)', () => {
+  test('rejects a non-financing sourceType (reminder / insurance_term / arbitrary string)', () => {
     for (const sourceType of ['reminder', 'insurance_term', 'manual', 'anything']) {
       const r = createSplitExpenseSchema.safeParse({
         ...baseCreate,
@@ -174,12 +174,12 @@ describe('createSplitExpenseSchema — source fields are both-or-neither', () =>
   });
 });
 
-// C408 (#104/C352 hole): the split-create schema's tags were a bare z.array(z.string()) that bypassed
+// The split-create schema's tags were a bare z.array(z.string()) that bypassed
 // the tagElementSchema separator-rejection the regular create/update boundaries enforce. A tag containing
 // ';' or ',' persisted onto every sibling, then the CSV export ('; '-join) → re-import (/[;,]/-split)
 // round-tripped it into MULTIPLE tags (silent data loss). Now routed through the shared tagElementSchema.
 // Pre-fix these REJECT-assertions were RED (the bare array accepted the separator tag).
-describe('createSplitExpenseSchema — tags reject the CSV separator (#104, C408)', () => {
+describe('createSplitExpenseSchema — tags reject the CSV separator', () => {
   const splitBase = {
     ...baseCreate,
     splitConfig: { method: 'even' as const, vehicleIds: ['v1', 'v2'] },
@@ -237,12 +237,12 @@ describe('updateSplitSchema — shares the same refinement', () => {
   });
 });
 
-// #141 (C458) + money-cents-migration: totalAmount is the dollars→integer-CENTS input edge at the
+// + money-cents-migration: totalAmount is the dollars→integer-CENTS input edge at the
 // validation boundary (centsAmount = z.number().positive().transform(dollarsToCents)). The split's
 // groupTotal + legs are then all computed in native cents from this SAME value (Σlegs == groupTotal
 // EXACTLY). A sub-cent dollar input rounds to the nearest whole cent (ROUND-before-int), never truncates.
 // The UI only sends 2-decimal dollar amounts; this verifies the dollars→cents conversion.
-describe('split totalAmount is converted to integer cents (#141 / money-cents-migration)', () => {
+describe('split totalAmount is converted to integer cents (/ money-cents-migration)', () => {
   test('a dollar totalAmount with a sub-cent tail rounds to whole cents on create', () => {
     const r = createSplitExpenseSchema.safeParse({
       ...baseCreate,

@@ -1,9 +1,9 @@
 /**
- * Characterization tests for sync ROUTE error behavior through the REAL HTTP stack (arch #1: net
- * written C30, try/catch DROPPED C36).
+ * Characterization tests for sync ROUTE error behavior through the REAL HTTP stack (arch: net
+ * written, try/catch DROPPED).
  *
- * arch #1 dropped the hand-rolled try/catch → handleSyncError from sync/routes.ts (C36) so errors
- * propagate to the central errorHandler (made SyncError-aware in C24). C24 proved the two paths are
+ * arch dropped the hand-rolled try/catch → handleSyncError from sync/routes.ts so errors
+ * propagate to the central errorHandler (made SyncError-aware in). proved the two paths are
  * byte-identical for a SyncError — so the SyncError-path assertions below are UNCHANGED across the
  * drop and prove it caused no regression on the common case. For a NON-SyncError thrown inside a sync
  * handler the paths diverged (handleSyncError wrapped any non-SyncError as 500 OPERATION_FAILED; the
@@ -33,7 +33,7 @@ interface ErrorBody {
 describe('sync route error behavior (characterization — pins today before the arch drop)', () => {
   test('POST /sync with invalid syncTypes → 400 VALIDATION_ERROR (SyncError path, stable)', async () => {
     // validateSyncTypes throws SyncError(VALIDATION_ERROR), caught by the handler's try/catch →
-    // handleSyncError → 400. This is a SyncError, so C24 proved the central handler is byte-identical;
+    // handleSyncError → 400. This is a SyncError, so proved the central handler is byte-identical;
     // the part-2 drop will NOT change this assertion.
     const res = await ctx.authed('POST', '/api/v1/sync', { syncTypes: [] });
     const body = (await json<ErrorBody>(res)) as ErrorBody;
@@ -66,7 +66,7 @@ describe('sync route error behavior (characterization — pins today before the 
     expect(body.error.code).toBe('VALIDATION_ERROR');
   });
 
-  // POST-DROP CONTRACT (C36): with the try/catch gone, a non-SyncError thrown inside a sync handler
+  // POST-DROP CONTRACT: with the try/catch gone, a non-SyncError thrown inside a sync handler
   // now reaches the central errorHandler, which maps it to its proper status instead of the old
   // blanket 500 OPERATION_FAILED. Asserted live here: an unauthenticated request hits requireAuth
   // (which throws AuthenticationError, an AppError, NOT a SyncError) → the central handler returns

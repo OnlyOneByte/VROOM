@@ -1,5 +1,5 @@
 /**
- * Unit tests for compareExpenseRows — the stable expenses-table comparator (bug #4).
+ * Unit tests for compareExpenseRows — the stable expenses-table comparator.
  *
  * The defect: both ExpensesTable sort sites compared only by date/amount and returned 0
  * on a tie, so equal-key rows fell back to JS engine ordering / the standalone-then-group
@@ -46,7 +46,7 @@ describe('compareExpenseRows — primary sort', () => {
 	});
 });
 
-describe('compareExpenseRows — id tiebreaker inherits the sort direction (the bug #4 fix)', () => {
+describe('compareExpenseRows — id tiebreaker inherits the sort direction (the bug fix)', () => {
 	const sameDate = '2024-06-15T00:00:00.000Z';
 	// All three share the same date → the date comparison is 0 → id decides.
 	const tied = [row('id-a', { date: sameDate }), row('id-b', { date: sameDate }), row('id-c', { date: sameDate })];
@@ -76,7 +76,7 @@ describe('compareExpenseRows — determinism (input order independence)', () => 
 	test('two different input orderings of tied rows produce the SAME output (no reshuffle)', () => {
 		const forward = [row('a', { date: sameDate }), row('b', { date: sameDate }), row('c', { date: sameDate })];
 		const reversed = [row('c', { date: sameDate }), row('b', { date: sameDate }), row('a', { date: sameDate })];
-		// This is the exact bug #4 invariant: regardless of how grouping concatenated the
+		// This is the exact bug invariant: regardless of how grouping concatenated the
 		// rows (standalone-then-group), the sorted order is fixed.
 		expect(order(forward, 'date', 'desc')).toEqual(order(reversed, 'date', 'desc'));
 	});

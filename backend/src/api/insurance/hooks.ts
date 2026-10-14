@@ -14,7 +14,7 @@ import type { TermCoverageRow } from './repository';
  * Derive the vehicleIds covered by a single term from a policy's junction coverage rows.
  * One source of truth for the `termVehicleCoverage.filter(termId).map(vehicleId)` derivation that
  * the three term-expense sites (create-policy loop, addTerm, updateTerm in routes.ts) repeated
- * byte-identically (C273 dedup). Pure — no DB.
+ * byte-identically. Pure — no DB.
  */
 export function vehicleIdsForTerm(
   termVehicleCoverage: readonly TermCoverageRow[],
@@ -28,7 +28,7 @@ interface TermExpenseParams {
   vehicleIds: string[];
   totalCost: number;
   startDate: Date;
-  /** #69: a monthly-premium term (no totalCost) — materialize monthlyCost × term-months into TCO. */
+  /** A monthly-premium term (no totalCost) — materialize monthlyCost × term-months into TCO. */
   monthlyCost?: number | null;
   endDate?: Date | null;
   policyNumber?: string;
@@ -36,12 +36,12 @@ interface TermExpenseParams {
 }
 
 /**
- * The cost a term materializes into TCO (#69): the explicit `totalCost` when present, else a
+ * The cost a term materializes into TCO: the explicit `totalCost` when present, else a
  * monthly-only term's `monthlyCost × the number of calendar months it spans` (the same month-count
  * `effectiveMonthlyPremium` uses to amortize a totalCost-only term, so the two cost shapes are
- * symmetric). Returns 0 when neither is set or the span is empty. Pre-#69, a monthly-only term created
+ * symmetric). Returns 0 when neither is set or the span is empty. Pre-, a monthly-only term created
  * NO expense row → it showed in analytics (effectiveMonthlyPremium honours monthlyCost) but was ABSENT
- * from TCO's insuranceCost bucket — the inconsistency #69 closes. No double-count: analytics reads
+ * from TCO's insuranceCost bucket — the inconsistency closes. No double-count: analytics reads
  * term.monthlyCost directly, never the materialized expense rows TCO sums.
  */
 export function effectiveTermCost(params: {
@@ -60,7 +60,7 @@ export function effectiveTermCost(params: {
 
 /**
  * Auto-create a split expense across covered vehicles when an insurance term has a cost — either an
- * explicit totalCost or a monthly premium materialized over the term (#69). The expense is tagged
+ * explicit totalCost or a monthly premium materialized over the term. The expense is tagged
  * 'insurance' so the UI can detect it as insurance-managed and prevent manual edits.
  */
 export async function createTermExpenses(params: TermExpenseParams): Promise<void> {
@@ -106,7 +106,7 @@ export async function createTermExpenses(params: TermExpenseParams): Promise<voi
  */
 export async function updateTermExpenses(params: TermExpenseParams): Promise<void> {
   const { termId, vehicleIds, userId } = params;
-  // #69: gate on the EFFECTIVE cost (totalCost OR monthlyCost × months), matching createTermExpenses.
+  // Gate on the EFFECTIVE cost (totalCost OR monthlyCost × months), matching createTermExpenses.
   const totalCost = effectiveTermCost(params);
 
   try {

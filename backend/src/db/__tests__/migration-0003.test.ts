@@ -1,9 +1,9 @@
 /**
- * Migration 0003: Maintenance-schedule columns (cycle 15, T1 — additive only)
+ * Migration 0003: Maintenance-schedule columns (T1 — additive only)
  *
  * Pure `ALTER TABLE ADD COLUMN` (no table rebuild, so existing rows are untouched):
  * - reminders gains trigger_mode (default 'time'), interval_mileage, last_service_odometer,
- *   next_due_odometer.
+ *  next_due_odometer.
  * - reminder_notifications gains due_odometer.
  *
  * Relaxing next_due_date / due_date to nullable + widening the dedup index is deferred to T3

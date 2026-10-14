@@ -1,5 +1,5 @@
 /**
- * Unit tests for chunk() — the shared batching primitive (C397) behind the photo / photo-ref
+ * Unit tests for chunk() — the shared batching primitive behind the photo / photo-ref
  * repositories' batched IN-clause loops (cascade-delete fan-outs that must stay under SQLite's
  * variable limit). Pins the boundary math the 4 call sites now delegate: a divergent stride would
  * silently drop or double-process a batch on a destructive cascade DELETE (data loss).

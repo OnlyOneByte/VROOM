@@ -1,23 +1,23 @@
 /**
- * Regression GUARD (committed, travels with the merge) for the #94 fleet-unit-pooling class (distance
- * member fixed C58).
+ * Regression GUARD (committed, travels with the merge) for the fleet-unit-pooling class (distance
+ * member fixed).
  *
  * The fleet-wide analytics SUMMARY readers (getQuickStats / getYearEnd / getSummary / getFuelStats) pool
  * per-vehicle quantities. To be correct for a MIXED-unit fleet (mi+km / gal+L), each vehicle's value must
  * be converted to the user's global units BEFORE pooling — the `computeConvertedTotalDistance` /
  * `computeConvertedEfficiencyValues` / `buildConvertedEfficiencyTrend` helpers do this, gated by a
- * `skipConversion = allVehiclesMatchUnits(...)` flag. Pre-C58, getFuelStats DEFEATED the conversion by
+ * `skipConversion = allVehiclesMatchUnits(...)` flag. Pre-, getFuelStats DEFEATED the conversion by
  * passing NO-OP PLACEHOLDERS — `new Map()` (empty unit map), `DEFAULT_UNIT_PREFERENCES`, and a hardcoded
- * `skipConversion = true` — so a mixed mi+km fleet pooled miles with kilometres (NORTH_STAR #2). The C58
+ * `skipConversion = true` — so a mixed mi+km fleet pooled miles with kilometres. The
  * fix threads the REAL units (vehicleUnitsMap, userUnits, the computed skipConversion variable).
  *
- * The C58 behavioral test (fuel-stats-fleet-distance-pooling.test.ts) proves the CURRENT getFuelStats path
+ * The behavioral test (fuel-stats-fleet-distance-pooling.test.ts) proves the CURRENT getFuelStats path
  * converts a mixed fleet, but it only drives that one reader's distance scalar. This SOURCE SCAN is the
  * tree-wide net: it pins that NO `computeConverted*` / `buildConverted*` call reintroduces the placeholder
  * triple — so a future reader (or a refactor) that hardcodes `new Map()` / `DEFAULT_UNIT_PREFERENCES` /
  * `skipConversion: true` regresses RED here even if its same-unit tests stay green (the bug is invisible to
  * a same-unit fixture). Source-scan > untracked e2e for merge survival (GUIDE); the one-edit-fix→source-scan
- * pattern again (C24→C25 #36, C44→C45 #37, C54 import-date — now C58→C59 for #94).
+ * pattern again (→→ import-date — now→ for).
  *
  * Pure source scan — no DB, no network. Runs in the fast suite.
  */
@@ -40,7 +40,7 @@ const REPO = join(HERE, '..', 'repository.ts');
 const CONVERT_CALL = /\.(?:computeConverted\w+|buildConverted\w+)\(([^;]*)\)\s*;/g;
 const PLACEHOLDERS = [/new Map\(\)/, /DEFAULT_UNIT_PREFERENCES/, /,\s*true\s*$/];
 
-describe('no unconverted fleet pooling — convert helpers get REAL units, never placeholders (#94 class guard)', () => {
+describe('no unconverted fleet pooling — convert helpers get REAL units, never placeholders', () => {
   test('the scan resolves the real analytics repository (guard is live, not a no-op)', () => {
     expect(readFileSync(REPO, 'utf8').length, `unreadable/empty: ${REPO}`).toBeGreaterThan(100);
   });
@@ -58,7 +58,7 @@ describe('no unconverted fleet pooling — convert helpers get REAL units, never
       offenders,
       `A fleet-summary convert-then-pool helper is called with a unit PLACEHOLDER (new Map() / ` +
         `DEFAULT_UNIT_PREFERENCES / hardcoded skipConversion=true), which defeats the per-vehicle ` +
-        `conversion → a mixed mi+km/gal+L fleet pools raw (#94, NORTH_STAR #2). Pass the real ` +
+        `conversion → a mixed mi+km/gal+L fleet pools raw. Pass the real ` +
         `vehicleUnitsMap + userUnits + skipConversion=allVehiclesMatchUnits(...):\n${offenders.join('\n')}`
     ).toEqual([]);
   });

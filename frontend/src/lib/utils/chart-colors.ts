@@ -8,7 +8,7 @@ import type { ExpenseCategory } from '$lib/types';
 
 /**
  * Semantic chart color CSS custom properties (var(--chart-1) through var(--chart-8)). Extended from 5 to
- * 8 (#112) so a fleet of ≥6 vehicles gets distinct, WCAG-AA-graphical (3:1 vs card) series colors instead
+ * 8 so a fleet of ≥6 vehicles gets distinct, WCAG-AA-graphical (3:1 vs card) series colors instead
  * of wrapping back onto --chart-1. Every built-in theme defines all 8 (theme-registry.ts); the contrast
  * guard (theme-contrast.test.ts) pins each at ≥3:1 vs card for every non-default theme.
  */

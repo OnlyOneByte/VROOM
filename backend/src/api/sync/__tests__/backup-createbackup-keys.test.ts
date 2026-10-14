@@ -24,7 +24,7 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-describe('createBackup output stays in sync with the registry (drift guard — cycle 208)', () => {
+describe('createBackup output stays in sync with the registry', () => {
   test('createBackup() emits exactly the registry keys (plus metadata)', async () => {
     // Import BOTH the service and the registry dynamically — a static `config` import would
     // pull the DB-bound singleton before createTestApp() rewrites DATABASE_URL to :memory:,

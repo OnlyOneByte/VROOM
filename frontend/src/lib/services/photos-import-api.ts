@@ -2,12 +2,12 @@
  * Photos → auto-expense import API client (photos-auto-expense T3 — the fork-free FE slice).
  *
  * A thin typed wrapper over the shipped backend stage endpoint:
- *   - `getReceiptDrafts()` → GET /api/v1/photos/receipt-drafts → the list of staged drafts (the backend
- *     walked VROOM's app-created Photos album, parsed each through the user's VLM, filtered out
- *     already-imported photos, and PERSISTED NOTHING — design §2).
- *   - `confirmDraft(item, vehicleId, overrides?)` → reuses the UNCHANGED POST /expenses with
- *     `clientId = photos:<mediaItemId>` so a re-import is idempotent (the shipped createIdempotent unique
- *     index, design §3). The user reviews + edits each draft before confirming; nothing is auto-written.
+ *  - `getReceiptDrafts()` → GET /api/v1/photos/receipt-drafts → the list of staged drafts (the backend
+ *  walked VROOM's app-created Photos album, parsed each through the user's VLM, filtered out
+ *  already-imported photos, and PERSISTED NOTHING — design §2).
+ *  - `confirmDraft(item, vehicleId, overrides?)` → reuses the UNCHANGED POST /expenses with
+ *  `clientId = photos:<mediaItemId>` so a re-import is idempotent (the shipped createIdempotent unique
+ *  index, design §3). The user reviews + edits each draft before confirming; nothing is auto-written.
  *
  * Money stays DOLLARS through the draft (the backend keeps major units; cents convert only at the POST
  * /expenses boundary). The clientId is spread onto the backend body directly — the same path the

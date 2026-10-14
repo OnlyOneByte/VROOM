@@ -60,7 +60,7 @@
 	// Lease mileage overage. `financing.mileageLimit` is the ANNUAL allowance; calculateLeaseOverage
 	// scales it by the term (annual × termMonths/12) before comparing against the lifetime `mileageUsed`,
 	// matching the sibling LeaseMetricsCard. Comparing driven miles against the bare ANNUAL number
-	// over-reported the overage + $ fee ~Nx on an N-year lease (the #64/#110 annual-vs-total class).
+	// over-reported the overage + $ fee ~Nx on an N-year lease (the annual-vs-total class).
 	let leaseOverage = $derived(calculateLeaseOverage(financing, mileageUsed));
 	let excessMiles = $derived(leaseOverage.excessMiles);
 	let overageCost = $derived(leaseOverage.overageCost);

@@ -95,7 +95,7 @@
 	// /vehicles/new the initializers capture the USD/imperial DEFAULT, and a metric
 	// user would get "Miles · Gallons" pre-selected (and silently saved). Re-seed from
 	// the store once it resolves, but only while the user hasn't touched the units and
-	// only in create mode (edit mode populates from the vehicle, not global prefs). (cycle 204)
+	// only in create mode (edit mode populates from the vehicle, not global prefs).
 	$effect(() => {
 		if (isEditMode || unitsTouched) return;
 		const prefs = settingsStore.unitPreferences;

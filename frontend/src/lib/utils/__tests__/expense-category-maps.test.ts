@@ -1,6 +1,6 @@
 /**
  * Exhaustiveness + correctness of the expense-category display maps in expense-helpers.ts
- * (categoryLabels / getCategoryIcon / getCategoryColor) — the C234 guard. compareExpenseRows
+ * (categoryLabels / getCategoryIcon / getCategoryColor) — the guard. compareExpenseRows
  * (the same module) is already pinned by compare-expense-rows.test.ts; these three exports were
  * UNCOVERED.
  *

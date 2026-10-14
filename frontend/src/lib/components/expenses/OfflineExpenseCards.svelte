@@ -9,7 +9,7 @@
 
 	interface Props {
 		pendingExpenses: OfflineExpense[];
-		/** Rows parked as permanently-unsyncable (#79) — surfaced so the user can fix or discard them. */
+		/** Rows parked as permanently-unsyncable — surfaced so the user can fix or discard them. */
 		needsAttentionExpenses?: OfflineExpense[];
 		syncedExpenses: OfflineExpense[];
 		onRemovePending: (_id: string) => void;

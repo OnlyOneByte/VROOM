@@ -163,18 +163,18 @@ describe('calculateAverageMilesPerKwh', () => {
 });
 
 // ---------------------------------------------------------------------------
-// averageConsecutiveMpg (C17 dedup) — the SHARED consecutive-fill-up MPG loop that calculateAverageMPG
-// (calculations.ts) and calculateAverageMpg (vehicle-stats.ts) both delegate to. Before C17 the loop was
-// hand-copied at both sites (C161 proved a copy once lost its guard); now it's ONE helper. It was only
-// tested INDIRECTLY through its two callers (the C181/C229 "helper tested only in isolation" gap, same as
+// averageConsecutiveMpg — the SHARED consecutive-fill-up MPG loop that calculateAverageMPG
+// (calculations.ts) and calculateAverageMpg (vehicle-stats.ts) both delegate to. Before the loop was
+// hand-copied at both sites (proved a copy once lost its guard); now it's ONE helper. It was only
+// tested INDIRECTLY through its two callers (the "helper tested only in isolation" gap, same as
 // monthsBetween/C6) — these pin its OWN cells directly so a future edit to the band / skip / guard can't
 // drift undetected. The helper takes PRE-SORTED rows (callers own the sort) + the minimal {mileage,
 // volume, missedFillup} shape. The outlier band is the CANONICAL inclusive [MIN_VALID_MPG, MAX_VALID_MPG]
-// = [5,100] shared with the analytics charts (#30/C419, Angelo-APPROVED C20 — was (0,150) here).
+// = [5,100] shared with the analytics charts ( — was (0,150) here).
 // ---------------------------------------------------------------------------
-describe('averageConsecutiveMpg (C17 shared consecutive-pair MPG loop)', () => {
+describe('averageConsecutiveMpg (shared consecutive-pair MPG loop)', () => {
   test('averages consecutive pairs: miles-driven / current.volume', () => {
-    // (1500−1000)/20 = 25 ; (2100−1500)/20 = 30 → mean 27.5 (both in the [5,100] band)
+    // (1500−1000)/20 = 25; (2100−1500)/20 = 30 → mean 27.5 (both in the [5,100] band)
     expect(
       averageConsecutiveMpg([
         { mileage: 1000, volume: 20, missedFillup: false },
@@ -249,7 +249,7 @@ describe('averageConsecutiveMpg (C17 shared consecutive-pair MPG loop)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// parseClampedInt (C211 — the insurance /expiring-soon days/limit dedup; the #70 guard)
+// parseClampedInt (— the insurance /expiring-soon days/limit dedup; the guard)
 // ---------------------------------------------------------------------------
 
 describe('parseClampedInt', () => {
@@ -261,7 +261,7 @@ describe('parseClampedInt', () => {
     expect(parseClampedInt(undefined, 30, 1, 366)).toBe(30);
   });
 
-  test('a non-numeric value → fallback (the #70 guard: never NaN)', () => {
+  test('a non-numeric value → fallback (the guard: never NaN)', () => {
     expect(parseClampedInt('abc', 30, 1, 366)).toBe(30);
     expect(parseClampedInt('', 30, 1, 366)).toBe(30);
   });
@@ -282,9 +282,9 @@ describe('parseClampedInt', () => {
   });
 });
 
-// C421: sortExpensesByDate is the ONE source of truth for the chronological-order invariant the pairwise
+// sortExpensesByDate is the ONE source of truth for the chronological-order invariant the pairwise
 // efficiency calcs require (calculateAverageMPG / calculateAverageMilesPerKwh / the /stats handler all
-// pair consecutive rows; unsorted input silently mis-pairs — the #75/C222 class). Pins ascending order,
+// pair consecutive rows; unsorted input silently mis-pairs — the class). Pins ascending order,
 // no input mutation, and Date+string date handling.
 describe('sortExpensesByDate', () => {
   test('sorts ASCENDING by date', () => {

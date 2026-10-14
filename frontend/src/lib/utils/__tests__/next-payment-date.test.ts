@@ -88,12 +88,12 @@ describe('calculateNextPaymentDate — core contract', () => {
 	});
 });
 
-describe('calculateNextPaymentDate — month-end CLAMP (C330: the JS setMonth-overflow fix)', () => {
-	// Until C330 this advanced via setMonth(getMonth()+1), so a 31st-of-month start in a
+describe('calculateNextPaymentDate — month-end CLAMP (the JS setMonth-overflow fix)', () => {
+	// Until this advanced via setMonth(getMonth()+1), so a 31st-of-month start in a
 	// short month ROLLED FORWARD (Jan 31 → Mar 2/3, since Feb has no 31st) — the due date
-	// drifted into the WRONG month. C330 routes the monthly advance through addMonthsClamped,
+	// drifted into the WRONG month. routes the monthly advance through addMonthsClamped,
 	// which anchors on baseDate and clamps a day-of-month overflow to the target month's LAST
-	// day (sibling of the #90/#91/#92 financing-math fixes). So a 31st-start now always lands
+	// day (sibling of the financing-math fixes). So a 31st-start now always lands
 	// on a real day of the INTENDED month: the 31st in long months, the 28th/29th/30th in
 	// short ones — NEVER the 1st-3rd of the following month.
 	test('a 31st-of-month start lands on a valid day of the intended month, never rolled forward', () => {
@@ -102,7 +102,7 @@ describe('calculateNextPaymentDate — month-end CLAMP (C330: the JS setMonth-ov
 		expect(next.getTime()).toBeGreaterThan(Date.now());
 		const d = next.getDate();
 		// The clamp guarantees a real month-end day (28..31), and specifically NOT the
-		// rolled-forward 1st-3rd the pre-C330 setMonth produced.
+		// rolled-forward 1st-3rd the pre- setMonth produced.
 		expect(d).toBeGreaterThanOrEqual(28);
 		expect(d).toBeLessThanOrEqual(31);
 	});

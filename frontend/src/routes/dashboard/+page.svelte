@@ -98,7 +98,7 @@
 		if (!periodSummary?.monthlyTrend) return [];
 		return periodSummary.monthlyTrend.map(t => ({
 			// Local-time parse: `new Date('YYYY-MM-01')` is midnight UTC and shifts the
-			// month label back one for negative-offset users (cycle 211).
+			// month label back one for negative-offset users.
 			date: parseMonthToDate(t.period),
 			amount: t.amount
 		}));

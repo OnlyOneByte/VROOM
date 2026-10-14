@@ -4,11 +4,11 @@
  * A fully ADDITIVE migration — a single `CREATE TABLE trips` + a `trips_vehicle_date_idx` index (the
  * 0003-class additive shape, NOT the 0004 rebuild footgun). It creates a brand-new table, so it touches
  * NO existing row: pre-0007 data must survive byte-for-byte. These tests are the T1 proof gate:
- *   - the table exists on a fresh apply with the design §1 column set + NOT-NULL shape,
- *   - the composite (vehicle_id, trip_date) index exists (the odometer-index read pattern),
- *   - the vehicle_id / user_id FKs are ON DELETE CASCADE (a trip is owned data — deleting its vehicle or
- *     user must not orphan it; NORTH_STAR #2 tenant hygiene),
- *   - applying 0007 over a populated pre-0007 DB leaves every prior row untouched (additive = zero data risk).
+ *  - the table exists on a fresh apply with the design §1 column set + NOT-NULL shape,
+ *  - the composite (vehicle_id, trip_date) index exists (the odometer-index read pattern),
+ *  - the vehicle_id / user_id FKs are ON DELETE CASCADE (a trip is owned data — deleting its vehicle or
+ *  user must not orphan it; tenant hygiene),
+ *  - applying 0007 over a populated pre-0007 DB leaves every prior row untouched (additive = zero data risk).
  */
 
 import { Database } from 'bun:sqlite';

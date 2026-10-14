@@ -28,7 +28,7 @@ export interface OAuthStateEntry {
 }
 
 /**
- * SINGLE-USE consumption of an OAuth `state` from the in-flight store, with flow isolation (C39).
+ * SINGLE-USE consumption of an OAuth `state` from the in-flight store, with flow isolation.
  *
  * The OAuth `state` parameter is the CSRF token of the login/link/provider round-trip: it must be
  * (1) single-use — a replayed callback can't re-consume it; (2) flow-isolated — a state minted for the
@@ -36,13 +36,13 @@ export interface OAuthStateEntry {
  * fixation/confusion attack could cross flows; (3) anti-fixation — a mismatched/unknown state is DELETED
  * on the failed lookup, so a planted value can't linger. This was previously inlined byte-near-identically
  * in `validateLoginState`/`validateLinkState` and pinned only by brittle SOURCE-STRING scans
- * (auth-routes.property.test.ts); extracting it makes the behavior unit-testable (the C38 pattern). The
+ * (auth-routes.property.test.ts); extracting it makes the behavior unit-testable (the pattern). The
  * provider flow keeps its own inline consume (it adds a PKCE codeVerifier assertion) — same contract.
  *
- * @param expectedFlow  the `flowType` this caller requires: `undefined` for the LOGIN flow (entry must
- *                      have NO flowType), or `'auth-link'`/`'provider'` for those flows.
+ * @param expectedFlow the `flowType` this caller requires: `undefined` for the LOGIN flow (entry must
+ *  have NO flowType), or `'auth-link'`/`'provider'` for those flows.
  * @returns the entry on a valid single-use match, else null. EITHER WAY the state is deleted from the
- *          store (consumed on success; evicted on any failure) — never replayable.
+ *  store (consumed on success; evicted on any failure) — never replayable.
  */
 export function consumeOAuthState(
   store: Map<string, OAuthStateEntry>,

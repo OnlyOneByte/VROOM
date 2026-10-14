@@ -1,6 +1,6 @@
 /**
  * FE↔BE contract-drift guard for the single-financing GET response's enriched shape
- * (loop-improvement #2; C55 locked /stats, C62 the /vehicles LIST enrichment — this locks the
+ * (loop-improvement; locked /stats, the /vehicles LIST enrichment — this locks the
  * single-financing GET, a SEPARATE hand-assembled surface).
  *
  * `GET /api/v1/financing/vehicles/:vehicleId/financing` runs `enrichWithBalance` (routes.ts:82),
@@ -10,7 +10,7 @@
  * (vehicle.ts:65-66) declares both; the FE reads `computedBalance` for payoff-date math, the payment
  * planner, lease metrics, and the financing-form payoff display.
  *
- * Nothing else pins that THIS route keeps emitting them (the C62 guard covers only the list route):
+ * Nothing else pins that THIS route keeps emitting them (the guard covers only the list route):
  * a refactor of `enrichWithBalance` that returned the raw row would silently drop both here, every
  * consumer would fall back to `?? 0`, and payoff logic would break with no failing test. This asserts
  * the two computed keys are present (+ the base fields survive the spread) + the no-financing null
@@ -49,7 +49,7 @@ interface FinancingShape {
 
 /** Seed a vehicle, returns its id. */
 // This file's fixture is a nickname-required Honda Civic 2022; converge onto the shared test-helpers/seed
-// seedVehicle (arch convergence, Angelo-approved) via a thin wrapper that keeps make/model/year explicit
+// seedVehicle  via a thin wrapper that keeps make/model/year explicit
 // (the shared default is a Camry) so behavior is preserved.
 const seedVehicle = (nickname: string): Promise<string> =>
   seedVehicleShared(ctx, { make: 'Honda', model: 'Civic', year: 2022, nickname });
@@ -119,7 +119,7 @@ describe('GET single financing — enriched contract (FE↔BE drift guard)', () 
 });
 
 /**
- * #67 (data-correctness, found C206) — re-financing a vehicle whose prior financing was paid off must
+ * Re-financing a vehicle whose prior financing was paid off must
  * produce an ACTIVE record. The POST endpoint is a create-or-replace keyed on vehicleId; when a prior
  * row exists it reuses it via update(). `isActive` is .optional() in the create schema (a
  * .notNull().default(true) column → drizzle-zod omits it), and the FE financing payload never sends it,
@@ -127,7 +127,7 @@ describe('GET single financing — enriched contract (FE↔BE drift guard)', () 
  * the isActive-filtered queries (loanBreakdown/analytics) + the FE's isActive gate. The fix re-activates (+ clears
  * endDate) on the upsert. These pin that contract over the real HTTP stack.
  */
-describe('POST financing upsert — #67 re-activates a paid-off record', () => {
+describe('POST financing upsert — re-activates a paid-off record', () => {
   test('re-financing a paid-off vehicle yields an ACTIVE record (the regression)', async () => {
     const id = await seedVehicle('Refinanced');
     await seedLoan(id);

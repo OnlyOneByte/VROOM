@@ -64,8 +64,8 @@ export class PreferencesRepository {
   }
 
   /**
-   * ATOMIC deep-merge of a partial JSON patch into one JSON column, in a SINGLE UPDATE (#100,
-   * Angelo-decided 2026-06-23). The legacy read-modify-write pattern — `getOrCreate()` → JS-merge →
+   * ATOMIC deep-merge of a partial JSON patch into one JSON column, in a SINGLE UPDATE.
+   * The legacy read-modify-write pattern — `getOrCreate()` → JS-merge →
    * `update()` — has a lost-update race: a concurrent request's merge, computed from the same stale read,
    * clobbers ours (last-writer-wins). SQLite's `json_patch(target, patch)` applies an RFC-7386 merge-patch
    * RECURSIVELY inside the DB engine with no JS read-then-write gap, so two concurrent delta-merges BOTH
@@ -168,7 +168,7 @@ export class SyncStateRepository {
    * generated), NOT the moment the run finished: a long run can take minutes, and any data change made
    * AFTER the snapshot but BEFORE completion would otherwise be stamped as "already synced" (its
    * lastDataChangeDate < a fresh end-of-run lastSyncDate) and silently dropped from all future backups
-   * (C144 #42). Defaults to now for callers with no snapshot semantics.
+   *  Defaults to now for callers with no snapshot semantics.
    */
   async updateSyncDate(userId: string, syncedAt: Date = new Date()): Promise<void> {
     try {

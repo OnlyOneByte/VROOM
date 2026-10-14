@@ -5,11 +5,11 @@
  * This guards the RESTORE half: if a table is backed up but restore never inserts it, the
  * data round-trips into the archive and back out to NOTHING — silent data loss on restore.
  * The restore path has THREE hand-maintained lists that must agree with the registry:
- *   1. TABLE_SCHEMA_MAP (config) — the source of truth.
- *   2. RestoreService.insertBackupData() — hand-written FK-ordered `tx.insert(<table>)` calls.
- *   3. The ImportSummary interface — one count field per table, populated by hand in BOTH
- *      restoreFromBackup and restoreFromSheets (a missing field = silent undercount in the
- *      user's "imported N rows" confirmation).
+ *  1. TABLE_SCHEMA_MAP (config) — the source of truth.
+ *  2. RestoreService.insertBackupData() — hand-written FK-ordered `tx.insert(<table>)` calls.
+ *  3. The ImportSummary interface — one count field per table, populated by hand in BOTH
+ *  restoreFromBackup and restoreFromSheets (a missing field = silent undercount in the
+ *  user's "imported N rows" confirmation).
  *
  * Verdict at review time (c209): restore coverage is SOUND — all 15 backed-up tables are
  * inserted and summarized. These guards keep it that way under autonomous development.
@@ -39,7 +39,7 @@ function exportNameFor(target: unknown): string | undefined {
   return undefined;
 }
 
-describe('restore table coverage (drift guard — cycle 209)', () => {
+describe('restore table coverage', () => {
   test('insertBackupData inserts every table the backup registry serializes', () => {
     const missing: string[] = [];
     for (const [key, table] of Object.entries(TABLE_SCHEMA_MAP)) {
@@ -62,15 +62,15 @@ describe('restore table coverage (drift guard — cycle 209)', () => {
     ).toEqual([]);
   });
 
-  test('every inserted table is conflict-probed OR a child of a probed parent (the #93 symmetry, C302)', () => {
-    // #93 (C300): merge-mode insert(userPreferences) against the importer's always-present prefs row
+  test('every inserted table is conflict-probed OR a child of a probed parent (the symmetry)', () => {
+    // Merge-mode insert(userPreferences) against the importer's always-present prefs row
     // threw a raw UNIQUE-PK error because detectConflicts didn't PROBE userPreferences — it only
     // probed 6 tables while insertBackupData inserts 15. The fix added userPreferences + syncState to
     // the probes. This guard makes that symmetry DRIFT-PROOF: every table insertBackupData inserts must
     // be either (a) conflict-probed in detectConflicts, or (b) a CHILD whose insert can't be reached on
     // a colliding merge because the merge ABORTS on the parent's conflict first (detectConflicts returns
     // before the transaction runs). A new PARENT-LESS table added to inserts without a probe would
-    // silently reintroduce the #93 raw-throw class — this fails loudly instead.
+    // silently reintroduce the raw-throw class — this fails loudly instead.
     //
     // detectConflicts probes are written as `name: '<db_table_name>'`; collect them.
     const probedTableNames = new Set(
@@ -86,9 +86,9 @@ describe('restore table coverage (drift guard — cycle 209)', () => {
       insuranceTermVehicles: 'insurance_terms → insurance_policies (probed ancestor)',
       insuranceClaims: 'insurance_policies (FK policyId → probed parent)',
       odometerEntries: 'vehicles (FK vehicleId → probed parent)',
-      // reminders is now DIRECTLY probed (C441) — it's userId-owned with its own id PK and is NOT FK'd to
-      // vehicles (it survives vehicle deletion, the #97 state), so the old "child of vehicles" exemption
-      // was FALSE and let the #93 raw-UNIQUE-throw class reach insert(reminders). It's no longer listed
+      // reminders is now DIRECTLY probed — it's userId-owned with its own id PK and is NOT FK'd to
+      // vehicles (it survives vehicle deletion, the state), so the old "child of vehicles" exemption
+      // was FALSE and let the raw-UNIQUE-throw class reach insert(reminders). It's no longer listed
       // here; these two are genuine children of the now-probed reminders parent.
       reminderVehicles: 'reminders (FK reminderId → a now-probed parent)',
       reminderNotifications: 'reminders (FK reminderId → a now-probed parent)',
@@ -112,7 +112,7 @@ describe('restore table coverage (drift guard — cycle 209)', () => {
       unguarded,
       `Table(s) insertBackupData inserts that are neither conflict-probed nor a documented child of a ` +
         `probed parent. On a colliding merge these would throw a raw UNIQUE-PK error instead of a clean ` +
-        `conflict (the #93 class). Either add a probe to detectConflicts, or add it to ` +
+        `conflict (class). Either add a probe to detectConflicts, or add it to ` +
         `CHILD_OF_PROBED_PARENT with the parent FK that collides first:\n${unguarded.join('\n')}`
     ).toEqual([]);
   });

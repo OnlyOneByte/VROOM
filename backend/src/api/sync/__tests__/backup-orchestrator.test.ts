@@ -4,14 +4,14 @@
  * conditional ZIP, parallel with timeout, lastBackupAt + sheetsSpreadsheetId
  * persistence, updateSyncDate, empty providers, skip unregistered strategy.
  *
- * C181: `filterEnabledProviders` + `needsZipGeneration` are now imported from the REAL
+ * `filterEnabledProviders` + `needsZipGeneration` are now imported from the REAL
  * orchestrator module (it was previously coverage theater — the test re-implemented those
  * filters locally and asserted against the copies, so the real branches stayed 0%-covered
  * and a divergence between copy and source would go uncaught). execute() now calls these same
  * exported functions, so these assertions pin real code. The remaining sims (acquireMutex,
  * collectResults, simulateFanOut) still mirror logic embedded inside execute()'s body, which
  * is bound to getDb()/dynamic-imports and not reachable from an in-memory harness without the
- * C38/C91 process-global mock.module trap (the same singleton-bound limit deep-review #3 hit
+ * process-global mock.module trap (the same singleton-bound limit deep-review hit
  * on getFinancing) — left as behavioral mirrors + flagged, not falsely claimed as real coverage.
  */
 
@@ -383,7 +383,7 @@ describe('BackupOrchestrator', () => {
   });
 });
 
-// C181: edge cases pinning the REAL exported filters directly (the assertions above repurpose them
+// Edge cases pinning the REAL exported filters directly (the assertions above repurpose them
 // too; these add the boundaries those don't cover). Guards the real backup-run provider selection.
 describe('filterEnabledProviders / needsZipGeneration (real exports — edge cases)', () => {
   test('an empty config selects no providers and needs no ZIP', () => {

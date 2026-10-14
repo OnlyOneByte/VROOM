@@ -35,7 +35,7 @@ import { vehicleRepository } from './repository';
 const routes = new Hono();
 
 // unitPreferencesSchema + partialUnitPreferencesSchema now live in utils/unit-preferences-schema.ts
-// (shared with settings/routes.ts — the C238 dedup).
+// (shared with settings/routes.ts — the dedup).
 
 // Validation schemas derived from db schema
 const baseVehicleSchema = createInsertSchema(vehiclesTable, {
@@ -97,7 +97,7 @@ const createVehicleSchema = baseVehicleSchema
     unitPreferences: unitPreferencesSchema.optional(),
   });
 
-// Exported so the C41 `.partial()`+`.default()` no-clobber net can assert against it directly
+// Exported so the `.partial()`+`.default()` no-clobber net can assert against it directly
 // (partial-update-no-default-injection.test.ts) — it's a createInsertSchema(...).partial() over a
 // table with four .default() columns (vehicleType/trackFuel/trackCharging/unitPreferences), the exact
 // shape that class targets. Safe today (drizzle-zod doesn't surface DB defaults as Zod defaults), but
@@ -144,7 +144,7 @@ function vehicleRowToApi<T extends Record<string, unknown>>(row: T): T {
   const v = vehicleToApi(row);
   const fin = v.financing as Record<string, unknown> | null | undefined;
   // The embedded financing (money + derived computedBalance) goes through the SHARED
-  // financingWithBalanceToApi — identical to what the financing route returns (C22 dedup of the C14 self-dup).
+  // financingWithBalanceToApi — identical to what the financing route returns (dedup of the self-dup).
   if (fin && typeof fin === 'object') {
     return { ...v, financing: financingWithBalanceToApi(fin) };
   }
@@ -153,8 +153,8 @@ function vehicleRowToApi<T extends Record<string, unknown>>(row: T): T {
 
 /**
  * Assert a license plate is free within THIS user's fleet (plate uniqueness is per-user, not global —
- * see findByLicensePlate + migration 0005, the #80 fix). One source of truth for the create + update
- * checks (C289 dedup): the conflict message + the per-user-scoped lookup lived in two hand-rolled
+ * see findByLicensePlate + migration 0005, the fix). One source of truth for the create + update
+ * checks: the conflict message + the per-user-scoped lookup lived in two hand-rolled
  * copies. `excludeId` lets the update path ignore the vehicle being edited (so re-saving without
  * changing the plate, or hitting its own row, never false-409s itself).
  * @throws ConflictError if another of the user's vehicles already carries the plate.
@@ -174,7 +174,7 @@ async function assertLicensePlateAvailable(
 // TO the user via an ACCEPTED share (vehicle-sharing T5a, R3). Shared rows carry a `sharedAccess`
 // annotation ({ level, sharedBy }) so the fleet UI can badge "shared by X" and gate edit affordances by
 // level; owned rows are unchanged (no annotation). The widening is READ-ONLY + additive — it does not
-// touch the expense read/write model (T5b, the editor-write widening, is escalated to Angelo).
+// touch the expense read/write model (T5b, the editor-write widening, is a separate decision).
 const listVehiclesQuerySchema = z.object({
   include: z.enum(['shared']).optional(),
 });
@@ -239,7 +239,7 @@ routes.post('/', zValidator('json', createVehicleSchema), async (c) => {
   const user = c.get('user');
   const vehicleData = c.req.valid('json');
 
-  // Plate uniqueness is per-user (see assertLicensePlateAvailable / migration 0005, #80).
+  // Plate uniqueness is per-user (see assertLicensePlateAvailable / migration 0005).
   if (vehicleData.licensePlate) {
     await assertLicensePlateAvailable(vehicleData.licensePlate, user.id);
   }
@@ -277,7 +277,7 @@ routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
 
-  // Resolve access first: owner | viewer | editor | null. Null → 404 (never 403, the #80 oracle rule).
+  // Resolve access first: owner | viewer | editor | null. Null → 404 (never 403, the oracle rule).
   const access = await resolveVehicleAccess(id, user.id);
   if (!access) {
     throw new NotFoundError('Vehicle');
@@ -352,7 +352,7 @@ routes.put(
       await assertLicensePlateAvailable(updateData.licensePlate, user.id, id);
     }
 
-    // Merge partial unitPreferences with existing values (shared helper — the C238 dedup).
+    // Merge partial unitPreferences with existing values (shared helper — the dedup).
     const { unitPreferences: partialUnitPrefs, ...restUpdateData } = updateData;
     const mergedUnitPreferences = mergeUnitPreferences(
       existingVehicle.unitPreferences,
@@ -396,21 +396,21 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
 
   await vehicleRepository.delete(id);
 
-  // Post-delete reminder cleanups (#88 + #97). These run AFTER the vehicle is already deleted (the DB
+  // Post-delete reminder cleanups. These run AFTER the vehicle is already deleted (the DB
   // FK-cascade has already dropped the reminder_vehicles junction rows), so they're best-effort: the
   // delete the user asked for is DONE, and a cleanup hiccup must NOT 500 a successful delete — that would
   // show "failed", prompt a retry (→ a confusing 404), AND leave the very states these calls prevent
   // (orphaned split-config legs / vehicleless active reminders) un-fixed because the throw skipped them.
-  // The next reminder /trigger re-runs the same normalization, so a missed pass self-heals. (C234, the
-  // C233 best-effort-contract class on the vehicle-delete path.) Log + swallow; return the earned 200.
+  // The next reminder /trigger re-runs the same normalization, so a missed pass self-heals. (the
+  // best-effort-contract class on the vehicle-delete path.) Log + swallow; return the earned 200.
   try {
-    // #88: the reminder_vehicles junction cascades, but a reminder's `expenseSplitConfig` JSON blob is NOT
+    // The reminder_vehicles junction cascades, but a reminder's `expenseSplitConfig` JSON blob is NOT
     // FK-managed — its leg for the deleted vehicle lingers, so the next trigger builds a split sibling for
-    // the dead vehicleId → an FK violation that leaves the surviving legs half-committed (C151 footgun).
+    // the dead vehicleId → an FK violation that leaves the surviving legs half-committed.
     // Prune the deleted leg + renormalize FIRST (clears the blob when <2 legs remain).
     await reminderRepository.pruneSplitConfigsForDeletedVehicle(user.id, id);
 
-    // #97: the reminder_vehicles junction rows cascade away with the vehicle, but a reminder whose
+    // The reminder_vehicles junction rows cascade away with the vehicle, but a reminder whose
     // sole/last vehicle was this one is left active with ZERO vehicles — the trigger skips it
     // 'no_vehicles' forever with no user signal. Deactivate any such now-vehicleless active reminder.
     await reminderRepository.deactivateVehicleless(user.id);

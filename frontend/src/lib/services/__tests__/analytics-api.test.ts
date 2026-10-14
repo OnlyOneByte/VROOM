@@ -189,7 +189,7 @@ describe('analyticsApi.getSummary()', () => {
 });
 
 // ---------------------------------------------------------------------------
-// getDefaultDateRange — the last-12-months window every analytics page seeds with (C212).
+// getDefaultDateRange — the last-12-months window every analytics page seeds with.
 // Pure, exported, previously untested; a regression in the offset would skew every analytics query.
 // ---------------------------------------------------------------------------
 describe('getDefaultDateRange', () => {
@@ -220,7 +220,7 @@ describe('getDefaultDateRange', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Method→endpoint wiring + buildQuery (C212). The 12 thin wrappers the getSummary-only suite left
+// Method→endpoint wiring + buildQuery. The 12 thin wrappers the getSummary-only suite left
 // uncovered (the ~36% func gap). Mock apiClient, assert the EXACT path + query, and that the wrapper
 // returns the apiClient result verbatim (apiClient.get already unwraps the {success,data} envelope).
 // ---------------------------------------------------------------------------

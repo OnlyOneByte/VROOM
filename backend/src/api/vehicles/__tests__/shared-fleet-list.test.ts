@@ -3,7 +3,7 @@
  *
  * The ONLY widening shipped this cycle: an ACCEPTED share makes the owner's vehicle appear in the
  * invitee's fleet list (annotated sharedAccess { level, sharedBy }), owned ∪ accepted-shared. The
- * editor-WRITE widening on expenses (T5b) is escalated to Angelo (the expense read/write/backup model
+ * editor-WRITE widening on expenses (T5b) is a separate decision (the expense read/write/backup model
  * is userId-keyed, not vehicleId-keyed — a naive gate-flip would mis-stamp money rows), so this test
  * pins ONLY the additive read widening + that it does NOT leak on pending/declined/revoked or to
  * non-shared third parties.
@@ -121,14 +121,11 @@ describe('GET /vehicles?include=shared — fleet-list widening (T5a, R3)', () =>
 });
 
 /**
- * vehicle-sharing T13 — the full lifecycle round-trip through the REAL stack, as a TRACKED HTTP-harness
- * test (not an untracked browser e2e). The browser FE→render legs are already eyes-on-verified (T12b-1
- * drove accept; T12b-2 shot the "shared by" fleet badge), and the GUIDE's standing truth is "source-scan
- * guards > untracked e2e for merge survival" — an untracked *.meshclaw.e2e.ts vanishes on merge, and a
- * browser spec cannot even set up the OWNER (auth is OAuth-only, no HTTP signup). So the durable artifact
- * is this lifecycle assertion. It walks the exact T13 sequence — owner invites → invitee accepts (vehicle
- * appears in the invitee fleet) → owner REVOKES → vehicle is GONE from the fleet — closing the D8
- * revoke→gone-from-fleet leg, which no existing test pinned (shares-routes pins revoke→slot-freed only).
+ * The full vehicle-sharing lifecycle round-trip through the REAL stack, via the HTTP harness rather
+ * than a browser E2E: a browser spec cannot set up the OWNER at all, since auth is OAuth-only with no
+ * HTTP signup. It walks owner invites → invitee accepts (vehicle appears in the invitee fleet) → owner
+ * REVOKES → vehicle is GONE from the fleet, covering the revoke→gone-from-fleet leg that the
+ * shares-routes tests miss (those pin revoke→slot-freed only).
  */
 describe('vehicle-sharing T13 — invite → accept → appears → revoke → gone (lifecycle, D8)', () => {
   test('the owner revoking an ACCEPTED share removes the vehicle from the invitee fleet', async () => {
@@ -148,7 +145,7 @@ describe('vehicle-sharing T13 — invite → accept → appears → revoke → g
     expect((await ctx.authed('DELETE', `/api/v1/shares/${shareId}`)).status).toBe(200);
 
     // 4. The vehicle is GONE from B's fleet — a revoked grant confers NO fleet visibility (the leg
-    //    no prior test pinned). B's owned fleet is unaffected (B never owned it).
+    //  no prior test pinned). B's owned fleet is unaffected (B never owned it).
     const afterRevoke = await json<DataEnvelope<VehicleRow[]>>(
       await asB('GET', '/api/v1/vehicles?include=shared')
     );

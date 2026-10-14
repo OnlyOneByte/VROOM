@@ -1,16 +1,16 @@
 /**
- * Regression guard (C139, bug #39) for the expense-list date-range END boundary.
+ * Regression guard for the expense-list date-range END boundary.
  *
  * The UI DatePicker sends `endDate` as a date-only `YYYY-MM-DD`, which `z.coerce.date()` turns into
  * LOCAL midnight (00:00:00 — the START of that day). A bare `lte(expenses.date, midnight)` then drops
  * every same-day expense NOT stamped at exactly midnight, so a "through Mar 31" filter silently hides
- * all of Mar 31 (the C6/C61/C103 local-vs-UTC boundary class). The fix treats a midnight `endDate` as
+ * all of Mar 31 (the C6/ local-vs-UTC boundary class). The fix treats a midnight `endDate` as
  * INCLUSIVE of the whole local day (extends to 23:59:59.999 local); a non-midnight `endDate` is
  * honored verbatim. This builder backs BOTH the list (findPaginated) and the CSV export (findAll), so
  * the guard pins the most-used surface + keeps list==export.
  *
  * Dates are built with `new Date(Y, M, D, …)` (LOCAL) so the test is host-independent — the picked
- * day and the seeded timestamps share whatever the host TZ is (sidesteps the C77 UTC-host vacuity trap).
+ * day and the seeded timestamps share whatever the host TZ is (sidesteps the UTC-host vacuity trap).
  */
 
 import { Database } from 'bun:sqlite';
@@ -62,7 +62,7 @@ function input(overrides: Partial<NewExpense>): NewExpense {
   } as NewExpense;
 }
 
-describe('findPaginated endDate boundary (bug #39 same-day inclusive)', () => {
+describe('findPaginated endDate boundary (bug same-day inclusive)', () => {
   test('an afternoon expense on the endDate day is INCLUDED (the regression)', async () => {
     // Picked range: Mar 1 → Mar 31. Expense stamped Mar 31, 2:00pm LOCAL.
     await repo.create(

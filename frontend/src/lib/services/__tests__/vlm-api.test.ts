@@ -1,5 +1,5 @@
 /**
- * vlm-api.ts client (vlm-receipt-parsing T5a, C514) — the C149/C163 service-test pattern: apiClient is
+ * vlm-api.ts client (vlm-receipt-parsing T5a) — the service-test pattern: apiClient is
  * mocked so we assert the exact endpoint + multipart payload parseReceipt builds, and that it unwraps
  * the `{ draft }` envelope. The fork-free FE wrapper over the shipped POST /api/v1/receipts/parse.
  */

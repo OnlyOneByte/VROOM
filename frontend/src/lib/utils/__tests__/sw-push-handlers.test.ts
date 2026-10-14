@@ -6,13 +6,13 @@
  * a real installed PWA + a real browser push service (eyes-on-pending, like the live-VLM/Photos legs), so
  * a headless e2e can't be the merge-surviving net. This scans the SOURCE instead and pins the invariants a
  * future autonomous cycle could silently break:
- *   - the SW registers a `push` listener that shows a notification (else a delivered push is dropped),
- *   - the SW registers a `notificationclick` listener that opens a window (else a click does nothing),
- *   - the SW precaches the injected manifest (else `injectManifest` ships a SW with NO offline precache —
- *     a silent PWA-offline regression vs the prior generateSW behavior),
- *   - `vite.config.ts` actually wires the `injectManifest` strategy at `filename: 'sw.ts'` (else the SW
- *     source exists but is never built into the app),
- *   - the dead `static/sw.js` stays deleted (two registered service workers would collide — D4).
+ *  - the SW registers a `push` listener that shows a notification (else a delivered push is dropped),
+ *  - the SW registers a `notificationclick` listener that opens a window (else a click does nothing),
+ *  - the SW precaches the injected manifest (else `injectManifest` ships a SW with NO offline precache —
+ *  a silent PWA-offline regression vs the prior generateSW behavior),
+ *  - `vite.config.ts` actually wires the `injectManifest` strategy at `filename: 'sw.ts'` (else the SW
+ *  source exists but is never built into the app),
+ *  - the dead `static/sw.js` stays deleted (two registered service workers would collide — D4).
  *
  * Runs in the fast unit suite (`npm test`) — no browser, no server, no build.
  */

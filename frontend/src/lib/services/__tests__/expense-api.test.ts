@@ -1,5 +1,5 @@
 /**
- * Coverage ratchet (guard, C149) for expense-api.ts — the C124-named FE low spot. `buildExpenseQuery`
+ * Coverage ratchet for expense-api.ts — the-named FE low spot. `buildExpenseQuery`
  * is already pinned (build-expense-query.test.ts); this covers the uncovered LAYER: the method→endpoint
  * wiring + the backend↔frontend transform (fromBackendExpense / toBackendExpense) those methods drive,
  * the getPaginated envelope passthrough, and the downloadExpensesCsv blob→anchor DOM dance.

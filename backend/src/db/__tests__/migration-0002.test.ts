@@ -3,8 +3,8 @@
  *
  * Adds:
  * - insurance_claims table (FK policy_id → insurance_policies ON DELETE cascade,
- *   term_id → insurance_terms ON DELETE set null, vehicle_id → vehicles ON DELETE
- *   set null)
+ *  term_id → insurance_terms ON DELETE set null, vehicle_id → vehicles ON DELETE
+ *  set null)
  * - indexes: ic_policy_id_idx, ic_policy_status_idx, ic_vehicle_idx
  */
 

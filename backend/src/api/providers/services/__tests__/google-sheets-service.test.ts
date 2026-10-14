@@ -57,7 +57,7 @@ describe('GoogleSheetsService.createOrUpdateVroomSpreadsheet', () => {
 
     expect(info.name).toBe('VROOM Data - Demo User');
     expect(info.webViewLink).toContain(info.id);
-    // createSpreadsheet builds its tabs from the canonical SHEET_NAMES roster (C30 dedup): the created
+    // createSpreadsheet builds its tabs from the canonical SHEET_NAMES roster: the created
     // tab set must equal it exactly (same titles, same count) — proves the extraction is behavior-preserving.
     expect(info.sheets.map((s) => s.title)).toEqual([...SHEET_NAMES]);
     expect(info.sheets).toHaveLength(SHEET_NAMES.length);
@@ -163,13 +163,13 @@ describe('GoogleSheetsService.readSpreadsheetData', () => {
     expect(data.metadata.userId).toBe(ctx.user.id);
   });
 
-  // C193 (deep-review): certify the C174 `themePreference` column survives the GOOGLE SHEETS round-trip.
-  // C180 certified the ZIP/CSV path (exportAsZip → restoreFromBackup); the Sheets path is a DISTINCT
+  // Certify the `themePreference` column survives the GOOGLE SHEETS round-trip.
+  // certified the ZIP/CSV path (exportAsZip → restoreFromBackup); the Sheets path is a DISTINCT
   // serializer (formatValue → grid → parseValue → coerceRow) with its own hazards (parseValue('')→null,
   // numeric-looking ids), and it was never asserted for themePreference. themePreference rides
-  // SHEET_HEADERS (C174) on export + TABLE_SCHEMA_MAP coerce on restore; this drives the REAL fake-Sheets
-  // create→read chain to prove a non-default theme id makes the full round trip intact (NORTH_STAR #1).
-  test('a non-default themePreference survives the Sheets export→read round-trip (C174/C193)', async () => {
+  // SHEET_HEADERS on export + TABLE_SCHEMA_MAP coerce on restore; this drives the REAL fake-Sheets
+  // create→read chain to prove a non-default theme id makes the full round trip intact.
+  test('a non-default themePreference survives the Sheets export→read round-trip', async () => {
     await seedVehicle('Honda', 'Civic', 2019); // a vehicle so readSpreadsheetData resolves the userId
     const { db } = await import('../../../../db/connection');
     const schema = await import('../../../../db/schema');
@@ -201,15 +201,15 @@ describe('GoogleSheetsService.readSpreadsheetData', () => {
     expect(data.userPreferences[0].themePreference).toBe('instrument');
   });
 
-  // C204 (bug-scout CLEAN → guard): certify a trip survives the GOOGLE SHEETS round-trip, esp. the
-  // `tripDate` TIMESTAMP column. C202 wired trips into the Sheets export+readback; C203 pinned the ZIP/CSV
+  // (bug-scout CLEAN → guard) Certify a trip survives the GOOGLE SHEETS round-trip, esp. the
+  // `tripDate` TIMESTAMP column. wired trips into the Sheets export+readback; pinned the ZIP/CSV
   // path's tripDate — but the Sheets path is a DISTINCT serializer (formatValue → grid → parseValue) with
   // its own hazards: parseValue re-coerces every cell (numeric-looking → Number, ISO-shaped → new Date()),
-  // so an odometer could come back a number (fine) but a date could in principle be mis-handled. A C204
+  // so an odometer could come back a number (fine) but a date could in principle be mis-handled. A
   // bug-scout verified firsthand the full create→read chain is clean; this pins it so a future Sheets
-  // serializer change can't silently drop a trip or shift its timestamp (NORTH_STAR #1, the #87 date seam
+  // serializer change can't silently drop a trip or shift its timestamp (the date seam
   // on the Sheets leg). Distinct from trips-roundtrip.test.ts which guards the ZIP/CSV path.
-  test('a trip (with a non-midnight tripDate) survives the Sheets export→read round-trip (C204)', async () => {
+  test('a trip (with a non-midnight tripDate) survives the Sheets export→read round-trip', async () => {
     const { db } = await import('../../../../db/connection');
     const schema = await import('../../../../db/schema');
     const [veh] = await db
@@ -259,7 +259,7 @@ describe('GoogleSheetsService.readSpreadsheetData', () => {
   });
 });
 
-describe('GoogleSheetsService — formula-injection safety (#36)', () => {
+describe('GoogleSheetsService — formula-injection safety', () => {
   // The backup writes must use RAW, not USER_ENTERED — otherwise a cell value beginning with a formula
   // trigger (=,+,-,@) is parsed as a live formula by Sheets (injection + the user's OWN data silently
   // round-trips back as the formula RESULT, not the text they stored). The fake records grids identically
@@ -321,10 +321,10 @@ describe('GoogleSheetsService — error/resilience paths', () => {
   });
 });
 
-describe('GoogleSheetsService — atomic backup swap (#37)', () => {
-  // #37: the backup must be ATOMIC. The old in-place design cleared then re-wrote each LIVE sheet, so a
+describe('GoogleSheetsService — atomic backup swap', () => {
+  // The backup must be ATOMIC. The old in-place design cleared then re-wrote each LIVE sheet, so a
   // failure mid-run left a TORN backup (some sheets new, the mid-write one emptied by its clear, the rest
-  // stale) on what may be the user's ONLY copy — silent data-loss (NORTH_STAR #1). The fix stages every
+  // stale) on what may be the user's ONLY copy — silent data-loss. The fix stages every
   // table into temp tabs and only swaps them in (delete-old + rename-staging) once ALL staging writes
   // succeed, in one atomic batchUpdate. These guard the invariant that matters: a failed backup leaves the
   // PRIOR backup fully intact.

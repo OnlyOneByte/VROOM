@@ -1,17 +1,17 @@
 /**
- * Unit guard for validateAndRefreshSession (C313 — the auth/utils.ts session-rotation core).
+ * Unit guard for validateAndRefreshSession (— the auth/utils.ts session-rotation core).
  *
  * This security-critical helper (used by BOTH requireAuth middleware and POST /auth/refresh) had ZERO
  * direct tests — only incidental middleware-integration coverage (auth/utils.ts sat at ~40% line). It
  * carries four safety invariants worth pinning against a mockable Lucia (no DB):
- *   1. an invalid/expired session → null (caller treats as unauthenticated).
- *   2. a FRESH session (time-to-expiry ≥ refreshThreshold) → returned as-is, refreshed:false (no needless
- *      rotation churn — every request would otherwise mint+invalidate a session).
- *   3. a NEAR-EXPIRY session → rotates, and CRITICALLY creates the new session BEFORE invalidating the old
- *      (so a createSession failure never leaves the user with no valid session — the ordering the source
- *      comments call out).
- *   4. if rotation's createSession THROWS → FAILS OPEN to the existing session (refreshed:false), never
- *      logs the user out on a transient hiccup.
+ *  1. an invalid/expired session → null (caller treats as unauthenticated).
+ *  2. a FRESH session (time-to-expiry ≥ refreshThreshold) → returned as-is, refreshed:false (no needless
+ *  rotation churn — every request would otherwise mint+invalidate a session).
+ *  3. a NEAR-EXPIRY session → rotates, and CRITICALLY creates the new session BEFORE invalidating the old
+ *  (so a createSession failure never leaves the user with no valid session — the ordering the source
+ *  comments call out).
+ *  4. if rotation's createSession THROWS → FAILS OPEN to the existing session (refreshed:false), never
+ *  logs the user out on a transient hiccup.
  *
  * Lucia is injected, so this drives the REAL function with a hand-built mock recording call order.
  */
@@ -52,7 +52,7 @@ function sessionExpiringIn(ms: number) {
   return { id: 'old-session', expiresAt: new Date(Date.now() + ms) };
 }
 
-describe('validateAndRefreshSession (C313)', () => {
+describe('validateAndRefreshSession', () => {
   test('an invalid session → null (no refresh attempted)', async () => {
     const { lucia, calls } = makeLucia({ validate: { session: null, user: null } });
     const result = await validateAndRefreshSession('bad', lucia);

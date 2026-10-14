@@ -1,14 +1,14 @@
 /**
- * #293 (C183 guard) — the create-or-replace financing path must RESET every nullable cross-type/schedule
+ * The create-or-replace financing path must RESET every nullable cross-type/schedule
  * column to a clean value on reuse, so switching a vehicle's financing TYPE can't leave a prior type's
- * field stale (a `loan` row carrying a lease `mileageLimit`, etc — NORTH_STAR #2). C293 fixed this by
- * coalescing each `.optional()` field to null on the reused row (routes.ts replace branch); the C293
+ * field stale (a `loan` row carrying a lease `mileageLimit`, etc). fixed this by
+ * coalescing each `.optional()` field to null on the reused row (routes.ts replace branch); the
  * behavioral test (refinance-cross-type-field-reset) pins the CURRENTLY-known fields in both directions.
  *
  * GAP this closes: that behavioral test enumerates today's fields by hand, so a FUTURE schema migration
- * adding a new NULLABLE financing column would leave the replace path silently merging it stale (the #293
+ * adding a new NULLABLE financing column would leave the replace path silently merging it stale (the
  * class reopens) while every existing test stays green. This is the source-scan completeness guard (the
- * C25/C170/C172 idiom): it censuses the live `vehicleFinancing` nullable columns via getTableColumns and
+ * idiom): it censuses the live `vehicleFinancing` nullable columns via getTableColumns and
  * asserts EACH one is explicitly handled in the replace-path SET object — so adding a nullable column
  * forces the author to either reset it there or consciously exempt it here.
  *
@@ -41,7 +41,7 @@ function replaceSetObject(): string {
  */
 const SYSTEM_MANAGED = new Set(['createdAt', 'updatedAt']);
 
-describe('#293 create-or-replace coalesce-list completeness (C183 source-scan guard)', () => {
+describe('create-or-replace coalesce-list completeness', () => {
   const cols = getTableColumns(vehicleFinancing) as Record<string, { notNull: boolean }>;
   const nullableCols = Object.entries(cols)
     .filter(([, c]) => !c.notNull)
@@ -72,7 +72,7 @@ describe('#293 create-or-replace coalesce-list completeness (C183 source-scan gu
     expect(
       unmanaged,
       `These nullable vehicleFinancing columns are NOT reset on the create-or-replace path — a financing ` +
-        `TYPE switch will leave them STALE (the #293 cross-type class). Coalesce each to null in the ` +
+        `TYPE switch will leave them STALE (cross-type class). Coalesce each to null in the ` +
         `replace-branch SET object (financing/routes.ts), or add it to SYSTEM_MANAGED if it's ` +
         `system-driven:\n  ${unmanaged.join(', ')}`
     ).toEqual([]);

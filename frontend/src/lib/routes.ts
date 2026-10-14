@@ -4,13 +4,13 @@
  * All route strings live here so that if a page moves, only this file changes.
  * Use with `resolve()` from `$app/paths`:
  *
- *   import { routes } from '$lib/routes';
- *   import { resolve } from '$app/paths';
+ *  import { routes } from '$lib/routes';
+ *  import { resolve } from '$app/paths';
  *
- *   // Static:       resolve(routes.dashboard)
- *   // Parameterized: resolve(routes.vehicle, { id })
- *   // With query:    resolve(routes.expenseNew) + `?vehicleId=${id}`
- *   // Dynamic goto:  gotoDynamic(returnTo)   (for runtime-only strings like returnTo)
+ *  // Static: resolve(routes.dashboard)
+ *  // Parameterized: resolve(routes.vehicle, { id })
+ *  // With query: resolve(routes.expenseNew) + `?vehicleId=${id}`
+ *  // Dynamic goto: gotoDynamic(returnTo) (for runtime-only strings like returnTo)
  */
 
 // ── Static routes (no params) ──────────────────────────────────

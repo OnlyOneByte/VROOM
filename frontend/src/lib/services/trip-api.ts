@@ -14,7 +14,7 @@ interface CreateTripRequest {
 	startOdometer: number;
 	endOdometer: number;
 	purpose: TripPurpose;
-	/** ISO timestamp (the form sends a local-day → noon-local ISO, the C61/dateOnlyToISO discipline). */
+	/** ISO timestamp. The form sends a local day as a noon-local ISO via dateOnlyToISO. */
 	tripDate: string;
 	startLocation?: string;
 	endLocation?: string;
@@ -24,14 +24,14 @@ interface CreateTripRequest {
 type UpdateTripRequest = Partial<Omit<CreateTripRequest, 'vehicleId'>>;
 
 /**
- * Trip API service (trips-location T6 FE seam) — the C149/C163 service pattern over the C210/C212 routes:
- *   GET    /api/v1/trips                — paginated list (optional vehicleId/purpose filter)
- *   GET    /api/v1/trips/summary        — the R4 mileage rollup (optional vehicleId scope + business rate)
- *   GET    /api/v1/trips/vehicle/:id    — one vehicle's trips (newest first)
- *   GET    /api/v1/trips/:id            — one trip
- *   POST   /api/v1/trips                — create (vehicleId in body)
- *   PUT    /api/v1/trips/:id            — update
- *   DELETE /api/v1/trips/:id            — delete
+ * Trip API service (trips-location T6 FE seam) — the service pattern over the routes:
+ *  GET /api/v1/trips — paginated list (optional vehicleId/purpose filter)
+ *  GET /api/v1/trips/summary — the R4 mileage rollup (optional vehicleId scope + business rate)
+ *  GET /api/v1/trips/vehicle/:id — one vehicle's trips (newest first)
+ *  GET /api/v1/trips/:id — one trip
+ *  POST /api/v1/trips — create (vehicleId in body)
+ *  PUT /api/v1/trips/:id — update
+ *  DELETE /api/v1/trips/:id — delete
  */
 export const tripApi = {
 	async list(filters?: TripListFilters): Promise<PaginatedResponse<Trip>> {
@@ -74,7 +74,7 @@ export const tripApi = {
 	},
 
 	/**
-	 * Delete a trip. The C214 lifecycle: the trip's create wrote a linked odometer entry (D2), so the
+	 * Delete a trip. The lifecycle: the trip's create wrote a linked odometer entry (D2), so the
 	 * caller chooses whether to KEEP it (default — non-destructive) or remove it with the trip. Passes
 	 * `?keepOdometer=false` ONLY when the user opts to remove the linked entry; absent → the backend keeps.
 	 */

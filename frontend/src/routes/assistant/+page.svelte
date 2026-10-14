@@ -8,10 +8,10 @@
 	 * never change data — so there is no confirm/commit step here.
 	 *
 	 * Four-states (R9), at the PAGE level keyed on the provider check:
-	 *   loading  — checking whether an `llm` provider is configured
-	 *   error    — that check failed (retry)
-	 *   empty    — no `llm` provider configured (link to Settings → Assistant)
-	 *   data     — the chat surface (its own send lifecycle: idle / sending-spinner / send-error+retry)
+	 *  loading — checking whether an `llm` provider is configured
+	 *  error — that check failed (retry)
+	 *  empty — no `llm` provider configured (link to Settings → Assistant)
+	 *  data — the chat surface (its own send lifecycle: idle / sending-spinner / send-error+retry)
 	 *
 	 * SAFE RENDER (R8): the reply is shown as PLAIN TEXT with preserved whitespace (`whitespace-pre-wrap`)
 	 * — a text node, never `{@html}` — so untrusted model output cannot inject markup/script. No markdown

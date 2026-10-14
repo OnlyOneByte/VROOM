@@ -9,7 +9,7 @@
  * the clamp + the year-rollover + the no-op paths.
  *
  * Inputs use Date OBJECTS (not date-only strings) so getFullYear/getMonth/getDate are read in the
- * SAME frame the function constructs them — host-timezone-independent assertions (the C103/C77 trap:
+ * SAME frame the function constructs them — host-timezone-independent assertions (the trap:
  * a 'YYYY-MM-DD' string parses as UTC midnight, which the local getters can shift a day). A separate
  * block exercises the real date-only-string call path with timezone-robust relative assertions.
  *

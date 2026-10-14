@@ -73,7 +73,7 @@ function narrowPolicyToVehicle<
  * (validateInsuranceOwnership); a NON-owner reads the policy only if they hold read access to AT LEAST
  * ONE vehicle the policy covers. Returns the set of vehicleIds the acting user may read (for the
  * blast-radius claim narrow) — empty for the owner (a sentinel meaning "no narrowing, see all"). A
- * non-owner with no covered-vehicle access gets a 404 (existence-hiding, #80), exactly like the
+ * non-owner with no covered-vehicle access gets a 404 (existence-hiding), exactly like the
  * per-vehicle policies route. Mirrors design §6.4: a share must never pull the owner's OTHER vehicles
  * (or unattributed claims) into the invitee's view.
  */
@@ -113,7 +113,7 @@ const claimParamsSchema = z.object({
 /**
  * Validate a claim's OPTIONAL vehicleId/termId links before a create/update write. The route already
  * proves policy ownership, but the claim schema accepts a free-form `vehicleId` (a cross-tenant FK —
- * the #61/#62 within-tenant-integrity class) and `termId` (which must belong to THIS policy, not another
+ * the within-tenant-integrity class) and `termId` (which must belong to THIS policy, not another
  * — including another tenant's). The repository wrote both VERBATIM, so without this a user could attach
  * a claim to a vehicle they don't own or a term from a different policy, corrupting claim attribution
  * and planting a cross-tenant reference. Only checks fields that are present (a `null` clear on update is
@@ -155,9 +155,9 @@ routes.get('/', async (c) => {
 // GET /api/v1/insurance/expiring-soon — expiring policies
 routes.get('/expiring-soon', async (c) => {
   const user = c.get('user');
-  // Both params go through parseClampedInt (C211 dedup): a non-numeric value → the fallback, never
+  // Both params go through parseClampedInt: a non-numeric value → the fallback, never
   // a NaN that would make `endDate = new Date(now + NaN)` an Invalid Date and silently empty the
-  // result (#70). `days` → 30-day default, clamped 1..366; `limit` → 100, clamped 1..200.
+  // result. `days` → 30-day default, clamped 1..366; `limit` → 100, clamped 1..200.
   const daysAhead = parseClampedInt(c.req.query('days'), 30, 1, 366);
   const limit = parseClampedInt(c.req.query('limit'), 100, 1, 200);
   const now = new Date();
@@ -198,7 +198,7 @@ routes.post('/', zValidator('json', createPolicySchema), async (c) => {
   const data = c.req.valid('json');
   const policy = await insurancePolicyRepository.create(data, user.id);
 
-  // Auto-create split expenses for each term that has a cost (totalCost OR a monthly premium, #69).
+  // Auto-create split expenses for each term that has a cost (totalCost OR a monthly premium).
   // The hook computes the effective total (createTermExpenses → effectiveTermCost) and no-ops on 0.
   for (const term of policy.terms) {
     const termVehicleIds = vehicleIdsForTerm(policy.termVehicleCoverage, term.id);
@@ -262,7 +262,7 @@ routes.delete('/:id', zValidator('param', idParamSchema), async (c) => {
   await deleteAllPhotosForEntity('insurance_policy', id, user.id);
   await deletePhotosForEntities('insurance_claim', claimIds, user.id);
 
-  // Clean the auto-materialized premium expenses too (#57). Each costed term spawned a split expense
+  // Clean the auto-materialized premium expenses too. Each costed term spawned a split expense
   // (hooks.ts createTermExpenses, sourceType:'insurance_term', sourceId:termId), but expenses link to
   // terms by plain text columns, NOT an FK — so the term cascade-delete below leaves those expense rows
   // ORPHANED, still summed into TCO insurance cost forever (analytics categorizes any financial +
@@ -290,7 +290,7 @@ routes.post(
     const termData = c.req.valid('json');
     const policy = await insurancePolicyRepository.addTerm(id, termData, user.id);
 
-    // Auto-create split expenses if the new term has a cost (totalCost OR a monthly premium, #69).
+    // Auto-create split expenses if the new term has a cost (totalCost OR a monthly premium).
     const termVehicleIds = vehicleIdsForTerm(policy.termVehicleCoverage, policy.newTermId);
     await createTermExpenses({
       termId: policy.newTermId,

@@ -269,7 +269,7 @@
 		{#if calculatedMpg && energyMode === 'fuel'}
 			<!-- Color stays on the icon (graphical, exempt); the TEXT is text-foreground.
 			     chart-2/chart-5 small text on this bg-chart-2/10 tint fails WCAG AA
-			     (~3.1:1); the ✅/⚠️ glyph carries the good/poor signal. (cycle 188/196 class) -->
+			     (~3.1:1); the ✅/⚠️ glyph carries the good/poor signal. -->
 			<div class="bg-chart-2/10 border border-chart-2/20 rounded-lg p-3">
 				<div class="flex items-center gap-2 text-foreground">
 					<Gauge class="h-4 w-4 text-chart-2" />

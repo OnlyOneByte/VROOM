@@ -1,16 +1,16 @@
 /**
- * Characterizes the MILEAGE axis of the reminder trigger (maintenance-schedule T3 part 2, cycle 25)
+ * Characterizes the MILEAGE axis of the reminder trigger.
  * — the whichever-comes-first runtime that fires a service reminder when a vehicle's odometer
  * reaches a milestone, independent of any time/date axis.
  *
  * Mileage reminders aren't API-creatable yet (validation is T4), so these seed the reminder row
  * directly via sqlite, then drive the REAL trigger endpoint (route → service → odometer repo → DB)
  * and read notifications straight off sqlite. Pinned:
- *   - current odometer >= nextDueOdometer → exactly ONE mileage notification (null dueDate,
- *     dueOdometer set); below the milestone → none
- *   - re-triggering does NOT duplicate the milestone notification (idempotent; no auto-re-arm)
- *   - a mileage reminder with !=1 linked vehicle is skipped (D4), not errored
- *   - the current odometer is the MAX across expenses.mileage + odometer_entries (getCurrentOdometer)
+ *  - current odometer >= nextDueOdometer → exactly ONE mileage notification (null dueDate,
+ *  dueOdometer set); below the milestone → none
+ *  - re-triggering does NOT duplicate the milestone notification (idempotent; no auto-re-arm)
+ *  - a mileage reminder with !=1 linked vehicle is skipped (D4), not errored
+ *  - the current odometer is the MAX across expenses.mileage + odometer_entries (getCurrentOdometer)
  *
  * createTestApp() rewrites env + dynamic-imports DB-bound modules, so keep static imports to the
  * harness + bun:test.
@@ -98,7 +98,7 @@ describe('mileage-reminder trigger (whichever-comes-first, odometer axis)', () =
     expect(notifs[0]?.due_odometer).toBe(35000);
   });
 
-  // C463 guard: the due-gate (trigger-service.ts:418) is `currentOdometer < nextDueOdometer →
+  // guard: the due-gate (trigger-service.ts:418) is `currentOdometer < nextDueOdometer →
   // not yet due`, i.e. EXACT-equality must FIRE (>=-due semantics). Every other firing case here
   // seeds STRICTLY past the milestone (35200/36000/40500), so a `<`→`<=` slip (re-deriving "not
   // yet due" as `<=`) would ship GREEN while silently dropping the notification for a vehicle that
@@ -178,7 +178,7 @@ describe('mileage-reminder trigger (whichever-comes-first, odometer axis)', () =
     expect(mileageNotifs('rm5')).toHaveLength(1);
   });
 
-  // C256: the mileage dedup is per-MILESTONE (the rn_reminder_odo_idx partial unique is on
+  // The mileage dedup is per-MILESTONE (the rn_reminder_odo_idx partial unique is on
   // (reminderId, dueOdometer)), NOT per-reminder. After mark-serviced re-arms to a NEW milestone,
   // crossing THAT must fire a fresh notification — a regression making the index reminderId-only
   // would silently block every future milestone. This pins the distinct-milestone invariant the
@@ -212,7 +212,7 @@ describe('mileage-reminder trigger (whichever-comes-first, odometer axis)', () =
     expect(after.map((n) => n.due_odometer)).toEqual([35000, 40200]);
   });
 
-  // C317 deep-review: a `both` (whichever-comes-first) reminder that is SIMULTANEOUSLY time-overdue
+  // deep-review: a `both` (whichever-comes-first) reminder that is SIMULTANEOUSLY time-overdue
   // AND mileage-past-milestone must fire TWO distinct notifications in one trigger — one on the time
   // axis (dueDate set, dueOdometer null) and one on the mileage axis (dueOdometer set, dueDate null).
   // This is exactly what the TWO partial unique indexes enable (rn_reminder_due_idx on dueDate +

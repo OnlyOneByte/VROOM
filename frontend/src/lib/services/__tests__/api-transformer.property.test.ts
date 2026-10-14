@@ -171,7 +171,7 @@ describe('Property 2: fuelType-based mutual exclusivity', () => {
 });
 
 /**
- * description clear-on-edit (the clear-optional-field class, cycles 82-85).
+ * description clear-on-edit (the clear-optional-field class).
  * On CREATE (default), an empty/absent description is OMITTED — preserving the
  * historical payload that the offline outbox + sync paths also emit. On EDIT
  * (isEdit: true), an emptied description is sent as explicit `null` so the user
@@ -200,14 +200,14 @@ describe('toBackendExpense description clear-on-edit', () => {
 });
 
 /**
- * #66 (offline data-safety, NORTH_STAR #1/#2) — toBackendExpense decides volume-vs-charge SOLELY
+ * (offline data-safety) toBackendExpense decides volume-vs-charge SOLELY
  * from isElectricFuelType(fuelType). The offline outbox (OfflineExpense) must therefore carry
  * fuelType, or an electric charging expense created offline syncs with NO energy value: with
  * fuelType undefined, isElectricFuelType(undefined) is false → the volume-only branch runs →
  * `volume` is undefined for an electric entry → the `charge` is silently dropped from the POST.
  * These pin the discriminant so the regression can't return at the transform layer.
  */
-describe('toBackendExpense — #66 charge survives only when fuelType is carried', () => {
+describe('toBackendExpense — charge survives only when fuelType is carried', () => {
 	const electric = { vehicleId: 'v1', category: 'fuel' as const, amount: 30, charge: 42 };
 
 	test('REGRESSION: an electric entry WITHOUT fuelType drops charge (volume-only branch) — the bug', () => {

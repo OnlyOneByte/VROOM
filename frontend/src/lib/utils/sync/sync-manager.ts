@@ -42,7 +42,7 @@ interface SyncResult {
 	success: boolean;
 	synced: number;
 	failed: number;
-	/** Count of rows parked as permanently-unsyncable this run (#79) — surfaced, not retried. */
+	/** Count of rows parked as permanently-unsyncable this run — surfaced, not retried. */
 	needsAttention: number;
 	conflicts: SyncConflict[];
 	errors: string[];
@@ -109,12 +109,12 @@ class SyncManager {
 			const pendingExpenses = getPendingExpenses();
 			const result = await this.syncExpenses(pendingExpenses);
 
-			// #135: reap the rows that successfully synced this run so localStorage does not grow unbounded.
+			// Reap the rows that successfully synced this run so localStorage does not grow unbounded.
 			// syncExpenses marks each successful row `synced:true` (leaving pending/conflict/needs-attention
 			// rows untouched), and clearSyncedExpenses drops ONLY `synced` rows — so this is safe to run
 			// regardless of the run's overall outcome: a partial run reaps just the synced rows and keeps the
 			// rest for the next attempt. (The legacy syncOfflineExpenses already reaped this way; SyncManager
-			// previously only marked synced and never cleared, so synced rows lingered forever — the #135 leak.)
+			// previously only marked synced and never cleared, so synced rows lingered forever — the leak.)
 			clearSyncedExpenses();
 
 			if (result.success && result.conflicts.length === 0) {
@@ -166,7 +166,7 @@ class SyncManager {
 					} else if (syncResult.conflict) {
 						result.conflicts.push(syncResult.conflict);
 					} else if (syncResult.permanent) {
-						// #79: a structurally-unsyncable row (e.g. malformed fuel entry) fails the same way every
+						// A structurally-unsyncable row (e.g. malformed fuel entry) fails the same way every
 						// attempt. PARK it as needs-attention instead of scheduling retries — it drops out of
 						// getPendingExpenses so it's never silently re-attempted again, and is surfaced via
 						// getNeedsAttentionExpenses for the user to fix or discard. NOT counted as a transient
@@ -205,7 +205,7 @@ class SyncManager {
 		success: boolean;
 		conflict?: SyncConflict;
 		error?: string;
-		/** True when the failure is structural + self-resolving-impossible (retrying can't help) — #79. */
+		/** True when the failure is structural, so retrying can never help. */
 		permanent?: boolean;
 	}> {
 		try {
@@ -224,7 +224,7 @@ class SyncManager {
 			if (isIncompleteFuelExpense(expense)) {
 				// A malformed fuel row (no volume/charge or no mileage) fails IDENTICALLY on every attempt —
 				// it's permanently unsyncable until the user edits it. Flag it permanent so syncExpenses parks
-				// it (needsAttention) instead of burning retries + silently re-attempting it forever (#79).
+				// it (needsAttention) instead of burning retries + silently re-attempting it forever.
 				return {
 					success: false,
 					permanent: true,
@@ -249,7 +249,7 @@ class SyncManager {
 	): Promise<{ date: string; amount: number; tags: string[] } | null> {
 		try {
 			// GET /expenses returns RAW backend rows (expenseAmount, un-split volume) — map each through
-			// fromBackendExpense like every other expense read (#133, the #128 class). Skipping it left
+			// fromBackendExpense like every other expense read. Skipping it left
 			// `existing.amount` undefined, so determineConflictType's `Math.abs(local.amount - server.amount)`
 			// was NaN → amountMatch always false → a genuine duplicate mis-classified 'modified', and the
 			// SyncConflictResolver dialog rendered a blank server amount.
@@ -284,9 +284,9 @@ class SyncManager {
 		// lost-response duplicate) and the user resolved it (markExpenseAsSynced). The setTimeout is
 		// detached from retryCount, so it fires regardless; without this re-check it would re-run the
 		// conflict-check, find the committed server row, and RESURRECT the already-resolved conflict —
-		// re-listing it in syncConflicts.current + flipping syncState back to 'error' (the C424 dedup
+		// re-listing it in syncConflicts.current + flipping syncState back to 'error' (the dedup
 		// doesn't catch it because resolution already removed it from the live set). getPendingExpenses()
-		// is the !synced source of truth (C426): if the row is no longer pending, the retry is a no-op.
+		// is the !synced source of truth: if the row is no longer pending, the retry is a no-op.
 		if (!getPendingExpenses().some(e => e.id === expense.id)) return;
 
 		try {
@@ -299,7 +299,7 @@ class SyncManager {
 					e.id === expense.id ? { ...e, synced: true } : e
 				);
 			} else if (result.conflict) {
-				// #121 (C424): a conflict detected ON A RETRY must be SURFACED for resolution, just like the
+				// A conflict detected ON A RETRY must be SURFACED for resolution, just like the
 				// main syncExpenses loop does (which pushes to result.conflicts → syncConflicts.current). The
 				// realistic trigger: the first POST committed server-side but its response was lost → the
 				// expense stayed pending + a retry was scheduled → on retry checkForExistingExpense now finds
@@ -330,11 +330,11 @@ class SyncManager {
 				case 'keep_local': {
 					const backendExpense = offlineExpenseToBackend(conflict.localExpense);
 					try {
-						// #98 (FIXED C51): POST to the create endpoint with `forceOverwrite: true` + the local
+						// POST to the create endpoint with `forceOverwrite: true` + the local
 						// row's clientId. The backend now HONORS the flag (createExpenseSchema accepts it;
 						// createIdempotent updates the existing (userId, clientId) row in place rather than
 						// no-op-returning it) — so on a GENUINE clientId collision the local edit is APPLIED,
-						// not silently dropped (NORTH_STAR #1). A clean insert (new clientId) is unaffected.
+						// not silently dropped. A clean insert (new clientId) is unaffected.
 						await apiClient.post('/api/v1/expenses', {
 							...backendExpense,
 							clientId: conflict.localExpense.clientId,

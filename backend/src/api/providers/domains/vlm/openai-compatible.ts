@@ -9,7 +9,7 @@
  * The adapter is DUMB TRANSPORT: it sends the FIXED prompt + the image and returns the model's RAW
  * text. The shared `parseExtraction` (prompt.ts) is the SOLE validator — this file never trusts or
  * bounds the content. A non-2xx / network / timeout failure THROWS (the parse route maps it to a 502;
- * never a faked success — the #43/#44/#144 anti-fail-open lesson). The api key (when present) goes in
+ * never a faked success — the anti-fail-open lesson). The api key (when present) goes in
  * the Authorization header; a keyless config (self-hosted Ollama) omits it.
  */
 

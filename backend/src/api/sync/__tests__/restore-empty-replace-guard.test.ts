@@ -1,5 +1,5 @@
 /**
- * Data-safety regression (NORTH_STAR #1: no silent loss) for bug #21.
+ * Data-safety regression (: no silent loss) for bug.
  *
  * Replace-mode restore deletes ALL of the user's data, then inserts the backup. `validateBackupData`
  * only checks metadata + per-row schema + referential integrity — so an empty-but-VALID backup (every
@@ -38,7 +38,7 @@ function vehicleRows(): VehicleRowDb[] {
   return ctx.sqlite.query('SELECT id, make FROM vehicles').all() as VehicleRowDb[];
 }
 
-describe('restore refuses an empty-backup replace (bug #21 silent total-wipe guard)', () => {
+describe('restore refuses an empty-backup replace (bug silent total-wipe guard)', () => {
   test('replace with a 0-row backup throws and leaves existing data intact', async () => {
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');

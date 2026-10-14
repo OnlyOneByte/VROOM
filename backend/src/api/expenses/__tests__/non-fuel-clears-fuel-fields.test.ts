@@ -1,5 +1,5 @@
 /**
- * Backend #76 (C244): a NON-fuel expense write must not persist fuel-only fields. The FE C226 fix
+ * Backend: a NON-fuel expense write must not persist fuel-only fields. The FE fix
  * clears volume/charge/fuelType/mileage on a category switch client-side, but the backend wrote
  * updateData/expenseData verbatim — so a direct API caller (or a future client) could store a
  * maintenance/misc row carrying volume/fuelType/missedFillup and, crucially, a stray `mileage` that
@@ -40,7 +40,7 @@ function expenseRow(id: string): FuelCols {
     .get(id) as FuelCols;
 }
 
-describe('non-fuel expense writes null the fuel-only fields (#76 backend)', () => {
+describe('non-fuel expense writes null the fuel-only fields (backend)', () => {
   test('POST a misc expense carrying stray volume/fuelType/mileage → stored with them nulled', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const res = await ctx.authed('POST', '/api/v1/expenses', {
@@ -94,7 +94,7 @@ describe('non-fuel expense writes null the fuel-only fields (#76 backend)', () =
     expect(row.missed_fillup).toBe(0);
   });
 
-  test('PUT writing a stray mileage onto an ALREADY-non-fuel row (no category sent) nulls it (#76 third leg, C434)', async () => {
+  test('PUT writing a stray mileage onto an ALREADY-non-fuel row (no category sent) nulls it (third leg)', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     // A maintenance expense — no fuel fields. (Created non-fuel, so it has no mileage to start.)
     const created = await ctx.authed('POST', '/api/v1/expenses', {
@@ -109,7 +109,7 @@ describe('non-fuel expense writes null the fuel-only fields (#76 backend)', () =
     expect(expenseRow(id).mileage).toBeNull(); // sanity: no mileage pre-edit
 
     // Edit it WITHOUT resending category, sneaking in a stray mileage (a direct API caller / stale
-    // client). updateData.category is undefined here — pre-C434 the clear was a no-op and 99_999 would
+    // client). updateData.category is undefined here — pre- the clear was a no-op and 99_999 would
     // persist on a maintenance row, becoming the vehicle's MAX(odometer) cross-category.
     const put = await ctx.authed('PUT', `/api/v1/expenses/${id}`, {
       expenseAmount: 85,

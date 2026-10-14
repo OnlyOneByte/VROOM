@@ -60,7 +60,7 @@ export interface ValidationResult {
  * their CAMELCASE drizzle field name (coerceRow + the CSV headers use the field name, not the snake_case
  * db column). A pre-cents backup (metadata.version < 2.0.0) stored these as DOLLAR floats; restoring it
  * into the cents schema must ×100 them, or coerceRow's INTEGER branch would `Math.round('12.34')` = 12
- * cents = $0.12, a silent 100× corruption (design §4, NORTH_STAR #1). A flat field-name set is safe:
+ * cents = $0.12, a silent 100× corruption (design §4). A flat field-name set is safe:
  * coerceRow processes ONE table at a time, and no NON-money column shares any of these names (apr/volume/
  * businessMileageRate — the excluded reals — are all distinctly named).
  */
@@ -132,7 +132,7 @@ export function coerceRow(
 
     // A NOT NULL column that carries a STATIC default: an absent/empty/null backup value must resolve to
     // that default, never to null — else the insert throws `NOT NULL constraint failed` and the WHOLE
-    // restore aborts (the user can't recover ANY data from their own valid backup, NORTH_STAR #1). This is
+    // restore aborts (the user can't recover ANY data from their own valid backup). This is
     // the steering-doc `coerceRow` footgun (DatabaseMigrations.md): the boolean special-case below already
     // did exactly this (`col.default ?? false`); this generalizes it to every type (text `themePreference`/
     // `currencyUnit`/`backupFrequency`, JSON `unitPreferences`, integer `syncInactivityMinutes`, …). Gated
@@ -174,7 +174,7 @@ export function coerceRow(
       // STRICT numeric parse, not Number.parseInt: parseInt stops at the first non-digit, so a
       // thousands-separated value the Google Sheets restore returns (default valueRenderOption is
       // FORMATTED_VALUE → a 12,345-mile odometer comes back as the string "12,345") would truncate
-      // to 12 — silently, since 12 is not NaN — corrupting the reading 1000x (#68, NORTH_STAR #1).
+      // to 12 — silently, since 12 is not NaN — corrupting the reading 1000x.
       // Strip grouping commas, then require the WHOLE string to be numeric (Number(), unlike parseInt,
       // rejects a "12abc" tail to NaN → null, matching the existing garbage→null contract). Round so a
       // Sheets "12345.0" / a stray decimal lands on a whole number rather than truncating.
@@ -552,7 +552,7 @@ export class BackupService {
     // total exceeds the cap. A real backup is CSV text well under this; a bomb is
     // far over. (header.size is the uncompressed byte count for each entry.)
     //
-    // #22: header.size is ATTACKER-DECLARED, so a bomb can lie (declare a small size to
+    // Header.size is ATTACKER-DECLARED, so a bomb can lie (declare a small size to
     // pass the sum below, then inflate to GB on getData()). Guard the COMPRESSION RATIO
     // per entry FIRST — compressedSize is the real in-file byte count, and the declared
     // size being an absurd multiple of it is a bomb signature the sum can't catch. This
@@ -734,13 +734,13 @@ export class BackupService {
 
   /**
    * Reject a backup whose rows would violate a DB-level UNIQUE index, BEFORE restore's destructive
-   * replace-mode wipe runs (#127, C428). Per-row schema + referential checks don't catch CROSS-ROW
+   * replace-mode wipe runs. Per-row schema + referential checks don't catch CROSS-ROW
    * duplicates, so a corrupt/truncated download with two expenses sharing a non-null clientId
    * (expenses_user_client_idx) or two vehicles sharing a licensePlate (vehicles_user_license_plate_idx)
    * passes validateBackupData, the wipe commits, then the 2nd colliding INSERT throws — and bun-sqlite's
-   * async-transaction callback does NOT roll back the wipe (the C151 footgun), leaving the account EMPTY.
+   * async-transaction callback does NOT roll back the wipe, leaving the account EMPTY.
    * Catching the duplicate here means the insert can't fail on it, so the wipe never runs. (The general
-   * transient-insert-failure window is a transaction-atomicity fix, escalated C428 — this closes the one
+   * transient-insert-failure window is a transaction-atomicity fix, escalated — this closes the one
    * reachable within-tenant data-loss trigger.)
    */
   private validateUniqueConstraints(backup: ParsedBackupData): string[] {
@@ -749,7 +749,7 @@ export class BackupService {
     // keyed column is null, because SQLite treats a NULL in an indexed column as DISTINCT (and the
     // partial indexes are `WHERE <col> IS NOT NULL`) — so such a row can never collide. A single-column
     // index is just the one-element case: `[String(v)].join(sep) === String(v)` with the identical
-    // null-skip, so this subsumes the former scalar dupCheck byte-for-byte (C292 dedup of the C291
+    // null-skip, so this subsumes the former scalar dupCheck byte-for-byte (dedup of the
     // self-introduced sibling — the scalar variant was a strict special case of this one).
     const dupCheck = (
       rows: Record<string, unknown>[] | undefined,
@@ -769,9 +769,9 @@ export class BackupService {
     };
     dupCheck(backup.expenses, ['clientId'], 'expense clientId'); // expenses_user_client_idx
     dupCheck(backup.vehicles, ['licensePlate'], 'vehicle licensePlate'); // vehicles_user_license_plate_idx
-    // The remaining DB-level UNIQUE indexes on backed-up + restored tables (C291 — the #127/C428 leg
+    // The remaining DB-level UNIQUE indexes on backed-up + restored tables (— the leg
     // those two checks missed): a duplicate on any of these survives per-row + referential validation,
-    // then throws on the colliding INSERT after the replace-mode wipe → empty account (C151 footgun).
+    // then throws on the colliding INSERT after the replace-mode wipe → empty account.
     dupCheck(backup.photoRefs, ['photoId', 'providerId'], 'photoRef photo+provider'); // pr_photo_provider_idx
     dupCheck(
       backup.reminderNotifications,
@@ -810,7 +810,7 @@ export class BackupService {
    * Shared referential check for a row that owns purely via a `vehicleId` FK (financing/odometer/trips —
    * each cascade-deletes with its vehicle). Rejects a backup whose row names a vehicle absent from the SAME
    * backup, so the post-wipe restore INSERT can't FK-violate. The three callers were byte-identical save the
-   * entity label (a rule-of-three the C202 trips addition tipped — dedup'd C205); the message is preserved
+   * entity label (a rule-of-three the trips addition tipped — dedup'd); the message is preserved
    * verbatim (`<Label> <id> references non-existent vehicle`) so any consumer of the text is unaffected.
    */
   private validateVehicleFkRefs(
@@ -954,8 +954,8 @@ export class BackupService {
     // entityType keys MUST match the photo upload allowlist (photos/helpers.ts validateEntityOwnership):
     // vehicle / insurance_policy / insurance_claim / expense / odometer_entry. A type accepted on upload
     // but missing here makes restore reject an otherwise-valid backup outright (valid:false aborts the
-    // WHOLE restore, not just the photo) — the crown-jewel NORTH_STAR #1 round-trip failure insurance_claim
-    // hit (C404: claim photos are a real, app-creatable target the original 15-table cert/C366 predated).
+    // WHOLE restore, not just the photo) — the crown-jewel round-trip failure insurance_claim
+    // hit (: claim photos are a real, app-creatable target the original 15-table cert/ predated).
     const entityTypeToIds: Record<string, Set<string>> = {
       vehicle: entityIds.vehicleIds,
       expense: entityIds.expenseIds,

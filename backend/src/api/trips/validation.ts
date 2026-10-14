@@ -2,15 +2,15 @@
  * Trip route validation (trips-location T3, design §3).
  *
  * createTripSchema enforces the business rules the DB can't:
- *   - R2: endOdometer >= startOdometer (a cross-field refine — the reminders/validation.ts idiom). The
- *     stored distance is DERIVED (tripDistance, max(0,…)), but rejecting an inverted pair at the boundary
- *     keeps a nonsensical reading out of the DB rather than silently clamping it to 0.
- *   - D4: purpose is one of the four known values (a z.enum, not free text).
- *   - R5: tripDate is z.coerce.date() — same as expenses/odometer/reminders; the client sends an ISO
- *     instant (its local-day handling is dateOnlyToISO on the FE = NOON LOCAL), the server stores it. The
- *     future-guard rejects only a future LOCAL CALENDAR DAY (notFutureLocalDay) — not an absolute instant,
- *     which would 400 a today-trip sent as noon-local whenever the server clock is before local noon.
- *   - D5: startLocation/endLocation/note are optional free-text (no GPS in v1), length-bounded.
+ *  - R2: endOdometer >= startOdometer (a cross-field refine — the reminders/validation.ts idiom). The
+ *  stored distance is DERIVED (tripDistance, max(0,…)), but rejecting an inverted pair at the boundary
+ *  keeps a nonsensical reading out of the DB rather than silently clamping it to 0.
+ *  - D4: purpose is one of the four known values (a z.enum, not free text).
+ *  - R5: tripDate is z.coerce.date() — same as expenses/odometer/reminders; the client sends an ISO
+ *  instant (its local-day handling is dateOnlyToISO on the FE = NOON LOCAL), the server stores it. The
+ *  future-guard rejects only a future LOCAL CALENDAR DAY (notFutureLocalDay) — not an absolute instant,
+ *  which would 400 a today-trip sent as noon-local whenever the server clock is before local noon.
+ *  - D5: startLocation/endLocation/note are optional free-text (no GPS in v1), length-bounded.
  *
  * The vehicleId is NOT in the body — it's a route param on POST /:vehicleId (the odometer/expenses idiom),
  * validated for ownership separately. updateTripSchema is the partial (every field optional) but KEEPS the
@@ -39,12 +39,12 @@ const REFINE_MSG = {
  * R5 future-guard: reject a tripDate whose LOCAL CALENDAR DAY is after today's — NOT a bare
  * `d <= new Date()` absolute-instant comparison.
  *
- * The FE sends a date-only value anchored at NOON LOCAL (dateOnlyToISO, the C61/#39 discipline), so an
+ * The FE sends a date-only value anchored at NOON LOCAL (dateOnlyToISO, the discipline), so an
  * absolute-instant guard wrongly rejected a trip dated TODAY whenever the server clock was before local
  * noon — noon-local-today is then HOURS in the "future" relative to `now`, 400-ing the form's own default
  * (log today's trip) for the entire local morning, every day. R5 specifies local-calendar-day semantics, so
  * "in the future" means a calendar DAY after today: compare against the END of the current local day. (The
- * #87/#106/#39 date-off-by-one family — an instant comparison where a local-day one was intended.)
+ * date-off-by-one family — an instant comparison where a local-day one was intended.)
  */
 const notFutureLocalDay = (d: Date): boolean => {
   const now = new Date();

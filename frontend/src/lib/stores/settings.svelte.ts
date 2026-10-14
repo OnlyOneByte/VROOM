@@ -18,8 +18,8 @@ const DEFAULT_UNIT_PREFERENCES: UnitPreferences = {
 	chargeUnit: 'kwh'
 };
 
-// C166 (arch): the local handleError was a byte-identical reimplementation of the shared
-// extractErrorMessage (C90/C137 — error-wins precedence). Converged onto the shared helper; the fallback
+// The local handleError was a byte-identical reimplementation of the shared
+// extractErrorMessage (— error-wins precedence). Converged onto the shared helper; the fallback
 // string is passed explicitly. (NOT handleApiError, whose fallback-wins precedence is a different contract.)
 const UNEXPECTED_ERROR = 'An unexpected error occurred';
 
