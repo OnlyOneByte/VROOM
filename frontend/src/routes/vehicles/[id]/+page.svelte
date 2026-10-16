@@ -190,11 +190,7 @@
 	// the owner; summary + fuel-efficiency are shared-readable (T5b-3 / T8a) so they fire for everyone.
 	onMount(async () => {
 		await loadVehicle();
-		await Promise.all([
-			...(isOwner ? [loadPhotos()] : []),
-			loadSummary(),
-			loadFuelEfficiency()
-		]);
+		await Promise.all([...(isOwner ? [loadPhotos()] : []), loadSummary(), loadFuelEfficiency()]);
 		// Load stats after initial data is loaded
 		if (vehicle) {
 			await loadVehicleStats();
@@ -581,7 +577,7 @@
 							<ExpensesTable
 								expenses={filteredExpenses}
 								showVehicleColumn={false}
-								canWrite={canWrite}
+								{canWrite}
 								returnTo={resolve(paramRoutes.vehicle, { id: vehicleId })}
 								onDelete={handleDeleteExpense}
 								emptyTitle={COMMON_MESSAGES.NO_EXPENSES}

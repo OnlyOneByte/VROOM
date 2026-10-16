@@ -496,9 +496,7 @@ describe('calculatePayoffDate', () => {
 				fc.double({ min: 100, max: 100_000, noNaN: true, noDefaultInfinity: true }),
 				fc.double({ min: 50, max: 5_000, noNaN: true, noDefaultInfinity: true }),
 				(apr, computedBalance, paymentAmount) => {
-					const d = calculatePayoffDate(
-						makeFinancing({ apr, computedBalance, paymentAmount })
-					);
+					const d = calculatePayoffDate(makeFinancing({ apr, computedBalance, paymentAmount }));
 					expect(isValidDate(d)).toBe(true);
 				}
 			),

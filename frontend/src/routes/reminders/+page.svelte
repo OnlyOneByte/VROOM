@@ -277,9 +277,9 @@
 					     mileage reminder's action cluster is up to 5 buttons (Serviced+Pause+edit+delete) and is
 					     flex-shrink-0, so on a phone the old single-row justify-between starved the min-w-0 title to
 					     a ~1-char sliver. -->
-					<CardNs.CardContent
-						class="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
-					>
+				<CardNs.CardContent
+					class="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+				>
 					<div class="flex items-start gap-3 min-w-0">
 						<div class="mt-0.5 {due ? 'text-warning' : 'text-muted-foreground'}">
 							{#if due}

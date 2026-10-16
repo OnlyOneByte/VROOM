@@ -66,7 +66,7 @@ describe('ExpenseForm offline-save sites carry the fuel fields (dropout guard)',
 	});
 
 	test('every addOfflineExpense call carries missedFillup (— MPG-pairing correctness)', () => {
-		const missing = bodies.filter((b) => !b.includes('missedFillup'));
+		const missing = bodies.filter(b => !b.includes('missedFillup'));
 		expect(
 			missing,
 			`An addOfflineExpense(...) call omits missedFillup. Dropping it on sync makes ` +
@@ -76,7 +76,7 @@ describe('ExpenseForm offline-save sites carry the fuel fields (dropout guard)',
 	});
 
 	test('every addOfflineExpense call carries fuelType (— electric charge survives sync)', () => {
-		const missing = bodies.filter((b) => !b.includes('fuelType'));
+		const missing = bodies.filter(b => !b.includes('fuelType'));
 		expect(
 			missing,
 			`An addOfflineExpense(...) call omits fuelType. The sync transform needs it to keep an ` +

@@ -144,9 +144,9 @@ describe('shouldTriggerRecurringExpenses (T5 opportunistic-materialization gate)
 	});
 
 	it('offline beats the never-run case (offline always skips)', () => {
-		expect(
-			shouldTriggerRecurringExpenses({ ...base, isOnline: false, lastRunMs: null })
-		).toBe(false);
+		expect(shouldTriggerRecurringExpenses({ ...base, isOnline: false, lastRunMs: null })).toBe(
+			false
+		);
 	});
 });
 

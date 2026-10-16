@@ -71,7 +71,9 @@ describe('validateTripFields', () => {
 	});
 
 	test('R2 holds across mixed string/number odometers (end < start)', () => {
-		expect(validateTripFields(form({ startOdometer: 1080, endOdometer: '1000' })).endOdometer).toBeTruthy();
+		expect(
+			validateTripFields(form({ startOdometer: 1080, endOdometer: '1000' })).endOdometer
+		).toBeTruthy();
 	});
 
 	test('parseOdometer tolerates string | number | null (the exported submit-path parser)', () => {

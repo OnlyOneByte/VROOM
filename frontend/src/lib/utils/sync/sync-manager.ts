@@ -139,7 +139,6 @@ class SyncManager {
 		}
 	}
 
-
 	private async syncExpenses(expenses: OfflineExpense[]): Promise<SyncResult> {
 		const result: SyncResult = {
 			success: true,

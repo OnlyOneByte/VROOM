@@ -242,7 +242,9 @@
 						<div class="flex items-start justify-between gap-3">
 							<div class="min-w-0 flex-1">
 								<div class="flex flex-wrap items-center gap-2">
-									<span class="text-sm font-medium text-foreground">{capitalize(claim.claimType)}</span>
+									<span class="text-sm font-medium text-foreground"
+										>{capitalize(claim.claimType)}</span
+									>
 									<Badge variant={STATUS_VARIANT[claim.status]} class="text-xs">
 										{STATUS_LABELS[claim.status]}
 									</Badge>
@@ -339,8 +341,13 @@
 					</div>
 					<div class="space-y-1">
 						<Label for="claim-type">Type</Label>
-						<Select.Root type="single" value={claimType} onValueChange={v => (claimType = v as ClaimType)}>
-							<Select.Trigger id="claim-type" class="w-full">{capitalize(claimType)}</Select.Trigger>
+						<Select.Root
+							type="single"
+							value={claimType}
+							onValueChange={v => (claimType = v as ClaimType)}
+						>
+							<Select.Trigger id="claim-type" class="w-full">{capitalize(claimType)}</Select.Trigger
+							>
 							<Select.Content>
 								{#each CLAIM_TYPES as t (t)}
 									<Select.Item value={t} label={capitalize(t)}>{capitalize(t)}</Select.Item>
@@ -350,8 +357,14 @@
 					</div>
 					<div class="space-y-1">
 						<Label for="claim-status">Status</Label>
-						<Select.Root type="single" value={status} onValueChange={v => (status = v as ClaimStatus)}>
-							<Select.Trigger id="claim-status" class="w-full">{STATUS_LABELS[status]}</Select.Trigger>
+						<Select.Root
+							type="single"
+							value={status}
+							onValueChange={v => (status = v as ClaimStatus)}
+						>
+							<Select.Trigger id="claim-status" class="w-full"
+								>{STATUS_LABELS[status]}</Select.Trigger
+							>
 							<Select.Content>
 								{#each CLAIM_STATUSES as s (s)}
 									<Select.Item value={s} label={STATUS_LABELS[s]}>{STATUS_LABELS[s]}</Select.Item>
@@ -361,7 +374,14 @@
 					</div>
 					<div class="space-y-1">
 						<Label for="claim-payout">Payout amount</Label>
-						<Input id="claim-payout" type="number" step="0.01" min="0" bind:value={payoutAmount} placeholder="0.00" />
+						<Input
+							id="claim-payout"
+							type="number"
+							step="0.01"
+							min="0"
+							bind:value={payoutAmount}
+							placeholder="0.00"
+						/>
 					</div>
 					<div class="space-y-1 sm:col-span-2">
 						<Label for="claim-fault">Fault</Label>
@@ -407,7 +427,12 @@
 
 				<div class="space-y-1">
 					<Label for="claim-desc">Description</Label>
-					<Textarea id="claim-desc" bind:value={description} rows={2} placeholder="What happened?" />
+					<Textarea
+						id="claim-desc"
+						bind:value={description}
+						rows={2}
+						placeholder="What happened?"
+					/>
 				</div>
 
 				<div class="flex justify-end gap-2">

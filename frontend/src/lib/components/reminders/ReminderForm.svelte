@@ -16,7 +16,11 @@
 	import { capitalize, dateOnlyToISO, toDateInputValue } from '$lib/utils/formatters';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
 	import { getDistanceUnitLabel } from '$lib/utils/units';
-	import { buildSplitConfig, categoryLabels, resetSplitAllocations } from '$lib/utils/expense-helpers';
+	import {
+		buildSplitConfig,
+		categoryLabels,
+		resetSplitAllocations
+	} from '$lib/utils/expense-helpers';
 	import type { SplitAllocationDraft } from '$lib/utils/expense-helpers';
 	import type { ExpenseCategory, ReminderWithVehicles, Vehicle } from '$lib/types';
 	import type { ReminderSplitConfig, TriggerMode } from '$lib/types/reminder';

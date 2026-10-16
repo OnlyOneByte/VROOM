@@ -58,9 +58,7 @@ describe('parseMonthToDate (local-time month bucket parser)', () => {
 	test('the rendered local month matches the input (no UTC-shift regression)', () => {
 		// The whole point: toLocaleDateString in any zone shows the month we asked for.
 		// `new Date('2024-03-01')` would render "Feb" west of UTC — this must not.
-		expect(parseMonthToDate('2024-03').toLocaleDateString('en-US', { month: 'short' })).toBe(
-			'Mar'
-		);
+		expect(parseMonthToDate('2024-03').toLocaleDateString('en-US', { month: 'short' })).toBe('Mar');
 		expect(parseMonthToDate('2024-01').getMonth()).toBe(0);
 		expect(parseMonthToDate('2024-12').getMonth()).toBe(11);
 	});

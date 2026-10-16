@@ -34,7 +34,7 @@ function stripComments(source: string): string {
 	return source
 		.replace(/\/\*[\s\S]*?\*\//g, ' ')
 		.split('\n')
-		.map((line) => {
+		.map(line => {
 			const idx = line.indexOf('//');
 			return idx === -1 ? line : line.slice(0, idx);
 		})
@@ -107,8 +107,8 @@ describe('Background Sync registration stays paired with a consuming sync listen
 	const CONSUMER = /addEventListener\(\s*['"]sync['"]/;
 
 	const registrars = appSourceFiles(SRC_ROOT)
-		.filter((file) => REGISTRAR.test(stripComments(readFileSync(file, 'utf8'))))
-		.map((file) => relative(SRC_ROOT, file).split(sep).join('/'));
+		.filter(file => REGISTRAR.test(stripComments(readFileSync(file, 'utf8'))))
+		.map(file => relative(SRC_ROOT, file).split(sep).join('/'));
 
 	test('no app code registers a Background Sync tag the service worker does not consume', () => {
 		if (registrars.length > 0) {

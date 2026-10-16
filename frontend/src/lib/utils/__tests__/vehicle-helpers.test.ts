@@ -32,9 +32,9 @@ describe('getVehicleDisplayName', () => {
 
 	test('an empty-string nickname falls through to "year make model" (|| is falsy-checked)', () => {
 		// nickname '' is falsy, so the OR picks the formatted name rather than rendering a blank label.
-		expect(getVehicleDisplayName({ year: 2020, make: 'Toyota', model: 'Camry', nickname: '' })).toBe(
-			'2020 Toyota Camry'
-		);
+		expect(
+			getVehicleDisplayName({ year: 2020, make: 'Toyota', model: 'Camry', nickname: '' })
+		).toBe('2020 Toyota Camry');
 	});
 
 	// The load-bearing branch: a reference to a vehicle that no longer exists (deleted while a split

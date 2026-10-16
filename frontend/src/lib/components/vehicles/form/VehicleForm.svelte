@@ -383,9 +383,7 @@
 			const vinVal = vehicleForm.vin ? vehicleForm.vin.toUpperCase() : undefined;
 			const mileage = vehicleForm.initialMileage ?? undefined;
 			const price = vehicleForm.purchasePrice ?? undefined;
-			const pDate = vehicleForm.purchaseDate
-				? dateOnlyToISO(vehicleForm.purchaseDate)
-				: undefined;
+			const pDate = vehicleForm.purchaseDate ? dateOnlyToISO(vehicleForm.purchaseDate) : undefined;
 
 			// Update/create vehicle.
 			let savedVehicle: Vehicle;

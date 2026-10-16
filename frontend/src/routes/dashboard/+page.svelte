@@ -139,31 +139,33 @@
 		const now = Date.now();
 		const horizon = now + UPCOMING_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 		const vehicleMap = new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)]));
-		return remindersList
-			.filter(r => r.reminder.isActive)
-			// This is the TIME-axis "due soon" widget. A pure-mileage reminder has a null nextDueDate
-			// (its due-ness is odometer-based, surfaced on the /reminders page) — exclude it here, and
-			// the narrowing lets the date math below treat nextDueDate as a string.
-			.filter(
-				(r): r is typeof r & { reminder: { nextDueDate: string } } =>
-					r.reminder.nextDueDate !== null
-			)
-			.filter(r => new Date(r.reminder.nextDueDate).getTime() <= horizon)
-			.sort(
-				(a, b) =>
-					new Date(a.reminder.nextDueDate).getTime() - new Date(b.reminder.nextDueDate).getTime()
-			)
-			.map(r => ({
-				id: r.reminder.id,
-				name: r.reminder.name,
-				nextDueDate: r.reminder.nextDueDate,
-				isOverdue: new Date(r.reminder.nextDueDate).getTime() <= now,
-				expenseAmount: r.reminder.expenseAmount,
-				vehicleNames: r.vehicleIds
-					.map(id => vehicleMap.get(id))
-					.filter(Boolean)
-					.join(', ')
-			}));
+		return (
+			remindersList
+				.filter(r => r.reminder.isActive)
+				// This is the TIME-axis "due soon" widget. A pure-mileage reminder has a null nextDueDate
+				// (its due-ness is odometer-based, surfaced on the /reminders page) — exclude it here, and
+				// the narrowing lets the date math below treat nextDueDate as a string.
+				.filter(
+					(r): r is typeof r & { reminder: { nextDueDate: string } } =>
+						r.reminder.nextDueDate !== null
+				)
+				.filter(r => new Date(r.reminder.nextDueDate).getTime() <= horizon)
+				.sort(
+					(a, b) =>
+						new Date(a.reminder.nextDueDate).getTime() - new Date(b.reminder.nextDueDate).getTime()
+				)
+				.map(r => ({
+					id: r.reminder.id,
+					name: r.reminder.name,
+					nextDueDate: r.reminder.nextDueDate,
+					isOverdue: new Date(r.reminder.nextDueDate).getTime() <= now,
+					expenseAmount: r.reminder.expenseAmount,
+					vehicleNames: r.vehicleIds
+						.map(id => vehicleMap.get(id))
+						.filter(Boolean)
+						.join(', ')
+				}))
+		);
 	});
 
 	onMount(loadDashboardData);

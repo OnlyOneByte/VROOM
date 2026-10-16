@@ -40,7 +40,7 @@ describe('every FloatingActionButton page reserves bottom clearance', () => {
 	});
 
 	test('the FAB is actually used somewhere (else this guard is vacuous)', () => {
-		const fabPages = routeFiles.filter((f) => USES_FAB.test(readFileSync(f, 'utf8')));
+		const fabPages = routeFiles.filter(f => USES_FAB.test(readFileSync(f, 'utf8')));
 		expect(fabPages.length).toBeGreaterThanOrEqual(4);
 	});
 

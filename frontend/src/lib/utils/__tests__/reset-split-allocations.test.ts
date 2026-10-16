@@ -31,7 +31,7 @@ describe('resetSplitAllocations', () => {
 	test("'percentage' rounds 100/3 to ONE decimal (33.3, the load-bearing rounding)", () => {
 		const out = resetSplitAllocations('percentage', ['v1', 'v2', 'v3']);
 		// 100/3 = 33.333… → 33.3 (round to 1 decimal). A 2-decimal copy would give 33.33 and diverge.
-		expect(out.map((a) => a.percentage)).toEqual([33.3, 33.3, 33.3]);
+		expect(out.map(a => a.percentage)).toEqual([33.3, 33.3, 33.3]);
 	});
 
 	test('empty vehicle list: even/absolute → [], percentage → [] (no NaN, no divide-by-zero)', () => {
@@ -66,10 +66,14 @@ describe('buildSplitConfig', () => {
 
 	test("'absolute' maps each allocation to {vehicleId, amount}", () => {
 		expect(
-			buildSplitConfig('absolute', ['v1', 'v2'], [
-				{ vehicleId: 'v1', amount: 30 },
-				{ vehicleId: 'v2', amount: 70 }
-			])
+			buildSplitConfig(
+				'absolute',
+				['v1', 'v2'],
+				[
+					{ vehicleId: 'v1', amount: 30 },
+					{ vehicleId: 'v2', amount: 70 }
+				]
+			)
 		).toEqual({
 			method: 'absolute',
 			allocations: [
@@ -81,10 +85,14 @@ describe('buildSplitConfig', () => {
 
 	test("'percentage' maps each allocation to {vehicleId, percentage}", () => {
 		expect(
-			buildSplitConfig('percentage', ['v1', 'v2'], [
-				{ vehicleId: 'v1', percentage: 60 },
-				{ vehicleId: 'v2', percentage: 40 }
-			])
+			buildSplitConfig(
+				'percentage',
+				['v1', 'v2'],
+				[
+					{ vehicleId: 'v1', percentage: 60 },
+					{ vehicleId: 'v2', percentage: 40 }
+				]
+			)
 		).toEqual({
 			method: 'percentage',
 			allocations: [
@@ -103,6 +111,9 @@ describe('buildSplitConfig', () => {
 
 	test('a cleared percentage input (undefined percentage) coalesces to 0', () => {
 		const out = buildSplitConfig('percentage', ['v1'], [{ vehicleId: 'v1' }]);
-		expect(out).toEqual({ method: 'percentage', allocations: [{ vehicleId: 'v1', percentage: 0 }] });
+		expect(out).toEqual({
+			method: 'percentage',
+			allocations: [{ vehicleId: 'v1', percentage: 0 }]
+		});
 	});
 });

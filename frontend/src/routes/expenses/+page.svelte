@@ -2,7 +2,18 @@
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { routes } from '$lib/routes';
-	import { Calendar, DollarSign, Search, FileText, TrendingUp, X, Car, CircleAlert, Download, Images } from '@lucide/svelte';
+	import {
+		Calendar,
+		DollarSign,
+		Search,
+		FileText,
+		TrendingUp,
+		X,
+		Car,
+		CircleAlert,
+		Download,
+		Images
+	} from '@lucide/svelte';
 	import { offlineExpenseQueue } from '$lib/stores/offline.svelte';
 	import { removeOfflineExpense } from '$lib/utils/offline-storage';
 	import { settingsStore } from '$lib/stores/settings.svelte';

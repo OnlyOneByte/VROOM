@@ -13,14 +13,7 @@
  */
 
 import { describe, expect, test } from 'vitest';
-import {
-	Wifi,
-	WifiOff,
-	RefreshCw,
-	CircleCheck,
-	CircleAlert,
-	Clock
-} from '@lucide/svelte';
+import { Wifi, WifiOff, RefreshCw, CircleCheck, CircleAlert, Clock } from '@lucide/svelte';
 import { getSyncStatusInfo, type SyncStatusParams } from '$lib/utils/sync/sync-status';
 
 /** A "nothing going on, online" baseline; override per case. */

@@ -34,14 +34,16 @@
 	// reflect the active theme). Values are the raw oklch strings from the registry → safe inline styles.
 	function swatchColors(theme: ThemeDefinition): string[] {
 		const tokens = theme[variant];
-		return theme.swatch.map((key) => tokens[key]);
+		return theme.swatch.map(key => tokens[key]);
 	}
 </script>
 
 <Card>
 	<CardHeader>
 		<CardTitle>Theme</CardTitle>
-		<CardDescription>Pick a color theme. Your light/dark choice above still applies.</CardDescription>
+		<CardDescription
+			>Pick a color theme. Your light/dark choice above still applies.</CardDescription
+		>
 	</CardHeader>
 	<CardContent>
 		<div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -72,9 +74,7 @@
 						     SAME color (e.g. background === card) — keying on (color) would throw Svelte's
 						     each_key_duplicate at runtime and crash the whole picker for that theme. -->
 						{#each swatchColors(theme) as color, i (i)}
-							<span
-								class="h-6 w-6 rounded-md border border-border/50"
-								style={`background:${color}`}
+							<span class="h-6 w-6 rounded-md border border-border/50" style={`background:${color}`}
 							></span>
 						{/each}
 					</div>

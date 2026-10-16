@@ -25,48 +25,48 @@ const STORE_SRC = readFileSync(`${CWD}/src/lib/stores/theme.svelte.ts`, 'utf8');
 
 /** Extract the store's STORAGE_KEY literal from its source (the value the head-script must read). */
 function storeStorageKey(): string {
-  const m = STORE_SRC.match(/const STORAGE_KEY\s*=\s*['"]([^'"]+)['"]/);
-  return m?.[1] ?? '';
+	const m = STORE_SRC.match(/const STORAGE_KEY\s*=\s*['"]([^'"]+)['"]/);
+	return m?.[1] ?? '';
 }
 
 /** Extract the store's THEME_ID_KEY literal (the theme-id mirror the head-script must read pre-paint). */
 function storeThemeIdKey(): string {
-  const m = STORE_SRC.match(/const THEME_ID_KEY\s*=\s*['"]([^'"]+)['"]/);
-  return m?.[1] ?? '';
+	const m = STORE_SRC.match(/const THEME_ID_KEY\s*=\s*['"]([^'"]+)['"]/);
+	return m?.[1] ?? '';
 }
 
 describe('app.html anti-FOUC head-script mirrors the theme store', () => {
-  test('the head-script reads the SAME localStorage key the store writes', () => {
-    const key = storeStorageKey();
-    expect(key, 'store STORAGE_KEY is parseable').toBeTruthy();
-    // The inline script must getItem the exact key the store persists to.
-    expect(APP_HTML).toContain(`localStorage.getItem('${key}')`);
-    // And the store itself must use it for both read + write (sanity that we parsed the real constant).
-    expect(STORE_SRC).toContain(`localStorage.getItem(STORAGE_KEY)`);
-    expect(STORE_SRC).toContain(`localStorage.setItem(STORAGE_KEY, preference)`);
-  });
+	test('the head-script reads the SAME localStorage key the store writes', () => {
+		const key = storeStorageKey();
+		expect(key, 'store STORAGE_KEY is parseable').toBeTruthy();
+		// The inline script must getItem the exact key the store persists to.
+		expect(APP_HTML).toContain(`localStorage.getItem('${key}')`);
+		// And the store itself must use it for both read + write (sanity that we parsed the real constant).
+		expect(STORE_SRC).toContain(`localStorage.getItem(STORAGE_KEY)`);
+		expect(STORE_SRC).toContain(`localStorage.setItem(STORAGE_KEY, preference)`);
+	});
 
-  test('the head-script toggles the SAME `dark` class the store toggles on <html>', () => {
-    // store: root.classList.toggle('dark', ...)
-    expect(STORE_SRC).toMatch(/classList\.toggle\(\s*['"]dark['"]/);
-    // head-script: documentElement.classList.add('dark')
-    expect(APP_HTML).toMatch(/classList\.add\(\s*['"]dark['"]\s*\)/);
-  });
+	test('the head-script toggles the SAME `dark` class the store toggles on <html>', () => {
+		// store: root.classList.toggle('dark', ...)
+		expect(STORE_SRC).toMatch(/classList\.toggle\(\s*['"]dark['"]/);
+		// head-script: documentElement.classList.add('dark')
+		expect(APP_HTML).toMatch(/classList\.add\(\s*['"]dark['"]\s*\)/);
+	});
 
-  test('the head-script resolves `system` via the SAME prefers-color-scheme query the store uses', () => {
-    const QUERY = '(prefers-color-scheme: dark)';
-    expect(STORE_SRC).toContain(QUERY);
-    expect(APP_HTML).toContain(QUERY);
-  });
+	test('the head-script resolves `system` via the SAME prefers-color-scheme query the store uses', () => {
+		const QUERY = '(prefers-color-scheme: dark)';
+		expect(STORE_SRC).toContain(QUERY);
+		expect(APP_HTML).toContain(QUERY);
+	});
 
-  test('the head-script honors the `system` sentinel (the store default when unset)', () => {
-    // The store defaults an unset/garbage value to 'system'; the head-script must treat 'system' as
-    // "follow the OS", not as an explicit light/dark — else an unset user gets the wrong first paint.
-    expect(STORE_SRC).toContain("return 'system'");
-    expect(APP_HTML).toContain("=== 'system'");
-    // And the head-script's default when the key is absent must be 'system' too (matches the store).
-    expect(APP_HTML).toMatch(/\|\|\s*['"]system['"]/);
-  });
+	test('the head-script honors the `system` sentinel (the store default when unset)', () => {
+		// The store defaults an unset/garbage value to 'system'; the head-script must treat 'system' as
+		// "follow the OS", not as an explicit light/dark — else an unset user gets the wrong first paint.
+		expect(STORE_SRC).toContain("return 'system'");
+		expect(APP_HTML).toContain("=== 'system'");
+		// And the head-script's default when the key is absent must be 'system' too (matches the store).
+		expect(APP_HTML).toMatch(/\|\|\s*['"]system['"]/);
+	});
 });
 
 /**
@@ -86,30 +86,30 @@ describe('app.html anti-FOUC head-script mirrors the theme store', () => {
  * so a rename of either trips this unless app.html is updated in lockstep (the cross-file idiom).
  */
 describe('app.html head-script pre-paints the theme-id axis', () => {
-  test('the head-script reads the SAME theme-id mirror key the store writes', () => {
-    const key = storeThemeIdKey();
-    expect(key, 'store THEME_ID_KEY is parseable').toBeTruthy();
-    // The store reads + writes the mirror via THEME_ID_KEY...
-    expect(STORE_SRC).toContain('localStorage.getItem(THEME_ID_KEY)');
-    expect(STORE_SRC).toContain('localStorage.setItem(THEME_ID_KEY, id)');
-    // ...and the head-script must getItem that exact literal pre-paint.
-    expect(APP_HTML).toContain(`localStorage.getItem('${key}')`);
-  });
+	test('the head-script reads the SAME theme-id mirror key the store writes', () => {
+		const key = storeThemeIdKey();
+		expect(key, 'store THEME_ID_KEY is parseable').toBeTruthy();
+		// The store reads + writes the mirror via THEME_ID_KEY...
+		expect(STORE_SRC).toContain('localStorage.getItem(THEME_ID_KEY)');
+		expect(STORE_SRC).toContain('localStorage.setItem(THEME_ID_KEY, id)');
+		// ...and the head-script must getItem that exact literal pre-paint.
+		expect(APP_HTML).toContain(`localStorage.getItem('${key}')`);
+	});
 
-  test('the head-script sets data-theme on <html> (mirrors applyTheme)', () => {
-    // store: root.setAttribute('data-theme', themeId)
-    expect(STORE_SRC).toMatch(/setAttribute\(\s*['"]data-theme['"]/);
-    // head-script: el.setAttribute('data-theme', themeId)
-    expect(APP_HTML).toMatch(/setAttribute\(\s*['"]data-theme['"]/);
-  });
+	test('the head-script sets data-theme on <html> (mirrors applyTheme)', () => {
+		// store: root.setAttribute('data-theme', themeId)
+		expect(STORE_SRC).toMatch(/setAttribute\(\s*['"]data-theme['"]/);
+		// head-script: el.setAttribute('data-theme', themeId)
+		expect(APP_HTML).toMatch(/setAttribute\(\s*['"]data-theme['"]/);
+	});
 
-  test('the head-script treats the DEFAULT_THEME_ID sentinel as "no override" (no data-theme set)', () => {
-    // The store clears data-theme for the default id (applyTheme: id !== DEFAULT_THEME_ID guards the set);
-    // the head-script must use the SAME sentinel so the identity theme stays attribute-free (app.css :root
-    // serves it). DEFAULT_THEME_ID is the registry's exported constant — pin both files against it.
-    expect(STORE_SRC).toMatch(/themeId\s*!==\s*DEFAULT_THEME_ID/);
-    expect(APP_HTML).toContain(`!== '${DEFAULT_THEME_ID}'`);
-    // ...and the head-script defaults the absent mirror to that same sentinel (matches getStoredThemeId).
-    expect(APP_HTML).toMatch(new RegExp(`\\|\\|\\s*['"]${DEFAULT_THEME_ID}['"]`));
-  });
+	test('the head-script treats the DEFAULT_THEME_ID sentinel as "no override" (no data-theme set)', () => {
+		// The store clears data-theme for the default id (applyTheme: id !== DEFAULT_THEME_ID guards the set);
+		// the head-script must use the SAME sentinel so the identity theme stays attribute-free (app.css :root
+		// serves it). DEFAULT_THEME_ID is the registry's exported constant — pin both files against it.
+		expect(STORE_SRC).toMatch(/themeId\s*!==\s*DEFAULT_THEME_ID/);
+		expect(APP_HTML).toContain(`!== '${DEFAULT_THEME_ID}'`);
+		// ...and the head-script defaults the absent mirror to that same sentinel (matches getStoredThemeId).
+		expect(APP_HTML).toMatch(new RegExp(`\\|\\|\\s*['"]${DEFAULT_THEME_ID}['"]`));
+	});
 });

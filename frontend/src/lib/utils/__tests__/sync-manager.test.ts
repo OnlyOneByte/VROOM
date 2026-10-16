@@ -32,7 +32,7 @@ vi.mock('../offline-storage', async () => {
 		// mockReturnValue still drives it — re-exporting actual.getPendingExpenses would bind the REAL loader.
 		getPendingExpenses: () =>
 			(loadOfflineExpenses() as ReturnType<typeof actual.loadOfflineExpenses>).filter(
-				(e) => !e.synced && !e.needsAttention
+				e => !e.synced && !e.needsAttention
 			)
 	};
 });
@@ -562,7 +562,9 @@ describe('Sync Manager', () => {
 
 				// The RETRY's conflict-check now finds the committed row → a duplicate conflict.
 				mockFetch.mockResolvedValueOnce(
-					apiOk([{ id: 'server-x', tags: ['fuel'], category: 'fuel', amount: 50.0, date: '2024-01-01' }])
+					apiOk([
+						{ id: 'server-x', tags: ['fuel'], category: 'fuel', amount: 50.0, date: '2024-01-01' }
+					])
 				);
 				await vi.advanceTimersByTimeAsync(200); // fire the scheduled retry (100 * 2^0)
 
@@ -602,7 +604,15 @@ describe('Sync Manager', () => {
 
 				// If the orphaned retry ran the conflict-check, this committed-row response would resurrect it.
 				mockFetch.mockResolvedValueOnce(
-					apiOk([{ id: 'server-x', tags: ['fuel'], category: 'fuel', expenseAmount: 50.0, date: '2024-01-01' }])
+					apiOk([
+						{
+							id: 'server-x',
+							tags: ['fuel'],
+							category: 'fuel',
+							expenseAmount: 50.0,
+							date: '2024-01-01'
+						}
+					])
 				);
 				await vi.advanceTimersByTimeAsync(200); // fire the orphaned retry (100 * 2^0)
 

@@ -22,12 +22,8 @@ const row = (id: string, over: Partial<SortableRow> = {}): SortableRow => ({
 });
 
 /** Sort a copy via the comparator and return the resulting id order. */
-function order(
-	rows: SortableRow[],
-	by: 'date' | 'amount',
-	dir: 'asc' | 'desc'
-): string[] {
-	return [...rows].sort((a, b) => compareExpenseRows(a, b, by, dir)).map((r) => r.id);
+function order(rows: SortableRow[], by: 'date' | 'amount', dir: 'asc' | 'desc'): string[] {
+	return [...rows].sort((a, b) => compareExpenseRows(a, b, by, dir)).map(r => r.id);
 }
 
 describe('compareExpenseRows — primary sort', () => {
@@ -49,7 +45,11 @@ describe('compareExpenseRows — primary sort', () => {
 describe('compareExpenseRows — id tiebreaker inherits the sort direction (the bug fix)', () => {
 	const sameDate = '2024-06-15T00:00:00.000Z';
 	// All three share the same date → the date comparison is 0 → id decides.
-	const tied = [row('id-a', { date: sameDate }), row('id-b', { date: sameDate }), row('id-c', { date: sameDate })];
+	const tied = [
+		row('id-a', { date: sameDate }),
+		row('id-b', { date: sameDate }),
+		row('id-c', { date: sameDate })
+	];
 
 	test('date desc → ties break by id DESC (matches the server)', () => {
 		expect(order(tied, 'date', 'desc')).toEqual(['id-c', 'id-b', 'id-a']);
@@ -74,8 +74,16 @@ describe('compareExpenseRows — determinism (input order independence)', () => 
 	const sameDate = '2024-06-15T00:00:00.000Z';
 
 	test('two different input orderings of tied rows produce the SAME output (no reshuffle)', () => {
-		const forward = [row('a', { date: sameDate }), row('b', { date: sameDate }), row('c', { date: sameDate })];
-		const reversed = [row('c', { date: sameDate }), row('b', { date: sameDate }), row('a', { date: sameDate })];
+		const forward = [
+			row('a', { date: sameDate }),
+			row('b', { date: sameDate }),
+			row('c', { date: sameDate })
+		];
+		const reversed = [
+			row('c', { date: sameDate }),
+			row('b', { date: sameDate }),
+			row('a', { date: sameDate })
+		];
 		// This is the exact bug invariant: regardless of how grouping concatenated the
 		// rows (standalone-then-group), the sorted order is fixed.
 		expect(order(forward, 'date', 'desc')).toEqual(order(reversed, 'date', 'desc'));

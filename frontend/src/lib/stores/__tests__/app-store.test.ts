@@ -29,9 +29,9 @@ beforeEach(() => {
 describe('appStore — vehicle CRUD', () => {
 	test('setVehicles / addVehicle / clearVehicles', () => {
 		appStore.setVehicles([vehicle('a'), vehicle('b')]);
-		expect(appStore.vehicles.map((v) => v.id)).toEqual(['a', 'b']);
+		expect(appStore.vehicles.map(v => v.id)).toEqual(['a', 'b']);
 		appStore.addVehicle(vehicle('c'));
-		expect(appStore.vehicles.map((v) => v.id)).toEqual(['a', 'b', 'c']);
+		expect(appStore.vehicles.map(v => v.id)).toEqual(['a', 'b', 'c']);
 		appStore.clearVehicles();
 		expect(appStore.vehicles).toEqual([]);
 	});
@@ -39,8 +39,8 @@ describe('appStore — vehicle CRUD', () => {
 	test('updateVehicle changes ONLY the id-matched vehicle, merging the partial', () => {
 		appStore.setVehicles([vehicle('a', { make: 'Honda' }), vehicle('b', { make: 'Mazda' })]);
 		appStore.updateVehicle('b', { model: 'CX-5' });
-		expect(appStore.vehicles.find((v) => v.id === 'a')?.make).toBe('Honda'); // untouched
-		const b = appStore.vehicles.find((v) => v.id === 'b');
+		expect(appStore.vehicles.find(v => v.id === 'a')?.make).toBe('Honda'); // untouched
+		const b = appStore.vehicles.find(v => v.id === 'b');
 		expect(b?.make).toBe('Mazda'); // preserved
 		expect(b?.model).toBe('CX-5'); // merged
 	});
@@ -55,7 +55,7 @@ describe('appStore — vehicle CRUD', () => {
 	test('removeVehicle drops only the id-matched vehicle', () => {
 		appStore.setVehicles([vehicle('a'), vehicle('b'), vehicle('c')]);
 		appStore.removeVehicle('b');
-		expect(appStore.vehicles.map((v) => v.id)).toEqual(['a', 'c']);
+		expect(appStore.vehicles.map(v => v.id)).toEqual(['a', 'c']);
 	});
 });
 
@@ -80,7 +80,7 @@ describe('appStore — notifications', () => {
 		appStore.addNotification({ type: 'error', message: 'two' });
 		const firstId = appStore.notifications[0]!.id;
 		appStore.removeNotification(firstId);
-		expect(appStore.notifications.map((n) => n.message)).toEqual(['two']);
+		expect(appStore.notifications.map(n => n.message)).toEqual(['two']);
 		appStore.clearNotifications();
 		expect(appStore.notifications).toEqual([]);
 	});
@@ -91,7 +91,7 @@ describe('appStore — notifications', () => {
 		appStore.showWarning('w');
 		appStore.showInfo('i');
 		const byType: Record<string, number | undefined> = Object.fromEntries(
-			appStore.notifications.map((n) => [n.type, n.duration])
+			appStore.notifications.map(n => [n.type, n.duration])
 		);
 		expect(byType['success']).toBe(5000);
 		expect(byType['error']).toBe(8000); // errors linger longest

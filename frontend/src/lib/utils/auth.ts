@@ -25,7 +25,7 @@ export const authRedirectRoutes = ['/auth'];
 // being treated as public just because some public route is a string prefix — and
 // keeps '/' from matching everything (special-cased below).
 function matchesRoute(pathname: string, routeList: string[]): boolean {
-	return routeList.some((route) => {
+	return routeList.some(route => {
 		if (route === '/') return pathname === '/';
 		return pathname === route || pathname.startsWith(`${route}/`);
 	});

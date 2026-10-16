@@ -92,7 +92,7 @@ function applyTheme(preference: ThemePreference, themeId: string = getStoredThem
  */
 function persistThemeToServer(id: string): void {
 	if (!browser) return;
-	settingsApi.updateSettings({ themePreference: id }).catch((err) => {
+	settingsApi.updateSettings({ themePreference: id }).catch(err => {
 		if (import.meta.env.DEV) console.error('Failed to sync themePreference to server:', err);
 	});
 }

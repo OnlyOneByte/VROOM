@@ -42,7 +42,7 @@ const ALLOWLIST = new Set<string>([
 	'lib/components/ui/badge/badge.svelte', // destructive-variant text-white on fixed red
 	'lib/components/ui/dialog/dialog-overlay.svelte', // bg-black/50 modal scrim
 	'lib/components/ui/alert-dialog/alert-dialog-overlay.svelte', // bg-black/50 modal scrim
-	'lib/components/ui/sheet/sheet-overlay.svelte', // bg-black/50 modal scrim
+	'lib/components/ui/sheet/sheet-overlay.svelte' // bg-black/50 modal scrim
 ]);
 
 // A bare (non-`dark:`) hardcoded palette color in a bg-/text-/border- utility. The negative

@@ -92,8 +92,7 @@ function validateMileage(value: string, ctx: ValidationContext): string | null {
 		return 'Mileage cannot be less than initial mileage';
 	}
 
-	const currentDateStr: string =
-		(ctx.formData['date'] as string) || toDateInputValue(new Date());
+	const currentDateStr: string = (ctx.formData['date'] as string) || toDateInputValue(new Date());
 	const otherExpenses = ctx.allVehicleExpenses.filter(
 		exp => exp.id !== ctx.expenseId && exp.mileage != null
 	);

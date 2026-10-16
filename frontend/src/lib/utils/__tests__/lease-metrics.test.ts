@@ -394,15 +394,21 @@ describe('resolveCurrentOdometer — prefers all-time currentOdometer over perio
 // ---------------------------------------------------------------------------
 describe('leaseTotalMileageAllowance — annual limit scaled by term', () => {
 	test('12000/yr on a 36-mo lease = 36000 total (not the bare 12000)', () => {
-		expect(leaseTotalMileageAllowance(makeLease({ mileageLimit: 12000, termMonths: 36 }))).toBe(36000);
+		expect(leaseTotalMileageAllowance(makeLease({ mileageLimit: 12000, termMonths: 36 }))).toBe(
+			36000
+		);
 	});
 
 	test('15000/yr on a 24-mo lease = 30000 total', () => {
-		expect(leaseTotalMileageAllowance(makeLease({ mileageLimit: 15000, termMonths: 24 }))).toBe(30000);
+		expect(leaseTotalMileageAllowance(makeLease({ mileageLimit: 15000, termMonths: 24 }))).toBe(
+			30000
+		);
 	});
 
 	test('a 0 termMonths falls back to the annual limit (term≈12mo), never 0/NaN', () => {
-		expect(leaseTotalMileageAllowance(makeLease({ mileageLimit: 12000, termMonths: 0 }))).toBe(12000);
+		expect(leaseTotalMileageAllowance(makeLease({ mileageLimit: 12000, termMonths: 0 }))).toBe(
+			12000
+		);
 	});
 
 	test('no mileageLimit → 0 allowance (no NaN)', () => {
@@ -456,7 +462,11 @@ describe('calculateLeaseOverage — current overage vs the TERM-SCALED total', (
 
 	test('missing excessMileageFee → excess miles can be >0 but cost is 0 (no NaN)', () => {
 		const { excessMiles, overageCost } = calculateLeaseOverage(
-			makeLease({ mileageLimit: 12000, termMonths: 36, excessMileageFee: undefined as unknown as number }),
+			makeLease({
+				mileageLimit: 12000,
+				termMonths: 36,
+				excessMileageFee: undefined as unknown as number
+			}),
 			50000
 		);
 		expect(excessMiles).toBe(14000); // 50000 − 36000

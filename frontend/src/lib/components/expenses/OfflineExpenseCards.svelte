@@ -107,7 +107,9 @@
 		<CardNs.Content>
 			<div class="space-y-3">
 				{#each needsAttentionExpenses as expense (expense.id)}
-					<div class="flex items-center gap-3 p-3 bg-warning/10 border border-warning/20 rounded-lg">
+					<div
+						class="flex items-center gap-3 p-3 bg-warning/10 border border-warning/20 rounded-lg"
+					>
 						<button
 							onclick={() => removeNeedsAttention(expense.id)}
 							class="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0"

@@ -143,8 +143,8 @@
 		{/snippet}
 		{#snippet title()}No fuel data yet{/snippet}
 		{#snippet description()}
-			Log a fill-up to unlock fuel efficiency, cost, and consumption insights — your fill-up
-			stats and trend charts will appear here once you have data.
+			Log a fill-up to unlock fuel efficiency, cost, and consumption insights — your fill-up stats
+			and trend charts will appear here once you have data.
 		{/snippet}
 		{#snippet action()}
 			<Button onclick={logFillup}>

@@ -64,7 +64,9 @@
 	let showDisclosure = $state(false);
 
 	const defaultVehicleId = $derived(vehicles[0]?.id ?? '');
-	const selectedCount = $derived(rows.filter(r => r.include && r.vehicleId && Number(r.amount) > 0).length);
+	const selectedCount = $derived(
+		rows.filter(r => r.include && r.vehicleId && Number(r.amount) > 0).length
+	);
 
 	/** Map a staged draft to an editable row, pre-filling from the draft + sensible defaults. */
 	function toRow(item: ReceiptDraftItem): ReviewRow {
@@ -190,7 +192,10 @@
 					<Button onclick={retry}>Try again</Button>
 				</div>
 			{:else if rows.length === 0}
-				<div class="flex flex-col items-center justify-center py-12 text-center" data-testid="photos-import-empty">
+				<div
+					class="flex flex-col items-center justify-center py-12 text-center"
+					data-testid="photos-import-empty"
+				>
 					<Images class="h-12 w-12 text-muted-foreground mb-3" />
 					<p class="text-sm font-medium">No new receipts in your VROOM Photos album</p>
 					<p class="text-xs text-muted-foreground mt-1 max-w-sm">
@@ -256,7 +261,9 @@
 										<Select.Trigger class="w-full">{categoryLabels[row.category]}</Select.Trigger>
 										<Select.Content>
 											{#each CATEGORY_VALUES as c (c)}
-												<Select.Item value={c} label={categoryLabels[c]}>{categoryLabels[c]}</Select.Item>
+												<Select.Item value={c} label={categoryLabels[c]}
+													>{categoryLabels[c]}</Select.Item
+												>
 											{/each}
 										</Select.Content>
 									</Select.Root>
@@ -289,7 +296,8 @@
 		</div>
 
 		<Dialog.Footer>
-			<Button variant="outline" onclick={() => (open = false)} disabled={isImporting}>Cancel</Button>
+			<Button variant="outline" onclick={() => (open = false)} disabled={isImporting}>Cancel</Button
+			>
 			{#if rows.length > 0 && !loadError}
 				<Button
 					onclick={handleImport}
@@ -315,12 +323,17 @@
 			<AlertDialog.Description>
 				VROOM reads only the receipt photos it uploaded to your Google Photos album — never your
 				camera roll. Each receipt is sent to the AI provider you configured to read its amount and
-				date; you review and confirm every draft before anything is saved. For maximum privacy, use a
-				self-hosted (Ollama) provider.
+				date; you review and confirm every draft before anything is saved. For maximum privacy, use
+				a self-hosted (Ollama) provider.
 			</AlertDialog.Description>
 		</AlertDialog.Header>
 		<AlertDialog.Footer>
-			<AlertDialog.Cancel onclick={() => { showDisclosure = false; open = false; }}>
+			<AlertDialog.Cancel
+				onclick={() => {
+					showDisclosure = false;
+					open = false;
+				}}
+			>
 				Cancel
 			</AlertDialog.Cancel>
 			<AlertDialog.Action onclick={acknowledgeDisclosure}>Continue</AlertDialog.Action>

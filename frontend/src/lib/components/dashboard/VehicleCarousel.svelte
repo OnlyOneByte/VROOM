@@ -2,14 +2,7 @@
 	import { resolve } from '$app/paths';
 	import { routes, paramRoutes } from '$lib/routes';
 	import { gotoWithQuery } from '$lib/utils/navigation';
-	import {
-		Car,
-		Calendar,
-		TrendingUp,
-		DollarSign,
-		Image as ImageIcon,
-		Users
-	} from '@lucide/svelte';
+	import { Car, Calendar, TrendingUp, DollarSign, Image as ImageIcon, Users } from '@lucide/svelte';
 	import * as Card from '$lib/components/ui/card';
 	import * as Carousel from '$lib/components/ui/carousel';
 	import { Button } from '$lib/components/ui/button';
@@ -76,9 +69,7 @@
 								     button inside an interactive ancestor — an a11y violation). The
 								     vehicle-name link below is the navigation target; the card just
 								     provides the hover affordance. -->
-								<Card.Root
-									class="overflow-hidden hover:shadow-lg transition-shadow group"
-								>
+								<Card.Root class="overflow-hidden hover:shadow-lg transition-shadow group">
 									<!-- Image area -->
 									<div
 										class="relative h-40 bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center overflow-hidden"

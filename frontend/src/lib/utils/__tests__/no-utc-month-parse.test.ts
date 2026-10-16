@@ -35,7 +35,7 @@ function stripComments(source: string): string {
 	const withoutBlocks = source.replace(/\/\*[\s\S]*?\*\//g, ' ');
 	return withoutBlocks
 		.split('\n')
-		.map((line) => {
+		.map(line => {
 			const trimmed = line.trimStart();
 			if (trimmed.startsWith('*')) return '';
 			const idx = line.indexOf('//');

@@ -19,45 +19,45 @@ const APP_CSS = readFileSync(`${process.cwd()}/src/app.css`, 'utf8');
 
 /** Extract the raw `--token` declaration names (without the leading `--`) inside a `<selector> { ... }` block. */
 function declaredTokenKeys(selector: string): Set<string> {
-  // Grab the FIRST brace-delimited body following the selector at column start (the :root / .dark block).
-  const re = new RegExp(`${selector.replace('.', '\\.')}\\s*\\{([^}]*)\\}`);
-  const body = APP_CSS.match(re)?.[1] ?? '';
-  const keys = new Set<string>();
-  for (const m of body.matchAll(/^\s*--([a-z0-9-]+)\s*:/gim)) {
-    const key = m[1];
-    if (key) keys.add(key);
-  }
-  return keys;
+	// Grab the FIRST brace-delimited body following the selector at column start (the :root / .dark block).
+	const re = new RegExp(`${selector.replace('.', '\\.')}\\s*\\{([^}]*)\\}`);
+	const body = APP_CSS.match(re)?.[1] ?? '';
+	const keys = new Set<string>();
+	for (const m of body.matchAll(/^\s*--([a-z0-9-]+)\s*:/gim)) {
+		const key = m[1];
+		if (key) keys.add(key);
+	}
+	return keys;
 }
 
 describe('THEME_TOKEN_KEYS mirrors the app.css per-variant token set (T4)', () => {
-  const light = declaredTokenKeys(':root');
-  const dark = declaredTokenKeys('.dark');
+	const light = declaredTokenKeys(':root');
+	const dark = declaredTokenKeys('.dark');
 
-  test('the scan actually found tokens (non-vacuous)', () => {
-    expect(light.size).toBeGreaterThan(20);
-    expect(dark.size).toBeGreaterThan(20);
-  });
+	test('the scan actually found tokens (non-vacuous)', () => {
+		expect(light.size).toBeGreaterThan(20);
+		expect(dark.size).toBeGreaterThan(20);
+	});
 
-  test('light (:root) and dark (.dark) declare the same key set, except the variant-invariant --radius', () => {
-    // --radius is the only :root-only token (a layout value, not swapped per dark/light).
-    const lightColorOnly = new Set([...light].filter((k) => k !== 'radius'));
-    expect([...lightColorOnly].sort()).toEqual([...dark].sort());
-  });
+	test('light (:root) and dark (.dark) declare the same key set, except the variant-invariant --radius', () => {
+		// --radius is the only :root-only token (a layout value, not swapped per dark/light).
+		const lightColorOnly = new Set([...light].filter(k => k !== 'radius'));
+		expect([...lightColorOnly].sort()).toEqual([...dark].sort());
+	});
 
-  test('THEME_TOKEN_KEYS equals the .dark (per-variant) token set exactly', () => {
-    expect([...THEME_TOKEN_KEYS].sort()).toEqual([...dark].sort());
-  });
+	test('THEME_TOKEN_KEYS equals the .dark (per-variant) token set exactly', () => {
+		expect([...THEME_TOKEN_KEYS].sort()).toEqual([...dark].sort());
+	});
 
-  test('--radius is NOT a themeable per-variant key (excluded by design)', () => {
-    expect(THEME_TOKEN_KEYS).not.toContain('radius');
-    // ...but it IS declared in :root (proving the exclusion is deliberate, not a missed scan).
-    expect(light.has('radius')).toBe(true);
-  });
+	test('--radius is NOT a themeable per-variant key (excluded by design)', () => {
+		expect(THEME_TOKEN_KEYS).not.toContain('radius');
+		// ...but it IS declared in :root (proving the exclusion is deliberate, not a missed scan).
+		expect(light.has('radius')).toBe(true);
+	});
 
-  test('THEME_TOKEN_KEYS has no duplicates', () => {
-    expect(new Set(THEME_TOKEN_KEYS).size).toBe(THEME_TOKEN_KEYS.length);
-  });
+	test('THEME_TOKEN_KEYS has no duplicates', () => {
+		expect(new Set(THEME_TOKEN_KEYS).size).toBe(THEME_TOKEN_KEYS.length);
+	});
 });
 
 /**
@@ -71,26 +71,26 @@ describe('THEME_TOKEN_KEYS mirrors the app.css per-variant token set (T4)', () =
  * token to the engine (THEME_TOKEN_KEYS + the registry).
  */
 describe('@theme inline color aliases reference only engine-managed tokens', () => {
-  // The `--color-*: var(--x)` aliases inside the `@theme inline { ... }` block.
-  const themeBlock = APP_CSS.match(/@theme[^{]*\{([\s\S]*?)\}/)?.[1] ?? '';
-  const aliasedRawTokens = new Set<string>();
-  for (const m of themeBlock.matchAll(/--color-[a-z0-9-]+\s*:\s*var\(--([a-z0-9-]+)\)/gim)) {
-    const raw = m[1];
-    if (raw) aliasedRawTokens.add(raw);
-  }
-  const managed = new Set<string>(THEME_TOKEN_KEYS);
+	// The `--color-*: var(--x)` aliases inside the `@theme inline { ... }` block.
+	const themeBlock = APP_CSS.match(/@theme[^{]*\{([\s\S]*?)\}/)?.[1] ?? '';
+	const aliasedRawTokens = new Set<string>();
+	for (const m of themeBlock.matchAll(/--color-[a-z0-9-]+\s*:\s*var\(--([a-z0-9-]+)\)/gim)) {
+		const raw = m[1];
+		if (raw) aliasedRawTokens.add(raw);
+	}
+	const managed = new Set<string>(THEME_TOKEN_KEYS);
 
-  test('the @theme color-alias scan is non-vacuous', () => {
-    expect(aliasedRawTokens.size).toBeGreaterThan(20);
-  });
+	test('the @theme color-alias scan is non-vacuous', () => {
+		expect(aliasedRawTokens.size).toBeGreaterThan(20);
+	});
 
-  test('every --color-* alias points at a THEME_TOKEN_KEYS-managed raw token (no stale-alias leak)', () => {
-    const unmanaged = [...aliasedRawTokens].filter((t) => !managed.has(t));
-    expect(
-      unmanaged,
-      `These Tailwind --color-* aliases reference raw tokens the theme engine does NOT manage — a theme ` +
-        `switch would leave them STALE (a visual leak). Add each to THEME_TOKEN_KEYS + the registry, or ` +
-        `point the alias at a managed token:\n  ${unmanaged.join(', ')}`
-    ).toEqual([]);
-  });
+	test('every --color-* alias points at a THEME_TOKEN_KEYS-managed raw token (no stale-alias leak)', () => {
+		const unmanaged = [...aliasedRawTokens].filter(t => !managed.has(t));
+		expect(
+			unmanaged,
+			`These Tailwind --color-* aliases reference raw tokens the theme engine does NOT manage — a theme ` +
+				`switch would leave them STALE (a visual leak). Add each to THEME_TOKEN_KEYS + the registry, or ` +
+				`point the alias at a managed token:\n  ${unmanaged.join(', ')}`
+		).toEqual([]);
+	});
 });

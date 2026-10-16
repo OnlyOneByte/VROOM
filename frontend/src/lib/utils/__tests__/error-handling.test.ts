@@ -63,7 +63,9 @@ describe('handleErrorWithNotification (drives handleApiError)', () => {
 
 	test('a known error code maps to its user-friendly message (not the raw message)', () => {
 		// VALIDATION_ERROR is in ERROR_CODE_MESSAGES → the friendly copy wins over "Raw backend text".
-		handleErrorWithNotification(new ApiError('Raw backend text', 400, undefined, 'VALIDATION_ERROR'));
+		handleErrorWithNotification(
+			new ApiError('Raw backend text', 400, undefined, 'VALIDATION_ERROR')
+		);
 		expect(notified()).toMatchObject({
 			type: 'error',
 			message: 'Please check your input and try again',

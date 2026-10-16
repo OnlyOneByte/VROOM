@@ -121,7 +121,10 @@
 
 		try {
 			const reply = await assistantApi.sendMessage(text, history);
-			messages = [...messages, { role: 'assistant', content: reply.reply, toolsUsed: reply.toolsUsed }];
+			messages = [
+				...messages,
+				{ role: 'assistant', content: reply.reply, toolsUsed: reply.toolsUsed }
+			];
 		} catch (err) {
 			sendError = errorMessageFor(err);
 		} finally {
@@ -135,14 +138,20 @@
 		const last = messages[messages.length - 1];
 		if (!last || last.role !== 'user' || isSending) return;
 		sendError = null;
-		const history = messages.slice(0, -1).slice(-MAX_HISTORY_TURNS).map(m => ({
-			role: m.role,
-			content: m.content
-		}));
+		const history = messages
+			.slice(0, -1)
+			.slice(-MAX_HISTORY_TURNS)
+			.map(m => ({
+				role: m.role,
+				content: m.content
+			}));
 		isSending = true;
 		try {
 			const reply = await assistantApi.sendMessage(last.content, history);
-			messages = [...messages, { role: 'assistant', content: reply.reply, toolsUsed: reply.toolsUsed }];
+			messages = [
+				...messages,
+				{ role: 'assistant', content: reply.reply, toolsUsed: reply.toolsUsed }
+			];
 		} catch (err) {
 			sendError = errorMessageFor(err);
 		} finally {
@@ -216,8 +225,8 @@
 						<Bot class="h-10 w-10 text-muted-foreground mb-2" />
 						<p class="text-sm font-medium">Ask me anything about your cars</p>
 						<p class="text-xs text-muted-foreground mt-1 max-w-sm">
-							Try “How much did I spend on fuel this year?” or “What is my loan balance?” I read your
-							data to answer — I never change it.
+							Try “How much did I spend on fuel this year?” or “What is my loan balance?” I read
+							your data to answer — I never change it.
 						</p>
 					</div>
 				{:else}
@@ -240,7 +249,9 @@
 									'user'
 										? 'bg-primary text-primary-foreground'
 										: 'bg-muted text-foreground'}"
-								>{message.content}</div>
+								>
+									{message.content}
+								</div>
 								{#if message.role === 'assistant' && message.toolsUsed && message.toolsUsed.length > 0}
 									<div class="flex flex-wrap gap-1" data-testid="assistant-tools-used">
 										{#each message.toolsUsed as tool (tool)}
@@ -262,7 +273,9 @@
 
 				{#if isSending}
 					<div class="flex gap-2 justify-start" data-testid="assistant-pending">
-						<div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10">
+						<div
+							class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10"
+						>
 							<Bot class="h-4 w-4 text-primary" />
 						</div>
 						<div class="rounded-lg bg-muted px-3 py-2">

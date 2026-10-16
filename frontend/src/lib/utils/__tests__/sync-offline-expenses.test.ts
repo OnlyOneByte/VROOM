@@ -14,7 +14,12 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { syncOfflineExpenses, saveOfflineExpenses, loadOfflineExpenses, type OfflineExpense } from '../offline-storage';
+import {
+	syncOfflineExpenses,
+	saveOfflineExpenses,
+	loadOfflineExpenses,
+	type OfflineExpense
+} from '../offline-storage';
 import { syncState } from '../../stores/offline.svelte';
 
 const mockFetch = vi.fn();
@@ -76,9 +81,7 @@ describe('syncOfflineExpenses', () => {
 	it('on a mid-batch failure: keeps the failed + remaining pending, no data lost', async () => {
 		saveOfflineExpenses([pending('a'), pending('b'), pending('c')]);
 		// a succeeds, b fails — c must never be sent this round.
-		mockFetch
-			.mockResolvedValueOnce(apiOk())
-			.mockRejectedValueOnce(new Error('network down'));
+		mockFetch.mockResolvedValueOnce(apiOk()).mockRejectedValueOnce(new Error('network down'));
 
 		await syncOfflineExpenses();
 
@@ -89,7 +92,7 @@ describe('syncOfflineExpenses', () => {
 		// 'a' is marked synced (so a retry won't duplicate it); 'b' and 'c' remain
 		// pending to retry next sync. Nothing is dropped from the queue.
 		const remaining = loadOfflineExpenses();
-		const byId = new Map(remaining.map((e) => [e.id, e]));
+		const byId = new Map(remaining.map(e => [e.id, e]));
 		expect(byId.get('a')?.synced).toBe(true);
 		expect(byId.get('b')?.synced).toBe(false);
 		expect(byId.get('c')?.synced).toBe(false);

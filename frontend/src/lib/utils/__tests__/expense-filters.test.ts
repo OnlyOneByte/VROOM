@@ -119,10 +119,11 @@ describe('filterExpenses — structured filters', () => {
 	});
 
 	test('tags filter is any-match', () => {
-		expect(filterExpenses(list, '', { tags: ['oil', 'regular'] }).map(e => e.id).sort()).toEqual([
-			'a',
-			'c'
-		]);
+		expect(
+			filterExpenses(list, '', { tags: ['oil', 'regular'] })
+				.map(e => e.id)
+				.sort()
+		).toEqual(['a', 'c']);
 	});
 
 	test('startDate is inclusive', () => {

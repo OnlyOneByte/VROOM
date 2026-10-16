@@ -72,7 +72,12 @@ describe('request envelope unwrapping', () => {
 	});
 
 	test('a non-JSON response (204, no content-type) is returned without parsing', async () => {
-		const raw = { ok: true, status: 204, headers: new Headers(), json: () => Promise.reject(new Error('no body')) };
+		const raw = {
+			ok: true,
+			status: 204,
+			headers: new Headers(),
+			json: () => Promise.reject(new Error('no body'))
+		};
 		mockFetch.mockResolvedValueOnce(raw as unknown as Response);
 		const result = await apiClient.delete('/api/v1/expenses/e1');
 		// The Response object itself is returned (cast) — not a thrown parse error.

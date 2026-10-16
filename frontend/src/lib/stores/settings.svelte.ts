@@ -81,7 +81,10 @@ function createSettingsStore() {
 				if (!response.ok) throw new Error('Failed to download backup');
 
 				const blob = await response.blob();
-				triggerBlobDownload(blob, `vroom-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.zip`);
+				triggerBlobDownload(
+					blob,
+					`vroom-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.zip`
+				);
 			} catch (err) {
 				error = extractErrorMessage(err, UNEXPECTED_ERROR);
 				throw err;

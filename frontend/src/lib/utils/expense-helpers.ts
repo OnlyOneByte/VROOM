@@ -1,13 +1,5 @@
 import type { ExpenseCategory, SplitConfig } from '$lib/types';
-import {
-	Coffee,
-	CreditCard,
-	DollarSign,
-	FileText,
-	Fuel,
-	Sparkles,
-	Wrench
-} from '@lucide/svelte';
+import { Coffee, CreditCard, DollarSign, FileText, Fuel, Sparkles, Wrench } from '@lucide/svelte';
 import {
 	CATEGORY_LABELS,
 	mapCategoryColorTokens,
@@ -80,9 +72,9 @@ export function resetSplitAllocations(
 	vehicleIds: string[]
 ): SplitAllocationDraft[] {
 	if (method === 'even') return [];
-	if (method === 'absolute') return vehicleIds.map((id) => ({ vehicleId: id, amount: 0 }));
+	if (method === 'absolute') return vehicleIds.map(id => ({ vehicleId: id, amount: 0 }));
 	const pct = vehicleIds.length > 0 ? 100 / vehicleIds.length : 0;
-	return vehicleIds.map((id) => ({ vehicleId: id, percentage: Math.round(pct * 10) / 10 }));
+	return vehicleIds.map(id => ({ vehicleId: id, percentage: Math.round(pct * 10) / 10 }));
 }
 
 /**
@@ -104,12 +96,12 @@ export function buildSplitConfig(
 	if (method === 'absolute') {
 		return {
 			method: 'absolute',
-			allocations: allocations.map((a) => ({ vehicleId: a.vehicleId, amount: a.amount ?? 0 }))
+			allocations: allocations.map(a => ({ vehicleId: a.vehicleId, amount: a.amount ?? 0 }))
 		};
 	}
 	return {
 		method: 'percentage',
-		allocations: allocations.map((a) => ({ vehicleId: a.vehicleId, percentage: a.percentage ?? 0 }))
+		allocations: allocations.map(a => ({ vehicleId: a.vehicleId, percentage: a.percentage ?? 0 }))
 	};
 }
 

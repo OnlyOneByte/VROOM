@@ -74,12 +74,15 @@ describe('getExpense (backend→frontend transform)', () => {
 describe('list methods (getPaginated passthrough + per-row transform)', () => {
 	test('getAllExpenses transforms each row and preserves pagination metadata', async () => {
 		getPaginated.mockResolvedValueOnce({
-			data: [backendExpense({ id: 'e1', expenseAmount: 10 }), backendExpense({ id: 'e2', expenseAmount: 20 })],
+			data: [
+				backendExpense({ id: 'e1', expenseAmount: 10 }),
+				backendExpense({ id: 'e2', expenseAmount: 20 })
+			],
 			pagination: { totalCount: 2, limit: 20, offset: 0, hasMore: false }
 		});
 		const result = await expenseApi.getAllExpenses({ limit: 20 });
 		expect(getPaginated).toHaveBeenCalledWith('/api/v1/expenses?limit=20');
-		expect(result.data.map((e) => e.amount)).toEqual([10, 20]);
+		expect(result.data.map(e => e.amount)).toEqual([10, 20]);
 		expect(result.pagination.totalCount).toBe(2);
 	});
 
@@ -106,14 +109,24 @@ describe('createExpense / updateExpense (frontend→backend transform + isEdit)'
 
 	test('createExpense OMITS an empty description (create payload unchanged)', async () => {
 		post.mockResolvedValueOnce(backendExpense());
-		await expenseApi.createExpense({ vehicleId: 'v1', category: 'fuel', amount: 50, description: '' });
+		await expenseApi.createExpense({
+			vehicleId: 'v1',
+			category: 'fuel',
+			amount: 50,
+			description: ''
+		});
 		const body = post.mock.calls[0]?.[1] as Record<string, unknown>;
 		expect('description' in body).toBe(false);
 	});
 
 	test('updateExpense sends an emptied description as null (the clear-field class)', async () => {
 		put.mockResolvedValueOnce(backendExpense());
-		await expenseApi.updateExpense('e1', { vehicleId: 'v1', category: 'fuel', amount: 50, description: '' });
+		await expenseApi.updateExpense('e1', {
+			vehicleId: 'v1',
+			category: 'fuel',
+			amount: 50,
+			description: ''
+		});
 		const [url, body] = put.mock.calls[0] ?? [];
 		expect(url).toBe('/api/v1/expenses/e1');
 		expect((body as { description: string | null }).description).toBeNull();
@@ -134,12 +147,16 @@ describe('downloadExpensesCsv (blob → anchor download)', () => {
 			if (tag === 'a') el.click = click; // stub only the anchor's click
 			return el;
 		});
-		vi.spyOn(document.body, 'appendChild').mockImplementation((n) => n);
-		vi.spyOn(document.body, 'removeChild').mockImplementation((n) => n);
+		vi.spyOn(document.body, 'appendChild').mockImplementation(n => n);
+		vi.spyOn(document.body, 'removeChild').mockImplementation(n => n);
 		// jsdom lacks URL.createObjectURL / revokeObjectURL — stub them.
 		(window.URL.createObjectURL as unknown) = vi.fn(() => 'blob:x');
 		(window.URL.revokeObjectURL as unknown) = vi.fn();
-		raw.mockResolvedValueOnce({ ok: true, status: 200, blob: () => Promise.resolve(new Blob(['csv'])) });
+		raw.mockResolvedValueOnce({
+			ok: true,
+			status: 200,
+			blob: () => Promise.resolve(new Blob(['csv']))
+		});
 
 		await expenseApi.downloadExpensesCsv({ vehicleId: 'v1', tags: ['a', 'b'] });
 
@@ -160,7 +177,12 @@ describe('split + delete endpoint wiring', () => {
 	});
 
 	test('createSplitExpense POSTs to the split endpoint with the config', async () => {
-		post.mockResolvedValueOnce({ siblings: [], groupId: 'g1', groupTotal: 100, splitMethod: 'even' });
+		post.mockResolvedValueOnce({
+			siblings: [],
+			groupId: 'g1',
+			groupTotal: 100,
+			splitMethod: 'even'
+		});
 		await expenseApi.createSplitExpense({
 			splitConfig: { method: 'even', vehicleIds: ['v1', 'v2'] },
 			category: 'fuel',

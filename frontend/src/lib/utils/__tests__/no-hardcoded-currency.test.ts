@@ -66,7 +66,7 @@ describe('no hardcoded currency symbols in user-facing labels (cycle-202 class g
 		// If UnitPreferencesCard moves/renames, the allowlist entry would silently stop
 		// matching — fail loudly so the allowlist is kept honest.
 		const allowlisted = [...ALLOWLIST][0];
-		const exists = files.some((f) => relative(SRC_ROOT, f).split('\\').join('/') === allowlisted);
+		const exists = files.some(f => relative(SRC_ROOT, f).split('\\').join('/') === allowlisted);
 		expect(exists, `Allowlisted path no longer exists: ${allowlisted}`).toBe(true);
 	});
 });

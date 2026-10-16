@@ -198,7 +198,9 @@ describe('the category source scan is live', () => {
 		expect(RENDERING_SOURCES.length).toBeGreaterThan(200);
 		expect(RENDERING_SOURCES.some(file => file.rel === 'lib/utils/expense-helpers.ts')).toBe(true);
 		expect(
-			RENDERING_SOURCES.some(file => file.rel === 'lib/components/expenses/OfflineExpenseCards.svelte')
+			RENDERING_SOURCES.some(
+				file => file.rel === 'lib/components/expenses/OfflineExpenseCards.svelte'
+			)
 		).toBe(true);
 	});
 });
@@ -297,9 +299,7 @@ describe('one category → color assignment', () => {
 		expect(hits(LABEL_VALUE_PATTERN, COLOR_AND_LABEL_HOME)).toEqual([
 			'lib/components/fake/Divergent.svelte:5'
 		]);
-		expect(hits(ICON_VALUE_PATTERN, ICON_HOME)).toEqual([
-			'lib/components/fake/Divergent.svelte:6'
-		]);
+		expect(hits(ICON_VALUE_PATTERN, ICON_HOME)).toEqual(['lib/components/fake/Divergent.svelte:6']);
 		// The sanctioned home of each axis is skipped, not matched-and-forgiven.
 		expect(hits(COLOR_VALUE_PATTERNS.token, 'lib/components/fake/Divergent.svelte')).toEqual([
 			`${COLOR_AND_LABEL_HOME}:1`
@@ -422,9 +422,7 @@ describe('one category → icon assignment', () => {
 	test('the icon scans recognise the shapes they hunt', () => {
 		// Both scans are regex-shaped, so pin that they match the real duplicates. Without this a
 		// typo'd pattern would make the test above pass over anything.
-		const keyedMap = new RegExp(
-			`^\\s*'?(?:${CATEGORY_ALTERNATION})'?:\\s*${ICON_VALUE_PATTERN}`
-		);
+		const keyedMap = new RegExp(`^\\s*'?(?:${CATEGORY_ALTERNATION})'?:\\s*${ICON_VALUE_PATTERN}`);
 		expect(keyedMap.test('\tregulatory: DollarSign,')).toBe(true);
 		expect(keyedMap.test("\t'misc': Coffee")).toBe(true);
 		expect(keyedMap.test("\tmisc: 'Misc',")).toBe(false);

@@ -83,7 +83,7 @@ sw.addEventListener('notificationclick', (event: NotificationEvent) => {
 	const data = (event.notification.data ?? {}) as { url?: string };
 	const targetUrl = data.url ?? DEFAULT_URL;
 	event.waitUntil(
-		sw.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (clientList) => {
+		sw.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async clientList => {
 			for (const client of clientList) {
 				const windowClient = client as WindowClient;
 				if ('focus' in windowClient) {

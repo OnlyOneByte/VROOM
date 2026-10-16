@@ -23,11 +23,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 
 // This file lives at .../expenses/form/__tests__/; the component is one level up.
-const COMPONENT = join(
-	dirname(fileURLToPath(import.meta.url)),
-	'..',
-	'CategorySelector.svelte'
-);
+const COMPONENT = join(dirname(fileURLToPath(import.meta.url)), '..', 'CategorySelector.svelte');
 
 // Pull every `label: '...'` (single- or double-quoted) out of the categories array.
 // The component has exactly one such array, so a file-wide scan is unambiguous.
@@ -51,7 +47,7 @@ describe('CategorySelector labels stay single-word (mobile-wrap guard)', () => {
 	});
 
 	test('no category label is multi-word (would wrap in the 2-col mobile grid)', () => {
-		const offenders = labels.filter((label) => /\s/.test(label.trim()));
+		const offenders = labels.filter(label => /\s/.test(label.trim()));
 
 		expect(
 			offenders,

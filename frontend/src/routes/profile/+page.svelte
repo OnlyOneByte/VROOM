@@ -437,12 +437,7 @@
 							</p>
 						</div>
 					</div>
-					<Button
-						variant="outline"
-						size="sm"
-						onclick={handleExportData}
-						disabled={isExporting}
-					>
+					<Button variant="outline" size="sm" onclick={handleExportData} disabled={isExporting}>
 						{#if isExporting}
 							<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
 							Exporting...

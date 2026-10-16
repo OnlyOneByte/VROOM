@@ -63,7 +63,9 @@
 								<div class="flex items-center gap-2 flex-wrap">
 									<span class="text-sm font-medium truncate">{reminder.name}</span>
 									{#if reminder.isOverdue}
-										<Badge variant="secondary" class="bg-warning/10 text-warning text-xs">Due now</Badge>
+										<Badge variant="secondary" class="bg-warning/10 text-warning text-xs"
+											>Due now</Badge
+										>
 									{/if}
 								</div>
 								<p class="text-xs text-muted-foreground mt-1 inline-flex items-center gap-1">

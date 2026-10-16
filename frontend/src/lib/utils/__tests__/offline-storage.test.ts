@@ -337,7 +337,7 @@ describe('Offline Storage', () => {
 				'utf8'
 			);
 			// Isolate the needs-attention <CardNs.Description> copy (between the section's title and its close).
-			const start = src.indexOf("Needs attention ({needsAttentionExpenses.length})");
+			const start = src.indexOf('Needs attention ({needsAttentionExpenses.length})');
 			expect(start, 'the Needs-attention section exists').toBeGreaterThan(-1);
 			const descSlice = src.slice(start, start + 400);
 			// The gate's real fields, by their user-facing names.
@@ -556,9 +556,19 @@ describe('offlineExpenseToBackend — shared offline→backend mapping', () => {
 		// if the outbox drops the flag, an offline missed fill-up syncs as a normal one → the next
 		// pair spans the unlogged gap → inflated/garbage MPG. Pin true AND false so
 		// a regression that drops the field (undefined→backend default false) turns the true case RED.
-		const trueOut = offlineExpenseToBackend({ ...base, volume: 40, fuelType: 'Diesel', missedFillup: true });
+		const trueOut = offlineExpenseToBackend({
+			...base,
+			volume: 40,
+			fuelType: 'Diesel',
+			missedFillup: true
+		});
 		expect(trueOut.missedFillup).toBe(true);
-		const falseOut = offlineExpenseToBackend({ ...base, volume: 40, fuelType: 'Diesel', missedFillup: false });
+		const falseOut = offlineExpenseToBackend({
+			...base,
+			volume: 40,
+			fuelType: 'Diesel',
+			missedFillup: false
+		});
 		expect(falseOut.missedFillup).toBe(false);
 	});
 
@@ -623,13 +633,17 @@ describe('isIncompleteFuelExpense (shared fuel-completeness sync guard)', () => 
 	}
 
 	it('a non-fuel expense is NEVER incomplete (the category gate), even with no volume/mileage', () => {
-		expect(isIncompleteFuelExpense(fuel({ category: 'maintenance', volume: undefined, mileage: undefined }))).toBe(
-			false
-		);
+		expect(
+			isIncompleteFuelExpense(
+				fuel({ category: 'maintenance', volume: undefined, mileage: undefined })
+			)
+		).toBe(false);
 	});
 
 	it('a fuel expense missing BOTH volume and charge is incomplete', () => {
-		expect(isIncompleteFuelExpense(fuel({ volume: undefined, charge: undefined, mileage: 30000 }))).toBe(true);
+		expect(
+			isIncompleteFuelExpense(fuel({ volume: undefined, charge: undefined, mileage: 30000 }))
+		).toBe(true);
 	});
 
 	it('a fuel expense missing mileage is incomplete (even with volume present)', () => {
@@ -641,6 +655,8 @@ describe('isIncompleteFuelExpense (shared fuel-completeness sync guard)', () => 
 	});
 
 	it('a complete ELECTRIC expense (charge satisfies the volume-or-charge requirement) is NOT incomplete', () => {
-		expect(isIncompleteFuelExpense(fuel({ volume: undefined, charge: 25, mileage: 30000 }))).toBe(false);
+		expect(isIncompleteFuelExpense(fuel({ volume: undefined, charge: 25, mileage: 30000 }))).toBe(
+			false
+		);
 	});
 });
