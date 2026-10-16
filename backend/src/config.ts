@@ -4,6 +4,7 @@
 
 import type { Table } from 'drizzle-orm';
 import { z } from 'zod';
+import packageJson from '../package.json';
 import {
   expenses,
   insuranceClaims,
@@ -36,16 +37,34 @@ const envSchema = z.object({
         throw new Error('PORT must be valid (1-65535)');
       return port;
     }),
-  HOST: z.string().default('localhost'),
+  // Address to bind. Handed to Bun as `hostname`, so it is honored exactly, and index.ts refuses
+  // to start if this machine cannot bind it.
+  //
+  // The default is the IPv4 loopback LITERAL, not `localhost` and not "every interface":
+  //  - a name binds whichever loopback family it resolves to — measurably ::1 only on hosts whose
+  //    resolver answers that first, which then REFUSES every client that dials 127.0.0.1 (curl,
+  //    an nginx/Caddy upstream, a port-forwarded probe). A literal is deterministic.
+  //  - omitting the hostname binds every interface, so a bare-metal install would be publicly
+  //    reachable by default — a silent exposure.
+  // Clients that resolve `localhost` get both loopback addresses and retry across them, so a
+  // documented `localhost:3001` upstream still reaches an IPv4-only bind. Containers must set
+  // `0.0.0.0` (loopback is unreachable from outside the container) — both Dockerfiles and both
+  // example stacks do.
+  HOST: z.string().default('127.0.0.1'),
   DATABASE_URL: z.string().default('./data/vroom.db'),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
-  GOOGLE_REDIRECT_URI: z.string().default('http://localhost:3001/auth/callback/google'),
+  // Must match a route the backend actually serves: auth routes mount under /api/v1/auth, and
+  // the /api/* -> /api/v1/* compatibility redirect never sees a bare /auth/... path (it 404s).
+  // GOOGLE_PROVIDER_REDIRECT_URI is derived from this value below, so a wrong path breaks both
+  // the login and the storage-connect callback.
+  GOOGLE_REDIRECT_URI: z.string().default('http://localhost:3001/api/v1/auth/callback/google'),
   GOOGLE_PROVIDER_REDIRECT_URI: z.string().optional(),
   GITHUB_CLIENT_ID: z.string().optional(),
   GITHUB_CLIENT_SECRET: z.string().optional(),
   GITHUB_REDIRECT_URI: z.string().default('http://localhost:3001/api/v1/auth/callback/github'),
-  SESSION_SECRET: z.string().min(32, 'Session secret must be at least 32 characters').optional(),
+  // There is deliberately no session secret: sessions are opaque ids stored in the `sessions`
+  // table (Lucia + Drizzle adapter), so nothing is signed or encrypted with a configurable key.
   FRONTEND_URL: z.string().optional(),
   CORS_ORIGINS: z
     .string()
@@ -79,10 +98,10 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((val) => val === '1' || val === 'true'),
-  // Web Push (push-notifications T2). The VAPID keypair is the app-wide push application-server
-  // identity — app-wide (NOT per-user), so it is a deploy secret like SESSION_SECRET, not a
-  // user_providers credential. The PRIVATE key is server-only (never shipped to the browser, never
-  // logged); the PUBLIC key is public-by-design (the applicationServerKey the browser requires).
+  // Web Push. The VAPID keypair is the push application-server identity for the whole instance
+  // (NOT per-user), so it is a deploy secret set in the environment, not a user_providers
+  // credential. The PRIVATE key is server-only (never shipped to the browser, never logged); the
+  // PUBLIC key is public-by-design (the applicationServerKey the browser requires).
   // When any of the three is unset the feature is OFF (CONFIG.push.enabled=false) and the subscribe
   // UI reports "push not configured on this server" — the in-app reminder feed is unchanged.
   // Generate a keypair with `bun run vapid:gen`.
@@ -128,6 +147,10 @@ const getDefaultCorsOrigins = (environment: Environment): string[] => {
 
 export const CONFIG = {
   env: env.NODE_ENV as Environment,
+  // The deployed build's own version, read from package.json so `GET /health` and `GET /api`
+  // report what is actually running instead of a literal that nobody remembers to bump — a
+  // bug report that names a version has to mean something.
+  version: packageJson.version,
   // Fake storage provider is allowed only outside production AND only when
   // explicitly opted in via ALLOW_FAKE_STORAGE — double-gated.
   allowFakeStorageProvider:
@@ -155,7 +178,6 @@ export const CONFIG = {
     githubClientId: env.GITHUB_CLIENT_ID,
     githubClientSecret: env.GITHUB_CLIENT_SECRET,
     githubRedirectUri: env.GITHUB_REDIRECT_URI,
-    sessionSecret: env.SESSION_SECRET,
     cookieMaxAge: 30 * 24 * 60 * 60,
     sessionDuration: 30 * 24 * 60 * 60 * 1000,
     refreshThreshold: 24 * 60 * 60 * 1000,
@@ -372,7 +394,6 @@ export const validateProductionConfig = () => {
     const requiredFields = [
       { field: 'GOOGLE_CLIENT_ID', value: CONFIG.auth.googleClientId },
       { field: 'GOOGLE_CLIENT_SECRET', value: CONFIG.auth.googleClientSecret },
-      { field: 'SESSION_SECRET', value: CONFIG.auth.sessionSecret },
     ];
 
     const missing = requiredFields.filter(({ value }) => !value);

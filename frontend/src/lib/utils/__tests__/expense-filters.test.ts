@@ -17,6 +17,30 @@ import type { Expense, ExpenseFilters } from '$lib/types';
 
 const NO_FILTERS: ExpenseFilters = {};
 
+/**
+ * A stored expense instant for a given calendar day: NOON LOCAL, which is exactly what
+ * `dateOnlyToISO` persists for a date-only form entry. Fixtures must use this rather than a
+ * hardcoded UTC-midnight instant — the filter's bounds are LOCAL calendar days, so a
+ * '…T00:00:00.000Z' date belongs to the PREVIOUS local day at any negative offset and the
+ * boundary assertions below would only hold at offset 0.
+ */
+function storedDate(year: number, month: number, day: number): string {
+	return new Date(year, month - 1, day, 12, 0, 0).toISOString();
+}
+
+/**
+ * A stored expense instant pinned to LOCAL MIDNIGHT of a calendar day — bit-for-bit the instant
+ * `localDayStart` derives from a date-range bound.
+ *
+ * A boundary fixture MUST sit here, not at noon: an inclusivity assertion built on a noon-local
+ * fixture is twelve hours INSIDE the bound, so flipping the filter's `>= start` to `> start` still
+ * keeps the row and the test passes in every timezone. Both sides going through the same local-day
+ * construction is what makes the assertion simultaneously offset-independent and able to fail.
+ */
+function storedDateAtLocalMidnight(year: number, month: number, day: number): string {
+	return new Date(year, month - 1, day, 0, 0, 0, 0).toISOString();
+}
+
 /** Minimal typed Expense factory — only the fields the filters read matter. */
 function expense(over: Partial<Expense> = {}): Expense {
 	return {
@@ -26,7 +50,7 @@ function expense(over: Partial<Expense> = {}): Expense {
 		tags: over.tags ?? [],
 		category: over.category ?? 'misc',
 		amount: over.amount ?? 10,
-		date: over.date ?? '2024-06-15T00:00:00.000Z',
+		date: over.date ?? storedDate(2024, 6, 15),
 		description: over.description,
 		createdAt: '2024-06-15T00:00:00.000Z',
 		updatedAt: '2024-06-15T00:00:00.000Z'
@@ -85,9 +109,9 @@ describe('filterExpenses — search', () => {
 
 describe('filterExpenses — structured filters', () => {
 	const list = [
-		expense({ id: 'a', category: 'fuel', tags: ['regular'], date: '2024-01-10T00:00:00.000Z' }),
-		expense({ id: 'b', category: 'fuel', tags: ['premium'], date: '2024-06-15T00:00:00.000Z' }),
-		expense({ id: 'c', category: 'maintenance', tags: ['oil'], date: '2024-12-31T00:00:00.000Z' })
+		expense({ id: 'a', category: 'fuel', tags: ['regular'], date: storedDate(2024, 1, 10) }),
+		expense({ id: 'b', category: 'fuel', tags: ['premium'], date: storedDate(2024, 6, 15) }),
+		expense({ id: 'c', category: 'maintenance', tags: ['oil'], date: storedDate(2024, 12, 31) })
 	];
 
 	test('category filter', () => {
@@ -102,10 +126,16 @@ describe('filterExpenses — structured filters', () => {
 	});
 
 	test('startDate is inclusive', () => {
-		// Boundary: an expense exactly on startDate is kept.
+		// The lower bound is local midnight of startDate, INCLUSIVE, so the boundary fixture sits at
+		// exactly that instant: `storedDateAtLocalMidnight` is the only fixture shape that makes
+		// `>=` vs `>` observable (see its doc comment). 'b' (noon on the bound day) and 'c' (December)
+		// also stay; 'a' (January) is correctly dropped.
+		const boundary = expense({ id: 'boundary', date: storedDateAtLocalMidnight(2024, 6, 15) });
 		expect(
-			filterExpenses(list, '', { startDate: '2024-06-15T00:00:00.000Z' }).map(e => e.id)
-		).toEqual(['b', 'c']);
+			filterExpenses([...list, boundary], '', { startDate: '2024-06-15T00:00:00.000Z' }).map(
+				e => e.id
+			)
+		).toEqual(['b', 'c', 'boundary']);
 	});
 
 	test('endDate is inclusive', () => {
@@ -128,18 +158,32 @@ describe('filterExpenses — structured filters', () => {
 	// EXCLUDED (off-by-one). The bounds are now LOCAL calendar days with an inclusive end. These pin a
 	// date-picker-shaped range including an expense logged later in the day on the end boundary.
 	describe('date-picker (YYYY-MM-DD) end boundary is inclusive of the whole day', () => {
-		// An expense stored at noon-local (how dateOnlyToISO persists a date-only entry) on the end day.
-		const noonOnEndDay = new Date(2024, 5, 15, 12, 0, 0).toISOString(); // 2024-06-15 noon LOCAL
 		const dayList = [
-			expense({ id: 'before', date: new Date(2024, 5, 14, 12, 0, 0).toISOString() }),
-			expense({ id: 'onEnd', date: noonOnEndDay }),
-			expense({ id: 'after', date: new Date(2024, 5, 16, 12, 0, 0).toISOString() })
+			expense({ id: 'before', date: storedDate(2024, 6, 14) }),
+			expense({ id: 'onEnd', date: storedDate(2024, 6, 15) }),
+			expense({ id: 'after', date: storedDate(2024, 6, 16) })
 		];
 
-		test('endDate = the picker day INCLUDES an expense logged that day (was excluded pre-)', () => {
+		test('endDate = the picker day INCLUDES an expense logged that day', () => {
+			// The old `<= new Date(endDate)` bound excluded this row; it is the load-bearing assertion.
 			const out = filterExpenses(dayList, '', { endDate: '2024-06-15' }).map(e => e.id);
-			expect(out).toContain('onEnd'); // the load-bearing assertion
+			expect(out).toContain('onEnd');
 			expect(out).not.toContain('after');
+		});
+
+		test('the end bound stops AT local midnight of the next day (exclusive)', () => {
+			// Upper-bound counterpart to 'startDate is inclusive': the bound is local midnight of the
+			// day AFTER endDate, exclusive, so a row stored at exactly that instant belongs to the next
+			// calendar day and must be dropped. Only a local-midnight fixture can observe that — the
+			// noon-local rows in `dayList` clear the bound by twelve hours, so `<` → `<=` would survive.
+			const nextDayMidnight = expense({
+				id: 'nextDayMidnight',
+				date: storedDateAtLocalMidnight(2024, 6, 16)
+			});
+			const out = filterExpenses([...dayList, nextDayMidnight], '', {
+				endDate: '2024-06-15'
+			}).map(e => e.id);
+			expect(out).toEqual(['before', 'onEnd']);
 		});
 
 		test('a YYYY-MM-DD closed range includes both boundary days', () => {

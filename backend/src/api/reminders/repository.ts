@@ -50,26 +50,15 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
   }
 
   /**
-   * Insert the reminder→vehicle junction rows inside the caller's transaction. One source of truth
-   * for the `for (vehicleId) insert(reminderVehicles)` loop the create + update-replace paths repeated
-   * byte-identically (dedup; mirrors insurance/repository.ts insertJunctionRowsSync). A future change
-   * to the junction write (batch insert, a new column) then lands once, not twice.
-   */
-  private async insertVehicleJunctions(
-    tx: DrizzleTransaction,
-    reminderId: string,
-    vehicleIds: string[]
-  ): Promise<void> {
-    for (const vehicleId of vehicleIds) {
-      await tx.insert(reminderVehicles).values({ reminderId, vehicleId });
-    }
-  }
-
-  /**
-   * SYNCHRONOUS sibling of insertVehicleJunctions. bun-sqlite is a sync dialect, so the
-   * create/update-replace transactions run their callbacks synchronously to get real atomic rollback (an
-   * async callback autocommits each write alone — the footgun, which here could leave a reminder with
-   * NO vehicles, the vehicle-less-but-active state). `.run()` executes inline inside the caller's tx.
+   * Insert the reminder→vehicle junction rows inside the caller's transaction. One source of truth for
+   * the `for (vehicleId) insert(reminderVehicles)` loop the create + update-replace paths would
+   * otherwise repeat byte-identically (mirrors insurance/repository.ts insertJunctionRowsSync), so a
+   * future change to the junction write (batch insert, a new column) lands once, not twice.
+   *
+   * SYNCHRONOUS on purpose — do NOT make this `async`. bun-sqlite is a sync dialect, so a transaction
+   * with an async callback autocommits each write alone instead of rolling back as one unit, which here
+   * could leave a reminder with NO vehicles (the vehicle-less-but-active state). `.run()` executes
+   * inline inside the caller's tx.
    */
   private insertVehicleJunctionsSync(
     tx: DrizzleTransaction,

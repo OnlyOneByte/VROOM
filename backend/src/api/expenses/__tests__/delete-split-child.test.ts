@@ -68,7 +68,7 @@ describe('deleting a split sibling via DELETE /:id', () => {
 
     // What the ExpensesTable row delete (and the non-insurance ExpenseForm delete)
     // actually call: a single-row delete on children[0].
-    const del = await ctx.authed('DELETE', `/api/v1/expenses/${group.siblings[0]!.id}`);
+    const del = await ctx.authed('DELETE', `/api/v1/expenses/${group.siblings[0].id}`);
     expect(del.status).toBe(200);
 
     // The OTHER sibling survives — the group is now a broken partial split whose

@@ -223,6 +223,9 @@ routes.post(
 routes.post(
   '/restore/from-backup',
   restoreRateLimiter,
+  // A whole backup ZIP, so larger than the app-wide body cap. That cap runs FIRST and rejects on
+  // Content-Length, so this allowance only takes effect because app.ts maps this path to it —
+  // keep the two in step or a large backup becomes unrestorable again.
   bodyLimit({ maxSize: CONFIG.backup.maxFileSize }),
   idempotency({ required: true }),
   async (c) => {

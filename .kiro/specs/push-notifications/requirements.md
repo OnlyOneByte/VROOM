@@ -1,133 +1,119 @@
 # Push Notifications — Requirements
 
-> SPEC (C555). TODO #14 "Push notifications". Greenlit-to-spec under Angelo decision-23: the SPEC step is
-> pre-authorized; the real product/UX + architecture forks below (D1–D6) gate the dependent build slices on
-> a T0 sign-off. This feature builds on TWO shipped systems — the persistent reminder-notification feed
-> (`reminder_notifications`, the trigger-service writes it) and the installed PWA (`@vite-pwa/sveltekit` +
-> a registered service worker) — so it EXTENDS, it does not greenfield a notification model.
+> STATUS: shipped (T0–T6 — see `tasks.md`). The decisions D1–D6 below were accepted and the code was
+> built to them; they are recorded as the rationale for what exists, not as open forks. The one thing
+> never verified end-to-end is live cross-vendor DELIVERY — that needs a real installed PWA and a real
+> browser push service. The named follow-on is a scheduled nudge (see Out of scope).
+>
+> This feature EXTENDS two shipped systems — the persistent reminder-notification feed
+> (`reminder_notifications`, written by the trigger-service) and the installed PWA
+> (`@vite-pwa/sveltekit` + a registered service worker). It does not greenfield a notification model.
 
 ## Problem
-VROOM already FIRES reminder notifications (mileage + time axis) and PERSISTS them
-(`reminder_notifications`, ordered by `createdAt`, deduped, userId-scoped) — but they only surface when the
-user OPENS the app and looks at the `/reminders` feed. A maintenance reminder due today, an insurance term
-expiring, a recurring expense materialized — none reach the user unless they happen to open VROOM. For a
-"log a fill-up at the pump" mobile-first PWA, that is exactly the moment the user is NOT looking at the app.
-The whole value of a reminder is a timely nudge; today there is no nudge, only a feed you must visit.
+VROOM already fires reminder notifications (mileage + time axis) and persists them
+(`reminder_notifications` — userId-scoped, deduped, ordered by `createdAt`) — but they only surface
+when the user opens the app and looks at the `/reminders` feed. A maintenance reminder due today, an
+insurance term expiring, a recurring expense materialized: none reach the user unless they happen to
+open VROOM. For a mobile-first "log a fill-up at the pump" PWA, that is exactly the moment the user is
+NOT looking at the app. The whole value of a reminder is a timely nudge.
 
 ## Goal
-Deliver the EXISTING reminder notifications to the user's device via the **Web Push API** (the standard,
-self-hostable, no-third-party-SaaS mechanism a PWA uses) so an installed VROOM can show a system
-notification even when the tab is closed. Reuse the shipped `reminder_notifications` row as the
-source-of-truth (one push per newly-created notification); add only the delivery layer (a per-user
-subscription store + a VAPID-signed send + a service-worker `push`/`notificationclick` handler). Opt-in,
-privacy-first, and degradeable (a self-hoster who sets no VAPID keys simply gets the in-app feed unchanged).
+Deliver the EXISTING reminder notifications to the user's device via the **Web Push API** — the
+standard, self-hostable, no-third-party-SaaS mechanism — so an installed VROOM can show a system
+notification even when the tab is closed. The `reminder_notifications` row stays the source of truth
+(one push per newly-created row); this adds only the delivery layer: a per-user subscription store, a
+VAPID-signed send, and a service-worker `push`/`notificationclick` handler. Opt-in, privacy-first, and
+degradeable — a self-hoster who sets no VAPID keys simply gets the in-app feed unchanged.
 
 ## In scope (v1)
-- A **per-user push-subscription store** (a new `0013` table): endpoint + p256dh + auth keys, userId-scoped,
-  FK-cascade on user delete — the same userId-owned-row shape as `reminder_notifications`.
+- A **per-user push-subscription store** (`push_subscriptions`, migration `0013`): endpoint + p256dh +
+  auth keys, userId-scoped, FK-cascade on user delete — the `reminder_notifications` row shape.
 - A **subscribe / unsubscribe** flow: a settings opt-in that calls `Notification.requestPermission()` →
-  `pushManager.subscribe({ applicationServerKey })` → POSTs the subscription to the store; an unsubscribe
-  that revokes it both browser-side and server-side.
-- A **VAPID keypair** (the Web Push application-server identity): private key is a SERVER SECRET, public key
-  (`applicationServerKey`) is served to the browser. Generated once; configured via env (the
-  `PROVIDER_ENCRYPTION_KEY`/`SESSION_SECRET` env convention).
-- A **send-on-create hook**: when the trigger-service inserts a new `reminder_notifications` row, fire a
-  Web Push to that user's active subscriptions (best-effort, never blocking the trigger, never failing the
-  reminder write).
-- A **service-worker `push` + `notificationclick` handler**: render the OS notification; on click, focus/open
-  VROOM at `/reminders`. This requires resolving the existing SW situation (D4 — the live SW is workbox-
-  `generateSW`-generated with no push handlers; there is also a dead `static/sw.js`).
-- **410/404 subscription reaping**: a push send that returns "gone" (the browser dropped the subscription)
-  prunes that row — no unbounded dead-subscription growth, no repeated failed sends.
+  `pushManager.subscribe({ applicationServerKey })` → POSTs the subscription; an unsubscribe that
+  revokes it both browser-side and server-side.
+- An app-wide **VAPID keypair**: private key is a server secret, public key (`applicationServerKey`) is
+  served to the browser. Configured via env, like `SESSION_SECRET`.
+- A **send-on-create hook**: when the trigger-service inserts a new `reminder_notifications` row, fire
+  a Web Push to that user's subscriptions — best-effort, never blocking or failing the reminder write.
+- A **service-worker `push` + `notificationclick` handler**: render the OS notification; on click,
+  focus or open VROOM at `/reminders`.
+- **Dead-subscription reaping**: a send that returns "gone" (404/410) prunes that row — no unbounded
+  growth, no repeated failed sends.
 
 ## Out of scope (v1) — explicit cuts
-- **A background SCHEDULER / cron.** The trigger-service is REQUEST-DRIVEN today (fires on login/poll +
-  synchronously after an odometer/expense write). v1 pushes on the SAME triggers — i.e. when something the
-  user does (or a poll) creates a notification, that notification is pushed. A true time-based "it's 9am,
-  your insurance expires today, and you haven't opened the app in a week" scheduled sweep needs a background
-  job runner that DOES NOT EXIST (scout-confirmed) — that is a separate infra spec (D6 names the boundary).
-- **Non-reminder push** (marketing, "your backup finished", sync conflicts). v1 pushes ONLY the existing
-  reminder notifications — the shipped, deduped, userId-scoped source. New push sources are later specs.
-- **iOS web-push nuance beyond best-effort.** iOS Safari supports web push ONLY for an installed
-  (Add-to-Home-Screen) PWA, 16.4+. v1 feature-detects and degrades gracefully (no permission prompt where
-  unsupported); it does not special-case iOS quirks beyond that.
-- **A native push provider (FCM/APNs direct, OneSignal, etc.).** v1 is standard self-hostable VAPID Web
-  Push — no third-party SaaS, no Google/Apple account, matching NORTH_STAR "no SaaS silo, self-hostable".
-- **Rich notifications** (action buttons, images, inline reply). v1 is a title + body + a click-to-open.
-- **A global in-app bell/unread badge in the nav.** The `/reminders` feed already shows the unread state;
-  v1 does not add a nav bell (a separate UI polish item if wanted).
+- **A scheduled reminder sweep.** The trigger-service is REQUEST-DRIVEN: it fires on `POST
+  /reminders/trigger` and synchronously after an odometer/expense/trip write. v1 pushes on those SAME
+  triggers — when something the user does (or a poll) creates a notification, that notification is
+  pushed. A true "it's 9am, your insurance expires today, and you haven't opened the app in a week"
+  nudge needs a scheduled sweep that does not exist; that is a separate spec (D6 names the boundary).
+- **Non-reminder push** (marketing, "your backup finished", sync conflicts). v1 pushes ONLY the
+  existing reminder notifications. New push sources are later specs.
+- **iOS web-push nuance beyond best-effort.** iOS Safari supports web push only for an installed
+  (Add-to-Home-Screen) PWA, 16.4+. v1 feature-detects and degrades (no prompt where unsupported).
+- **A native push provider** (FCM/APNs direct, OneSignal). v1 is standard self-hostable VAPID Web Push
+  — no third-party SaaS, no Google/Apple account.
+- **Rich notifications** (action buttons, images, inline reply). v1 is title + body + click-to-open.
+- **A nav bell / unread badge.** The `/reminders` feed already shows unread state.
 
-## Product / UX + ARCHITECTURE decisions (T0 gates these — each has a RECOMMENDED option; ACK takes it)
-- **D1 — Delivery mechanism.** RECOMMEND **standard VAPID Web Push** (the `web-push` npm library server-side,
-  the browser Push API client-side) — self-hostable, no third-party SaaS, works on Chromium/Firefox + iOS16.4+
-  installed PWAs. (Alt: a SaaS like OneSignal — rejected, violates the self-hostable/privacy-first NORTH_STAR
-  and adds a vendor account dependency. Alt: email — a different channel, separate spec.)
-- **D2 — Trigger timing (the central scope fork).** RECOMMEND **push on the existing request-driven trigger**
-  — when the trigger-service creates a new `reminder_notifications` row (login/poll sweep + post-odometer/
-  expense recheck), push it then. Honestly scoped: "you get a push when VROOM next runs a reminder check",
-  NOT "a guaranteed 9am daily nudge". (Alt: build a background scheduler now — rejected for v1, it is a
-  separate infra concern with its own design [a Bun cron / a system timer hitting `/trigger`]; D6 records the
-  boundary so we do not silently imply guaranteed timing.)
-- **D3 — VAPID key provisioning.** RECOMMEND **env-configured server secret** — the VAPID keypair is
-  app-wide (NOT per-user), so it is a deploy secret like `SESSION_SECRET`: `VAPID_PUBLIC_KEY` +
-  `VAPID_PRIVATE_KEY` + `VAPID_SUBJECT` (a mailto:). If unset, the feature is OFF (the in-app feed is
-  unchanged) and the subscribe UI shows "push not configured on this server". A `bun run vapid:gen` helper
-  prints a fresh keypair for the self-hoster. (Alt: store in the DB via the `user_providers` encryption seam
-  — rejected: the keypair is server-wide infra, not a per-user credential; env matches `SESSION_SECRET`.)
-- **D4 — Service-worker strategy (resolve the SW collision).** RECOMMEND switch `@vite-pwa/sveltekit` to the
-  **`injectManifest` strategy with a custom `src/service-worker.ts`** that adds `push` + `notificationclick`
-  handlers on top of the workbox precache, and DELETE the dead `static/sw.js` (scout-confirmed it is
-  overwritten by the generated SW and never runs). (Alt: keep `generateSW` and add an importScripts shim —
-  rejected, fragile + still leaves the dead file. Alt: hand-roll the whole SW — rejected, loses workbox
-  precache.) This is the highest-risk slice (eyes-on + a real PWA install to verify) — gated, built last.
-- **D5 — Opt-in placement + disclosure.** RECOMMEND a **settings card** ("Push Notifications" — a permission
-  toggle + status: not-supported / not-configured / denied / subscribed) with a first-enable disclosure
-  ("VROOM will send a system notification when a reminder is due; you can turn this off anytime; the push
-  goes through your browser vendor's push service"). (Alt: an inline prompt on the reminders page — rejected,
-  permission prompts are best gated behind an explicit user action, never auto-fired on page load.)
-- **D6 — Guaranteed-timing boundary (honesty fork).** RECOMMEND **document the request-driven limit
-  explicitly** in the settings copy + the spec — v1 delivers "when VROOM runs a check", and a guaranteed
-  scheduled nudge is a named follow-on (a background-trigger infra spec). (Alt: silently ship request-driven
-  and let users assume daily nudges — rejected, that is a data-honesty violation of the "no silent" bar.)
+## Accepted decisions (D1–D6)
+- **D1 — Delivery mechanism: standard VAPID Web Push** (the `web-push` library server-side, the browser
+  Push API client-side). Self-hostable, no SaaS vendor account. (A SaaS like OneSignal was rejected as
+  a privacy/self-hosting violation; email is a different channel and a separate spec.)
+- **D2 — Trigger timing: push on the existing request-driven trigger.** When the trigger-service creates
+  a `reminder_notifications` row, push it then. Honestly scoped as "you get a push when VROOM next runs
+  a reminder check", NOT a guaranteed daily nudge. (Building a scheduler was deferred to its own spec.)
+- **D3 — VAPID keys: an env-configured server secret.** The keypair is app-wide, not per-user, so it is
+  a deploy secret: `VAPID_PUBLIC_KEY` + `VAPID_PRIVATE_KEY` + `VAPID_SUBJECT`. Unset → the feature is
+  OFF and the in-app feed is unchanged. `bun run vapid:gen` prints a fresh keypair for the self-hoster.
+  (Storing it per-user via the `user_providers` encryption seam was rejected: it is server-wide infra.)
+- **D4 — Service worker: the `injectManifest` strategy with a custom `src/service-worker.ts`** that adds
+  `push` + `notificationclick` on top of the workbox precache, plus deletion of the dead `static/sw.js`
+  (which the generated SW overwrote, so it never ran). (A `generateSW` + `importScripts` shim was
+  rejected as fragile; hand-rolling the whole SW loses the workbox precache.)
+- **D5 — Opt-in placement: a settings card** ("Push Notifications" — a toggle plus a status line:
+  not-supported / not-configured / denied / subscribed / off) with a first-enable disclosure. (An inline
+  prompt on the reminders page was rejected: a permission prompt must follow an explicit user action.)
+- **D6 — Timing honesty: document the request-driven limit** in the settings copy and here. v1 delivers
+  "when VROOM runs a check"; a guaranteed scheduled nudge is a named follow-on.
 
 ## Functional requirements
-- **R1** — A new `push_subscriptions` table (migration `0013`, additive — NOT a rebuild): `id`, `userId`
-  (FK→users, onDelete cascade), `endpoint` (unique-per-user), `p256dh`, `auth`, `userAgent?`, `createdAt`,
-  `lastSuccessAt?`, `failureCount`. UserId-scoped exactly like `reminder_notifications`.
-- **R2** — `GET /push/vapid-public-key` returns the configured public key (or a 503/clear "not configured"
-  when unset). `POST /push/subscribe` persists a `{endpoint, keys:{p256dh,auth}}` for the session user
-  (idempotent on endpoint — re-subscribe updates, never duplicates). `DELETE /push/subscribe` (or
-  `/unsubscribe`) removes it. All three are session-userId-scoped — the userId is NEVER client-supplied.
+- **R1** — A `push_subscriptions` table (additive migration `0013`): `id`, `userId` (FK→users, cascade),
+  `endpoint`, `p256dh`, `auth`, `userAgent?`, `createdAt`, `lastSuccessAt?`, `failureCount`, unique on
+  `(userId, endpoint)`.
+- **R2** — `GET /api/v1/push/vapid-public-key` returns the configured public key, or 503
+  `PUSH_NOT_CONFIGURED` when unset. `POST /api/v1/push/subscribe` persists
+  `{endpoint, keys:{p256dh,auth}, userAgent?}` for the session user (idempotent on endpoint — a
+  re-subscribe updates, never duplicates) and returns the row id only. `DELETE /api/v1/push/subscribe`
+  removes it by endpoint (idempotent). All three are session-authed and userId-scoped — the userId is
+  NEVER client-supplied, and the endpoint alone never authorizes a read or write.
 - **R3** — When the trigger-service creates a `reminder_notifications` row, it emits a Web Push to that
-  user's subscriptions via a thin `pushService.notifyUser(userId, payload)` seam. The send is best-effort:
-  it NEVER throws into the trigger path, NEVER blocks the reminder write, and a transport error is logged
-  (status only, never the subscription/keys) — the in-app feed is unaffected if push fails.
-- **R4** — A push send returning 404/410 ("gone") PRUNES that subscription row; repeated transient failures
-  increment `failureCount` and a row past a cap is reaped (no unbounded dead-subscription growth — the #135
-  reaping-hygiene lesson applied to subscriptions).
-- **R5** — The service worker handles `push` (show a notification: title from the reminder, body, an icon
-  from the existing PWA assets, a tag so repeated nudges collapse) and `notificationclick` (focus an existing
-  VROOM tab or open `/reminders`).
-- **R6** — Feature-detect + degrade: where Push/Notification/serviceWorker is unavailable (or VAPID is
-  unconfigured), the subscribe UI shows the reason and the rest of VROOM is unchanged. No console error, no
-  broken state — the in-app `/reminders` feed remains the baseline channel.
-- **R7** — The VAPID keypair config does NOT affect the test suite: the push send is behind a DI seam (a
-  `PushSender` interface) so the in-memory HTTP harness injects a fake (zero-network), exactly like the
-  `PhotosClient`/VLM-adapter test seams. The subscribe/store routes test against the real DB; the send hook
-  tests assert the fake sender was called with the right payload + that a 410 reaps the row.
+  user's subscriptions via `notifyUser(userId, payload)`. Best-effort: it NEVER throws into the trigger
+  path, NEVER blocks the reminder write, and logs status only (never the subscription or its keys).
+- **R4** — A send returning 404/410 PRUNES that row; repeated transient failures increment
+  `failureCount` and a row past the cap is reaped. The rows ONE user may hold are also capped: a new
+  device past the cap evicts their oldest subscription rather than being rejected.
+- **R5** — The service worker handles `push` (show a notification: title, body, a PWA icon, and a tag so
+  repeated nudges for one reminder collapse) and `notificationclick` (focus an existing VROOM tab or
+  open `/reminders`).
+- **R6** — Feature-detect and degrade: where serviceWorker/PushManager/Notification is unavailable, or
+  VAPID is unconfigured (503), the subscribe UI states the reason and the rest of VROOM is unchanged.
+  No console error, no broken state — the in-app `/reminders` feed remains the baseline channel.
+- **R7** — Push config must not be needed to run the tests: the send sits behind a `PushSender` DI seam
+  so the in-memory HTTP harness injects a fake (zero-network), the same pattern as the injectable
+  `PhotosClient`. The store routes test against a real DB; the hook tests assert the fake sender was
+  called with the right payload and that a `gone` result reaps the row.
 
-## Non-functional / safety
-- **VAPID private key = a server secret** (ARCC SAX-05 credential-isolation): env-only, never shipped to the
-  browser, never logged. The public key IS public (it is the `applicationServerKey` the browser needs).
-- **A push subscription is user PII** (a device endpoint + crypto keys identifying the user's browser): it is
-  a userId-scoped row, cross-tenant-isolated (a user can only read/write/delete their OWN subscriptions —
-  the IDOR discipline), and never logged. It is **NOT backed up** (T1/C556 correction — it joins
-  `sessions`/`user_providers` on the backup `EXCLUDED_BY_DESIGN` list): the keys are device-ephemeral secrets
-  re-derivable on re-subscribe, and a restored stale subscription would push to a dead endpoint — the
-  `sessions` meaningless/unsafe-to-restore rationale. The user re-enables push per-device after a restore.
-- **The service worker is same-origin**; CSP stays tight (no new `connect-src` for delivery — the browser
-  push service delivers TO the SW; the SW does not fetch it). The subscribe endpoint is same-origin.
-- **Opt-in only.** No permission prompt auto-fires; the browser permission is requested ONLY on an explicit
-  user toggle (D5). A denied permission is respected (no re-nag).
-- **Best-effort delivery, honestly disclosed** (D6): v1 does not promise guaranteed timing; the copy states
-  the request-driven limit so the user is not misled (NORTH_STAR "no silent" / data-honesty bar).
+## Safety requirements
+- **The VAPID private key is a server secret**: env-only, never shipped to the browser, never logged.
+  The public key IS public — it is the `applicationServerKey` the browser needs and authorizes nothing.
+- **A push subscription is user PII** (a device endpoint plus crypto keys): a userId-scoped,
+  cross-tenant-isolated row, never logged. It is deliberately **NOT backed up** — it sits on the backup
+  `EXCLUDED_BY_DESIGN` list beside `sessions`/`user_providers`, because the keys are device-ephemeral
+  and re-derivable on re-subscribe, and a restored stale subscription would push to a dead endpoint.
+  The user re-enables push per device after a restore.
+- **A user-supplied endpoint is an SSRF vector** — the server later POSTs to it. Only an https URL on a
+  known browser-vendor push host is accepted, rejected before storing.
+- **Opt-in only.** No permission prompt auto-fires; the browser permission is requested only on an
+  explicit user toggle. A denied permission is respected (no re-nag).
+- **Best-effort delivery, honestly disclosed.** v1 does not promise guaranteed timing; the settings copy
+  states the request-driven limit so the user is not misled.

@@ -1,4 +1,5 @@
 import type { DerivedPaymentEntry, Expense, VehicleFinancing } from '$lib/types';
+import { dateOnlyToISO } from './formatters';
 import { memoizeMulti } from './memoize';
 
 /**
@@ -45,10 +46,10 @@ const DEV = import.meta.env.DEV;
  * Add `months` to `date`, clamping a day-of-month overflow back to the last day of the TARGET month.
  * Plain `Date.setMonth(getMonth() + n)` rolls a day past the target month's length into the FOLLOWING
  * month (Aug 31 + 1mo → Oct 1, since Sept has no 31st; Jan 31 + 1mo → Mar 3), silently shifting a
- * payment/payoff/lease-end date into the wrong month. This mirrors the clamp `calculatePayoffDateFromStart`
- * already used inline (detect the rolled day → `setDate(0)` to the intended month's last day) and is the
- * ONE source of truth for it across this file (the financing-math defect family). Returns a
- * fresh Date; does not mutate the input.
+ * payment/payoff/lease-end date into the wrong month. Detect the rolled day → `setDate(0)` back to the
+ * intended month's last day. This is the ONE source of truth for the clamp across this file (the
+ * financing-math defect family) — `calculatePayoffDateFromStart` routes through it too, rather than
+ * keeping its own copy. Returns a fresh Date; does not mutate the input.
  */
 function addMonthsClamped(date: Date, months: number): Date {
 	const result = new Date(date);
@@ -622,20 +623,36 @@ export function derivePaymentEntries(
 	});
 }
 
+/** A bare `<input type="date">` value — no time part, so `new Date()` would parse it as UTC midnight. */
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Parse a financing start date, reading a date-only 'YYYY-MM-DD' as that LOCAL calendar day.
+ *
+ * `new Date('2024-03-01')` is midnight UTC, which for a negative-offset (Americas) user is the
+ * PREVIOUS local day — and since the payoff preview renders month+year only, a 1st-of-month loan
+ * start (the common contract day) previews the WRONG MONTH. `dateOnlyToISO` is the ONE date-only
+ * parse in the codebase (noon local, the anchor every form save persists at), so delegate to it
+ * instead of re-deriving the parts here. Anything else (a full ISO instant from the API — or, at
+ * runtime, a Date, which `calculatePayoffDateFromStart`'s callers may pass) goes to `new Date`
+ * unchanged.
+ */
+function parseStartDate(value: string | undefined): Date {
+	if (!value) return new Date();
+	if (!DATE_ONLY.test(value)) return new Date(value);
+	return new Date(dateOnlyToISO(value));
+}
+
 /**
  * Calculate a payoff date by adding N months to a start date.
  * Used by the vehicle form's amortization preview.
+ *
+ * Shares `addMonthsClamped` with the payment/lease-end projections, so a month-end start
+ * (Jan 31 + 1mo → Feb 28, not Mar 3) clamps identically everywhere.
  */
 export function calculatePayoffDateFromStart(
 	startDateStr: string | undefined,
 	numPayments: number
 ): Date {
-	const start = startDateStr ? new Date(startDateStr) : new Date();
-	const targetMonth = start.getMonth() + numPayments;
-	const payoff = new Date(start.getFullYear(), targetMonth, start.getDate());
-	// If the day overflowed (e.g. Jan 31 + 1 month → Mar 3), clamp to last day of target month
-	if (payoff.getDate() !== start.getDate()) {
-		payoff.setDate(0); // Sets to last day of previous month (i.e. the intended target month)
-	}
-	return payoff;
+	return addMonthsClamped(parseStartDate(startDateStr), numPayments);
 }

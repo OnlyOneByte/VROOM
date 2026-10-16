@@ -1,14 +1,14 @@
 /**
- * Migration 0003: Maintenance-schedule columns (T1 — additive only)
+ * Migration 0003: Maintenance-schedule columns — additive only.
  *
  * Pure `ALTER TABLE ADD COLUMN` (no table rebuild, so existing rows are untouched):
  * - reminders gains trigger_mode (default 'time'), interval_mileage, last_service_odometer,
  *  next_due_odometer.
  * - reminder_notifications gains due_odometer.
  *
- * Relaxing next_due_date / due_date to nullable + widening the dedup index is deferred to T3
- * (it forces a table rebuild, which under the test harness's transaction cascades child rows;
- * keeping T1 additive avoids that risk entirely).
+ * Relaxing next_due_date / due_date to nullable + widening the dedup index is deliberately left to
+ * 0004: that forces a table rebuild, which inside the migrator's transaction cascades child rows,
+ * so keeping this one additive avoids the risk entirely.
  */
 
 import { Database } from 'bun:sqlite';
@@ -102,7 +102,7 @@ describe('Migration 0003: maintenance-schedule columns (additive)', () => {
     applyMigrationsUpTo(db, migrations, 3);
     seedCoreData(db);
     const user = db.query('SELECT id FROM users LIMIT 1').get() as { id: string };
-    // Mileage/both still carries a next_due_date here (NOT NULL until T3); the mileage axis is
+    // Mileage/both still carries a next_due_date here (NOT NULL until 0004); the mileage axis is
     // exercised via the new columns.
     db.run(
       `INSERT INTO reminders (id, user_id, name, type, action_mode, frequency, trigger_mode, interval_mileage, last_service_odometer, next_due_odometer, start_date, next_due_date, is_active)

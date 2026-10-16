@@ -5,7 +5,6 @@
 	import { gotoDynamic, gotoWithQuery } from '$lib/utils/navigation';
 	import { onlineStatus } from '$lib/stores/offline.svelte';
 	import { addOfflineExpense } from '$lib/utils/offline-storage';
-	import { requestBackgroundSync } from '$lib/utils/pwa';
 	import { appStore } from '$lib/stores/app.svelte';
 	import { settingsStore } from '$lib/stores/settings.svelte';
 	import { expenseApi } from '$lib/services/expense-api';
@@ -42,7 +41,12 @@
 	import { validateExpenseField } from './expense-form-validation';
 	import { Checkbox } from '$lib/components/ui/checkbox';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
-	import { formatCurrency, dateOnlyToISO, toDateInputValue } from '$lib/utils/formatters';
+	import {
+		formatCurrency,
+		formatDate,
+		dateOnlyToISO,
+		toDateInputValue
+	} from '$lib/utils/formatters';
 	import {
 		buildSplitConfig,
 		categoryLabels,
@@ -96,6 +100,11 @@
 	});
 
 	// Form state
+	// `expenseId` is a route param, fixed for this component's life, so capturing it once is the
+	// intent — and `isLoading` is reassigned when the load settles, so it can't become a $derived.
+	// Svelte's state_referenced_locally warning here is the false positive MainSteering tells us to
+	// tolerate; leave it visible rather than suppressed, because it is also the only live signal that
+	// the load runs in onMount only (a same-route expenseId change would reload nothing).
 	let isLoading = $state(!!expenseId);
 	let isSubmitting = $state(false);
 	let isDeleting = $state(false);
@@ -248,8 +257,7 @@
 						formData.category = first.category;
 						formData.amount = splitGroup.groupTotal.toString();
 						formData.tags = first.tags || [];
-						const groupDate = new Date(first.date);
-						formData.date = `${groupDate.getFullYear()}-${String(groupDate.getMonth() + 1).padStart(2, '0')}-${String(groupDate.getDate()).padStart(2, '0')}`;
+						formData.date = toDateInputValue(new Date(first.date));
 						formData.description = first.description || '';
 						isLoading = false;
 						return;
@@ -260,8 +268,7 @@
 					formData.category = first.category;
 					formData.amount = splitGroup.groupTotal.toString();
 					formData.tags = first.tags || [];
-					const groupDate = new Date(first.date);
-					formData.date = `${groupDate.getFullYear()}-${String(groupDate.getMonth() + 1).padStart(2, '0')}-${String(groupDate.getDate()).padStart(2, '0')}`;
+					formData.date = toDateInputValue(new Date(first.date));
 					formData.description = first.description || '';
 
 					// Set up split state from siblings
@@ -302,8 +309,7 @@
 			formData.tags = expense.tags || [];
 			formData.category = expense.category;
 			formData.amount = expense.amount.toString();
-			const expenseDate = new Date(expense.date);
-			formData.date = `${expenseDate.getFullYear()}-${String(expenseDate.getMonth() + 1).padStart(2, '0')}-${String(expenseDate.getDate()).padStart(2, '0')}`;
+			formData.date = toDateInputValue(new Date(expense.date));
 			formData.mileage = expense.mileage?.toString() ?? '';
 			formData.volume = expense.volume?.toString() ?? '';
 			formData.charge = expense.charge?.toString() ?? '';
@@ -352,12 +358,12 @@
 	}
 
 	/**
-	 * Apply a VLM receipt-parse draft to the form (T6). Each field is optional + already validated
+	 * Apply a VLM receipt-parse draft to the form. Each field is optional + already validated
 	 * server-side (fail-closed), so we set ONLY the fields the draft carries and leave the rest for the
 	 * user. The draft amount is in DOLLARS (formData.amount is a dollar string); date is 'YYYY-MM-DD'
 	 * (the DatePicker's bind format); category routes through selectCategory so its side-effects fire;
 	 * odometer → mileage; vendor → description. The image rides pendingFiles → the existing
-	 * expense_receipts photo flow on save (R5). The user reviews + submits via the UNCHANGED path.
+	 * expense_receipts photo flow on save. The user reviews + submits via the UNCHANGED path.
 	 */
 	function handleReceiptDraft(draft: ReceiptDraft, image: File) {
 		if (typeof draft.amount === 'number') formData.amount = String(draft.amount);
@@ -516,11 +522,13 @@
 
 		isSubmitting = true;
 
-		try {
-			// Convert date string to ISO at noon local time to avoid timezone day-shift
-			// (see dateOnlyToISO). Shared with VehicleForm/odometer so all forms agree.
-			const dateISO = dateOnlyToISO(formData.date);
+		// Convert the date-input value to an ISO timestamp at noon local time to avoid a timezone
+		// day-shift (see dateOnlyToISO). Shared with VehicleForm/odometer so all forms agree, and
+		// computed OUTSIDE the try so the error-fallback offline save below persists the same
+		// instant instead of re-deriving (or leaking) the raw 'YYYY-MM-DD' picker value.
+		const dateISO = dateOnlyToISO(formData.date);
 
+		try {
 			const expenseData = {
 				vehicleId: formData.vehicleId,
 				tags: formData.tags,
@@ -616,8 +624,7 @@
 						})
 					});
 
-					requestBackgroundSync('expense-sync');
-
+					// syncManager's `online` listener delivers this; see the note in $lib/utils/pwa.
 					appStore.addNotification({
 						type: 'info',
 						message: 'Expense saved offline. Will sync when online.'
@@ -636,7 +643,7 @@
 					tags: formData.tags,
 					category: formData.category,
 					amount: parseFloat(formData.amount),
-					date: formData.date,
+					date: dateISO,
 					mileage: formData.mileage ? parseInt(formData.mileage) : undefined,
 					volume: formData.volume ? parseFloat(formData.volume) : undefined,
 					charge: formData.charge ? parseFloat(formData.charge) : undefined,
@@ -659,13 +666,13 @@
 					// Carry fuelType: the sync transform needs it to keep an electric charge.
 					...(expenseData.fuelType !== undefined && { fuelType: expenseData.fuelType }),
 					// Carry missedFillup: dropping it on sync corrupts consecutive-fillup MPG pairing.
-					// This error-fallback save mirrors the offline-first save above: the
-					// fix landed on that path only, so a fuel fill-up logged with "missed previous" checked
-					// during an online-create FAILURE (timeout/5xx → this catch) silently dropped the flag.
+					// This error-fallback save must stay field-for-field identical to the offline-first save
+					// above — an online create that fails (timeout/5xx → this catch) lands here, and any
+					// field only one of the two paths carries is silently lost for those users.
 					...(expenseData.missedFillup !== undefined && { missedFillup: expenseData.missedFillup })
 				});
-				requestBackgroundSync('expense-sync');
 
+				// syncManager's `online` listener delivers this; see the note in $lib/utils/pwa.
 				appStore.addNotification({
 					type: 'warning',
 					message: 'Saved offline due to connection issue. Will sync when online.'
@@ -870,8 +877,11 @@
 					</div>
 					<div>
 						<p class="text-muted-foreground">Date</p>
+						<!-- formData.date is the raw date-input value ('YYYY-MM-DD', and empty until the user
+						picks one), so it goes through dateOnlyToISO (noon local) — the same parse the save path
+						uses, which also turns an empty picker into a valid instant instead of a throw. -->
 						<p class="font-medium text-foreground">
-							{new Date(formData.date || '').toLocaleDateString()}
+							{formatDate(dateOnlyToISO(formData.date))}
 						</p>
 					</div>
 					{#if formData.description}
@@ -960,7 +970,7 @@
 				}}
 				class="rounded-lg border bg-card p-6 space-y-6"
 			>
-				<!-- Scan receipt (create mode only) — pre-fills the fields below from a photo (T6). -->
+				<!-- Scan receipt (create mode only) — pre-fills the fields below from a photo. -->
 				{#if !isEditMode && !isSplit && !isInsuranceManaged}
 					<ReceiptScanButton onDraft={handleReceiptDraft} />
 				{/if}
@@ -1262,7 +1272,7 @@
 					/>
 				</div>
 
-				<!-- Location (expense-location D2: a single-line free-text label, no GPS) -->
+				<!-- Location: a single-line free-text label, deliberately not GPS coordinates -->
 				<div class="space-y-2">
 					<Label for="location">Location (Optional)</Label>
 					<Input

@@ -1,201 +1,161 @@
 # Push Notifications — Design
 
-> Backend-first per CLAUDE.md (subscription store → VAPID config + public-key route → send-on-create hook →
-> frontend subscribe UI → service-worker push handler). Nothing that depends on a fork (D1–D6) builds until
-> T0; the schema/store/route plumbing (T1–T3) is fork-free additive and MAY build first (the expense-location
-> precedent: the additive column built before T0). ARCC §7 below is a PRECONDITION on the credential-handling
-> surface and is CLEARED.
+> Built backend-first: subscription store → VAPID config + public-key route → subscribe/unsubscribe
+> routes → send + trigger hook → frontend client + settings card → service worker. All of it has
+> shipped; this document describes what exists and why. See `requirements.md` for the accepted
+> decisions D1–D6 that each choice follows.
+>
+> Two facts the design rides on. (1) The notification source-of-truth already existed:
+> `reminder_notifications` (userId-FK, `dueDate` XOR `dueOdometer`, `isRead`, ordered
+> `desc(createdAt)`, deduped by a unique `(reminderId, dueDate)` index plus a partial-unique
+> `(reminderId, dueOdometer)` index for the mileage axis). Push rides that row — one push per newly
+> inserted notification, no new notification model. (2) The reminder trigger is REQUEST-DRIVEN:
+> `POST /reminders/trigger` (the full sweep) plus `recheckMileageReminders` called synchronously from
+> the odometer/expense/trip write paths. Nothing schedules it. A guaranteed-time daily nudge would
+> need a scheduled sweep — the in-process `setInterval` worker in `api/providers/sync-worker.ts` is
+> the precedent for how one would be built, but no such sweep exists for reminders.
 
-## §0 — Grounding (scout-confirmed, do not re-derive)
-- **The notification source-of-truth already exists.** `reminder_notifications` (schema.ts:554) — userId-FK,
-  `dueDate` XOR `dueOdometer`, `isRead`, ordered `desc(createdAt)`, deduped (unique on (reminderId,dueDate)
-  time + partial-unique on (reminderId,dueOdometer) mileage), `limit(100)`. The trigger-service WRITES it:
-  time axis `processNotificationPeriod` (trigger-service.ts:263), mileage axis `processMileageReminder`
-  (:403). Push RIDES this row — one push per newly-inserted notification. NO new notification model.
-- **The trigger is REQUEST-DRIVEN — there is NO scheduler.** Firing happens on the `/trigger` route
-  (login/poll full sweep) + `recheckMileageReminders` (synchronous, post odometer/expense write). This is
-  the D2/D6 fork: v1 pushes on these existing triggers; a guaranteed-time daily nudge needs a background
-  runner that does not exist.
-- **The PWA + SW exist; push handlers do not.** `@vite-pwa/sveltekit` v1.1.0 (`vite.config.ts:10`) with the
-  workbox **`generateSW`** strategy → the live SW precaches + does navigation-fallback, with NO `push`/
-  `notificationclick` listener. `registerSW({immediate:true, onRegistered(r){…}})` is wired in
-  `+layout.svelte:96` — `onRegistered` hands back the `ServiceWorkerRegistration` (the natural
-  `.pushManager.subscribe` hook). A DEAD hand-written `static/sw.js` exists but is OVERWRITTEN by the
-  generated SW and never runs (D4 deletes it). `pwa.ts` (utils, not services) does install-prompt +
-  `requestBackgroundSync` (Background Sync, not Push) — zero push code.
-- **The credential-at-rest pattern** is `user_providers.credentials` AES-256-GCM via `utils/encryption.ts`
-  (`PROVIDER_ENCRYPTION_KEY`). But the VAPID keypair is APP-WIDE, not per-user → env secret (D3), like
-  `SESSION_SECRET`, NOT a `user_providers` row.
-- **No web-push dependency yet** — `web-push` is net-new in `backend/package.json`. Highest migration `0012`
-  → the new subscription table is `0013`.
-- **The reaping lesson (#135)** — a synced/dead row that is never reaped is unbounded growth; R4 applies it
-  to subscriptions (410/404 → prune; failureCount cap → reap).
+## §1 — The subscription store
+`push_subscriptions` (`db/schema.ts`, migration `0013_push_subscriptions.sql`, journal idx 13): `id`
+(cuid2 pk), `userId` (FK→users, cascade), `endpoint`, `p256dh`, `auth`, `userAgent?`, `failureCount`
+(default 0), `lastSuccessAt?`, `createdAt`; index `ps_user_idx` on `(userId)` and unique index
+`ps_user_endpoint_idx` on `(userId, endpoint)` so a re-subscribing browser upserts instead of
+duplicating.
 
-## §1 — Backend: the subscription store (T1)
-New table `push_subscriptions` (schema.ts), migration `0013_push_subscriptions.sql` + journal idx-13:
-```
-push_subscriptions:
-  id            text pk ($defaultFn createId)
-  userId        text notNull → users.id (onDelete cascade)
-  endpoint      text notNull           // the push-service URL (vendor-specific)
-  p256dh        text notNull           // the client public key (base64url)
-  auth          text notNull           // the client auth secret (base64url)
-  userAgent     text                   // optional, for the user to identify a device in a list
-  failureCount  integer notNull default 0
-  lastSuccessAt integer (timestamp)
-  createdAt     integer (timestamp) $defaultFn now
-  index ps_user_idx           on (userId)
-  unique index ps_user_endpoint_idx on (userId, endpoint)   // idempotent re-subscribe; never dup
-```
-A `pushSubscriptionRepository` (mirrors the reminders repo): `upsertByEndpoint(userId, sub)`,
-`findByUser(userId)`, `deleteByEndpoint(userId, endpoint)`, `incrementFailure(id)` / `markSuccess(id)`,
-`prune(id)`. All methods userId-scoped (the IDOR discipline) — the endpoint alone never authorizes a write.
-**NOT backed up (CORRECTED at T1/C556):** the backup-coverage drift guard forces a deliberate decision on
-every new schema table (registry OR `EXCLUDED_BY_DESIGN`), and `push_subscriptions` joins `sessions` /
-`user_providers` on the EXCLUDED list — the endpoint + p256dh/auth keys are DEVICE-EPHEMERAL secrets
-re-derivable by the browser on re-subscribe, and a restored stale subscription would push to a dead endpoint
-in a new environment (the `sessions` "meaningless/unsafe to restore" rationale). The user simply re-enables
-push per-device after a restore; nothing of value is lost. (The earlier draft assumed the column auto-flows
-into the backup — that was wrong; the exclusion is the correct, deterministic follow of the `sessions`
-precedent, not a product fork.)
+`pushSubscriptionRepository` (`api/push/repository.ts`): `upsertByEndpoint` (onConflictDoUpdate on
+`(userId, endpoint)` — refreshes the keys and resets `failureCount`), `findByUser`,
+`deleteByEndpoint`, `markSuccess`, `incrementFailure`, `prune`. Every method is userId-scoped; the
+endpoint alone never authorizes a write. `upsertByEndpoint` also enforces
+`CONFIG.validation.push.maxSubscriptionsPerUser` by evicting the user's OLDEST surplus rows — device
+rotation is normal, so a legitimate new phone must not be rejected, and the cap bounds a
+crafted-endpoint flood.
 
-## §2 — Backend: VAPID config + the public-key route (T2)
-- `CONFIG.push` (config.ts): `{ vapidPublicKey, vapidPrivateKey, vapidSubject, enabled }` read from env
-  (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`); `enabled = !!(public && private && subject)`.
-  Unset → `enabled:false` (the feature is OFF; the in-app feed is unchanged).
-- `GET /api/v1/push/vapid-public-key` → `{ publicKey }` when enabled, else **503** with a clear
-  `PUSH_NOT_CONFIGURED` body (the FE shows "push not configured on this server" — R6).
-- A `bun run vapid:gen` script (`web-push generateVAPIDKeys`) prints a fresh keypair + the `.env` lines for
-  the self-hoster. Documented in the README/`.env.example` (the `SESSION_SECRET` convention).
-- **The private key NEVER leaves the server** (ARCC §7.1) — only the public key is served. Neither is logged.
+**Deliberately NOT backed up.** The table sits on the backup suite's `EXCLUDED_BY_DESIGN` list beside
+`sessions`/`user_providers`: the endpoint and keys are device-ephemeral secrets the browser
+re-derives on re-subscribe, and a restored stale subscription would push to a dead endpoint. (The
+backup-coverage drift guard forces this decision explicitly for every new schema table.)
 
-## §3 — Backend: subscribe/unsubscribe routes (T3)
-- `POST /api/v1/push/subscribe` — Zod-validates `{ endpoint, keys:{ p256dh, auth }, userAgent? }`;
-  `upsertByEndpoint(ctx.userId, …)`; idempotent (re-subscribe updates the same (userId,endpoint) row,
-  resets failureCount). 201/200. SAX-04 input caps (endpoint length-bounded).
-- `DELETE /api/v1/push/subscribe` — `{ endpoint }`; `deleteByEndpoint(ctx.userId, endpoint)`. 204.
-- Mounted under a new `push` router (`/api/v1/push`), session-authed; the userId is `ctx.userId`, NEVER from
-  the body. An IDOR test asserts user A cannot read/delete user B's subscription.
+## §2 — VAPID config + the public-key route
+- `CONFIG.push` (`config.ts`): `{ vapidPublicKey, vapidPrivateKey, vapidSubject, enabled }` read from
+  `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT`; `enabled` is true only when all three
+  are set. Unset → the feature is OFF and the in-app feed is unchanged.
+- `GET /api/v1/push/vapid-public-key` (session-authed) → `{ publicKey }` when enabled, else **503**
+  `PUSH_NOT_CONFIGURED` so the frontend can report the reason honestly rather than fail opaquely.
+- `bun run vapid:gen` (`src/scripts/gen-vapid-keys.ts`) prints a fresh keypair plus the `.env` lines;
+  `.env.example` documents the three vars as optional.
+- The private key never leaves the server — no route returns it, nothing logs it.
 
-## §4 — Backend: the send-on-create hook + the PushSender DI seam (T4)
-- A `PushSender` interface: `send(subscription, payload): Promise<PushResult>` where `PushResult` is
-  `{ ok } | { gone } | { transientError }`. The REAL impl wraps `web-push.sendNotification` (maps a 404/410 →
-  `gone`, other non-2xx → `transientError`). A FAKE impl (test) records calls + scripts results — the
-  zero-network seam (the PhotosClient/VLM-adapter pattern). `setPushSenderForTest(sender|null)` mirrors the
-  shipped DI seams.
-- `pushService.notifyUser(userId, payload)`: `findByUser` → for each, `send`; on `gone` → `prune`; on
-  `transientError` → `incrementFailure` (+ reap past a cap, R4); on `ok` → `markSuccess`. **Best-effort:
-  wrapped so it NEVER throws into the caller** (R3) — a `try/catch` that logs status only.
-- The hook: in the trigger-service, AFTER a `reminder_notifications` row is inserted (both
-  `processNotificationPeriod` time + `processMileageReminder` mileage paths), call
-  `pushService.notifyUser(userId, payloadFromReminder(reminder, notification))` — fire-and-forget (do not
-  await into the trigger result; or await-and-swallow so a slow push never stalls the sweep). The payload is
-  `{ title, body, tag: reminder.id, url: '/reminders' }` — title/body derived from the reminder name + due
-  axis (e.g. "Oil change due" / "Due at 60,000 mi"). NO PII beyond the reminder text the user authored.
-- Tests: the fake sender asserts `notifyUser` fired with the right payload on a trigger that creates a
-  notification; a `gone` result reaps the row; a `transientError` does NOT throw (the trigger still returns
-  its normal `TriggerResult`); the in-memory harness runs with `enabled:false`-equivalent (the fake is
-  injected, so no real VAPID needed).
+## §3 — Subscribe / unsubscribe routes
+Both live on the `push` router (`api/push/routes.ts`, mounted at `/api/v1/push` with `requireAuth`).
+Neither is gated on `CONFIG.push.enabled`: a browser may register regardless of whether this server
+can currently send, and the send path checks enablement itself.
+- `POST /subscribe` — Zod-validates `{ endpoint, keys:{p256dh,auth}, userAgent? }` with input caps
+  (endpoint 2000 chars, keys 512, userAgent 512), rejects a disallowed endpoint host with a 400
+  (§7.3), then `upsertByEndpoint(ctx.userId, …)`. Returns **201 `{ id }`** — the crypto keys are never
+  echoed back.
+- `DELETE /subscribe` — `{ endpoint }` → `deleteByEndpoint(ctx.userId, endpoint)`, returning
+  **`{ removed }`**. Idempotent: an unknown or another user's endpoint is a clean no-op, not an error.
+- The userId is always `ctx.userId`, never the body.
 
-## §5 — Frontend: the subscribe client + settings card (T5)
-- `push-api.ts` client: `getVapidPublicKey()`, `subscribe(sub)`, `unsubscribe(endpoint)`.
-- `push.ts` (utils, beside `pwa.ts`): `isPushSupported()` (feature-detect serviceWorker + PushManager +
-  Notification), `getSubscriptionState()`, `enablePush()` (request permission → `reg.pushManager.subscribe(
-  { userVisibleOnly:true, applicationServerKey: urlBase64ToUint8Array(publicKey) })` → POST), `disablePush()`
-  (`sub.unsubscribe()` + DELETE). Uses the `registerSW onRegistered` registration (or
-  `navigator.serviceWorker.ready`).
-- `PushNotificationsCard.svelte` (settings, beside the LLM/VLM provider cards): a toggle + a status line —
-  **not-supported** / **not-configured** (503) / **denied** / **subscribed** / **off**. First-enable
-  AlertDialog disclosure (D5: what it does, the request-driven-timing honesty D6, the vendor-push-service
-  note, off-anytime). Four-states + a11y + mobile-first. localStorage flag for the disclosure (the R7
-  pattern from the assistant/photos cards).
+## §4 — The send, the `PushSender` seam, and the trigger hook
+`api/push/push-service.ts`:
+- `PushSender` is `send(subscription, payload) => Promise<PushResult>`, where `PushResult` is a
+  discriminated `{ kind: 'ok' | 'gone' | 'transientError' }`. The real `webPushSender` wraps
+  `web-push.sendNotification` (VAPID details set once; a `WebPushError` 404/410 → `gone`, anything
+  else → `transientError`). `setPushSenderForTest(sender | null)` is the DI seam a test fake uses.
+- `notifyUser(userId, payload)` fans out over `findByUser` and applies the reaping lifecycle per
+  result: `ok` → `markSuccess`; `gone` → `prune`; `transientError` → `incrementFailure`, and `prune`
+  once the count reaches `CONFIG.validation.push.maxConsecutiveFailures`. It returns a small
+  `{ sent, pruned, failed }` summary and is **best-effort**: a per-subscription error cannot abort the
+  fan-out, and the whole call is wrapped so it never throws into its caller. When the real sender is
+  active but no VAPID keypair is configured it returns immediately without touching `failureCount` — a
+  config gap is not a failed send.
+- The hook (`api/reminders/trigger-service.ts`): after a `reminder_notifications` row is inserted on
+  BOTH the time path and the mileage path, `firePushForNotification(reminder, created)` calls
+  `notifyUser`. `payloadFromReminder` reads the axis off the row rather than guessing:
+  `{ title: '<name> due', body: dueOdometer !== null ? 'Due at <n> mi' : 'This reminder is now due',
+  tag: reminder.id, url: '/reminders' }`. The call is awaited and swallowed, so a slow or failing push
+  can neither fail nor stall the sweep. No PII beyond the reminder name the user authored.
 
-## §6 — Frontend: the service worker push handler (T6 — the gated, eyes-on slice)
-- Switch `vite.config.ts` to `SvelteKitPWA({ strategies: 'injectManifest', srcDir: 'src',
-  filename: 'service-worker.ts', … })` + author `src/service-worker.ts`:
-  - `precacheAndRoute(self.__WB_MANIFEST)` (keep the workbox precache + autoUpdate).
-  - `self.addEventListener('push', …)` → `event.waitUntil(self.registration.showNotification(title, {
-    body, icon: '/pwa-192x192.png', tag, data:{ url } }))`.
-  - `self.addEventListener('notificationclick', …)` → close + focus an existing client or `clients.openWindow(url)`.
-- DELETE the dead `static/sw.js` (D4 — scout-confirmed it never runs).
-- **This is the highest-risk slice** (the build pipeline + a real PWA install to verify a delivered push) —
-  built LAST, gated on T0, eyes-on verified (boot + the settings card render + the SW build emits push
-  handlers; the live cross-vendor delivery stays eyes-on-pending like the live-VLM/Photos legs since it needs
-  a real installed PWA + a real browser push service).
+## §5 — Frontend: the client, the utils, and the settings card
+- `lib/services/push-api.ts` — `pushApi.getVapidPublicKey()` / `.subscribe(input)` /
+  `.unsubscribe(endpoint)` over the shared `apiClient`. Transport only; it never touches the browser
+  Push API. The 503 surfaces as an `ApiError` with `code === 'PUSH_NOT_CONFIGURED'`.
+- `lib/utils/push.ts` (beside `pwa.ts`) — `isPushSupported()`, `getNotificationPermission()`,
+  `urlBase64ToUint8Array()`, `getExistingSubscription()`, `enablePush()` (request permission → fetch
+  the public key → `pushManager.subscribe({ userVisibleOnly: true, applicationServerKey })` → POST,
+  returning a discriminated `PushEnableOutcome`), `disablePush()` (`sub.unsubscribe()` + DELETE), and
+  the pure `derivePushStatus` / `pushStatusLabel` state machine. `getExistingSubscription` uses
+  `serviceWorker.getRegistration()`, NOT `.ready` — `.ready` never resolves when no SW is registered
+  (dev), which would hang the card's loading spinner.
+- `lib/components/settings/cards/PushNotificationsCard.svelte` — a Switch plus a status line
+  (not-supported / not-configured / denied / subscribed / off). Turning it ON first opens the
+  disclosure AlertDialog (what push does, the request-driven timing limit, that delivery goes through
+  the browser vendor's push service, that it can be turned off anytime); the browser permission prompt
+  fires only after that acknowledgement. The acknowledgement is remembered in `localStorage` under
+  `vroom.push.disclosed`; turning the toggle off is immediate.
 
-## §7 — ARCC governance mapping (the credential-surface precondition — CLEARED 2026-06-30)
-This feature handles a SERVER CREDENTIAL (the VAPID private key), stores USER PII (push subscriptions —
-device endpoints + crypto keys), and ships a service worker. The ARCC governance flow (credentials + user
-data + file/SW surface) applies → `search_arcc` ran BEFORE the design opinions.
+## §6 — The service worker
+`vite.config.ts` runs `SvelteKitPWA({ strategies: 'injectManifest', srcDir: 'src', filename:
+'service-worker.ts', registerType: 'autoUpdate', injectManifest: { globPatterns: [...] }, manifest })`,
+and `src/service-worker.ts`:
+- `precacheAndRoute(self.__WB_MANIFEST)` plus `skipWaiting()` / `clientsClaim()` — `injectManifest`
+  means we wire the precache and the autoUpdate behavior ourselves.
+- a `push` listener → `showNotification(title, { body, icon: '/pwa-192x192.png', tag, data:{url} })`,
+  reading the §4 payload defensively so a bodyless or non-JSON push still surfaces a generic
+  notification instead of being dropped.
+- a `notificationclick` listener → close, then focus and navigate an existing window client, else
+  `clients.openWindow(url)`.
 
-**ARCC RAN 2026-06-30 (C555, alias angryang, sdlcStage authoring)** — query: "web push notifications, VAPID
-keys, service worker, push subscription credentials". The corpus has no dedicated web-push article (it is
-AWS-console-centric); the directly-applicable returned guidance + how this design satisfies each control:
+Two build constraints, both load-bearing: the file MUST be named `service-worker.ts` (SvelteKit's
+reserved SW entry — `@vite-pwa/sveltekit`'s injectManifest step reads SvelteKit's compiled
+`output/client/service-worker.js`), and `self.__WB_MANIFEST` must appear verbatim rather than via an
+alias, because workbox substitutes it by string match on the built output. The dead `static/sw.js` is
+deleted — two registered service workers would collide.
 
-1. **Service Credential Isolation (cnt_lTgkGeaTGO5SET / SAX-05 — never expose a service credential to the
-   client/untrusted side; scope to least privilege; inject via a secure channel; rotate).** → **Control:**
-   the VAPID **private key** is a server-only secret — env-configured (`VAPID_PRIVATE_KEY`, the
-   `SESSION_SECRET` convention), NEVER serialized to the browser, NEVER logged (the existing token-handling
-   discipline: log status codes, not secrets). Only the VAPID **public key** crosses to the client — that is
-   public-by-design (the `applicationServerKey` the browser cryptographically requires; it authorizes
-   nothing on its own). The keypair is rotatable (regen + re-subscribe). No service credential reaches
-   client-controlled code.
-2. **CSP / Web-worker (cnt_TFTi8U2Rvqny0N — a service worker applies CSP from its loading domain; keep CSP
-   tight; avoid `unsafe-eval`/`unsafe-inline` beyond style; be careful with `data:`/`blob:`).** →
-   **Control:** the push service worker is SAME-ORIGIN (served by VROOM, not a CDN/data:/blob:), so it
-   inherits VROOM's CSP. Push DELIVERY flows FROM the browser's push service TO the SW (a browser-internal
-   channel) — the SW does NOT `fetch` the push endpoint, so NO new `connect-src` is required for delivery;
-   the only same-origin call is the subscribe POST. No `unsafe-eval`/`unsafe-inline` is introduced (the SW is
-   a built module, not eval'd). The `injectManifest` SW is a standard built artifact, not dynamically eval'd.
-3. **User-PII / least-data handling (general data-protection discipline).** → **Control:** a push
-   subscription (endpoint + p256dh + auth) is the user's own device identifier — stored as a userId-scoped
-   row, cross-tenant-isolated (IDOR-tested: a user reads/writes/deletes only their own), included in the
-   user's backup payload as their data, and NEVER logged. Only the minimum needed (the W3C PushSubscription
-   fields + an optional userAgent label) is stored. The push PAYLOAD carries only the reminder text the user
-   authored — no additional PII, no analytics beacon.
-4. **Least-privilege / opt-in + honest disclosure.** → **Control:** push is OPT-IN (no permission prompt
-   auto-fires; requested only on an explicit toggle, D5); a denied permission is respected (no re-nag); the
-   feature is OFF when VAPID is unconfigured; the timing limit is disclosed (D6). The narrowest capability
-   (`userVisibleOnly:true` — the standard that forbids silent/background push) is requested.
-5. **SSRF on the subscribe endpoint (ARCC SSRF-mitigation + SAX-04, searched C560).** → **Control:** the
-   subscription `endpoint` is a user-supplied URL the server later POSTs to via web-push — an unvalidated
-   one is a blind SSRF (an authed user could store `http://169.254.169.254/…` metadata / a localhost admin
-   port). `push-endpoint.ts` `isAllowedPushEndpoint` enforces a STRICT positive allowlist: an https URL, no
-   userinfo, host == or a dot-suffixed subdomain of a known browser-vendor push host (fcm.googleapis.com /
-   push.services.mozilla.com / push.apple.com / notify.windows.com). Wired at the subscribe route (reject
-   → 400 BEFORE storing, the earliest point) AND in the sender (defense-in-depth: a non-allowlisted host is
-   treated as `gone` and pruned, never POSTed to). A vendor-domain allowlist is immune to DNS rebinding (a
-   string match on non-attacker-controllable domains, no runtime resolution); an IP-literal host never
-   matches. Found by an adversarial review of the shipped backend (C560) + fixed same-cycle (commit 778efb5).
+## §7 — Security controls
+1. **The VAPID private key is a server credential.** Env-configured, never serialized to the browser,
+   never logged (log status codes, not secrets). Only the public key crosses to the client, which is
+   public by design — it is the `applicationServerKey` the browser cryptographically requires and it
+   authorizes nothing on its own. The keypair is rotatable (regenerate, then users re-subscribe).
+2. **The service worker is same-origin**, so it inherits VROOM's CSP, and it introduces no new egress:
+   push delivery flows from the browser's push service TO the SW over a browser-internal channel, so
+   the SW never fetches the push endpoint and no new `connect-src` is needed. The only same-origin
+   call is the subscribe POST. The SW is a built module, not eval'd.
+3. **SSRF on the subscribe endpoint.** The `endpoint` is a user-supplied URL the server later POSTs to,
+   so an unvalidated one is a blind SSRF (an authed user could store an instance-metadata address or a
+   localhost admin port). `api/push/push-endpoint.ts` `isAllowedPushEndpoint` enforces a strict
+   positive allowlist: an https URL, no userinfo, and a host that equals or is a dot-suffixed subdomain
+   of a known browser-vendor push host (`ALLOWED_PUSH_HOSTS`: fcm.googleapis.com,
+   push.services.mozilla.com, push.apple.com, notify.windows.com). It runs at the subscribe route
+   (reject before storing) AND in the sender (defense in depth — a non-allowlisted host is treated as
+   `gone` and pruned, never POSTed to). A vendor-domain allowlist is immune to DNS rebinding (a string
+   match on non-attacker-controllable domains, no runtime resolution), and an IP-literal host — the
+   actual SSRF vector — can never match one.
+4. **Subscriptions are tenant-isolated user PII.** Each row is userId-scoped, readable/writable/
+   deletable only by its owner, never logged, and excluded from backups (§1). Only the W3C
+   PushSubscription fields plus an optional userAgent label are stored, and the payload carries only
+   the reminder text the user authored — no analytics beacon.
+5. **Least privilege and opt-in.** `userVisibleOnly: true` is requested (the standard forbids silent
+   background push). No prompt auto-fires; a denied permission is respected; the feature is off when
+   VAPID is unconfigured; the timing limit is disclosed in the UI.
 
-**VERDICT: CLEARED to build.** The VAPID private key is a server-only env secret on the SAX-05 isolation
-pattern, the SW is same-origin under VROOM's CSP with no new egress, the subscription is a tenant-isolated
-user-PII row, and push is opt-in + honestly disclosed. No blocking finding. (A formal TPSM vendor assessment
-is an Amazon-internal-production process — N/A to VROOM, a personal self-hosted project where the user is
-their own data controller and the browser push service is the user's own chosen browser vendor; recorded for
-completeness, not a gate.) All slices are UNBLOCKED on the ARCC axis; the product/architecture forks D1–D6
-remain a SEPARATE T0 sign-off.
+## §8 — Risks and their mitigations
+1. **Implying guaranteed timing** → push fires on the existing request-driven trigger and the settings
+   copy says so; a scheduled nudge is a named follow-on, not a silent promise.
+2. **A broken PWA build from the SW switch** → one custom SW under `injectManifest`, the dead
+   `static/sw.js` deleted, and a guard test that source-scans for the handlers, the vite wiring, and
+   the absence of `static/sw.js`.
+3. **Dead-subscription growth** → 404/410 prunes, a failure cap reaps, and a per-user row cap evicts
+   the oldest.
+4. **Push failing a reminder write** → `notifyUser` never throws into the trigger path and never
+   blocks it; the in-app feed is the unaffected baseline.
+5. **A VAPID private-key leak** → env-only, never client-shipped, never logged, rotatable.
+6. **Permission-prompt fatigue** → opt-in behind an explicit toggle plus the disclosure gate.
+7. **Cross-tenant subscription access (IDOR)** → every store method is session-userId-scoped and the
+   endpoint never authorizes.
+8. **Unsupported browsers / iOS** → feature-detect and degrade; the `/reminders` feed is the baseline.
+9. **SSRF via a crafted endpoint** → the §7.3 host allowlist, enforced at both the route and the sender.
 
-## §8 — Risk register
-1. **Implying guaranteed timing.** Mitigation: D2/D6 — push fires on the existing request-driven trigger;
-   the settings copy states "when VROOM runs a reminder check", and a scheduled-nudge background runner is a
-   named follow-on spec. No silent over-promise (the data-honesty bar).
-2. **The SW collision / a broken PWA build.** Mitigation: D4 — switch to `injectManifest` with one custom
-   SW, DELETE the dead `static/sw.js`; the SW slice is built LAST + eyes-on verified (the build emits push
-   handlers; the precache still works). Highest-risk → gated + last.
-3. **Dead-subscription growth.** Mitigation: R4 — a 404/410 push result prunes the row; a failureCount cap
-   reaps a persistently-failing one (the #135 reaping lesson).
-4. **Push failing the reminder write.** Mitigation: R3 — `notifyUser` is best-effort, wrapped so it NEVER
-   throws into the trigger path + NEVER blocks the sweep; a transport error logs status only; the in-app feed
-   is the unaffected baseline.
-5. **A VAPID private-key leak.** Mitigation: §7.1 — env-only, never client-shipped, never logged; rotatable.
-6. **Permission-prompt fatigue.** Mitigation: D5 — opt-in behind an explicit toggle, never auto-fired; a
-   denied permission is respected.
-7. **Cross-tenant subscription access (IDOR).** Mitigation: every store method is session-userId-scoped; the
-   endpoint never authorizes; an IDOR test pins it.
-8. **iOS / unsupported-browser breakage.** Mitigation: R6 — feature-detect + degrade; the in-app `/reminders`
-   feed is the baseline channel where push is unavailable; no console error.
-9. **SSRF via a crafted subscription endpoint** (found by an adversarial review C560). Mitigation: §7.5 —
-   a strict https-only vendor-host allowlist (`isAllowedPushEndpoint`), enforced at the subscribe route
-   (reject before storing) + in the sender (defense-in-depth, prune a rogue host). Shipped 778efb5, guarded
-   by push-endpoint-ssrf.test.ts.
+Risks 1–9 are mitigated in the shipped code; live cross-vendor DELIVERY remains the one unverified
+leg, since it needs a real installed PWA and a real browser push service.

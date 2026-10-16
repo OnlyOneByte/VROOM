@@ -3,6 +3,17 @@ import { defineConfig } from 'vitest/config';
 import { SvelteKitPWA } from '@vite-pwa/sveltekit';
 import tailwindcss from '@tailwindcss/vite';
 
+// Same `/api` -> backend proxy for `vite dev` AND `vite preview`. One object so the two
+// servers can't drift: `preview` previously had no proxy at all, so the built app it serves
+// answered every `/api/v1/...` call with its own 404 — the app looked signed out and empty
+// with a healthy backend running on :3001.
+const apiProxy = {
+	'/api': {
+		target: 'http://localhost:3001',
+		changeOrigin: true
+	}
+};
+
 export default defineConfig({
 	plugins: [
 		tailwindcss(),
@@ -69,11 +80,14 @@ export default defineConfig({
 		}
 	},
 	server: {
-		proxy: {
-			'/api': {
-				target: 'http://localhost:3001',
-				changeOrigin: true
-			}
-		}
+		proxy: apiProxy
+	},
+	// Pinned explicitly (4173 is also vite's default) with strictPort so a port already in use
+	// fails loudly instead of silently shifting to 4174 while a caller waits on 4173 forever —
+	// which is exactly how playwright.config.ts used to hang (it waited on 5173).
+	preview: {
+		port: 4173,
+		strictPort: true,
+		proxy: apiProxy
 	}
 });

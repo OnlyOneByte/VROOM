@@ -91,7 +91,7 @@ routes.get('/receipt-drafts', async (c) => {
 
   // 1) Resolve both providers — either missing → an actionable 400 (link to Settings).
   const photosRow = await findEnabledProvider(db, user.id, 'storage');
-  if (!photosRow || photosRow.providerType !== 'google-photos') {
+  if (photosRow?.providerType !== 'google-photos') {
     throw new ValidationError(
       'Connect Google Photos in Settings to import receipts from your VROOM photo album.'
     );

@@ -1,11 +1,10 @@
 /**
- * Migration 0011: expenses.created_by (vehicle-sharing T5b; the ruling was option (a), owner-stamp +
- * createdBy 2026-06-27).
+ * Migration 0011: expenses.created_by.
  *
  * Purely ADDITIVE — a single `ALTER TABLE expenses ADD created_by text REFERENCES users(id)`, the
  * 0003/0007/0008/0010 additive class (no backfill, no table rebuild). The column records the row's
  * actual AUTHOR; it differs from `user_id` only for an editor-created shared row (createdBy = editor,
- * userId = vehicle owner — the owner-stamp model in design.md §2.1). NULL = legacy/self-created.
+ * userId = vehicle owner — the owner-stamp model). NULL = legacy/self-created.
  *
  * This test is the proof gate that 0011 is additive AND that the column behaves as designed:
  *  - the column exists after the migration and is NULLABLE (legacy rows + the sentinel),

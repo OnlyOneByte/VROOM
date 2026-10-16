@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { appStore } from '../../stores/app.svelte';
 import { authStore } from '../../stores/auth.svelte';
+import {
+	calculateMinimumPayment,
+	calculatePayoffDateFromStart
+} from '../../utils/financing-calculations';
 import type { Vehicle, User, VehicleFormData } from '../../types/index.js';
 
 // Mock $app/navigation
@@ -426,6 +430,11 @@ describe('Vehicle Management Components', () => {
 		});
 
 		it('calculates loan amortization correctly', () => {
+			// Mirrors VehicleForm.calculateAmortization, the form's payment preview. The payoff date
+			// MUST come from the shared helper, as the component does: a local
+			// `new Date('2024-01-01')` is midnight UTC, i.e. Dec 31 2023 at any negative offset, so a
+			// 60-month loan previewed Dec 2028 west of Greenwich and Jan 2029 east of it — and a bare
+			// setMonth would also skip the month-end clamp.
 			const calculateAmortization = (
 				principal: number,
 				apr: number,
@@ -445,28 +454,35 @@ describe('Vehicle Management Components', () => {
 				const totalPayments = monthlyPayment * numPayments;
 				const totalInterest = totalPayments - principal;
 
-				// Calculate payoff date
-				const start = new Date(startDate);
-				const payoffDate = new Date(start);
-				payoffDate.setMonth(payoffDate.getMonth() + numPayments);
-
 				return {
 					monthlyPayment: Math.round(monthlyPayment * 100) / 100,
 					totalInterest: Math.round(totalInterest * 100) / 100,
 					totalPayments: Math.round(totalPayments * 100) / 100,
-					payoffDate
+					payoffDate: calculatePayoffDateFromStart(startDate, numPayments)
 				};
 			};
 
 			const result = calculateAmortization(20000, 4.5, 60, '2024-01-01');
 			expect(result).not.toBeNull();
 			expect(result!.monthlyPayment).toBeCloseTo(372.86, 2);
-			expect(result!.totalInterest).toBeCloseTo(2371.62, 2); // Corrected expected value
-			expect(result!.totalPayments).toBeCloseTo(22371.62, 2); // Corrected expected value
-			// 60 months from 2024-01-01 should be 2029-01-01
-			// But the actual calculation might be slightly different due to month boundaries
-			expect(result!.payoffDate.getFullYear()).toBeGreaterThanOrEqual(2028);
-			expect(result!.payoffDate.getFullYear()).toBeLessThanOrEqual(2029);
+			expect(result!.totalInterest).toBeCloseTo(2371.62, 2);
+			expect(result!.totalPayments).toBeCloseTo(22371.62, 2);
+
+			// The preview payment is the production minimum payment to the cent — the form offers to
+			// write it straight into paymentAmount, so the two formulas must not drift apart.
+			expect(
+				calculateMinimumPayment({
+					...mockVehicles[0]!.financing!,
+					originalAmount: 20000,
+					apr: 4.5,
+					termMonths: 60
+				})
+			).toBe(result!.monthlyPayment);
+
+			// 60 monthly payments from Jan 1 2024 land on Jan 1 2029 — the same local calendar day in
+			// every host timezone, which is why this is exact rather than a year range.
+			const payoff = result!.payoffDate;
+			expect([payoff.getFullYear(), payoff.getMonth(), payoff.getDate()]).toEqual([2029, 0, 1]);
 
 			// Test invalid inputs
 			expect(calculateAmortization(0, 4.5, 60, '2024-01-01')).toBeNull();
@@ -758,7 +774,10 @@ describe('Vehicle Management Components', () => {
 			expect(formatCurrency(1234.56)).toBe('$1,234.56');
 			expect(formatCurrency(0)).toBe('$0.00');
 
-			const testDate = new Date('2024-01-15T12:00:00Z'); // Use explicit UTC time
+			// Built from LOCAL parts at noon: Intl formats in the host zone, so the hardcoded
+			// '2024-01-15T12:00:00Z' instant this used to pass rendered 'Jan 16, 2024' at UTC+13/+14
+			// and failed there. Noon local is the one anchor no real offset can push off its day.
+			const testDate = new Date(2024, 0, 15, 12);
 			expect(formatDate(testDate)).toBe('Jan 15, 2024');
 		});
 	});

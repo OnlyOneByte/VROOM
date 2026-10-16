@@ -1,3 +1,117 @@
+<script module lang="ts">
+	import { isElectricFuelType } from '$lib/utils/units';
+
+	export type EnergyMode = 'fuel' | 'charging';
+
+	/** Charging-type option seeded into a form with no energy values yet — see reconcileEnergyMode. */
+	export const DEFAULT_CHARGING_FUEL_TYPE = 'Electric';
+
+	export interface EnergyCapabilities {
+		canFuel: boolean;
+		canCharge: boolean;
+	}
+
+	export interface EnergyModeDecision {
+		/** The mode to show. */
+		mode: EnergyMode;
+		/** Mode whose fields to (re)apply, clearing the other mode's. `null` touches nothing. */
+		applyFields: EnergyMode | null;
+		/** fuelType to write into a form carrying no energy values yet. `null` writes nothing. */
+		seedFuelType: string | null;
+	}
+
+	/**
+	 * The volume/charge/fuelType values that entering `mode` implies. Clearing the other mode's
+	 * value stops a stale volume riding along onto an EV charge row (and vice versa), and the
+	 * fuelType it writes is what keeps requiredness pointed at the field the mode actually shows.
+	 */
+	export function energyModeFields(
+		mode: EnergyMode,
+		current: { volume: string; charge: string }
+	): { volume: string; charge: string; fuelType: string } {
+		return mode === 'charging'
+			? { volume: '', charge: current.charge, fuelType: DEFAULT_CHARGING_FUEL_TYPE }
+			: { volume: current.volume, charge: '', fuelType: '' };
+	}
+
+	/**
+	 * Decide the energy mode for a vehicle's capabilities, given the mode on screen, the energy
+	 * values on the form, and the capability pair that mode was last reconciled against (`seen`,
+	 * `null` before the first run).
+	 *
+	 * The mode only chooses which INPUT is rendered. Requiredness comes from `fuelType` —
+	 * ExpenseForm's `showVolumeField`/`showChargeField` read `formData.fuelType` and never this
+	 * mode — so the invariant to hold is that the two AGREE. A disagreement either requires a
+	 * HIDDEN field (validateForm fails on an error the user cannot see or clear) or saves the wrong
+	 * unit (gallons plus an octane rating recorded against an EV; nothing downstream rejects it).
+	 *
+	 * `seen` must be COMPARED rather than assumed stale: the capability props compile to plain
+	 * getters over ExpenseForm's `vehicle` state source (not memoized deriveds), and ExpenseForm
+	 * reassigns `vehicle` more than once per load, so this runs again with IDENTICAL booleans.
+	 * Clearing fields on such a run would wipe the expense being edited.
+	 *
+	 * Only the first run may write anything into an untouched form, and only when that form carries
+	 * NO energy values: anything already there is either a row ExpenseForm loaded or something the
+	 * user typed, and both outrank the vehicle's capabilities.
+	 */
+	export function reconcileEnergyMode(current: {
+		mode: EnergyMode;
+		seen: EnergyCapabilities | null;
+		caps: EnergyCapabilities;
+		fuelType: string;
+		volume: string;
+		charge: string;
+	}): EnergyModeDecision {
+		const { mode, seen, caps, fuelType, volume, charge } = current;
+		const stay: EnergyModeDecision = { mode, applyFields: null, seedFuelType: null };
+
+		// Same capabilities as last time: the vehicle did not change, so there is nothing to decide.
+		if (seen && seen.canFuel === caps.canFuel && seen.canCharge === caps.canCharge) return stay;
+
+		if (!seen) {
+			// A fuelType that is already filled in decides the mode: it is what requiredness reads,
+			// and rewriting it would destroy the value an edit-mode load just restored.
+			if (fuelType) {
+				return {
+					mode: isElectricFuelType(fuelType) ? 'charging' : 'fuel',
+					applyFields: null,
+					seedFuelType: null
+				};
+			}
+			// A quantity with no fuelType belongs to a row that already exists — edit mode mounts this
+			// section only once loadExpense has filled formData, and `fuelType` is optional on this
+			// form, so every Fuelio-imported fill-up arrives as a volume with an empty fuel_type.
+			// Write nothing, and open the mode whose field an empty fuelType makes REQUIRED (volume),
+			// which is also the one that keeps a loaded volume on screen.
+			if (volume || charge) {
+				return { mode: 'fuel', applyFields: null, seedFuelType: null };
+			}
+			// No energy values at all, so this is a new entry and the vehicle decides. A charge-only
+			// vehicle also needs an electric fuelType seeded: without it validateForm requires the
+			// HIDDEN volume field and the save silently does nothing.
+			if (caps.canCharge && !caps.canFuel) {
+				return { mode: 'charging', applyFields: null, seedFuelType: DEFAULT_CHARGING_FUEL_TYPE };
+			}
+			// Fuel mode is also where a vehicle tracking NEITHER lands: nothing says "electric", and
+			// seeding one would file the row as a charge in the efficiency analytics.
+			return { mode: 'fuel', applyFields: null, seedFuelType: null };
+		}
+
+		// The capabilities really did change, so clamp a mode the vehicle no longer supports — but
+		// only onto one it DOES support. Both switches off is a real vehicle state (VehicleForm
+		// toggles trackFuel/trackCharging independently and nothing forbids the pair); there is no
+		// better mode to move to, and the mode on screen still agrees with fuelType, so its own
+		// field stays the visible AND required one. Staying put is the correct no-op.
+		if (mode === 'fuel' && !caps.canFuel && caps.canCharge) {
+			return { mode: 'charging', applyFields: 'charging', seedFuelType: null };
+		}
+		if (mode === 'charging' && !caps.canCharge && caps.canFuel) {
+			return { mode: 'fuel', applyFields: 'fuel', seedFuelType: null };
+		}
+		return stay;
+	}
+</script>
+
 <script lang="ts">
 	import { Fuel, Gauge, Zap } from '@lucide/svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
@@ -7,7 +121,6 @@
 	import { Checkbox } from '$lib/components/ui/checkbox';
 	import { Button } from '$lib/components/ui/button';
 	import {
-		isElectricFuelType,
 		getVolumeUnitLabel,
 		getChargeUnitLabel,
 		getFuelEfficiencyLabel,
@@ -56,10 +169,16 @@
 		onMileageChange
 	}: Props = $props();
 
-	// Derive initial energy mode from fuelType on edit, default to appropriate mode
-	let energyMode = $state<'fuel' | 'charging'>(
-		isElectricFuelType(fuelType) ? 'charging' : trackFuel ? 'fuel' : 'charging'
-	);
+	// The mode is user-switchable (handleModeSwitch writes it), so it must stay mutable $state —
+	// a $derived would destroy the toggle. It also can't be seeded from the capability props in
+	// the initializer: ExpenseForm swaps its `vehicle` object under a STILL-MOUNTED section when
+	// the user picks another vehicle, so a mode captured once survives onto a vehicle that doesn't
+	// support it — gallons and an octane rating saved against an EV, since `showToggle` needs BOTH
+	// flags and offers no way back to the kWh field. The effect below owns the initial resolution
+	// and the clamp (MainSteering: "value is reset by an $effect").
+	let energyMode = $state<EnergyMode>('fuel');
+	// Bookkeeping for that effect rather than UI state, so a plain (non-reactive) let.
+	let seenCapabilities: EnergyCapabilities | null = null;
 
 	let showToggle = $derived(trackFuel && trackCharging);
 	let showCustomFuelType = $state(false);
@@ -81,22 +200,44 @@
 		{ value: 'Electric', label: 'Electric' }
 	];
 
-	function handleModeSwitch(mode: 'fuel' | 'charging') {
+	// Shared by the explicit toggle and the capability clamp, so both clear the same way.
+	function applyEnergyModeFields(mode: EnergyMode) {
+		const next = energyModeFields(mode, { volume, charge });
+		volume = next.volume;
+		charge = next.charge;
+		fuelType = next.fuelType;
+		showCustomFuelType = false;
+	}
+
+	function handleModeSwitch(mode: EnergyMode) {
 		if (mode === energyMode) return;
 		energyMode = mode;
-
-		if (mode === 'charging') {
-			// fuel → charging: clear volume and fuelType, set Electric default
-			volume = '';
-			fuelType = 'Electric';
-			showCustomFuelType = false;
-		} else {
-			// charging → fuel: clear charge and fuelType
-			charge = '';
-			fuelType = '';
-			showCustomFuelType = false;
-		}
+		applyEnergyModeFields(mode);
 	}
+
+	// The writes at the bottom land on props this effect also reads, so it schedules itself again.
+	// That run is a no-op purely because `seenCapabilities` now matches the incoming flags — the
+	// `seen` comparison is what makes this converge instead of loop.
+	$effect(() => {
+		// Read both flags unconditionally so neither can be missed as a dependency.
+		const caps: EnergyCapabilities = { canFuel: trackFuel, canCharge: trackCharging };
+		const decision = reconcileEnergyMode({
+			mode: energyMode,
+			seen: seenCapabilities,
+			caps,
+			fuelType,
+			volume,
+			charge
+		});
+		seenCapabilities = caps;
+
+		if (decision.mode !== energyMode) energyMode = decision.mode;
+		if (decision.applyFields) {
+			applyEnergyModeFields(decision.applyFields);
+		} else if (decision.seedFuelType) {
+			fuelType = decision.seedFuelType;
+		}
+	});
 </script>
 
 <div class="p-4 bg-primary/10 rounded-lg space-y-4">

@@ -824,7 +824,11 @@ function resolveProviderState(
   code: string | null
 ): { state: ProviderCallbackState; returnTo: string } | { error: string; returnTo: string } {
   const storedData = stateParam ? oauthStateStore.get(stateParam) : undefined;
-  const returnTo = storedData?.returnTo ?? '/settings/providers';
+  // Fallback for an expired/unknown state, where the caller's own returnTo is gone. It must be
+  // a frontend page that EXISTS and reads `provider_error`, or the error is reported into a 404:
+  // the provider-connect form (new/edit) is the only place that renders it, and this flow always
+  // starts there.
+  const returnTo = storedData?.returnTo ?? '/settings/providers/new';
 
   // Handle OAuth cancellation (user denied consent)
   if (!code) {
@@ -889,7 +893,9 @@ routes.get('/callback/provider/google', async (c) => {
   if (!validated) {
     const authResult = await validateProviderSession(sessionId);
     if (!authResult) {
-      return c.redirect(`${CONFIG.frontend.url}/auth/login`);
+      // The login page is /auth (there is no /auth/login); auth_error=invalid_state is the
+      // key its copy maps to "your sign-in session expired", which is exactly this case.
+      return c.redirect(`${CONFIG.frontend.url}/auth?auth_error=invalid_state`);
     }
     logger.warn('Provider OAuth CSRF mismatch', {
       sessionUserId: authResult.user.id,

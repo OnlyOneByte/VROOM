@@ -89,22 +89,14 @@ export async function promptInstall(): Promise<boolean> {
 	}
 }
 
-// Request background sync
-export async function requestBackgroundSync(tag: string, forceBrowser = false): Promise<void> {
-	if (!(forceBrowser || browser) || !('serviceWorker' in navigator)) {
-		return;
-	}
-
-	try {
-		const registration = await navigator.serviceWorker.ready;
-		if ('sync' in registration) {
-			await (
-				registration as ServiceWorkerRegistration & {
-					sync: { register: (tag: string) => Promise<void> };
-				}
-			).sync.register(tag);
-		}
-	} catch (error) {
-		if (import.meta.env.DEV) console.error('Background sync registration failed:', error);
-	}
-}
+// Deliberately NO Background Sync helper here. Two hard blockers, not an oversight:
+//  - The offline outbox lives in localStorage ('vroom_offline_expenses'), and localStorage does not
+//    exist in ServiceWorkerGlobalScope — a `sync` handler in the service worker cannot read the
+//    queued expenses, so it has nothing to POST. Reaching it would mean moving the outbox to
+//    IndexedDB and reimplementing conflict detection/retry/backoff in worker scope.
+//  - Background Sync is Chromium-only. iOS Safari is a first-class install target here (see
+//    getPlatformInfo's iOS branch and the apple-* meta tags in app.html) and has never shipped it.
+// Offline writes are delivered by the FOREGROUND path instead: syncManager.setupAutoSync() listens
+// for `online` and runs syncAll(), plus the manual sync control. Re-adding a sync.register() call
+// without a matching `sync` listener in src/service-worker.ts re-creates a silent no-op; the
+// sw-push-handlers guard fails if the two ever drift apart.

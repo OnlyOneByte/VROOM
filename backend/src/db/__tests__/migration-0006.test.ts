@@ -1,10 +1,10 @@
 /**
- * Migration 0006: add `user_preferences.theme_preference` (theming-engine spec T1, D2).
+ * Migration 0006: add `user_preferences.theme_preference`.
  *
  * A fully ADDITIVE column: `text NOT NULL DEFAULT 'default'`. The theming engine's contract is that
  * `'default'` reproduces today's look byte-for-byte, so an existing user's row must backfill to
  * `'default'` (no visual change, no NULL, no NOT-NULL violation on the rebuild-free ALTER). These tests
- * are the T1 proof gate: the column exists with the right shape on a fresh apply, and a pre-0006
+ * are the proof gate: the column exists with the right shape on a fresh apply, and a pre-0006
  * user_preferences row survives the migration with the new column backfilled to 'default'.
  */
 
@@ -19,7 +19,7 @@ import {
   seedCoreData,
 } from './migration-helpers';
 
-describe('Migration 0006: user_preferences.theme_preference (theming-engine T1)', () => {
+describe('Migration 0006: user_preferences.theme_preference', () => {
   let db: Database;
   const migrations = loadMigrations();
 

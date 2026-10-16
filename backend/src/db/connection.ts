@@ -44,17 +44,13 @@ export const db = drizzle(sqlite, { schema });
  */
 export type AppDatabase = typeof db;
 
-// ============================================================================
-// TEST DATABASE SUPPORT
-// ============================================================================
-
-const testDb: typeof db | null = null;
-
 /**
- * Get the active database instance (test or production)
+ * Accessor for the process-wide database, used where a module needs the live instance rather than
+ * importing `db` directly. There is no test override here: repositories take an `AppDatabase` in
+ * their constructor, so a test builds one over its own in-memory database instead of swapping this.
  */
 export function getDb(): typeof db {
-  return testDb || db;
+  return db;
 }
 
 // ============================================================================
@@ -89,7 +85,8 @@ export async function runMigrations() {
     migrate(db, { migrationsFolder: './drizzle' });
     logger.info('Database migrations completed successfully');
 
-    // Run data migration (idempotent — creates providers and backfills photo_refs)
+    // Hook for one-time data migrations that must run after the schema migrations. Currently a
+    // no-op stub; see data-migration.ts.
     const { runDataMigration } = await import('./data-migration');
     await runDataMigration(sqlite);
   } catch (error) {

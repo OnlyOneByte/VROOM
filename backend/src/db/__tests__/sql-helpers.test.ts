@@ -1,7 +1,6 @@
 /**
- * Characterization net for the dialect-aware SQL date/time helpers (guard,
- * Sql-helpers.ts was 33% func, never directly tested — only
- * exercised incidentally through analytics queries).
+ * Characterization net for the dialect-aware SQL date/time helpers, which were only ever
+ * exercised incidentally through analytics queries rather than directly.
  *
  * These three helpers are the ONLY SQLite-specific raw SQL in the codebase, and their
  * doc comments record two REAL past bugs, both from the same root cause — the column is

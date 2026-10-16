@@ -20,8 +20,10 @@ Coding conventions live in `.kiro/steering/*.md`. Read `MainSteering.md`, `Svelt
 | Full gate | `bun run all:fix && bun run validate` | `npm run all:fix && npm run validate` |
 
 `validate` = lint, format, type-check, tests, build. Run it in every subfolder you modified
-and fix everything it reports, including pre-existing findings. CI runs the same steps
-individually, minus the format check.
+and fix everything it reports, including pre-existing findings. CI runs the same commands,
+regrouped into job steps — the backend pairs `type-check` and `check` into one step, the
+frontend keeps type-check, lint, tests, and build separate — and skips only the frontend
+format check.
 
 First-time backend setup: copy `.env.example` to `.env`, then `bun run db:init` (add
 `--seed`, or `bun run db:seed`, for sample data — seeded login is `demo@example.com`).
@@ -31,12 +33,15 @@ Use `db:init`, not `db:push`: init applies the committed `drizzle/` migrations, 
 ## Architecture in one pass
 
 Backend request path: `middleware → routes → repository → Drizzle → SQLite`. One folder per
-domain under `src/api/<domain>/` (`routes.ts` + `repository.ts`), mounted at `/api/v1/<domain>`
-in `src/app.ts`. Repositories extend `BaseRepository` and are exported as singletons — no DI.
+domain under `src/api/<domain>/` (`routes.ts`, plus a `*repository.ts` for whatever data
+access it has), mounted at `/api/v1/<domain>` in `src/app.ts`. Every repository takes a
+Drizzle handle in its constructor and is exported as a singleton — no DI; many also extend
+`BaseRepository` for the common CRUD.
 
-Frontend data path: `route/page → component → store → service → apiClient`. `api-client.ts` is
-the only place raw `fetch` is used; `api-transformer.ts` owns every backend↔frontend shape
-conversion, so reads must go through it.
+Frontend data path: `route/page → component → store → service → apiClient`. `api-client.ts`
+is the only place app code calls the global `fetch`; `api-transformer.ts` owns the expense
+shape conversion (`expenseAmount` → `amount`, and `volume` → `volume` or `charge` by fuel
+type), so every expense read goes through `fromBackendExpense`.
 
 Expense-linked records (financing payments, insurance premiums, reminder materializations) use
 a polymorphic `source_type` + `source_id` pair on `expenses` rather than per-feature columns.
@@ -47,8 +52,12 @@ See `docs/architecture.md` for the design decisions behind these.
 
 A green build is the floor, not "done".
 
-1. **Data safety is sacred.** No silent loss. Backup/restore round-trips every table;
-   destructive actions disclose their full cascade; offline writes never drop.
+1. **Data safety is sacred.** No silent loss. Every schema table is either round-tripped by
+   backup/restore or on the documented exclusion list in the backend's
+   `src/api/sync/__tests__/backup-table-coverage.test.ts` (account identity, sessions,
+   encrypted provider credentials, per-device push subscriptions), and those guards fail if
+   a new table is silently omitted; destructive actions disclose their full cascade; offline
+   writes never drop.
 2. **Correct for everyone.** Unit- and currency-correct for metric and non-USD users;
    timezone-correct dates; a user can never read or write another user's data.
 3. **Four states + a11y + mobile-first.** Every surface handles loading, empty, error, and

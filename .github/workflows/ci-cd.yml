@@ -67,8 +67,10 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          # Vite 8 requires ^20.19.0 || >=22.12.0, and must match .nvmrc.
-          node-version: '22'
+          # Single source of truth, shared with local dev. `node-version: '22'` resolved to the
+          # latest 22.x, which silently satisfied the lockfile's `^22.22.2` floor while a
+          # developer on an older 22.x could not install at all.
+          node-version-file: .nvmrc
 
       - name: Install dependencies
         # Must be `npm ci`, never `npm install`: re-resolving the lockfile changes which
@@ -77,9 +79,16 @@ jobs:
         run: npm ci
 
       - name: Prepare SvelteKit
-        run: npm run prepare
+        # NOT `npm run prepare`: that script is `svelte-kit sync || echo ''`, because npm runs
+        # `prepare` as an install lifecycle script where svelte-kit may be absent (e.g.
+        # --omit=dev), and the `|| echo ''` swallows a failed sync. `npm run sync` is the same
+        # command without the tolerance, so a broken sync fails the job here.
+        run: npm run sync
 
       - name: Run type checking
+        # Guarded by frontend/scripts/type-check.mjs (svelte-check is fail-open in two ways;
+        # see that file). Keep this a plain script call so CI, the git hook, `validate`, and
+        # local runs are all covered by the same guard.
         run: npm run type-check
 
       - name: Run linting

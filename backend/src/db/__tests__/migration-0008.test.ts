@@ -1,10 +1,10 @@
 /**
- * Migration 0008: add `user_preferences.business_mileage_rate` (trips-location D3, T8).
+ * Migration 0008: add `user_preferences.business_mileage_rate`.
  *
  * A fully ADDITIVE column: `real NOT NULL DEFAULT 0`. The trip mileage-summary uses it as the DEFAULT
  * business-mileage rate ($/mile) when no explicit ?rate= override is passed; 0 reproduces today's behavior
  * (businessValue 0 until a rate is set). An existing user's row must backfill to 0 (no NULL, no NOT-NULL
- * violation on the rebuild-free ALTER). These tests are the T8 proof gate: the column exists with the right
+ * violation on the rebuild-free ALTER). These tests are the proof gate: the column exists with the right
  * shape on a fresh apply, and a pre-0008 user_preferences row survives the migration backfilled to 0.
  */
 
@@ -19,7 +19,7 @@ import {
   seedCoreData,
 } from './migration-helpers';
 
-describe('Migration 0008: user_preferences.business_mileage_rate (trips-location T8)', () => {
+describe('Migration 0008: user_preferences.business_mileage_rate', () => {
   let db: Database;
   const migrations = loadMigrations();
 

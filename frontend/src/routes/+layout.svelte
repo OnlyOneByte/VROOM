@@ -15,9 +15,9 @@
 	import { loadOfflineExpenses } from '$lib/utils/offline-storage';
 	import { offlineExpenseQueue } from '$lib/stores/offline.svelte';
 	import '../app.css';
-	// Theming engine (T7): the generated `:root[data-theme="<id>"]` blocks for non-default themes. Imported
-	// right after app.css so a non-default theme paints with zero FOUC + zero token duplication in JS. The
-	// store (T8) sets `data-theme` on <html>; with no data-theme (or "default") app.css's bare :root wins.
+	// The generated `:root[data-theme="<id>"]` blocks for non-default themes. Imported right after
+	// app.css so a non-default theme paints with zero FOUC and zero token duplication in JS. themeStore
+	// sets `data-theme` on <html>; with no data-theme (or "default") app.css's bare :root wins.
 	import '$lib/theme/themes.css';
 
 	import { LoaderCircle } from '@lucide/svelte';
@@ -62,11 +62,11 @@
 		}
 	}
 
-	// recurring-expenses T5/D1: opportunistically materialize due recurring expenses on app init —
-	// authed + online + at most once per local calendar day (the gate + localStorage debounce live in
-	// maybeTriggerRecurringExpenses). Fail-soft (a trigger error is swallowed there; the manual "Run due
-	// reminders" button remains). Once per session here (recurringTriggered) so re-running the auth
-	// effect doesn't re-call it within the same load.
+	// Opportunistically materialize due recurring expenses on app init — authed + online + at most once
+	// per local calendar day (the gate + localStorage debounce live in maybeTriggerRecurringExpenses).
+	// Fail-soft: a trigger error is swallowed there and the manual "Run due reminders" button remains.
+	// Once per session here (recurringTriggered) so re-running the auth effect doesn't re-call it within
+	// the same load.
 	async function maybeTriggerRecurring() {
 		if (recurringTriggered) return;
 		recurringTriggered = true;
@@ -163,8 +163,16 @@
 </script>
 
 <svelte:head>
-	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-	<meta name="theme-color" content="#2563eb" />
+	<!--
+		Do NOT re-declare `viewport` or `theme-color` here. app.html owns both, and a duplicate in
+		<svelte:head> lands AFTER it in the document:
+		  - viewport: a later <meta name="viewport"> REPLACES the earlier description wholesale rather
+		    than merging, so one that omits `viewport-fit=cover` resets it to `auto`. The safe-area
+		    insets app.css's .safe-top/.safe-bottom read then collapse to 0 on notched devices.
+		  - theme-color: the browser uses the FIRST declaration, which is also the one themeStore
+		    rewrites (document.querySelector returns the first match), so a second one is dead weight
+		    that silently disagrees with the installed-app manifest colour in vite.config.ts.
+	-->
 	<!-- eslint-disable-next-line svelte/no-at-html-tags -- PWA manifest link from @vite-pwa/sveltekit -->
 	{@html webManifestLink}
 </svelte:head>

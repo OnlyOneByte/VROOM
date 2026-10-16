@@ -24,6 +24,7 @@
 	import { Label } from '$lib/components/ui/label';
 	import { Checkbox } from '$lib/components/ui/checkbox';
 	import { Skeleton } from '$lib/components/ui/skeleton';
+	import { dateOnlyToISO } from '$lib/utils/formatters';
 	import { Images, LoaderCircle, CircleAlert, ImageOff } from '@lucide/svelte';
 	import { photosImportApi, type ReceiptDraftItem } from '$lib/services/photos-import-api';
 	import { appStore } from '$lib/stores/app.svelte';
@@ -128,7 +129,9 @@
 					vehicleId: row.vehicleId,
 					category: row.category,
 					amount: Number(row.amount),
-					date: row.date
+					// The review row holds a date-only picker value; the API coerces whatever it gets,
+					// so send noon-local or the expense lands a day early west of UTC.
+					date: dateOnlyToISO(row.date)
 				});
 				created++;
 			}

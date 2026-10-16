@@ -1,25 +1,26 @@
 /**
- * Regression GUARD (committed, travels with the merge) for the bug class:
- * the Google Sheets BACKUP must be ATOMIC — stage every table into temp `__vroom_staging` tabs, then
+ * Regression GUARD against a NON-ATOMIC Google Sheets backup:
+ * the Sheets BACKUP must be ATOMIC — stage every table into temp `__vroom_staging` tabs, then
  * swap them in with ONE batchUpdate (delete old canonical sheets + rename staging → canonical).
  *
- * The pre- design did per-sheet `values.clear()` THEN `values.update()` on the LIVE sheets, so a
+ * The original design did per-sheet `values.clear()` THEN `values.update()` on the LIVE sheets, so a
  * failure mid-run left a TORN backup — some sheets rewritten, the one mid-write EMPTIED by its own
  * preceding clear, the rest stale — on what may be the user's ONLY copy (silent data-loss).
  *
  * The fake-seam test (google-sheets-service.test.ts) proves the CURRENT path is atomic by simulating
  * a mid-backup failure, but it only drives the one code path that exists today. This SOURCE SCAN is the
  * tree-wide structural net: it pins the invariant that the safety rests on, so a future refactor that
- * silently reintroduces the footgun regresses RED here even if no test happens to exercise the new path
- * (source-scan > untracked e2e for merge survival — GUIDE).
+ * silently reintroduces the clear-then-write footgun regresses RED here even if no test happens to
+ * exercise the new path.
  *
  * The load-bearing properties (any one reverting = the data-loss bug is back):
- *  1. NO `values.clear(` anywhere in the Sheets service — clearing a live sheet before writing IS the
- *  destructive in-place mechanism. The atomic design has no clear at all (staging tabs are born empty).
- *  2. The staging mechanism is present — a `SHEET_STAGING_SUFFIX` constant, and the swap uses
- *  `deleteSheet` + `updateSheetProperties` (delete-old + rename-staging) in the commit batch.
- *  3. The staging suffix is SPACE-FREE — it's interpolated UNQUOTED into A1 ranges (`${title}${suffix}!A1`),
- *  so a space would silently corrupt every staging write's range.
+ *   1. NO `values.clear(` anywhere in the Sheets service — clearing a live sheet before writing IS the
+ *      destructive in-place mechanism. The atomic design has no clear at all (staging tabs are born
+ *      empty).
+ *   2. The staging mechanism is present — a `SHEET_STAGING_SUFFIX` constant, and the swap uses
+ *      `deleteSheet` + `updateSheetProperties` (delete-old + rename-staging) in the commit batch.
+ *   3. The staging suffix is SPACE-FREE — it's interpolated UNQUOTED into A1 ranges
+ *      (`${title}${suffix}!A1`), so a space would silently corrupt every staging write's range.
  *
  * Pure source scan — no DB, no network. Runs in the fast suite.
  */
@@ -45,7 +46,8 @@ describe('Sheets backup is atomic — stage-then-swap', () => {
   test('the backup path never calls values.clear (no destructive in-place clear)', () => {
     const src = serviceSource();
     // Match an actual call `…values.clear(` (any receiver), tolerant of whitespace. The atomic design
-    // removed clearing entirely; a clear-then-write revert is the exact footgun.
+    // removed clearing entirely; reverting to clear-then-write is exactly the footgun this guard exists
+    // to catch.
     const clearCalls = [...src.matchAll(/\.values\s*\.\s*clear\s*\(/g)];
     expect(
       clearCalls.length,

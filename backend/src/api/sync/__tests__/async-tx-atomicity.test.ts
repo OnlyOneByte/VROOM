@@ -1,21 +1,22 @@
 /**
- * -class async-tx atomicity sweep — the footgun closed across the multi-write repos.
+ * Transaction-atomicity sweep over the multi-write repositories.
  *
  * bun-sqlite is a SYNCHRONOUS dialect: an `async` transaction() callback returns a pending promise, so
  * bun's BEGIN/COMMIT wrap nothing and each `await tx.*` autocommits independently — a throw mid-callback
- * does NOT roll back earlier writes. converted the 7 genuine multi-write gaps to SYNCHRONOUS
- * callbacks (.run()/.all()/.get() inline) so each is now ONE real transaction that rolls back atomically.
+ * does NOT roll back earlier writes. A transaction that must land SEVERAL writes atomically therefore
+ * has to use a SYNCHRONOUS callback (.run()/.all()/.get() inline), which is what keeps the writes
+ * covered here inside ONE real transaction that rolls back as a unit.
  *
  * These guards FORCE a mid-transaction failure and assert NO partial state survives. The forcing function
  * is a junction-row FK violation: reminder_vehicles.vehicleId and insurance_term_vehicles.vehicleId both
  * FK vehicles(id) with PRAGMA foreign_keys=ON, so a junction insert referencing a NON-EXISTENT vehicle
- * throws AFTER the parent row (reminder / term) was inserted in the same callback. Pre- (async) the
- * parent stayed committed (orphan reminder with no vehicles = the state; term with zero coverage);
- * post- (sync) the whole transaction rolls back. Calling the repos DIRECTLY bypasses the route-layer
+ * throws AFTER the parent row (reminder / term) was inserted in the same callback. With an async callback
+ * the parent stayed committed — an orphan reminder covering no vehicles, a term with zero coverage; with
+ * a synchronous one the whole transaction rolls back. Calling the repos DIRECTLY bypasses the route-layer
  * ownership pre-check, which is exactly what lets the bogus id reach the junction insert.
  *
- * Covers BOTH invocation styles: reminders uses the module-level `transaction()` helper (retyped to
- * accept a sync callback); insurance uses `this.db.transaction(...)` directly.
+ * Covers BOTH invocation styles: reminders uses the module-level `transaction()` helper (typed to accept
+ * a sync callback); insurance uses `this.db.transaction(...)` directly.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -46,8 +47,8 @@ describe('async-tx atomicity sweep', () => {
     expect(reminderCount()).toBe(0);
 
     // One real vehicle + one BOGUS id → the 2nd junction insert FK-violates AFTER the reminder row
-    // inserted in the same sync transaction. Pre- the reminder persisted vehicle-less; now it
-    // rolls back.
+    // inserted in the same sync transaction. Under an async callback the reminder persisted
+    // vehicle-less; now it rolls back.
     let threw = false;
     try {
       await reminderRepository.createWithVehicles(

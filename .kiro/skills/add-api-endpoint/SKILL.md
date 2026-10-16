@@ -5,155 +5,92 @@ description: Step-by-step guide for adding a new API domain with routes, reposit
 
 # Add API Endpoint
 
-Use this skill when adding a new API domain (e.g., trips, reminders) or adding endpoints to an existing domain.
+Use this skill when adding a new API domain (e.g. trips, reminders) or endpoints to an existing one.
+
+The per-file patterns live in `.kiro/steering/APIConventions.md` — route and repository templates,
+validation, typed errors, response shape, ownership checks, the frontend seam. This skill is the
+*order*, plus the cross-cutting files that are easy to miss.
 
 ## Adding a New Domain
 
-### 1. Create the Backend Domain Directory
+### 1. Backend domain directory
 
 ```
 backend/src/api/<domain>/
 ├── routes.ts
 ├── repository.ts
+├── validation.ts   # optional — schemas too complex for routes.ts (trips, reminders, insurance)
+├── hooks.ts        # optional — cross-domain side effects (financing, insurance)
 └── __tests__/
 ```
 
-### 2. Define the Database Table (if needed)
+### 2. Database table (if needed)
 
-File: `backend/src/db/schema.ts`
+Use the `add-db-table` skill. A new table carries its own migration and backup/restore
+obligations that a route change does not.
 
-Add the new table using Drizzle's `sqliteTable()`. Follow existing patterns:
-- Use `text('id').primaryKey().$defaultFn(() => createId())` for IDs
-- Use `integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date())` for timestamps
-- Add foreign keys with `onDelete: 'cascade'` where appropriate
-- Export the inferred types: `type Entity = typeof entityTable.$inferSelect`
+### 3. Repository
 
-After modifying schema.ts, follow the Database Migration SOP (see `DatabaseMigrations.md` steering).
+`repository.ts`: extend `BaseRepository<Entity, NewEntity>`, take `AppDatabase` (never
+`BunSQLiteDatabase`), export a singleton bound to `getDb()`. Any method taking `userId` must scope
+its query by it, and a destructive delete keys on both `id` and `userId`.
 
-### 3. Create the Repository
+### 4. Routes
 
-File: `backend/src/api/<domain>/repository.ts`
+`routes.ts`: `requireAuth` then `changeTracker` on `'*'`, `zValidator()` on every input, typed
+errors from `errors.ts`, `{ success: true, data }` responses. Export as `routes`.
 
-```typescript
-import { eq } from 'drizzle-orm';
-import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
-import { getDb } from '../../db/connection';
-import type { Entity, NewEntity } from '../../db/schema';
-import { entityTable } from '../../db/schema';
-import { DatabaseError } from '../../errors';
-import { logger } from '../../utils/logger';
-import { BaseRepository } from '../../utils/repository';
+### 5. Mount
 
-export class EntityRepository extends BaseRepository<Entity, NewEntity> {
-  constructor(db: BunSQLiteDatabase<Record<string, unknown>>) {
-    super(db, entityTable);
-  }
-
-  async findByUserId(userId: string): Promise<Entity[]> {
-    try {
-      return await this.db
-        .select()
-        .from(entityTable)
-        .where(eq(entityTable.userId, userId));
-    } catch (error) {
-      logger.error('Failed to find entities', { userId, error });
-      throw new DatabaseError('Failed to find entities', error);
-    }
-  }
-}
-
-export const entityRepository = new EntityRepository(getDb());
-```
-
-### 4. Create the Routes
-
-File: `backend/src/api/<domain>/routes.ts`
-
-Follow the pattern in `APIConventions.md` steering:
-- Derive Zod schemas from Drizzle schema with `createInsertSchema()`
-- Apply `requireAuth` and `changeTracker` middleware
-- Use `zValidator()` for request validation
-- Use typed errors from `errors.ts`
-- Return `{ success: true, data: ... }` responses
-
-### 5. Mount the Routes
-
-File: `backend/src/index.ts`
+`backend/src/app.ts` — **not** `index.ts`, which only adds runtime side effects (migrations, sync
+worker, signal handlers) around the app `app.ts` builds.
 
 ```typescript
 import { routes as domainRoutes } from './api/<domain>/routes';
 app.route('/api/v1/<domain>', domainRoutes);
 ```
 
-### 6. Create the Frontend API Service
+### 6. Frontend service
 
-File: `frontend/src/lib/services/<domain>-api.ts`
+`frontend/src/lib/services/<domain>-api.ts`: an exported object of methods over `apiClient`
+(`get`, `post`, `put`, `patch`, `delete`, `getPaginated`, `raw`). `get` unwraps `data` and throws
+`ApiError`; `getPaginated` keeps the whole `{ data, pagination }` envelope. Services are grouped by
+frontend domain, so they need not map 1:1 to route groups.
 
-```typescript
-import { apiClient } from './api-client';
-import type { Entity } from '$lib/types';
+### 7. Frontend types
 
-export const domainApi = {
-  async getAll(): Promise<Entity[]> {
-    const response = await apiClient.get<Entity[]>('/api/v1/<domain>');
-    return response;
-  },
+`frontend/src/lib/types/<domain>.ts`, re-exported from the `types/index.ts` barrel — one file per
+domain, declared there rather than inline in the barrel. If the wire shape differs from the frontend
+type, put the mapping in `frontend/src/lib/services/api-transformer.ts` and route every read *and*
+write through it; returning a raw wire row typed as the frontend type is a type lie.
 
-  async getById(id: string): Promise<Entity> {
-    return apiClient.get<Entity>(`/api/v1/<domain>/${id}`);
-  },
+### 8. Backup/restore (new table only)
 
-  async create(data: Omit<Entity, 'id' | 'createdAt' | 'updatedAt'>): Promise<Entity> {
-    return apiClient.post<Entity>('/api/v1/<domain>', data);
-  },
+Follow "Adding a Table to the Backup" in `.kiro/steering/BackupRestore.md`. Committed drift guards
+fail by name on each list you miss — run `bun test src/api/sync src/api/providers`.
 
-  async update(id: string, data: Partial<Entity>): Promise<Entity> {
-    return apiClient.put<Entity>(`/api/v1/<domain>/${id}`, data);
-  },
+### 9. Tests
 
-  async delete(id: string): Promise<void> {
-    await apiClient.delete(`/api/v1/<domain>/${id}`);
-  },
-};
-```
+Route tests drive the real app through the `createTestApp()` harness
+(`backend/src/test-helpers/http-client.ts`) — `<domain>-http.test.ts` for routes,
+`repository.test.ts` for repo queries, `<module>.property.test.ts` for fast-check invariants.
+Conventions in `.kiro/steering/Testing.md`.
 
-### 7. Add Frontend Types
-
-File: `frontend/src/lib/types/index.ts`
-
-Add the entity type. If the backend response shape differs from the frontend type, add a transformer in `api-transformer.ts`.
-
-### 8. Update Backup/Restore (if new table)
-
-- Add to `TABLE_SCHEMA_MAP` and `TABLE_FILENAME_MAP` in `backend/src/config.ts`
-- Add to `ParsedBackupData` type in `backend/src/types.ts`
-- Update `createBackup` and `restoreFromBackup`
-- Update `validateReferentialIntegrity` if the table has foreign keys
-
-### 9. Write Tests
-
-- Create `backend/src/api/<domain>/__tests__/<domain>.property.test.ts` for property tests
-- Create migration test if a new table was added
-- Run `bun run validate` and `npm run validate`
+Then `bun run validate` in `backend/` and `npm run validate` in `frontend/`.
 
 ## Adding Endpoints to an Existing Domain
 
-1. Add the Zod schema for the new endpoint in `routes.ts`
-2. Add the route handler
-3. Add the repository method if new data access is needed
-4. Add the frontend service method
-5. Update types if the response shape is new
-6. Write tests
+Zod schema → route handler → repository method (if new data access) → frontend service method →
+types → tests.
 
 ## Verification Checklist
 
-- [ ] Repository extends `BaseRepository` and exports a singleton
-- [ ] Routes use `zValidator()` for all inputs
-- [ ] Routes apply `requireAuth` and `changeTracker`
-- [ ] Error handling uses typed errors from `errors.ts`
-- [ ] Frontend service created with methods matching backend endpoints
-- [ ] Types added to `$lib/types/`
-- [ ] Backup/restore updated (if new table)
+- [ ] Repository extends `BaseRepository`, takes `AppDatabase`, exports a singleton
+- [ ] Every `userId`-taking repository method scopes its query by it
+- [ ] Routes apply `requireAuth` + `changeTracker` and `zValidator()` every input
+- [ ] Mounted in `app.ts` at `/api/v1/<domain>`
+- [ ] Ownership verified before the repository call on every write
+- [ ] Frontend service goes through `apiClient`; types in `types/<domain>.ts` and the barrel
+- [ ] Backup/restore lists updated (if new table)
 - [ ] Migration generated and tested (if schema changed)
-- [ ] `bun run validate` passes in backend/
-- [ ] `npm run validate` passes in frontend/
+- [ ] `bun run validate` and `npm run validate` pass

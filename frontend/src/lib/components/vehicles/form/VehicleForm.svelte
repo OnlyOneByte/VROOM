@@ -71,6 +71,10 @@
 	const isEditMode = $derived(!!vehicleId);
 
 	// Component state
+	// `vehicleId` is a route param, so this only supplies the first-paint value (the spinner
+	// branch, instead of a flash of the empty form); the load $effect below re-arms `isLoading`
+	// on any later change. It is reassigned, so it can't become a $derived. Svelte's
+	// state_referenced_locally warning here is the false positive MainSteering tells us to tolerate.
 	let isLoading = $state(!!vehicleId);
 	let isSubmitting = $state(false);
 	let isDeleting = $state(false);

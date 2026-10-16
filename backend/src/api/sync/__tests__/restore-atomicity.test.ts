@@ -15,8 +15,9 @@
  * This test reproduces a validator-surviving mid-insert failure: it tampers a REAL exported ZIP so
  * `vehicles.csv` carries TWO rows with the SAME id (both with an empty licensePlate, so the
  * dup-check — which skips NULL-keyed rows — passes). validateBackupData accepts it (per-row schema +
- * referential-integrity are fine; the cross-row id collision is NOT one of the two UNIQUE indexes
- * guards), then the multi-row `insert(vehicles)` throws `UNIQUE constraint failed: vehicles.id`.
+ * referential-integrity are fine; the cross-row id collision is NOT one of the two UNIQUE indexes the
+ * pre-validate covers), then the multi-row `insert(vehicles)` throws `UNIQUE constraint failed:
+ * vehicles.id`.
  *  - PRE-FIX: the wipe had autocommitted → the user's ORIGINAL vehicle is gone (total loss).
  *  - POST-FIX: the synchronous transaction rolls back → the original vehicle SURVIVES untouched.
  *
@@ -26,12 +27,7 @@
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import AdmZip from 'adm-zip';
-import {
-  createTestApp,
-  type DataEnvelope,
-  json,
-  type TestApp,
-} from '../../../test-helpers/http-client';
+import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
@@ -72,7 +68,7 @@ describe('replace-mode restore atomicity — a mid-insert failure rolls the wipe
 
     // Real export, then tamper: two vehicles.csv rows with the same id (empty licensePlate → the
     // cross-row UNIQUE pre-validate skips them as NULL-keyed, so validation passes and the throw lands
-    // at INSERT time — exactly the post-validate mid-insert failure is about).
+    // at INSERT time — exactly the post-validate mid-insert failure this test guards against).
     const zip = await backupService.exportAsZip(ctx.user.id);
     const tampered = duplicateVehicleRow(zip);
 

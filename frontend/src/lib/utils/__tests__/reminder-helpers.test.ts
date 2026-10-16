@@ -115,7 +115,12 @@ describe('frequencyLabel', () => {
 });
 
 describe('shouldTriggerRecurringExpenses (T5 opportunistic-materialization gate)', () => {
-	const base = { isAuthed: true, isOnline: true, lastRunMs: null as number | null, now: NOW };
+	// The gate debounces on the user's LOCAL calendar day, so its fixtures are built from LOCAL date
+	// PARTS rather than hardcoded UTC instants: `Date.parse('2024-06-15T00:00Z')` vs
+	// `'2024-06-14T23:00Z'` is "yesterday" only at offset 0 — in every other zone the pair lands on
+	// one local day and the "PRIOR day" claim is vacuous. Local parts make these true in ANY zone.
+	const NOW_LOCAL = new Date(2024, 5, 15, 12, 0, 0).getTime(); // 2024-06-15 noon LOCAL
+	const base = { isAuthed: true, isOnline: true, lastRunMs: null as number | null, now: NOW_LOCAL };
 
 	it('triggers when authed + online + never run before', () => {
 		expect(shouldTriggerRecurringExpenses({ ...base, lastRunMs: null })).toBe(true);
@@ -128,12 +133,13 @@ describe('shouldTriggerRecurringExpenses (T5 opportunistic-materialization gate)
 
 	it('skips when the last run was already TODAY (the user local calendar day)', () => {
 		// Earlier the same local day → debounced.
-		const earlierToday = Date.parse('2024-06-15T06:30:00.000Z');
+		const earlierToday = new Date(2024, 5, 15, 6, 30, 0).getTime();
 		expect(shouldTriggerRecurringExpenses({ ...base, lastRunMs: earlierToday })).toBe(false);
 	});
 
 	it('triggers when the last run was a PRIOR day', () => {
-		const yesterday = Date.parse('2024-06-14T23:00:00.000Z');
+		// Late on the PREVIOUS local day — a different local calendar day, so the gate re-opens.
+		const yesterday = new Date(2024, 5, 14, 23, 0, 0).getTime();
 		expect(shouldTriggerRecurringExpenses({ ...base, lastRunMs: yesterday })).toBe(true);
 	});
 
@@ -148,7 +154,9 @@ describe('shouldTriggerRecurringExpenses (T5 opportunistic-materialization gate)
 // debounce timestamp around the pure gate, POSTs the (injected) trigger, and stamps the timestamp ONLY
 // on success. `trigger` is injected so this is unit-testable without the service/network.
 describe('maybeTriggerRecurringExpenses (T5 app-init hook orchestration)', () => {
-	const NOW = Date.parse('2024-06-15T12:00:00.000Z');
+	// Local-part-constructed for the same reason as the gate's own fixtures: the wrapped debounce is a
+	// LOCAL-calendar-day comparison, so a UTC instant pair only reads as "same day" at some offsets.
+	const NOW = new Date(2024, 5, 15, 12, 0, 0).getTime(); // 2024-06-15 noon LOCAL
 
 	beforeEach(() => {
 		localStorage.clear();
@@ -169,7 +177,7 @@ describe('maybeTriggerRecurringExpenses (T5 app-init hook orchestration)', () =>
 	});
 
 	it('does NOT trigger (or stamp) when the gate declines — already ran today', async () => {
-		const earlierToday = Date.parse('2024-06-15T06:00:00.000Z');
+		const earlierToday = new Date(2024, 5, 15, 6, 0, 0).getTime();
 		localStorage.setItem(RECURRING_TRIGGER_TS_KEY, String(earlierToday));
 		const trigger = vi.fn().mockResolvedValue({});
 		const fired = await maybeTriggerRecurringExpenses({

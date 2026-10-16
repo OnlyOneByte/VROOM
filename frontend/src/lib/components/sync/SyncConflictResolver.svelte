@@ -11,7 +11,10 @@
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
 	import { Button } from '$lib/components/ui/button';
 	import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert';
-	import { formatCurrency } from '$lib/utils/formatters';
+	import { formatCurrency, formatDate } from '$lib/utils/formatters';
+	// A conflicting row's `category` is whatever the local draft or the server holds, so these
+	// go through the key-tolerant label helper rather than indexing `categoryLabels` directly.
+	import { getCategoryLabel } from '$lib/utils/chart-colors';
 
 	let showModal = $state(false);
 	let currentConflict = $state<SyncConflict | null>(null);
@@ -52,10 +55,6 @@
 	function closeModal() {
 		showModal = false;
 		currentConflict = null;
-	}
-
-	function formatDate(dateString: string): string {
-		return new Date(dateString).toLocaleDateString();
 	}
 
 	function formatAmount(amount: number): string {
@@ -109,8 +108,9 @@
 							<div class="space-y-2 text-sm">
 								<div class="flex justify-between">
 									<span class="text-muted-foreground">Category:</span>
-									<span class="font-medium capitalize">{currentConflict.localExpense.category}</span
-									>
+									<span class="font-medium">
+										{getCategoryLabel(currentConflict.localExpense.category)}
+									</span>
 								</div>
 								{#if currentConflict.localExpense.tags && currentConflict.localExpense.tags.length > 0}
 									<div class="flex justify-between">
@@ -160,9 +160,9 @@
 								<div class="space-y-2 text-sm">
 									<div class="flex justify-between">
 										<span class="text-muted-foreground">Category:</span>
-										<span class="font-medium capitalize"
-											>{currentConflict.serverExpense.category}</span
-										>
+										<span class="font-medium">
+											{getCategoryLabel(currentConflict.serverExpense.category ?? '')}
+										</span>
 									</div>
 									<div class="flex justify-between">
 										<span class="text-muted-foreground">Tags:</span>

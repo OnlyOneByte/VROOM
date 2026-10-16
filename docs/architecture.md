@@ -20,12 +20,16 @@ names and file names are the index, and they change more often than prose does.
 ### Layering
 
 `middleware → routes → repository → Drizzle → SQLite`, one folder per domain under
-`src/api/<domain>/` holding `routes.ts` (HTTP + Zod validation) and `repository.ts` (data
-access). Domains mount at `/api/v1/<domain>` in `src/app.ts`.
+`src/api/<domain>/` holding `routes.ts` (HTTP + Zod validation) and, for whatever data access
+the domain has, one or more `*repository.ts` — usually `repository.ts`, sometimes split
+(`insurance/claims-repository.ts`, `photos/photo-ref-repository.ts`) and sometimes owning no
+table at all (`analytics/repository.ts` only aggregates). Domains mount at
+`/api/v1/<domain>` in `src/app.ts`.
 
-Repositories extend `BaseRepository` (`src/utils/repository.ts`) and are exported as
-singletons. There is no DI container — a repository takes a Drizzle handle in its
-constructor, which is what lets tests pass an in-memory database.
+Every repository takes a Drizzle handle in its constructor and is exported as a singleton.
+There is no DI container — that constructor handle is what lets tests pass an in-memory
+database. Many extend `BaseRepository` (`src/utils/repository.ts`) for
+findById/create/update/delete; the rest only ever need their own queries.
 
 `src/app.ts` builds the app with **no side effects** — no migrations, no timers, no server
 start. `src/index.ts` adds those for the real process. That split is what makes the whole
@@ -83,12 +87,14 @@ one registry per capability:
 - **llm** — the assistant (same three, plus tool-calling)
 
 Each domain defines a provider interface and a registry; adding a vendor means adding one
-file, not touching call sites. Backups go through `backup-strategies/` behind
-`backup-strategy.ts`, and `sync/backup-orchestrator.ts` fans out to every enabled provider.
+file, not touching call sites. Backups go through the `BackupStrategy` interface and registry
+in `src/api/sync/`, implemented under `src/api/providers/backup-strategies/` (Google Drive
+today), and `src/api/sync/backup-orchestrator.ts` fans out to every enabled provider.
 
-Auto-sync is inactivity-driven: the activity middleware marks data changed, and when a user
-goes idle long enough `sync/activity-tracker.ts` triggers the enabled backups. The trigger
-keys off *changes*, so an idle user with no edits costs nothing.
+Auto-sync is inactivity-driven: a per-domain `changeTracker` middleware marks data changed on
+each successful write, the global activity middleware arms the inactivity timer, and when it
+elapses `src/api/sync/activity-tracker.ts` triggers the enabled backups. The orchestrator
+no-ops when nothing changed since the last sync, so an idle user with no edits costs nothing.
 
 ## Frontend
 
@@ -96,12 +102,14 @@ keys off *changes*, so an idle user with no edits costs nothing.
 
 `route/page → component → store → service → apiClient`.
 
-- `services/api-client.ts` is the only place raw `fetch` appears. Everything else goes
-  through a domain service (`expense-api.ts`, `vehicle-api.ts`, …).
-- `services/api-transformer.ts` owns every backend↔frontend shape conversion. Reads that skip
-  it get raw column names and the wrong units — route all of them through it.
-- `stores/` holds cross-route state (app, auth, offline, settings). Component-local state
-  stays in the component.
+- `services/api-client.ts` is the only place app code calls the global `fetch`. Everything
+  else goes through a domain service (`expense-api.ts`, `vehicle-api.ts`, …).
+- `services/api-transformer.ts` owns the expense shape conversion — `expenseAmount` →
+  `amount`, and the backend's single `volume` column split into `volume` or `charge` by fuel
+  type. An expense read that skips `fromBackendExpense` gets raw column names and loses the
+  electric split, so route all of them through it.
+- `stores/` holds cross-route state (app, auth, offline, settings, theme). Component-local
+  state stays in the component.
 
 `src/lib/routes.ts` centralizes route paths; navigation goes through `resolve()` from
 `$app/paths` so the app works under any base path.
@@ -109,10 +117,10 @@ keys off *changes*, so an idle user with no edits costs nothing.
 ### Conventions
 
 Svelte 5 runes only — `$state`, `$derived`, `$effect`, `$props`; no `$:` and no
-`$app/stores`. UI primitives come from shadcn-svelte under `lib/components/ui/`, which is
-upstream-managed and not edited by hand. Colors are semantic tokens (`text-foreground`,
-`bg-background`, `chart-1`–`chart-5`), never raw hex, so theming and dark mode work
-everywhere at once.
+`$app/stores`. UI primitives live under `lib/components/ui/`; the ones pulled from the
+shadcn-svelte registry (`components.json`) are upstream-managed and not edited by hand.
+Colors are semantic tokens (`text-foreground`, `bg-background`, `chart-1`–`chart-8`), never
+raw hex, so theming and dark mode work everywhere at once.
 
 Expense categories are a closed set: `fuel`, `maintenance`, `financial`, `regulatory`,
 `enhancement`, `misc`.
@@ -122,8 +130,9 @@ Full conventions, including the Svelte 5 decision trees, are in `.kiro/steering/
 ### Offline
 
 The PWA accepts writes while offline. Entries are queued locally with a client-generated
-`client_id`, and the backend's idempotency middleware dedupes on it, so replaying a queued
-write after a flaky reconnect can't create a duplicate.
+`client_id`, and the create route inserts idempotently on `(user_id, client_id)` — backed by
+a partial unique index — so replaying a queued write after a flaky reconnect returns the
+original row instead of creating a duplicate.
 
 ## Key design decisions
 

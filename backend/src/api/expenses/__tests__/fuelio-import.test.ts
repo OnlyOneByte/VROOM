@@ -12,7 +12,7 @@ import { describe, expect, test } from 'bun:test';
 import { DistanceUnit, VolumeUnit } from '../../../types';
 import { convertDistance, convertVolume } from '../../../utils/unit-conversions';
 import { isFuelioExport, parseFuelioExport } from '../fuelio-import';
-import { buildImportPlan, type ImportVehicle } from '../import-csv';
+import { buildImportPlan, type ImportableExpense, type ImportVehicle } from '../import-csv';
 
 // A realistic Fuelio export: metric (km / litres), two fuel rows (one full, one partial+Missed),
 // and two costs (Service → maintenance; Ferry → unmapped → misc).
@@ -95,10 +95,12 @@ describe('Fuelio → native CSV → buildImportPlan (end-to-end)', () => {
   });
 
   test('fuel rows: km→mi + litres→gal conversion, cents amount, Missed→missedFillup', () => {
-    const fuel = plan.rows.map((r) => r.expense).filter((e) => e?.category === 'fuel');
+    const fuel: ImportableExpense[] = plan.rows.flatMap((r) =>
+      r.expense?.category === 'fuel' ? [r.expense] : []
+    );
     expect(fuel).toHaveLength(2);
 
-    const full = fuel[0]!; // 2024-01-05, Missed=0
+    const full = fuel[0]; // 2024-01-05, Missed=0
     expect(full.expenseAmount).toBe(6890); // $68.90 → cents
     expect(full.mileage).toBe(
       Math.round(convertDistance(45210, DistanceUnit.KILOMETERS, DistanceUnit.MILES))
@@ -109,22 +111,26 @@ describe('Fuelio → native CSV → buildImportPlan (end-to-end)', () => {
     );
     expect(full.missedFillup).toBe(false);
 
-    const partial = fuel[1]!; // 2024-01-19, Missed=1
+    const partial = fuel[1]; // 2024-01-19, Missed=1
     expect(partial.expenseAmount).toBe(3280);
     expect(partial.missedFillup).toBe(true);
   });
 
   test('cost rows: category-mapped, cents amount, no fuel fields leaked', () => {
-    const costs = plan.rows.map((r) => r.expense).filter((e) => e && e.category !== 'fuel');
+    const costs: ImportableExpense[] = plan.rows.flatMap((r) =>
+      r.expense && r.expense.category !== 'fuel' ? [r.expense] : []
+    );
     expect(costs).toHaveLength(2);
 
-    const service = costs.find((e) => e?.description?.includes('Oil change'))!;
+    const service = costs.find((e) => e.description?.includes('Oil change'));
+    if (!service) throw new Error('no "Oil change" cost row in the plan');
     expect(service.category).toBe('maintenance'); // Fuelio "Service" → maintenance
     expect(service.expenseAmount).toBe(8900);
     expect(service.mileage).toBeNull(); // non-fuel row must not carry an odometer
     expect(service.volume).toBeNull();
 
-    const ferry = costs.find((e) => e?.description?.includes('Ferry'))!;
+    const ferry = costs.find((e) => e.description?.includes('Ferry'));
+    if (!ferry) throw new Error('no "Ferry" cost row in the plan');
     expect(ferry.category).toBe('misc'); // unmapped Fuelio category → misc
     expect(ferry.expenseAmount).toBe(2500);
   });

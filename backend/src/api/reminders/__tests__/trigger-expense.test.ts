@@ -96,7 +96,7 @@ describe('expense-reminder trigger (auto-creates financial records)', () => {
 
     const rows = expensesForReminder(reminderId);
     expect(rows.length).toBeGreaterThanOrEqual(1);
-    const first = rows[0]!;
+    const first = rows[0];
     // The expense carries the reminder's template, not defaults.
     expect(first.category).toBe('financial');
     expect(first.expense_amount).toBe(12550); // $125.50 template → 12550 cents (money-cents-migration)

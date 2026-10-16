@@ -20,8 +20,7 @@ bun run dev             # http://localhost:3001
 # Frontend (separate terminal)
 cd frontend
 npm ci
-cp .env.example .env    # set PUBLIC_API_URL=http://localhost:3001
-npm run dev             # http://localhost:5173
+npm run dev             # http://localhost:5173, proxies /api to :3001
 ```
 
 Seeded login is `demo@example.com`.
@@ -44,34 +43,39 @@ cd frontend && npm run all:fix && npm run validate
 ```
 
 `all:fix` auto-fixes lint and formatting; `validate` runs lint, format check, type check,
-tests, and the build. CI runs the same steps individually, minus the format check.
+tests, and the build. CI runs the same checks as separate steps; only the frontend format
+check is skipped (the backend's `bun run check` covers formatting too).
 
-E2E tests are separate and need both dev servers running:
+E2E tests are separate, and need neither a backend nor a database — Playwright starts the
+frontend dev server itself and mocks every `/api/v1` call in the browser. One-time setup is
+`npx playwright install` for the browser binaries. See `frontend/e2e/README.md`.
 
 ```bash
 cd frontend && npm run test:e2e
 ```
 
-Some unit tests assert on local calendar dates and currently only pass under `TZ=UTC`.
-
 ## Conventions
 
-`.kiro/steering/` holds the project's coding rules — tech stack, Svelte 5 runes patterns,
-API and repository patterns, migrations, testing, design system, and UI quality. Read the
-ones relevant to what you're touching before writing code; they are the authority on style,
-and they are more specific than this guide.
+`.kiro/steering/` holds the project's coding rules — one file per area: tech stack, code
+quality, Svelte 5 runes patterns, API and repository patterns, migrations, testing (including
+external APIs), the design system, UI quality, PWA behavior, backup/restore, and workspace
+MCPs. Read the ones relevant to what you're touching before writing code; they are the
+authority on style, and they are more specific than this guide.
 
 `.kiro/skills/` holds step-by-step workflows for repetitive multi-file tasks (adding an API
-endpoint, adding a database table, adding an expense category, debugging a component).
+endpoint, adding a database table, adding an expense category, debugging a component,
+reviewing frontend changes).
 
-`.kiro/specs/` holds specs for in-flight features as requirements → design → tasks. Specs for
-shipped work are deleted once the code lands; git history keeps them.
+`.kiro/specs/` holds feature specs as requirements → design → tasks. A spec is deleted once
+its work has shipped; git history keeps it.
 
 ## Editor integration
 
-`.kiro/settings/mcp.json` configures MCP servers for Svelte and shadcn-svelte docs, SQLite
-read access, Chrome DevTools, and Playwright. `.kiro/hooks/` adds on-save and post-task
-automation (autofix, validation, migration reminders, review passes). Both are picked up
+`.kiro/settings/mcp.json` configures MCP servers for Svelte and shadcn-svelte docs, Chrome
+DevTools, and SQLite against the dev database `backend/data/vroom.db` — writes included, so
+don't point it at anything you care about. A Playwright server is configured but ships
+disabled. `.kiro/hooks/` adds pre-task, on-save, and post-task automation (steering preload,
+Svelte autofix, validation, migration reminders, review passes). Both are picked up
 automatically by [Kiro](https://kiro.dev/) and ignored by other editors.
 
 The Chrome DevTools server expects Chrome on the default debugging port:

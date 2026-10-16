@@ -1,9 +1,11 @@
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { dirname, join, relative, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, it, expect, beforeEach, vi } from 'vitest';
 import {
 	getPlatformInfo,
 	initializePWA,
 	promptInstall,
-	requestBackgroundSync,
 	pwaInstallState,
 	type BeforeInstallPromptEvent
 } from '../pwa';
@@ -120,85 +122,12 @@ describe('PWA Utils', () => {
 		});
 	});
 
-	describe('requestBackgroundSync', () => {
-		it('should register background sync when supported', async () => {
-			const mockSync = {
-				register: vi.fn().mockResolvedValue(undefined)
-			};
-
-			// Set up the mock for this test
-			mockServiceWorker.ready = Promise.resolve({
-				sync: mockSync
-			} as any);
-
-			// Also update the navigator mock directly
-			Object.defineProperty(navigator, 'serviceWorker', {
-				value: {
-					...mockServiceWorker,
-					ready: Promise.resolve({
-						sync: mockSync
-					})
-				},
-				writable: true
-			});
-
-			await requestBackgroundSync('test-sync', true); // Force browser mode
-
-			expect(mockSync.register).toHaveBeenCalledWith('test-sync');
-		});
-
-		it('should handle background sync registration failure', async () => {
-			const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-			// Set up the mock for this test
-			const rejectedPromise = Promise.reject(new Error('Service worker not ready'));
-			mockServiceWorker.ready = rejectedPromise;
-
-			// Also update the navigator mock directly
-			Object.defineProperty(navigator, 'serviceWorker', {
-				value: {
-					...mockServiceWorker,
-					ready: rejectedPromise
-				},
-				writable: true
-			});
-
-			await requestBackgroundSync('test-sync', true); // Force browser mode
-
-			// Wait a bit for the promise to reject and console.error to be called
-			await new Promise(resolve => setTimeout(resolve, 10));
-
-			expect(consoleError).toHaveBeenCalledWith(
-				'Background sync registration failed:',
-				expect.any(Error)
-			);
-
-			consoleError.mockRestore();
-		});
-
-		it('should not register when service worker not supported', async () => {
-			// Remove service worker support
-			Object.defineProperty(window, 'navigator', {
-				value: {},
-				writable: true
-			});
-
-			await requestBackgroundSync('test-sync');
-
-			// Should not throw or call any methods
-			expect(mockServiceWorker.ready).toBeDefined();
-		});
-
-		it('should handle missing sync API', async () => {
-			mockServiceWorker.ready = Promise.resolve({
-				// No sync property
-			} as any);
-
-			await requestBackgroundSync('test-sync');
-
-			// Should not throw
-		});
-	});
+	// There is no requestBackgroundSync here any more: it registered a Background Sync tag that the
+	// service worker never consumed, so offline expenses were never synced in the background despite
+	// the call reading that way. The outbox lives in localStorage, which worker scope cannot read, so
+	// the handler side was not implementable without moving the outbox to IndexedDB. Delivery is the
+	// foreground sync manager's `online` listener plus the manual sync control.
+	// sw-push-handlers.test.ts fails if a sync registration reappears without a consuming listener.
 
 	describe('getPlatformInfo', () => {
 		// getPlatformInfo classifies the UA to decide which install instructions to show
@@ -363,5 +292,98 @@ describe('PWA Utils', () => {
 			expect(result).toBe(true);
 			expect(pwaInstallState.canInstall).toBe(false);
 		});
+	});
+});
+
+/**
+ * Source-scan guard for the PWA document head.
+ *
+ * `viewport` and `theme-color` are single-declaration metas, and a duplicate does real damage rather
+ * than being merely redundant:
+ *  - A second `<meta name="viewport">` REPLACES the first description instead of merging with it, so
+ *    one that omits `viewport-fit=cover` resets it to `auto`. `env(safe-area-inset-*)` then reports 0,
+ *    and app.css's .safe-top/.safe-bottom plus the mobile nav's safe-area padding silently collapse on
+ *    notched devices. `<svelte:head>` content lands AFTER app.html's head, so a layout or page copy
+ *    always wins.
+ *  - The browser picks the FIRST `theme-color`, which is also the one themeStore rewrites per active
+ *    theme (document.querySelector returns the first match). A second one is dead weight that
+ *    disagrees with the installed-app manifest colour and would hijack theming if it ever sorted first.
+ *
+ * `user-scalable=no` is called out separately because it fails WCAG 1.4.4 (Resize Text) and the axe
+ * `meta-viewport` rule, independent of the duplication problem.
+ */
+describe('PWA document head — viewport and theme-color are declared exactly once', () => {
+	const UTILS_TESTS_DIR = dirname(fileURLToPath(import.meta.url));
+	const SRC_ROOT = join(UTILS_TESTS_DIR, '..', '..', '..');
+	const FRONTEND_ROOT = join(SRC_ROOT, '..');
+
+	/** Drop HTML comments so prose ABOUT a meta tag is not scanned as a declaration of one. */
+	function stripHtmlComments(source: string): string {
+		return source.replace(/<!--[\s\S]*?-->/g, ' ');
+	}
+
+	function metaDeclarations(source: string, name: string): string[] {
+		const pattern = new RegExp(`<meta[^>]*name=["']${name}["'][^>]*>`, 'gi');
+		return stripHtmlComments(source).match(pattern) ?? [];
+	}
+
+	const appHtml = readFileSync(join(SRC_ROOT, 'app.html'), 'utf8');
+	const layout = readFileSync(join(SRC_ROOT, 'routes', '+layout.svelte'), 'utf8');
+	const viteConfig = readFileSync(join(FRONTEND_ROOT, 'vite.config.ts'), 'utf8');
+
+	it('app.html declares one viewport, and it carries viewport-fit=cover', () => {
+		const declarations = metaDeclarations(appHtml, 'viewport');
+		expect(declarations).toHaveLength(1);
+		expect(declarations[0]).toContain('viewport-fit=cover');
+		expect(declarations[0]).not.toContain('user-scalable=no');
+	});
+
+	it('the root layout re-declares neither viewport nor theme-color', () => {
+		expect(metaDeclarations(layout, 'viewport')).toEqual([]);
+		expect(metaDeclarations(layout, 'theme-color')).toEqual([]);
+	});
+
+	it('app.html declares one theme-color and it matches the installed-app manifest', () => {
+		const declarations = metaDeclarations(appHtml, 'theme-color');
+		expect(declarations).toHaveLength(1);
+
+		const metaColor = /content=["']([^"']+)["']/.exec(declarations[0] ?? '')?.[1];
+		const manifestColor = /theme_color:\s*['"]([^'"]+)['"]/.exec(viteConfig)?.[1];
+		expect(manifestColor).toBeTruthy();
+		expect(metaColor).toBe(manifestColor);
+	});
+
+	/**
+	 * Routes that still override the viewport. Every entry is a live defect: it drops
+	 * `viewport-fit=cover` for that route, so the safe-area insets collapse there. The assertion is
+	 * exact rather than "at most these", so this list can only ever shrink — removing the last
+	 * override turns this test red until the list is emptied too.
+	 */
+	const PENDING_VIEWPORT_OVERRIDES = ['routes/expenses/[id]/edit/+page.svelte'];
+
+	it('no route re-declares the viewport beyond the known pending overrides', () => {
+		const offenders: string[] = [];
+		const walk = (dir: string): void => {
+			for (const entry of readdirSync(dir)) {
+				const full = join(dir, entry);
+				if (statSync(full).isDirectory()) {
+					walk(full);
+				} else if (entry.endsWith('.svelte')) {
+					const source = readFileSync(full, 'utf8');
+					if (metaDeclarations(source, 'viewport').length > 0) {
+						offenders.push(relative(SRC_ROOT, full).split(sep).join('/'));
+					}
+				}
+			}
+		};
+		walk(join(SRC_ROOT, 'routes'));
+		walk(join(SRC_ROOT, 'lib'));
+
+		expect(
+			offenders.sort(),
+			'A <meta name="viewport"> outside app.html overrides it and drops viewport-fit=cover, ' +
+				'collapsing env(safe-area-inset-*) on that route. Remove the override. If this list is now ' +
+				'SHORTER than expected, the override was fixed — delete its PENDING_VIEWPORT_OVERRIDES entry.'
+		).toEqual([...PENDING_VIEWPORT_OVERRIDES].sort());
 	});
 });

@@ -1,23 +1,21 @@
 /**
- * Regression GUARD (committed, travels with the merge) for the fleet-unit-pooling class (distance
- * member fixed).
+ * Regression GUARD against UNCONVERTED fleet-wide unit pooling.
  *
  * The fleet-wide analytics SUMMARY readers (getQuickStats / getYearEnd / getSummary / getFuelStats) pool
  * per-vehicle quantities. To be correct for a MIXED-unit fleet (mi+km / gal+L), each vehicle's value must
  * be converted to the user's global units BEFORE pooling — the `computeConvertedTotalDistance` /
  * `computeConvertedEfficiencyValues` / `buildConvertedEfficiencyTrend` helpers do this, gated by a
- * `skipConversion = allVehiclesMatchUnits(...)` flag. Pre-, getFuelStats DEFEATED the conversion by
+ * `skipConversion = allVehiclesMatchUnits(...)` flag. getFuelStats once DEFEATED that conversion by
  * passing NO-OP PLACEHOLDERS — `new Map()` (empty unit map), `DEFAULT_UNIT_PREFERENCES`, and a hardcoded
- * `skipConversion = true` — so a mixed mi+km fleet pooled miles with kilometres. The
- * fix threads the REAL units (vehicleUnitsMap, userUnits, the computed skipConversion variable).
+ * `skipConversion = true` — so a mixed mi+km fleet pooled miles with kilometres. Every such call must
+ * thread the REAL units: vehicleUnitsMap, userUnits, and the COMPUTED skipConversion variable.
  *
  * The behavioral test (fuel-stats-fleet-distance-pooling.test.ts) proves the CURRENT getFuelStats path
  * converts a mixed fleet, but it only drives that one reader's distance scalar. This SOURCE SCAN is the
  * tree-wide net: it pins that NO `computeConverted*` / `buildConverted*` call reintroduces the placeholder
  * triple — so a future reader (or a refactor) that hardcodes `new Map()` / `DEFAULT_UNIT_PREFERENCES` /
- * `skipConversion: true` regresses RED here even if its same-unit tests stay green (the bug is invisible to
- * a same-unit fixture). Source-scan > untracked e2e for merge survival (GUIDE); the one-edit-fix→source-scan
- * pattern again (→→ import-date — now→ for).
+ * `skipConversion: true` regresses RED here even if its same-unit tests stay green — the bug is invisible
+ * to a same-unit fixture, which is why a structural scan and not a behavioral case is the net here.
  *
  * Pure source scan — no DB, no network. Runs in the fast suite.
  */

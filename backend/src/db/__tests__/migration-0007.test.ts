@@ -1,10 +1,10 @@
 /**
- * Migration 0007: add the `trips` table (trips-location spec T1, design §1).
+ * Migration 0007: add the `trips` table.
  *
  * A fully ADDITIVE migration — a single `CREATE TABLE trips` + a `trips_vehicle_date_idx` index (the
  * 0003-class additive shape, NOT the 0004 rebuild footgun). It creates a brand-new table, so it touches
- * NO existing row: pre-0007 data must survive byte-for-byte. These tests are the T1 proof gate:
- *  - the table exists on a fresh apply with the design §1 column set + NOT-NULL shape,
+ * NO existing row: pre-0007 data must survive byte-for-byte. These tests are the proof gate:
+ *  - the table exists on a fresh apply with its full column set + NOT-NULL shape,
  *  - the composite (vehicle_id, trip_date) index exists (the odometer-index read pattern),
  *  - the vehicle_id / user_id FKs are ON DELETE CASCADE (a trip is owned data — deleting its vehicle or
  *  user must not orphan it; tenant hygiene),
@@ -23,7 +23,7 @@ import {
   seedCoreData,
 } from './migration-helpers';
 
-describe('Migration 0007: trips table (trips-location T1)', () => {
+describe('Migration 0007: trips table', () => {
   let db: Database;
   const migrations = loadMigrations();
 
@@ -36,7 +36,7 @@ describe('Migration 0007: trips table (trips-location T1)', () => {
     db.close();
   });
 
-  test('creates the trips table with the design §1 column set', () => {
+  test('creates the trips table with its full column set', () => {
     applyMigrationsUpTo(db, migrations, 7);
     const cols = getColumnNames(db, 'trips').sort();
     expect(cols).toEqual(
@@ -57,21 +57,21 @@ describe('Migration 0007: trips table (trips-location T1)', () => {
     );
   });
 
-  test('the odometer/purpose/date core columns are NOT NULL; locations + note are nullable (D5)', () => {
+  test('the odometer/purpose/date core columns are NOT NULL; locations + note are nullable', () => {
     applyMigrationsUpTo(db, migrations, 7);
     const info = db.query(`PRAGMA table_info('trips')`).all() as {
       name: string;
       notnull: number;
     }[];
     const notnull = (name: string) => info.find((c) => c.name === name)?.notnull;
-    // Required core (R2 odometer pair, D4 purpose, R5 date):
+    // Required core: the odometer pair, the purpose, the date, and both owners.
     expect(notnull('start_odometer')).toBe(1);
     expect(notnull('end_odometer')).toBe(1);
     expect(notnull('purpose')).toBe(1);
     expect(notnull('trip_date')).toBe(1);
     expect(notnull('vehicle_id')).toBe(1);
     expect(notnull('user_id')).toBe(1);
-    // Optional v1 free-text (D5 — no GPS, labels optional):
+    // Optional free-text: there is no GPS capture, so the location labels stay optional.
     expect(notnull('start_location')).toBe(0);
     expect(notnull('end_location')).toBe(0);
     expect(notnull('note')).toBe(0);

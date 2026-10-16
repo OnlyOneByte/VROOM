@@ -1,9 +1,8 @@
 /**
  * Migration 0000: Consolidated v2 schema (single migration)
  *
- * Creates all tables: users, vehicles, expenses, vehicle_financing,
- * insurance_policies, insurance_terms, insurance_term_vehicles,
- * photos, photo_refs, odometer_entries, user_providers, user_preferences, sync_state, sessions.
+ * Creates the 17 tables of the baseline schema — `creates all expected tables` below holds the
+ * authoritative list.
  *
  * Includes 4 manually-appended partial indexes:
  * - vf_active_vehicle_idx (one active financing per vehicle)
@@ -59,9 +58,9 @@ describe('Migration 0000: Consolidated v2 Schema', () => {
       'vehicle_financing',
       'vehicles',
     ];
-    for (const table of expectedTables) {
-      expect(tables).toContain(table);
-    }
+    // Set equality, so this list stays the authoritative count the file header cites: a table
+    // added to or dropped from 0000 without updating it fails here.
+    expect(tables).toEqual([...expectedTables].sort());
   });
 
   test('vehicles table has expected columns (no current_insurance_policy_id)', () => {
@@ -350,7 +349,6 @@ describe('Migration 0000: Consolidated v2 Schema', () => {
 
 // ---------------------------------------------------------------------------
 // Property 3: License plate partial unique index enforcement
-// **Validates: Requirements 3.3**
 // ---------------------------------------------------------------------------
 
 describe('Property 3: License plate partial unique index enforcement', () => {
@@ -452,7 +450,6 @@ describe('Property 3: License plate partial unique index enforcement', () => {
 
 // ---------------------------------------------------------------------------
 // Property 4: Active financing partial unique index enforcement
-// **Validates: Requirements 4.3**
 // ---------------------------------------------------------------------------
 
 describe('Property 4: Active financing partial unique index enforcement', () => {

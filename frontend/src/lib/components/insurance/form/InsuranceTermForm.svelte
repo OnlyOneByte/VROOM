@@ -42,7 +42,7 @@
 	// (EUR/GBP users would otherwise see the wrong unit). Same class as.
 	const currencySymbol = $derived(getCurrencySymbol());
 
-	const isEditMode = !!termId;
+	const isEditMode = $derived(!!termId);
 
 	let isLoading = $state(true);
 	let isSubmitting = $state(false);

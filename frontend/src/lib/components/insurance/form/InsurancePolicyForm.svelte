@@ -35,7 +35,7 @@
 	import { insuranceApi } from '$lib/services/insurance-api';
 	import { vehicleApi } from '$lib/services/vehicle-api';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
-	import { getCurrencySymbol } from '$lib/utils/formatters';
+	import { dateOnlyToISO, getCurrencySymbol } from '$lib/utils/formatters';
 	import type { InsurancePolicy, Vehicle, CreateTermRequest } from '$lib/types';
 	import FormLayout from '$lib/components/common/form-layout.svelte';
 
@@ -201,8 +201,11 @@
 					company: company.trim(),
 					terms: [
 						{
-							startDate,
-							endDate,
+							// Date-only picker values; the API coerces them, so send noon-local or the
+							// term boundary (and the premium rows it materializes) lands a day early
+							// west of UTC.
+							startDate: dateOnlyToISO(startDate),
+							endDate: dateOnlyToISO(endDate),
 							...termData,
 							vehicleCoverage: {
 								vehicleIds: selectedVehicleIds

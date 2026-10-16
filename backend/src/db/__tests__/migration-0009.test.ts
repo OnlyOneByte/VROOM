@@ -1,7 +1,7 @@
 /**
- * Migration 0009: money columns float-dollars → integer-cents (money-cents-migration T1).
+ * Migration 0009: money columns float-dollars → integer-cents.
  *
- * The 14 money columns (design §1) flip from `real` (binary-float dollars) to `integer` (cents). The
+ * All 14 money columns flip from `real` (binary-float dollars) to `integer` (cents). The
  * hand-authored migration converts every stored value in place:
  *  UPDATE <table> SET <col> = CAST(ROUND(<col> * 100) AS INTEGER) WHERE <col> IS NOT NULL;
  *
@@ -144,7 +144,7 @@ describe('Migration 0009: money float-dollars → integer-cents', () => {
   });
 
   test('the migration is in-place: physical column affinity stays REAL (no rebuild), values become integers', () => {
-    // KEY design §3 invariant. The hand-authored migration does an in-place UPDATE — it does NOT rebuild
+    // The KEY invariant. The hand-authored migration does an in-place UPDATE — it does NOT rebuild
     // the table — so the DECLARED column affinity is still REAL (a rebuild is exactly the 0004 cascade
     // footgun this migration deliberately avoids: SQLite dynamic typing means integer VALUES live happily
     // in a REAL-affinity column). The `integer` change in schema.ts drives the Drizzle TS type +
@@ -175,7 +175,7 @@ describe('Migration 0009: money float-dollars → integer-cents', () => {
   });
 
   test('double-apply re-scales (NOT idempotent) — the migration must never be hand-replayed', () => {
-    // This documents the design §3 idempotency HAZARD: UPDATE …*100 run twice multiplies by 10000.
+    // This documents the idempotency HAZARD: UPDATE …*100 run twice multiplies by 10000.
     // The __drizzle_migrations ledger guards the normal path; this test pins WHY a manual replay is unsafe.
     applyMigrationsUpTo(db, migrations, idxPrev);
     seedCoreData(db); // e1 = 45.50

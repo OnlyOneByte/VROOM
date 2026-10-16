@@ -6,6 +6,9 @@
 	import { DISPLAY_LIMITS } from '$lib/constants/limits';
 	import { EXPENSE_MESSAGES } from '$lib/constants/messages';
 	import { formatCurrency, formatDate } from '$lib/utils/formatters';
+	// `OfflineExpense.category` is unvalidated user input typed `string`, so these rows go through
+	// the key-tolerant label helper rather than indexing `categoryLabels` directly.
+	import { getCategoryLabel } from '$lib/utils/chart-colors';
 
 	interface Props {
 		pendingExpenses: OfflineExpense[];
@@ -58,8 +61,8 @@
 						</button>
 						<div class="flex-1">
 							<div class="flex items-center gap-2 mb-1">
-								<Badge variant="secondary" class="capitalize">
-									{expense.category}
+								<Badge variant="secondary">
+									{getCategoryLabel(expense.category)}
 								</Badge>
 								{#if expense.tags && expense.tags.length > 0}
 									<span class="text-sm text-muted-foreground">
@@ -114,7 +117,7 @@
 						</button>
 						<div class="flex-1">
 							<div class="flex items-center gap-2 mb-1">
-								<Badge variant="secondary" class="capitalize">{expense.category}</Badge>
+								<Badge variant="secondary">{getCategoryLabel(expense.category)}</Badge>
 								{#if expense.tags && expense.tags.length > 0}
 									<span class="text-sm text-muted-foreground">{expense.tags.join(', ')}</span>
 								{/if}
@@ -158,8 +161,8 @@
 					>
 						<div class="flex-1">
 							<div class="flex items-center gap-2 mb-1">
-								<Badge variant="secondary" class="capitalize">
-									{expense.category}
+								<Badge variant="secondary">
+									{getCategoryLabel(expense.category)}
 								</Badge>
 								{#if expense.tags && expense.tags.length > 0}
 									<span class="text-sm text-muted-foreground">

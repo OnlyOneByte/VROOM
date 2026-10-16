@@ -61,7 +61,7 @@ async function createPolicy(
   });
   const body = await json<DataEnvelope<PolicyRow>>(res);
   expect(res.status, JSON.stringify(body)).toBe(201);
-  return { policyId: body.data.id, termId: body.data.terms[0]!.id };
+  return { policyId: body.data.id, termId: body.data.terms[0].id };
 }
 
 /** Create a policy whose single term is MONTHLY-priced (no totalCost) — the path. */
@@ -83,7 +83,7 @@ async function createMonthlyPolicy(
   });
   const body = await json<DataEnvelope<PolicyRow>>(res);
   expect(res.status, JSON.stringify(body)).toBe(201);
-  return { policyId: body.data.id, termId: body.data.terms[0]!.id };
+  return { policyId: body.data.id, termId: body.data.terms[0].id };
 }
 
 interface InsExpenseRow {
@@ -165,10 +165,10 @@ describe('insurance premium → expense hook lifecycle', () => {
 
     const rows = autoExpensesForTerm(termId);
     expect(rows).toHaveLength(1); // one covered vehicle → one sibling
-    expect(rows[0]!.expense_amount).toBe(130000); // $100/mo × 13 months = $1300 → 130000 cents
-    expect(rows[0]!.category).toBe('financial');
-    expect(rows[0]!.tags ?? '').toContain('insurance');
-    expect(rows[0]!.source_type).toBe('insurance_term');
+    expect(rows[0].expense_amount).toBe(130000); // $100/mo × 13 months = $1300 → 130000 cents
+    expect(rows[0].category).toBe('financial');
+    expect(rows[0].tags ?? '').toContain('insurance');
+    expect(rows[0].source_type).toBe('insurance_term');
   });
 
   test('an explicit totalCost still wins over monthlyCost (no change to the costed path)', async () => {
@@ -190,9 +190,9 @@ describe('insurance premium → expense hook lifecycle', () => {
     });
     const body = await json<DataEnvelope<PolicyRow>>(res);
     expect(res.status, JSON.stringify(body)).toBe(201);
-    const rows = autoExpensesForTerm(body.data.terms[0]!.id);
+    const rows = autoExpensesForTerm(body.data.terms[0].id);
     expect(rows).toHaveLength(1);
-    expect(rows[0]!.expense_amount).toBe(120000); // totalCost $1200 → 120000 cents, not 100×13
+    expect(rows[0].expense_amount).toBe(120000); // totalCost $1200 → 120000 cents, not 100×13
   });
 
   test('updating the term cost regenerates the auto-expenses at the new amount', async () => {
@@ -200,8 +200,8 @@ describe('insurance premium → expense hook lifecycle', () => {
     const { policyId, termId } = await createPolicy([v1], 1000);
     const before = autoExpensesForTerm(termId);
     expect(before).toHaveLength(1);
-    expect(before[0]!.expense_amount).toBe(100000); // $1000 → 100000 cents
-    const beforeId = before[0]!.id;
+    expect(before[0].expense_amount).toBe(100000); // $1000 → 100000 cents
+    const beforeId = before[0].id;
 
     const res = await ctx.authed('PUT', `/api/v1/insurance/${policyId}/terms/${termId}`, {
       totalCost: 1500,
@@ -210,9 +210,9 @@ describe('insurance premium → expense hook lifecycle', () => {
 
     const after = autoExpensesForTerm(termId);
     expect(after).toHaveLength(1);
-    expect(after[0]!.expense_amount).toBe(150000); // $1500 → 150000 cents
+    expect(after[0].expense_amount).toBe(150000); // $1500 → 150000 cents
     // Regenerated (delete-by-source + recreate), not mutated in place.
-    expect(after[0]!.id).not.toBe(beforeId);
+    expect(after[0].id).not.toBe(beforeId);
   });
 
   test('updating the term cost to 0 removes the auto-expenses', async () => {

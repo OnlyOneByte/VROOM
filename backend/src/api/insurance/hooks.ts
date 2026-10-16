@@ -39,10 +39,12 @@ interface TermExpenseParams {
  * The cost a term materializes into TCO: the explicit `totalCost` when present, else a
  * monthly-only term's `monthlyCost × the number of calendar months it spans` (the same month-count
  * `effectiveMonthlyPremium` uses to amortize a totalCost-only term, so the two cost shapes are
- * symmetric). Returns 0 when neither is set or the span is empty. Pre-, a monthly-only term created
- * NO expense row → it showed in analytics (effectiveMonthlyPremium honours monthlyCost) but was ABSENT
- * from TCO's insuranceCost bucket — the inconsistency closes. No double-count: analytics reads
- * term.monthlyCost directly, never the materialized expense rows TCO sums.
+ * symmetric). Returns 0 when neither is set or the span is empty.
+ *
+ * A monthly-only term used to materialize NO expense row at all, so it showed in analytics
+ * (effectiveMonthlyPremium honours monthlyCost) but was ABSENT from TCO's insuranceCost bucket;
+ * deriving a cost here closes that inconsistency. No double-count: analytics reads term.monthlyCost
+ * directly, never the materialized expense rows TCO sums.
  */
 export function effectiveTermCost(params: {
   totalCost: number;

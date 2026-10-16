@@ -43,8 +43,9 @@ VROOM (Vehicle Record & Organization Of Maintenance) is a self-hostable car cost
 ### Prerequisites
 
 - [Bun](https://bun.sh/) (backend runtime)
-- Node.js 22+ (frontend — see `.nvmrc`)
-- Docker 20.10+ (optional, for containerized deployment)
+- Node.js 22.22.2+ (frontend) — the lockfile needs `^22.22.2 || ^24.15.0 || >=26.0.0`;
+  `npm ci` fails with `EBADENGINE` on anything older. `nvm use` reads `.nvmrc`
+- Docker 20.10+ with Compose v2 (optional, for containerized deployment)
 
 ### Local Development
 
@@ -60,9 +61,8 @@ bun run dev             # http://localhost:3001
 
 # Frontend (separate terminal)
 cd frontend
-npm install
-cp .env.example .env    # set PUBLIC_API_URL=http://localhost:3001
-npm run dev             # http://localhost:5173
+npm ci                  # not `npm install` — see the Development Guide
+npm run dev             # http://localhost:5173, proxies /api to :3001
 ```
 
 ### Docker (Production)
@@ -70,7 +70,9 @@ npm run dev             # http://localhost:5173
 ```bash
 cp docs/examples/.env.example .env
 cp docs/examples/docker-compose.yml .
-docker-compose up -d
+mkdir -p data                                  # the DATA_PATH bind mount; Docker won't create it
+mkdir -p config && touch config/backend.env    # or delete that mount from the compose file
+docker compose up -d
 # Frontend: http://localhost:3000
 # Backend:  http://localhost:3001
 ```
@@ -81,8 +83,8 @@ See the [Deployment Guide](docs/deployment.md) for full instructions.
 
 ```
 vroom/
-├── backend/        # Bun + Hono API. One folder per domain under src/api/,
-│                   # each with routes.ts + repository.ts. Migrations in drizzle/.
+├── backend/        # Bun + Hono API. One folder per domain under src/api/: routes.ts
+│                   # plus any *repository.ts it needs. Migrations in drizzle/.
 ├── frontend/       # SvelteKit PWA. Components, services, stores, and utils
 │                   # under src/lib/; file-based routing under src/routes/.
 ├── docs/           # Architecture, development, and deployment guides

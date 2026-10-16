@@ -41,14 +41,41 @@ const app = new Hono();
 // Global error handler
 app.onError(errorHandler);
 
-// Body size limit middleware - prevents DoS attacks via large payloads
-app.use(
-  '*',
-  bodyLimit({
-    maxSize: 10 * 1024 * 1024, // 10MB
-    message: 'Request body too large',
-  })
+// Body size limit middleware - prevents DoS attacks via large payloads.
+const GLOBAL_MAX_BODY_SIZE = 10 * 1024 * 1024; // 10MB
+
+/**
+ * Paths whose bodies are legitimately LARGER than the global cap, mapped to the cap they
+ * enforce instead. A route-level `bodyLimit` can only ever TIGHTEN the global one: this
+ * middleware runs first and rejects on Content-Length, so a route asking for more than
+ * GLOBAL_MAX_BODY_SIZE never sees the request and its larger allowance is dead code. The
+ * backup restore upload takes a whole backup ZIP (CONFIG.backup.maxFileSize), so without an
+ * entry here a user cannot restore a backup larger than the global cap — data recovery, the
+ * one path that must never be blocked by a DoS guard tuned for JSON payloads.
+ *
+ * The unversioned alias is listed too: it only 308-redirects to its `/api/v1` twin (no body is
+ * read there), but a 413 on the redirect stops a large upload from ever reaching the real route.
+ *
+ * Adding a path here does NOT remove its cap — the larger limit is still enforced below, and
+ * the route keeps its own matching `bodyLimit` as the authoritative declaration.
+ */
+const LARGER_BODY_LIMITS: Record<string, number> = {
+  '/api/v1/sync/restore/from-backup': CONFIG.backup.maxFileSize,
+  '/api/sync/restore/from-backup': CONFIG.backup.maxFileSize,
+};
+
+const globalBodyLimit = bodyLimit({
+  maxSize: GLOBAL_MAX_BODY_SIZE,
+  message: 'Request body too large',
+});
+const largerBodyLimits = new Map(
+  Object.entries(LARGER_BODY_LIMITS).map(([path, maxSize]) => [
+    path,
+    bodyLimit({ maxSize, message: 'Request body too large' }),
+  ])
 );
+
+app.use('*', (c, next) => (largerBodyLimits.get(c.req.path) ?? globalBodyLimit)(c, next));
 
 /**
  * Security Headers Configuration
@@ -140,7 +167,7 @@ app.get('/health', (c) => {
   return c.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '1.0.0',
+    version: CONFIG.version,
   });
 });
 
@@ -185,7 +212,7 @@ app.use('/api/*', async (c, next) => {
 app.get('/api', (c) => {
   return c.json({
     message: 'VROOM Car Tracker API',
-    version: '1.0.0',
+    version: CONFIG.version,
     apiVersion: 'v1',
     deprecation: {
       message: 'Unversioned endpoints (/api/*) are deprecated and will redirect to /api/v1/*',

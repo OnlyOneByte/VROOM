@@ -63,8 +63,8 @@ describe('reminder notification feed (GET + mark-read)', () => {
     // Newest-first by createdAt (the recency axis — NOT dueDate, which is NULL for mileage
     // notifications and would sink them). Each createdAt >= the next one.
     for (let i = 1; i < body.data.length; i++) {
-      const prev = new Date(body.data[i - 1]!.createdAt).getTime();
-      const cur = new Date(body.data[i]!.createdAt).getTime();
+      const prev = new Date(body.data[i - 1].createdAt).getTime();
+      const cur = new Date(body.data[i].createdAt).getTime();
       expect(prev).toBeGreaterThanOrEqual(cur);
     }
     // All start unread.
@@ -78,7 +78,7 @@ describe('reminder notification feed (GET + mark-read)', () => {
     const listed = await json<DataEnvelope<NotificationRow[]>>(
       await ctx.authed('GET', '/api/v1/reminders/notifications')
     );
-    const target = listed.data[0]!;
+    const target = listed.data[0];
     const unreadBefore = listed.data.length;
 
     const marked = await ctx.authed('PUT', `/api/v1/reminders/notifications/${target.id}/read`);

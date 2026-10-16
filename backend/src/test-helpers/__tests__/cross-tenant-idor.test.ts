@@ -959,8 +959,8 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
       await ctx.authed('GET', '/api/v1/shares/received')
     );
     expect(aRecv.data.length).toBe(1);
-    expect(aRecv.data[0]!.sharedWithId).toBe(ctx.user.id);
-    expect(aRecv.data[0]!.vehicleName).toBe('2023 Subaru Outback');
+    expect(aRecv.data[0].sharedWithId).toBe(ctx.user.id);
+    expect(aRecv.data[0].vehicleName).toBe('2023 Subaru Outback');
 
     // B is the OWNER, not an invitee — B's /received is empty (the join did not leak its own grant in).
     const bRecv = await json<DataEnvelope<unknown[]>>(await asB('GET', '/api/v1/shares/received'));
