@@ -225,7 +225,10 @@ describe('processBatch', () => {
     expect(mockFindActiveByPhoto).not.toHaveBeenCalled();
   });
 
-  test('skips ref when no active source ref exists for the photo', async () => {
+  // A ref with nothing to sync FROM must be written, not skipped: an untouched row comes straight
+  // back out of findPendingOrFailed (oldest first, LIMIT batchSize) on the next poll, forever, and
+  // starves every newer ref behind it. See sync-worker-stuck-ref-liveness.test.ts.
+  test('records a failure when no active source ref exists for the photo', async () => {
     const pendingRef = makePhotoRef({ status: 'pending' });
     mockFindPendingOrFailed.mockResolvedValue([pendingRef]);
     mockFindActiveByPhoto.mockResolvedValue(null);
@@ -233,10 +236,15 @@ describe('processBatch', () => {
     await processBatch(makeDeps());
 
     expect(mockFindActiveByPhoto).toHaveBeenCalledWith('photo-1');
-    expect(mockUpdateStatus).not.toHaveBeenCalled();
+    expect(mockUpdateStatus).toHaveBeenCalledWith('ref-1', {
+      status: 'failed',
+      errorMessage: 'No active source copy available for this photo',
+      retryCount: 1,
+      syncedAt: expect.any(Date),
+    });
   });
 
-  test('skips ref when photo record not found', async () => {
+  test('records a failure when the photo record is not found', async () => {
     const pendingRef = makePhotoRef({ status: 'pending' });
     const activeRef = makeActiveRef();
     mockFindPendingOrFailed.mockResolvedValue([pendingRef]);
@@ -246,7 +254,12 @@ describe('processBatch', () => {
     await processBatch(makeDeps());
 
     expect(mockFindById).toHaveBeenCalledWith('photo-1');
-    expect(mockUpdateStatus).not.toHaveBeenCalled();
+    expect(mockUpdateStatus).toHaveBeenCalledWith('ref-1', {
+      status: 'failed',
+      errorMessage: 'Photo record no longer exists',
+      retryCount: 1,
+      syncedAt: expect.any(Date),
+    });
   });
 
   test('successfully syncs a pending ref: downloads from source, uploads to target', async () => {

@@ -26,13 +26,24 @@ interface FuelEfficiencyResponse {
 	fuelEfficiencyTrend: FuelEfficiencyPoint[];
 }
 
-/** Get default date range: last 12 months from now (unix timestamps in seconds). */
+/**
+ * Default analytics window: the twelve local calendar months ending with TODAY, as unix seconds.
+ *
+ * Both bounds are LOCAL midnights, never the current instant. A date-only expense is stored
+ * anchored at NOON local (`dateOnlyToISO`) and the backend's upper bound is exclusive
+ * (`date < end`), so an end bound at "now" puts everything dated today in the FUTURE until the
+ * clock passes noon — a fill-up logged at 08:00 would be missing from every chart and total on the
+ * page. Ending at the start of TOMORROW covers the whole local day whatever time-of-day a row is
+ * anchored at. Same exclusive-day-after bound the list filter uses.
+ */
 export function getDefaultDateRange(): { startDate: number; endDate: number } {
 	const now = new Date();
-	const end = Math.floor(now.getTime() / 1000);
-	const start = Math.floor(
-		new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()).getTime() / 1000
-	);
+	const year = now.getFullYear();
+	const month = now.getMonth();
+	const day = now.getDate();
+	// Day/month overflow is normalized by the Date constructor, so day + 1 is rollover-safe.
+	const start = Math.floor(new Date(year - 1, month, day).getTime() / 1000);
+	const end = Math.floor(new Date(year, month, day + 1).getTime() / 1000);
 	return { startDate: start, endDate: end };
 }
 

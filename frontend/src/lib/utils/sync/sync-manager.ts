@@ -14,6 +14,7 @@ import {
 import {
 	clearSyncedExpenses,
 	getPendingExpenses,
+	INCOMPLETE_FUEL_REASON,
 	isIncompleteFuelExpense,
 	markExpenseAsSynced,
 	markExpenseNeedsAttention,
@@ -21,6 +22,7 @@ import {
 	type OfflineExpense
 } from '../offline-storage';
 import { extractErrorMessage } from '$lib/utils/error-handling';
+import { classifySyncFailure, type SyncFailureKind } from './classify-failure';
 import { apiClient } from '$lib/services/api-client';
 import { type BackendExpenseResponse, fromBackendExpense } from '$lib/services/api-transformer';
 import { browser } from '$app/environment';
@@ -47,6 +49,10 @@ interface SyncResult {
 	conflicts: SyncConflict[];
 	errors: string[];
 }
+
+// What a failed write means for the queue. Defined in ./classify-failure so this module and
+// offline-storage can share it without importing each other; re-exported here for existing callers.
+export { classifySyncFailure, type SyncFailureKind } from './classify-failure';
 
 // Fetch last sync time from server
 export async function fetchLastSyncTime(): Promise<void> {
@@ -164,16 +170,24 @@ class SyncManager {
 						this.retryCount.delete(expense.id);
 					} else if (syncResult.conflict) {
 						result.conflicts.push(syncResult.conflict);
-					} else if (syncResult.permanent) {
-						// A structurally-unsyncable row (e.g. malformed fuel entry) fails the same way every
-						// attempt. PARK it as needs-attention instead of scheduling retries — it drops out of
-						// getPendingExpenses so it's never silently re-attempted again, and is surfaced via
-						// getNeedsAttentionExpenses for the user to fix or discard. NOT counted as a transient
-						// failure (it won't self-resolve), so it doesn't flip result.success on its own.
-						markExpenseNeedsAttention(expense.id);
+					} else if (syncResult.failureKind === 'terminal') {
+						// A row the server (or the local completeness gate) rejects on its own merits fails the
+						// same way every attempt. PARK it as needs-attention instead of scheduling retries — it
+						// drops out of getPendingExpenses so it's never silently re-attempted again, and is
+						// surfaced via getNeedsAttentionExpenses for the user to fix or discard. NOT counted as a
+						// transient failure (it won't self-resolve), so it doesn't flip result.success on its own.
+						const reason = syncResult.error || 'Entry needs attention';
+						markExpenseNeedsAttention(expense.id, reason);
 						this.retryCount.delete(expense.id);
 						result.needsAttention++;
-						result.errors.push(syncResult.error || 'Entry needs attention');
+						result.errors.push(reason);
+					} else if (syncResult.failureKind === 'auth') {
+						// Signed out: the row is valid and will sync as soon as the user signs in again, so it
+						// stays pending — not parked (nothing is wrong with it) and not retried on a timer
+						// (a backoff cannot restore a session), which also keeps its retry budget intact for
+						// the real transient failures.
+						result.failed++;
+						result.errors.push(syncResult.error || 'Sign in to sync this entry');
 					} else {
 						result.failed++;
 						result.errors.push(syncResult.error || 'Unknown error');
@@ -204,8 +218,8 @@ class SyncManager {
 		success: boolean;
 		conflict?: SyncConflict;
 		error?: string;
-		/** True when the failure is structural, so retrying can never help. */
-		permanent?: boolean;
+		/** How the caller must treat the failure — see SyncFailureKind. Absent on success. */
+		failureKind?: SyncFailureKind;
 	}> {
 		try {
 			const existingExpense = await this.checkForExistingExpense(expense);
@@ -222,14 +236,9 @@ class SyncManager {
 
 			if (isIncompleteFuelExpense(expense)) {
 				// A malformed fuel row (no volume/charge or no mileage) fails IDENTICALLY on every attempt —
-				// it's permanently unsyncable until the user edits it. Flag it permanent so syncExpenses parks
-				// it (needsAttention) instead of burning retries + silently re-attempting it forever.
-				return {
-					success: false,
-					permanent: true,
-					error:
-						'Fuel expenses require volume/charge and mileage data. Please edit the expense and add the missing information.'
-				};
+				// it's unsyncable until the user edits it. Terminal, so syncExpenses parks it
+				// (needsAttention) instead of burning retries + silently re-attempting it forever.
+				return { success: false, failureKind: 'terminal', error: INCOMPLETE_FUEL_REASON };
 			}
 
 			const backendExpense = offlineExpenseToBackend(expense);
@@ -239,7 +248,11 @@ class SyncManager {
 			await apiClient.post('/api/v1/expenses', { ...backendExpense, clientId: expense.clientId });
 			return { success: true };
 		} catch (error) {
-			return { success: false, error: extractErrorMessage(error, 'Unknown error') };
+			return {
+				success: false,
+				failureKind: classifySyncFailure(error),
+				error: extractErrorMessage(error, 'Unknown error')
+			};
 		}
 	}
 
@@ -314,6 +327,11 @@ class SyncManager {
 					syncConflicts.current = [...syncConflicts.current, result.conflict];
 					syncState.current = 'error';
 				}
+			} else if (result.failureKind === 'terminal') {
+				// The retry came back with a verdict, not a transport failure: park it here exactly as the
+				// main loop would, so a row that turned out to be unsyncable stops being re-POSTed.
+				markExpenseNeedsAttention(expense.id, result.error || 'Entry needs attention');
+				this.retryCount.delete(expense.id);
 			}
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Retry failed for expense:', expense.id, error);

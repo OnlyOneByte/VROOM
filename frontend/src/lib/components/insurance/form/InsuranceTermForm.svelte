@@ -547,7 +547,7 @@
 						class="rounded-full shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 px-5 flex-shrink-0"
 					>
 						<X class="h-5 w-5 sm:mr-2" />
-						<span class="hidden sm:inline font-semibold">Cancel</span>
+						<span class="max-sm:sr-only font-semibold">Cancel</span>
 					</Button>
 
 					<Button

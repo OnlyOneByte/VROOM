@@ -7,7 +7,7 @@
 		CollapsibleContent,
 		CollapsibleTrigger
 	} from '$lib/components/ui/collapsible';
-	import { StatCardGrid } from '$lib/components/charts';
+	import StatCardGrid from '$lib/components/charts/StatCardGrid.svelte';
 	import { categoryLabels, getCategoryIcon, getCategoryColor } from '$lib/utils/expense-helpers';
 	import { formatCurrency } from '$lib/utils/formatters';
 	import type { ExpenseSummary, ExpenseCategory } from '$lib/types';

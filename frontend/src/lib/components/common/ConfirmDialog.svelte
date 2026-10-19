@@ -77,7 +77,7 @@
 				onclick={handleConfirm}
 				disabled={isWorking}
 				class={cn(
-					destructive && 'bg-destructive hover:bg-destructive/90 text-destructive-foreground'
+					destructive && 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
 				)}
 			>
 				{#if isWorking}

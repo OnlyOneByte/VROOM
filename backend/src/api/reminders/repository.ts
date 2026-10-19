@@ -405,20 +405,33 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
   }
 
   /**
-   * Transactional variant of advanceNextDueDate, also sets lastTriggeredAt.
-   * Used by the trigger service within a transaction.
+   * CLAIM one reminder period inside the caller's transaction: compare-and-swap `nextDueDate` from
+   * `expectedCurrentDueDate` to `nextDueDate` (also stamping `lastTriggeredAt`) and report whether
+   * this caller won the claim. `false` means the row no longer holds the expected value — a
+   * concurrent trigger already processed that period — and the caller MUST NOT materialize it.
+   * Returning the CAS outcome is what makes the guard real: a `.update()` whose WHERE matches
+   * nothing does not throw, so an unchecked CAS lets every racing trigger write the period's rows.
+   *
+   * SYNCHRONOUS on purpose — do NOT make this `async`, and do not call it from an async transaction
+   * callback. bun-sqlite is a sync dialect: a transaction whose callback awaits anything autocommits
+   * each statement on its own while BEGIN/COMMIT wrap nothing, so the claim and the rows it guards
+   * would be independent writes and the claim would guard nothing. `.returning().all()` executes
+   * inline inside the caller's tx, and its length is the affected-row count the CAS needs.
    */
-  async advanceNextDueDateTx(
+  claimPeriodSync(
     tx: DrizzleTransaction,
     id: string,
     expectedCurrentDueDate: Date,
     nextDueDate: Date,
     lastTriggeredAt: Date
-  ): Promise<void> {
-    await tx
+  ): boolean {
+    const claimed = tx
       .update(reminders)
       .set({ nextDueDate, lastTriggeredAt, updatedAt: new Date() })
-      .where(and(eq(reminders.id, id), eq(reminders.nextDueDate, expectedCurrentDueDate)));
+      .where(and(eq(reminders.id, id), eq(reminders.nextDueDate, expectedCurrentDueDate)))
+      .returning({ id: reminders.id })
+      .all();
+    return claimed.length > 0;
   }
 
   /**

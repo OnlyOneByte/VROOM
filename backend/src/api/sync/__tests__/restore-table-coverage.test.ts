@@ -6,7 +6,8 @@
  * data round-trips into the archive and back out to NOTHING — silent data loss on restore.
  * The restore path has THREE hand-maintained lists that must agree with the registry:
  *  1. TABLE_SCHEMA_MAP (config) — the source of truth.
- *  2. RestoreService.insertBackupData() — hand-written FK-ordered `tx.insert(<table>)` calls.
+ *  2. RestoreService.insertBackupData() — hand-written FK-ordered `insertRows(tx, <table>, …)` calls
+ *  (the batching helper that keeps each statement under SQLite's bind-parameter ceiling).
  *  3. The ImportSummary interface — one count field per table, populated by hand in BOTH
  *  restoreFromBackup and restoreFromSheets (a missing field = silent undercount in the
  *  user's "imported N rows" confirmation).
@@ -15,9 +16,9 @@
  * inserted and summarized. These guards keep it that way under autonomous development.
  *
  * Pure source/shape introspection — no DB, no createTestApp (so no DB-singleton import trap).
- * insertBackupData is private, so its table coverage is asserted by scanning the source for a
- * `.insert(<schemaExport>)` call per registry table — the same drizzle table object the
- * registry maps, resolved to its exported variable name.
+ * insertBackupData is private, so its table coverage is asserted by scanning the source for an insert
+ * of each registry table — the same drizzle table object the registry maps, resolved to its exported
+ * variable name.
  */
 
 import { describe, expect, test } from 'bun:test';
@@ -48,9 +49,12 @@ describe('restore table coverage', () => {
         missing.push(`${key} (table not found among schema exports)`);
         continue;
       }
-      // restore.ts inserts via `tx.insert(<exportName>)`. A registry table with no such
-      // insert call means the backup writes it but restore drops it — silent data loss.
-      const insertPattern = new RegExp(`\\.insert\\(\\s*${exportName}\\s*\\)`);
+      // restore.ts inserts a table through the batched helper, `insertRows(tx, <exportName>, …)`, or
+      // directly via `.insert(<exportName>)`. A registry table with neither means the backup writes it
+      // but restore drops it — silent data loss.
+      const insertPattern = new RegExp(
+        `\\.insert\\(\\s*${exportName}\\s*\\)|insertRows\\(\\s*tx,\\s*${exportName}\\s*,`
+      );
       if (!insertPattern.test(RESTORE_SRC)) {
         missing.push(`${key} → ${exportName} (getTableName: ${getTableName(table)})`);
       }
@@ -94,9 +98,10 @@ describe('restore table coverage', () => {
       reminderNotifications: 'reminders (FK reminderId → a now-probed parent)',
     };
 
-    const insertedExportNames = [...RESTORE_SRC.matchAll(/\.insert\(\s*(\w+)\s*\)/g)].map(
-      (m) => m[1]
-    );
+    const insertedExportNames = [
+      ...RESTORE_SRC.matchAll(/\.insert\(\s*(\w+)\s*\)/g),
+      ...RESTORE_SRC.matchAll(/insertRows\(\s*tx,\s*(\w+)\s*,/g),
+    ].map((m) => m[1]);
 
     const unguarded: string[] = [];
     for (const exportName of new Set(insertedExportNames)) {

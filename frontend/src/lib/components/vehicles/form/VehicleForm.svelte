@@ -880,7 +880,11 @@
 							class="rounded-full shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 px-5 flex-shrink-0"
 						>
 							<Trash2 class="h-5 w-5 sm:mr-2" />
-							<span class="hidden sm:inline font-semibold">Delete</span>
+							<!-- Clipped, not `hidden`, below `sm`: the icon is all that is left there and every Lucide
+							     icon is aria-hidden, so display:none on the text leaves the button with no accessible
+							     name at all. `max-sm:sr-only` (not `sr-only sm:not-sr-only`) because a later vendor
+							     `.sr-only` rule outranks `sm:not-sr-only` and would hide the label at every width. -->
+							<span class="max-sm:sr-only font-semibold">Delete</span>
 						</Button>
 					{/if}
 
@@ -893,7 +897,7 @@
 						class="rounded-full shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 px-5 flex-shrink-0"
 					>
 						<X class="h-5 w-5 sm:mr-2" />
-						<span class="hidden sm:inline font-semibold">Cancel</span>
+						<span class="max-sm:sr-only font-semibold">Cancel</span>
 					</Button>
 
 					<Button
@@ -954,7 +958,7 @@
 					<AlertDialogAction
 						onclick={handleDelete}
 						disabled={isDeleting}
-						class="bg-destructive hover:bg-destructive/90"
+						class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
 					>
 						{#if isDeleting}
 							<LoaderCircle class="h-4 w-4 animate-spin mr-2" />

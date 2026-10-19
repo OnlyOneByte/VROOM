@@ -12,6 +12,7 @@ import { getClientIp } from '../../utils/client-ip';
 import { encrypt } from '../../utils/encryption';
 import { logger } from '../../utils/logger';
 import { storePending } from '../../utils/pending-credentials';
+import { readJsonBody } from '../../utils/request-body';
 import { authProviderRepository, buildAuthProviderConfig } from './auth-provider-repository';
 import { getLucia, googleProvider } from './lucia';
 import { getEnabledProvider, getEnabledProviders, getProvider } from './providers/registry';
@@ -527,14 +528,9 @@ routes.get('/me', async (c) => {
 routes.patch('/me', requireAuth, async (c) => {
   const user = c.get('user');
 
-  let body: unknown;
-  try {
-    body = await c.req.json();
-  } catch {
-    throw new HTTPException(400, { message: 'Invalid JSON body' });
-  }
+  const body = await readJsonBody<{ displayName?: unknown }>(c);
 
-  const displayNameRaw = (body as { displayName?: unknown })?.displayName;
+  const displayNameRaw = body?.displayName;
   if (typeof displayNameRaw !== 'string') {
     throw new HTTPException(400, { message: 'displayName is required' });
   }

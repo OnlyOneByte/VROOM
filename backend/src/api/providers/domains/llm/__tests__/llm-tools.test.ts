@@ -77,8 +77,9 @@ describe('assistant tool layer — userId scoping (the confused-deputy core, T2)
       NOW_MS
     )) as { totalAmount: number; expenseCount: number };
     // Only the session user's single expense is counted — the other user's huge expense is invisible.
+    // Totals arrive in DOLLARS (the stored 5000 cents), as the HTTP summary route reports them.
     expect(summary.expenseCount).toBe(1);
-    expect(summary.totalAmount).toBe(5000);
+    expect(summary.totalAmount).toBe(50);
   });
 
   test("a model-supplied vehicleId for ANOTHER user's vehicle is rejected (confused-deputy guard)", async () => {
@@ -112,7 +113,7 @@ describe('assistant tool layer — userId scoping (the confused-deputy core, T2)
       ctx.user.id,
       NOW_MS
     )) as { totalAmount: number };
-    expect(summary.totalAmount).toBe(7500);
+    expect(summary.totalAmount).toBe(75); // dollars, from the stored 7500 cents
   });
 });
 

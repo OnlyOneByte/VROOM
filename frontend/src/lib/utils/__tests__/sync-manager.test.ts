@@ -20,6 +20,9 @@ vi.mock('../offline-storage', async () => {
 		// offlineExpenseToBackend, NOT a stub: stubbing it would make the sync paths skip the
 		// genuine fuel-completeness gate and assert against a fake.
 		isIncompleteFuelExpense: actual.isIncompleteFuelExpense,
+		// The user-facing explanation that travels with a row parked by that predicate — a plain
+		// constant, passed through for the same reason: a stub would let the tests assert fake wording.
+		INCOMPLETE_FUEL_REASON: actual.INCOMPLETE_FUEL_REASON,
 		loadOfflineExpenses,
 		saveOfflineExpenses: vi.fn(),
 		markExpenseAsSynced: vi.fn(),
@@ -375,7 +378,11 @@ describe('Sync Manager', () => {
 				// Parked, not failed-transiently: surfaced via needsAttention, retryCount untouched.
 				expect(result.needsAttention).toBe(1);
 				expect(result.failed).toBe(0);
-				expect(vi.mocked(markExpenseNeedsAttention)).toHaveBeenCalledWith('malformed-1');
+				// Parked WITH its reason: the card that surfaces the row has to explain what to fix.
+				expect(vi.mocked(markExpenseNeedsAttention)).toHaveBeenCalledWith(
+					'malformed-1',
+					expect.stringContaining('volume/charge and mileage')
+				);
 				expect(syncManager.getRetryCount('malformed-1')).toBe(0); // NO retry tracked
 				// No RETRY-backoff timer scheduled (the 3000ms idle reset is fine; retry delays are 100/200/…).
 				const RETRY_DELAYS = new Set([100, 200, 400, 800]);

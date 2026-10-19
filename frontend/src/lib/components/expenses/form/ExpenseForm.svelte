@@ -5,6 +5,8 @@
 	import { gotoDynamic, gotoWithQuery } from '$lib/utils/navigation';
 	import { onlineStatus } from '$lib/stores/offline.svelte';
 	import { addOfflineExpense } from '$lib/utils/offline-storage';
+	import { classifySyncFailure, type SyncFailureKind } from '$lib/utils/sync/sync-manager';
+	import { extractErrorMessage } from '$lib/utils/error-handling';
 	import { appStore } from '$lib/stores/app.svelte';
 	import { settingsStore } from '$lib/stores/settings.svelte';
 	import { expenseApi } from '$lib/services/expense-api';
@@ -111,6 +113,10 @@
 	let showDeleteConfirm = $state(false);
 	let vehicles = $state<Vehicle[]>([]);
 	let errors = $state<ExpenseFormErrors>({});
+	// Form-level failure of the LAST submit (a server rejection, or a device that cannot store the
+	// entry). Field errors live in `errors`; this is for the failures no single field owns, and it is
+	// rendered next to Save because the user stays on the form when it is set.
+	let submitError = $state<string | null>(null);
 	let touched = $state<Record<string, boolean>>({});
 	let originalExpense = $state<Expense | null>(null);
 	let vehicle = $state<Vehicle | null>(null);
@@ -512,6 +518,29 @@
 		return Object.keys(errors).length === 0;
 	}
 
+	/**
+	 * What to tell the user about a submit that could NOT be queued for later delivery, so they stay
+	 * on the form with their data instead of being sent away believing it was saved.
+	 */
+	function submitFailureMessage(kind: SyncFailureKind, error: unknown): string {
+		if (kind === 'auth') return 'Your session has expired. Please sign in again.';
+		if (kind === 'transient') return 'Network error. Please try again.';
+		// A terminal rejection carries the server's own reason — the only message that tells the user
+		// what to change.
+		return extractErrorMessage(error, 'Could not save this expense. Please try again.');
+	}
+
+	/**
+	 * The offline outbox write itself failed (site data blocked, or the device is out of storage), so
+	 * nothing about this expense survives a navigation. Say so and keep the user on the filled-in form.
+	 */
+	function reportUnqueuedSave(): void {
+		submitError =
+			'This device could not store the expense — storage is full or site data is blocked. ' +
+			'Your entry is still on this form: try again, or copy the values before leaving the page.';
+		appStore.addNotification({ type: 'error', message: submitError });
+	}
+
 	async function handleSubmit() {
 		if (!validateForm()) {
 			Object.keys(formData).forEach(field => {
@@ -521,6 +550,7 @@
 		}
 
 		isSubmitting = true;
+		submitError = null;
 
 		// Convert the date-input value to an ISO timestamp at noon local time to avoid a timezone
 		// day-shift (see dateOnlyToISO). Shared with VehicleForm/odometer so all forms agree, and
@@ -606,7 +636,7 @@
 					gotoDynamic(returnTo);
 				} else {
 					// Save offline
-					addOfflineExpense({
+					const queued = addOfflineExpense({
 						vehicleId: expenseData.vehicleId,
 						tags: expenseData.tags,
 						category: expenseData.category,
@@ -624,6 +654,11 @@
 						})
 					});
 
+					if (!queued) {
+						reportUnqueuedSave();
+						return;
+					}
+
 					// syncManager's `online` listener delivers this; see the note in $lib/utils/pwa.
 					appStore.addNotification({
 						type: 'info',
@@ -636,7 +671,13 @@
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to save expense:', error);
 
-			if (!isEditMode) {
+			// A failure the SERVER decided (a validation rejection, a deleted vehicle, a revoked share)
+			// is not a connection problem: the outbox would re-POST it forever and never succeed, so it
+			// belongs on screen, next to the data that caused it. Only a failure that can still succeed
+			// later — no response, a timeout, a 5xx, or an expired session — may be queued.
+			const failureKind = classifySyncFailure(error);
+
+			if (!isEditMode && failureKind !== 'terminal') {
 				// Save offline as fallback for new expenses
 				const expenseData = {
 					vehicleId: formData.vehicleId,
@@ -653,7 +694,7 @@
 					missedFillup: formData.missedFillup
 				};
 
-				addOfflineExpense({
+				const queued = addOfflineExpense({
 					vehicleId: expenseData.vehicleId,
 					tags: expenseData.tags,
 					category: expenseData.category,
@@ -672,18 +713,24 @@
 					...(expenseData.missedFillup !== undefined && { missedFillup: expenseData.missedFillup })
 				});
 
+				if (!queued) {
+					reportUnqueuedSave();
+					return;
+				}
+
 				// syncManager's `online` listener delivers this; see the note in $lib/utils/pwa.
 				appStore.addNotification({
 					type: 'warning',
-					message: 'Saved offline due to connection issue. Will sync when online.'
+					message:
+						failureKind === 'auth'
+							? 'Signed out — saved on this device. Sign in to sync it.'
+							: 'Saved offline due to connection issue. Will sync when online.'
 				});
 
 				gotoDynamic(returnTo);
 			} else {
-				appStore.addNotification({
-					type: 'error',
-					message: 'Network error. Please try again.'
-				});
+				submitError = submitFailureMessage(failureKind, error);
+				appStore.addNotification({ type: 'error', message: submitError });
 			}
 		} finally {
 			isSubmitting = false;
@@ -1303,6 +1350,12 @@
 						onRemove={i => (pendingFiles = pendingFiles.filter((_, idx) => idx !== i))}
 					/>
 				{/if}
+
+				{#if submitError}
+					<FormFieldError data-testid="submit-error" class="rounded-md bg-destructive/10 p-3">
+						{submitError}
+					</FormFieldError>
+				{/if}
 			</form>
 
 			<!-- Floating Action Bar -->
@@ -1321,7 +1374,11 @@
 							class="sm:rounded-full rounded-full shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 sm:h-14 px-5 border-0 flex-shrink-0"
 						>
 							<Trash2 class="h-5 w-5 sm:mr-2" />
-							<span class="hidden sm:inline font-semibold">Delete</span>
+							<!-- Clipped, not `hidden`, below `sm`: the icon is all that is left there and every Lucide
+							     icon is aria-hidden, so display:none on the text leaves the button with no accessible
+							     name at all. `max-sm:sr-only` (not `sr-only sm:not-sr-only`) because a later vendor
+							     `.sr-only` rule outranks `sm:not-sr-only` and would hide the label at every width. -->
+							<span class="max-sm:sr-only font-semibold">Delete</span>
 						</Button>
 					{/if}
 
@@ -1331,11 +1388,10 @@
 							variant="outline"
 							onclick={handleDuplicate}
 							disabled={isSubmitting || isDeleting}
-							class="sm:rounded-full rounded-full shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 sm:h-14 px-5 border-0 flex-shrink-0"
-							aria-label="Duplicate this expense"
+							class="sm:rounded-full rounded-full shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 sm:h-14 px-5 flex-shrink-0"
 						>
 							<Copy class="h-5 w-5 sm:mr-2" />
-							<span class="hidden sm:inline font-semibold">Duplicate</span>
+							<span class="max-sm:sr-only font-semibold">Duplicate</span>
 						</Button>
 					{/if}
 
@@ -1344,10 +1400,10 @@
 						variant="outline"
 						onclick={handleBack}
 						disabled={isSubmitting || isDeleting}
-						class="sm:rounded-full rounded-full bg-muted-foreground hover:bg-muted-foreground/80 text-background shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 sm:h-14 px-5 border-0 flex-shrink-0"
+						class="sm:rounded-full rounded-full shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 sm:h-14 px-5 flex-shrink-0"
 					>
 						<X class="h-5 w-5 sm:mr-2" />
-						<span class="hidden sm:inline font-semibold">Cancel</span>
+						<span class="max-sm:sr-only font-semibold">Cancel</span>
 					</Button>
 
 					<Button

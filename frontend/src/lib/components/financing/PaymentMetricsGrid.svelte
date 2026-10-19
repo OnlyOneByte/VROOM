@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { StatCardGrid } from '$lib/components/charts';
+	import StatCardGrid from '$lib/components/charts/StatCardGrid.svelte';
 	import { Banknote, Calendar, TrendingUp, Hash, DollarSign, TriangleAlert } from '@lucide/svelte';
 	import { formatCurrency, formatDate } from '$lib/utils/formatters';
 	import { getDistanceUnitLabel } from '$lib/utils/units';

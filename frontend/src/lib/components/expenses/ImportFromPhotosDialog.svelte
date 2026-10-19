@@ -81,16 +81,28 @@
 		};
 	}
 
-	/** Open-gate: when the dialog opens, gate the FIRST-ever sweep behind the R7/D1 disclosure. */
+	/**
+	 * Open-gate: sweep ONCE per open transition, gating the FIRST-ever sweep behind the R7/D1
+	 * disclosure. The key is the open state itself — NOT the sweep's result. Inferring "not swept
+	 * yet" from `rows.length === 0 && !isLoading && !loadError` re-armed this effect after every
+	 * sweep that found nothing (the steady state once everything is imported), and since the effect
+	 * also writes those three signals it re-entered immediately: one album search + VLM-filter pass
+	 * per round trip, forever, for as long as the dialog stayed open. Keying on the transition
+	 * sweeps exactly once however the sweep ends, and re-arms when the dialog is closed and
+	 * reopened. (The sibling dialogs use this same lastKey idiom.)
+	 */
+	let lastOpenKey = '';
 	$effect(() => {
-		if (open && rows.length === 0 && !isLoading && !loadError) {
-			const disclosed =
-				typeof localStorage !== 'undefined' && localStorage.getItem(DISCLOSURE_KEY) === '1';
-			if (disclosed) {
-				void sweep();
-			} else {
-				showDisclosure = true;
-			}
+		const key = String(open);
+		if (key === lastOpenKey) return;
+		lastOpenKey = key;
+		if (!open) return;
+		const disclosed =
+			typeof localStorage !== 'undefined' && localStorage.getItem(DISCLOSURE_KEY) === '1';
+		if (disclosed) {
+			void sweep();
+		} else {
+			showDisclosure = true;
 		}
 	});
 
@@ -107,6 +119,9 @@
 	async function sweep() {
 		isLoading = true;
 		loadError = null;
+		// Drop any previous open's review rows up front, so a re-open never shows stale drafts
+		// behind the new sweep.
+		rows = [];
 		try {
 			const drafts = await photosImportApi.getReceiptDrafts();
 			rows = drafts.map(toRow);

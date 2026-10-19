@@ -13,7 +13,12 @@ import {
 import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { neutralizeCsvRow } from '../../utils/csv-safety';
-import { centsToDollars, expenseToApi, moneyDollarsToCents } from '../../utils/money';
+import {
+  centsToDollars,
+  expenseSummaryToApi,
+  expenseToApi,
+  moneyDollarsToCents,
+} from '../../utils/money';
 import { buildPaginatedResponse, clampPagination } from '../../utils/pagination';
 import {
   requireVehicleRead,
@@ -559,22 +564,10 @@ routes.get('/summary', zValidator('query', summaryQuerySchema), async (c) => {
     period,
   });
 
-  // T6 display edge: every money field in the summary is cents-denominated (sums + the monthlyAverage
-  // cents/month) → dollars for the FE. counts/periods/categories are untouched.
-  return c.json({
-    success: true,
-    data: {
-      ...summary,
-      totalAmount: centsToDollars(summary.totalAmount),
-      monthlyAverage: centsToDollars(summary.monthlyAverage),
-      recentAmount: centsToDollars(summary.recentAmount),
-      categoryBreakdown: summary.categoryBreakdown.map((r) => ({
-        ...r,
-        amount: centsToDollars(r.amount),
-      })),
-      monthlyTrend: summary.monthlyTrend.map((r) => ({ ...r, amount: centsToDollars(r.amount) })),
-    },
-  });
+  // Display edge: every money field in the summary is cents-denominated (the sums + the monthlyAverage
+  // cents/month) → dollars for the FE; counts/periods/categories are untouched. Going through the shared
+  // mapper is what keeps this identical to the assistant tool that answers the same question.
+  return c.json({ success: true, data: expenseSummaryToApi(summary) });
 });
 
 // GET /api/expenses/export - Download all matching expenses as CSV.

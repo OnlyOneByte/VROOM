@@ -10,7 +10,11 @@
  *  the model can only ever read the requesting user's own rows (ARCC confused-deputy guard);
  *  - typed + bounded — `args` is a Zod schema; the orchestrator parses the model's raw JSON args through
  *  it BEFORE calling `run`, and passes a typed OBJECT to the existing repo (ARCC AIQi: build queries as
- *  objects, never concatenate model text). An out-of-set `range`/bad arg is rejected, not coerced.
+ *  objects, never concatenate model text). An out-of-set `range`/bad arg is rejected, not coerced;
+ *  - DOLLAR-denominated — every tool pairs its repository read with the SAME cents→dollars display-edge
+ *  transform the matching HTTP route applies (see `defineTool`). Money is stored and summed in integer
+ *  cents, and the model is told the amounts are already in the user's currency, so a tool that returned
+ *  raw cents would make the assistant state every figure 100x too large.
  * A model-supplied `vehicleId` is re-checked via `requireVehicleRead(vehicleId, userId)` (throws
  * NotFoundError on no-access — existence-hiding) so it can never widen scope to another user's vehicle.
  *
@@ -19,7 +23,19 @@
  */
 
 import { z } from 'zod';
+import {
+  expenseSummaryToApi,
+  reminderWithVehiclesToApi,
+  vehicleRowToApi,
+} from '../../../../utils/money';
 import { requireVehicleRead, resolveVehicleOwnerId } from '../../../../utils/sharing';
+import {
+  analyticsSummaryToApi,
+  crossVehicleToApi,
+  financingToApi as financingAnalyticsToApi,
+  fuelStatsToApi,
+  insuranceToApi,
+} from '../../../analytics/api-transform';
 import { analyticsRepository } from '../../../analytics/repository';
 import { expenseRepository } from '../../../expenses/repository';
 import { reminderRepository } from '../../../reminders/repository';
@@ -91,10 +107,46 @@ export interface AssistantTool<A = unknown> {
 }
 
 /**
+ * How ONE tool is declared: the userId-scoped repository read PLUS the display-edge transform that
+ * projects its result into the API's dollar contract. The split is what makes that contract structural
+ * rather than remembered — `toApi` is REQUIRED, so a tool added later cannot hand the model raw integer
+ * cents by forgetting a conversion, and the transform is the very function the matching HTTP route
+ * applies (never a second copy of the maths, which is how the two surfaces diverge).
+ */
+interface AssistantToolSpec<A, R> {
+  name: string;
+  description: string;
+  schema: z.ZodType<A>;
+  /** Read the data userId-scoped. Money comes back in integer CENTS (the repository contract). */
+  read(args: A, userId: string, nowMs: number): Promise<R>;
+  /** The SAME cents→dollars mapper the HTTP route for this shape uses. */
+  toApi(data: R): unknown;
+}
+
+/** Compose a spec into a tool: `run` is `read` followed by the mandatory display-edge transform. */
+function defineTool<A, R>(spec: AssistantToolSpec<A, R>): AssistantTool<A> {
+  return {
+    name: spec.name,
+    description: spec.description,
+    schema: spec.schema,
+    run: async (args, userId, nowMs) => spec.toApi(await spec.read(args, userId, nowMs)),
+  };
+}
+
+/**
  * Validate a model-supplied vehicleId against the SESSION user — the confused-deputy guard. Returns the
- * scope id (the vehicle's owner, since shared rows are owner-stamped) when the user may read it; throws
- * NotFoundError otherwise (existence-hiding — a stranger cannot tell "not yours" from "does not exist").
- * `undefined` vehicleId → the user's own id (fleet-wide scope).
+ * scope id to query BY: the vehicle's OWNER, because a shared vehicle's expense/fuel rows are
+ * owner-stamped, so scoping a per-vehicle question to the acting user would report zeros to a sharee for
+ * data the API shows them. Throws NotFoundError when the user cannot read the vehicle (existence-hiding
+ * — a stranger cannot tell "not yours" from "does not exist"). The vehicleId+ownerId pin means only THAT
+ * vehicle's rows surface, never the owner's other vehicles. This mirrors the HTTP routes exactly
+ * (expenses `/summary`, the per-vehicle analytics).
+ *
+ * `undefined` vehicleId → the acting user's own id. The fleet-wide tools are therefore acting-user-owned
+ * and, like `GET /vehicles` without `include=shared`, never mention a vehicle shared TO the user: a
+ * sharee reaches a shared vehicle by naming its id, not by it appearing in their fleet. Deliberate —
+ * widening the fleet-wide surface would both double-count a co-owned fleet's totals and ship the other
+ * user's display name to the configured LLM provider.
  */
 async function resolveScope(vehicleId: string | undefined, userId: string): Promise<string> {
   if (!vehicleId) return userId;
@@ -110,77 +162,88 @@ async function resolveScope(vehicleId: string | undefined, userId: string): Prom
  * dumps (data-minimization, D4) — the FE/model gets totals + breakdowns, not every expense row.
  */
 const TOOL_LIST: AssistantTool[] = [
-  {
+  defineTool({
     name: 'listVehicles',
     description:
       "List the user's vehicles (make, model, year, nickname) with any financing summary.",
     schema: emptyArgs,
-    run: async (_args, userId) => vehicleRepository.findByUserId(userId),
-  },
-  {
+    read: async (_args, userId) => vehicleRepository.findByUserId(userId),
+    toApi: (rows) => rows.map(vehicleRowToApi),
+  }),
+  defineTool({
     name: 'getExpenseSummary',
     description:
       'Total spend, expense count, monthly average, and a per-category breakdown over a time range. ' +
       'Optionally scoped to one vehicle.',
     schema: rangeVehicleArgs,
-    run: async (args: z.infer<typeof rangeVehicleArgs>, userId) => {
-      // A model-supplied vehicleId is scope-checked (confused-deputy guard) before it reaches the repo.
-      if (args.vehicleId) await resolveScope(args.vehicleId, userId);
+    read: async (args: z.infer<typeof rangeVehicleArgs>, userId) => {
+      // A model-supplied vehicleId is scope-checked (confused-deputy guard) and resolved to the books
+      // that own the vehicle's rows BEFORE it reaches the repo — see resolveScope.
+      const scopeId = await resolveScope(args.vehicleId, userId);
       return expenseRepository.getSummary({
-        userId,
+        userId: scopeId,
         period: toExpensePeriod(args.range),
         ...(args.vehicleId ? { vehicleId: args.vehicleId } : {}),
       });
     },
-  },
-  {
+    toApi: expenseSummaryToApi,
+  }),
+  defineTool({
     name: 'getFuelStats',
     description:
       'Fuel/efficiency statistics (MPG or mi/kWh, cost per mile, fill-up counts) over a time range. ' +
       'Optionally scoped to one vehicle.',
     schema: rangeVehicleArgs,
-    run: async (args: z.infer<typeof rangeVehicleArgs>, userId, nowMs) => {
-      const range = resolveRange(args.range, nowMs);
-      // getFuelStats is userId-scoped; a vehicleId narrows it — scope-check it first.
-      if (args.vehicleId) await resolveScope(args.vehicleId, userId);
-      return analyticsRepository.getFuelStats(userId, range, args.vehicleId);
+    read: async (args: z.infer<typeof rangeVehicleArgs>, userId, nowMs) => {
+      const scopeId = await resolveScope(args.vehicleId, userId);
+      return analyticsRepository.getFuelStats(
+        scopeId,
+        resolveRange(args.range, nowMs),
+        args.vehicleId
+      );
     },
-  },
-  {
+    toApi: fuelStatsToApi,
+  }),
+  defineTool({
     name: 'getAnalyticsSummary',
     description:
       'A combined quick-stats + fuel-stats overview across all vehicles over a time range.',
     schema: rangeArgs,
-    run: async (args: z.infer<typeof rangeArgs>, userId, nowMs) =>
+    read: async (args: z.infer<typeof rangeArgs>, userId, nowMs) =>
       analyticsRepository.getSummary(userId, resolveRange(args.range, nowMs)),
-  },
-  {
+    toApi: analyticsSummaryToApi,
+  }),
+  defineTool({
     name: 'getCrossVehicle',
     description:
       'Compare all vehicles head-to-head over a time range (spend, efficiency, cost-per-mile per vehicle).',
     schema: rangeArgs,
-    run: async (args: z.infer<typeof rangeArgs>, userId, nowMs) =>
+    read: async (args: z.infer<typeof rangeArgs>, userId, nowMs) =>
       analyticsRepository.getCrossVehicle(userId, resolveRange(args.range, nowMs)),
-  },
-  {
+    toApi: crossVehicleToApi,
+  }),
+  defineTool({
     name: 'getFinancingState',
     description: "The user's loan/lease state per vehicle: balances, payments, payoff progress.",
     schema: emptyArgs,
-    run: async (_args, userId) => analyticsRepository.getFinancing(userId),
-  },
-  {
+    read: async (_args, userId) => analyticsRepository.getFinancing(userId),
+    toApi: financingAnalyticsToApi,
+  }),
+  defineTool({
     name: 'getInsuranceState',
     description: "The user's insurance policies/terms per vehicle and upcoming expirations.",
     schema: emptyArgs,
-    run: async (_args, userId) => analyticsRepository.getInsurance(userId),
-  },
-  {
+    read: async (_args, userId) => analyticsRepository.getInsurance(userId),
+    toApi: insuranceToApi,
+  }),
+  defineTool({
     name: 'getUpcomingReminders',
     description:
       'Active reminders (service intervals, registration, etc.) and when they are next due.',
     schema: emptyArgs,
-    run: async (_args, userId) => reminderRepository.findByUserId(userId, { isActive: true }),
-  },
+    read: async (_args, userId) => reminderRepository.findByUserId(userId, { isActive: true }),
+    toApi: (rows) => rows.map(reminderWithVehiclesToApi),
+  }),
 ];
 
 /** The allowlist as a name→tool map (the orchestrator's lookup). Frozen — the model cannot add to it. */

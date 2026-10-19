@@ -3,7 +3,8 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart';
 	import { Badge } from '$lib/components/ui/badge';
-	import { AppLineChart, AppBarChart, StatCardGrid } from '$lib/components/charts';
+	import { AppLineChart, AppBarChart } from '$lib/components/charts';
+	import StatCardGrid from '$lib/components/charts/StatCardGrid.svelte';
 	import type { InsuranceResponse } from '$lib/types';
 	import { formatCurrency } from '$lib/utils/formatters';
 	import { parseMonthToDate } from '$lib/utils/chart-formatters';

@@ -9,7 +9,8 @@
 	import { Progress } from '$lib/components/ui/progress';
 	import { analyticsApi, getDefaultDateRange } from '$lib/services/analytics-api';
 	import { vehicleApi } from '$lib/services/vehicle-api';
-	import { AppPieChart, StatCardGrid } from '$lib/components/charts';
+	import { AppPieChart } from '$lib/components/charts';
+	import StatCardGrid from '$lib/components/charts/StatCardGrid.svelte';
 	import { buildCategoryPieData } from '$lib/utils/chart-colors';
 	import type {
 		Vehicle,

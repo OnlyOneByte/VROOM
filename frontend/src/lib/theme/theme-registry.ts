@@ -29,6 +29,12 @@ const DEFAULT_SWATCH: ThemeTokenKey[] = ['primary', 'accent', 'background', 'for
  * with its id/label/description + light/dark maps; `swatch` is OPTIONAL (defaults to {@link DEFAULT_SWATCH},
  * a theme may still pass its own for a characterful preview). This makes "builtin + default swatch" the
  * un-forgettable default so a future palette registration can not omit `source` or mis-shape the object.
+ *
+ * One palette rule is easy to miss when authoring a new theme: `destructive` is read BOTH as ink
+ * (`text-destructive` error copy, over `card`/`background`/`popover`/`muted`) and as a fill whose label is
+ * `destructive-foreground`. So a dark variant needs a LIGHT red with a DARK foreground, and a light variant
+ * the reverse — every variant here sets `destructive-foreground` to its own `background` for that reason.
+ * theme-contrast.test.ts holds both roles to AA, so a palette that gets this wrong fails before merge.
  */
 function defineBuiltinTheme(
 	def: Pick<ThemeDefinition, 'id' | 'label' | 'description' | 'light' | 'dark'> & {
@@ -63,6 +69,7 @@ const DEFAULT_LIGHT: ThemeTokens = {
 	accent: 'oklch(0.967 0.001 286.375)',
 	'accent-foreground': 'oklch(0.21 0.006 285.885)',
 	destructive: 'oklch(0.505 0.22 27.325)',
+	'destructive-foreground': 'oklch(1 0 0)',
 	warning: 'oklch(0.52 0.12 75)',
 	border: 'oklch(0.92 0.004 286.32)',
 	input: 'oklch(0.92 0.004 286.32)',
@@ -102,6 +109,7 @@ const DEFAULT_DARK: ThemeTokens = {
 	accent: 'oklch(0.274 0.006 286.033)',
 	'accent-foreground': 'oklch(0.985 0 0)',
 	destructive: 'oklch(0.704 0.191 22.216)',
+	'destructive-foreground': 'oklch(0.141 0.005 285.823)',
 	warning: 'oklch(0.8 0.13 80)',
 	border: 'oklch(1 0 0 / 10%)',
 	input: 'oklch(1 0 0 / 15%)',
@@ -134,7 +142,7 @@ const DEFAULT_THEME: ThemeDefinition = defineBuiltinTheme({
 
 /**
  * `blueprint` light palette — an engineering "whiteprint": navy ink on pale drafting-paper blue. Distilled
- * from the ryang.dev blueprint mock (cyan-on-navy schematic) into VROOM's 32 tokens, then AA-tuned: every
+ * from the ryang.dev blueprint mock (cyan-on-navy schematic) into VROOM's token set, then AA-tuned: every
  * foreground/background pair clears WCAG AA 4.5 (verified by theme-contrast.test.ts, the D4 hard gate).
  */
 const BLUEPRINT_LIGHT: ThemeTokens = {
@@ -153,6 +161,7 @@ const BLUEPRINT_LIGHT: ThemeTokens = {
 	accent: 'oklch(0.9 0.04 235)',
 	'accent-foreground': 'oklch(0.3 0.05 245)',
 	destructive: 'oklch(0.52 0.22 27)',
+	'destructive-foreground': 'oklch(0.98 0.01 230)',
 	warning: 'oklch(0.55 0.13 75)',
 	border: 'oklch(0.85 0.03 235)',
 	input: 'oklch(0.85 0.03 235)',
@@ -194,7 +203,8 @@ const BLUEPRINT_DARK: ThemeTokens = {
 	'muted-foreground': 'oklch(0.76 0.05 233)',
 	accent: 'oklch(0.34 0.05 240)',
 	'accent-foreground': 'oklch(0.93 0.03 230)',
-	destructive: 'oklch(0.62 0.21 25)',
+	destructive: 'oklch(0.72 0.21 25)',
+	'destructive-foreground': 'oklch(0.22 0.04 245)',
 	warning: 'oklch(0.8 0.13 80)',
 	border: 'oklch(0.4 0.05 240)',
 	input: 'oklch(0.4 0.05 240)',
@@ -227,7 +237,7 @@ const BLUEPRINT_THEME: ThemeDefinition = defineBuiltinTheme({
 
 /**
  * `bento` light palette — a clean bento-light: soft-grey canvas, white card panels, the mock's violet/blue
- * accent family. Distilled from the ryang.dev bento mock (a modular dark dashboard) into VROOM's 32 tokens,
+ * accent family. Distilled from the ryang.dev bento mock (a modular dark dashboard) into VROOM's token set,
  * AA-tuned (every fg/bg pair clears WCAG AA 4.5 — theme-contrast.test.ts).
  */
 const BENTO_LIGHT: ThemeTokens = {
@@ -246,6 +256,7 @@ const BENTO_LIGHT: ThemeTokens = {
 	accent: 'oklch(0.9 0.05 300)',
 	'accent-foreground': 'oklch(0.3 0.04 300)',
 	destructive: 'oklch(0.52 0.22 27)',
+	'destructive-foreground': 'oklch(0.97 0.005 265)',
 	warning: 'oklch(0.55 0.13 75)',
 	border: 'oklch(0.88 0.01 265)',
 	input: 'oklch(0.88 0.01 265)',
@@ -287,7 +298,8 @@ const BENTO_DARK: ThemeTokens = {
 	'muted-foreground': 'oklch(0.72 0.02 265)',
 	accent: 'oklch(0.7 0.13 300)',
 	'accent-foreground': 'oklch(0.18 0.02 300)',
-	destructive: 'oklch(0.62 0.21 25)',
+	destructive: 'oklch(0.72 0.21 25)',
+	'destructive-foreground': 'oklch(0.17 0.012 265)',
 	warning: 'oklch(0.8 0.13 80)',
 	border: 'oklch(0.3 0.016 265)',
 	input: 'oklch(0.3 0.016 265)',
@@ -320,7 +332,7 @@ const BENTO_THEME: ThemeDefinition = defineBuiltinTheme({
 
 /**
  * `vaporwave` light palette — a soft-lavender vaporwave-light: pale magenta canvas, the neon-magenta brand,
- * a cyan accent. Distilled from the ryang.dev CRT/vaporwave mock into VROOM's 32 tokens, AA-tuned (every
+ * a cyan accent. Distilled from the ryang.dev CRT/vaporwave mock into VROOM's token set, AA-tuned (every
  * fg/bg pair clears WCAG AA 4.5 — theme-contrast.test.ts). D7 token-only: the palette, not scanline/glow effects.
  */
 const VAPORWAVE_LIGHT: ThemeTokens = {
@@ -339,6 +351,7 @@ const VAPORWAVE_LIGHT: ThemeTokens = {
 	accent: 'oklch(0.9 0.08 220)',
 	'accent-foreground': 'oklch(0.34 0.12 230)',
 	destructive: 'oklch(0.52 0.22 25)',
+	'destructive-foreground': 'oklch(0.97 0.02 320)',
 	warning: 'oklch(0.55 0.13 75)',
 	border: 'oklch(0.88 0.04 320)',
 	input: 'oklch(0.88 0.04 320)',
@@ -380,7 +393,8 @@ const VAPORWAVE_DARK: ThemeTokens = {
 	'muted-foreground': 'oklch(0.8 0.08 320)',
 	accent: 'oklch(0.45 0.13 230)',
 	'accent-foreground': 'oklch(0.95 0.05 220)',
-	destructive: 'oklch(0.62 0.23 18)',
+	destructive: 'oklch(0.72 0.23 18)',
+	'destructive-foreground': 'oklch(0.22 0.11 310)',
 	warning: 'oklch(0.82 0.14 85)',
 	border: 'oklch(0.42 0.14 330)',
 	input: 'oklch(0.4 0.13 320)',
@@ -413,7 +427,7 @@ const VAPORWAVE_THEME: ThemeDefinition = defineBuiltinTheme({
 
 /**
  * `cyberpunk` light palette — a clean cyberpunk-light: pale blue-grey canvas, the cyan brand, a magenta
- * accent. Distilled from the ryang.dev cyberpunk mock into VROOM's 32 tokens, AA-tuned (theme-contrast.test.ts).
+ * accent. Distilled from the ryang.dev cyberpunk mock into VROOM's token set, AA-tuned (theme-contrast.test.ts).
  * D7 token-only: the palette, not the scanline/chromatic-aberration effects.
  */
 const CYBERPUNK_LIGHT: ThemeTokens = {
@@ -432,6 +446,7 @@ const CYBERPUNK_LIGHT: ThemeTokens = {
 	accent: 'oklch(0.9 0.07 350)',
 	'accent-foreground': 'oklch(0.35 0.12 350)',
 	destructive: 'oklch(0.52 0.22 25)',
+	'destructive-foreground': 'oklch(0.97 0.01 220)',
 	warning: 'oklch(0.55 0.13 75)',
 	border: 'oklch(0.87 0.02 225)',
 	input: 'oklch(0.87 0.02 225)',
@@ -473,7 +488,8 @@ const CYBERPUNK_DARK: ThemeTokens = {
 	'muted-foreground': 'oklch(0.72 0.04 225)',
 	accent: 'oklch(0.55 0.24 350)',
 	'accent-foreground': 'oklch(0.98 0.01 350)',
-	destructive: 'oklch(0.62 0.23 18)',
+	destructive: 'oklch(0.72 0.23 18)',
+	'destructive-foreground': 'oklch(0.16 0.02 240)',
 	warning: 'oklch(0.82 0.16 80)',
 	border: 'oklch(0.32 0.04 235)',
 	input: 'oklch(0.3 0.035 238)',
@@ -506,7 +522,7 @@ const CYBERPUNK_THEME: ThemeDefinition = defineBuiltinTheme({
 
 /**
  * `aurora` light palette — a clean aurora-light: near-white canvas, the aurora-blue brand, a teal accent.
- * Distilled from the ryang.dev Glass/Aurora mock into VROOM's 32 tokens, AA-tuned (theme-contrast.test.ts).
+ * Distilled from the ryang.dev Glass/Aurora mock into VROOM's token set, AA-tuned (theme-contrast.test.ts).
  * D7 token-only: the palette, not the gradient-mesh / backdrop-blur effects.
  */
 const AURORA_LIGHT: ThemeTokens = {
@@ -525,6 +541,7 @@ const AURORA_LIGHT: ThemeTokens = {
 	accent: 'oklch(0.88 0.08 180)',
 	'accent-foreground': 'oklch(0.32 0.08 200)',
 	destructive: 'oklch(0.52 0.22 25)',
+	'destructive-foreground': 'oklch(0.98 0.01 265)',
 	warning: 'oklch(0.55 0.13 75)',
 	border: 'oklch(0.88 0.02 265)',
 	input: 'oklch(0.88 0.02 265)',
@@ -566,7 +583,8 @@ const AURORA_DARK: ThemeTokens = {
 	'muted-foreground': 'oklch(0.74 0.03 265)',
 	accent: 'oklch(0.7 0.13 180)',
 	'accent-foreground': 'oklch(0.18 0.04 200)',
-	destructive: 'oklch(0.62 0.22 20)',
+	destructive: 'oklch(0.72 0.22 20)',
+	'destructive-foreground': 'oklch(0.18 0.04 265)',
 	warning: 'oklch(0.82 0.14 85)',
 	border: 'oklch(0.34 0.04 265)',
 	input: 'oklch(0.32 0.04 265)',
@@ -600,7 +618,7 @@ const AURORA_THEME: ThemeDefinition = defineBuiltinTheme({
 /**
  * `solarpunk` light palette — the mock's native warm look: cream/sand canvas, moss-green brand, clay accent,
  * warm-brown text. The first WARM/organic theme (the v1 set is all cool/neon). Distilled from the ryang.dev
- * solarpunk mock into VROOM's 32 tokens, AA-tuned (theme-contrast.test.ts). D7 token-only.
+ * solarpunk mock into VROOM's token set, AA-tuned (theme-contrast.test.ts). D7 token-only.
  */
 const SOLARPUNK_LIGHT: ThemeTokens = {
 	background: 'oklch(0.95 0.02 95)',
@@ -618,6 +636,7 @@ const SOLARPUNK_LIGHT: ThemeTokens = {
 	accent: 'oklch(0.88 0.06 70)',
 	'accent-foreground': 'oklch(0.38 0.08 60)',
 	destructive: 'oklch(0.52 0.2 28)',
+	'destructive-foreground': 'oklch(0.95 0.02 95)',
 	warning: 'oklch(0.6 0.13 70)',
 	border: 'oklch(0.86 0.03 90)',
 	input: 'oklch(0.86 0.03 90)',
@@ -659,7 +678,8 @@ const SOLARPUNK_DARK: ThemeTokens = {
 	'muted-foreground': 'oklch(0.74 0.04 85)',
 	accent: 'oklch(0.5 0.1 60)',
 	'accent-foreground': 'oklch(0.97 0.02 90)',
-	destructive: 'oklch(0.62 0.21 28)',
+	destructive: 'oklch(0.72 0.21 28)',
+	'destructive-foreground': 'oklch(0.22 0.02 75)',
 	warning: 'oklch(0.78 0.14 75)',
 	border: 'oklch(0.36 0.03 75)',
 	input: 'oklch(0.34 0.03 75)',
@@ -693,7 +713,7 @@ const SOLARPUNK_THEME: ThemeDefinition = defineBuiltinTheme({
 /**
  * `editorial` light palette — the mock's native magazine look: cream paper, near-black ink, a crimson
  * accent, warm-grey muted. A warm-NEUTRAL palette whose signature is the crimson. Distilled from the
- * ryang.dev editorial mock into VROOM's 32 tokens, AA-tuned (theme-contrast.test.ts). D7 token-only.
+ * ryang.dev editorial mock into VROOM's token set, AA-tuned (theme-contrast.test.ts). D7 token-only.
  */
 const EDITORIAL_LIGHT: ThemeTokens = {
 	background: 'oklch(0.97 0.012 85)',
@@ -711,6 +731,7 @@ const EDITORIAL_LIGHT: ThemeTokens = {
 	accent: 'oklch(0.9 0.03 40)',
 	'accent-foreground': 'oklch(0.4 0.13 30)',
 	destructive: 'oklch(0.5 0.2 27)',
+	'destructive-foreground': 'oklch(0.97 0.012 85)',
 	warning: 'oklch(0.58 0.13 70)',
 	border: 'oklch(0.87 0.014 80)',
 	input: 'oklch(0.87 0.014 80)',
@@ -752,7 +773,8 @@ const EDITORIAL_DARK: ThemeTokens = {
 	'muted-foreground': 'oklch(0.74 0.014 80)',
 	accent: 'oklch(0.5 0.12 30)',
 	'accent-foreground': 'oklch(0.96 0.02 85)',
-	destructive: 'oklch(0.62 0.21 27)',
+	destructive: 'oklch(0.72 0.21 27)',
+	'destructive-foreground': 'oklch(0.21 0.008 60)',
 	warning: 'oklch(0.78 0.14 75)',
 	border: 'oklch(0.35 0.01 60)',
 	input: 'oklch(0.33 0.01 60)',
@@ -785,7 +807,7 @@ const EDITORIAL_THEME: ThemeDefinition = defineBuiltinTheme({
 
 /**
  * `tui` light palette — a paper-terminal: cream canvas, dark-amber brand, teal-green accent. Distilled from
- * the ryang.dev terminal/TUI mock into VROOM's 32 tokens, AA-tuned (theme-contrast.test.ts). D7 token-only
+ * the ryang.dev terminal/TUI mock into VROOM's token set, AA-tuned (theme-contrast.test.ts). D7 token-only
  * (no box-drawing/monospace layout — the palette only).
  */
 const TUI_LIGHT: ThemeTokens = {
@@ -804,6 +826,7 @@ const TUI_LIGHT: ThemeTokens = {
 	accent: 'oklch(0.88 0.06 165)',
 	'accent-foreground': 'oklch(0.34 0.08 165)',
 	destructive: 'oklch(0.52 0.22 25)',
+	'destructive-foreground': 'oklch(0.96 0.01 95)',
 	warning: 'oklch(0.55 0.13 75)',
 	border: 'oklch(0.86 0.015 95)',
 	input: 'oklch(0.86 0.015 95)',
@@ -845,7 +868,8 @@ const TUI_DARK: ThemeTokens = {
 	'muted-foreground': 'oklch(0.7 0.02 95)',
 	accent: 'oklch(0.5 0.1 165)',
 	'accent-foreground': 'oklch(0.97 0.02 160)',
-	destructive: 'oklch(0.62 0.21 25)',
+	destructive: 'oklch(0.72 0.21 25)',
+	'destructive-foreground': 'oklch(0.16 0.004 90)',
 	warning: 'oklch(0.8 0.13 80)',
 	border: 'oklch(0.32 0.006 90)',
 	input: 'oklch(0.3 0.006 90)',
@@ -878,7 +902,7 @@ const TUI_THEME: ThemeDefinition = defineBuiltinTheme({
 
 /**
  * `y2k` light palette — a Frutiger-Aero / Y2K chrome look: cool blue-white canvas, bubblegum-magenta brand,
- * electric-cyan accent, an indigo ink. Distilled from the ryang.dev Y2K mock into VROOM's 32 tokens, AA-tuned
+ * electric-cyan accent, an indigo ink. Distilled from the ryang.dev Y2K mock into VROOM's token set, AA-tuned
  * (every fg/bg pair clears WCAG AA 4.5 — theme-contrast.test.ts, the D4 hard gate). D7 token-only (the
  * palette, not the glossy-bevel / lens-flare effects).
  */
@@ -898,6 +922,7 @@ const Y2K_LIGHT: ThemeTokens = {
 	accent: 'oklch(0.9 0.08 205)',
 	'accent-foreground': 'oklch(0.33 0.11 235)',
 	destructive: 'oklch(0.52 0.22 25)',
+	'destructive-foreground': 'oklch(0.98 0.015 220)',
 	warning: 'oklch(0.55 0.13 75)',
 	border: 'oklch(0.86 0.035 240)',
 	input: 'oklch(0.86 0.035 240)',
@@ -939,7 +964,8 @@ const Y2K_DARK: ThemeTokens = {
 	'muted-foreground': 'oklch(0.74 0.04 230)',
 	accent: 'oklch(0.5 0.2 350)',
 	'accent-foreground': 'oklch(0.97 0.02 340)',
-	destructive: 'oklch(0.62 0.23 18)',
+	destructive: 'oklch(0.72 0.23 18)',
+	'destructive-foreground': 'oklch(0.17 0.03 275)',
 	warning: 'oklch(0.82 0.14 85)',
 	border: 'oklch(0.33 0.04 270)',
 	input: 'oklch(0.31 0.04 270)',
@@ -973,7 +999,7 @@ const Y2K_THEME: ThemeDefinition = defineBuiltinTheme({
 /**
  * `neobrutalist` light palette — the mock's stark hard-edged look: off-white paper, near-black INK borders
  * (border/input = the ink token, the thick-outline signature as a TOKEN), an electric-blue brand, a loud
- * yellow accent. Distilled from the ryang.dev neobrutalist mock into VROOM's 32 tokens, AA-tuned (every
+ * yellow accent. Distilled from the ryang.dev neobrutalist mock into VROOM's token set, AA-tuned (every
  * fg/bg pair clears WCAG AA 4.5 — theme-contrast.test.ts). D7 token-only (no hard drop-shadow / offset
  * effects — the palette + the ink-colored borders only).
  */
@@ -993,6 +1019,7 @@ const NEOBRUTALIST_LIGHT: ThemeTokens = {
 	accent: 'oklch(0.85 0.12 95)',
 	'accent-foreground': 'oklch(0.24 0.05 90)',
 	destructive: 'oklch(0.52 0.22 27)',
+	'destructive-foreground': 'oklch(0.97 0.01 95)',
 	warning: 'oklch(0.55 0.13 75)',
 	border: 'oklch(0.18 0.02 270)',
 	input: 'oklch(0.18 0.02 270)',
@@ -1035,7 +1062,8 @@ const NEOBRUTALIST_DARK: ThemeTokens = {
 	'muted-foreground': 'oklch(0.72 0.02 95)',
 	accent: 'oklch(0.85 0.16 95)',
 	'accent-foreground': 'oklch(0.2 0.05 90)',
-	destructive: 'oklch(0.62 0.23 18)',
+	destructive: 'oklch(0.72 0.23 18)',
+	'destructive-foreground': 'oklch(0.16 0.01 270)',
 	warning: 'oklch(0.82 0.14 85)',
 	border: 'oklch(0.97 0.01 95)',
 	input: 'oklch(0.4 0.02 270)',

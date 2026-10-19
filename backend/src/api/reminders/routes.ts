@@ -4,7 +4,12 @@ import { CONFIG } from '../../config';
 import type { NewReminder, Reminder } from '../../db/schema';
 import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, rateLimiter, requireAuth } from '../../middleware';
-import { centsToDollars, expenseToApi, reminderToApi } from '../../utils/money';
+import {
+  centsToDollars,
+  expenseToApi,
+  reminderToApi,
+  reminderWithVehiclesToApi,
+} from '../../utils/money';
 import {
   requireVehicleRead,
   requireVehicleWrite,
@@ -23,15 +28,6 @@ import {
 } from './validation';
 
 const routes = new Hono();
-
-/**
- * T6 display edge for a ReminderWithVehicles response ({ reminder, vehicleIds }): convert the nested
- * reminder's expenseAmount from integer CENTS → dollars. vehicleIds + the rest pass through. Used at
- * every reminder list/get/create/update return (the money lives under `.reminder`).
- */
-function reminderWithVehiclesToApi<T extends { reminder: Record<string, unknown> }>(row: T): T {
-  return { ...row, reminder: reminderToApi(row.reminder) };
-}
 
 /**
  * Resolve the server-derived mileage fields for a create/update (T4, D4). For a mileage/both

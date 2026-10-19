@@ -9,6 +9,8 @@
  * DOM, no render. Validated against the shipped `default` palette (known-AA) by the same assertions below.
  */
 
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join, relative, sep } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import { THEME_REGISTRY } from '../theme-registry';
 import type { ThemeTokenKey, ThemeTokens } from '../theme-types';
@@ -61,8 +63,16 @@ const AA_NORMAL = 4.5;
 /**
  * Foreground/background pairs that carry body text or UI labels. Each must clear AA. `muted-foreground` is
  * checked against BOTH `background` and `muted` (it renders on both). These are the pairs a reader actually
- * reads — chart/border/ring/destructive/warning tokens are decorative or status accents (AA-large at most),
- * so they are not asserted as AA-normal here (a future enhancement could add AA-large 3:1 for those).
+ * reads — chart/border/ring/warning tokens are decorative or status accents (AA-large at most), so they are
+ * not asserted as AA-normal here (a future enhancement could add AA-large 3:1 for those).
+ *
+ * `destructive` is asserted BOTH WAYS because the app uses it in both roles:
+ *  - as INK (`text-destructive` — the standard inline form/fetch error style) over every surface body text
+ *    lands on, so it must clear AA against `card`/`background`/`popover`/`muted`;
+ *  - as a FILL (`bg-destructive` on a confirm button), where `destructive-foreground` is its label.
+ * Those two roles pull the token in opposite directions in dark mode — readable red ink on a near-black
+ * card has to be LIGHT, which in turn forces the button label to be DARK — which is exactly why
+ * `destructive-foreground` is a per-variant token rather than a fixed white.
  */
 const TEXT_PAIRS: ReadonlyArray<readonly [ThemeTokenKey, ThemeTokenKey]> = [
 	['foreground', 'background'],
@@ -75,7 +85,12 @@ const TEXT_PAIRS: ReadonlyArray<readonly [ThemeTokenKey, ThemeTokenKey]> = [
 	['muted-foreground', 'muted'],
 	['sidebar-foreground', 'sidebar'],
 	['sidebar-primary-foreground', 'sidebar-primary'],
-	['sidebar-accent-foreground', 'sidebar-accent']
+	['sidebar-accent-foreground', 'sidebar-accent'],
+	['destructive-foreground', 'destructive'],
+	['destructive', 'card'],
+	['destructive', 'background'],
+	['destructive', 'popover'],
+	['destructive', 'muted']
 ];
 
 describe('every built-in theme clears WCAG AA on text pairs (D4 hard gate)', () => {
@@ -150,5 +165,100 @@ describe('every built-in theme clears WCAG 3:1 on chart series vs card (graphica
 				).toBeGreaterThanOrEqual(AA_GRAPHICAL);
 			});
 		});
+	});
+});
+
+/**
+ * DESTRUCTIVE-FILL FOREGROUND GUARD — the other half of the AA gate above. The contrast math pins that
+ * `destructive-foreground` on `destructive` is readable in every theme; this pins that the app's hand-rolled
+ * destructive fills actually ASK for it.
+ *
+ * Why an unnamed foreground is a silent failure rather than a cosmetic slip: `AlertDialogAction` renders
+ * `cn(buttonVariants(), className)`, and `buttonVariants()` takes no variant — so its DEFAULT
+ * `bg-primary text-primary-foreground` is always in the class list. A `class="bg-destructive …"` overrides
+ * only the background, leaving `text-primary-foreground` — a colour chosen to read on the PRIMARY fill — as
+ * the label on a red one. It looks fine in the `default` palette (whose primary ink happens to invert the
+ * same way) and is unreadable in others: measured 2.79:1 in bento/dark and 3.04:1 in vaporwave/dark.
+ *
+ * Scope: only a FULL-STRENGTH `bg-destructive` fill (opacity-modified washes like `bg-destructive/10` are
+ * tints under `text-destructive` ink, covered by the pairs above) and only outside `components/ui/`, whose
+ * button/badge variants deliberately pair their own dark-mode composite (`dark:bg-destructive/60`) with
+ * `text-white` — the carve-out `no-theme-clashing-colors.test.ts` already records.
+ *
+ * The assertion is exact rather than "at most these", so the pending list can only ever shrink.
+ */
+describe('hand-rolled bg-destructive fills name their foreground', () => {
+	const SRC_ROOT = join(import.meta.dirname, '..', '..', '..');
+
+	/** `.svelte` files under src/, excluding the kit (`lib/components/ui/`). */
+	function appSvelteFiles(dir: string, acc: string[] = []): string[] {
+		for (const entry of readdirSync(dir)) {
+			const full = join(dir, entry);
+			if (statSync(full).isDirectory()) {
+				appSvelteFiles(full, acc);
+			} else if (entry.endsWith('.svelte')) {
+				acc.push(full);
+			}
+		}
+		return acc;
+	}
+
+	/** A bare `bg-destructive` utility — no variant prefix (`dark:`), no opacity modifier (`/60`). */
+	const BARE_FILL = /(?<![\w/:[\]&-])bg-destructive(?![\w/-])/;
+
+	const appFiles = [
+		...appSvelteFiles(join(SRC_ROOT, 'routes')),
+		...appSvelteFiles(join(SRC_ROOT, 'lib'))
+	].filter(f => !relative(SRC_ROOT, f).split(sep).join('/').startsWith('lib/components/ui/'));
+
+	/** Each file's bare-destructive-fill class strings, split by whether they name the matching ink. */
+	function fills(file: string): { named: string[]; unnamed: string[] } {
+		const source = readFileSync(file, 'utf8');
+		const named: string[] = [];
+		const unnamed: string[] = [];
+		// Per quoted class string: a bare destructive fill must carry the matching ink in the SAME string.
+		for (const [, , classString] of source.matchAll(/(['"])([^'"\n]*bg-destructive[^'"\n]*)\1/g)) {
+			if (!classString || !BARE_FILL.test(classString)) continue;
+			(classString.includes('text-destructive-foreground') ? named : unnamed).push(classString);
+		}
+		return { named, unnamed };
+	}
+
+	const offenders = appFiles
+		.filter(f => fills(f).unnamed.length > 0)
+		.map(f => relative(SRC_ROOT, f).split(sep).join('/'))
+		.sort();
+
+	/**
+	 * Destructive confirm buttons that still inherit `text-primary-foreground`. Every entry is a live
+	 * sub-AA label in at least one theme; fixing one means appending `text-destructive-foreground` to its
+	 * class string and deleting its entry here. Empty means every site names its own ink — the
+	 * non-vacuity check below is what keeps that from silently meaning "the walk is broken".
+	 */
+	const PENDING_UNNAMED_DESTRUCTIVE_INK: string[] = [];
+
+	// Non-vacuity: the walk must actually reach the components that DO comply, else an empty offender list
+	// would prove nothing once the pending list is emptied (a broken walk reads as "all clean").
+	test('the scan walks the app and recognises a compliant fill (non-vacuous)', () => {
+		expect(
+			appFiles.length,
+			'the .svelte walk found almost nothing — SRC_ROOT is wrong'
+		).toBeGreaterThan(50);
+		const compliant = appFiles.filter(f => fills(f).named.length > 0);
+		expect(
+			compliant.length,
+			'no class string matched as a COMPLIANT bare destructive fill, so the matcher cannot tell ' +
+				'compliant from offending and an empty offender list would mean nothing'
+		).toBeGreaterThan(0);
+	});
+
+	test('no app component paints a bare bg-destructive without text-destructive-foreground', () => {
+		expect(
+			offenders,
+			'A full-strength `bg-destructive` fill with no `text-destructive-foreground` keeps ' +
+				"buttonVariants()'s `text-primary-foreground` — ink tuned for the PRIMARY fill, which is " +
+				'sub-AA on red in several themes. Add the class. If this list is SHORTER than expected, the ' +
+				'site was fixed — delete its PENDING_UNNAMED_DESTRUCTIVE_INK entry.'
+		).toEqual([...PENDING_UNNAMED_DESTRUCTIVE_INK].sort());
 	});
 });

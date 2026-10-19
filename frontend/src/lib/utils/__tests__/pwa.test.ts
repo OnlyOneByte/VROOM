@@ -359,7 +359,7 @@ describe('PWA document head — viewport and theme-color are declared exactly on
 	 * exact rather than "at most these", so this list can only ever shrink — removing the last
 	 * override turns this test red until the list is emptied too.
 	 */
-	const PENDING_VIEWPORT_OVERRIDES = ['routes/expenses/[id]/edit/+page.svelte'];
+	const PENDING_VIEWPORT_OVERRIDES: string[] = [];
 
 	it('no route re-declares the viewport beyond the known pending overrides', () => {
 		const offenders: string[] = [];

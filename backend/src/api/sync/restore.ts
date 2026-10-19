@@ -2,7 +2,8 @@
  * Restore Service - Handles data restoration from backups and Google Sheets
  */
 
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, getTableColumns, inArray } from 'drizzle-orm';
+import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
 import { CONFIG, TABLE_SCHEMA_MAP } from '../../config';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
@@ -29,6 +30,8 @@ import {
 } from '../../db/schema';
 import { SyncError, SyncErrorCode } from '../../errors';
 import type { BackupConfig, ParsedBackupData } from '../../types';
+import { chunk, rowsPerInsert } from '../../utils/chunk';
+import { logger } from '../../utils/logger';
 import { preferencesRepository } from '../settings/repository';
 import { backupService, coerceRow } from './backup';
 
@@ -413,14 +416,20 @@ class RestoreService {
     for (const { data: items, table, name, scope, idColumn, idField } of tables) {
       if (items.length === 0) continue;
       const idOf = (row: Record<string, unknown>): string => String(row[idField]);
-      const ids = items.map((item) => String(item.id));
-      const existing = await this.db
-        .select()
-        .from(table)
-        .where(and(inArray(idColumn, ids), scope));
+      // The id list comes from the backup, so it is unbounded — chunk the IN-clause per the contract in
+      // utils/chunk, or a large backup's probe would blow SQLite's bind-parameter ceiling and merge mode
+      // would fail for exactly the accounts most in need of a careful restore.
+      const existing: Record<string, unknown>[] = [];
+      for (const idBatch of chunk(items.map((item) => String(item.id)))) {
+        const rows = await this.db
+          .select()
+          .from(table)
+          .where(and(inArray(idColumn, idBatch), scope));
+        existing.push(...(rows as Record<string, unknown>[]));
+      }
       conflicts.push(
         ...existing.map((e) => {
-          const eid = idOf(e as Record<string, unknown>);
+          const eid = idOf(e);
           return {
             table: name,
             id: eid,
@@ -455,10 +464,11 @@ class RestoreService {
     // their vehicle FK would cascade — same direct-by-userId pattern as photos/expenses).
     tx.delete(trips).where(eq(trips.userId, userId)).run();
 
-    // Delete odometer entries before vehicles (FK constraint)
-    if (vehicleIds.length > 0) {
-      tx.delete(odometerEntries).where(inArray(odometerEntries.vehicleId, vehicleIds)).run();
-      tx.delete(vehicleFinancing).where(inArray(vehicleFinancing.vehicleId, vehicleIds)).run();
+    // Delete odometer entries before vehicles (FK constraint). Chunked per the IN-clause contract in
+    // utils/chunk: the id list is as long as the user's fleet.
+    for (const idBatch of chunk(vehicleIds)) {
+      tx.delete(odometerEntries).where(inArray(odometerEntries.vehicleId, idBatch)).run();
+      tx.delete(vehicleFinancing).where(inArray(vehicleFinancing.vehicleId, idBatch)).run();
     }
 
     // Delete insurance policies directly by userId (terms, junction rows, and
@@ -492,144 +502,151 @@ class RestoreService {
     return (rows ?? []).map((row) => ({ ...row, userId }));
   }
 
-  // SYNCHRONOUS: every insert is `.run()` and the two lookups are `.all()` so the entire FK-ordered
-  // insert sequence executes inline within the caller's real transaction. With the old `await`, drizzle's
-  // bun-sqlite (sync dialect) had already committed the BEGIN before the first await resolved, so each insert
-  // autocommitted alone and a later throw could not undo the wipe (the data-loss footgun). Running sync
-  // keeps wipe+insert atomic — a thrown insert rolls the whole restore back.
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Sequential FK-ordered inserts for all backup tables
+  /**
+   * Null out `createdBy` on any row whose named author is not a user on THIS instance. `createdBy` is
+   * PROVENANCE — who physically entered a shared-fleet row — and it FKs users, but identity is
+   * deliberately excluded from a backup, so a restore onto a different instance legitimately names an
+   * author who does not exist here. Inserting that id FK-violates and aborts the WHOLE restore, the one
+   * thing the recovery path must never do; NULL is the column's own documented legacy/self sentinel, so
+   * the cost row and its ownership survive intact and only the authorship is lost. Same absence-only
+   * filter the vehicle_shares invitee and the photo_ref provider already get: a known author is never
+   * touched.
+   */
+  private dropUnknownAuthors<T extends Record<string, unknown>>(
+    rows: T[],
+    knownUserIds: Set<string>
+  ): T[] {
+    const isAbsent = (row: T): boolean =>
+      row.createdBy != null && !knownUserIds.has(String(row.createdBy));
+    const absentCount = rows.filter(isAbsent).length;
+    if (absentCount > 0) {
+      logger.warn('Restore cleared expense authorship naming users absent on this instance', {
+        rows: absentCount,
+      });
+    }
+    return rows.map((row) => (isAbsent(row) ? { ...row, createdBy: null } : row));
+  }
+
+  /**
+   * Insert every row of one table, batched so no single statement approaches SQLite's host-parameter
+   * ceiling. A multi-row INSERT binds one parameter per column per row, so one `.values(allRows)` call
+   * breaks past `floor(SQLITE_MAX_BIND_PARAMS / columns)` rows — 2,978 expenses, 2,621 reminders — which
+   * a decade-long account reaches, and the driver reports the count mod 65536 so the failure names
+   * neither the table nor a real number. Batching bounds the count at `rowsPerInsert(columns) × columns`
+   * however large the backup is.
+   *
+   * SYNCHRONOUS (`.run()` inline, no await): the batches stay inside the caller's one real transaction,
+   * so the wipe and ALL batches still commit or roll back as a unit (see restoreFromBackup).
+   */
+  private insertRows<TTable extends SQLiteTable>(
+    tx: DrizzleTransaction,
+    table: TTable,
+    rows: Record<string, unknown>[]
+  ): void {
+    if (rows.length === 0) return;
+    const columnCount = Object.keys(getTableColumns(table)).length;
+    for (const batch of chunk(rows, rowsPerInsert(columnCount))) {
+      // The rows are coerced Record maps — coerceRow walked this very table's columns to build them,
+      // which is the only thing that can vouch for their shape; the cast just restates that.
+      tx.insert(table)
+        .values(batch as unknown as TTable['$inferInsert'][])
+        .run();
+    }
+  }
+
+  // SYNCHRONOUS: every insert is `.run()` and the lookups are `.all()` so the entire FK-ordered insert
+  // sequence executes inline within the caller's real transaction. With the old `await`, drizzle's
+  // bun-sqlite (sync dialect) had already committed the BEGIN before the first await resolved, so each
+  // insert autocommitted alone and a later throw could not undo the wipe (the data-loss footgun). Running
+  // sync keeps wipe+insert atomic — a thrown insert rolls the whole restore back.
   private insertBackupData(tx: DrizzleTransaction, data: ParsedBackupData, userId: string): void {
-    // Data is already coerced by coerceRow (ZIP path via parseZipBackup, Sheets path via restoreFromSheets)
-    if (data.vehicles.length > 0) {
-      tx.insert(vehicles)
-        .values(this.stampUserId(data.vehicles, userId) as (typeof vehicles.$inferInsert)[])
-        .run();
-    }
-    if (data.financing.length > 0) {
-      tx.insert(vehicleFinancing)
-        .values(data.financing as (typeof vehicleFinancing.$inferInsert)[])
-        .run();
-    }
-    if (data.insurance.length > 0) {
-      tx.insert(insurancePolicies)
-        .values(
-          this.stampUserId(data.insurance, userId) as (typeof insurancePolicies.$inferInsert)[]
-        )
-        .run();
-    }
-    // Insert insurance terms after policies (FK constraint)
-    if (data.insuranceTerms?.length > 0) {
-      tx.insert(insuranceTerms)
-        .values(data.insuranceTerms as (typeof insuranceTerms.$inferInsert)[])
-        .run();
-    }
-    // Insert insurance term vehicles after terms (FK constraint)
-    if (data.insuranceTermVehicles?.length > 0) {
-      tx.insert(insuranceTermVehicles)
-        .values(data.insuranceTermVehicles as (typeof insuranceTermVehicles.$inferInsert)[])
-        .run();
-    }
-    // Insert insurance claims after policies/terms/vehicles (policy FK + optional
-    // term_id/vehicle_id set-null FKs)
-    if ((data.insuranceClaims?.length ?? 0) > 0) {
-      tx.insert(insuranceClaims)
-        .values(data.insuranceClaims as (typeof insuranceClaims.$inferInsert)[])
-        .run();
-    }
-    // Insert reminders after vehicles (userId + vehicleId FKs)
-    if ((data.reminders?.length ?? 0) > 0) {
-      tx.insert(reminders)
-        .values(this.stampUserId(data.reminders, userId) as (typeof reminders.$inferInsert)[])
-        .run();
-    }
-    // Insert reminder vehicles after reminders and vehicles (junction FK)
-    if ((data.reminderVehicles?.length ?? 0) > 0) {
-      tx.insert(reminderVehicles)
-        .values(data.reminderVehicles as (typeof reminderVehicles.$inferInsert)[])
-        .run();
-    }
-    // Insert reminder notifications after reminders (reminderId FK)
-    if ((data.reminderNotifications?.length ?? 0) > 0) {
-      tx.insert(reminderNotifications)
-        .values(
-          this.stampUserId(
-            data.reminderNotifications,
-            userId
-          ) as (typeof reminderNotifications.$inferInsert)[]
-        )
-        .run();
-    }
-    if (data.expenses.length > 0) {
-      tx.insert(expenses)
-        .values(this.stampUserId(data.expenses, userId) as (typeof expenses.$inferInsert)[])
-        .run();
-    }
-    if (data.odometer?.length > 0) {
-      tx.insert(odometerEntries)
-        .values(this.stampUserId(data.odometer, userId) as (typeof odometerEntries.$inferInsert)[])
-        .run();
-    }
-    // Insert trips AFTER vehicles (trips.vehicle_id FK) — userId-stamped like odometer/expenses.
-    if ((data.trips?.length ?? 0) > 0) {
-      tx.insert(trips)
-        .values(this.stampUserId(data.trips, userId) as (typeof trips.$inferInsert)[])
-        .run();
-    }
-    // Insert vehicle_shares AFTER vehicles (vehicle-sharing T9). Re-stamp ownerId to the importer (the
-    // backup's owner == the importer; same chokepoint as stampUserId). The sharedWithId (invitee) FKs
-    // users — that user is NOT in the backup, so on a CROSS-INSTANCE restore it may be absent; inserting
-    // it would FK-violate and abort the WHOLE restore (the data-loss class). So filter to grants
-    // whose invitee EXISTS in this DB; a share to an absent user is silently skipped (the owner can re-invite
-    // once that user joins). Same-instance restore (the common case) keeps every grant.
-    if ((data.vehicleShares?.length ?? 0) > 0) {
-      const existingUserRows = tx.select({ id: users.id }).from(users).all();
-      const knownUserIds = new Set(existingUserRows.map((u) => u.id));
-      const insertableShares = (data.vehicleShares ?? [])
-        .filter((s) => knownUserIds.has(String(s.sharedWithId)))
-        .map((s) => ({ ...s, ownerId: userId }));
-      if (insertableShares.length > 0) {
-        tx.insert(vehicleShares)
-          .values(insertableShares as (typeof vehicleShares.$inferInsert)[])
-          .run();
-      }
-    }
-    // Insert user preferences and sync state
-    if (data.userPreferences?.length > 0) {
-      tx.insert(userPreferences)
-        .values(
-          this.stampUserId(data.userPreferences, userId) as (typeof userPreferences.$inferInsert)[]
-        )
-        .run();
-    }
-    if (data.syncState?.length > 0) {
-      tx.insert(syncState)
-        .values(this.stampUserId(data.syncState, userId) as (typeof syncState.$inferInsert)[])
-        .run();
-    }
-    // Insert photos AFTER all entity tables so entityId references are valid
-    if (data.photos?.length > 0) {
-      tx.insert(photos)
-        .values(this.stampUserId(data.photos, userId) as (typeof photos.$inferInsert)[])
-        .run();
-    }
-    // Insert photo_refs AFTER photos (photo_id FK references photos)
-    // Filter out refs whose providerId doesn't exist in user_providers —
-    // providers contain encrypted credentials and are NOT included in backups,
-    // so restored refs may reference providers that don't exist on this instance.
-    if (data.photoRefs?.length > 0) {
-      const refRows = data.photoRefs as (typeof photoRefs.$inferInsert)[];
-      const providerIds = [...new Set(refRows.map((r) => r.providerId))];
-      const existingProviders = tx
+    // Data is already coerced by coerceRow (ZIP path via parseZipBackup, Sheets path via
+    // restoreFromSheets). Every insert goes through insertRows, which batches to stay under SQLite's
+    // bind-parameter ceiling and no-ops on an empty array.
+
+    // The users THIS instance knows, read once for the two absence filters below (the expense author and
+    // the share invitee). Users are deliberately not part of a backup, so a cross-instance restore
+    // legitimately names users who do not exist here.
+    const knownUserIds = new Set(
+      tx
+        .select({ id: users.id })
+        .from(users)
+        .all()
+        .map((u) => u.id)
+    );
+
+    this.insertRows(tx, vehicles, this.stampUserId(data.vehicles, userId));
+    this.insertRows(tx, vehicleFinancing, data.financing ?? []);
+    this.insertRows(tx, insurancePolicies, this.stampUserId(data.insurance, userId));
+    // Insurance terms after policies (FK), the junction after terms, claims after all three (policy FK
+    // plus the optional set-null term_id / vehicle_id FKs).
+    this.insertRows(tx, insuranceTerms, data.insuranceTerms ?? []);
+    this.insertRows(tx, insuranceTermVehicles, data.insuranceTermVehicles ?? []);
+    this.insertRows(tx, insuranceClaims, data.insuranceClaims ?? []);
+    // Reminders after vehicles (userId + vehicleId FKs), then the junction, then the notifications.
+    this.insertRows(tx, reminders, this.stampUserId(data.reminders, userId));
+    this.insertRows(tx, reminderVehicles, data.reminderVehicles ?? []);
+    this.insertRows(
+      tx,
+      reminderNotifications,
+      this.stampUserId(data.reminderNotifications, userId)
+    );
+    this.insertRows(
+      tx,
+      expenses,
+      this.dropUnknownAuthors(this.stampUserId(data.expenses, userId), knownUserIds)
+    );
+    this.insertRows(tx, odometerEntries, this.stampUserId(data.odometer, userId));
+    // Trips AFTER vehicles (trips.vehicle_id FK) — userId-stamped like odometer/expenses.
+    this.insertRows(tx, trips, this.stampUserId(data.trips, userId));
+    // vehicle_shares AFTER vehicles. Re-stamp ownerId to the importer (the backup's owner IS the
+    // importer; same chokepoint as stampUserId). The sharedWithId (invitee) FKs users, who are absent
+    // from the backup, so on a cross-instance restore the grant would FK-violate and abort everything —
+    // skip a grant whose invitee is unknown here (the owner can re-invite once that user joins). A
+    // same-instance restore (the common case) keeps every grant.
+    this.insertRows(
+      tx,
+      vehicleShares,
+      (data.vehicleShares ?? [])
+        .filter((share) => knownUserIds.has(String(share.sharedWithId)))
+        .map((share) => ({ ...share, ownerId: userId }))
+    );
+    this.insertRows(tx, userPreferences, this.stampUserId(data.userPreferences, userId));
+    this.insertRows(tx, syncState, this.stampUserId(data.syncState, userId));
+    // Photos AFTER all entity tables so their entityId references are valid.
+    this.insertRows(tx, photos, this.stampUserId(data.photos, userId));
+    // photo_refs AFTER photos (photo_id FK). Drop refs naming a provider absent from user_providers:
+    // providers hold encrypted credentials and are NOT backed up, so a restored ref may point at a
+    // provider that does not exist on this instance.
+    const refRows = (data.photoRefs ?? []) as Record<string, unknown>[];
+    const knownProviders = this.knownProviderIds(tx, refRows);
+    this.insertRows(
+      tx,
+      photoRefs,
+      refRows.filter((ref) => knownProviders.has(String(ref.providerId)))
+    );
+  }
+
+  /**
+   * Which of the providers named by `refRows` exist on this instance. The id list comes from the backup,
+   * so it is unbounded — chunked per the IN-clause contract in utils/chunk.
+   */
+  private knownProviderIds(
+    tx: DrizzleTransaction,
+    refRows: Record<string, unknown>[]
+  ): Set<string> {
+    const providerIds = [...new Set(refRows.map((ref) => String(ref.providerId)))];
+    const known = new Set<string>();
+    for (const batch of chunk(providerIds)) {
+      for (const row of tx
         .select({ id: userProviders.id })
         .from(userProviders)
-        .where(inArray(userProviders.id, providerIds))
-        .all();
-      const existingProviderIds = new Set(existingProviders.map((p) => p.id));
-      const validRefs = refRows.filter((r) => existingProviderIds.has(r.providerId));
-      if (validRefs.length > 0) {
-        tx.insert(photoRefs).values(validRefs).run();
+        .where(inArray(userProviders.id, batch))
+        .all()) {
+        known.add(row.id);
       }
     }
+    return known;
   }
 }
 

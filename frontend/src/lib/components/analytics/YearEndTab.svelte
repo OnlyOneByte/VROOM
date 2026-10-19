@@ -14,7 +14,8 @@
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
 	import * as Select from '$lib/components/ui/select';
-	import { AppLineChart, AppPieChart, StatCardGrid } from '$lib/components/charts';
+	import { AppLineChart, AppPieChart } from '$lib/components/charts';
+	import StatCardGrid from '$lib/components/charts/StatCardGrid.svelte';
 	import { buildCategoryPieData, buildChartConfig } from '$lib/utils/chart-colors';
 	import { analyticsApi } from '$lib/services/analytics-api';
 	import type { YearEndResponse } from '$lib/types';

@@ -66,9 +66,9 @@ describe('THEME_TOKEN_KEYS mirrors the app.css per-variant token set (T4)', () =
  * (T7) swaps the RAW tokens per `data-theme`; a Tailwind utility re-resolves through its `--color-*` alias.
  * So if a `--color-foo: var(--foo)` alias references a raw token NOT in THEME_TOKEN_KEYS, switching themes
  * would leave `--color-foo` resolving to a stale/unmanaged value — a visual leak the registry/token guards
- * can't see. Certified firsthand that today all 32 color aliases map 1:1 onto the 32 managed keys;
- * this pins it so a NEW Tailwind color alias (a routine app.css edit) can't land without adding its raw
- * token to the engine (THEME_TOKEN_KEYS + the registry).
+ * can't see. The alias set and the managed-key set map 1:1 today, and both directions are pinned below: a
+ * NEW Tailwind color alias can't land without adding its raw token to the engine (THEME_TOKEN_KEYS + the
+ * registry), and a new managed token can't land without its alias.
  */
 describe('@theme inline color aliases reference only engine-managed tokens', () => {
 	// The `--color-*: var(--x)` aliases inside the `@theme inline { ... }` block.
@@ -91,6 +91,21 @@ describe('@theme inline color aliases reference only engine-managed tokens', () 
 			`These Tailwind --color-* aliases reference raw tokens the theme engine does NOT manage — a theme ` +
 				`switch would leave them STALE (a visual leak). Add each to THEME_TOKEN_KEYS + the registry, or ` +
 				`point the alias at a managed token:\n  ${unmanaged.join(', ')}`
+		).toEqual([]);
+	});
+
+	// The CONVERSE direction, and the one that bites silently. A raw token with no `--color-*` alias is
+	// invisible to Tailwind, so the utility that names it (`text-destructive-foreground`, `bg-warning`, …)
+	// generates NO rule at all: the class is accepted, emits nothing, and the element quietly inherits
+	// whatever colour its ancestor had. Nothing else sees it — the token guards above check the raw
+	// declarations, the contrast gate checks the VALUES, and both stay green while the class is inert.
+	test('every managed token is exposed as a --color-* alias (no utility-less token)', () => {
+		const unaliased = [...managed].filter(t => !aliasedRawTokens.has(t)).sort();
+		expect(
+			unaliased,
+			`These engine-managed tokens have no \`--color-<token>: var(--<token>)\` alias in @theme inline, so ` +
+				`the Tailwind utilities that name them emit NOTHING and the colour silently inherits. Add an ` +
+				`alias for each:\n  ${unaliased.join(', ')}`
 		).toEqual([]);
 	});
 });

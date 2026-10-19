@@ -6,7 +6,7 @@ import AdmZip from 'adm-zip';
 import { parse } from 'csv-parse/sync';
 import { stringify } from 'csv-stringify/sync';
 import type { Table } from 'drizzle-orm';
-import { and, eq, getTableColumns, inArray } from 'drizzle-orm';
+import { and, eq, getTableColumns, getTableName, inArray } from 'drizzle-orm';
 import { createInsertSchema } from 'drizzle-zod';
 import type { z } from 'zod';
 import {
@@ -49,6 +49,7 @@ import type {
 } from '../../types';
 import { logger } from '../../utils/logger';
 import { joinStoragePath } from '../../utils/paths';
+import { unitPreferencesSchema } from '../../utils/unit-preferences-schema';
 
 export interface ValidationResult {
   valid: boolean;
@@ -168,7 +169,18 @@ export function coerceRow(
       try {
         coerced[columnName] = JSON.parse(strVal);
       } catch {
-        coerced[columnName] = null;
+        // A cell that does not parse carries NOTHING recoverable, so it resolves exactly like an
+        // absent one: the column's static default when it has one, else null. Assigning null
+        // unconditionally violated NOT NULL on a defaulted JSON column, and since restore wipes and
+        // re-inserts in ONE transaction, that threw away the user's WHOLE restore over a single
+        // corrupt cell. Warn rather than substitute silently — the default is a guess, and for unit
+        // preferences it reinterprets the row's raw distances and volumes.
+        logger.warn('Backup cell is not valid JSON; substituted the column default', {
+          table: getTableName(table),
+          column: columnName,
+          row: row.id ?? row.userId,
+        });
+        coerced[columnName] = hasStaticDefault ? col.default : null;
       }
     } else if (INTEGER_TYPES.has(col.columnType)) {
       // STRICT numeric parse, not Number.parseInt: parseInt stops at the first non-digit, so a
@@ -662,7 +674,50 @@ export class BackupService {
     }
 
     errors.push(...this.validateReferentialIntegrity(backup));
+    errors.push(...this.validateJsonColumnShapes(backup));
     return { valid: errors.length === 0, errors };
+  }
+
+  /**
+   * Refuse a backup whose JSON cell PARSES but is not a valid value for its column, naming the table,
+   * the column and the row so the user can fix that one cell.
+   *
+   * drizzle-zod maps a `mode: 'json'` column to an unconstrained value, so the per-row schema check
+   * above sees nothing wrong with `{"distanceUnit":"mi","volumeUnit":"gal"}` — the short spellings a
+   * hand-written or third-party export produces. Such a row used to be inserted by a restore that
+   * reported SUCCESS, after which every unit-reading analytics surface failed, because reading a
+   * vehicle's units treats unreadable preferences as a hard error by design. Defaulting the value
+   * instead would be worse than refusing: the raw distances and volumes stay as they are, so a vehicle
+   * recorded in kilometres and litres would come back labelled miles and gallons and every figure the
+   * user reads would be wrong. Validating here means the restore either goes through whole or never
+   * starts — the same contract as the referential checks.
+   *
+   * The unit columns are the ones with a parser to validate against and an unforgiving reader; another
+   * JSON column earns a line here as soon as it has a schema of its own.
+   */
+  private validateJsonColumnShapes(backup: ParsedBackupData): string[] {
+    const errors: string[] = [];
+    const checkUnitPreferences = (
+      rows: Record<string, unknown>[] | undefined,
+      tableName: string,
+      idField: string
+    ): void => {
+      for (const row of rows ?? []) {
+        // Only a PRESENT value is checked: an absent cell resolves to the column's static default
+        // during coercion, which runs before validation on both restore paths.
+        if (row.unitPreferences == null) continue;
+        // The same schema the vehicle / settings write routes validate against, so the recovery path
+        // accepts exactly what the API accepts.
+        const result = unitPreferencesSchema.safeParse(row.unitPreferences);
+        if (!result.success) {
+          const issues = result.error.issues.map((e) => e.message).join(', ');
+          errors.push(`${tableName}[${row[idField]}]: unitPreferences is invalid — ${issues}`);
+        }
+      }
+    };
+    checkUnitPreferences(backup.vehicles, 'vehicles', 'id');
+    checkUnitPreferences(backup.userPreferences, 'user_preferences', 'userId');
+    return errors;
   }
 
   private validateArray(

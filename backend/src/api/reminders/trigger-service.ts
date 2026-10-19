@@ -42,6 +42,18 @@ function pushReminderSkipError(result: TriggerResult, reminderId: string, error:
 }
 
 /**
+ * Record that this request lost the race for a reminder period and is therefore DONE with that
+ * reminder. The period claim (`claimPeriodSync`) fails when the stored due date is no longer the one
+ * this request read — normally because another in-flight trigger is working through the same
+ * reminder, or because an edit moved the due date mid-sweep. Either way this request's view is stale,
+ * so it must stop: not retry, and not touch the reminder's due date / active state. The skip makes
+ * the hand-off visible in the response instead of looking like a reminder that silently did nothing.
+ */
+function pushConcurrentTriggerSkip(result: TriggerResult, reminderId: string): void {
+  result.skipped.push({ reminderId, reason: 'concurrent_trigger' });
+}
+
+/**
  * Build the Web Push payload for a just-created reminder notification (T4b, design §4). The title
  * carries the user-authored reminder name; the body names the due axis (mileage vs time). NO PII
  * beyond the reminder text the user themselves wrote. A mileage notification carries dueOdometer
@@ -186,11 +198,20 @@ export function advanceReminderDueDate(reminder: Reminder, from: Date): Date {
 // Expense Creation
 // ============================================================================
 
-async function createExpenseFromReminder(
+/**
+ * Materialize one period of an expense reminder as expense row(s) inside the caller's transaction.
+ *
+ * SYNCHRONOUS on purpose — do NOT make this `async`. bun-sqlite is a sync dialect, so an awaiting
+ * transaction callback autocommits each statement on its own with BEGIN/COMMIT wrapping nothing:
+ * the money rows would then commit independently of the period claim that guards them (and a split
+ * reminder could leave half its legs committed when a later leg fails). `.returning().get()` /
+ * createSiblingsSync execute inline inside the caller's tx so the whole period is one real atom.
+ */
+function createExpenseFromReminder(
   tx: DrizzleTransaction,
   { reminder, vehicleIds }: ReminderWithVehicles,
   dueDate: Date
-): Promise<Expense[]> {
+): Expense[] {
   const splitConfig = reminder.expenseSplitConfig as ReminderSplitConfig | null;
   const amount = reminder.expenseAmount ?? 0;
   const category = reminder.expenseCategory ?? 'misc';
@@ -203,7 +224,7 @@ async function createExpenseFromReminder(
     if (!vehicleId) {
       throw new ValidationError('Reminder has no linked vehicle to create an expense for');
     }
-    const [expense] = await tx
+    const expense = tx
       .insert(expenses)
       .values({
         id: createId(),
@@ -221,7 +242,8 @@ async function createExpenseFromReminder(
         sourceType: 'reminder',
         sourceId: reminder.id,
       })
-      .returning();
+      .returning()
+      .get();
     return [expense];
   }
 
@@ -229,7 +251,7 @@ async function createExpenseFromReminder(
   const allocations = expenseSplitService.computeAllocations(splitConfig, amount);
   const groupId = createId();
 
-  const siblings = await expenseSplitService.createSiblings(tx, {
+  return expenseSplitService.createSiblingsSync(tx, {
     groupId,
     userId: reminder.userId,
     splitMethod: splitConfig.method,
@@ -242,8 +264,6 @@ async function createExpenseFromReminder(
     sourceType: 'reminder',
     sourceId: reminder.id,
   });
-
-  return siblings;
 }
 
 // ============================================================================
@@ -269,37 +289,55 @@ function hasReminderEndedBy(reminder: Reminder, nextDue: Date): boolean {
   return reminder.endDate != null && nextDue > reminder.endDate;
 }
 
+/**
+ * Process ONE period of an expense reminder: claim the period, then materialize its money row(s).
+ * Returns null when the claim was lost — a concurrent trigger already materialized this period.
+ *
+ * The claim (the `nextDueDate` compare-and-swap) runs FIRST and in the SAME synchronous transaction
+ * as the insert, which is what makes "at most one expense row per period" true: the loser has
+ * written nothing to roll back, and a synchronous callback cannot be interleaved by another request
+ * between the claim and the insert. Both halves inside an *async* callback is what let two
+ * overlapping /trigger requests each write every overdue period (doubled money, doubled totals).
+ */
 async function processExpensePeriod(
   reminder: Reminder,
   vehicleIds: string[],
   nextDue: Date,
   now: Date
-): Promise<{ created: Expense[]; advancedDue: Date }> {
-  // Compute (and validate) the advance BEFORE the insert. computeNextDueDate is a pure function and
-  // throws on a corrupt frequency / non-positive intervalValue (completion). Doing it first means
-  // a non-advancing reminder throws before ANY expense row is written — zero duplicate rows,
-  // guaranteed, independent of the driver's rollback semantics. (better-sqlite3 runs the INSERT
-  // synchronously and does NOT roll it back when a throw escapes the async transaction callback, so a
-  // throw *after* createExpenseFromReminder would still leak one persisted dupe — proven by the
-  // regression test that pre-hoist asserted 1, not 0.)
+): Promise<{ created: Expense[]; advancedDue: Date } | null> {
+  // Compute (and validate) the advance BEFORE opening the transaction. computeNextDueDate is a pure
+  // function and throws on a corrupt frequency / non-positive intervalValue (completion). Doing it
+  // first means a non-advancing reminder throws before ANY expense row is written, rather than
+  // relying on the rollback to undo one.
   const advancedDue = advanceReminderDueDate(reminder, nextDue);
-  return transaction(async (tx) => {
-    const created = await createExpenseFromReminder(tx, { reminder, vehicleIds }, nextDue);
-    await reminderRepository.advanceNextDueDateTx(tx, reminder.id, nextDue, advancedDue, now);
-    return { created, advancedDue };
+  return transaction((tx) => {
+    if (!reminderRepository.claimPeriodSync(tx, reminder.id, nextDue, advancedDue, now)) {
+      return null;
+    }
+    return {
+      created: createExpenseFromReminder(tx, { reminder, vehicleIds }, nextDue),
+      advancedDue,
+    };
   });
 }
 
+/**
+ * Process ONE period of a notification reminder — the notification twin of processExpensePeriod
+ * (claim first, insert second, one synchronous transaction). Returns null on a lost claim.
+ */
 async function processNotificationPeriod(
   reminder: Reminder,
   nextDue: Date,
   now: Date
-): Promise<{ created: ReminderNotification; advancedDue: Date }> {
-  // Validate/compute the advance BEFORE the insert (see processExpensePeriod) so a corrupt reminder
-  // throws before a notification row is written — no leaked dupe on the non-rollback path.
+): Promise<{ created: ReminderNotification; advancedDue: Date } | null> {
+  // Validate/compute the advance BEFORE the transaction (see processExpensePeriod) so a corrupt
+  // reminder throws before a notification row is written.
   const advancedDue = advanceReminderDueDate(reminder, nextDue);
-  return transaction(async (tx) => {
-    const [created] = await tx
+  return transaction((tx) => {
+    if (!reminderRepository.claimPeriodSync(tx, reminder.id, nextDue, advancedDue, now)) {
+      return null;
+    }
+    const created = tx
       .insert(reminderNotifications)
       .values({
         id: createId(),
@@ -308,11 +346,37 @@ async function processNotificationPeriod(
         dueDate: nextDue,
         isRead: false,
       })
-      .returning();
-
-    await reminderRepository.advanceNextDueDateTx(tx, reminder.id, nextDue, advancedDue, now);
+      .returning()
+      .get();
     return { created, advancedDue };
   });
+}
+
+/**
+ * Process ONE time-axis period for either reminder type and record what it produced in `result`.
+ * Returns the advanced due date to continue the catch-up loop from, or null when the period claim
+ * was lost. ONE dispatch site for the expense/notification fork so the two branches cannot drift in
+ * how they handle a lost claim.
+ */
+async function processPeriod(
+  reminder: Reminder,
+  vehicleIds: string[],
+  nextDue: Date,
+  now: Date,
+  result: TriggerResult
+): Promise<Date | null> {
+  if (reminder.type === 'expense') {
+    const period = await processExpensePeriod(reminder, vehicleIds, nextDue, now);
+    if (!period) return null;
+    result.createdExpenses.push(...period.created);
+    return period.advancedDue;
+  }
+
+  const period = await processNotificationPeriod(reminder, nextDue, now);
+  if (!period) return null;
+  result.notifications.push(period.created);
+  await firePushForNotification(reminder, period.created); // T4b (best-effort, never throws)
+  return period.advancedDue;
 }
 
 async function fastForwardPastNow(reminder: Reminder, currentDue: Date, now: Date): Promise<void> {
@@ -496,16 +560,12 @@ class ReminderTriggerService {
         break;
       }
 
-      if (reminder.type === 'expense') {
-        const txResult = await processExpensePeriod(reminder, vehicleIds, nextDue, now);
-        result.createdExpenses.push(...txResult.created);
-        nextDue = txResult.advancedDue;
-      } else {
-        const notifResult = await processNotificationPeriod(reminder, nextDue, now);
-        result.notifications.push(notifResult.created);
-        await firePushForNotification(reminder, notifResult.created); // T4b (best-effort, never throws)
-        nextDue = notifResult.advancedDue;
+      const advancedDue = await processPeriod(reminder, vehicleIds, nextDue, now, result);
+      if (advancedDue === null) {
+        pushConcurrentTriggerSkip(result, reminder.id);
+        return;
       }
+      nextDue = advancedDue;
 
       catchUpCount++;
     }

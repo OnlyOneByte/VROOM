@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Car, DollarSign, TrendingUp, CreditCard } from '@lucide/svelte';
-	import { StatCardGrid } from '$lib/components/charts';
+	import StatCardGrid from '$lib/components/charts/StatCardGrid.svelte';
 	import { formatCurrency } from '$lib/utils/formatters';
 
 	interface Props {

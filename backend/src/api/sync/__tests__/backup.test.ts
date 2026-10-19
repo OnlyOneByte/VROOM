@@ -24,7 +24,7 @@ import {
   vehicleFinancing,
   vehicles,
 } from '../../../db/schema';
-import type { ParsedBackupData } from '../../../types';
+import { DEFAULT_UNIT_PREFERENCES, type ParsedBackupData } from '../../../types';
 import { backupService, coerceRow } from '../backup';
 
 // ---------------------------------------------------------------------------
@@ -40,6 +40,16 @@ const COLUMN_TYPE_DEFAULTS: Record<string, string> = {
   SQLiteTextJson: '[]',
 };
 
+/**
+ * Cell values for the columns whose TYPE default is not a legal value for them. A JSON column gets
+ * `[]`, but unit_preferences is NOT NULL, defaults to a unit-preferences OBJECT, and is validated
+ * against the unit-preferences schema on restore — a row carrying `[]` there is not a row the exporter
+ * could ever have written, and the validator rightly refuses it.
+ */
+const COLUMN_NAME_DEFAULTS: Record<string, string> = {
+  unitPreferences: JSON.stringify(DEFAULT_UNIT_PREFERENCES),
+};
+
 /** Build a minimal valid CSV-like row (all string values) for a given table. */
 function buildMinimalStringRow(
   table: Parameters<typeof getTableColumns>[0],
@@ -53,6 +63,8 @@ function buildMinimalStringRow(
     const c = col as any;
     if (overrides[name] !== undefined) {
       row[name] = overrides[name];
+    } else if (COLUMN_NAME_DEFAULTS[name]) {
+      row[name] = COLUMN_NAME_DEFAULTS[name];
     } else if (COLUMN_TYPE_DEFAULTS[c.columnType]) {
       row[name] = COLUMN_TYPE_DEFAULTS[c.columnType];
     } else if (c.enumValues && c.enumValues.length > 0) {
@@ -1239,9 +1251,11 @@ describe('coerceRow: unitPreferences JSON column on vehicles', () => {
     expect(result.errors).toHaveLength(0);
   });
 
-  test('invalid unitPreferences JSON coerces to null', () => {
+  test('unparseable unitPreferences JSON resolves to the column default, not null', () => {
+    // null would violate NOT NULL on this column, and the restore inserts inside one transaction —
+    // so the old null assignment threw away the user's entire restore over one corrupt cell.
     const row = buildMinimalStringRow(vehicles, { unitPreferences: '{broken-json' });
     const result = coerceRow(row, vehicles);
-    expect(result.unitPreferences).toBeNull();
+    expect(result.unitPreferences).toEqual(DEFAULT_UNIT_PREFERENCES);
   });
 });

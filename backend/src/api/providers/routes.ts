@@ -500,12 +500,22 @@ routes.put(
       // config to an unusable one would otherwise persist a 200 + a bricked row that throws on every
       // later use. Validate against the EXISTING provider's type. VLM rows get the model/baseUrl shape
       // check; a config-only edit does NOT require the apiKey (it is already stored encrypted).
+      // It runs on the PAYLOAD, not on the merge below, so the fields a provider cannot run without
+      // (an S3 connection triple, a model name) stay a unit the caller edits as a whole.
       if (isVlmProviderType(existingType)) {
         validateVlmConfigShape(existingType, body.config);
       } else {
         validateStorageProviderConfig(existingType, body.config);
       }
-      updates.config = body.config;
+      // `config` is a PARTIAL update: the keys the caller sends are replaced, the keys it omits
+      // survive — the same per-entry merge PUT /settings does for backupConfig. Some of this column
+      // is written by the SERVER and echoed back by no form: `accountEmail` comes from the OAuth
+      // grant and is the only record of WHICH Google account a provider is (the provider card, the
+      // restore picker and the create-time duplicate check all read it), and `albumId` is a resolved
+      // handle. Replacing the column wholesale therefore made every edit-save lossy. The trade-off is
+      // that PUT cannot DELETE a config key; nothing needs to, because providerType is immutable
+      // here — a key is only ever absent from a payload because that caller does not manage it.
+      updates.config = { ...(existing[0].config ?? {}), ...body.config };
     }
     if (body.credentials !== undefined) {
       // A VLM credentials update must still carry an api key for a non-ollama type (the both-paths

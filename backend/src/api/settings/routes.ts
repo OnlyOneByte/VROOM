@@ -8,6 +8,7 @@ import { userPreferences, userProviders } from '../../db/schema';
 import { ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import type { BackupConfig, StorageConfig } from '../../types';
+import { readJsonBody } from '../../utils/request-body';
 import {
   mergeUnitPreferences,
   partialUnitPreferencesSchema,
@@ -257,7 +258,7 @@ routes.get('/', async (c) => {
  */
 routes.put('/', async (c) => {
   const user = c.get('user');
-  const body = await c.req.json();
+  const body = await readJsonBody(c);
   // A ZodError here propagates to the central errorHandler → 400 ValidationError
   // ('Invalid request data'); the storage/backup validators throw ValidationError
   // (an AppError subclass) which the handler shapes by its 400 statusCode.

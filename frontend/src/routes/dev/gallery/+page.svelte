@@ -19,7 +19,8 @@
 	import { Label } from '$lib/components/ui/label';
 	import { FormFieldError } from '$lib/components/ui/form-field';
 	import * as Card from '$lib/components/ui/card';
-	import { StatCardGrid, AppLineChart } from '$lib/components/charts';
+	import { AppLineChart } from '$lib/components/charts';
+	import StatCardGrid from '$lib/components/charts/StatCardGrid.svelte';
 	import ChartCard from '$lib/components/charts/ChartCard.svelte';
 	import { Inbox, DollarSign, TrendingUp, Car, Plus } from '@lucide/svelte';
 

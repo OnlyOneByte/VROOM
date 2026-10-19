@@ -9,7 +9,7 @@ import { ConflictError, NotFoundError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { getPeriodStartDate, sortExpensesByDate } from '../../utils/calculations';
 import { logger } from '../../utils/logger';
-import { financingWithBalanceToApi, moneyDollarsToCents, vehicleToApi } from '../../utils/money';
+import { moneyDollarsToCents, vehicleRowToApi } from '../../utils/money';
 import {
   requireVehicleRead,
   resolveVehicleAccess,
@@ -133,23 +133,6 @@ routes.use('*', changeTracker);
 
 // Mount photo sub-router
 routes.route('/:vehicleId/photos', photoRoutes);
-
-/**
- * T6 display edge for a vehicle API object: convert the vehicle's own money (purchasePrice) AND its
- * embedded financing (money columns + the derived computedBalance) from integer CENTS → dollars. A
- * vehicle row may carry a nested `financing` object (enriched with computedBalance/eligibleForPayoff);
- * eligibleForPayoff is computed on the cents balance so it is copied through unchanged. Pure, shallow.
- */
-function vehicleRowToApi<T extends Record<string, unknown>>(row: T): T {
-  const v = vehicleToApi(row);
-  const fin = v.financing as Record<string, unknown> | null | undefined;
-  // The embedded financing (money + derived computedBalance) goes through the SHARED
-  // financingWithBalanceToApi — identical to what the financing route returns (dedup of the self-dup).
-  if (fin && typeof fin === 'object') {
-    return { ...v, financing: financingWithBalanceToApi(fin) };
-  }
-  return v;
-}
 
 /**
  * Assert a license plate is free within THIS user's fleet (plate uniqueness is per-user, not global —

@@ -5,7 +5,7 @@
  * Load-bearing contract (R1, inviolable): a theme is a pure VALUE swap on the EXISTING `app.css` custom
  * properties — zero component/markup changes. So `ThemeTokenKey` is EXACTLY the set of per-variant color
  * custom properties `src/app.css` declares in BOTH `:root` (light) and `.dark` (dark). Verified firsthand
- *  those two blocks declare an identical 32-key set; `--radius` is `:root`-only (a variant-invariant
+ *  those two blocks declare an identical key set; `--radius` is `:root`-only (a variant-invariant
  * layout token) and is therefore NOT a themeable per-variant key. A guard in T5 asserts this list still
  * equals the live app.css set so a future token add/remove can't silently desync the engine.
  */
@@ -45,6 +45,7 @@ export type ThemeTokenKey =
 	| 'chart-7'
 	| 'chart-8'
 	| 'destructive'
+	| 'destructive-foreground'
 	| 'foreground'
 	| 'input'
 	| 'muted'
@@ -88,6 +89,7 @@ export const THEME_TOKEN_KEYS = [
 	'chart-7',
 	'chart-8',
 	'destructive',
+	'destructive-foreground',
 	'foreground',
 	'input',
 	'muted',

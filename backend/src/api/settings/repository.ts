@@ -26,6 +26,17 @@ export class PreferencesRepository {
     }
   }
 
+  /**
+   * Read the user's preferences row, lazily creating the defaults row on first use.
+   *
+   * The create is an UPSERT, not a conditional insert: `user_preferences` is PK'd by userId and this
+   * row is created lazily, so a brand-new account whose first session fires several
+   * preference-touching requests at once (two tabs, a reload mid-load, the activity middleware
+   * overlapping a settings fetch) has every one of them miss the pre-select. `onConflictDoNothing`
+   * makes the losers no-ops that then read the winner's row, instead of raising
+   * SQLITE_CONSTRAINT_PRIMARYKEY and 500-ing a brand-new user's first page load. The pre-select
+   * stays as the fast path for the overwhelmingly common already-exists case.
+   */
   async getOrCreate(userId: string): Promise<UserPreferences> {
     const existing = await this.getByUserId(userId);
     if (existing) return existing;
@@ -40,9 +51,20 @@ export class PreferencesRepository {
         syncOnInactivity: true,
         syncInactivityMinutes: 5,
       };
-      const result = await this.db.insert(userPreferences).values(newPrefs).returning();
-      return result[0];
+      const inserted = await this.db
+        .insert(userPreferences)
+        .values(newPrefs)
+        .onConflictDoNothing()
+        .returning();
+      if (inserted[0]) return inserted[0];
+
+      // Conflict: a concurrent caller created the row between our select and our insert. Its row is
+      // the one source of truth — read it rather than reporting a failure.
+      const concurrent = await this.getByUserId(userId);
+      if (concurrent) return concurrent;
+      throw new DatabaseError('User preferences row vanished after an upsert');
     } catch (error) {
+      if (error instanceof DatabaseError) throw error;
       throw new DatabaseError('Failed to create user preferences', error);
     }
   }
@@ -112,16 +134,21 @@ export class PreferencesRepository {
 export class SyncStateRepository {
   constructor(private db: AppDatabase) {}
 
+  /**
+   * Read the user's sync-state row, lazily creating it on first use.
+   *
+   * Same upsert shape as PreferencesRepository.getOrCreate and for the same reason: sync_state is
+   * PK'd by userId and created lazily, so concurrent first-time callers all miss the pre-select.
+   * `onConflictDoNothing` + re-read makes the losers no-ops instead of PRIMARY KEY failures (here
+   * they would surface as a swallowed activity/change-tracking error and a noisy log). Note
+   * sync_state has no createdAt/updatedAt columns, so there is nothing to touch on conflict.
+   */
   async getOrCreate(userId: string): Promise<SyncState> {
     try {
-      const existing = await this.db
-        .select()
-        .from(syncState)
-        .where(eq(syncState.userId, userId))
-        .limit(1);
-      if (existing[0]) return existing[0];
+      const existing = await this.read(userId);
+      if (existing) return existing;
 
-      const result = await this.db
+      const inserted = await this.db
         .insert(syncState)
         .values({
           userId,
@@ -129,11 +156,27 @@ export class SyncStateRepository {
           lastDataChangeDate: null,
           lastBackupDate: null,
         })
+        .onConflictDoNothing()
         .returning();
-      return result[0];
+      if (inserted[0]) return inserted[0];
+
+      const concurrent = await this.read(userId);
+      if (concurrent) return concurrent;
+      throw new DatabaseError('Sync state row vanished after an upsert');
     } catch (error) {
+      if (error instanceof DatabaseError) throw error;
       throw new DatabaseError('Failed to get or create sync state', error);
     }
+  }
+
+  /** The user's sync-state row, or null when it has not been created yet. */
+  private async read(userId: string): Promise<SyncState | null> {
+    const rows = await this.db
+      .select()
+      .from(syncState)
+      .where(eq(syncState.userId, userId))
+      .limit(1);
+    return rows[0] ?? null;
   }
 
   async markDataChanged(userId: string): Promise<void> {

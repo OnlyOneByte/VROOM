@@ -13,6 +13,7 @@
  */
 
 import { z } from 'zod';
+import type { ExpenseSummary } from '../api/expenses/repository';
 
 /** Dollars (possibly fractional) → integer cents. `12.34 → 1234`. ROUND-before-int (binary-float safe). */
 export function dollarsToCents(dollars: number): number {
@@ -111,6 +112,56 @@ export function financingWithBalanceToApi<T extends Record<string, unknown>>(row
   return typeof withMoney.computedBalance === 'number'
     ? { ...withMoney, computedBalance: centsToDollars(withMoney.computedBalance) }
     : withMoney;
+}
+
+/**
+ * A VEHICLE API object's money cents→dollars: the vehicle's own `purchasePrice` AND its embedded
+ * `financing` (money columns + the derived `computedBalance`, via the shared financing mapper so a
+ * vehicle card and the financing page can never show different balances). `eligibleForPayoff` is
+ * computed on the cents balance upstream, so it is copied through unchanged. Pure, shallow.
+ *
+ * Shared rather than route-local because the vehicles routes are not the only consumer: the LLM
+ * assistant's read tools return vehicle rows too, and a second hand-rolled copy is exactly how one
+ * consumer ends up reporting cents as dollars.
+ */
+export function vehicleRowToApi<T extends Record<string, unknown>>(row: T): T {
+  const v = vehicleToApi(row);
+  const fin = v.financing as Record<string, unknown> | null | undefined;
+  if (fin && typeof fin === 'object') {
+    return { ...v, financing: financingWithBalanceToApi(fin) };
+  }
+  return v;
+}
+
+/**
+ * A ReminderWithVehicles API object ({ reminder, vehicleIds }) cents→dollars: the money (expenseAmount)
+ * lives on the nested reminder; vehicleIds and everything else pass through. Shared with the assistant
+ * tools for the same reason as `vehicleRowToApi`.
+ */
+export function reminderWithVehiclesToApi<T extends { reminder: Record<string, unknown> }>(
+  row: T
+): T {
+  return { ...row, reminder: reminderToApi(row.reminder) };
+}
+
+/**
+ * An expense SUMMARY (`expenseRepository.getSummary`) cents→dollars: the two totals, the monthly
+ * average (a cents-per-month quotient) and the amount in both breakdown series. Counts, category keys
+ * and period labels are not money. ONE source of truth for the five fields, since the summary route and
+ * the assistant's getExpenseSummary tool both return this shape.
+ */
+export function expenseSummaryToApi(summary: ExpenseSummary): ExpenseSummary {
+  return {
+    ...summary,
+    totalAmount: centsToDollars(summary.totalAmount),
+    monthlyAverage: centsToDollars(summary.monthlyAverage),
+    recentAmount: centsToDollars(summary.recentAmount),
+    categoryBreakdown: summary.categoryBreakdown.map((r) => ({
+      ...r,
+      amount: centsToDollars(r.amount),
+    })),
+    monthlyTrend: summary.monthlyTrend.map((r) => ({ ...r, amount: centsToDollars(r.amount) })),
+  };
 }
 
 /**

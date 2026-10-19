@@ -15,6 +15,7 @@ import {
 	offlineExpenseToBackend,
 	type OfflineExpense
 } from '../offline-storage';
+import { offlineExpenseQueue } from '$lib/stores/offline.svelte';
 
 // Get localStorage mock from global setup
 const localStorageMock = window.localStorage as any;
@@ -140,6 +141,91 @@ describe('Offline Storage', () => {
 			expect(localStorageMock.setItem).toHaveBeenCalledWith(
 				'vroom_offline_expenses',
 				JSON.stringify(mockExpenses)
+			);
+		});
+	});
+
+	// An offline write that does not land MUST be visible to its caller: localStorage.setItem throws
+	// when site data is blocked (SecurityError) or the quota is exhausted (QuotaExceededError), and the
+	// caller is about to tell the user "saved offline" and navigate away from the only other copy.
+	// A swallowed failure here is a silently dropped expense.
+	describe('a storage write that fails is reported, never swallowed', () => {
+		const row: OfflineExpense = {
+			id: 'test-1',
+			vehicleId: 'vehicle-1',
+			tags: ['fuel'],
+			category: 'fuel',
+			amount: 50.0,
+			date: '2024-01-01',
+			timestamp: Date.now(),
+			synced: false
+		};
+
+		/** Fail ONLY the next write, so the stateful mock keeps working for every later test. */
+		function blockNextWrite(error: Error): void {
+			localStorageMock.setItem.mockImplementationOnce(() => {
+				throw error;
+			});
+		}
+
+		it('saveOfflineExpenses returns false when setItem throws', () => {
+			blockNextWrite(new DOMException('exceeded the quota', 'QuotaExceededError'));
+
+			expect(saveOfflineExpenses([row])).toBe(false);
+		});
+
+		it('saveOfflineExpenses returns true when the write lands', () => {
+			expect(saveOfflineExpenses([row])).toBe(true);
+		});
+
+		it('addOfflineExpense propagates the failure to its caller (the save-offline toast depends on it)', () => {
+			blockNextWrite(new DOMException('site data is blocked', 'SecurityError'));
+
+			const queued = addOfflineExpense({
+				vehicleId: 'vehicle-1',
+				tags: ['fuel'],
+				category: 'fuel',
+				amount: 50.0,
+				date: '2024-01-01'
+			});
+
+			expect(queued).toBe(false);
+		});
+
+		it('addOfflineExpense returns true on a successful queue', () => {
+			const queued = addOfflineExpense({
+				vehicleId: 'vehicle-1',
+				tags: ['fuel'],
+				category: 'fuel',
+				amount: 50.0,
+				date: '2024-01-01'
+			});
+
+			expect(queued).toBe(true);
+		});
+
+		it('the in-memory queue is NOT mirrored when the write failed (no phantom pending row)', () => {
+			offlineExpenseQueue.current = [];
+			blockNextWrite(new DOMException('exceeded the quota', 'QuotaExceededError'));
+
+			saveOfflineExpenses([row]);
+
+			// A badge counting a row that no reload can bring back would promise a delivery that
+			// cannot happen.
+			expect(offlineExpenseQueue.current).toEqual([]);
+		});
+	});
+
+	// A blob that cannot be parsed is about to be overwritten by the next write, and it is the only
+	// trace of whatever was queued — copy it aside first (best effort) rather than erasing it.
+	describe('corrupted outbox blob', () => {
+		it('is stashed under a sibling key before the next write can overwrite it', () => {
+			localStorageMock.getItem.mockReturnValue('{not json');
+
+			expect(loadOfflineExpenses()).toEqual([]);
+			expect(localStorageMock.setItem).toHaveBeenCalledWith(
+				'vroom_offline_expenses.corrupt',
+				'{not json'
 			);
 		});
 	});
@@ -321,6 +407,24 @@ describe('Offline Storage', () => {
 			clearNeedsAttention('malformed-1');
 			saved = JSON.parse(localStorageMock.setItem.mock.calls.at(-1)[1]);
 			expect(saved.find((e: OfflineExpense) => e.id === 'malformed-1').needsAttention).toBe(false);
+		});
+
+		// A parked row has two unrelated causes — a local completeness gate and a server verdict — so
+		// the reason has to travel WITH the row. Otherwise whatever surfaces it can only guess, and the
+		// single hardcoded guess ("add the volume and mileage") is wrong for every rejected row.
+		it('stores the reason with the parked row, and drops it when the row is re-admitted', () => {
+			localStorageMock.getItem.mockReturnValue(
+				JSON.stringify([{ ...rows[1], needsAttention: false }])
+			);
+
+			markExpenseNeedsAttention('malformed-1', 'Vehicle not found');
+			let saved = JSON.parse(localStorageMock.setItem.mock.calls.at(-1)[1]);
+			expect(saved[0].attentionReason).toBe('Vehicle not found');
+
+			localStorageMock.getItem.mockReturnValue(JSON.stringify(saved));
+			clearNeedsAttention('malformed-1');
+			saved = JSON.parse(localStorageMock.setItem.mock.calls.at(-1)[1]);
+			expect(saved[0].attentionReason).toBeUndefined();
 		});
 
 		// (bug) The "Needs attention" card description must name the fields the parking GATE actually
