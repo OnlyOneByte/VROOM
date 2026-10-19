@@ -99,6 +99,66 @@ describe('PWA Utils', () => {
 		});
 	});
 
+	describe('initializePWA — idempotent registration', () => {
+		/**
+		 * The `beforeinstallprompt`/`appinstalled` listeners live on `window`, so they outlive the
+		 * components that ask for them, and nothing ever removes them. initializePWA is called from
+		 * TWO components, one of which (the settings install card) re-mounts on every visit to
+		 * /settings — so registering unconditionally accumulated a fresh pair per visit for the life
+		 * of the page. Calling it repeatedly must leave exactly one listener per event.
+		 */
+		type WindowListener = (event: Event) => void;
+
+		const setupRemoveEventListener = window.removeEventListener;
+
+		/** Replay add/remove against a set, so "how many are LIVE" is observable, not just call counts. */
+		function trackWindowListeners(): Map<string, Set<WindowListener>> {
+			const live = new Map<string, Set<WindowListener>>();
+			const listenersFor = (type: string): Set<WindowListener> => {
+				const existing = live.get(type);
+				if (existing) return existing;
+				const created = new Set<WindowListener>();
+				live.set(type, created);
+				return created;
+			};
+			window.addEventListener = vi.fn((type: string, handler: WindowListener) =>
+				listenersFor(type).add(handler)
+			) as unknown as typeof window.addEventListener;
+			window.removeEventListener = vi.fn((type: string, handler: WindowListener) =>
+				listenersFor(type).delete(handler)
+			) as unknown as typeof window.removeEventListener;
+			return live;
+		}
+
+		afterEach(() => {
+			window.removeEventListener = setupRemoveEventListener;
+		});
+
+		it('leaves exactly one listener per event after repeated calls', () => {
+			const live = trackWindowListeners();
+
+			initializePWA();
+			initializePWA();
+			initializePWA();
+
+			expect(live.get('beforeinstallprompt')?.size).toBe(1);
+			expect(live.get('appinstalled')?.size).toBe(1);
+		});
+
+		it('keeps the surviving registration live, so install detection still works', () => {
+			const live = trackWindowListeners();
+
+			initializePWA();
+			initializePWA();
+
+			const [handler] = [...(live.get('beforeinstallprompt') ?? [])];
+			expect(handler).toBeDefined();
+			handler!({ preventDefault: vi.fn() } as unknown as Event);
+
+			expect(pwaInstallState.canInstall).toBe(true);
+		});
+	});
+
 	describe('promptInstall', () => {
 		it('should return false when no deferred prompt available', async () => {
 			const result = await promptInstall();

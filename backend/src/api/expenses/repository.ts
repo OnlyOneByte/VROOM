@@ -1,5 +1,5 @@
 import { createId } from '@paralleldrive/cuid2';
-import { and, asc, desc, eq, gte, inArray, lte, type SQL, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNotNull, lte, type SQL, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { Expense, NewExpense, SplitMethod } from '../../db/schema';
@@ -312,12 +312,19 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   /**
    * Commit a batch of CSV-imported expenses ATOMICALLY and IDEMPOTENTLY.
    *
-   * All inserts run in a single transaction, so a failure on any row rolls back the whole
-   * batch — the user never ends up with a half-imported file (and a fix-and-re-import can't
-   * double-write the rows that already committed). Each row carries a deterministic
-   * `clientId` (see import-csv.ts), so re-importing the same file is a no-op: a row whose
-   * (userId, clientId) already exists is skipped and counted as a duplicate rather than
-   * inserted again. The unique partial index on (userId, clientId) backs this at the DB level.
+   * All inserts run in ONE transaction, so a failure on any row rolls back the whole batch — the
+   * user never ends up with a half-imported file (and a fix-and-re-import can't double-write the
+   * rows that already committed). The callback MUST stay SYNCHRONOUS for that to hold: bun-sqlite
+   * is a synchronous dialect, so an `async` callback returns a pending promise, BEGIN/COMMIT wrap
+   * nothing, and every `await tx.*` autocommits on its own.
+   *
+   * Each row carries a deterministic `clientId` (see import-csv.ts), so re-importing the same file
+   * is a no-op: a row whose (userId, clientId) already exists is skipped and counted as a duplicate
+   * rather than inserted again. The already-present keys are read ONCE up front rather than per row
+   * (at the maxImportRows cap a per-row probe dominates the import's wall time), and the set grows
+   * as rows insert so a file that repeats a clientId within ITSELF is caught too. Pre-fetching is
+   * only safe because the loop is one real transaction; the unique partial index on
+   * (userId, clientId) remains the backstop.
    *
    * Returns the count actually inserted and the count skipped as already-present duplicates.
    */
@@ -327,23 +334,27 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   ): Promise<{ imported: number; duplicates: number }> {
     if (rows.length === 0) return { imported: 0, duplicates: 0 };
     try {
-      return await this.db.transaction(async (tx) => {
+      const present = await this.db
+        .select({ clientId: expenses.clientId })
+        .from(expenses)
+        .where(and(eq(expenses.userId, userId), isNotNull(expenses.clientId)));
+      const seenClientIds = new Set<string>();
+      for (const row of present) {
+        if (row.clientId) seenClientIds.add(row.clientId);
+      }
+
+      return this.db.transaction((tx) => {
         let imported = 0;
         let duplicates = 0;
         for (const row of rows) {
-          const data = { ...row, userId };
-          if (data.clientId) {
-            const existing = await tx
-              .select({ id: expenses.id })
-              .from(expenses)
-              .where(and(eq(expenses.clientId, data.clientId), eq(expenses.userId, userId)))
-              .limit(1);
-            if (existing.length > 0) {
-              duplicates += 1;
-              continue;
-            }
+          if (row.clientId && seenClientIds.has(row.clientId)) {
+            duplicates += 1;
+            continue;
           }
-          await tx.insert(expenses).values(data);
+          tx.insert(expenses)
+            .values({ ...row, userId })
+            .run();
+          if (row.clientId) seenClientIds.add(row.clientId);
           imported += 1;
         }
         return { imported, duplicates };
@@ -582,6 +593,12 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   /**
    * Delete all expenses linked to a source (e.g., insurance term, financing).
    * Used when a source entity is deleted/updated to replace auto-created expenses.
+   *
+   * CALLER CONTRACT: run `deletePhotosForEntities('expense', ids, userId)` for the linked ids FIRST
+   * (`findBySource` enumerates them). The raw `photos` delete below keeps the DB consistent, but only
+   * photo-service talks to the storage provider — drop a photo row without it and the receipt file
+   * stays in the user's Drive/Dropbox with nothing left pointing at it. This repository cannot call
+   * photo-service itself: photos/helpers.ts imports this module, so the dependency would be a cycle.
    */
   async deleteBySource(sourceType: string, sourceId: string, userId: string): Promise<number> {
     try {
@@ -594,11 +611,16 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
 
       const linkedIds = linked.map((e) => e.id);
 
-      await this.db.transaction(async (tx) => {
-        await tx
-          .delete(photos)
-          .where(and(eq(photos.entityType, 'expense'), inArray(photos.entityId, linkedIds)));
-        await tx.delete(expenses).where(this.sourceScope(sourceType, sourceId, userId));
+      // SYNCHRONOUS callback: two writes that must land together. An `async` callback would make
+      // bun-sqlite autocommit each one separately, so a throw after the photo delete would leave the
+      // expenses in place with their photo rows already gone — receipts detached from live rows.
+      this.db.transaction((tx) => {
+        tx.delete(photos)
+          .where(and(eq(photos.entityType, 'expense'), inArray(photos.entityId, linkedIds)))
+          .run();
+        tx.delete(expenses)
+          .where(this.sourceScope(sourceType, sourceId, userId))
+          .run();
       });
 
       return linked.length;
@@ -747,18 +769,21 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     const siblingIds = siblings.map((s) => s.id);
 
     try {
-      await this.db.transaction(async (tx) => {
+      // SYNCHRONOUS callback (as in updateSplitExpense): an `async` one makes bun-sqlite autocommit
+      // each write on its own, so a throw between the two would detach the siblings' photo rows from
+      // rows that are still there.
+      this.db.transaction((tx) => {
         // Delete photos attached to sibling expenses
-        await tx
-          .delete(photos)
-          .where(and(eq(photos.entityType, 'expense'), inArray(photos.entityId, siblingIds)));
+        tx.delete(photos)
+          .where(and(eq(photos.entityType, 'expense'), inArray(photos.entityId, siblingIds)))
+          .run();
 
         // Delete all sibling expense rows. AND the userId scope (not groupId alone): the read above is
         // userId-scoped, so the destructive write must match it — keeping ownership and deletion on the
         // SAME predicate. Behavior-identical today (groupId is a server cuid2, single-owner), but a
         // defense-in-depth boundary so a future cross-user group can never be cross-deleted (the
         // detectConflicts tenant-scope class).
-        await tx.delete(expenses).where(this.groupOwnedBy(groupId, userId));
+        tx.delete(expenses).where(this.groupOwnedBy(groupId, userId)).run();
       });
     } catch (error) {
       logger.error('Failed to delete split expense', {
@@ -813,8 +838,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       // absolute amounts in the config → they still need the caller's total to divide.
       const totalAmount =
         data.splitConfig.method === 'absolute'
-          ? Math.round(data.splitConfig.allocations.reduce((sum, a) => sum + a.amount, 0) * 100) /
-            100
+          ? data.splitConfig.allocations.reduce((sum, a) => sum + a.amount, 0)
           : (data.totalAmount ?? firstOld.groupTotal ?? firstOld.expenseAmount);
       const allocations = expenseSplitService.computeAllocations(data.splitConfig, totalAmount);
       const splitMethod: SplitMethod = data.splitConfig.method;

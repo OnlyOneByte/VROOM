@@ -25,9 +25,6 @@ export type NativeImportField =
 /** How dates are encoded in the foreign file (backend D3). */
 export type ImportDateFormat = 'iso' | 'mdy' | 'dmy' | 'epoch';
 
-/** Built-in tracker presets the backend can detect from a file's headers. */
-export type ImportPresetId = 'fuelly' | 'fuelio' | 'drivvo';
-
 /**
  * The field→header mapping the dialog sends to `POST /expenses/import` as `mapping`. Mirrors the
  * backend `ColumnMapping` / `columnMappingSchema` exactly — unmapped fields stay absent from

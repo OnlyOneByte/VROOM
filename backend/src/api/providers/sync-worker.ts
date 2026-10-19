@@ -297,12 +297,16 @@ async function processSingleRef(
     const errorMessage = extractErrorMessage(error);
 
     // A revoked/expired token (AUTH_INVALID) or a denied scope (PERMISSION_DENIED) is TERMINAL —
-    // retrying it burns backoff cycles and never succeeds. The provider adapters deliberately map
-    // a 401/403 to these codes "so the user re-connects"; honor that here by jumping
-    // retryCount straight to the cap so findPendingOrFailed (`retryCount < 3`) stops re-picking it,
-    // and prefix the message so the provider-stats `failed` count surfaces "reconnect required"
-    // rather than masquerading as a transient network flake (the family at the
-    // sync-worker consumer leg).
+    // retrying it burns backoff cycles and never succeeds. Honor that by jumping retryCount straight
+    // to the cap so findPendingOrFailed (`retryCount < 3`) stops re-picking it, and prefix the stored
+    // message so a parked ref reads as "reconnect required" rather than as a transient network flake.
+    //
+    // REACH: only the Google Photos client maps a 401/403 onto these codes today. The googleapis-backed
+    // Drive service and the AWS-SDK-backed S3 provider throw their vendor errors unmapped, so a revoked
+    // grant there still spends all three retries before parking at the same cap. Mapping them needs a
+    // code DISTINCT from AUTH_INVALID: that one means "the VROOM session expired" on the interactive
+    // routes (it is the 401 the frontend turns into "Please log in again"), and a provider's token
+    // expiring must not tell the user to re-authenticate to VROOM.
     const isTerminalAuth =
       isSyncError(error) &&
       (error.code === SyncErrorCode.AUTH_INVALID || error.code === SyncErrorCode.PERMISSION_DENIED);

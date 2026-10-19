@@ -260,13 +260,27 @@ class SyncManager {
 		expense: OfflineExpense
 	): Promise<{ date: string; amount: number; tags: string[] } | null> {
 		try {
+			// Narrow to the expense's OWN day using the filters GET /expenses actually implements.
+			// The query previously sent `date` and `amount`, neither of which exists on the route's
+			// query schema — Zod strips unknown keys, so the server answered with the vehicle's recent
+			// expenses UNFILTERED and the tag-overlap match below then flagged an unrelated expense from
+			// any date, for any amount, as a conflict with this one. `startDate`/`endDate` are the real
+			// parameters, and the route treats a date-only `endDate` as inclusive of its whole day. A
+			// stored date is the DatePicker's `YYYY-MM-DD`; should one ever carry a time, the slice
+			// yields its UTC day, so the window can only ever be too narrow — and a check that finds
+			// nothing falls back on the clientId idempotency the POST already carries.
+			const filters = new URLSearchParams({
+				vehicleId: expense.vehicleId,
+				startDate: expense.date.slice(0, 10),
+				endDate: expense.date.slice(0, 10)
+			});
 			// GET /expenses returns RAW backend rows (expenseAmount, un-split volume) — map each through
 			// fromBackendExpense like every other expense read. Skipping it left
 			// `existing.amount` undefined, so determineConflictType's `Math.abs(local.amount - server.amount)`
 			// was NaN → amountMatch always false → a genuine duplicate mis-classified 'modified', and the
 			// SyncConflictResolver dialog rendered a blank server amount.
 			const rows = await apiClient.get<BackendExpenseResponse[]>(
-				`/api/v1/expenses?vehicleId=${expense.vehicleId}&date=${expense.date}&amount=${expense.amount}`
+				`/api/v1/expenses?${filters.toString()}`
 			);
 			const expenseList = Array.isArray(rows) ? rows.map(fromBackendExpense) : [];
 			return (
@@ -386,6 +400,22 @@ class SyncManager {
 		fetchLastSyncTime();
 
 		if (browser) {
+			// Deliver whatever is already queued at mount. The 'online' event below fires only on a
+			// TRANSITION, so the ordinary PWA sequence — log an expense in a garage, close the app,
+			// reopen it the next day on wifi — never triggered delivery at all, and the rows sat in
+			// localStorage until the user happened to notice the pending badge, despite the app having
+			// promised they would "sync when online". Same 2s settle delay as the transition path;
+			// getPendingExpenses() already excludes parked rows, so a permanently-unsyncable row cannot
+			// make this re-POST on every app open, and a manual tap landing inside the delay is absorbed
+			// by syncAll's own in-progress guard (whose rejection is what the catch below swallows).
+			if (onlineStatus.current && getPendingExpenses().length > 0) {
+				setTimeout(() => {
+					this.syncAll().catch(error => {
+						if (import.meta.env.DEV) console.error('Startup sync failed:', error);
+					});
+				}, 2000);
+			}
+
 			window.addEventListener('online', () => {
 				if (!this.syncInProgress) {
 					fetchLastSyncTime();

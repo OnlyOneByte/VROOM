@@ -32,17 +32,17 @@ import { defineConfig, devices } from '@playwright/test';
  *
  * See e2e/README.md.
  */
-const PREVIEW = process.env.E2E_TARGET === 'preview';
+const PREVIEW = process.env['E2E_TARGET'] === 'preview';
 const PORT = PREVIEW ? 4173 : 5173;
 
 export default defineConfig({
 	testDir: './e2e',
 	fullyParallel: true,
-	forbidOnly: !!process.env.CI,
+	forbidOnly: !!process.env['CI'],
 	// Zero locally, on purpose: a retry here would hide a flake from the only person able to
 	// reproduce and fix it. CI retries because a red shared pipeline blocks everyone.
-	retries: process.env.CI ? 2 : 0,
-	workers: process.env.CI ? 1 : undefined,
+	retries: process.env['CI'] ? 2 : 0,
+	workers: process.env['CI'] ? 1 : undefined,
 	// `open: 'never'`: the default ('on-failure') hands the terminal to a report web server
 	// and never returns, so a failing run hangs CI and any non-interactive caller. `list` is
 	// already the default local reporter; it is named so adding `html` does not drop it.
@@ -100,7 +100,7 @@ export default defineConfig({
 		url: `http://localhost:${PORT}/`,
 		// A dev server always reads current source, so a reused one cannot serve a stale
 		// bundle. A preview server can, so it is never reused.
-		reuseExistingServer: !process.env.CI && !PREVIEW,
+		reuseExistingServer: !process.env['CI'] && !PREVIEW,
 		// Cold start is a dependency re-optimization plus the first SSR compile; on the
 		// preview target it is a full production build.
 		timeout: 180_000,

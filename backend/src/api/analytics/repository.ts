@@ -997,8 +997,25 @@ export class AnalyticsRepository {
 
   // ---- Financing helpers --------------------------------------------------
 
+  /**
+   * Resolve the current balance of every ACTIVE financing row in two queries total.
+   *
+   * Both financing builders need these, so they are computed ONCE per request and threaded in: a
+   * per-row `computeBalance` costs two queries each (its own doc says the batch form exists to
+   * avoid that N+1) and recomputing them per builder would also let the two halves of one response
+   * disagree. Ids with no matching record are absent from the map — read a miss as "no balance".
+   */
+  private async computeActiveBalances(
+    financingRows: Array<{ id: string; isActive: boolean }>
+  ): Promise<Map<string, number>> {
+    const { financingRepository } = await import('../financing/repository');
+    return financingRepository.computeBalances(
+      financingRows.filter((fin) => fin.isActive).map((fin) => fin.id)
+    );
+  }
+
   /** Build vehicle financing details from active financing rows. */
-  private async buildFinancingVehicleDetails(
+  private buildFinancingVehicleDetails(
     financingRows: Array<{
       id: string;
       vehicleId: string;
@@ -1010,16 +1027,16 @@ export class AnalyticsRepository {
       termMonths: number;
       startDate: Date | null;
     }>,
-    vehicleNameMap: Map<string, string>
-  ): Promise<{
+    vehicleNameMap: Map<string, string>,
+    balances: Map<string, number>
+  ): {
     vehicleDetails: FinancingData['vehicleDetails'];
     totalMonthlyPayments: number;
     remainingBalance: number;
     loanCount: number;
     leaseCount: number;
     activeIds: Set<string>;
-  }> {
-    const { financingRepository } = await import('../financing/repository');
+  } {
     const vehicleDetails: FinancingData['vehicleDetails'] = [];
     let totalMonthlyPayments = 0;
     let remainingBalance = 0;
@@ -1031,7 +1048,7 @@ export class AnalyticsRepository {
       if (!fin.isActive) continue;
       activeIds.add(fin.id);
       totalMonthlyPayments += fin.paymentAmount;
-      const computedBalance = await financingRepository.computeBalance(fin.id);
+      const computedBalance = balances.get(fin.id) ?? 0;
       remainingBalance += computedBalance;
       if (fin.financingType === 'loan') loanCount++;
       if (fin.financingType === 'lease') leaseCount++;
@@ -1123,7 +1140,7 @@ export class AnalyticsRepository {
   }
 
   /** Build loan interest/principal breakdown for the next 12 months. */
-  private async buildLoanBreakdown(
+  private buildLoanBreakdown(
     financingRows: Array<{
       id: string;
       isActive: boolean;
@@ -1131,8 +1148,9 @@ export class AnalyticsRepository {
       apr: number | null;
       originalAmount: number;
       paymentAmount: number;
-    }>
-  ): Promise<FinancingData['loanBreakdown']> {
+    }>,
+    balances: Map<string, number>
+  ): FinancingData['loanBreakdown'] {
     // NOTE: do NOT add `&& f.apr` — apr is `.min(0)`-valid, so a 0%-APR dealer-promo loan has apr===0
     // (falsy) and would be silently DROPPED from the breakdown chart, hiding a real active loan's
     // principal paydown (the 0%-APR class, 3rd site). financingType==='loan' already excludes
@@ -1141,19 +1159,16 @@ export class AnalyticsRepository {
     const activeLoans = financingRows.filter((f) => f.isActive && f.financingType === 'loan');
     if (activeLoans.length === 0) return [];
 
-    const { financingRepository } = await import('../financing/repository');
     const now = new Date();
 
-    // Resolve each loan's current balance, then hand the pure amortization helper the inputs +
-    // the 12 month-key labels. The helper walks each balance down by its principal each month
-    // (bug — balances were previously read but never decremented, so all 12 months were equal).
-    const loans = await Promise.all(
-      activeLoans.map(async (loan) => ({
-        balance: await financingRepository.computeBalance(loan.id),
-        apr: loan.apr ?? 0,
-        paymentAmount: loan.paymentAmount,
-      }))
-    );
+    // Hand the pure amortization helper each loan's current balance + the 12 month-key labels. The
+    // helper walks each balance DOWN by its principal every month, so the twelve rows differ; a
+    // balance held constant across the walk would make all twelve identical.
+    const loans = activeLoans.map((loan) => ({
+      balance: balances.get(loan.id) ?? 0,
+      apr: loan.apr ?? 0,
+      paymentAmount: loan.paymentAmount,
+    }));
     const monthKeys = Array.from({ length: 12 }, (_, m) =>
       toMonthKey(new Date(now.getFullYear(), now.getMonth() + m, 1))
     );
@@ -1375,8 +1390,15 @@ export class AnalyticsRepository {
   /** Compute fuel efficiency trend from sequential fuel expenses. */
   async getFuelEfficiencyTrend(userId: string, vehicleId?: string): Promise<FuelEfficiencyPoint[]> {
     try {
+      // Scope by expenses.userId, the column denormalized onto the row to eliminate the vehicles
+      // JOIN for exactly this shape of query — every other analytics read does the same. The row
+      // set is identical: a shared vehicle's rows carry the OWNER's userId (the owner-stamp
+      // invariant), the route resolves the owner id for a per-vehicle query, and vehicleId is NOT
+      // NULL + cascade-deleted, so the join could never have filtered anything either. What
+      // changes is the plan: the join drove from (category, date), scanning EVERY user's fuel rows
+      // and probing vehicles per row, where this uses (user_id, category, date).
       const conditions = [
-        eq(vehicles.userId, userId),
+        eq(expenses.userId, userId),
         eq(expenses.category, 'fuel'),
         isNotNull(expenses.mileage),
         isNotNull(expenses.volume),
@@ -1396,7 +1418,6 @@ export class AnalyticsRepository {
           missedFillup: expenses.missedFillup,
         })
         .from(expenses)
-        .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
         .where(and(...conditions))
         .orderBy(asc(expenses.vehicleId), asc(expenses.date));
       if (rows.length < 2) return [];
@@ -1574,6 +1595,10 @@ export class AnalyticsRepository {
         skipConversion
       );
     } catch (error) {
+      // getAllVehicleUnits throws a ValidationError naming the vehicle whose stored unit
+      // preferences do not parse. That is the actionable 400 the user needs to fix their data —
+      // wrapping it in a DatabaseError would answer 500 and swallow the vehicle id.
+      if (error instanceof ValidationError) throw error;
       logger.error('Failed to compute fuel stats', {
         userId,
         range,
@@ -1762,6 +1787,9 @@ export class AnalyticsRepository {
         skipConversion
       );
     } catch (error) {
+      // Same contract as getFuelStats: a vehicle's unparseable unit preferences are a 400 naming
+      // the offending vehicle, not an opaque 500.
+      if (error instanceof ValidationError) throw error;
       logger.error('Failed to compute fuel advanced analytics', {
         userId,
         range,
@@ -1972,6 +2000,7 @@ export class AnalyticsRepository {
         .select()
         .from(vehicleFinancing)
         .where(inArray(vehicleFinancing.vehicleId, userVehicleIds));
+      const balances = await this.computeActiveBalances(financingRows);
       const {
         vehicleDetails,
         totalMonthlyPayments,
@@ -1979,7 +2008,7 @@ export class AnalyticsRepository {
         loanCount,
         leaseCount,
         activeIds,
-      } = await this.buildFinancingVehicleDetails(financingRows, vehicleNameMap);
+      } = this.buildFinancingVehicleDetails(financingRows, vehicleNameMap, balances);
 
       const monthlyTimeline = this.buildFinancingTimeline(vehicleDetails);
 
@@ -2012,7 +2041,7 @@ export class AnalyticsRepository {
         vehicleDetails,
         monthlyTimeline,
         typeDistribution,
-        loanBreakdown: await this.buildLoanBreakdown(financingRows),
+        loanBreakdown: this.buildLoanBreakdown(financingRows, balances),
       };
     } catch (error) {
       logger.error('Failed to compute financing analytics', {

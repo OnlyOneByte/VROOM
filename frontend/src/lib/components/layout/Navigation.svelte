@@ -19,6 +19,7 @@
 	import { syncState, onlineStatus, offlineExpenseQueue } from '$lib/stores/offline.svelte';
 	import { syncConflicts } from '$lib/utils/sync/sync-manager';
 	import { getSyncStatusInfo } from '$lib/utils/sync/sync-status';
+	import { countPendingSync } from '$lib/utils/sync/pending-expenses';
 	import { Badge } from '$lib/components/ui/badge';
 	import {
 		Sheet,
@@ -63,13 +64,19 @@
 		mobileMenuOpen = false;
 	}
 
-	// Desktop sidebar hover state
+	// Desktop sidebar expansion: pointer hover OR keyboard focus inside it. Hover alone made the
+	// labels a mouse-only affordance — a keyboard user tabbing the sidebar got bare icons.
 	let isDesktopSidebarExpanded = $state(false);
 
+	function collapseSidebarOnFocusLeave(event: FocusEvent & { currentTarget: HTMLElement }): void {
+		// A null relatedTarget means focus left the document entirely, which should also collapse.
+		if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+			isDesktopSidebarExpanded = false;
+		}
+	}
+
 	// Mobile sync status helpers
-	let pendingCount = $derived(
-		offlineExpenseQueue.current.filter(expense => !expense.synced).length
-	);
+	let pendingCount = $derived(countPendingSync(offlineExpenseQueue.current));
 
 	let syncStatusInfo = $derived(
 		getSyncStatusInfo({
@@ -141,6 +148,7 @@
 											: 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
 									)}
 									onclick={closeMobileMenu}
+									aria-current={isActive(item.href) ? 'page' : undefined}
 								>
 									<IconComponent
 										class={cn(
@@ -168,6 +176,7 @@
 											: 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
 									)}
 									onclick={closeMobileMenu}
+									aria-current={isActive(item.href) ? 'page' : undefined}
 								>
 									<IconComponent
 										class={cn(
@@ -200,7 +209,13 @@
 	</div>
 </div>
 
-<!-- Desktop Sidebar -->
+<!--
+	Desktop Sidebar. The wrapper is explicitly presentational: it exists only for the width
+	transition and the hover/focus handlers that expand it, and the <nav> it contains is already the
+	navigation landmark. Giving this element role="navigation" too made two nested, unlabelled
+	navigation landmarks, so neither was distinguishable (axe landmark-unique). role="none" rather
+	than no role at all because a static element carrying pointer handlers needs one.
+-->
 <div
 	class={cn(
 		'hidden lg:fixed lg:inset-y-0 lg:flex lg:flex-col z-40',
@@ -209,7 +224,9 @@
 	)}
 	onmouseenter={() => (isDesktopSidebarExpanded = true)}
 	onmouseleave={() => (isDesktopSidebarExpanded = false)}
-	role="navigation"
+	onfocusin={() => (isDesktopSidebarExpanded = true)}
+	onfocusout={collapseSidebarOnFocusLeave}
+	role="none"
 >
 	<div
 		class={cn(
@@ -246,6 +263,7 @@
 						!isDesktopSidebarExpanded && 'justify-center'
 					)}
 					title={!isDesktopSidebarExpanded ? item.name : ''}
+					aria-current={isActive(item.href) ? 'page' : undefined}
 				>
 					<IconComponent
 						class={cn(
@@ -279,6 +297,7 @@
 							!isDesktopSidebarExpanded && 'justify-center'
 						)}
 						title={!isDesktopSidebarExpanded ? item.name : ''}
+						aria-current={isActive(item.href) ? 'page' : undefined}
 					>
 						<IconComponent
 							class={cn(

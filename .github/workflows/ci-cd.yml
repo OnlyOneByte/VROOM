@@ -91,6 +91,11 @@ jobs:
         # local runs are all covered by the same guard.
         run: npm run type-check
 
+      - name: Type check the E2E harness
+        # The app's program comes from the SvelteKit-generated include list, which covers src/
+        # only — e2e/ and playwright.config.ts compile under nothing without their own project.
+        run: npx tsc -p tsconfig.e2e.json --noEmit
+
       - name: Run linting
         run: npm run lint
 
@@ -99,6 +104,32 @@ jobs:
 
       - name: Build application
         run: npm run build
+
+      - name: Install Playwright browsers
+        # Chromium only. The suite declares five projects (two of them mobile viewports) and
+        # runs at `workers: 1` under CI, so the full matrix costs roughly 5x; chromium catches
+        # the regressions these specs are about — the a11y ratchet, the offline outbox drain,
+        # delete-confirms-before-DELETE, server-side search — at a fifth of the runtime. The
+        # engine-specific and mobile-viewport projects stay a local/pre-release concern.
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        # Sequential, after the build, NOT in parallel with type-check or vitest: those run
+        # `svelte-kit sync`, which rewrites .svelte-kit/generated/ and makes the dev server
+        # force-reload every open page, aborting in-flight navigations (see
+        # playwright.config.ts). The dev target needs no backend and no database — every
+        # /api/v1 call is mocked in-browser.
+        run: npm run test:e2e:chromium
+
+      - name: Upload Playwright report
+        # The axe scans attach their full violation JSON to the report; without this the
+        # report dies with the runner and a red a11y gate says only "expected [] to equal".
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7
 
   # Build and push Docker images
   build-backend:

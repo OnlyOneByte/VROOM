@@ -1,14 +1,13 @@
 import { eq } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/connection';
-import { odometerEntries, photos } from '../../db/schema';
+import { photos } from '../../db/schema';
 import { AppError, NotFoundError, ValidationError } from '../../errors';
-import {
-  validateExpenseOwnership,
-  validateInsuranceOwnership,
-  validateVehicleOwnership,
-} from '../../utils/validation';
+import { requireVehicleWrite } from '../../utils/sharing';
+import { validateInsuranceOwnership, validateVehicleOwnership } from '../../utils/validation';
+import { expenseRepository } from '../expenses/repository';
 import { insuranceClaimRepository } from '../insurance/claims-repository';
+import { odometerRepository } from '../odometer/repository';
 
 /**
  * Check photo ownership directly via photos.user_id.
@@ -61,19 +60,23 @@ export async function validateEntityOwnership(
       break;
     }
     case 'expense': {
-      // Shared validator throws NotFoundError('Expense') on miss/mismatch.
-      await validateExpenseOwnership(entityId, userId);
+      // Rows on a SHARED vehicle are OWNER-stamped: an accepted editor's expense carries the
+      // vehicle owner's userId, so a strict acting-user match denied the editor the receipt photo on
+      // a row they had just authored themselves — a 404 the UI reported as "re-upload in edit mode",
+      // where it 404'd again forever and the receipt was dropped. Load the row unscoped and
+      // authorize through the sharing seam instead: requireVehicleWrite is the SAME gate the expense
+      // mutate routes use, so photo access is never wider than the right to edit the expense itself
+      // (and a viewer/stranger keeps the existence-hiding 404).
+      const expense = await expenseRepository.findById(entityId);
+      if (!expense) throw new NotFoundError('Expense');
+      await requireVehicleWrite(expense.vehicleId, userId);
       break;
     }
     case 'odometer_entry': {
-      const db = getDb();
-      const rows = await db
-        .select({ userId: odometerEntries.userId })
-        .from(odometerEntries)
-        .where(eq(odometerEntries.id, entityId))
-        .limit(1);
-      const entry = rows[0];
-      if (!entry || entry.userId !== userId) throw new NotFoundError('Odometer entry');
+      // Owner-stamped on a shared vehicle exactly like expenses above — same gate, same reason.
+      const entry = await odometerRepository.findById(entityId);
+      if (!entry) throw new NotFoundError('Odometer entry');
+      await requireVehicleWrite(entry.vehicleId, userId);
       break;
     }
     default:

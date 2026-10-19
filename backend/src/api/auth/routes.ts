@@ -642,11 +642,31 @@ routes.delete('/accounts/:id', requireAuth, async (c) => {
   const accountId = c.req.param('id');
   const db = getDb();
 
-  const result = await db.transaction(async (tx) => {
-    // Verify row exists, belongs to user, and is auth domain
-    const row = await tx
-      .select()
+  // SYNCHRONOUS transaction callback: bun-sqlite is a sync dialect, so an `async` callback hands
+  // BEGIN/COMMIT a pending promise and each `await tx.…` inside it autocommits on its own. That made
+  // "you cannot unlink your last sign-in method" a read-then-write race rather than a guard: two
+  // concurrent unlinks of two different providers each counted 2, each passed, and the user was left
+  // with ZERO sign-in methods — unrecoverable from the UI, since there is no password auth and a
+  // fresh OAuth login refuses to merge into an account whose email already exists. Running with no
+  // yield point between the count and the delete (.all()/.run() inline, never awaited) is what puts
+  // them in one real transaction. The delete re-states the ownership + domain predicate so this
+  // route can never reach a row of another domain (e.g. a storage provider) by id.
+  const result = db.transaction((tx) => {
+    const authRows = tx
+      .select({ id: userProviders.id })
       .from(userProviders)
+      .where(and(eq(userProviders.userId, user.id), eq(userProviders.domain, 'auth')))
+      .all();
+
+    if (!authRows.some((row) => row.id === accountId)) {
+      return { error: 'not_found' as const };
+    }
+
+    if (authRows.length <= 1) {
+      return { error: 'last_account' as const };
+    }
+
+    tx.delete(userProviders)
       .where(
         and(
           eq(userProviders.id, accountId),
@@ -654,23 +674,7 @@ routes.delete('/accounts/:id', requireAuth, async (c) => {
           eq(userProviders.domain, 'auth')
         )
       )
-      .limit(1);
-
-    if (!row[0]) {
-      return { error: 'not_found' as const };
-    }
-
-    // Count auth rows within the transaction
-    const countResult = await tx
-      .select({ value: userProviders.id })
-      .from(userProviders)
-      .where(and(eq(userProviders.userId, user.id), eq(userProviders.domain, 'auth')));
-
-    if (countResult.length <= 1) {
-      return { error: 'last_account' as const };
-    }
-
-    await tx.delete(userProviders).where(eq(userProviders.id, accountId));
+      .run();
 
     return { success: true as const };
   });
@@ -704,6 +708,26 @@ routes.delete('/accounts/:id', requireAuth, async (c) => {
 // STORAGE PROVIDER OAUTH ROUTES (existing — kept below auth routes)
 // ============================================================================
 
+/**
+ * Is `value` a path this server may bounce a browser back to after the provider round-trip?
+ *
+ * The callback reports its outcome by redirecting to the frontend origin + returnTo + its own query
+ * string (see `frontendRedirect` in the provider callback below), so an unvalidated `returnTo` is an
+ * open redirect wearing the app's own origin. EXPORTED for its unit guard — the rejected shapes are
+ * the point of the function, and each one is a live hazard:
+ *  - not starting with a single `/`: `@evil.example.com/x` turns the app's origin into the URL's
+ *  *userinfo*, so the browser resolves the host to the attacker's while the link still reads as
+ *  the real app.
+ *  - `//host` or `/\host`: scheme-relative authorities.
+ *  - `?` or `#`: the callback appends its OWN query, so a returnTo carrying one would swallow
+ *  `provider_error`/`provider_connected`/`nonce` into a parameter value and the frontend would
+ *  never see the result of the flow.
+ *  - whitespace, which is how CR/LF would otherwise reach the Location header.
+ */
+export function isSafeReturnPath(value: string | undefined): value is string {
+  return value !== undefined && /^\/(?![/\\])[^?#\\\s]*$/.test(value);
+}
+
 // Provider OAuth initiation — isolated from login flow
 routes.get('/providers/connect/google', requireAuth, async (c) => {
   const user = c.get('user');
@@ -712,6 +736,12 @@ routes.get('/providers/connect/google', requireAuth, async (c) => {
 
   if (!returnTo || !nonce) {
     throw new HTTPException(400, { message: 'Missing required parameters: returnTo, nonce' });
+  }
+
+  if (!isSafeReturnPath(returnTo)) {
+    throw new HTTPException(400, {
+      message: 'returnTo must be a same-origin path beginning with /',
+    });
   }
 
   const providerId = c.req.query('providerId') ?? undefined;
@@ -824,7 +854,12 @@ function resolveProviderState(
   // a frontend page that EXISTS and reads `provider_error`, or the error is reported into a 404:
   // the provider-connect form (new/edit) is the only place that renders it, and this flow always
   // starts there.
-  const returnTo = storedData?.returnTo ?? '/settings/providers/new';
+  const requestedReturnTo = storedData?.returnTo ?? '/settings/providers/new';
+  // Re-validate on the way OUT as well as at intake, so a state written by any other code path —
+  // or one minted before the intake gate existed — still cannot steer this redirect off-origin.
+  const returnTo = isSafeReturnPath(requestedReturnTo)
+    ? requestedReturnTo
+    : '/settings/providers/new';
 
   // Handle OAuth cancellation (user denied consent)
   if (!code) {

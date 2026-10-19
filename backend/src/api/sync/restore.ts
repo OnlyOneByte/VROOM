@@ -28,7 +28,7 @@ import {
   vehicleShares,
   vehicles,
 } from '../../db/schema';
-import { SyncError, SyncErrorCode } from '../../errors';
+import { AppError, SyncError, SyncErrorCode, ValidationError } from '../../errors';
 import type { BackupConfig, ParsedBackupData } from '../../types';
 import { chunk, rowsPerInsert } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
@@ -71,6 +71,19 @@ export interface RestoreResponse {
   conflicts?: Conflict[];
 }
 
+/** NUL-joined composite key for a (vehicle, invitee) share pair — unambiguous for any id text. */
+const shareConsentKey = (vehicleId: string, sharedWithId: string): string =>
+  `${vehicleId}\u0000${sharedWithId}`;
+
+/**
+ * `vehicle_shares.level` is a plain text column whose allowed values are enforced only by the Zod
+ * enum on the share routes, so a hand-edited backup can carry anything. Access resolution already
+ * fails closed (only the exact string `editor` grants write), so an unknown level reads as a viewer
+ * either way — restore narrows it to the real literal so the column cannot hold a value no route
+ * could ever have written.
+ */
+const clampShareLevel = (level: unknown): string => (level === 'editor' ? 'editor' : 'viewer');
+
 class RestoreService {
   private db = getDb();
 
@@ -80,7 +93,7 @@ class RestoreService {
     file: Buffer,
     mode: 'replace' | 'merge' | 'preview'
   ): Promise<RestoreResponse> {
-    const parsedBackup = await backupService.parseZipBackup(file);
+    const parsedBackup = await this.parseOrReject(file);
 
     const userIdValidation = backupService.validateUserId(parsedBackup.metadata.userId, userId);
     if (!userIdValidation.valid) {
@@ -141,13 +154,40 @@ class RestoreService {
     // wipe+insert SYNCHRONOUSLY (.run()/.all() inline) keeps them in ONE real transaction, so a thrown
     // insert rolls the delete back. Keep this callback non-async + the helpers fully synchronous.
     this.db.transaction((tx) => {
+      // Read the invitee-consented grants BEFORE the wipe, which cascades vehicle_shares away with
+      // the vehicles (see consentedShareKeys).
+      const consented = this.consentedShareKeys(tx, userId);
       if (mode === 'replace') {
         this.deleteUserData(tx, userId);
       }
-      this.insertBackupData(tx, parsedBackup, userId);
+      this.insertBackupData(tx, parsedBackup, userId, consented);
     });
 
     return { success: true, imported: summary };
+  }
+
+  /**
+   * Parse the uploaded bytes, reporting bytes that are not a readable backup as the CLIENT error they
+   * are. Every other refusal on this endpoint is a clean 400 naming what is wrong; an unwrapped
+   * AdmZip or csv-parse throw instead reached the global handler as 500 "An internal error occurred",
+   * which tells the user the server broke and tells a self-hosted operator's monitoring that a server
+   * fault occurred — for the single likeliest restore mistake, picking the wrong file in the dialog.
+   * parseZipBackup's own refusals (zip-bomb ratio, oversize, missing member file) already carry an
+   * actionable 400 message, so they pass straight through; the parser's own message is attached as
+   * details because it names the offending CSV line. ValidationError rather than SyncError so the
+   * global handler also LOGS it as the client error it is — a SyncError is logged at error level as
+   * "Server error", which is the half of this that misleads an operator watching the logs.
+   */
+  private async parseOrReject(file: Buffer): Promise<ParsedBackupData> {
+    try {
+      return await backupService.parseZipBackup(file);
+    } catch (error) {
+      if (error instanceof AppError || error instanceof SyncError) throw error;
+      throw new ValidationError(
+        'That file is not a readable VROOM backup ZIP — it may be the wrong file, truncated, or edited into a shape the parser cannot read.',
+        { parserMessage: error instanceof Error ? error.message : String(error) }
+      );
+    }
   }
 
   /**
@@ -270,10 +310,11 @@ class RestoreService {
     // the identical synchronous treatment: wipe+insert run inline in ONE real transaction that rolls
     // back atomically if any insert throws.
     this.db.transaction((tx) => {
+      const consented = this.consentedShareKeys(tx, userId);
       if (mode === 'replace') {
         this.deleteUserData(tx, userId);
       }
-      this.insertBackupData(tx, sheetData, userId);
+      this.insertBackupData(tx, sheetData, userId, consented);
     });
 
     return { success: true, imported: summary };
@@ -559,7 +600,12 @@ class RestoreService {
   // bun-sqlite (sync dialect) had already committed the BEGIN before the first await resolved, so each
   // insert autocommitted alone and a later throw could not undo the wipe (the data-loss footgun). Running
   // sync keeps wipe+insert atomic — a thrown insert rolls the whole restore back.
-  private insertBackupData(tx: DrizzleTransaction, data: ParsedBackupData, userId: string): void {
+  private insertBackupData(
+    tx: DrizzleTransaction,
+    data: ParsedBackupData,
+    userId: string,
+    consentedShares: Set<string>
+  ): void {
     // Data is already coerced by coerceRow (ZIP path via parseZipBackup, Sheets path via
     // restoreFromSheets). Every insert goes through insertRows, which batches to stay under SQLite's
     // bind-parameter ceiling and no-ops on an empty array.
@@ -609,7 +655,12 @@ class RestoreService {
       vehicleShares,
       (data.vehicleShares ?? [])
         .filter((share) => knownUserIds.has(String(share.sharedWithId)))
-        .map((share) => ({ ...share, ownerId: userId }))
+        .map((share) => ({
+          ...share,
+          ownerId: userId,
+          level: clampShareLevel(share.level),
+          status: this.resolveShareStatus(share, consentedShares),
+        }))
     );
     this.insertRows(tx, userPreferences, this.stampUserId(data.userPreferences, userId));
     this.insertRows(tx, syncState, this.stampUserId(data.syncState, userId));
@@ -619,7 +670,7 @@ class RestoreService {
     // providers hold encrypted credentials and are NOT backed up, so a restored ref may point at a
     // provider that does not exist on this instance.
     const refRows = (data.photoRefs ?? []) as Record<string, unknown>[];
-    const knownProviders = this.knownProviderIds(tx, refRows);
+    const knownProviders = this.knownProviderIds(tx, refRows, userId);
     this.insertRows(
       tx,
       photoRefs,
@@ -628,12 +679,54 @@ class RestoreService {
   }
 
   /**
-   * Which of the providers named by `refRows` exist on this instance. The id list comes from the backup,
-   * so it is unbounded — chunked per the IN-clause contract in utils/chunk.
+   * The (vehicle, invitee) pairs whose invitee has ACTUALLY accepted a grant from this owner, read
+   * before the restore writes anything.
+   *
+   * A backup file is untrusted input, and `status` is the one field on a restorable row that encodes
+   * ANOTHER user's decision: `accepted` is only reachable through the invitee's own accept call, which
+   * is the consent boundary for the single deliberate cross-user widening in the app. Taking it
+   * verbatim from the ZIP let an importer mint an accepted grant on a stranger, and re-mint one the
+   * stranger had explicitly declined. Restore therefore re-derives it (see resolveShareStatus) from
+   * what the DB says the invitee agreed to, and this snapshot is that evidence.
+   *
+   * It MUST be read before `deleteUserData`: vehicle_shares.vehicle_id cascades on vehicle delete, so
+   * after the replace-mode wipe the table holds none of the owner's grants and every genuine accepted
+   * share would come back pending — sharees silently losing access on an ordinary restore.
+   */
+  private consentedShareKeys(tx: DrizzleTransaction, userId: string): Set<string> {
+    return new Set(
+      tx
+        .select({ vehicleId: vehicleShares.vehicleId, sharedWithId: vehicleShares.sharedWithId })
+        .from(vehicleShares)
+        .where(and(eq(vehicleShares.ownerId, userId), eq(vehicleShares.status, 'accepted')))
+        .all()
+        .map((row) => shareConsentKey(row.vehicleId, row.sharedWithId))
+    );
+  }
+
+  /**
+   * A restored grant keeps `accepted` only where the invitee is on record as having accepted THIS
+   * (vehicle, invitee) pair; anything else lands `pending`, so the invitee decides. Pending is the
+   * state a fresh invite starts in and the owner loses nothing by it — an invite to any address is
+   * already a normal feature — while the invitee keeps the accept/decline they are entitled to.
+   */
+  private resolveShareStatus(share: Record<string, unknown>, consented: Set<string>): string {
+    const key = shareConsentKey(String(share.vehicleId), String(share.sharedWithId));
+    return consented.has(key) ? 'accepted' : 'pending';
+  }
+
+  /**
+   * Which of the providers named by `refRows` exist on this instance AND belong to the importer. The
+   * ownership predicate matters because a ref naming someone ELSE's provider id would otherwise be
+   * accepted, after which the sync worker — which resolves a ref's provider by id alone, with no
+   * ownership check — would upload the importer's photo bytes into a stranger's storage account. The
+   * id list comes from the backup, so it is unbounded: chunked per the IN-clause contract in
+   * utils/chunk.
    */
   private knownProviderIds(
     tx: DrizzleTransaction,
-    refRows: Record<string, unknown>[]
+    refRows: Record<string, unknown>[],
+    userId: string
   ): Set<string> {
     const providerIds = [...new Set(refRows.map((ref) => String(ref.providerId)))];
     const known = new Set<string>();
@@ -641,7 +734,7 @@ class RestoreService {
       for (const row of tx
         .select({ id: userProviders.id })
         .from(userProviders)
-        .where(inArray(userProviders.id, batch))
+        .where(and(inArray(userProviders.id, batch), eq(userProviders.userId, userId)))
         .all()) {
         known.add(row.id);
       }

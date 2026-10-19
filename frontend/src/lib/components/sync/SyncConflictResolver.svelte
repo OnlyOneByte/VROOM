@@ -20,9 +20,24 @@
 	let currentConflict = $state<SyncConflict | null>(null);
 	let resolving = $state(false);
 
+	/**
+	 * The conflict batch the user has deferred, held by identity.
+	 *
+	 * Dismissal MUST be remembered: the effect below opens the dialog whenever a conflict is queued,
+	 * so without this every exit — Skip, the X, Escape, an overlay click — was undone in the same
+	 * flush, and the only way out of the dialog was to resolve every conflict.
+	 *
+	 * Identity is the right granularity because `syncConflicts.current` is REPLACED wholesale by each
+	 * sync run and appended to by a retry: deferring the batch on screen leaves it queued (the sidebar
+	 * keeps counting it) and the next sync attempt, or any newly discovered conflict, produces a
+	 * different array and brings the dialog back.
+	 */
+	let dismissedBatch = $state<SyncConflict[] | null>(null);
+
 	$effect(() => {
-		if (syncConflicts.current.length > 0 && !showModal) {
-			currentConflict = syncConflicts.current[0] ?? null;
+		const conflicts = syncConflicts.current;
+		if (conflicts.length > 0 && !showModal && conflicts !== dismissedBatch) {
+			currentConflict = conflicts[0] ?? null;
 			showModal = true;
 		}
 	});
@@ -53,6 +68,7 @@
 	}
 
 	function closeModal() {
+		dismissedBatch = syncConflicts.current;
 		showModal = false;
 		currentConflict = null;
 	}
@@ -62,7 +78,16 @@
 	}
 </script>
 
-<Dialog bind:open={showModal}>
+<Dialog
+	bind:open={showModal}
+	onOpenChange={open => {
+		// Escape, an overlay click and the X close through the primitive rather than closeModal(), so
+		// the deferral has to be recorded here as well — otherwise the effect re-opens the dialog in
+		// the same flush and those three controls do nothing. Only the primitive's own close paths
+		// reach this; a programmatic `showModal = false` does not.
+		if (!open) dismissedBatch = syncConflicts.current;
+	}}
+>
 	<DialogContent class="max-w-2xl">
 		{#if currentConflict}
 			<DialogHeader>

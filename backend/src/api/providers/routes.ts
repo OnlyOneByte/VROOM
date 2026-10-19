@@ -392,10 +392,17 @@ routes.post('/', zValidator('json', createProviderSchema), async (c) => {
     body.nonce
   );
 
-  // Use transaction to narrow TOCTOU window for duplicate check + insert
-  const created = await db.transaction(async (tx) => {
+  // SYNCHRONOUS transaction: the duplicate check and the insert must be ONE atomic step. The
+  // duplicate key is `config.accountEmail`, which lives inside a JSON blob, so no index can catch a
+  // racing second row (user_providers carries only a NON-unique (user_id, domain) index). bun-sqlite
+  // is a synchronous dialect: an async callback hands back a pending promise, so BEGIN/COMMIT wrap
+  // nothing and each awaited statement autocommits on its own — the check and the insert land in
+  // separate turns and a double-submitted "Connect" (or a replayed OAuth callback) interleaves
+  // between them, persisting two providers for the same account. Run synchronously (`.all()`,
+  // `.returning().get()`) and the whole check-then-insert cannot be interleaved.
+  const created = db.transaction((tx) => {
     // Check for duplicate: same user + domain + providerType + accountEmail
-    const existingProviders = await tx
+    const existingProviders = tx
       .select({ id: userProviders.id, config: userProviders.config })
       .from(userProviders)
       .where(
@@ -404,7 +411,8 @@ routes.post('/', zValidator('json', createProviderSchema), async (c) => {
           eq(userProviders.domain, body.domain),
           eq(userProviders.providerType, body.providerType)
         )
-      );
+      )
+      .all();
 
     const newAccountEmail = (resolvedConfig as Record<string, unknown> | null)?.accountEmail as
       | string
@@ -422,7 +430,7 @@ routes.post('/', zValidator('json', createProviderSchema), async (c) => {
       }
     }
 
-    const result = await tx
+    return tx
       .insert(userProviders)
       .values({
         userId: user.id,
@@ -433,9 +441,8 @@ routes.post('/', zValidator('json', createProviderSchema), async (c) => {
         config: resolvedConfig,
         status: 'active',
       })
-      .returning();
-
-    return result[0];
+      .returning()
+      .get();
   });
 
   // If domain is 'storage', auto-populate storage_config.providerCategories

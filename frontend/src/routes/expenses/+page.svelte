@@ -45,7 +45,7 @@
 	// Component state
 	let isLoading = $state(true);
 	let loadError = $state<string | null>(null);
-	let expenses = $state<ExpenseWithVehicle[]>([]);
+	let expenses = $state<Expense[]>([]);
 	let vehicles = $state<Vehicle[]>([]);
 	let summary = $state<ExpenseSummary | null>(null);
 
@@ -155,18 +155,23 @@
 	onMount(loadInitial);
 
 	/**
-	 * Initial page load. Previously these awaits were unguarded, so a failure in
-	 * settings/vehicles/expenses left `isLoading` stuck `true` forever (permanent
-	 * skeleton). Now a failure surfaces a persistent error + Retry, matching the
-	 * insurance/dashboard/analytics routes.
+	 * Initial page load, in ONE latency round. Settings, the vehicle list and the first expense
+	 * page are independent: the vehicle name shown on each row is joined reactively
+	 * (`displayExpenses`), so the rows no longer have to wait for the fleet to arrive.
+	 *
+	 * A failure in any leg must surface a persistent error + Retry rather than leave `isLoading`
+	 * stuck true forever on a permanent skeleton, matching the insurance/dashboard/analytics routes.
 	 */
 	async function loadInitial() {
 		isLoading = true;
 		loadError = null;
 		try {
-			await settingsStore.load();
-			vehicles = await vehicleApi.getVehicles();
-			await fetchPageAndSummary();
+			const [, loadedVehicles] = await Promise.all([
+				settingsStore.load(),
+				vehicleApi.getVehicles(),
+				fetchPageAndSummary()
+			]);
+			vehicles = loadedVehicles;
 		} catch (error) {
 			loadError = error instanceof Error ? error.message : 'Failed to load expenses';
 			handleErrorWithNotification(error, 'Failed to load expenses');
@@ -207,10 +212,7 @@
 				expenseApi.getExpenseSummary(buildSummaryParams())
 			]);
 
-			expenses = pageResult.data.map(expense => ({
-				...expense,
-				vehicle: vehicles.find(v => v.id === expense.vehicleId)
-			}));
+			expenses = pageResult.data;
 			totalCount = pageResult.pagination.totalCount;
 			currentOffset = offset;
 			summary = summaryResult;
@@ -230,10 +232,7 @@
 		isLoadingPage = true;
 		try {
 			const pageResult = await expenseApi.getAllExpenses(buildListParams(offset));
-			expenses = pageResult.data.map(expense => ({
-				...expense,
-				vehicle: vehicles.find(v => v.id === expense.vehicleId)
-			}));
+			expenses = pageResult.data;
 			totalCount = pageResult.pagination.totalCount;
 			currentOffset = offset;
 		} catch (error) {
@@ -333,10 +332,17 @@
 		await fetchPageAndSummary(currentOffset);
 	}
 
-	// Search is now applied server-side (description + category) across ALL pages,
-	// so the rows we receive are already filtered — no client-side narrowing needed.
-	// (The previous client-only filter silently missed matches on other pages.)
-	let displayExpenses = $derived(expenses);
+	// Search, category, date range and tags are all applied server-side across ALL pages, so the
+	// rows we receive are already the right ones — no client-side narrowing, which would only ever
+	// see the current 20-row page and silently hide matches on the others.
+	//
+	// The vehicle each row belongs to is joined HERE rather than at fetch time, so the page request
+	// and the vehicle-list request can go out together: a row rendered before the fleet arrives
+	// simply gains its vehicle name when it does, instead of keeping it blank for good.
+	let vehicleById = $derived(new Map(vehicles.map(v => [v.id, v])));
+	let displayExpenses = $derived<ExpenseWithVehicle[]>(
+		expenses.map(expense => ({ ...expense, vehicle: vehicleById.get(expense.vehicleId) }))
+	);
 </script>
 
 <svelte:head>
@@ -418,11 +424,14 @@
 						<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
 							<Search class="h-5 w-5 text-muted-foreground" />
 						</div>
+						<!-- The placeholder is not an accessible name: it disappears as soon as the user
+						     types, leaving a screen reader or voice-control user with an unnamed field. -->
 						<Input
 							type="text"
 							bind:value={searchTerm}
 							placeholder="Search expenses, vehicles..."
 							class="pl-10 w-full"
+							aria-label="Search expenses and vehicles"
 						/>
 					</div>
 					<div class="sm:w-56">

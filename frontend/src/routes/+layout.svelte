@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, type Component } from 'svelte';
 	import { page } from '$app/state';
 	import { authStore } from '$lib/stores/auth.svelte';
 	import { appStore } from '$lib/stores/app.svelte';
@@ -10,7 +10,7 @@
 	import OfflineIndicator from '$lib/components/sync/OfflineIndicator.svelte';
 	import { NOTIFICATION_LIMITS } from '$lib/constants/limits';
 	import PWAInstallPrompt from '$lib/components/layout/PWAInstallPrompt.svelte';
-	import SyncConflictResolver from '$lib/components/sync/SyncConflictResolver.svelte';
+	import { syncConflicts } from '$lib/utils/sync/sync-state.svelte';
 	import { pwaInfo } from 'virtual:pwa-info';
 	import { loadOfflineExpenses } from '$lib/utils/offline-storage';
 	import { offlineExpenseQueue } from '$lib/stores/offline.svelte';
@@ -22,7 +22,6 @@
 
 	import { LoaderCircle } from '@lucide/svelte';
 
-	import { vehicleApi } from '$lib/services/vehicle-api';
 	import { reminderApi } from '$lib/services/reminder-api';
 	import { maybeTriggerRecurringExpenses } from '$lib/utils/reminder-helpers';
 	import { onlineStatus } from '$lib/stores/offline.svelte';
@@ -31,20 +30,8 @@
 
 	let { children } = $props();
 
-	let vehiclesLoaded = $state(false);
 	let settingsLoaded = $state(false);
 	let recurringTriggered = $state(false);
-
-	async function loadUserVehicles() {
-		if (vehiclesLoaded) return;
-		try {
-			const vehicles = await vehicleApi.getVehicles();
-			appStore.setVehicles(vehicles);
-			vehiclesLoaded = true;
-		} catch (error) {
-			if (import.meta.env.DEV) console.error('Failed to load vehicles:', error);
-		}
-	}
 
 	// Hydrate the settings store app-wide once authenticated. currencyUnit and unit
 	// preferences are GLOBAL display state — getCurrencySymbol()/formatCurrency() and
@@ -78,10 +65,17 @@
 		});
 	}
 
+	// The SOLE toast dedup for the notification queue: a notification is toasted once, ever, even if
+	// it is re-added or the effect re-runs. Do not add a second "ids I saw last run" snapshot — the
+	// effect removes each notification as it toasts it, so any snapshot taken afterwards is empty.
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- intentionally non-reactive tracking Set, not used in $state or $derived
 	const shownNotifications = new Set<string>();
 
-	let previousNotificationIds = new Set<string>();
+	// The offline-sync conflict dialog: loaded on demand because its dialog/scroll-area/alert chrome
+	// is dead weight on every route for a modal that appears only when a queued write collides with
+	// the server. Set-once on purpose — resolving the last conflict empties the list, and unmounting
+	// the dialog in that same flush would tear it down mid-close.
+	let SyncConflictResolver = $state<Component | null>(null);
 
 	let webManifestLink = $derived(pwaInfo ? pwaInfo.webManifest.linkTag : '');
 
@@ -116,15 +110,21 @@
 
 	$effect(() => {
 		if (authState.isAuthenticated && !authState.isLoading) {
-			loadUserVehicles();
 			loadUserSettings();
 			maybeTriggerRecurring();
 		}
 	});
 
 	$effect(() => {
+		if (SyncConflictResolver || syncConflicts.current.length === 0) return;
+		void import('$lib/components/sync/SyncConflictResolver.svelte').then(module => {
+			SyncConflictResolver = module.default;
+		});
+	});
+
+	$effect(() => {
 		appState.notifications.forEach(notification => {
-			if (previousNotificationIds.has(notification.id) || shownNotifications.has(notification.id)) {
+			if (shownNotifications.has(notification.id)) {
 				return;
 			}
 
@@ -153,8 +153,6 @@
 			toastFn(notification.message, options);
 			appStore.removeNotification(notification.id);
 		});
-
-		previousNotificationIds = new Set(appState.notifications.map(n => n.id));
 	});
 
 	$effect(() => {
@@ -215,8 +213,10 @@
 <!-- PWA install prompt -->
 <PWAInstallPrompt />
 
-<!-- Sync conflict resolver -->
-<SyncConflictResolver />
+<!-- Sync conflict resolver (loaded on first conflict) -->
+{#if SyncConflictResolver}
+	<SyncConflictResolver />
+{/if}
 
 <!-- Sonner toast container -->
 <Toaster position="bottom-right" richColors closeButton />

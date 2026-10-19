@@ -20,7 +20,7 @@
 	import {
 		categoryLabels,
 		getCategoryIcon,
-		getCategoryColor,
+		getCategoryBadgeClasses,
 		compareExpenseRows,
 		type SortableRow
 	} from '$lib/utils/expense-helpers';
@@ -89,10 +89,10 @@
 		expenses: Expense[];
 		vehicles?: Vehicle[];
 		showVehicleColumn?: boolean;
-		/** vehicle-sharing T12b-3b: expense edit/delete are WRITES (owner or accepted editor). A shared
-		 *  VIEWER sees the table read-only. When false, the Edit links are hidden AND `onDelete` is
-		 *  suppressed (so every existing `{#if onDelete}` delete gate hides too). Default true so every
-		 *  existing call site (global expenses page, owner vehicle tab) is unchanged. */
+		/** Editing or deleting an expense is a write, so a vehicle shared read-only renders the table
+		 *  without either. When false the Edit links are hidden AND `onDelete` is suppressed, so every
+		 *  `{#if onDelete}` delete gate hides with it. Defaults true: a caller that does not mention
+		 *  sharing is the owner's own view. */
 		canWrite?: boolean;
 		returnTo?: string;
 		onDelete?: (_expense: Expense) => Promise<void>;
@@ -154,8 +154,8 @@
 		onCategoryChange
 	}: Props = $props();
 
-	// vehicle-sharing T12b-3b: a VIEWER (canWrite=false) gets NO delete — suppress onDelete so every
-	// `{#if onDelete}` delete-affordance gate (mobile + desktop, standalone + split) hides in one place.
+	// A read-only viewer gets no delete. Suppressing the callback here — rather than at each site —
+	// hides every `{#if onDelete}` affordance (mobile + desktop, standalone + split) in one place.
 	// The Edit links are gated separately on `canWrite` at each href site.
 	let onDelete = $derived(canWrite ? onDeleteProp : undefined);
 
@@ -163,8 +163,11 @@
 	// (getVehicleForExpense is called at several render sites for every expense + child).
 	let vehicleMap = $derived(new Map(vehicles.map(v => [v.id, v])));
 
-	// Pagination derived values
-	let showPagination = $derived(totalCount !== undefined && onPageChange !== undefined);
+	// Pagination derived values. Nothing to page through means no bar: an empty list already
+	// explains itself with its empty state, and a Previous/Next pair under it is dead chrome.
+	let showPagination = $derived(
+		totalCount !== undefined && totalCount > 0 && onPageChange !== undefined
+	);
 
 	const isMobile = new IsMobile();
 
@@ -399,11 +402,23 @@
 
 	/** Layout of a compact row's summary, shared by its interactive and read-only forms. */
 	const MOBILE_ROW_SUMMARY_CLASS = 'flex w-full items-start gap-3 px-3 py-3 text-left';
+
+	/**
+	 * A compact row's Edit/Delete pair. They are drawn small so the revealed strip does not
+	 * dominate the card, which leaves them under the 40px tap-target floor — so each carries an
+	 * invisible 6px-per-side vertical hit area (28px drawn, 40px touchable) instead of growing.
+	 * `inset-x-0` keeps the extension vertical only: the two sit side by side and one of them is
+	 * destructive, so their hit areas must never overlap. Their container pads the top by the same
+	 * 6px so the extension stays inside the strip rather than stealing from the row above.
+	 */
+	const MOBILE_ROW_ACTION_CLASS =
+		"h-7 px-2 text-xs relative before:absolute before:inset-x-0 before:-inset-y-1.5 before:content-['']";
+	const MOBILE_ROW_ACTIONS_CONTAINER_CLASS = 'flex items-center justify-end gap-2 px-3 pt-1.5 pb-3';
 </script>
 
 {#snippet mobileExpenseSummary(expense: Expense, vehicle: Vehicle | undefined)}
 	{@const IconComponent = getCategoryIcon(expense.category)}
-	<div class="mt-0.5 p-1.5 rounded-lg {getCategoryColor(expense.category)} flex-shrink-0">
+	<div class="mt-0.5 p-1.5 rounded-lg {getCategoryBadgeClasses(expense.category)} flex-shrink-0">
 		<IconComponent class="h-4 w-4" />
 	</div>
 	<div class="flex-1 min-w-0">
@@ -558,11 +573,11 @@
 								</div>
 							{/if}
 							{#if isSelected && canWrite}
-								<div class="flex items-center justify-end gap-1 px-3 pb-3">
+								<div class={MOBILE_ROW_ACTIONS_CONTAINER_CLASS}>
 									<Button
 										variant="ghost"
 										size="sm"
-										class="h-7 px-2 text-xs"
+										class={MOBILE_ROW_ACTION_CLASS}
 										href={`${resolve(paramRoutes.expenseEdit, { id: expense.id })}?returnTo=${returnTo}`}
 									>
 										<Pencil class="h-3.5 w-3.5 mr-1" />
@@ -572,7 +587,7 @@
 										<Button
 											variant="ghost"
 											size="sm"
-											class="h-7 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+											class="{MOBILE_ROW_ACTION_CLASS} text-destructive hover:text-destructive hover:bg-destructive/10"
 											onclick={() => confirmDelete(expense)}
 										>
 											<Trash2 class="h-3.5 w-3.5 mr-1" />
@@ -595,7 +610,11 @@
 								aria-expanded={isSelected}
 								onclick={() => selectRow(row.groupId)}
 							>
-								<div class="mt-0.5 p-1.5 rounded-lg {getCategoryColor(row.category)} flex-shrink-0">
+								<div
+									class="mt-0.5 p-1.5 rounded-lg {getCategoryBadgeClasses(
+										row.category
+									)} flex-shrink-0"
+								>
 									<IconComponent class="h-4 w-4" />
 								</div>
 								<div class="flex-1 min-w-0">
@@ -633,11 +652,11 @@
 							</button>
 							{#if isSelected && canWrite}
 								{@const blockedId = blockedReasonId(row.groupId)}
-								<div class="flex items-center justify-end gap-1 px-3 pb-3">
+								<div class={MOBILE_ROW_ACTIONS_CONTAINER_CLASS}>
 									<Button
 										variant="ghost"
 										size="sm"
-										class="h-7 px-2 text-xs"
+										class={MOBILE_ROW_ACTION_CLASS}
 										href={`${resolve(paramRoutes.expenseEdit, { id: row.children[0]?.id ?? '' })}?returnTo=${returnTo}`}
 									>
 										<Pencil class="h-3.5 w-3.5 mr-1" />
@@ -647,7 +666,7 @@
 										<Button
 											variant="ghost"
 											size="sm"
-											class="h-7 px-2 text-xs {isInsuranceLinked(row)
+											class="{MOBILE_ROW_ACTION_CLASS} {isInsuranceLinked(row)
 												? 'cursor-not-allowed aria-disabled:pointer-events-auto'
 												: 'text-destructive hover:text-destructive hover:bg-destructive/10'}"
 											onclick={() => requestGroupDelete(row)}
@@ -796,7 +815,9 @@
 									<TableCell>
 										<div class="flex items-center gap-2">
 											<div
-												class="p-1.5 rounded-lg {getCategoryColor(expense.category)} flex-shrink-0"
+												class="p-1.5 rounded-lg {getCategoryBadgeClasses(
+													expense.category
+												)} flex-shrink-0"
 											>
 												<IconComponent class="h-4 w-4" />
 											</div>
@@ -905,7 +926,11 @@
 									{/if}
 									<TableCell>
 										<div class="flex items-center gap-2">
-											<div class="p-1.5 rounded-lg {getCategoryColor(row.category)} flex-shrink-0">
+											<div
+												class="p-1.5 rounded-lg {getCategoryBadgeClasses(
+													row.category
+												)} flex-shrink-0"
+											>
 												<IconComponent class="h-4 w-4" />
 											</div>
 											<span class="whitespace-nowrap"
@@ -1049,7 +1074,7 @@
 				{@const IconComponent = getCategoryIcon(expenseToDelete.category)}
 				<div class="bg-muted rounded-lg p-3">
 					<div class="flex items-center gap-3">
-						<div class="p-2 rounded-lg {getCategoryColor(expenseToDelete.category)}">
+						<div class="p-2 rounded-lg {getCategoryBadgeClasses(expenseToDelete.category)}">
 							<IconComponent class="h-4 w-4" />
 						</div>
 						<div class="flex-1">

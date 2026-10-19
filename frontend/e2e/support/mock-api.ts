@@ -326,6 +326,25 @@ export async function mockApi(page: Page, options: MockApiOptions = {}) {
 		if (path === '/photos') return fulfillData(route, {});
 		if (/^\/photos\/[^/]+\/[^/]+$/.test(path)) return fulfillPage(route, []);
 
+		// ── insurance ─────────────────────────────────────────────────────────
+		if (path === '/insurance') return fulfillData(route, []);
+
+		// ── trips ─────────────────────────────────────────────────────────────
+		// Every `milesByPurpose` key must be present: the page indexes the record per purpose,
+		// so a missing one renders `undefined` where a number belongs.
+		if (path === '/trips/summary') {
+			return fulfillData(route, {
+				tripCount: 0,
+				totalMiles: 0,
+				milesByPurpose: { business: 0, personal: 0, commute: 0, other: 0 },
+				averageTripMiles: 0,
+				businessMiles: 0,
+				businessMileageValue: 0,
+				rate: 0.67
+			});
+		}
+		if (path === '/trips') return fulfillPage(route, []);
+
 		// ── reminders ─────────────────────────────────────────────────────────
 		if (path === '/reminders/recurring-cost') {
 			return fulfillData(route, { count: 0, monthlyTotal: 0 });

@@ -2,20 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { authStore } from '../../stores/auth.svelte';
 import type { User } from '../../types/index.js';
 
-// Mock $app/stores
-vi.mock('$app/stores', () => {
-	const mockPageStore = {
-		subscribe: vi.fn(callback => {
-			callback({ url: { pathname: '/dashboard' } });
-			return () => {};
-		})
-	};
-
-	return {
-		page: mockPageStore
-	};
-});
-
 // Mock $app/state
 vi.mock('$app/state', () => ({
 	page: { url: { pathname: '/dashboard' } }

@@ -589,7 +589,10 @@ export class InsurancePolicyRepository {
           throw new NotFoundError('Term');
         }
 
-        // Delete term — junction rows cascade, expenses get SET NULL via FK
+        // Delete term — the junction rows cascade via FK. The materialized premium EXPENSES do
+        // NOT: they link to the term by the plain text (sourceType, sourceId) pair, with no FK, so
+        // nothing here touches them and they would stay summed into TCO insurance cost forever.
+        // The caller MUST deleteBySource('insurance_term', termId) first.
         await tx.delete(insuranceTerms).where(eq(insuranceTerms.id, termId));
 
         // Update policy updatedAt

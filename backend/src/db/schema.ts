@@ -1,5 +1,5 @@
 import { createId } from '@paralleldrive/cuid2';
-import { relations, sql } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import {
   index,
   integer,
@@ -364,11 +364,6 @@ export const sessions = sqliteTable('sessions', {
     .references(() => users.id, { onDelete: 'cascade' }),
   expiresAt: integer('expires_at').notNull(),
 });
-
-// Relations
-export const expensesRelations = relations(expenses, ({ one }) => ({
-  vehicle: one(vehicles, { fields: [expenses.vehicleId], references: [vehicles.id] }),
-}));
 
 // Odometer Entries table (v2: removed linkedEntityType, linkedEntityId, odometer_linked_entity_idx)
 export const odometerEntries = sqliteTable(

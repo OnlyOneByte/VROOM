@@ -1,20 +1,22 @@
 /**
- * Regression GUARD (committed, travels with the merge) for the cycle-18 dedup:
- * `photos/helpers.ts validateEntityOwnership` must route the vehicle / expense /
- * insurance_policy cases through the SHARED exported validators in
- * `utils/validation.ts` — never a private copy or an inlined repository check.
+ * Regression GUARD: `photos/helpers.ts validateEntityOwnership` must express each entity's
+ * authorization rule by calling a SHARED seam — never a private copy or an inlined repository
+ * check. Two implementations of one authorization rule drift independently: one gets a security
+ * fix, the other does not.
  *
- * Before this file carried a private `validateExpenseOwnership` plus inlined
- * `vehicleRepository.findByUserIdAndId` / `insurancePolicyRepository.findById`
- * ownership checks that duplicated the shared validators — two implementations of
- * the same authorization rule that could DRIFT independently (one gets a security
- * fix, the other doesn't). collapsed them to one source of truth. This guard
- * fails if any of that duplication creeps back.
+ * This file once carried a private `validateExpenseOwnership` plus inlined
+ * `vehicleRepository.findByUserIdAndId` / `insurancePolicyRepository.findById` checks that
+ * duplicated the shared validators. Which seam each entity belongs to is itself load-bearing:
+ *  - `vehicle` / `insurance_policy` own via their own userId column → the STRICT validators in
+ *  utils/validation.ts.
+ *  - `expense` / `odometer_entry` are OWNER-STAMPED on a shared vehicle (the row carries the
+ *  vehicle owner's userId, not the editor's), so a strict acting-user match denies an accepted
+ *  editor the photo on a row they authored → the vehicle-sharing seam, `requireVehicleWrite`.
+ *  Reverting either to a userId-match check brings back a 404 on the editor's own receipt.
  *
- * It deliberately does NOT touch the genuinely-inline cases that have no shared
- * validator: `insurance_claim` (transitive claim→policy ownership via
- * insuranceClaimRepository) and `odometer_entry` (direct odometer_entries.user_id
- * check), nor `validatePhotoOwnership` (a different check on an existing photo row).
+ * It deliberately does NOT touch `insurance_claim` (transitive claim→policy ownership via
+ * insuranceClaimRepository, no shared validator exists) nor `validatePhotoOwnership` (a different
+ * check, on an existing photo row).
  *
  * Pure source scan — no DB, no network. Runs in the fast suite.
  */
@@ -36,27 +38,34 @@ describe('photo entity-ownership uses the shared validators', () => {
     expect(readHelpers().length, `unreadable/empty: ${HELPERS}`).toBeGreaterThan(200);
   });
 
-  test('routes vehicle / expense / insurance_policy through the shared validators', () => {
+  test('routes vehicle / insurance_policy through the strict shared validators', () => {
     const src = readHelpers();
-    for (const fn of [
-      'validateVehicleOwnership',
-      'validateExpenseOwnership',
-      'validateInsuranceOwnership',
-    ]) {
+    for (const fn of ['validateVehicleOwnership', 'validateInsuranceOwnership']) {
       expect(
         src.includes(`${fn}(`),
-        `validateEntityOwnership must call the shared ${fn} from utils/validation.ts ` +
+        `validateEntityOwnership must call the shared ${fn} from utils/validation.ts. ` +
           `Missing call site.`
       ).toBe(true);
     }
   });
 
+  test('routes the owner-stamped entities through the vehicle-sharing seam', () => {
+    const src = readHelpers();
+    expect(
+      src.includes('requireVehicleWrite('),
+      'the expense and odometer_entry legs must authorize via requireVehicleWrite (utils/sharing.ts). ' +
+        'A userId-match check there denies an accepted editor the photo on their own owner-stamped row.'
+    ).toBe(true);
+    // Two call sites, one per owner-stamped entity type — not one leg quietly left behind.
+    expect(src.match(/requireVehicleWrite\(/g)?.length).toBe(2);
+  });
+
   test('does NOT locally re-declare a shared ownership validator (no shadowing duplicate)', () => {
     const src = readHelpers();
     // The shared validators are IMPORTED; a local `function`/`const` of the same name
-    // would be a re-introduced private copy that can drift from utils/validation.ts.
+    // would be a re-introduced private copy that can drift from its source of truth.
     const localDecl =
-      /(?:function|const|let)\s+(validateVehicleOwnership|validateExpenseOwnership|validateInsuranceOwnership)\b/;
+      /(?:function|const|let)\s+(validateVehicleOwnership|validateInsuranceOwnership|requireVehicleWrite)\b/;
     const m = localDecl.exec(src);
     expect(
       m,

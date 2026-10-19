@@ -187,7 +187,9 @@ export class BackupOrchestrator {
 
       // Collect results — track BOTH succeeded and failed providers so the run-level outcome is honest.
       const results: Record<string, BackupStrategyResult> = {};
-      const updatedConfig = { ...config, providers: { ...config.providers } };
+      // Only the stamps THIS run earned, keyed by provider, applied later as an atomic JSON patch
+      // rather than as a rewrite of the whole column (see the persist step below).
+      const configPatch: Record<string, Record<string, string>> = {};
       let anySuccess = false;
       const failedProviders: string[] = [];
 
@@ -208,20 +210,14 @@ export class BackupOrchestrator {
 
         if (result.success) {
           anySuccess = true;
-          updatedConfig.providers[providerId] = {
-            ...updatedConfig.providers[providerId],
-            lastBackupAt: timestamp,
-          };
+          configPatch[providerId] = { lastBackupAt: timestamp };
 
           // Persist sheetsSpreadsheetId from strategy result
           const sheetsId = result.capabilities.sheets?.metadata?.spreadsheetId as
             | string
             | undefined;
           if (sheetsId) {
-            updatedConfig.providers[providerId] = {
-              ...updatedConfig.providers[providerId],
-              sheetsSpreadsheetId: sheetsId,
-            };
+            configPatch[providerId].sheetsSpreadsheetId = sheetsId;
           }
         } else {
           failedProviders.push(providerId);
@@ -247,8 +243,19 @@ export class BackupOrchestrator {
       // advances on a fully-clean run — if ANY provider failed, the user still has un-synced changes,
       // so leaving the anchor un-advanced is what makes the failed provider RETRY next run. A
       // partial-success that advanced the anchor would strand the failed provider forever.
+      //
+      // Patch the column, never rewrite it. The config was read at the top of a run whose per-provider
+      // budget is OPERATION_TIMEOUTS.BACKUP, so writing back a whole-column value derived from that
+      // snapshot discards every concurrent edit made during the run — a provider the user disconnected
+      // mid-run came back, and a backup the user switched OFF in Settings mid-run was silently switched
+      // on again. The patch names only the providers this run actually backed up and only the stamps it
+      // earned, so siblings and concurrent edits survive; it carries no `enabled`/`sheetsSyncEnabled`
+      // key, so a key re-created for a provider deleted mid-run cannot make a ghost eligible for the
+      // next run.
       if (anySuccess) {
-        await preferencesRepository.update(userId, { backupConfig: updatedConfig });
+        await preferencesRepository.mergeJsonField(userId, 'backupConfig', {
+          providers: configPatch,
+        });
       }
       if (runOutcome === 'success') {
         const { syncStateRepository } = await import('../settings/repository');

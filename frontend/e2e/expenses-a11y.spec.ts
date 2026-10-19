@@ -1,5 +1,5 @@
-import AxeBuilder from '@axe-core/playwright';
 import { test, expect, type Page, type TestInfo } from '@playwright/test';
+import { scanA11y } from './support/axe';
 import {
 	addSessionCookie,
 	mockApi,
@@ -106,16 +106,7 @@ async function openExpenses(page: Page) {
 
 /** The rule ids axe reports in the current state, attached to the report either way. */
 async function axeViolationIds(page: Page, testInfo: TestInfo, label: string) {
-	const results = await new AxeBuilder({ page })
-		.withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-		.analyze();
-
-	await testInfo.attach(`axe-expenses-${label}.json`, {
-		body: JSON.stringify(results.violations, null, 2),
-		contentType: 'application/json'
-	});
-
-	return [...new Set(results.violations.map(v => v.id))].sort();
+	return (await scanA11y(page, testInfo, `expenses-${label}`)).ids;
 }
 
 test.describe('Expense list accessibility — wide layout', () => {

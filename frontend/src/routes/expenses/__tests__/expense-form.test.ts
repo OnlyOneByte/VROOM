@@ -7,15 +7,6 @@ vi.mock('$app/navigation', () => ({
 	goto: vi.fn()
 }));
 
-vi.mock('$app/stores', () => ({
-	page: {
-		subscribe: vi.fn(callback => {
-			callback({ url: { pathname: '/expenses/new' } });
-			return () => {};
-		})
-	}
-}));
-
 vi.mock('$app/state', () => ({
 	page: { url: { pathname: '/expenses/new' } }
 }));

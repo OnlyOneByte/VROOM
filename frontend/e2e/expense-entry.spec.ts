@@ -257,8 +257,11 @@ test.describe('Expense list', () => {
 		});
 
 		// The page-level search box, not the table's own control: the table's controls differ
-		// between the compact and wide layouts, this input does not.
-		await page.getByRole('textbox', { name: 'Search expenses, vehicles...' }).fill('oil');
+		// between the compact and wide layouts, this input does not. Matched on a prefix because
+		// the accessible name is whatever labels the input — a placeholder today, an explicit
+		// `aria-label` the moment someone gives it one — and this test is about the request it
+		// issues, not about its wording.
+		await page.getByRole('textbox', { name: /^Search expenses/i }).fill('oil');
 
 		await filtered;
 	});

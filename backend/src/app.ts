@@ -32,6 +32,7 @@ import { routes as syncRoutes } from './api/sync/routes';
 import { routes as tripRoutes } from './api/trips/routes';
 import { routes as vehicleRoutes } from './api/vehicles/routes';
 import { CONFIG } from './config';
+import { createErrorResponse } from './errors';
 import { activityTracker, bodyLimit, errorHandler, optionalAuth, rateLimiter } from './middleware';
 import { getClientIp } from './utils/client-ip';
 import { logger } from './utils/logger';
@@ -221,16 +222,16 @@ app.get('/api', (c) => {
   });
 });
 
-// 404 handler
-app.notFound((c) => {
-  return c.json(
-    {
-      error: 'Not Found',
-      message: 'The requested endpoint does not exist',
+// 404 handler. Shapes the standard error envelope, same as every thrown error: a string-valued
+// `error` would leave the client reading `error.message` of a string — undefined — so the UI could
+// only report the bare status code.
+app.notFound((c) =>
+  c.json(
+    createErrorResponse('NotFoundError', 'The requested endpoint does not exist', {
       path: c.req.path,
-    },
+    }),
     404
-  );
-});
+  )
+);
 
 export { app };

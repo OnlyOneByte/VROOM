@@ -12,16 +12,6 @@ vi.mock('$app/navigation', () => ({
 	goto: vi.fn()
 }));
 
-// Mock $app/stores
-vi.mock('$app/stores', () => ({
-	page: {
-		subscribe: vi.fn(callback => {
-			callback({ params: { id: 'test-vehicle-id' }, url: { pathname: '/vehicles' } });
-			return () => {};
-		})
-	}
-}));
-
 vi.mock('$app/state', () => ({
 	page: { params: { id: 'test-vehicle-id' }, url: { pathname: '/vehicles' } }
 }));

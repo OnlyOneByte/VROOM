@@ -28,10 +28,26 @@ Prerequisites:
   as a readable failure instead of an `undefined` field. Nothing listens on :3001 during a
   run and nothing needs to.
 
-A full five-engine run is 220 tests, 15 of which are skipped on the dev target (the three
-build-only PWA tests, across five projects). Most individual tests land in 1-3s once the
-routes are warm, but a failing test burns its 90s timeout, so a red run takes far longer
-than a green one. `npm run test:e2e:chromium` is the fast inner loop.
+A full five-engine run is 335 tests, 55 of which skip on the dev target: the three
+build-only PWA tests across five projects (15), and the ten-theme palette sweep on the four
+non-chromium projects (40). Most individual tests land in 1-3s once the routes are warm, but
+a failing test burns its 90s timeout, so a red run takes far longer than a green one.
+`npm run test:e2e:chromium` is the fast inner loop — 67 tests, measured at 52s against a
+warm preview server and 1-3 minutes against dev.
+
+## What runs this
+
+CI runs `npm run test:e2e:chromium` in the `frontend-test` job, after `npm run build`, and
+uploads `playwright-report/` as an artifact (that is where the axe violation JSON lands).
+Chromium only: the five-project matrix at `workers: 1` costs roughly 5x for regressions that
+are not engine-specific, so the other four engines and the mobile viewports stay a local and
+pre-release concern.
+
+The harness is also its own type-check program. SvelteKit generates the app's `include` list
+and it covers `src/` only, so `e2e/` and `playwright.config.ts` would compile under nothing;
+`frontend/tsconfig.e2e.json` extends the app's `tsconfig.json` (same strictness) over those
+files instead, and CI runs `npx tsc -p tsconfig.e2e.json --noEmit`. Run it before pushing —
+the suite is not a place where a type error should have to be found by a red browser run.
 
 ## The two server targets
 
@@ -74,14 +90,15 @@ lives in the server, so one browser warms the expensive half for all five projec
 prints a line you should expect to see at the top of every run:
 
 ```
-[e2e] warmed 8/8 routes in 9.3s
+[e2e] warmed 12/12 routes in 9.3s
 ```
 
-Warming cannot fail the suite. A route that fails to warm is listed as `un-warmed` and
-still runs its own tests, which then fail with a real assertion rather than hiding behind a
-setup error — and the `chromium.launch()` itself is inside that guard too, so a missing
-browser binary prints `warming skipped: …` instead of aborting the run (including for the
-four projects that never use chromium).
+Warming cannot fail the suite. A route that fails to warm is listed as `un-warmed` **with
+the reason it failed** — a half-warmed run is only actionable if you can tell an aborted
+navigation from a timeout — and still runs its own tests, which then fail with a real
+assertion rather than hiding behind a setup error. The `chromium.launch()` itself is inside
+that guard too, so a missing browser binary prints `warming skipped: …` instead of aborting
+the run (including for the four projects that never use chromium).
 
 ## Harness settings, and why each one is not the default
 
@@ -124,7 +141,8 @@ oversubscription; capping `workers` does not help.
 | `vehicle-management.spec.ts` | empty fleet, fleet cards + per-vehicle links, financed badge, create form + validation + POST                                                                                               |
 | `expense-entry.spec.ts`      | form fields, category set, validation, fuel-only fields, odometer monotonicity, create POST, offline queue + drain, list, search, category filter, delete, per-layout fields, mobile layout |
 | `analytics.spec.ts`          | summary load, quick stats, fuel tab, tab switching, zero-data state, error + retry                                                                                                          |
-| `pwa.spec.ts`                | install meta tags, offline badge, responsive overflow, mobile nav, axe scan, + 3 preview-only (manifest, service worker, precache)                                                          |
+| `pwa.spec.ts`                | install meta tags, offline badge, responsive overflow, mobile nav, the route + theme axe ratchets, + 3 preview-only (manifest, service worker, precache)                                    |
+| `expenses-a11y.spec.ts`      | the expense list's axe-clean states: split group collapsed/expanded, row actions revealed by tap, insurance-blocked delete, keyboard reach into a split row's actions                       |
 
 ### Intent reconciliation against the pre-rewrite suite
 
@@ -165,20 +183,45 @@ Dropped, and still missing — these are real gaps, not preserved coverage:
   for `/vehicles/:id/stats`, `/vehicles/:id/photos` and `/analytics/fuel-efficiency`.
 - The non-fuel analytics tabs. Each lazy-loads its own bundle and its own endpoint;
   `analytics.spec.ts` asserts only that the tab selection and panel swap.
-- Expense **split** delete (`/expenses/split/:groupId`). The single-row delete is covered;
-  no fixture carries a `groupId`.
+- Expense **split** delete (`/expenses/split/:groupId`). The single-row delete is covered,
+  and `expenses-a11y.spec.ts` carries split-group fixtures and opens the split row's delete
+  confirmation, but nothing asserts the DELETE that confirming it issues.
 
 ## Accessibility ratchet
 
-`pwa.spec.ts` runs `@axe-core/playwright` over `/`, `/auth` and `/dashboard` with the
-`wcag2a`/`wcag2aa`/`wcag21a`/`wcag21aa` tags. It is a **ratchet**: each route lists the rule
-ids it currently violates, and the test fails only on an id that is NOT on that list, so
-existing debt blocks nobody while a new class of violation does. The full violation JSON is
-attached to the HTML report either way.
+Every scan in the suite goes through `support/axe.ts`, which pins the tag set to
+`wcag2a`/`wcag2aa`/`wcag21a`/`wcag21aa` and attaches the full violation JSON to the HTML
+report whether the test passes or fails. A spec that quietly scanned a narrower tag set
+would report an empty violation list for a page that fails WCAG.
 
-All three lists are currently **empty** — those three routes have zero violations at those
-tags, so any new one fails the run. Shrink a list when you fix something; an id left behind
-after the fix makes the ratchet permanently looser than the app.
+Three layers, each covering what the others cannot reach:
+
+- **`pwa.spec.ts` — `A11Y_ROUTES`.** `/`, `/auth`, `/dashboard`, `/expenses/new`,
+  `/vehicles/new`, `/analytics`, `/insurance`, `/reminders`, `/trips`, `/settings`,
+  `/profile` as they first render. Each entry carries its debt list, whether it is a
+  signed-out surface, and a locator proving its own content rendered.
+- **`pwa.spec.ts` — the theme sweep.** `/dashboard` in dark mode under each non-default
+  registry theme. A theme swaps the custom properties the whole app paints from, so a
+  low-contrast palette fails on every route at once — the one defect class no
+  default-palette scan can see. Chromium only; axe derives it from computed colour, which
+  does not differ by engine. The theme ids come from `THEME_REGISTRY`, so a new theme is
+  scanned the day it is added.
+- **`expenses-a11y.spec.ts`.** The expense table's post-interaction states — a row's actions
+  exist only after a tap, and a split group only renders when a fixture carries a `groupId`.
+
+It is a **ratchet**: each route lists the rule ids it currently violates and the test fails
+only on an id that is NOT on that list, so existing debt blocks nobody while a new class of
+violation does. Every list is currently **empty**, i.e. a hard zero-violation gate
+everywhere. Shrink a list when you fix something; an id left behind after the fix makes the
+ratchet permanently looser than the app.
+
+Two assertions guard the ratchet against itself, because its failure mode is silence rather
+than red. A route whose readiness locator is generic enough to match the app shell — or the
+sign-in page the auth gate redirects a logged-out visitor to — scans the wrong page, passes,
+and keeps an empty allowlist that reads as a clean bill of health. So every route states the
+content that proves it rendered, and the test re-checks `page.url()` **after** the scan:
+route protection runs in an effect once `/auth/me` resolves, so immediately after `goto` the
+URL is still the requested one whether or not the app is about to bounce you.
 
 ## Conventions
 

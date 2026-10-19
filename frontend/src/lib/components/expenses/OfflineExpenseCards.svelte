@@ -55,6 +55,7 @@
 						<button
 							onclick={() => onRemovePending(expense.id)}
 							class="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0"
+							aria-label="Delete pending expense"
 							title="Delete pending expense"
 						>
 							<X class="h-4 w-4" />
@@ -113,6 +114,7 @@
 						<button
 							onclick={() => removeNeedsAttention(expense.id)}
 							class="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0"
+							aria-label="Discard this entry"
 							title="Discard this entry"
 						>
 							<X class="h-4 w-4" />

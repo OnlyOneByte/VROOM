@@ -39,31 +39,43 @@ export const pwaInstallState = {
 	isStandalone: false
 };
 
-// Initialize PWA detection
+// Named rather than inline so the registrations below are removable — see initializePWA.
+function handleBeforeInstallPrompt(e: Event): void {
+	e.preventDefault();
+	deferredPrompt = e as BeforeInstallPromptEvent;
+	pwaInstallState.canInstall = true;
+}
+
+function handleAppInstalled(): void {
+	pwaInstallState.isInstalled = true;
+	pwaInstallState.canInstall = false;
+	deferredPrompt = null;
+}
+
+/**
+ * Initialize PWA detection. Safe to call any number of times: the window listeners outlive the
+ * components that ask for them, and this is called from two of them — including a settings card
+ * that re-mounts on every visit to /settings. Registering unconditionally therefore accumulated a
+ * fresh pair of listeners per visit for the life of the page, with nothing ever removing them.
+ *
+ * Each call removes the previous registration before adding it back, so exactly one listener per
+ * event is live no matter how many callers there are, and no caller needs to own a teardown. The
+ * standalone/installed probe is deliberately NOT guarded — display-mode can change mid-session
+ * (the user installs the app), so a later caller must be able to re-read it.
+ */
 export function initializePWA(): void {
 	if (!browser) return;
 
-	// Check if app is running in standalone mode
 	pwaInstallState.isStandalone =
 		window.matchMedia('(display-mode: standalone)').matches ||
 		(window.navigator as { standalone?: boolean }).standalone === true;
-
-	// Check if app is already installed
 	pwaInstallState.isInstalled = pwaInstallState.isStandalone;
 
-	// Listen for beforeinstallprompt event
-	window.addEventListener('beforeinstallprompt', (e: Event) => {
-		e.preventDefault();
-		deferredPrompt = e as BeforeInstallPromptEvent;
-		pwaInstallState.canInstall = true;
-	});
+	window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+	window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
-	// Listen for app installed event
-	window.addEventListener('appinstalled', () => {
-		pwaInstallState.isInstalled = true;
-		pwaInstallState.canInstall = false;
-		deferredPrompt = null;
-	});
+	window.removeEventListener('appinstalled', handleAppInstalled);
+	window.addEventListener('appinstalled', handleAppInstalled);
 }
 
 // Prompt user to install PWA

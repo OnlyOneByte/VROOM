@@ -49,11 +49,11 @@ describe('userPreferences RMW inventory', () => {
     expect(await countRmwUpdates('api/providers/routes.ts')).toBe(2);
   });
 
-  test('backup-orchestrator has exactly ONE RMW update (the pre-existing wholesale auto-backup write)', async () => {
-    // backup-orchestrator.ts:209 — wholesale backupConfig write from a stale read. Pre-exists; NOT a
-    // regression. A concurrent provider-delete (now atomic) could be clobbered by this stale write —
-    // the remaining surface, tracked. (The backup mutex serializes backup RUNS, not provider-deletes.)
-    expect(await countRmwUpdates('api/sync/backup-orchestrator.ts')).toBe(1);
+  test('backup-orchestrator has NO RMW update — it patches atomically', async () => {
+    // It used to write the whole backupConfig column from a snapshot read up to ten minutes earlier,
+    // so a provider switched off in Settings mid-run came back on. It now patches only the stamps the
+    // run earned, via mergeJsonField, so a concurrent provider edit survives.
+    expect(await countRmwUpdates('api/sync/backup-orchestrator.ts')).toBe(0);
   });
 
   test('cleanupBackupConfig now uses the ATOMIC mergeJsonField, not an RMW update', async () => {

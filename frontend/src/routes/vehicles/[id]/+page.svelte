@@ -31,11 +31,8 @@
 	let InsuranceTab = $state<Component<{ vehicleId: string; readOnly?: boolean }> | null>(null);
 	let hasLoadedInsurance = $state(false);
 	import { categoryLabels } from '$lib/utils/expense-helpers';
-	import { getCategoryColor as getCategoryChartColor } from '$lib/utils/chart-colors';
-	import {
-		filterExpenses,
-		hasActiveFilters as checkActiveFilters
-	} from '$lib/utils/expense-filters';
+	import { getCategoryChartColor } from '$lib/utils/chart-colors';
+	import { hasActiveFilters as checkActiveFilters } from '$lib/utils/expense-filters';
 	import { COMMON_MESSAGES, VEHICLE_MESSAGES } from '$lib/constants/messages';
 	import { type TimePeriod } from '$lib/constants/time-periods';
 	import { SCROLL_HEIGHTS } from '$lib/constants/ui';
@@ -94,9 +91,15 @@
 	// Share dialog (vehicle-sharing T11) — owner invites/manages access to this vehicle.
 	let shareOpen = $state(false);
 
-	// Filters and search
+	// Filters and search for the Expenses tab. Every one of these travels to the SERVER (see
+	// buildExpenseListParams) so it spans all pages: narrowing the 20 rows already on screen
+	// searched a single page while the header count and the paginator described the whole set,
+	// so a match on page 3 was indistinguishable from a match that did not exist.
 	let searchTerm = $state('');
 	let filters = $state<ExpenseFilters>({});
+	// The category axis is owned here rather than inside the table for the same reason: the
+	// table's own dropdown can only ever filter the page it was handed.
+	let expenseCategoryFilter = $state<string>('');
 
 	// Derived chart data from server summary
 	let expenseTrendData = $derived.by(() => {
@@ -143,11 +146,10 @@
 	// Whether the overview has any expense data (from summary)
 	let hasExpenseData = $derived((summary?.expenseCount ?? 0) > 0);
 
-	// Filtered expenses based on search and filters (client-side on current page)
-	let filteredExpenses = $derived(filterExpenses(expenses, searchTerm, filters));
-
 	// Check if any filters are active
-	let hasActiveFilters = $derived(checkActiveFilters(searchTerm, filters));
+	let hasActiveFilters = $derived(
+		checkActiveFilters(searchTerm, filters) || !!expenseCategoryFilter
+	);
 
 	let vehicleDisplayName = $derived(
 		vehicle ? vehicle.nickname || `${vehicle.year} ${vehicle.make} ${vehicle.model}` : ''
@@ -183,17 +185,16 @@
 		}
 	});
 
-	// Load data on mount. T12b-3c: the vehicle PHOTOS read (GET /photos/vehicle/:id) is owner-only
-	// server-side AND the photo carousel is already isOwner-gated (T12b-3b), so for a shared viewer/
-	// editor the fetch is pure waste that only produces a "vehicle not found" error toast (a
-	// four-states violation). Load the vehicle FIRST to establish isOwner, then fetch photos only for
-	// the owner; summary + fuel-efficiency are shared-readable (T5b-3 / T8a) so they fire for everyone.
+	// Load data on mount. Photos are the ONLY leg that depends on the vehicle: the read
+	// (GET /photos/vehicle/:id) is owner-only server-side and the carousel is already isOwner-gated,
+	// so for a shared viewer/editor the fetch is pure waste that produces nothing but a "vehicle not
+	// found" error toast (a four-states violation) — hence the second round. Summary, fuel efficiency
+	// and stats are all shared-readable and read only the route param plus the initial period, so
+	// they go out WITH the vehicle rather than after it.
 	onMount(async () => {
-		await loadVehicle();
-		await Promise.all([...(isOwner ? [loadPhotos()] : []), loadSummary(), loadFuelEfficiency()]);
-		// Load stats after initial data is loaded
-		if (vehicle) {
-			await loadVehicleStats();
+		await Promise.all([loadVehicle(), loadSummary(), loadFuelEfficiency(), loadVehicleStats()]);
+		if (vehicle && isOwner) {
+			await loadPhotos();
 		}
 		isLoading = false;
 	});
@@ -219,6 +220,52 @@
 			hasLoadedExpensesTab = true;
 			void fetchExpensesPage(0);
 		}
+	});
+
+	// Debounce the search box, then re-fetch from page 0 so a match on any page is found.
+	let searchDebounce: ReturnType<typeof setTimeout> | undefined;
+	// Plain (non-reactive) guard: writing it must NOT re-trigger this effect, or the cleanup below
+	// would cancel the timer the same run just armed and the search would never fire.
+	let prevSearchTerm = '';
+	$effect(() => {
+		const term = searchTerm;
+		if (!hasLoadedExpensesTab) {
+			prevSearchTerm = term;
+			return;
+		}
+		if (term === prevSearchTerm) return;
+		prevSearchTerm = term;
+		clearTimeout(searchDebounce);
+		searchDebounce = setTimeout(() => void fetchExpensesPage(0), 300);
+		// Cancel a pending debounce on the next change or on unmount, so no fetch — and no state
+		// write — lands after teardown.
+		return () => clearTimeout(searchDebounce);
+	});
+
+	/** Snapshot of every non-search filter axis, for change detection. */
+	function filterKey(): string {
+		return JSON.stringify([
+			expenseCategoryFilter,
+			filters.startDate ?? '',
+			filters.endDate ?? '',
+			filters.tags ?? []
+		]);
+	}
+
+	// The tag and date-range filters arrive through `bind:filters`, so detect changes by comparing
+	// snapshots and re-fetch from page 0. Plain `let` for the same reason as prevSearchTerm.
+	let prevFilterKey = '';
+	$effect(() => {
+		const key = filterKey();
+		if (!hasLoadedExpensesTab) {
+			// Baseline while the tab has never been opened, so opening it is not also read as a
+			// filter change on top of the fetch the activation above already does.
+			prevFilterKey = key;
+			return;
+		}
+		if (key === prevFilterKey) return;
+		prevFilterKey = key;
+		void fetchExpensesPage(0);
 	});
 
 	async function loadVehicle() {
@@ -255,16 +302,29 @@
 		}
 	}
 
+	/** The request for one page of this vehicle's expenses: pagination, sort AND every filter. */
+	function buildExpenseListParams(offset: number) {
+		return {
+			limit: pageSize,
+			offset,
+			...(expenseCategoryFilter && { category: expenseCategoryFilter }),
+			...(filters.startDate && { startDate: filters.startDate }),
+			...(filters.endDate && { endDate: filters.endDate }),
+			...(filters.tags?.length && { tags: filters.tags }),
+			...(searchTerm.trim() && { search: searchTerm.trim() }),
+			sortBy: expenseSortBy,
+			sortDir: expenseSortDir
+		};
+	}
+
 	async function fetchExpensesPage(offset: number) {
 		isLoadingPage = true;
 		expensesLoadError = null;
 		try {
-			const result = await expenseApi.getExpensesByVehicle(vehicleId, {
-				limit: pageSize,
-				offset,
-				sortBy: expenseSortBy,
-				sortDir: expenseSortDir
-			});
+			const result = await expenseApi.getExpensesByVehicle(
+				vehicleId,
+				buildExpenseListParams(offset)
+			);
 			expenses = result.data;
 			totalCount = result.pagination.totalCount;
 			currentOffset = offset;
@@ -283,6 +343,13 @@
 		fetchExpensesPage(0);
 	}
 
+	/** Category changed in the Expenses tab — re-fetch from page 0 so it filters all pages. */
+	function handleExpenseCategoryChange(category: string) {
+		expenseCategoryFilter = category;
+		prevFilterKey = filterKey();
+		fetchExpensesPage(0);
+	}
+
 	async function loadVehicleStats() {
 		isLoadingStats = true;
 		try {
@@ -295,8 +362,13 @@
 	}
 
 	async function handleDeleteExpense(_deletedExpense: Expense) {
-		// Re-fetch current page, summary, and fuel efficiency after deletion
-		await Promise.all([fetchExpensesPage(currentOffset), loadSummary(), loadFuelEfficiency()]);
+		// Deleting the last row of the last page would leave an empty table beside a paginator that
+		// still claims there are rows, so step back a page when this offset falls out of range.
+		const remaining = Math.max(0, totalCount - 1);
+		const offset =
+			currentOffset >= remaining ? Math.max(0, currentOffset - pageSize) : currentOffset;
+		// Re-fetch the page, summary, and fuel efficiency after deletion
+		await Promise.all([fetchExpensesPage(offset), loadSummary(), loadFuelEfficiency()]);
 	}
 
 	function handlePageChange(offset: number) {
@@ -306,6 +378,13 @@
 	function clearFilters() {
 		searchTerm = '';
 		filters = {};
+		expenseCategoryFilter = '';
+		// Prime both change guards so clearing several axes at once is ONE refetch, not one per axis,
+		// and re-fetch from page 0 since the cleared set is wider than the page we were on.
+		clearTimeout(searchDebounce);
+		prevSearchTerm = '';
+		prevFilterKey = filterKey();
+		if (hasLoadedExpensesTab) void fetchExpensesPage(0);
 	}
 
 	// Export THIS vehicle's expenses as CSV (server-generated, vehicle-scoped).
@@ -314,7 +393,16 @@
 	async function handleExportCsv() {
 		isExporting = true;
 		try {
-			await expenseApi.downloadExpensesCsv({ vehicleId });
+			// The export mirrors EVERY active list filter, so the CSV is exactly what the user is
+			// looking at rather than this vehicle's whole history.
+			await expenseApi.downloadExpensesCsv({
+				vehicleId,
+				category: expenseCategoryFilter || undefined,
+				startDate: filters.startDate,
+				endDate: filters.endDate,
+				search: searchTerm.trim() || undefined,
+				tags: filters.tags?.length ? filters.tags : undefined
+			});
 		} catch (err) {
 			handleErrorWithNotification(err, 'Failed to export expenses');
 		} finally {
@@ -575,7 +663,7 @@
 							</div>
 						{:else}
 							<ExpensesTable
-								expenses={filteredExpenses}
+								{expenses}
 								showVehicleColumn={false}
 								{canWrite}
 								returnTo={resolve(paramRoutes.vehicle, { id: vehicleId })}
@@ -595,6 +683,8 @@
 								activeSortBy={expenseSortBy}
 								activeSortDir={expenseSortDir}
 								onSortChange={handleExpenseSortChange}
+								activeCategory={expenseCategoryFilter}
+								onCategoryChange={handleExpenseCategoryChange}
 							/>
 						{/if}
 					</CardFull.Content>

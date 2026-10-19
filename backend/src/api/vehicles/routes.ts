@@ -1,13 +1,16 @@
 import { zValidator } from '@hono/zod-validator';
+import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import { createInsertSchema } from 'drizzle-zod';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
-import { vehicles as vehiclesTable } from '../../db/schema';
+import { getDb } from '../../db/connection';
+import { expenses, vehicles as vehiclesTable } from '../../db/schema';
 import type { ApiResponse } from '../../errors';
 import { ConflictError, NotFoundError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { getPeriodStartDate, sortExpensesByDate } from '../../utils/calculations';
+import { chunk } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
 import { moneyDollarsToCents, vehicleRowToApi } from '../../utils/money';
 import {
@@ -355,6 +358,51 @@ routes.put(
   }
 );
 
+/** The split-expense groups this vehicle has a leg in — read BEFORE the FK cascade removes them. */
+async function splitGroupIdsForVehicle(vehicleId: string, userId: string): Promise<string[]> {
+  const rows = await getDb()
+    .selectDistinct({ groupId: expenses.groupId })
+    .from(expenses)
+    .where(
+      and(
+        eq(expenses.vehicleId, vehicleId),
+        eq(expenses.userId, userId),
+        isNotNull(expenses.groupId)
+      )
+    );
+  return rows.map((r) => r.groupId).filter((groupId): groupId is string => groupId !== null);
+}
+
+/**
+ * Shrink each named split group's `groupTotal` to the sum of the legs that still exist.
+ *
+ * A split expense is one row per vehicle: each carries its own leg in `expenseAmount` plus
+ * `groupTotal`, the pre-split total repeated on every sibling, and both split write paths enforce
+ * "the legs sum to groupTotal". A vehicle delete breaks that — the FK cascade removes only the
+ * deleted vehicle's sibling row — and the stale header is not merely cosmetic: an even or percentage
+ * edit that omits `totalAmount` re-divides the stored `groupTotal`, so the survivor's recorded cost
+ * silently grows toward the whole pre-delete amount.
+ *
+ * Shrinking (rather than redistributing) is the honest answer and matches how a deleted vehicle's leg
+ * is pruned from a reminder's split config: each surviving vehicle keeps exactly the cost it incurred.
+ * One correlated UPDATE per batch, so a group is never left half-repaired.
+ */
+async function shrinkSplitGroupsToSurvivingLegs(userId: string, groupIds: string[]): Promise<void> {
+  const db = getDb();
+  // Chunked because `inArray` binds one parameter per id and a long-lived fleet's expense history has
+  // no bound on how many split groups one vehicle appears in.
+  for (const batch of chunk(groupIds)) {
+    await db
+      .update(expenses)
+      .set({
+        groupTotal: sql`(SELECT sum(legs.expense_amount) FROM ${expenses} AS legs
+          WHERE legs.group_id = ${expenses.groupId} AND legs.user_id = ${expenses.userId})`,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(expenses.userId, userId), inArray(expenses.groupId, batch)));
+  }
+}
+
 // DELETE /api/vehicles/:id - Delete vehicle
 routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
@@ -369,9 +417,11 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   // odometer entries would otherwise orphan their photo rows AND leak the
   // external storage files. Clean the vehicle's own photos plus every dependent
   // entity's photos here, while those entities still exist to be enumerated.
-  const [expenseIds, odometerIds] = await Promise.all([
+  const [expenseIds, odometerIds, splitGroupIds] = await Promise.all([
     expenseRepository.findIdsByVehicleId(id),
     odometerRepository.findIdsByVehicleId(id),
+    // The groups whose totals the cascade is about to invalidate — only readable while the legs exist.
+    splitGroupIdsForVehicle(id, user.id),
   ]);
   await deleteAllPhotosForEntity('vehicle', id, user.id);
   await deletePhotosForEntities('expense', expenseIds, user.id);
@@ -379,14 +429,18 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
 
   await vehicleRepository.delete(id);
 
-  // Post-delete reminder cleanups. These run AFTER the vehicle is already deleted (the DB
-  // FK-cascade has already dropped the reminder_vehicles junction rows), so they're best-effort: the
-  // delete the user asked for is DONE, and a cleanup hiccup must NOT 500 a successful delete — that would
-  // show "failed", prompt a retry (→ a confusing 404), AND leave the very states these calls prevent
-  // (orphaned split-config legs / vehicleless active reminders) un-fixed because the throw skipped them.
-  // The next reminder /trigger re-runs the same normalization, so a missed pass self-heals. (the
-  // best-effort-contract class on the vehicle-delete path.) Log + swallow; return the earned 200.
+  // Post-delete cleanups of the state the FK cascade cannot reach. These run AFTER the vehicle is
+  // already deleted, so they're best-effort: the delete the user asked for is DONE, and a cleanup
+  // hiccup must NOT 500 a successful delete — that would show "failed", prompt a retry (→ a confusing
+  // 404), AND leave the very states these calls prevent (stale split-group totals, orphaned
+  // split-config legs, vehicleless active reminders) un-fixed because the throw skipped them. Log +
+  // swallow; return the earned 200.
   try {
+    // FIRST, because this is the only one of the three that does NOT self-heal: the reminder
+    // normalizations below are re-run by the next /trigger, whereas a split group's total stays wrong
+    // until the next vehicle delete touches the same group. The log line is the only signal.
+    await shrinkSplitGroupsToSurvivingLegs(user.id, splitGroupIds);
+
     // The reminder_vehicles junction cascades, but a reminder's `expenseSplitConfig` JSON blob is NOT
     // FK-managed — its leg for the deleted vehicle lingers, so the next trigger builds a split sibling for
     // the dead vehicleId → an FK violation that leaves the surviving legs half-committed.
@@ -398,7 +452,7 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
     // 'no_vehicles' forever with no user signal. Deactivate any such now-vehicleless active reminder.
     await reminderRepository.deactivateVehicleless(user.id);
   } catch (error) {
-    logger.error('Post-delete reminder cleanup failed (vehicle already deleted)', {
+    logger.error('Post-delete vehicle cleanup failed (vehicle already deleted)', {
       vehicleId: id,
       error: error instanceof Error ? error.message : String(error),
     });

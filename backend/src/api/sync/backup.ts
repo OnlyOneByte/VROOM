@@ -47,6 +47,7 @@ import type {
   ProviderBackupList,
   ProviderBackupSettings,
 } from '../../types';
+import { chunk } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
 import { joinStoragePath } from '../../utils/paths';
 import { unitPreferencesSchema } from '../../utils/unit-preferences-schema';
@@ -440,12 +441,12 @@ export class BackupService {
     // Query photos directly by userId
     const userPhotos = await db.select().from(photos).where(eq(photos.userId, userId));
 
-    // Query photo_refs for all user photos (batched to stay under SQLite variable limit)
+    // Query photo_refs for all user photos, chunked per the IN-clause contract in utils/chunk: the id
+    // list is as long as the user's photo library, so an unchunked IN would blow SQLite's bind-parameter
+    // ceiling on exactly the accounts whose backup matters most.
     const photoIds = userPhotos.map((p) => p.id);
     const userPhotoRefs: (typeof photoRefs.$inferSelect)[] = [];
-    const BATCH_SIZE = 500;
-    for (let i = 0; i < photoIds.length; i += BATCH_SIZE) {
-      const batch = photoIds.slice(i, i + BATCH_SIZE);
+    for (const batch of chunk(photoIds)) {
       const rows = await db.select().from(photoRefs).where(inArray(photoRefs.photoId, batch));
       userPhotoRefs.push(...rows);
     }

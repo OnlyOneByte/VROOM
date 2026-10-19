@@ -1,13 +1,12 @@
 <script lang="ts">
 	import { onlineStatus, syncState, offlineExpenseQueue } from '$lib/stores/offline.svelte';
 	import { syncOfflineExpenses } from '$lib/utils/offline-storage';
+	import { countPendingSync } from '$lib/utils/sync/pending-expenses';
 	import { Wifi, WifiOff, RefreshCw, CircleCheck, CircleAlert } from '@lucide/svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 
-	let pendingCount = $derived(
-		offlineExpenseQueue.current.filter(expense => !expense.synced).length
-	);
+	let pendingCount = $derived(countPendingSync(offlineExpenseQueue.current));
 
 	async function handleSync() {
 		if (onlineStatus.current && pendingCount > 0) {

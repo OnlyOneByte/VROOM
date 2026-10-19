@@ -7,12 +7,72 @@
  * - Response envelope unwrapping (extracts `data` from `{ success, data }`)
  */
 
+import { browser } from '$app/environment';
 import { env } from '$env/dynamic/public';
 import { ApiError } from '$lib/utils/error-handling';
 
 /** Returns the API base URL (e.g. "https://api.vroom.ryang.dev") or empty string for same-origin. */
 export function getApiBaseUrl(): string {
 	return env['PUBLIC_API_URL'] ?? '';
+}
+
+/**
+ * Auth endpoints for which a 401 is an ordinary answer rather than an expiry: the startup probe
+ * (`authStore.initialize`) and the refresh call both read it as "not signed in" and handle it
+ * themselves. Running the global handler for them would toast and redirect on every page load
+ * made by a visitor who is simply not logged in.
+ */
+const SELF_REPORTED_401_PATHS = ['/api/v1/auth/me', '/api/v1/auth/refresh'];
+
+/** One toast and one navigation per expiry, however many in-flight requests see the same 401. */
+let sessionExpiryHandled = false;
+
+/**
+ * A 401 on an app request means the server-side session is gone, so the auth store still claiming
+ * an authenticated user is a lie: clear it, say why, and send the user to sign in. This is the only
+ * place the app reaches the network, which is why it is the only place that can see every 401.
+ *
+ * Clearing the store also makes the layout's route-protection effect navigate — to the same
+ * destination, so the duplicate is harmless; the latch above is about repeated 401s, not that.
+ *
+ * Total by construction: the caller is about to throw an `ApiError` describing the real failure,
+ * and a secondary fault in notifying or navigating must not replace it with an unrelated one.
+ */
+async function handleSessionExpiry(url: string): Promise<void> {
+	if (!browser || sessionExpiryHandled) return;
+	if (SELF_REPORTED_401_PATHS.some(path => url.includes(path))) return;
+
+	sessionExpiryHandled = true;
+	setTimeout(() => {
+		sessionExpiryHandled = false;
+	}, 1000);
+
+	try {
+		// Imported lazily: the stores import this module, so a static import would be circular.
+		const [{ authStore }, { appStore }] = await Promise.all([
+			import('$lib/stores/auth.svelte'),
+			import('$lib/stores/app.svelte')
+		]);
+		authStore.clearUser();
+		appStore.addNotification({
+			type: 'warning',
+			message: 'Your session has expired. Please sign in again.',
+			duration: 5000
+		});
+
+		const [{ goto }, { resolve }, { routes }] = await Promise.all([
+			import('$app/navigation'),
+			import('$app/paths'),
+			import('$lib/routes')
+		]);
+		// Started, not awaited: the caller is blocked on this before it can throw its own ApiError,
+		// and a navigation that stalls (a `beforeNavigate` hold, say) must not strand that error.
+		void goto(resolve(routes.auth)).catch((error: unknown) => {
+			if (import.meta.env.DEV) console.error('Session-expiry redirect failed:', error);
+		});
+	} catch (error) {
+		if (import.meta.env.DEV) console.error('Failed to handle session expiry:', error);
+	}
 }
 
 interface ApiOptions {
@@ -57,6 +117,8 @@ async function fetchOrThrow(url: string, options: ApiOptions): Promise<Response>
 	});
 
 	if (!response.ok) {
+		if (response.status === 401) await handleSessionExpiry(fullUrl);
+
 		let message = `Request failed with status ${response.status}`;
 		let code: string | undefined;
 		let details: Record<string, unknown> | undefined;

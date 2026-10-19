@@ -26,9 +26,9 @@
 	const PAGE_SIZE = 20;
 	const MIN_CHART_POINTS = 2;
 
-	// vehicle-sharing T12b-3b: odometer add/edit/delete are WRITES (owner or accepted editor, widened
-	// server-side in T6 via requireVehicleWrite). A shared VIEWER sees the readings read-only — no Add
-	// Reading button, no per-row edit/delete. Default true so the owner [id] tab is unchanged.
+	// Adding, editing and deleting a reading are writes, which the server allows the owner or an
+	// accepted editor. A vehicle shared read-only therefore renders the readings with no Add Reading
+	// button and no per-row controls. Defaults true: the owner's own tab passes nothing.
 	let {
 		vehicleId,
 		unitPreferences,
@@ -264,6 +264,7 @@
 										variant="ghost"
 										size="icon"
 										class="h-8 w-8"
+										aria-label="Edit reading"
 										title="Edit reading"
 										href={resolve(paramRoutes.vehicleOdometerEntryEdit, {
 											id: vehicleId,
@@ -276,6 +277,7 @@
 										variant="ghost"
 										size="icon"
 										class="h-8 w-8 text-destructive hover:text-destructive"
+										aria-label="Delete reading"
 										title="Delete reading"
 										onclick={() => openDeleteDialog(entry)}
 									>

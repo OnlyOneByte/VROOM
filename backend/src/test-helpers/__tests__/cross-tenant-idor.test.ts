@@ -15,7 +15,13 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, type DataEnvelope, json, type TestApp } from '../http-client';
+import {
+  createTestApp,
+  type DataEnvelope,
+  json,
+  type PaginatedEnvelope,
+  type TestApp,
+} from '../http-client';
 
 let ctx: TestApp; // user A (the harness-seeded session)
 let bCookie: string; // a real Lucia session cookie for a SECOND user, B
@@ -656,6 +662,240 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
       await ctx.authed('GET', `/api/v1/photos/vehicle/${vid}`),
       'GET photos for B vehicle'
     );
+  });
+
+  // The generic photo router is entityType-GENERIC: one switch (photos/helpers.ts
+  // validateEntityOwnership) is the only authorization gate for every type, and the sweep covered
+  // only 'vehicle'. The other four types each authorize differently — expense and odometer_entry
+  // through the vehicle-sharing seam (their rows are owner-stamped), insurance_policy through its own
+  // userId, insurance_claim transitively through its policy — so one gate regressing is invisible to
+  // the vehicle case. Receipts and insurance documents are the most sensitive bytes in the app.
+  test("photo (non-vehicle entities): A cannot list or upload to any of B's photo entities", async () => {
+    const vid = await idOf(
+      await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
+    );
+    const eid = await idOf(
+      await asB('POST', '/api/v1/expenses', {
+        vehicleId: vid,
+        category: 'misc',
+        expenseAmount: 42,
+        date: '2024-06-01T00:00:00.000Z',
+      })
+    );
+    const oid = await idOf(
+      await asB('POST', `/api/v1/odometer/${vid}`, {
+        odometer: 31000,
+        recordedAt: '2024-06-02T00:00:00.000Z',
+      })
+    );
+    const policyRes = await asB('POST', '/api/v1/insurance', {
+      company: 'B Mutual',
+      terms: [
+        {
+          startDate: '2024-01-01T00:00:00.000Z',
+          endDate: '2025-01-01T00:00:00.000Z',
+          vehicleCoverage: { vehicleIds: [vid] },
+        },
+      ],
+    });
+    const pid = await idOf(policyRes);
+    const cid = await idOf(
+      await asB('POST', `/api/v1/insurance/${pid}/claims`, {
+        claimDate: '2024-06-15T00:00:00.000Z',
+        claimType: 'collision',
+      })
+    );
+
+    const entities: [string, string][] = [
+      ['expense', eid],
+      ['odometer_entry', oid],
+      ['insurance_policy', pid],
+      ['insurance_claim', cid],
+    ];
+    for (const [entityType, entityId] of entities) {
+      expectDenied(
+        await ctx.authed('GET', `/api/v1/photos/${entityType}/${entityId}`),
+        `GET photos for B ${entityType}`
+      );
+      // The upload leg must be denied by the OWNERSHIP gate, not by a missing file — so send a real
+      // multipart body and require exactly the existence-hiding 404 (a 400 here would mean the
+      // request never reached the gate and the assertion proved nothing).
+      const form = new FormData();
+      form.append('photo', new File([new Uint8Array([1, 2, 3])], 'x.jpg', { type: 'image/jpeg' }));
+      const upload = await ctx.app.request(`/api/v1/photos/${entityType}/${entityId}`, {
+        method: 'POST',
+        headers: { Cookie: ctx.cookie, 'Sec-Fetch-Site': 'same-origin' },
+        body: form,
+      });
+      expect(upload.status, `POST photo to B ${entityType}: expected a 404`).toBe(404);
+    }
+
+    // Nothing was attached to any of B's entities.
+    for (const [entityType, entityId] of entities) {
+      const bList = await json<PaginatedEnvelope<unknown>>(
+        await asB('GET', `/api/v1/photos/${entityType}/${entityId}`)
+      );
+      expect(bList.data).toHaveLength(0);
+    }
+  });
+
+  // trips-location: every /trips surface takes an id or a vehicleId and is correct today, but the
+  // sweep never drove one with a foreign session — so swapping a userId-scoped finder for a bare
+  // findById would ship green. GET /trips?vehicleId= is deliberately asserted as 200-with-nothing
+  // rather than a denial: that route filters an already-user-scoped list, so a foreign filter is a
+  // legitimate empty result, and recording which of the two shapes applies is the point.
+  test("trips: A cannot GET/PUT/DELETE B's trip, nor read B's vehicle trips or summary", async () => {
+    const vid = await idOf(
+      await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
+    );
+    const tid = await idOf(
+      await asB('POST', '/api/v1/trips', {
+        vehicleId: vid,
+        startOdometer: 1000,
+        endOdometer: 1100,
+        purpose: 'business',
+        tripDate: '2024-06-01T00:00:00.000Z',
+      })
+    );
+
+    expectDenied(await ctx.authed('GET', `/api/v1/trips/${tid}`), 'GET trip');
+    expectDenied(
+      await ctx.authed('PUT', `/api/v1/trips/${tid}`, { purpose: 'personal' }),
+      'PUT trip'
+    );
+    expectDenied(await ctx.authed('DELETE', `/api/v1/trips/${tid}`), 'DELETE trip');
+    expectDenied(await ctx.authed('GET', `/api/v1/trips/vehicle/${vid}`), 'GET vehicle trips');
+    expectDenied(
+      await ctx.authed('GET', `/api/v1/trips/summary?vehicleId=${vid}`),
+      'GET trip summary for B vehicle'
+    );
+
+    // The user-scoped list filtered by B's vehicle: allowed, but it must return NOTHING of B's.
+    const listed = await ctx.authed('GET', `/api/v1/trips?vehicleId=${vid}`);
+    expect(listed.status, 'the user-scoped list accepts any vehicleId filter').toBe(200);
+    expect((await json<PaginatedEnvelope<unknown>>(listed)).data).toHaveLength(0);
+
+    // B's trip survived every denied write, with its original purpose — and B reaches every surface
+    // A was denied, so each denial above is the ownership gate rather than a broken fixture.
+    const stillThere = await asB('GET', `/api/v1/trips/${tid}`);
+    expect(stillThere.status).toBe(200);
+    expect((await json<DataEnvelope<{ purpose: string }>>(stillThere)).data.purpose).toBe(
+      'business'
+    );
+    expect((await asB('GET', `/api/v1/trips/vehicle/${vid}`)).status).toBe(200);
+    expect((await asB('GET', `/api/v1/trips/summary?vehicleId=${vid}`)).status).toBe(200);
+  });
+
+  // Storage providers hold ENCRYPTED third-party credentials and are the egress path for every
+  // photo, so a cross-tenant reach here is worse than a data read: /test exercises B's credentials,
+  // /backfill queues work against B's account, and DELETE tears down B's config and photo refs.
+  // All five gate on the same findOwnedProviderOrThrow; none was ever driven by a foreign session.
+  test("providers: A cannot update/delete/test/backfill/inspect B's provider", async () => {
+    // Seeded directly: POST /providers demands real credentials for a supported type, and every
+    // probe below gates on ownership BEFORE it touches the row, so the row's contents are
+    // irrelevant to what is proven here. `domain` is NOT NULL.
+    const providerId = `idor-prov-${bCounter}`;
+    ctx.sqlite.run(
+      `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
+       VALUES (?, ?, 'storage', 's3', 'B Bucket', '', ?, 'active')`,
+      [
+        providerId,
+        bId,
+        JSON.stringify({
+          endpoint: 'https://s3.example.com',
+          bucket: 'b-bucket',
+          region: 'us-east-1',
+        }),
+      ]
+    );
+    // Positive control: the row exists, is B's, and B reaches it through the very same gate — so
+    // every denial below is the ownership predicate, not a missing fixture or a broken route.
+    const bOwns = await json<DataEnvelope<Array<{ id: string }>>>(
+      await asB('GET', '/api/v1/providers')
+    );
+    expect(bOwns.data.map((p) => p.id)).toContain(providerId);
+    expect(
+      (await asB('GET', `/api/v1/providers/${providerId}/sync-status`)).status,
+      'B reaches its own provider through findOwnedProviderOrThrow'
+    ).toBe(200);
+
+    expectDenied(
+      await ctx.authed('PUT', `/api/v1/providers/${providerId}`, { displayName: 'Hacked' }),
+      'PUT provider'
+    );
+    expectDenied(
+      await ctx.authed('POST', `/api/v1/providers/${providerId}/test`),
+      'POST provider test'
+    );
+    expectDenied(
+      await ctx.authed('POST', `/api/v1/providers/${providerId}/backfill`),
+      'POST provider backfill'
+    );
+    expectDenied(
+      await ctx.authed('GET', `/api/v1/providers/${providerId}/sync-status`),
+      'GET provider sync-status'
+    );
+    expectDenied(await ctx.authed('DELETE', `/api/v1/providers/${providerId}`), 'DELETE provider');
+
+    // The row survived every probe, unrenamed.
+    const stillOwned = await json<DataEnvelope<Array<{ id: string; displayName: string }>>>(
+      await asB('GET', '/api/v1/providers')
+    );
+    expect(stillOwned.data.find((p) => p.id === providerId)?.displayName).toBe('B Bucket');
+  });
+
+  // POST /sync/restore/from-provider takes a providerId in the BODY and then READS and WRITES the
+  // caller's whole dataset from it. `mode: 'preview'` is the read-only leg and `sourceType: 'sheets'`
+  // is the shape that reaches the ownership check (the 'zip' variant demands a fileRef and would 400
+  // on schema before ever getting there — a vacuous pass). The route is idempotency-gated, so the
+  // request is built by hand to carry the required header.
+  test("sync: A cannot restore from B's storage provider", async () => {
+    const seedProvider = (id: string, userId: string): void => {
+      ctx.sqlite.run(
+        `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
+         VALUES (?, ?, 'storage', 's3', 'Bucket', '', ?, 'active')`,
+        [
+          id,
+          userId,
+          JSON.stringify({
+            endpoint: 'https://s3.example.com',
+            bucket: 'a-bucket',
+            region: 'us-east-1',
+          }),
+        ]
+      );
+    };
+    const restoreAsA = async (providerId: string, key: string): Promise<Response> =>
+      ctx.app.request('/api/v1/sync/restore/from-provider', {
+        method: 'POST',
+        headers: {
+          Cookie: ctx.cookie,
+          'Content-Type': 'application/json',
+          'Idempotency-Key': key,
+          'Sec-Fetch-Site': 'same-origin',
+        },
+        body: JSON.stringify({ sourceType: 'sheets', providerId, mode: 'preview' }),
+      });
+
+    const bProvider = `idor-restore-b-${bCounter}`;
+    const aProvider = `idor-restore-a-${bCounter}`;
+    seedProvider(bProvider, bId);
+    seedProvider(aProvider, ctx.user.id);
+
+    const denied = await restoreAsA(bProvider, `idor-restore-b-${bCounter}`);
+    expectDenied(denied, "restore from B's provider");
+    const deniedBody = (await denied.json()) as { error?: { message?: string } };
+    expect(deniedBody.error?.message).toContain('Provider not found');
+
+    // Positive control: the SAME request against A's OWN identical row gets past the ownership
+    // check and fails further in (there are no real credentials behind it). Without this, a schema
+    // or idempotency rejection would make the denial above prove nothing.
+    const ownRes = await restoreAsA(aProvider, `idor-restore-a-${bCounter}`);
+    const ownBody = (await ownRes.json()) as { error?: { message?: string } };
+    expect(
+      ownBody.error?.message ?? '',
+      "A's own provider must get past the ownership gate"
+    ).not.toContain('Provider not found');
   });
 
   // vehicle-sharing T3 (owner-side share management). The share IS the cross-tenant feature, so the

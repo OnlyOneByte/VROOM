@@ -1,18 +1,17 @@
 /**
- * Characterization tests for sync ROUTE error behavior through the REAL HTTP stack (arch: net
- * written, try/catch DROPPED).
+ * The error contract of the sync routes, over the REAL HTTP stack.
  *
- * arch dropped the hand-rolled try/catch → handleSyncError from sync/routes.ts so errors
- * propagate to the central errorHandler (made SyncError-aware in). proved the two paths are
- * byte-identical for a SyncError — so the SyncError-path assertions below are UNCHANGED across the
- * drop and prove it caused no regression on the common case. For a NON-SyncError thrown inside a sync
- * handler the paths diverged (handleSyncError wrapped any non-SyncError as 500 OPERATION_FAILED; the
- * central errorHandler maps a ZodError → 400 ValidationError + an AppError by its statusCode), so the
- * drop deliberately IMPROVED those: bad input now returns its proper status instead of a blanket 500.
+ * The sync handlers hand-roll no try/catch: every error they raise propagates to the global
+ * errorHandler middleware, which is the single error path for this router. Three classes are pinned
+ * here because each maps to a different status through a different branch of that handler:
+ *  - a SyncError raised inside a handler → its code's status (VALIDATION_ERROR → 400);
+ *  - a SyncError raised by MIDDLEWARE, before the handler runs → the same envelope, proving the
+ *  handler serves the whole stack and not just route bodies;
+ *  - an AppError (requireAuth's AuthenticationError) → its own statusCode, not a flattened 500.
  *
- * This file was the net that made the drop provable; it now also documents the post-drop contract.
- * createTestApp() rewrites env then dynamic-imports DB-bound modules; keep imports to the harness +
- * bun:test.
+ * A route that reintroduced a local catch block could silently change any of these, so the shapes are
+ * asserted rather than assumed. createTestApp() rewrites env then dynamic-imports DB-bound modules;
+ * keep imports to the harness + bun:test.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -30,11 +29,9 @@ interface ErrorBody {
   error: { code: string; message: string; details?: unknown };
 }
 
-describe('sync route error behavior (characterization — pins today before the arch drop)', () => {
-  test('POST /sync with invalid syncTypes → 400 VALIDATION_ERROR (SyncError path, stable)', async () => {
-    // validateSyncTypes throws SyncError(VALIDATION_ERROR), caught by the handler's try/catch →
-    // handleSyncError → 400. This is a SyncError, so proved the central handler is byte-identical;
-    // the part-2 drop will NOT change this assertion.
+describe('sync route error behavior', () => {
+  test('POST /sync with invalid syncTypes → 400 VALIDATION_ERROR (SyncError path)', async () => {
+    // validateSyncTypes throws SyncError(VALIDATION_ERROR); the global handler maps the code to 400.
     const res = await ctx.authed('POST', '/api/v1/sync', { syncTypes: [] });
     const body = (await json<ErrorBody>(res)) as ErrorBody;
     expect(res.status).toBe(400);
@@ -42,7 +39,7 @@ describe('sync route error behavior (characterization — pins today before the 
     expect(body.error.code).toBe('VALIDATION_ERROR');
   });
 
-  test('POST /sync with an unknown sync type → 400 VALIDATION_ERROR (SyncError path, stable)', async () => {
+  test('POST /sync with an unknown sync type → 400 VALIDATION_ERROR (SyncError path)', async () => {
     const res = await ctx.authed('POST', '/api/v1/sync', { syncTypes: ['not_a_real_type'] });
     const body = (await json<ErrorBody>(res)) as ErrorBody;
     expect(res.status).toBe(400);
@@ -50,11 +47,9 @@ describe('sync route error behavior (characterization — pins today before the 
     expect(body.error.message).toContain('Invalid sync types');
   });
 
-  test('POST /restore/from-provider without Idempotency-Key → 400 (middleware SyncError, already central)', async () => {
-    // The idempotency({ required: true }) middleware throws SyncError BEFORE the handler's try/catch,
-    // so this ALREADY propagates to the central errorHandler today (not via handleSyncError). It
-    // documents the middleware-vs-handler split and is unaffected by the part-2 drop — a useful
-    // anchor showing the central handler already serves this route's middleware errors correctly.
+  test('POST /restore/from-provider without Idempotency-Key → 400 (SyncError from middleware)', async () => {
+    // idempotency({ required: true }) throws its SyncError before the handler runs at all, so this
+    // pins that the global handler serves middleware errors with the same envelope as handler errors.
     const res = await ctx.authed('POST', '/api/v1/sync/restore/from-provider', {
       sourceType: 'zip',
       providerId: 'p1',
@@ -66,13 +61,9 @@ describe('sync route error behavior (characterization — pins today before the 
     expect(body.error.code).toBe('VALIDATION_ERROR');
   });
 
-  // POST-DROP CONTRACT: with the try/catch gone, a non-SyncError thrown inside a sync handler
-  // now reaches the central errorHandler, which maps it to its proper status instead of the old
-  // blanket 500 OPERATION_FAILED. Asserted live here: an unauthenticated request hits requireAuth
-  // (which throws AuthenticationError, an AppError, NOT a SyncError) → the central handler returns
-  // 401 AuthenticationError. Pre-drop, requireAuth ran before the route try/catch so this was already
-  // 401 — but it now confirms the central handler is the single error path for these routes, and that
-  // an AppError keeps its statusCode rather than being flattened to 500.
+  // An AppError must keep its own statusCode rather than being flattened to a blanket 500: requireAuth
+  // throws AuthenticationError, which is an AppError and NOT a SyncError, so it exercises a different
+  // branch of the handler from the two cases above.
   test('an unauthenticated sync request → 401 via the central handler (AppError keeps its status)', async () => {
     const res = await ctx.anon('POST', '/api/v1/sync', { syncTypes: ['backup'] });
     expect(res.status).toBe(401);

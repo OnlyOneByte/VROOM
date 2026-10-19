@@ -1,0 +1,17 @@
+{
+	// The E2E harness is TypeScript too, but it is NOT in the app's program: SvelteKit
+	// generates the include list in .svelte-kit/tsconfig.json and it covers src/, test/,
+	// tests/ and vite.config.ts only. Without this file `e2e/` and playwright.config.ts
+	// compile under nothing, so a type error there is found by a red E2E run at best.
+	//
+	// Same compilerOptions as the app (inherited through ./tsconfig.json) so the harness is
+	// held to the repo's own strictness, including noUncheckedIndexedAccess and
+	// noPropertyAccessFromIndexSignature.
+	"extends": "./tsconfig.json",
+	"include": [
+		".svelte-kit/ambient.d.ts",
+		".svelte-kit/non-ambient.d.ts",
+		"e2e/**/*.ts",
+		"playwright.config.ts"
+	]
+}

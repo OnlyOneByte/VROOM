@@ -795,9 +795,9 @@ routes.post('/import', zValidator('json', importBodySchema), async (c) => {
   // Commit: insert only the rows that validated. Rows that errored are reported
   // back untouched so the user can fix and re-import just those.
   //
-  // Insert ATOMICALLY (all-or-nothing transaction) and IDEMPOTENTLY: each ready row carries
-  // a deterministic clientId, so re-importing the same file is a no-op — already-present
-  // rows are skipped and counted as duplicates rather than duplicated.
+  // Insert ATOMICALLY (one synchronous all-or-nothing transaction — see importExpenses) and
+  // IDEMPOTENTLY: each ready row carries a deterministic clientId, so re-importing the same file
+  // is a no-op — already-present rows are skipped and counted as duplicates rather than duplicated.
   const readyRows = plan.rows
     .filter((row) => row.status === 'ready' && row.expense)
     .map((row) => ({ ...row.expense, userId: user.id }) as NewExpense);
@@ -831,7 +831,7 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
   // (the legacy/self sentinel — keeps owner-authored rows identical to pre-T5b). requireVehicleWrite
   // already 404'd an absent vehicle, so the owner id is always present here.
   const ownerId = await resolveVehicleOwnerId(expenseData.vehicleId);
-  if (!ownerId) throw new ValidationError('Vehicle');
+  if (!ownerId) throw new NotFoundError('Vehicle');
   const createdBy = ownerId === user.id ? null : user.id;
 
   // Validate: a financing source link must point at the vehicle's active financing (shared with PUT).
@@ -956,7 +956,7 @@ routes.put(
     // gate: a stranger (no access), a VIEWER (read-only), and an editor on a DIFFERENT vehicle all get
     // the same 404 (existence-hiding) — replacing the prior userId-scoped ownership check.
     const existingExpense = await expenseRepository.findById(id);
-    if (!existingExpense) throw new ValidationError('Expense');
+    if (!existingExpense) throw new NotFoundError('Expense');
     await requireVehicleWrite(existingExpense.vehicleId, user.id);
 
     // If the edit reassigns the expense to a different vehicle, the acting user must have WRITE access
@@ -1036,7 +1036,7 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   // WRITE access — owner or accepted editor; a viewer/stranger gets the same 404 (existence-hiding).
   // An editor may delete a cost row on a shared vehicle (D3 editor capability).
   const existingExpense = await expenseRepository.findById(id);
-  if (!existingExpense) throw new ValidationError('Expense');
+  if (!existingExpense) throw new NotFoundError('Expense');
   await requireVehicleWrite(existingExpense.vehicleId, user.id);
 
   // Clean the expense's receipt photos (provider files + DB) before deleting the row — the photos

@@ -28,6 +28,10 @@ const ROUTES = [
 	'/expenses/new',
 	'/analytics',
 	'/profile',
+	'/settings',
+	'/reminders',
+	'/insurance',
+	'/trips',
 	'/vehicles/new'
 ];
 
@@ -38,6 +42,10 @@ export default async function warmDevServer(config: FullConfig) {
 	// Starts empty, so the "un-warmed" report is accurate even when the block below never
 	// gets as far as the loop.
 	const warmed = new Set<string>();
+	// Keyed by route rather than a parallel list: the summary derives both the un-warmed set
+	// and its reasons from here, so the two can never drift apart. A route missing from this
+	// map but absent from `warmed` was never attempted, which is itself the diagnosis.
+	const failures = new Map<string, string>();
 
 	// `chromium.launch()` is INSIDE the guard, not outside it. Launching is the step most
 	// likely to fail on a fresh checkout (no `npx playwright install`), and a throw here
@@ -63,8 +71,11 @@ export default async function warmDevServer(config: FullConfig) {
 					// is being warmed.
 					await page.goto(`${baseURL}${route}`, { waitUntil: 'commit', timeout: 120_000 });
 					warmed.add(route);
-				} catch {
-					// Reported as un-warmed below; the route's own tests still run.
+				} catch (error) {
+					// Named for the same reason the outer catch names its error: a degraded
+					// warm-up is only actionable if the reason survives. Still non-fatal — the
+					// route's own tests run and fail with their own specific assertion.
+					failures.set(route, error instanceof Error ? error.message : String(error));
 				}
 			}
 		} finally {
@@ -80,9 +91,11 @@ export default async function warmDevServer(config: FullConfig) {
 	// A run where every route is listed as un-warmed means the server was not up yet, and the
 	// cold-compile cost is back on the first test that touches each page.
 	const seconds = ((Date.now() - started) / 1000).toFixed(1);
-	const unwarmed = ROUTES.filter(route => !warmed.has(route));
+	const unwarmed = ROUTES.filter(route => !warmed.has(route)).map(
+		route => `${route}: ${failures.get(route) ?? 'not attempted'}`
+	);
 	console.log(
 		`[e2e] warmed ${warmed.size}/${ROUTES.length} routes in ${seconds}s` +
-			(unwarmed.length ? ` (un-warmed: ${unwarmed.join(', ')})` : '')
+			(unwarmed.length ? ` (un-warmed: ${unwarmed.join('; ')})` : '')
 	);
 }

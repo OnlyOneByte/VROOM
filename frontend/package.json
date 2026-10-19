@@ -40,22 +40,20 @@
 		"@sveltejs/adapter-node": "^5.5.7",
 		"@sveltejs/kit": "^2.70.3",
 		"@sveltejs/vite-plugin-svelte": "^7.3.1",
-		"@tailwindcss/forms": "^0.5.11",
-		"@tailwindcss/typography": "^0.5.20",
 		"@tailwindcss/vite": "^4.3.3",
 		"@testing-library/jest-dom": "^7.0.1",
 		"@testing-library/svelte": "^5.4.2",
 		"@types/d3": "^7.4.3",
-		"@types/jsdom": "^30.0.0",
 		"@typescript-eslint/eslint-plugin": "^8.71.0",
 		"@typescript-eslint/parser": "^8.18.2",
 		"@vite-pwa/assets-generator": "^1.0.2",
 		"@vite-pwa/sveltekit": "^1.1.0",
 		"@vitest/coverage-v8": "^4.1.11",
-		"@vitest/ui": "^4.0.18",
 		"autoprefixer": "^10.6.1",
 		"bits-ui": "^2.19.4",
 		"clsx": "^2.1.1",
+		"d3-scale": "^4.0.2",
+		"d3-shape": "^3.2.0",
 		"embla-carousel-svelte": "^8.6.0",
 		"eslint": "^10.11.0",
 		"eslint-config-prettier": "^10.1.8",
@@ -63,9 +61,7 @@
 		"fast-check": "^4.10.2",
 		"globals": "^17.13.0",
 		"happy-dom": "^20.14.5",
-		"jsdom": "^30.1.1",
 		"layerchart": "2.5.1",
-		"mode-watcher": "^1.1.0",
 		"postcss": "^8.5.28",
 		"prettier": "^3.9.9",
 		"prettier-plugin-svelte": "^4.1.1",
@@ -79,15 +75,14 @@
 		"typescript": "^6.0.3",
 		"@typescript/native": "npm:typescript@7.0.2",
 		"vite": "^8.3.2",
-		"vitest": "^4.0.18"
+		"vitest": "^4.0.18",
+		"workbox-core": "^7.4.1",
+		"workbox-precaching": "^7.4.1"
 	},
 	"overrides": {
 		"serialize-javascript": "^7.0.5"
 	},
 	"dependencies": {
-		"@tailwindcss/postcss": "^4.3.3",
-		"d3": "^7.9.0",
-		"sveltekit-superforms": "^2.31.0",
 		"zod": "^4.6.5"
 	}
 }

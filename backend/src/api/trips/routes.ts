@@ -16,6 +16,7 @@
 import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { logger } from '../../utils/logger';
 import { buildPaginatedResponse, clampPagination } from '../../utils/pagination';
@@ -189,13 +190,7 @@ routes.put(
     const start = data.startOdometer ?? existing.startOdometer;
     const end = data.endOdometer ?? existing.endOdometer;
     if (end < start) {
-      return c.json(
-        {
-          success: false,
-          error: 'endOdometer must be greater than or equal to startOdometer',
-        },
-        400
-      );
+      throw new ValidationError('endOdometer must be greater than or equal to startOdometer');
     }
 
     const updated = await tripRepository.update(id, data);
@@ -270,13 +265,13 @@ routes.delete(
     // Read the trip BEFORE deleting so we have its (vehicle, endOdometer, tripDate) to find the linked entry.
     const existing = await tripRepository.findByIdAndUserId(id, user.id);
     if (!existing) {
-      return c.json({ success: false, error: 'Trip not found' }, 404);
+      throw new NotFoundError('Trip');
     }
 
     const deleted = await tripRepository.deleteByIdAndUserId(id, user.id);
     if (!deleted) {
       // Lost a race (deleted between read and delete) — still a 404, same as a miss.
-      return c.json({ success: false, error: 'Trip not found' }, 404);
+      throw new NotFoundError('Trip');
     }
 
     if (keepOdometer === false) {

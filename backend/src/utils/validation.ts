@@ -92,13 +92,12 @@ export const commonSchemas = {
  * They throw HTTPException if the resource is not found or doesn't belong to the user.
  */
 
-import { expenseRepository } from '../api/expenses/repository';
 import { financingRepository } from '../api/financing/repository';
 import { insurancePolicyRepository } from '../api/insurance/repository';
 import { type ReminderWithVehicles, reminderRepository } from '../api/reminders/repository';
 import { tripRepository } from '../api/trips/repository';
 import { vehicleRepository } from '../api/vehicles/repository';
-import type { Expense, InsurancePolicy, Trip, Vehicle, VehicleFinancing } from '../db/schema';
+import type { InsurancePolicy, Trip, Vehicle, VehicleFinancing } from '../db/schema';
 import { NotFoundError } from '../errors';
 
 /**
@@ -136,19 +135,12 @@ export async function validateVehicleIdsOwned(
 }
 
 /**
- * Validate that an expense belongs to the user (via direct userId column)
- * @throws NotFoundError if expense not found or doesn't belong to user
+ * There is deliberately NO `validateExpenseOwnership` here. An expense on a shared vehicle is
+ * OWNER-stamped (`expenses.userId` is the vehicle's owner, not the editor who wrote the row), so a
+ * strict acting-user match denies an accepted editor their own row. Every expense surface —
+ * including the receipt-photo gate — loads the row unscoped and authorizes on the vehicle through
+ * `requireVehicleRead`/`requireVehicleWrite` in utils/sharing.ts, the one widening seam.
  */
-export async function validateExpenseOwnership(
-  expenseId: string,
-  userId: string
-): Promise<Expense> {
-  const expense = await expenseRepository.findByIdAndUserId(expenseId, userId);
-  if (!expense) {
-    throw new NotFoundError('Expense');
-  }
-  return expense;
-}
 
 /**
  * Validate that financing belongs to the user (via vehicle ownership)

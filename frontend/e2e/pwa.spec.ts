@@ -1,6 +1,7 @@
-import AxeBuilder from '@axe-core/playwright';
-import { test, expect } from '@playwright/test';
+import { test, expect, type Locator, type Page, type TestInfo } from '@playwright/test';
+import { scanA11y } from './support/axe';
 import { addSessionCookie, mockApi } from './support/mock-api';
+import { THEME_REGISTRY, DEFAULT_THEME_ID } from '../src/lib/theme/theme-registry';
 
 /**
  * App-shell smoke: the PWA surface (manifest, service worker, asset caching, meta tags),
@@ -14,7 +15,7 @@ import { addSessionCookie, mockApi } from './support/mock-api';
  * worker, a different artifact from the one that ships: green without testing the thing that
  * matters.
  */
-const PREVIEW = process.env.E2E_TARGET === 'preview';
+const PREVIEW = process.env['E2E_TARGET'] === 'preview';
 const needsRealBundle = () =>
 	test.skip(!PREVIEW, 'needs the production bundle; run with E2E_TARGET=preview');
 
@@ -156,63 +157,153 @@ test.describe('Responsive layout', () => {
 /**
  * Accessibility ratchet.
  *
- * `@axe-core/playwright` was a devDependency with no consumer; this is its only use. It is
- * a RATCHET, not a gate on today's debt: each route carries the set of WCAG rule ids it
- * currently violates, and the test fails only on a rule id that is NOT already on that
- * list. So pre-existing violations do not block anyone, a NEW class of violation does, and
- * the full violation detail is attached to the report either way.
+ * `@axe-core/playwright` was a devDependency with no consumer; this and expenses-a11y.spec.ts
+ * are its only uses. It is a RATCHET, not a gate on today's debt: each route carries the set
+ * of WCAG rule ids it currently violates, and the test fails only on a rule id that is NOT
+ * already on that list. So pre-existing violations do not block anyone, a NEW class of
+ * violation does, and the full violation detail is attached to the report either way.
  *
  * Shrink a list when you fix something — an id left here after the fix makes the ratchet
  * permanently looser than the app.
+ *
+ * Every entry also says how to REACH its route and what proves it arrived, because the
+ * failure mode of a route-keyed scan is silence rather than red: a route reached without a
+ * session is bounced to the sign-in page, and a readiness assertion generic enough to pass
+ * there leaves axe scanning /auth under this route's name, forever, with an empty allowlist
+ * that reads as a clean bill of health. The URL re-check after the scan is the backstop.
+ *
+ * Not every route is here. The expenses table's post-interaction states live in
+ * expenses-a11y.spec.ts (its controls exist only after a tap), and the remaining routes are
+ * edit forms that need a fixture id. Add a page here when you add one.
  */
-const A11Y_DEBT: Record<string, string[]> = {
-	'/': [],
-	'/auth': [],
-	'/dashboard': []
+interface A11yRoute {
+	/** WCAG rule ids this route violates today. A rule id outside this set fails the test. */
+	debt: string[];
+	/** Signed-out surfaces. Every other route needs the session cookie or it redirects. */
+	anonymous?: true;
+	/** Content only this route renders — the app shell's loading state does not count. */
+	ready: (page: Page) => Locator;
+}
+
+/** Both signed-out surfaces end at the same control, under different copy. */
+const signInControl = (page: Page) =>
+	page.getByRole('button', { name: /Sign In|Continue with/i }).first();
+/** `.first()`: this is a readiness check, not a uniqueness one — several pages repeat their
+ *  own name on a card heading below the page title. */
+const pageHeading = (name: string) => (page: Page) => page.getByRole('heading', { name }).first();
+
+const A11Y_ROUTES: Record<string, A11yRoute> = {
+	'/': { anonymous: true, debt: [], ready: signInControl },
+	'/auth': { anonymous: true, debt: [], ready: signInControl },
+	'/dashboard': { debt: [], ready: pageHeading('Dashboard') },
+	'/expenses/new': { debt: [], ready: pageHeading('Add Expense') },
+	'/vehicles/new': { debt: [], ready: pageHeading('Add New Vehicle') },
+	'/analytics': { debt: [], ready: pageHeading('Analytics Dashboard') },
+	'/insurance': { debt: [], ready: pageHeading('Insurance') },
+	'/reminders': { debt: [], ready: pageHeading('Reminders') },
+	'/trips': { debt: [], ready: pageHeading('Trips') },
+	'/settings': { debt: [], ready: pageHeading('Settings') },
+	'/profile': { debt: [], ready: pageHeading('Profile') }
 };
 
+/** `/` → `root`, `/expenses/new` → `expenses-new`: a filename-safe attachment label. */
+const attachmentLabel = (route: string) => route.replace(/^\//, '').replace(/\//g, '-') || 'root';
+
+async function expectNoNewViolations(
+	page: Page,
+	testInfo: TestInfo,
+	label: string,
+	debt: string[]
+) {
+	const { ids, violations } = await scanA11y(page, testInfo, label);
+	const unexpected = ids.filter(id => !debt.includes(id));
+	expect(
+		unexpected,
+		`new axe violations on ${label} (full detail attached): ${JSON.stringify(
+			violations
+				.filter(violation => unexpected.includes(violation.id))
+				.map(violation => ({
+					id: violation.id,
+					impact: violation.impact,
+					nodes: violation.nodes.map(node => node.target)
+				}))
+		)}`
+	).toEqual([]);
+}
+
 test.describe('Accessibility (axe)', () => {
-	for (const [route, allowed] of Object.entries(A11Y_DEBT)) {
+	for (const [route, { debt, anonymous, ready }] of Object.entries(A11Y_ROUTES)) {
 		test(`${route} has no axe violations beyond its recorded debt`, async ({
 			page,
 			context
 		}, testInfo) => {
-			const authenticated = route === '/dashboard';
-			if (authenticated) await addSessionCookie(context);
-			await mockApi(page, { authenticated });
+			if (!anonymous) await addSessionCookie(context);
+			await mockApi(page, { authenticated: !anonymous });
 
 			await page.goto(route);
-			// Wait for the route's own content, not just navigation — scanning the loading
-			// shell would measure nothing.
-			await expect(
-				authenticated
-					? page.getByRole('heading', { name: 'Dashboard' })
-					: page.getByRole('button', { name: /Sign In|Continue with/i }).first()
-			).toBeVisible();
+			// The route's own content, not the app shell's loading state — scanning the shell
+			// measures nothing, and a readiness locator generic enough to match the shell (or
+			// the sign-in page the auth gate redirects to) is how a route-keyed ratchet ends up
+			// reporting a permanently empty allowlist for a page it never rendered.
+			await expect(ready(page)).toBeVisible();
 
-			const results = await new AxeBuilder({ page })
-				.withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-				.analyze();
+			await expectNoNewViolations(page, testInfo, attachmentLabel(route), debt);
 
-			await testInfo.attach(`axe${route === '/' ? '-root' : route.replace(/\//g, '-')}.json`, {
-				body: JSON.stringify(results.violations, null, 2),
-				contentType: 'application/json'
-			});
+			// LAST, deliberately. Route protection runs in an effect once `/auth/me` resolves,
+			// so immediately after `goto` the URL is still the requested one whether or not the
+			// app is about to bounce you; by the time axe has run, it has settled. This is the
+			// backstop for the case the readiness locator cannot see: a scan that passed, on
+			// some other page, recorded under this route's name.
+			await expect(page).toHaveURL(route);
+		});
+	}
+});
 
-			const found = [...new Set(results.violations.map(v => v.id))].sort();
-			const unexpected = found.filter(id => !allowed.includes(id));
-			expect(
-				unexpected,
-				`new axe violations on ${route} (full detail attached): ${JSON.stringify(
-					results.violations
-						.filter(v => unexpected.includes(v.id))
-						.map(v => ({
-							id: v.id,
-							impact: v.impact,
-							nodes: v.nodes.map(n => n.target)
-						}))
-				)}`
-			).toEqual([]);
+/**
+ * The same scan under every non-default theme, in dark mode.
+ *
+ * A theme swaps the CSS custom properties the entire app paints from, so a palette with too
+ * little contrast is a WCAG failure on every route at once — the one defect class that
+ * scanning routes under the default theme cannot see. The two localStorage keys below are
+ * the app's own persistence, set before the first script runs so no flash of the default
+ * palette is scanned.
+ *
+ * `/dashboard` is the sample: cards, stat tiles, badges, charts and the nav shell, which
+ * between them paint most of the token set. Chromium only — axe derives these violations
+ * from computed colour, which does not differ by engine, so the other four projects would
+ * pay full price for the same answer.
+ */
+const NON_DEFAULT_THEMES = Object.keys(THEME_REGISTRY).filter(id => id !== DEFAULT_THEME_ID);
+
+test.describe('Accessibility (axe) — theme palettes', () => {
+	test.skip(
+		({ browserName }) => browserName !== 'chromium',
+		'palette contrast is engine-independent'
+	);
+
+	for (const themeId of NON_DEFAULT_THEMES) {
+		test(`the ${themeId} theme in dark mode has no axe violations`, async ({
+			page,
+			context
+		}, testInfo) => {
+			await addSessionCookie(context);
+			await page.addInitScript(
+				({ modeKey, idKey, id }) => {
+					localStorage.setItem(modeKey, 'dark');
+					localStorage.setItem(idKey, id);
+				},
+				{ modeKey: 'vroom-theme-preference', idKey: 'vroom-theme-id', id: themeId }
+			);
+			await mockApi(page);
+
+			await page.goto('/dashboard');
+			await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+			// The theme actually took: both axes are applied to <html> by the store, and a
+			// mis-set key would otherwise scan the default palette and pass.
+			await expect(page.locator('html')).toHaveAttribute('data-theme', themeId);
+			await expect(page.locator('html')).toHaveClass(/dark/);
+
+			await expectNoNewViolations(page, testInfo, `dashboard-dark-${themeId}`, []);
 		});
 	}
 });

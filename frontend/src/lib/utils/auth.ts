@@ -18,7 +18,7 @@ export const publicRoutes = ['/', '/auth', '/privacypolicy', '/termsofservice'];
 // (you shouldn't sit on the sign-in page while signed in). The landing page handles
 // its own authed redirect, and the legal pages are readable while signed in, so only
 // '/auth' belongs here.
-export const authRedirectRoutes = ['/auth'];
+const authRedirectRoutes = ['/auth'];
 
 // A path is public if it exactly equals a public route or is a sub-path of one
 // (e.g. /auth/callback). The exact-or-segment match avoids a prefix like '/trips'

@@ -14,20 +14,6 @@ export interface VehicleFormData {
 	purchaseDate?: string | undefined;
 }
 
-export interface ExpenseFormData {
-	vehicleId: string;
-	tags: string[];
-	category: ExpenseCategory;
-	amount: number;
-	date: string;
-	mileage?: number | undefined;
-	volume?: number | undefined;
-	charge?: number | undefined;
-	fuelType?: string;
-	description?: string;
-	missedFillup?: boolean;
-}
-
 export interface ExpenseFilters {
 	vehicleId?: string;
 	category?: ExpenseCategory | undefined;
