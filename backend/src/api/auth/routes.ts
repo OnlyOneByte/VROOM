@@ -7,6 +7,7 @@ import { HTTPException } from 'hono/http-exception';
 import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
 import { userProviders, users } from '../../db/schema';
+import { createErrorResponse } from '../../errors';
 import { rateLimiter, requireAuth } from '../../middleware';
 import { getClientIp } from '../../utils/client-ip';
 import { encrypt } from '../../utils/encryption';
@@ -681,22 +682,10 @@ routes.delete('/accounts/:id', requireAuth, async (c) => {
 
   if ('error' in result) {
     if (result.error === 'not_found') {
-      return c.json(
-        {
-          success: false,
-          error: { code: 'NOT_FOUND', message: 'Auth account not found' },
-        },
-        404
-      );
+      return c.json(createErrorResponse('NOT_FOUND', 'Auth account not found'), 404);
     }
     return c.json(
-      {
-        success: false,
-        error: {
-          code: 'LAST_ACCOUNT',
-          message: 'Cannot unlink your last sign-in method',
-        },
-      },
+      createErrorResponse('LAST_ACCOUNT', 'Cannot unlink your last sign-in method'),
       400
     );
   }

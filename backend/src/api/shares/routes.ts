@@ -1,4 +1,3 @@
-import { zValidator } from '@hono/zod-validator';
 import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
@@ -7,7 +6,7 @@ import { users, type VehicleShare } from '../../db/schema';
 import type { ApiResponse } from '../../errors';
 import { ConflictError, NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
-import { commonSchemas, validateVehicleOwnership } from '../../utils/validation';
+import { commonSchemas, validateVehicleOwnership, zValidator } from '../../utils/validation';
 import { type ReceivedShare, vehicleShareRepository } from './repository';
 
 /**

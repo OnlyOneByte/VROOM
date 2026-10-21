@@ -3,10 +3,59 @@
  *
  * Common validation schemas used across route handlers to avoid duplication.
  * These schemas can be composed and reused in different endpoints.
+ *
+ * Also the home of `zValidator` — route files import it from HERE, not from `@hono/zod-validator`,
+ * so every validation failure answers in the same envelope as every other error. See below.
  */
 
+import { zValidator as honoZValidator } from '@hono/zod-validator';
+import type { ValidationTargets } from 'hono';
+import type { ZodError, ZodType } from 'zod';
 import { z } from 'zod';
 import { CONFIG } from '../config';
+import { createErrorResponse } from '../errors';
+
+/**
+ * One Zod issue rendered for a human: `body.date: Required`, or just `Required` at the root.
+ * `path` is the only place the offending field is named, so dropping it would leave a message that
+ * cannot be acted on when a schema has more than one field.
+ */
+function describeIssue(issue: ZodError['issues'][number]): string {
+  const path = issue.path.join('.');
+  return path ? `${path}: ${issue.message}` : issue.message;
+}
+
+/**
+ * `zValidator` that fails in the app's error envelope.
+ *
+ * Hono's own validator answers `{ success: false, error: { name: 'ZodError', message: <the issue
+ * array, JSON-stringified> } }`. Two things are wrong with that for a client: there is no `code`,
+ * which every other error on every other route carries and which the frontend switches on; and
+ * `message` is a serialized dump of Zod internals, so a UI that surfaces `error.message` — as ours
+ * does — shows the user a blob of JSON instead of a sentence.
+ *
+ * `details.issues` keeps the full per-field breakdown for a form that wants to highlight fields,
+ * so nothing is lost by making `message` readable.
+ */
+export function zValidator<Target extends keyof ValidationTargets, Schema extends ZodType>(
+  target: Target,
+  schema: Schema
+) {
+  return honoZValidator(target, schema, (result, c) => {
+    if (result.success) return;
+    const { issues } = result.error;
+    return c.json(
+      createErrorResponse(
+        'ValidationError',
+        issues.length === 1
+          ? `Invalid ${target}: ${describeIssue(issues[0])}`
+          : `Invalid ${target}: ${issues.map(describeIssue).join('; ')}`,
+        { target, issues }
+      ),
+      400
+    );
+  });
+}
 
 /**
  * The raw `limit`/`offset` field validators for a list endpoint that pairs with `clampPagination`

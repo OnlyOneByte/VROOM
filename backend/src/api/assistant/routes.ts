@@ -16,7 +16,6 @@
  * The global rate-limiter (app.ts) already covers request-rate; the LLM cost lands on the user's own key.
  */
 
-import { zValidator } from '@hono/zod-validator';
 import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
@@ -25,6 +24,7 @@ import { userProviders } from '../../db/schema';
 import { AppError, ValidationError } from '../../errors';
 import { requireAuth } from '../../middleware';
 import { logger } from '../../utils/logger';
+import { zValidator } from '../../utils/validation';
 import type { ChatMessage } from '../providers/domains/llm/llm-provider';
 import { runAssistant } from '../providers/domains/llm/orchestrator';
 import { getLlmProvider } from '../providers/domains/llm/registry';

@@ -1,4 +1,3 @@
-import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { NotFoundError } from '../../errors';
@@ -9,7 +8,7 @@ import {
   requireVehicleWrite,
   resolveVehicleOwnerId,
 } from '../../utils/sharing';
-import { commonSchemas } from '../../utils/validation';
+import { commonSchemas, zValidator } from '../../utils/validation';
 import { deleteAllPhotosForEntity } from '../photos/photo-service';
 import { reminderTriggerService } from '../reminders/trigger-service';
 import { odometerRepository } from './repository';

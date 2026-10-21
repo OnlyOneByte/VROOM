@@ -1,8 +1,7 @@
-import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { NotFoundError } from '../../errors';
 import { buildPaginatedResponse } from '../../utils/pagination';
-import { commonSchemas } from '../../utils/validation';
+import { commonSchemas, zValidator } from '../../utils/validation';
 import { parseUploadedPhoto, photoThumbnailResponse } from '../photos/helpers';
 import {
   deletePhotoForEntity,

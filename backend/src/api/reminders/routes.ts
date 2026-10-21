@@ -1,4 +1,3 @@
-import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { CONFIG } from '../../config';
 import type { NewReminder, Reminder } from '../../db/schema';
@@ -15,7 +14,7 @@ import {
   requireVehicleWrite,
   resolveVehicleOwnerId,
 } from '../../utils/sharing';
-import { commonSchemas, validateReminderOwnership } from '../../utils/validation';
+import { commonSchemas, validateReminderOwnership, zValidator } from '../../utils/validation';
 import { expenseRepository } from '../expenses/repository';
 import { odometerRepository } from '../odometer/repository';
 import { recurringCostSummary } from './reminder-cost';

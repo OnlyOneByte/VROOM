@@ -1,4 +1,3 @@
-import { zValidator } from '@hono/zod-validator';
 import { createInsertSchema } from 'drizzle-zod';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
@@ -12,6 +11,7 @@ import {
   validateFinancingOwnership,
   validateLoanTerms,
   validateVehicleOwnership,
+  zValidator,
 } from '../../utils/validation';
 import { deactivateFinancing } from './hooks';
 import { financingRepository, withComputedBalance } from './repository';

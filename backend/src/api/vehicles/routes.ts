@@ -1,4 +1,3 @@
-import { zValidator } from '@hono/zod-validator';
 import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import { createInsertSchema } from 'drizzle-zod';
 import { Hono } from 'hono';
@@ -23,7 +22,7 @@ import {
   partialUnitPreferencesSchema,
   unitPreferencesSchema,
 } from '../../utils/unit-preferences-schema';
-import { commonSchemas, validateVehicleOwnership } from '../../utils/validation';
+import { commonSchemas, validateVehicleOwnership, zValidator } from '../../utils/validation';
 import { calculateVehicleStats } from '../../utils/vehicle-stats';
 import { expenseRepository } from '../expenses/repository';
 import { financingRepository, withComputedBalance } from '../financing/repository';

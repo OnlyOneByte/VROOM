@@ -13,7 +13,6 @@
  * a userId column, and the repo finders are userId-scoped, so an unowned id is indistinguishable from absent.
  */
 
-import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { NotFoundError, ValidationError } from '../../errors';
@@ -25,6 +24,7 @@ import {
   commonSchemas,
   validateTripOwnership,
   validateVehicleOwnership,
+  zValidator,
 } from '../../utils/validation';
 import { odometerRepository } from '../odometer/repository';
 import { reminderTriggerService } from '../reminders/trigger-service';

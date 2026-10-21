@@ -1,4 +1,3 @@
-import { zValidator } from '@hono/zod-validator';
 import { stringify } from 'csv-stringify/sync';
 import { createInsertSchema } from 'drizzle-zod';
 import { Hono } from 'hono';
@@ -25,7 +24,7 @@ import {
   requireVehicleWrite,
   resolveVehicleOwnerId,
 } from '../../utils/sharing';
-import { commonSchemas, validateFuelExpenseData } from '../../utils/validation';
+import { commonSchemas, validateFuelExpenseData, zValidator } from '../../utils/validation';
 import { financingRepository } from '../financing/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
 import { reminderTriggerService } from '../reminders/trigger-service';
