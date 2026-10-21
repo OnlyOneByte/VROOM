@@ -76,6 +76,13 @@ export const entityRepository = new EntityRepository(getDb());
 `NotFoundError` on a missing row). Take `AppDatabase`, never `BunSQLiteDatabase` — the alias
 is the seam for a future non-SQLite dialect.
 
+Extending it is the default, not a requirement: 8 of the 15 repositories do. Its signature is
+`table: Table & { id: Column }`, so a table without a single `id` column cannot extend it —
+`settings` (keyed on `user_id`) is the structural case. `analytics` runs read-only aggregations and
+has no row CRUD to inherit. The rest (`auth`, both `insurance`, both `photos`) own enough
+domain-specific query shape that the four inherited methods carry little of their weight. Extend it
+when the generic CRUD is genuinely what you need; don't reshape a repository to qualify.
+
 ## Rules
 
 ### Validation

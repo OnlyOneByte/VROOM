@@ -43,7 +43,7 @@
     "drizzle-orm": "^0.45.3",
     "drizzle-zod": "^0.8.3",
     "googleapis": "^176.0.0",
-    "hono": "^4.13.9",
+    "hono": "^4.13.13",
     "lucia": "^3.2.2",
     "oslo": "^1.2.1",
     "web-push": "^3.6.7",
