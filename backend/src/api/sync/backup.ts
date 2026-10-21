@@ -810,10 +810,17 @@ export class BackupService {
     const dupCheck = (
       rows: Record<string, unknown>[] | undefined,
       fields: string[],
-      label: string
+      label: string,
+      /**
+       * Mirrors a partial index's WHERE clause: rows outside it cannot collide, so counting them
+       * would reject a legitimate backup. Only needed where the predicate tests a column rather
+       * than `IS NOT NULL`, which the null-skip above already covers.
+       */
+      inIndex?: (row: Record<string, unknown>) => boolean
     ): void => {
       const seen = new Set<string>();
       for (const row of rows ?? []) {
+        if (inIndex && !inIndex(row)) continue;
         const values = fields.map((f) => row[f]);
         if (values.some((v) => v == null)) continue; // NULL in any column → distinct (never collides)
         const key = values.map((v) => String(v)).join('\u0000'); // NUL join — unambiguous composite key
@@ -823,6 +830,9 @@ export class BackupService {
         seen.add(key);
       }
     };
+    /** A CSV round-trip can present a boolean as `true`, `1`, `'1'` or `'true'`. */
+    const isTruthyFlag = (value: unknown): boolean =>
+      value === true || value === 1 || value === '1' || value === 'true';
     dupCheck(backup.expenses, ['clientId'], 'expense clientId'); // expenses_user_client_idx
     dupCheck(backup.vehicles, ['licensePlate'], 'vehicle licensePlate'); // vehicles_user_license_plate_idx
     // The remaining DB-level UNIQUE indexes on backed-up + restored tables (— the leg
@@ -842,6 +852,13 @@ export class BackupService {
     // vehicle_shares_active_idx (partial WHERE status in pending/accepted). Export is accepted-only, so
     // every exported row is "active" → a dup on (vehicleId, sharedWithId) would collide on restore.
     dupCheck(backup.vehicleShares, ['vehicleId', 'sharedWithId'], 'vehicleShare vehicle+invitee');
+    // vf_active_vehicle_idx (partial WHERE is_active = 1). Financing history is exported in full, so
+    // the predicate has to be applied here: several SETTLED agreements per vehicle are valid, two
+    // ACTIVE ones are not. This index spent its life as hand-written SQL absent from `schema.ts`,
+    // which is why the coverage guard could not see it and this check was missing.
+    dupCheck(backup.financing, ['vehicleId'], 'active financing vehicleId', (row) =>
+      isTruthyFlag(row.isActive)
+    );
     return errors;
   }
 

@@ -64,10 +64,10 @@ const schemaTables = [...schemaColumns.keys()].sort();
  * whose TYPE or nullability drifted — SQLite cannot alter a column in place, so drizzle-kit emits a
  * 12-step table rebuild whose `DROP TABLE` takes the rows with it — and a drifted index set, which
  * re-emits a `CREATE INDEX` that throws inside the migrator's transaction and stops an existing
- * install from booting. Both are invisible unless the shape itself is compared, and the real
- * incident was exactly this: migration 0009 flipped the money columns real -> integer in schema.ts
- * without writing a snapshot, so the stale 0008 snapshot still said `real` and the next generate
- * emitted six table rebuilds.
+ * install from booting. Both are invisible unless the shape itself is compared, and both have
+ * happened here: a money-to-cents change flipped those columns real -> integer in `schema.ts` and
+ * shipped a data-only migration, so the head snapshot still said `real` and the next generate
+ * queued six table rebuilds.
  */
 const schemaShapes = new Map(
   Object.values<unknown>(schema)
@@ -105,22 +105,14 @@ const schemaShapes = new Map(
  * shipped row therefore rewrites history on every database that already ran it. Raising a `when`
  * replays that migration (the replay dies on the first re-added column); lowering one hides it from
  * a database that stopped just before it. Append a row when a migration ships; never edit one.
+ *
+ * The fourteen incremental migrations that preceded this were collapsed into one baseline. Editing
+ * the row below is NOT an ordinary change: any database carrying a `__drizzle_migrations` row from
+ * the old chain will not match it, which is why the collapse was a declared break requiring a
+ * backup/restore rather than an in-place upgrade.
  */
 const SHIPPED_JOURNAL: readonly { idx: number; tag: string; when: number }[] = [
-  { idx: 0, tag: '0000_tiresome_skrulls', when: 1773718943289 },
-  { idx: 1, tag: '0001_blushing_juggernaut', when: 1780689548990 },
-  { idx: 2, tag: '0002_medical_the_phantom', when: 1780798332385 },
-  { idx: 3, tag: '0003_many_jean_grey', when: 1780892459335 },
-  { idx: 4, tag: '0004_marvelous_the_fury', when: 1780930491804 },
-  { idx: 5, tag: '0005_license_plate_per_user', when: 1781000000000 },
-  { idx: 6, tag: '0006_mixed_zarek', when: 1782318187087 },
-  { idx: 7, tag: '0007_previous_ikaris', when: 1782340462679 },
-  { idx: 8, tag: '0008_awesome_avengers', when: 1782503441067 },
-  { idx: 9, tag: '0009_money_to_cents', when: 1782510000000 },
-  { idx: 10, tag: '0010_absurd_clint_barton', when: 1782520918582 },
-  { idx: 11, tag: '0011_quick_red_hulk', when: 1782534527999 },
-  { idx: 12, tag: '0012_expense_location', when: 1782600100000 },
-  { idx: 13, tag: '0013_push_subscriptions', when: 1782700000000 },
+  { idx: 0, tag: '0000_baseline', when: 1792617530275 },
 ];
 
 describe('Migrations: General', () => {
@@ -210,8 +202,8 @@ describe('Migrations: General', () => {
     expect(snapshots.filter((s) => !journalIdxs.has(s.idx)).map((s) => s.file)).toEqual([]);
 
     // drizzle-kit diffs against the LAST snapshot in this order, so it must describe the newest
-    // migration that actually moved the schema — a data-only head migration (0009's class) has no
-    // snapshot of its own, and correctly needs none.
+    // migration that actually moved the schema — a data-only head migration has no snapshot of its
+    // own, and correctly needs none.
     expect(snapshots[snapshots.length - 1].idx).toBe(schemaChanging[schemaChanging.length - 1].idx);
   });
 

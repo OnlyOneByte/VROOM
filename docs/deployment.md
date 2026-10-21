@@ -306,6 +306,13 @@ One SQLite file at `DATABASE_URL`, in WAL mode — so the data directory holds `
 plus `vroom.db-wal` and `vroom.db-shm`. The migrations in `backend/drizzle/` are applied
 automatically at startup; there is no manual migration step.
 
+**Upgrading across the migration collapse is not in-place.** The incremental migrations were
+replaced by a single `0000_baseline`, so a database created by an earlier build carries migration
+history the current journal does not recognise and will not upgrade. To move such a database
+forward: export a backup from the running old build, stop it, move `vroom.db*` aside, start the new
+build (which creates a fresh schema), then restore the backup through the UI. Keep the old file
+until the restore is verified.
+
 ### Backup
 
 Stop the backend first. Shutdown checkpoints the WAL into the main file, which a hot copy of

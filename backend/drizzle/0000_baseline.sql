@@ -6,20 +6,24 @@ CREATE TABLE `expenses` (
 	`date` integer NOT NULL,
 	`mileage` integer,
 	`description` text,
+	`location` text,
 	`created_at` integer,
 	`updated_at` integer,
-	`expense_amount` real NOT NULL,
+	`expense_amount` integer NOT NULL,
 	`volume` real,
 	`fuel_type` text,
 	`missed_fillup` integer DEFAULT false NOT NULL,
 	`user_id` text NOT NULL,
+	`created_by` text,
 	`group_id` text,
-	`group_total` real,
+	`group_total` integer,
 	`split_method` text,
 	`source_type` text,
 	`source_id` text,
+	`client_id` text,
 	FOREIGN KEY (`vehicle_id`) REFERENCES `vehicles`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE set null
 );
 --> statement-breakpoint
 CREATE INDEX `expenses_vehicle_date_idx` ON `expenses` (`vehicle_id`,`date`);--> statement-breakpoint
@@ -29,6 +33,28 @@ CREATE INDEX `expenses_user_date_idx` ON `expenses` (`user_id`,`date`);--> state
 CREATE INDEX `expenses_user_category_date_idx` ON `expenses` (`user_id`,`category`,`date`);--> statement-breakpoint
 CREATE INDEX `expenses_group_idx` ON `expenses` (`group_id`);--> statement-breakpoint
 CREATE INDEX `expenses_source_idx` ON `expenses` (`source_type`,`source_id`);--> statement-breakpoint
+CREATE UNIQUE INDEX `expenses_user_client_idx` ON `expenses` (`user_id`,`client_id`) WHERE "expenses"."client_id" IS NOT NULL;--> statement-breakpoint
+CREATE TABLE `insurance_claims` (
+	`id` text PRIMARY KEY NOT NULL,
+	`policy_id` text NOT NULL,
+	`term_id` text,
+	`vehicle_id` text,
+	`claim_date` integer NOT NULL,
+	`claim_type` text NOT NULL,
+	`description` text,
+	`status` text DEFAULT 'filed' NOT NULL,
+	`payout_amount` integer,
+	`fault_designation` text,
+	`created_at` integer,
+	`updated_at` integer,
+	FOREIGN KEY (`policy_id`) REFERENCES `insurance_policies`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`term_id`) REFERENCES `insurance_terms`(`id`) ON UPDATE no action ON DELETE set null,
+	FOREIGN KEY (`vehicle_id`) REFERENCES `vehicles`(`id`) ON UPDATE no action ON DELETE set null
+);
+--> statement-breakpoint
+CREATE INDEX `ic_policy_id_idx` ON `insurance_claims` (`policy_id`);--> statement-breakpoint
+CREATE INDEX `ic_policy_status_idx` ON `insurance_claims` (`policy_id`,`status`);--> statement-breakpoint
+CREATE INDEX `ic_vehicle_idx` ON `insurance_claims` (`vehicle_id`);--> statement-breakpoint
 CREATE TABLE `insurance_policies` (
 	`id` text PRIMARY KEY NOT NULL,
 	`user_id` text NOT NULL,
@@ -57,15 +83,15 @@ CREATE TABLE `insurance_terms` (
 	`end_date` integer NOT NULL,
 	`policy_number` text,
 	`coverage_description` text,
-	`deductible_amount` real,
-	`coverage_limit` real,
+	`deductible_amount` integer,
+	`coverage_limit` integer,
 	`agent_name` text,
 	`agent_phone` text,
 	`agent_email` text,
-	`total_cost` real,
-	`monthly_cost` real,
+	`total_cost` integer,
+	`monthly_cost` integer,
 	`premium_frequency` text,
-	`payment_amount` real,
+	`payment_amount` integer,
 	`created_at` integer,
 	`updated_at` integer,
 	FOREIGN KEY (`policy_id`) REFERENCES `insurance_policies`(`id`) ON UPDATE no action ON DELETE cascade
@@ -103,6 +129,7 @@ CREATE TABLE `photo_refs` (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `pr_photo_provider_idx` ON `photo_refs` (`photo_id`,`provider_id`);--> statement-breakpoint
+CREATE INDEX `pr_pending_idx` ON `photo_refs` (`status`,`created_at`) WHERE "photo_refs"."status" IN ('pending', 'failed') AND "photo_refs"."retry_count" < 3;--> statement-breakpoint
 CREATE TABLE `photos` (
 	`id` text PRIMARY KEY NOT NULL,
 	`user_id` text NOT NULL,
@@ -119,11 +146,27 @@ CREATE TABLE `photos` (
 --> statement-breakpoint
 CREATE INDEX `photos_entity_idx` ON `photos` (`entity_type`,`entity_id`);--> statement-breakpoint
 CREATE INDEX `photos_user_entity_type_idx` ON `photos` (`user_id`,`entity_type`);--> statement-breakpoint
+CREATE TABLE `push_subscriptions` (
+	`id` text PRIMARY KEY NOT NULL,
+	`user_id` text NOT NULL,
+	`endpoint` text NOT NULL,
+	`p256dh` text NOT NULL,
+	`auth` text NOT NULL,
+	`user_agent` text,
+	`failure_count` integer DEFAULT 0 NOT NULL,
+	`last_success_at` integer,
+	`created_at` integer,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `ps_user_idx` ON `push_subscriptions` (`user_id`);--> statement-breakpoint
+CREATE UNIQUE INDEX `ps_user_endpoint_idx` ON `push_subscriptions` (`user_id`,`endpoint`);--> statement-breakpoint
 CREATE TABLE `reminder_notifications` (
 	`id` text PRIMARY KEY NOT NULL,
 	`reminder_id` text NOT NULL,
 	`user_id` text NOT NULL,
-	`due_date` integer NOT NULL,
+	`due_date` integer,
+	`due_odometer` integer,
 	`is_read` integer DEFAULT false NOT NULL,
 	`created_at` integer,
 	`updated_at` integer,
@@ -133,6 +176,7 @@ CREATE TABLE `reminder_notifications` (
 --> statement-breakpoint
 CREATE INDEX `rn_user_unread_idx` ON `reminder_notifications` (`user_id`,`is_read`);--> statement-breakpoint
 CREATE UNIQUE INDEX `rn_reminder_due_idx` ON `reminder_notifications` (`reminder_id`,`due_date`);--> statement-breakpoint
+CREATE UNIQUE INDEX `rn_reminder_odo_idx` ON `reminder_notifications` (`reminder_id`,`due_odometer`) WHERE "reminder_notifications"."due_odometer" IS NOT NULL;--> statement-breakpoint
 CREATE TABLE `reminder_vehicles` (
 	`reminder_id` text NOT NULL,
 	`vehicle_id` text NOT NULL,
@@ -152,12 +196,16 @@ CREATE TABLE `reminders` (
 	`frequency` text NOT NULL,
 	`interval_value` integer,
 	`interval_unit` text,
+	`trigger_mode` text DEFAULT 'time' NOT NULL,
+	`interval_mileage` integer,
+	`last_service_odometer` integer,
+	`next_due_odometer` integer,
 	`start_date` integer NOT NULL,
 	`end_date` integer,
-	`next_due_date` integer NOT NULL,
+	`next_due_date` integer,
 	`expense_category` text,
 	`expense_tags` text,
-	`expense_amount` real,
+	`expense_amount` integer,
 	`expense_description` text,
 	`expense_split_config` text,
 	`is_active` integer DEFAULT true NOT NULL,
@@ -183,10 +231,30 @@ CREATE TABLE `sync_state` (
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
+CREATE TABLE `trips` (
+	`id` text PRIMARY KEY NOT NULL,
+	`vehicle_id` text NOT NULL,
+	`user_id` text NOT NULL,
+	`start_odometer` integer NOT NULL,
+	`end_odometer` integer NOT NULL,
+	`purpose` text NOT NULL,
+	`trip_date` integer NOT NULL,
+	`start_location` text,
+	`end_location` text,
+	`note` text,
+	`created_at` integer,
+	`updated_at` integer,
+	FOREIGN KEY (`vehicle_id`) REFERENCES `vehicles`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `trips_vehicle_date_idx` ON `trips` (`vehicle_id`,`trip_date`);--> statement-breakpoint
 CREATE TABLE `user_preferences` (
 	`user_id` text PRIMARY KEY NOT NULL,
 	`unit_preferences` text DEFAULT '{"distanceUnit":"miles","volumeUnit":"gallons_us","chargeUnit":"kwh"}' NOT NULL,
 	`currency_unit` text DEFAULT 'USD' NOT NULL,
+	`theme_preference` text DEFAULT 'default' NOT NULL,
+	`business_mileage_rate` real DEFAULT 0 NOT NULL,
 	`auto_backup_enabled` integer DEFAULT false NOT NULL,
 	`backup_frequency` text DEFAULT 'weekly' NOT NULL,
 	`sync_on_inactivity` integer DEFAULT true NOT NULL,
@@ -215,6 +283,7 @@ CREATE TABLE `user_providers` (
 );
 --> statement-breakpoint
 CREATE INDEX `up_user_domain_idx` ON `user_providers` (`user_id`,`domain`);--> statement-breakpoint
+CREATE UNIQUE INDEX `up_auth_identity_idx` ON `user_providers` (`provider_type`,`provider_account_id`) WHERE "user_providers"."domain" = 'auth';--> statement-breakpoint
 CREATE TABLE `users` (
 	`id` text PRIMARY KEY NOT NULL,
 	`email` text NOT NULL,
@@ -229,17 +298,17 @@ CREATE TABLE `vehicle_financing` (
 	`vehicle_id` text NOT NULL,
 	`financing_type` text DEFAULT 'loan' NOT NULL,
 	`provider` text NOT NULL,
-	`original_amount` real NOT NULL,
+	`original_amount` integer NOT NULL,
 	`apr` real,
 	`term_months` integer NOT NULL,
 	`start_date` integer NOT NULL,
-	`payment_amount` real NOT NULL,
+	`payment_amount` integer NOT NULL,
 	`payment_frequency` text DEFAULT 'monthly' NOT NULL,
 	`payment_day_of_month` integer,
 	`payment_day_of_week` integer,
-	`residual_value` real,
+	`residual_value` integer,
 	`mileage_limit` integer,
-	`excess_mileage_fee` real,
+	`excess_mileage_fee` integer,
 	`is_active` integer DEFAULT true NOT NULL,
 	`end_date` integer,
 	`created_at` integer,
@@ -248,6 +317,24 @@ CREATE TABLE `vehicle_financing` (
 );
 --> statement-breakpoint
 CREATE INDEX `vf_vehicle_id_idx` ON `vehicle_financing` (`vehicle_id`);--> statement-breakpoint
+CREATE UNIQUE INDEX `vf_active_vehicle_idx` ON `vehicle_financing` (`vehicle_id`) WHERE "vehicle_financing"."is_active" = 1;--> statement-breakpoint
+CREATE TABLE `vehicle_shares` (
+	`id` text PRIMARY KEY NOT NULL,
+	`vehicle_id` text NOT NULL,
+	`owner_id` text NOT NULL,
+	`shared_with_id` text NOT NULL,
+	`level` text NOT NULL,
+	`status` text DEFAULT 'pending' NOT NULL,
+	`created_at` integer,
+	`updated_at` integer,
+	FOREIGN KEY (`vehicle_id`) REFERENCES `vehicles`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`owner_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`shared_with_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `vehicle_shares_active_idx` ON `vehicle_shares` (`vehicle_id`,`shared_with_id`) WHERE status in ('pending','accepted');--> statement-breakpoint
+CREATE INDEX `vehicle_shares_shared_with_idx` ON `vehicle_shares` (`shared_with_id`,`status`);--> statement-breakpoint
+CREATE INDEX `vehicle_shares_owner_idx` ON `vehicle_shares` (`owner_id`);--> statement-breakpoint
 CREATE TABLE `vehicles` (
 	`id` text PRIMARY KEY NOT NULL,
 	`user_id` text NOT NULL,
@@ -261,7 +348,7 @@ CREATE TABLE `vehicles` (
 	`nickname` text,
 	`vin` text,
 	`initial_mileage` integer,
-	`purchase_price` real,
+	`purchase_price` integer,
 	`purchase_date` integer,
 	`unit_preferences` text DEFAULT '{"distanceUnit":"miles","volumeUnit":"gallons_us","chargeUnit":"kwh"}' NOT NULL,
 	`created_at` integer,
@@ -270,12 +357,4 @@ CREATE TABLE `vehicles` (
 );
 --> statement-breakpoint
 CREATE INDEX `vehicles_user_id_idx` ON `vehicles` (`user_id`);--> statement-breakpoint
--- Partial unique/filtered indexes (manually appended — Drizzle cannot express WHERE clauses on indexes)
--- One active financing per vehicle
-CREATE UNIQUE INDEX `vf_active_vehicle_idx` ON `vehicle_financing` (`vehicle_id`) WHERE `is_active` = 1;--> statement-breakpoint
--- Unique license plates (non-null only)
-CREATE UNIQUE INDEX `vehicles_license_plate_idx` ON `vehicles` (`license_plate`) WHERE `license_plate` IS NOT NULL;--> statement-breakpoint
--- Auth identity uniqueness (auth-domain rows only)
-CREATE UNIQUE INDEX `up_auth_identity_idx` ON `user_providers` (`provider_type`, `provider_account_id`) WHERE `domain` = 'auth';--> statement-breakpoint
--- Sync worker poll optimization
-CREATE INDEX `pr_pending_idx` ON `photo_refs` (`status`, `created_at`) WHERE `status` IN ('pending', 'failed') AND `retry_count` < 3;
+CREATE UNIQUE INDEX `vehicles_user_license_plate_idx` ON `vehicles` (`user_id`,`license_plate`) WHERE "vehicles"."license_plate" IS NOT NULL;

@@ -642,6 +642,48 @@ describe('validateBackupData: cross-row unique constraints', () => {
     );
     expect(result.errors.some((e) => e.includes('violates a unique constraint'))).toBe(false);
   });
+
+  /**
+   * `vf_active_vehicle_idx` is unique on `vehicle_id` WHERE `is_active = 1`. Financing is exported
+   * in full, history included, so the predicate has to be honoured here: a vehicle legitimately
+   * accumulates settled agreements, and only a second ACTIVE one collides. Validating without the
+   * predicate would reject every backup from anyone who has ever refinanced.
+   */
+  const financingRow = (id: string, isActive: boolean, vehicleId = 'veh-1') =>
+    ({
+      ...coerceRow(buildMinimalStringRow(vehicleFinancing, { vehicleId }), vehicleFinancing),
+      id,
+      vehicleId,
+      isActive,
+    }) as Record<string, unknown>;
+
+  test('two ACTIVE financing rows for one vehicle are rejected — vf_active_vehicle_idx', () => {
+    // Without this check the duplicate survives validation and throws on the colliding INSERT
+    // *after* the replace-mode wipe, which leaves the account empty.
+    const result = backupService.validateBackupData(
+      backupWith({ financing: [financingRow('f1', true), financingRow('f2', true)] })
+    );
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('active financing vehicleId'))).toBe(true);
+  });
+
+  test('several SETTLED financing rows for one vehicle are accepted (outside the partial index)', () => {
+    const result = backupService.validateBackupData(
+      backupWith({
+        financing: [financingRow('f1', false), financingRow('f2', false), financingRow('f3', true)],
+      })
+    );
+    expect(result.errors.some((e) => e.includes('active financing vehicleId'))).toBe(false);
+  });
+
+  test('one ACTIVE row per vehicle across different vehicles is accepted', () => {
+    const result = backupService.validateBackupData(
+      backupWith({
+        financing: [financingRow('f1', true, 'veh-1'), financingRow('f2', true, 'veh-2')],
+      })
+    );
+    expect(result.errors.some((e) => e.includes('active financing vehicleId'))).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------

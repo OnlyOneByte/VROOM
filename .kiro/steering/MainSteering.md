@@ -124,7 +124,7 @@ Routes live in `frontend/src/routes/` under SvelteKit file-based routing; `$lib/
 - Use Biome for linting and formatting (not ESLint/Prettier). `bun run all:fix` chains `lint:fix`, `format:fix`, and `check:fix`.
 - Schema changes go through generated migrations in `backend/drizzle/`: edit `db/schema.ts`, then `bun run db:generate`. Migrations apply automatically at startup via `runMigrations()`. Never use `db:push` for a schema change — see `DatabaseMigrations.md`.
 
-## Money (integer cents — migration 0009)
+## Money (integer cents)
 
 All monetary values are stored AND computed as **integer cents** — the 14 money columns (expenses.expenseAmount/groupTotal, vehicleFinancing.{originalAmount,paymentAmount,residualValue,excessMileageFee}, insuranceTerms.{deductibleAmount,coverageLimit,totalCost,monthlyCost,paymentAmount}, insuranceClaims.payoutAmount, vehicles.purchasePrice, reminders.expenseAmount) are `integer`, NOT `real`. Dollars exist ONLY at two edges; everything in between (sums, splits, balances, analytics) is integer cents.
 

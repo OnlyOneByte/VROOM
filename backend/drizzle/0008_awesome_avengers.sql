@@ -1,1 +1,0 @@
-ALTER TABLE `user_preferences` ADD `business_mileage_rate` real DEFAULT 0 NOT NULL;

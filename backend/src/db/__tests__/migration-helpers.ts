@@ -129,9 +129,9 @@ const DDL_STATEMENT =
 /**
  * Does this migration change the schema, or only the rows?
  *
- * Only a schema change needs a snapshot of its own: a data-only migration (0009 is the repo's
- * precedent — fourteen `UPDATE`s, no DDL) leaves the previous snapshot an accurate description of
- * the database, so drizzle-kit neither writes nor needs a new one.
+ * Only a schema change needs a snapshot of its own: a data-only migration (all `UPDATE`s, no DDL —
+ * the money-to-cents backfill was one) leaves the previous snapshot an accurate description of the
+ * database, so drizzle-kit neither writes nor needs a new one.
  */
 export function migrationChangesSchema(migration: MigrationFile): boolean {
   return splitStatements(migration).some((statement) =>
@@ -197,7 +197,13 @@ export function countRows(db: Database, table: string): number {
   return result.count;
 }
 
-/** Seed a minimal user + vehicle + expense for data survival tests. */
+/**
+ * Seed a minimal user + vehicle + expense.
+ *
+ * `expense_amount` is integer CENTS (4550 = $45.50), matching the column. A float here would be
+ * stored verbatim — SQLite leaves a value it cannot losslessly convert in its original type, so an
+ * INTEGER column quietly accepts 45.5 and every later read is off by 100x.
+ */
 export function seedCoreData(db: Database): void {
   db.run(
     "INSERT INTO users (id, email, display_name) VALUES ('u1', 'test@example.com', 'Test User')"
@@ -206,6 +212,6 @@ export function seedCoreData(db: Database): void {
     "INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('v1', 'u1', 'Toyota', 'Camry', 2022)"
   );
   db.run(
-    "INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount) VALUES ('e1', 'v1', 'u1', 'fuel', 1700000000, 45.50)"
+    "INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount) VALUES ('e1', 'v1', 'u1', 'fuel', 1700000000, 4550)"
   );
 }

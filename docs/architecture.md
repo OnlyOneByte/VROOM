@@ -67,6 +67,15 @@ SQLite via `bun:sqlite` + Drizzle. Schema is one file, `src/db/schema.ts`. Migra
 applies them locally. Do not use `drizzle-kit push` against a real database — it diffs the
 schema directly and will offer to drop columns.
 
+The fourteen migrations that predate `0000_baseline` were collapsed into it, so the journal no
+longer describes the path any pre-collapse database took. A database created before the collapse
+cannot migrate forward in place; it has to be re-created and repopulated from a backup restore.
+Collapsing also closed two defects the incremental chain carried: the money columns were still
+declared `real` (the cents conversion rewrote values but never the types, and SQLite's loose typing
+hid the disagreement with `schema.ts`), and `expenses.created_by` had no `ON DELETE` action, so
+once account deletion shipped it would have refused to delete any user who had logged an expense on
+a vehicle shared with them.
+
 PRAGMAs set in `src/db/connection.ts`: WAL journaling for concurrent reads, `synchronous =
 NORMAL`, `foreign_keys = ON`, a large page cache, and `wal_autocheckpoint`. A timer
 checkpoints the WAL periodically, plus forced checkpoints on startup and shutdown, so the

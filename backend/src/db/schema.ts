@@ -98,6 +98,12 @@ export const vehicleFinancing = sqliteTable(
   },
   (table) => ({
     vehicleIdIdx: index('vf_vehicle_id_idx').on(table.vehicleId),
+    // At most one ACTIVE financing agreement per vehicle, enforced in the database rather than by
+    // the repository: a vehicle with two active loans double-counts every payment in cost-per-mile.
+    // History is unbounded, hence partial rather than a plain unique on vehicle_id.
+    activeVehicleIdx: uniqueIndex('vf_active_vehicle_idx')
+      .on(table.vehicleId)
+      .where(sql`${table.isActive} = 1`),
   })
 );
 
@@ -306,6 +312,12 @@ export const userProviders = sqliteTable(
   },
   (table) => ({
     userDomainIdx: index('up_user_domain_idx').on(table.userId, table.domain),
+    // One auth identity per external account: the uniqueness that stops a second local user from
+    // claiming an OAuth account already linked elsewhere. Scoped to `auth` because the other
+    // domains (storage, llm) legitimately hold several rows per provider account.
+    authIdentityIdx: uniqueIndex('up_auth_identity_idx')
+      .on(table.providerType, table.providerAccountId)
+      .where(sql`${table.domain} = 'auth'`),
   })
 );
 
@@ -472,6 +484,11 @@ export const photoRefs = sqliteTable(
   },
   (table) => ({
     photoProviderIdx: uniqueIndex('pr_photo_provider_idx').on(table.photoId, table.providerId),
+    // Drives the upload-retry sweep, which only ever looks at rows still worth retrying. Partial so
+    // the index stays small as `active` rows accumulate — they are the overwhelming majority.
+    pendingIdx: index('pr_pending_idx')
+      .on(table.status, table.createdAt)
+      .where(sql`${table.status} IN ('pending', 'failed') AND ${table.retryCount} < 3`),
   })
 );
 

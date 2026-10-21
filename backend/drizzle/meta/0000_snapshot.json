@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "d79f6511-2e30-4450-a97e-eda54c4aa028",
+  "id": "9bf80678-728f-4bf5-930c-fee1c5777fb5",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "expenses": {
@@ -56,6 +56,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "location": {
+          "name": "location",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "integer",
@@ -72,7 +79,7 @@
         },
         "expense_amount": {
           "name": "expense_amount",
-          "type": "real",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -106,6 +113,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "group_id": {
           "name": "group_id",
           "type": "text",
@@ -115,7 +129,7 @@
         },
         "group_total": {
           "name": "group_total",
-          "type": "real",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -136,6 +150,13 @@
         },
         "source_id": {
           "name": "source_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "client_id": {
+          "name": "client_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -199,6 +220,15 @@
             "source_id"
           ],
           "isUnique": false
+        },
+        "expenses_user_client_idx": {
+          "name": "expenses_user_client_idx",
+          "columns": [
+            "user_id",
+            "client_id"
+          ],
+          "isUnique": true,
+          "where": "\"expenses\".\"client_id\" IS NOT NULL"
         }
       },
       "foreignKeys": {
@@ -226,6 +256,177 @@
             "id"
           ],
           "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "expenses_created_by_users_id_fk": {
+          "name": "expenses_created_by_users_id_fk",
+          "tableFrom": "expenses",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "insurance_claims": {
+      "name": "insurance_claims",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "policy_id": {
+          "name": "policy_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "term_id": {
+          "name": "term_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "vehicle_id": {
+          "name": "vehicle_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "claim_date": {
+          "name": "claim_date",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "claim_type": {
+          "name": "claim_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'filed'"
+        },
+        "payout_amount": {
+          "name": "payout_amount",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "fault_designation": {
+          "name": "fault_designation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "ic_policy_id_idx": {
+          "name": "ic_policy_id_idx",
+          "columns": [
+            "policy_id"
+          ],
+          "isUnique": false
+        },
+        "ic_policy_status_idx": {
+          "name": "ic_policy_status_idx",
+          "columns": [
+            "policy_id",
+            "status"
+          ],
+          "isUnique": false
+        },
+        "ic_vehicle_idx": {
+          "name": "ic_vehicle_idx",
+          "columns": [
+            "vehicle_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "insurance_claims_policy_id_insurance_policies_id_fk": {
+          "name": "insurance_claims_policy_id_insurance_policies_id_fk",
+          "tableFrom": "insurance_claims",
+          "tableTo": "insurance_policies",
+          "columnsFrom": [
+            "policy_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "insurance_claims_term_id_insurance_terms_id_fk": {
+          "name": "insurance_claims_term_id_insurance_terms_id_fk",
+          "tableFrom": "insurance_claims",
+          "tableTo": "insurance_terms",
+          "columnsFrom": [
+            "term_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "insurance_claims_vehicle_id_vehicles_id_fk": {
+          "name": "insurance_claims_vehicle_id_vehicles_id_fk",
+          "tableFrom": "insurance_claims",
+          "tableTo": "vehicles",
+          "columnsFrom": [
+            "vehicle_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -429,14 +630,14 @@
         },
         "deductible_amount": {
           "name": "deductible_amount",
-          "type": "real",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "coverage_limit": {
           "name": "coverage_limit",
-          "type": "real",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -464,14 +665,14 @@
         },
         "total_cost": {
           "name": "total_cost",
-          "type": "real",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "monthly_cost": {
           "name": "monthly_cost",
-          "type": "real",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -485,7 +686,7 @@
         },
         "payment_amount": {
           "name": "payment_amount",
-          "type": "real",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -727,6 +928,15 @@
             "provider_id"
           ],
           "isUnique": true
+        },
+        "pr_pending_idx": {
+          "name": "pr_pending_idx",
+          "columns": [
+            "status",
+            "created_at"
+          ],
+          "isUnique": false,
+          "where": "\"photo_refs\".\"status\" IN ('pending', 'failed') AND \"photo_refs\".\"retry_count\" < 3"
         }
       },
       "foreignKeys": {
@@ -874,6 +1084,110 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "push_subscriptions": {
+      "name": "push_subscriptions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "endpoint": {
+          "name": "endpoint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "p256dh": {
+          "name": "p256dh",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "auth": {
+          "name": "auth",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_agent": {
+          "name": "user_agent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "failure_count": {
+          "name": "failure_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "last_success_at": {
+          "name": "last_success_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "ps_user_idx": {
+          "name": "ps_user_idx",
+          "columns": [
+            "user_id"
+          ],
+          "isUnique": false
+        },
+        "ps_user_endpoint_idx": {
+          "name": "ps_user_endpoint_idx",
+          "columns": [
+            "user_id",
+            "endpoint"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "push_subscriptions_user_id_users_id_fk": {
+          "name": "push_subscriptions_user_id_users_id_fk",
+          "tableFrom": "push_subscriptions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "reminder_notifications": {
       "name": "reminder_notifications",
       "columns": {
@@ -902,7 +1216,14 @@
           "name": "due_date",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "due_odometer": {
+          "name": "due_odometer",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "is_read": {
@@ -944,6 +1265,15 @@
             "due_date"
           ],
           "isUnique": true
+        },
+        "rn_reminder_odo_idx": {
+          "name": "rn_reminder_odo_idx",
+          "columns": [
+            "reminder_id",
+            "due_odometer"
+          ],
+          "isUnique": true,
+          "where": "\"reminder_notifications\".\"due_odometer\" IS NOT NULL"
         }
       },
       "foreignKeys": {
@@ -1112,6 +1442,35 @@
           "notNull": false,
           "autoincrement": false
         },
+        "trigger_mode": {
+          "name": "trigger_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'time'"
+        },
+        "interval_mileage": {
+          "name": "interval_mileage",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "last_service_odometer": {
+          "name": "last_service_odometer",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "next_due_odometer": {
+          "name": "next_due_odometer",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "start_date": {
           "name": "start_date",
           "type": "integer",
@@ -1130,7 +1489,7 @@
           "name": "next_due_date",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
         "expense_category": {
@@ -1149,7 +1508,7 @@
         },
         "expense_amount": {
           "name": "expense_amount",
-          "type": "real",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1325,6 +1684,136 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "trips": {
+      "name": "trips",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "vehicle_id": {
+          "name": "vehicle_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "start_odometer": {
+          "name": "start_odometer",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "end_odometer": {
+          "name": "end_odometer",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "purpose": {
+          "name": "purpose",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "trip_date": {
+          "name": "trip_date",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "start_location": {
+          "name": "start_location",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "end_location": {
+          "name": "end_location",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "trips_vehicle_date_idx": {
+          "name": "trips_vehicle_date_idx",
+          "columns": [
+            "vehicle_id",
+            "trip_date"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "trips_vehicle_id_vehicles_id_fk": {
+          "name": "trips_vehicle_id_vehicles_id_fk",
+          "tableFrom": "trips",
+          "tableTo": "vehicles",
+          "columnsFrom": [
+            "vehicle_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "trips_user_id_users_id_fk": {
+          "name": "trips_user_id_users_id_fk",
+          "tableFrom": "trips",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "user_preferences": {
       "name": "user_preferences",
       "columns": {
@@ -1350,6 +1839,22 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'USD'"
+        },
+        "theme_preference": {
+          "name": "theme_preference",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'default'"
+        },
+        "business_mileage_rate": {
+          "name": "business_mileage_rate",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         },
         "auto_backup_enabled": {
           "name": "auto_backup_enabled",
@@ -1531,6 +2036,15 @@
             "domain"
           ],
           "isUnique": false
+        },
+        "up_auth_identity_idx": {
+          "name": "up_auth_identity_idx",
+          "columns": [
+            "provider_type",
+            "provider_account_id"
+          ],
+          "isUnique": true,
+          "where": "\"user_providers\".\"domain\" = 'auth'"
         }
       },
       "foreignKeys": {
@@ -1639,7 +2153,7 @@
         },
         "original_amount": {
           "name": "original_amount",
-          "type": "real",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -1667,7 +2181,7 @@
         },
         "payment_amount": {
           "name": "payment_amount",
-          "type": "real",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -1696,7 +2210,7 @@
         },
         "residual_value": {
           "name": "residual_value",
-          "type": "real",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1710,7 +2224,7 @@
         },
         "excess_mileage_fee": {
           "name": "excess_mileage_fee",
-          "type": "real",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1752,6 +2266,14 @@
             "vehicle_id"
           ],
           "isUnique": false
+        },
+        "vf_active_vehicle_idx": {
+          "name": "vf_active_vehicle_idx",
+          "columns": [
+            "vehicle_id"
+          ],
+          "isUnique": true,
+          "where": "\"vehicle_financing\".\"is_active\" = 1"
         }
       },
       "foreignKeys": {
@@ -1761,6 +2283,138 @@
           "tableTo": "vehicles",
           "columnsFrom": [
             "vehicle_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "vehicle_shares": {
+      "name": "vehicle_shares",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "vehicle_id": {
+          "name": "vehicle_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "shared_with_id": {
+          "name": "shared_with_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "level": {
+          "name": "level",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'pending'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "vehicle_shares_active_idx": {
+          "name": "vehicle_shares_active_idx",
+          "columns": [
+            "vehicle_id",
+            "shared_with_id"
+          ],
+          "isUnique": true,
+          "where": "status in ('pending','accepted')"
+        },
+        "vehicle_shares_shared_with_idx": {
+          "name": "vehicle_shares_shared_with_idx",
+          "columns": [
+            "shared_with_id",
+            "status"
+          ],
+          "isUnique": false
+        },
+        "vehicle_shares_owner_idx": {
+          "name": "vehicle_shares_owner_idx",
+          "columns": [
+            "owner_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "vehicle_shares_vehicle_id_vehicles_id_fk": {
+          "name": "vehicle_shares_vehicle_id_vehicles_id_fk",
+          "tableFrom": "vehicle_shares",
+          "tableTo": "vehicles",
+          "columnsFrom": [
+            "vehicle_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "vehicle_shares_owner_id_users_id_fk": {
+          "name": "vehicle_shares_owner_id_users_id_fk",
+          "tableFrom": "vehicle_shares",
+          "tableTo": "users",
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "vehicle_shares_shared_with_id_users_id_fk": {
+          "name": "vehicle_shares_shared_with_id_users_id_fk",
+          "tableFrom": "vehicle_shares",
+          "tableTo": "users",
+          "columnsFrom": [
+            "shared_with_id"
           ],
           "columnsTo": [
             "id"
@@ -1865,7 +2519,7 @@
         },
         "purchase_price": {
           "name": "purchase_price",
-          "type": "real",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1907,6 +2561,15 @@
             "user_id"
           ],
           "isUnique": false
+        },
+        "vehicles_user_license_plate_idx": {
+          "name": "vehicles_user_license_plate_idx",
+          "columns": [
+            "user_id",
+            "license_plate"
+          ],
+          "isUnique": true,
+          "where": "\"vehicles\".\"license_plate\" IS NOT NULL"
         }
       },
       "foreignKeys": {

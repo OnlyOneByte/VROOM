@@ -32,7 +32,7 @@ Column types:
 | `integer('col', { mode: 'timestamp' })` | `Date` as unix epoch ms |
 | `text('col', { mode: 'json' }).$type<T>()` | JSON as text |
 
-**Money is `integer` CENTS**, never `real` — migration 0009 converted all of it. A new money column
+**Money is `integer` CENTS**, never `real`. A new money column
 must also be added to `MONEY_CENTS_FIELDS` in `backend/src/api/sync/backup.ts`, or restoring a
 pre-2.0.0 backup stores it 100× low. `money-cents-fields-guard.test.ts` pins that set against a
 hand-maintained mirror, so update `EXPECTED_MONEY_FIELDS` there in the same change. `real` is for
@@ -91,6 +91,16 @@ describe('Migration 000N: Add new_table', () => {
 `migration-general.test.ts` needs no edit — it derives the expected table list from `schema.ts`
 itself. It does require the `migration-000N.test.ts` file above to exist.
 
+`migration-0000.test.ts` pins the table and index inventories as set equality, so add your table to
+`EXPECTED_TABLES` and its indexes to `EXPECTED_INDEXES` there. Put the *behaviour* of any new
+constraint — what a partial index's predicate admits, what a FK does on delete, what a default
+resolves to — in `schema-invariants.test.ts`, which is organised by invariant rather than by
+migration and therefore survives the next collapse.
+
+Declare indexes in `schema.ts`, never as hand-appended SQL in the migration file: drizzle-kit only
+knows what the snapshot records, so an index added by hand is invisible to every future regenerate.
+Partial indexes are expressible — `uniqueIndex('name').on(cols).where(sql\`…\`)`.
+
 ### 4. Backup/restore
 
 Every table round-trips through hand-maintained lists. Work the checklist in
@@ -126,7 +136,9 @@ bun run validate   # from backend/
 - [ ] Money columns are `integer` cents and listed in `MONEY_CENTS_FIELDS`
 - [ ] Migration generated and its SQL reviewed; `.sql`, `meta/000N_snapshot.json` and the
       `_journal.json` entry all committed
-- [ ] `migration-000N.test.ts` added
+- [ ] Every index declared in `schema.ts` (not hand-appended SQL), partial ones via `.where()`
+- [ ] `migration-000N.test.ts` added; table + indexes in `migration-0000.test.ts`'s inventories
+- [ ] New constraint behaviour covered in `schema-invariants.test.ts`
 - [ ] All five backup/restore files above updated (or `EXCLUDED_BY_DESIGN`, with a reason)
 - [ ] `bun test src/api/sync src/api/providers` green — no drift guard naming the table
 - [ ] `bun run validate` passes

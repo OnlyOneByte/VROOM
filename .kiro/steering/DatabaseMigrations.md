@@ -41,11 +41,20 @@ just invokes it standalone (plus `--seed` via `bun run db:seed`).
 - Never hand-edit a *generated* migration. Fix the schema and regenerate.
 - Migrations are append-only. Never delete or renumber a committed migration; reverse it with a
   new one.
+- **Every constraint must live in `schema.ts`.** A hand-written `CREATE UNIQUE INDEX` appended to a
+  migration file is invisible to drizzle-kit: it is absent from the snapshot, so the next
+  regenerate neither preserves nor drops it — it simply never knows it existed. Four partial
+  indexes were carried that way, and the baseline collapse silently lost three of them until a
+  schema diff caught it. Partial indexes ARE expressible: `uniqueIndex(...).on(...).where(sql\`…\`)`.
 - Drizzle decides what to apply by comparing each `_journal.json` `when` against the newest
   `created_at` in `__drizzle_migrations`, and applies everything greater. A hand-written migration
-  (a data backfill like `0009_money_to_cents` that drizzle-kit cannot generate) therefore needs a
-  journal entry whose `when` is higher than the previous entry's — a lower one is skipped forever
-  on any DB that stops at the preceding migration.
+  (a data backfill that drizzle-kit cannot generate) therefore needs a journal entry whose `when`
+  is higher than the previous entry's — a lower one is skipped forever on any DB that stops at the
+  preceding migration.
+- A data backfill that changes a column's *declared* type must also change `schema.ts` and ship a
+  snapshot. The money-to-cents backfill rewrote values with `UPDATE`s only, so the columns stayed
+  `real` in the database while `schema.ts` said `integer` — a disagreement SQLite's loose typing
+  hid until the collapse surfaced it.
 - Do not modify `__drizzle_migrations` by hand except to recover a DB bootstrapped by `db:push`
   (see Production).
 
@@ -57,10 +66,15 @@ no app startup. `migration-helpers.ts` provides `loadMigrations`, `applyMigratio
 `migration-general.test.ts` applies the full set in sequence, asserts the resulting table list
 against the one derived from `schema.ts` itself (set equality both ways, so no hand-maintained
 list to update) plus FK cascades, and checks the journal/snapshot bookkeeping.
-`migration-000N.test.ts` covers one migration each, including the hand-written and data-only
-ones; `migration-general.test.ts` fails by tag on any migration missing its file.
+`migration-000N.test.ts` covers one migration each; `migration-general.test.ts` fails by tag on any
+migration missing its file. `migration-0000.test.ts` pins the baseline's table and index
+inventories as set equality — that is what catches a lost index.
 
-For a new migration, add `migration-000N.test.ts` asserting that it applies cleanly, that new
+`schema-invariants.test.ts` holds what the database *enforces*, independent of which migration
+introduced it: every partial index's predicate, every FK's delete action, every column default. Put
+a new constraint's behaviour there, not in the migration's own file — it outlives the migration.
+
+For a new migration, add `migration-000N.test.ts` asserting that it applies cleanly and that new
 constraints/indexes exist, and that data seeded by `seedCoreData` after
 `applyMigrationsUpTo(db, migrations, N - 1)` survives `applyMigration(db, migrations[N])`.
 
