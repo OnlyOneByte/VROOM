@@ -33,6 +33,7 @@ import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 import { collectSvelteFiles } from './_helpers/collect-svelte-files';
+import { ratchet } from './_helpers/debt-ratchet';
 
 // This file lives at src/lib/utils/__tests__/, so src/ is three dirs up from __tests__'s parent.
 const SRC_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -42,8 +43,11 @@ const SRC_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
  * `max-sm:sr-only`. `hidden` is `display:none`, which removes the label from the accessibility
  * tree, so an icon-only button below the `sm` breakpoint ends up with no accessible name at all.
  * Empty means every call site is converted; an entry here is a live axe `button-name` violation.
+ *
+ * Site identity is the PATH, not path:line — a line number churns on every edit above it, which
+ * would make the list expire for reasons unrelated to the defect.
  */
-const KNOWN_DEBT = new Set<string>([]);
+const KNOWN_DEBT: string[] = [];
 
 interface Element {
 	/** The opening tag, from `<Button` through its closing `>`. */
@@ -113,38 +117,37 @@ const buttons = files.flatMap(file => {
 	return findButtons(readFileSync(file, 'utf-8')).map(el => ({ ...el, rel }));
 });
 
-describe('kit Button call sites', () => {
-	test('the scan actually parsed Buttons out of the sources (guard is live, not a no-op)', () => {
-		// If either of these collapses to 0 the parser broke and both checks below are vacuous.
-		expect(files.length).toBeGreaterThan(20);
-		expect(buttons.length).toBeGreaterThan(50);
+/** Buttons that go icon-only below `sm` with nothing left to name them. */
+const unnamedAtMobile = buttons.filter(
+	b => DISPLAY_HIDDEN_LABEL.test(b.body) && !/\baria-label\b/.test(b.tag)
+);
 
-		// The pattern must still match the shape it exists to catch. This is asserted against a
-		// synthetic fixture rather than the live tree on purpose: every real call site has been
-		// converted, so a tree-based probe would be unsatisfiable at zero debt — which would force
-		// whoever fixed the last one to weaken the guard to land their fix.
+ratchet({
+	name: 'every kit Button keeps an accessible name below the `sm` breakpoint',
+	tolerated: KNOWN_DEBT,
+	guidance:
+		"Icon-only at mobile width with no accessible name (axe button-name). Swap the label span's " +
+		'`hidden sm:inline` for `max-sm:sr-only` so the name survives where the text does not:\n' +
+		`${unnamedAtMobile.map(b => `${b.rel}:${b.line}`).join('\n')}\nOffending files:`,
+	scan: () => unnamedAtMobile.map(b => b.rel),
+	probe: () => {
+		// Asserted against synthetic fixtures rather than the live tree on purpose: every real call
+		// site has been converted, so a tree-based probe would be unsatisfiable at zero debt — which
+		// would force whoever fixed the last one to weaken the guard to land their fix.
 		expect(
 			DISPLAY_HIDDEN_LABEL.test('<span class="hidden sm:inline font-semibold">Delete</span>')
 		).toBe(true);
 		expect(
 			DISPLAY_HIDDEN_LABEL.test('<span class="max-sm:sr-only font-semibold">Delete</span>')
 		).toBe(false);
-	});
+		// And that the parse reached the tree — if either collapses to 0 the parser broke and every
+		// check in this file is vacuous.
+		expect(files.length, 'the .svelte walk found almost nothing').toBeGreaterThan(20);
+		expect(buttons.length, 'the Button parser found almost nothing').toBeGreaterThan(50);
+	}
+});
 
-	test('every Button keeps an accessible name below the `sm` breakpoint', () => {
-		const offenders = buttons
-			.filter(b => DISPLAY_HIDDEN_LABEL.test(b.body) && !/\baria-label\b/.test(b.tag))
-			.filter(b => !KNOWN_DEBT.has(b.rel))
-			.map(b => `${b.rel}:${b.line}`);
-
-		expect(
-			offenders,
-			"Icon-only at mobile width with no accessible name (axe button-name). Swap the label span's " +
-				'`hidden sm:inline` for `max-sm:sr-only` so the name survives where the text does not:\n' +
-				offenders.join('\n')
-		).toEqual([]);
-	});
-
+describe('kit Button call sites', () => {
 	test('no label tries to undo `sr-only` above a breakpoint (a later rule wins, hiding it always)', () => {
 		const offenders: string[] = [];
 		for (const file of files) {
@@ -187,18 +190,5 @@ describe('kit Button call sites', () => {
 				'the chosen foreground expects. Theme it through the variant, or set both modes:\n' +
 				offenders.join('\n')
 		).toEqual([]);
-	});
-
-	test('every KNOWN_DEBT entry still exists (no stale allowlist)', () => {
-		const missing = [...KNOWN_DEBT].filter(rel => {
-			try {
-				readFileSync(join(SRC_ROOT, rel), 'utf-8');
-				return false;
-			} catch {
-				return true;
-			}
-		});
-
-		expect(missing, `Stale KNOWN_DEBT entr(ies) — remove them:\n${missing.join('\n')}`).toEqual([]);
 	});
 });

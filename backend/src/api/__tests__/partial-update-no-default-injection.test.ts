@@ -28,19 +28,25 @@
  * a PUT editing only the nickname would silently revert an EV to gas — this test would catch it.
  */
 
-import { describe, expect, test } from 'bun:test';
+import { expect } from 'bun:test';
+import { ratchet } from '../../test-helpers/debt-ratchet';
 import { updateClaimSchema } from '../insurance/claims-validation';
 import { updatePolicySchema, updateTermSchema } from '../insurance/validation';
 import { updateReminderSchema } from '../reminders/validation';
 import { updateVehicleSchema } from '../vehicles/routes';
 
-// A default key is allowed ONLY if injecting its fixed value can't clobber a user choice (a
-// literal-single-value default). Keep this list tiny + justified — adding to it is a deliberate
-// assertion that the field has exactly one legal value.
-const EXEMPT_DEFAULT_KEYS = new Set<string>([
-  // reminders: actionMode is z.literal('automatic').default('automatic') — one legal value.
-  'actionMode',
-]);
+/**
+ * Keys allowed to be injected, qualified by schema so an exemption cannot leak across schemas: a
+ * bare `actionMode` would also exempt a future `actionMode` on a different, clobbering schema.
+ *
+ * A default key is allowed ONLY if injecting its fixed value cannot clobber a user choice — i.e. the
+ * field has exactly one legal value. Keep this tiny and justified.
+ */
+const EXEMPT_DEFAULT_KEYS = [
+  // actionMode is z.literal('automatic').default('automatic') — one legal value, so re-injecting it
+  // cannot overwrite anything the user chose.
+  'updateReminderSchema.actionMode',
+];
 
 const UPDATE_SCHEMAS: Array<{ name: string; schema: { safeParse: (v: unknown) => unknown } }> = [
   { name: 'updateReminderSchema', schema: updateReminderSchema },
@@ -50,27 +56,42 @@ const UPDATE_SCHEMAS: Array<{ name: string; schema: { safeParse: (v: unknown) =>
   { name: 'updateVehicleSchema', schema: updateVehicleSchema },
 ];
 
-describe('update schemas inject no clobbering default on an empty update (.partial()+.default() class)', () => {
-  for (const { name, schema } of UPDATE_SCHEMAS) {
-    test(`${name}: parse({}) injects no user-settable default`, () => {
-      const result = schema.safeParse({}) as
-        | { success: true; data: Record<string, unknown> }
-        | { success: false };
+/** Every `schema.key` an empty update injects, across all update schemas. */
+function injectedKeys(): string[] {
+  return UPDATE_SCHEMAS.flatMap(({ name, schema }) => {
+    const result = schema.safeParse({}) as
+      | { success: true; data: Record<string, unknown> }
+      | { success: false };
+    // Some update schemas .refine(keys > 0) so an empty update legitimately FAILS to parse — that
+    // injects nothing, and the route rejects an empty body.
+    if (!result.success) return [];
+    return Object.keys(result.data).map((key) => `${name}.${key}`);
+  });
+}
 
-      // Some update schemas .refine(keys > 0) so an empty update legitimately FAILS to parse — that's
-      // fine (it injects nothing, and the route rejects an empty body). Only inspect injected keys
-      // when the empty object parsed successfully.
-      if (!result.success) return;
-
-      const injected = Object.keys(result.data).filter((k) => !EXEMPT_DEFAULT_KEYS.has(k));
-      expect(
-        injected,
-        `${name} injects ${injected.join(', ')} on an empty update — a Zod .default() survived ` +
-          `.partial() and would CLOBBER the stored value(s) on any unrelated edit (the ` +
-          `data-loss class). Re-declare the field as a plain .optional() (no default) in the update ` +
-          `schema via .extend(), or — if its value is a single literal that can't clobber — add it to ` +
-          `EXEMPT_DEFAULT_KEYS with a one-line justification.`
-      ).toEqual([]);
-    });
-  }
+ratchet({
+  name: 'update schemas inject no clobbering default on an empty update',
+  kind: 'exclusion',
+  tolerated: EXEMPT_DEFAULT_KEYS,
+  guidance:
+    'These are injected on an empty update — a Zod .default() survived .partial() and would ' +
+    'CLOBBER the stored value on any unrelated edit (the data-loss class). Re-declare the field ' +
+    'as a plain .optional() with no default in the update schema via .extend(), or — if its value ' +
+    'is a single literal that cannot clobber — add it to EXEMPT_DEFAULT_KEYS with a justification:',
+  scan: injectedKeys,
+  probe: () => {
+    // Every schema must still PARSE or still refine-reject — if an import broke and safeParse threw
+    // or every schema started refusing `{}`, the scan would be empty and pass forever.
+    expect(UPDATE_SCHEMAS.length).toBe(5);
+    const outcomes = UPDATE_SCHEMAS.map(
+      ({ schema }) => schema.safeParse({}) as { success: boolean }
+    );
+    expect(outcomes.every((o) => typeof o.success === 'boolean')).toBe(true);
+    // At least one schema accepts `{}`, which is the only case that can inject anything. Were that
+    // to stop being true the guard would be vacuous rather than satisfied.
+    expect(
+      outcomes.some((o) => o.success),
+      'no update schema accepts an empty object any more — this guard can no longer observe an injection'
+    ).toBe(true);
+  },
 });
