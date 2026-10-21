@@ -12,6 +12,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { describe, expect, test } from 'vitest';
+import { ratchet } from '$lib/utils/__tests__/_helpers/debt-ratchet';
 import { THEME_REGISTRY } from '../theme-registry';
 import type { ThemeTokenKey, ThemeTokens } from '../theme-types';
 
@@ -224,41 +225,34 @@ describe('hand-rolled bg-destructive fills name their foreground', () => {
 		return { named, unnamed };
 	}
 
-	const offenders = appFiles
-		.filter(f => fills(f).unnamed.length > 0)
-		.map(f => relative(SRC_ROOT, f).split(sep).join('/'))
-		.sort();
-
 	/**
-	 * Destructive confirm buttons that still inherit `text-primary-foreground`. Every entry is a live
-	 * sub-AA label in at least one theme; fixing one means appending `text-destructive-foreground` to its
-	 * class string and deleting its entry here. Empty means every site names its own ink — the
-	 * non-vacuity check below is what keeps that from silently meaning "the walk is broken".
+	 * Destructive confirm buttons that still inherit `text-primary-foreground` — a live sub-AA label
+	 * in at least one theme. Fixing one means appending `text-destructive-foreground` to its class
+	 * string; the ratchet then tells you to delete its entry here.
 	 */
 	const PENDING_UNNAMED_DESTRUCTIVE_INK: string[] = [];
 
-	// Non-vacuity: the walk must actually reach the components that DO comply, else an empty offender list
-	// would prove nothing once the pending list is emptied (a broken walk reads as "all clean").
-	test('the scan walks the app and recognises a compliant fill (non-vacuous)', () => {
-		expect(
-			appFiles.length,
-			'the .svelte walk found almost nothing — SRC_ROOT is wrong'
-		).toBeGreaterThan(50);
-		const compliant = appFiles.filter(f => fills(f).named.length > 0);
-		expect(
-			compliant.length,
-			'no class string matched as a COMPLIANT bare destructive fill, so the matcher cannot tell ' +
-				'compliant from offending and an empty offender list would mean nothing'
-		).toBeGreaterThan(0);
-	});
-
-	test('no app component paints a bare bg-destructive without text-destructive-foreground', () => {
-		expect(
-			offenders,
+	ratchet({
+		name: 'bare bg-destructive fills name their own ink',
+		tolerated: PENDING_UNNAMED_DESTRUCTIVE_INK,
+		guidance:
 			'A full-strength `bg-destructive` fill with no `text-destructive-foreground` keeps ' +
-				"buttonVariants()'s `text-primary-foreground` — ink tuned for the PRIMARY fill, which is " +
-				'sub-AA on red in several themes. Add the class. If this list is SHORTER than expected, the ' +
-				'site was fixed — delete its PENDING_UNNAMED_DESTRUCTIVE_INK entry.'
-		).toEqual([...PENDING_UNNAMED_DESTRUCTIVE_INK].sort());
+			"buttonVariants()'s `text-primary-foreground` — ink tuned for the PRIMARY fill, which is " +
+			'sub-AA on red in several themes. Add the class to these:',
+		scan: () =>
+			appFiles
+				.filter(f => fills(f).unnamed.length > 0)
+				.map(f => relative(SRC_ROOT, f).split(sep).join('/')),
+		probe: () => {
+			// Fixtures, not live offenders: asserting that a real component still offends would break
+			// as soon as the tolerated list reached zero, which is the goal state.
+			expect(BARE_FILL.test('bg-destructive hover:bg-destructive/90')).toBe(true);
+			expect(BARE_FILL.test('bg-destructive/60 text-white')).toBe(false);
+			// And that the walk reaches the tree at all — a scan over nothing passes a subset check.
+			expect(
+				appFiles.length,
+				'the .svelte walk found almost nothing — SRC_ROOT is wrong'
+			).toBeGreaterThan(50);
+		}
 	});
 });

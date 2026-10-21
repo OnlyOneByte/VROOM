@@ -25,6 +25,7 @@
 import { describe, expect, test } from 'bun:test';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { countRatchet } from '../../../test-helpers/debt-ratchet';
 
 const SRC_ROOT = join(import.meta.dir, '../../../');
 
@@ -41,8 +42,6 @@ const INVENTORY: Record<string, number> = {
   // first write so a bad id cannot leave the entity cover-less, which is the mitigation, not a fix.
   'api/photos/photo-repository.ts': 1,
 };
-
-const MAX_ASYNC_TX_CALLBACKS = 4;
 
 /** Every production .ts file under src — tests, test helpers and type declarations excluded. */
 function productionSources(dir: string = SRC_ROOT): string[] {
@@ -72,41 +71,22 @@ function countAsyncTransactions(src: string): number {
   return (stripComments(src).match(/\.transaction\(\s*async\b/g) ?? []).length;
 }
 
-describe('async transaction callbacks are ratcheted, not merely documented', () => {
-  const counts = new Map<string, number>();
-  for (const file of productionSources()) {
-    const n = countAsyncTransactions(readFileSync(file, 'utf-8'));
-    if (n > 0) counts.set(relative(SRC_ROOT, file), n);
-  }
-
-  test('no production file outside the inventory uses an async transaction callback', () => {
-    const unexpected = [...counts.keys()].filter((f) => !(f in INVENTORY)).sort();
-    expect(
-      unexpected,
-      'these files introduce the autocommit footgun — make the callback synchronous ' +
-        '(.run()/.all()/.get() inline) or inventory the site above with a reason'
-    ).toEqual([]);
-  });
-
-  test('no inventoried file gained an async transaction callback', () => {
-    const grown = [...counts.entries()]
-      .filter(([file, n]) => file in INVENTORY && n > INVENTORY[file])
-      .map(([file, n]) => `${file}: ${n} > ${INVENTORY[file]}`)
-      .sort();
-    expect(
-      grown,
-      'a new async transaction callback was added to an already-inventoried file'
-    ).toEqual([]);
-  });
-
-  test('the codebase-wide total has not risen', () => {
-    const total = [...counts.values()].reduce((sum, n) => sum + n, 0);
-    expect(total).toBeLessThanOrEqual(MAX_ASYNC_TX_CALLBACKS);
-  });
-
-  test('the scan actually sees the pattern it claims to police', () => {
-    // A ratchet whose matcher is broken passes forever. Prove the matcher on both polarities, and
-    // prove the comment stripper does not blind it.
+countRatchet({
+  name: 'async transaction callbacks are ratcheted, not merely documented',
+  tolerated: INVENTORY,
+  guidance:
+    'These files introduce the autocommit footgun — make the callback synchronous ' +
+    '(.run()/.all()/.get() inline), or inventory the site in INVENTORY above with a reason:',
+  scan: () => {
+    const counts = new Map<string, number>();
+    for (const file of productionSources()) {
+      const n = countAsyncTransactions(readFileSync(file, 'utf-8'));
+      if (n > 0) counts.set(relative(SRC_ROOT, file), n);
+    }
+    return counts;
+  },
+  probe: () => {
+    // Both polarities, plus proof the comment stripper does not blind the matcher.
     expect(countAsyncTransactions('await db.transaction(async (tx) => { x(); });')).toBe(1);
     expect(countAsyncTransactions('this.db.transaction(\n  async (tx) => { x(); }\n);')).toBe(1);
     expect(countAsyncTransactions('db.transaction((tx) => { x(); });')).toBe(0);
@@ -114,12 +94,14 @@ describe('async transaction callbacks are ratcheted, not merely documented', () 
       countAsyncTransactions('// never db.transaction(async (tx) => …\ndb.transaction(() => 1);')
     ).toBe(0);
     expect(countAsyncTransactions('/* db.transaction(async (tx) => … */')).toBe(0);
-    // Non-vacuity has to come from the SCAN, not from the debt: anchoring it on a specific file
-    // still having a callback would make this test unsatisfiable the moment the inventory reaches
-    // zero, forcing whoever lands the last fix to weaken the guard. Assert the walk read the tree.
+    // And that the walk reads the tree at all — a scan over zero files would pass every subset
+    // check forever. Deliberately NOT anchored on a file still holding a callback: that would make
+    // the guard unsatisfiable the moment the inventory reaches zero, which is the goal state.
     expect(productionSources().length).toBeGreaterThan(100);
-  });
+  },
+});
 
+describe('async transaction callbacks: the highest-stakes site', () => {
   test('the restore service — the highest-stakes transaction in the app — has none', () => {
     const restore = readFileSync(join(SRC_ROOT, 'api/sync/restore.ts'), 'utf-8');
     // Replace mode wipes the account before re-inserting, so an async callback here would mean a

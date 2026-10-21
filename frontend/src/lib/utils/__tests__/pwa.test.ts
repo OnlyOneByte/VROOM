@@ -2,6 +2,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, it, expect, beforeEach, vi } from 'vitest';
+import { ratchet } from './_helpers/debt-ratchet';
 import {
 	getPlatformInfo,
 	initializePWA,
@@ -415,13 +416,11 @@ describe('PWA document head — viewport and theme-color are declared exactly on
 
 	/**
 	 * Routes that still override the viewport. Every entry is a live defect: it drops
-	 * `viewport-fit=cover` for that route, so the safe-area insets collapse there. The assertion is
-	 * exact rather than "at most these", so this list can only ever shrink — removing the last
-	 * override turns this test red until the list is emptied too.
+	 * `viewport-fit=cover` for that route, so the safe-area insets collapse there.
 	 */
 	const PENDING_VIEWPORT_OVERRIDES: string[] = [];
 
-	it('no route re-declares the viewport beyond the known pending overrides', () => {
+	const viewportOverrides = (): string[] => {
 		const offenders: string[] = [];
 		const walk = (dir: string): void => {
 			for (const entry of readdirSync(dir)) {
@@ -429,8 +428,7 @@ describe('PWA document head — viewport and theme-color are declared exactly on
 				if (statSync(full).isDirectory()) {
 					walk(full);
 				} else if (entry.endsWith('.svelte')) {
-					const source = readFileSync(full, 'utf8');
-					if (metaDeclarations(source, 'viewport').length > 0) {
+					if (metaDeclarations(readFileSync(full, 'utf8'), 'viewport').length > 0) {
 						offenders.push(relative(SRC_ROOT, full).split(sep).join('/'));
 					}
 				}
@@ -438,12 +436,26 @@ describe('PWA document head — viewport and theme-color are declared exactly on
 		};
 		walk(join(SRC_ROOT, 'routes'));
 		walk(join(SRC_ROOT, 'lib'));
+		return offenders;
+	};
 
-		expect(
-			offenders.sort(),
+	ratchet({
+		name: 'no route re-declares the viewport',
+		tolerated: PENDING_VIEWPORT_OVERRIDES,
+		guidance:
 			'A <meta name="viewport"> outside app.html overrides it and drops viewport-fit=cover, ' +
-				'collapsing env(safe-area-inset-*) on that route. Remove the override. If this list is now ' +
-				'SHORTER than expected, the override was fixed — delete its PENDING_VIEWPORT_OVERRIDES entry.'
-		).toEqual([...PENDING_VIEWPORT_OVERRIDES].sort());
+			'collapsing env(safe-area-inset-*) on that route. Remove the override from these:',
+		scan: viewportOverrides,
+		probe: () => {
+			// Fixtures, not a live override: anchoring on one would break once the list hit zero.
+			expect(
+				metaDeclarations('<meta name="viewport" content="width=device-width" />', 'viewport')
+			).toHaveLength(1);
+			expect(
+				metaDeclarations('<meta name="theme-color" content="#000" />', 'viewport')
+			).toHaveLength(0);
+			// app.html itself must still declare one, else the walk/matcher pair proves nothing.
+			expect(metaDeclarations(appHtml, 'viewport').length).toBe(1);
+		}
 	});
 });
