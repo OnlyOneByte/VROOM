@@ -79,7 +79,7 @@
 		"vitest": "^4.0.18"
 	},
 	"overrides": {
-		"serialize-javascript": "^7.0.5"
+		"serialize-javascript": "^7.1.4"
 	},
 	"dependencies": {
 		"@tailwindcss/postcss": "^4.3.3",
