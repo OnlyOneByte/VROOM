@@ -4,8 +4,8 @@ import type { Expense, ExpenseFilters } from '$lib/types';
  * Parse a date-range bound to the LOCAL start-of-day instant. The DateRangePicker binds a date-only
  * 'YYYY-MM-DD' (CalendarDate.toString()); `new Date('2024-03-15')` would parse that as midnight UTC,
  * which for a negative-offset (Americas) user is the PREVIOUS calendar day — so the old
- * `new Date(expense.date) <= new Date(endDate)` EXCLUDED expenses on the chosen end day (#106, the
- * #87/#39 off-by-one class on the list filter). Reading the date PARTS into a local Date fixes the
+ * `new Date(expense.date) <= new Date(endDate)` EXCLUDED expenses on the chosen end day (the
+ * off-by-one class on the list filter). Reading the date PARTS into a local Date fixes the
  * zone; slicing the first 10 chars also tolerates a full-ISO bound. Returns null on a malformed bound.
  */
 function localDayStart(dateStr: string): Date | null {
@@ -59,7 +59,7 @@ export function filterExpenses(
 
 	// Apply date range filter. Bounds are LOCAL calendar days (the picker's intent): start = local
 	// midnight of startDate (inclusive); end = local midnight of the day AFTER endDate (exclusive), so
-	// the WHOLE end day is included regardless of the expense's time-of-day (#106).
+	// the WHOLE end day is included regardless of the expense's time-of-day.
 	if (filters.startDate) {
 		const start = localDayStart(filters.startDate);
 		if (start) filtered = filtered.filter(expense => new Date(expense.date) >= start);

@@ -1,19 +1,26 @@
 /// <reference lib="webworker" />
 /**
- * VROOM push service worker (push-notifications T6 — injectManifest strategy).
+ * VROOM service worker — the injectManifest entry point.
  *
  * Two jobs:
- *  1. Precache the built app shell (`precacheAndRoute` + `autoUpdate`) — the same offline behavior the
- *     prior `generateSW` strategy gave; `injectManifest` requires we wire the precache ourselves.
+ *  1. Precache the built app shell (`precacheAndRoute` + `autoUpdate`). Under the `generateSW`
+ *  strategy workbox wired this itself; `injectManifest` hands us the manifest and expects us to.
  *  2. Web Push delivery: render a notification from a pushed reminder payload and route a click to the
- *     reminders page. Delivery is browser→SW (no `fetch`), so no new network egress (design §7.2).
+ *  reminders page. Delivery is browser→SW, so this adds no outbound network calls.
  *
- * The payload shape matches the backend sender (T4b `payloadFromReminder`): `{ title, body, tag, url }`.
- * Named `service-worker.ts` (SvelteKit's reserved SW entry): SvelteKit compiles it to
- * `output/client/service-worker.js`, then `@vite-pwa/sveltekit`'s injectManifest step reads that build
- * output and substitutes `self.__WB_MANIFEST` with the precache list. It is excluded from the app
- * type-check program by SvelteKit's generated tsconfig, so the `webworker` lib reference below does not
- * leak into the DOM-typed app code.
+ * There is deliberately NO `sync` (Background Sync) listener: the offline expense outbox lives in
+ * localStorage, which does not exist in service-worker scope, so a `sync` handler here could not read
+ * the queued writes it would need to POST. Offline expenses are delivered by the foreground sync
+ * manager (an `online` listener + the manual sync control) instead. Adding a `sync` listener without
+ * first moving the outbox somewhere a worker can read is a no-op.
+ *
+ * The push payload shape matches the backend sender: `{ title, body, tag, url }`.
+ *
+ * The filename is load-bearing. `service-worker.ts` is SvelteKit's reserved service-worker entry:
+ * SvelteKit compiles it to `output/client/service-worker.js`, then `@vite-pwa/sveltekit`'s
+ * injectManifest step reads that build output and substitutes `self.__WB_MANIFEST` with the precache
+ * list. It is excluded from the app type-check program by SvelteKit's generated tsconfig, so the
+ * `webworker` lib reference below does not leak into the DOM-typed app code.
  */
 import { clientsClaim } from 'workbox-core';
 import { precacheAndRoute } from 'workbox-precaching';
@@ -34,7 +41,7 @@ precacheAndRoute((self as unknown as PushServiceWorker).__WB_MANIFEST);
 sw.skipWaiting();
 clientsClaim();
 
-/** The push payload the backend sends (T4b). Every field is optional so a malformed push still notifies. */
+/** The push payload the backend sends. Every field is optional so a malformed push still notifies. */
 interface PushPayload {
 	title?: string;
 	body?: string;
@@ -76,7 +83,7 @@ sw.addEventListener('notificationclick', (event: NotificationEvent) => {
 	const data = (event.notification.data ?? {}) as { url?: string };
 	const targetUrl = data.url ?? DEFAULT_URL;
 	event.waitUntil(
-		sw.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (clientList) => {
+		sw.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async clientList => {
 			for (const client of clientList) {
 				const windowClient = client as WindowClient;
 				if ('focus' in windowClient) {

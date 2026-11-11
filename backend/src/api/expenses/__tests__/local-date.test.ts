@@ -1,7 +1,7 @@
 /**
- * Unit tests for the shared `buildLocalDate` helper (C177 arch dedup — the echo-check
+ * Unit tests for the shared `buildLocalDate` helper (arch dedup — the echo-check
  * extracted from import-csv.ts parseDate + import-mapping.ts normalizeForeignDate into one
- * source of truth). The two IMPORT paths keep their own #23/#59 regression tests as the
+ * source of truth). The two IMPORT paths keep their own regression tests as the
  * green→green oracle; these pin the extracted primitive's own contract directly.
  *
  * Host-independent: every assertion checks the LOCAL calendar day the helper builds, which
@@ -35,7 +35,7 @@ describe('buildLocalDate', () => {
     expect(d?.getSeconds()).toBe(45);
   });
 
-  test('rejects a month past 12 instead of rolling forward (the #23/#59 class)', () => {
+  test('rejects a month past 12 instead of rolling forward', () => {
     // `new Date(2024, 12, 45)` ("2024-13-45") never NaNs — it rolls to ~2025-02-14.
     // The echo-check must return null so the caller surfaces a clean "Invalid date".
     expect(buildLocalDate(2024, 13, 45)).toBeNull();
@@ -54,7 +54,7 @@ describe('buildLocalDate', () => {
     expect(buildLocalDate(2023, 2, 29)).toBeNull(); // 2023 is not → would roll to Mar 1
   });
 
-  // C385: an out-of-range HOUR that rolls the calendar day FORWARD is rejected — the existing date
+  // An out-of-range HOUR that rolls the calendar day FORWARD is rejected — the existing date
   // echo-check (getDate() === day) catches it incidentally, since hh>=24 advances the day. This IS
   // reachable: normalizeForeignDate (import-mapping.ts:192) parses a foreign CSV time segment with a
   // bare `parseInt(...) || 0` (NO range clamp), so a malformed cell like "2024-03-15 25:00:00" feeds

@@ -131,8 +131,8 @@ describe('findPaginated search', () => {
     expect(blank.totalCount).toBe(2);
   });
 
-  // bug #41: LIKE metacharacters in the search term must be treated as LITERALS, not wildcards.
-  describe('LIKE-wildcard escaping (#41)', () => {
+  // bug: LIKE metacharacters in the search term must be treated as LITERALS, not wildcards.
+  describe('LIKE-wildcard escaping', () => {
     test('a literal "%" matches only rows containing "%", not every row', async () => {
       await repo.create(input({ description: '50% synthetic oil' }));
       await repo.create(input({ description: '1000 mile service' }));

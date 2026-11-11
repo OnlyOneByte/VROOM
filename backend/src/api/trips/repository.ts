@@ -3,9 +3,9 @@
  *
  * Manual trip-log CRUD over the `trips` table. Mirrors OdometerRepository: a thin BaseRepository
  * subclass (inheriting findById/create/update/delete) plus userId-scoped finders. EVERY query ANDs
- * `eq(trips.userId, userId)` — the C155 tenant-scope discipline; the destructive delete keys on BOTH
- * id AND userId (the #52 lesson: an id-only delete lets one user delete another's row). `distance` is
- * NOT a column — it's derived `max(0, endOdometer − startOdometer)` at read time (R2, the #46 clamp),
+ * `eq(trips.userId, userId)` — the tenant-scope discipline; the destructive delete keys on BOTH
+ * id AND userId (the lesson: an id-only delete lets one user delete another's row). `distance` is
+ * NOT a column — it's derived `max(0, endOdometer − startOdometer)` at read time (R2, the clamp),
  * so a later odometer correction can't desync a stored value; the helper is exported for the route/
  * analytics layers (T3/T5) to share one source of truth.
  */
@@ -18,7 +18,7 @@ import { trips } from '../../db/schema';
 import { BaseRepository } from '../../utils/repository';
 import { localDayWindow } from '../odometer/repository';
 
-/** Derived trip distance: driven miles, clamped at 0 (R2, the #46 negative-guard). Never stored. */
+/** Derived trip distance: driven miles, clamped at 0 (R2, the negative-guard). Never stored. */
 export function tripDistance(trip: Pick<Trip, 'startOdometer' | 'endOdometer'>): number {
   return Math.max(0, trip.endOdometer - trip.startOdometer);
 }
@@ -45,10 +45,10 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
 
   /**
    * Count OTHER trips (excluding `excludeTripId`) that map to the SAME trip↔odometer dedup key — same
-   * vehicle + owner + endOdometer + LOCAL calendar day of tripDate. The C214 lifecycle removes the linked
+   * vehicle + owner + endOdometer + LOCAL calendar day of tripDate. The lifecycle removes the linked
    * odometer entry on a keepOdometer=false delete (and the edit re-sync), but createFromTrip DEDUPS, so two
    * trips at the same (vehicle, day, reading) SHARE one entry (N:1). Removing it while another trip still
-   * references it orphans that survivor's odometer reading (#C214-N1, found C10). The route uses this to
+   * references it orphans that survivor's odometer reading (#-N1, found). The route uses this to
    * remove the shared entry ONLY when no other trip still maps to it. Uses the SAME localDayWindow as
    * createFromTrip/deleteLinkedTripEntry so "another trip on this day" agrees with the dedup's day. Tenant-scoped.
    */
@@ -130,7 +130,7 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
   }
 
   /**
-   * Delete a trip scoped to its owner: the WHERE keys on BOTH id AND userId (the #52 lesson — an
+   * Delete a trip scoped to its owner: the WHERE keys on BOTH id AND userId (the lesson — an
    * id-only delete would let a crafted request remove another user's trip). Returns true when a row
    * was actually deleted, false when nothing matched (caller maps false → 404). Distinct from the
    * BaseRepository `delete(id)` which keys on id alone (correct only after an ownership pre-check).

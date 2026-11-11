@@ -1,5 +1,5 @@
 /**
- * Characterization (C300 deep-review): merge-mode restore + the un-probed userPreferences/syncState
+ * Characterization: merge-mode restore + the un-probed userPreferences/syncState
  * primary-key collision.
  *
  * `detectConflicts` probes only 6 tables (vehicles, expenses, vehicle_financing, insurance_policies,
@@ -10,9 +10,9 @@
  * default prefs and no overlapping vehicle/expense ids) slips past conflict detection, then hits the raw
  * `insert(userPreferences)` with the existing PK → a UNIQUE/PK constraint violation that throws and rolls
  * back the WHOLE restore. The merge never completes and the user gets a DB error, not a clean conflict
- * report (NORTH_STAR #1 — restore must be predictable).
+ * report (— restore must be predictable).
  *
- * FIX (C300): detectConflicts now probes userPreferences + syncState (PK = userId) like any other owned
+ * FIX: detectConflicts now probes userPreferences + syncState (PK = userId) like any other owned
  * table, so the collision is reported as a normal merge conflict instead of throwing a raw SQLite
  * UNIQUE-constraint error from insertBackupData. This test was RED before the fix (threw "UNIQUE constraint
  * failed: user_preferences.user_id") and is GREEN after. createTestApp rewrites env + dynamic-imports
@@ -41,7 +41,7 @@ async function createVehicle(make: string): Promise<string> {
   return body.data.id;
 }
 
-describe('restore merge: userPreferences PK collision is detected as a conflict, not a raw DB throw (C300)', () => {
+describe('restore merge: userPreferences PK collision is detected as a conflict, not a raw DB throw', () => {
   test('merging a backup whose ONLY collision is the prefs row → clean conflict, not an unhandled PK throw', async () => {
     // Own a vehicle + the app-created userPreferences row; export a real ZIP carrying BOTH.
     const myVehicleId = await createVehicle('Honda');

@@ -5,129 +5,121 @@ fileMatchPattern: "backend/src/db/schema.ts"
 
 # Database Migration SOP
 
-When `backend/src/db/schema.ts` is modified, follow these steps to create a migration.
+A `backend/src/db/schema.ts` change is not done until a migration exists for it.
 
-## Steps
+## Generating a migration
 
-1. Make changes to `backend/src/db/schema.ts`
-2. Generate a migration from the `backend/` directory:
-   ```
-   bun run db:generate
-   ```
-   This creates a new SQL file in `backend/drizzle/` and updates `backend/drizzle/meta/_journal.json`.
-3. Review the generated SQL file to confirm it matches your intent. Drizzle may infer destructive operations (e.g., `DROP TABLE`) if a table was removed from the schema — verify before committing.
-4. The migration runs automatically on startup via `runMigrations()` in `backend/src/db/connection.ts`. No manual apply step is needed.
-5. Commit the new migration SQL file, snapshot, and updated `_journal.json` alongside the schema change.
+From `backend/`:
+
+```
+bun run db:generate
+```
+
+This writes `backend/drizzle/000N_*.sql`, `backend/drizzle/meta/000N_snapshot.json`, and an entry
+in `backend/drizzle/meta/_journal.json`. Commit all three with the schema change.
+
+Review the generated SQL before committing:
+
+- drizzle-kit infers destructive statements (`DROP TABLE`, `DROP COLUMN`) from anything absent
+  from the schema.
+- It diffs against the **highest-numbered snapshot present in `meta/`**, so that snapshot must
+  describe the current `schema.ts` — otherwise a generate re-emits DDL that already shipped. A
+  hand-written DDL migration therefore needs a hand-written snapshot too (a data-only migration
+  changes no schema and needs none). `migration-general.test.ts` guards the snapshot chain. With
+  the chain intact, `db:generate` on an unchanged schema writes nothing and prints "No schema
+  changes, nothing to migrate".
+
+`runMigrations()` in `backend/src/db/connection.ts` applies pending migrations at every startup —
+local `bun run dev`, prod, and `createTestApp()`. There is no manual apply step; `bun run db:init`
+just invokes it standalone (plus `--seed` via `bun run db:seed`).
 
 ## Rules
 
-- Never use `bun run db:push` for schema changes. Always use `bun run db:generate` so migrations are tracked and reproducible.
-- Never manually edit generated migration SQL files. If the generated migration is wrong, fix the schema and regenerate.
-- Never delete migration files once committed. Migrations are append-only. If you need to undo a change, create a new migration that reverses it.
-- The `__drizzle_migrations` table in SQLite tracks which migrations have been applied. Do not manually modify it unless recovering from a `db:push` bootstrapped database.
+- **Never `bun run db:push`.** It diffs the live DB and applies the diff with no row in
+  `__drizzle_migrations`, so the database and the migration folder silently disagree; with
+  `strict: true` in `drizzle.config.ts` it also prompts to drop whatever it believes you removed.
+- Never hand-edit a *generated* migration. Fix the schema and regenerate.
+- Migrations are append-only. Never delete or renumber a committed migration; reverse it with a
+  new one.
+- **Every constraint must live in `schema.ts`.** A hand-written `CREATE UNIQUE INDEX` appended to a
+  migration file is invisible to drizzle-kit: it is absent from the snapshot, so the next
+  regenerate neither preserves nor drops it — it simply never knows it existed. Four partial
+  indexes were carried that way, and the baseline collapse silently lost three of them until a
+  schema diff caught it. Partial indexes ARE expressible: `uniqueIndex(...).on(...).where(sql\`…\`)`.
+- Drizzle decides what to apply by comparing each `_journal.json` `when` against the newest
+  `created_at` in `__drizzle_migrations`, and applies everything greater. A hand-written migration
+  (a data backfill that drizzle-kit cannot generate) therefore needs a journal entry whose `when`
+  is higher than the previous entry's — a lower one is skipped forever on any DB that stops at the
+  preceding migration.
+- A data backfill that changes a column's *declared* type must also change `schema.ts` and ship a
+  snapshot. The money-to-cents backfill rewrote values with `UPDATE`s only, so the columns stayed
+  `real` in the database while `schema.ts` said `integer` — a disagreement SQLite's loose typing
+  hid until the collapse surfaced it.
+- Do not modify `__drizzle_migrations` by hand except to recover a DB bootstrapped by `db:push`
+  (see Production).
 
-## Testing Migrations
+## Testing migrations
 
-Migration tests live in `backend/src/db/__tests__/` and use in-memory SQLite — no disk, no app startup, fast.
+Tests live in `backend/src/db/__tests__/` and apply raw SQL to an in-memory SQLite DB — no disk,
+no app startup. `migration-helpers.ts` provides `loadMigrations`, `applyMigration`,
+`applyMigrationsUpTo`, `getTables`, `getColumnNames`, `getIndexNames`, `countRows`, `seedCoreData`.
+`migration-general.test.ts` applies the full set in sequence, asserts the resulting table list
+against the one derived from `schema.ts` itself (set equality both ways, so no hand-maintained
+list to update) plus FK cascades, and checks the journal/snapshot bookkeeping.
+`migration-000N.test.ts` covers one migration each; `migration-general.test.ts` fails by tag on any
+migration missing its file. `migration-0000.test.ts` pins the baseline's table and index
+inventories as set equality — that is what catches a lost index.
 
-### File structure
+`schema-invariants.test.ts` holds what the database *enforces*, independent of which migration
+introduced it: every partial index's predicate, every FK's delete action, every column default. Put
+a new constraint's behaviour there, not in the migration's own file — it outlives the migration.
 
-- `migration-helpers.ts` — shared utilities (`loadMigrations`, `applyMigration`, `applyMigrationsUpTo`, `getTables`, `getColumnNames`, `getIndexNames`, `countRows`, `seedCoreData`)
-- `migration-general.test.ts` — tests that apply to the full migration set (sequential apply, FK cascades)
-- `migration-0000.test.ts` — tests for migration 0000 (initial schema)
-- `migration-0001.test.ts` — tests for migration 0001 (photos table)
-
-### What the tests cover
-
-- Each migration applies cleanly to a fresh database
-- All migrations apply in sequence without conflicts
-- Seed data inserted before a migration survives after it runs
-- NOT NULL constraints and indexes are present on new tables
-- Foreign key cascades work as expected
-
-### When adding a new migration
-
-Create a new file `migration-000N.test.ts` following this pattern:
-
-```typescript
-import { Database } from 'bun:sqlite';
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import {
-  applyMigration,
-  applyMigrationsUpTo,
-  countRows,
-  getColumnNames,
-  getTables,
-  loadMigrations,
-  seedCoreData,
-} from './migration-helpers';
-
-describe('Migration 000N: Description', () => {
-  let db: Database;
-  const migrations = loadMigrations();
-
-  beforeEach(() => {
-    db = new Database(':memory:');
-    db.run('PRAGMA foreign_keys = ON');
-  });
-
-  afterEach(() => {
-    db.close();
-  });
-
-  test('creates new_table', () => {
-    applyMigrationsUpTo(db, migrations, N);
-    expect(getTables(db)).toContain('new_table');
-  });
-
-  test('seed data survives this migration', () => {
-    applyMigrationsUpTo(db, migrations, N - 1);
-    seedCoreData(db);
-    expect(countRows(db, 'users')).toBe(1);
-
-    applyMigration(db, migrations[N]);
-    expect(countRows(db, 'users')).toBe(1);
-  });
-});
-```
-
-Also add the new table to the expected tables list in `migration-general.test.ts`.
-
-### Running migration tests
+For a new migration, add `migration-000N.test.ts` asserting that it applies cleanly and that new
+constraints/indexes exist, and that data seeded by `seedCoreData` after
+`applyMigrationsUpTo(db, migrations, N - 1)` survives `applyMigration(db, migrations[N])`.
 
 ```bash
-bun test src/db/__tests__/migration-general.test.ts src/db/__tests__/migration-000N.test.ts
+bun test src/db/__tests__/          # or the whole suite via `bun run validate`
 ```
 
-They also run as part of `bun run validate`.
+## Backup / restore / sync impact
 
-## Backup / Restore / Sync Impact
-
-Schema changes affect the backup, restore, and Google Sheets sync pipeline. When adding or modifying tables or columns, check and update these files:
+Every table and column is exported, validated, and restored through hand-maintained lists. Run
+`bun test src/api/sync src/api/providers` after a schema change — drift guards
+(`backup-table-coverage`, `restore-table-coverage`, `sheets-header-coverage`) fail by name on each
+list you missed. What they point at:
 
 | File | What to update |
 |---|---|
-| `backend/src/config.ts` | Add new tables to `TABLE_SCHEMA_MAP` and `TABLE_FILENAME_MAP`. If the table may be absent in older backups, add its filename to `OPTIONAL_BACKUP_FILES`. |
-| `backend/src/types.ts` | Add the new data field to `BackupData` and `ParsedBackupData` interfaces. |
-| `backend/src/api/sync/backup.ts` | Export the new table's data in `createBackup()`. Add CSV column output in `exportAsZip()`. Validate referential integrity in `validateReferentialIntegrity()`. |
-| `backend/src/api/sync/restore.ts` | Insert the new table's data in `insertBackupData()`. Delete it in `deleteUserData()` if applicable. Update `ImportSummary` type. |
-| `backend/src/api/sync/google-sheets.ts` | Add headers function, new sheet in `createSpreadsheet()`, export in `updateSpreadsheetWithUserData()`, read in `readSpreadsheetData()`. |
+| `backend/src/config.ts` | `TABLE_SCHEMA_MAP` + `TABLE_FILENAME_MAP`. A new table's CSV must also go in `OPTIONAL_BACKUP_FILES` — existing backups do not contain it, and a required-but-absent file fails the whole restore. |
+| `backend/src/types.ts` | `BackupData` and `ParsedBackupData`. |
+| `backend/src/api/sync/backup.ts` | Query the table in `createBackup()`; emit its CSV in `exportAsZip()`; check its FKs in `validateReferentialIntegrity()`. |
+| `backend/src/api/sync/restore.ts` | `insertBackupData()` (FK order), `deleteUserData()`, and the per-table count in `ImportSummary`. |
+| `backend/src/api/providers/services/google-sheets-service.ts` | `SHEET_HEADERS` (one entry per table, covering every column) and `SHEET_NAMES` (tab roster, consumed by both `createSpreadsheet` and `ensureRequiredSheets`). The `updateSpreadsheetWithUserData()` write fan-out and `readSpreadsheetData()` read ranges are both per-table; only the write side has a drift guard. |
 
-### Column type considerations
+`coerceRow()` in `backup.ts` derives CSV-string → JS-value coercion from Drizzle column metadata,
+so most new columns need no mapping. Two cases to confirm with a round-trip test:
 
-- `NOT NULL` boolean columns (e.g., `missedFillup`, `isFinancingPayment`): CSV empty values are coerced to `false` by `coerceRow()`. If you add a new `NOT NULL` boolean column, verify that `coerceRow` handles it — the generic `SQLiteBoolean` branch already does this, but confirm with a backup round-trip test.
-- `NOT NULL` columns with defaults: Drizzle's `createInsertSchema()` may not accept `null` even if the DB column has a default. Ensure `coerceRow` produces a valid value, not `null`, for these columns.
-- JSON columns: `coerceRow` parses JSON strings. If you add a new JSON column, ensure the backup CSV serializes it as a JSON string (not `[object Object]`).
+- `NOT NULL` boolean (e.g. `expenses.missedFillup`): empty CSV cells coerce to `false` via the
+  generic `SQLiteBoolean` branch, and `createInsertSchema()` may reject `null` even when the column
+  has a DB default.
+- JSON column: `coerceRow` parses JSON strings, so the export must serialize the value as JSON,
+  not `[object Object]`.
 
-### Testing
+Round-trip tests live in `backend/src/api/sync/__tests__/`. See `.kiro/steering/BackupRestore.md`
+for the coercion and validation pipeline in detail.
 
-Backup round-trip tests live in `backend/src/api/sync/__tests__/backup.test.ts`. When adding new tables or columns, add tests that verify:
-- `coerceRow` produces valid values for the new column types (especially NOT NULL booleans and JSON)
-- `validateBackupData` accepts properly coerced rows
-- `validateBackupData` rejects rows with invalid data for the new columns
+## Production
 
-## Production Considerations
-
-- Both local and prod run `runMigrations()` on startup. New migrations deploy automatically with the next container build.
-- The Dockerfile copies `backend/drizzle/` into the prod image, so migration files must be committed to git.
-- If prod was bootstrapped with `db:push` (no migration history), you must manually insert the migration hash into `__drizzle_migrations` before deploying new migrations. Use: `sqlite3 /app/data/vroom.db "INSERT INTO __drizzle_migrations (hash, created_at) VALUES ('<sha256>', <timestamp>);"` — get the hash with `shasum -a 256 <migration_file>` and the timestamp from `_journal.json`.
+- Prod runs `runMigrations()` on startup, so migrations deploy with the next container build.
+  `backend/Dockerfile` copies `backend/drizzle/` into the image — uncommitted migration files do
+  not ship.
+- Recovering a DB bootstrapped with `db:push` (no migration history): insert the already-applied
+  migrations' rows before deploying new ones. The prod image ships no `sqlite3` binary, so run this
+  against the mounted volume from the host.
+  ```
+  sqlite3 /app/data/vroom.db "INSERT INTO __drizzle_migrations (hash, created_at) VALUES ('<sha256>', <when>);"
+  ```
+  `<sha256>` is `shasum -a 256 <migration_file>` and `<when>` is that migration's `when` from
+  `_journal.json`. Only the highest `created_at` is consulted, so it gates every lower-numbered
+  migration too.

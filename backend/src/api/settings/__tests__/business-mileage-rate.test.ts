@@ -6,11 +6,11 @@
  * the settings route with an EXPLICIT bounded field (`z.number().min(0).max(100)`) and has the trip
  * mileage-summary consume it as the DEFAULT rate when no explicit ?rate= override is passed (D3: a default
  * rate in preferences + a per-request override). These pin the contract end-to-end:
- *   - GET returns the column default (0) for a fresh user;
- *   - a PUT persists a rate and GET round-trips it;
- *   - the merge is per-field (#82): setting the rate leaves sibling prefs untouched + vice-versa;
- *   - the bound rejects a negative rate and an absurd (>100 $/mile) one;
- *   - the trip summary uses the STORED rate when ?rate= is absent, and an explicit ?rate= OVERRIDES it.
+ *  - GET returns the column default (0) for a fresh user;
+ *  - a PUT persists a rate and GET round-trips it;
+ *  - the merge is per-field: setting the rate leaves sibling prefs untouched + vice-versa;
+ *  - the bound rejects a negative rate and an absurd (>100 $/mile) one;
+ *  - the trip summary uses the STORED rate when ?rate= is absent, and an explicit ?rate= OVERRIDES it.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -52,7 +52,7 @@ describe('PUT/GET /settings businessMileageRate (trips-location T8)', () => {
     expect((await getSettings()).businessMileageRate).toBe(0.67);
   });
 
-  test('setting businessMileageRate leaves sibling prefs untouched (per-field merge, #82)', async () => {
+  test('setting businessMileageRate leaves sibling prefs untouched (per-field merge)', async () => {
     await ctx.authed('PUT', '/api/v1/settings', { currencyUnit: 'EUR' });
     await ctx.authed('PUT', '/api/v1/settings', { businessMileageRate: 0.5 });
     const data = await getSettings();

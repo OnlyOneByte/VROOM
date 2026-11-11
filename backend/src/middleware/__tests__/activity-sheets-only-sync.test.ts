@@ -1,5 +1,5 @@
 /**
- * #136 (C446 deep-review→bug): the activityTracker middleware must arm the inactivity timer for a
+ * The activityTracker middleware must arm the inactivity timer for a
  * Sheets-only-sync provider (enabled:false, sheetsSyncEnabled:true), not just enabled-ZIP providers.
  *
  * The middleware gated `hasSyncEnabled` on `.some((p) => p.enabled)` — NARROWER than the orchestrator's
@@ -31,7 +31,7 @@ function seedProvider(id: string, displayName: string): void {
   );
 }
 
-describe('activityTracker arms the inactivity timer for a Sheets-only-sync provider (#136)', () => {
+describe('activityTracker arms the inactivity timer for a Sheets-only-sync provider', () => {
   test('a Sheets-only provider (enabled:false, sheetsSyncEnabled:true) + syncOnInactivity → recordActivity fires', async () => {
     seedProvider('drive-sheets', 'Drive (Sheets only)');
 
@@ -53,7 +53,7 @@ describe('activityTracker arms the inactivity timer for a Sheets-only-sync provi
     expect(put.status, await put.text()).toBeLessThan(300);
 
     // Spy AFTER the settings PUT (that PUT is itself a tracked write; we want to observe the NEXT write).
-    // Dynamic-import the tracker singleton AFTER createTestApp bound the DB to :memory: (C291/C300) — a
+    // Dynamic-import the tracker singleton AFTER createTestApp bound the DB to :memory: — a
     // top-level import would bind the DB singleton before the harness rewrites DATABASE_URL.
     const { activityTracker: userActivityTracker } = await import(
       '../../api/sync/activity-tracker'

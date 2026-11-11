@@ -6,7 +6,7 @@
  * reminder's `expenseAmount` to a per-month figure using the SAME frequency interpretation the engine
  * uses in `computeNextDueDate` (weekly = every 7 days, monthly = +1 month, yearly = +1 year, custom =
  * intervalValue × intervalUnit). This is a pure derivation over existing rows — NO new table/scheduler
- * (NORTH_STAR #4: extend the engine, don't reinvent it). The dashboard widget (T7 eyes-on) renders the
+ * (: extend the engine, don't reinvent it). The dashboard widget (T7 eyes-on) renders the
  * number; this module is the testable core that lands while Playwright is blocked.
  *
  * Basis: occurrences-PER-YEAR ÷ 12, so the four frequencies stay mutually consistent

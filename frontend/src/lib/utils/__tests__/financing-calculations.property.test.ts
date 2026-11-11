@@ -371,10 +371,10 @@ describe('Property 10: Principal and Interest Derivation', () => {
 		);
 	});
 
-	// C361 deep-review (CERTIFIED CLEAN — pins the beyond-schedule fallback the property test
+	// deep-review (CERTIFIED CLEAN — pins the beyond-schedule fallback the property test
 	// above SKIPS via `if (entry && scheduleEntry)`). The amortization schedule is the CONTRACTUAL
 	// projection: it stops at termMonths, or earlier when the balance reaches 0 (paid off) or the
-	// C161 negative-amortization guard fires. derivePaymentEntries maps logged payments POSITIONALLY
+	// negative-amortization guard fires. derivePaymentEntries maps logged payments POSITIONALLY
 	// onto that schedule, so a payment logged BEYOND the schedule's length has no scheduleEntry and
 	// falls back to `principal = expense.amount, interest = 0`. This is CORRECT, not a bug: those
 	// payments land after the loan has no remaining balance to amortize, so there is genuinely no
@@ -413,7 +413,7 @@ describe('Property 10: Principal and Interest Derivation', () => {
 
 // ---------------------------------------------------------------------------
 // calculateMinimumPayment — the standard amortization formula
-//   M = P * [r(1+r)^n] / [(1+r)^n - 1]
+//  M = P * [r(1+r)^n] / [(1+r)^n - 1]
 // The 0%-APR / lease / missing-input paths return null, which is what keeps the
 // (factor - 1) denominator from being a divide-by-zero (the cycle-168 class).
 // These were untested; the property suite above only covers derivePaymentEntries.
@@ -496,9 +496,7 @@ describe('calculatePayoffDate', () => {
 				fc.double({ min: 100, max: 100_000, noNaN: true, noDefaultInfinity: true }),
 				fc.double({ min: 50, max: 5_000, noNaN: true, noDefaultInfinity: true }),
 				(apr, computedBalance, paymentAmount) => {
-					const d = calculatePayoffDate(
-						makeFinancing({ apr, computedBalance, paymentAmount })
-					);
+					const d = calculatePayoffDate(makeFinancing({ apr, computedBalance, paymentAmount }));
 					expect(isValidDate(d)).toBe(true);
 				}
 			),

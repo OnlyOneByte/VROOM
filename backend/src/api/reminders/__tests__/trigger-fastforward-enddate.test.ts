@@ -1,5 +1,5 @@
 /**
- * Bug #12 (C21 audit, fixed C25): fastForwardPastNow ignored endDate.
+ * Bug: fastForwardPastNow ignored endDate.
  *
  * The main catch-up loop deactivates a bounded reminder once nextDue crosses endDate. But a
  * reminder lapsed past maxCatchUpOccurrences (12) reaches fastForwardPastNow INSTEAD — which (before
@@ -33,16 +33,16 @@ function reminderRow(id: string): { is_active: number } {
   };
 }
 
-describe('fastForwardPastNow honors endDate (bug #12)', () => {
+describe('fastForwardPastNow honors endDate', () => {
   test('a lapsed bounded reminder past the catch-up cap is deactivated, not left active', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Mazda', model: '3', year: 2019 });
 
     // Weekly, starting 2024-01-01. maxCatchUp = 12 → the main loop processes ~12 weekly
     // occurrences (through ~2024-03-25) then hits the cap and hands off to fastForwardPastNow.
     // endDate = 2024-06-01 is AFTER that window but still far in the past relative to now, so:
-    //   - the main loop never sees nextDue > endDate (it stops at the 12-occurrence cap first), and
-    //   - fastForward, stepping weekly from ~Mar 25 toward now (2026+), crosses endDate — and with
-    //     the fix must deactivate there instead of advancing past now and staying active.
+    //  - the main loop never sees nextDue > endDate (it stops at the 12-occurrence cap first), and
+    //  - fastForward, stepping weekly from ~Mar 25 toward now (2026+), crosses endDate — and with
+    //  the fix must deactivate there instead of advancing past now and staying active.
     const createRes = await ctx.authed('POST', '/api/v1/reminders', {
       name: 'Bounded weekly checkup',
       type: 'notification',
@@ -62,7 +62,7 @@ describe('fastForwardPastNow honors endDate (bug #12)', () => {
     expect(reminderRow(reminderId).is_active).toBe(0);
   });
 
-  // Bug #107 (C362 audit): the in-loop endDate check only inspects values <= now (the while guard).
+  // Bug: the in-loop endDate check only inspects values <= now (the while guard).
   // The FINAL advance steps nextDue PAST now and exits the loop, so that last value is never tested
   // against endDate. A bounded reminder whose endDate falls in the period STRADDLING now (after the
   // last <=now step, before the first >now step) was written forward of its endDate yet left active

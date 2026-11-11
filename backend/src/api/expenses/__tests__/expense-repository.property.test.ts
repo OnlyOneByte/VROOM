@@ -231,7 +231,7 @@ describe('Property 5 (Design): Split expense update preserves groupId and migrat
     );
   });
 
-  // C101 (deep-review): a reminder-materialized split must STAY linked to its reminder
+  // A reminder-materialized split must STAY linked to its reminder
   // across an edit. updateSplitExpense deletes old siblings + inserts new ones, copying
   // sourceType/sourceId from the first old sibling (repository.ts:739-740) — but nothing
   // pinned it, and recurring-expenses T3 (cascade-safe delete, which keys on sourceId)
@@ -346,14 +346,14 @@ describe('Property 5 (Design): Split expense update preserves groupId and migrat
 });
 
 // ---------------------------------------------------------------------------
-// #52 (C155 deep-review): split DELETE/regenerate must be userId-scoped, not groupId-alone.
+// Split DELETE/regenerate must be userId-scoped, not groupId-alone.
 // deleteSplitExpense + updateSplitExpense each user-scope their guarding SELECT but, pre-fix, keyed the
 // destructive `delete(expenses).where(eq(groupId))` on groupId ALONE — the ownership check and the
 // write on DIFFERENT predicates. Not exploitable today (groupId is a server cuid2, single-owner), but a
 // latent cross-tenant boundary if a group ever held siblings under two userIds. These tests pin the
 // boundary at the destructive write: a same-groupId sibling owned by ANOTHER user must survive both ops.
 // ---------------------------------------------------------------------------
-describe('#52: split delete/update is userId-scoped at the destructive write (cross-tenant safety)', () => {
+describe('split delete/update is userId-scoped at the destructive write (cross-tenant safety)', () => {
   const USER_2 = 'test-user-2';
 
   /** Seed a second user owning vehicle v-other, and inject a sibling under THAT user sharing `groupId`. */
@@ -419,7 +419,7 @@ describe('#52: split delete/update is userId-scoped at the destructive write (cr
   });
 });
 
-// #60 (deep-review C173 agent B, VERIFIED firsthand C174): editing an ABSOLUTE split via
+// Editing an ABSOLUTE split via
 // updateSplitExpense WITHOUT a `totalAmount` must recompute groupTotal from the new
 // allocations — not fall back to the stale stored groupTotal. updateSplitSchema makes
 // totalAmount optional AND gates its absolute-sum refinement on it being present, so an
@@ -427,7 +427,7 @@ describe('#52: split delete/update is userId-scoped at the destructive write (cr
 // groupTotal, stamping every sibling with a header that no longer matched the legs (the
 // Property 3 "legs sum to groupTotal" invariant). These are deterministic invariants, not
 // distribution properties, so plain fixtures (not fast-check) are the right gate.
-describe('#60: absolute split edit recomputes groupTotal from allocations (no stale header)', () => {
+describe('absolute split edit recomputes groupTotal from allocations (no stale header)', () => {
   /** Create an absolute split (validation forces sum===total at create), return its groupId. */
   async function createAbsolute(
     allocations: Array<{ vehicleId: string; amount: number }>

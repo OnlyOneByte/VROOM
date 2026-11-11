@@ -2,10 +2,6 @@ import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { ELECTRIC_FUEL_TYPES, isElectricFuelType } from '../types';
 
-/**
- * Property 3: isElectricFuelType consistency
- * Validates: Requirements 8.2, 8.3, 8.4
- */
 describe('Property 3: isElectricFuelType consistency', () => {
   test('returns true for all ELECTRIC_FUEL_TYPES values', () => {
     fc.assert(

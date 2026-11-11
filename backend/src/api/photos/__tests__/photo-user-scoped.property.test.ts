@@ -180,14 +180,14 @@ describe('Property 20: Photo create stores userId and user-scoped queries work',
 });
 
 // ===========================================================================
-// #72 (C214 deep-review): findByEntityPaginated must be userId-scoped.
+// findByEntityPaginated must be userId-scoped.
 // It was the lone photo read-method filtering on (entityType, entityId) ALONE — every sibling
 // (findByUser/countByUser/findIdsByUser) scopes by user_id. Not a live leak (the route's
 // validateEntityOwnership gates it), but a latent tenant boundary: if two users' photos ever shared
 // an (entityType, entityId) — a raw cross-tenant case only constructible by direct seed — the page
-// would mix them. These pin the WHERE predicate itself (the C192 approach), not just the route guard.
+// would mix them. These pin the WHERE predicate itself (the approach), not just the route guard.
 // ===========================================================================
-describe('#72: findByEntityPaginated is userId-scoped', () => {
+describe('findByEntityPaginated is userId-scoped', () => {
   test('excludes another user’s photo that shares the same (entityType, entityId)', async () => {
     // The load-bearing cross-tenant case: SAME entityType+entityId, different owners.
     const SHARED_ENTITY = 'shared-veh';

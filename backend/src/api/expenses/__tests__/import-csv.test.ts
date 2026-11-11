@@ -26,9 +26,8 @@ beforeEach(async () => {
 afterEach(() => ctx.close());
 
 // Seed the file's fixture vehicle: a Honda Civic 2021 with the given nickname — several tests rely on
-// the exact "2021 Honda Civic" name-match and the #102 same-year/make/model ambiguity, so make/model/year
-// are passed explicitly (the shared seedVehicle default is a Toyota Camry). Converged onto the shared
-// test-helpers/seed seedVehicle (arch convergence, Angelo-approved).
+// the exact "2021 Honda Civic" name-match and the same-year/make/model ambiguity, so make/model/year
+// are passed explicitly (the shared test-helpers/seed seedVehicle defaults to a Toyota Camry).
 const seedCivic = (nickname: string) =>
   seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021, nickname });
 
@@ -104,10 +103,10 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect(rows.find((r) => r.category === 'maintenance')?.expenseAmount).toBe(120);
   });
 
-  // C383: the FULL export→import round-trip on a populated fuel row. export-csv.test.ts pins the export
+  // The FULL export→import round-trip on a populated fuel row. export-csv.test.ts pins the export
   // SHAPE (filters, formula-injection, currency, numeric-quoting) and import-csv pins individual import
   // fields, but NOTHING drove a create→EXPORT→import→re-read asserting EVERY field survives together — the
-  // NORTH_STAR #1 crown jewel ("export → re-import round-trips losslessly"). A regression in either the
+  // crown-jewel guarantee that export → re-import round-trips losslessly. A regression in either the
   // export serialization OR the import parse of any one field would silently corrupt that field on a real
   // user's backup/restore-via-CSV. Create a fully-populated fuel expense, export it, WIPE the table (avoids
   // the idempotency/duplicate-detection collision), import the exact exported CSV, and read the row back.
@@ -159,12 +158,12 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect(storedDay.getUTCFullYear()).toBe(2024);
   });
 
-  test('a multi-tag cell splits on ; OR , into a real tags array (the export "; "-join → import round-trip, #104 by-design)', async () => {
+  test('a multi-tag cell splits on ; OR , into a real tags array (the export "; "-join → import round-trip is by design)', async () => {
     // The round-trip test above imports a `road; trip` cell but only asserts amounts — the tags
     // ARRAY it produces was never verified, leaving the multi-tag split (parseTags' `split(/[;,]/)`)
     // unpinned. This is the intended export↔import contract: the exporter joins a tags array with
-    // "; " (routes.ts), and import splits on ; OR , back into the array. #104 (C352) guarantees no
-    // single tag can CONTAIN ; or , (rejected at the write boundary), so a delimiter in a cell is
+    // "; " (routes.ts), and import splits on `;` OR `,` back into the array. The tag write boundary
+    // REJECTS a tag containing `;` or `,`, so a delimiter inside a cell is
     // ALWAYS a separator, never literal data — splitting is correct, not data loss. Pin both
     // delimiters + the trim, so a regression narrowing the split silently merges two tags into one.
     await seedCivic('Daily Driver');
@@ -191,7 +190,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect(tagsOf('Commas')).toEqual(['errand', 'grocery']);
   });
 
-  test('missedFillup round-trips faithfully: the export `true`/`false` strings import to the stored boolean (C321)', async () => {
+  test('missedFillup round-trips faithfully: the export `true`/`false` strings import to the stored boolean', async () => {
     // The export writes missedFillup as the literal 'true'/'false' (routes.ts:432); import parses it with
     // /^(true|1|yes)$/i. A regression narrowing that regex (e.g. to only '1') would silently import EVERY
     // missed-fillup row as false — corrupting MPG pairing (a missed fillup means the next interval spans two
@@ -222,7 +221,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     // Excel / Google Sheets / Numbers prepend a UTF-8 BOM (﻿) when they re-save a
     // CSV as UTF-8. WITHOUT bom:true on the parser the BOM sticks to the FIRST header
     // name, so the `date` column key becomes "﻿date" → record.date is undefined and
-    // EVERY row fails with a misleading "Invalid date" (cycle 51). bom:true strips it
+    // EVERY row fails with a misleading "Invalid date". bom:true strips it
     // pre-parse, so a VROOM export survives a spreadsheet round-trip. (Pre-fix this test
     // would see imported:0 / errorCount:1 with an "Invalid date" message.)
     const csv = `﻿${[
@@ -261,7 +260,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect(stored.getDate()).toBe(15);
   });
 
-  test('an OUT-OF-RANGE date-only cell is REJECTED, not silently rolled forward (#59)', async () => {
+  test('an OUT-OF-RANGE date-only cell is REJECTED, not silently rolled forward', async () => {
     await seedCivic('Daily Driver');
     // `new Date(2024, 12, 45)` ("2024-13-45") never NaNs — it rolls to 2025-02-14. The native parseDate
     // now echo-checks the constructed Y/M/D (the buildLocalDate guard the mapping path had), so an
@@ -300,7 +299,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect(new Date(row.date).getTime()).toBe(new Date(iso).getTime());
   });
 
-  test('re-importing the same file is idempotent (no duplicate rows; cycle 211)', async () => {
+  test('re-importing the same file is idempotent (no duplicate rows)', async () => {
     await seedCivic('Daily Driver');
     const csv = [
       'date,vehicle,category,amount',
@@ -434,10 +433,11 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect(body.data.imported).toBe(1);
   });
 
-  test('#102: an AMBIGUOUS "year make model" name (two cars share it) errors, not silent misattribution', async () => {
+  test('an AMBIGUOUS "year make model" name (two cars share it) errors, not silent misattribution', async () => {
     // Two vehicles share "2021 Honda Civic" (legal — distinct nicknames, no unique constraint).
-    // Pre-C344 the name map resolved to the LAST one (silent misattribution, NORTH_STAR #1). Now
-    // the row must FAIL with a clear "use distinct nicknames" message — nothing imported.
+    // A last-wins name map would resolve the shared key to whichever car was seen LAST — silent
+    // misattribution. The row must instead FAIL with a clear "use distinct nicknames" message, and
+    // nothing may be imported.
     await seedCivic('Work Car'); // 2021 Honda Civic
     await seedCivic('Personal Car'); // 2021 Honda Civic (same year/make/model)
     const csv = [
@@ -453,7 +453,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect(body.data.rows[0]?.message).toContain('more than one vehicle');
   });
 
-  test('#102: a UNIQUE nickname still resolves even when its year/make/model is shared', async () => {
+  test('a UNIQUE nickname still resolves even when its year/make/model is shared', async () => {
     // The ambiguity is per-NAME-KEY: the shared "2021 Honda Civic" key is ambiguous, but each
     // car's distinct nickname is not — so importing by nickname must still work.
     await seedCivic('Work Car');
@@ -488,7 +488,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     // The export neutralizes CWE-1236 cells by prefixing a leading ' (so a
     // spreadsheet treats `=...` as text). On re-import the importer must STRIP that
     // prefix symmetrically, else `=SUM(A1:A2)` round-trips to `'=SUM(A1:A2)` — silent
-    // corruption (cycle 192 fix). Create → export → import → description identical.
+    // corruption. Create → export → import → description identical.
     const vehicleId = await seedCivic('Daily Driver');
     const formula = '=SUM(A1:A2) reimbursement';
     const created = await ctx.authed('POST', '/api/v1/expenses', {
@@ -545,8 +545,8 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect(list.data[0]?.description).toBe("'24 road trip fuel");
   });
 
-  test("round-trips a user-typed `'`+trigger description LOSSLESSLY (csv-apostrophe ruling, C527)", async () => {
-    // The C401 data-loss, now CLOSED (ruled 2026-06-30: optimize VROOM-own-export fidelity). A
+  test("round-trips a user-typed `'`+trigger description LOSSLESSLY (csv-apostrophe ruling)", async () => {
+    // The data contract optimizes fidelity for VROOM's OWN export over foreign hand-authored CSVs. A
     // description the user genuinely typed as a leading apostrophe BEFORE a formula trigger (e.g.
     // `'=Daily mention`) used to round-trip LOSSY to `=Daily mention` (export left it bare, import
     // over-stripped the apostrophe). The matched invertible escape (export `'=` → `''=`, import peels
@@ -585,13 +585,13 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect(list.data[0]?.description).toBe(userTyped);
   });
 
-  // #137 (C448): a NON-fuel imported row that carries a mileage/volume/fuelType (a foreign tracker like
+  // A NON-fuel imported row that carries a mileage/volume/fuelType (a foreign tracker like
   // Drivvo/Fuelio logs an odometer on a Service/maintenance entry) must NOT persist those fuel-only fields
   // — the import commit (importExpenses) inserts verbatim, bypassing the clearFuelFieldsIfNotFuel guard the
-  // POST (#76/C244) + PUT (#130/C434) paths apply. A stray mileage on a non-fuel row poisons
+  // POST + PUT paths apply. A stray mileage on a non-fuel row poisons
   // getCurrentOdometer's cross-category MAX(odometer) UNION → wrong reminder firing + inflated lease-overage $.
-  // parseRow now nulls the fuel-only fields for a non-fuel category (the #76 transform at the import site).
-  test('a non-fuel imported row carrying mileage/volume/fuelType stores them NULL (#137, the #76 import write site)', async () => {
+  // parseRow therefore applies the same clear at the import write site.
+  test('a non-fuel imported row carrying mileage/volume/fuelType stores them NULL (the import write site)', async () => {
     await seedCivic('Daily Driver');
     const csv = [
       'date,vehicle,category,amount,currency,mileage,volume,fuelType,description,tags,missedFillup,createdAt',

@@ -182,8 +182,8 @@
 					<div class="min-w-0">
 						<p class="text-sm font-medium text-foreground">No photo storage set up yet</p>
 						<p class="mt-1 text-xs text-muted-foreground">
-							Connect a storage provider (Google Drive, S3, …) in Settings before uploading
-							photos or documents.
+							Connect a storage provider (Google Drive, S3, …) in Settings before uploading photos
+							or documents.
 						</p>
 					</div>
 				</div>

@@ -1,40 +1,34 @@
 /**
- * Meta-GUARD (committed) pairing the C275 rule-of-four convergence: the recursive `.svelte` file
- * walker (`collectSvelteFiles`) now lives in ONE shared helper (./collect-svelte-files.ts), and the
- * four source-scan guards that used to re-declare it byte-identically (no-hardcoded-currency,
- * no-interpolated-arbitrary-class, no-theme-clashing-colors, fab-bottom-clearance) import it.
+ * The recursive `.svelte` walker lives in one place (`./collect-svelte-files.ts`); source-scan
+ * guards import it rather than re-declaring it.
  *
- * The drift this pins: a FUTURE source-scan guard is the natural place to copy the `.svelte` walker
- * locally again (it's the obvious "I need to enumerate every .svelte" boilerplate) — silently
- * un-converging C275 back toward five copies. This scan fails the moment any *.test.ts under __tests__
- * declares its OWN `function collectSvelteFiles` instead of importing the shared helper.
+ * The drift this pins: enumerating every `.svelte` is the obvious boilerplate for a new source-scan
+ * guard, so the natural move is to paste the walker in locally again — which silently un-converges
+ * back toward a copy per guard, each free to disagree about which directories to skip. A guard that
+ * walks a subtly different tree reports a subtly different answer, and nothing says so.
  *
- * SCOPE (narrow, deliberately): this pins the `collectSvelteFiles` symbol ONLY — the exact thing C275
- * converged. It does NOT flag the bare `readdirSync(... withFileTypes)` idiom in general, because a
- * SEPARATE, differently-shaped walker family exists — `collectSourceFiles` (collects .ts + .svelte;
- * in no-native-dialogs / no-utc-date-input / no-utc-month-parse) — which is its OWN un-converged
- * rule-of-three (found C276, FILED as a follow-on arch target, NOT yet deduped). Over-flagging the
- * raw idiom would false-positive on that family + on this guard's own collectTestFiles (the C271
- * over-flag lesson). Keep this guard honest to what C275 actually converged.
+ * Scope is the `collectSvelteFiles` SYMBOL only, not the `readdirSync(…, withFileTypes)` idiom in
+ * general. A separate, differently-shaped `collectSourceFiles` family (collects `.ts` AND `.svelte`)
+ * legitimately exists, and this guard's own `collectTestFiles` walks `.test.ts` — matching the raw
+ * idiom would flag both.
  *
- * The shared helper itself (collect-svelte-files.ts) is the ONE sanctioned home, allowlisted below.
- * Pure node:fs/path — runs in the fast unit suite, no browser/server.
+ * There is no allowlist: the shared helper is a `.ts` file, and the walk below only collects
+ * `.test.ts`, so it is out of scope structurally rather than by exemption. (It previously carried an
+ * allowlist entry naming the helper, which could never match anything.) The helper's own existence
+ * is asserted separately — the scan passing because the helper vanished would be the one way this
+ * could read green while the convergence was gone.
  */
 
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
+import { ratchet } from './debt-ratchet';
 
 // This file lives at src/lib/utils/__tests__/_helpers/, so __tests__/ is one dir up.
 const TESTS_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-// The sole sanctioned home for the walker — the shared helper this guard pairs with.
-const ALLOWLIST = new Set<string>(['_helpers/collect-svelte-files.ts']);
-
-// A local re-declaration of the EXACT symbol C275 converged. Scoped to the name (not the raw
-// readdir idiom) so it doesn't false-positive on the separate collectSourceFiles family or on
-// this guard's own collectTestFiles (the C271 over-flag lesson).
+/** A local re-declaration of the exact symbol that was converged. */
 const LOCAL_WALKER_DECL = /function\s+collectSvelteFiles\s*\(/;
 
 function collectTestFiles(dir: string, acc: string[] = []): string[] {
@@ -49,34 +43,46 @@ function collectTestFiles(dir: string, acc: string[] = []): string[] {
 	return acc;
 }
 
-describe('no duplicate .svelte file-walker in the source-scan guard suite (C275 convergence guard)', () => {
-	const files = collectTestFiles(TESTS_ROOT);
+const files = collectTestFiles(TESTS_ROOT);
 
-	test('the scan actually found .test.ts sources (guard is live, not a no-op)', () => {
-		expect(files.length).toBeGreaterThan(10);
-	});
-
-	test('no *.test.ts re-declares the file-walker locally — import the shared helper instead', () => {
-		const offenders: string[] = [];
-		for (const file of files) {
-			const rel = relative(TESTS_ROOT, file).split('\\').join('/');
-			if (ALLOWLIST.has(rel)) continue;
-			const src = readFileSync(file, 'utf-8');
-			if (LOCAL_WALKER_DECL.test(src)) {
-				offenders.push(rel);
-			}
-		}
+ratchet({
+	name: 'no duplicate .svelte file-walker in the source-scan guard suite',
+	tolerated: [],
+	guidance:
+		'Source-scan guard(s) re-declaring the .svelte file-walker locally, which un-converges the ' +
+		"shared walker. Import { collectSvelteFiles } from './_helpers/collect-svelte-files' " +
+		"(or '../_helpers/…' by depth) instead:",
+	scan: () =>
+		files
+			.map(file => ({ file, rel: relative(TESTS_ROOT, file).split('\\').join('/') }))
+			// This file quotes the declaration as a probe fixture, so it always matches itself.
+			.filter(({ rel }) => rel !== '_helpers/no-duplicate-file-walker.test.ts')
+			.filter(({ file }) => LOCAL_WALKER_DECL.test(readFileSync(file, 'utf-8')))
+			.map(({ rel }) => rel),
+	probe: () => {
+		expect(LOCAL_WALKER_DECL.test('function collectSvelteFiles(dir: string) {')).toBe(true);
+		expect(LOCAL_WALKER_DECL.test('export function collectSvelteFiles (dir) {')).toBe(true);
+		// An IMPORT of the shared helper is the correct form and must not match.
 		expect(
-			offenders,
-			`Source-scan guard(s) re-declaring the .svelte file-walker locally — this silently un-converges ` +
-				`the C275 dedup. Import { collectSvelteFiles } from './_helpers/collect-svelte-files' (or ` +
-				`'../_helpers/...' by depth) instead:\n${offenders.join('\n')}`
-		).toEqual([]);
-	});
+			LOCAL_WALKER_DECL.test(
+				"import { collectSvelteFiles } from './_helpers/collect-svelte-files';"
+			)
+		).toBe(false);
+		// Neither may the other walker families.
+		expect(LOCAL_WALKER_DECL.test('function collectSourceFiles(dir: string) {')).toBe(false);
+		expect(LOCAL_WALKER_DECL.test('function collectTestFiles(dir: string) {')).toBe(false);
+		expect(
+			files.length,
+			'the .test.ts walk found almost nothing — TESTS_ROOT is wrong'
+		).toBeGreaterThan(10);
+	}
+});
 
-	test('the shared helper still exists + still exports the walker (no stale allowlist / convergence intact)', () => {
+describe('the converged walker is still there', () => {
+	test('the shared helper exists and still exports collectSvelteFiles', () => {
+		// Without this, deleting the helper would make the scan above pass by vacuity: no file
+		// re-declares the walker because nothing uses it any more.
 		const helper = join(TESTS_ROOT, '_helpers/collect-svelte-files.ts');
-		const src = readFileSync(helper, 'utf-8');
-		expect(src).toMatch(/export function collectSvelteFiles\s*\(/);
+		expect(readFileSync(helper, 'utf-8')).toMatch(/export function collectSvelteFiles\s*\(/);
 	});
 });

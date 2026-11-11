@@ -67,30 +67,34 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          # Node 22: Vite 8 (the frontend build tool) requires `^20.19.0 || >=22.12.0`. The old '20'
-          # pin resolved to a Node 20.x the `vite build` step hard-failed on (the only red CI step;
-          # install/type-check/lint/test all passed). 22 matches the project's documented toolchain
-          # (CLAUDE.md: node22+bun) and Vite 8's preferred engine.
-          node-version: '22'
+          # Single source of truth, shared with local dev. `node-version: '22'` resolved to the
+          # latest 22.x, which silently satisfied the lockfile's `^22.22.2` floor while a
+          # developer on an older 22.x could not install at all.
+          node-version-file: .nvmrc
 
       - name: Install dependencies
-        # Use `npm ci` against the COMMITTED lockfile. The previous step did
-        # `rm -rf node_modules package-lock.json && npm install` as a "workaround for the npm
-        # optional-dependencies bug" — but that destructive re-resolve is what was BREAKING the
-        # frontend build: regenerating the lock changes rolldown's platform-binding resolution and
-        # `vite build` then hits the rolldown WASM-fallback parser, which fatally chokes on TS
-        # optional params in .svelte files (`[PARSE_ERROR] Expected ',' or ')' but found '?'`, 5×).
-        # The committed package-lock.json is cross-platform-complete (all 15 @rolldown/binding-*
-        # entries incl. linux-x64-gnu for this runner), so `npm ci` installs the correct native
-        # binding and the build passes. Verified locally on the same vite@8.0.16 / rolldown@1.0.3:
-        # `npm ci` build → 0 parse errors; `rm lock && npm install` build → 5 parse errors.
+        # Must be `npm ci`, never `npm install`: re-resolving the lockfile changes which
+        # @rolldown/binding-* platform package is installed, and the WASM fallback parser
+        # fails on TypeScript optional parameters in .svelte files.
         run: npm ci
 
       - name: Prepare SvelteKit
-        run: npm run prepare
+        # NOT `npm run prepare`: that script is `svelte-kit sync || echo ''`, because npm runs
+        # `prepare` as an install lifecycle script where svelte-kit may be absent (e.g.
+        # --omit=dev), and the `|| echo ''` swallows a failed sync. `npm run sync` is the same
+        # command without the tolerance, so a broken sync fails the job here.
+        run: npm run sync
 
       - name: Run type checking
+        # Guarded by frontend/scripts/type-check.mjs (svelte-check is fail-open in two ways;
+        # see that file). Keep this a plain script call so CI, the git hook, `validate`, and
+        # local runs are all covered by the same guard.
         run: npm run type-check
+
+      - name: Type check the E2E harness
+        # The app's program comes from the SvelteKit-generated include list, which covers src/
+        # only — e2e/ and playwright.config.ts compile under nothing without their own project.
+        run: npx tsc -p tsconfig.e2e.json --noEmit
 
       - name: Run linting
         run: npm run lint
@@ -100,6 +104,32 @@ jobs:
 
       - name: Build application
         run: npm run build
+
+      - name: Install Playwright browsers
+        # Chromium only. The suite declares five projects (two of them mobile viewports) and
+        # runs at `workers: 1` under CI, so the full matrix costs roughly 5x; chromium catches
+        # the regressions these specs are about — the a11y ratchet, the offline outbox drain,
+        # delete-confirms-before-DELETE, server-side search — at a fifth of the runtime. The
+        # engine-specific and mobile-viewport projects stay a local/pre-release concern.
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        # Sequential, after the build, NOT in parallel with type-check or vitest: those run
+        # `svelte-kit sync`, which rewrites .svelte-kit/generated/ and makes the dev server
+        # force-reload every open page, aborting in-flight navigations (see
+        # playwright.config.ts). The dev target needs no backend and no database — every
+        # /api/v1 call is mocked in-browser.
+        run: npm run test:e2e:chromium
+
+      - name: Upload Playwright report
+        # The axe scans attach their full violation JSON to the report; without this the
+        # report dies with the runner and a red a11y gate says only "expected [] to equal".
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7
 
   # Build and push Docker images
   build-backend:

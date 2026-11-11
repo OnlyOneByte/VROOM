@@ -23,9 +23,13 @@
 		{#if icon}
 			{@render icon()}
 		{/if}
-		<h3 class="text-lg font-semibold mb-2">
+		<!-- `h2`, not `h3`: this card is a top-level region of whatever page renders it, so it sits
+		     directly under that page's `h1`. An `h3` here skips a level, which is both an axe
+		     `heading-order` failure and a screen-reader outline with a hole in it. Nothing inside
+		     the card is a heading, so there is no level below this to preserve. -->
+		<h2 class="text-lg font-semibold mb-2">
 			{@render title()}
-		</h3>
+		</h2>
 		<p class="text-muted-foreground text-center mb-4">
 			{@render description()}
 		</p>

@@ -401,14 +401,14 @@ describe('Property 14: TCO total equals sum of components', () => {
 });
 
 // ---------------------------------------------------------------------------
-// #27 (C154, Angelo-approved option c): TCO must not double-count a financed vehicle's principal.
+// TCO must not double-count a financed vehicle's principal.
 // The `financingInterest` bucket sums WHOLE financing-sourced expense rows (full loan payments =
 // principal + interest), so counting both purchasePrice AND those payments counts the principal twice.
 // Decided model: when purchasePrice is counted, EXCLUDE the financing-payment rows from the total (they
 // retire the already-counted price). seedExpense can't set source_type, so we insert the financing row
 // directly. Pre-fix this asserted ~price+payments (double); post-fix it asserts price only.
 // ---------------------------------------------------------------------------
-describe('#27: financed vehicle TCO does not double-count principal', () => {
+describe('financed vehicle TCO does not double-count principal', () => {
   /** Insert a financing-sourced expense row (category 'financial' + source_type 'financing'). */
   function seedFinancingPayment(vehicleId: string, id: string, amount: number, date: Date): void {
     testDb.sqlite.run(
@@ -480,19 +480,19 @@ describe('#27: financed vehicle TCO does not double-count principal', () => {
 });
 
 // ---------------------------------------------------------------------------
-// C33 deep-review CERT: categorizeTCOExpenses buckets a `financial` row by its sourceType, NOT by
+// deep-review CERT: categorizeTCOExpenses buckets a `financial` row by its sourceType, NOT by
 // category alone. The predicate is `category==='financial' && sourceType==='financing'` → financingInterest;
 // `financial` + 'insurance_term' → insuranceCost; ANY OTHER `financial` row (sourceType 'reminder' from a
-// recurring expense [C27], or null from a manual financial entry) falls through to otherCosts. This is the
-// money-facing seam recurring-expenses (C27) now exercises (it materializes financial+'reminder' rows), and
-// it was UNPINNED — the prior #27 tests only seed financing-sourced financial rows. Certified firsthand
-// (C33 probe): reminder/null financial → otherCosts, NOT financingInterest. NON-VACUOUS: dropping the
+// recurring expense [], or null from a manual financial entry) falls through to otherCosts. This is the
+// money-facing seam recurring-expenses now exercises (it materializes financial+'reminder' rows), and
+// it was UNPINNED — the prior tests only seed financing-sourced financial rows. Certified firsthand
+// (probe): reminder/null financial → otherCosts, NOT financingInterest. NON-VACUOUS: dropping the
 // `sourceType==='financing'` clause (bucketing by category alone) would pull the reminder+null rows into
 // financingInterest → and since this vehicle is PRICED, computeTCOTotal would then EXCLUDE them as
 // "principal-retiring payments", silently dropping a recurring financial cost from TCO. This pins the
 // guard so that mis-edit turns RED.
 // ---------------------------------------------------------------------------
-describe('C33: TCO buckets financial rows by sourceType (recurring/manual → otherCosts, not financing)', () => {
+describe('TCO buckets financial rows by sourceType (recurring/manual → otherCosts, not financing)', () => {
   function seedFinancialRow(
     vehicleId: string,
     id: string,
@@ -516,11 +516,11 @@ describe('C33: TCO buckets financial rows by sourceType (recurring/manual → ot
 
   test('a recurring (reminder) + a manual (null) financial row land in otherCosts, not financingInterest', async () => {
     // No purchasePrice → financing payments are kept (the unpriced cost-signal path), so a mis-bucket
-    // would show up directly in financingInterest rather than being masked by the #27 exclusion.
+    // would show up directly in financingInterest rather than being masked by the exclusion.
     const { userId, vehicle } = setupUserAndVehicle({ purchasePrice: null });
     seedFinancialRow(vehicle.id, 'fin', 200, 'financing'); // a real loan payment
     seedFinancialRow(vehicle.id, 'ins', 75, 'insurance_term'); // an insurance premium
-    seedFinancialRow(vehicle.id, 'rem', 100, 'reminder'); // a recurring financial expense (C27)
+    seedFinancialRow(vehicle.id, 'rem', 100, 'reminder'); // a recurring financial expense
     seedFinancialRow(vehicle.id, 'man', 50, null); // a manual financial expense
 
     const result = await repo.getVehicleTCO(userId, vehicle.id);
@@ -531,7 +531,7 @@ describe('C33: TCO buckets financial rows by sourceType (recurring/manual → ot
     expect(result.totalCost).toBe(425);
   });
 
-  test('PRICED + a recurring financial row → the recurring cost survives in otherCosts (not dropped by #27)', async () => {
+  test('PRICED + a recurring financial row → the recurring cost survives in otherCosts', async () => {
     // The dangerous mis-bucket: if a reminder financial row were treated as financing, computeTCOTotal
     // would EXCLUDE it (purchasePrice counted), silently dropping the cost. Pin that it's kept.
     const { userId, vehicle } = setupUserAndVehicle({ purchasePrice: 30000 });
@@ -546,18 +546,18 @@ describe('C33: TCO buckets financial rows by sourceType (recurring/manual → ot
 });
 
 // ---------------------------------------------------------------------------
-// #28 + #27, YEAR-SCOPED arm (C333 deep-review → guard). Every getVehicleTCO call in the suite
+// +, YEAR-SCOPED arm (deep-review → guard). Every getVehicleTCO call in the suite
 // omitted the optional `year` arg, so the year-scoped accounting path was UNPINNED — including the
 // load-bearing rule computeTCOTotal documents (repository.ts:1081): purchasePrice is an all-time-only
-// acquisition cost (#28, EXCLUDED from any year window since the window's expenses are already
+// acquisition cost (EXCLUDED from any year window since the window's expenses are already
 // date-filtered), and because the price is NOT counted in a year window, the financing-payment rows
 // for that year ARE kept (they're the cost signal for the window — NOT a double-count, since the
-// acquisition isn't in the window). A C333 audit flagged the year+unpriced+financed case as a
+// acquisition isn't in the window). A audit flagged the year+unpriced+financed case as a
 // "double-count bug" — it is NOT (the price was a prior-year acquisition, absent from the window);
-// these pin the DECIDED #28/#27 semantics so a future "fix" to that branch is a deliberate, RED-turning
+// these pin the DECIDED semantics so a future "fix" to that branch is a deliberate, RED-turning
 // change, not a silent regression. seedExpense can't set source_type → insert the financing row raw.
 // ---------------------------------------------------------------------------
-describe('#28/#27 year-scoped: purchasePrice excluded from a year window; that year financing kept', () => {
+describe('year-scoped: purchasePrice excluded from a year window; that year financing kept', () => {
   function seedFinancingPayment(vehicleId: string, id: string, amount: number, date: Date): void {
     testDb.sqlite.run(
       'INSERT INTO expenses (id, vehicle_id, user_id, category, expense_amount, date, source_type, missed_fillup) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -586,14 +586,14 @@ describe('#28/#27 year-scoped: purchasePrice excluded from a year window; that y
 
     const result = await repo.getVehicleTCO(userId, vehicle.id, TEST_YEAR);
 
-    // The $30k prior-year purchase is NOT in this window (#28); the two in-year payments ARE the
+    // The $30k prior-year purchase is NOT in this window; the two in-year payments ARE the
     // window's cost signal (not a double-count — the acquisition isn't counted here). Out-of-year
     // payment excluded by the date filter.
     expect(result.totalCost).toBe(1000);
     expect(result.financingInterest).toBe(1000);
     // The response still REPORTS the vehicle's stored purchasePrice (it's a vehicle attribute), but a
-    // year-scoped totalCost EXCLUDES it (#28) — so in a year window the breakdown fields intentionally
-    // do NOT sum to totalCost by exactly purchasePrice. That divergence is the #28 design, pinned here.
+    // year-scoped totalCost EXCLUDES it — so in a year window the breakdown fields intentionally
+    // do NOT sum to totalCost by exactly purchasePrice. That divergence is the design, pinned here.
     expect(result.purchasePrice).toBe(30000);
     expect(result.totalCost).toBe(
       result.financingInterest +
@@ -604,7 +604,7 @@ describe('#28/#27 year-scoped: purchasePrice excluded from a year window; that y
     ); // year total = the windowed buckets, purchasePrice NOT added
   });
 
-  test('UNPRICED + financed, year-scoped: the year financing IS counted (the documented #28/#27 branch)', async () => {
+  test('UNPRICED + financed, year-scoped: the year financing IS counted (the documented branch)', async () => {
     const { userId, vehicle } = setupUserAndVehicle({
       purchasePrice: null,
       purchaseDate: new Date(2020, 0, 1),
@@ -619,13 +619,13 @@ describe('#28/#27 year-scoped: purchasePrice excluded from a year window; that y
     expect(result.financingInterest).toBe(1000);
   });
 
-  test('year-scoped costPerMonth divides by monthsOwnedInYear (≤12), NOT full-ownership monthsBetween (#28 divisor)', async () => {
+  test('year-scoped costPerMonth divides by monthsOwnedInYear (≤12), NOT full-ownership monthsBetween (divisor)', async () => {
     // The year arm selects ownershipMonths = monthsOwnedInYear(start, now, year) (repository.ts:1907),
     // capped at 12 for a fully-owned past year — so a year-windowed numerator is divided by a matching
-    // ≤12 span, not the purchase→now full-ownership months (the #28 mistake). monthsOwnedInYear is
+    // ≤12 span, not the purchase→now full-ownership months (the mistake). monthsOwnedInYear is
     // unit-tested in isolation + the ALL-TIME costPerMonth is pinned by Property 15, but NOTHING drove
     // the REAL getVehicleTCO through the YEAR branch to confirm the divisor SELECTION — a refactor
-    // swapping to monthsBetween would turn no test red (the C181/C229 helper-tested-in-isolation gap).
+    // swapping to monthsBetween would turn no test red (the helper-tested-in-isolation gap).
     const { userId, vehicle } = setupUserAndVehicle({
       purchasePrice: 30000,
       purchaseDate: new Date(2020, 0, 1), // owned ALL of TEST_YEAR (a prior-year acquisition)
@@ -671,7 +671,7 @@ describe('#28/#27 year-scoped: purchasePrice excluded from a year window; that y
       result.maintenanceCost +
       result.otherCosts;
     expect(Math.abs(result.totalCost - windowedBuckets)).toBeLessThan(0.01);
-    expect(result.totalCost).toBe(560); // 500 financing + 60 fuel, NO purchasePrice (#28)
+    expect(result.totalCost).toBe(560); // 500 financing + 60 fuel, NO purchasePrice
   });
 });
 
@@ -713,8 +713,8 @@ describe('Property 15: Cost per month formula', () => {
 
 // ---------------------------------------------------------------------------
 // FE↔BE response contract-drift guard for getVehicleHealth — the FINAL hand-assembled surface
-// in loop-improvement #2 (C55 /stats, C62 /vehicles list, C68 single-financing, C74
-// /analytics/insurance, C78 /analytics/year-end). getVehicleHealth hand-assembles a 6-field
+// in loop-improvement (/stats, /vehicles list, single-financing,
+// /analytics/insurance, /analytics/year-end). getVehicleHealth hand-assembles a 6-field
 // literal (repository.ts:1713) with NO type binding to the frontend VehicleHealthResponse
 // (types/analytics.ts:199). Property 10 above pins the SCORE MATH but NOT the key shape, so a
 // dropped/renamed field would silently break the health card. Exact top-level key equality.

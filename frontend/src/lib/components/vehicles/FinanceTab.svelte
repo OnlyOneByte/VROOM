@@ -147,11 +147,11 @@
 		{/if}
 
 		{#if vehicle.financing.paymentAmount && vehicle.financing.paymentAmount > 0}
-			<!-- C157 (bug, Angelo-approved C151): loan miles-used consumes the ALL-TIME `currentOdometer`,
-			     NOT the period-scoped + fuel-only `currentMileage`. Miles-used is inherently all-time, so a
-			     "7d"/"30d" stats-period selection must not shrink it (and it must see manual odometer entries
-			     too). `currentOdometer` is the canonical all-sources, period-independent reading (C52); falls
-			     back to currentMileage then initialMileage if it's somehow absent. See LEDGER C157. -->
+			<!-- Loan miles-used consumes the ALL-TIME `currentOdometer`, NOT the period-scoped,
+			     fuel-only `currentMileage`. Miles-used is inherently all-time, so a "7d"/"30d" stats-period
+			     selection must not shrink it, and it must see manual odometer entries too. `currentOdometer`
+			     is the canonical all-sources, period-independent reading; it falls back to currentMileage
+			     then initialMileage if absent. -->
 			<PaymentMetricsGrid
 				financing={vehicle.financing}
 				{totalInterestPaid}
@@ -182,11 +182,10 @@
 	{/if}
 
 	{#if vehicle.financing.financingType === 'lease'}
-		<!-- C157 (bug, Angelo-approved C151): same fix as PaymentMetricsGrid — lease overage consumes the
-		     ALL-TIME, all-sources `currentOdometer`, not the period-scoped + fuel-only `currentMileage`, so a
-		     non-'all' stats period can't understate the projected excess-fee $. calculateLeaseMetrics itself
-		     is correct/tested; this only corrects its odometer input. Falls back to currentMileage then
-		     initialMileage. See LEDGER C157. -->
+		<!-- Same rule as PaymentMetricsGrid: lease overage consumes the ALL-TIME, all-sources
+		     `currentOdometer`, not the period-scoped, fuel-only `currentMileage`, so a non-'all' stats
+		     period can't understate the projected excess-fee $. calculateLeaseMetrics itself is correct;
+		     this only feeds it the right odometer. Falls back to currentMileage then initialMileage. -->
 		<LeaseMetricsCard
 			financing={vehicle.financing}
 			currentMileage={resolveCurrentOdometer(

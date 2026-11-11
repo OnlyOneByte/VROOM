@@ -108,7 +108,7 @@ describe('Property 1: Current term derivation returns latest term', () => {
           // end_date (endDate = startMs + gapMs can collide), SQL breaks the tie arbitrarily, so
           // BOTH tied terms are valid "current" results. Asserting a specific startDate against a
           // strict-`>` reference loop was therefore NON-DETERMINISTIC — it failed only when a tie's
-          // two terms had different startDates and SQL picked the other one (the C362 flake; the
+          // two terms had different startDates and SQL picked the other one (the flake; the
           // false failure then cost ~6.6s of fast-check shrinking, tripping the 5s timeout). Pin the
           // REAL contract deterministically: the returned end_date IS the maximum, and the returned
           // (startDate, endDate) pair belongs to SOME created term carrying that max end_date (so the
@@ -135,7 +135,7 @@ describe('Property 1: Current term derivation returns latest term', () => {
     expect(result).toBeNull();
   });
 
-  // C363 (infra, the C362-filed flake): two terms TIE on end_date with DIFFERENT start_dates — the
+  // Two terms TIE on end_date with DIFFERENT start_dates — the
   // exact shape that made the old strict-`>` reference assertion non-deterministic. getCurrentTermDates
   // is ORDER BY end_date DESC LIMIT 1 (single key), so EITHER tied term is a valid result. This pins
   // the tie-tolerant contract deterministically: the returned end_date is the (shared) max, and the
@@ -462,11 +462,11 @@ describe('Property 12: Expiring terms date range query', () => {
     expect(expiring.length).toBe(0);
   });
 
-  // #26c (C184): a term on a CANCELLED (isActive=false) policy must NOT surface as "expiring soon" —
+  // A term on a CANCELLED (isActive=false) policy must NOT surface as "expiring soon" —
   // GET /expiring-soon is an upcoming-renewal nag, and a policy the user cancelled isn't being renewed.
   // Pre-fix the query joined policies but never filtered isActive, so a cancelled policy's in-range term
   // still showed. An ACTIVE policy's term in the same window must still appear (the filter isn't over-broad).
-  test('excludes terms of INACTIVE policies; an active policy’s in-range term still shows (#26c)', async () => {
+  test('excludes terms of INACTIVE policies; an active policy’s in-range term still shows', async () => {
     const rangeStart = new Date('2031-01-01');
     const rangeEnd = new Date('2031-12-31');
     const termIn = (s: string, e: string) => ({

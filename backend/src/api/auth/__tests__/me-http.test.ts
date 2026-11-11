@@ -1,7 +1,7 @@
 /**
  * HTTP-level test for GET /api/v1/auth/me.
  *
- * REGRESSION GUARD (cycle 14 UI review): the profile page's "Member Since" row
+ * REGRESSION GUARD (UI review): the profile page's "Member Since" row
  * rendered "—" for a logged-in user because the /me handler serialized only
  * { id, email, displayName } and dropped `createdAt` — even though the column
  * exists, Lucia validates the full row, and the frontend User type expects
@@ -47,9 +47,9 @@ describe('GET /api/v1/auth/me', () => {
 });
 
 /**
- * POST /refresh success-body shape (C187): GET /me and POST /refresh emit the SAME session-user
+ * POST /refresh success-body shape: GET /me and POST /refresh emit the SAME session-user
  * block, now via the shared `serializeSessionUser` helper. GET /me's body is pinned above, but the
- * /refresh success body had NO field-shape assertion (the C182-scout caveat) — so a /refresh-only
+ * /refresh success body had NO field-shape assertion (the-scout caveat) — so a /refresh-only
  * regression (or a helper-wiring slip at that site) would have gone uncaught. This pins it: a valid
  * session refreshes to 200 with the full id/email/displayName/createdAt-ISO/updatedAt-ISO + session.
  */
@@ -77,7 +77,7 @@ describe('POST /api/v1/auth/refresh — success body shape', () => {
 });
 
 /**
- * Convergence guard (C56, arch #1): the auth route does NOT hand-roll an error envelope —
+ * Convergence guard: the auth route does NOT hand-roll an error envelope —
  * its validation handlers throw `HTTPException` directly and rely on the central
  * `errorHandler` (error-handler.ts:43) to shape it as `{ success:false, error:{ code, message } }`.
  * These pin that PATCH /me's 400 paths surface through that central handler with the canonical
@@ -125,7 +125,7 @@ describe('PATCH /api/v1/auth/me — validation errors via the central handler (c
 });
 
 /**
- * Hygiene guard (C127, #32a — surfaced by the C126 auth deep-review): GET /me and POST /refresh threw
+ * Hygiene guard (— surfaced by the auth deep-review): GET /me and POST /refresh threw
  * 401 on an INVALID/expired session cookie but never cleared it, diverging from requireAuth + logout.
  * A dead session cookie should be cleared so the browser stops re-sending it (OWASP session-mgmt; ARCC
  * secure-cookie-handling). These pin that a bad-session 401 now also emits a clearing Set-Cookie.
@@ -133,7 +133,7 @@ describe('PATCH /api/v1/auth/me — validation errors via the central handler (c
  * The session is already invalid server-side (not replayable) — this is hygiene, not a vuln fix — but
  * the cleared cookie is the documented contract, so it's pinned merge-surviving.
  */
-describe('bad-session 401 clears the session cookie (C127 #32a)', () => {
+describe('bad-session 401 clears the session cookie', () => {
   // A request carrying the real session-cookie NAME but a garbage value → an invalid session.
   async function withGarbageSession(method: string, path: string): Promise<Response> {
     const cookieName = ctx.cookie.split('=')[0];

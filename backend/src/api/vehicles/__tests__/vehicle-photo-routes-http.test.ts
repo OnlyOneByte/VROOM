@@ -1,6 +1,6 @@
 /**
  * In-process HTTP tests for the vehicle-photo sub-router's DB-only endpoints (the file was 0%-covered,
- * C228 guard). The router (vehicles/photo-routes.ts) is mounted at /api/v1/vehicles/:vehicleId/photos
+ * guard). The router (vehicles/photo-routes.ts) is mounted at /api/v1/vehicles/:vehicleId/photos
  * and inherits requireAuth + changeTracker from the parent. Upload + thumbnail need a real storage
  * provider (not in-harness-testable; the property tests model those), so this drives the provider-free
  * paths over the FULL route stack: LIST (GET /) and SET-COVER (PUT /:photoId/cover).
@@ -8,7 +8,7 @@
  * Pins the load-bearing invariants: list is ownership-gated + paginated; set-cover enforces the
  * entityType/entityId match (a photo from another entity can't become this vehicle's cover) + the
  * single-cover guarantee; a foreign vehicle 404s (never leaks another tenant's photos). Photos are
- * raw-seeded (no provider needed for a DB read/flag-flip), the C215/C220 pattern.
+ * raw-seeded (no provider needed for a DB read/flag-flip), the pattern.
  *
  * createTestApp() rewrites env + dynamic-imports the DB-bound modules, so this file imports only the
  * harness + bun:test.
@@ -31,7 +31,7 @@ beforeEach(async () => {
 afterEach(() => ctx.close());
 
 // This file's fixture is a nickname-required Subaru Outback 2021; converge onto the shared test-helpers/seed
-// seedVehicle (arch convergence, Angelo-approved) via a thin wrapper that keeps make/model/year explicit
+// seedVehicle  via a thin wrapper that keeps make/model/year explicit
 // (the shared default is a Toyota Camry) so behavior is preserved.
 const seedVehicle = (nickname: string): Promise<string> =>
   seedVehicleShared(ctx, { make: 'Subaru', model: 'Outback', year: 2021, nickname });

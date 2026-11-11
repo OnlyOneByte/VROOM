@@ -24,8 +24,8 @@ const SRC_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 
 // The midnight-UTC month-bucket antipattern: a "-01" day suffix CONCATENATED onto a
 // month variable and handed to the Date string constructor — either
-//   new Date(expr + '-01')   (string concat, day char before -01 is a quote)
-//   new Date(`${expr}-01`)   (template literal, day char before -01 is a `}`)
+//  new Date(expr + '-01') (string concat, day char before -01 is a quote)
+//  new Date(`${expr}-01`) (template literal, day char before -01 is a `}`)
 // The char immediately before "-01" must be a quote/backtick (concat) or `}` (interp) —
 // NOT a digit, so a full literal date like new Date('2024-01-01') does NOT match, and the
 // fix new Date(year, monthIndex, 1) (no quoted "-01") never matches.
@@ -35,7 +35,7 @@ function stripComments(source: string): string {
 	const withoutBlocks = source.replace(/\/\*[\s\S]*?\*\//g, ' ');
 	return withoutBlocks
 		.split('\n')
-		.map((line) => {
+		.map(line => {
 			const trimmed = line.trimStart();
 			if (trimmed.startsWith('*')) return '';
 			const idx = line.indexOf('//');
@@ -59,7 +59,7 @@ function collectSourceFiles(dir: string, acc: string[] = []): string[] {
 	return acc;
 }
 
-describe('no UTC midnight month-bucket parsing (use parseMonthToDate — cycle 211 class guard)', () => {
+describe('no UTC midnight month-bucket parsing (use parseMonthToDate — class guard)', () => {
 	const files = collectSourceFiles(SRC_ROOT);
 
 	test('the scan actually found sources (guard is live, not a no-op)', () => {
@@ -86,7 +86,7 @@ describe('no UTC midnight month-bucket parsing (use parseMonthToDate — cycle 2
 		expect(
 			offenders,
 			`Month-bucket parsed as midnight UTC — use parseMonthToDate() from chart-formatters.ts ` +
-				`(local time, new Date(y, m, 1)) so the month label is correct west of UTC (cycle 211):\n${offenders.join('\n')}`
+				`(local time, new Date(y, m, 1)) so the month label is correct west of UTC:\n${offenders.join('\n')}`
 		).toEqual([]);
 	});
 });

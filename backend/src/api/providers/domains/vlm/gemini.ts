@@ -5,7 +5,7 @@
  *
  * Same DUMB-TRANSPORT contract as the other adapters: send the fixed prompt + image, return the model's
  * RAW text; the shared `parseExtraction` (prompt.ts) is the SOLE validator. A non-2xx / network /
- * timeout failure THROWS (the parse route maps it to 502; never a faked success — the #43/#44/#144
+ * timeout failure THROWS (the parse route maps it to 502; never a faked success — the
  * anti-fail-open lesson). Gemini authenticates with the api key as a `?key=` QUERY param (not a header),
  * so the key is kept OUT of logs (only the model + status are logged, never the URL).
  */

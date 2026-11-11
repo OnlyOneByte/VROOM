@@ -3,10 +3,59 @@
  *
  * Common validation schemas used across route handlers to avoid duplication.
  * These schemas can be composed and reused in different endpoints.
+ *
+ * Also the home of `zValidator` — route files import it from HERE, not from `@hono/zod-validator`,
+ * so every validation failure answers in the same envelope as every other error. See below.
  */
 
+import { zValidator as honoZValidator } from '@hono/zod-validator';
+import type { ValidationTargets } from 'hono';
+import type { ZodError, ZodType } from 'zod';
 import { z } from 'zod';
 import { CONFIG } from '../config';
+import { createErrorResponse } from '../errors';
+
+/**
+ * One Zod issue rendered for a human: `body.date: Required`, or just `Required` at the root.
+ * `path` is the only place the offending field is named, so dropping it would leave a message that
+ * cannot be acted on when a schema has more than one field.
+ */
+function describeIssue(issue: ZodError['issues'][number]): string {
+  const path = issue.path.join('.');
+  return path ? `${path}: ${issue.message}` : issue.message;
+}
+
+/**
+ * `zValidator` that fails in the app's error envelope.
+ *
+ * Hono's own validator answers `{ success: false, error: { name: 'ZodError', message: <the issue
+ * array, JSON-stringified> } }`. Two things are wrong with that for a client: there is no `code`,
+ * which every other error on every other route carries and which the frontend switches on; and
+ * `message` is a serialized dump of Zod internals, so a UI that surfaces `error.message` — as ours
+ * does — shows the user a blob of JSON instead of a sentence.
+ *
+ * `details.issues` keeps the full per-field breakdown for a form that wants to highlight fields,
+ * so nothing is lost by making `message` readable.
+ */
+export function zValidator<Target extends keyof ValidationTargets, Schema extends ZodType>(
+  target: Target,
+  schema: Schema
+) {
+  return honoZValidator(target, schema, (result, c) => {
+    if (result.success) return;
+    const { issues } = result.error;
+    return c.json(
+      createErrorResponse(
+        'ValidationError',
+        issues.length === 1
+          ? `Invalid ${target}: ${describeIssue(issues[0])}`
+          : `Invalid ${target}: ${issues.map(describeIssue).join('; ')}`,
+        { target, issues }
+      ),
+      400
+    );
+  });
+}
 
 /**
  * The raw `limit`/`offset` field validators for a list endpoint that pairs with `clampPagination`
@@ -15,7 +64,7 @@ import { CONFIG } from '../config';
  * what `clampPagination` re-clamps — so an out-of-range value is rejected at the boundary while an
  * omitted one falls through to `clampPagination`'s `defaultPageSize`. `commonSchemas.pagination`
  * instead bakes in `.default(50)`/`.default(0)` + a hardcoded `.max(100)`, which would CHANGE
- * clamp/default behavior if a clampPagination consumer adopted it (the C212 divergence). Spread into a
+ * clamp/default behavior if a clampPagination consumer adopted it. Spread into a
  * route's own `z.object({...})` so it can add endpoint-specific filters (e.g. vehicleId/purpose).
  */
 const clampedPaginationFields = {
@@ -92,13 +141,12 @@ export const commonSchemas = {
  * They throw HTTPException if the resource is not found or doesn't belong to the user.
  */
 
-import { expenseRepository } from '../api/expenses/repository';
 import { financingRepository } from '../api/financing/repository';
 import { insurancePolicyRepository } from '../api/insurance/repository';
 import { type ReminderWithVehicles, reminderRepository } from '../api/reminders/repository';
 import { tripRepository } from '../api/trips/repository';
 import { vehicleRepository } from '../api/vehicles/repository';
-import type { Expense, InsurancePolicy, Trip, Vehicle, VehicleFinancing } from '../db/schema';
+import type { InsurancePolicy, Trip, Vehicle, VehicleFinancing } from '../db/schema';
 import { NotFoundError } from '../errors';
 
 /**
@@ -136,19 +184,12 @@ export async function validateVehicleIdsOwned(
 }
 
 /**
- * Validate that an expense belongs to the user (via direct userId column)
- * @throws NotFoundError if expense not found or doesn't belong to user
+ * There is deliberately NO `validateExpenseOwnership` here. An expense on a shared vehicle is
+ * OWNER-stamped (`expenses.userId` is the vehicle's owner, not the editor who wrote the row), so a
+ * strict acting-user match denies an accepted editor their own row. Every expense surface —
+ * including the receipt-photo gate — loads the row unscoped and authorizes on the vehicle through
+ * `requireVehicleRead`/`requireVehicleWrite` in utils/sharing.ts, the one widening seam.
  */
-export async function validateExpenseOwnership(
-  expenseId: string,
-  userId: string
-): Promise<Expense> {
-  const expense = await expenseRepository.findByIdAndUserId(expenseId, userId);
-  if (!expense) {
-    throw new NotFoundError('Expense');
-  }
-  return expense;
-}
 
 /**
  * Validate that financing belongs to the user (via vehicle ownership)
@@ -210,10 +251,10 @@ export async function validateReminderOwnership(
 }
 
 /**
- * Validate that a trip belongs to the user, returning it (trips-location T2, the C160 family). Trips own
+ * Validate that a trip belongs to the user, returning it (trips-location T2, the family). Trips own
  * via a userId column, so the repository's own userId-scoped read is the ownership check — mirrors the
  * validateReminderOwnership shape (findByIdAndUserId → NotFoundError → return entity). A NotFoundError
- * (never 403) keeps the #80 enumeration-oracle discipline: a foreign or absent id is indistinguishable.
+ * (never 403) keeps the enumeration-oracle discipline: a foreign or absent id is indistinguishable.
  * @throws NotFoundError if the trip is not found or doesn't belong to the user
  */
 export async function validateTripOwnership(tripId: string, userId: string): Promise<Trip> {

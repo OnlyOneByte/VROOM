@@ -1,5 +1,5 @@
 /**
- * C42 deep-review regression: recheckMileageReminders must NOT throw when its candidate query fails.
+ * deep-review regression: recheckMileageReminders must NOT throw when its candidate query fails.
  *
  * recheck runs AFTER an odometer/expense write has already persisted (D5). The per-reminder loop has
  * a try/catch, but the `findMileageTracking` fetch was OUTSIDE it — and that query throws
@@ -20,7 +20,7 @@ afterEach(() => {
   spyOn(reminderRepository, 'findMileageTracking').mockRestore?.();
 });
 
-describe('recheckMileageReminders is best-effort on a query failure (C42)', () => {
+describe('recheckMileageReminders is best-effort on a query failure', () => {
   test('a findMileageTracking failure resolves to a skip, does not throw', async () => {
     const spy = spyOn(reminderRepository, 'findMileageTracking').mockRejectedValue(
       new Error('connection lost')

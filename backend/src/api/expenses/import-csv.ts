@@ -145,7 +145,7 @@ function parseDate(raw: string): { value: Date } | { error: string } {
   if (dateOnly) {
     // buildLocalDate constructs in LOCAL time AND echo-checks the parts, so an out-of-range
     // cell like "2024-13-45" (which `new Date` silently ROLLS FORWARD to 2025-02-14) returns
-    // null → a clean per-row "Invalid date" instead of a stored wrong date (bug #23 / #59).
+    // null → a clean per-row "Invalid date" instead of a stored wrong date.
     // Shared with the mapping path's normalizeForeignDate so the two importers can't drift.
     const date = buildLocalDate(Number(dateOnly[1]), Number(dateOnly[2]), Number(dateOnly[3]));
     if (!date) return { error: `Invalid date "${raw}"` };
@@ -195,7 +195,7 @@ function parseTags(raw: string): { value: string[] } | { error: string } {
 /**
  * Resolve a CSV row's vehicle NAME to an owned vehicleId. `vehicleByName` maps a lowercased
  * nickname / "year make model" to the id, or to `null` when that name matches ≥2 vehicles
- * (ambiguous — see buildImportPlan). Returns the id, or an error: missing, ambiguous (#102: never
+ * (ambiguous — see buildImportPlan). Returns the id, or an error: missing, ambiguous (: never
  * silently pick one — that misattributes every row), or not-in-garage.
  */
 function resolveImportVehicleId(
@@ -267,11 +267,11 @@ function parseRow(
     };
   }
 
-  // A NON-fuel imported row must NOT carry fuel-only fields (#137, the #76/C244 class's import write site).
+  // A NON-fuel imported row must NOT carry fuel-only fields (the class's import write site).
   // parseMileage/parseVolume run for every category, so a foreign tracker that logs an odometer on a
   // 'maintenance'/'misc' row (Drivvo/Fuelio Service entries) would otherwise persist a stray mileage that
   // poisons getCurrentOdometer's cross-category MAX(odometer) UNION. clearImportedFuelFields nulls them for
-  // a non-fuel row (the transform the POST [#76]/PUT [#130] paths apply; extracted to keep parseRow's
+  // a non-fuel row (the transform the POST []/PUT [] paths apply; extracted to keep parseRow's
   // complexity under the Biome ceiling + as ONE source of truth for the import-side clear).
   return {
     expense: clearImportedFuelFields({
@@ -294,7 +294,7 @@ function parseRow(
 
 /**
  * Null the fuel-only fields (mileage/volume/fuelType/missedFillup) on a NON-fuel imported row so the
- * verbatim importExpenses insert can't persist a stray odometer that poisons getCurrentOdometer (#137,
+ * verbatim importExpenses insert can't persist a stray odometer that poisons getCurrentOdometer (
  * the import-side mirror of routes.ts clearFuelFieldsIfNotFuel). A fuel row passes through untouched.
  */
 function clearImportedFuelFields(expense: ImportableExpense): ImportableExpense {
@@ -372,7 +372,7 @@ export function buildImportPlan(csv: string, vehicles: ImportVehicle[]): ImportP
   // A name that maps to MORE THAN ONE vehicle (two cars sharing a "2021 Honda Civic"
   // string, or the same nickname) is marked AMBIGUOUS (id=null): two vehicles can
   // legally share those (no unique constraint), and silently resolving to the last
-  // one would misattribute every imported row with no signal (#102, NORTH_STAR #1).
+  // one would misattribute every imported row with no signal.
   // parseRow rejects an ambiguous name with a clear "use a unique nickname" error.
   const vehicleByName = new Map<string, string | null>();
   const register = (key: string, id: string) => {

@@ -7,8 +7,8 @@
  * the user's currencyUnit. They now delegate to formatCurrency, which resolves
  * the user's currency. With no settings loaded (test env) the currency falls
  * back to USD, so these pin the decimal-precision contract + the delegation:
- *   - formatCurrencyAxis: compact, 0 decimals ($1,200)
- *   - formatCentsAxis: 2 decimals ($0.05)
+ *  - formatCurrencyAxis: compact, 0 decimals ($1,200)
+ *  - formatCentsAxis: 2 decimals ($0.05)
  * The currency-symbol resolution itself is covered in formatters.test.ts.
  */
 
@@ -39,7 +39,7 @@ describe('chart money axis formatters', () => {
 
 /**
  * parseMonthToDate is the sanctioned LOCAL-time parser for a "YYYY-MM" trend bucket.
- * The bug it exists to prevent (cycle 211): `new Date('2024-03-01')` parses as midnight
+ * The bug it exists to prevent: `new Date('2024-03-01')` parses as midnight
  * UTC, so a negative-offset user (e.g. UTC-8) sees the Date as 2024-02-29 *local* and the
  * chart x-axis renders the month one back ("Feb" for a March bucket). These pin that the
  * helper builds a date in LOCAL time, on the 1st, with the requested month — so the month
@@ -58,21 +58,19 @@ describe('parseMonthToDate (local-time month bucket parser)', () => {
 	test('the rendered local month matches the input (no UTC-shift regression)', () => {
 		// The whole point: toLocaleDateString in any zone shows the month we asked for.
 		// `new Date('2024-03-01')` would render "Feb" west of UTC — this must not.
-		expect(parseMonthToDate('2024-03').toLocaleDateString('en-US', { month: 'short' })).toBe(
-			'Mar'
-		);
+		expect(parseMonthToDate('2024-03').toLocaleDateString('en-US', { month: 'short' })).toBe('Mar');
 		expect(parseMonthToDate('2024-01').getMonth()).toBe(0);
 		expect(parseMonthToDate('2024-12').getMonth()).toBe(11);
 	});
 });
 
 /**
- * The remaining chart-axis helpers (C436 guard). These five exports were ZERO-test despite each
+ * The remaining chart-axis helpers. These five exports were ZERO-test despite each
  * being a LayerChart axis/series callback rendered on real charts (fuel-efficiency trend, year-end,
  * fuel charts, every monthly time series). They are display-shape contracts — lower-stakes than money
  * math — but reachable + load-bearing, so a silent regression (a flipped default, a dropped clamp, a
  * lost NaN guard) would change a rendered axis with nothing to catch it. Pinned firsthand against the
- * REAL exports (not a re-implementation — the C181/C229 trap).
+ * REAL exports (not a re-implementation — the trap).
  */
 describe('formatDecimalAxis (Y-axis fixed-decimal label)', () => {
 	test('defaults to ONE decimal place (the bare-call contract for efficiency-trend Y ticks)', () => {
@@ -128,7 +126,7 @@ describe('monthlyXAxisProps (monthly time-series axis wiring)', () => {
 	test('the wired format callback renders a 3-letter month and guards unknown input', () => {
 		// formatMonthTick is NOT exported — its only reachable seam is this returned callback, which
 		// layerchart invokes for every monthly-chart x-tick. Drive the REAL wired function (not a
-		// re-implementation — the C181/C229 trap): a real Date → "Mar"; a non-Date / Invalid Date →
+		// re-implementation — the trap): a real Date → "Mar"; a non-Date / Invalid Date →
 		// '' (the same unknown-input guard formatDateTick carries). A dropped guard would surface
 		// "Invalid Date" as a literal tick label on every fuel-efficiency / monthly trend chart.
 		const format = monthlyXAxisProps(6).format;

@@ -1,5 +1,5 @@
 /**
- * Characterization net for the body-limit middleware (guard, cycle 156).
+ * Characterization net for the body-limit middleware.
  *
  * bodyLimit is a DoS guard wired LIVE in two places — globally (app.ts:41) and on the backup upload
  * (sync/routes.ts:209, maxSize=CONFIG.backup.maxFileSize) — yet sat ~35% line: only the happy path was
@@ -7,13 +7,13 @@
  * boundary, and the header-absent/malformed passthroughs unpinned. These drive the middleware through a
  * minimal Hono app (the rate-limit/idempotency convention) with a handler-run counter that proves whether
  * `next()` ran, pinning the full contract:
- *   1. under the limit → handler runs, 200;
- *   2. over the limit → 413 PAYLOAD_TOO_LARGE, handler NOT run, MB-formatted default message;
- *   3. EXACTLY at the limit → passes (the check is strict `size > maxSize`);
- *   4. no Content-Length header → passthrough (a chunked/streaming request isn't size-checked here —
- *      documenting the known gap, which the uncompressed-size guards backstop for the backup path);
- *   5. a malformed Content-Length (NaN) → passthrough (NaN > maxSize is false);
- *   6. a custom `message` overrides the default copy.
+ *  1. under the limit → handler runs, 200;
+ *  2. over the limit → 413 PAYLOAD_TOO_LARGE, handler NOT run, MB-formatted default message;
+ *  3. EXACTLY at the limit → passes (the check is strict `size > maxSize`);
+ *  4. no Content-Length header → passthrough (a chunked/streaming request isn't size-checked here —
+ *  documenting the known gap, which the uncompressed-size guards backstop for the backup path);
+ *  5. a malformed Content-Length (NaN) → passthrough (NaN > maxSize is false);
+ *  6. a custom `message` overrides the default copy.
  *
  * `maxSize`/`message` come from the config ARG (not a frozen CONFIG singleton), so the harness controls
  * them directly — no vacuity trap. Content-Length is a request header, so the body need not actually be

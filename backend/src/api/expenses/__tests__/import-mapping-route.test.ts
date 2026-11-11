@@ -3,7 +3,7 @@
  * optional `mapping`. Proves the foreign-tracker path is BACKWARD-COMPATIBLE
  * (no mapping → today's native path unchanged), that a mapped file is translated then run through
  * the EXISTING buildImportPlan/dryRun/importExpenses flow (so idempotency/atomicity/tenant-safety
- * are inherited), unit conversion targets the resolved vehicle's units (C60 wiring risk), unmapped
+ * are inherited), unit conversion targets the resolved vehicle's units (wiring risk), unmapped
  * categories surface, and malformed rows still report per-row.
  *
  * createTestApp() rewrites env + dynamic-imports DB-bound modules — import only the harness here.
@@ -22,7 +22,7 @@ afterEach(() => ctx.close());
 
 // Seed the file's fixture vehicle: a Honda Civic 2021 (default unit prefs = miles / US gallons) with
 // the given nickname — the foreign-tracker mappings target it by name. Converged onto the shared
-// test-helpers/seed seedVehicle (arch convergence, Angelo-approved); make/model/year passed explicitly
+// test-helpers/seed seedVehicle ; make/model/year passed explicitly
 // to preserve the prior fixture exactly (the shared default is a Toyota Camry).
 async function listExpenses(): Promise<
   Array<{ category: string; expenseAmount: number; mileage: number | null; volume: number | null }>
@@ -186,10 +186,10 @@ describe('POST /import — foreign-tracker mapping path (T3)', () => {
     expect(res.status).toBe(400);
   });
 
-  // C163 GUARD (bug-scout pivot): a mapping whose `targetVehicle` the user does NOT own must NOT import
-  // against another tenant's vehicle (NORTH_STAR #2). The route resolves targetVehicle ONLY against the
+  // GUARD (bug-scout pivot): a mapping whose `targetVehicle` the user does NOT own must NOT import
+  // against another tenant's vehicle. The route resolves targetVehicle ONLY against the
   // caller's own fleet on BOTH legs — resolveTargetUnits returns {} (skip unit conversion, no guessing
-  // toward a foreign vehicle's units, the C60 risk) AND buildImportPlan rejects the rows by name. So an
+  // toward a foreign vehicle's units, the risk) AND buildImportPlan rejects the rows by name. So an
   // unowned target → 0 ready, a clean "No vehicle named X in your garage" per-row error, no leak, no
   // insert. This route-level cross-tenant path had no test (the existing cases all target an owned vehicle).
   test('a mapping targeting an UNOWNED vehicle imports nothing (cross-tenant safe, no leak)', async () => {
@@ -216,13 +216,13 @@ describe('POST /import — foreign-tracker mapping path (T3)', () => {
   });
 });
 
-// C152 GUARD (the C148 defaultCategory at the ROUTE layer): C151 pinned the pure applyMapping/buildImportPlan
-// path, but the actual user flow Angelo's fix enables — a DETECTED fuel tracker (NO category column) committed
+// GUARD (the defaultCategory at the ROUTE layer): pinned the pure applyMapping/buildImportPlan
+// path, but the actual user flow the fix enables — a DETECTED fuel tracker (NO category column) committed
 // through the real HTTP stack — had no route-level coverage. columnMappingSchema must ACCEPT defaultCategory
 // (bounded to a real ExpenseCategory) and the route must translate → commit a real fuel expense. Pins the
 // end-to-end wiring so a schema/route regression (e.g. dropping defaultCategory from columnMappingSchema →
 // stripped before applyMapping → back to 0-ready) can't silently return.
-describe('POST /import — fuel-tracker defaultCategory commits through the route (C148/C152)', () => {
+describe('POST /import — fuel-tracker defaultCategory commits through the route', () => {
   // A Fuelly-shaped file with NO category column (the real case: refuel exports are all-fuel, no category field).
   const FUELLY_NO_CATEGORY_CSV = [
     'Date,Odometer,Fill Amount,Price',
@@ -246,7 +246,7 @@ describe('POST /import — fuel-tracker defaultCategory commits through the rout
     });
     const body = await json<ImportResponse>(res);
     expect(res.status, JSON.stringify(body)).toBe(200);
-    expect(body.data.imported).toBe(1); // was 0-ready "Unknown category" before the C148 defaultCategory fix
+    expect(body.data.imported).toBe(1); // was 0-ready "Unknown category" before the defaultCategory fix
     expect(body.data.errorCount).toBe(0);
     const [row] = await listExpenses();
     expect(row.category).toBe('fuel'); // the blank category cell was defaulted to fuel server-side

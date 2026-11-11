@@ -68,10 +68,14 @@
 							</div>
 						</div>
 					{/if}
+					<!-- Visible unconditionally below `lg`, where there is no hover to reveal it, and
+					     revealed by focus as well as hover above it: an `opacity-0` control still takes
+					     Tab focus, so hover alone would put the focus ring somewhere invisible. Same
+					     class string as VehiclePhotoCarousel's overlay actions. -->
 					<button
 						type="button"
 						onclick={() => onRemove(i)}
-						class="absolute right-1 top-1 rounded-full bg-background/80 p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+						class="absolute right-1 top-1 rounded-full bg-background/80 p-1 text-muted-foreground opacity-100 transition-opacity hover:text-foreground lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100"
 						aria-label="Remove {preview.name}"
 					>
 						<X class="h-3 w-3" />

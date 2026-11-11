@@ -1,8 +1,8 @@
 /**
  * TRUE backup → restore round-trip for the maintenance-schedule reminder fields, through the REAL
- * stack (T5 "Remaining", cycle 27 guard). Data-safety quality bar #1: no silent loss.
+ * stack (T5 "Remaining", guard). Data-safety quality bar: no silent loss.
  *
- * C22/C25 added five columns to the reminder graph — reminders.{triggerMode, intervalMileage,
+ * added five columns to the reminder graph — reminders.{triggerMode, intervalMileage,
  * lastServiceOdometer, nextDueOdometer} and reminderNotifications.dueOdometer — plus made
  * next_due_date / due_date nullable so a mileage-only reminder/notification carries no date. The
  * CSV backup is schema-derived, so these are *supposed* to ride along automatically — but the

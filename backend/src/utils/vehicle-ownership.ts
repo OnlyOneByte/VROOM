@@ -8,7 +8,7 @@ import { NotFoundError } from '../errors';
  * Assert that EVERY id in `vehicleIds` is a vehicle owned by `userId`, throwing NotFoundError if any
  * is missing or not owned. ONE source of truth for the cross-tenant ownership query that the expense
  * split-create/update and the insurance policy/term transactions each ran as a byte-identical private
- * helper (`select id from vehicles where userId AND id IN (ids)` → throw if any unowned). The C109
+ * helper (`select id from vehicles where userId AND id IN (ids)` → throw if any unowned). The
  * tenant-scope guard REQUIRES both predicates together (userId AND id) — a divergent copy that dropped
  * the userId leg would surface another user's vehicles into a split allocation or an insurance term
  * (a money/coverage cross-tenant write). Collapsing both copies here keeps that boundary in lockstep.

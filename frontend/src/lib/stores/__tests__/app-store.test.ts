@@ -1,15 +1,15 @@
 /**
- * C342 (guard) — pin appStore, the global vehicle-list + notification (toast) store.
+ * Pin appStore, the global vehicle-list + notification (toast) store.
  *
  * stores/app.svelte.ts had ZERO direct test coverage. It backs the app-wide vehicle list (every
  * vehicle CRUD surface reads/writes it) and the toast notification system (showSuccess/Error/Warning/
  * Info → addNotification). The load-bearing logic a refactor could silently break:
- *   - updateVehicle does an ID-MATCH map (only the matching vehicle changes; a non-match is a no-op);
- *     removeVehicle is an ID filter — get either predicate wrong and the wrong vehicle mutates/vanishes.
- *   - addNotification assigns a fresh id + stamps a timestamp + defaults duration to 5000.
- *   - the four show* helpers carry DISTINCT default toast lifetimes (success 5000 / error 8000 /
- *     warning 6000 / info 5000) — these are the user-facing dismiss timings; a regression that
- *     flattened them would make errors vanish too fast (or infos linger).
+ *  - updateVehicle does an ID-MATCH map (only the matching vehicle changes; a non-match is a no-op);
+ *  removeVehicle is an ID filter — get either predicate wrong and the wrong vehicle mutates/vanishes.
+ *  - addNotification assigns a fresh id + stamps a timestamp + defaults duration to 5000.
+ *  - the four show* helpers carry DISTINCT default toast lifetimes (success 5000 / error 8000 /
+ *  warning 6000 / info 5000) — these are the user-facing dismiss timings; a regression that
+ *  flattened them would make errors vanish too fast (or infos linger).
  * reset() clears state; the store is a singleton so each test resets first.
  * NON-VACUOUS: flip an updateVehicle/removeVehicle predicate, or change a default duration, → RED.
  */
@@ -29,9 +29,9 @@ beforeEach(() => {
 describe('appStore — vehicle CRUD', () => {
 	test('setVehicles / addVehicle / clearVehicles', () => {
 		appStore.setVehicles([vehicle('a'), vehicle('b')]);
-		expect(appStore.vehicles.map((v) => v.id)).toEqual(['a', 'b']);
+		expect(appStore.vehicles.map(v => v.id)).toEqual(['a', 'b']);
 		appStore.addVehicle(vehicle('c'));
-		expect(appStore.vehicles.map((v) => v.id)).toEqual(['a', 'b', 'c']);
+		expect(appStore.vehicles.map(v => v.id)).toEqual(['a', 'b', 'c']);
 		appStore.clearVehicles();
 		expect(appStore.vehicles).toEqual([]);
 	});
@@ -39,8 +39,8 @@ describe('appStore — vehicle CRUD', () => {
 	test('updateVehicle changes ONLY the id-matched vehicle, merging the partial', () => {
 		appStore.setVehicles([vehicle('a', { make: 'Honda' }), vehicle('b', { make: 'Mazda' })]);
 		appStore.updateVehicle('b', { model: 'CX-5' });
-		expect(appStore.vehicles.find((v) => v.id === 'a')?.make).toBe('Honda'); // untouched
-		const b = appStore.vehicles.find((v) => v.id === 'b');
+		expect(appStore.vehicles.find(v => v.id === 'a')?.make).toBe('Honda'); // untouched
+		const b = appStore.vehicles.find(v => v.id === 'b');
 		expect(b?.make).toBe('Mazda'); // preserved
 		expect(b?.model).toBe('CX-5'); // merged
 	});
@@ -55,7 +55,7 @@ describe('appStore — vehicle CRUD', () => {
 	test('removeVehicle drops only the id-matched vehicle', () => {
 		appStore.setVehicles([vehicle('a'), vehicle('b'), vehicle('c')]);
 		appStore.removeVehicle('b');
-		expect(appStore.vehicles.map((v) => v.id)).toEqual(['a', 'c']);
+		expect(appStore.vehicles.map(v => v.id)).toEqual(['a', 'c']);
 	});
 });
 
@@ -80,7 +80,7 @@ describe('appStore — notifications', () => {
 		appStore.addNotification({ type: 'error', message: 'two' });
 		const firstId = appStore.notifications[0]!.id;
 		appStore.removeNotification(firstId);
-		expect(appStore.notifications.map((n) => n.message)).toEqual(['two']);
+		expect(appStore.notifications.map(n => n.message)).toEqual(['two']);
 		appStore.clearNotifications();
 		expect(appStore.notifications).toEqual([]);
 	});
@@ -91,7 +91,7 @@ describe('appStore — notifications', () => {
 		appStore.showWarning('w');
 		appStore.showInfo('i');
 		const byType: Record<string, number | undefined> = Object.fromEntries(
-			appStore.notifications.map((n) => [n.type, n.duration])
+			appStore.notifications.map(n => [n.type, n.duration])
 		);
 		expect(byType['success']).toBe(5000);
 		expect(byType['error']).toBe(8000); // errors linger longest

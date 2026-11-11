@@ -27,7 +27,7 @@ export interface VlmProvider {
    * Send the image + the fixed extraction prompt to the model and return its RAW response.
    * MUST NOT validate or trust the content — the registry's caller runs `parseExtraction` on the
    * result. Throws on a transport/auth failure (the parse route maps that to a 502, never a fake
-   * success — the #43/#44/#144 anti-fail-open lesson).
+   * success — the anti-fail-open lesson).
    */
   extractReceipt(image: ReceiptImage): Promise<RawExtraction>;
 }

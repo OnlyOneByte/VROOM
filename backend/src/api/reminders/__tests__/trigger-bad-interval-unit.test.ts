@@ -1,5 +1,5 @@
 /**
- * Bug #13 (C21 audit, severity-raised C28, fixed C29): an invalid custom `intervalUnit` must not
+ * Bug (audit, severity-raised, fixed): an invalid custom `intervalUnit` must not
  * hang the trigger.
  *
  * advanceCustom switches on intervalUnit (day|week|month|year). Before the fix it had no default, so
@@ -58,7 +58,7 @@ function seedCorruptCustomReminder(id: string, vehicleId: string): void {
   ]);
 }
 
-describe('bug #13 — invalid custom intervalUnit is skipped, never hangs', () => {
+describe('bug — invalid custom intervalUnit is skipped, never hangs', () => {
   test('a corrupt-intervalUnit reminder is reported in skipped, not an infinite loop', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Kia', model: 'Soul', year: 2018 });
     seedCorruptCustomReminder('bad1', vehicleId);

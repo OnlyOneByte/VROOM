@@ -20,7 +20,7 @@
 	import {
 		categoryLabels,
 		getCategoryIcon,
-		getCategoryColor,
+		getCategoryBadgeClasses,
 		compareExpenseRows,
 		type SortableRow
 	} from '$lib/utils/expense-helpers';
@@ -89,10 +89,10 @@
 		expenses: Expense[];
 		vehicles?: Vehicle[];
 		showVehicleColumn?: boolean;
-		/** vehicle-sharing T12b-3b: expense edit/delete are WRITES (owner or accepted editor). A shared
-		 *  VIEWER sees the table read-only. When false, the Edit links are hidden AND `onDelete` is
-		 *  suppressed (so every existing `{#if onDelete}` delete gate hides too). Default true so every
-		 *  existing call site (global expenses page, owner vehicle tab) is unchanged. */
+		/** Editing or deleting an expense is a write, so a vehicle shared read-only renders the table
+		 *  without either. When false the Edit links are hidden AND `onDelete` is suppressed, so every
+		 *  `{#if onDelete}` delete gate hides with it. Defaults true: a caller that does not mention
+		 *  sharing is the owner's own view. */
 		canWrite?: boolean;
 		returnTo?: string;
 		onDelete?: (_expense: Expense) => Promise<void>;
@@ -154,8 +154,8 @@
 		onCategoryChange
 	}: Props = $props();
 
-	// vehicle-sharing T12b-3b: a VIEWER (canWrite=false) gets NO delete — suppress onDelete so every
-	// `{#if onDelete}` delete-affordance gate (mobile + desktop, standalone + split) hides in one place.
+	// A read-only viewer gets no delete. Suppressing the callback here — rather than at each site —
+	// hides every `{#if onDelete}` affordance (mobile + desktop, standalone + split) in one place.
 	// The Edit links are gated separately on `canWrite` at each href site.
 	let onDelete = $derived(canWrite ? onDeleteProp : undefined);
 
@@ -163,8 +163,11 @@
 	// (getVehicleForExpense is called at several render sites for every expense + child).
 	let vehicleMap = $derived(new Map(vehicles.map(v => [v.id, v])));
 
-	// Pagination derived values
-	let showPagination = $derived(totalCount !== undefined && onPageChange !== undefined);
+	// Pagination derived values. Nothing to page through means no bar: an empty list already
+	// explains itself with its empty state, and a Previous/Next pair under it is dead chrome.
+	let showPagination = $derived(
+		totalCount !== undefined && totalCount > 0 && onPageChange !== undefined
+	);
 
 	const isMobile = new IsMobile();
 
@@ -210,7 +213,7 @@
 		if (controlled) return filtered;
 
 		// Sort via the shared comparator, which carries a stable id tiebreaker in the
-		// server's direction (bug #4) so equal date/amount rows don't reshuffle.
+		// server's direction so equal date/amount rows don't reshuffle.
 		filtered.sort((a, b) => compareExpenseRows(a, b, sortBy, sortOrder));
 
 		return filtered;
@@ -273,7 +276,7 @@
 		// collapsed split group sits in the right place among standalone rows; in
 		// controlled mode it re-imposes the server's chosen order onto the grouped view
 		// (consistent, since both use the same field+direction). Via compareExpenseRows
-		// so equal date/amount rows break ties by id in the server's direction (bug #4)
+		// so equal date/amount rows break ties by id in the server's direction
 		// — grouping concatenates standalone-then-group, which would otherwise reshuffle
 		// same-key rows out of the server's order.
 		rows.sort((a, b) => {
@@ -296,6 +299,29 @@
 
 	// Mobile: selected row for showing actions
 	let selectedRowId = $state<string | null>(null);
+
+	/** An insurance premium belongs to its policy, so the expense rows it materializes cannot be
+	 *  deleted from here. The reason must travel with the control: a `title` on a disabled button
+	 *  reaches nobody — the browser never hover-tests a `pointer-events-none` element and assistive
+	 *  tech skips a control that is out of the tab order. */
+	const INSURANCE_DELETE_BLOCKED = 'Delete the insurance policy to remove this expense';
+
+	function isInsuranceLinked(row: GroupRow) {
+		return row.tags.includes('insurance');
+	}
+
+	function blockedReasonId(groupId: string) {
+		return `expense-delete-blocked-${groupId}`;
+	}
+
+	function requestGroupDelete(row: GroupRow) {
+		if (isInsuranceLinked(row)) {
+			appStore.addNotification({ type: 'info', message: INSURANCE_DELETE_BLOCKED });
+			return;
+		}
+		const first = row.children[0];
+		if (first) confirmDelete(first);
+	}
 
 	function selectRow(id: string) {
 		selectedRowId = selectedRowId === id ? null : id;
@@ -373,7 +399,58 @@
 	function getVehicleForExpense(expense: Expense): Vehicle | undefined {
 		return vehicleMap.get(expense.vehicleId);
 	}
+
+	/** Layout of a compact row's summary, shared by its interactive and read-only forms. */
+	const MOBILE_ROW_SUMMARY_CLASS = 'flex w-full items-start gap-3 px-3 py-3 text-left';
+
+	/**
+	 * A compact row's Edit/Delete pair. They are drawn small so the revealed strip does not
+	 * dominate the card, which leaves them under the 40px tap-target floor — so each carries an
+	 * invisible 6px-per-side vertical hit area (28px drawn, 40px touchable) instead of growing.
+	 * `inset-x-0` keeps the extension vertical only: the two sit side by side and one of them is
+	 * destructive, so their hit areas must never overlap. Their container pads the top by the same
+	 * 6px so the extension stays inside the strip rather than stealing from the row above.
+	 */
+	const MOBILE_ROW_ACTION_CLASS =
+		"h-7 px-2 text-xs relative before:absolute before:inset-x-0 before:-inset-y-1.5 before:content-['']";
+	const MOBILE_ROW_ACTIONS_CONTAINER_CLASS = 'flex items-center justify-end gap-2 px-3 pt-1.5 pb-3';
 </script>
+
+{#snippet mobileExpenseSummary(expense: Expense, vehicle: Vehicle | undefined)}
+	{@const IconComponent = getCategoryIcon(expense.category)}
+	<div class="mt-0.5 p-1.5 rounded-lg {getCategoryBadgeClasses(expense.category)} flex-shrink-0">
+		<IconComponent class="h-4 w-4" />
+	</div>
+	<div class="flex-1 min-w-0">
+		<div class="flex items-start justify-between gap-2">
+			<p class="text-sm font-medium text-foreground truncate">
+				{categoryLabels[expense.category as ExpenseCategory]}
+			</p>
+			<span class="text-sm font-semibold text-foreground whitespace-nowrap">
+				{formatCurrency(expense.amount)}
+			</span>
+		</div>
+		<div class="flex items-center flex-wrap gap-1.5 mt-0.5 text-xs text-muted-foreground">
+			<span>{formatDate(new Date(expense.date))}</span>
+			{#if showVehicleColumn && vehicle}
+				<span>·</span>
+				<span class="truncate">{getVehicleDisplayName(vehicle)}</span>
+			{/if}
+		</div>
+		{#if expense.sourceType === 'reminder'}
+			<div class="mt-1.5">
+				<RecurringExpenseBadge />
+			</div>
+		{/if}
+		{#if expense.tags && expense.tags.length > 0}
+			<div class="flex flex-wrap gap-1 mt-1.5">
+				{#each expense.tags as tag (tag)}
+					<Badge variant="secondary" class="font-normal text-xs px-1.5 py-0">{tag}</Badge>
+				{/each}
+			</div>
+		{/if}
+	</div>
+{/snippet}
 
 {#if expenses.length === 0}
 	<Empty>
@@ -473,170 +550,139 @@
 				{#each tableRows as row (row.type === 'standalone' ? row.expense.id : row.groupId)}
 					{#if row.type === 'standalone'}
 						{@const expense = row.expense}
-						{@const IconComponent = getCategoryIcon(expense.category)}
 						{@const vehicle = getVehicleForExpense(expense)}
 						{@const isSelected = selectedRowId === expense.id}
-						<button
-							type="button"
-							class="flex items-start gap-3 px-3 py-3 w-full text-left transition-colors {isSelected
-								? 'bg-muted/50'
-								: ''}"
-							onclick={() => selectRow(expense.id)}
-						>
-							<div
-								class="mt-0.5 p-1.5 rounded-lg {getCategoryColor(expense.category)} flex-shrink-0"
-							>
-								<IconComponent class="h-4 w-4" />
-							</div>
-							<div class="flex-1 min-w-0">
-								<div class="flex items-start justify-between gap-2">
-									<p class="text-sm font-medium text-foreground truncate">
-										{categoryLabels[expense.category as ExpenseCategory]}
-									</p>
-									<span class="text-sm font-semibold text-foreground whitespace-nowrap">
-										{formatCurrency(expense.amount)}
-									</span>
-								</div>
-								<div
-									class="flex items-center flex-wrap gap-1.5 mt-0.5 text-xs text-muted-foreground"
+						<div class="transition-colors {isSelected ? 'bg-muted/50' : ''}">
+							{#if canWrite}
+								<!-- The summary is the disclosure and the Edit/Delete cluster is its SIBLING below,
+								     never a descendant. A button may not contain interactive content (axe
+								     nested-interactive), and a keydown inside one bubbles out to close the row,
+								     unmounting the control before its activation click can land. -->
+								<button
+									type="button"
+									class="{MOBILE_ROW_SUMMARY_CLASS} cursor-pointer"
+									aria-expanded={isSelected}
+									onclick={() => selectRow(expense.id)}
 								>
-									<span>{formatDate(new Date(expense.date))}</span>
-									{#if showVehicleColumn && vehicle}
-										<span>·</span>
-										<span class="truncate">{getVehicleDisplayName(vehicle)}</span>
-									{/if}
+									{@render mobileExpenseSummary(expense, vehicle)}
+								</button>
+							{:else}
+								<!-- A read-only viewer has no actions to reveal, so the row is not a control. -->
+								<div class={MOBILE_ROW_SUMMARY_CLASS}>
+									{@render mobileExpenseSummary(expense, vehicle)}
 								</div>
-								{#if expense.sourceType === 'reminder'}
-									<div class="mt-1.5">
-										<RecurringExpenseBadge />
-									</div>
-								{/if}
-								{#if expense.tags && expense.tags.length > 0}
-									<div class="flex flex-wrap gap-1 mt-1.5">
-										{#each expense.tags as tag (tag)}
-											<Badge variant="secondary" class="font-normal text-xs px-1.5 py-0"
-												>{tag}</Badge
-											>
-										{/each}
-									</div>
-								{/if}
-								{#if isSelected && canWrite}
-									<div class="flex items-center justify-end gap-1 mt-2">
+							{/if}
+							{#if isSelected && canWrite}
+								<div class={MOBILE_ROW_ACTIONS_CONTAINER_CLASS}>
+									<Button
+										variant="ghost"
+										size="sm"
+										class={MOBILE_ROW_ACTION_CLASS}
+										href={`${resolve(paramRoutes.expenseEdit, { id: expense.id })}?returnTo=${returnTo}`}
+									>
+										<Pencil class="h-3.5 w-3.5 mr-1" />
+										Edit
+									</Button>
+									{#if onDelete}
 										<Button
 											variant="ghost"
 											size="sm"
-											class="h-7 px-2 text-xs"
-											href={`${resolve(paramRoutes.expenseEdit, { id: expense.id })}?returnTo=${returnTo}`}
-											onclick={e => e.stopPropagation()}
+											class="{MOBILE_ROW_ACTION_CLASS} text-destructive hover:text-destructive hover:bg-destructive/10"
+											onclick={() => confirmDelete(expense)}
 										>
-											<Pencil class="h-3.5 w-3.5 mr-1" />
-											Edit
+											<Trash2 class="h-3.5 w-3.5 mr-1" />
+											Delete
 										</Button>
-										{#if onDelete}
-											<Button
-												variant="ghost"
-												size="sm"
-												class="h-7 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
-												onclick={e => {
-													e.stopPropagation();
-													confirmDelete(expense);
-												}}
-											>
-												<Trash2 class="h-3.5 w-3.5 mr-1" />
-												Delete
-											</Button>
-										{/if}
-									</div>
-								{/if}
-							</div>
-						</button>
+									{/if}
+								</div>
+							{/if}
+						</div>
 					{:else}
 						{@const IconComponent = getCategoryIcon(row.category)}
 						{@const isSelected = selectedRowId === row.groupId}
-						<!-- Group parent row (mobile) -->
-						<div
-							class="flex items-start gap-3 px-3 py-3 cursor-pointer transition-colors {isSelected
-								? 'bg-muted/50'
-								: ''}"
-							role="button"
-							tabindex="0"
-							onclick={() => selectRow(row.groupId)}
-							onkeydown={e => {
-								if (e.key === 'Enter' || e.key === ' ') selectRow(row.groupId);
-							}}
-						>
-							<div class="mt-0.5 p-1.5 rounded-lg {getCategoryColor(row.category)} flex-shrink-0">
-								<IconComponent class="h-4 w-4" />
-							</div>
-							<div class="flex-1 min-w-0">
-								<div class="flex items-center justify-between gap-2">
-									<p class="text-sm font-medium text-foreground truncate">
-										{categoryLabels[row.category as ExpenseCategory]}
-									</p>
-									<span
-										class="text-sm font-semibold text-foreground whitespace-nowrap flex-shrink-0"
-									>
-										{formatCurrency(row.totalAmount)}
-									</span>
-								</div>
+						<!-- Group parent row (mobile). Same shape as the standalone row: a disclosure
+						     button carrying the summary, with the actions as its sibling. This one always
+						     has something to reveal — the per-vehicle portions — so it is always a control. -->
+						<div class="transition-colors {isSelected ? 'bg-muted/50' : ''}">
+							<button
+								type="button"
+								class="{MOBILE_ROW_SUMMARY_CLASS} cursor-pointer"
+								aria-expanded={isSelected}
+								onclick={() => selectRow(row.groupId)}
+							>
 								<div
-									class="flex items-center flex-wrap gap-1.5 mt-0.5 text-xs text-muted-foreground"
+									class="mt-0.5 p-1.5 rounded-lg {getCategoryBadgeClasses(
+										row.category
+									)} flex-shrink-0"
 								>
-									<SplitExpenseBadge />
-									<span>·</span>
-									<span>{formatDate(new Date(row.date))}</span>
-									{#if showVehicleColumn && row.vehicleNames.length > 0}
+									<IconComponent class="h-4 w-4" />
+								</div>
+								<div class="flex-1 min-w-0">
+									<div class="flex items-center justify-between gap-2">
+										<p class="text-sm font-medium text-foreground truncate">
+											{categoryLabels[row.category as ExpenseCategory]}
+										</p>
+										<span
+											class="text-sm font-semibold text-foreground whitespace-nowrap flex-shrink-0"
+										>
+											{formatCurrency(row.totalAmount)}
+										</span>
+									</div>
+									<div
+										class="flex items-center flex-wrap gap-1.5 mt-0.5 text-xs text-muted-foreground"
+									>
+										<SplitExpenseBadge />
 										<span>·</span>
-										<span class="truncate">{row.vehicleNames.join(', ')}</span>
+										<span>{formatDate(new Date(row.date))}</span>
+										{#if showVehicleColumn && row.vehicleNames.length > 0}
+											<span>·</span>
+											<span class="truncate">{row.vehicleNames.join(', ')}</span>
+										{/if}
+									</div>
+									{#if row.tags && row.tags.length > 0}
+										<div class="flex flex-wrap gap-1 mt-1.5">
+											{#each row.tags as tag (tag)}
+												<Badge variant="secondary" class="font-normal text-xs px-1.5 py-0"
+													>{tag}</Badge
+												>
+											{/each}
+										</div>
 									{/if}
 								</div>
-								{#if row.tags && row.tags.length > 0}
-									<div class="flex flex-wrap gap-1 mt-1.5">
-										{#each row.tags as tag (tag)}
-											<Badge variant="secondary" class="font-normal text-xs px-1.5 py-0"
-												>{tag}</Badge
-											>
-										{/each}
-									</div>
-								{/if}
-								{#if isSelected && canWrite}
-									<div class="flex items-center justify-end gap-1 mt-2">
+							</button>
+							{#if isSelected && canWrite}
+								{@const blockedId = blockedReasonId(row.groupId)}
+								<div class={MOBILE_ROW_ACTIONS_CONTAINER_CLASS}>
+									<Button
+										variant="ghost"
+										size="sm"
+										class={MOBILE_ROW_ACTION_CLASS}
+										href={`${resolve(paramRoutes.expenseEdit, { id: row.children[0]?.id ?? '' })}?returnTo=${returnTo}`}
+									>
+										<Pencil class="h-3.5 w-3.5 mr-1" />
+										Edit
+									</Button>
+									{#if onDelete}
 										<Button
 											variant="ghost"
 											size="sm"
-											class="h-7 px-2 text-xs"
-											href={`${resolve(paramRoutes.expenseEdit, { id: row.children[0]?.id ?? '' })}?returnTo=${returnTo}`}
-											onclick={e => e.stopPropagation()}
+											class="{MOBILE_ROW_ACTION_CLASS} {isInsuranceLinked(row)
+												? 'cursor-not-allowed aria-disabled:pointer-events-auto'
+												: 'text-destructive hover:text-destructive hover:bg-destructive/10'}"
+											onclick={() => requestGroupDelete(row)}
+											aria-disabled={isInsuranceLinked(row) ? true : undefined}
+											aria-describedby={isInsuranceLinked(row) ? blockedId : undefined}
+											title={isInsuranceLinked(row) ? INSURANCE_DELETE_BLOCKED : 'Delete expense'}
 										>
-											<Pencil class="h-3.5 w-3.5 mr-1" />
-											Edit
+											<Trash2 class="h-3.5 w-3.5 mr-1" />
+											Delete
 										</Button>
-										{#if onDelete}
-											{@const isInsuranceLinked = row.tags.includes('insurance')}
-											<Button
-												variant="ghost"
-												size="sm"
-												class="h-7 px-2 text-xs {isInsuranceLinked
-													? 'text-muted-foreground/40 cursor-not-allowed'
-													: 'text-destructive hover:text-destructive hover:bg-destructive/10'}"
-												onclick={e => {
-													e.stopPropagation();
-													if (!isInsuranceLinked && row.children[0]) {
-														confirmDelete(row.children[0]);
-													}
-												}}
-												disabled={isInsuranceLinked}
-												title={isInsuranceLinked
-													? 'Delete the insurance policy to remove this expense'
-													: 'Delete expense'}
-											>
-												<Trash2 class="h-3.5 w-3.5 mr-1" />
-												Delete
-											</Button>
+										{#if isInsuranceLinked(row)}
+											<span id={blockedId} class="sr-only">{INSURANCE_DELETE_BLOCKED}</span>
 										{/if}
-									</div>
-								{/if}
-							</div>
+									{/if}
+								</div>
+							{/if}
 						</div>
 						<!-- Children visible when selected (mobile) -->
 						{#if isSelected}
@@ -670,7 +716,7 @@
 	<div class="rounded-md border bg-card overflow-hidden">
 		<!-- height MUST be an inline style, not `h-[{scrollHeight}]`: Tailwind only generates
 		     arbitrary-value classes it can see as STATIC literals at build time, so a runtime-
-		     interpolated `h-[600px]` produces no CSS rule (confirmed C14 via DOM probe) — the cap
+		     interpolated `h-[600px]` produces no CSS rule — the cap
 		     + internal scroll never engage and a many-row vehicle grows unbounded. Inline style is
 		     the ChartCard idiom for a dynamic height. -->
 		<ScrollArea class="w-full" style="height: {scrollHeight}">
@@ -769,7 +815,9 @@
 									<TableCell>
 										<div class="flex items-center gap-2">
 											<div
-												class="p-1.5 rounded-lg {getCategoryColor(expense.category)} flex-shrink-0"
+												class="p-1.5 rounded-lg {getCategoryBadgeClasses(
+													expense.category
+												)} flex-shrink-0"
 											>
 												<IconComponent class="h-4 w-4" />
 											</div>
@@ -800,8 +848,11 @@
 										{formatCurrency(expense.amount)}
 									</TableCell>
 									<TableCell class="text-right">
+										<!-- `opacity-0` leaves these controls in the tab order, so the focus variant is
+										     not decoration: without it Tab lands on an invisible link with no focus
+										     ring anywhere on screen. -->
 										<div
-											class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+											class="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100"
 										>
 											{#if canWrite}
 												<Button
@@ -809,8 +860,8 @@
 													size="icon"
 													class="h-8 w-8"
 													href={`${resolve(paramRoutes.expenseEdit, { id: expense.id })}?returnTo=${returnTo}`}
+													aria-label="Edit expense"
 													title="Edit expense"
-													onclick={e => e.stopPropagation()}
 												>
 													<Pencil class="h-4 w-4" />
 												</Button>
@@ -820,10 +871,8 @@
 													variant="ghost"
 													size="icon"
 													class="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-													onclick={e => {
-														e.stopPropagation();
-														confirmDelete(expense);
-													}}
+													onclick={() => confirmDelete(expense)}
+													aria-label="Delete expense"
 													title="Delete expense"
 												>
 													<Trash2 class="h-4 w-4" />
@@ -842,11 +891,26 @@
 								>
 									<TableCell class="font-medium text-muted-foreground">
 										<div class="flex items-center gap-1.5">
-											<ChevronRight
-												class="h-4 w-4 text-muted-foreground transition-transform duration-200 flex-shrink-0 {isExpanded
-													? 'rotate-90'
-													: ''}"
-											/>
+											<!-- The row's click handler is a mouse convenience; this button is what makes
+											     the per-vehicle portions reachable at all by keyboard and what reports the
+											     expanded state. `stopPropagation` keeps a click on it from toggling twice. -->
+											<Button
+												variant="ghost"
+												size="icon-sm"
+												class="-ml-1.5 text-muted-foreground"
+												aria-label="Split expense portions"
+												aria-expanded={isExpanded}
+												onclick={e => {
+													e.stopPropagation();
+													toggleGroup(row.groupId);
+												}}
+											>
+												<ChevronRight
+													class="h-4 w-4 transition-transform duration-200 {isExpanded
+														? 'rotate-90'
+														: ''}"
+												/>
+											</Button>
 											{formatDate(new Date(row.date))}
 										</div>
 									</TableCell>
@@ -862,7 +926,11 @@
 									{/if}
 									<TableCell>
 										<div class="flex items-center gap-2">
-											<div class="p-1.5 rounded-lg {getCategoryColor(row.category)} flex-shrink-0">
+											<div
+												class="p-1.5 rounded-lg {getCategoryBadgeClasses(
+													row.category
+												)} flex-shrink-0"
+											>
 												<IconComponent class="h-4 w-4" />
 											</div>
 											<span class="whitespace-nowrap"
@@ -887,8 +955,11 @@
 										</div>
 									</TableCell>
 									<TableCell class="text-right">
+										<!-- `opacity-0` leaves these controls in the tab order, so the focus variant is
+										     not decoration: without it Tab lands on an invisible link with no focus
+										     ring anywhere on screen. -->
 										<div
-											class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+											class="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100"
 										>
 											{#if canWrite}
 												<Button
@@ -896,6 +967,7 @@
 													size="icon"
 													class="h-8 w-8"
 													href={`${resolve(paramRoutes.expenseEdit, { id: row.children[0]?.id ?? '' })}?returnTo=${returnTo}`}
+													aria-label="Edit split expense"
 													title="Edit split expense"
 													onclick={e => e.stopPropagation()}
 												>
@@ -903,26 +975,34 @@
 												</Button>
 											{/if}
 											{#if onDelete}
-												{@const isInsuranceLinked = row.tags.includes('insurance')}
+												{@const blockedId = blockedReasonId(row.groupId)}
+												<!-- `aria-disabled` rather than `disabled`: the kit's disabled styling is
+												     `pointer-events-none`, which hides the tooltip from the mouse, and
+												     `disabled` hides the control from the keyboard and from assistive tech
+												     — leaving the reason it cannot be used reachable by nobody. Restoring
+												     pointer events keeps the explanation one click (and one hover) away. -->
 												<Button
 													variant="ghost"
 													size="icon"
-													class="h-8 w-8 {isInsuranceLinked
-														? 'text-muted-foreground/40 cursor-not-allowed'
+													class="h-8 w-8 {isInsuranceLinked(row)
+														? 'cursor-not-allowed aria-disabled:pointer-events-auto'
 														: 'text-destructive hover:text-destructive hover:bg-destructive/10'}"
 													onclick={e => {
 														e.stopPropagation();
-														if (!isInsuranceLinked && row.children[0]) {
-															confirmDelete(row.children[0]);
-														}
+														requestGroupDelete(row);
 													}}
-													disabled={isInsuranceLinked}
-													title={isInsuranceLinked
-														? 'Delete the insurance policy to remove this expense'
+													aria-label="Delete expense"
+													aria-disabled={isInsuranceLinked(row) ? true : undefined}
+													aria-describedby={isInsuranceLinked(row) ? blockedId : undefined}
+													title={isInsuranceLinked(row)
+														? INSURANCE_DELETE_BLOCKED
 														: 'Delete expense'}
 												>
 													<Trash2 class="h-4 w-4" />
 												</Button>
+												{#if isInsuranceLinked(row)}
+													<span id={blockedId} class="sr-only">{INSURANCE_DELETE_BLOCKED}</span>
+												{/if}
 											{/if}
 										</div>
 									</TableCell>
@@ -994,7 +1074,7 @@
 				{@const IconComponent = getCategoryIcon(expenseToDelete.category)}
 				<div class="bg-muted rounded-lg p-3">
 					<div class="flex items-center gap-3">
-						<div class="p-2 rounded-lg {getCategoryColor(expenseToDelete.category)}">
+						<div class="p-2 rounded-lg {getCategoryBadgeClasses(expenseToDelete.category)}">
 							<IconComponent class="h-4 w-4" />
 						</div>
 						<div class="flex-1">

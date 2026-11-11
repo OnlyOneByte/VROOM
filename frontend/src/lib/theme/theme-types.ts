@@ -5,7 +5,7 @@
  * Load-bearing contract (R1, inviolable): a theme is a pure VALUE swap on the EXISTING `app.css` custom
  * properties — zero component/markup changes. So `ThemeTokenKey` is EXACTLY the set of per-variant color
  * custom properties `src/app.css` declares in BOTH `:root` (light) and `.dark` (dark). Verified firsthand
- * (C181): those two blocks declare an identical 32-key set; `--radius` is `:root`-only (a variant-invariant
+ *  those two blocks declare an identical key set; `--radius` is `:root`-only (a variant-invariant
  * layout token) and is therefore NOT a themeable per-variant key. A guard in T5 asserts this list still
  * equals the live app.css set so a future token add/remove can't silently desync the engine.
  */
@@ -25,46 +25,47 @@ export type ThemeId = string;
 
 /**
  * Every per-variant themeable token, by its `app.css` custom-property name WITHOUT the leading `--`.
- * EXACTLY the keys declared in both `:root` and `.dark` (C181 census). A `ThemeVariant` must specify all
+ * EXACTLY the keys declared in both `:root` and `.dark` (census). A `ThemeVariant` must specify all
  * of them — a missing key would leave that token at the previously-applied theme's value (a visual leak),
  * which the T5 registry-integrity test forbids.
  */
 export type ThemeTokenKey =
-  | 'accent'
-  | 'accent-foreground'
-  | 'background'
-  | 'border'
-  | 'card'
-  | 'card-foreground'
-  | 'chart-1'
-  | 'chart-2'
-  | 'chart-3'
-  | 'chart-4'
-  | 'chart-5'
-  | 'chart-6'
-  | 'chart-7'
-  | 'chart-8'
-  | 'destructive'
-  | 'foreground'
-  | 'input'
-  | 'muted'
-  | 'muted-foreground'
-  | 'popover'
-  | 'popover-foreground'
-  | 'primary'
-  | 'primary-foreground'
-  | 'ring'
-  | 'secondary'
-  | 'secondary-foreground'
-  | 'sidebar'
-  | 'sidebar-accent'
-  | 'sidebar-accent-foreground'
-  | 'sidebar-border'
-  | 'sidebar-foreground'
-  | 'sidebar-primary'
-  | 'sidebar-primary-foreground'
-  | 'sidebar-ring'
-  | 'warning';
+	| 'accent'
+	| 'accent-foreground'
+	| 'background'
+	| 'border'
+	| 'card'
+	| 'card-foreground'
+	| 'chart-1'
+	| 'chart-2'
+	| 'chart-3'
+	| 'chart-4'
+	| 'chart-5'
+	| 'chart-6'
+	| 'chart-7'
+	| 'chart-8'
+	| 'destructive'
+	| 'destructive-foreground'
+	| 'foreground'
+	| 'input'
+	| 'muted'
+	| 'muted-foreground'
+	| 'popover'
+	| 'popover-foreground'
+	| 'primary'
+	| 'primary-foreground'
+	| 'ring'
+	| 'secondary'
+	| 'secondary-foreground'
+	| 'sidebar'
+	| 'sidebar-accent'
+	| 'sidebar-accent-foreground'
+	| 'sidebar-border'
+	| 'sidebar-foreground'
+	| 'sidebar-primary'
+	| 'sidebar-primary-foreground'
+	| 'sidebar-ring'
+	| 'warning';
 
 /**
  * The runtime-checkable list of every {@link ThemeTokenKey}, frozen. The T5 registry-integrity test pins
@@ -73,41 +74,42 @@ export type ThemeTokenKey =
  * the app.css declaration order's sorted census; consumers must not depend on order.
  */
 export const THEME_TOKEN_KEYS = [
-  'accent',
-  'accent-foreground',
-  'background',
-  'border',
-  'card',
-  'card-foreground',
-  'chart-1',
-  'chart-2',
-  'chart-3',
-  'chart-4',
-  'chart-5',
-  'chart-6',
-  'chart-7',
-  'chart-8',
-  'destructive',
-  'foreground',
-  'input',
-  'muted',
-  'muted-foreground',
-  'popover',
-  'popover-foreground',
-  'primary',
-  'primary-foreground',
-  'ring',
-  'secondary',
-  'secondary-foreground',
-  'sidebar',
-  'sidebar-accent',
-  'sidebar-accent-foreground',
-  'sidebar-border',
-  'sidebar-foreground',
-  'sidebar-primary',
-  'sidebar-primary-foreground',
-  'sidebar-ring',
-  'warning',
+	'accent',
+	'accent-foreground',
+	'background',
+	'border',
+	'card',
+	'card-foreground',
+	'chart-1',
+	'chart-2',
+	'chart-3',
+	'chart-4',
+	'chart-5',
+	'chart-6',
+	'chart-7',
+	'chart-8',
+	'destructive',
+	'destructive-foreground',
+	'foreground',
+	'input',
+	'muted',
+	'muted-foreground',
+	'popover',
+	'popover-foreground',
+	'primary',
+	'primary-foreground',
+	'ring',
+	'secondary',
+	'secondary-foreground',
+	'sidebar',
+	'sidebar-accent',
+	'sidebar-accent-foreground',
+	'sidebar-border',
+	'sidebar-foreground',
+	'sidebar-primary',
+	'sidebar-primary-foreground',
+	'sidebar-ring',
+	'warning'
 ] as const satisfies readonly ThemeTokenKey[];
 
 /**
@@ -119,8 +121,8 @@ export type ThemeTokens = Record<ThemeTokenKey, string>;
 
 /** A theme's two variants. The {@link ThemeMode} (resolved against the OS pref for `system`) picks one. */
 export interface ThemeVariant {
-  light: ThemeTokens;
-  dark: ThemeTokens;
+	light: ThemeTokens;
+	dark: ThemeTokens;
 }
 
 /** Where a theme came from — a shipped built-in or (future, D6) a user-authored custom theme. */
@@ -133,10 +135,10 @@ export type ThemeSource = 'builtin' | 'custom';
  * the actual colors).
  */
 export interface ThemeDefinition extends ThemeVariant {
-  id: ThemeId;
-  label: string;
-  description: string;
-  /** Token keys whose colors the picker card previews as a swatch strip. */
-  swatch: ThemeTokenKey[];
-  source: ThemeSource;
+	id: ThemeId;
+	label: string;
+	description: string;
+	/** Token keys whose colors the picker card previews as a swatch strip. */
+	swatch: ThemeTokenKey[];
+	source: ThemeSource;
 }

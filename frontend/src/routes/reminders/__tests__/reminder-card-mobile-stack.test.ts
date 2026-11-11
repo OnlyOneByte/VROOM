@@ -1,8 +1,8 @@
 /**
- * C247 source-scan guard — the reminder card stacks vertically on mobile so the title isn't occluded.
+ * source-scan guard — the reminder card stacks vertically on mobile so the title isn't occluded.
  *
- * A C247 eyes-on scout (seeded 3 reminders via the API + shot /reminders mobile + Read) found a real
- * NORTH_STAR #3 defect: the card's CardContent was a single `flex items-start justify-between` row with a
+ * A eyes-on scout (seeded 3 reminders via the API + shot /reminders mobile + Read) found a real
+ * defect: the card's CardContent was a single `flex items-start justify-between` row with a
  * `min-w-0` title block beside a `flex-shrink-0` action cluster. For a mileage reminder that cluster is up
  * to 5 buttons (Serviced + Pause + edit + delete), so on a phone it claimed the full width and starved the
  * title to a ~1-character sliver ("Oil change" was unreadable). Fix: stack the title above the actions on
@@ -21,7 +21,7 @@ import { describe, expect, test } from 'vitest';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SRC = readFileSync(join(HERE, '..', '+page.svelte'), 'utf8');
 
-describe('reminder card mobile stack (C247 occlusion guard)', () => {
+describe('reminder card mobile stack (occlusion guard)', () => {
 	test('the card CardContent stacks flex-col on mobile, flex-row only at sm:', () => {
 		// The defining layout line: must start column (mobile) and only become a row at the sm breakpoint.
 		expect(SRC).toMatch(/CardContent[\s\S]{0,120}flex flex-col/);

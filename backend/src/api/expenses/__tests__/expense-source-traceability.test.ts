@@ -1,5 +1,5 @@
 /**
- * recurring-expenses T1 (C96) — pins the SOURCE-TRACEABILITY contract on the expense
+ * recurring-expenses T1 — pins the SOURCE-TRACEABILITY contract on the expense
  * READ path: a reminder-materialized expense must surface `sourceType`/`sourceId` in the
  * GET *HTTP response*, not merely in the DB row.
  *
@@ -7,7 +7,7 @@
  * off sqlite (bypassing serialization), so it stays green even if a future response mapper
  * stripped the field — which would silently break the T6 "Recurring" badge + the T3 cascade
  * UI that key off `sourceType==='reminder'` / `sourceId`. This locks the OBSERVABLE response
- * (the C91-class positive-contract test: the field IS echoed to the client), and the
+ * (the-class positive-contract test: the field IS echoed to the client), and the
  * manual-expense case pins that the value reflects reality (null when there's no source),
  * not a hardcoded literal.
  *
@@ -60,7 +60,7 @@ interface SplitResponse {
 }
 
 // This file's fixture is a no-arg Honda Civic 2021; converge onto the shared test-helpers/seed seedVehicle
-// (arch convergence, Angelo-approved) via a thin wrapper preserving the exact prior make/model/year (the
+//  via a thin wrapper preserving the exact prior make/model/year (the
 // shared default is a Camry). seedVehicleWithFinancing (below) keeps calling this wrapper unchanged.
 const seedVehicle = (): Promise<string> =>
   seedVehicleShared(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
@@ -147,14 +147,14 @@ describe('expense source traceability (recurring-expenses T1 — read-path surfa
 });
 
 /**
- * #62 (C190): the manual create/update route accepts ONLY sourceType 'financing' (which it fully
+ * The manual create/update route accepts ONLY sourceType 'financing' (which it fully
  * validates). 'insurance_term' + 'reminder' expenses are created exclusively by system paths that
  * BYPASS this route (insurance hooks / the reminder trigger — verified firsthand), so accepting them
  * on the manual route was pure over-permissiveness: a hand-crafted POST/PUT could forge an UNVALIDATED
  * source link on the caller's own row (skews source-bucketed analytics + a matching sourceId would
  * cascade-delete the manual expense when its parent is removed). These pin the enum restriction.
  */
-describe('#62 — manual expense route rejects system-only sourceTypes', () => {
+describe('manual expense route rejects system-only sourceTypes', () => {
   test('POST with sourceType "reminder" is rejected 400 (system-only — never via the manual route)', async () => {
     const vehicleId = await seedVehicle();
     const res = await ctx.authed('POST', '/api/v1/expenses', {
@@ -210,13 +210,13 @@ describe('#62 — manual expense route rejects system-only sourceTypes', () => {
     expect(res.status).toBe(201);
   });
 
-  // #145 (C465): the SPLIT route (POST /expenses/split) is the THIRD source-link path #125/C422
+  // The SPLIT route (POST /expenses/split) is the THIRD source-link path
   // missed — its schema was z.string().optional() (any string) and the handler ran NO
   // assertFinancingSourceValid, so a hand-crafted split could forge an unvalidated reminder/
   // insurance_term link (cascade-delete data-loss vector) OR a 'financing' link to an arbitrary
   // sourceId (understates the displayed loan balance). Now: non-financing rejected at the schema;
   // a financing link is validated per vehicle.
-  test('POST /split with a system-only sourceType "insurance_term" is rejected 400 (#145)', async () => {
+  test('POST /split with a system-only sourceType "insurance_term" is rejected 400', async () => {
     const vehicleId = await seedVehicle();
     const res = await ctx.authed('POST', '/api/v1/expenses/split', {
       splitConfig: { method: 'even', vehicleIds: [vehicleId] },
@@ -229,7 +229,7 @@ describe('#62 — manual expense route rejects system-only sourceTypes', () => {
     expect(res.status).toBe(400);
   });
 
-  test('POST /split with sourceType "financing" but a bogus sourceId is rejected (per-vehicle validation) (#145)', async () => {
+  test('POST /split with sourceType "financing" but a bogus sourceId is rejected (per-vehicle validation)', async () => {
     const vehicleId = await seedVehicle();
     const res = await ctx.authed('POST', '/api/v1/expenses/split', {
       splitConfig: { method: 'even', vehicleIds: [vehicleId] },
@@ -243,7 +243,7 @@ describe('#62 — manual expense route rejects system-only sourceTypes', () => {
     expect(res.status).toBe(400);
   });
 
-  test('POST /split with NO source still creates fine (the restriction is not over-broad) (#145)', async () => {
+  test('POST /split with NO source still creates fine (the restriction is not over-broad)', async () => {
     const vehicleId = await seedVehicle();
     const res = await ctx.authed('POST', '/api/v1/expenses/split', {
       splitConfig: { method: 'even', vehicleIds: [vehicleId] },
@@ -255,14 +255,14 @@ describe('#62 — manual expense route rejects system-only sourceTypes', () => {
   });
 });
 
-// #109 (C372): the create schema enforces both-or-neither for sourceType/sourceId via .refine(), but
+// The create schema enforces both-or-neither for sourceType/sourceId via .refine(), but
 // .refine() does NOT survive the update schema's .partial()/.omit() re-derivation and was never re-added —
-// so a PUT could persist an ASYMMETRIC source link (one of the pair without the other), the #62/#34
+// so a PUT could persist an ASYMMETRIC source link (one of the pair without the other), the
 // within-tenant integrity class: it skews source-bucketed analytics and a half-link with a real sourceId
 // would mis-/never-trigger the financing cascade-delete cleanup. The create path forbids this; now the
 // update path does too. (The vehicleId/source seeds use the manual route's only-allowed sourceType,
 // 'financing'; here we only need the asymmetry to trip the refine, so the id can be any string.)
-describe('#109 — PUT rejects an asymmetric sourceType/sourceId (both-or-neither, mirroring create)', () => {
+describe('PUT rejects an asymmetric sourceType/sourceId (both-or-neither, mirroring create)', () => {
   async function seedPlainExpense(): Promise<string> {
     const vehicleId = await seedVehicle();
     const createRes = await ctx.authed('POST', '/api/v1/expenses', {
@@ -301,13 +301,13 @@ describe('#109 — PUT rejects an asymmetric sourceType/sourceId (both-or-neithe
   });
 });
 
-// #125 (C422): the create path VERIFIES a financing source link points at the vehicle's ACTIVE financing
+// The create path VERIFIES a financing source link points at the vehicle's ACTIVE financing
 // (computeBalance sums `source_type='financing' AND source_id=id`, so a forged/mismatched link mis-attributes
 // the expense as a loan payment → understates the displayed balance). The PUT path SKIPPED this — it ran the
-// both-or-neither refine (#109) + the enum restriction but never the financing-existence/id-match check — so
+// both-or-neither refine + the enum restriction but never the financing-existence/id-match check — so
 // a SYMMETRIC `{sourceType:'financing', sourceId:<forged>}` PUT persisted. Now both paths share
-// assertFinancingSourceValid. These are the symmetric cases the #62/#109 tests above don't cover.
-describe('#125 — PUT verifies a financing source link (not just the asymmetry/enum)', () => {
+// assertFinancingSourceValid. These are the symmetric cases the tests above don't cover.
+describe('PUT verifies a financing source link (not just the asymmetry/enum)', () => {
   async function seedPlainExpense(vehicleId: string): Promise<string> {
     const createRes = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId,
@@ -374,12 +374,12 @@ describe('#125 — PUT verifies a financing source link (not just the asymmetry/
     expect(res.status).toBe(400); // "Source ID does not match the active financing record"
   });
 
-  // C425 (guard): C422 extracted assertFinancingSourceValid as ONE source of truth shared by POST + PUT,
-  // but the C422 tests above all drive the PUT call site. The POST call site's financing-source
-  // verification was previously inline + NEVER directly tested (the #62 POST tests cover only the ENUM
+  // extracted assertFinancingSourceValid as ONE source of truth shared by POST + PUT,
+  // but the tests above all drive the PUT call site. The POST call site's financing-source
+  // verification was previously inline + NEVER directly tested (the POST tests cover only the ENUM
   // rejection of reminder/insurance_term, not the financing existence/id-match) — so a refactor dropping
   // the POST call to the shared helper would go RED nowhere. These pin the POST boundary enforces the
-  // contract too, so BOTH call sites of the shared helper are covered (NORTH_STAR #5).
+  // contract too, so BOTH call sites of the shared helper are covered.
   test('POST {sourceType:financing, sourceId:forged} on a vehicle with NO financing → 400 (POST call site)', async () => {
     const vehicleId = await seedVehicle();
     const res = await ctx.authed('POST', '/api/v1/expenses', {
@@ -419,15 +419,15 @@ describe('#125 — PUT verifies a financing source link (not just the asymmetry/
   });
 });
 
-// #147 (C2): the SPLIT-UPDATE path (PUT /expenses/split/:id) is the financing-source-link path the
-// per-vehicle check (#145 on create, #125 on the regular PUT) missed. updateSplitExpense REGENERATES the
+// The SPLIT-UPDATE path (PUT /expenses/split/:id) is the financing-source-link path the
+// per-vehicle check (on create, on the regular PUT) missed. updateSplitExpense REGENERATES the
 // siblings carrying the group's existing sourceType/sourceId forward (the update schema doesn't expose
 // them), but the NEW splitConfig can land them on a DIFFERENT vehicle set. computeBalance sums financing
 // payments by (sourceType,sourceId) with NO vehicle scope, so reallocating a financing-sourced split onto
 // a vehicle whose active financing isn't that sourceId mis-attributes a loan payment → understates the
-// displayed balance (NORTH_STAR #1). The route now re-validates the carried link against the new vehicles
+// displayed balance. The route now re-validates the carried link against the new vehicles
 // before regenerating, mirroring the create-split per-vehicle guard.
-describe('#147 — PUT /split re-validates the carried financing source against the NEW vehicle set', () => {
+describe('PUT /split re-validates the carried financing source against the NEW vehicle set', () => {
   /** Seed a vehicle and (optionally) active loan financing on it; return both ids. */
   async function seedVehicleWithFinancing(): Promise<{ vehicleId: string; financingId: string }> {
     const vehicleId = await seedVehicle();

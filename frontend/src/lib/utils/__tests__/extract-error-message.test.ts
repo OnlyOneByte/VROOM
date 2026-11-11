@@ -1,7 +1,7 @@
 /**
  * Unit tests for extractErrorMessage — the shared `error instanceof Error ? error.message
  * : fallback` idiom extracted from the catch blocks in load-state, the auth store, and the
- * sync manager (arch dedup, C90).
+ * sync manager.
  *
  * The load-bearing contract is the PRECEDENCE: a real Error's own message WINS, and the
  * literal is only the fallback for a non-Error throw. (This is deliberately the OPPOSITE

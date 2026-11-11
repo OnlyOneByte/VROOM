@@ -1,5 +1,5 @@
 /**
- * effectiveMonthlyPremium (bug #8, cycle 23).
+ * effectiveMonthlyPremium.
  *
  * An insurance term may record cost as a recurring monthlyCost OR a lump-sum totalCost. The old
  * premium math (`monthlyCost ?? 0`) silently contributed $0 for every totalCost-only term, zeroing
@@ -33,7 +33,7 @@ describe('effectiveMonthlyPremium', () => {
     ).toBe(0);
   });
 
-  test('totalCost-only term amortizes across the inclusive month span (the bug #8 case)', () => {
+  test('totalCost-only term amortizes across the inclusive month span (the bug case)', () => {
     // Jan..Jun inclusive = 6 month keys → 1200 / 6 = 200 (was silently $0 before the fix).
     expect(
       effectiveMonthlyPremium({

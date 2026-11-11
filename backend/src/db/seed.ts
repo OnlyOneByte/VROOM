@@ -1,5 +1,6 @@
 import { createId } from '@paralleldrive/cuid2';
 import { logger } from '../utils/logger';
+import { dollarsToCents } from '../utils/money';
 import { db } from './connection.js';
 import {
   expenses,
@@ -61,7 +62,7 @@ export async function seedDatabase() {
         licensePlate: 'ABC123',
         nickname: 'Daily Driver',
         initialMileage: 25000,
-        purchasePrice: 22000,
+        purchasePrice: dollarsToCents(22000),
         purchaseDate: new Date('2020-03-15'),
       })
       .returning();
@@ -76,7 +77,7 @@ export async function seedDatabase() {
         licensePlate: 'XYZ789',
         nickname: 'Weekend Car',
         initialMileage: 15000,
-        purchasePrice: 18000,
+        purchasePrice: dollarsToCents(18000),
         purchaseDate: new Date('2019-08-20'),
       })
       .returning();
@@ -88,11 +89,11 @@ export async function seedDatabase() {
       vehicleId: vehicle1.id,
       financingType: 'loan',
       provider: 'Bank of America',
-      originalAmount: 20000,
+      originalAmount: dollarsToCents(20000),
       apr: 4.5,
       termMonths: 60,
       startDate: new Date('2020-03-15'),
-      paymentAmount: 372.86,
+      paymentAmount: dollarsToCents(372.86),
       paymentFrequency: 'monthly',
       paymentDayOfMonth: 15,
     });
@@ -127,8 +128,8 @@ export async function seedDatabase() {
         startDate: new Date('2024-01-01'),
         endDate: new Date('2024-06-30'),
         policyNumber: 'SF123456789',
-        totalCost: 1200,
-        monthlyCost: 200,
+        totalCost: dollarsToCents(1200),
+        monthlyCost: dollarsToCents(200),
       },
       {
         id: termGe1Id,
@@ -136,8 +137,8 @@ export async function seedDatabase() {
         startDate: new Date('2024-01-01'),
         endDate: new Date('2024-06-30'),
         policyNumber: 'GE987654321',
-        totalCost: 900,
-        monthlyCost: 150,
+        totalCost: dollarsToCents(900),
+        monthlyCost: dollarsToCents(150),
       },
     ]);
 
@@ -155,7 +156,7 @@ export async function seedDatabase() {
         userId: sampleUser.id,
         tags: ['fuel', 'gas'],
         category: 'fuel',
-        expenseAmount: 45.5,
+        expenseAmount: dollarsToCents(45.5),
         date: new Date('2024-01-15'),
         mileage: 25500,
         volume: 12.5,
@@ -166,7 +167,7 @@ export async function seedDatabase() {
         userId: sampleUser.id,
         tags: ['fuel', 'gas'],
         category: 'fuel',
-        expenseAmount: 52.3,
+        expenseAmount: dollarsToCents(52.3),
         date: new Date('2024-01-28'),
         mileage: 25850,
         volume: 14.2,
@@ -178,7 +179,7 @@ export async function seedDatabase() {
         userId: sampleUser.id,
         tags: ['oil-change', 'maintenance'],
         category: 'maintenance',
-        expenseAmount: 75.0,
+        expenseAmount: dollarsToCents(75.0),
         date: new Date('2024-01-10'),
         mileage: 25400,
         description: 'Jiffy Lube - Full synthetic oil change',
@@ -188,7 +189,7 @@ export async function seedDatabase() {
         userId: sampleUser.id,
         tags: ['brakes', 'maintenance'],
         category: 'maintenance',
-        expenseAmount: 150.0,
+        expenseAmount: dollarsToCents(150.0),
         date: new Date('2024-01-20'),
         mileage: 15200,
         description: 'Brake pad replacement',
@@ -199,7 +200,7 @@ export async function seedDatabase() {
         userId: sampleUser.id,
         tags: ['insurance', 'monthly'],
         category: 'financial',
-        expenseAmount: 200.0,
+        expenseAmount: dollarsToCents(200.0),
         date: new Date('2024-01-01'),
         description: 'State Farm - Monthly premium',
       },
@@ -209,7 +210,7 @@ export async function seedDatabase() {
         userId: sampleUser.id,
         tags: ['parking'],
         category: 'misc',
-        expenseAmount: 15.0,
+        expenseAmount: dollarsToCents(15.0),
         date: new Date('2024-01-12'),
         description: 'Downtown parking garage',
       },
@@ -218,7 +219,7 @@ export async function seedDatabase() {
         userId: sampleUser.id,
         tags: ['tolls'],
         category: 'misc',
-        expenseAmount: 8.5,
+        expenseAmount: dollarsToCents(8.5),
         date: new Date('2024-01-18'),
         description: 'Highway toll',
       },
@@ -228,7 +229,7 @@ export async function seedDatabase() {
 
     // Create sample split expense (car wash shared evenly across both vehicles)
     const splitGroupId = createId();
-    const splitGroupTotal = 60.0;
+    const splitGroupTotal = dollarsToCents(60.0);
     const splitDate = new Date('2024-02-01');
 
     await db.insert(expenses).values([
@@ -237,7 +238,7 @@ export async function seedDatabase() {
         userId: sampleUser.id,
         tags: ['car-wash'],
         category: 'maintenance',
-        expenseAmount: 30.0,
+        expenseAmount: dollarsToCents(30.0),
         date: splitDate,
         description: 'Deluxe car wash - split',
         groupId: splitGroupId,
@@ -249,7 +250,7 @@ export async function seedDatabase() {
         userId: sampleUser.id,
         tags: ['car-wash'],
         category: 'maintenance',
-        expenseAmount: 30.0,
+        expenseAmount: dollarsToCents(30.0),
         date: splitDate,
         description: 'Deluxe car wash - split',
         groupId: splitGroupId,

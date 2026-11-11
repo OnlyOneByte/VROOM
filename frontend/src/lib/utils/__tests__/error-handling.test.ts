@@ -1,8 +1,8 @@
 /**
- * Coverage ratchet (guard, C137) for error-handling.ts — the C124 report's top FE low spot (34% line)
+ * Coverage ratchet for error-handling.ts — the report's top FE low spot (34% line)
  * and a load-bearing module: every page's catch routes a thrown value through
  * `handleErrorWithNotification`, which drives the private `handleApiError` mapping (the user-facing
- * error copy). `extractErrorMessage` is already pinned (C90); this covers the rest — the `ApiError`
+ * error copy). `extractErrorMessage` is already pinned; this covers the rest — the `ApiError`
  * class, the 3-way `handleApiError` branch (VroomError → friendly-or-own message / network error /
  * unknown fallback), the error-code→friendly-message map, and the notification side-effect.
  *
@@ -63,7 +63,9 @@ describe('handleErrorWithNotification (drives handleApiError)', () => {
 
 	test('a known error code maps to its user-friendly message (not the raw message)', () => {
 		// VALIDATION_ERROR is in ERROR_CODE_MESSAGES → the friendly copy wins over "Raw backend text".
-		handleErrorWithNotification(new ApiError('Raw backend text', 400, undefined, 'VALIDATION_ERROR'));
+		handleErrorWithNotification(
+			new ApiError('Raw backend text', 400, undefined, 'VALIDATION_ERROR')
+		);
 		expect(notified()).toMatchObject({
 			type: 'error',
 			message: 'Please check your input and try again',

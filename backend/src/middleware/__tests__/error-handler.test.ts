@@ -1,14 +1,11 @@
 /**
- * Characterization tests for the global errorHandler + SyncError convergence (arch, cycle 24).
+ * Tests for the global errorHandler — the ONLY thing that shapes a thrown error into a response.
+ * Routes throw and hand-roll no catch blocks, so every branch here is load-bearing: an error class
+ * that matches none of them answers a generic 500 and loses its status and message.
  *
- * Context: the `sync` routes hand-roll try/catch → handleSyncError in every handler. The arch goal
- * is to drop that boilerplate and let the central errorHandler shape SyncErrors instead. That is
- * only safe if the middleware produces a BYTE-IDENTICAL response to handleSyncError for a SyncError
- * — SyncError extends Error (not AppError), so before this cycle it fell through to a generic 500,
- * losing its code→status mapping. These tests pin:
- *   1. every existing errorHandler branch (there was NO prior coverage), and
- *   2. the equivalence handleSyncError(err) === errorHandler(err) for SyncErrors,
- * so the try/catch removal next cycle can be proven behavior-preserving against this net.
+ * The SyncError block is the branch that needs the most pinning. SyncError extends Error, not
+ * AppError, so without its own branch it falls through to the generic 500 and loses its
+ * code→status mapping — a VALIDATION_ERROR would 500 instead of 400.
  */
 
 import { describe, expect, test } from 'bun:test';
@@ -18,7 +15,6 @@ import { z } from 'zod';
 import {
   AuthenticationError,
   ConflictError,
-  handleSyncError,
   NotFoundError,
   SyncError,
   SyncErrorCode,
@@ -94,15 +90,29 @@ describe('errorHandler — application error branches', () => {
 });
 
 describe('errorHandler — SyncError convergence', () => {
-  const SYNC_CASES: Array<{ code: SyncErrorCode; status: number }> = [
-    { code: SyncErrorCode.VALIDATION_ERROR, status: 400 },
-    { code: SyncErrorCode.AUTH_INVALID, status: 401 },
-    { code: SyncErrorCode.PERMISSION_DENIED, status: 403 },
-    { code: SyncErrorCode.CONFLICT_DETECTED, status: 409 },
-    { code: SyncErrorCode.SYNC_IN_PROGRESS, status: 409 },
-    { code: SyncErrorCode.QUOTA_EXCEEDED, status: 429 },
-    { code: SyncErrorCode.NETWORK_ERROR, status: 503 },
-  ];
+  /**
+   * Keyed by the enum rather than listed, so adding a SyncErrorCode cannot land UNCOVERED: a
+   * `Record<SyncErrorCode, number>` missing a member fails type-check, and the cases are then
+   * enumerated from `Object.values` so no member can be silently skipped at runtime either.
+   */
+  const EXPECTED_STATUS: Record<SyncErrorCode, number> = {
+    [SyncErrorCode.VALIDATION_ERROR]: 400,
+    [SyncErrorCode.AUTH_INVALID]: 401,
+    [SyncErrorCode.PERMISSION_DENIED]: 403,
+    [SyncErrorCode.CONFLICT_DETECTED]: 409,
+    [SyncErrorCode.SYNC_IN_PROGRESS]: 409,
+    [SyncErrorCode.QUOTA_EXCEEDED]: 429,
+    [SyncErrorCode.NETWORK_ERROR]: 503,
+  };
+  const SYNC_CASES = Object.values(SyncErrorCode).map((code) => ({
+    code,
+    status: EXPECTED_STATUS[code],
+  }));
+
+  test('every SyncErrorCode has a pinned status (the case list cannot go stale)', () => {
+    expect(SYNC_CASES.length).toBe(Object.keys(SyncErrorCode).length);
+    expect(SYNC_CASES.every(({ status }) => typeof status === 'number')).toBe(true);
+  });
 
   test('every SyncErrorCode maps to its proper status (not a generic 500)', async () => {
     for (const { code, status } of SYNC_CASES) {
@@ -121,30 +131,5 @@ describe('errorHandler — SyncError convergence', () => {
     ).request('/boom');
     const body = (await res.json()) as ErrorBody;
     expect(body.error.details).toEqual({ field: 'syncTypes' });
-  });
-
-  test('middleware output is IDENTICAL to handleSyncError for every SyncErrorCode', async () => {
-    for (const { code } of SYNC_CASES) {
-      const err = new SyncError(code, `${code} msg`, { ctx: code });
-
-      // Path A: the central middleware.
-      const viaMiddleware = await appThatThrows(err).request('/boom');
-      const middlewareBody = (await viaMiddleware.json()) as ErrorBody;
-
-      // Path B: the local handleSyncError (what the route catch blocks call today).
-      const stubCtx = {
-        get: () => ({ id: 'user-123' }),
-        json: (body: unknown, status: number) =>
-          new Response(JSON.stringify(body), {
-            status,
-            headers: { 'content-type': 'application/json' },
-          }),
-      } as unknown as Parameters<typeof handleSyncError>[0];
-      const viaLocal = handleSyncError(stubCtx, err, 'test op');
-      const localBody = (await viaLocal.json()) as ErrorBody;
-
-      expect(viaMiddleware.status).toBe(viaLocal.status);
-      expect(middlewareBody).toEqual(localBody);
-    }
   });
 });

@@ -258,7 +258,7 @@ describe('Property 8: Monthly arrays bounded to 12 entries', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Regression (cycle 211): total distance is summed PER VEHICLE, not pooled.
+// Regression: total distance is summed PER VEHICLE, not pooled.
 //
 // buildFuelStatsFromData previously did Math.max(allMileages) - Math.min(allMileages)
 // over EVERY vehicle's readings. For a user with two cars at different odometer ranges
@@ -266,7 +266,7 @@ describe('Property 8: Monthly arrays bounded to 12 entries', () => {
 // on the dashboard summary. The fix groups by vehicle, computes max-min per car, and
 // sums. This pins that contract with a deterministic two-vehicle fixture.
 // ---------------------------------------------------------------------------
-describe('total distance is summed per vehicle (cycle 211 multi-vehicle regression)', () => {
+describe('total distance is summed per vehicle (multi-vehicle regression)', () => {
   test('two vehicles in disjoint odometer ranges sum per-car distance, not pooled max-min', async () => {
     const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
     seedUser(testDb.sqlite, user);
@@ -347,7 +347,7 @@ describe('total distance is summed per vehicle (cycle 211 multi-vehicle regressi
 });
 
 // ---------------------------------------------------------------------------
-// Regression (C97, bug #18): cross-fleet fillup COUNT must not be inflated by a
+// Regression: cross-fleet fillup COUNT must not be inflated by a
 // split fuel expense.
 //
 // A fuel expense split across N vehicles creates N sibling rows, but only the AMOUNT
@@ -359,7 +359,7 @@ describe('total distance is summed per vehicle (cycle 211 multi-vehicle regressi
 // was wrong. This pins: two real fillups (volume set) + two split siblings (volume
 // null) on different cars => currentYear fillups == 2, not 4; gallons unchanged.
 // ---------------------------------------------------------------------------
-describe('cross-fleet fillup count excludes split siblings (C97 bug #18)', () => {
+describe('cross-fleet fillup count excludes split siblings', () => {
   test('a split fuel expense (volume-null siblings) counts as zero fillups, not N', async () => {
     const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
     seedUser(testDb.sqlite, user);

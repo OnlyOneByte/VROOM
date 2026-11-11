@@ -35,12 +35,12 @@
 	import { insuranceApi } from '$lib/services/insurance-api';
 	import { vehicleApi } from '$lib/services/vehicle-api';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
-	import { getCurrencySymbol } from '$lib/utils/formatters';
+	import { dateOnlyToISO, getCurrencySymbol } from '$lib/utils/formatters';
 	import type { InsurancePolicy, Vehicle, CreateTermRequest } from '$lib/types';
 	import FormLayout from '$lib/components/common/form-layout.svelte';
 
 	// Money-field labels show the user's currency symbol, not a hardcoded "$"
-	// (EUR/GBP users would otherwise see the wrong unit). Same class as cycles 74/75.
+	// (EUR/GBP users would otherwise see the wrong unit). Same class as.
 	const currencySymbol = $derived(getCurrencySymbol());
 
 	interface Props {
@@ -201,8 +201,11 @@
 					company: company.trim(),
 					terms: [
 						{
-							startDate,
-							endDate,
+							// Date-only picker values; the API coerces them, so send noon-local or the
+							// term boundary (and the premium rows it materializes) lands a day early
+							// west of UTC.
+							startDate: dateOnlyToISO(startDate),
+							endDate: dateOnlyToISO(endDate),
 							...termData,
 							vehicleCoverage: {
 								vehicleIds: selectedVehicleIds
@@ -549,7 +552,7 @@
 							class="rounded-full shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 px-5 flex-shrink-0"
 						>
 							<Trash2 class="h-5 w-5 sm:mr-2" />
-							<span class="hidden sm:inline font-semibold">Delete</span>
+							<span class="max-sm:sr-only font-semibold">Delete</span>
 						</Button>
 					{/if}
 
@@ -562,7 +565,7 @@
 						class="rounded-full shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 px-5 flex-shrink-0"
 					>
 						<X class="h-5 w-5 sm:mr-2" />
-						<span class="hidden sm:inline font-semibold">Cancel</span>
+						<span class="max-sm:sr-only font-semibold">Cancel</span>
 					</Button>
 
 					<Button
@@ -619,7 +622,7 @@
 					<AlertDialogAction
 						onclick={handleDelete}
 						disabled={isDeleting}
-						class="bg-destructive hover:bg-destructive/90"
+						class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
 					>
 						{#if isDeleting}
 							<LoaderCircle class="h-4 w-4 animate-spin mr-2" />

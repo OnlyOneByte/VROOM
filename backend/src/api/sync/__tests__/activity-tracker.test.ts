@@ -62,7 +62,7 @@ describe('Activity tracker', () => {
     expect(tracker.getSyncStatus(userId).lastActivity).toBeUndefined();
   });
 
-  // cleanupInactiveUsers (C195 guard ratchet — the pure ageout was 0%-covered; it's the
+  // cleanupInactiveUsers (guard ratchet — the pure ageout was 0%-covered; it's the
   // synchronous, timer-free slice of this otherwise setInterval/orchestrator-bound module).
   // recordActivity always uses a long delay (999 min) so no inactivity timer fires mid-test.
   describe('cleanupInactiveUsers — ages out stale users only', () => {
@@ -136,10 +136,10 @@ describe('Activity tracker', () => {
   });
 
   // hasChangesSinceLastSync FAILS OPEN (line 148): a repo error returns `true`, so a check failure
-  // triggers a backup rather than silently SKIPPING one — the conservative, NORTH_STAR #1
+  // triggers a backup rather than silently SKIPPING one — the conservative,
   // (no silent data loss) choice. Pin it so a refactor can't flip it to fail-closed (which would
   // make a transient DB hiccup silently drop an auto-backup the user expected).
-  describe('hasChangesSinceLastSync — fails OPEN on a repo error (#1 data-safety)', () => {
+  describe('hasChangesSinceLastSync — fails OPEN on a repo error (data-safety)', () => {
     test('a throwing syncStateRepository.hasChangesSinceLastSync → returns true (back up, do not skip)', async () => {
       const tracker = UserActivityTracker.getInstance();
       const repoModule = await import('../../settings/repository');

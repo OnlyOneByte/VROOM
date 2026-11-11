@@ -116,11 +116,19 @@
 	});
 
 	// --- S3 form state ---
-	let s3Config = $state({ endpoint: '', bucket: '', region: '', photoRootPath: 'vroom/photos' });
+	let s3Config = $state({ endpoint: '', bucket: '', region: '' });
 	let s3Credentials = $state({ accessKeyId: '', secretAccessKey: '' });
 
-	// --- Provider root path ---
+	// --- Storage paths ---
 	let providerRootPath = $state('VROOM');
+	/**
+	 * Owned here, edited in PhotoFolderSection and written by handleSave, so what the user sees is
+	 * what is stored. It is a real path segment server-side (the upload path is
+	 * providerRootPath / photoRootPath / category folder), so a default written over a configured
+	 * value sends new photos to a different folder from the existing ones. Only an explicit provider
+	 * type pick re-seeds it — see the type picker.
+	 */
+	let photoRootPath = $state(getDefaultPhotoRootPath('google-drive'));
 
 	// --- Folder settings ---
 	let folderSettings = $state<Record<PhotoCategory, CategorySetting>>({
@@ -134,6 +142,13 @@
 	let sheetsSyncEnabled = $state(false);
 	let sheetsSpreadsheetId = $state('');
 	let backupConfig = $state<BackupConfig>({ providers: {} });
+	/**
+	 * The per-category default providers, as loaded from the server. This form edits ONE provider's
+	 * folder settings and no defaults, so it round-trips what it loaded (the server merges
+	 * storageConfig per key) — inventing a value here would re-point or clear a default the user set
+	 * elsewhere. Empty until the load lands, which is a no-op for the merge.
+	 */
+	let storageDefaults = $state<Partial<StorageConfig['defaults']>>({});
 
 	let providerRootPrefix = $derived(
 		providerRootPath ? `${providerRootPath.replace(/\/+$/, '')}/` : ''
@@ -161,12 +176,14 @@
 			selectedType = existingProvider.providerType;
 			displayName = existingProvider.displayName;
 			providerRootPath = (existingProvider.config?.['providerRootPath'] as string) || 'VROOM';
+			photoRootPath =
+				(existingProvider.config?.['photoRootPath'] as string) ||
+				getDefaultPhotoRootPath(existingProvider.providerType);
 			if (existingProvider.providerType === 's3') {
 				s3Config = {
 					endpoint: (existingProvider.config?.['endpoint'] as string) ?? '',
 					bucket: (existingProvider.config?.['bucket'] as string) ?? '',
-					region: (existingProvider.config?.['region'] as string) ?? '',
-					photoRootPath: (existingProvider.config?.['photoRootPath'] as string) ?? 'vroom/photos'
+					region: (existingProvider.config?.['region'] as string) ?? ''
 				};
 			}
 			if (existingFolderSettings) {
@@ -176,10 +193,11 @@
 		}
 	});
 
-	async function loadBackupConfig() {
+	async function loadSettings() {
 		try {
 			const settings = await settingsApi.getSettings();
 			backupConfig = settings.backupConfig ?? { providers: {} };
+			storageDefaults = settings.storageConfig?.defaults ?? {};
 			if (providerId) {
 				const providerSettings = backupConfig.providers[providerId];
 				if (providerSettings) {
@@ -196,34 +214,12 @@
 	}
 
 	onMount(async () => {
-		loadBackupConfig();
-
-		// Handle OAuth return (reads URL params, fetches pending email, cleans URL)
-		const oauthResult = await oauth.handleOAuthReturn();
+		// Independent calls, so one latency round: the settings load and the OAuth return
+		// (reads URL params, fetches pending email, cleans URL) need nothing from each other.
+		const [, oauthResult] = await Promise.all([loadSettings(), oauth.handleOAuthReturn()]);
 		if (oauthResult.restoredSelectedType) selectedType = oauthResult.restoredSelectedType;
 		if (oauthResult.restoredDisplayName) displayName = oauthResult.restoredDisplayName;
 	});
-
-	const CREATED_AT_PLACEHOLDER = new Date().toISOString();
-
-	let tempProvider = $derived.by(
-		() =>
-			({
-				id: providerId ?? 'new',
-				domain: 'storage',
-				providerType: selectedType ?? 'google-drive',
-				displayName: displayName || 'New Provider',
-				status: 'active' as const,
-				config: {
-					providerRootPath: providerRootPath.trim(),
-					photoRootPath:
-						selectedType === 's3'
-							? s3Config.photoRootPath
-							: getDefaultPhotoRootPath(selectedType ?? 'google-drive')
-				},
-				createdAt: existingProvider?.createdAt ?? CREATED_AT_PLACEHOLDER
-			}) satisfies UserProviderInfo
-	);
 
 	function handleFolderSettingsUpdate(settings: Record<PhotoCategory, CategorySetting>) {
 		folderSettings = settings;
@@ -270,10 +266,13 @@
 		isSaving = true;
 		try {
 			let credentials: Record<string, unknown> = {};
+			// Seeded from the stored config so the keys this form does not manage survive the save —
+			// `accountEmail` is written server-side from the OAuth grant and is the only record of
+			// which Google account this provider is.
 			let config: Record<string, unknown> = {
+				...(existingProvider?.config ?? {}),
 				providerRootPath: providerRootPath.trim(),
-				photoRootPath:
-					selectedType === 's3' ? s3Config.photoRootPath : getDefaultPhotoRootPath(selectedType)
+				photoRootPath: photoRootPath.trim() || getDefaultPhotoRootPath(selectedType)
 			};
 
 			if (selectedType === 's3') {
@@ -321,18 +320,24 @@
 				resultId = created.id;
 			}
 
+			// What could not be saved, named for the user. The provider row itself is saved by now, so
+			// a failure here is never rolled back — but it is never reported as success either: these
+			// two calls carry the folder paths and the backup toggles, which is what decides whether
+			// photos and backups go anywhere at all.
+			const unsaved: string[] = [];
+
 			// Persist folder settings
 			try {
 				await settingsApi.updateSettings({
 					storageConfig: {
-						defaults: {} as StorageConfig['defaults'],
+						defaults: storageDefaults as StorageConfig['defaults'],
 						providerCategories: {
 							[resultId]: folderSettings
 						}
 					}
 				});
 			} catch {
-				// Non-critical — backend auto-populated defaults
+				unsaved.push('folder settings');
 			}
 
 			// Persist backup settings
@@ -359,15 +364,19 @@
 					};
 					await settingsApi.updateSettings({ backupConfig: updatedBackupConfig });
 				} catch {
-					// Non-critical — backup settings can be configured later
+					unsaved.push('backup settings');
 				}
 			}
 
-			appStore.showSuccess(
-				isEditMode
-					? `${displayName.trim()} updated successfully`
-					: `${displayName.trim()} added successfully`
-			);
+			const name = displayName.trim();
+			const verb = isEditMode ? 'updated' : 'added';
+			if (unsaved.length > 0) {
+				appStore.showWarning(
+					`${name} ${verb}, but its ${unsaved.join(' and ')} could not be saved. Re-open the provider to try again.`
+				);
+			} else {
+				appStore.showSuccess(`${name} ${verb} successfully`);
+			}
 			navigateBack();
 		} catch {
 			appStore.showError(isEditMode ? 'Failed to update provider' : 'Failed to add provider');
@@ -447,7 +456,12 @@
 										? 'border-border bg-muted opacity-50 cursor-not-allowed'
 										: 'border-border hover:border-primary/50 hover:bg-muted/50 cursor-pointer'}"
 								onclick={() => {
-									if (!pt.disabled) selectedType = pt.id;
+									if (pt.disabled) return;
+									selectedType = pt.id;
+									// The only place the photo root path is re-seeded: picking a type is an
+									// explicit choice of a new provider, so its default path is expected. Anything
+									// else (a keystroke elsewhere, a reload) must leave what the user typed alone.
+									photoRootPath = getDefaultPhotoRootPath(pt.id);
 								}}
 							>
 								<Icon
@@ -503,14 +517,10 @@
 				<CardContent class="space-y-4">
 					{#if selectedType === 's3'}
 						<S3ProviderForm
-							config={s3Config}
+							config={{ ...s3Config, photoRootPath }}
 							credentials={s3Credentials}
-							onConfigChange={(c: {
-								endpoint: string;
-								bucket: string;
-								region: string;
-								photoRootPath: string;
-							}) => (s3Config = c)}
+							onConfigChange={(c: { endpoint: string; bucket: string; region: string }) =>
+								(s3Config = { endpoint: c.endpoint, bucket: c.bucket, region: c.region })}
 							onCredentialsChange={(c: { accessKeyId: string; secretAccessKey: string }) =>
 								(s3Credentials = c)}
 						/>
@@ -554,7 +564,7 @@
 				</CardHeader>
 				<CardContent>
 					<ProviderFolderSettings
-						provider={tempProvider}
+						bind:photoRootPath
 						categorySettings={folderSettings}
 						{defaultCategories}
 						{providerRootPath}

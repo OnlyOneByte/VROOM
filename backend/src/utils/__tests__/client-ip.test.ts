@@ -3,10 +3,10 @@
  *
  * SECURITY regression guard: an attacker must NOT be able to get a fresh rate-limit
  * bucket by spoofing X-Forwarded-For. These tests pin the trust rules:
- *   - no trusted proxies (default)          → ignore XFF, use socket IP
- *   - socket IS a trusted proxy             → honor leftmost XFF (the real client)
- *   - socket is NOT a trusted proxy         → ignore XFF even if present
- *   - no socket IP (in-process app.request) → fall back to XFF, else 'unknown'
+ *  - no trusted proxies (default) → ignore XFF, use socket IP
+ *  - socket IS a trusted proxy → honor leftmost XFF (the real client)
+ *  - socket is NOT a trusted proxy → ignore XFF even if present
+ *  - no socket IP (in-process app.request) → fall back to XFF, else 'unknown'
  *
  * The trusted-proxy list is injected (getClientIp's 2nd arg) so the trust logic is
  * tested deterministically without env/module-cache gymnastics. `getConnInfo`
@@ -72,7 +72,7 @@ describe('getClientIp — behind a trusted proxy', () => {
     );
   });
 
-  // C265: a request can arrive AT the trusted proxy's socket IP with NO X-Forwarded-For (e.g. a
+  // A request can arrive AT the trusted proxy's socket IP with NO X-Forwarded-For (e.g. a
   // direct hit to the LB, or a probe). The trusted branch is entered but `xff` is undefined, so it
   // must fall through to the socket IP — never crash, never key on 'unknown' (which would pool all
   // such requests into one shared bucket).
@@ -81,7 +81,7 @@ describe('getClientIp — behind a trusted proxy', () => {
     expect(getClientIp(ctx({}), ['10.0.0.1'])).toBe('10.0.0.1');
   });
 
-  // C265: an empty / whitespace-only X-Forwarded-For from a trusted proxy parses to undefined
+  // An empty / whitespace-only X-Forwarded-For from a trusted proxy parses to undefined
   // (clientFromForwardedFor's `first || undefined`), so it must fall through to the socket IP — not
   // return '' as the rate-limit key (an empty key would pool every empty-XFF request together).
   test('falls back to the socket IP when trusted but X-Forwarded-For is empty/whitespace', () => {
@@ -101,7 +101,7 @@ describe('getClientIp — no socket IP (in-process app.request)', () => {
     expect(getClientIp(ctx({}), [])).toBe('unknown');
   });
 
-  // C265: the no-socket fallback (:62) takes the LEFTMOST XFF entry + trims, mirroring the
+  // The no-socket fallback (:62) takes the LEFTMOST XFF entry + trims, mirroring the
   // trusted-proxy parse — pin that a multi-entry header keys on the original client, not the raw
   // string (so two in-process requests behind the same first-hop client share a bucket).
   test('takes the leftmost entry of a multi-hop X-Forwarded-For in the fallback', () => {

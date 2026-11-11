@@ -1,18 +1,18 @@
 /**
  * VLM receipt-parsing T7 — the DRAFT → CREATE round-trip guard (the merge-surviving half of the
  * feature DoD). The T4 test (vlm-parse-route.test.ts) pins that `POST /receipts/parse` returns a clean
- * draft and PERSISTS NOTHING; this pins the OTHER half NORTH_STAR #3 cares about: that the returned
+ * draft and PERSISTS NOTHING; this pins the OTHER half cares about: that the returned
  * draft, mapped exactly as the expense form maps it, drives a SUCCESSFUL `POST /expenses` create whose
  * money + fields survive end-to-end. The two together prove the whole FE→BE→draft→form→create seam
  * without a live VLM or a browser (the live-VLM + photo-attach leg is the untracked Playwright e2e,
- * which needs the dev server's ALLOW_FAKE_STORAGE seam — gated off in the in-process suite, C91).
+ * which needs the dev server's ALLOW_FAKE_STORAGE seam — gated off in the in-process suite).
  *
  * "Mapped exactly as the form maps it" = ExpenseForm.handleReceiptDraft + handleSubmit + toBackendExpense:
- *   draft.amount   (dollars)        → expenseAmount  (dollars in the body; POST transforms → cents)
- *   draft.date     ("YYYY-MM-DD")   → date           (the form's dateOnlyToISO → noon-local ISO)
- *   draft.odometer (integer)        → mileage
- *   draft.vendor   (string)         → description     (only when the description is empty)
- *   draft.category (one of 6)       → category
+ *  draft.amount (dollars) → expenseAmount (dollars in the body; POST transforms → cents)
+ *  draft.date ("YYYY-MM-DD") → date (the form's dateOnlyToISO → noon-local ISO)
+ *  draft.odometer (integer) → mileage
+ *  draft.vendor (string) → description (only when the description is empty)
+ *  draft.category (one of 6) → category
  * The GET back returns expenseToApi (cents→dollars), so a $47.83 draft must read back as 47.83 — the
  * money-cents boundary is the exact thing a draft round-trip could silently corrupt.
  *

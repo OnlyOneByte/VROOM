@@ -7,18 +7,18 @@ fileMatchPattern: "backend/src/api/**"
 
 ## Domain Structure
 
-Each domain under `backend/src/api/` follows this structure:
-
 ```
 api/<domain>/
-├── routes.ts           # Hono route definitions, validation schemas, request handling
-├── repository.ts       # Data access layer (Drizzle queries), extends BaseRepository
-├── __tests__/          # Property tests and unit tests
-│   ├── *.property.test.ts
-│   └── *-test-generators.ts
-├── validation.ts       # (optional) Complex validation logic extracted from routes
-└── hooks.ts            # (optional) Cross-domain side effects (e.g., financing hooks)
+├── routes.ts        # Hono routes, Zod schemas, request handling
+├── repository.ts    # Drizzle queries, extends BaseRepository
+├── validation.ts    # (optional) schemas too complex for routes.ts
+├── hooks.ts         # (optional) cross-domain side effects
+└── __tests__/
 ```
+
+Domains with real logic add named services (`split-service.ts`, `trigger-service.ts`,
+`photo-service.ts`); `providers/` additionally nests `domains/<kind>/` registries. Every
+domain exports `routes` and is mounted in `app.ts` at `/api/v1/<domain>`.
 
 ## Route File Pattern (`routes.ts`)
 
@@ -29,31 +29,25 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { tableName } from '../../db/schema';
-import { NotFoundError, ValidationError } from '../../errors';
+import { type ApiResponse, NotFoundError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { commonSchemas } from '../../utils/validation';
 import { domainRepository } from './repository';
 
 const routes = new Hono();
 
-// 1. Define Zod schemas derived from Drizzle schema
 const baseSchema = createInsertSchema(tableName, {
-  // Override specific fields with custom validation
   fieldName: z.string().min(1).max(CONFIG.validation.domain.fieldMaxLength),
 });
-const createSchema = baseSchema.omit({ id: true, createdAt: true, updatedAt: true });
+const createSchema = baseSchema.omit({ id: true, userId: true, createdAt: true, updatedAt: true });
 const updateSchema = createSchema.partial();
 
-// 2. Apply middleware to all routes
 routes.use('*', requireAuth);
 routes.use('*', changeTracker);
 
-// 3. Define routes: GET list, POST create, GET :id, PUT :id, DELETE :id
-routes.get('/', async (c) => { /* ... */ });
+// GET list, POST create, GET :id, PUT :id, DELETE :id
 routes.post('/', zValidator('json', createSchema), async (c) => { /* ... */ });
 routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => { /* ... */ });
-routes.put('/:id', zValidator('param', commonSchemas.idParam), zValidator('json', updateSchema), async (c) => { /* ... */ });
-routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => { /* ... */ });
 
 export { routes };
 ```
@@ -61,81 +55,109 @@ export { routes };
 ## Repository File Pattern (`repository.ts`)
 
 ```typescript
-import { eq, and, desc, type SQL } from 'drizzle-orm';
-import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
-import { getDb } from '../../db/connection';
-import type { Entity, NewEntity } from '../../db/schema';
-import { entityTable } from '../../db/schema';
-import { DatabaseError } from '../../errors';
-import { logger } from '../../utils/logger';
+import { and, desc, eq } from 'drizzle-orm';
+import { type AppDatabase, getDb } from '../../db/connection';
+import { type Entity, entityTable, type NewEntity } from '../../db/schema';
 import { BaseRepository } from '../../utils/repository';
 
 export class EntityRepository extends BaseRepository<Entity, NewEntity> {
-  constructor(db: BunSQLiteDatabase<Record<string, unknown>>) {
+  constructor(db: AppDatabase) {
     super(db, entityTable);
   }
 
-  // Add domain-specific query methods
-  async findByUserId(userId: string): Promise<Entity[]> {
-    // Use direct Drizzle queries, not abstraction layers
-  }
+  // Domain queries use Drizzle directly — no query-builder abstraction
+  async findByUserId(userId: string): Promise<Entity[]> { /* ... */ }
 }
 
-// Export singleton instance
 export const entityRepository = new EntityRepository(getDb());
 ```
+
+`BaseRepository` supplies `findById`/`create`/`update`/`delete` (the last two throw
+`NotFoundError` on a missing row). Take `AppDatabase`, never `BunSQLiteDatabase` — the alias
+is the seam for a future non-SQLite dialect.
+
+Extending it is the default, not a requirement: 8 of the 15 repositories do. Its signature is
+`table: Table & { id: Column }`, so a table without a single `id` column cannot extend it —
+`settings` (keyed on `user_id`) is the structural case. `analytics` runs read-only aggregations and
+has no row CRUD to inherit. The rest (`auth`, both `insurance`, both `photos`) own enough
+domain-specific query shape that the four inherited methods carry little of their weight. Extend it
+when the generic CRUD is genuinely what you need; don't reshape a repository to qualify.
 
 ## Rules
 
 ### Validation
-- Derive Zod schemas from Drizzle schema using `createInsertSchema()` from `drizzle-zod`
-- Override fields with custom constraints referencing `CONFIG.validation.*`
-- Use `zValidator('json', schema)` and `zValidator('param', schema)` middleware — don't manually parse
-- Use `commonSchemas.idParam` from `utils/validation.ts` for `:id` route params
-- Validate ownership before mutations: check that the resource belongs to the authenticated user
+- Mirror a table with `createInsertSchema()`; domains with heavy cross-field rules hand-write
+  `z.object` schemas in `validation.ts` (reminders, insurance, trips). Both are current.
+- Field constraints come from `CONFIG.validation.*`, not inline literals.
+- Validate with `zValidator('json' | 'param' | 'query', schema)`; never parse the body by hand.
+  `commonSchemas` (`utils/validation.ts`) has `idParam`, `vehicleIdParam`, `pagination`,
+  `clampedPaginationFields`, `dateRange`.
+- `.refine()` does NOT survive `.partial()`/`.omit()` — re-add every cross-field refinement to
+  the update schema, or a PUT persists what the POST rejects.
+- Nullable columns use `.nullish()`, not `.optional()`: an update that re-validates a merged DB
+  row sees `null` for unset columns, which `.optional()` rejects.
 
 ### Error Handling
-- Use typed errors from `errors.ts`: `NotFoundError`, `ValidationError`, `ConflictError`, `DatabaseError`
-- Don't catch errors in routes unless you need to transform them — the global error handler catches `AppError` subclasses
-- For sync/Drive operations, throw `SyncError` (from `errors.ts`). As of C24 the global error handler is `SyncError`-aware (maps each `SyncErrorCode` to its status via the shared `syncErrorResponse()`), so a thrown `SyncError` no longer needs a local catch. The existing `sync` route catch blocks still call `handleSyncError()` directly; converging them onto the global handler is a queued `arch` item (see BACKLOG arch #1)
-- Repository methods should throw `DatabaseError` for DB failures, with the original error as `details`
+- Throw typed errors from `errors.ts`: `ValidationError` (400), `AuthenticationError` (401),
+  `NotFoundError` (404), `ConflictError` (409), `DatabaseError` (500). `app.onError(errorHandler)`
+  formats them all — don't try/catch in a route just to reshape an error.
+- Provider/sync failures throw `SyncError` with a `SyncErrorCode`; the global handler maps the
+  code to its status (400/401/403/409/429/503). No local catch needed.
+- Repositories throw `DatabaseError` with the original error as `details`.
 
 ### Response Format
-- All responses use `{ success: true, data: ..., message?: ... }` for success
-- Error responses use `{ success: false, error: { code, message, details? } }`
-- Use HTTP status codes correctly: 200 (OK), 201 (created), 400 (validation), 404 (not found), 409 (conflict), 429 (rate limit), 500 (server error)
+- Success: `{ success: true, data, message? }`, typed as `ApiResponse<T>` from `errors.ts`.
+  `201` on create, `200` otherwise.
+- Paginated lists: `clampPagination()` the query params, respond via `buildPaginatedResponse()`
+  (`utils/pagination.ts`) → `{ success: true, data, pagination: { totalCount, limit, offset,
+  hasMore } }`.
+- Errors: `{ success: false, error: { code, message, details? } }`, emitted by the global
+  handler — don't hand-build it.
 
 ### Middleware
-- `requireAuth` — validates session, sets `c.get('user')`. Apply to all protected routes.
-- `changeTracker` — records data changes for sync. Apply to routes that modify data.
-- Rate limiters are configured in `CONFIG.rateLimit` and applied per-domain in `index.ts`. If you add a rate limit config entry, you must also apply it — unused config is a bug.
+- `requireAuth` validates the session and sets `c.get('user')`. First line of every domain router.
+- `changeTracker` marks data changed after a 2xx write so auto-sync/backup picks it up. A domain
+  that writes backed-up data and omits it is silently missing from the next backup.
+- `bodyLimit`, the global `rateLimiter`, `optionalAuth`, `activityTracker`, CORS, CSRF and
+  secure-headers are applied once in `app.ts` — don't re-apply per domain.
+- Scoped limiters come from `CONFIG.rateLimit` (`auth`, `sync`, `backup`, `restore`, `trigger`)
+  and are applied in the owning `routes.ts`. A config entry nothing applies is a bug.
+- `idempotency({ required })` replays a cached 2xx JSON body per `Idempotency-Key`
+  (`sync/routes.ts`); a non-JSON 2xx is intentionally left uncached.
 
 ### Ownership & Authorization
-- Every mutation (POST/PUT/DELETE) must verify the resource belongs to the authenticated user before proceeding. Don't rely on downstream services to enforce this — validate at the route level.
-- When removing ownership checks (e.g., refactoring a service function), ensure the caller still validates ownership. Document the contract if ownership is the caller's responsibility.
-- Functions that accept `userId` must actually use it for scoping. Prefixing with `_` to silence lint warnings while removing the check is a security regression.
+- Every POST/PUT/DELETE verifies the resource belongs to `c.get('user')` *before* the repository
+  call, via the `validate*Ownership` helpers in `utils/validation.ts`. Don't delegate it downstream.
+- A repository method taking `userId` must scope its query by it. Never `_`-prefix the param to
+  silence `noUnusedVariables` after dropping a check (insurance's `_userId` params are the
+  pre-existing route-validated case, not a pattern to copy).
+- Shared-vehicle access goes through `utils/sharing.ts` (`resolveVehicleAccess`,
+  `requireVehicleRead`, `requireVehicleWrite`, `resolveVehicleOwnerId`), not a raw `userId` compare.
 
-### Raw SQL & Data Migrations
-- When building raw SQL `IN (...)` clauses with dynamic arrays, batch in chunks of ~500 to stay under SQLite's `SQLITE_MAX_VARIABLE_NUMBER` limit (default 999). Unbounded arrays will crash for users with large datasets.
-- Data migrations that run after Drizzle schema migrations must be idempotent — safe to run multiple times without duplicating data.
+### Batching & Migrations
+- Build any `inArray`/`IN (...)` clause over an unbounded id list with `chunk()`
+  (`utils/chunk.ts`, batch 500) — SQLite's variable limit is 999.
+- Prefer one batched query to a per-item loop in cascade operations.
+- Anything added to `db/data-migration.ts` (runs after the Drizzle migrations) must be idempotent.
+- `createProviderInstance` decrypts credentials on every call — resolve a provider once and reuse it.
 
-### Entity Type Mappings
-- When mapping entity types to categories or behaviors, cover ALL entity types the system supports. Check the existing entity types in `photos.entityType`: `vehicle`, `expense`, `insurance_policy`, `odometer_entry`. Missing mappings cause runtime errors for valid operations.
-
-### Imports & Module Initialization
-- Keep all `import` statements at the top of the file. Don't place imports mid-file after runtime code — they're hoisted by the runtime anyway, and mid-file placement is misleading.
-- Singleton instances that call `getDb()` at module scope work in this project but create tight coupling to initialization order. Be aware of this when adding new singletons.
-
-### Performance
-- Avoid N+1 query patterns in cascade operations (e.g., deleting all photos for an entity). When iterating over a list and querying per item, consider batch queries with `inArray()` instead.
-- Provider credential decryption and instantiation is expensive. Don't create new provider instances per-request in hot paths if the same provider is used repeatedly.
+### Photo Entity Types
+The photo-bearing entities are `vehicle`, `expense`, `insurance_policy`, `insurance_claim`,
+`odometer_entry`. Three maps must list all five and stay in sync: `validateEntityOwnership`
+(`photos/helpers.ts`, the upload allowlist), `validateReferentialIntegrity` (`sync/backup.ts` —
+a missing type makes restore reject an otherwise-valid backup outright), and
+`ENTITY_TO_CATEGORY` (`providers/domains/storage/storage-provider.ts`).
 
 ### Cross-Domain Side Effects
-- When a mutation in one domain affects another (e.g., expense creation adjusting financing balance), use a hooks file (`hooks.ts`)
-- Hooks are called from the route handler, not the repository
-- Keep repositories focused on data access — business logic lives in routes or hooks
+A mutation affecting another domain goes in `hooks.ts` (`financing/`, `insurance/`) and is called
+from the route handler, never a repository. Repositories stay data access only; business logic
+lives in routes, hooks, or a named service.
 
-### Frontend Counterpart
-- Each backend domain should have a corresponding frontend API service in `frontend/src/lib/services/`
-- Service methods map 1:1 to backend endpoints
-- Types shared between frontend and backend are defined in `frontend/src/lib/services/api-transformer.ts`
+### Frontend Seam
+- The frontend reaches the API only through a domain service in `frontend/src/lib/services/`,
+  which calls `apiClient` (it unwraps `data` and throws `ApiError` from the error envelope).
+  Services are grouped by frontend domain, so they don't map 1:1 to route groups (financing
+  lives in `vehicle-api.ts`; photo endpoints sit on each entity's service).
+- Expense wire rows differ from the frontend `Expense` type: every read maps through
+  `fromBackendExpense`, every write through `toBackendExpense`
+  (`services/api-transformer.ts`). Returning a raw row typed as `Expense` is a type lie.

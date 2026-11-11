@@ -10,6 +10,10 @@ node_modules/
 package-lock.json
 *.lock
 
+# Emitted by themes-css.ts and pinned byte-for-byte by themes-css.test.ts — formatting it here
+# would make the generator and the committed file disagree.
+src/lib/theme/themes.css
+
 # Environment files
 .env*
 

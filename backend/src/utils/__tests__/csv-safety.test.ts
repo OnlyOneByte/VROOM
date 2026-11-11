@@ -136,7 +136,7 @@ describe('denormalizeCsvCell — symmetric inverse for round-trip import', () =>
 });
 
 // ---------------------------------------------------------------------------
-// ROUND-TRIP FIDELITY (RULED 2026-06-30, vlm/csv-apostrophe — optimize VROOM-own-export). The C401
+// ROUND-TRIP FIDELITY (RULED 2026-06-30, vlm/csv-apostrophe — optimize VROOM-own-export). The
 // asymmetry is CLOSED: a value the user genuinely typed as `'`+trigger (e.g. a vehicle nickname
 // `'=Daily`, a description `'=mc2 rebate`) now round-trips LOSSLESSLY. neutralizeCsvCell adds an
 // invertible escape (`'=Daily` → `''=Daily`); denormalizeCsvCell peels exactly one layer
@@ -144,9 +144,9 @@ describe('denormalizeCsvCell — symmetric inverse for round-trip import', () =>
 // value while leaving the foreign-import contract intact (a leading `'` before a NON-trigger is never
 // touched on either side). These assert the round-trip is now faithful — the property that matters.
 // ---------------------------------------------------------------------------
-describe('neutralizeCsvCell ↔ denormalizeCsvCell — LOSSLESS round-trip for every value (C527, ruling landed)', () => {
+describe('neutralizeCsvCell ↔ denormalizeCsvCell — LOSSLESS round-trip for every value (ruling landed)', () => {
   test.each([
-    // The crux: a user-typed `'`+trigger value survives export→import EXACTLY (was the C401 data-loss).
+    // The crux: a user-typed `'`+trigger value survives export→import EXACTLY (was the data-loss).
     "'=Daily", // a vehicle nickname forced-to-text with a leading '
     "'=mc2 rebate", // a description
     "'+1 driver fee",
@@ -169,7 +169,7 @@ describe('neutralizeCsvCell ↔ denormalizeCsvCell — LOSSLESS round-trip for e
 
   test("a `'`+trigger value is ESCAPED on export (not left bare) so import can restore it", () => {
     const userTyped = "'=Daily";
-    expect(neutralizeCsvCell(userTyped)).toBe("''=Daily"); // export now escapes it (the fix)
+    expect(neutralizeCsvCell(userTyped)).toBe("''=Daily"); // export now escapes it
     expect(denormalizeCsvCell("''=Daily")).toBe(userTyped); // import restores the literal '=Daily
   });
 });

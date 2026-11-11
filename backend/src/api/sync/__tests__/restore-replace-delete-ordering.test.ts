@@ -1,9 +1,9 @@
 /**
- * CERTIFICATION + GUARD (C13, deep-review): a replace-mode restore wipes the importer's data
+ * CERTIFICATION + GUARD: a replace-mode restore wipes the importer's data
  * (deleteUserData) and then re-inserts the backup (insertBackupData) — both must respect the FK graph,
  * which the DB enforces (connection.ts: PRAGMA foreign_keys = ON). bun-sqlite's async-transaction
- * callback does NOT roll back a throw (the C151/#127 footgun), so an FK violation MID-restore corrupts
- * the account: NORTH_STAR #1 silent total loss.
+ * callback does NOT roll back a throw, so an FK violation MID-restore corrupts
+ * the account: silent total loss.
  *
  * VERIFIED FIRSTHAND which side is load-bearing: the child FKs are `onDelete: cascade`, so the WIPE order
  * is defensively redundant (deleting a parent cascades its children — no throw). The teeth are on the
@@ -139,7 +139,7 @@ async function seedFullDataset(): Promise<void> {
   ctx.sqlite.run(`INSERT OR IGNORE INTO sync_state (user_id) VALUES (?)`, [uid]);
 }
 
-describe('replace-mode restore: FK-safe deleteUserData ordering on a COMPLETE dataset (C13)', () => {
+describe('replace-mode restore: FK-safe deleteUserData ordering on a COMPLETE dataset', () => {
   test('a full FK-linked dataset replace-restores cleanly (the wipe order survives FK enforcement)', async () => {
     await seedFullDataset();
 
@@ -177,7 +177,7 @@ describe('replace-mode restore: FK-safe deleteUserData ordering on a COMPLETE da
     const zip = await backupService.exportAsZip(ctx.user.id);
 
     // The crux: replace-mode runs deleteUserData (FK-ordered wipe) THEN re-inserts. With FKs enforced
-    // (PRAGMA foreign_keys=ON) a wrong delete order throws here; the C151 footgun means a throw mid-wipe
+    // (PRAGMA foreign_keys=ON) a wrong delete order throws here; the footgun means a throw mid-wipe
     // would corrupt the account. Success proves the order is FK-safe across the whole graph.
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);

@@ -8,13 +8,13 @@
  */
 
 import { describe, expect, mock, test } from 'bun:test';
-import { zValidator } from '@hono/zod-validator';
 import type { MiddlewareHandler } from 'hono';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
 import { DatabaseError } from '../../../errors';
 import { errorHandler } from '../../../middleware/error-handler';
+import { zValidator } from '../../../utils/validation';
 import type { AnalyticsSummaryData } from '../repository';
 
 // ---------------------------------------------------------------------------

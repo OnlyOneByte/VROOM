@@ -1,11 +1,11 @@
 /**
- * Coverage ratchet (guard, C169) for settings-api.ts — the last FE service-layer sibling at ~7% line
- * (the C143 api-client / C149 expense-api / C163 reminder-api ratchet covered the rest). Every settings/
+ * Coverage ratchet for settings-api.ts — the last FE service-layer sibling at ~7% line
+ * (the api-client / expense-api / reminder-api ratchet covered the rest). Every settings/
  * sync/backup/restore UI call routes through this module; its method→endpoint wiring + the load-bearing
  * restore-body branching + the Idempotency-Key headers (the double-restore data-safety guard) were
  * unexercised.
  *
- * apiClient is mocked (the C143/C149/C163 file-scoped vi.mock pattern — NOT the process-global mock.module
+ * apiClient is mocked (the file-scoped vi.mock pattern — NOT the process-global mock.module
  * trap) so each test asserts the exact URL + verb + body + headers the real method builds.
  */
 

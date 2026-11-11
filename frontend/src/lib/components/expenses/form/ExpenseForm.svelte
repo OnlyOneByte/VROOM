@@ -5,7 +5,8 @@
 	import { gotoDynamic, gotoWithQuery } from '$lib/utils/navigation';
 	import { onlineStatus } from '$lib/stores/offline.svelte';
 	import { addOfflineExpense } from '$lib/utils/offline-storage';
-	import { requestBackgroundSync } from '$lib/utils/pwa';
+	import { classifySyncFailure, type SyncFailureKind } from '$lib/utils/sync/sync-manager';
+	import { extractErrorMessage } from '$lib/utils/error-handling';
 	import { appStore } from '$lib/stores/app.svelte';
 	import { settingsStore } from '$lib/stores/settings.svelte';
 	import { expenseApi } from '$lib/services/expense-api';
@@ -42,7 +43,12 @@
 	import { validateExpenseField } from './expense-form-validation';
 	import { Checkbox } from '$lib/components/ui/checkbox';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
-	import { formatCurrency, dateOnlyToISO, toDateInputValue } from '$lib/utils/formatters';
+	import {
+		formatCurrency,
+		formatDate,
+		dateOnlyToISO,
+		toDateInputValue
+	} from '$lib/utils/formatters';
 	import {
 		buildSplitConfig,
 		categoryLabels,
@@ -96,12 +102,21 @@
 	});
 
 	// Form state
+	// `expenseId` is a route param, fixed for this component's life, so capturing it once is the
+	// intent — and `isLoading` is reassigned when the load settles, so it can't become a $derived.
+	// Svelte's state_referenced_locally warning here is the false positive MainSteering tells us to
+	// tolerate; leave it visible rather than suppressed, because it is also the only live signal that
+	// the load runs in onMount only (a same-route expenseId change would reload nothing).
 	let isLoading = $state(!!expenseId);
 	let isSubmitting = $state(false);
 	let isDeleting = $state(false);
 	let showDeleteConfirm = $state(false);
 	let vehicles = $state<Vehicle[]>([]);
 	let errors = $state<ExpenseFormErrors>({});
+	// Form-level failure of the LAST submit (a server rejection, or a device that cannot store the
+	// entry). Field errors live in `errors`; this is for the failures no single field owns, and it is
+	// rendered next to Save because the user stays on the form when it is set.
+	let submitError = $state<string | null>(null);
 	let touched = $state<Record<string, boolean>>({});
 	let originalExpense = $state<Expense | null>(null);
 	let vehicle = $state<Vehicle | null>(null);
@@ -248,8 +263,7 @@
 						formData.category = first.category;
 						formData.amount = splitGroup.groupTotal.toString();
 						formData.tags = first.tags || [];
-						const groupDate = new Date(first.date);
-						formData.date = `${groupDate.getFullYear()}-${String(groupDate.getMonth() + 1).padStart(2, '0')}-${String(groupDate.getDate()).padStart(2, '0')}`;
+						formData.date = toDateInputValue(new Date(first.date));
 						formData.description = first.description || '';
 						isLoading = false;
 						return;
@@ -260,8 +274,7 @@
 					formData.category = first.category;
 					formData.amount = splitGroup.groupTotal.toString();
 					formData.tags = first.tags || [];
-					const groupDate = new Date(first.date);
-					formData.date = `${groupDate.getFullYear()}-${String(groupDate.getMonth() + 1).padStart(2, '0')}-${String(groupDate.getDate()).padStart(2, '0')}`;
+					formData.date = toDateInputValue(new Date(first.date));
 					formData.description = first.description || '';
 
 					// Set up split state from siblings
@@ -302,8 +315,7 @@
 			formData.tags = expense.tags || [];
 			formData.category = expense.category;
 			formData.amount = expense.amount.toString();
-			const expenseDate = new Date(expense.date);
-			formData.date = `${expenseDate.getFullYear()}-${String(expenseDate.getMonth() + 1).padStart(2, '0')}-${String(expenseDate.getDate()).padStart(2, '0')}`;
+			formData.date = toDateInputValue(new Date(expense.date));
 			formData.mileage = expense.mileage?.toString() ?? '';
 			formData.volume = expense.volume?.toString() ?? '';
 			formData.charge = expense.charge?.toString() ?? '';
@@ -352,12 +364,12 @@
 	}
 
 	/**
-	 * Apply a VLM receipt-parse draft to the form (T6). Each field is optional + already validated
+	 * Apply a VLM receipt-parse draft to the form. Each field is optional + already validated
 	 * server-side (fail-closed), so we set ONLY the fields the draft carries and leave the rest for the
 	 * user. The draft amount is in DOLLARS (formData.amount is a dollar string); date is 'YYYY-MM-DD'
 	 * (the DatePicker's bind format); category routes through selectCategory so its side-effects fire;
 	 * odometer → mileage; vendor → description. The image rides pendingFiles → the existing
-	 * expense_receipts photo flow on save (R5). The user reviews + submits via the UNCHANGED path.
+	 * expense_receipts photo flow on save. The user reviews + submits via the UNCHANGED path.
 	 */
 	function handleReceiptDraft(draft: ReceiptDraft, image: File) {
 		if (typeof draft.amount === 'number') formData.amount = String(draft.amount);
@@ -381,7 +393,7 @@
 			sourceId = null;
 		}
 
-		// Clear fuel-only fields when switching AWAY from fuel (#76, mirroring the financing-source
+		// Clear fuel-only fields when switching AWAY from fuel (mirroring the financing-source
 		// reset above). The fuel inputs hide via `showFuelFields`, but their formData values otherwise
 		// PERSIST and ride along on submit — stamping a stale volume/charge/fuelType onto a non-fuel
 		// row (inert in analytics, which filter category='fuel', but a real data-hygiene leak), and a
@@ -506,6 +518,29 @@
 		return Object.keys(errors).length === 0;
 	}
 
+	/**
+	 * What to tell the user about a submit that could NOT be queued for later delivery, so they stay
+	 * on the form with their data instead of being sent away believing it was saved.
+	 */
+	function submitFailureMessage(kind: SyncFailureKind, error: unknown): string {
+		if (kind === 'auth') return 'Your session has expired. Please sign in again.';
+		if (kind === 'transient') return 'Network error. Please try again.';
+		// A terminal rejection carries the server's own reason — the only message that tells the user
+		// what to change.
+		return extractErrorMessage(error, 'Could not save this expense. Please try again.');
+	}
+
+	/**
+	 * The offline outbox write itself failed (site data blocked, or the device is out of storage), so
+	 * nothing about this expense survives a navigation. Say so and keep the user on the filled-in form.
+	 */
+	function reportUnqueuedSave(): void {
+		submitError =
+			'This device could not store the expense — storage is full or site data is blocked. ' +
+			'Your entry is still on this form: try again, or copy the values before leaving the page.';
+		appStore.addNotification({ type: 'error', message: submitError });
+	}
+
 	async function handleSubmit() {
 		if (!validateForm()) {
 			Object.keys(formData).forEach(field => {
@@ -515,12 +550,15 @@
 		}
 
 		isSubmitting = true;
+		submitError = null;
+
+		// Convert the date-input value to an ISO timestamp at noon local time to avoid a timezone
+		// day-shift (see dateOnlyToISO). Shared with VehicleForm/odometer so all forms agree, and
+		// computed OUTSIDE the try so the error-fallback offline save below persists the same
+		// instant instead of re-deriving (or leaking) the raw 'YYYY-MM-DD' picker value.
+		const dateISO = dateOnlyToISO(formData.date);
 
 		try {
-			// Convert date string to ISO at noon local time to avoid timezone day-shift
-			// (see dateOnlyToISO). Shared with VehicleForm/odometer so all forms agree.
-			const dateISO = dateOnlyToISO(formData.date);
-
 			const expenseData = {
 				vehicleId: formData.vehicleId,
 				tags: formData.tags,
@@ -598,7 +636,7 @@
 					gotoDynamic(returnTo);
 				} else {
 					// Save offline
-					addOfflineExpense({
+					const queued = addOfflineExpense({
 						vehicleId: expenseData.vehicleId,
 						tags: expenseData.tags,
 						category: expenseData.category,
@@ -608,16 +646,20 @@
 						...(expenseData.mileage !== undefined && { mileage: expenseData.mileage }),
 						...(expenseData.volume !== undefined && { volume: expenseData.volume }),
 						...(expenseData.charge !== undefined && { charge: expenseData.charge }),
-						// Carry fuelType: the sync transform needs it to keep an electric charge (#66).
+						// Carry fuelType: the sync transform needs it to keep an electric charge.
 						...(expenseData.fuelType !== undefined && { fuelType: expenseData.fuelType }),
-						// Carry missedFillup: dropping it on sync corrupts consecutive-fillup MPG pairing (#101).
+						// Carry missedFillup: dropping it on sync corrupts consecutive-fillup MPG pairing.
 						...(expenseData.missedFillup !== undefined && {
 							missedFillup: expenseData.missedFillup
 						})
 					});
 
-					requestBackgroundSync('expense-sync');
+					if (!queued) {
+						reportUnqueuedSave();
+						return;
+					}
 
+					// syncManager's `online` listener delivers this; see the note in $lib/utils/pwa.
 					appStore.addNotification({
 						type: 'info',
 						message: 'Expense saved offline. Will sync when online.'
@@ -629,14 +671,20 @@
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to save expense:', error);
 
-			if (!isEditMode) {
+			// A failure the SERVER decided (a validation rejection, a deleted vehicle, a revoked share)
+			// is not a connection problem: the outbox would re-POST it forever and never succeed, so it
+			// belongs on screen, next to the data that caused it. Only a failure that can still succeed
+			// later — no response, a timeout, a 5xx, or an expired session — may be queued.
+			const failureKind = classifySyncFailure(error);
+
+			if (!isEditMode && failureKind !== 'terminal') {
 				// Save offline as fallback for new expenses
 				const expenseData = {
 					vehicleId: formData.vehicleId,
 					tags: formData.tags,
 					category: formData.category,
 					amount: parseFloat(formData.amount),
-					date: formData.date,
+					date: dateISO,
 					mileage: formData.mileage ? parseInt(formData.mileage) : undefined,
 					volume: formData.volume ? parseFloat(formData.volume) : undefined,
 					charge: formData.charge ? parseFloat(formData.charge) : undefined,
@@ -646,7 +694,7 @@
 					missedFillup: formData.missedFillup
 				};
 
-				addOfflineExpense({
+				const queued = addOfflineExpense({
 					vehicleId: expenseData.vehicleId,
 					tags: expenseData.tags,
 					category: expenseData.category,
@@ -656,27 +704,33 @@
 					...(expenseData.mileage !== undefined && { mileage: expenseData.mileage }),
 					...(expenseData.volume !== undefined && { volume: expenseData.volume }),
 					...(expenseData.charge !== undefined && { charge: expenseData.charge }),
-					// Carry fuelType: the sync transform needs it to keep an electric charge (#66).
+					// Carry fuelType: the sync transform needs it to keep an electric charge.
 					...(expenseData.fuelType !== undefined && { fuelType: expenseData.fuelType }),
-					// Carry missedFillup: dropping it on sync corrupts consecutive-fillup MPG pairing (#101).
-					// This error-fallback save mirrors the offline-first save above (#111, C377): the #101
-					// fix landed on that path only, so a fuel fill-up logged with "missed previous" checked
-					// during an online-create FAILURE (timeout/5xx → this catch) silently dropped the flag.
+					// Carry missedFillup: dropping it on sync corrupts consecutive-fillup MPG pairing.
+					// This error-fallback save must stay field-for-field identical to the offline-first save
+					// above — an online create that fails (timeout/5xx → this catch) lands here, and any
+					// field only one of the two paths carries is silently lost for those users.
 					...(expenseData.missedFillup !== undefined && { missedFillup: expenseData.missedFillup })
 				});
-				requestBackgroundSync('expense-sync');
 
+				if (!queued) {
+					reportUnqueuedSave();
+					return;
+				}
+
+				// syncManager's `online` listener delivers this; see the note in $lib/utils/pwa.
 				appStore.addNotification({
 					type: 'warning',
-					message: 'Saved offline due to connection issue. Will sync when online.'
+					message:
+						failureKind === 'auth'
+							? 'Signed out — saved on this device. Sign in to sync it.'
+							: 'Saved offline due to connection issue. Will sync when online.'
 				});
 
 				gotoDynamic(returnTo);
 			} else {
-				appStore.addNotification({
-					type: 'error',
-					message: 'Network error. Please try again.'
-				});
+				submitError = submitFailureMessage(failureKind, error);
+				appStore.addNotification({ type: 'error', message: submitError });
 			}
 		} finally {
 			isSubmitting = false;
@@ -790,7 +844,7 @@
 	}
 
 	function resetAllocationsForMethod(method: 'even' | 'absolute' | 'percentage') {
-		// resetSplitAllocations is the shared source of truth (C415) — the insurance-term form runs the
+		// resetSplitAllocations is the shared source of truth — the insurance-term form runs the
 		// identical reset, so the 100/N rounded-to-1-decimal percentage seed can't drift between them.
 		splitAllocations = resetSplitAllocations(method, selectedVehicleIds);
 	}
@@ -870,8 +924,11 @@
 					</div>
 					<div>
 						<p class="text-muted-foreground">Date</p>
+						<!-- formData.date is the raw date-input value ('YYYY-MM-DD', and empty until the user
+						picks one), so it goes through dateOnlyToISO (noon local) — the same parse the save path
+						uses, which also turns an empty picker into a valid instant instead of a throw. -->
 						<p class="font-medium text-foreground">
-							{new Date(formData.date || '').toLocaleDateString()}
+							{formatDate(dateOnlyToISO(formData.date))}
 						</p>
 					</div>
 					{#if formData.description}
@@ -960,7 +1017,7 @@
 				}}
 				class="rounded-lg border bg-card p-6 space-y-6"
 			>
-				<!-- Scan receipt (create mode only) — pre-fills the fields below from a photo (T6). -->
+				<!-- Scan receipt (create mode only) — pre-fills the fields below from a photo. -->
 				{#if !isEditMode && !isSplit && !isInsuranceManaged}
 					<ReceiptScanButton onDraft={handleReceiptDraft} />
 				{/if}
@@ -1262,7 +1319,7 @@
 					/>
 				</div>
 
-				<!-- Location (expense-location D2: a single-line free-text label, no GPS) -->
+				<!-- Location: a single-line free-text label, deliberately not GPS coordinates -->
 				<div class="space-y-2">
 					<Label for="location">Location (Optional)</Label>
 					<Input
@@ -1293,6 +1350,12 @@
 						onRemove={i => (pendingFiles = pendingFiles.filter((_, idx) => idx !== i))}
 					/>
 				{/if}
+
+				{#if submitError}
+					<FormFieldError data-testid="submit-error" class="rounded-md bg-destructive/10 p-3">
+						{submitError}
+					</FormFieldError>
+				{/if}
 			</form>
 
 			<!-- Floating Action Bar -->
@@ -1311,7 +1374,11 @@
 							class="sm:rounded-full rounded-full shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 sm:h-14 px-5 border-0 flex-shrink-0"
 						>
 							<Trash2 class="h-5 w-5 sm:mr-2" />
-							<span class="hidden sm:inline font-semibold">Delete</span>
+							<!-- Clipped, not `hidden`, below `sm`: the icon is all that is left there and every Lucide
+							     icon is aria-hidden, so display:none on the text leaves the button with no accessible
+							     name at all. `max-sm:sr-only` (not `sr-only sm:not-sr-only`) because a later vendor
+							     `.sr-only` rule outranks `sm:not-sr-only` and would hide the label at every width. -->
+							<span class="max-sm:sr-only font-semibold">Delete</span>
 						</Button>
 					{/if}
 
@@ -1321,11 +1388,10 @@
 							variant="outline"
 							onclick={handleDuplicate}
 							disabled={isSubmitting || isDeleting}
-							class="sm:rounded-full rounded-full shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 sm:h-14 px-5 border-0 flex-shrink-0"
-							aria-label="Duplicate this expense"
+							class="sm:rounded-full rounded-full shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 sm:h-14 px-5 flex-shrink-0"
 						>
 							<Copy class="h-5 w-5 sm:mr-2" />
-							<span class="hidden sm:inline font-semibold">Duplicate</span>
+							<span class="max-sm:sr-only font-semibold">Duplicate</span>
 						</Button>
 					{/if}
 
@@ -1334,10 +1400,10 @@
 						variant="outline"
 						onclick={handleBack}
 						disabled={isSubmitting || isDeleting}
-						class="sm:rounded-full rounded-full bg-muted-foreground hover:bg-muted-foreground/80 text-background shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 sm:h-14 px-5 border-0 flex-shrink-0"
+						class="sm:rounded-full rounded-full shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 sm:h-14 px-5 flex-shrink-0"
 					>
 						<X class="h-5 w-5 sm:mr-2" />
-						<span class="hidden sm:inline font-semibold">Cancel</span>
+						<span class="max-sm:sr-only font-semibold">Cancel</span>
 					</Button>
 
 					<Button

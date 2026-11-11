@@ -1,14 +1,21 @@
 #!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
+# Enable with: git config core.hooksPath .husky
+#
+# `set -e` is load-bearing: without it every check below runs regardless of the previous
+# one's result and the hook exits with the status of the LAST command, so a failing
+# frontend type-check would not block the commit.
+set -e
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
 
 # Frontend checks
-cd frontend
+cd "$REPO_ROOT/frontend"
 npm run lint:fix
 npm run format
 npm run type-check
 
 # Backend checks
-cd ../backend
+cd "$REPO_ROOT/backend"
 bun run check:fix
 bun run test
 bun run type-check

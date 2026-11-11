@@ -308,7 +308,7 @@
 		{#if successMessage}
 			<!-- Icon keeps the chart-2 "success" hue (graphical, exempt) + the tint bg;
 			     the TEXT is text-foreground because chart-2 on its own 10% tint is ~3.26:1,
-			     below WCAG AA 4.5:1 for this small text (cycle 187-189 class). -->
+			     below WCAG AA 4.5:1 for this small text. -->
 			<div class="flex items-start gap-3 rounded-lg border border-chart-2/50 bg-chart-2/10 p-4">
 				<CircleCheck class="h-5 w-5 text-chart-2 shrink-0 mt-0.5" />
 				<p class="text-sm text-foreground">{successMessage}</p>
@@ -437,12 +437,7 @@
 							</p>
 						</div>
 					</div>
-					<Button
-						variant="outline"
-						size="sm"
-						onclick={handleExportData}
-						disabled={isExporting}
-					>
+					<Button variant="outline" size="sm" onclick={handleExportData} disabled={isExporting}>
 						{#if isExporting}
 							<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
 							Exporting...

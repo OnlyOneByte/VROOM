@@ -1,5 +1,5 @@
 /**
- * Unit tests for oklchToHex (#333 — the PWA theme-color tint converter). Pure input→output, no DOM. Pins
+ * Unit tests for oklchToHex (— the PWA theme-color tint converter). Pure input→output, no DOM. Pins
  * the OKLab→sRGB→hex pipeline at known anchor points + the fail-soft null contract callers rely on.
  */
 

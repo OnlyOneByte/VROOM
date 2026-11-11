@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import type {
 	QuickStatsResponse,
 	FuelStatsResponse,
@@ -6,6 +6,7 @@ import type {
 	AnalyticsSummaryResponse
 } from '$lib/types';
 import { ApiError } from '$lib/utils/error-handling';
+import { dateOnlyToISO, toDateInputValue } from '$lib/utils/formatters';
 
 // Mock apiClient
 vi.mock('../api-client', () => ({
@@ -189,10 +190,24 @@ describe('analyticsApi.getSummary()', () => {
 });
 
 // ---------------------------------------------------------------------------
-// getDefaultDateRange — the last-12-months window every analytics page seeds with (C212).
-// Pure, exported, previously untested; a regression in the offset would skew every analytics query.
+// getDefaultDateRange — the last-12-months window every analytics surface seeds with (summary,
+// cross-vehicle, per-vehicle, fuel stats). The backend reads it as [start, end): gte(date, start)
+// and lt(date, end), so both bounds are asserted against the instants expenses are actually
+// stored at — a skewed bound silently empties every chart on the page.
 // ---------------------------------------------------------------------------
 describe('getDefaultDateRange', () => {
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	/** Freeze the clock at a local wall-clock time on a fixed local calendar day. */
+	function freezeLocal(hour: number, minute = 0): Date {
+		const at = new Date(2026, 4, 14, hour, minute, 30, 123);
+		vi.useFakeTimers();
+		vi.setSystemTime(at);
+		return at;
+	}
+
 	it('returns unix-SECONDS (not ms) — both bounds are ~10-digit, not ~13', () => {
 		const { startDate, endDate } = getDefaultDateRange();
 		// seconds since epoch are ~1.7e9 (10 digits); ms would be ~1.7e12 (13). Guards the /1000.
@@ -202,25 +217,58 @@ describe('getDefaultDateRange', () => {
 		expect(Number.isInteger(endDate)).toBe(true);
 	});
 
-	it('start is exactly one year before end (same month/day)', () => {
+	it('spans one year of local calendar days: [local midnight a year ago, local midnight tomorrow)', () => {
+		const now = freezeLocal(8);
 		const { startDate, endDate } = getDefaultDateRange();
-		const start = new Date(startDate * 1000);
-		const end = new Date(endDate * 1000);
-		expect(end.getFullYear() - start.getFullYear()).toBe(1);
-		expect(start.getMonth()).toBe(end.getMonth());
-		expect(start.getDate()).toBe(end.getDate());
+		expect(new Date(startDate * 1000)).toEqual(
+			new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())
+		);
+		expect(new Date(endDate * 1000)).toEqual(
+			new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+		);
 	});
 
-	it('end is at/just-before now (window ends at the present, not the future)', () => {
-		const nowSec = Math.floor(Date.now() / 1000);
+	// A date-only expense is stored anchored at NOON local (dateOnlyToISO), so a window whose upper
+	// bound is the current instant drops everything logged today until the clock passes noon — and
+	// the bound is exclusive on the backend (`lt`). Sweep the whole day: the window must contain
+	// today's noon anchor no matter what time the user opens the page.
+	for (const hour of [0, 8, 11, 12, 13, 23]) {
+		it(`includes an expense dated today when the local clock reads ${String(hour).padStart(2, '0')}:00`, () => {
+			const now = freezeLocal(hour);
+			const { startDate, endDate } = getDefaultDateRange();
+			const storedSec = new Date(dateOnlyToISO(toDateInputValue(now))).getTime() / 1000;
+
+			expect(storedSec).toBeGreaterThanOrEqual(startDate);
+			expect(storedSec).toBeLessThan(endDate);
+		});
+	}
+
+	it('excludes an expense dated tomorrow (the window stops at the end of today)', () => {
+		const now = freezeLocal(8);
+		const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
 		const { endDate } = getDefaultDateRange();
-		expect(endDate).toBeLessThanOrEqual(nowSec + 2); // tiny clock slop
-		expect(endDate).toBeGreaterThan(nowSec - 5);
+		const storedSec = new Date(dateOnlyToISO(toDateInputValue(tomorrow))).getTime() / 1000;
+
+		expect(storedSec).toBeGreaterThanOrEqual(endDate);
+	});
+
+	it('includes an expense dated the first day of the window, excludes the day before it', () => {
+		const now = freezeLocal(8);
+		const { startDate } = getDefaultDateRange();
+		const firstDay = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+		const dayBefore = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate() - 1);
+
+		expect(
+			new Date(dateOnlyToISO(toDateInputValue(firstDay))).getTime() / 1000
+		).toBeGreaterThanOrEqual(startDate);
+		expect(new Date(dateOnlyToISO(toDateInputValue(dayBefore))).getTime() / 1000).toBeLessThan(
+			startDate
+		);
 	});
 });
 
 // ---------------------------------------------------------------------------
-// Method→endpoint wiring + buildQuery (C212). The 12 thin wrappers the getSummary-only suite left
+// Method→endpoint wiring + buildQuery. The 12 thin wrappers the getSummary-only suite left
 // uncovered (the ~36% func gap). Mock apiClient, assert the EXACT path + query, and that the wrapper
 // returns the apiClient result verbatim (apiClient.get already unwraps the {success,data} envelope).
 // ---------------------------------------------------------------------------

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { browser } from '$app/environment';
 	import { LoaderCircle, Upload, X, CircleAlert, SwitchCamera, Circle } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
@@ -27,8 +28,12 @@
 	let hasCameraSupport = $derived(browser && !!navigator.mediaDevices?.getUserMedia);
 
 	// --- Camera lifecycle ---
+	// Mount/unmount only. `startCamera` reads `facingMode` synchronously to build its constraints, so
+	// calling it tracked would make this effect re-run on every camera switch — tearing down the
+	// stream the switch had just acquired and opening the hardware a second time. Every restart is
+	// owned by the action that needs one (toggleFacingMode, retakePhoto, the error "Try Again").
 	$effect(() => {
-		startCamera();
+		untrack(() => startCamera());
 		return () => {
 			stopCamera();
 			if (capturedPreview) {
@@ -46,8 +51,7 @@
 		const thisStartId = ++cameraStartId;
 		cameraError = null;
 		cameraReady = false;
-		capturedPreview = null;
-		capturedFile = null;
+		discardCapture();
 
 		try {
 			const stream = await navigator.mediaDevices.getUserMedia({
@@ -122,6 +126,19 @@
 		cameraReady = false;
 	}
 
+	/**
+	 * Drop the pending capture, releasing its blob URL first. The ONLY correct way to clear
+	 * `capturedPreview`: assigning null on its own leaks the full-resolution JPEG for the lifetime of
+	 * the page, because the URL is then unreachable and nothing can revoke it afterwards.
+	 */
+	function discardCapture() {
+		if (capturedPreview) {
+			URL.revokeObjectURL(capturedPreview);
+		}
+		capturedPreview = null;
+		capturedFile = null;
+	}
+
 	async function toggleFacingMode() {
 		facingMode = facingMode === 'environment' ? 'user' : 'environment';
 		stopCamera();
@@ -170,11 +187,7 @@
 	}
 
 	function retakePhoto() {
-		if (capturedPreview) {
-			URL.revokeObjectURL(capturedPreview);
-		}
-		capturedPreview = null;
-		capturedFile = null;
+		discardCapture();
 		startCamera();
 	}
 
@@ -183,8 +196,10 @@
 		uploadingCapture = true;
 		try {
 			await onUploadCapture(capturedFile);
-			capturedPreview = null;
-			capturedFile = null;
+			// Revoke BEFORE dropping the reference: nulling it first makes the full-resolution JPEG
+			// unreachable but still resident, and a later reset() can no longer free it. A session of
+			// several captures would otherwise retain every one of them for the page's lifetime.
+			discardCapture();
 			uploadingCapture = false;
 		} catch {
 			uploadingCapture = false;
@@ -193,13 +208,9 @@
 
 	export function reset() {
 		stopCamera();
-		if (capturedPreview) {
-			URL.revokeObjectURL(capturedPreview);
-		}
+		discardCapture();
 		cameraError = null;
 		cameraReady = false;
-		capturedPreview = null;
-		capturedFile = null;
 		uploadingCapture = false;
 	}
 

@@ -7,7 +7,7 @@
  * tool call and runs it scoped to the SESSION user. Returns `{ reply, toolsUsed }`. PERSISTS NOTHING
  * (D3 ephemeral — the transcript lives in the client).
  *
- * Error honesty (the #43/#44/#144 anti-fail-open lesson): no configured provider → 400 with an
+ * Error honesty (the anti-fail-open lesson): no configured provider → 400 with an
  * actionable message; a provider transport/HTTP failure → 502 (never a faked reply); a loop that hits
  * its caps without an answer returns a 200 with an HONEST bounded reply (handled in the orchestrator).
  *
@@ -16,7 +16,6 @@
  * The global rate-limiter (app.ts) already covers request-rate; the LLM cost lands on the user's own key.
  */
 
-import { zValidator } from '@hono/zod-validator';
 import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
@@ -25,6 +24,7 @@ import { userProviders } from '../../db/schema';
 import { AppError, ValidationError } from '../../errors';
 import { requireAuth } from '../../middleware';
 import { logger } from '../../utils/logger';
+import { zValidator } from '../../utils/validation';
 import type { ChatMessage } from '../providers/domains/llm/llm-provider';
 import { runAssistant } from '../providers/domains/llm/orchestrator';
 import { getLlmProvider } from '../providers/domains/llm/registry';

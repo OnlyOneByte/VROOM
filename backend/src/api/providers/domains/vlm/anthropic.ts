@@ -6,7 +6,7 @@
  * Same DUMB-TRANSPORT contract as the OpenAI-compatible adapter (T3a): send the fixed prompt + image,
  * return the model's RAW text; the shared `parseExtraction` (prompt.ts) is the SOLE validator. A
  * non-2xx / network / timeout failure THROWS (the parse route maps it to 502; never a faked success —
- * the #43/#44/#144 anti-fail-open lesson). The api key goes in the `x-api-key` header (Anthropic's
+ * the anti-fail-open lesson). The api key goes in the `x-api-key` header (Anthropic's
  * scheme, NOT Bearer), and the required `anthropic-version` header pins the wire format.
  */
 

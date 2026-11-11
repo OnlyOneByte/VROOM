@@ -4,13 +4,13 @@
  * Drives the REAL notifyUser against the in-memory DB (via createTestApp, which points the DB singleton
  * the repo binds at ':memory:') with a FAKE PushSender (the DI seam) — so the whole lifecycle runs
  * ZERO-network with no VAPID keypair. Pins:
- *   - ok        → markSuccess (failure streak cleared, lastSuccessAt stamped), row survives.
- *   - gone      → prune (the 404/410 endpoint is removed).
- *   - transient → incrementFailure; reaped once the streak hits the CONFIG cap (the #135 class).
- *   - fan-out over MANY of a user's devices; the summary counts each outcome.
- *   - best-effort: a sender that THROWS is swallowed (notifyUser never rejects) + does not abort the
- *     rest of the fan-out.
- *   - scope: only the target user's subscriptions are sent to.
+ *  - ok → markSuccess (failure streak cleared, lastSuccessAt stamped), row survives.
+ *  - gone → prune (the 404/410 endpoint is removed).
+ *  - transient → incrementFailure; reaped once the streak hits the CONFIG cap.
+ *  - fan-out over MANY of a user's devices; the summary counts each outcome.
+ *  - best-effort: a sender that THROWS is swallowed (notifyUser never rejects) + does not abort the
+ *  rest of the fan-out.
+ *  - scope: only the target user's subscriptions are sent to.
  *
  * NOTE: with the fake sender injected, notifyUser runs regardless of CONFIG.push.enabled (only the REAL
  * web-push transport is gated on VAPID config) — so the harness (no VAPID env) exercises it fully.
@@ -100,7 +100,7 @@ describe('notifyUser lifecycle (T4a)', () => {
     expect(rows[0].failureCount).toBe(1);
   });
 
-  test('a persistently-transient endpoint is reaped once the streak hits the cap (#135)', async () => {
+  test('a persistently-transient endpoint is reaped once the streak hits the cap', async () => {
     await sub(userA, 'ep-dead');
     setPushSenderForTest(scriptedSender({ 'ep-dead': { kind: 'transientError' } }));
 

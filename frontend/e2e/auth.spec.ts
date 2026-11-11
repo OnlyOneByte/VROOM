@@ -1,137 +1,116 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+import { E2E_USER, addSessionCookie, mockApi } from './support/mock-api';
 
 /**
- * Authentication E2E Tests
- * Tests the Google OAuth login flow and session management
- * Requirements: 3.1, 3.2, 3.3, 3.4
+ * Sign-in, route protection and sign-out.
+ *
+ * Route facts this spec is written against (there is no `/login` route — the previous
+ * version of this file navigated to one):
+ *   `/`     — marketing landing page, public, has the "Sign In" affordance
+ *   `/auth` — sign-in page; the provider buttons come from `GET /api/v1/auth/providers`,
+ *             so the label is "Continue with <provider>", not "Sign in with Google"
+ *   anything not in `publicRoutes` ($lib/utils/auth.ts) redirects a logged-out visitor
+ *             to `/auth`
  */
 
-test.describe('Authentication Flow', () => {
-	test('should display login page for unauthenticated users', async ({ page }) => {
+/** Sign out lives in the desktop sidebar, and on narrow viewports inside the mobile
+ *  navigation sheet — which is not in the DOM until the hamburger is clicked. */
+async function openNavigationForNarrowViewports(page: Page) {
+	const hamburger = page.getByRole('button', { name: 'Open navigation menu' });
+	if (await hamburger.isVisible()) {
+		await hamburger.click();
+	}
+}
+
+test.describe('Signed out', () => {
+	test.beforeEach(async ({ page }) => {
+		await mockApi(page, { authenticated: false });
+	});
+
+	test('landing page offers sign-in', async ({ page }) => {
 		await page.goto('/');
 
-		// Should redirect to login or show login option
-		await expect(page).toHaveURL(/\/(login)?/);
-
-		// Check for Google OAuth button
-		const loginButton = page.getByRole('button', { name: /sign in with google/i });
-		await expect(loginButton).toBeVisible();
+		await expect(page).toHaveURL(/\/$/);
+		await expect(page.getByRole('button', { name: 'Sign In' })).toBeVisible();
 	});
 
-	test('should show Google OAuth button with correct attributes', async ({ page }) => {
-		await page.goto('/login');
+	test('sign-in page lists the providers the backend reports', async ({ page }) => {
+		await page.goto('/auth');
 
-		const googleButton = page.getByRole('button', { name: /sign in with google/i });
-		await expect(googleButton).toBeVisible();
-		await expect(googleButton).toBeEnabled();
+		await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
+		await expect(page.getByRole('button', { name: /Continue with Google/i })).toBeEnabled();
+		await expect(page.getByRole('button', { name: /Continue with GitHub/i })).toBeEnabled();
 	});
 
-	test('should handle OAuth redirect flow', async ({ page }) => {
-		await page.goto('/login');
+	test('sign-in page reports a provider-fetch failure instead of an empty card', async ({
+		page
+	}) => {
+		await page.route('**/api/v1/auth/providers', route =>
+			route.fulfill({
+				status: 500,
+				contentType: 'application/json',
+				body: JSON.stringify({ success: false, error: { message: 'boom' } })
+			})
+		);
 
-		// Click Google OAuth button
-		const googleButton = page.getByRole('button', { name: /sign in with google/i });
+		await page.goto('/auth');
 
-		// Mock OAuth flow by intercepting the redirect
-		await page.route('**/auth/login/google', async route => {
-			// Simulate successful OAuth callback
-			await route.fulfill({
-				status: 302,
-				headers: {
-					Location: '/auth/callback/google?code=mock_auth_code&state=mock_state'
-				}
-			});
-		});
-
-		await googleButton.click();
-
-		// Should attempt to redirect to Google OAuth
-		await page.waitForURL(/auth\/login\/google|accounts\.google\.com/);
+		await expect(page.getByText(/Failed to load sign-in options/i)).toBeVisible();
 	});
 
-	test('should protect routes requiring authentication', async ({ page }) => {
-		// Try to access protected route without authentication
+	test('choosing a provider hands off to the backend OAuth start endpoint', async ({ page }) => {
+		// The real endpoint 302s to Google. Stub it so the test asserts the handoff without
+		// leaving localhost.
+		await page.route('**/api/v1/auth/login/google', route =>
+			route.fulfill({ status: 200, contentType: 'text/html', body: '<html>provider</html>' })
+		);
+
+		await page.goto('/auth');
+		await page.getByRole('button', { name: /Continue with Google/i }).click();
+
+		await expect(page).toHaveURL(/\/api\/v1\/auth\/login\/google$/);
+	});
+
+	test('a protected route redirects to sign-in', async ({ page }) => {
 		await page.goto('/dashboard');
 
-		// Should redirect to login
-		await expect(page).toHaveURL(/login/);
+		await expect(page).toHaveURL(/\/auth$/);
+		await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
+	});
+});
+
+test.describe('Signed in', () => {
+	test.beforeEach(async ({ page, context }) => {
+		await addSessionCookie(context);
+		await mockApi(page);
 	});
 
-	test('should display user profile after successful login', async ({ page, context }) => {
-		// Mock authenticated session
-		await context.addCookies([
-			{
-				name: 'auth_session',
-				value: 'mock_session_token',
-				domain: 'localhost',
-				path: '/',
-				httpOnly: true,
-				secure: false,
-				sameSite: 'Lax'
-			}
-		]);
+	test('the landing page bounces a signed-in visitor to the dashboard', async ({ page }) => {
+		await page.goto('/');
 
-		// Mock API response for user info
-		await page.route('**/api/auth/me', async route => {
-			await route.fulfill({
-				status: 200,
-				contentType: 'application/json',
-				body: JSON.stringify({
-					id: 'user123',
-					email: 'test@example.com',
-					displayName: 'Test User'
-				})
-			});
-		});
-
-		await page.goto('/dashboard');
-
-		// Should show user profile
-		await expect(page.getByText('Test User')).toBeVisible();
+		await expect(page).toHaveURL(/\/dashboard$/);
 	});
 
-	test('should handle logout successfully', async ({ page, context }) => {
-		// Set up authenticated session
-		await context.addCookies([
-			{
-				name: 'auth_session',
-				value: 'mock_session_token',
-				domain: 'localhost',
-				path: '/',
-				httpOnly: true,
-				secure: false,
-				sameSite: 'Lax'
-			}
-		]);
+	test('the profile page shows the signed-in identity', async ({ page }) => {
+		await page.goto('/profile');
 
-		await page.route('**/api/auth/me', async route => {
-			await route.fulfill({
-				status: 200,
-				contentType: 'application/json',
-				body: JSON.stringify({
-					id: 'user123',
-					email: 'test@example.com',
-					displayName: 'Test User'
-				})
-			});
-		});
+		await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible();
+		await expect(page.getByText(E2E_USER.displayName).first()).toBeVisible();
+		await expect(page.getByText(E2E_USER.email).first()).toBeVisible();
+	});
 
+	test('signing out calls the logout endpoint and returns to sign-in', async ({ page }) => {
 		await page.goto('/dashboard');
+		await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
 
-		// Mock logout endpoint
-		await page.route('**/api/auth/logout', async route => {
-			await route.fulfill({
-				status: 200,
-				contentType: 'application/json',
-				body: JSON.stringify({ success: true })
-			});
-		});
+		const logoutRequest = page.waitForRequest(
+			request => request.url().includes('/api/v1/auth/logout') && request.method() === 'POST'
+		);
 
-		// Click logout button
-		const logoutButton = page.getByRole('button', { name: /logout|sign out/i });
-		await logoutButton.click();
+		await openNavigationForNarrowViewports(page);
+		await page.getByRole('button', { name: 'Sign out' }).click();
 
-		// Should redirect to login page
-		await expect(page).toHaveURL(/login/);
+		await logoutRequest;
+		await expect(page).toHaveURL(/\/auth$/);
 	});
 });

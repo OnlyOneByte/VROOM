@@ -5,7 +5,12 @@ fileMatchPattern: "**/*.svelte,**/*.svelte.ts"
 
 # Svelte Component Patterns
 
-Quick-reference for common patterns in this project. For full rules, see MainSteering.md and CodeQualityRules.md.
+Svelte 5 component mechanics for this project. Not repeated here — defer to:
+**MainSteering.md** "Svelte 5 Runes Mode" for runes, the no-`$effect`-for-async-data-loading rule,
+forbidden syntax (`$:`, `on:`, `|modifier`, `$app/stores`, directives on components) and
+"Navigation" for routing (`resolve()` / `$lib/routes`), then "UI Components" for icon imports;
+**DesignSystem.md** for the component inventory, import paths, tokens and spacing;
+**UIQuality.md** for the four-states bar.
 
 ## Component Structure
 
@@ -16,71 +21,83 @@ Quick-reference for common patterns in this project. For full rules, see MainSte
   import { vehicleApi } from '$lib/services/vehicle-api';
   import type { Vehicle } from '$lib/types';
 
-  // 2. Props
-  let { vehicleId, onSave }: { vehicleId: string; onSave: () => void } = $props();
+  // 2. Props — declare an interface, then destructure
+  interface Props {
+    vehicleId: string;
+    onSave: () => void;
+  }
+  let { vehicleId, onSave }: Props = $props();
 
   // 3. State
   let isLoading = $state(false);
-  let error = $state<string | null>(null);
+  let loadError = $state<string | null>(null);
 
   // 4. Derived values
   let isValid = $derived(formData.make.length > 0 && formData.model.length > 0);
 
-  // 5. Effects (sparingly)
-  $effect(() => { /* side effects only */ });
-
+  // 5. Effects (sparingly — side effects only)
   // 6. Functions
-  async function handleSubmit() { /* ... */ }
 </script>
 
 <!-- 7. Template -->
-<div>...</div>
 ```
 
-## Form Handling with Superforms
+## Props
 
-This project uses `sveltekit-superforms` with Zod for form validation:
+- Declare an `interface Props` and destructure it (`let { a, b }: Props = $props()`). A few
+  older components use an inline object type; new code uses the interface.
+- Two-way props use `$bindable`: `let { open = $bindable(), onSync }: Props = $props()`.
+- `class` is reserved — rename on destructure: `let { class: className = '' }: Props = $props()`.
+- Child → parent communication is callback props (`onSave`, `onSync`, `onPageChange`).
+
+## Snippets (Replaces Slots)
+
+Named `Snippet` props in, `{@render}` out; optional snippets are guarded.
+`common/empty-state.svelte` is the reference implementation.
 
 ```svelte
+<!-- empty-state.svelte -->
 <script lang="ts">
-  import { superForm } from 'sveltekit-superforms';
-  import { zodClient } from 'sveltekit-superforms/adapters';
-  import { z } from 'zod';
-
-  const schema = z.object({ name: z.string().min(1) });
-  const { form, errors, enhance } = superForm(data.form, {
-    validators: zodClient(schema),
-  });
+  import type { Snippet } from 'svelte';
+  interface Props { icon?: Snippet; title: Snippet }
+  let { icon, title }: Props = $props();
 </script>
+{#if icon}{@render icon()}{/if}
+<h3>{@render title()}</h3>
 
-<form method="POST" use:enhance>
-  <input bind:value={$form.name} />
-  {#if $errors.name}<span class="text-destructive text-sm">{$errors.name}</span>{/if}
-</form>
+<!-- Caller -->
+<EmptyState>
+  {#snippet icon()}<Bell class="h-8 w-8" />{/snippet}
+  {#snippet title()}No reminders yet{/snippet}
+</EmptyState>
 ```
 
-## Dialog / Sheet Pattern (bits-ui via shadcn-svelte)
+For plain wrapped content, use `children: Snippet` + `{@render children()}`.
+
+## Dialog Pattern (bits-ui via shadcn-svelte)
+
+A dialog owns an `open = $bindable()` prop and is opened by setting parent state — not with
+`Dialog.Trigger`. bits-ui v2 has no `asChild` / `builders` API.
 
 ```svelte
 <script lang="ts">
   import * as Dialog from '$lib/components/ui/dialog';
   import { Button } from '$lib/components/ui/button';
 
-  let open = $state(false);
+  interface Props { open: boolean; onSync: () => void }
+  let { open = $bindable(), onSync }: Props = $props();
 </script>
 
 <Dialog.Root bind:open>
-  <Dialog.Trigger asChild let:builder>
-    <Button builders={[builder]}>Open</Button>
-  </Dialog.Trigger>
-  <Dialog.Content>
+  <Dialog.Content class="max-w-lg">
     <Dialog.Header>
-      <Dialog.Title>Title</Dialog.Title>
-      <Dialog.Description>Description</Dialog.Description>
+      <Dialog.Title>Backup Now</Dialog.Title>
+      <Dialog.Description>Run a backup to all enabled providers</Dialog.Description>
     </Dialog.Header>
-    <!-- content -->
-    <Dialog.Footer>
-      <Button onclick={() => (open = false)}>Close</Button>
+    <!-- body -->
+    <Dialog.Footer class="flex gap-2">
+      <Button variant="outline" onclick={() => (open = false)}>Cancel</Button>
+      <Button onclick={onSync}>Backup Now</Button>
     </Dialog.Footer>
   </Dialog.Content>
 </Dialog.Root>
@@ -88,115 +105,41 @@ This project uses `sveltekit-superforms` with Zod for form validation:
 
 ## Data Loading Pattern
 
-```svelte
-<script lang="ts">
-  import { onMount } from 'svelte';
-  import { vehicleApi } from '$lib/services/vehicle-api';
-  import { LoaderCircle } from 'lucide-svelte';
-
-  let vehicles = $state<Vehicle[]>([]);
-  let isLoading = $state(true);
-  let error = $state<string | null>(null);
-
-  onMount(async () => {
-    try {
-      vehicles = await vehicleApi.getVehicles();
-    } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to load';
-    } finally {
-      isLoading = false;
-    }
-  });
-</script>
-
-{#if isLoading}
-  <div class="flex justify-center p-8">
-    <LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
-  </div>
-{:else if error}
-  <p class="text-destructive text-sm">{error}</p>
-{:else}
-  <!-- render data -->
-{/if}
-```
-
-## Reactive Change Handler (Not $effect for API Calls)
-
-When a select/input change should trigger a data reload:
+Pages fetch in the component (`onMount`), not in a `load()` function, and render all four
+states off `isLoading` / `loadError`:
 
 ```svelte
-<script lang="ts">
-  // ❌ WRONG — $effect causes duplicate calls with onMount
-  // $effect(() => { if (selectedId) loadData(); });
+let isLoading = $state(true);
+let loadError = $state<string | null>(null);
+let vehicles = $state<Vehicle[]>([]);
 
-  // ✅ CORRECT — explicit change handler
-  function handleVehicleChange(newId: string) {
-    selectedVehicleId = newId;
-    loadExpenses(newId);
+async function load() {
+  isLoading = true;
+  loadError = null;
+  try {
+    vehicles = await vehicleApi.getVehicles();
+  } catch (e) {
+    loadError = e instanceof Error ? e.message : 'Failed to load vehicles';
+  } finally {
+    isLoading = false;
   }
-</script>
-
-<Select onValueChange={handleVehicleChange}>...</Select>
+}
+onMount(load);
 ```
+
+Template: `{#if isLoading}` → `Skeleton`, `{:else if loadError}` → visible message + retry,
+`{:else}` → `EmptyState` or the data.
 
 ## Conditional Classes
 
-```svelte
-<!-- Simple conditional -->
-<div class={isActive ? 'text-foreground' : 'text-muted-foreground'}>
-
-<!-- Multiple conditionals with clsx (imported as cn) -->
-<script lang="ts">
-  import { cn } from '$lib/utils';
-</script>
-<div class={cn(
-  'rounded-lg border p-4',
-  isSelected && 'border-primary bg-primary/5',
-  hasError && 'border-destructive'
-)}>
-```
-
-## Event Handling (No on: Directives)
-
-```svelte
-<!-- ❌ WRONG (Svelte 4 syntax) -->
-<button on:click={handleClick}>
-<button on:click|preventDefault={handleSubmit}>
-
-<!-- ✅ CORRECT (Svelte 5 syntax) -->
-<button onclick={handleClick}>
-<button onclick={(e) => { e.preventDefault(); handleSubmit(); }}>
-```
-
-## Snippet Pattern (Replaces Slots)
-
-```svelte
-<!-- Parent -->
-<Card>
-  {#snippet header()}
-    <h2>Title</h2>
-  {/snippet}
-  {#snippet content()}
-    <p>Body</p>
-  {/snippet}
-</Card>
-
-<!-- Card.svelte -->
-<script lang="ts">
-  import type { Snippet } from 'svelte';
-  let { header, content }: { header: Snippet; content: Snippet } = $props();
-</script>
-<div>
-  {@render header()}
-  {@render content()}
-</div>
-```
+One condition: a ternary in the class string
+(`class={isActive ? 'text-foreground' : 'text-muted-foreground'}`). Several: `cn()` from
+`$lib/utils` (clsx + tailwind-merge) — `cn('rounded-lg border p-4', isSelected &&
+'border-primary', hasError && 'border-destructive')`.
 
 ## Common Mistakes to Avoid
 
-- Don't use `export let` for props — use `$props()` destructuring
-- Don't use `createEventDispatcher` — use callback props
-- Don't use `$$slots` — use optional `Snippet` props with `{#if snippet}{@render snippet()}{/if}`
-- Don't use `<slot>` — use `{@render children()}` with `children: Snippet` prop
-- Don't import from `$app/stores` — use `$app/state` (e.g., `import { page } from '$app/state'` then `page.url`)
-- Don't use `goto` with `invalidateAll` for simple navigation — `goto` alone handles it
+- Don't use `export let` for props — use `$props()` destructuring.
+- Don't use `createEventDispatcher` — use callback props.
+- Don't use `<slot>` or `$$slots` — use `Snippet` props with `{@render}` (guard optional ones).
+- Don't use `goto` with `invalidateAll` for simple navigation — `goto` alone handles it.

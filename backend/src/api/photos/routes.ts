@@ -1,14 +1,15 @@
-import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { NotFoundError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { buildPaginatedResponse } from '../../utils/pagination';
-import { commonSchemas } from '../../utils/validation';
+import { commonSchemas, zValidator } from '../../utils/validation';
 import { parseUploadedPhoto, photoThumbnailResponse } from './helpers';
 import {
   deletePhotoForEntity,
+  getPhotoServeMetadataForEntity,
   getPhotoThumbnailForEntity,
+  ifNoneMatchSatisfies,
   listPhotosByEntityType,
   listPhotosForEntity,
   uploadPhotoForEntity,
@@ -22,9 +23,9 @@ const routes = new Hono();
 
 routes.use('*', requireAuth);
 // Stamp lastDataChangeDate on a 2xx photo mutation (upload/delete) so the change re-triggers the
-// next auto-backup (#74): photos + photo_refs ARE in the backup payload (backup.ts), and the
+// next auto-backup: photos + photo_refs ARE in the backup payload (backup.ts), and the
 // orchestrator skips when !hasChangesSinceLastSync — without this, a photo-only change between
-// backups was silently excluded until some OTHER tracked mutation bumped the timestamp (the #42
+// backups was silently excluded until some OTHER tracked mutation bumped the timestamp (the
 // silent-backup-gap class). This was the lone mutating route module missing changeTracker.
 routes.use('*', changeTracker);
 
@@ -67,7 +68,15 @@ routes.post('/:entityType/:entityId', async (c) => {
   return c.json({ success: true, data: photo }, 201);
 });
 
-// GET /photos/:entityType/:entityId/:photoId/thumbnail — Get photo thumbnail
+// GET /photos/:entityType/:entityId/:photoId/thumbnail — Serve a photo's bytes.
+//
+// "thumbnail" is historical: this serves the FULL-RESOLUTION original, because nothing in the stack
+// resizes (see getPhotoThumbnailForEntity). A conditional GET is therefore the only thing bounding
+// the repeat cost of a gallery of multi-megabyte receipts, so answer one BEFORE the provider
+// round-trip: the validator comes from the photo row, so a revalidation costs two indexed SQLite
+// reads instead of re-downloading the original twice over — once from the provider onto this box
+// (the same home uplink a self-hoster's client is on), once out to the client. Resolving the row a
+// second time on a cache MISS is the deliberate price.
 routes.get('/:entityType/:entityId/:photoId/thumbnail', async (c) => {
   const entityType = c.req.param('entityType');
   const entityId = c.req.param('entityId');
@@ -75,6 +84,21 @@ routes.get('/:entityType/:entityId/:photoId/thumbnail', async (c) => {
   if (!entityType || !entityId || !photoId) throw new NotFoundError('Photo');
 
   const user = c.get('user');
+  const { etag, mimeType: storedMimeType } = await getPhotoServeMetadataForEntity(
+    entityType,
+    entityId,
+    photoId,
+    user.id
+  );
+
+  if (ifNoneMatchSatisfies(c.req.header('if-none-match'), etag)) {
+    // Reuse the 200's headers so the 304 carries the same validator + caching policy (RFC 9110
+    // §15.4.5 requires both, or the next request can no longer revalidate) and the two can't drift.
+    const headers = photoThumbnailResponse(Buffer.alloc(0), storedMimeType).headers;
+    headers.set('ETag', etag);
+    return new Response(null, { status: 304, headers });
+  }
+
   const { buffer, mimeType } = await getPhotoThumbnailForEntity(
     entityType,
     entityId,
@@ -82,7 +106,9 @@ routes.get('/:entityType/:entityId/:photoId/thumbnail', async (c) => {
     user.id
   );
 
-  return photoThumbnailResponse(buffer, mimeType);
+  const response = photoThumbnailResponse(buffer, mimeType);
+  response.headers.set('ETag', etag);
+  return response;
 });
 
 // DELETE /photos/:entityType/:entityId/:photoId — Delete a photo

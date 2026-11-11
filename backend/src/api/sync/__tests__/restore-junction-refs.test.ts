@@ -86,11 +86,11 @@ describe('restore rejects junction rows that reference out-of-backup ids', () =>
     expect(rows.some((r) => r.id === 'not-in-backup-vehicle')).toBe(false);
   });
 
-  // C246: financing is the highest-stakes UN-stamped child — it carries NO userId column (it owns
+  // Financing is the highest-stakes UN-stamped child — it carries NO userId column (it owns
   // purely via its vehicleId FK), so its ENTIRE ownership safety rests on validateFinancingRefs
   // constraining it to in-backup vehicleIds. If that ref-check regressed, a crafted backup could
   // attach a financing record to a vehicle outside the (importer-stamped) backup. Pins it the same
-  // way as the junction case (the deep-review C246 certified the indirect-ownership model; this is
+  // way as the junction case (the deep-review certified the indirect-ownership model; this is
   // the merge-surviving net on its load-bearing assumption).
   test('a vehicle_financing row pointing at a bogus vehicle id is rejected', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
@@ -142,10 +142,10 @@ describe('restore rejects junction rows that reference out-of-backup ids', () =>
     expect(rows[0].id).toBe(vehicleId);
   });
 
-  // C396: the expenses table carries (sourceType, sourceId) for system-materialized rows
+  // The expenses table carries (sourceType, sourceId) for system-materialized rows
   // (sourceType='reminder' → sourceId is a reminder id). validateExpenseSourceRefs (backup.ts:781)
   // hard-fails a restore if a 'reminder'-sourced expense points at a reminder NOT in the backup — the
-  // expense-level sibling of the junction/financing ref checks above (the C246/C339 dangling-ref class).
+  // expense-level sibling of the junction/financing ref checks above (the dangling-ref class).
   // Junction + financing refs are pinned; this expense-source ref was NOT. Pins it: tamper an exported
   // expenses.csv to repoint a reminder-sourced expense at a bogus reminder id → restore must reject.
   test('a reminder-sourced expense pointing at a bogus reminder id is rejected', async () => {

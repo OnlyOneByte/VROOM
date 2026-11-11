@@ -1,5 +1,5 @@
 import { createId } from '@paralleldrive/cuid2';
-import { and, asc, desc, eq, gte, inArray, lte, type SQL, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNotNull, lte, type SQL, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { Expense, NewExpense, SplitMethod } from '../../db/schema';
@@ -87,7 +87,7 @@ function buildExpenseConditions(filters: ExpenseFilters): SQL[] {
     // `endDate` from the UI is a date-only `YYYY-MM-DD` (the DatePicker), coerced to LOCAL
     // midnight (00:00:00.000) — the START of that day. A bare `lte(date, midnight)` therefore
     // drops every same-day expense not stamped at exactly midnight, so a "through Mar 31" filter
-    // silently hides all of Mar 31 (the C6/C61/C103 local-vs-UTC boundary class, here on the
+    // silently hides all of Mar 31 (the C6/ local-vs-UTC boundary class, here on the
     // most-used list + the CSV export — both route through this one builder). Treat a midnight
     // endDate as INCLUSIVE of the whole local day by extending it to 23:59:59.999 local; a
     // non-midnight endDate (a deliberate full timestamp) is honored as-is.
@@ -106,7 +106,7 @@ function buildExpenseConditions(filters: ExpenseFilters): SQL[] {
   // Escape the LIKE metacharacters (`%` `_` and the escape char `\`) in the user's term so a
   // search for a literal "50%" or "oil_change" matches the TEXT, not a wildcard — without the
   // ESCAPE clause a `%` means "any chars" (over-matches every row) and `_` means "any one char"
-  // (bug #41). Order matters: escape `\` FIRST so we don't double-escape the ones we just added.
+  //  Order matters: escape `\` FIRST so we don't double-escape the ones we just added.
   const search = filters.search?.trim();
   if (search) {
     const escaped = search.toLowerCase().replace(/[\\%_]/g, (ch) => `\\${ch}`);
@@ -184,7 +184,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
    * scope can't drift apart. These methods act on AUTO-MATERIALIZED expenses (reminder/insurance/
    * financing cascade cleanup), so a divergent copy dropping the userId leg would let one user's
    * source-entity delete/deactivate wipe or null ANOTHER user's expenses (a cross-tenant destructive
-   * write — the C109/#57/#62 class). One predicate keeps the boundary in lockstep structurally.
+   * write — the class). One predicate keeps the boundary in lockstep structurally.
    */
   private sourceScope(sourceType: string, sourceId: string, userId: string): SQL | undefined {
     return and(
@@ -213,7 +213,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
    * ownership scope and the deletion scope can never drift apart — a divergent copy that
    * dropped the userId predicate would be a cross-tenant read or (worse) a cross-tenant
    * DELETE. Behavior-identical today (groupId is a server cuid2, single-owner), but this
-   * keeps the C109 defense-in-depth boundary in lockstep structurally instead of by comment.
+   * keeps the defense-in-depth boundary in lockstep structurally instead of by comment.
    */
   private groupOwnedBy(groupId: string, userId: string): SQL | undefined {
     return and(eq(expenses.groupId, groupId), eq(expenses.userId, userId));
@@ -267,11 +267,11 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
    * create. The pre-check + unique index together close the retry race: a concurrent
    * duplicate insert hits the unique constraint, which we recover by re-reading.
    *
-   * `overwrite` (#98, C51): when the caller is a conflict RESOLUTION choosing keep-local (not a blind
+   * `overwrite`: when the caller is a conflict RESOLUTION choosing keep-local (not a blind
    * retry), a (userId, clientId) collision must APPLY the local edit, not silently discard it. With the
    * flag set, an existing row is UPDATED with the new data (preserving its id/userId/clientId/createdAt —
    * clientId/userId are stripped from the patch so the identity + idempotency key never change) instead
-   * of returned unchanged. Default false keeps the plain-retry path a pure no-op (NORTH_STAR #1: a
+   * of returned unchanged. Default false keeps the plain-retry path a pure no-op (: a
    * resolved offline edit is never lost).
    */
   async createIdempotent(data: NewExpense, overwrite = false): Promise<Expense> {
@@ -298,7 +298,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   }
 
   /**
-   * Apply a keep-local overwrite (#98) onto the existing (userId, clientId) row: replace its mutable
+   * Apply a keep-local overwrite onto the existing (userId, clientId) row: replace its mutable
    * fields with the local edit while keeping the identity + idempotency keys IMMUTABLE — clientId/userId
    * are stripped from the patch so they (and the row id/createdAt) never change. ONE source of truth for
    * the overwrite, shared by both createIdempotent collision branches (the pre-check hit + the raced
@@ -312,12 +312,19 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   /**
    * Commit a batch of CSV-imported expenses ATOMICALLY and IDEMPOTENTLY.
    *
-   * All inserts run in a single transaction, so a failure on any row rolls back the whole
-   * batch — the user never ends up with a half-imported file (and a fix-and-re-import can't
-   * double-write the rows that already committed). Each row carries a deterministic
-   * `clientId` (see import-csv.ts), so re-importing the same file is a no-op: a row whose
-   * (userId, clientId) already exists is skipped and counted as a duplicate rather than
-   * inserted again. The unique partial index on (userId, clientId) backs this at the DB level.
+   * All inserts run in ONE transaction, so a failure on any row rolls back the whole batch — the
+   * user never ends up with a half-imported file (and a fix-and-re-import can't double-write the
+   * rows that already committed). The callback MUST stay SYNCHRONOUS for that to hold: bun-sqlite
+   * is a synchronous dialect, so an `async` callback returns a pending promise, BEGIN/COMMIT wrap
+   * nothing, and every `await tx.*` autocommits on its own.
+   *
+   * Each row carries a deterministic `clientId` (see import-csv.ts), so re-importing the same file
+   * is a no-op: a row whose (userId, clientId) already exists is skipped and counted as a duplicate
+   * rather than inserted again. The already-present keys are read ONCE up front rather than per row
+   * (at the maxImportRows cap a per-row probe dominates the import's wall time), and the set grows
+   * as rows insert so a file that repeats a clientId within ITSELF is caught too. Pre-fetching is
+   * only safe because the loop is one real transaction; the unique partial index on
+   * (userId, clientId) remains the backstop.
    *
    * Returns the count actually inserted and the count skipped as already-present duplicates.
    */
@@ -327,23 +334,27 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   ): Promise<{ imported: number; duplicates: number }> {
     if (rows.length === 0) return { imported: 0, duplicates: 0 };
     try {
-      return await this.db.transaction(async (tx) => {
+      const present = await this.db
+        .select({ clientId: expenses.clientId })
+        .from(expenses)
+        .where(and(eq(expenses.userId, userId), isNotNull(expenses.clientId)));
+      const seenClientIds = new Set<string>();
+      for (const row of present) {
+        if (row.clientId) seenClientIds.add(row.clientId);
+      }
+
+      return this.db.transaction((tx) => {
         let imported = 0;
         let duplicates = 0;
         for (const row of rows) {
-          const data = { ...row, userId };
-          if (data.clientId) {
-            const existing = await tx
-              .select({ id: expenses.id })
-              .from(expenses)
-              .where(and(eq(expenses.clientId, data.clientId), eq(expenses.userId, userId)))
-              .limit(1);
-            if (existing.length > 0) {
-              duplicates += 1;
-              continue;
-            }
+          if (row.clientId && seenClientIds.has(row.clientId)) {
+            duplicates += 1;
+            continue;
           }
-          await tx.insert(expenses).values(data);
+          tx.insert(expenses)
+            .values({ ...row, userId })
+            .run();
+          if (row.clientId) seenClientIds.add(row.clientId);
           imported += 1;
         }
         return { imported, duplicates };
@@ -582,6 +593,12 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   /**
    * Delete all expenses linked to a source (e.g., insurance term, financing).
    * Used when a source entity is deleted/updated to replace auto-created expenses.
+   *
+   * CALLER CONTRACT: run `deletePhotosForEntities('expense', ids, userId)` for the linked ids FIRST
+   * (`findBySource` enumerates them). The raw `photos` delete below keeps the DB consistent, but only
+   * photo-service talks to the storage provider — drop a photo row without it and the receipt file
+   * stays in the user's Drive/Dropbox with nothing left pointing at it. This repository cannot call
+   * photo-service itself: photos/helpers.ts imports this module, so the dependency would be a cycle.
    */
   async deleteBySource(sourceType: string, sourceId: string, userId: string): Promise<number> {
     try {
@@ -594,11 +611,16 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
 
       const linkedIds = linked.map((e) => e.id);
 
-      await this.db.transaction(async (tx) => {
-        await tx
-          .delete(photos)
-          .where(and(eq(photos.entityType, 'expense'), inArray(photos.entityId, linkedIds)));
-        await tx.delete(expenses).where(this.sourceScope(sourceType, sourceId, userId));
+      // SYNCHRONOUS callback: two writes that must land together. An `async` callback would make
+      // bun-sqlite autocommit each one separately, so a throw after the photo delete would leave the
+      // expenses in place with their photo rows already gone — receipts detached from live rows.
+      this.db.transaction((tx) => {
+        tx.delete(photos)
+          .where(and(eq(photos.entityType, 'expense'), inArray(photos.entityId, linkedIds)))
+          .run();
+        tx.delete(expenses)
+          .where(this.sourceScope(sourceType, sourceId, userId))
+          .run();
       });
 
       return linked.length;
@@ -645,7 +667,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
    */
   private async validateVehicleOwnership(splitConfig: SplitConfig, userId: string): Promise<void> {
     // splitConfigVehicleIds owns the `even ? vehicleIds : allocations.map(...)` extraction (one source
-    // of truth, C50); assertVehiclesOwned (C376) owns the cross-tenant `userId AND id IN (ids)` query +
+    // of truth); assertVehiclesOwned owns the cross-tenant `userId AND id IN (ids)` query +
     // NotFoundError throw, shared with the insurance term path.
     await assertVehiclesOwned(this.db, splitConfigVehicleIds(splitConfig), userId);
   }
@@ -681,7 +703,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       );
       const splitMethod: SplitMethod = data.splitConfig.method;
 
-      // SYNCHRONOUS transaction (#127 class, C504): the split insert loop must be atomic — under the old
+      // SYNCHRONOUS transaction: the split insert loop must be atomic — under the old
       // async callback a throw mid-loop committed a partial split group (siblings summing to less than the
       // group total, an orphaned invariant-violating group with no idempotency key to recover). Running
       // synchronously (createSiblingsSync, `.returning().get()` inline) keeps every sibling in ONE real
@@ -747,18 +769,21 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     const siblingIds = siblings.map((s) => s.id);
 
     try {
-      await this.db.transaction(async (tx) => {
+      // SYNCHRONOUS callback (as in updateSplitExpense): an `async` one makes bun-sqlite autocommit
+      // each write on its own, so a throw between the two would detach the siblings' photo rows from
+      // rows that are still there.
+      this.db.transaction((tx) => {
         // Delete photos attached to sibling expenses
-        await tx
-          .delete(photos)
-          .where(and(eq(photos.entityType, 'expense'), inArray(photos.entityId, siblingIds)));
+        tx.delete(photos)
+          .where(and(eq(photos.entityType, 'expense'), inArray(photos.entityId, siblingIds)))
+          .run();
 
         // Delete all sibling expense rows. AND the userId scope (not groupId alone): the read above is
         // userId-scoped, so the destructive write must match it — keeping ownership and deletion on the
         // SAME predicate. Behavior-identical today (groupId is a server cuid2, single-owner), but a
-        // defense-in-depth boundary so a future cross-user group can never be cross-deleted (the C109
+        // defense-in-depth boundary so a future cross-user group can never be cross-deleted (the
         // detectConflicts tenant-scope class).
-        await tx.delete(expenses).where(this.groupOwnedBy(groupId, userId));
+        tx.delete(expenses).where(this.groupOwnedBy(groupId, userId)).run();
       });
     } catch (error) {
       logger.error('Failed to delete split expense', {
@@ -813,14 +838,13 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       // absolute amounts in the config → they still need the caller's total to divide.
       const totalAmount =
         data.splitConfig.method === 'absolute'
-          ? Math.round(data.splitConfig.allocations.reduce((sum, a) => sum + a.amount, 0) * 100) /
-            100
+          ? data.splitConfig.allocations.reduce((sum, a) => sum + a.amount, 0)
           : (data.totalAmount ?? firstOld.groupTotal ?? firstOld.expenseAmount);
       const allocations = expenseSplitService.computeAllocations(data.splitConfig, totalAmount);
       const splitMethod: SplitMethod = data.splitConfig.method;
       const oldSiblingIds = oldSiblings.map((s) => s.id);
 
-      // SYNCHRONOUS transaction (#127 class, C504): this is the most dangerous split path — it DELETEs the
+      // SYNCHRONOUS transaction: this is the most dangerous split path — it DELETEs the
       // old siblings then re-inserts the new set. Under the old async callback a throw between the delete
       // and the re-insert irrecoverably lost the entire split group (a retry re-reads zero old siblings →
       // NotFoundError), and a throw on the photo migration orphaned photos pointing at deleted sibling ids.

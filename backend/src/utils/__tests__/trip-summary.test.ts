@@ -2,10 +2,10 @@
  * buildTripSummary unit + property tests (trips-location T5, design §5, R4).
  *
  * The spec's required properties:
- *   - sum of milesByPurpose == totalMiles (no miles lost / double-counted);
- *   - businessMileageValue == businessMiles × rate (the reimbursement contract);
- *   - empty trips → all zeros, never NaN (the div-guard on averageTripMiles).
- * Plus: distance is the clamped tripDistance (R2/#46 — an inverted pair contributes 0), every purpose key
+ *  - sum of milesByPurpose == totalMiles (no miles lost / double-counted);
+ *  - businessMileageValue == businessMiles × rate (the reimbursement contract);
+ *  - empty trips → all zeros, never NaN (the div-guard on averageTripMiles).
+ * Plus: distance is the clamped tripDistance (R2/ — an inverted pair contributes 0), every purpose key
  * is always present, and an unexpected purpose buckets to 'other' (no crash, no dropped miles).
  */
 
@@ -72,7 +72,7 @@ describe('buildTripSummary (T5)', () => {
     expect(s.rate).toBe(0.67);
   });
 
-  test('an inverted odometer pair contributes 0 miles (tripDistance clamp, R2/#46)', () => {
+  test('an inverted odometer pair contributes 0 miles (tripDistance clamp, R2/)', () => {
     const s = buildTripSummary([
       trip({ startOdometer: 5000, endOdometer: 4000, purpose: 'business' }),
     ]);

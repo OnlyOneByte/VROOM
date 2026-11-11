@@ -9,23 +9,23 @@ import { routes } from '$lib/routes';
 // automatically instead of silently leaking a broken authed shell to logged-out
 // visitors until someone remembers to extend an allowlist. The public set is small
 // and stable (marketing + sign-in + legal); the authed surface is the one that grows.
-//   '/'               — landing page (its own $effect bounces authed users to /dashboard)
-//   '/auth'           — sign-in (login initiation + OAuth callback live under it)
-//   '/privacypolicy', '/termsofservice' — legal pages, footer-linked, must be public
+//  '/' — landing page (its own $effect bounces authed users to /dashboard)
+//  '/auth' — sign-in (login initiation + OAuth callback live under it)
+//  '/privacypolicy', '/termsofservice' — legal pages, footer-linked, must be public
 export const publicRoutes = ['/', '/auth', '/privacypolicy', '/termsofservice'];
 
 // Routes that, when an authenticated user lands on them, redirect to the dashboard
 // (you shouldn't sit on the sign-in page while signed in). The landing page handles
 // its own authed redirect, and the legal pages are readable while signed in, so only
 // '/auth' belongs here.
-export const authRedirectRoutes = ['/auth'];
+const authRedirectRoutes = ['/auth'];
 
 // A path is public if it exactly equals a public route or is a sub-path of one
 // (e.g. /auth/callback). The exact-or-segment match avoids a prefix like '/trips'
 // being treated as public just because some public route is a string prefix — and
 // keeps '/' from matching everything (special-cased below).
 function matchesRoute(pathname: string, routeList: string[]): boolean {
-	return routeList.some((route) => {
+	return routeList.some(route => {
 		if (route === '/') return pathname === '/';
 		return pathname === route || pathname.startsWith(`${route}/`);
 	});

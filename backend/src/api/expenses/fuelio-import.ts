@@ -13,14 +13,14 @@
  *
  * Fuelio specifics handled (per the format research):
  *  - Units are embedded in the LOG header names (`Odo (mi)`/`Odo (km)`, `Fuel (us gallons)`/
- *    `Fuel (litres)`) and are per-vehicle — read from the header, convert into the target
- *    vehicle's units (never assume metric).
+ *  `Fuel (litres)`) and are per-vehicle — read from the header, convert into the target
+ *  vehicle's units (never assume metric).
  *  - Columns keyed by header NAME (regex), not fixed index, so version drift / trailing
- *    `(optional)` suffixes / extra columns don't break parsing.
+ *  `(optional)` suffixes / extra columns don't break parsing.
  *  - `Missed=1` → VROOM `missedFillup` (a prior fill-up was skipped). Fuelio's separate `Full`
- *    (partial-tank) flag has no VROOM equivalent and is intentionally not mapped.
+ *  (partial-tank) flag has no VROOM equivalent and is intentionally not mapped.
  *  - The `## Costs` section (non-fuel expenses) is migrated too, its Fuelio cost category mapped
- *    to a VROOM category; an unrecognized one falls to `misc` and is surfaced (never a silent guess).
+ *  to a VROOM category; an unrecognized one falls to `misc` and is surfaced (never a silent guess).
  *  - Fuelio has NO currency column — amounts import as-is in the user's configured currency.
  */
 

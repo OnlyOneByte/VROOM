@@ -6,6 +6,21 @@ import svelteParser from 'svelte-eslint-parser';
 import prettier from 'eslint-config-prettier';
 import globals from 'globals';
 
+// The charts barrel re-exports the layerchart wrappers, and three of them import a CSS file for
+// their enter animation, so those modules are side-effectful and cannot be tree-shaken. Any name
+// taken from the barrel therefore pulls layerchart + the d3 cluster (~120 KB gzip) into the
+// importing route's chunk. Only the wrappers — which need that runtime anyway — may come from the
+// barrel; chart-free neighbours such as StatCardGrid must be imported from their own file so
+// chartless routes stay chartless. Listed per specifier because the rule matches exact strings and
+// a glob would also catch the direct `charts/StatCardGrid.svelte` imports this rule exists to force.
+const chartsBarrelSpecifiers = ['$lib/components/charts', '../charts', '../../charts'];
+const restrictedChartsBarrelPaths = chartsBarrelSpecifiers.map(name => ({
+	name,
+	allowImportNames: ['AppLineChart', 'AppBarChart', 'AppPieChart', 'AppAreaChart'],
+	message:
+		'The charts barrel drags layerchart + d3 into the route chunk. Import chart-free components directly, e.g. `import StatCardGrid from "$lib/components/charts/StatCardGrid.svelte"`.'
+}));
+
 export default [
 	js.configs.recommended,
 	{
@@ -146,6 +161,12 @@ export default [
 			],
 			'no-unused-vars': 'off',
 			'no-undef': 'off' // Runes are global
+		}
+	},
+	{
+		files: ['**/*.{js,ts,mjs,svelte}'],
+		rules: {
+			'no-restricted-imports': ['error', { paths: restrictedChartsBarrelPaths }]
 		}
 	},
 	{

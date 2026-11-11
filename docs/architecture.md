@@ -1,310 +1,159 @@
 # Architecture
 
-VROOM is a monorepo with a Bun/Hono backend API and a SvelteKit frontend PWA, connected via REST.
-
-## System Overview
+VROOM is a monorepo: a Bun/Hono REST API over SQLite, and a SvelteKit PWA that consumes it.
 
 ```
 Browser (SvelteKit PWA)
-    ↓ REST API (JSON)
-Hono Backend (Bun runtime)
+    ↓ REST /api/v1/* (JSON, cookie auth)
+Hono backend (Bun)
     ↓ Drizzle ORM
 SQLite (WAL mode)
-    ↓ Optional sync
-Google Drive / Google Sheets
+    ↓ optional, user-configured
+Storage providers — Google Drive / Sheets / Photos, S3-compatible
 ```
 
-## Backend Architecture
+This document covers the shape and the reasoning. For layout, read the tree: directory
+names and file names are the index, and they change more often than prose does.
 
-### Directory Layout
+## Backend
 
-```
-backend/src/
-├── api/                    # Domain modules
-│   ├── auth/               # Google OAuth + session management
-│   │   ├── lucia.ts        # Lucia auth setup
-│   │   ├── routes.ts       # Auth route handlers
-│   │   └── utils.ts        # Auth utilities
-│   ├── vehicles/           # Vehicle CRUD + statistics
-│   │   ├── repository.ts   # Data access layer
-│   │   └── routes.ts       # Route handlers
-│   ├── expenses/           # Expense tracking + fuel calculations
-│   │   ├── repository.ts
-│   │   └── routes.ts
-│   ├── financing/          # Loan/lease management + payments
-│   │   ├── hooks.ts        # Financing lifecycle hooks
-│   │   ├── repository.ts
-│   │   └── routes.ts
-│   ├── insurance/          # Policy management
-│   │   ├── repository.ts
-│   │   └── routes.ts
-│   ├── settings/           # User preferences + sync config
-│   │   ├── repository.ts
-│   │   └── routes.ts
-│   └── sync/               # Backup, restore, Google integration
-│       ├── activity-tracker.ts   # User activity + auto-sync triggers
-│       ├── backup.ts             # Backup creation + validation
-│       ├── google-drive.ts       # Google Drive file operations
-│       ├── google-sheets.ts      # Google Sheets data mirroring
-│       ├── restore.ts            # Data restoration
-│       └── routes.ts             # Sync route handlers
-├── db/                     # Database layer
-│   ├── schema.ts           # Drizzle table definitions
-│   ├── connection.ts       # SQLite connection + WAL config
-│   ├── checkpoint.ts       # WAL checkpoint utility
-│   ├── init.ts             # Database initialization
-│   ├── seed.ts             # Sample data seeding
-│   └── types.ts            # Database enums and types
-├── middleware/             # Hono middleware stack
-│   ├── auth.ts             # requireAuth / optionalAuth guards
-│   ├── rate-limit.ts       # Per-user/IP rate limiting
-│   ├── error-handler.ts    # Global error handler
-│   ├── idempotency.ts      # Duplicate request prevention
-│   ├── body-limit.ts       # Request size limiting (10MB)
-│   ├── activity.ts         # Activity + change tracking for sync
-│   └── index.ts            # Re-exports
-├── utils/                  # Shared utilities
-│   ├── calculations.ts     # MPG and cost calculations
-│   ├── logger.ts           # Structured logging
-│   ├── repository.ts       # BaseRepository class
-│   ├── timeout.ts          # Async timeout wrapper
-│   ├── unit-conversions.ts # Unit label helpers
-│   ├── validation.ts       # Ownership validation helpers
-│   └── vehicle-stats.ts    # Vehicle statistics
-├── config.ts               # Zod-validated environment config
-├── errors.ts               # Error classes, handlers, response formatters
-├── types.ts                # Shared TypeScript types
-└── index.ts                # App entry point + middleware composition
-```
+### Layering
 
-### Middleware Stack (applied in order)
+`middleware → routes → repository → Drizzle → SQLite`, one folder per domain under
+`src/api/<domain>/` holding `routes.ts` (HTTP + Zod validation) and, for whatever data access
+the domain has, one or more `*repository.ts` — usually `repository.ts`, sometimes split
+(`insurance/claims-repository.ts`, `photos/photo-ref-repository.ts`) and sometimes owning no
+table at all (`analytics/repository.ts` only aggregates). Domains mount at
+`/api/v1/<domain>` in `src/app.ts`.
 
-1. Body Limit — prevents DoS via large payloads (10MB max)
-2. Secure Headers — CSP, X-Frame-Options, HSTS, etc.
-3. Rate Limiting — per-user/IP, configurable per route group
-4. CORS — environment-based allowed origins
-5. CSRF — origin validation on state-changing methods
-6. Logging — request/response logging via Hono logger
-7. Activity Tracking — monitors data changes for auto-sync
+Every repository takes a Drizzle handle in its constructor and is exported as a singleton.
+There is no DI container — that constructor handle is what lets tests pass an in-memory
+database. Many extend `BaseRepository` (`src/utils/repository.ts`) for
+findById/create/update/delete; the rest only ever need their own queries.
 
-### API Versioning
+`src/app.ts` builds the app with **no side effects** — no migrations, no timers, no server
+start. `src/index.ts` adds those for the real process. That split is what makes the whole
+backend drivable in-process from tests via `app.request()`.
 
-All routes are mounted under `/api/v1/`:
+### Middleware order
 
-```
-/api/v1/auth/*        — Google OAuth flow, sessions
-/api/v1/vehicles/*    — Vehicle CRUD
-/api/v1/expenses/*    — Expense CRUD
-/api/v1/financing/*   — Loan/lease management
-/api/v1/insurance/*   — Insurance policies
-/api/v1/settings/*    — User preferences
-/api/v1/sync/*        — Backup, restore, Google sync
-```
+Composed in `src/app.ts`, in this order: error handler → body limit (10MB) → secure headers
+(CSP, HSTS, `X-Frame-Options`) → optional auth (`/api/*` only) → rate limiter → CORS → CSRF
+→ request logging → activity tracking.
 
-Legacy `/api/*` requests are redirected to `/api/v1/*` with HTTP 308.
+Optional auth runs *before* the rate limiter on purpose: it populates the user context, so
+authenticated callers are rate-limited per user instead of sharing an IP bucket.
 
-### Repository Pattern
+### Authentication
 
-Each domain module uses a repository extending `BaseRepository` for data access:
+Lucia sessions over HTTP-only cookies, established by OAuth (Google, GitHub). `requireAuth`
+rejects anonymous requests; `optionalAuth` only populates context. Every repository read and
+write is scoped by `userId` — cross-tenant isolation is enforced in the data layer, not just
+at the route.
 
-```typescript
-export class VehicleRepository extends BaseRepository<Vehicle, NewVehicle> {
-  async findByUserId(userId: string): Promise<VehicleWithFinancing[]> { ... }
-}
+### Errors
 
-// Exported as singleton
-export const vehicleRepository = new VehicleRepository(getDb());
-```
-
-No factory pattern or DI framework — direct exports for simplicity.
-
-### Error Hierarchy
-
-All errors are defined in `errors.ts`:
-
-```
-AppError (base, 500)
-├── ValidationError (400)
-├── AuthenticationError (401)
-├── AuthorizationError (403)
-├── NotFoundError (404)
-├── ConflictError (409)
-├── DatabaseError (500)
-└── RateLimitError (429)
-
-SyncError (separate hierarchy with SyncErrorCode enum)
-├── AUTH_INVALID (401)
-├── NETWORK_ERROR (503)
-├── QUOTA_EXCEEDED (429)
-├── PERMISSION_DENIED (403)
-├── VALIDATION_ERROR (400)
-├── CONFLICT_DETECTED (409)
-└── SYNC_IN_PROGRESS (409)
-```
+`AppError` is the base (500) with `ValidationError` (400), `AuthenticationError` (401),
+`NotFoundError` (404), `ConflictError` (409), and `DatabaseError` (500). Sync and provider
+failures use a separate `SyncError` carrying a `SyncErrorCode`
+(`AUTH_INVALID`, `NETWORK_ERROR`, `QUOTA_EXCEEDED`, `PERMISSION_DENIED`, `VALIDATION_ERROR`,
+`CONFLICT_DETECTED`, `SYNC_IN_PROGRESS`), so callers can tell a revoked token from a
+transient network blip and avoid retrying what will never succeed.
 
 ### Database
 
-SQLite with WAL mode via `bun:sqlite` + Drizzle ORM.
+SQLite via `bun:sqlite` + Drizzle. Schema is one file, `src/db/schema.ts`. Migrations live in
+`backend/drizzle/` and run on startup via `drizzle-orm/bun-sqlite/migrator`; `bun run db:init`
+applies them locally. Do not use `drizzle-kit push` against a real database — it diffs the
+schema directly and will offer to drop columns.
 
-Tables: `users`, `vehicles`, `vehicle_financing`, `insurance_policies`, `expenses`, `user_settings`, `sessions`
+The fourteen migrations that predate `0000_baseline` were collapsed into it, so the journal no
+longer describes the path any pre-collapse database took. A database created before the collapse
+cannot migrate forward in place; it has to be re-created and repopulated from a backup restore.
+Collapsing also closed two defects the incremental chain carried: the money columns were still
+declared `real` (the cents conversion rewrote values but never the types, and SQLite's loose typing
+hid the disagreement with `schema.ts`), and `expenses.created_by` had no `ON DELETE` action, so
+once account deletion shipped it would have refused to delete any user who had logged an expense on
+a vehicle shared with them.
 
-Key SQLite PRAGMAs:
-- `journal_mode = WAL` — concurrent reads
-- `synchronous = NORMAL` — balanced durability/performance
-- `foreign_keys = ON` — referential integrity
-- `cache_size = 1000000` — large in-memory cache
-- `wal_autocheckpoint = 1000` — auto-checkpoint after ~4MB of writes
+PRAGMAs set in `src/db/connection.ts`: WAL journaling for concurrent reads, `synchronous =
+NORMAL`, `foreign_keys = ON`, a large page cache, and `wal_autocheckpoint`. A timer
+checkpoints the WAL periodically, plus forced checkpoints on startup and shutdown, so the
+`.db` file a user copies out is never missing recent writes.
 
-Periodic WAL checkpoints run on a timer (5 min dev, 15 min prod) plus forced checkpoints on startup and shutdown.
+**Expense-linked records use a polymorphic link.** Financing payments, insurance premiums,
+and reminder materializations are real rows in `expenses` tagged with `source_type` +
+`source_id` rather than per-feature boolean columns or separate tables. One query path serves
+all of them, and analytics can bucket by source without knowing which features exist.
 
-Migrations are in `backend/drizzle/` and run automatically on startup via `drizzle-orm/bun-sqlite/migrator`.
+### Providers and sync
 
-### Sync Architecture
+Everything the user brings their own account for sits under `src/api/providers/domains/`,
+one registry per capability:
 
-Two sync targets, both optional:
+- **storage** — Google Drive, Google Photos, S3-compatible, plus a fake for tests
+- **vlm** — receipt parsing (Anthropic, Gemini, OpenAI-compatible)
+- **llm** — the assistant (same three, plus tool-calling)
 
-- **Google Drive Backup** — exports all user data as a ZIP of CSVs, uploads to Drive. Supports retention policies.
-- **Google Sheets Sync** — mirrors user data to a spreadsheet for easy viewing.
+Each domain defines a provider interface and a registry; adding a vendor means adding one
+file, not touching call sites. Backups go through the `BackupStrategy` interface and registry
+in `src/api/sync/`, implemented under `src/api/providers/backup-strategies/` (Google Drive
+today), and `src/api/sync/backup-orchestrator.ts` fans out to every enabled provider.
 
-Auto-sync is triggered by user inactivity:
+Auto-sync is inactivity-driven: a per-domain `changeTracker` middleware marks data changed on
+each successful write, the global activity middleware arms the inactivity timer, and when it
+elapses `src/api/sync/activity-tracker.ts` triggers the enabled backups. The orchestrator
+no-ops when nothing changed since the last sync, so an idle user with no edits costs nothing.
 
-```
-User Activity → changeTracker marks data modified
-    ↓
-Inactivity timer expires (configurable, default 5 min)
-    ↓
-activityTracker checks for changes since last sync
-    ↓
-Triggers backup and/or sheets sync
-```
+## Frontend
 
----
+### Layering
 
-## Frontend Architecture
+`route/page → component → store → service → apiClient`.
 
-### Directory Layout
+- `services/api-client.ts` is the only place app code calls the global `fetch`. Everything
+  else goes through a domain service (`expense-api.ts`, `vehicle-api.ts`, …).
+- `services/api-transformer.ts` owns the expense shape conversion — `expenseAmount` →
+  `amount`, and the backend's single `volume` column split into `volume` or `charge` by fuel
+  type. An expense read that skips `fromBackendExpense` gets raw column names and loses the
+  electric split, so route all of them through it.
+- `stores/` holds cross-route state (app, auth, offline, settings, theme). Component-local
+  state stays in the component.
 
-```
-frontend/src/lib/
-├── components/          # Svelte components by domain
-│   ├── analytics/       # Charts and analytics views
-│   ├── charts/          # Shared chart components
-│   ├── dashboard/       # Dashboard widgets
-│   ├── expenses/        # Expense forms and tables
-│   ├── financing/       # Financing management
-│   ├── layout/          # Navigation, layout shells
-│   ├── settings/        # Settings panels
-│   ├── sync/            # Sync status and controls
-│   ├── vehicles/        # Vehicle cards and forms
-│   └── ui/              # shadcn-svelte primitives (do not modify)
-├── services/            # API layer
-│   ├── api-client.ts    # Base HTTP client (only place raw fetch is used)
-│   ├── api-transformer.ts # Backend ↔ frontend type transforms
-│   ├── vehicle-api.ts   # Vehicle endpoints
-│   ├── expense-api.ts   # Expense endpoints
-│   └── settings-api.ts  # Settings endpoints
-├── stores/              # Svelte stores
-│   ├── app.ts           # Global app state
-│   ├── auth.ts          # Auth state
-│   ├── offline.ts       # Offline detection
-│   └── settings.ts      # User settings
-├── types/
-│   └── index.ts         # All TypeScript type definitions
-├── utils/               # Shared utilities
-│   ├── formatters.ts    # Date, currency, number formatting
-│   ├── validation.ts    # Form validation helpers
-│   ├── expense-filters.ts
-│   ├── expense-helpers.ts
-│   ├── financing-calculations.ts
-│   ├── vehicle-helpers.ts
-│   ├── chart-formatters.ts
-│   ├── sync-status.ts
-│   ├── sync-manager.ts
-│   ├── units.ts
-│   ├── memoize.ts
-│   ├── transitions.ts
-│   ├── accessibility.ts
-│   ├── analytics-api.ts
-│   ├── auth.ts
-│   ├── error-handling.ts
-│   ├── offline-storage.ts
-│   ├── payment-planner.ts
-│   ├── performance.ts
-│   ├── pwa.ts
-│   └── validation-rules.ts
-├── constants/
-│   ├── limits.ts
-│   ├── messages.ts
-│   ├── time-periods.ts
-│   └── ui.ts
-└── hooks/
-    └── is-mobile.svelte.ts  # Reactive mobile detection hook
-```
+`src/lib/routes.ts` centralizes route paths; navigation goes through `resolve()` from
+`$app/paths` so the app works under any base path.
 
-### Routes
+### Conventions
 
-SvelteKit file-based routing in `frontend/src/routes/`:
+Svelte 5 runes only — `$state`, `$derived`, `$effect`, `$props`; no `$:` and no
+`$app/stores`. UI primitives live under `lib/components/ui/`; the ones pulled from the
+shadcn-svelte registry (`components.json`) are upstream-managed and not edited by hand.
+Colors are semantic tokens (`text-foreground`, `bg-background`, `chart-1`–`chart-8`), never
+raw hex, so theming and dark mode work everywhere at once.
 
-```
-/                  — Landing / redirect
-/auth/             — Login, OAuth callback
-/dashboard/        — Main dashboard
-/vehicles/         — Vehicle list and detail pages
-/expenses/         — Expense list and management
-/analytics/        — Charts and reports
-/settings/         — User preferences, sync config
-/profile/          — User profile
-/trips/            — Trip tracking
-```
+Expense categories are a closed set: `fuel`, `maintenance`, `financial`, `regulatory`,
+`enhancement`, `misc`.
 
-### Key Patterns
+Full conventions, including the Svelte 5 decision trees, are in `.kiro/steering/`.
 
-- **Svelte 5 runes mode** — `$state()`, `$derived()`, `$effect()`, `$props()`. No legacy `$:` reactivity.
-- **shadcn-svelte** for all UI primitives. Components in `ui/` are upstream-managed and not modified.
-- **Semantic color tokens** throughout — `text-foreground`, `bg-background`, `border-input`, `chart-1`–`chart-5`.
-- **Domain API services** (`vehicleApi`, `expenseApi`, `settingsApi`) wrap `apiClient` for type-safe API calls.
-- **Expense categories**: `fuel`, `maintenance`, `financial`, `regulatory`, `enhancement`, `misc`.
+### Offline
 
----
+The PWA accepts writes while offline. Entries are queued locally with a client-generated
+`client_id`, and the create route inserts idempotently on `(user_id, client_id)` — backed by
+a partial unique index — so replaying a queued write after a flaky reconnect returns the
+original row instead of creating a duplicate.
 
-## Data Flow
-
-```
-User Action (browser)
-    ↓
-SvelteKit Route → Component → Domain API Service
-    ↓
-apiClient (fetch with auth cookies)
-    ↓
-Hono Backend
-    ↓
-Body Limit → Security → Rate Limit → CORS → CSRF → Auth → Activity Tracking
-    ↓
-Route Handler → Zod Validation → Repository → Drizzle ORM → SQLite
-    ↓
-JSON Response → Component State Update
-```
-
-## Module Responsibilities
-
-| Module | Purpose |
-|--------|---------|
-| Auth | Google OAuth flow, Lucia session management, cookie-based auth |
-| Vehicles | Vehicle CRUD, statistics, ownership validation |
-| Expenses | Expense tracking, fuel calculations, category management |
-| Financing | Loan/lease management, payment tracking, amortization |
-| Insurance | Policy management, term tracking |
-| Sync | Google Drive backup (ZIP/CSV), Google Sheets mirroring, restore |
-| Settings | User preferences (units, currency), sync configuration |
-
-## Key Design Decisions
+## Key design decisions
 
 | Decision | Rationale |
-|----------|-----------|
-| SQLite over Postgres | Single-file DB, no server needed, fast for single-user/family use, easy backup |
-| Hono over Express | Lightweight, optimized for Bun, excellent TypeScript support |
-| Direct repository exports (no DI) | Simpler code, easier to trace, testing via class exports |
-| WAL mode | Concurrent reads without blocking writes |
-| Svelte 5 runes | Modern reactivity model, better performance, cleaner component code |
-| shadcn-svelte | Accessible, themeable UI primitives without vendor lock-in |
-| layerchart over D3 direct | Svelte-native charting with better DX |
+|---|---|
+| SQLite over Postgres | Single file, no server to run or secure, trivially backed up — right for self-hosting one household |
+| WAL mode | Readers don't block the writer, which matters because analytics queries are wide |
+| Hono on Bun | Small, fast, first-class TypeScript, no transpile step |
+| Repository singletons, no DI framework | Less indirection to trace; constructor-injected DB handle is all testing needs |
+| Side-effect-free `app.ts` | Lets the real app run in-process against an in-memory DB, so route tests exercise real middleware |
+| Polymorphic `source_type`/`source_id` | New expense-generating features add no columns and no query paths |
+| Provider registries per capability | A new storage or model vendor is one file; call sites stay untouched |
+| Svelte 5 runes | Finer-grained reactivity and less ceremony than stores-everywhere |
+| shadcn-svelte | Accessible primitives you own in-tree, no component-library lock-in |
+| layerchart over raw D3 | Svelte-native, so charts are components rather than imperative DOM code |

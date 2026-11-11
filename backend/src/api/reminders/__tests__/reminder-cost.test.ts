@@ -1,5 +1,5 @@
 /**
- * Unit net for the recurring-cost normalizer (recurring-expenses T7 backend core, C111).
+ * Unit net for the recurring-cost normalizer (recurring-expenses T7 backend core).
  *
  * Pure functions over a Reminder row — no DB. Pins the monthly run-rate derivation: the four
  * frequencies stay mutually consistent on an occurrences-per-year ÷ 12 basis, custom intervals convert

@@ -1,11 +1,11 @@
 /**
- * C151 (recurring-expenses engine hardening — completes the bug #13 fix): the MAIN catch-up loop in
- * processReminder had no non-progress guard. The #13 fix guarded advanceCustom (bad UNIT) +
+ * (recurring-expenses engine hardening — completes the bug fix) The MAIN catch-up loop in
+ * processReminder had no non-progress guard. The fix guarded advanceCustom (bad UNIT) +
  * fastForwardPastNow (non-progress backstop), but left two reachable holes in the main loop:
- *   (a) a corrupt top-level `frequency` (e.g. 'monthy') hit computeNextDueDate's switch with NO
- *       default → returned the date UNCHANGED;
- *   (b) `intervalValue = 0` (frequency='custom') → `?? 1` doesn't replace 0 → setDate(+0)/setMonth(+0)
- *       is a no-op.
+ *  (a) a corrupt top-level `frequency` (e.g. 'monthy') hit computeNextDueDate's switch with NO
+ *  default → returned the date UNCHANGED;
+ *  (b) `intervalValue = 0` (frequency='custom') → `?? 1` doesn't replace 0 → setDate(+0)/setMonth(+0)
+ *  is a no-op.
  * Either way `nextDue` never advanced, so the `while (nextDue <= now)` loop materialized up to
  * maxCatchUp (12) DUPLICATE expense rows at the same date before fastForwardPastNow's backstop fired.
  *
@@ -13,7 +13,7 @@
  * `throw`s on intervalValue<=0 — both BEFORE the period commits (processExpensePeriod's transaction
  * rolls back), so the throw lands in processReminder's per-reminder try/catch as a clean SKIP with
  * ZERO expense rows. Reachable only via DB corruption / validation bypass (Zod blocks both on the API),
- * so the corrupt rows are seeded directly via sqlite — the #13 test pattern.
+ * so the corrupt rows are seeded directly via sqlite — the test pattern.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -67,7 +67,7 @@ function expenseCount(reminderId: string): number {
   return row.n;
 }
 
-describe('C151 — main catch-up loop non-progress guard (completes #13)', () => {
+describe('main catch-up loop non-progress guard (completes)', () => {
   test('a corrupt top-level frequency is skipped with ZERO duplicate expenses', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Kia', model: 'Soul', year: 2019 });
     seedCorruptExpenseReminder('badfreq', vehicleId, {

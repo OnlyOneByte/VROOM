@@ -7,7 +7,7 @@ import { userProviders } from '../../db/schema';
 
 /**
  * The shape of an auth-domain provider's `config` blob (the OAuth identity profile). One source of
- * truth for the `{ email, avatarUrl }` object that was hand-assembled at 3 write sites (C283 dedup):
+ * truth for the `{ email, avatarUrl }` object that was hand-assembled at 3 write sites:
  * create + updateProfile here, and the new-user insert in auth/routes.ts. It's read back via
  * `config.email` / `config.avatarUrl`, so the write sites must stay in lockstep — a future field
  * (e.g. locale) is then added in one place, not three.

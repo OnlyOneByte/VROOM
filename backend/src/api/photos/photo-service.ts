@@ -22,7 +22,7 @@ export const MAX_FILE_SIZE = 10_485_760;
 
 /**
  * Persist the DB side of an upload (photo row + active default ref) AFTER the bytes are already in
- * the provider. #34: the upload is not atomic — if either insert throws (DB error, constraint), the
+ * the provider.: the upload is not atomic — if either insert throws (DB error, constraint), the
  * external object would be orphaned (no DB row → never reconcilable or deletable through the app).
  * Compensate: best-effort delete the just-uploaded object before re-throwing, so a failed upload
  * leaves no provider-side litter. A failed compensating delete is logged (reconcilable) but never
@@ -124,7 +124,7 @@ export async function uploadPhotoForEntity(
     pathHint: folderPath,
   });
 
-  // #34: the upload is not atomic — the bytes now live in the provider, but the photo row + its
+  // The upload is not atomic — the bytes now live in the provider, but the photo row + its
   // active ref are two more writes that can throw (DB error, constraint). On ANY failure after the
   // upload, the external object would be orphaned (no DB row → never reconcilable, never deletable
   // through the app). Compensate: best-effort delete the just-uploaded object before re-throwing, so
@@ -206,8 +206,89 @@ export async function listPhotosByEntityType(
 }
 
 /**
+ * Load a photo after checking the caller owns the entity in the URL, asserting the photo really
+ * belongs to that entity. The photo id alone is not enough: one of the user's OWN photo ids must
+ * not be reachable through a different entity's URL, or the (entityType, entityId) path segments
+ * would be decoration rather than scope.
+ */
+async function requireEntityPhoto(
+  entityType: string,
+  entityId: string,
+  photoId: string,
+  userId: string
+): Promise<Photo> {
+  await validateEntityOwnership(entityType, entityId, userId);
+
+  const photo = await photoRepository.findById(photoId);
+  if (!photo || photo.entityType !== entityType || photo.entityId !== entityId) {
+    throw new NotFoundError('Photo');
+  }
+  return photo;
+}
+
+/**
+ * Strong HTTP validator for a stored photo's bytes.
+ *
+ * A photo row is write-once: an upload inserts a NEW row and no route replaces the bytes behind an
+ * existing id, so (id, fileSize) names that content for the life of the row. Deriving the validator
+ * from the row — not from the bytes — is what lets a conditional GET be answered without asking the
+ * storage provider for the original at all.
+ */
+export function photoETag(photo: Pick<Photo, 'id' | 'fileSize'>): string {
+  return `"${photo.id}-${photo.fileSize}"`;
+}
+
+/**
+ * Does a client's `If-None-Match` satisfy `etag`? Implements the weak comparison RFC 9110 §13.1.2
+ * mandates for this header: the value is a comma-separated list, `*` matches any existing
+ * representation, and a `W/` prefix is ignored on both sides — so a cache or proxy that weakened
+ * our tag still revalidates for free instead of re-downloading the photo.
+ */
+export function ifNoneMatchSatisfies(header: string | undefined | null, etag: string): boolean {
+  if (!header) return false;
+
+  const strip = (tag: string): string => (tag.startsWith('W/') ? tag.slice(2) : tag);
+  const target = strip(etag);
+
+  return header
+    .split(',')
+    .map((candidate) => candidate.trim())
+    .some((candidate) => candidate === '*' || strip(candidate) === target);
+}
+
+/** What a serve route needs to answer a conditional GET without fetching the bytes. */
+export interface PhotoServeMetadata {
+  /** Strong validator for the stored bytes — see {@link photoETag}. */
+  etag: string;
+  /** The stored MIME type the serve route echoes as Content-Type. */
+  mimeType: string;
+}
+
+/**
+ * Resolve the serve metadata for a photo WITHOUT downloading it — ownership gate plus two indexed
+ * SQLite reads. A serve route calls this first so a revalidation can be answered with 304 before
+ * the provider round-trip; it deliberately does not resolve a storage ref, because a client whose
+ * cached copy is still valid does not need one (and on a provider outage gets its photo anyway).
+ */
+export async function getPhotoServeMetadataForEntity(
+  entityType: string,
+  entityId: string,
+  photoId: string,
+  userId: string
+): Promise<PhotoServeMetadata> {
+  const photo = await requireEntityPhoto(entityType, entityId, photoId, userId);
+  return { etag: photoETag(photo), mimeType: photo.mimeType };
+}
+
+/**
  * Download a photo via the provider abstraction and return the raw buffer + MIME type.
  * Uses a fallback chain: try the user's default provider first, then any active ref.
+ *
+ * This returns the FULL-RESOLUTION ORIGINAL — despite the route being called "thumbnail", nothing in
+ * this stack resizes: there is no image codec in the Bun runtime and none is vendored, and the
+ * upload path stores whatever the camera produced (capped at {@link MAX_FILE_SIZE}). So a 48px
+ * avatar costs megabytes, and the conditional GET in the serve routes is what bounds the repeat
+ * cost until a real resize (client-side downscale on upload, or a provider-generated size) lands.
  */
 export async function getPhotoThumbnailForEntity(
   entityType: string,
@@ -215,12 +296,7 @@ export async function getPhotoThumbnailForEntity(
   photoId: string,
   userId: string
 ): Promise<{ buffer: Buffer; mimeType: string }> {
-  await validateEntityOwnership(entityType, entityId, userId);
-
-  const photo = await photoRepository.findById(photoId);
-  if (!photo || photo.entityType !== entityType || photo.entityId !== entityId) {
-    throw new NotFoundError('Photo');
-  }
+  const photo = await requireEntityPhoto(entityType, entityId, photoId, userId);
 
   const category = ENTITY_TO_CATEGORY[entityType];
 
@@ -270,12 +346,7 @@ export async function setCoverPhotoForEntity(
   photoId: string,
   userId: string
 ): Promise<Photo> {
-  await validateEntityOwnership(entityType, entityId, userId);
-
-  const photo = await photoRepository.findById(photoId);
-  if (!photo || photo.entityType !== entityType || photo.entityId !== entityId) {
-    throw new NotFoundError('Photo');
-  }
+  await requireEntityPhoto(entityType, entityId, photoId, userId);
 
   return photoRepository.setCoverPhoto(entityType, entityId, photoId);
 }
@@ -290,12 +361,7 @@ export async function deletePhotoForEntity(
   photoId: string,
   userId: string
 ): Promise<void> {
-  await validateEntityOwnership(entityType, entityId, userId);
-
-  const photo = await photoRepository.findById(photoId);
-  if (!photo || photo.entityType !== entityType || photo.entityId !== entityId) {
-    throw new NotFoundError('Photo');
-  }
+  const photo = await requireEntityPhoto(entityType, entityId, photoId, userId);
 
   const wasCover = photo.isCover;
 

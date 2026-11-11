@@ -32,6 +32,7 @@ import { routes as syncRoutes } from './api/sync/routes';
 import { routes as tripRoutes } from './api/trips/routes';
 import { routes as vehicleRoutes } from './api/vehicles/routes';
 import { CONFIG } from './config';
+import { createErrorResponse } from './errors';
 import { activityTracker, bodyLimit, errorHandler, optionalAuth, rateLimiter } from './middleware';
 import { getClientIp } from './utils/client-ip';
 import { logger } from './utils/logger';
@@ -41,14 +42,41 @@ const app = new Hono();
 // Global error handler
 app.onError(errorHandler);
 
-// Body size limit middleware - prevents DoS attacks via large payloads
-app.use(
-  '*',
-  bodyLimit({
-    maxSize: 10 * 1024 * 1024, // 10MB
-    message: 'Request body too large',
-  })
+// Body size limit middleware - prevents DoS attacks via large payloads.
+const GLOBAL_MAX_BODY_SIZE = 10 * 1024 * 1024; // 10MB
+
+/**
+ * Paths whose bodies are legitimately LARGER than the global cap, mapped to the cap they
+ * enforce instead. A route-level `bodyLimit` can only ever TIGHTEN the global one: this
+ * middleware runs first and rejects on Content-Length, so a route asking for more than
+ * GLOBAL_MAX_BODY_SIZE never sees the request and its larger allowance is dead code. The
+ * backup restore upload takes a whole backup ZIP (CONFIG.backup.maxFileSize), so without an
+ * entry here a user cannot restore a backup larger than the global cap — data recovery, the
+ * one path that must never be blocked by a DoS guard tuned for JSON payloads.
+ *
+ * The unversioned alias is listed too: it only 308-redirects to its `/api/v1` twin (no body is
+ * read there), but a 413 on the redirect stops a large upload from ever reaching the real route.
+ *
+ * Adding a path here does NOT remove its cap — the larger limit is still enforced below, and
+ * the route keeps its own matching `bodyLimit` as the authoritative declaration.
+ */
+const LARGER_BODY_LIMITS: Record<string, number> = {
+  '/api/v1/sync/restore/from-backup': CONFIG.backup.maxFileSize,
+  '/api/sync/restore/from-backup': CONFIG.backup.maxFileSize,
+};
+
+const globalBodyLimit = bodyLimit({
+  maxSize: GLOBAL_MAX_BODY_SIZE,
+  message: 'Request body too large',
+});
+const largerBodyLimits = new Map(
+  Object.entries(LARGER_BODY_LIMITS).map(([path, maxSize]) => [
+    path,
+    bodyLimit({ maxSize, message: 'Request body too large' }),
+  ])
 );
+
+app.use('*', (c, next) => (largerBodyLimits.get(c.req.path) ?? globalBodyLimit)(c, next));
 
 /**
  * Security Headers Configuration
@@ -61,8 +89,8 @@ app.use(
  * - fontSrc: Add CDN domains if using external fonts
  *
  * Example for Google Drive integration:
- *   imgSrc: ["'self'", 'data:', 'https:', 'https://drive.google.com']
- *   connectSrc: ["'self'", 'https://www.googleapis.com']
+ *  imgSrc: ["'self'", 'data:', 'https:', 'https://drive.google.com']
+ *  connectSrc: ["'self'", 'https://www.googleapis.com']
  */
 app.use(
   '*',
@@ -140,7 +168,7 @@ app.get('/health', (c) => {
   return c.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '1.0.0',
+    version: CONFIG.version,
   });
 });
 
@@ -185,7 +213,7 @@ app.use('/api/*', async (c, next) => {
 app.get('/api', (c) => {
   return c.json({
     message: 'VROOM Car Tracker API',
-    version: '1.0.0',
+    version: CONFIG.version,
     apiVersion: 'v1',
     deprecation: {
       message: 'Unversioned endpoints (/api/*) are deprecated and will redirect to /api/v1/*',
@@ -194,16 +222,16 @@ app.get('/api', (c) => {
   });
 });
 
-// 404 handler
-app.notFound((c) => {
-  return c.json(
-    {
-      error: 'Not Found',
-      message: 'The requested endpoint does not exist',
+// 404 handler. Shapes the standard error envelope, same as every thrown error: a string-valued
+// `error` would leave the client reading `error.message` of a string — undefined — so the UI could
+// only report the bare status code.
+app.notFound((c) =>
+  c.json(
+    createErrorResponse('NotFoundError', 'The requested endpoint does not exist', {
       path: c.req.path,
-    },
+    }),
     404
-  );
-});
+  )
+);
 
 export { app };

@@ -1,21 +1,21 @@
 /**
  * Characterization tests for the dashboard EXPENSE-SUMMARY builder family in analytics-charts.ts
- * (C119 deep-review). These four GeneralExpenseRow[] -> chart-data builders had ZERO test
+ *  These four GeneralExpenseRow[] -> chart-data builders had ZERO test
  * references — the exact never-pinned-analytics-builder class the loop's defect vein has lived in
- * (C7 pooled-distance, C11 oldest-slice, C14 month-skip, C53 TCO trend, C67 the six date builders).
- * The C119 audit read each against source and found them CORRECT; this locks that conclusion so a
- * future edit can't silently regress it (NORTH_STAR #5). The companion C67 file
+ * (C7 pooled-distance, oldest-slice, month-skip, TCO trend, the six date builders).
+ * The audit read each against source and found them CORRECT; this locks that conclusion so a
+ * future edit can't silently regress it. The companion file
  * (analytics-charts-unpinned.test.ts) certified the fuel/date builders; this is the expense-summary
  * sibling set that audit did not reach:
  *
- *   - buildExpenseByCategory       — the pie-chart contract: percentages SUM to 100, total===0 -> [],
- *                                     unknown category folds to 'misc'.
- *   - buildVehicleExpenseBreakdown — the same category fold WITHOUT percentages (no total guard).
- *   - buildMonthlyExpenseTrends    — localeCompare-then-slice(-24) keeps the NEWEST 24 months (the
- *                                     C11 oldest-slice direction class); same-month co-accumulate;
- *                                     dateless rows dropped.
- *   - findBiggestExpense           — strict-greater max-by-amount (first-wins on ties), []->null,
- *                                     null-description fallback, ISO date.
+ *  - buildExpenseByCategory — the pie-chart contract: percentages SUM to 100, total===0 -> [],
+ *  unknown category folds to 'misc'.
+ *  - buildVehicleExpenseBreakdown — the same category fold WITHOUT percentages (no total guard).
+ *  - buildMonthlyExpenseTrends — localeCompare-then-slice(-24) keeps the NEWEST 24 months (the
+ *  oldest-slice direction class); same-month co-accumulate;
+ *  dateless rows dropped.
+ *  - findBiggestExpense — strict-greater max-by-amount (first-wins on ties), []->null,
+ *  null-description fallback, ISO date.
  *
  * Pure module → no DB, no server.
  */
@@ -30,7 +30,7 @@ import {
 } from '../analytics-charts';
 
 // Local-time date for a given Y/M/D so the bucketing assertions are timezone-independent
-// (the functions bucket on local getMonth/getFullYear via toMonthKey — matches the C6/C11/C67
+// (the functions bucket on local getMonth/getFullYear via toMonthKey — matches the C6/
 // discipline of constructing local-time dates, never UTC ISO strings, in analytics tests).
 function d(year: number, month1to12: number, day: number): Date {
   return new Date(year, month1to12 - 1, day);
@@ -153,7 +153,7 @@ describe('buildMonthlyExpenseTrends', () => {
     expect(out[0]).toEqual({ month: '2024-02', amount: 50 });
   });
 
-  test('keeps the NEWEST 24 months, not the oldest (the C11 slice-direction class)', () => {
+  test('keeps the NEWEST 24 months, not the oldest (the slice-direction class)', () => {
     // 30 distinct months Jan-2022 .. Jun-2024, $1 each. slice(-24) must drop the OLDEST 6.
     const rows: GeneralExpenseRow[] = [];
     for (let i = 0; i < 30; i++) {
@@ -166,7 +166,7 @@ describe('buildMonthlyExpenseTrends', () => {
     // newest retained is 2024-06 (i=29); oldest retained is 2022-07 (dropped 2022-01..2022-06).
     expect(out[out.length - 1]?.month).toBe('2024-06');
     expect(out[0]?.month).toBe('2022-07');
-    // the oldest 6 months are GONE — a .slice(0,24) refactor would invert this (C11 regression).
+    // the oldest 6 months are GONE — a .slice(0,24) refactor would invert this.
     expect(out.some((e) => e.month === '2022-01')).toBe(false);
   });
 });

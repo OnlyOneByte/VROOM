@@ -128,9 +128,9 @@ export class ExpenseSplitService {
   }
 
   /**
-   * SYNCHRONOUS sibling of createSiblings (#127 class, C504). bun-sqlite is a sync dialect, so the split
+   * SYNCHRONOUS sibling of createSiblings. bun-sqlite is a sync dialect, so the split
    * create/update transactions run their callbacks synchronously for real atomic rollback — an async
-   * callback autocommits each insert alone (the C151 footgun), which on the update path (delete-then-
+   * callback autocommits each insert alone, which on the update path (delete-then-
    * reinsert) could irrecoverably lose a split group. `.returning().get()` executes inline inside the
    * caller's tx. Identical row shape to createSiblings — the two MUST stay in lockstep.
    */

@@ -11,10 +11,7 @@ export interface UnitPreferences {
 export type UnitsMetadata = UnitPreferences;
 
 export type PhotoCategory =
-	| 'vehicle_photos'
-	| 'expense_receipts'
-	| 'insurance_docs'
-	| 'odometer_readings';
+	'vehicle_photos' | 'expense_receipts' | 'insurance_docs' | 'odometer_readings';
 
 export interface CategorySetting {
 	enabled: boolean;

@@ -175,7 +175,7 @@ describe('Property 8: Document MIME type validation', () => {
 });
 
 // ---------------------------------------------------------------------------
-// updateTermSchema CONDITIONAL date-order refine (C443 guard). The PUT term schema is partial — both
+// updateTermSchema CONDITIONAL date-order refine. The PUT term schema is partial — both
 // dates are independently optional — so its refine differs from createTermSchema: it enforces
 // `endDate > startDate` ONLY when BOTH are present, and DELIBERATELY skips the check when exactly one
 // date is sent (the "user corrects just the start date" partial-update path). The property suite above
@@ -184,7 +184,7 @@ describe('Property 8: Document MIME type validation', () => {
 // reachable via PUT /insurance/:id/terms/:termId (the repository writes whichever single date is sent
 // with independent guards + no cross-check, so the schema is the ONLY order gate). Drives the REAL export.
 // ---------------------------------------------------------------------------
-describe('updateTermSchema date-order refine (partial-update, C443)', () => {
+describe('updateTermSchema date-order refine (partial-update)', () => {
   const T1 = '2024-01-01T00:00:00.000Z';
   const T2 = '2024-06-01T00:00:00.000Z';
 

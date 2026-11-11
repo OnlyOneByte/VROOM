@@ -16,17 +16,25 @@ export async function withTimeout<T>(
   timeoutMs: number,
   operation: string
 ): Promise<T> {
-  const timeout = new Promise<never>((_, reject) =>
-    setTimeout(
+  // The handle is captured and always cleared: an uncleared timer keeps the event loop
+  // referenced for the FULL budget (10 minutes for a backup) after the work has already
+  // finished, so a script or test that calls this cannot exit until the timer drains.
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
       () =>
         reject(
           new SyncError(SyncErrorCode.NETWORK_ERROR, `${operation} timed out after ${timeoutMs}ms`)
         ),
       timeoutMs
-    )
-  );
+    );
+  });
 
-  return Promise.race([promise, timeout]);
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**

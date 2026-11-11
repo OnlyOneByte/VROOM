@@ -249,7 +249,7 @@ describe('Property 14: Renew pre-fill from previous term', () => {
 		);
 	});
 
-	// C450 guard: the EQUAL-endDate tiebreak. insurance.ts:57 uses a strict `>` so on two terms sharing
+	// guard: the EQUAL-endDate tiebreak. insurance.ts:57 uses a strict `>` so on two terms sharing
 	// an identical endDate the FIRST in the array wins (latest is never reassigned on a tie). This is
 	// REACHABLE: insuranceTerms has only a NON-unique (policyId, endDate) index, so two co-terminating
 	// terms can legitimately share an endDate; the backend orders desc(endDate) but SQLite's order AMONG

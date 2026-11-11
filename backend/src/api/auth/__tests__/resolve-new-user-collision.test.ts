@@ -1,19 +1,19 @@
 /**
- * #C157 DEEP-REVIEW (certify + guard): `resolveNewUser`'s email-collision + race-retry invariant.
+ * # DEEP-REVIEW (certify + guard): `resolveNewUser`'s email-collision + race-retry invariant.
  *
  * `resolveNewUser` (auth/routes.ts) creates a user on an OAuth login that has no existing auth row. Its
- * collision handling is a load-bearing data-safety + concurrency contract (NORTH_STAR #2 — VROOM NEVER
+ * collision handling is a load-bearing data-safety + concurrency contract (— VROOM NEVER
  * implicitly merges two accounts):
- *   1. PRE-CHECK: if a user with the incoming email already exists → redirect `email_exists` (no merge).
- *   2. TRANSACTIONAL CATCH (concurrency-only): the new-user tx inserts BOTH `users(email)` (UNIQUE on email)
- *      and `user_providers(provider_type, provider_account_id)` (partial UNIQUE `up_auth_identity_idx` WHERE
- *      domain='auth'). So a concurrent request landing between our pre-check SELECT and our tx commit can
- *      UNIQUE-violate on EITHER index. The catch re-queries findByProviderIdentity(authProvider, accountId):
- *        - row FOUND  → the race winner was the SAME provider identity → return its userId (idempotent login);
- *          the provider-identity UNIQUE guarantees that row is unambiguous
- *        - row ABSENT → a DIFFERENT account grabbed that email → redirect `email_exists`
+ *  1. PRE-CHECK: if a user with the incoming email already exists → redirect `email_exists` (no merge).
+ *  2. TRANSACTIONAL CATCH (concurrency-only): the new-user tx inserts BOTH `users(email)` (UNIQUE on email)
+ *  and `user_providers(provider_type, provider_account_id)` (partial UNIQUE `up_auth_identity_idx` WHERE
+ *  domain='auth'). So a concurrent request landing between our pre-check SELECT and our tx commit can
+ *  UNIQUE-violate on EITHER index. The catch re-queries findByProviderIdentity(authProvider, accountId):
+ *  - row FOUND → the race winner was the SAME provider identity → return its userId (idempotent login);
+ *  the provider-identity UNIQUE guarantees that row is unambiguous
+ *  - row ABSENT → a DIFFERENT account grabbed that email → redirect `email_exists`
  *
- * Certified CLEAN firsthand (C157) — no defect. resolveNewUser is a private handler helper, so this guard
+ * Certified CLEAN firsthand — no defect. resolveNewUser is a private handler helper, so this guard
  * models the EXACT decision logic against the REAL migrated schema (the SQL contract it runs): the pre-check
  * no-merge, and the catch-branch race-winner-vs-collision discrimination. A regression that (a) implicitly
  * merged on email, or (b) returned a userId for a different-account collision (cross-account login!), breaks it.
@@ -67,7 +67,7 @@ function catchBranchResolution(
   return row ? { userId: row.user_id } : { redirect: 'email_exists' };
 }
 
-describe('resolveNewUser — pre-check (no implicit account merge, NORTH_STAR #2)', () => {
+describe('resolveNewUser — pre-check (no implicit account merge)', () => {
   test('an email already owned by another account blocks new-user creation (→ email_exists)', () => {
     seedAuthUser('u_first', 'shared@example.com', 'google', 'acc-1');
     // A different provider account presenting the SAME email must NOT merge into u_first.

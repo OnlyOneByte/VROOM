@@ -1,14 +1,14 @@
 /**
  * Characterization tests for previously-UNPINNED pure builders in analytics-charts.ts
- * (C67 deep-review). These six date/bucketing-heavy functions had ZERO test references —
+ *  These six date/bucketing-heavy functions had ZERO test references —
  * exactly the class the analytics defect vein has historically lived in (C7 pooled-distance,
- * C11 oldest-slice, C14 month-skip, C23 lump-sum premium). The C67 audit read each against
+ * oldest-slice, month-skip, lump-sum premium). The audit read each against
  * source and found them CORRECT; this locks that conclusion so a future edit can't silently
- * regress it (NORTH_STAR #5). Each test asserts an invariant the audit verified:
- *   - empty / single-element inputs don't NaN/Infinity/throw,
- *   - divide-by-zero guards hold,
- *   - localeCompare-then-slice keeps the NEWEST window (the C11/C13 direction class),
- *   - buildFillupIntervals does NOT mutate its input (the C67 hygiene fix).
+ * regress it. Each test asserts an invariant the audit verified:
+ *  - empty / single-element inputs don't NaN/Infinity/throw,
+ *  - divide-by-zero guards hold,
+ *  - localeCompare-then-slice keeps the NEWEST window (the direction class),
+ *  - buildFillupIntervals does NOT mutate its input (the hygiene fix).
  * Pure module → no DB, no server.
  */
 
@@ -90,13 +90,13 @@ describe('buildDayOfWeekPatterns', () => {
     expect(monday?.avgVolume).toBe(8); // (10+6)/2
   });
 
-  // #113 (C390, the #56/#18/C97/#108 split-sibling class — the sibling of the #108 buildSeasonalEfficiency
-  // fix at C367): a split fuel expense creates one sibling PER VEHICLE with volume=null, and
+  // (the split-sibling class — the sibling of the buildSeasonalEfficiency
+  // fix at): a split fuel expense creates one sibling PER VEHICLE with volume=null, and
   // queryFuelExpenses has no volume filter, so an unconditional count overcounts a single split fillup as
   // N AND skews avgVolume (totalGallons/N) + avgCost (per-row, not per-fillup). The fix counts only
   // volume-bearing rows. This pins it: a Monday split fillup (1 volume row + 2 null siblings) is ONE
   // fillup with the REAL avg, not three.
-  test('a split fuel fillup counts as ONE fillup with the real avg, not N (#113)', () => {
+  test('a split fuel fillup counts as ONE fillup with the real avg, not N', () => {
     const out = buildDayOfWeekPatterns([
       // One split fillup on Monday 2024-01-15: the volume-bearing leg + two null-volume per-vehicle siblings.
       fuelRow({ date: d(2024, 1, 15), expenseAmount: 30, volume: 12 }),
@@ -110,7 +110,7 @@ describe('buildDayOfWeekPatterns', () => {
     expect(monday?.avgCost).toBe(30); // the volume-bearing leg's cost, not skewed by the null siblings
   });
 
-  test('a zero-volume fuel row is not counted as a fillup (#113 — boundary)', () => {
+  test('a zero-volume fuel row is not counted as a fillup (— boundary)', () => {
     const out = buildDayOfWeekPatterns([fuelRow({ date: d(2024, 1, 15), volume: 0 })]);
     const monday = out.find((r) => r.day === 'Monday');
     expect(monday?.fillupCount).toBe(0);
@@ -132,13 +132,13 @@ describe('buildSeasonalEfficiency', () => {
     expect(winter?.avgEfficiency).toBe(0);
   });
 
-  // #108 (C367, the #56/#18/C97 class): a split fuel expense creates one sibling PER VEHICLE —
+  // A split fuel expense creates one sibling PER VEHICLE —
   // each with its cost share but volume=null (createSiblings never sets volume). The query feeding
   // this (queryFuelExpenses) selects ALL category='fuel' rows with NO volume filter, so the
   // null-volume siblings arrive here. Pre-fix, the unconditional row count inflated the season's
   // fillupCount by N for a single split fillup; the fix counts only volume-bearing rows (a real
-  // fillup has a volume), matching computeAverageCosts (#56) + the fuel-stats COUNT (C97).
-  test('a split fuel fillup (1 volume-bearing row + null-volume siblings) counts as ONE fillup, not N (#108)', () => {
+  // fillup has a volume), matching computeAverageCosts + the fuel-stats COUNT.
+  test('a split fuel fillup (1 volume-bearing row + null-volume siblings) counts as ONE fillup, not N', () => {
     const out = buildSeasonalEfficiency([
       // One split fillup in January: the volume-bearing leg + two null-volume per-vehicle siblings.
       fuelRow({ date: d(2024, 1, 10), volume: 12 }),
@@ -150,7 +150,7 @@ describe('buildSeasonalEfficiency', () => {
     expect(winter?.fillupCount).toBe(1);
   });
 
-  test('a zero-volume fuel row is not counted as a fillup (#108 — boundary)', () => {
+  test('a zero-volume fuel row is not counted as a fillup (— boundary)', () => {
     const out = buildSeasonalEfficiency([fuelRow({ date: d(2024, 1, 10), volume: 0 })]);
     const winter = out.find((s) => s.season === 'Winter');
     expect(winter?.fillupCount).toBe(0);
@@ -232,7 +232,7 @@ describe('computePreviousYearComparison', () => {
   });
 });
 
-describe('buildFillupIntervals — input is not mutated (C67 hygiene fix)', () => {
+describe('buildFillupIntervals — input is not mutated (hygiene fix)', () => {
   test('the caller-visible row order is preserved after building intervals', () => {
     // Two vehicles, deliberately NOT date-sorted, so an in-place sort would reorder them.
     const rows: FuelExpenseRow[] = [
@@ -255,15 +255,15 @@ describe('buildFillupIntervals — input is not mutated (C67 hygiene fix)', () =
     expect(bucket?.count).toBe(1);
   });
 
-  // C391 (the #108/#113 split-sibling sweep): buildFillupIntervals is the SAFE sibling of the
-  // overcounting buildSeasonalEfficiency(#108)/buildDayOfWeekPatterns(#113) — it pairs on DATES via
+  // buildFillupIntervals is the SAFE sibling of the
+  // overcounting buildSeasonalEfficiency/buildDayOfWeekPatterns — it pairs on DATES via
   // accumulateIntervalBuckets, whose `days <= 0 → continue` guard (analytics-charts.ts:893) drops a
   // SAME-DATE pair. A split fuel expense's null-volume siblings share the volume-bearing leg's date, so
   // they'd form 0-day pairs — which must NOT land in the '1-3 days' bucket as phantom intervals. This
   // pins that safety: a single split fillup (3 same-date rows) + one real later fillup yields exactly
   // ONE interval (the real gap), not 1 + the intra-split 0-day pairs. A regression loosening the
   // `days <= 0` guard (e.g. to `< 0`) would let the split inflate the distribution → RED.
-  test('a same-date split fillup does NOT create phantom 0-day intervals (#108/#113 sibling, the days<=0 guard)', () => {
+  test('a same-date split fillup does NOT create phantom 0-day intervals (sibling, the days<=0 guard)', () => {
     const out = buildFillupIntervals([
       // One split fillup on Jan 1 (one volume-bearing leg + two null-volume siblings, same date+vehicle).
       fuelRow({ vehicleId: 'v1', date: d(2024, 1, 1), volume: 12 }),
@@ -281,12 +281,12 @@ describe('buildFillupIntervals — input is not mutated (C67 hygiene fix)', () =
 });
 
 // ---------------------------------------------------------------------------
-// computeAverageCosts.perFillup — #56 (C162): avg cost/fillup must divide by the FILLUP COUNT, not the
+// computeAverageCosts.perFillup: avg cost/fillup must divide by the FILLUP COUNT, not the
 // row count. A split fuel expense creates one sibling per vehicle (cost share + volume=null), so a
 // row-based denominator overcounts a split fillup as N → understated avg cost/fillup. Restrict numerator
-// + denominator to volume-bearing rows (matching the C97 #18 count fix). Pure function, no DB.
+// + denominator to volume-bearing rows (matching the count fix). Pure function, no DB.
 // ---------------------------------------------------------------------------
-describe('computeAverageCosts.perFillup — split fuel siblings do not inflate the denominator (#56)', () => {
+describe('computeAverageCosts.perFillup — split fuel siblings do not inflate the denominator', () => {
   const YEAR_START = d(2024, 1, 1);
   const YEAR_END = d(2025, 1, 1);
   const NOW = d(2024, 6, 1);
@@ -324,7 +324,7 @@ describe('computeAverageCosts.perFillup — split fuel siblings do not inflate t
   });
 });
 
-// sortByVehicleThenDate (C200 dedup): the canonical (vehicleId, then date asc) pre-sort the per-vehicle
+// sortByVehicleThenDate: the canonical (vehicleId, then date asc) pre-sort the per-vehicle
 // pairing builders need, hand-duplicated byte-for-byte at 3 analytics/repository.ts sites. Pins the
 // comparator: groups by vehicle, orders within a vehicle by date, doesn't mutate the input, and the date
 // key handles the `Date | number | null` shape (number = epoch-ms, null → 0) exactly as the inline form did.
@@ -366,13 +366,13 @@ describe('sortByVehicleThenDate', () => {
   });
 });
 
-// #119 (C411): the FuelStats "Fuel Consumption" card (mpgValues → computeFuelConsumptionMetrics, labeled
+// The FuelStats "Fuel Consumption" card (mpgValues → computeFuelConsumptionMetrics, labeled
 // mi/gal) must NOT include a plug-in-hybrid's CHARGE sessions — a charge stores kWh in `volume`, so
 // computeEfficiencyPoint emits its ~mi/kWh (a different quantity), which dragged the avg down + showed a
 // charge's mi/kWh as "mi/gal". The fix excludes electric rows from mpgValues ONLY; costPerMileValues stays
 // unfiltered because cost-per-mile is total energy spend over total miles (fuel + charge), a consistent
-// $/mi (C378). Pre-fix mpgValues had length 2 (the gas point AND the charge point) — RED.
-describe('computeMpgAndCostPerMile — charge rows excluded from MPG, kept in cost-per-mile (#119)', () => {
+// $/mi. Pre-fix mpgValues had length 2 (the gas point AND the charge point) — RED.
+describe('computeMpgAndCostPerMile — charge rows excluded from MPG, kept in cost-per-mile', () => {
   // One gas vehicle: 10000 → 10300 mi on 10 gal = 30 MPG. One charge interval on the SAME vehicle right
   // after: 10300 → 10360 on 15 kWh = 4 mi/kWh (within the electric realistic band). Distinct mileages so
   // the cost-per-mile deltas are positive and real.
@@ -411,7 +411,7 @@ describe('computeMpgAndCostPerMile — charge rows excluded from MPG, kept in co
     expect(mpgValues.some((v) => v < 10)).toBe(false); // no mi/kWh-magnitude value leaked in
   });
 
-  test('costPerMileValues still includes the charge interval (cost spans all energy, C378)', () => {
+  test('costPerMileValues still includes the charge interval (cost spans all energy)', () => {
     const { costPerMileValues } = computeMpgAndCostPerMile(rows);
     // Both consecutive intervals contribute a cost/mile: gas 40/300 and charge 9/60 = 0.15.
     expect(costPerMileValues).toHaveLength(2);
@@ -439,12 +439,12 @@ describe('computeMpgAndCostPerMile — charge rows excluded from MPG, kept in co
   });
 });
 
-// #122 (C413): the #119 sweep across the sibling gas-MPG efficiency builders. They all summed
+// The sweep across the sibling gas-MPG efficiency builders. They all summed
 // computeEfficiencyPoint().efficiency into a gas-MPG average (labeled mi/gal) with no gas/charge
 // partition, so a PHEV's ~mi/kWh charge point diluted the average. Now routed through gasEfficiencyPoint
 // (the ONE source of truth — null for an electric current row). Pre-fix the charge interval contributed
 // to effSum/effCount; post-fix only gas pairs do.
-describe('gasEfficiencyPoint — gas-MPG partition source of truth (#122)', () => {
+describe('gasEfficiencyPoint — gas-MPG partition source of truth', () => {
   test('returns a point for a gas pair, null for an electric current row', () => {
     const gas = fuelRow({ mileage: 10300, volume: 10, fuelType: 'regular' });
     const prev = fuelRow({ mileage: 10000, volume: 10, fuelType: 'regular' });
@@ -454,7 +454,7 @@ describe('gasEfficiencyPoint — gas-MPG partition source of truth (#122)', () =
   });
 });
 
-describe('sibling efficiency builders exclude PHEV charge from the gas-MPG average (#122)', () => {
+describe('sibling efficiency builders exclude PHEV charge from the gas-MPG average', () => {
   // Same vehicle: two gas fillups (10000→10300 on 10 gal = 30 MPG) then a charge session (→10360 on
   // 15 kWh = 4 mi/kWh). The gas-MPG average must be 30, NOT (30+4)/2 = 17.
   const rows: FuelExpenseRow[] = [
@@ -495,15 +495,15 @@ describe('sibling efficiency builders exclude PHEV charge from the gas-MPG avera
   });
 });
 
-// C414 (guard, NORTH_STAR #5): the LOAD-BEARING edge of the #119/#122 gas/charge partition — an EV-ONLY
+// The LOAD-BEARING edge of the gas/charge partition — an EV-ONLY
 // vehicle (all charge rows, no gas). The mixed-PHEV tests above pin that charge is excluded from the
-// gas-MPG average; this pins the OTHER side that the C411/C413 fix rests on: a pure-EV car must produce a
+// gas-MPG average; this pins the OTHER side that the fix rests on: a pure-EV car must produce a
 // CLEAN-EMPTY gas-MPG series (null avg / empty mpgValues — NOT a phantom mi/kWh value mislabeled mi/gal,
 // NOT a NaN/divide-by-zero), WHILE cost-per-mile still computes from the charge spend (cost spans all
-// energy, C378). Without this, a refactor reverting gasEfficiencyPoint → computeEfficiencyPoint would
+// energy). Without this, a refactor reverting gasEfficiencyPoint → computeEfficiencyPoint would
 // re-mislabel an EV-only car's mi/kWh as mi/gal and only a mixed test (which still has a gas point) might
 // stay green — this catches that distinctly. An EV-only car IS a real VROOM vehicle hitting Analytics.
-describe('an EV-only vehicle yields an EMPTY gas-MPG series but a real cost-per-mile (#119/#122 load-bearing edge)', () => {
+describe('an EV-only vehicle yields an EMPTY gas-MPG series but a real cost-per-mile (load-bearing edge)', () => {
   // Two charge sessions on one all-electric vehicle: 20000 → 20240 mi on 60 kWh = 4 mi/kWh, $9 each.
   const evRows: FuelExpenseRow[] = [
     fuelRow({
@@ -550,13 +550,13 @@ describe('an EV-only vehicle yields an EMPTY gas-MPG series but a real cost-per-
   });
 });
 
-// C419 (guard): pin computeEfficiencyPoint's realistic-band boundaries against the REAL function. The
+// Pin computeEfficiencyPoint's realistic-band boundaries against the REAL function. The
 // only existing band coverage (fuel-efficiency.property.test.ts) RE-IMPLEMENTS isRealisticEfficiency as a
-// local reference and tests THAT — the C229 coverage-theater trap — so a regression changing
+// local reference and tests THAT — the coverage-theater trap — so a regression changing
 // MAX_VALID_MPG (5–100 gas) or MAX_VALID_MI_KWH (1–10 electric) would leave it green while production
 // shifted. These drive the exported computeEfficiencyPoint directly so the band can't drift unnoticed.
-// (As of C20 the per-vehicle stats path [calculations.ts averageConsecutiveMpg / calculateAverageMilesPerKwh]
-// shares this SAME canonical band — the #30/C419 divergence was unified to [5,100]/[1,10], Angelo-APPROVED.)
+// (As of the per-vehicle stats path [calculations.ts averageConsecutiveMpg / calculateAverageMilesPerKwh]
+// shares this SAME canonical band — the divergence was unified to [5,100]/[1,10].)
 describe('computeEfficiencyPoint — realistic-band boundaries (gas 5–100, electric 1–10) on the REAL fn', () => {
   // efficiency = (current.mileage − previous.mileage) / current.volume; control volume=1 so efficiency
   // equals the mileage delta. fuelType 'regular' = gas band [5,100]; 'Level 2 (AC)' = electric [1,10].
@@ -588,10 +588,10 @@ describe('computeEfficiencyPoint — realistic-band boundaries (gas 5–100, ele
 });
 
 // ---------------------------------------------------------------------------
-// buildFuelEfficiencyComparison (C456 guard) — the per-vehicle/per-month gas-MPG comparison rendered on
+// buildFuelEfficiencyComparison — the per-vehicle/per-month gas-MPG comparison rendered on
 // the cross-vehicle analytics tab (getCrossVehicle's skipConversion branch, the DEFAULT same-units fleet
-// case). It was the ONE comparison builder with ZERO test references: the #54 cross-vehicle-pairing pin
-// covered the TREND path's forEachVehiclePair, and the #122/C413 gas-gate sweep covered buildMonthly
+// case). It was the ONE comparison builder with ZERO test references: the cross-vehicle-pairing pin
+// covered the TREND path's forEachVehiclePair, and the gas-gate sweep covered buildMonthly
 // Consumption/buildSeasonalEfficiency — but this builder re-rolls BOTH inline (groups byVehicle before
 // pairing; gates on gasEfficiencyPoint) and neither pin reaches it. These drive the REAL export.
 // ---------------------------------------------------------------------------
@@ -601,9 +601,9 @@ describe('buildFuelEfficiencyComparison (cross-vehicle per-month gas-MPG)', () =
     ['v2', 'Car Two'],
   ]);
 
-  test('pairs ONLY within a vehicle — interleaved two-car rows never phantom-pair across vehicles (#54)', () => {
+  test('pairs ONLY within a vehicle — interleaved two-car rows never phantom-pair across vehicles', () => {
     // INTERLEAVED by date so a naive flat-list pairing would subtract v2's odometer from v1's:
-    //   v1: 1000 → 1300 mi on 10 gal = 30 MPG;  v2: 5000 → 5240 mi on 8 gal = 30 MPG.
+    //  v1: 1000 → 1300 mi on 10 gal = 30 MPG; v2: 5000 → 5240 mi on 8 gal = 30 MPG.
     // A cross-vehicle pair (e.g. v2@5000 − v1@1000) would be ~thousands of miles / a few gal = absurd.
     const rows: FuelExpenseRow[] = [
       fuelRow({ vehicleId: 'v1', date: d(2024, 1, 1), mileage: 1000, volume: 10 }),
@@ -623,7 +623,7 @@ describe('buildFuelEfficiencyComparison (cross-vehicle per-month gas-MPG)', () =
     // NON-VACUOUS: a cross-vehicle phantom pair would push an efficiency wildly off 30 (or out of band → dropped).
   });
 
-  test('a PHEV CHARGE row on a vehicle contributes NOTHING to its gas-MPG comparison (#122 gas-gate)', () => {
+  test('a PHEV CHARGE row on a vehicle contributes NOTHING to its gas-MPG comparison (gas-gate)', () => {
     // v1: a clean gas pair (30 MPG) PLUS a charge session — gasEfficiencyPoint excludes the electric row,
     // so v1's comparison efficiency stays the gas 30, never diluted by a ~mi/kWh value.
     const rows: FuelExpenseRow[] = [
@@ -659,13 +659,13 @@ describe('buildFillupCostByVehicle', () => {
     expect(jan?.avgCost).toBe(50); // (40+60)/2
   });
 
-  // #146 (C466, the #56/#108/#113 split-sibling overcount class — the member the C391 sweep + the
+  // (the split-sibling overcount class — the member the sweep + the
   // isFillup swept-site docstring missed): a split fuel expense creates one sibling PER VEHICLE with
   // volume=null, and queryFuelExpenses has no volume filter, so an unconditional count/sum treats each
   // partial-cost allocation as a standalone fillup and dilutes the per-vehicle average fillup cost.
   // This pins it: one $40 real fillup + one $30 split-share leg on v1 in a month → avgCost $40 (the
   // real fillup), NOT $35 (=70/2). NON-VACUOUS: pre-fix the null-volume leg was counted → $35.
-  test('a split fuel cost-allocation sibling (volume=null) is NOT counted as a fillup (#146)', () => {
+  test('a split fuel cost-allocation sibling (volume=null) is NOT counted as a fillup', () => {
     const out = buildFillupCostByVehicle(
       [
         fuelRow({ date: d(2024, 1, 10), expenseAmount: 40, volume: 10 }), // a real fillup
@@ -677,7 +677,7 @@ describe('buildFillupCostByVehicle', () => {
     expect(jan?.avgCost).toBe(40); // the real fillup's cost, not (40+30)/2 = 35
   });
 
-  test('a vehicle with ONLY split-share legs (no real fillup) yields no chart row (#146 — boundary)', () => {
+  test('a vehicle with ONLY split-share legs (no real fillup) yields no chart row (— boundary)', () => {
     const out = buildFillupCostByVehicle(
       [fuelRow({ date: d(2024, 1, 20), expenseAmount: 30, volume: null })],
       names

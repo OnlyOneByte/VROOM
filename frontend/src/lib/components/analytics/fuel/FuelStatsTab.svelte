@@ -107,7 +107,7 @@
 	{#if change != null}
 		<!-- Direction hue lives on the ICON (graphical, exempt); the % TEXT is
 		     text-foreground. chart-2 (#009689) on white is 3.66:1 at text-xs — below
-		     WCAG AA 4.5:1 (cycle 189). text-destructive is dark enough to pass, but
+		     WCAG AA 4.5:1. text-destructive is dark enough to pass, but
 		     keeping the text neutral in both branches is simpler and consistent. -->
 		<span class="inline-flex items-center gap-1 text-xs font-medium text-foreground">
 			{#if change >= 0}
@@ -143,8 +143,8 @@
 		{/snippet}
 		{#snippet title()}No fuel data yet{/snippet}
 		{#snippet description()}
-			Log a fill-up to unlock fuel efficiency, cost, and consumption insights — your fill-up
-			stats and trend charts will appear here once you have data.
+			Log a fill-up to unlock fuel efficiency, cost, and consumption insights — your fill-up stats
+			and trend charts will appear here once you have data.
 		{/snippet}
 		{#snippet action()}
 			<Button onclick={logFillup}>

@@ -1,16 +1,16 @@
 /**
- * Tests for the three previously-UNCOVERED PhotoRepository finder methods (C126 guard):
+ * Tests for the three previously-UNCOVERED PhotoRepository finder methods:
  * `findIdsByUser`, `findById`, `findCoverPhoto` (coverage showed lines 47-69/134-148 untested).
  * Drives the REAL repo over a migrated in-memory SQLite DB (the batch-by-entity-type.test.ts
  * pattern — constructor-injected `this.db`, NOT the getDb singleton, so this is real coverage and
- * not the C229 coverage-theater trap).
+ * not the coverage-theater trap).
  *
  * The load-bearing properties pinned:
- *   - findIdsByUser is USER-scoped + optionally entity-type-scoped + honors extraConditions — it's
- *     the bulk-delete id finder, so a dropped userId scope would leak/operate on another tenant's
- *     photo ids (the #48/#72/#180 tenant-scope-at-the-read class).
- *   - findById returns the row or null on miss (no throw).
- *   - findCoverPhoto returns ONLY the isCover=true row for the entity, null when none is flagged.
+ *  - findIdsByUser is USER-scoped + optionally entity-type-scoped + honors extraConditions — it's
+ *  the bulk-delete id finder, so a dropped userId scope would leak/operate on another tenant's
+ *  photo ids (the tenant-scope-at-the-read class).
+ *  - findById returns the row or null on miss (no throw).
+ *  - findCoverPhoto returns ONLY the isCover=true row for the entity, null when none is flagged.
  */
 
 import { Database } from 'bun:sqlite';

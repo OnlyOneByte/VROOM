@@ -1,6 +1,6 @@
 /**
- * Coverage for validateExpenseField's non-date branches + validateMileage (C201 guard ratchet —
- * expense-form-validation.ts was ~15% covered; only the C103 date slice had a test). These are PURE
+ * Coverage for validateExpenseField's non-date branches + validateMileage (guard ratchet —
+ * expense-form-validation.ts was ~15% covered; only the date slice had a test). These are PURE
  * (a ValidationContext in, an error-string-or-null out — no DOM/network), and carry real form rules:
  * the amount/volume/charge bounds, the fuel-vs-charging unit gating (electric fuelType routes to
  * `charge`, else `volume`), and — the load-bearing one — validateMileage's MONOTONICITY check (a

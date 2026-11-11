@@ -6,12 +6,12 @@
  * cleanly (the table + its indexes exist) — the merge-surviving net for the additive table.
  *
  * Pins the contract the routes (T3) + the send hook (T4) depend on:
- *   - upsertByEndpoint persists + reads back, and is IDEMPOTENT on (userId, endpoint): a
- *     re-subscribe from the same browser UPDATES the keys + RESETS failureCount, never duplicates.
- *   - findByUser is userId-scoped (a user sees only their own devices).
- *   - deleteByEndpoint is userId-scoped: user A cannot delete user B's subscription via the
- *     endpoint alone (the IDOR discipline — the endpoint is not a capability).
- *   - markSuccess / incrementFailure / prune drive the reaping lifecycle (#135 hygiene).
+ *  - upsertByEndpoint persists + reads back, and is IDEMPOTENT on (userId, endpoint): a
+ *  re-subscribe from the same browser UPDATES the keys + RESETS failureCount, never duplicates.
+ *  - findByUser is userId-scoped (a user sees only their own devices).
+ *  - deleteByEndpoint is userId-scoped: user A cannot delete user B's subscription via the
+ *  endpoint alone (the IDOR discipline — the endpoint is not a capability).
+ *  - markSuccess / incrementFailure / prune drive the reaping lifecycle.
  *
  * Fresh per-test DB (the date-range-boundary.test.ts pattern) — host-TZ-independent, no shared
  * DB-singleton import trap.

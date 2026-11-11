@@ -2,13 +2,13 @@
  * DRIFT GUARD (C3, deep-review): the set of "photographable" entity types is duplicated across THREE
  * independent code paths that MUST stay in sync, and today are held together only by code comments:
  *
- *   1. `validateEntityOwnership` (photos/helpers.ts)      — the upload gate (which types may be uploaded)
- *   2. `validatePhotoRefs` entityTypeToIds (sync/backup.ts) — the RESTORE validator (which types a backup
- *                                                             may legally contain)
- *   3. `ENTITY_TO_CATEGORY` (storage-provider.ts)          — provider routing (entity → storage category)
+ *  1. `validateEntityOwnership` (photos/helpers.ts) — the upload gate (which types may be uploaded)
+ *  2. `validatePhotoRefs` entityTypeToIds (sync/backup.ts) — the RESTORE validator (which types a backup
+ *  may legally contain)
+ *  3. `ENTITY_TO_CATEGORY` (storage-provider.ts) — provider routing (entity → storage category)
  *
- * The crown-jewel failure this guards (NORTH_STAR #1): when `insurance_claim` was added to the upload
- * gate but MISSED in the backup validator's map (C404), a perfectly valid backup containing a claim photo
+ * The crown-jewel failure this guards: when `insurance_claim` was added to the upload
+ * gate but MISSED in the backup validator's map, a perfectly valid backup containing a claim photo
  * failed `validatePhotoRefs` ("unknown entity type") → valid:false → the WHOLE restore aborted, so the
  * user couldn't recover ANY of their own data. The reactive fix added the one missing key; this guard
  * makes the THREE allowlists provably equal so the next new photographable type (e.g. a future `trip`)
@@ -82,10 +82,10 @@ function emptyBackup(userId: string): ParsedBackupData {
   } as ParsedBackupData;
 }
 
-describe('photo entity-type allowlist sync (#C404 drift guard)', () => {
+describe('photo entity-type allowlist sync (drift guard)', () => {
   // --- 1. The RESTORE validator must accept every canonical photo entity type --------------------
   // A photo of any ENTITY_TO_CATEGORY type, pointed at a row that EXISTS in the backup, must NOT trip
-  // validatePhotoRefs' "unknown entity type" branch — that branch aborts the whole restore (C404). We
+  // validatePhotoRefs' "unknown entity type" branch — that branch aborts the whole restore. We
   // assert specifically the unknown-type error is absent (a "references non-existent" error from a
   // seeding gap would be a test bug, not the drift this guards — so we seed the target row per type).
   for (const entityType of PHOTO_ENTITY_TYPES) {
@@ -132,7 +132,7 @@ describe('photo entity-type allowlist sync (#C404 drift guard)', () => {
       const unknownTypeErr = result.errors.filter((e) => e.includes('unknown entity type'));
       expect(
         unknownTypeErr,
-        `restore validator does NOT recognize photo entityType "${entityType}" — it is in ENTITY_TO_CATEGORY (upload/provider allowlist) but missing from validatePhotoRefs' entityTypeToIds map in sync/backup.ts. A real backup with this photo type would abort the WHOLE restore (the C404 NORTH_STAR #1 failure). Add "${entityType}" to that map.`
+        `restore validator does NOT recognize photo entityType "${entityType}" — it is in ENTITY_TO_CATEGORY (upload/provider allowlist) but missing from validatePhotoRefs' entityTypeToIds map in sync/backup.ts. A real backup with this photo type would abort the WHOLE restore (a whole-restore abort). Add "${entityType}" to that map.`
       ).toEqual([]);
     });
   }

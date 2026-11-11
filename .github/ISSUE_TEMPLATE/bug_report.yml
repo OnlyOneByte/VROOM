@@ -44,8 +44,8 @@ body:
   - type: input
     id: version
     attributes:
-      label: Version / Commit
-      placeholder: e.g. v1.2.3 or commit SHA
+      label: Version
+      placeholder: Docker image tag (e.g. 1.2.3, dev) or commit SHA
 
   - type: textarea
     id: context

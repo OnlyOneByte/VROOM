@@ -1,5 +1,5 @@
 /**
- * photos-import-api.ts client (photos-auto-expense T3) — the C149/C163 service-test pattern: apiClient is
+ * photos-import-api.ts client (photos-auto-expense T3) — the service-test pattern: apiClient is
  * mocked so we assert the exact endpoints + payloads, the draft→create-body mapping, and crucially the
  * `clientId = photos:<photoId>` idempotency key the confirm path must send. The fork-free FE wrapper over
  * the shipped GET /api/v1/photos/receipt-drafts (stage) + the unchanged POST /api/v1/expenses (confirm).

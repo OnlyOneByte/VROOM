@@ -1,5 +1,5 @@
 /**
- * Regression: calculateAmortizationSchedule negative-amortization guard (C161 deep-review).
+ * Regression: calculateAmortizationSchedule negative-amortization guard.
  *
  * When paymentAmount < the period's interest, principalAmount = paymentAmount − interest goes NEGATIVE,
  * so `remainingBalance − principalAmount` GROWS the balance every period — the schedule emitted rows with
@@ -35,7 +35,7 @@ function makeLoan(overrides: Partial<VehicleFinancing> = {}): VehicleFinancing {
 	};
 }
 
-describe('calculateAmortizationSchedule — negative-amortization guard (C161)', () => {
+describe('calculateAmortizationSchedule — negative-amortization guard', () => {
 	test('under-funded loan (payment < monthly interest) → no negative principal, non-increasing balance', () => {
 		// 100k @ 30% APR → monthly interest = 100000 * 0.30/12 = $2500; payment $50 ≪ that.
 		// Pre-fix: 60 rows with negative principal (−2450, −2511, …) + a balance climbing past 100k.

@@ -1,7 +1,7 @@
 /**
- * Real-`execute()` skip-path coverage for BackupOrchestrator (C291 deep-review → guard).
+ * Real-`execute()` skip-path coverage for BackupOrchestrator (deep-review → guard).
  *
- * backup-orchestrator.test.ts pins the pure exports (filterEnabledProviders/needsZipGeneration, C181)
+ * backup-orchestrator.test.ts pins the pure exports (filterEnabledProviders/needsZipGeneration)
  * but its mutex / change-detection-skip / no-providers cases are LOCAL SIMS (mirrors of logic embedded
  * in execute()), flagged in that file's header as "not reachable from an in-memory harness." That note
  * was over-cautious: createTestApp() rewrites DATABASE_URL to in-memory BEFORE the orchestrator's
@@ -10,10 +10,10 @@
  * drivable for real — converting those sims to genuine coverage of the namesake method.
  *
  * Pinned on the real execute():
- *   - force=false + a brand-new user (no data changes) → { skipped: true } (the no-op-backup guard).
- *   - force=false + an empty backupConfig (no enabled providers) → { results: {} }, NOT skipped
- *     (this user HAS changes — seeding a vehicle bumps lastDataChangeDate — so it passes the change
- *     gate, then short-circuits on zero providers).
+ *  - force=false + a brand-new user (no data changes) → { skipped: true } (the no-op-backup guard).
+ *  - force=false + an empty backupConfig (no enabled providers) → { results: {} }, NOT skipped
+ *  (this user HAS changes — seeding a vehicle bumps lastDataChangeDate — so it passes the change
+ *  gate, then short-circuits on zero providers).
  *
  * createTestApp() must run before static config/connection imports — keep imports to the harness.
  */
@@ -43,7 +43,7 @@ interface OrchestratorResult {
   results: Record<string, { success: boolean }>;
 }
 
-describe('BackupOrchestrator.execute() real skip paths (C291)', () => {
+describe('BackupOrchestrator.execute() real skip paths', () => {
   test('force=false with no data changes since last sync → skipped (the no-op-backup guard)', async () => {
     // A brand-new seeded user has no tracked data change yet, so hasChangesSinceLastSync is false.
     const { backupOrchestrator } = await import('../backup-orchestrator');
@@ -93,10 +93,10 @@ describe('BackupOrchestrator.execute() real skip paths (C291)', () => {
   });
 });
 
-// #43/#44 — HONEST partial/total-failure reporting. A fake strategy registered for a custom provider
+// HONEST partial/total-failure reporting. A fake strategy registered for a custom provider
 // type lets us drive the REAL execute() fan-out + outcome aggregation over the harness DB with NO
 // provider network (the leak-free pattern — register/unregister around each test).
-describe('BackupOrchestrator.execute() honest outcome (#43/#44)', () => {
+describe('BackupOrchestrator.execute() honest outcome', () => {
   /**
    * Seed an enabled storage provider of the given type owned by the test user. MERGES into the
    * existing backup_config (so multiple providers can coexist in one run — needed for the orchestrator
@@ -173,7 +173,7 @@ describe('BackupOrchestrator.execute() honest outcome (#43/#44)', () => {
       });
   });
 
-  test('every provider fails → outcome failed AND the sync anchor is NOT advanced (retry, #43)', async () => {
+  test('every provider fails → outcome failed AND the sync anchor is NOT advanced (retry)', async () => {
     registerFake('fake-fail', false);
     try {
       seedEnabledProvider(ctx, 'pf', 'fake-fail');
@@ -220,7 +220,7 @@ describe('BackupOrchestrator.execute() honest outcome (#43/#44)', () => {
     }
   });
 
-  test('one provider succeeds, another fails → outcome partial (#44)', async () => {
+  test('one provider succeeds, another fails → outcome partial', async () => {
     registerFake('fake-ok-2', true);
     registerFake('fake-fail-2', false);
     try {
@@ -238,7 +238,7 @@ describe('BackupOrchestrator.execute() honest outcome (#43/#44)', () => {
       expect(result.results.pok?.success).toBe(true);
 
       // A partial run must NOT advance the global sync anchor either — the failed provider still
-      // owes a backup, so leaving the user "unsynced" is what makes it retry next run (#43).
+      // owes a backup, so leaving the user "unsynced" is what makes it retry next run.
       const sync = ctx.sqlite
         .query('SELECT last_sync_date FROM sync_state WHERE user_id = ?')
         .get(ctx.user.id) as { last_sync_date: string | null } | null;

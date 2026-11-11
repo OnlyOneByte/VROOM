@@ -4,7 +4,7 @@
  * setTheme persists the `vroom-theme-id` mirror + applies `data-theme` on <html> (which drives the
  * generated themes.css blocks), the `default` id REMOVES data-theme (app.css's bare :root serves the
  * identity theme), and the mode axis (setPreference / the OS listener) preserves the active theme id.
- * Pins the load-bearing observable effects (the C100/C101/C336 store-guard pattern). A regression here
+ * Pins the load-bearing observable effects (the store-guard pattern). A regression here
  * silently breaks theme switching (wrong/absent data-theme = the registry block never applies).
  */
 

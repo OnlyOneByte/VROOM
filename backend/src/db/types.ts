@@ -15,13 +15,16 @@ export const EXPENSE_CATEGORIES = [
 
 export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
 
+// Display labels served by GET /api/v1/expenses/categories. They must match the frontend's
+// CATEGORY_LABELS word for word: an API client that renders this endpoint and a VROOM screen that
+// renders its own copy would otherwise name the same category two different things.
 export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
   fuel: 'Fuel & Charging',
   maintenance: 'Maintenance',
   financial: 'Financial',
   regulatory: 'Regulatory',
   enhancement: 'Enhancement',
-  misc: 'Misc Operating Costs',
+  misc: 'Misc',
 };
 
 export const EXPENSE_CATEGORY_DESCRIPTIONS: Record<ExpenseCategory, string> = {

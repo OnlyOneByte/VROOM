@@ -2,13 +2,13 @@
  * In-process HTTP tests for the per-vehicle expense-stats route
  * (GET /api/v1/expenses/vehicle-stats → expenseRepository.getPerVehicleStats), which had NO coverage.
  *
- * A C257 bug-scout certified expenses/repository.ts CLEAN firsthand (buildExpenseConditions inclusive-
+ * A bug-scout certified expenses/repository.ts CLEAN firsthand (buildExpenseConditions inclusive-
  * endDate + LIKE-escape + AND-tags; findPaginated stable tiebreaker; getSummary period/recent boundaries;
  * getPerVehicleStats' 30-day seconds boundary matching the timestamp column) — no defect — then pivoted to
  * this guard: getPerVehicleStats is REACHABLE (the dashboard /vehicle-stats route) but entirely untested.
  * Its load-bearing pieces — the per-vehicle GROUP BY + COALESCE(SUM), the `recentAmount` last-N-days
  * boundary (date >= now − recentDays, in Unix SECONDS to match the `timestamp` column — a ms/seconds drift
- * here is the C122 normalizeDate class), the lastExpenseDate MAX, and the userId scope — are unpinned. A
+ * here is the normalizeDate class), the lastExpenseDate MAX, and the userId scope — are unpinned. A
  * regression (drift the cutoff units, drop the userId scope, mis-bucket a vehicle) would silently corrupt
  * the dashboard's per-vehicle figures. This drives the REAL route stack end-to-end and pins them.
  *

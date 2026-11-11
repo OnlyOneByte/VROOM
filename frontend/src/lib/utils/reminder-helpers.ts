@@ -8,7 +8,7 @@ import { capitalize } from './formatters';
  * odometer-based, evaluated server-side and surfaced via notifications), so it is NOT time-due and
  * must NOT be fed to `new Date(...)` — doing so yields `new Date(null)` = the epoch (1970), which
  * would wrongly mark every mileage reminder "due". This guard is the load-bearing invariant the
- * `nextDueDate: string | null` type introduced (C22 backend rebuild → C39 frontend); kept in one
+ * `nextDueDate: string | null` type introduced (backend rebuild → frontend); kept in one
  * tested place so a future caller can't re-introduce the unguarded `new Date(nextDueDate)` deref.
  *
  * `now` is injectable for deterministic tests.
@@ -32,7 +32,7 @@ export function isMileageTracking(reminder: Reminder): boolean {
  *
  * `lastRunMs` is the stored timestamp (localStorage) of the previous trigger, or null if never run.
  * `now`/`lastRunMs` are epoch ms and INJECTED → deterministic + host-independent (the same-local-day
- * comparison is done via local Y/M/D parts, sidestepping the C77 UTC-host vacuity trap). The eyes-on
+ * comparison is done via local Y/M/D parts, sidestepping the UTC-host vacuity trap). The eyes-on
  * hook owns reading/writing localStorage + the navigator.onLine/auth signals; this is just the policy.
  */
 export function shouldTriggerRecurringExpenses(opts: {

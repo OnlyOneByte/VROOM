@@ -1,15 +1,15 @@
 /**
- * T4 part 2 (cycle 32): POST /:id/mark-serviced re-arm (D3).
+ * T4 part 2: POST /:id/mark-serviced re-arm (D3).
  *
  * A fired mileage reminder stays due until the user marks it serviced (there's no auto-re-arm on the
- * mileage axis — C25). This endpoint re-arms it: anchor lastServiceOdometer to the CURRENT odometer
+ * mileage axis). This endpoint re-arms it: anchor lastServiceOdometer to the CURRENT odometer
  * and recompute the nextDueOdometer milestone; for the time axis, advance nextDueDate one period.
  * Pinned end-to-end through the real route → repo → DB stack:
- *   - mileage: lastServiceOdometer := current, nextDueOdometer := current + interval
- *   - time: nextDueDate advances one period; lastTriggeredAt stamped
- *   - both: both axes move
- *   - after re-arm, a mileage reminder that WAS due is no longer due at the trigger (the milestone moved)
- *   - cross-tenant id → 404, no mutation
+ *  - mileage: lastServiceOdometer := current, nextDueOdometer := current + interval
+ *  - time: nextDueDate advances one period; lastTriggeredAt stamped
+ *  - both: both axes move
+ *  - after re-arm, a mileage reminder that WAS due is no longer due at the trigger (the milestone moved)
+ *  - cross-tenant id → 404, no mutation
  *
  * createTestApp() rewrites env + dynamic-imports DB-bound modules; keep imports to harness + bun:test.
  */
@@ -221,12 +221,12 @@ describe('POST /:id/mark-serviced — re-arm (D3)', () => {
     expect((after.next_due_date as number) > (before.next_due_date as number)).toBe(true);
   });
 
-  // #114 (C394): mark-serviced must honor endDate on the time-axis re-arm, mirroring the trigger-service
-  // fastForwardPastNow guard (#107/C362). A BOUNDED reminder serviced AFTER its endDate would otherwise be
+  // Mark-serviced must honor endDate on the time-axis re-arm, mirroring the trigger-service
+  // fastForwardPastNow guard. A BOUNDED reminder serviced AFTER its endDate would otherwise be
   // re-armed to a FUTURE nextDueDate and left is_active=1 — living past its end + firing again. The re-arm
   // must instead DEACTIVATE the reminder. Pin it: a monthly reminder with start+end both in the past,
   // serviced now → is_active=0, no future nextDueDate write.
-  test('a bounded reminder serviced past its endDate is DEACTIVATED, not re-armed forward (#114)', async () => {
+  test('a bounded reminder serviced past its endDate is DEACTIVATED, not re-armed forward', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Mazda', model: 'CX-5', year: 2020 });
     const created = await ctx.authed('POST', '/api/v1/reminders', {
       name: 'Bounded registration',

@@ -11,16 +11,26 @@
 		syncConflicts,
 		fetchLastSyncTime
 	} from '$lib/utils/sync/sync-manager';
-	import { RefreshCw, CircleAlert, Clock, Wifi, WifiOff } from '@lucide/svelte';
+	import { RefreshCw, CircleAlert, Clock, Wifi, WifiOff, TriangleAlert } from '@lucide/svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { formatCompactRelativeTime } from '$lib/utils/formatters';
 	import { getSyncStatusInfo } from '$lib/utils/sync/sync-status';
+	import { countParked, countPendingSync } from '$lib/utils/sync/pending-expenses';
+	import { routes } from '$lib/routes';
+	import { resolve } from '$app/paths';
 
 	let { isExpanded = true } = $props();
 
-	let pendingCount = $derived(
-		offlineExpenseQueue.current.filter(expense => !expense.synced).length
+	let pendingCount = $derived(countPendingSync(offlineExpenseQueue.current));
+	// Parked rows are counted separately from `pendingCount` because they are not waiting on the
+	// network, they are waiting on the user — this panel is the only place in the chrome that can
+	// point them at the expenses page, where the parked rows are listed with their reasons.
+	let parkedCount = $derived(countParked(offlineExpenseQueue.current));
+	let parkedLinkLabel = $derived(
+		parkedCount === 1
+			? '1 expense needs attention — open expenses'
+			: `${parkedCount} expenses need attention — open expenses`
 	);
 
 	let statusInfo = $derived(
@@ -94,6 +104,23 @@
 						<Clock class="h-3 w-3" />
 						<span>{pendingCount}</span>
 					</Badge>
+				</div>
+			{/if}
+
+			<!-- Parked rows: unsyncable until the user edits or discards them -->
+			{#if parkedCount > 0}
+				<div class="flex items-center justify-between text-xs">
+					<span class="text-muted-foreground">Needs attention</span>
+					<a
+						href={resolve(routes.expenses)}
+						aria-label={parkedLinkLabel}
+						class="rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+					>
+						<Badge variant="destructive" class="text-xs px-2 py-0.5 gap-1">
+							<TriangleAlert class="h-3 w-3" />
+							<span>{parkedCount}</span>
+						</Badge>
+					</a>
 				</div>
 			{/if}
 

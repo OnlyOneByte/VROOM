@@ -30,14 +30,14 @@
 	let totalCount = $state(0);
 
 	// The GLOBAL distance label — used ONLY on the cross-fleet Mileage Summary card (which pools all
-	// vehicles' miles via getSummary(); a single label on a mixed mi+km fleet is the #94 pooling class,
+	// vehicles' miles via getSummary(); a single label on a mixed mi+km fleet is the pooling class,
 	// product-gated/escalated — out of scope here).
 	let distLabel = $derived(getDistanceUnitLabel(settingsStore.unitPreferences.distanceUnit, true));
 	// vehicleId -> display name, so each trip card can name its vehicle (graceful fallback if deleted).
 	let vehicleNames = $derived(new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)])));
 	// vehicleId -> THAT vehicle's distance label. Trip odometers are stored same-unit-as-the-vehicle (R2),
 	// so a per-trip card must label distance by its OWN vehicle's distanceUnit, NOT the global setting —
-	// else a km vehicle's trips read "mi" for a mixed-fleet user (NORTH_STAR #2, the per-vehicle-units
+	// else a km vehicle's trips read "mi" for a mixed-fleet user (the per-vehicle-units
 	// pattern OdometerTab/LeaseMetricsCard already follow). Falls back to the global pref when the vehicle
 	// (or its prefs) is absent — the `unitPreferences ?? settingsStore` graceful-default idiom.
 	let vehicleDistLabels = $derived(
@@ -54,7 +54,7 @@
 	const tripDistLabel = (vehicleId: string): string =>
 		vehicleDistLabels.get(vehicleId) ?? distLabel;
 
-	// Create/edit form (dialog) state. The C214 trips↔odometer EDIT/DELETE lifecycle is now RATIFIED +
+	// Create/edit form (dialog) state. The trips↔odometer EDIT/DELETE lifecycle is now RATIFIED +
 	// shipped (T7 backend): editing re-syncs the linked odometer entry; deleting prompts keep-or-delete.
 	let formOpen = $state(false);
 	let editingTrip = $state<Trip | null>(null);
@@ -69,7 +69,7 @@
 		formOpen = true;
 	}
 
-	// Delete-confirm dialog state + the C214 keep-or-delete-linked-odometer choice. Default KEEP (matches
+	// Delete-confirm dialog state + the keep-or-delete-linked-odometer choice. Default KEEP (matches
 	// the backend non-destructive default — the linked reading may be part of the user's odometer history).
 	let deleteTarget = $state<Trip | null>(null);
 	let keepOdometer = $state(true);
@@ -290,7 +290,7 @@
 
 	<TripForm bind:open={formOpen} {vehicles} trip={editingTrip} onSaved={load} />
 
-	<!-- Delete-confirm with the C214 keep-or-delete-linked-odometer choice. Controlled open (bound to
+	<!-- Delete-confirm with the keep-or-delete-linked-odometer choice. Controlled open (bound to
 	     deleteTarget) so the per-card Delete button drives it without a per-row trigger element. -->
 	<AlertDialog.Root
 		open={deleteTarget !== null}

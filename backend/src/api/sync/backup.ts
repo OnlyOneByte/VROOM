@@ -6,7 +6,7 @@ import AdmZip from 'adm-zip';
 import { parse } from 'csv-parse/sync';
 import { stringify } from 'csv-stringify/sync';
 import type { Table } from 'drizzle-orm';
-import { and, eq, getTableColumns, inArray } from 'drizzle-orm';
+import { and, eq, getTableColumns, getTableName, inArray } from 'drizzle-orm';
 import { createInsertSchema } from 'drizzle-zod';
 import type { z } from 'zod';
 import {
@@ -47,8 +47,10 @@ import type {
   ProviderBackupList,
   ProviderBackupSettings,
 } from '../../types';
+import { chunk } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
 import { joinStoragePath } from '../../utils/paths';
+import { unitPreferencesSchema } from '../../utils/unit-preferences-schema';
 
 export interface ValidationResult {
   valid: boolean;
@@ -60,7 +62,7 @@ export interface ValidationResult {
  * their CAMELCASE drizzle field name (coerceRow + the CSV headers use the field name, not the snake_case
  * db column). A pre-cents backup (metadata.version < 2.0.0) stored these as DOLLAR floats; restoring it
  * into the cents schema must ×100 them, or coerceRow's INTEGER branch would `Math.round('12.34')` = 12
- * cents = $0.12, a silent 100× corruption (design §4, NORTH_STAR #1). A flat field-name set is safe:
+ * cents = $0.12, a silent 100× corruption (design §4). A flat field-name set is safe:
  * coerceRow processes ONE table at a time, and no NON-money column shares any of these names (apr/volume/
  * businessMileageRate — the excluded reals — are all distinctly named).
  */
@@ -132,7 +134,7 @@ export function coerceRow(
 
     // A NOT NULL column that carries a STATIC default: an absent/empty/null backup value must resolve to
     // that default, never to null — else the insert throws `NOT NULL constraint failed` and the WHOLE
-    // restore aborts (the user can't recover ANY data from their own valid backup, NORTH_STAR #1). This is
+    // restore aborts (the user can't recover ANY data from their own valid backup). This is
     // the steering-doc `coerceRow` footgun (DatabaseMigrations.md): the boolean special-case below already
     // did exactly this (`col.default ?? false`); this generalizes it to every type (text `themePreference`/
     // `currencyUnit`/`backupFrequency`, JSON `unitPreferences`, integer `syncInactivityMinutes`, …). Gated
@@ -168,13 +170,24 @@ export function coerceRow(
       try {
         coerced[columnName] = JSON.parse(strVal);
       } catch {
-        coerced[columnName] = null;
+        // A cell that does not parse carries NOTHING recoverable, so it resolves exactly like an
+        // absent one: the column's static default when it has one, else null. Assigning null
+        // unconditionally violated NOT NULL on a defaulted JSON column, and since restore wipes and
+        // re-inserts in ONE transaction, that threw away the user's WHOLE restore over a single
+        // corrupt cell. Warn rather than substitute silently — the default is a guess, and for unit
+        // preferences it reinterprets the row's raw distances and volumes.
+        logger.warn('Backup cell is not valid JSON; substituted the column default', {
+          table: getTableName(table),
+          column: columnName,
+          row: row.id ?? row.userId,
+        });
+        coerced[columnName] = hasStaticDefault ? col.default : null;
       }
     } else if (INTEGER_TYPES.has(col.columnType)) {
       // STRICT numeric parse, not Number.parseInt: parseInt stops at the first non-digit, so a
       // thousands-separated value the Google Sheets restore returns (default valueRenderOption is
       // FORMATTED_VALUE → a 12,345-mile odometer comes back as the string "12,345") would truncate
-      // to 12 — silently, since 12 is not NaN — corrupting the reading 1000x (#68, NORTH_STAR #1).
+      // to 12 — silently, since 12 is not NaN — corrupting the reading 1000x.
       // Strip grouping commas, then require the WHOLE string to be numeric (Number(), unlike parseInt,
       // rejects a "12abc" tail to NaN → null, matching the existing garbage→null contract). Round so a
       // Sheets "12345.0" / a stray decimal lands on a whole number rather than truncating.
@@ -428,12 +441,12 @@ export class BackupService {
     // Query photos directly by userId
     const userPhotos = await db.select().from(photos).where(eq(photos.userId, userId));
 
-    // Query photo_refs for all user photos (batched to stay under SQLite variable limit)
+    // Query photo_refs for all user photos, chunked per the IN-clause contract in utils/chunk: the id
+    // list is as long as the user's photo library, so an unchunked IN would blow SQLite's bind-parameter
+    // ceiling on exactly the accounts whose backup matters most.
     const photoIds = userPhotos.map((p) => p.id);
     const userPhotoRefs: (typeof photoRefs.$inferSelect)[] = [];
-    const BATCH_SIZE = 500;
-    for (let i = 0; i < photoIds.length; i += BATCH_SIZE) {
-      const batch = photoIds.slice(i, i + BATCH_SIZE);
+    for (const batch of chunk(photoIds)) {
       const rows = await db.select().from(photoRefs).where(inArray(photoRefs.photoId, batch));
       userPhotoRefs.push(...rows);
     }
@@ -552,7 +565,7 @@ export class BackupService {
     // total exceeds the cap. A real backup is CSV text well under this; a bomb is
     // far over. (header.size is the uncompressed byte count for each entry.)
     //
-    // #22: header.size is ATTACKER-DECLARED, so a bomb can lie (declare a small size to
+    // Header.size is ATTACKER-DECLARED, so a bomb can lie (declare a small size to
     // pass the sum below, then inflate to GB on getData()). Guard the COMPRESSION RATIO
     // per entry FIRST — compressedSize is the real in-file byte count, and the declared
     // size being an absurd multiple of it is a bomb signature the sum can't catch. This
@@ -662,7 +675,50 @@ export class BackupService {
     }
 
     errors.push(...this.validateReferentialIntegrity(backup));
+    errors.push(...this.validateJsonColumnShapes(backup));
     return { valid: errors.length === 0, errors };
+  }
+
+  /**
+   * Refuse a backup whose JSON cell PARSES but is not a valid value for its column, naming the table,
+   * the column and the row so the user can fix that one cell.
+   *
+   * drizzle-zod maps a `mode: 'json'` column to an unconstrained value, so the per-row schema check
+   * above sees nothing wrong with `{"distanceUnit":"mi","volumeUnit":"gal"}` — the short spellings a
+   * hand-written or third-party export produces. Such a row used to be inserted by a restore that
+   * reported SUCCESS, after which every unit-reading analytics surface failed, because reading a
+   * vehicle's units treats unreadable preferences as a hard error by design. Defaulting the value
+   * instead would be worse than refusing: the raw distances and volumes stay as they are, so a vehicle
+   * recorded in kilometres and litres would come back labelled miles and gallons and every figure the
+   * user reads would be wrong. Validating here means the restore either goes through whole or never
+   * starts — the same contract as the referential checks.
+   *
+   * The unit columns are the ones with a parser to validate against and an unforgiving reader; another
+   * JSON column earns a line here as soon as it has a schema of its own.
+   */
+  private validateJsonColumnShapes(backup: ParsedBackupData): string[] {
+    const errors: string[] = [];
+    const checkUnitPreferences = (
+      rows: Record<string, unknown>[] | undefined,
+      tableName: string,
+      idField: string
+    ): void => {
+      for (const row of rows ?? []) {
+        // Only a PRESENT value is checked: an absent cell resolves to the column's static default
+        // during coercion, which runs before validation on both restore paths.
+        if (row.unitPreferences == null) continue;
+        // The same schema the vehicle / settings write routes validate against, so the recovery path
+        // accepts exactly what the API accepts.
+        const result = unitPreferencesSchema.safeParse(row.unitPreferences);
+        if (!result.success) {
+          const issues = result.error.issues.map((e) => e.message).join(', ');
+          errors.push(`${tableName}[${row[idField]}]: unitPreferences is invalid — ${issues}`);
+        }
+      }
+    };
+    checkUnitPreferences(backup.vehicles, 'vehicles', 'id');
+    checkUnitPreferences(backup.userPreferences, 'user_preferences', 'userId');
+    return errors;
   }
 
   private validateArray(
@@ -734,13 +790,13 @@ export class BackupService {
 
   /**
    * Reject a backup whose rows would violate a DB-level UNIQUE index, BEFORE restore's destructive
-   * replace-mode wipe runs (#127, C428). Per-row schema + referential checks don't catch CROSS-ROW
+   * replace-mode wipe runs. Per-row schema + referential checks don't catch CROSS-ROW
    * duplicates, so a corrupt/truncated download with two expenses sharing a non-null clientId
    * (expenses_user_client_idx) or two vehicles sharing a licensePlate (vehicles_user_license_plate_idx)
    * passes validateBackupData, the wipe commits, then the 2nd colliding INSERT throws — and bun-sqlite's
-   * async-transaction callback does NOT roll back the wipe (the C151 footgun), leaving the account EMPTY.
+   * async-transaction callback does NOT roll back the wipe, leaving the account EMPTY.
    * Catching the duplicate here means the insert can't fail on it, so the wipe never runs. (The general
-   * transient-insert-failure window is a transaction-atomicity fix, escalated C428 — this closes the one
+   * transient-insert-failure window is a transaction-atomicity fix, escalated — this closes the one
    * reachable within-tenant data-loss trigger.)
    */
   private validateUniqueConstraints(backup: ParsedBackupData): string[] {
@@ -749,15 +805,22 @@ export class BackupService {
     // keyed column is null, because SQLite treats a NULL in an indexed column as DISTINCT (and the
     // partial indexes are `WHERE <col> IS NOT NULL`) — so such a row can never collide. A single-column
     // index is just the one-element case: `[String(v)].join(sep) === String(v)` with the identical
-    // null-skip, so this subsumes the former scalar dupCheck byte-for-byte (C292 dedup of the C291
+    // null-skip, so this subsumes the former scalar dupCheck byte-for-byte (dedup of the
     // self-introduced sibling — the scalar variant was a strict special case of this one).
     const dupCheck = (
       rows: Record<string, unknown>[] | undefined,
       fields: string[],
-      label: string
+      label: string,
+      /**
+       * Mirrors a partial index's WHERE clause: rows outside it cannot collide, so counting them
+       * would reject a legitimate backup. Only needed where the predicate tests a column rather
+       * than `IS NOT NULL`, which the null-skip above already covers.
+       */
+      inIndex?: (row: Record<string, unknown>) => boolean
     ): void => {
       const seen = new Set<string>();
       for (const row of rows ?? []) {
+        if (inIndex && !inIndex(row)) continue;
         const values = fields.map((f) => row[f]);
         if (values.some((v) => v == null)) continue; // NULL in any column → distinct (never collides)
         const key = values.map((v) => String(v)).join('\u0000'); // NUL join — unambiguous composite key
@@ -767,11 +830,14 @@ export class BackupService {
         seen.add(key);
       }
     };
+    /** A CSV round-trip can present a boolean as `true`, `1`, `'1'` or `'true'`. */
+    const isTruthyFlag = (value: unknown): boolean =>
+      value === true || value === 1 || value === '1' || value === 'true';
     dupCheck(backup.expenses, ['clientId'], 'expense clientId'); // expenses_user_client_idx
     dupCheck(backup.vehicles, ['licensePlate'], 'vehicle licensePlate'); // vehicles_user_license_plate_idx
-    // The remaining DB-level UNIQUE indexes on backed-up + restored tables (C291 — the #127/C428 leg
+    // The remaining DB-level UNIQUE indexes on backed-up + restored tables (— the leg
     // those two checks missed): a duplicate on any of these survives per-row + referential validation,
-    // then throws on the colliding INSERT after the replace-mode wipe → empty account (C151 footgun).
+    // then throws on the colliding INSERT after the replace-mode wipe → empty account.
     dupCheck(backup.photoRefs, ['photoId', 'providerId'], 'photoRef photo+provider'); // pr_photo_provider_idx
     dupCheck(
       backup.reminderNotifications,
@@ -786,6 +852,13 @@ export class BackupService {
     // vehicle_shares_active_idx (partial WHERE status in pending/accepted). Export is accepted-only, so
     // every exported row is "active" → a dup on (vehicleId, sharedWithId) would collide on restore.
     dupCheck(backup.vehicleShares, ['vehicleId', 'sharedWithId'], 'vehicleShare vehicle+invitee');
+    // vf_active_vehicle_idx (partial WHERE is_active = 1). Financing history is exported in full, so
+    // the predicate has to be applied here: several SETTLED agreements per vehicle are valid, two
+    // ACTIVE ones are not. This index spent its life as hand-written SQL absent from `schema.ts`,
+    // which is why the coverage guard could not see it and this check was missing.
+    dupCheck(backup.financing, ['vehicleId'], 'active financing vehicleId', (row) =>
+      isTruthyFlag(row.isActive)
+    );
     return errors;
   }
 
@@ -810,7 +883,7 @@ export class BackupService {
    * Shared referential check for a row that owns purely via a `vehicleId` FK (financing/odometer/trips —
    * each cascade-deletes with its vehicle). Rejects a backup whose row names a vehicle absent from the SAME
    * backup, so the post-wipe restore INSERT can't FK-violate. The three callers were byte-identical save the
-   * entity label (a rule-of-three the C202 trips addition tipped — dedup'd C205); the message is preserved
+   * entity label (a rule-of-three the trips addition tipped — dedup'd); the message is preserved
    * verbatim (`<Label> <id> references non-existent vehicle`) so any consumer of the text is unaffected.
    */
   private validateVehicleFkRefs(
@@ -954,8 +1027,8 @@ export class BackupService {
     // entityType keys MUST match the photo upload allowlist (photos/helpers.ts validateEntityOwnership):
     // vehicle / insurance_policy / insurance_claim / expense / odometer_entry. A type accepted on upload
     // but missing here makes restore reject an otherwise-valid backup outright (valid:false aborts the
-    // WHOLE restore, not just the photo) — the crown-jewel NORTH_STAR #1 round-trip failure insurance_claim
-    // hit (C404: claim photos are a real, app-creatable target the original 15-table cert/C366 predated).
+    // WHOLE restore, not just the photo) — the crown-jewel round-trip failure insurance_claim
+    // hit (: claim photos are a real, app-creatable target the original 15-table cert/ predated).
     const entityTypeToIds: Record<string, Set<string>> = {
       vehicle: entityIds.vehicleIds,
       expense: entityIds.expenseIds,

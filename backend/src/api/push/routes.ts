@@ -15,12 +15,12 @@
  * endpoint is not a capability, the IDOR discipline). The send hook + SW handler are T4/T6.
  */
 
-import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
-import { ValidationError } from '../../errors';
+import { createErrorResponse, ValidationError } from '../../errors';
 import { requireAuth } from '../../middleware';
+import { zValidator } from '../../utils/validation';
 import { isAllowedPushEndpoint } from './push-endpoint';
 import { pushSubscriptionRepository } from './repository';
 
@@ -54,13 +54,10 @@ const unsubscribeSchema = z.object({
 routes.get('/vapid-public-key', (c) => {
   if (!CONFIG.push.enabled) {
     return c.json(
-      {
-        success: false,
-        error: {
-          code: 'PUSH_NOT_CONFIGURED',
-          message: 'Push notifications are not configured on this server.',
-        },
-      },
+      createErrorResponse(
+        'PUSH_NOT_CONFIGURED',
+        'Push notifications are not configured on this server.'
+      ),
       503
     );
   }

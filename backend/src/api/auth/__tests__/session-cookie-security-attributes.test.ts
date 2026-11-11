@@ -1,16 +1,16 @@
 /**
  * Regression GUARD (committed, travels with the merge) for the session-cookie SECURITY ATTRIBUTES
- * (deep-review-adjacent, C92/C97 flagged the session/cookie lifecycle unaudited).
+ * (deep-review-adjacent, flagged the session/cookie lifecycle unaudited).
  *
  * Every place the app writes the Lucia session cookie must set the SAME three security attributes, or
  * that auth path silently ships a weaker cookie:
- *   - `secure: CONFIG.env === 'production'` — HTTPS-only in prod (a hardcoded `true` breaks local-http
- *     dev so the cookie never sets → no login; a hardcoded `false` ships a plaintext-transmittable
- *     session cookie in production → network theft).
- *   - `httpOnly: true` — JS can't read it (defeats XSS session-token exfiltration). Dropping it on ONE
- *     path makes the session readable from script on that path.
- *   - `sameSite: 'Lax'` — the cookie isn't sent on cross-site sub-requests (CSRF defense alongside the
- *     csrf() middleware).
+ *  - `secure: CONFIG.env === 'production'` — HTTPS-only in prod (a hardcoded `true` breaks local-http
+ *  dev so the cookie never sets → no login; a hardcoded `false` ships a plaintext-transmittable
+ *  session cookie in production → network theft).
+ *  - `httpOnly: true` — JS can't read it (defeats XSS session-token exfiltration). Dropping it on ONE
+ *  path makes the session readable from script on that path.
+ *  - `sameSite: 'Lax'` — the cookie isn't sent on cross-site sub-requests (CSRF defense alongside the
+ *  csrf() middleware).
  *
  * These attributes are hand-duplicated across every MANUAL session-cookie call site — both the SETs
  * (auth/routes.ts login, auth/utils.ts validateAndRefreshSession's rotation) AND the DELETEs (auth/routes.ts
@@ -25,7 +25,7 @@
  *
  * This guard source-scans both files: every `set/deleteCookie(c, lucia.sessionCookieName, …, { … })` block
  * must carry `secure: CONFIG.env === 'production'`, `httpOnly: true`, and `sameSite: 'Lax'`. Edit any site
- * out of contract → RED. The one-edit→source-scan pattern (C25/C45/C59/C67/C80/C87/C94).
+ * out of contract → RED. The one-edit→source-scan pattern.
  *
  * Pure source scan — no DB, no network. Runs in the fast suite.
  */

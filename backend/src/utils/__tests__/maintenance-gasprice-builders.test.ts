@@ -1,20 +1,20 @@
 /**
  * Characterization tests for the MAINTENANCE + GAS-PRICE chart builder family in analytics-charts.ts
- * (C120 deep-review/guard). Three more zero-coverage builders the C67 (fuel/date) + C119
+ *  Three more zero-coverage builders the (fuel/date) +
  * (expense-summary) audits did not reach — `buildGasPriceHistory`, `buildVehicleMaintenanceCosts`,
  * `buildMaintenanceTimeline` (the last drives the private buildTimelineEntry / estimateServiceInterval
  * / assignTimelineStatus trio). Read each against source firsthand and found CORRECT; this locks the
- * conclusion so a future edit can't silently regress it (NORTH_STAR #5). Each test pins an invariant
+ * conclusion so a future edit can't silently regress it. Each test pins an invariant
  * the audit verified:
  *
- *   - buildGasPriceHistory        — keeps only priced fillups (volume>0 ∧ amount>0 ∧ date present),
- *                                    pricePerVolume = amount/volume, fuelType ?? 'Regular', slice(-100).
- *   - buildVehicleMaintenanceCosts— category==='maintenance' ONLY (fuel/financial excluded), month-bucket
- *                                    sum, ascending month sort, dateless dropped.
- *   - buildMaintenanceTimeline    — groups by description (case-insensitive; null→'general maintenance');
- *                                    assignTimelineStatus thresholds (<0 overdue / <30 warning / else good);
- *                                    a single-occurrence group defaults the interval to 180 days; output
- *                                    sorted by daysRemaining ascending (most-overdue first).
+ *  - buildGasPriceHistory — keeps only priced fillups (volume>0 ∧ amount>0 ∧ date present),
+ *  pricePerVolume = amount/volume, fuelType ?? 'Regular', slice(-100).
+ *  - buildVehicleMaintenanceCosts— category==='maintenance' ONLY (fuel/financial excluded), month-bucket
+ *  sum, ascending month sort, dateless dropped.
+ *  - buildMaintenanceTimeline — groups by description (case-insensitive; null→'general maintenance');
+ *  assignTimelineStatus thresholds (<0 overdue / <30 warning / else good);
+ *  a single-occurrence group defaults the interval to 180 days; output
+ *  sorted by daysRemaining ascending (most-overdue first).
  *
  * Pure module → no DB, no server.
  */
@@ -30,7 +30,7 @@ import {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// Local-time date so bucketing assertions are timezone-independent (the C6/C11/C67/C119 discipline).
+// Local-time date so bucketing assertions are timezone-independent (the C6/ discipline).
 function d(year: number, month1to12: number, day: number): Date {
   return new Date(year, month1to12 - 1, day);
 }

@@ -75,13 +75,13 @@ describe('applyMapping — unit conversion into the target vehicle units (D1)', 
     expect(row.volume).toBe('12.5');
   });
 
-  // C334 (bug-cycle dormant-vein scout outcome): mapMileage/mapVolume guard conversion on each
+  // mapMileage/mapVolume guard conversion on each
   // field's OWN `from && to` independently. The live caller (resolveTargetUnits) only ever returns
   // {} or BOTH units set, so today every row is all-converted or all-passed-through. But the
   // per-field guards mean a future change handing applyMapping a PARTIAL target (one unit resolved,
   // the other not — e.g. a vehicle missing one preference, or a refactor that resolves units
   // separately) would convert ONE axis and silently pass the other through in the SAME row — a
-  // mixed converted/unconverted record (NORTH_STAR #2 unit-correctness). Pin the per-field
+  // mixed converted/unconverted record (unit-correctness). Pin the per-field
   // independence so that mixed-target behavior is explicit + a regression that coupled the two
   // guards (or dropped one) is caught. Distance converts, volume passes through verbatim, here.
   test('a PARTIAL target converts only the field whose target unit is present (per-field guard)', () => {
@@ -128,7 +128,7 @@ describe('applyMapping — European decimal-comma (D1)', () => {
     expect(Number(row.volume)).toBeCloseTo(45.7, 3); // lone comma → decimal dot
   });
 
-  // #124 (C417): a US-format value with BOTH separators (comma thousands + dot decimal) is reachable via
+  // A US-format value with BOTH separators (comma thousands + dot decimal) is reachable via
   // the US Fuelly preset (mdy/miles/US-gallons). The old code hard-assumed comma-decimal → stripped the
   // dots → "1,234.56" became 1.23456 (~1000x money under-count). The fix keys on the LAST separator as
   // the decimal, so BOTH conventions normalize correctly. Pre-fix this asserted ~1.23 (RED).
@@ -230,7 +230,7 @@ describe('normalizeForeignDate — local-time discipline across formats (D3)', (
   });
 });
 
-describe('normalizeForeignDate — out-of-range parts do NOT silently roll over (C115, bug #23)', () => {
+describe('normalizeForeignDate — out-of-range parts do NOT silently roll over', () => {
   // JS `new Date(2024, 44, 13)` is a VALID Date ~3.7yr later, and `new Date(2024, 1, 30)` (Feb 30)
   // rolls to March — so before the echo-check these stored a wrong date with no error. The contract:
   // an out-of-range/impossible date returns the RAW string so buildImportPlan's parseDate errors the
@@ -318,9 +318,9 @@ describe('applyMapping → buildImportPlan round-trip (the consumable-output pro
   });
 });
 
-// ── C60 deep-review: characterization guards for two verified-but-uncovered branches.
-// The C58 audit confirmed these behave correctly; pin them so a future edit can't
-// silently regress (NORTH_STAR quality-bar #5).
+// ── deep-review: characterization guards for two verified-but-uncovered branches.
+// The audit confirmed these behave correctly; pin them so a future edit can't
+// silently regress (quality-bar).
 
 describe('normalizeForeignDate — an ISO value with an explicit timezone is an absolute instant', () => {
   test('a Z-suffixed ISO timestamp is honored as-is (NOT re-interpreted in local time)', () => {

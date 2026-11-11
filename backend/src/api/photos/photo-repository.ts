@@ -103,11 +103,11 @@ export class PhotoRepository {
     limit: number,
     offset: number
   ): Promise<PaginatedResult<Photo>> {
-    // userId-scope the WHERE (the C168/#48 + C180 + C192 tenant-scope-at-the-read class): this was the
+    // userId-scope the WHERE (the + + tenant-scope-at-the-read class): this was the
     // lone photo read-method not scoped by user_id, even though photos carries that column and every
     // sibling (findByUser/countByUser/findIdsByUser) filters on it. Behavior-identical today — the route's
     // validateEntityOwnership proves ownership before this runs — but it closes the boundary at the query
-    // so a future caller that forgets the guard can't page another tenant's photos (#72).
+    // so a future caller that forgets the guard can't page another tenant's photos.
     const whereClause = and(
       eq(photos.entityType, entityType),
       eq(photos.entityId, entityId),
@@ -162,12 +162,12 @@ export class PhotoRepository {
     // of being wrapped into a 500 DatabaseError).
     return this.db.transaction(async (tx) => {
       // Validate the target photo belongs to THIS entity BEFORE any write. Two reasons:
-      // (1) the C63/#192 + C72/#215 "write keyed on id alone, match proven a layer up" class — a
-      //     photoId from a DIFFERENT entity must never be flagged as this entity's cover; and
-      // (2) the bun:sqlite ASYNC-transaction footgun (the C151 lesson): a throw escaping this async
-      //     callback AFTER a sync write does NOT roll the write back, so validating BEFORE the unset
-      //     is what actually guarantees we never leave the entity cover-less on a bad id (an
-      //     unset-then-throw would persist the unset).
+      // (1) the + "write keyed on id alone, match proven a layer up" class — a
+      //  photoId from a DIFFERENT entity must never be flagged as this entity's cover; and
+      // (2) the bun:sqlite ASYNC-transaction footgun (the lesson): a throw escaping this async
+      //  callback AFTER a sync write does NOT roll the write back, so validating BEFORE the unset
+      //  is what actually guarantees we never leave the entity cover-less on a bad id (an
+      //  unset-then-throw would persist the unset).
       const target = await tx
         .select({ id: photos.id })
         .from(photos)

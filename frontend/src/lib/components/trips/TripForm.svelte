@@ -27,7 +27,7 @@
 		vehicles: Vehicle[];
 		/** Called after a successful create/update so the parent can refetch. */
 		onSaved: () => void;
-		/** When set, the form is in EDIT mode: hydrate from this trip + submit via update (C214/T6b-3). */
+		/** When set, the form is in EDIT mode: hydrate from this trip + submit via update (/T6b-3). */
 		trip?: Trip | null;
 	}
 
@@ -37,7 +37,7 @@
 
 	// Form fields. The odometer fields bind to `<input type="number">`, which Svelte coerces to a NUMBER
 	// (or null when cleared) — so they're typed `string | number | null` even though seeded ''; parseOdometer
-	// tolerates all three (the C230 fix). Everything else is a plain string the inputs bind.
+	// tolerates all three. Everything else is a plain string the inputs bind.
 	let vehicleId = $state('');
 	let startOdometer = $state<string | number | null>('');
 	let endOdometer = $state<string | number | null>('');
@@ -60,7 +60,7 @@
 		);
 	});
 
-	// Re-seed the form whenever it opens. EDIT mode (a `trip` prop) HYDRATES from the existing row (the C68
+	// Re-seed the form whenever it opens. EDIT mode (a `trip` prop) HYDRATES from the existing row (the
 	// blank-edit-form data-loss footgun — a never-populated field must not silently wipe on save); CREATE
 	// mode starts blank (defaulting to the only vehicle when the user owns exactly one + today's date).
 	// Keyed on `open` so reopening after cancel resets cleanly.
@@ -75,7 +75,7 @@
 			startOdometer = trip.startOdometer;
 			endOdometer = trip.endOdometer;
 			purpose = trip.purpose;
-			// Stored as a noon-local ISO instant; toDateInputValue reads the LOCAL calendar day (the #87/#138
+			// Stored as a noon-local ISO instant; toDateInputValue reads the LOCAL calendar day (the
 			// round-trip discipline — a bare .slice(0,10) would shift the date back a day for +TZ users).
 			tripDate = toDateInputValue(new Date(trip.tripDate));
 			startLocation = trip.startLocation ?? '';
@@ -121,7 +121,7 @@
 				startOdometer: startValue,
 				endOdometer: endValue,
 				purpose,
-				// The backend reads this as noon-local (dateOnlyToISO), so "today" is accepted (the C226 fix).
+				// The backend reads this as noon-local (dateOnlyToISO), so "today" is accepted.
 				tripDate: dateOnlyToISO(tripDate),
 				startLocation: startLocation.trim() || undefined,
 				endLocation: endLocation.trim() || undefined,

@@ -1,5 +1,5 @@
 /**
- * Source-scan GUARD (#76, C226) — switching an expense's category AWAY from 'fuel' must clear the
+ * Source-scan GUARD — switching an expense's category AWAY from 'fuel' must clear the
  * fuel-only formData fields (volume/charge/fuelType/mileage/missedFillup) in `selectCategory`.
  *
  * WHY: the fuel inputs hide via the `showFuelFields = category === 'fuel'` derived, but their
@@ -26,7 +26,7 @@ const FORM_SRC = readFileSync(
 	'utf-8'
 );
 
-describe('category switch clears fuel fields (#76 source guard)', () => {
+describe('category switch clears fuel fields (source guard)', () => {
 	test('selectCategory has a non-fuel branch that clears the fuel-only fields', () => {
 		// Anchor on selectCategory, then assert the switch-away-from-fuel clear-block lives within it.
 		const start = FORM_SRC.indexOf('function selectCategory');

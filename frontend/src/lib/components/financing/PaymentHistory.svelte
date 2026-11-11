@@ -152,7 +152,7 @@
 												     separate chart-2 TrendingDown icon as the "extra" affordance, but the
 												     NUMBER text is text-foreground, NOT text-chart-2: small chart-2 text on
 												     its own 10% tint is only 3.26:1 (fails WCAG AA, same class fixed on the
-												     dashboard in cycle 187). The standard branch's primary is near-black so
+												     dashboard). The standard branch's primary is near-black so
 												     it already passes. -->
 												<div
 													class="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center font-semibold text-xs sm:text-sm {isExtraPayment
@@ -290,7 +290,7 @@
 										<div class="flex items-start gap-3 sm:gap-4">
 											<!-- Payment Number Badge. text-foreground, NOT text-chart-2: see the
 											     identical block in the virtual-scroll path above for why (chart-2 on
-											     its own tint is 3.08:1, fails WCAG AA — cycle 188). -->
+											     its own tint is 3.08:1, fails WCAG AA). -->
 											<div
 												class="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center font-semibold text-xs sm:text-sm {isExtraPayment
 													? 'bg-chart-2/10 text-foreground'

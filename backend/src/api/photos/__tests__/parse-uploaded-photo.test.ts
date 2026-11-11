@@ -1,12 +1,12 @@
 /**
  * Unit net for `parseUploadedPhoto` (photos/helpers.ts) — the multipart upload-body parse + File
- * validation extracted (C221) from the two byte-identical upload routes (photos/routes.ts +
+ * validation extracted from the two byte-identical upload routes (photos/routes.ts +
  * vehicles/photo-routes.ts). Pure of any storage provider: it only parses the request body and asserts
  * a `photo` File, throwing AppError(400) otherwise. Driven through a minimal Hono app + real FormData
  * requests (the same path Hono's parseBody runs in production), so this exercises the genuine helper.
  *
  * Pins the upload-input contract one place now that both routes share it — the natural seam for future
- * size/type/magic-byte validation (the #34 follow-on).
+ * size/type/magic-byte validation (the follow-on).
  */
 
 import { describe, expect, test } from 'bun:test';

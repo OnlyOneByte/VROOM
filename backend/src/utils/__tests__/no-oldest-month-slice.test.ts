@@ -31,11 +31,11 @@ const FILES = [
 ];
 
 // A month-key ascending sort chained into slice(0, …) WITHIN ONE statement. `[^;]*?` stays
-// inside the chain (a `;` ends the statement), so a later unrelated slice(0,) won't match,
+// inside the chain (a `;` ends the statement), so a later unrelated slice(0) won't match,
 // and a numeric `.sort(...).slice(0, N)` (no localeCompare) is never flagged.
 const OLDEST_MONTH_SLICE = /localeCompare[^;]*?\.slice\(\s*0\s*,/;
 
-describe('no oldest-month slice in analytics month series (cycle 11 class guard)', () => {
+describe('no oldest-month slice in analytics month series', () => {
   test('the scan resolves real source files (guard is live, not a no-op)', () => {
     for (const f of FILES) {
       expect(readFileSync(f, 'utf8').length, `unreadable/empty: ${f}`).toBeGreaterThan(100);
@@ -54,7 +54,7 @@ describe('no oldest-month slice in analytics month series (cycle 11 class guard)
     expect(
       offenders,
       `A month-key (localeCompare) sort is sliced from the START — that keeps the OLDEST months ` +
-        `and hides the current period (cycle 11). Use .slice(-N) for the most-recent window:\n${offenders.join('\n')}`
+        `and hides the current period. Use .slice(-N) for the most-recent window:\n${offenders.join('\n')}`
     ).toEqual([]);
   });
 });

@@ -1,7 +1,7 @@
 /**
  * Cross-tenant authorization (IDOR) regression guard — through the REAL stack.
  *
- * A read-only audit (cycle 138) found every resource route enforces ownership
+ * A read-only audit found every resource route enforces ownership
  * before read/mutate/delete. This PROVES it with two real Lucia sessions sharing
  * one app/DB: user B creates resources; user A (a foreign session) tries to
  * GET / PUT / DELETE them by id and must be denied (4xx, never 200 with B's data).
@@ -15,7 +15,13 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, type DataEnvelope, json, type TestApp } from '../http-client';
+import {
+  createTestApp,
+  type DataEnvelope,
+  json,
+  type PaginatedEnvelope,
+  type TestApp,
+} from '../http-client';
 
 let ctx: TestApp; // user A (the harness-seeded session)
 let bCookie: string; // a real Lucia session cookie for a SECOND user, B
@@ -114,7 +120,7 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     );
     expectDenied(await ctx.authed('DELETE', `/api/v1/expenses/${eid}`), 'DELETE expense');
 
-    // C115: the SPLIT routes (PUT/DELETE /split/:id) are state-changing + (groupId, userId)-scoped in the
+    // The SPLIT routes (PUT/DELETE /split/:id) are state-changing + (groupId, userId)-scoped in the
     // repo (updateSplitExpense/deleteSplitExpense throw NotFoundError when the group isn't found for the
     // caller), but the IDOR sweep skipped them. They're destructive (regenerate/delete sibling expense rows
     // + their photos) and money-bearing — a regression to an un-scoped group write would let A rewrite or
@@ -138,13 +144,13 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     expectDenied(await ctx.authed('DELETE', `/api/v1/expenses/split/${gid}`), 'DELETE split');
   });
 
-  // vehicle-sharing T5b-2b (split WRITE widening — the C108-C116 IDOR discipline). The split routes
+  // Split WRITE widening. The split routes
   // moved from the strict assertVehiclesOwned (own EVERY vehicle) → requireSplitWriteAccess (owner |
   // accepted editor on every config vehicle, single-owner set). This pins the widening did not
   // over-open: an accepted VIEWER who legitimately READS the shared split still cannot CREATE/PUT/DELETE
   // one (the requireVehicleRead vs requireVehicleWrite split), and a cross-owner set is rejected. Here B
   // owns the vehicle; A is the viewer.
-  test('split (T5b-2b): a viewer reads but cannot create/update/delete a split; cross-owner rejected', async () => {
+  test('split: a viewer reads but cannot create/update/delete a split; cross-owner rejected', async () => {
     const vid = await idOf(
       await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
     );
@@ -247,11 +253,11 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
       'PUT policy'
     );
     expectDenied(await ctx.authed('DELETE', `/api/v1/insurance/${pid}`), 'DELETE policy');
-    // C114: TERM routes (PUT/DELETE /:id/terms/:termId) are state-changing, gated on the SAME
+    // TERM routes (PUT/DELETE /:id/terms/:termId) are state-changing, gated on the SAME
     // validateInsuranceOwnership(id) as the policy itself (routes.ts:230/257), but the IDOR sweep
     // skipped them. A cross-tenant term edit/delete would let A mutate B's insurance terms (and their
     // auto-materialized premium expenses via updateTermExpenses/deleteBySource). terms-http.test.ts
-    // (C272) pins the INNER FK defense (a foreign vehicleId in the coverage payload) but always AS the
+    //  pins the INNER FK defense (a foreign vehicleId in the coverage payload) but always AS the
     // policy owner — the policy-level ownership gate on the term routes was never cross-tenant tested.
     expectDenied(
       await ctx.authed('PUT', `/api/v1/insurance/${pid}/terms/${tid}`, { policyNumber: 'HACK' }),
@@ -294,7 +300,7 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
       'PATCH financing'
     );
     expectDenied(await ctx.authed('DELETE', `/api/v1/financing/${fid}`), 'DELETE financing');
-    // C113: PUT /:financingId/payoff is a state-changing route gated on the SAME
+    // PUT /:financingId/payoff is a state-changing route gated on the SAME
     // validateFinancingOwnership (routes.ts:219) as DELETE, but the IDOR sweep skipped it. A
     // cross-tenant payoff would let A mark B's financing paid-off (deactivateFinancing → isActive=0,
     // severs the source link) — a destructive write on B's data. Pin it alongside its siblings.
@@ -325,7 +331,7 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     expectDenied(await ctx.authed('GET', `/api/v1/odometer/${vid}`), 'GET odometer list');
   });
 
-  // vehicle-sharing T6 (odometer READ+WRITE widening — the C108-C116 IDOR discipline). The odometer
+  // vehicle-sharing T6 (odometer READ+WRITE widening — the- IDOR discipline). The odometer
   // read/write gates moved from validateVehicleOwnership/validateOdometerOwnership → requireVehicleRead/
   // Write. This pins the widening did not over-open: a NON-shared third party is still denied every
   // read+write (existence-hiding 404), and an accepted VIEWER who legitimately READS the shared vehicle
@@ -410,11 +416,11 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     );
     expectDenied(await ctx.authed('DELETE', `/api/v1/reminders/${rid}`), 'DELETE reminder');
 
-    // C116 (the LAST known IDOR-sweep gap): PUT /notifications/:id/read is a state-changing route
+    // PUT /notifications/:id/read is a state-changing route
     // gated on markNotificationRead's (id, userId) scope (it throws NotFoundError when no row matches —
     // repository.ts:565), but the sweep never covered it. Raw-seed a notification owned by B (the API
     // only creates these via the trigger), then prove A can't mark B's notification read. Closes the
-    // route-coverage IDOR audit (C108–C116) for every state-changing route.
+    // route-coverage IDOR audit for every state-changing route.
     ctx.sqlite.run(
       `INSERT INTO reminder_notifications (id, reminder_id, user_id, due_date, due_odometer, is_read, created_at)
        VALUES ('n-idor-b', ?, ?, 1700000000, NULL, 0, 1000)`,
@@ -431,14 +437,14 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     expect(stillUnread.is_read).toBe(0);
   });
 
-  // vehicle-sharing T7 + T7b (reminder per-vehicle READ + WRITE widening — the C108-C116 IDOR
-  // discipline). T7 widened the GET ?vehicleId list (requireVehicleRead + owner-scope); T7b widened the
-  // WRITE paths (POST/PUT/DELETE/mark-serviced) to requireReminderVehiclesWrite (owner | accepted editor
-  // on every vehicle, single-owner set, owner-stamp). This pins the widening did not over-open: a
+  // Reminder per-vehicle READ + WRITE widening. The GET ?vehicleId list moved to
+  // requireVehicleRead + owner-scope, and the WRITE paths (POST/PUT/DELETE/mark-serviced) moved to
+  // requireReminderVehiclesWrite (owner | accepted editor on every vehicle, single-owner set,
+  // owner-stamp). This pins the widening did not over-open: a
   // NON-shared third party is denied the per-vehicle list AND every write; an accepted EDITOR may write
   // (owner-stamped); a VIEWER may read but NOT write (the requireVehicleRead vs requireVehicleWrite
   // split); and a cross-owner reminder is rejected. Here B owns the vehicle.
-  test('reminder per-vehicle (T7/T7b): third party denied; editor writes (owner-stamped); viewer reads not writes; cross-owner rejected', async () => {
+  test('reminder per-vehicle: third party denied; editor writes (owner-stamped); viewer reads not writes; cross-owner rejected', async () => {
     const vid = await idOf(
       await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
     );
@@ -524,7 +530,7 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
       startDate: '2024-06-02T00:00:00.000Z',
       vehicleIds: [vid],
     });
-    expect(editorCreate.status, 'editor create now allowed (T7b)').toBe(201);
+    expect(editorCreate.status, 'editor create now allowed').toBe(201);
     const editorRid = (await json<DataEnvelope<{ reminder: { id: string } }>>(editorCreate)).data
       .reminder.id;
     const stamped = ctx.sqlite
@@ -550,12 +556,12 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     expect(cross.status).toBeLessThan(500);
   });
 
-  // vehicle-sharing T8a (per-vehicle analytics READ widening — the C108-C116 IDOR discipline). The six
+  // Per-vehicle analytics READ widening. The six
   // vehicle-scoped analytics routes moved from validateVehicleOwnership → requireVehicleRead + owner-scope.
   // This pins the widening did not over-open: a NON-shared third party is denied every per-vehicle
   // analytics route (existence-hiding 404). An accepted viewer reading them is covered in
   // shared-analytics-read.test.ts; here B owns the vehicle and A has no share.
-  test('analytics per-vehicle read (T8a): a third party is denied every vehicle-scoped analytics route', async () => {
+  test('analytics per-vehicle read: a third party is denied every vehicle-scoped analytics route', async () => {
     const vid = await idOf(
       await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
     );
@@ -583,13 +589,13 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     }
   });
 
-  // vehicle-sharing T8b (per-vehicle insurance READ widening — the C108-C116 IDOR discipline). The
+  // Per-vehicle insurance READ widening. The
   // GET /insurance/vehicles/:vehicleId/policies route moved from validateVehicleOwnership →
   // requireVehicleRead + a blast-radius narrow. This pins the widening did not over-open: a NON-shared
   // third party is denied the per-vehicle policies list (existence-hiding 404). The blast-radius
   // narrowing for an accepted invitee (no leak of the owner's other vehicles) is covered positively in
   // shared-insurance-read.test.ts. Here B owns the vehicle + policy; A has no share.
-  test('insurance per-vehicle read (T8b): a third party is denied the vehicle-scoped policies list', async () => {
+  test('insurance per-vehicle read: a third party is denied the vehicle-scoped policies list', async () => {
     const vid = await idOf(
       await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
     );
@@ -610,13 +616,13 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     );
   });
 
-  // vehicle-sharing T12b-3c (insurance CLAIMS READ widening). GET /insurance/:id/claims moved from
+  // Insurance CLAIMS READ widening. GET /insurance/:id/claims moved from
   // validateInsuranceOwnership → a policy-read gate (owner | accepted share on a covered vehicle) + a
-  // §6.4 blast-radius claim narrow. This pins the widening did not over-open: a third party with NO
+  // blast-radius claim narrow. This pins the widening did not over-open: a third party with NO
   // share to ANY of the policy's covered vehicles is denied the claims list (existence-hiding 404).
   // The positive narrowing (a viewer sees only the shared vehicle's claims) lives in
   // shared-insurance-read.test.ts. B owns the vehicle + policy + claim; A has no share.
-  test('insurance claims read (T12b-3c): a third party is denied a policy claims list', async () => {
+  test('insurance claims read: a third party is denied a policy claims list', async () => {
     const vid = await idOf(
       await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
     );
@@ -656,6 +662,240 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
       await ctx.authed('GET', `/api/v1/photos/vehicle/${vid}`),
       'GET photos for B vehicle'
     );
+  });
+
+  // The generic photo router is entityType-GENERIC: one switch (photos/helpers.ts
+  // validateEntityOwnership) is the only authorization gate for every type, and the sweep covered
+  // only 'vehicle'. The other four types each authorize differently — expense and odometer_entry
+  // through the vehicle-sharing seam (their rows are owner-stamped), insurance_policy through its own
+  // userId, insurance_claim transitively through its policy — so one gate regressing is invisible to
+  // the vehicle case. Receipts and insurance documents are the most sensitive bytes in the app.
+  test("photo (non-vehicle entities): A cannot list or upload to any of B's photo entities", async () => {
+    const vid = await idOf(
+      await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
+    );
+    const eid = await idOf(
+      await asB('POST', '/api/v1/expenses', {
+        vehicleId: vid,
+        category: 'misc',
+        expenseAmount: 42,
+        date: '2024-06-01T00:00:00.000Z',
+      })
+    );
+    const oid = await idOf(
+      await asB('POST', `/api/v1/odometer/${vid}`, {
+        odometer: 31000,
+        recordedAt: '2024-06-02T00:00:00.000Z',
+      })
+    );
+    const policyRes = await asB('POST', '/api/v1/insurance', {
+      company: 'B Mutual',
+      terms: [
+        {
+          startDate: '2024-01-01T00:00:00.000Z',
+          endDate: '2025-01-01T00:00:00.000Z',
+          vehicleCoverage: { vehicleIds: [vid] },
+        },
+      ],
+    });
+    const pid = await idOf(policyRes);
+    const cid = await idOf(
+      await asB('POST', `/api/v1/insurance/${pid}/claims`, {
+        claimDate: '2024-06-15T00:00:00.000Z',
+        claimType: 'collision',
+      })
+    );
+
+    const entities: [string, string][] = [
+      ['expense', eid],
+      ['odometer_entry', oid],
+      ['insurance_policy', pid],
+      ['insurance_claim', cid],
+    ];
+    for (const [entityType, entityId] of entities) {
+      expectDenied(
+        await ctx.authed('GET', `/api/v1/photos/${entityType}/${entityId}`),
+        `GET photos for B ${entityType}`
+      );
+      // The upload leg must be denied by the OWNERSHIP gate, not by a missing file — so send a real
+      // multipart body and require exactly the existence-hiding 404 (a 400 here would mean the
+      // request never reached the gate and the assertion proved nothing).
+      const form = new FormData();
+      form.append('photo', new File([new Uint8Array([1, 2, 3])], 'x.jpg', { type: 'image/jpeg' }));
+      const upload = await ctx.app.request(`/api/v1/photos/${entityType}/${entityId}`, {
+        method: 'POST',
+        headers: { Cookie: ctx.cookie, 'Sec-Fetch-Site': 'same-origin' },
+        body: form,
+      });
+      expect(upload.status, `POST photo to B ${entityType}: expected a 404`).toBe(404);
+    }
+
+    // Nothing was attached to any of B's entities.
+    for (const [entityType, entityId] of entities) {
+      const bList = await json<PaginatedEnvelope<unknown>>(
+        await asB('GET', `/api/v1/photos/${entityType}/${entityId}`)
+      );
+      expect(bList.data).toHaveLength(0);
+    }
+  });
+
+  // trips-location: every /trips surface takes an id or a vehicleId and is correct today, but the
+  // sweep never drove one with a foreign session — so swapping a userId-scoped finder for a bare
+  // findById would ship green. GET /trips?vehicleId= is deliberately asserted as 200-with-nothing
+  // rather than a denial: that route filters an already-user-scoped list, so a foreign filter is a
+  // legitimate empty result, and recording which of the two shapes applies is the point.
+  test("trips: A cannot GET/PUT/DELETE B's trip, nor read B's vehicle trips or summary", async () => {
+    const vid = await idOf(
+      await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
+    );
+    const tid = await idOf(
+      await asB('POST', '/api/v1/trips', {
+        vehicleId: vid,
+        startOdometer: 1000,
+        endOdometer: 1100,
+        purpose: 'business',
+        tripDate: '2024-06-01T00:00:00.000Z',
+      })
+    );
+
+    expectDenied(await ctx.authed('GET', `/api/v1/trips/${tid}`), 'GET trip');
+    expectDenied(
+      await ctx.authed('PUT', `/api/v1/trips/${tid}`, { purpose: 'personal' }),
+      'PUT trip'
+    );
+    expectDenied(await ctx.authed('DELETE', `/api/v1/trips/${tid}`), 'DELETE trip');
+    expectDenied(await ctx.authed('GET', `/api/v1/trips/vehicle/${vid}`), 'GET vehicle trips');
+    expectDenied(
+      await ctx.authed('GET', `/api/v1/trips/summary?vehicleId=${vid}`),
+      'GET trip summary for B vehicle'
+    );
+
+    // The user-scoped list filtered by B's vehicle: allowed, but it must return NOTHING of B's.
+    const listed = await ctx.authed('GET', `/api/v1/trips?vehicleId=${vid}`);
+    expect(listed.status, 'the user-scoped list accepts any vehicleId filter').toBe(200);
+    expect((await json<PaginatedEnvelope<unknown>>(listed)).data).toHaveLength(0);
+
+    // B's trip survived every denied write, with its original purpose — and B reaches every surface
+    // A was denied, so each denial above is the ownership gate rather than a broken fixture.
+    const stillThere = await asB('GET', `/api/v1/trips/${tid}`);
+    expect(stillThere.status).toBe(200);
+    expect((await json<DataEnvelope<{ purpose: string }>>(stillThere)).data.purpose).toBe(
+      'business'
+    );
+    expect((await asB('GET', `/api/v1/trips/vehicle/${vid}`)).status).toBe(200);
+    expect((await asB('GET', `/api/v1/trips/summary?vehicleId=${vid}`)).status).toBe(200);
+  });
+
+  // Storage providers hold ENCRYPTED third-party credentials and are the egress path for every
+  // photo, so a cross-tenant reach here is worse than a data read: /test exercises B's credentials,
+  // /backfill queues work against B's account, and DELETE tears down B's config and photo refs.
+  // All five gate on the same findOwnedProviderOrThrow; none was ever driven by a foreign session.
+  test("providers: A cannot update/delete/test/backfill/inspect B's provider", async () => {
+    // Seeded directly: POST /providers demands real credentials for a supported type, and every
+    // probe below gates on ownership BEFORE it touches the row, so the row's contents are
+    // irrelevant to what is proven here. `domain` is NOT NULL.
+    const providerId = `idor-prov-${bCounter}`;
+    ctx.sqlite.run(
+      `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
+       VALUES (?, ?, 'storage', 's3', 'B Bucket', '', ?, 'active')`,
+      [
+        providerId,
+        bId,
+        JSON.stringify({
+          endpoint: 'https://s3.example.com',
+          bucket: 'b-bucket',
+          region: 'us-east-1',
+        }),
+      ]
+    );
+    // Positive control: the row exists, is B's, and B reaches it through the very same gate — so
+    // every denial below is the ownership predicate, not a missing fixture or a broken route.
+    const bOwns = await json<DataEnvelope<Array<{ id: string }>>>(
+      await asB('GET', '/api/v1/providers')
+    );
+    expect(bOwns.data.map((p) => p.id)).toContain(providerId);
+    expect(
+      (await asB('GET', `/api/v1/providers/${providerId}/sync-status`)).status,
+      'B reaches its own provider through findOwnedProviderOrThrow'
+    ).toBe(200);
+
+    expectDenied(
+      await ctx.authed('PUT', `/api/v1/providers/${providerId}`, { displayName: 'Hacked' }),
+      'PUT provider'
+    );
+    expectDenied(
+      await ctx.authed('POST', `/api/v1/providers/${providerId}/test`),
+      'POST provider test'
+    );
+    expectDenied(
+      await ctx.authed('POST', `/api/v1/providers/${providerId}/backfill`),
+      'POST provider backfill'
+    );
+    expectDenied(
+      await ctx.authed('GET', `/api/v1/providers/${providerId}/sync-status`),
+      'GET provider sync-status'
+    );
+    expectDenied(await ctx.authed('DELETE', `/api/v1/providers/${providerId}`), 'DELETE provider');
+
+    // The row survived every probe, unrenamed.
+    const stillOwned = await json<DataEnvelope<Array<{ id: string; displayName: string }>>>(
+      await asB('GET', '/api/v1/providers')
+    );
+    expect(stillOwned.data.find((p) => p.id === providerId)?.displayName).toBe('B Bucket');
+  });
+
+  // POST /sync/restore/from-provider takes a providerId in the BODY and then READS and WRITES the
+  // caller's whole dataset from it. `mode: 'preview'` is the read-only leg and `sourceType: 'sheets'`
+  // is the shape that reaches the ownership check (the 'zip' variant demands a fileRef and would 400
+  // on schema before ever getting there — a vacuous pass). The route is idempotency-gated, so the
+  // request is built by hand to carry the required header.
+  test("sync: A cannot restore from B's storage provider", async () => {
+    const seedProvider = (id: string, userId: string): void => {
+      ctx.sqlite.run(
+        `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
+         VALUES (?, ?, 'storage', 's3', 'Bucket', '', ?, 'active')`,
+        [
+          id,
+          userId,
+          JSON.stringify({
+            endpoint: 'https://s3.example.com',
+            bucket: 'a-bucket',
+            region: 'us-east-1',
+          }),
+        ]
+      );
+    };
+    const restoreAsA = async (providerId: string, key: string): Promise<Response> =>
+      ctx.app.request('/api/v1/sync/restore/from-provider', {
+        method: 'POST',
+        headers: {
+          Cookie: ctx.cookie,
+          'Content-Type': 'application/json',
+          'Idempotency-Key': key,
+          'Sec-Fetch-Site': 'same-origin',
+        },
+        body: JSON.stringify({ sourceType: 'sheets', providerId, mode: 'preview' }),
+      });
+
+    const bProvider = `idor-restore-b-${bCounter}`;
+    const aProvider = `idor-restore-a-${bCounter}`;
+    seedProvider(bProvider, bId);
+    seedProvider(aProvider, ctx.user.id);
+
+    const denied = await restoreAsA(bProvider, `idor-restore-b-${bCounter}`);
+    expectDenied(denied, "restore from B's provider");
+    const deniedBody = (await denied.json()) as { error?: { message?: string } };
+    expect(deniedBody.error?.message).toContain('Provider not found');
+
+    // Positive control: the SAME request against A's OWN identical row gets past the ownership
+    // check and fails further in (there are no real credentials behind it). Without this, a schema
+    // or idempotency rejection would make the denial above prove nothing.
+    const ownRes = await restoreAsA(aProvider, `idor-restore-a-${bCounter}`);
+    const ownBody = (await ownRes.json()) as { error?: { message?: string } };
+    expect(
+      ownBody.error?.message ?? '',
+      "A's own provider must get past the ownership gate"
+    ).not.toContain('Provider not found');
   });
 
   // vehicle-sharing T3 (owner-side share management). The share IS the cross-tenant feature, so the
@@ -738,7 +978,7 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     expect(acc.status, 'the real invitee A can accept').toBe(200);
   });
 
-  // vehicle-sharing T5b-2 (expense WRITE widening — the C108-C116 IDOR discipline for the owner-stamp
+  // vehicle-sharing T5b-2 (expense WRITE widening — the- IDOR discipline for the owner-stamp
   // model). The write gate moved from strict validateVehicleOwnership to requireVehicleWrite (owner OR
   // accepted editor). This pins that the WIDENING did not over-open: every NON-writer is still denied
   // with the existence-hiding 404 — a third party with no share, a VIEWER (read-only), and an editor
@@ -879,7 +1119,7 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     expect(stillB.data.make).toBe('B');
   });
 
-  // vehicle-sharing T5b-3 (expense READ widening — the C108-C116 IDOR discipline for the read seam).
+  // vehicle-sharing T5b-3 (expense READ widening — the- IDOR discipline for the read seam).
   // The per-vehicle reads moved from validateVehicleOwnership/validateExpenseOwnership →
   // requireVehicleRead (owner | accepted viewer | accepted editor). This pins the read widening did not
   // over-open: a NON-shared third party is still denied the per-vehicle list / single / summary with the
@@ -959,8 +1199,8 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
       await ctx.authed('GET', '/api/v1/shares/received')
     );
     expect(aRecv.data.length).toBe(1);
-    expect(aRecv.data[0]!.sharedWithId).toBe(ctx.user.id);
-    expect(aRecv.data[0]!.vehicleName).toBe('2023 Subaru Outback');
+    expect(aRecv.data[0].sharedWithId).toBe(ctx.user.id);
+    expect(aRecv.data[0].vehicleName).toBe('2023 Subaru Outback');
 
     // B is the OWNER, not an invitee — B's /received is empty (the join did not leak its own grant in).
     const bRecv = await json<DataEnvelope<unknown[]>>(await asB('GET', '/api/v1/shares/received'));
