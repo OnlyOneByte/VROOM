@@ -4,13 +4,6 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { themeStore } from '$lib/stores/theme.svelte';
 import { Toaster } from '../index';
 
-// Tests resolve svelte's server entry by default, so mount with the client build, located through the package so the path does not depend on this file's depth.
-vi.mock('svelte', async () => {
-	const { createRequire } = await import('node:module');
-	const pkgJson = createRequire(import.meta.url).resolve('svelte/package.json');
-	return import(pkgJson.replace(/package\.json$/, 'src/index-client.js'));
-});
-
 // sonner mounts its themed list only once a toast exists.
 async function themeOfMountedToaster(): Promise<string | null> {
 	toast('a message');

@@ -5,8 +5,6 @@ import { render } from '@testing-library/svelte';
 import type { ReceiptDraftItem } from '$lib/services/photos-import-api';
 import type { Vehicle } from '$lib/types';
 
-vi.mock('svelte', () => import('../../../../../node_modules/svelte/src/index-client.js' as string));
-
 /** Hard budget: past this the dialog is looping, and the rejection breaks the loop. */
 const CALL_BUDGET = 8;
 

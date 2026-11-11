@@ -54,6 +54,7 @@ import {
 import { maxOf, minOf } from '../../utils/calculations';
 import { logger } from '../../utils/logger';
 import { convertDistance, convertEfficiency, convertVolume } from '../../utils/unit-conversions';
+import { FinancingRepository } from '../financing/repository';
 
 export type { FuelEfficiencyPoint } from '../../utils/analytics-charts';
 
@@ -841,8 +842,7 @@ export class AnalyticsRepository {
   private async computeActiveBalances(
     financingRows: Array<{ id: string; isActive: boolean }>
   ): Promise<Map<string, number>> {
-    const { financingRepository } = await import('../financing/repository');
-    return financingRepository.computeBalances(
+    return new FinancingRepository(this.db).computeBalances(
       financingRows.filter((fin) => fin.isActive).map((fin) => fin.id)
     );
   }

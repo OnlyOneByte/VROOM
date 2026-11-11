@@ -3,11 +3,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
 
-vi.mock(
-	'svelte',
-	() => import('../../../../../../node_modules/svelte/src/index-client.js' as string)
-);
-
 const CameraTab = (await import('../CameraTab.svelte')).default;
 
 interface FakeTrack {

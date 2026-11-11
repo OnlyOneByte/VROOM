@@ -6,13 +6,6 @@ import ExpensesTable from '../ExpensesTable.svelte';
 import { appStore } from '$lib/stores/app.svelte';
 import type { Expense, Vehicle } from '$lib/types';
 
-// Mounting needs svelte's client entries; svelte/reactivity matters because the server MediaQuery always reports the wide layout.
-vi.mock('svelte', () => import('../../../../../node_modules/svelte/src/index-client.js' as string));
-vi.mock(
-	'svelte/reactivity',
-	() => import('../../../../../node_modules/svelte/src/reactivity/index-client.js' as string)
-);
-
 const VEHICLE: Vehicle = {
 	id: 'v1',
 	userId: 'u1',

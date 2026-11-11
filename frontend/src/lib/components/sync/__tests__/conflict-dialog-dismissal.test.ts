@@ -4,8 +4,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import type { SyncConflict } from '$lib/utils/sync/sync-state.svelte';
 
-vi.mock('svelte', () => import('../../../../../node_modules/svelte/src/index-client.js' as string));
-
 const resolveConflict = vi.fn(async () => true);
 vi.mock('$lib/utils/sync/sync-manager', async () => {
 	const state = await import('$lib/utils/sync/sync-state.svelte');

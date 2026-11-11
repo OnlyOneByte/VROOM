@@ -8,7 +8,7 @@ import { logger } from '../../utils/logger';
 import { BaseRepository } from '../../utils/repository';
 
 /** Balance in integer cents at or below which a financing counts as paid off. */
-export const PAYOFF_BALANCE_THRESHOLD = 1;
+export const PAYOFF_BALANCE_THRESHOLD = 100;
 
 export function isEligibleForPayoff(computedBalance: number): boolean {
   return computedBalance <= PAYOFF_BALANCE_THRESHOLD;

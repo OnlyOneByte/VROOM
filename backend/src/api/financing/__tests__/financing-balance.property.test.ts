@@ -203,6 +203,12 @@ describe('financing payoff eligibility flag', () => {
     expect(isEligibleForPayoff(PAYOFF_BALANCE_THRESHOLD + 1)).toBe(false);
     expect(isEligibleForPayoff(10_000)).toBe(false);
   });
+
+  test('a remaining balance of one dollar or less counts as paid off', () => {
+    expect(PAYOFF_BALANCE_THRESHOLD).toBe(100);
+    expect(isEligibleForPayoff(100)).toBe(true);
+    expect(isEligibleForPayoff(101)).toBe(false);
+  });
 });
 
 describe('computeBalances (batch) equivalence', () => {

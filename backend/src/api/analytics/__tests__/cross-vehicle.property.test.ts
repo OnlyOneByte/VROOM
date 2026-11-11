@@ -137,7 +137,7 @@ describe('Cost per distance formula', () => {
 });
 
 describe('Unfinanced vehicles classified as own', () => {
-  test.skip('vehicles without financing records have financingType = own', async () => {
+  test('vehicles without financing records have financingType = own', async () => {
     await fc.assert(
       fc.asyncProperty(
         fc.integer({ min: 1, max: 4 }),

@@ -1,13 +1,8 @@
 // The remove control must work without hover: visible on small screens, focus-revealed on large ones.
 
-import { describe, expect, test, vi } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { render } from '@testing-library/svelte';
 import PendingPhotoPreview from '../PendingPhotoPreview.svelte';
-
-vi.mock(
-	'svelte',
-	() => import('../../../../../../node_modules/svelte/src/index-client.js' as string)
-);
 
 function mountWithOneFile() {
 	const file = new File(['receipt-bytes'], 'receipt.pdf', { type: 'application/pdf' });

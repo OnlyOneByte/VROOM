@@ -1,17 +1,10 @@
 // Empty lists show no pagination: the bar never reports fewer than one page, and the table renders no bar for a zero count.
 
-import { describe, expect, test, vi } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { render } from '@testing-library/svelte';
 import PaginationControls from '../pagination-controls.svelte';
 import ExpensesTable from '../../expenses/ExpensesTable.svelte';
 import type { Expense } from '$lib/types';
-
-// Mounting needs svelte's client entries; svelte/reactivity matters because its server MediaQuery pins IsMobile to the wide layout.
-vi.mock('svelte', () => import('../../../../../node_modules/svelte/src/index-client.js' as string));
-vi.mock(
-	'svelte/reactivity',
-	() => import('../../../../../node_modules/svelte/src/reactivity/index-client.js' as string)
-);
 
 describe('the pagination bar itself', () => {
 	test('never reports a page count below one', () => {

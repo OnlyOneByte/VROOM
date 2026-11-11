@@ -4,13 +4,6 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { render, waitFor } from '@testing-library/svelte';
 import type { Vehicle } from '$lib/types';
 
-// Mounting needs svelte's client entries; vite.config.ts sets no browser condition for tests.
-vi.mock('svelte', () => import('../../../../node_modules/svelte/src/index-client.js' as string));
-vi.mock(
-	'svelte/reactivity',
-	() => import('../../../../node_modules/svelte/src/reactivity/index-client.js' as string)
-);
-
 vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 

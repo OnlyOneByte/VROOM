@@ -6,12 +6,6 @@ import { fireEvent, render, screen } from '@testing-library/svelte';
 import { ApiError } from '$lib/utils/error-handling';
 import { loadOfflineExpenses } from '$lib/utils/offline-storage';
 
-// Mounting needs svelte's client entry, which the default test resolution does not provide.
-vi.mock(
-	'svelte',
-	() => import('../../../../../../node_modules/svelte/src/index-client.js' as string)
-);
-
 const goto = vi.fn(() => Promise.resolve());
 vi.mock('$app/navigation', () => ({
 	goto,

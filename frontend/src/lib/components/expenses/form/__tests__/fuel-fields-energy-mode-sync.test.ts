@@ -1,11 +1,12 @@
 // The energy mode must agree with vehicle capabilities and fuelType, and must never rewrite a value it was handed.
 
-import { describe, expect, test, vi } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fireEvent, render } from '@testing-library/svelte';
 import { flushSync } from 'svelte';
+import { reactiveState } from '../../../../../test-utils/reactive-state.svelte';
 import FuelFieldsSection, {
 	DEFAULT_CHARGING_FUEL_TYPE,
 	energyModeFields,
@@ -15,17 +16,7 @@ import FuelFieldsSection, {
 } from '../FuelFieldsSection.svelte';
 import { validateExpenseField } from '../expense-form-validation';
 
-// Mounting needs svelte's client entry, which the default test resolution does not provide.
-vi.mock(
-	'svelte',
-	() => import('../../../../../../node_modules/svelte/src/index-client.js' as string)
-);
-
 // Props are real $state so the component's $effect re-runs when a capability prop changes.
-const { proxy } = (await import(
-	'../../../../../../node_modules/svelte/src/internal/client/index.js' as string
-)) as { proxy: <T extends object>(value: T) => T };
-
 const GAS: EnergyCapabilities = { canFuel: true, canCharge: false };
 const EV: EnergyCapabilities = { canFuel: false, canCharge: true };
 const HYBRID: EnergyCapabilities = { canFuel: true, canCharge: true };
@@ -271,7 +262,7 @@ interface MountedSection {
 }
 
 function mountSection(caps: EnergyCapabilities, loaded: Partial<BoundForm> = {}): MountedSection {
-	const state = proxy({
+	const state = reactiveState({
 		vehicle: { ...caps },
 		volume: '',
 		charge: '',

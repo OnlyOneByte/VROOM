@@ -2,12 +2,6 @@ import { render, screen, waitFor } from '@testing-library/svelte';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type { UserProviderInfo } from '$lib/types';
 
-vi.mock('svelte', async () => {
-	const { createRequire } = await import('node:module');
-	const pkgJson = createRequire(import.meta.url).resolve('svelte/package.json');
-	return import(pkgJson.replace(/package\.json$/, 'src/index-client.js'));
-});
-
 const getProviders = vi.fn((_domain?: string) => Promise.resolve([] as UserProviderInfo[]));
 vi.mock('$lib/services/provider-api', () => ({
 	providerApi: {

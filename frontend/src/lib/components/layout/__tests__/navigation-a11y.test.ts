@@ -6,8 +6,6 @@ import { render, screen, fireEvent } from '@testing-library/svelte';
 import { offlineExpenseQueue, onlineStatus, syncState } from '$lib/stores/offline.svelte';
 import type { OfflineExpense } from '$lib/utils/offline-storage';
 
-vi.mock('svelte', () => import('../../../../../node_modules/svelte/src/index-client.js' as string));
-
 let currentUrl = new URL('http://localhost/expenses');
 vi.mock('$app/state', () => ({
 	get page() {

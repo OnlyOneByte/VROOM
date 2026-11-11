@@ -1,11 +1,9 @@
 // EmptyState's title is an h2, so it sits directly under the page's h1 and the heading outline has no gap.
 
-import { describe, expect, test, vi } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { render } from '@testing-library/svelte';
 import { createRawSnippet } from 'svelte';
 import EmptyState from '../empty-state.svelte';
-
-vi.mock('svelte', () => import('../../../../../node_modules/svelte/src/index-client.js' as string));
 
 const text = (value: string) => createRawSnippet(() => ({ render: () => `<span>${value}</span>` }));
 

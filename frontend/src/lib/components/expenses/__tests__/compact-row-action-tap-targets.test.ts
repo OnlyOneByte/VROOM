@@ -5,12 +5,6 @@ import { fireEvent, render } from '@testing-library/svelte';
 import ExpensesTable from '../ExpensesTable.svelte';
 import type { Expense } from '$lib/types';
 
-vi.mock('svelte', () => import('../../../../../node_modules/svelte/src/index-client.js' as string));
-vi.mock(
-	'svelte/reactivity',
-	() => import('../../../../../node_modules/svelte/src/reactivity/index-client.js' as string)
-);
-
 const SPACING_PX = 4;
 const TAP_TARGET_FLOOR_PX = 40;
 

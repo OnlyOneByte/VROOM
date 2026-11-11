@@ -4,12 +4,6 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import type { UserProviderInfo } from '$lib/types';
 
-// Mounting needs svelte's client entry, which the default test resolution does not provide.
-vi.mock(
-	'svelte',
-	() => import('../../../../../../../node_modules/svelte/src/index-client.js' as string)
-);
-
 vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 vi.mock('$app/environment', () => ({ browser: true }));

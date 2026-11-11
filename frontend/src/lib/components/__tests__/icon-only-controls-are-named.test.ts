@@ -3,12 +3,10 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, test, vi } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { render } from '@testing-library/svelte';
 import OfflineExpenseCards from '../expenses/OfflineExpenseCards.svelte';
 import type { OfflineExpense } from '$lib/utils/offline-storage';
-
-vi.mock('svelte', () => import('../../../../node_modules/svelte/src/index-client.js' as string));
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ODOMETER_TAB = join(HERE, '..', 'vehicles', 'OdometerTab.svelte');

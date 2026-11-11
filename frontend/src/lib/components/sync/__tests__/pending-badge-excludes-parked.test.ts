@@ -6,8 +6,6 @@ import { offlineExpenseQueue, onlineStatus, syncState } from '$lib/stores/offlin
 import { appStore } from '$lib/stores/app.svelte';
 import type { OfflineExpense } from '$lib/utils/offline-storage';
 
-vi.mock('svelte', () => import('../../../../../node_modules/svelte/src/index-client.js' as string));
-
 const setupAutoSync = vi.fn();
 type SyncResultStub = { synced: number; needsAttention: number };
 const syncAll = vi.fn(async () => ({ success: true, conflicts: [] }));

@@ -1,25 +1,44 @@
-// Switching a category away from fuel must clear the fuel-only fields in selectCategory; source scan, since the state is component-internal.
+// Switching a category away from fuel must clear the fuel-only fields, so hidden inputs never submit stale values.
 
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
+import { ExpenseFormState } from '../expense-form/expense-form-state.svelte';
 
-const FORM_SRC = readFileSync(
-	join(dirname(fileURLToPath(import.meta.url)), '..', 'ExpenseForm.svelte'),
-	'utf-8'
-);
+function fuelEntry(): ExpenseFormState {
+	const state = new ExpenseFormState({ expenseId: undefined, returnTo: '/expenses' }, false);
+	state.formData.category = 'fuel';
+	state.formData.volume = '10.5';
+	state.formData.charge = '40';
+	state.formData.fuelType = '87 (Regular)';
+	state.formData.mileage = '1200';
+	state.formData.missedFillup = true;
+	return state;
+}
 
 describe('category switch clears fuel fields', () => {
-	test('selectCategory has a non-fuel branch that clears the fuel-only fields', () => {
-		// Anchor on selectCategory, then assert the switch-away-from-fuel clear-block lives within it.
-		const start = FORM_SRC.indexOf('function selectCategory');
-		expect(start).toBeGreaterThan(-1);
-		const block = FORM_SRC.slice(start, start + 1400);
-		expect(block).toContain("categoryValue !== 'fuel'");
-		expect(block).toContain('formData.volume');
-		expect(block).toContain('formData.charge');
-		expect(block).toContain('formData.fuelType');
-		expect(block).toContain('formData.mileage');
+	test('switching away from fuel clears volume, charge, fuelType, mileage and missedFillup', () => {
+		const state = fuelEntry();
+
+		state.selectCategory('misc');
+
+		expect(state.formData).toMatchObject({
+			category: 'misc',
+			volume: '',
+			charge: '',
+			fuelType: '',
+			mileage: '',
+			missedFillup: false
+		});
+	});
+
+	test('re-selecting fuel keeps the fuel fields', () => {
+		const state = fuelEntry();
+
+		state.selectCategory('fuel');
+
+		expect(state.formData).toMatchObject({
+			volume: '10.5',
+			charge: '40',
+			fuelType: '87 (Regular)'
+		});
 	});
 });

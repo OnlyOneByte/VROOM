@@ -68,6 +68,14 @@ export default defineConfig({
 		environment: 'happy-dom',
 		setupFiles: ['src/test-setup.ts'],
 		globals: true,
+		// Component tests mount with svelte's client build. Vitest externalizes node_modules, so
+		// Node would otherwise load svelte's server entry (where mount() throws). Inlining these
+		// packages routes them through Vite, which applies the browser condition below.
+		server: {
+			deps: {
+				inline: ['svelte', '@testing-library/svelte', '@testing-library/svelte-core']
+			}
+		},
 		coverage: {
 			provider: 'v8',
 			reporter: ['text', 'json-summary'],
@@ -78,6 +86,12 @@ export default defineConfig({
 			$app: new URL('./node_modules/@sveltejs/kit/src/runtime/app', import.meta.url).pathname,
 			'$env/dynamic/public': new URL('./src/test-env-mock.ts', import.meta.url).pathname
 		}
+	},
+	// Vitest's config sets resolve.conditions to server defaults, which lack 'browser', so without
+	// this the inlined svelte still resolves its server entry. 'browser' is already a default for
+	// the client build, and the SSR build reads ssr.resolve.conditions instead.
+	resolve: {
+		conditions: ['browser']
 	},
 	server: {
 		proxy: apiProxy
