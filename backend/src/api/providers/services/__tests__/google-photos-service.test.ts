@@ -15,11 +15,16 @@ beforeEach(() => {
 });
 
 describe('GooglePhotosService — album resolution', () => {
-  test('creates the VROOM album when none exists, and caches the id', async () => {
+  test('creates the VROOM album when none exists', async () => {
     const id = await svc.resolveAlbumId();
     expect(id).toBeTruthy();
     expect([...store.albums.values()].some((a) => a.title === VROOM_ALBUM_TITLE)).toBe(true);
-    expect(svc.cachedAlbumId).toBe(id);
+  });
+
+  test('caches the resolved album id, so later calls skip the album lookup', async () => {
+    const id = await svc.resolveAlbumId();
+    store.injectFault('listAlbums', photosApiError(500, 'album lookup should be cached'));
+    expect(await svc.resolveAlbumId()).toBe(id);
   });
 
   test('reuses an existing VROOM album instead of creating a duplicate', async () => {

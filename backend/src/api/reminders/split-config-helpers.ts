@@ -1,4 +1,4 @@
-import type { ReminderSplitConfig } from '../../db/types';
+import type { SplitConfig } from '../../db/types';
 
 /**
  * Removes a deleted vehicle from a split config. The config is JSON and not FK-managed, so the leg would
@@ -6,9 +6,9 @@ import type { ReminderSplitConfig } from '../../db/types';
  * meaning the caller should clear the config, and the same reference when the vehicle was absent.
  */
 export function pruneVehicleFromSplitConfig(
-  config: ReminderSplitConfig,
+  config: SplitConfig,
   deletedVehicleId: string
-): ReminderSplitConfig | null {
+): SplitConfig | null {
   if (config.method === 'even') {
     if (!config.vehicleIds.includes(deletedVehicleId)) return config;
     const remaining = config.vehicleIds.filter((id) => id !== deletedVehicleId);

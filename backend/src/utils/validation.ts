@@ -5,8 +5,15 @@ import { zValidator as honoZValidator } from '@hono/zod-validator';
 import type { ValidationTargets } from 'hono';
 import type { ZodError, ZodType } from 'zod';
 import { z } from 'zod';
+import { financingRepository } from '../api/financing/repository';
+import { insurancePolicyRepository } from '../api/insurance/repository';
+import { type ReminderWithVehicles, reminderRepository } from '../api/reminders/repository';
+import { tripRepository } from '../api/trips/repository';
+import { vehicleRepository } from '../api/vehicles/repository';
 import { CONFIG } from '../config';
-import { createErrorResponse } from '../errors';
+import type { InsurancePolicy, Trip, Vehicle, VehicleFinancing } from '../db/schema';
+import { isElectricFuelType } from '../db/types';
+import { createErrorResponse, NotFoundError, ValidationError } from '../errors';
 
 // The path is included so a multi-field failure names the field it refers to.
 function describeIssue(issue: ZodError['issues'][number]): string {
@@ -60,14 +67,6 @@ export const commonSchemas = {
     offset: z.coerce.number().int().min(0).optional().default(0),
   }),
 };
-
-import { financingRepository } from '../api/financing/repository';
-import { insurancePolicyRepository } from '../api/insurance/repository';
-import { type ReminderWithVehicles, reminderRepository } from '../api/reminders/repository';
-import { tripRepository } from '../api/trips/repository';
-import { vehicleRepository } from '../api/vehicles/repository';
-import type { InsurancePolicy, Trip, Vehicle, VehicleFinancing } from '../db/schema';
-import { NotFoundError } from '../errors';
 
 export async function validateVehicleOwnership(
   vehicleId: string,
@@ -136,9 +135,6 @@ export async function validateTripOwnership(tripId: string, userId: string): Pro
   }
   return trip;
 }
-
-import { isElectricFuelType } from '../db/types';
-import { ValidationError } from '../errors';
 
 export function validateFuelExpenseData(
   category: string,

@@ -71,3 +71,27 @@ export interface ExpenseSummary {
 	categoryBreakdown: Array<{ category: string; amount: number; count: number }>;
 	monthlyTrend: Array<{ period: string; amount: number; count: number }>;
 }
+
+/** Expense as the backend sends it, before fromBackendExpense maps it to Expense. */
+export interface BackendExpenseResponse {
+	id: string;
+	vehicleId: string;
+	userId: string;
+	tags: string[];
+	category: string;
+	expenseAmount: number;
+	date: string;
+	mileage?: number;
+	volume?: number;
+	fuelType?: string;
+	description?: string | null;
+	location?: string | null;
+	missedFillup?: boolean;
+	sourceType?: string;
+	sourceId?: string;
+	groupId?: string;
+	groupTotal?: number;
+	splitMethod?: string;
+	createdAt: string;
+	updatedAt: string;
+}

@@ -23,6 +23,13 @@ describe('deriveImportClientId — field sensitivity (the import idempotency-key
     expect(deriveImportClientId(baseExpense(), 0).startsWith('csv:')).toBe(true);
   });
 
+  // Pinned so a refactor of the hash input (separators, field order) cannot silently change the
+  // keys of rows already imported, which would make a re-import duplicate them.
+  test('derived keys are stable across releases', () => {
+    expect(deriveImportClientId(baseExpense(), 0)).toBe('csv:d56062d1b54daf9c876d0d3cce0bd6b0');
+    expect(deriveImportClientId(baseExpense(), 1)).toBe('csv:49d036c6bddcbd829bebd2ea4e16478e');
+  });
+
   test('identical content + same occurrence → identical key (deterministic; re-import dedups)', () => {
     expect(deriveImportClientId(baseExpense(), 0)).toBe(deriveImportClientId(baseExpense(), 0));
   });

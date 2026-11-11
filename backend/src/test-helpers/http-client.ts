@@ -1,6 +1,5 @@
 // In-process HTTP client for the backend. Drives the real Hono app with app.request() against an in-memory DB.
-// Import order is load-bearing: DB-bound modules must be imported after createTestApp() sets the environment,
-// so this file keeps its own imports type-only.
+// The test environment (NODE_ENV, DATABASE_URL) is set by the bunfig preload, test-helpers/preload.ts.
 
 import type { Hono } from 'hono';
 
@@ -38,11 +37,6 @@ let counter = 0;
 let migrated = false;
 
 export async function createTestApp(seedUser: Partial<TestUser> = {}): Promise<TestApp> {
-  process.env.NODE_ENV = 'test';
-  process.env.DATABASE_URL = ':memory:';
-  // Fixed key so provider credential decryption never throws in tests.
-  process.env.PROVIDER_ENCRYPTION_KEY ||= '0'.repeat(64);
-
   const { db, runMigrations } = await import('../db/connection');
   const schema = await import('../db/schema');
   const { lucia } = await import('../api/auth/lucia');
@@ -66,35 +60,48 @@ export async function createTestApp(seedUser: Partial<TestUser> = {}): Promise<T
   const sessionCookie = lucia.createSessionCookie(session.id);
   const cookie = `${sessionCookie.name}=${sessionCookie.value}`;
 
-  // async so the return type is Promise<Response>, matching TestApp.authed and anon.
-  const buildReq = async (
-    method: string,
-    path: string,
-    body: unknown,
-    withCookie: boolean
-  ): Promise<Response> => {
-    const headers: Record<string, string> = {};
-    if (withCookie) headers.Cookie = cookie;
-    // csrf() rejects state-changing requests that lack a JSON content type and a same-origin signal.
-    // Browsers always send this header, so the harness must too.
-    headers['Sec-Fetch-Site'] = 'same-origin';
-    let init: RequestInit = { method, headers };
-    if (body !== undefined) {
-      headers['Content-Type'] = 'application/json';
-      init = { ...init, body: JSON.stringify(body), headers };
-    }
-    return app.request(path, init);
-  };
-
   return {
     app,
     user: { id, email, displayName },
     sqlite,
     cookie,
-    authed: (method, path, body) => buildReq(method, path, body, true),
-    anon: (method, path, body) => buildReq(method, path, body, false),
+    authed: (method, path, body) => sendRequest(app, method, path, body, cookie),
+    anon: (method, path, body) => sendRequest(app, method, path, body),
     // No-op: the in-memory DB is shared by the process, and the next createTestApp() wipes it.
     close: () => {},
+  };
+}
+
+// async so the return type is Promise<Response>, matching TestApp.authed and anon.
+async function sendRequest(
+  app: Hono,
+  method: string,
+  path: string,
+  body: unknown,
+  cookie?: string
+): Promise<Response> {
+  // csrf() rejects state-changing requests that lack a JSON content type and a same-origin signal.
+  // Browsers always send this header, so the harness must too.
+  const headers: Record<string, string> = { 'Sec-Fetch-Site': 'same-origin' };
+  if (cookie) headers.Cookie = cookie;
+  if (body === undefined) return app.request(path, { method, headers });
+  headers['Content-Type'] = 'application/json';
+  return app.request(path, { method, headers, body: JSON.stringify(body) });
+}
+
+export type RequestFn = (method: string, path: string, body?: unknown) => Promise<Response>;
+
+/** Creates a session for an existing user and returns its cookie plus a JSON request function bound to it. */
+export async function requestAs(
+  ctx: TestApp,
+  userId: string
+): Promise<{ cookie: string; request: RequestFn }> {
+  const { lucia } = await import('../api/auth/lucia');
+  const sessionCookie = lucia.createSessionCookie((await lucia.createSession(userId, {})).id);
+  const cookie = `${sessionCookie.name}=${sessionCookie.value}`;
+  return {
+    cookie,
+    request: (method, path, body) => sendRequest(ctx.app, method, path, body, cookie),
   };
 }
 

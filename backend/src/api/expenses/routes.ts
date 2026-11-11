@@ -20,6 +20,7 @@ import {
 } from '../../utils/money';
 import { buildPaginatedResponse, clampPagination } from '../../utils/pagination';
 import {
+  requireVehicleOwnerScope,
   requireVehicleRead,
   requireVehicleWrite,
   resolveVehicleOwnerId,
@@ -36,6 +37,7 @@ import {
   CsvImportError,
   importCsvSchema,
   summarizeImportPlan,
+  vehicleNameKey,
 } from './import-csv';
 import {
   applyMapping,
@@ -46,6 +48,7 @@ import {
 import { detectSource } from './import-mapping-presets';
 import { expenseRepository } from './repository';
 import {
+  clearFuelFieldsIfNotFuel,
   createSplitExpenseSchema,
   type SplitConfig,
   splitConfigVehicleIds,
@@ -142,20 +145,6 @@ const updateExpenseSchema = createExpenseSchemaBase
     }
   );
 
-// A stray mileage on a non-fuel row would skew getCurrentOdometer, which reads across categories.
-function clearFuelFieldsIfNotFuel<
-  T extends {
-    category?: string;
-    volume?: number | null;
-    fuelType?: string | null;
-    mileage?: number | null;
-    missedFillup?: boolean;
-  },
->(data: T, effectiveCategory: string | undefined = data.category): T {
-  if (effectiveCategory === undefined || effectiveCategory === 'fuel') return data;
-  return { ...data, volume: null, fuelType: null, mileage: null, missedFillup: false };
-}
-
 // The financing balance sums expenses by (sourceType, sourceId) with no vehicle scope, so a link
 // must point at this vehicle's active financing.
 async function assertFinancingSourceValid(
@@ -194,9 +183,7 @@ async function requireSplitWriteAccess(
   const vehicleIds = splitConfigVehicleIds(splitConfig);
   let ownerId: string | undefined;
   for (const vehicleId of vehicleIds) {
-    await requireVehicleWrite(vehicleId, actingUserId);
-    const vehicleOwner = await resolveVehicleOwnerId(vehicleId);
-    if (!vehicleOwner) throw new NotFoundError('Vehicle');
+    const vehicleOwner = await requireVehicleOwnerScope(vehicleId, actingUserId, 'write');
     if (ownerId === undefined) {
       ownerId = vehicleOwner;
     } else if (ownerId !== vehicleOwner) {
@@ -242,7 +229,7 @@ routes.post('/split', zValidator('json', createSplitExpenseSchema), async (c) =>
   await assertSplitFinancingSourceValid(data.sourceType, data.sourceId, data.splitConfig);
 
   const { ownerId, createdBy } = await requireSplitWriteAccess(data.splitConfig, user.id);
-  const siblings = await expenseRepository.createSplitExpense(data, user.id, ownerId, createdBy);
+  const siblings = await expenseRepository.createSplitExpense(data, { ownerId, createdBy });
   const first = siblings[0];
   if (!first?.groupId || first.groupTotal == null || !first.splitMethod) {
     throw new ValidationError('Split expense creation returned invalid data');
@@ -413,9 +400,7 @@ routes.get('/summary', zValidator('query', summaryQuerySchema), async (c) => {
   // Per-vehicle reads use the owner's rows; cross-fleet reads stay on the acting user's rows to avoid double counting.
   let summaryUserId = user.id;
   if (vehicleId) {
-    await requireVehicleRead(vehicleId, user.id);
-    const ownerId = await resolveVehicleOwnerId(vehicleId);
-    if (!ownerId) throw new NotFoundError('Vehicle');
+    const ownerId = await requireVehicleOwnerScope(vehicleId, user.id, 'read');
     summaryUserId = ownerId;
   }
 
@@ -466,9 +451,7 @@ routes.get('/export', zValidator('query', exportQuerySchema), async (c) => {
   // Per-vehicle exports use the owner's rows; cross-fleet exports stay on the acting user's rows.
   let exportUserId = user.id;
   if (vehicleId) {
-    await requireVehicleRead(vehicleId, user.id);
-    const ownerId = await resolveVehicleOwnerId(vehicleId);
-    if (!ownerId) throw new NotFoundError('Vehicle');
+    const ownerId = await requireVehicleOwnerScope(vehicleId, user.id, 'read');
     exportUserId = ownerId;
   }
 
@@ -541,11 +524,11 @@ function resolveTargetUnits(
   vehicles: Awaited<ReturnType<typeof vehicleRepository.findByUserId>>
 ): TargetUnits {
   if (!targetVehicle) return {};
-  const wanted = targetVehicle.trim().toLowerCase();
+  const wanted = vehicleNameKey(targetVehicle);
   const match = vehicles.find(
     (v) =>
-      v.nickname?.toLowerCase() === wanted ||
-      `${v.year} ${v.make} ${v.model}`.toLowerCase() === wanted
+      (v.nickname && vehicleNameKey(v.nickname) === wanted) ||
+      vehicleNameKey(`${v.year} ${v.make} ${v.model}`) === wanted
   );
   if (!match) return {};
   return {
@@ -632,12 +615,9 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
   const { forceOverwrite, ...body } = c.req.valid('json');
   const expenseData = clearFuelFieldsIfNotFuel(body);
 
-  await requireVehicleWrite(expenseData.vehicleId, user.id);
-
   // Rows are stamped with the vehicle owner's id so shared-editor entries count once in the owner's books.
   // createdBy records the actual author when that is not the owner.
-  const ownerId = await resolveVehicleOwnerId(expenseData.vehicleId);
-  if (!ownerId) throw new NotFoundError('Vehicle');
+  const ownerId = await requireVehicleOwnerScope(expenseData.vehicleId, user.id, 'write');
   const createdBy = ownerId === user.id ? null : user.id;
 
   await assertFinancingSourceValid(
@@ -687,9 +667,7 @@ routes.get('/', zValidator('query', expenseQuerySchema), async (c) => {
   // stay on the acting user's rows so shared costs are not double counted.
   let listUserId = user.id;
   if (query.vehicleId) {
-    await requireVehicleRead(query.vehicleId, user.id);
-    const ownerId = await resolveVehicleOwnerId(query.vehicleId);
-    if (!ownerId) throw new NotFoundError('Vehicle');
+    const ownerId = await requireVehicleOwnerScope(query.vehicleId, user.id, 'read');
     listUserId = ownerId;
   }
 

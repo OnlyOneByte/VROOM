@@ -69,7 +69,7 @@ describe('restore merge: reminders PK collision is detected as a conflict, not a
     expect(
       reminderConflictReported,
       `merge should report the surviving reminder (${reminderId}) as a 'reminders'-table conflict, not omit ` +
-        `it (pre-fix: unprobed → raw UNIQUE throw on insert). threw: ${
+        `it (an unprobed row reaches the insert and throws a raw UNIQUE error). threw: ${
           threw instanceof Error ? threw.message : String(threw)
         }`
     ).toBe(true);

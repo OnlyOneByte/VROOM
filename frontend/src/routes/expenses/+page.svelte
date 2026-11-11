@@ -42,6 +42,7 @@
 	import ImportExpensesDialog from '$lib/components/expenses/ImportExpensesDialog.svelte';
 	import ImportFromPhotosDialog from '$lib/components/expenses/ImportFromPhotosDialog.svelte';
 	import * as Select from '$lib/components/ui/select';
+	import { useExpenseListReload } from './expense-list-reload.svelte';
 
 	let isLoading = $state(true);
 	let loadError = $state<string | null>(null);
@@ -58,10 +59,6 @@
 	let selectedVehicleId = $state<string | undefined>(undefined);
 	let startDate = $state<string | undefined>(undefined);
 	let endDate = $state<string | undefined>(undefined);
-
-	// Compared against the bound dates so only real changes trigger a refetch.
-	let prevStartDate = $state<string | undefined>(undefined);
-	let prevEndDate = $state<string | undefined>(undefined);
 
 	let selectedTags = $state<string[]>([]);
 	let tagMatchMode = $state<'any' | 'all'>('any');
@@ -111,30 +108,12 @@
 		}
 	]);
 
-	$effect(() => {
-		const s = startDate;
-		const e = endDate;
-		if (isLoading) return;
-		if (s !== prevStartDate || e !== prevEndDate) {
-			prevStartDate = s;
-			prevEndDate = e;
-			handleFilterChange();
-		}
-	});
-
-	// Debounced server-side search, re-fetching page 0.
-	let searchDebounce: ReturnType<typeof setTimeout> | undefined;
-	// Plain (non-reactive) guard: writing it must not re-run this effect.
-	let prevSearchTerm = '';
-	$effect(() => {
-		const term = searchTerm;
-		if (isLoading) return;
-		if (term === prevSearchTerm) return;
-		prevSearchTerm = term;
-		clearTimeout(searchDebounce);
-		searchDebounce = setTimeout(() => handleFilterChange(), 300);
-		// Cancels the pending debounce on change or unmount.
-		return () => clearTimeout(searchDebounce);
+	// Date changes arrive via bind, so they are detected by comparing a snapshot. Search is debounced.
+	const expenseListReload = useExpenseListReload({
+		ready: () => !isLoading,
+		search: () => searchTerm,
+		filterKey: () => JSON.stringify([startDate ?? '', endDate ?? '']),
+		reload: handleFilterChange
 	});
 
 	onMount(loadInitial);
@@ -250,8 +229,7 @@
 		startDate = undefined;
 		endDate = undefined;
 		categoryFilter = '';
-		currentOffset = 0;
-		fetchPageAndSummary(0);
+		expenseListReload.reloadNow();
 	}
 
 	let isExporting = $state(false);

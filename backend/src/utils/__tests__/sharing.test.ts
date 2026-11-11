@@ -9,7 +9,12 @@ import { applyMigration, loadMigrations } from '../../db/__tests__/migration-hel
 import type { AppDatabase } from '../../db/connection';
 import * as schema from '../../db/schema';
 import { NotFoundError } from '../../errors';
-import { requireVehicleRead, requireVehicleWrite, resolveVehicleAccess } from '../sharing';
+import {
+  requireVehicleOwnerScope,
+  requireVehicleRead,
+  requireVehicleWrite,
+  resolveVehicleAccess,
+} from '../sharing';
 
 let sqlite: Database;
 let db: AppDatabase;
@@ -132,5 +137,31 @@ describe('requireVehicleWrite — owner|editor or 404 (viewer denied)', () => {
 
   test('a third party is denied write with NotFoundError', async () => {
     await expect(requireVehicleWrite(VEHICLE, STRANGER, db)).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe('requireVehicleOwnerScope — scopes shared access to the owner id', () => {
+  test('the owner scopes to themselves', async () => {
+    expect(await requireVehicleOwnerScope(VEHICLE, OWNER, 'write', db)).toBe(OWNER);
+  });
+
+  test('an accepted viewer reads in the owner scope', async () => {
+    share('accepted', 'viewer');
+    expect(await requireVehicleOwnerScope(VEHICLE, INVITEE, 'read', db)).toBe(OWNER);
+  });
+
+  test('an accepted editor writes in the owner scope', async () => {
+    share('accepted', 'editor');
+    expect(await requireVehicleOwnerScope(VEHICLE, INVITEE, 'write', db)).toBe(OWNER);
+  });
+
+  test('a viewer is denied write and a stranger is denied read', async () => {
+    share('accepted', 'viewer');
+    await expect(requireVehicleOwnerScope(VEHICLE, INVITEE, 'write', db)).rejects.toBeInstanceOf(
+      NotFoundError
+    );
+    await expect(requireVehicleOwnerScope(VEHICLE, STRANGER, 'read', db)).rejects.toBeInstanceOf(
+      NotFoundError
+    );
   });
 });

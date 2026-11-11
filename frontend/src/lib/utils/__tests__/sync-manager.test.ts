@@ -332,7 +332,6 @@ describe('Sync Manager', () => {
 					'malformed-1',
 					expect.stringContaining('volume/charge and mileage')
 				);
-				expect(syncManager.getRetryCount('malformed-1')).toBe(0);
 				const RETRY_DELAYS = new Set([100, 200, 400, 800]);
 				const retryScheduled = setTimeoutSpy.mock.calls.some(
 					([, delay]) => typeof delay === 'number' && RETRY_DELAYS.has(delay)
@@ -359,64 +358,12 @@ describe('Sync Manager', () => {
 	});
 
 	describe('retry mechanism', () => {
-		it('should track retry count for failed syncs', async () => {
-			const mockExpenses: OfflineExpense[] = [
-				{
-					id: 'test-1',
-					vehicleId: 'vehicle-1',
-					tags: ['fuel'],
-					category: 'fuel',
-					amount: 50.0,
-					date: '2024-01-01',
-					mileage: 50000,
-					volume: 10.5,
-					timestamp: Date.now(),
-					synced: false
-				}
-			];
-
-			vi.mocked(loadOfflineExpenses).mockReturnValue(mockExpenses);
-
-			mockFetch
-				.mockResolvedValueOnce(apiOk([]))
-				.mockResolvedValueOnce(apiError(500, 'Server Error'));
-
-			const result = await syncManager.syncAll();
-
-			expect(result.failed).toBe(1);
-			expect(syncManager.getRetryCount('test-1')).toBeGreaterThanOrEqual(1);
-		});
-
-		it('should respect max retries setting', async () => {
-			syncConfig.update(config => ({ ...config, maxRetries: 1 }));
-
-			const mockExpenses: OfflineExpense[] = [
-				{
-					id: 'test-1',
-					vehicleId: 'vehicle-1',
-					tags: ['fuel'],
-					category: 'fuel',
-					amount: 50.0,
-					date: '2024-01-01',
-					mileage: 50000,
-					volume: 10.5,
-					timestamp: Date.now(),
-					synced: false
-				}
-			];
-
-			vi.mocked(loadOfflineExpenses).mockReturnValue(mockExpenses);
-			mockFetch.mockResolvedValue(apiError(500, 'Server Error'));
-
-			await syncManager.syncAll();
-			const firstCount = syncManager.getRetryCount('test-1');
-
-			mockFetch.mockResolvedValue(apiError(500, 'Server Error'));
-			await syncManager.syncAll();
-			const secondCount = syncManager.getRetryCount('test-1');
-
-			expect(secondCount).toBeLessThanOrEqual(firstCount + 1);
-		});
+		const RETRY_DELAYS = new Set([100, 200, 400, 800]);
+		function retryTimerScheduled(spy: { mock: { calls: unknown[][] } }): boolean {
+			return spy.mock.calls.some(
+				([, delay]) => typeof delay === 'number' && RETRY_DELAYS.has(delay)
+			);
+		}
 
 		function failingExpense(id = 'bo-1'): OfflineExpense {
 			return {
@@ -456,17 +403,18 @@ describe('Sync Manager', () => {
 
 			vi.useFakeTimers();
 			try {
-				await syncManager.syncAll();
-				expect(syncManager.getRetryCount('cap-1')).toBe(1);
-
 				const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
 				await syncManager.syncAll();
-				const RETRY_DELAYS = new Set([100, 200, 400, 800]);
-				const retryScheduled = setTimeoutSpy.mock.calls.some(
-					([, delay]) => typeof delay === 'number' && RETRY_DELAYS.has(delay)
+				expect(retryTimerScheduled(setTimeoutSpy), 'the first failure schedules a retry').toBe(
+					true
 				);
-				expect(retryScheduled, 'no retry-backoff timer scheduled past the cap').toBe(false);
-				expect(syncManager.getRetryCount('cap-1')).toBe(1);
+
+				setTimeoutSpy.mockClear();
+				await syncManager.syncAll();
+				expect(
+					retryTimerScheduled(setTimeoutSpy),
+					'no retry-backoff timer scheduled past the cap'
+				).toBe(false);
 				setTimeoutSpy.mockRestore();
 			} finally {
 				vi.useRealTimers();
@@ -482,7 +430,6 @@ describe('Sync Manager', () => {
 			try {
 				mockFetch.mockResolvedValueOnce(apiOk([])).mockResolvedValueOnce(apiError(500, 'boom'));
 				await syncManager.syncAll();
-				expect(syncManager.getRetryCount('retry-conf-1')).toBe(1);
 				expect(syncConflicts.current).toHaveLength(0);
 
 				mockFetch.mockResolvedValueOnce(
@@ -494,7 +441,6 @@ describe('Sync Manager', () => {
 
 				expect(syncConflicts.current).toHaveLength(1);
 				expect(syncConflicts.current[0]?.localExpense.id).toBe('retry-conf-1');
-				expect(syncManager.getRetryCount('retry-conf-1')).toBe(0);
 			} finally {
 				vi.useRealTimers();
 				syncConflicts.current = [];
@@ -511,7 +457,6 @@ describe('Sync Manager', () => {
 			try {
 				mockFetch.mockResolvedValueOnce(apiOk([])).mockResolvedValueOnce(apiError(500, 'boom'));
 				await syncManager.syncAll();
-				expect(syncManager.getRetryCount('resurrect-1')).toBe(1);
 
 				vi.mocked(loadOfflineExpenses).mockReturnValue([{ ...exp, synced: true }]);
 				syncState.current = 'success';

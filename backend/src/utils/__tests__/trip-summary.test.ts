@@ -5,7 +5,7 @@ import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { TRIP_PURPOSES } from '../../api/trips/validation';
 import type { Trip } from '../../db/schema';
-import { buildTripSummary, buildTripSummaryByMonth } from '../trip-summary';
+import { buildTripSummary } from '../trip-summary';
 
 let idc = 0;
 function trip(over: Partial<Trip> = {}): Trip {
@@ -108,40 +108,5 @@ describe('buildTripSummary', () => {
         expect(Number.isNaN(s.averageTripMiles)).toBe(false);
       })
     );
-  });
-});
-
-describe('buildTripSummaryByMonth', () => {
-  test('buckets trips by their local YYYY-MM and summarizes each', () => {
-    const trips = [
-      trip({
-        tripDate: new Date('2024-05-10T12:00:00.000Z'),
-        startOdometer: 0,
-        endOdometer: 100,
-        purpose: 'business',
-      }),
-      trip({
-        tripDate: new Date('2024-06-01T12:00:00.000Z'),
-        startOdometer: 0,
-        endOdometer: 40,
-        purpose: 'personal',
-      }),
-      trip({
-        tripDate: new Date('2024-06-20T12:00:00.000Z'),
-        startOdometer: 0,
-        endOdometer: 60,
-        purpose: 'business',
-      }),
-    ];
-    const byMonth = buildTripSummaryByMonth(trips, 1);
-    expect(Object.keys(byMonth).sort()).toEqual(['2024-05', '2024-06']);
-    expect(byMonth['2024-05'].totalMiles).toBe(100);
-    expect(byMonth['2024-06'].totalMiles).toBe(100);
-    expect(byMonth['2024-06'].milesByPurpose.business).toBe(60);
-    expect(byMonth['2024-06'].businessMileageValue).toBe(60); // 60 × 1
-  });
-
-  test('empty → empty map (no NaN month)', () => {
-    expect(buildTripSummaryByMonth([], 1)).toEqual({});
   });
 });

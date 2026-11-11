@@ -3,7 +3,7 @@ import { CONFIG } from '../../config';
 import { transaction } from '../../db/connection';
 import type { Expense, Reminder, ReminderNotification } from '../../db/schema';
 import { expenses, reminderNotifications } from '../../db/schema';
-import type { DrizzleTransaction, ReminderSplitConfig } from '../../db/types';
+import type { DrizzleTransaction, SplitConfig } from '../../db/types';
 import { ValidationError } from '../../errors';
 import { expenseSplitService } from '../expenses/split-service';
 import { odometerRepository } from '../odometer/repository';
@@ -159,7 +159,7 @@ function createExpenseFromReminder(
   { reminder, vehicleIds }: ReminderWithVehicles,
   dueDate: Date
 ): Expense[] {
-  const splitConfig = reminder.expenseSplitConfig as ReminderSplitConfig | null;
+  const splitConfig = reminder.expenseSplitConfig as SplitConfig | null;
   const amount = reminder.expenseAmount ?? 0;
   const category = reminder.expenseCategory ?? 'misc';
 

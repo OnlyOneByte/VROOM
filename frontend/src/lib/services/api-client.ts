@@ -2,7 +2,8 @@
 
 import { browser } from '$app/environment';
 import { env } from '$env/dynamic/public';
-import { ApiError } from '$lib/utils/error-handling';
+import { ApiError, NetworkError } from '$lib/utils/error-handling';
+import { buildQueryString } from './api-utils';
 
 /** Empty string means same-origin. */
 export function getApiBaseUrl(): string {
@@ -69,8 +70,9 @@ function toFetchBody(body: unknown): globalThis.BodyInit | undefined {
 }
 
 /**
- * Shared fetch core for `request` and `requestFull`. Throws an ApiError built from the backend
- * `{ error: { message, code, details } }` envelope on non-ok responses; callers handle success bodies.
+ * Shared fetch core for every apiClient method. Throws an ApiError built from the backend
+ * `{ error: { message, code, details } }` envelope on non-ok responses, and a NetworkError when no
+ * response arrives; callers handle success bodies.
  */
 async function fetchOrThrow(url: string, options: ApiOptions): Promise<Response> {
 	const { body, headers: customHeaders, method, signal } = options;
@@ -84,13 +86,20 @@ async function fetchOrThrow(url: string, options: ApiOptions): Promise<Response>
 		headers['Content-Type'] = 'application/json';
 	}
 
-	const response = await fetch(fullUrl, {
-		method,
-		credentials: 'include',
-		headers,
-		signal,
-		body: toFetchBody(body)
-	});
+	let response: Response;
+	try {
+		response = await fetch(fullUrl, {
+			method,
+			credentials: 'include',
+			headers,
+			signal,
+			body: toFetchBody(body)
+		});
+	} catch (error) {
+		// A caller-aborted request is the caller's decision, not a connectivity problem.
+		if (signal?.aborted) throw error;
+		throw new NetworkError(error);
+	}
 
 	if (!response.ok) {
 		if (response.status === 401) await handleSessionExpiry(fullUrl);
@@ -136,11 +145,7 @@ async function requestFull<T>(url: string, options: ApiOptions = {}): Promise<T>
 }
 
 export function withPagination(url: string, params?: { limit?: number; offset?: number }): string {
-	const query = new URLSearchParams();
-	if (params?.limit !== undefined) query.set('limit', String(params.limit));
-	if (params?.offset !== undefined) query.set('offset', String(params.offset));
-	const qs = query.toString();
-	return qs ? `${url}?${qs}` : url;
+	return `${url}${buildQueryString({ limit: params?.limit, offset: params?.offset })}`;
 }
 
 export const apiClient = {
@@ -158,10 +163,8 @@ export const apiClient = {
 	delete: <T>(url: string, options?: ApiOptions) =>
 		request<T>(url, { ...options, method: 'DELETE' }),
 
-	raw: (url: string, options: { method?: string; headers?: Record<string, string> } = {}) => {
-		const fullUrl = url.startsWith('http') ? url : `${getApiBaseUrl()}${url}`;
-		return fetch(fullUrl, { credentials: 'include', ...options });
-	},
+	// For file downloads: the unparsed Response, after the same error and session-expiry handling.
+	raw: (url: string, options: Omit<ApiOptions, 'body'> = {}) => fetchOrThrow(url, options),
 
 	// Unlike get(), keeps the { data, pagination } envelope.
 	getPaginated: <T>(url: string, options?: ApiOptions) =>

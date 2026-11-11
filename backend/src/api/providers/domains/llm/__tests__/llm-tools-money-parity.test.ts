@@ -3,11 +3,14 @@ import {
   createTestApp,
   type DataEnvelope,
   json,
+  type RequestFn,
   type TestApp,
 } from '../../../../../test-helpers/http-client';
+import { createInvitee } from '../../../../../test-helpers/invitee';
 import { seedVehicle } from '../../../../../test-helpers/seed';
 
 let ctx: TestApp;
+let asB: RequestFn;
 
 type ToolsModule = typeof import('../tools');
 let tools: ToolsModule;
@@ -40,35 +43,18 @@ function overTheWire<T>(value: unknown): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-let bCookie: string;
 let bEmail: string;
 let bUserId: string;
-let bCounter = 0;
 
 beforeEach(async () => {
   ctx = await createTestApp();
   tools = await import('../tools');
-  const { db } = await import('../../../../../db/connection');
-  const schema = await import('../../../../../db/schema');
-  const { lucia } = await import('../../../../auth/lucia');
-  bUserId = `llm-money-invitee-${++bCounter}`;
-  bEmail = `llm-money-invitee-${bCounter}@test.com`;
-  await db.insert(schema.users).values({ id: bUserId, email: bEmail, displayName: 'Invitee B' });
-  const session = await lucia.createSession(bUserId, {});
-  const sc = lucia.createSessionCookie(session.id);
-  bCookie = `${sc.name}=${sc.value}`;
+  const b = await createInvitee(ctx, 'llm-money-invitee', 'Invitee B');
+  bUserId = b.id;
+  bEmail = b.email;
+  asB = b.request;
 });
 afterEach(() => ctx.close());
-
-async function asB(method: string, path: string, body?: unknown): Promise<Response> {
-  const headers: Record<string, string> = { Cookie: bCookie, 'Sec-Fetch-Site': 'same-origin' };
-  let init: RequestInit = { method, headers };
-  if (body !== undefined) {
-    headers['Content-Type'] = 'application/json';
-    init = { ...init, body: JSON.stringify(body) };
-  }
-  return ctx.app.request(path, init);
-}
 
 async function expectCreated(res: Response, label: string): Promise<void> {
   const body = await json<unknown>(res);

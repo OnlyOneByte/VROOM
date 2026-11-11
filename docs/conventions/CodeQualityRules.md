@@ -1,6 +1,6 @@
 # Frontend Code Quality Rules
 
-MainSteering.md is always on and carries the shared rules, under three headings:
+MainSteering.md carries the shared rules, under three headings:
 
 - **"UI Components"** — semantic color tokens, compose from the kit, `LoaderCircle` spinners,
   `@lucide/svelte` imports, `FormLayout` on form pages.
@@ -48,7 +48,7 @@ it before working around a failure.
 | `no-interpolated-arbitrary-class` | an interpolated arbitrary value (`h-[{height}px]`) — Tailwind scans source text, so no CSS is generated and the utility is silently dead | a literal arbitrary value, or inline `style=` |
 | `fab-bottom-clearance` | a page importing `FloatingActionButton` without `pb-16` or larger | `pb-24` on the content wrapper (the FAB is `position: fixed` and would occlude the last row) |
 | `expense-category-maps` | a label/icon/badge lookup in `expense-helpers.ts` missing a key of the `ExpenseCategory` union (`fuel`, `maintenance`, `financial`, `regulatory`, `enhancement`, `misc`), or an extra key | add the category to `CATEGORY_LABELS` + `CATEGORY_COLOR_TOKENS` (`chart-colors`) and to `CATEGORY_ICONS` |
-| `category-color-label-convergence` | a second category → color, label, or icon map anywhere under `src`; a badge/chart/icon rendering that stops resolving to the one assignment; a component printing a category as the bare enum value instead of its label; a `getCategoryColor` alias re-pointed at the other module's helper; a `--chart-N` token in `app.css` that `StatCard`'s icon map and type don't both list | assign each category's color, label, and icon once — `CATEGORY_COLOR_TOKENS` + `CATEGORY_LABELS` (`chart-colors`) and `CATEGORY_ICONS` (`expense-helpers`) — and derive every rendering from those |
+| `category-color-label-convergence` | a second category → color, label, or icon map anywhere under `src`; a badge/chart/icon rendering that stops resolving to the one assignment; a component printing a category as the bare enum value instead of its label; a `--chart-N` token in `app.css` that `StatCard`'s icon map and type don't both list | assign each category's color, label, and icon once — `CATEGORY_COLOR_TOKENS` + `CATEGORY_LABELS` (`chart-colors`) and `CATEGORY_ICONS` (`expense-helpers`) — and derive every rendering from those |
 | `assistant-safe-render` | `{@html}` on the assistant surface, which renders untrusted LLM output | a plain-text node with `whitespace-pre-wrap` |
 | `_helpers/no-duplicate-file-walker` | a new guard re-declaring `collectSvelteFiles` | import `__tests__/_helpers/collect-svelte-files` |
 
@@ -61,8 +61,7 @@ with the route (e.g. `routes/reminders/__tests__/reminder-card-mobile-stack.test
   assigned exactly once, in that module's `CATEGORY_COLOR_TOKENS`; every surface derives its own
   rendering from it — `getCategoryChartColor` (a CSS color value, for a chart fill or legend
   swatch) and `getCategoryBadgeClasses` in `expense-helpers` (a Tailwind `text-*`/`bg-*` pair, for
-  a badge). Never hardcode a hex or build a second category map. The bare `getCategoryColor` name
-  survives in both modules as a deprecated alias for its own module's helper; don't add call sites.
+  a badge). Never hardcode a hex or build a second category map.
 - The tokens are `var(--chart-1)` … `var(--chart-8)` — plain `var()`, not `hsl(var(--chart-N))`,
   since the values are oklch under Tailwind v4. Eight exist so a fleet of ≥6 vehicles gets
   distinct series colors; `theme/theme-registry.ts` defines all eight per theme and

@@ -66,9 +66,9 @@ describe('settings route error responses', () => {
 
 /**
  * POST /settings/backup writes sync_state.last_backup_date, which the backup-status UI reads, so the
- * test checks the row and not only the response. Both endpoints require auth.
+ * test checks the row and not only the response.
  */
-describe('settings POST /backup and /restore', () => {
+describe('settings POST /backup', () => {
   function backupDateRow(userId: string): { last_backup_date: number | null } | undefined {
     return ctx.sqlite
       .query('SELECT last_backup_date FROM sync_state WHERE user_id = ?')
@@ -92,15 +92,11 @@ describe('settings POST /backup and /restore', () => {
     expect((after?.last_backup_date as number) <= nowSeconds + 5).toBe(true);
   });
 
-  test('POST /settings/restore → 200 success envelope', async () => {
-    const res = await ctx.authed('POST', '/api/v1/settings/restore');
-    expect(res.status).toBe(200);
-    const body = await json<{ success: boolean; message: string }>(res);
-    expect(body.success).toBe(true);
+  test('POST /settings/backup requires auth (401 when anonymous)', async () => {
+    expect((await ctx.anon('POST', '/api/v1/settings/backup')).status).toBe(401);
   });
 
-  test('both POST endpoints require auth (401 when anonymous)', async () => {
-    expect((await ctx.anon('POST', '/api/v1/settings/backup')).status).toBe(401);
-    expect((await ctx.anon('POST', '/api/v1/settings/restore')).status).toBe(401);
+  test('POST /settings/restore is not served, so it cannot report a restore that never ran', async () => {
+    expect((await ctx.authed('POST', '/api/v1/settings/restore')).status).toBe(404);
   });
 });

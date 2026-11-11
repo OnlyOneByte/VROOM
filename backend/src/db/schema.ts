@@ -11,7 +11,7 @@ import {
 } from 'drizzle-orm/sqlite-core';
 import type { BackupConfig, StorageConfig, UnitPreferences } from '../types';
 import { DEFAULT_BACKUP_CONFIG, DEFAULT_STORAGE_CONFIG, DEFAULT_UNIT_PREFERENCES } from '../types';
-import type { ReminderSplitConfig } from './types';
+import type { SplitConfig } from './types';
 
 export const users = sqliteTable('users', {
   id: text('id')
@@ -466,7 +466,7 @@ export const reminders = sqliteTable(
     expenseTags: text('expense_tags', { mode: 'json' }).$type<string[]>(),
     expenseAmount: integer('expense_amount'), // cents; required when type='expense' and actionMode='automatic'
     expenseDescription: text('expense_description'),
-    expenseSplitConfig: text('expense_split_config', { mode: 'json' }).$type<ReminderSplitConfig>(),
+    expenseSplitConfig: text('expense_split_config', { mode: 'json' }).$type<SplitConfig>(),
     isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
     lastTriggeredAt: integer('last_triggered_at', { mode: 'timestamp' }),
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),

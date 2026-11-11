@@ -1,39 +1,60 @@
-import { describe, expect, test } from 'bun:test';
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { MAX_RETRY_COUNT } from '../sync-worker';
+import { beforeEach, describe, expect, test } from 'bun:test';
+import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-const REPO = join(HERE, '..', '..', 'photos', 'photo-ref-repository.ts');
+let ctx: TestApp;
 
-const RETRY_CEILING = /photoRefs\.retryCount\s*}\s*<\s*(\d+)/;
+beforeEach(async () => {
+  ctx = await createTestApp();
+});
 
 describe('sync-worker retry ceiling matches the repository query', () => {
-  test('MAX_RETRY_COUNT is the real exported worker constant', () => {
-    expect(MAX_RETRY_COUNT).toBe(3);
-  });
+  test('the repository hands the worker refs below MAX_RETRY_COUNT and withholds refs at it', async () => {
+    const { db } = await import('../../../db/connection');
+    const schema = await import('../../../db/schema');
+    const { photoRefRepository } = await import('../../photos/photo-ref-repository');
+    const { MAX_RETRY_COUNT } = await import('../sync-worker');
 
-  test('the source scan finds the photo-ref repository', () => {
-    expect(readFileSync(REPO, 'utf8').length, `unreadable/empty: ${REPO}`).toBeGreaterThan(100);
-  });
+    const [provider] = await db
+      .insert(schema.userProviders)
+      .values({
+        userId: ctx.user.id,
+        domain: 'storage',
+        providerType: 's3',
+        displayName: 'Ceiling test storage',
+        credentials: 'opaque',
+        status: 'active',
+      })
+      .returning();
+    // One photo per ref: a photo can hold only one ref per provider.
+    const seedRef = async (id: string, retryCount: number) => {
+      const [photo] = await db
+        .insert(schema.photos)
+        .values({
+          userId: ctx.user.id,
+          entityType: 'vehicle',
+          entityId: `vehicle-${id}`,
+          fileName: `${id}.jpg`,
+          mimeType: 'image/jpeg',
+          fileSize: 1,
+        })
+        .returning();
+      await db.insert(schema.photoRefs).values({
+        id,
+        photoId: photo.id,
+        providerId: provider.id,
+        storageRef: '',
+        status: 'failed',
+        retryCount,
+      });
+    };
+    await seedRef('one-below-ceiling', MAX_RETRY_COUNT - 1);
+    await seedRef('at-ceiling', MAX_RETRY_COUNT);
 
-  test('findPendingOrFailed excludes refs AT the worker retry cap (query bound === MAX_RETRY_COUNT)', () => {
-    const src = readFileSync(REPO, 'utf8');
-    const m = src.match(RETRY_CEILING);
-    expect(
-      m,
-      `Could not find the \`\${photoRefs.retryCount} < N\` retry-ceiling bound in findPendingOrFailed ` +
-        `(${REPO}). If the predicate was refactored, update this guard to match the new shape.`
-    ).not.toBeNull();
+    const queued = (await photoRefRepository.findPendingOrFailed(100)).map((r) => r.id);
 
-    const queryBound = Number(m?.[1]);
-    expect(
-      queryBound,
-      `The repository's retry-ceiling bound (retryCount < ${queryBound}) has DRIFTED from the ` +
-        `sync-worker's MAX_RETRY_COUNT (${MAX_RETRY_COUNT}). A terminal-auth ref is parked at ` +
-        `MAX_RETRY_COUNT to drop it from the work set; if the query bound is larger, that ref is ` +
-        `re-picked forever. Keep the two in lockstep.`
-    ).toBe(MAX_RETRY_COUNT);
+    // A ref at the ceiling is parked on purpose (terminal auth errors park there); if the query
+    // includes it, the worker re-picks it forever.
+    expect(queued).toContain('one-below-ceiling');
+    expect(queued).not.toContain('at-ceiling');
   });
 });

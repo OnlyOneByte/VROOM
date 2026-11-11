@@ -7,7 +7,7 @@
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, json, type TestApp } from '../../../test-helpers/http-client';
-import { seedVehicle as seedVehicleShared } from '../../../test-helpers/seed';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -16,13 +16,9 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-const seedVehicle = (): Promise<string> =>
-  seedVehicleShared(ctx, {
-    make: 'Honda',
-    model: 'Civic',
-    year: 2021,
-    extra: { initialMileage: 10000 },
-  });
+const INITIAL_MILEAGE = 10000;
+const seedVehicleAtInitialMileage = (): Promise<string> =>
+  seedVehicle(ctx, { extra: { initialMileage: INITIAL_MILEAGE } });
 
 async function addFuelExpense(vehicleId: string, mileage: number, isoDate: string): Promise<void> {
   const res = await ctx.authed('POST', '/api/v1/expenses', {
@@ -62,7 +58,7 @@ async function getStats(vehicleId: string, period: string): Promise<StatsRespons
 
 describe('GET /vehicles/:id/stats — currentOdometer', () => {
   test('currentOdometer ignores the period while currentMileage is period-scoped', async () => {
-    const id = await seedVehicle();
+    const id = await seedVehicleAtInitialMileage();
     await addFuelExpense(id, 12000, '2020-01-01T00:00:00.000Z');
     await addFuelExpense(id, 30000, new Date().toISOString());
 
@@ -75,7 +71,7 @@ describe('GET /vehicles/:id/stats — currentOdometer', () => {
   });
 
   test('a short window that excludes all fuel rows nulls currentMileage but not currentOdometer', async () => {
-    const id = await seedVehicle();
+    const id = await seedVehicleAtInitialMileage();
     await addFuelExpense(id, 12000, '2019-01-01T00:00:00.000Z');
     await addFuelExpense(id, 20000, '2019-06-01T00:00:00.000Z');
 
@@ -85,7 +81,7 @@ describe('GET /vehicles/:id/stats — currentOdometer', () => {
   });
 
   test('currentOdometer includes manual odometer entries that currentMileage ignores', async () => {
-    const id = await seedVehicle();
+    const id = await seedVehicleAtInitialMileage();
     await addFuelExpense(id, 15000, new Date().toISOString());
     await addOdometerEntry(id, 18000, new Date().toISOString());
 
@@ -95,7 +91,7 @@ describe('GET /vehicles/:id/stats — currentOdometer', () => {
   });
 
   test('currentOdometer is null when the vehicle has no readings on either source', async () => {
-    const id = await seedVehicle();
+    const id = await seedVehicleAtInitialMileage();
     const all = await getStats(id, 'all');
     expect(all.currentMileage).toBeNull();
     expect(all.currentOdometer).toBeNull();
@@ -133,7 +129,7 @@ async function getRawStatsData(
 
 describe('GET /vehicles/:id/stats — response field set matches the frontend contract', () => {
   test('a populated vehicle returns exactly the frontend VehicleStats field set', async () => {
-    const id = await seedVehicle();
+    const id = await seedVehicleAtInitialMileage();
     await addFuelExpense(id, 20000, new Date().toISOString());
     await addOdometerEntry(id, 25000, new Date().toISOString());
 
@@ -142,13 +138,13 @@ describe('GET /vehicles/:id/stats — response field set matches the frontend co
   });
 
   test('an empty vehicle returns the same field set', async () => {
-    const id = await seedVehicle();
+    const id = await seedVehicleAtInitialMileage();
     const data = await getRawStatsData(id, 'all');
     expect(Object.keys(data).sort()).toEqual(EXPECTED_STATS_FIELDS);
   });
 
   test('the field set is identical across every period', async () => {
-    const id = await seedVehicle();
+    const id = await seedVehicleAtInitialMileage();
     await addFuelExpense(id, 18000, '2020-01-01T00:00:00.000Z');
     for (const period of ['7d', '30d', '90d', '1y', 'all']) {
       const data = await getRawStatsData(id, period);

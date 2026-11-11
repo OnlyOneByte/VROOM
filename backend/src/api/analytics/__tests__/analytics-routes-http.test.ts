@@ -5,7 +5,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
-import { seedVehicle as seedVehicleShared } from '../../../test-helpers/seed';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -13,9 +13,6 @@ beforeEach(async () => {
   ctx = await createTestApp();
 });
 afterEach(() => ctx.close());
-
-const seedVehicle = (nickname: string): Promise<string> =>
-  seedVehicleShared(ctx, { make: 'Honda', model: 'Civic', year: 2021, nickname });
 
 describe('analytics routes (real HTTP stack)', () => {
   test('401 without a session (auth middleware gates every analytics route)', async () => {
@@ -34,7 +31,7 @@ describe('analytics routes (real HTTP stack)', () => {
   });
 
   test('vehicle-tco serves an OWNED vehicle (200 + envelope)', async () => {
-    const vehicleId = await seedVehicle('Daily Driver');
+    const vehicleId = await seedVehicle(ctx, { nickname: 'Daily Driver' });
     const res = await ctx.authed('GET', `/api/v1/analytics/vehicle-tco?vehicleId=${vehicleId}`);
     const body = await json<{ success: boolean; data: unknown }>(res);
     expect(res.status, JSON.stringify(body)).toBe(200);
@@ -43,7 +40,7 @@ describe('analytics routes (real HTTP stack)', () => {
   });
 
   test('vehicle-tco REJECTS a foreign/nonexistent vehicleId with 404 (no cross-tenant analytics leak)', async () => {
-    await seedVehicle('Daily Driver');
+    await seedVehicle(ctx, { nickname: 'Daily Driver' });
     const res = await ctx.authed(
       'GET',
       '/api/v1/analytics/vehicle-tco?vehicleId=not-my-vehicle-id'
@@ -52,7 +49,7 @@ describe('analytics routes (real HTTP stack)', () => {
   });
 
   test('vehicle-health REJECTS a foreign vehicleId with 404 too (same ownership guard)', async () => {
-    await seedVehicle('Daily Driver');
+    await seedVehicle(ctx, { nickname: 'Daily Driver' });
     const res = await ctx.authed(
       'GET',
       '/api/v1/analytics/vehicle-health?vehicleId=someone-elses-vehicle'
@@ -65,6 +62,24 @@ describe('analytics routes (real HTTP stack)', () => {
     expect(res.status).toBe(400);
   });
 
+  test('vehicle-health missing the REQUIRED vehicleId is a 400 (query validation)', async () => {
+    const res = await ctx.authed('GET', '/api/v1/analytics/vehicle-health');
+    expect(res.status).toBe(400);
+  });
+
+  test('a non-positive or non-integer year is a 400 on year-end and vehicle-tco', async () => {
+    const vehicleId = await seedVehicle(ctx, { nickname: 'Daily Driver' });
+    for (const year of ['abc', '-1', '0', '3.5']) {
+      const yearEnd = await ctx.authed('GET', `/api/v1/analytics/year-end?year=${year}`);
+      expect(yearEnd.status, `year-end year=${year}`).toBe(400);
+      const tco = await ctx.authed(
+        'GET',
+        `/api/v1/analytics/vehicle-tco?vehicleId=${vehicleId}&year=${year}`
+      );
+      expect(tco.status, `vehicle-tco year=${year}`).toBe(400);
+    }
+  });
+
   test('fuel-efficiency with NO vehicleId is allowed (the optional-guard branch — all-fleet trend)', async () => {
     const res = await ctx.authed('GET', '/api/v1/analytics/fuel-efficiency');
     const body = await json<{ success: boolean; data: { fuelEfficiencyTrend: unknown } }>(res);
@@ -74,7 +89,7 @@ describe('analytics routes (real HTTP stack)', () => {
   });
 
   test('fuel-efficiency with a FOREIGN vehicleId is 404 (the guard fires when an id IS supplied)', async () => {
-    await seedVehicle('Daily Driver');
+    await seedVehicle(ctx, { nickname: 'Daily Driver' });
     const res = await ctx.authed('GET', '/api/v1/analytics/fuel-efficiency?vehicleId=nope');
     expect(res.status).toBe(404);
   });
@@ -90,7 +105,7 @@ describe('analytics routes (real HTTP stack)', () => {
   });
 
   test('fuel-stats with a FOREIGN vehicleId is 404 (cross-tenant ownership guard)', async () => {
-    await seedVehicle('Daily Driver');
+    await seedVehicle(ctx, { nickname: 'Daily Driver' });
     const res = await ctx.authed('GET', `/api/v1/analytics/fuel-stats?${RANGE}&vehicleId=not-mine`);
     expect(res.status).toBe(404);
   });
@@ -104,7 +119,7 @@ describe('analytics routes (real HTTP stack)', () => {
   });
 
   test('fuel-advanced with a FOREIGN vehicleId is 404 (cross-tenant ownership guard)', async () => {
-    await seedVehicle('Daily Driver');
+    await seedVehicle(ctx, { nickname: 'Daily Driver' });
     const res = await ctx.authed(
       'GET',
       `/api/v1/analytics/fuel-advanced?${RANGE}&vehicleId=not-mine`
@@ -113,7 +128,7 @@ describe('analytics routes (real HTTP stack)', () => {
   });
 
   test('vehicle-expenses serves an OWNED vehicle (200 + envelope)', async () => {
-    const vehicleId = await seedVehicle('Daily Driver');
+    const vehicleId = await seedVehicle(ctx, { nickname: 'Daily Driver' });
     const res = await ctx.authed(
       'GET',
       `/api/v1/analytics/vehicle-expenses?${RANGE}&vehicleId=${vehicleId}`
@@ -125,7 +140,7 @@ describe('analytics routes (real HTTP stack)', () => {
   });
 
   test('vehicle-expenses REJECTS a foreign/nonexistent vehicleId with 404 (no cross-tenant analytics leak)', async () => {
-    await seedVehicle('Daily Driver');
+    await seedVehicle(ctx, { nickname: 'Daily Driver' });
     const res = await ctx.authed(
       'GET',
       `/api/v1/analytics/vehicle-expenses?${RANGE}&vehicleId=not-my-vehicle-id`
@@ -169,7 +184,7 @@ describe('analytics routes (real HTTP stack)', () => {
   });
 
   test('a 0%-APR active loan still appears in loanBreakdown with a principal series', async () => {
-    const vehicleId = await seedVehicle('Promo Lease');
+    const vehicleId = await seedVehicle(ctx, { nickname: 'Promo Lease' });
     ctx.sqlite.run(
       `INSERT INTO vehicle_financing
          (id, vehicle_id, financing_type, provider, original_amount, apr, term_months, start_date, payment_amount, is_active)

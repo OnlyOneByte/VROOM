@@ -125,7 +125,6 @@
 	});
 
 	function populateFromTerm(source: InsuranceTerm | Partial<InsuranceTerm>) {
-		// Read the stored ISO back as the local calendar date; a UTC slice shows the prior day for UTC+13/+14 users.
 		if (source.startDate && typeof source.startDate === 'string') {
 			startDate = toDateInputValue(source.startDate);
 		}
@@ -151,16 +150,11 @@
 		} else {
 			selectedVehicleIds = [...selectedVehicleIds, id];
 		}
-		resetAllocationsForMethod(splitMethod);
+		splitAllocations = resetSplitAllocations(splitMethod, selectedVehicleIds);
 	}
 
 	function handleSplitMethodChange(method: 'even' | 'absolute' | 'percentage') {
 		splitMethod = method;
-		resetAllocationsForMethod(method);
-	}
-
-	function resetAllocationsForMethod(method: 'even' | 'absolute' | 'percentage') {
-		// Same reset as the expense form, so the 100/N percentage seed cannot drift between them.
 		splitAllocations = resetSplitAllocations(method, selectedVehicleIds);
 	}
 
@@ -231,7 +225,6 @@
 
 			if (isEditMode && termId) {
 				await insuranceApi.updateTerm(policyId, termId, {
-					// Noon local keeps the stored date on the same calendar day in every timezone (see dateOnlyToISO).
 					startDate: dateOnlyToISO(startDate),
 					endDate: dateOnlyToISO(endDate),
 					...buildTermData(true),

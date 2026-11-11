@@ -4,7 +4,7 @@
  */
 
 import { logger } from '../../../../utils/logger';
-import type { ChatMessage, LlmProvider } from './llm-provider';
+import type { ChatMessage, LlmProvider, ToolCall } from './llm-provider';
 import { ASSISTANT_TOOLS, toolDefinitions } from './tools';
 
 export const MAX_TOOL_CALLS = 5;
@@ -31,7 +31,7 @@ function toolMessage(name: string, id: string, content: string): ChatMessage {
 
 /** Unknown names, bad args and tool throws all become error messages for the model, never a 500. */
 async function runOneToolCall(
-  call: { id: string; name: string; argumentsJson: string },
+  call: ToolCall,
   userId: string,
   nowMs: number
 ): Promise<{ message: ChatMessage; ran: boolean }> {
@@ -70,11 +70,32 @@ async function runOneToolCall(
   }
 }
 
+/** Appends the assistant tool-call turn, then one result per call in the same order. */
+async function appendToolTurn(
+  messages: ChatMessage[],
+  toolsUsed: string[],
+  text: string,
+  batch: ToolCall[],
+  userId: string,
+  nowMs: number
+): Promise<void> {
+  messages.push({ role: 'assistant', content: text, toolCalls: batch });
+  for (const call of batch) {
+    const { message, ran } = await runOneToolCall(call, userId, nowMs);
+    if (ran) toolsUsed.push(call.name);
+    messages.push(message);
+  }
+}
+
+function finalReply(text: string | undefined): string {
+  const reply = (text ?? '').trim();
+  return reply.length > 0 ? reply : 'Sorry, I could not produce an answer for that.';
+}
+
 /**
- * Throws only on provider transport failure. Hitting the turn cap without an answer returns a bounded
- * apology instead of a fabricated reply.
+ * Throws only on provider transport failure. Hitting the turn or tool-call cap without an answer
+ * returns a bounded apology instead of a fabricated reply.
  */
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: the bounded turn-loop with its early-exit branches (final answer / tool batch / cap exhaustion) IS the design-§4 structure; the per-tool-call dispatch is already extracted to runOneToolCall, so the remaining complexity is the loop shape itself — splitting it further would obscure the safety-critical control flow.
 export async function runAssistant(
   provider: LlmProvider,
   userId: string,
@@ -93,25 +114,19 @@ export async function runAssistant(
 
   for (let turn = 0; turn < MAX_TURNS; turn++) {
     const result = await provider.chat({ messages, tools });
+    const requested = result.toolCalls ?? [];
 
-    if (!result.toolCalls || result.toolCalls.length === 0) {
-      const reply = (result.text ?? '').trim();
-      return {
-        reply: reply.length > 0 ? reply : 'Sorry, I could not produce an answer for that.',
-        toolsUsed,
-      };
+    if (requested.length === 0) {
+      return { reply: finalReply(result.text), toolsUsed };
     }
 
-    // Providers expect an assistant turn before its tool results; the transcript is resent each turn.
-    messages.push({ role: 'assistant', content: '' });
+    // Every call echoed on the assistant turn must get a result, so calls past the budget are
+    // dropped from the turn rather than left unanswered.
+    const batch = requested.slice(0, toolCallBudget);
+    if (batch.length === 0) break;
+    toolCallBudget -= batch.length;
 
-    for (const call of result.toolCalls) {
-      if (toolCallBudget <= 0) break;
-      toolCallBudget--;
-      const { message, ran } = await runOneToolCall(call, userId, nowMs);
-      if (ran) toolsUsed.push(call.name);
-      messages.push(message);
-    }
+    await appendToolTurn(messages, toolsUsed, result.text ?? '', batch, userId, nowMs);
   }
 
   return {

@@ -92,11 +92,14 @@ export function parseUnitPreferences(value: unknown): UnitPreferences | null {
   };
 }
 
-export type PhotoCategory =
-  | 'vehicle_photos'
-  | 'expense_receipts'
-  | 'insurance_docs'
-  | 'odometer_readings';
+export const PHOTO_CATEGORIES = [
+  'vehicle_photos',
+  'expense_receipts',
+  'insurance_docs',
+  'odometer_readings',
+] as const;
+
+export type PhotoCategory = (typeof PHOTO_CATEGORIES)[number];
 
 export interface CategorySetting {
   enabled: boolean;

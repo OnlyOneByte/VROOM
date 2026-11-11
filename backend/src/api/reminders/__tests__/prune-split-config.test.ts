@@ -4,12 +4,12 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import type { ReminderSplitConfig } from '../../../db/types';
+import type { SplitConfig } from '../../../db/types';
 import { pruneVehicleFromSplitConfig } from '../split-config-helpers';
 
 describe('pruneVehicleFromSplitConfig — even', () => {
   test('drops the deleted id and keeps the split when two or more legs remain', () => {
-    const config: ReminderSplitConfig = { method: 'even', vehicleIds: ['a', 'b', 'c'] };
+    const config: SplitConfig = { method: 'even', vehicleIds: ['a', 'b', 'c'] };
     expect(pruneVehicleFromSplitConfig(config, 'b')).toEqual({
       method: 'even',
       vehicleIds: ['a', 'c'],
@@ -17,19 +17,19 @@ describe('pruneVehicleFromSplitConfig — even', () => {
   });
 
   test('collapses to null when only one leg would remain', () => {
-    const config: ReminderSplitConfig = { method: 'even', vehicleIds: ['a', 'b'] };
+    const config: SplitConfig = { method: 'even', vehicleIds: ['a', 'b'] };
     expect(pruneVehicleFromSplitConfig(config, 'b')).toBeNull();
   });
 
   test('returns the same reference when the deleted id is absent', () => {
-    const config: ReminderSplitConfig = { method: 'even', vehicleIds: ['a', 'b'] };
+    const config: SplitConfig = { method: 'even', vehicleIds: ['a', 'b'] };
     expect(pruneVehicleFromSplitConfig(config, 'zzz')).toBe(config);
   });
 });
 
 describe('pruneVehicleFromSplitConfig — absolute', () => {
   test('drops the allocation and keeps the remaining fixed amounts', () => {
-    const config: ReminderSplitConfig = {
+    const config: SplitConfig = {
       method: 'absolute',
       allocations: [
         { vehicleId: 'a', amount: 30 },
@@ -47,7 +47,7 @@ describe('pruneVehicleFromSplitConfig — absolute', () => {
   });
 
   test('collapses to null when only 1 allocation would remain', () => {
-    const config: ReminderSplitConfig = {
+    const config: SplitConfig = {
       method: 'absolute',
       allocations: [
         { vehicleId: 'a', amount: 30 },
@@ -60,7 +60,7 @@ describe('pruneVehicleFromSplitConfig — absolute', () => {
 
 describe('pruneVehicleFromSplitConfig — percentage (rescale to 100)', () => {
   test('drops the leg + RESCALES survivors proportionally back to 100%', () => {
-    const config: ReminderSplitConfig = {
+    const config: SplitConfig = {
       method: 'percentage',
       allocations: [
         { vehicleId: 'a', percentage: 25 },
@@ -80,7 +80,7 @@ describe('pruneVehicleFromSplitConfig — percentage (rescale to 100)', () => {
   });
 
   test('survivors that all summed to 0% fall back to an even split', () => {
-    const config: ReminderSplitConfig = {
+    const config: SplitConfig = {
       method: 'percentage',
       allocations: [
         { vehicleId: 'a', percentage: 0 },
@@ -96,7 +96,7 @@ describe('pruneVehicleFromSplitConfig — percentage (rescale to 100)', () => {
   });
 
   test('collapses to null when only 1 allocation would remain', () => {
-    const config: ReminderSplitConfig = {
+    const config: SplitConfig = {
       method: 'percentage',
       allocations: [
         { vehicleId: 'a', percentage: 40 },

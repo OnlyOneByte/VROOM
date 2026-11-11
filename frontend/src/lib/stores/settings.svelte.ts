@@ -74,8 +74,6 @@ function createSettingsStore() {
 			error = null;
 			try {
 				const response = await settingsApi.downloadBackup();
-				if (!response.ok) throw new Error('Failed to download backup');
-
 				const blob = await response.blob();
 				triggerBlobDownload(
 					blob,

@@ -73,7 +73,7 @@ routes.post('/', zValidator('json', createTripSchema), async (c) => {
     });
     await reminderTriggerService.recheckMileageReminders(user.id, data.vehicleId);
   } catch (error) {
-    logger.error('Trip D2 odometer-linkage/reminder-recheck failed (trip already persisted)', {
+    logger.error('Trip odometer sync or mileage reminder recheck failed (trip already persisted)', {
       tripId: trip.id,
       vehicleId: data.vehicleId,
       error: error instanceof Error ? error.message : String(error),

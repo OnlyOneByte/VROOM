@@ -91,6 +91,22 @@ describe('POST /import — foreign-tracker mapping path', () => {
     expect(row.volume).toBeCloseTo(10, 2);
   });
 
+  test('a stored nickname with surrounding whitespace matches for both units and rows', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
+    ctx.sqlite.run('UPDATE vehicles SET nickname = ? WHERE id = ?', ['  Daily Driver ', vehicleId]);
+    const res = await ctx.authed('POST', '/api/v1/expenses/import', {
+      csv: FLAT_TRACKER_CSV,
+      mapping: FLAT_TRACKER_MAPPING,
+    });
+    const body = await json<ImportResponse>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.data.imported, JSON.stringify(body.data.rows)).toBe(1);
+
+    const [row] = await listExpenses();
+    expect(row.mileage, 'converted into the matched vehicle units').toBe(100);
+    expect(row.volume).toBeCloseTo(10, 2);
+  });
+
   test('dry-run previews the mapped plan without writing', async () => {
     await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021, nickname: 'Daily Driver' });
     const res = await ctx.authed('POST', '/api/v1/expenses/import', {

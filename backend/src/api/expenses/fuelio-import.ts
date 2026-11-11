@@ -21,12 +21,6 @@ export class FuelioParseError extends Error {}
 
 export interface FuelioParseResult {
   csv: string;
-  /** Suggestion only; the import target is chosen by the user. */
-  fileVehicleName: string | null;
-  fileDistanceUnit: DistanceUnit | null;
-  fileVolumeUnit: VolumeUnit | null;
-  logCount: number;
-  costCount: number;
   unmappedCategories: string[];
 }
 
@@ -132,7 +126,7 @@ function buildLogRows(
   logRecords: Record<string, string>[],
   opts: FuelioParseOptions,
   dateFormat: ImportDateFormat
-): { rows: NativeRow[]; fileDistanceUnit: DistanceUnit | null; fileVolumeUnit: VolumeUnit | null } {
+): NativeRow[] {
   const first = logRecords[0];
   const odoKey = findKey(first, /odo/i);
   const fuelKey = findKey(first, /^fuel\b/i);
@@ -143,7 +137,7 @@ function buildLogRows(
   const fileDistanceUnit = detectDistanceUnit(odoKey);
   const fileVolumeUnit = detectVolumeUnit(fuelKey);
 
-  const rows = logRecords.map((rec) => ({
+  return logRecords.map((rec) => ({
     date: normalizeForeignDate(cell(rec, dateKey), dateFormat),
     vehicle: opts.targetVehicle,
     category: 'fuel',
@@ -156,7 +150,6 @@ function buildLogRows(
     tags: '',
     missedFillup: cell(rec, missedKey).trim() === '1' ? 'true' : '',
   }));
-  return { rows, fileDistanceUnit, fileVolumeUnit };
 }
 
 function buildCostRows(
@@ -215,31 +208,16 @@ export function parseFuelioExport(text: string, opts: FuelioParseOptions): Fueli
   const sections = splitSections(text);
 
   const vehicleRec = parseBlock(sections.vehicle)[0];
-  const nameKey = findKey(vehicleRec, /^name$/i);
-  const fileVehicleName = (nameKey && vehicleRec?.[nameKey]?.trim()) || null;
   const dateFmtKey = findKey(vehicleRec, /importcsvdateformat|dateformat/i);
   const dateFormat = resolveDateFormat(dateFmtKey ? vehicleRec?.[dateFmtKey] : undefined);
 
-  const log = buildLogRows(parseBlock(sections.log), opts, dateFormat);
+  const logRows = buildLogRows(parseBlock(sections.log), opts, dateFormat);
   const costs = includeCosts
     ? buildCostRows(sections, opts, dateFormat)
     : { rows: [] as NativeRow[], unmapped: new Set<string>() };
-  const rows = [...log.rows, ...costs.rows];
-  const logCount = log.rows.length;
-  const costCount = costs.rows.length;
-  const unmapped = costs.unmapped;
-  const fileDistanceUnit = log.fileDistanceUnit;
-  const fileVolumeUnit = log.fileVolumeUnit;
-
-  const csv = stringifyNative(rows);
 
   return {
-    csv,
-    fileVehicleName,
-    fileDistanceUnit,
-    fileVolumeUnit,
-    logCount,
-    costCount,
-    unmappedCategories: [...unmapped].sort(),
+    csv: stringifyNative([...logRows, ...costs.rows]),
+    unmappedCategories: [...costs.unmapped].sort(),
   };
 }

@@ -1,7 +1,7 @@
 // Real execute() skip paths against the in-memory harness DB. These return before any provider or
 // ZIP work. createTestApp() must run before static config/connection imports.
 
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import {
   createTestApp,
   type DataEnvelope,
@@ -23,7 +23,7 @@ interface OrchestratorResult {
   status?: string;
   outcome: 'success' | 'partial' | 'failed' | 'noop';
   failedProviders: string[];
-  results: Record<string, { success: boolean }>;
+  results: Record<string, { success: boolean; message?: string }>;
 }
 
 describe('BackupOrchestrator.execute() real skip paths', () => {
@@ -70,6 +70,42 @@ describe('BackupOrchestrator.execute() real skip paths', () => {
     expect(result.skipped).toBeUndefined(); // forced → did not take the change-skip path
     expect(result.results).toEqual({});
     expect(result.outcome).toBe('noop');
+  });
+
+  test('a second run for the same user while one is in flight returns in_progress', async () => {
+    const { backupOrchestrator } = await import('../backup-orchestrator');
+    // The mutex is taken synchronously on entry, before the first await, so the second call sees it.
+    const first = backupOrchestrator.execute(ctx.user.id, 'Test User', true);
+    const second = (await backupOrchestrator.execute(
+      ctx.user.id,
+      'Test User',
+      true
+    )) as OrchestratorResult;
+
+    expect(second.status).toBe('in_progress');
+    expect((await first).status).toBeUndefined();
+  });
+
+  test('a mutex held past the 5-minute TTL does not block a new run', async () => {
+    const { backupOrchestrator } = await import('../backup-orchestrator');
+    const TTL_MS = 5 * 60 * 1000;
+    const clock = spyOn(Date, 'now').mockReturnValue(1_000_000);
+    try {
+      // The stuck run takes the mutex at t0 and is still in flight when the clock moves past the TTL.
+      const stuck = backupOrchestrator.execute(ctx.user.id, 'Test User', true);
+      clock.mockReturnValue(1_000_000 + TTL_MS + 1);
+
+      const fresh = (await backupOrchestrator.execute(
+        ctx.user.id,
+        'Test User',
+        true
+      )) as OrchestratorResult;
+      expect(fresh.status).toBeUndefined();
+      expect(fresh.outcome).toBe('noop');
+      await stuck;
+    } finally {
+      clock.mockRestore();
+    }
   });
 });
 
@@ -233,6 +269,146 @@ describe('BackupOrchestrator.execute() outcome', () => {
       expect(result.failedProviders).toEqual([]);
     } finally {
       unregister('fake-ok');
+    }
+  });
+
+  test('a rejected per-provider attempt counts as a failed provider, not a skip', async () => {
+    registerFake('fake-reject', true);
+    const { backupStrategyRegistry } = await import('../backup-strategy-registry');
+    // The lookup runs outside the per-provider try, so a throw there rejects the attempt itself.
+    const lookup = spyOn(backupStrategyRegistry, 'get').mockImplementation(() => {
+      throw new Error('lookup exploded');
+    });
+    try {
+      seedEnabledProvider(ctx, 'prej', 'fake-reject');
+      const { backupOrchestrator } = await import('../backup-orchestrator');
+      const result = (await backupOrchestrator.execute(
+        ctx.user.id,
+        'U',
+        true
+      )) as OrchestratorResult;
+
+      expect(result.failedProviders).toEqual(['prej']);
+      expect(result.outcome).toBe('failed');
+      expect(result.results.prej?.success).toBe(false);
+      expect(result.results.prej?.message).toBe('lookup exploded');
+    } finally {
+      lookup.mockRestore();
+      unregister('fake-reject');
+    }
+  });
+
+  test('a backup-config entry with no provider row is skipped while the live provider still runs', async () => {
+    registerFake('fake-live', true);
+    try {
+      seedEnabledProvider(ctx, 'plive', 'fake-live');
+      seedEnabledProvider(ctx, 'pghost', 'fake-live');
+      // The config still names pghost, but its provider row was deleted.
+      ctx.sqlite.run('DELETE FROM user_providers WHERE id = ?', ['pghost']);
+      const { backupOrchestrator } = await import('../backup-orchestrator');
+      const result = (await backupOrchestrator.execute(
+        ctx.user.id,
+        'U',
+        true
+      )) as OrchestratorResult;
+
+      expect(Object.keys(result.results)).toEqual(['plive']);
+      expect(result.failedProviders).toEqual([]);
+      expect(result.outcome).toBe('success');
+    } finally {
+      unregister('fake-live');
+    }
+  });
+
+  test('a provider whose type has no registered strategy is skipped, not failed', async () => {
+    seedEnabledProvider(ctx, 'punreg', 'no-such-provider-type');
+    const { backupOrchestrator } = await import('../backup-orchestrator');
+    const result = (await backupOrchestrator.execute(ctx.user.id, 'U', true)) as OrchestratorResult;
+
+    expect(result.results).toEqual({});
+    expect(result.failedProviders).toEqual([]);
+    expect(result.outcome).toBe('noop');
+  });
+
+  test('a Sheets-only provider is attempted by the run, and no ZIP is built for it', async () => {
+    let zipSeen: Buffer | null | undefined;
+    const { backupStrategyRegistry } = await import('../backup-strategy-registry');
+    backupStrategyRegistry.register('fake-sheets-only', {
+      async execute(context) {
+        zipSeen = context.zipBuffer;
+        return { success: true, capabilities: { sheets: { success: true } } };
+      },
+    });
+    const { backupService } = await import('../backup');
+    const zipSpy = spyOn(backupService, 'exportAsZip');
+    try {
+      seedEnabledProvider(ctx, 'psheets', 'fake-sheets-only');
+      ctx.sqlite.run(
+        'INSERT OR REPLACE INTO user_preferences (user_id, backup_config) VALUES (?, ?)',
+        [
+          ctx.user.id,
+          JSON.stringify({
+            providers: {
+              psheets: {
+                enabled: false,
+                folderPath: 'B',
+                retentionCount: 5,
+                sheetsSyncEnabled: true,
+              },
+            },
+          }),
+        ]
+      );
+      const { backupOrchestrator } = await import('../backup-orchestrator');
+      const result = (await backupOrchestrator.execute(
+        ctx.user.id,
+        'U',
+        true
+      )) as OrchestratorResult;
+
+      expect(result.results.psheets?.success).toBe(true);
+      expect(zipSpy).not.toHaveBeenCalled();
+      expect(zipSeen).toBeNull();
+    } finally {
+      zipSpy.mockRestore();
+      backupStrategyRegistry.register('fake-sheets-only', {
+        async execute() {
+          return { success: true, capabilities: {} };
+        },
+      });
+    }
+  });
+
+  test('a failed ZIP build does not abort the run; the strategy gets a null ZIP', async () => {
+    let zipSeen: Buffer | null | undefined;
+    const { backupStrategyRegistry } = await import('../backup-strategy-registry');
+    backupStrategyRegistry.register('fake-zip-probe', {
+      async execute(context) {
+        zipSeen = context.zipBuffer;
+        return { success: true, capabilities: { zip: { success: true } } };
+      },
+    });
+    const { backupService } = await import('../backup');
+    const zipSpy = spyOn(backupService, 'exportAsZip').mockRejectedValue(new Error('zip exploded'));
+    try {
+      seedEnabledProvider(ctx, 'pzip', 'fake-zip-probe');
+      const { backupOrchestrator } = await import('../backup-orchestrator');
+      const result = (await backupOrchestrator.execute(
+        ctx.user.id,
+        'U',
+        true
+      )) as OrchestratorResult;
+
+      expect(zipSpy).toHaveBeenCalledTimes(1);
+      expect(zipSeen).toBeNull();
+      expect(result.outcome).toBe('success');
+    } finally {
+      zipSpy.mockRestore();
+      backupStrategyRegistry.register('fake-zip-probe', {
+        async execute() {
+          return { success: true, capabilities: {} };
+        },
+      });
     }
   });
 });

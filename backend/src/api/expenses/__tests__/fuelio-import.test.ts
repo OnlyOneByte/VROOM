@@ -30,6 +30,12 @@ const VEHICLES: ImportVehicle[] = [
   { id: 'veh-1', make: 'Volkswagen', model: 'Golf', year: 2018, nickname: null },
 ];
 
+function categoryCounts(csv: string): { fuel: number; other: number } {
+  const plan = buildImportPlan(csv, VEHICLES);
+  const fuel = plan.rows.filter((r) => r.expense?.category === 'fuel').length;
+  return { fuel, other: plan.rows.length - fuel };
+}
+
 describe('isFuelioExport', () => {
   test('recognizes a Fuelio multi-section export', () => {
     expect(isFuelioExport(FUELIO_CSV)).toBe(true);
@@ -37,16 +43,12 @@ describe('isFuelioExport', () => {
 });
 
 describe('parseFuelioExport', () => {
-  test('detects the vehicle name and the file units from the headers', () => {
+  test('emits every log and cost row and reports the unmapped cost category', () => {
     const r = parseFuelioExport(FUELIO_CSV, {
       targetVehicle: TARGET_VEHICLE,
       targetUnits: TARGET_UNITS,
     });
-    expect(r.fileVehicleName).toBe('Golf');
-    expect(r.fileDistanceUnit).toBe(DistanceUnit.KILOMETERS);
-    expect(r.fileVolumeUnit).toBe(VolumeUnit.LITERS);
-    expect(r.logCount).toBe(2);
-    expect(r.costCount).toBe(2);
+    expect(categoryCounts(r.csv)).toEqual({ fuel: 2, other: 2 });
     expect(r.unmappedCategories).toEqual(['Ferry']);
   });
 
@@ -62,8 +64,7 @@ describe('parseFuelioExport', () => {
       targetUnits: TARGET_UNITS,
       includeCosts: false,
     });
-    expect(r.logCount).toBe(2);
-    expect(r.costCount).toBe(0);
+    expect(categoryCounts(r.csv)).toEqual({ fuel: 2, other: 0 });
   });
 });
 
@@ -150,7 +151,7 @@ describe('cost categories that resolve to no name are still surfaced (never a si
       targetVehicle: TARGET_VEHICLE,
       targetUnits: TARGET_UNITS,
     });
-    expect(r.costCount).toBe(1);
+    expect(categoryCounts(r.csv)).toEqual({ fuel: 1, other: 1 });
     expect(r.unmappedCategories).toEqual(['Unknown category 99']);
 
     const plan = buildImportPlan(r.csv, VEHICLES);
@@ -164,7 +165,7 @@ describe('cost categories that resolve to no name are still surfaced (never a si
       targetVehicle: TARGET_VEHICLE,
       targetUnits: TARGET_UNITS,
     });
-    expect(r.costCount).toBe(1);
+    expect(categoryCounts(r.csv)).toEqual({ fuel: 1, other: 1 });
     expect(r.unmappedCategories).toEqual(['Unknown category 99']);
   });
 
@@ -188,7 +189,7 @@ function fileWithLogHeaders(odoHeader: string, fuelHeader: string, odo = '45210'
 `;
 }
 
-describe('unit detection from the ## Log header', () => {
+describe('the ## Log header units drive conversion into the vehicle units', () => {
   const CASES: [string, string, DistanceUnit | null, VolumeUnit | null][] = [
     ['Odo (km)', 'Fuel (litres)', DistanceUnit.KILOMETERS, VolumeUnit.LITERS],
     ['Odo (mi)', 'Fuel (us gallons)', DistanceUnit.MILES, VolumeUnit.GALLONS_US],
@@ -204,8 +205,15 @@ describe('unit detection from the ## Log header', () => {
         targetVehicle: TARGET_VEHICLE,
         targetUnits: TARGET_UNITS,
       });
-      expect(r.fileDistanceUnit).toBe(distance);
-      expect(r.fileVolumeUnit).toBe(volume);
+      const expense = buildImportPlan(r.csv, VEHICLES).rows[0]?.expense;
+      // An undetected unit passes the value through unconverted.
+      expect(expense?.mileage).toBe(
+        distance ? Math.round(convertDistance(45210, distance, DistanceUnit.MILES)) : 45210
+      );
+      expect(expense?.volume).toBeCloseTo(
+        volume ? convertVolume(42.1, volume, VolumeUnit.GALLONS_US) : 42.1,
+        2
+      );
     });
   }
 

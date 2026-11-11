@@ -97,21 +97,15 @@ describe('GoogleDriveService — files', () => {
     expect(await svc.listFilesInFolder(folder)).toHaveLength(230);
   });
 
-  test('renameFolder updates the name', async () => {
-    const id = store.seedFolder('OldName');
-    await svc.renameFolder(id, 'NewName');
-    expect(store.files.get(id)?.name).toBe('NewName');
-  });
-});
+  test('moveFile re-parents the file without leaving it under the old folder', async () => {
+    const from = store.seedFolder('Old');
+    const to = store.seedFolder('New');
+    const file = store.seedFile({ name: 'sheet', mimeType: 'text/plain', parentId: from });
 
-describe('GoogleDriveService — permissions', () => {
-  test('set then list a folder permission', async () => {
-    const folder = store.seedFolder('Shared');
-    await svc.setFolderPermissions(folder, 'friend@example.com', 'writer');
-    const perms = await svc.getFolderPermissions(folder);
-    expect(perms).toHaveLength(1);
-    expect(perms[0].emailAddress).toBe('friend@example.com');
-    expect(perms[0].role).toBe('writer');
+    await svc.moveFile(file, to, from);
+
+    expect(store.files.get(file)?.parents).toEqual([to]);
+    expect((await svc.listFilesInFolder(from)).map((f) => f.id)).not.toContain(file);
   });
 });
 

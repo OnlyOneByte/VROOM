@@ -115,21 +115,6 @@ describe('photo create stores userId and user-scoped queries work', () => {
     );
   });
 
-  test('countByUser returns correct count per user', async () => {
-    for (let i = 0; i < 3; i++) {
-      await repo.create(makePhotoData(USER_A, 'vehicle', VEHICLE_A));
-    }
-    for (let i = 0; i < 2; i++) {
-      await repo.create(makePhotoData(USER_B, 'vehicle', VEHICLE_B));
-    }
-
-    const countA = await repo.countByUser(USER_A);
-    const countB = await repo.countByUser(USER_B);
-
-    expect(countA).toBe(3);
-    expect(countB).toBe(2);
-  });
-
   test('findByUser with entityType filter works correctly', async () => {
     await repo.create(makePhotoData(USER_A, 'vehicle', VEHICLE_A));
     await repo.create(makePhotoData(USER_A, 'vehicle', VEHICLE_A));
@@ -142,16 +127,6 @@ describe('photo create stores userId and user-scoped queries work', () => {
     expect(vehiclePhotos.length).toBe(2);
     expect(expensePhotos.length).toBe(1);
     expect(allPhotos.length).toBe(3);
-  });
-
-  test('countByUser with entityType filter works correctly', async () => {
-    await repo.create(makePhotoData(USER_A, 'vehicle', VEHICLE_A));
-    await repo.create(makePhotoData(USER_A, 'expense', 'exp-1'));
-    await repo.create(makePhotoData(USER_A, 'expense', 'exp-2'));
-
-    expect(await repo.countByUser(USER_A, 'vehicle')).toBe(1);
-    expect(await repo.countByUser(USER_A, 'expense')).toBe(2);
-    expect(await repo.countByUser(USER_A)).toBe(3);
   });
 });
 

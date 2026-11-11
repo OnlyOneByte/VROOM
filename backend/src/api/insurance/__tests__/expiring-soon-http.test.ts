@@ -1,7 +1,6 @@
 /**
  * HTTP tests for GET /insurance/expiring-soon. A non-numeric or out-of-range `days` must fall back or clamp,
  * never produce an Invalid Date that silently hides expiring terms.
- * Imports only the harness: createTestApp sets env before config loads.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';

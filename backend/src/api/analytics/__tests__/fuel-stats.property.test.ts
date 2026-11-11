@@ -419,3 +419,39 @@ describe('Gas price always positive', () => {
     );
   });
 });
+
+// slice(0, 12) would keep the oldest months and hide the current period.
+describe('monthlyConsumption keeps the most recent 12 months', () => {
+  test('with 14 months of fill-ups, returns 2023-03 .. 2024-02', async () => {
+    seedUser(testDb.sqlite, { id: 'user-1', email: 'test@test.com', displayName: 'Test' });
+    seedVehicle(testDb.sqlite, {
+      id: 'vehicle-1',
+      userId: 'user-1',
+      make: 'Toyota',
+      model: 'Camry',
+      year: 2022,
+    });
+    for (let i = 0; i < 14; i++) {
+      seedExpense(testDb.sqlite, {
+        id: `fuel-${i}`,
+        vehicleId: 'vehicle-1',
+        category: 'fuel',
+        expenseAmount: 40,
+        date: new Date(2023 + Math.floor(i / 12), i % 12, 10),
+        mileage: 10000 + i * 300,
+        volume: 10,
+        fuelType: 'Regular',
+        missedFillup: false,
+      });
+    }
+
+    const range = { start: yearToRange(2023).start, end: yearToRange(2024).end };
+    const months = (await repo.getFuelStats('user-1', range)).monthlyConsumption.map(
+      (m) => m.month
+    );
+
+    expect(months).toHaveLength(12);
+    expect(months[0]).toBe('2023-03');
+    expect(months.at(-1)).toBe('2024-02');
+  });
+});

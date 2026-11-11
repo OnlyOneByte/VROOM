@@ -7,7 +7,7 @@ import { DatabaseError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { BaseRepository } from '../../utils/repository';
 
-export interface OdometerHistoryEntry {
+interface OdometerHistoryEntry {
   odometer: number;
   recordedAt: Date;
   source: 'expense' | 'manual';
@@ -15,7 +15,7 @@ export interface OdometerHistoryEntry {
   note: string | null;
 }
 
-export interface OdometerHistoryResult {
+interface OdometerHistoryResult {
   data: OdometerHistoryEntry[];
   totalCount: number;
 }

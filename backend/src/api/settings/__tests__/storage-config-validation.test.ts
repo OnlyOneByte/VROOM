@@ -98,3 +98,33 @@ describe('PUT /settings storageConfig consistency validation', () => {
     expect(body.error.message).toContain('Cannot disable');
   });
 });
+
+describe('PUT /settings accepts a partial storageConfig and merges it per category', () => {
+  test('a payload naming one default keeps the stored defaults it omits', async () => {
+    seedProvider('drive-4');
+    const providerCategories = { 'drive-4': categoryMap() };
+    const first = await putStorageConfig({
+      defaults: defaults({ vehicle_photos: 'drive-4' }),
+      providerCategories,
+    });
+    expect(first.status).toBe(200);
+
+    const res = await putStorageConfig({
+      defaults: { expense_receipts: 'drive-4' },
+      providerCategories,
+    });
+    expect(res.status).toBe(200);
+    const body = await json<{
+      data: { storageConfig: { defaults: Record<string, string | null> } };
+    }>(res);
+    expect(body.data.storageConfig.defaults).toEqual(
+      defaults({ vehicle_photos: 'drive-4', expense_receipts: 'drive-4' })
+    );
+  });
+
+  test('a payload with no defaults at all is accepted', async () => {
+    seedProvider('drive-5');
+    const res = await putStorageConfig({ providerCategories: { 'drive-5': categoryMap() } });
+    expect(res.status).toBe(200);
+  });
+});

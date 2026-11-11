@@ -67,19 +67,14 @@ SQLite via `bun:sqlite` + Drizzle. Schema is one file, `src/db/schema.ts`. Migra
 applies them locally. Do not use `drizzle-kit push` against a real database — it diffs the
 schema directly and will offer to drop columns.
 
-The fourteen migrations that predate `0000_baseline` were collapsed into it, so the journal no
-longer describes the path any pre-collapse database took. A database created before the collapse
-cannot migrate forward in place; it has to be re-created and repopulated from a backup restore.
-Collapsing also closed two defects the incremental chain carried: the money columns were still
-declared `real` (the cents conversion rewrote values but never the types, and SQLite's loose typing
-hid the disagreement with `schema.ts`), and `expenses.created_by` had no `ON DELETE` action, so
-once account deletion shipped it would have refused to delete any user who had logged an expense on
-a vehicle shared with them.
+Migrations start from a single `0000_baseline`. A database created before that baseline cannot
+migrate in place; the deployment guide covers how to move one forward.
 
 PRAGMAs set in `src/db/connection.ts`: WAL journaling for concurrent reads, `synchronous =
 NORMAL`, `foreign_keys = ON`, a large page cache, and `wal_autocheckpoint`. A timer
-checkpoints the WAL periodically, plus forced checkpoints on startup and shutdown, so the
-`.db` file a user copies out is never missing recent writes.
+checkpoints the WAL periodically, plus forced checkpoints on startup and shutdown. A copy of
+`vroom.db` taken while the backend runs must include its `-wal` and `-shm` files, or it can miss
+recent writes.
 
 **Expense-linked records use a polymorphic link.** Financing payments, insurance premiums,
 and reminder materializations are real rows in `expenses` tagged with `source_type` +
@@ -91,7 +86,7 @@ all of them, and analytics can bucket by source without knowing which features e
 Everything the user brings their own account for sits under `src/api/providers/domains/`,
 one registry per capability:
 
-- **storage** — Google Drive, Google Photos, S3-compatible, plus a fake for tests
+- **storage** — Google Drive, Google Photos, S3-compatible, plus an in-memory fake for tests and local development
 - **vlm** — receipt parsing (Anthropic, Gemini, OpenAI-compatible)
 - **llm** — the assistant (same three, plus tool-calling)
 

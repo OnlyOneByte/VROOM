@@ -1,7 +1,6 @@
 /**
  * The premium-to-expense hook over HTTP. A costed term creates an even-split insurance expense per covered
  * vehicle. Updating the term replaces those expenses, and deleting the term removes them. Reads rows from sqlite.
- * Keep static imports to the harness and bun:test: createTestApp sets env before config loads.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';

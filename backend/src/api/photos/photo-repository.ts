@@ -22,37 +22,6 @@ export class PhotoRepository {
       .orderBy(asc(photos.createdAt));
   }
 
-  async countByUser(userId: string, entityType?: string): Promise<number> {
-    const conditions = [eq(photos.userId, userId)];
-    if (entityType) {
-      conditions.push(eq(photos.entityType, entityType));
-    }
-    const [result] = await this.db
-      .select({ count: sql<number>`count(*)` })
-      .from(photos)
-      .where(and(...conditions));
-    return result?.count ?? 0;
-  }
-
-  async findIdsByUser(
-    userId: string,
-    entityType?: string,
-    extraConditions?: ReturnType<typeof and>
-  ): Promise<string[]> {
-    const conditions = [eq(photos.userId, userId)];
-    if (entityType) {
-      conditions.push(eq(photos.entityType, entityType));
-    }
-    if (extraConditions) {
-      conditions.push(extraConditions);
-    }
-    const rows = await this.db
-      .select({ id: photos.id })
-      .from(photos)
-      .where(and(...conditions));
-    return rows.map((r) => r.id);
-  }
-
   async findByEntity(entityType: string, entityId: string): Promise<Photo[]> {
     return this.db
       .select()
@@ -107,21 +76,6 @@ export class PhotoRepository {
 
   async findById(photoId: string): Promise<Photo | null> {
     const result = await this.db.select().from(photos).where(eq(photos.id, photoId)).limit(1);
-    return result[0] || null;
-  }
-
-  async findCoverPhoto(entityType: string, entityId: string): Promise<Photo | null> {
-    const result = await this.db
-      .select()
-      .from(photos)
-      .where(
-        and(
-          eq(photos.entityType, entityType),
-          eq(photos.entityId, entityId),
-          eq(photos.isCover, true)
-        )
-      )
-      .limit(1);
     return result[0] || null;
   }
 

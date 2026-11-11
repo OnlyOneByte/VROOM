@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import type { BackendExpenseResponse } from '../api-transformer';
+import type { BackendExpenseResponse } from '$lib/types';
 
 const get = vi.fn();
 const post = vi.fn();
@@ -122,9 +122,16 @@ describe('createExpense / updateExpense (frontend→backend transform + isEdit)'
 });
 
 describe('downloadExpensesCsv (blob → anchor download)', () => {
-	test('throws on a non-ok export response', async () => {
-		raw.mockResolvedValueOnce({ ok: false, status: 500 });
-		await expect(expenseApi.downloadExpensesCsv()).rejects.toThrow(/Export failed with status 500/);
+	test('propagates the apiClient error for a failed export', async () => {
+		const failure = new Error('Request failed with status 500');
+		raw.mockRejectedValueOnce(failure);
+		await expect(expenseApi.downloadExpensesCsv()).rejects.toBe(failure);
+	});
+
+	test('no filters → bare export path', async () => {
+		raw.mockRejectedValueOnce(new Error('stop'));
+		await expect(expenseApi.downloadExpensesCsv()).rejects.toThrow('stop');
+		expect(raw).toHaveBeenCalledWith('/api/v1/expenses/export');
 	});
 
 	test('on success: fetches the export URL with filters, blobs, and clicks a download anchor', async () => {

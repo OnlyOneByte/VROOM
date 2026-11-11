@@ -12,7 +12,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
-import { seedVehicle as seedVehicleShared } from '../../../test-helpers/seed';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -20,9 +20,6 @@ beforeEach(async () => {
   ctx = await createTestApp();
 });
 afterEach(() => ctx.close());
-
-const seedVehicle = (nickname: string): Promise<string> =>
-  seedVehicleShared(ctx, { make: 'Subaru', model: 'Outback', year: 2021, nickname });
 
 /** Inserts a photo row directly, bypassing the storage provider. */
 function seedPhoto(opts: {
@@ -60,7 +57,7 @@ function coverFlag(photoId: string): number {
 
 describe('GET /api/v1/vehicles/:vehicleId/photos (list)', () => {
   test('returns the vehicle’s photos in a paginated envelope', async () => {
-    const vid = await seedVehicle('Listed');
+    const vid = await seedVehicle(ctx, { nickname: 'Listed' });
     seedPhoto({ id: 'vp1', vehicleId: vid, isCover: true, sortOrder: 0 });
     seedPhoto({ id: 'vp2', vehicleId: vid, sortOrder: 1 });
 
@@ -88,7 +85,7 @@ describe('GET /api/v1/vehicles/:vehicleId/photos (list)', () => {
 
 describe('PUT /api/v1/vehicles/:vehicleId/photos/:photoId/cover (set cover)', () => {
   test('flips the target to cover and clears the previous cover', async () => {
-    const vid = await seedVehicle('Cover');
+    const vid = await seedVehicle(ctx, { nickname: 'Cover' });
     seedPhoto({ id: 'c1', vehicleId: vid, isCover: true });
     seedPhoto({ id: 'c2', vehicleId: vid, isCover: false });
 
@@ -102,8 +99,8 @@ describe('PUT /api/v1/vehicles/:vehicleId/photos/:photoId/cover (set cover)', ()
   });
 
   test('a photo belonging to another vehicle returns 404 through this vehicle URL', async () => {
-    const vid = await seedVehicle('Mine');
-    const otherVid = await seedVehicle('Other');
+    const vid = await seedVehicle(ctx, { nickname: 'Mine' });
+    const otherVid = await seedVehicle(ctx, { nickname: 'Other' });
     seedPhoto({ id: 'mine-1', vehicleId: vid });
     seedPhoto({ id: 'other-1', vehicleId: otherVid });
 

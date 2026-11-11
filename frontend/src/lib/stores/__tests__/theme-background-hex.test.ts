@@ -1,49 +1,64 @@
-import { describe, expect, test } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { DEFAULT_THEME_ID, THEME_REGISTRY } from '$lib/theme/theme-registry';
 import { oklchToHex } from '$lib/theme/oklch-to-hex';
+import { generateThemeChromeModule } from '$lib/theme/themes-css';
 
-const STORE_PATH = `${process.cwd()}/src/lib/stores/theme.svelte.ts`;
-const STORE_SRC = readFileSync(STORE_PATH, 'utf8');
+vi.mock('$lib/services/settings-api', () => ({
+	settingsApi: { updateSettings: vi.fn(() => Promise.resolve()) }
+}));
 
-function storeBackgroundHex(): Record<string, { light: string; dark: string }> {
-	const body = STORE_SRC.match(/const THEME_BACKGROUND_HEX:[^=]*=\s*\{([\s\S]*?)\n\};/)?.[1];
-	expect(body, 'THEME_BACKGROUND_HEX literal is parseable from the store source').toBeTruthy();
+const { themeStore } = await import('../theme.svelte');
 
-	const entries: Record<string, { light: string; dark: string }> = {};
-	const row = /(\w[\w-]*):\s*\{\s*light:\s*'(#[0-9a-f]{6})',\s*dark:\s*'(#[0-9a-f]{6})'\s*\}/g;
-	for (const match of (body as string).matchAll(row)) {
-		entries[match[1] as string] = { light: match[2] as string, dark: match[3] as string };
-	}
-	return entries;
+const CWD = process.cwd();
+
+function themeColor(): string | null {
+	return document.querySelector('meta[name="theme-color"]')?.getAttribute('content') ?? null;
 }
 
-function storeDefaultThemeId(): string {
-	return STORE_SRC.match(/const DEFAULT_THEME_ID\s*=\s*'([^']+)'/)?.[1] ?? '';
-}
-
-describe('theme store background-hex map mirrors the theme registry', () => {
-	test('covers exactly the registry theme set', () => {
-		expect(Object.keys(storeBackgroundHex()).sort()).toEqual(Object.keys(THEME_REGISTRY).sort());
+describe('theme-chrome.ts is generated from the theme registry', () => {
+	test('the committed theme-chrome.ts equals generateThemeChromeModule(THEME_REGISTRY) byte-for-byte', () => {
+		const committed = readFileSync(`${CWD}/src/lib/theme/theme-chrome.ts`, 'utf8');
+		expect(
+			committed,
+			'theme-chrome.ts is stale: write generateThemeChromeModule(THEME_REGISTRY, DEFAULT_THEME_ID) to it'
+		).toBe(generateThemeChromeModule(THEME_REGISTRY, DEFAULT_THEME_ID));
 	});
 
-	test('every hex equals oklchToHex of the theme variant background token', () => {
-		const stored = storeBackgroundHex();
-		for (const [id, definition] of Object.entries(THEME_REGISTRY)) {
-			for (const variant of ['light', 'dark'] as const) {
-				const expected = oklchToHex(definition[variant].background);
-				expect(expected, `${id}.${variant}.background converts to a hex`).toBeTruthy();
-				expect(stored[id]?.[variant], `${id}.${variant} background hex`).toBe(expected);
-			}
+	test('the theme store reads the generated module, not the token registry', () => {
+		const storeSrc = readFileSync(`${CWD}/src/lib/stores/theme.svelte.ts`, 'utf8');
+		expect(storeSrc).toMatch(/from\s+['"]\$lib\/theme\/theme-chrome['"]/);
+		expect(storeSrc).not.toMatch(/from\s+['"][^'"]*theme-registry['"]/);
+		expect(storeSrc).not.toMatch(/from\s+['"][^'"]*oklch-to-hex['"]/);
+	});
+});
+
+describe('the theme-color meta tracks every registry theme background', () => {
+	beforeEach(() => {
+		localStorage.clear();
+		let meta = document.querySelector('meta[name="theme-color"]');
+		if (!meta) {
+			meta = document.createElement('meta');
+			meta.setAttribute('name', 'theme-color');
+			document.head.appendChild(meta);
 		}
+		meta.setAttribute('content', '');
 	});
 
-	test('the store DEFAULT_THEME_ID literal equals the registry export', () => {
-		expect(storeDefaultThemeId()).toBe(DEFAULT_THEME_ID);
-	});
+	for (const [id, definition] of Object.entries(THEME_REGISTRY)) {
+		for (const variant of ['light', 'dark'] as const) {
+			test(`${id} (${variant}) sets the meta to that variant's background hex`, () => {
+				themeStore.setPreference(variant);
+				themeStore.setTheme(id);
+				expect(themeColor()).toBe(oklchToHex(definition[variant].background));
+			});
+		}
+	}
 
-	test('the store does not import the token registry', () => {
-		expect(STORE_SRC).not.toMatch(/from\s+'\$lib\/theme\/theme-registry'/);
-		expect(STORE_SRC).not.toMatch(/from\s+'\$lib\/theme\/oklch-to-hex'/);
+	test('an unknown id falls back to the default theme background', () => {
+		themeStore.setPreference('dark');
+		themeStore.setTheme('no-such-theme');
+		const fallback = THEME_REGISTRY[DEFAULT_THEME_ID]?.dark.background ?? '';
+		expect(themeColor()).toBe(oklchToHex(fallback));
 	});
 });

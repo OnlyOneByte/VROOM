@@ -12,46 +12,22 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { createInvitee, type Invitee } from '../../../test-helpers/invitee';
 import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp; // owner (user A)
-let bCookie: string; // invitee B (the shared editor/viewer)
-let bId: string;
-let bEmail: string;
-let bCounter = 0;
+let b: Invitee; // invitee B (the shared editor/viewer)
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  const { db } = await import('../../../db/connection');
-  const schema = await import('../../../db/schema');
-  const { lucia } = await import('../../auth/lucia');
-  bId = `remw-invitee-${++bCounter}`;
-  bEmail = `remw-invitee-${bCounter}@test.com`;
-  await db.insert(schema.users).values({ id: bId, email: bEmail, displayName: 'Rem Editor B' });
-  const session = await lucia.createSession(bId, {});
-  const sc = lucia.createSessionCookie(session.id);
-  bCookie = `${sc.name}=${sc.value}`;
+  b = await createInvitee(ctx, 'remw-invitee');
 });
 afterEach(() => ctx.close());
-
-async function asB(method: string, path: string, body?: unknown): Promise<Response> {
-  const headers: Record<string, string> = { Cookie: bCookie, 'Sec-Fetch-Site': 'same-origin' };
-  let init: RequestInit = { method, headers };
-  if (body !== undefined) {
-    headers['Content-Type'] = 'application/json';
-    init = { ...init, body: JSON.stringify(body) };
-  }
-  return ctx.app.request(path, init);
-}
 
 /** A owns a vehicle and invites B at `level`, B accepts → an ACCEPTED share. Returns vehicleId. */
 async function shareAccepted(level: 'viewer' | 'editor'): Promise<string> {
   const vehicleId = await seedVehicle(ctx, { make: 'Shared', model: 'Car', year: 2021 });
-  const invite = await ctx.authed('POST', '/api/v1/shares', { vehicleId, email: bEmail, level });
-  const inviteBody = await json<DataEnvelope<{ id: string }>>(invite);
-  expect(invite.status, JSON.stringify(inviteBody)).toBe(201);
-  const acc = await asB('POST', `/api/v1/shares/${inviteBody.data.id}/accept`);
-  expect(acc.status, 'B accepts the invite').toBe(200);
+  await b.acceptShare(vehicleId, level);
   return vehicleId;
 }
 
@@ -73,7 +49,7 @@ describe('reminder writes on shared vehicles', () => {
   test('an EDITOR create stamps the reminder userId=OWNER (rides the owner books)', async () => {
     const vehicleId = await shareAccepted('editor');
 
-    const res = await asB('POST', '/api/v1/reminders', {
+    const res = await b.request('POST', '/api/v1/reminders', {
       name: 'Editor oil change',
       type: 'notification',
       frequency: 'monthly',
@@ -96,7 +72,7 @@ describe('reminder writes on shared vehicles', () => {
   test('an editor expense reminder materializes its expense onto the owner books', async () => {
     const vehicleId = await shareAccepted('editor');
     // An automatic expense reminder due in the past → /trigger materializes an expense row.
-    const res = await asB('POST', '/api/v1/reminders', {
+    const res = await b.request('POST', '/api/v1/reminders', {
       name: 'Editor annual reg',
       type: 'expense',
       actionMode: 'automatic',
@@ -136,7 +112,7 @@ describe('reminder writes on shared vehicles', () => {
 
   test('a reminder spanning two owners is rejected', async () => {
     const sharedFromA = await shareAccepted('editor'); // owned by A, B is editor
-    const bVehRes = await asB('POST', '/api/v1/vehicles', {
+    const bVehRes = await b.request('POST', '/api/v1/vehicles', {
       make: 'BOwn',
       model: 'Car',
       year: 2023,
@@ -144,7 +120,7 @@ describe('reminder writes on shared vehicles', () => {
     const bOwn = (await json<DataEnvelope<{ id: string }>>(bVehRes)).data.id;
     expect(bVehRes.status, 'B seeds own vehicle').toBeLessThan(300);
 
-    const res = await asB('POST', '/api/v1/reminders', {
+    const res = await b.request('POST', '/api/v1/reminders', {
       name: 'Cross-owner reminder',
       type: 'notification',
       frequency: 'monthly',
@@ -167,15 +143,17 @@ describe('reminder writes on shared vehicles', () => {
     });
     const rid = (await json<DataEnvelope<ReminderEnvelope>>(created)).data.reminder.id;
 
-    const put = await asB('PUT', `/api/v1/reminders/${rid}`, { name: 'Tire rotation (edited)' });
+    const put = await b.request('PUT', `/api/v1/reminders/${rid}`, {
+      name: 'Tire rotation (edited)',
+    });
     expect(put.status, 'editor can update a shared reminder').toBe(200);
     expect(storedReminderUserId(rid)).toBe(ctx.user.id);
 
-    const mark = await asB('POST', `/api/v1/reminders/${rid}/mark-serviced`);
+    const mark = await b.request('POST', `/api/v1/reminders/${rid}/mark-serviced`);
     expect(mark.status, 'editor can mark-serviced a shared reminder').toBe(200);
     expect(storedReminderUserId(rid)).toBe(ctx.user.id);
 
-    const del = await asB('DELETE', `/api/v1/reminders/${rid}`);
+    const del = await b.request('DELETE', `/api/v1/reminders/${rid}`);
     expect(del.status, 'editor can delete a shared reminder').toBe(200);
     expect(ctx.sqlite.query('SELECT id FROM reminders WHERE id = ?').get(rid)).toBeNull();
   });
@@ -192,7 +170,7 @@ describe('reminder writes on shared vehicles', () => {
     });
     const rid = (await json<DataEnvelope<ReminderEnvelope>>(created)).data.reminder.id;
 
-    const create = await asB('POST', '/api/v1/reminders', {
+    const create = await b.request('POST', '/api/v1/reminders', {
       name: 'Viewer reminder',
       type: 'notification',
       frequency: 'monthly',
@@ -200,14 +178,17 @@ describe('reminder writes on shared vehicles', () => {
       vehicleIds: [vehicleId],
     });
     expect(create.status, 'viewer create denied').toBe(404);
-    expect((await asB('PUT', `/api/v1/reminders/${rid}`, { name: 'x' })).status, 'viewer PUT').toBe(
-      404
-    );
     expect(
-      (await asB('POST', `/api/v1/reminders/${rid}/mark-serviced`)).status,
+      (await b.request('PUT', `/api/v1/reminders/${rid}`, { name: 'x' })).status,
+      'viewer PUT'
+    ).toBe(404);
+    expect(
+      (await b.request('POST', `/api/v1/reminders/${rid}/mark-serviced`)).status,
       'viewer mark-serviced'
     ).toBe(404);
-    expect((await asB('DELETE', `/api/v1/reminders/${rid}`)).status, 'viewer DELETE').toBe(404);
+    expect((await b.request('DELETE', `/api/v1/reminders/${rid}`)).status, 'viewer DELETE').toBe(
+      404
+    );
 
     expect(ctx.sqlite.query('SELECT id FROM reminders WHERE id = ?').get(rid)).not.toBeNull();
   });

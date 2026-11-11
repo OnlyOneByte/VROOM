@@ -3,8 +3,7 @@
  */
 
 import { and, eq, inArray } from 'drizzle-orm';
-import type { OAuth2Client } from 'google-auth-library';
-import { type drive_v3, google, type sheets_v4 } from 'googleapis';
+import { google, type sheets_v4 } from 'googleapis';
 import { getDb } from '../../../db/connection';
 import {
   expenses,
@@ -21,11 +20,13 @@ import {
   syncState,
   trips,
   userPreferences,
+  userProviders,
   vehicleFinancing,
   vehicleShares,
   vehicles,
 } from '../../../db/schema';
-import { SyncError, SyncErrorCode } from '../../../errors';
+import { NotFoundError, SyncError, SyncErrorCode, ValidationError } from '../../../errors';
+import { decrypt } from '../../../utils/encryption';
 import { GoogleDriveService } from './google-drive-service';
 
 /**
@@ -246,29 +247,34 @@ export const SHEET_HEADERS = {
   ],
 } as const satisfies Record<string, readonly string[]>;
 
-/** Display titles of the backup tabs, in creation order. Distinct from the camelCase SHEET_HEADERS keys. */
-export const SHEET_NAMES = [
-  'Vehicles',
-  'Expenses',
-  'Insurance Policies',
-  'Insurance Terms',
-  'Insurance Term Vehicles',
-  'Insurance Claims',
-  'Vehicle Financing',
-  'Odometer',
-  'Photos',
-  'Photo Refs',
-  'User Preferences',
-  'Sync State',
-  'Reminders',
-  'Reminder Vehicles',
-  'Reminder Notifications',
-  'Trips',
-  'Vehicle Shares',
-] as const;
+/** Display title of each backup tab, keyed like SHEET_HEADERS. The only place a tab title is written. */
+export const SHEET_TABS = {
+  vehicles: 'Vehicles',
+  expenses: 'Expenses',
+  insurance: 'Insurance Policies',
+  insuranceTerms: 'Insurance Terms',
+  insuranceTermVehicles: 'Insurance Term Vehicles',
+  insuranceClaims: 'Insurance Claims',
+  financing: 'Vehicle Financing',
+  odometer: 'Odometer',
+  photos: 'Photos',
+  photoRefs: 'Photo Refs',
+  userPreferences: 'User Preferences',
+  syncState: 'Sync State',
+  reminders: 'Reminders',
+  reminderVehicles: 'Reminder Vehicles',
+  reminderNotifications: 'Reminder Notifications',
+  trips: 'Trips',
+  vehicleShares: 'Vehicle Shares',
+} as const satisfies Record<keyof typeof SHEET_HEADERS, string>;
+
+type SheetTableKey = keyof typeof SHEET_TABS;
+
+/** Tab titles in creation order. The backup swap relies on this order to index each tab. */
+export const SHEET_NAMES = Object.values(SHEET_TABS);
 
 // Space-free so the range needs no A1 quoting.
-const SHEET_STAGING_SUFFIX = '__vroom_staging';
+export const SHEET_STAGING_SUFFIX = '__vroom_staging';
 
 export interface SpreadsheetInfo {
   id: string;
@@ -277,39 +283,34 @@ export interface SpreadsheetInfo {
   sheets: { id: number; title: string }[];
 }
 
-/** Injected in tests. All three clients must share one backing store so Sheets and Drive stay consistent. */
+/** Injected in tests. Both clients must share one backing store so Sheets and Drive stay consistent. */
 export interface GoogleSheetsClients {
   sheets: sheets_v4.Sheets;
-  drive: drive_v3.Drive;
   driveService: GoogleDriveService;
 }
 
 export class GoogleSheetsService {
-  private oauth2Client?: OAuth2Client;
   private sheets: sheets_v4.Sheets;
-  private drive: drive_v3.Drive;
   private driveService: GoogleDriveService;
 
   constructor(refreshToken: string, clients?: GoogleSheetsClients) {
     if (clients) {
       this.sheets = clients.sheets;
-      this.drive = clients.drive;
       this.driveService = clients.driveService;
       return;
     }
 
-    this.oauth2Client = new google.auth.OAuth2(
+    const oauth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
       process.env.GOOGLE_REDIRECT_URI
     );
 
-    this.oauth2Client.setCredentials({
+    oauth2Client.setCredentials({
       refresh_token: refreshToken,
     });
 
-    this.sheets = google.sheets({ version: 'v4', auth: this.oauth2Client });
-    this.drive = google.drive({ version: 'v3', auth: this.oauth2Client });
+    this.sheets = google.sheets({ version: 'v4', auth: oauth2Client });
     this.driveService = new GoogleDriveService(refreshToken);
   }
 
@@ -336,11 +337,8 @@ export class GoogleSheetsService {
       }
       spreadsheetId = spreadsheet.spreadsheetId;
 
-      await this.drive.files.update({
-        fileId: spreadsheetId,
-        addParents: targetFolderId,
-        removeParents: 'root',
-      });
+      // New spreadsheets land in My Drive root; move it into the backup folder.
+      await this.driveService.moveFile(spreadsheetId, targetFolderId, 'root');
     }
 
     await this.updateSpreadsheetWithUserData(spreadsheetId, userId);
@@ -520,59 +518,33 @@ export class GoogleSheetsService {
       .from(vehicleShares)
       .where(and(eq(vehicleShares.ownerId, userId), eq(vehicleShares.status, 'accepted')));
 
-    // Must follow SHEET_NAMES order: the atomic swap assigns each tab's index from this position.
-    const tables: { title: string; rows: Record<string, unknown>[]; headers: readonly string[] }[] =
-      [
-        { title: 'Vehicles', rows: userVehicles, headers: SHEET_HEADERS.vehicles },
-        { title: 'Expenses', rows: userExpenses, headers: SHEET_HEADERS.expenses },
-        { title: 'Insurance Policies', rows: userInsurance, headers: SHEET_HEADERS.insurance },
-        {
-          title: 'Insurance Terms',
-          rows: userInsuranceTerms,
-          headers: SHEET_HEADERS.insuranceTerms,
-        },
-        {
-          title: 'Insurance Term Vehicles',
-          rows: userInsuranceTermVehicles,
-          headers: SHEET_HEADERS.insuranceTermVehicles,
-        },
-        {
-          title: 'Insurance Claims',
-          rows: userInsuranceClaims,
-          headers: SHEET_HEADERS.insuranceClaims,
-        },
-        {
-          title: 'Vehicle Financing',
-          rows: userFinancing.map((f) => f.vehicle_financing),
-          headers: SHEET_HEADERS.financing,
-        },
-        {
-          title: 'Odometer',
-          rows: userOdometer.map((o) => o.odometer_entries),
-          headers: SHEET_HEADERS.odometer,
-        },
-        { title: 'Photos', rows: userPhotos, headers: SHEET_HEADERS.photos },
-        { title: 'Photo Refs', rows: userPhotoRefs, headers: SHEET_HEADERS.photoRefs },
-        {
-          title: 'User Preferences',
-          rows: userPreferencesRows,
-          headers: SHEET_HEADERS.userPreferences,
-        },
-        { title: 'Sync State', rows: syncStateRows, headers: SHEET_HEADERS.syncState },
-        { title: 'Reminders', rows: userReminders, headers: SHEET_HEADERS.reminders },
-        {
-          title: 'Reminder Vehicles',
-          rows: userReminderVehicles,
-          headers: SHEET_HEADERS.reminderVehicles,
-        },
-        {
-          title: 'Reminder Notifications',
-          rows: userReminderNotifications,
-          headers: SHEET_HEADERS.reminderNotifications,
-        },
-        { title: 'Trips', rows: userTrips, headers: SHEET_HEADERS.trips },
-        { title: 'Vehicle Shares', rows: userVehicleShares, headers: SHEET_HEADERS.vehicleShares },
-      ];
+    // Record-typed so a table missing its rows is a compile error, not an empty tab.
+    const rowsByTable: Record<SheetTableKey, Record<string, unknown>[]> = {
+      vehicles: userVehicles,
+      expenses: userExpenses,
+      insurance: userInsurance,
+      insuranceTerms: userInsuranceTerms,
+      insuranceTermVehicles: userInsuranceTermVehicles,
+      insuranceClaims: userInsuranceClaims,
+      financing: userFinancing.map((f) => f.vehicle_financing),
+      odometer: userOdometer.map((o) => o.odometer_entries),
+      photos: userPhotos,
+      photoRefs: userPhotoRefs,
+      userPreferences: userPreferencesRows,
+      syncState: syncStateRows,
+      reminders: userReminders,
+      reminderVehicles: userReminderVehicles,
+      reminderNotifications: userReminderNotifications,
+      trips: userTrips,
+      vehicleShares: userVehicleShares,
+    };
+
+    // Object key order matches SHEET_NAMES, which the atomic swap relies on to index each tab.
+    const tables = (Object.keys(SHEET_TABS) as SheetTableKey[]).map((key) => ({
+      title: SHEET_TABS[key],
+      rows: rowsByTable[key],
+      headers: SHEET_HEADERS[key],
+    }));
 
     await this.writeAllSheetsAtomically(spreadsheetId, tables);
   }
@@ -684,6 +656,16 @@ export class GoogleSheetsService {
     return response.data.values || [];
   }
 
+  /** `optional` tabs read as empty when absent, which covers backups made before the tab existed. */
+  private readTab(
+    spreadsheetId: string,
+    key: SheetTableKey,
+    optional = false
+  ): Promise<(string | number | boolean)[][]> {
+    const read = this.readSheetData(spreadsheetId, `${SHEET_TABS[key]}!A:Z`);
+    return optional ? read.catch(() => []) : read;
+  }
+
   async readSpreadsheetData(spreadsheetId: string): Promise<{
     metadata: { version: string; timestamp: string; userId: string };
     vehicles: Record<string, unknown>[];
@@ -723,24 +705,24 @@ export class GoogleSheetsService {
       tripsData,
       vehicleSharesData,
     ] = await Promise.all([
-      this.readSheetData(spreadsheetId, 'Vehicles!A:Z'),
-      this.readSheetData(spreadsheetId, 'Expenses!A:Z'),
-      this.readSheetData(spreadsheetId, 'Insurance Policies!A:Z'),
-      this.readSheetData(spreadsheetId, 'Insurance Terms!A:Z').catch(() => []),
-      this.readSheetData(spreadsheetId, 'Insurance Term Vehicles!A:Z').catch(() => []),
-      this.readSheetData(spreadsheetId, 'Insurance Claims!A:Z').catch(() => []),
-      this.readSheetData(spreadsheetId, 'Vehicle Financing!A:Z'),
-      this.readSheetData(spreadsheetId, 'Photos!A:Z').catch(() => []),
-      this.readSheetData(spreadsheetId, 'Odometer!A:Z').catch(() => []),
-      this.readSheetData(spreadsheetId, 'Photo Refs!A:Z').catch(() => []),
-      this.readSheetData(spreadsheetId, 'User Preferences!A:Z').catch(() => []),
-      this.readSheetData(spreadsheetId, 'Sync State!A:Z').catch(() => []),
-      this.readSheetData(spreadsheetId, 'Reminders!A:Z').catch(() => []),
-      this.readSheetData(spreadsheetId, 'Reminder Vehicles!A:Z').catch(() => []),
-      this.readSheetData(spreadsheetId, 'Reminder Notifications!A:Z').catch(() => []),
+      this.readTab(spreadsheetId, 'vehicles'),
+      this.readTab(spreadsheetId, 'expenses'),
+      this.readTab(spreadsheetId, 'insurance'),
+      this.readTab(spreadsheetId, 'insuranceTerms', true),
+      this.readTab(spreadsheetId, 'insuranceTermVehicles', true),
+      this.readTab(spreadsheetId, 'insuranceClaims', true),
+      this.readTab(spreadsheetId, 'financing'),
+      this.readTab(spreadsheetId, 'photos', true),
+      this.readTab(spreadsheetId, 'odometer', true),
+      this.readTab(spreadsheetId, 'photoRefs', true),
+      this.readTab(spreadsheetId, 'userPreferences', true),
+      this.readTab(spreadsheetId, 'syncState', true),
+      this.readTab(spreadsheetId, 'reminders', true),
+      this.readTab(spreadsheetId, 'reminderVehicles', true),
+      this.readTab(spreadsheetId, 'reminderNotifications', true),
       // Older backups lack these tabs.
-      this.readSheetData(spreadsheetId, 'Trips!A:Z').catch(() => []),
-      this.readSheetData(spreadsheetId, 'Vehicle Shares!A:Z').catch(() => []),
+      this.readTab(spreadsheetId, 'trips', true),
+      this.readTab(spreadsheetId, 'vehicleShares', true),
     ]);
 
     const vehicleRecords = this.parseSheetData(vehiclesData);
@@ -817,10 +799,6 @@ export async function createSheetsServiceForProvider(
   providerId: string,
   userId: string
 ): Promise<GoogleSheetsService> {
-  const { userProviders } = await import('../../../db/schema');
-  const { decrypt } = await import('../../../utils/encryption');
-  const { NotFoundError, ValidationError } = await import('../../../errors');
-
   const db = getDb();
   const providerRow = await db
     .select()

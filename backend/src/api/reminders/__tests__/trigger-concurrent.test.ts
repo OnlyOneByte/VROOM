@@ -3,7 +3,6 @@
  * claimed by a compare-and-swap on nextDueDate inside the same synchronous transaction as its money row,
  * so the loser of the claim writes nothing. The second block checks the other half: a claim and its rows
  * commit or roll back together.
- * Keep static imports to the harness and bun:test: createTestApp sets env before config loads.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';

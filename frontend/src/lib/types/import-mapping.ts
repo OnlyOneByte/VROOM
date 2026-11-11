@@ -51,4 +51,5 @@ export interface ImportMappingPreset {
 	distanceUnit?: DistanceUnit;
 	volumeUnit?: VolumeUnit;
 	categoryMap?: Record<string, ExpenseCategory>;
+	defaultCategory?: ExpenseCategory;
 }

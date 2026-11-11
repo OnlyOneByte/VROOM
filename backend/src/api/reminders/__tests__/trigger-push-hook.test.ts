@@ -1,7 +1,6 @@
 /**
  * The trigger fires notifyUser after each notification row is written, on both the time and mileage axes.
- * A fake PushSender is injected, so no network or VAPID keys are needed. Keep static imports to the
- * harness and the DI seam: createTestApp sets env before config loads.
+ * A fake PushSender is injected, so no network or VAPID keys are needed.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -19,6 +18,7 @@ import {
   setPushSenderForTest,
 } from '../../push/push-service';
 import { pushSubscriptionRepository } from '../../push/repository';
+import { addOdometerReading, seedMileageReminder } from './_helpers';
 
 let ctx: TestApp;
 
@@ -77,36 +77,6 @@ function seedTimeReminder(reminderId: string, vehicleId: string, name: string): 
   ]);
 }
 
-/** Seed a mileage reminder at a milestone (null date) — mirrors trigger-mileage.test.ts. */
-function seedMileageReminder(
-  reminderId: string,
-  vehicleId: string,
-  nextDueOdometer: number,
-  name: string
-): void {
-  ctx.sqlite.run(
-    `INSERT INTO reminders
-       (id, user_id, name, type, action_mode, frequency, trigger_mode,
-        interval_mileage, last_service_odometer, next_due_odometer,
-        start_date, next_due_date, is_active)
-     VALUES (?, ?, ?, 'notification', 'automatic', 'custom', 'mileage',
-        5000, ?, ?, 0, NULL, 1)`,
-    [reminderId, ctx.user.id, name, nextDueOdometer - 5000, nextDueOdometer]
-  );
-  ctx.sqlite.run(`INSERT INTO reminder_vehicles (reminder_id, vehicle_id) VALUES (?, ?)`, [
-    reminderId,
-    vehicleId,
-  ]);
-}
-
-async function addOdometerReading(vehicleId: string, odometer: number): Promise<void> {
-  const res = await ctx.authed('POST', `/api/v1/odometer/${vehicleId}`, {
-    odometer,
-    recordedAt: '2024-06-01T00:00:00.000Z',
-  });
-  expect(res.status, `odometer create ${odometer}`).toBe(201);
-}
-
 describe('trigger push hook', () => {
   test('a time-axis notification fires notifyUser with the reminder-derived payload', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
@@ -127,9 +97,9 @@ describe('trigger push hook', () => {
 
   test('a mileage-axis notification fires notifyUser with a mileage-worded body', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2020 });
-    await addOdometerReading(vehicleId, 60200); // past the 60000 milestone
+    await addOdometerReading(ctx, vehicleId, 60200); // past the 60000 milestone
     await subscribe();
-    seedMileageReminder('rp-mi', vehicleId, 60000, 'Oil change');
+    seedMileageReminder(ctx, 'rp-mi', vehicleId, 60000);
     const sender = recordingSender();
     setPushSenderForTest(sender);
 
@@ -145,9 +115,9 @@ describe('trigger push hook', () => {
 
   test('a throwing push sender does not fail the trigger or lose the notification', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2020 });
-    await addOdometerReading(vehicleId, 60200);
+    await addOdometerReading(ctx, vehicleId, 60200);
     await subscribe();
-    seedMileageReminder('rp-boom', vehicleId, 60000, 'Oil change');
+    seedMileageReminder(ctx, 'rp-boom', vehicleId, 60000);
     setPushSenderForTest(recordingSender({ throwOnSend: true }));
 
     // The in-app notification is the source of truth, so it must be written even when push fails.
@@ -162,9 +132,9 @@ describe('trigger push hook', () => {
 
   test('nothing due means no push is sent', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2020 });
-    await addOdometerReading(vehicleId, 34000); // below the milestone
+    await addOdometerReading(ctx, vehicleId, 34000); // below the milestone
     await subscribe();
-    seedMileageReminder('rp-none', vehicleId, 60000, 'Oil change');
+    seedMileageReminder(ctx, 'rp-none', vehicleId, 60000);
     const sender = recordingSender();
     setPushSenderForTest(sender);
 

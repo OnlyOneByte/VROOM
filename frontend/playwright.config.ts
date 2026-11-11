@@ -17,11 +17,6 @@ import { defineConfig, devices } from '@playwright/test';
  *     the three PWA tests that need them run HERE and skip on dev (see pwa.spec.ts).
  *     Run it with `E2E_TARGET=preview npx playwright test`.
  *
- * Both targets are green. Earlier revisions of this file claimed `npm run build` was broken
- * in `@vite-pwa/sveltekit`; that was a dangling import from an unrelated change, and the
- * build has since exited 0. What actually used to hang this config was `webServer.port: 5173`
- * against a `vite preview` that binds 4173.
- *
  * ONE HAZARD TO KNOW ABOUT on the dev target: anything that runs `svelte-kit sync` — a
  * concurrent `npm run check`, `vitest`, or another editor on the same checkout — rewrites
  * `.svelte-kit/generated/`, and `vite dev` answers by force-reloading every page it is

@@ -6,7 +6,8 @@ import {
 	type OfflineExpense,
 	saveOfflineExpenses
 } from '../../offline-storage';
-import { classifySyncFailure, syncConfig, syncManager } from '../sync-manager';
+import { classifySyncFailure } from '../classify-failure';
+import { syncConfig, syncManager } from '../sync-manager';
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
@@ -106,7 +107,6 @@ describe('SyncManager.syncAll — HTTP failure classification', () => {
 			expect(result.errors).toContain('amount must be positive');
 			expect(loadOfflineExpenses()[0]?.needsAttention).toBe(true);
 			expect(loadOfflineExpenses()[0]?.attentionReason).toBe('amount must be positive');
-			expect(syncManager.getRetryCount('rejected')).toBe(0);
 			expect(retryWasScheduled(setTimeoutSpy)).toBe(false);
 		} finally {
 			setTimeoutSpy.mockRestore();
@@ -144,7 +144,6 @@ describe('SyncManager.syncAll — HTTP failure classification', () => {
 			expect(result.failed).toBe(1);
 			expect(result.needsAttention).toBe(0);
 			expect(loadOfflineExpenses()[0]?.needsAttention).toBeUndefined();
-			expect(syncManager.getRetryCount('flaky')).toBe(1);
 			expect(retryWasScheduled(setTimeoutSpy)).toBe(true);
 		} finally {
 			setTimeoutSpy.mockRestore();
@@ -182,11 +181,136 @@ describe('SyncManager.syncAll — HTTP failure classification', () => {
 			const [row] = loadOfflineExpenses();
 			expect(row?.synced).toBe(false);
 			expect(row?.needsAttention).toBeUndefined();
-			expect(syncManager.getRetryCount('signedout')).toBe(0);
 			expect(retryWasScheduled(setTimeoutSpy)).toBe(false);
 		} finally {
 			setTimeoutSpy.mockRestore();
 			vi.useRealTimers();
 		}
+	});
+});
+
+describe('SyncManager.syncAll — delivery', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		ls.clear();
+		syncState.current = 'idle';
+		onlineStatus.current = true;
+		syncConfig.current = {
+			maxRetries: 3,
+			retryDelay: 100,
+			batchSize: 10,
+			conflictResolution: 'ask_user'
+		};
+	});
+
+	function postBodies(): Array<Record<string, unknown>> {
+		return mockFetch.mock.calls
+			.filter(([, init]) => (init as { method?: string } | undefined)?.method === 'POST')
+			.map(([, init]) => JSON.parse((init as { body: string }).body));
+	}
+
+	it('POSTs each pending expense with its clientId, then clears the queue', async () => {
+		saveOfflineExpenses([pending('a'), pending('b')]);
+		mockFetch.mockImplementation(() => Promise.resolve(apiOk([])));
+
+		const result = await syncManager.syncAll();
+
+		expect(result.synced).toBe(2);
+		expect(postBodies().map(b => b['clientId'])).toEqual(['cid-a', 'cid-b']);
+		expect(loadOfflineExpenses()).toHaveLength(0);
+		expect(syncState.current).toBe('success');
+	});
+
+	it('on a mid-batch transient failure keeps only the failed row and still attempts the rest', async () => {
+		saveOfflineExpenses([pending('a'), pending('b'), pending('c')]);
+		vi.useFakeTimers();
+		mockFetch.mockImplementation((_url: string, init?: { method?: string; body?: string }) => {
+			if ((init?.method ?? 'GET') === 'GET') return Promise.resolve(apiOk([]));
+			const body = JSON.parse(init?.body ?? '{}');
+			if (body.clientId === 'cid-b') return Promise.reject(new TypeError('Failed to fetch'));
+			return Promise.resolve(apiOk());
+		});
+		try {
+			await syncManager.syncAll();
+
+			expect(postBodies()).toHaveLength(3);
+			expect(syncState.current).toBe('error');
+			const remaining = loadOfflineExpenses();
+			expect(remaining.map(e => e.id)).toEqual(['b']);
+			expect(remaining[0]?.synced).toBe(false);
+			expect(remaining[0]?.needsAttention).toBeFalsy();
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('parks an incomplete fuel row without POSTing it, and still delivers the others', async () => {
+		saveOfflineExpenses([{ ...pending('fuel-bad'), category: 'fuel' }, pending('ok')]);
+		mockFetch.mockImplementation(() => Promise.resolve(apiOk([])));
+
+		const result = await syncManager.syncAll();
+
+		expect(result.needsAttention).toBe(1);
+		expect(postBodies().map(b => b['clientId'])).toEqual(['cid-ok']);
+		const remaining = loadOfflineExpenses();
+		expect(remaining.map(e => e.id)).toEqual(['fuel-bad']);
+		expect(remaining[0]?.needsAttention).toBe(true);
+	});
+});
+
+describe('SyncManager.retryParked', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		ls.clear();
+		syncState.current = 'idle';
+		onlineStatus.current = true;
+		syncConfig.current = {
+			maxRetries: 3,
+			retryDelay: 100,
+			batchSize: 10,
+			conflictResolution: 'ask_user'
+		};
+	});
+
+	const parked = (id: string): OfflineExpense => ({
+		...pending(id),
+		needsAttention: true,
+		attentionReason: 'Vehicle not found'
+	});
+
+	it('re-admits parked rows and re-sends them, so a since-fixed rejection can still deliver', async () => {
+		saveOfflineExpenses([parked('p1')]);
+		mockFetch.mockImplementation(() => Promise.resolve(apiOk([])));
+
+		const result = await syncManager.retryParked();
+
+		expect(result.synced).toBe(1);
+		const posts = mockFetch.mock.calls.filter(
+			([, init]) => (init as { method?: string } | undefined)?.method === 'POST'
+		);
+		expect(posts).toHaveLength(1);
+		expect(loadOfflineExpenses()).toHaveLength(0);
+	});
+
+	it('re-parks a row the server still rejects, with the fresh reason', async () => {
+		saveOfflineExpenses([parked('p1')]);
+		postFailsWith(400, 'amount must be positive');
+
+		const result = await syncManager.retryParked();
+
+		expect(result.needsAttention).toBe(1);
+		const [row] = loadOfflineExpenses();
+		expect(row?.needsAttention).toBe(true);
+		expect(row?.attentionReason).toBe('amount must be positive');
+	});
+
+	it('refuses while offline and leaves the parked rows parked', async () => {
+		saveOfflineExpenses([parked('p1')]);
+		onlineStatus.current = false;
+
+		await expect(syncManager.retryParked()).rejects.toThrow(/offline/i);
+
+		expect(mockFetch).not.toHaveBeenCalled();
+		expect(loadOfflineExpenses()[0]?.needsAttention).toBe(true);
 	});
 });

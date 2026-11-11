@@ -10,7 +10,7 @@ import {
   reminderWithVehiclesToApi,
   vehicleRowToApi,
 } from '../../../../utils/money';
-import { requireVehicleRead, resolveVehicleOwnerId } from '../../../../utils/sharing';
+import { requireVehicleOwnerScope } from '../../../../utils/sharing';
 import {
   analyticsSummaryToApi,
   crossVehicleToApi,
@@ -22,6 +22,7 @@ import { analyticsRepository } from '../../../analytics/repository';
 import { expenseRepository } from '../../../expenses/repository';
 import { reminderRepository } from '../../../reminders/repository';
 import { vehicleRepository } from '../../../vehicles/repository';
+import type { ToolDefinition } from './llm-provider';
 
 export const RANGE_VALUES = ['30d', '90d', 'ytd', '12mo', 'all'] as const;
 export type RangeValue = (typeof RANGE_VALUES)[number];
@@ -68,10 +69,18 @@ const rangeVehicleArgs = z
   .object({ range: rangeSchema, vehicleId: z.string().min(1).optional() })
   .strip();
 
+/** Derived from the Zod schema itself so the advertised arguments cannot drift from the validated ones. */
+function toToolParameters(schema: z.ZodType): Record<string, unknown> {
+  const { $schema: _dialect, ...jsonSchema } = z.toJSONSchema(schema);
+  return jsonSchema;
+}
+
 export interface AssistantTool<A = unknown> {
   name: string;
   description: string;
   schema: z.ZodType<A>;
+  /** JSON Schema advertised to the model for the same argument object. */
+  parameters: Record<string, unknown>;
   run(args: A, userId: string, nowMs: number): Promise<unknown>;
 }
 
@@ -90,6 +99,7 @@ function defineTool<A, R>(spec: AssistantToolSpec<A, R>): AssistantTool<A> {
     name: spec.name,
     description: spec.description,
     schema: spec.schema,
+    parameters: toToolParameters(spec.schema),
     run: async (args, userId, nowMs) => spec.toApi(await spec.read(args, userId, nowMs)),
   };
 }
@@ -102,9 +112,7 @@ function defineTool<A, R>(spec: AssistantToolSpec<A, R>): AssistantTool<A> {
  */
 async function resolveScope(vehicleId: string | undefined, userId: string): Promise<string> {
   if (!vehicleId) return userId;
-  await requireVehicleRead(vehicleId, userId);
-  const ownerId = await resolveVehicleOwnerId(vehicleId);
-  return ownerId ?? userId;
+  return requireVehicleOwnerScope(vehicleId, userId, 'read');
 }
 
 const TOOL_LIST: AssistantTool[] = [
@@ -122,7 +130,7 @@ const TOOL_LIST: AssistantTool[] = [
       'Total spend, expense count, monthly average, and a per-category breakdown over a time range. ' +
       'Optionally scoped to one vehicle.',
     schema: rangeVehicleArgs,
-    read: async (args: z.infer<typeof rangeVehicleArgs>, userId) => {
+    read: async (args, userId) => {
       const scopeId = await resolveScope(args.vehicleId, userId);
       return expenseRepository.getSummary({
         userId: scopeId,
@@ -138,7 +146,7 @@ const TOOL_LIST: AssistantTool[] = [
       'Fuel/efficiency statistics (MPG or mi/kWh, cost per mile, fill-up counts) over a time range. ' +
       'Optionally scoped to one vehicle.',
     schema: rangeVehicleArgs,
-    read: async (args: z.infer<typeof rangeVehicleArgs>, userId, nowMs) => {
+    read: async (args, userId, nowMs) => {
       const scopeId = await resolveScope(args.vehicleId, userId);
       return analyticsRepository.getFuelStats(
         scopeId,
@@ -153,7 +161,7 @@ const TOOL_LIST: AssistantTool[] = [
     description:
       'A combined quick-stats + fuel-stats overview across all vehicles over a time range.',
     schema: rangeArgs,
-    read: async (args: z.infer<typeof rangeArgs>, userId, nowMs) =>
+    read: async (args, userId, nowMs) =>
       analyticsRepository.getSummary(userId, resolveRange(args.range, nowMs)),
     toApi: analyticsSummaryToApi,
   }),
@@ -162,7 +170,7 @@ const TOOL_LIST: AssistantTool[] = [
     description:
       'Compare all vehicles head-to-head over a time range (spend, efficiency, cost-per-mile per vehicle).',
     schema: rangeArgs,
-    read: async (args: z.infer<typeof rangeArgs>, userId, nowMs) =>
+    read: async (args, userId, nowMs) =>
       analyticsRepository.getCrossVehicle(userId, resolveRange(args.range, nowMs)),
     toApi: crossVehicleToApi,
   }),
@@ -194,36 +202,10 @@ export const ASSISTANT_TOOLS: Readonly<Record<string, AssistantTool>> = Object.f
   Object.fromEntries(TOOL_LIST.map((t) => [t.name, t]))
 );
 
-export function toolDefinitions(): Array<{
-  name: string;
-  description: string;
-  parameters: Record<string, unknown>;
-}> {
+export function toolDefinitions(): ToolDefinition[] {
   return TOOL_LIST.map((t) => ({
     name: t.name,
     description: t.description,
-    parameters: zodToJsonSchema(t.schema),
+    parameters: t.parameters,
   }));
-}
-
-/** Hand-rolled because it only has to cover the three arg shapes above. */
-function zodToJsonSchema(schema: z.ZodType<unknown>): Record<string, unknown> {
-  const rangeProp = { type: 'string', enum: [...RANGE_VALUES] };
-  if (schema === emptyArgs) {
-    return { type: 'object', properties: {}, additionalProperties: false };
-  }
-  if (schema === rangeArgs) {
-    return {
-      type: 'object',
-      properties: { range: rangeProp },
-      required: ['range'],
-      additionalProperties: false,
-    };
-  }
-  return {
-    type: 'object',
-    properties: { range: rangeProp, vehicleId: { type: 'string' } },
-    required: ['range'],
-    additionalProperties: false,
-  };
 }

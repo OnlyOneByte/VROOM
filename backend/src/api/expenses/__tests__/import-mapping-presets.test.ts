@@ -99,7 +99,7 @@ describe('presetToMapping feeds applyMapping', () => {
   });
 });
 
-describe('MAPPING_PRESETS category column gap', () => {
+describe('fuel-log presets import rows as fuel', () => {
   const vehicles: ImportVehicle[] = [
     { id: 'veh-1', make: 'Honda', model: 'Civic', year: 2020, nickname: 'Daily Driver' },
   ];
@@ -116,18 +116,10 @@ describe('MAPPING_PRESETS category column gap', () => {
     ].join('\n'),
   };
 
-  test('NONE of the presets map a category column (the root of the gap)', () => {
-    for (const preset of MAPPING_PRESETS) {
-      expect(
-        preset.columns.category,
-        `${preset.id} should have no category column today`
-      ).toBeUndefined();
-    }
-  });
-
-  test('every preset yields 0 ready rows when no category column is mapped', () => {
+  test('every preset defaults a file with no category column to fuel', () => {
     for (const preset of MAPPING_PRESETS) {
       const mapping = presetToMapping(preset, 'Daily Driver');
+      expect(mapping.defaultCategory, `${preset.id} default category`).toBe('fuel');
       const csv = PRESET_ROWS[preset.id];
       expect(csv, `add a sample row for preset ${preset.id}`).toBeDefined();
 
@@ -137,9 +129,10 @@ describe('MAPPING_PRESETS category column gap', () => {
       });
       const plan = buildImportPlan(native.csv, vehicles);
 
-      expect(plan.readyCount, `${preset.id} ready count (pre-defaultCategory fix)`).toBe(0);
-      expect(plan.errorCount, `${preset.id} error count`).toBe(1);
-      expect(plan.rows[0]?.message, `${preset.id} error message`).toMatch(/category/i);
+      expect(plan.errorCount, `${preset.id} errors: ${plan.rows[0]?.message}`).toBe(0);
+      expect(plan.readyCount, `${preset.id} ready count`).toBe(1);
+      expect(plan.rows[0]?.expense?.category, `${preset.id} category`).toBe('fuel');
+      expect(plan.rows[0]?.expense?.vehicleId).toBe('veh-1');
     }
   });
 });

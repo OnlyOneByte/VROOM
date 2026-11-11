@@ -45,8 +45,9 @@ countRatchet({
   name: 'async transaction callbacks are ratcheted, not merely documented',
   tolerated: INVENTORY,
   guidance:
-    'These files introduce the autocommit footgun — make the callback synchronous ' +
-    '(.run()/.all()/.get() inline), or inventory the site in INVENTORY above with a reason:',
+    'An async transaction callback autocommits each statement, so a throw mid-write leaves earlier ' +
+    'writes committed. Make the callback synchronous (.run()/.all()/.get() inline), or inventory the ' +
+    'site in INVENTORY above with a reason:',
   scan: () => {
     const counts = new Map<string, number>();
     for (const file of productionSources()) {

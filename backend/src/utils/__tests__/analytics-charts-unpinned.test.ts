@@ -4,13 +4,9 @@
 
 import { describe, expect, test } from 'bun:test';
 import {
-  buildDayOfWeekPatterns,
   buildFillupCostByVehicle,
   buildFillupIntervals,
-  buildFuelEfficiencyComparison,
-  buildMonthlyConsumption,
   buildMonthlyCostHeatmap,
-  buildSeasonalEfficiency,
   computeAverageCosts,
   computeEfficiencyPoint,
   computeFuelConsumptionMetrics,
@@ -56,82 +52,6 @@ function genRow(over: Partial<GeneralExpenseRow> = {}): GeneralExpenseRow {
     ...over,
   };
 }
-
-describe('buildDayOfWeekPatterns', () => {
-  test('empty input returns all 7 days at zero (no NaN from divide-by-zero)', () => {
-    const out = buildDayOfWeekPatterns([]);
-    expect(out).toHaveLength(7);
-    expect(out.every((r) => r.fillupCount === 0 && r.avgCost === 0 && r.avgVolume === 0)).toBe(
-      true
-    );
-    expect(out.every((r) => Number.isFinite(r.avgCost) && Number.isFinite(r.avgVolume))).toBe(true);
-  });
-
-  test('buckets a fill-up onto its LOCAL day-of-week and averages cost/volume', () => {
-    // 2024-01-15 is a Monday in local time.
-    const out = buildDayOfWeekPatterns([
-      fuelRow({ date: d(2024, 1, 15), expenseAmount: 50, volume: 10 }),
-      fuelRow({ date: d(2024, 1, 22), expenseAmount: 30, volume: 6 }),
-    ]);
-    const monday = out.find((r) => r.day === 'Monday');
-    expect(monday?.fillupCount).toBe(2);
-    expect(monday?.avgCost).toBe(40);
-    expect(monday?.avgVolume).toBe(8);
-  });
-
-  // A split fuel expense leaves one null-volume sibling per vehicle. Counting rows would count one
-  // fillup as N, so only volume-bearing rows count.
-  test('a split fuel fillup counts as one fillup with the real average', () => {
-    const out = buildDayOfWeekPatterns([
-      fuelRow({ date: d(2024, 1, 15), expenseAmount: 30, volume: 12 }),
-      fuelRow({ date: d(2024, 1, 15), expenseAmount: 30, volume: null }),
-      fuelRow({ date: d(2024, 1, 15), expenseAmount: 30, volume: null }),
-    ]);
-    const monday = out.find((r) => r.day === 'Monday');
-    expect(monday?.fillupCount).toBe(1);
-    expect(monday?.avgVolume).toBe(12);
-    expect(monday?.avgCost).toBe(30);
-  });
-
-  test('a zero-volume fuel row is not counted as a fillup', () => {
-    const out = buildDayOfWeekPatterns([fuelRow({ date: d(2024, 1, 15), volume: 0 })]);
-    const monday = out.find((r) => r.day === 'Monday');
-    expect(monday?.fillupCount).toBe(0);
-  });
-});
-
-describe('buildSeasonalEfficiency', () => {
-  test('empty input returns the 4 seasons at zero (no divide-by-zero)', () => {
-    const out = buildSeasonalEfficiency([]);
-    expect(out.map((s) => s.season)).toEqual(['Winter', 'Spring', 'Summer', 'Fall']);
-    expect(out.every((s) => s.fillupCount === 0 && s.avgEfficiency === 0)).toBe(true);
-  });
-
-  test('counts a fill-up into its Northern-hemisphere season (Jan → Winter)', () => {
-    const out = buildSeasonalEfficiency([fuelRow({ date: d(2024, 1, 10) })]);
-    const winter = out.find((s) => s.season === 'Winter');
-    expect(winter?.fillupCount).toBe(1);
-    // A lone fill-up yields no consecutive pair, so avgEfficiency stays 0 rather than NaN.
-    expect(winter?.avgEfficiency).toBe(0);
-  });
-
-  // Same split-sibling rule as buildDayOfWeekPatterns: only volume-bearing rows are fillups.
-  test('a split fuel fillup (1 volume-bearing row + null-volume siblings) counts as one fillup', () => {
-    const out = buildSeasonalEfficiency([
-      fuelRow({ date: d(2024, 1, 10), volume: 12 }),
-      fuelRow({ date: d(2024, 1, 10), volume: null }),
-      fuelRow({ date: d(2024, 1, 10), volume: null }),
-    ]);
-    const winter = out.find((s) => s.season === 'Winter');
-    expect(winter?.fillupCount).toBe(1);
-  });
-
-  test('a zero-volume fuel row is not counted as a fillup', () => {
-    const out = buildSeasonalEfficiency([fuelRow({ date: d(2024, 1, 10), volume: 0 })]);
-    const winter = out.find((s) => s.season === 'Winter');
-    expect(winter?.fillupCount).toBe(0);
-  });
-});
 
 describe('buildMonthlyCostHeatmap', () => {
   test('empty input returns an empty array', () => {
@@ -399,46 +319,6 @@ describe('gasEfficiencyPoint', () => {
   });
 });
 
-describe('sibling efficiency builders exclude PHEV charge from the gas-MPG average', () => {
-  // Two gas fill-ups (30 MPG), then a charge session (4 mi/kWh). Averaging the charge in would give
-  // 17, so the gas average must be 30.
-  const rows: FuelExpenseRow[] = [
-    fuelRow({
-      vehicleId: 'v1',
-      date: d(2024, 1, 1),
-      mileage: 10000,
-      volume: 10,
-      fuelType: 'regular',
-    }),
-    fuelRow({
-      vehicleId: 'v1',
-      date: d(2024, 1, 8),
-      mileage: 10300,
-      volume: 10,
-      fuelType: 'regular',
-    }),
-    fuelRow({
-      vehicleId: 'v1',
-      date: d(2024, 1, 15),
-      mileage: 10360,
-      volume: 15,
-      fuelType: 'Level 2 (AC)',
-    }),
-  ];
-
-  test('buildMonthlyConsumption efficiency is the gas MPG (30), not diluted by the charge mi/kWh', () => {
-    const out = buildMonthlyConsumption(rows);
-    const jan = out.find((m) => m.month === '2024-01');
-    expect(jan).toBeDefined();
-    expect(jan?.efficiency).toBeCloseTo(30, 5);
-  });
-
-  test('buildSeasonalEfficiency avgEfficiency is the gas MPG (30), not diluted', () => {
-    const winter = buildSeasonalEfficiency(rows).find((s) => s.season === 'Winter');
-    expect(winter?.avgEfficiency).toBeCloseTo(30, 5);
-  });
-});
-
 // An EV-only vehicle must give an empty gas-MPG series, with no mi/kWh value labeled as mi/gal. Its
 // cost per mile must still come from the charge spend.
 describe('an EV-only vehicle yields an empty gas-MPG series but a real cost-per-mile', () => {
@@ -476,14 +356,6 @@ describe('an EV-only vehicle yields an empty gas-MPG series but a real cost-per-
     expect(fc.bestEfficiency).toBeNull();
     expect(fc.worstEfficiency).toBeNull();
   });
-
-  test('buildMonthlyConsumption shows 0 gas efficiency for the EV-only month', () => {
-    const march = buildMonthlyConsumption(evRows).find((m) => m.month === '2024-03');
-    expect(march).toBeDefined();
-    // No gas pair, so efficiency is 0 rather than the ~4 mi/kWh.
-    expect(march?.efficiency).toBe(0);
-    expect(march?.volume).toBeCloseTo(120, 5);
-  });
 });
 
 // Pins the realistic-band limits against the real computeEfficiencyPoint: gas 5–100 mi/gal,
@@ -515,53 +387,6 @@ describe('computeEfficiencyPoint realistic-band boundaries (gas 5–100, electri
     expect(
       computeEfficiencyPoint(cur(10011, 'Level 2 (AC)'), prev(10000, 'Level 2 (AC)'))
     ).toBeNull();
-  });
-});
-
-// The per-vehicle, per-month gas-MPG comparison. It groups by vehicle before pairing, so it needs
-// its own tests.
-describe('buildFuelEfficiencyComparison (cross-vehicle per-month gas-MPG)', () => {
-  const names = new Map([
-    ['v1', 'Car One'],
-    ['v2', 'Car Two'],
-  ]);
-
-  test('pairs only within a vehicle, even when rows interleave', () => {
-    // Rows are interleaved, so a flat-list pairing would subtract one car's odometer from the other's.
-    //  v1: 1000 → 1300 mi on 10 gal = 30 MPG; v2: 5000 → 5240 mi on 8 gal = 30 MPG.
-    const rows: FuelExpenseRow[] = [
-      fuelRow({ vehicleId: 'v1', date: d(2024, 1, 1), mileage: 1000, volume: 10 }),
-      fuelRow({ vehicleId: 'v2', date: d(2024, 1, 10), mileage: 5000, volume: 8 }),
-      fuelRow({ vehicleId: 'v1', date: d(2024, 1, 20), mileage: 1300, volume: 10 }),
-      fuelRow({ vehicleId: 'v2', date: d(2024, 1, 25), mileage: 5240, volume: 8 }),
-    ];
-    const out = buildFuelEfficiencyComparison(rows, names);
-    const jan = out.find((m) => m.month === '2024-01');
-    expect(jan, 'a 2024-01 bucket exists').toBeTruthy();
-    const v1 = jan?.vehicles.find((v) => v.vehicleId === 'v1');
-    const v2 = jan?.vehicles.find((v) => v.vehicleId === 'v2');
-    expect(v1?.efficiency).toBeCloseTo(30, 5);
-    expect(v1?.vehicleName).toBe('Car One');
-    expect(v2?.efficiency).toBeCloseTo(30, 5);
-  });
-
-  test('a charge row contributes nothing to the gas-MPG comparison', () => {
-    // The charge row is excluded, so the gas average stays 30.
-    const rows: FuelExpenseRow[] = [
-      fuelRow({ vehicleId: 'v1', date: d(2024, 2, 1), mileage: 2000, volume: 10 }),
-      fuelRow({ vehicleId: 'v1', date: d(2024, 2, 15), mileage: 2300, volume: 10 }),
-      fuelRow({
-        vehicleId: 'v1',
-        date: d(2024, 2, 20),
-        mileage: 2360,
-        volume: 15,
-        fuelType: 'Level 2 (AC)',
-      }),
-    ];
-    const out = buildFuelEfficiencyComparison(rows, names);
-    const feb = out.find((m) => m.month === '2024-02');
-    const v1 = feb?.vehicles.find((v) => v.vehicleId === 'v1');
-    expect(v1?.efficiency, 'gas MPG only, charge excluded').toBeCloseTo(30, 5);
   });
 });
 

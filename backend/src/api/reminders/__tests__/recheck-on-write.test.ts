@@ -1,7 +1,6 @@
 /**
  * Mileage reminders fire as soon as an odometer reading or mileaged expense crosses their milestone,
  * without waiting for /trigger. Reminder rows are seeded via sqlite so the setup can sit below the milestone.
- * Keep imports limited to the harness and bun:test: createTestApp sets env before config loads.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -12,6 +11,7 @@ import {
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
+import { addOdometerReading, seedMileageReminder } from './_helpers';
 
 let ctx: TestApp;
 
@@ -19,22 +19,6 @@ beforeEach(async () => {
   ctx = await createTestApp();
 });
 afterEach(() => ctx.close());
-
-/** Seed a pure-mileage reminder with the given milestone, linked to one vehicle. */
-function seedMileageReminder(id: string, vehicleId: string, nextDueOdometer: number): void {
-  ctx.sqlite.run(
-    `INSERT INTO reminders
-       (id, user_id, name, type, action_mode, frequency, trigger_mode,
-        interval_mileage, last_service_odometer, next_due_odometer, start_date, next_due_date, is_active)
-     VALUES (?, ?, 'Oil change', 'notification', 'automatic', 'custom', 'mileage',
-        5000, ?, ?, 0, NULL, 1)`,
-    [id, ctx.user.id, nextDueOdometer - 5000, nextDueOdometer]
-  );
-  ctx.sqlite.run(`INSERT INTO reminder_vehicles (reminder_id, vehicle_id) VALUES (?, ?)`, [
-    id,
-    vehicleId,
-  ]);
-}
 
 function mileageNotifCount(reminderId: string): number {
   return (
@@ -46,37 +30,29 @@ function mileageNotifCount(reminderId: string): number {
   ).n;
 }
 
-async function addOdometerReading(vehicleId: string, odometer: number): Promise<void> {
-  const res = await ctx.authed('POST', `/api/v1/odometer/${vehicleId}`, {
-    odometer,
-    recordedAt: '2024-06-01T00:00:00.000Z',
-  });
-  expect(res.status, `odometer ${odometer}`).toBe(201);
-}
-
 describe('mileage re-check on write', () => {
   test('an odometer reading crossing the milestone fires the notification immediately (no /trigger)', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'RAV4', year: 2022 });
-    seedMileageReminder('rw1', vehicleId, 35000);
+    seedMileageReminder(ctx, 'rw1', vehicleId, 35000);
 
     // Just the write — no POST /trigger. The recheck hook should fire it.
-    await addOdometerReading(vehicleId, 35100);
+    await addOdometerReading(ctx, vehicleId, 35100);
 
     expect(mileageNotifCount('rw1')).toBe(1);
   });
 
   test('an odometer reading below the milestone fires nothing', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'RAV4', year: 2022 });
-    seedMileageReminder('rw2', vehicleId, 35000);
+    seedMileageReminder(ctx, 'rw2', vehicleId, 35000);
 
-    await addOdometerReading(vehicleId, 34000);
+    await addOdometerReading(ctx, vehicleId, 34000);
 
     expect(mileageNotifCount('rw2')).toBe(0);
   });
 
   test('a mileaged expense crossing the milestone fires it too', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'RAV4', year: 2022 });
-    seedMileageReminder('rw3', vehicleId, 35000);
+    seedMileageReminder(ctx, 'rw3', vehicleId, 35000);
 
     const res = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId,
@@ -93,9 +69,9 @@ describe('mileage re-check on write', () => {
 
   test('recheck-on-write is idempotent: a later /trigger does not double-fire', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'RAV4', year: 2022 });
-    seedMileageReminder('rw4', vehicleId, 35000);
+    seedMileageReminder(ctx, 'rw4', vehicleId, 35000);
 
-    await addOdometerReading(vehicleId, 36000); // recheck fires it
+    await addOdometerReading(ctx, vehicleId, 36000); // recheck fires it
     expect(mileageNotifCount('rw4')).toBe(1);
 
     await ctx.authed('POST', '/api/v1/reminders/trigger'); // must NOT add a second
@@ -104,7 +80,7 @@ describe('mileage re-check on write', () => {
 
   test('a non-mileaged expense write does not fire a mileage reminder', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'RAV4', year: 2022 });
-    seedMileageReminder('rw5', vehicleId, 35000);
+    seedMileageReminder(ctx, 'rw5', vehicleId, 35000);
 
     // An expense with NO mileage — even though the milestone is 35000, no reading exists.
     const res = await ctx.authed('POST', '/api/v1/expenses', {
@@ -123,7 +99,7 @@ describe('mileage re-check on write', () => {
 describe('mileage re-check on update', () => {
   test('editing an odometer reading UP across the milestone fires immediately (no /trigger)', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'RAV4', year: 2022 });
-    seedMileageReminder('ru1', vehicleId, 35000);
+    seedMileageReminder(ctx, 'ru1', vehicleId, 35000);
 
     // Create a reading BELOW the milestone — fires nothing yet.
     const created = await ctx.authed('POST', `/api/v1/odometer/${vehicleId}`, {
@@ -141,7 +117,7 @@ describe('mileage re-check on update', () => {
 
   test('editing a mileaged expense UP across the milestone fires immediately', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'RAV4', year: 2022 });
-    seedMileageReminder('ru2', vehicleId, 35000);
+    seedMileageReminder(ctx, 'ru2', vehicleId, 35000);
 
     // A fuel expense BELOW the milestone — fires nothing yet.
     const created = await ctx.authed('POST', '/api/v1/expenses', {
@@ -170,7 +146,7 @@ describe('mileage re-check on update', () => {
 describe('deleting an odometer reading', () => {
   test('keeps an already-fired mileage notification and does not re-fire it', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'RAV4', year: 2022 });
-    seedMileageReminder('rd1', vehicleId, 35000);
+    seedMileageReminder(ctx, 'rd1', vehicleId, 35000);
 
     // A reading across the milestone fires the notification (via the create recheck).
     const created = await ctx.authed('POST', `/api/v1/odometer/${vehicleId}`, {

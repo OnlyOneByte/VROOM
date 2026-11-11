@@ -14,7 +14,7 @@ export function centsToDollars(cents: number): number {
 }
 
 // Shallow copy. Null or undefined money values stay absent.
-export function centsFieldsToDollars<T extends Record<string, unknown>>(
+function centsFieldsToDollars<T extends Record<string, unknown>>(
   row: T,
   moneyFields: readonly (keyof T)[]
 ): T {
@@ -29,23 +29,23 @@ export function centsFieldsToDollars<T extends Record<string, unknown>>(
 }
 
 // Apply at route response boundaries only. Repositories and analytics must keep reading cents.
-export const EXPENSE_MONEY_FIELDS = ['expenseAmount', 'groupTotal'] as const;
-export const FINANCING_MONEY_FIELDS = [
+const EXPENSE_MONEY_FIELDS = ['expenseAmount', 'groupTotal'] as const;
+const FINANCING_MONEY_FIELDS = [
   'originalAmount',
   'paymentAmount',
   'residualValue',
   'excessMileageFee',
 ] as const;
-export const INSURANCE_TERM_MONEY_FIELDS = [
+const INSURANCE_TERM_MONEY_FIELDS = [
   'deductibleAmount',
   'coverageLimit',
   'totalCost',
   'monthlyCost',
   'paymentAmount',
 ] as const;
-export const INSURANCE_CLAIM_MONEY_FIELDS = ['payoutAmount'] as const;
-export const VEHICLE_MONEY_FIELDS = ['purchasePrice'] as const;
-export const REMINDER_MONEY_FIELDS = ['expenseAmount'] as const;
+const INSURANCE_CLAIM_MONEY_FIELDS = ['payoutAmount'] as const;
+const VEHICLE_MONEY_FIELDS = ['purchasePrice'] as const;
+const REMINDER_MONEY_FIELDS = ['expenseAmount'] as const;
 
 function mapMoney<T extends Record<string, unknown>>(row: T, fields: readonly (keyof T)[]): T;
 function mapMoney<T extends Record<string, unknown>>(
@@ -67,7 +67,7 @@ export const insuranceTermToApi = <T extends Record<string, unknown>>(row: T) =>
   mapMoney(row, INSURANCE_TERM_MONEY_FIELDS as readonly (keyof T)[]);
 export const insuranceClaimToApi = <T extends Record<string, unknown>>(row: T) =>
   mapMoney(row, INSURANCE_CLAIM_MONEY_FIELDS as readonly (keyof T)[]);
-export const vehicleToApi = <T extends Record<string, unknown>>(row: T) =>
+const vehicleToApi = <T extends Record<string, unknown>>(row: T) =>
   mapMoney(row, VEHICLE_MONEY_FIELDS as readonly (keyof T)[]);
 export const reminderToApi = <T extends Record<string, unknown>>(row: T) =>
   mapMoney(row, REMINDER_MONEY_FIELDS as readonly (keyof T)[]);

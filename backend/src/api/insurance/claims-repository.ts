@@ -109,8 +109,6 @@ export class InsuranceClaimRepository {
     claimId: string,
     updates: UpdateClaimInput
   ): Promise<InsuranceClaim> {
-    await this.findById(policyId, claimId);
-
     const patch: Record<string, unknown> = { updatedAt: new Date() };
     if (updates.claimDate !== undefined) patch.claimDate = updates.claimDate;
     if (updates.claimType !== undefined) patch.claimType = updates.claimType;

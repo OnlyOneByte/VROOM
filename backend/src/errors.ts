@@ -140,10 +140,24 @@ const ERROR_STATUS_MAP: Record<string, number> = {
   [SyncErrorCode.SYNC_IN_PROGRESS]: 409,
 };
 
+// bun:sqlite sets `code`; drizzle may wrap the driver error, so the cause chain is walked too.
+// A primary-key collision is reported as its own code but is the same violation.
+const UNIQUE_VIOLATION_CODES = new Set([
+  'SQLITE_CONSTRAINT_UNIQUE',
+  'SQLITE_CONSTRAINT_PRIMARYKEY',
+]);
+
+export function isUniqueConstraintError(err: unknown): boolean {
+  for (let e: unknown = err; e instanceof Error; e = e.cause) {
+    const code = (e as Error & { code?: unknown }).code;
+    if (typeof code === 'string' && UNIQUE_VIOLATION_CODES.has(code)) return true;
+  }
+  return false;
+}
+
 export const handleDatabaseError = (error: unknown): AppError => {
+  if (isUniqueConstraintError(error)) return new ConflictError('Resource already exists');
   if (error instanceof Error) {
-    if (error.message.includes('UNIQUE constraint failed'))
-      return new ConflictError('Resource already exists');
     if (error.message.includes('FOREIGN KEY constraint failed'))
       return new ValidationError('Invalid reference to related resource');
     if (error.message.includes('NOT NULL constraint failed'))

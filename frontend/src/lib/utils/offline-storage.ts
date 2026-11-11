@@ -1,8 +1,5 @@
-import { offlineExpenseQueue, syncState } from '$lib/stores/offline.svelte';
+import { offlineExpenseQueue } from '$lib/stores/offline.svelte';
 import { toBackendExpense } from '$lib/services/api-transformer';
-import { apiClient } from '$lib/services/api-client';
-import { classifySyncFailure } from '$lib/utils/sync/classify-failure';
-import { extractErrorMessage } from '$lib/utils/error-handling';
 import { browser } from '$app/environment';
 import type { ExpenseCategory } from '$lib/types';
 
@@ -29,6 +26,7 @@ export interface OfflineExpense {
 	// Must be kept: a missed fill-up is excluded from MPG pairing.
 	missedFillup?: boolean;
 	description?: string;
+	location?: string;
 	timestamp: number;
 	synced: boolean;
 	needsAttention?: boolean;
@@ -50,7 +48,8 @@ export function offlineExpenseToBackend(
 		charge: expense.charge,
 		fuelType: expense.fuelType,
 		missedFillup: expense.missedFillup,
-		description: expense.description
+		description: expense.description,
+		location: expense.location
 	});
 }
 
@@ -175,59 +174,4 @@ export function clearSyncedExpenses(): void {
 	const currentExpenses = loadOfflineExpenses();
 	const pendingExpenses = currentExpenses.filter(expense => !expense.synced);
 	saveOfflineExpenses(pendingExpenses);
-}
-
-export async function syncOfflineExpenses(): Promise<void> {
-	const pendingExpenses = getPendingExpenses();
-
-	if (pendingExpenses.length === 0) return;
-
-	syncState.current = 'syncing';
-
-	let failed = 0;
-
-	try {
-		for (const expense of pendingExpenses) {
-			if (isIncompleteFuelExpense(expense)) {
-				if (import.meta.env.DEV) {
-					console.warn(
-						`Parking expense ${expense.id} (needs attention): fuel expenses require volume/charge and mileage`
-					);
-				}
-				markExpenseNeedsAttention(expense.id, INCOMPLETE_FUEL_REASON);
-				continue;
-			}
-
-			const backendExpense = offlineExpenseToBackend(expense);
-
-			try {
-				await apiClient.post('/api/v1/expenses', {
-					...backendExpense,
-					clientId: expense.clientId
-				});
-				markExpenseAsSynced(expense.id);
-			} catch (error) {
-				const kind = classifySyncFailure(error);
-				if (kind === 'terminal') {
-					markExpenseNeedsAttention(
-						expense.id,
-						extractErrorMessage(error, 'The server rejected this entry')
-					);
-				} else {
-					failed++;
-				}
-				if (import.meta.env.DEV) {
-					console.error(`Failed to sync expense ${expense.id} (${kind}):`, error);
-				}
-			}
-		}
-
-		clearSyncedExpenses();
-		syncState.current = failed > 0 ? 'error' : 'success';
-		setTimeout(() => (syncState.current = 'idle'), failed > 0 ? 5000 : 3000);
-	} catch (error) {
-		if (import.meta.env.DEV) console.error('Failed to sync offline expenses:', error);
-		syncState.current = 'error';
-		setTimeout(() => (syncState.current = 'idle'), 5000);
-	}
 }

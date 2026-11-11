@@ -13,8 +13,9 @@ import { preferencesRepository, syncStateRepository } from '../settings/reposito
 import { activityTracker } from './activity-tracker';
 import { backupService } from './backup';
 import { backupOrchestrator } from './backup-orchestrator';
+import { hasSheetsSync, hasZipBackup } from './backup-strategy';
 import './init';
-import { restoreService } from './restore';
+import { type RestoreResponse, restoreService } from './restore';
 
 const routes = new Hono();
 
@@ -33,7 +34,7 @@ const restoreRateLimiter = rateLimiter({
   keyGenerator: (c) => `restore:${c.get('user').id}`,
 });
 
-const restoreFromProviderSchema = z.discriminatedUnion('sourceType', [
+export const restoreFromProviderSchema = z.discriminatedUnion('sourceType', [
   z.object({
     sourceType: z.literal('zip'),
     providerId: z.string().min(1).max(64),
@@ -113,10 +114,8 @@ routes.get('/status', async (c) => {
 
   const config = settings.backupConfig as BackupConfig | null;
   const providers = config?.providers;
-  const backupEnabled = providers ? Object.values(providers).some((p) => p.enabled) : false;
-  const sheetsSyncEnabled = providers
-    ? Object.values(providers).some((p) => p.sheetsSyncEnabled)
-    : false;
+  const backupEnabled = providers ? Object.values(providers).some(hasZipBackup) : false;
+  const sheetsSyncEnabled = providers ? Object.values(providers).some(hasSheetsSync) : false;
 
   return c.json(
     createSuccessResponse({
@@ -187,7 +186,7 @@ routes.post(
       throw new SyncError(SyncErrorCode.VALIDATION_ERROR, 'Provider not found or inactive');
     }
 
-    let result: import('./restore').RestoreResponse;
+    let result: RestoreResponse;
     if (body.sourceType === 'zip') {
       const zipBuffer = await withTimeout(
         backupService.downloadBackup(user.id, body.providerId, body.fileRef),
@@ -288,10 +287,10 @@ routes.get('/restore/providers', syncRateLimiter, async (c) => {
 
     const sourceTypes: ('zip' | 'sheets')[] = [];
 
-    if (providerConfig.enabled && providerConfig.lastBackupAt) {
+    if (hasZipBackup(providerConfig) && providerConfig.lastBackupAt) {
       sourceTypes.push('zip');
     }
-    if (providerConfig.sheetsSyncEnabled && providerConfig.sheetsSpreadsheetId) {
+    if (hasSheetsSync(providerConfig) && providerConfig.sheetsSpreadsheetId) {
       sourceTypes.push('sheets');
     }
 

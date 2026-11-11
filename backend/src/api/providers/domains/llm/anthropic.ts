@@ -1,18 +1,18 @@
 /**
  * Anthropic Messages API adapter. Dumb transport: it never executes tools or trusts tool args.
- * Failures throw so the chat route can answer 502 instead of a fake success.
  */
 
-import { logger } from '../../../../utils/logger';
-import type {
-  ChatMessage,
-  ChatRequest,
-  ChatResult,
-  LlmProvider,
-  ToolCall,
-  ToolDefinition,
+import type { ModelProviderSettings } from '../model/model-registry';
+import { postModelJson, trimBaseUrl } from '../model/model-transport';
+import {
+  type ChatMessage,
+  type ChatRequest,
+  type ChatResult,
+  type LlmProvider,
+  parseToolArguments,
+  type ToolCall,
+  type ToolDefinition,
 } from './llm-provider';
-import type { LlmProviderSettings } from './registry';
 
 const REQUEST_TIMEOUT_MS = 60_000;
 const MAX_TOKENS = 1024;
@@ -29,19 +29,23 @@ interface AnthropicBlock {
 interface AnthropicResponse {
   content?: AnthropicBlock[];
 }
+interface AnthropicMessage {
+  role: 'user' | 'assistant';
+  content: string | Record<string, unknown>[];
+}
 
 export class AnthropicLlmProvider implements LlmProvider {
   private readonly apiKey: string;
   private readonly model: string;
   private readonly baseUrl: string;
 
-  constructor(settings: LlmProviderSettings) {
+  constructor(settings: ModelProviderSettings) {
     if (!settings.apiKey) {
       throw new Error('Anthropic LLM requires an API key');
     }
     this.apiKey = settings.apiKey;
     this.model = settings.model;
-    this.baseUrl = (settings.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, '');
+    this.baseUrl = trimBaseUrl(settings.baseUrl ?? DEFAULT_BASE_URL);
   }
 
   async chat(request: ChatRequest): Promise<ChatResult> {
@@ -50,58 +54,68 @@ export class AnthropicLlmProvider implements LlmProvider {
       .filter((m) => m.role === 'system')
       .map((m) => m.content)
       .join('\n\n');
-    const messages = request.messages.filter((m) => m.role !== 'system').map(toAnthropicMessage);
 
-    const body = {
+    const json = await postModelJson<AnthropicResponse>({
+      domain: 'LLM',
+      providerType: 'anthropic',
       model: this.model,
-      max_tokens: MAX_TOKENS,
-      temperature: 0,
-      ...(system ? { system } : {}),
-      messages,
-      ...(request.tools.length > 0 ? { tools: request.tools.map(toAnthropicTool) } : {}),
-    };
-
-    let res: Response;
-    try {
-      res = await fetch(`${this.baseUrl}/v1/messages`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': this.apiKey,
-          'anthropic-version': ANTHROPIC_VERSION,
-        },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'network error';
-      logger.warn('LLM anthropic request failed', { model: this.model, error: message });
-      throw new Error(`LLM request failed: ${message}`);
-    }
-
-    if (!res.ok) {
-      const detail = await res.text().catch(() => '');
-      logger.warn('LLM anthropic non-2xx', {
+      url: `${this.baseUrl}/v1/messages`,
+      headers: { 'x-api-key': this.apiKey, 'anthropic-version': ANTHROPIC_VERSION },
+      timeoutMs: REQUEST_TIMEOUT_MS,
+      body: {
         model: this.model,
-        status: res.status,
-        detail: detail.slice(0, 200),
-      });
-      throw new Error(`LLM provider returned HTTP ${res.status}`);
-    }
-
-    const json = (await res.json().catch(() => null)) as AnthropicResponse | null;
+        max_tokens: MAX_TOKENS,
+        temperature: 0,
+        ...(system ? { system } : {}),
+        messages: toAnthropicMessages(request.messages),
+        ...(request.tools.length > 0 ? { tools: request.tools.map(toAnthropicTool) } : {}),
+      },
+    });
     return normalizeResponse(json);
   }
 }
 
-function toAnthropicMessage(m: ChatMessage): Record<string, unknown> {
-  if (m.role === 'tool') {
-    return {
-      role: 'user',
-      content: [{ type: 'tool_result', tool_use_id: m.toolCallId ?? '', content: m.content }],
-    };
+/**
+ * Tool calls become tool_use blocks on the assistant turn, and every tool result for that turn goes in
+ * ONE following user message: Anthropic rejects a tool_result without a matching tool_use in the
+ * immediately preceding assistant turn.
+ */
+function toAnthropicMessages(messages: ChatMessage[]): AnthropicMessage[] {
+  const out: AnthropicMessage[] = [];
+  for (const m of messages) {
+    if (m.role === 'system') continue;
+    if (m.role === 'tool') {
+      const block = { type: 'tool_result', tool_use_id: m.toolCallId, content: m.content };
+      const prev = out[out.length - 1];
+      if (prev?.role === 'user' && Array.isArray(prev.content) && isToolResults(prev.content)) {
+        prev.content.push(block);
+      } else {
+        out.push({ role: 'user', content: [block] });
+      }
+      continue;
+    }
+    if (m.role === 'assistant' && m.toolCalls && m.toolCalls.length > 0) {
+      out.push({
+        role: 'assistant',
+        content: [
+          ...(m.content.length > 0 ? [{ type: 'text', text: m.content }] : []),
+          ...m.toolCalls.map((c) => ({
+            type: 'tool_use',
+            id: c.id,
+            name: c.name,
+            input: parseToolArguments(c.argumentsJson),
+          })),
+        ],
+      });
+      continue;
+    }
+    out.push({ role: m.role, content: m.content });
   }
-  return { role: m.role, content: m.content };
+  return out;
+}
+
+function isToolResults(blocks: Record<string, unknown>[]): boolean {
+  return blocks.every((b) => b.type === 'tool_result');
 }
 
 function toAnthropicTool(t: ToolDefinition): Record<string, unknown> {
@@ -111,6 +125,10 @@ function toAnthropicTool(t: ToolDefinition): Record<string, unknown> {
 /** A malformed 2xx body yields empty text rather than throwing. */
 function normalizeResponse(json: AnthropicResponse | null): ChatResult {
   const blocks = json?.content ?? [];
+  const text = blocks
+    .filter((b) => b.type === 'text' && typeof b.text === 'string')
+    .map((b) => b.text as string)
+    .join('');
   const toolUses = blocks.filter((b) => b.type === 'tool_use');
   if (toolUses.length > 0) {
     const toolCalls: ToolCall[] = toolUses.map((b, i) => ({
@@ -118,11 +136,7 @@ function normalizeResponse(json: AnthropicResponse | null): ChatResult {
       name: typeof b.name === 'string' ? b.name : '',
       argumentsJson: JSON.stringify(b.input ?? {}),
     }));
-    return { toolCalls };
+    return text ? { text, toolCalls } : { toolCalls };
   }
-  const text = blocks
-    .filter((b) => b.type === 'text' && typeof b.text === 'string')
-    .map((b) => b.text as string)
-    .join('');
   return { text };
 }

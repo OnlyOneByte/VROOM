@@ -11,7 +11,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
-import { seedVehicle as seedVehicleShared } from '../../../test-helpers/seed';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -34,9 +34,6 @@ interface VehicleWithFinancing {
   id: string;
   financing?: FinancingShape;
 }
-
-const seedVehicle = (nickname: string): Promise<string> =>
-  seedVehicleShared(ctx, { make: 'Honda', model: 'Civic', year: 2022, nickname });
 
 /** Attaches a loan so the list route's enrichment branch runs. The path is doubled by the router mounts. */
 async function seedLoan(vehicleId: string): Promise<void> {
@@ -63,7 +60,7 @@ async function listVehicles(): Promise<VehicleWithFinancing[]> {
 
 describe('GET /vehicles list: enriched financing contract', () => {
   test('a financed vehicle exposes the route-injected computed fields + the base financing row', async () => {
-    const id = await seedVehicle('Financed');
+    const id = await seedVehicle(ctx, { nickname: 'Financed' });
     await seedLoan(id);
 
     const vehicles = await listVehicles();
@@ -86,7 +83,7 @@ describe('GET /vehicles list: enriched financing contract', () => {
 
   test('a fresh loan is not eligible for payoff (computedBalance tracks the real balance)', async () => {
     // Key presence alone would pass a hardcoded balance, so the value itself is asserted.
-    const id = await seedVehicle('FreshLoan');
+    const id = await seedVehicle(ctx, { nickname: 'FreshLoan' });
     await seedLoan(id);
 
     const financing = (await listVehicles()).find((x) => x.id === id)?.financing;
@@ -96,7 +93,7 @@ describe('GET /vehicles list: enriched financing contract', () => {
   });
 
   test('a vehicle with no financing simply omits the object (no phantom computed fields)', async () => {
-    const id = await seedVehicle('NoFinancing');
+    const id = await seedVehicle(ctx, { nickname: 'NoFinancing' });
     const v = (await listVehicles()).find((x) => x.id === id);
     expect(v).toBeDefined();
     expect(v?.financing).toBeUndefined();
@@ -105,7 +102,7 @@ describe('GET /vehicles list: enriched financing contract', () => {
   test('a paid-off financing row still appears on the list, flagged isActive:false', async () => {
     // The join has no isActive filter. Consumers gate on isActive, so the paid-off row is ignored.
     // Filtering it out in the query would be a deliberate change that this test should catch.
-    const id = await seedVehicle('PaidOff');
+    const id = await seedVehicle(ctx, { nickname: 'PaidOff' });
     await seedLoan(id);
 
     const beforeFin = (await listVehicles()).find((x) => x.id === id)?.financing;

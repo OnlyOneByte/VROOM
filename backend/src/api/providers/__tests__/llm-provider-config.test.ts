@@ -84,6 +84,25 @@ describe('POST /api/v1/providers — LLM domain', () => {
     expect(res.status).toBe(400);
   });
 
+  test('validation messages name the LLM domain, not VLM', async () => {
+    const noModel = await ctx.authed(
+      'POST',
+      '/api/v1/providers',
+      llmBody({ config: { baseUrl: 'https://x/v1' } })
+    );
+    const noBaseUrl = await ctx.authed(
+      'POST',
+      '/api/v1/providers',
+      llmBody({ config: { model: 'gpt-4o' } })
+    );
+    const noKey = await ctx.authed('POST', '/api/v1/providers', llmBody({ credentials: {} }));
+    const bodies = [await noModel.text(), await noBaseUrl.text(), await noKey.text()];
+    expect(bodies[0]).toContain('LLM config must include a model name');
+    expect(bodies[1]).toContain('Self-hosted or OpenAI-compatible LLM requires a base URL');
+    expect(bodies[2]).toContain('LLM provider requires an API key');
+    for (const b of bodies) expect(b).not.toContain('VLM');
+  });
+
   test('allows an ollama (self-hosted, KEYLESS) llm provider — the local assistant path', async () => {
     const res = await ctx.authed(
       'POST',
@@ -167,6 +186,13 @@ describe('PUT /api/v1/providers/:id — LLM domain', () => {
       config: { baseUrl: 'https://api.openai.com/v1' },
     });
     expect(res.status).toBe(400);
+  });
+
+  test('PUT validation messages name the LLM domain', async () => {
+    const id = await createLlm();
+    const res = await ctx.authed('PUT', `/api/v1/providers/${id}`, { config: { baseUrl: 'x' } });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain('LLM config must include a model name');
   });
 
   test('a credentials update that drops the key on a non-ollama type is rejected (400)', async () => {

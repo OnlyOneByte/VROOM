@@ -201,7 +201,16 @@ async function processSingleRef(
     if (category) {
       try {
         pathHint = await deps.registry.resolveProviderFolderPath(ref.providerId, category);
-      } catch {}
+      } catch (error) {
+        // Uploading to the provider's root beats failing the whole sync over a folder lookup.
+        logger.warn('Sync worker: folder path lookup failed, uploading without a path hint', {
+          refId: ref.id,
+          photoId: ref.photoId,
+          providerId: ref.providerId,
+          category,
+          error: extractErrorMessage(error),
+        });
+      }
     }
 
     const targetProvider = await getCachedProvider(ref.providerId, providerCache, deps.registry);

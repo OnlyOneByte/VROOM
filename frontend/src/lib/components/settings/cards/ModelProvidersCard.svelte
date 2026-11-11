@@ -1,7 +1,7 @@
 <script lang="ts">
-	/** LLM provider settings: mirrors the VLM card for the llm domain. The API key is write-only; blank on edit keeps the stored key. */
+	/** AI model provider settings for one domain (vlm = receipt parsing, llm = assistant). The API key is write-only; blank on edit keeps the stored key. */
 	import { onMount } from 'svelte';
-	import { Bot, Plus, LoaderCircle, Pencil, Trash2 } from '@lucide/svelte';
+	import { Bot, Sparkles, Plus, LoaderCircle, Pencil, Trash2 } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
@@ -16,8 +16,49 @@
 	} from '$lib/components/ui/card';
 	import { providerApi } from '$lib/services/provider-api';
 	import { appStore } from '$lib/stores/app.svelte';
-	import { LLM_PROVIDER_TYPES, type ModelProviderTypeOption } from '$lib/constants/providers';
+	import {
+		LLM_PROVIDER_TYPES,
+		VLM_PROVIDER_TYPES,
+		type ModelProviderTypeOption
+	} from '$lib/constants/providers';
 	import type { UserProviderInfo } from '$lib/types';
+
+	type ModelDomain = 'vlm' | 'llm';
+
+	let { domain }: { domain: ModelDomain } = $props();
+
+	const COPY = {
+		vlm: {
+			icon: Sparkles,
+			title: 'Receipt Parsing (AI)',
+			description:
+				'Connect a vision-AI provider to scan receipts into expense drafts. Bring your own key — your receipt is sent only to the provider you choose. For maximum privacy, self-host with Ollama.',
+			noun: 'receipt-parsing provider',
+			emptyHint: 'Add one to scan receipts straight into an expense.',
+			dialogNote:
+				'The API key is stored encrypted and never shown again. Your receipt image is sent only to this provider when you scan.',
+			namePlaceholder: 'My receipt parser',
+			loadError: 'Failed to load receipt-parsing providers',
+			types: VLM_PROVIDER_TYPES
+		},
+		llm: {
+			icon: Bot,
+			title: 'Assistant (AI)',
+			description:
+				'Connect a chat-AI provider to ask questions about your vehicles and costs. Bring your own key — your questions are sent only to the provider you choose. The assistant is read-only and can never change your data. For maximum privacy, self-host with Ollama.',
+			noun: 'assistant provider',
+			emptyHint: 'Add one to chat with an AI about your vehicles and costs.',
+			dialogNote:
+				'The API key is stored encrypted and never shown again. Your questions are sent only to this provider when you chat.',
+			namePlaceholder: 'My assistant',
+			loadError: 'Failed to load assistant providers',
+			types: LLM_PROVIDER_TYPES
+		}
+	} as const;
+
+	let copy = $derived(COPY[domain]);
+	let providerTypes = $derived<ModelProviderTypeOption[]>(copy.types);
+	let Icon = $derived(copy.icon);
 
 	let providers = $state<UserProviderInfo[]>([]);
 	let isLoading = $state(true);
@@ -33,19 +74,19 @@
 	let isSaving = $state(false);
 
 	// The provider type set is non-empty, so [0] is defined; the assertion satisfies noUncheckedIndexedAccess.
-	const FALLBACK_TYPE: ModelProviderTypeOption = LLM_PROVIDER_TYPES[0] as ModelProviderTypeOption;
+	let fallbackType = $derived(providerTypes[0] as ModelProviderTypeOption);
 	let selectedTypeOption = $derived<ModelProviderTypeOption>(
-		LLM_PROVIDER_TYPES.find(t => t.id === formType) ?? FALLBACK_TYPE
+		providerTypes.find(t => t.id === formType) ?? fallbackType
 	);
 	let typeLabel = $derived(selectedTypeOption.label);
 
 	async function loadData() {
 		isLoading = true;
 		try {
-			providers = await providerApi.getProviders('llm');
+			providers = await providerApi.getProviders(domain);
 			error = null;
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load assistant providers';
+			error = e instanceof Error ? e.message : copy.loadError;
 		} finally {
 			isLoading = false;
 		}
@@ -102,7 +143,7 @@
 
 			if (editingId === null) {
 				await providerApi.createProvider({
-					domain: 'llm',
+					domain,
 					providerType: formType,
 					displayName: formDisplayName.trim(),
 					credentials: formApiKey.trim() ? { apiKey: formApiKey.trim() } : {},
@@ -139,21 +180,17 @@
 	}
 
 	function labelFor(typeId: string): string {
-		return LLM_PROVIDER_TYPES.find(t => t.id === typeId)?.label ?? typeId;
+		return providerTypes.find(t => t.id === typeId)?.label ?? typeId;
 	}
 </script>
 
 <Card>
 	<CardHeader>
 		<div class="flex items-center gap-2">
-			<Bot class="h-5 w-5 text-muted-foreground" />
-			<CardTitle>Assistant (AI)</CardTitle>
+			<Icon class="h-5 w-5 text-muted-foreground" />
+			<CardTitle>{copy.title}</CardTitle>
 		</div>
-		<CardDescription>
-			Connect a chat-AI provider to ask questions about your vehicles and costs. Bring your own key
-			— your questions are sent only to the provider you choose. The assistant is read-only and can
-			never change your data. For maximum privacy, self-host with Ollama.
-		</CardDescription>
+		<CardDescription>{copy.description}</CardDescription>
 	</CardHeader>
 	<CardContent>
 		{#if isLoading}
@@ -166,7 +203,12 @@
 			<div class="space-y-3">
 				<div class="flex items-center justify-between">
 					<p class="text-sm font-medium">Providers</p>
-					<Button variant="outline" size="sm" onclick={openCreate} data-testid="llm-add-provider">
+					<Button
+						variant="outline"
+						size="sm"
+						onclick={openCreate}
+						data-testid="{domain}-add-provider"
+					>
 						<Plus class="h-4 w-4 mr-1" />
 						Add Provider
 					</Button>
@@ -174,11 +216,9 @@
 
 				{#if providers.length === 0}
 					<div class="text-center py-6">
-						<Bot class="h-10 w-10 text-muted-foreground mx-auto mb-2" />
-						<p class="text-sm font-medium">No assistant provider configured</p>
-						<p class="text-xs text-muted-foreground mt-1">
-							Add one to chat with an AI about your vehicles and costs.
-						</p>
+						<Icon class="h-10 w-10 text-muted-foreground mx-auto mb-2" />
+						<p class="text-sm font-medium">No {copy.noun} configured</p>
+						<p class="text-xs text-muted-foreground mt-1">{copy.emptyHint}</p>
 						<Button variant="outline" size="sm" class="mt-3" onclick={openCreate}>
 							<Plus class="h-4 w-4 mr-1" />
 							Add Provider
@@ -189,7 +229,7 @@
 						{#each providers as provider (provider.id)}
 							<div
 								class="flex items-center justify-between rounded-lg border p-3"
-								data-testid="llm-provider-row"
+								data-testid="{domain}-provider-row"
 							>
 								<div class="min-w-0">
 									<p class="text-sm font-medium truncate">{provider.displayName}</p>
@@ -230,27 +270,24 @@
 <Dialog.Root bind:open={dialogOpen}>
 	<Dialog.Content class="sm:max-w-md">
 		<Dialog.Header>
-			<Dialog.Title>{editingId === null ? 'Add' : 'Edit'} assistant provider</Dialog.Title>
-			<Dialog.Description>
-				The API key is stored encrypted and never shown again. Your questions are sent only to this
-				provider when you chat.
-			</Dialog.Description>
+			<Dialog.Title>{editingId === null ? 'Add' : 'Edit'} {copy.noun}</Dialog.Title>
+			<Dialog.Description>{copy.dialogNote}</Dialog.Description>
 		</Dialog.Header>
 
 		<div class="space-y-4 py-2">
 			<div class="space-y-1.5">
-				<Label for="llm-type">Provider</Label>
+				<Label for="{domain}-type">Provider</Label>
 				<Select.Root
 					type="single"
 					value={formType}
 					onValueChange={onTypeChange}
 					disabled={editingId !== null}
 				>
-					<Select.Trigger id="llm-type" class="w-full" data-testid="llm-type-trigger">
+					<Select.Trigger id="{domain}-type" class="w-full" data-testid="{domain}-type-trigger">
 						{typeLabel}
 					</Select.Trigger>
 					<Select.Content>
-						{#each LLM_PROVIDER_TYPES as t (t.id)}
+						{#each providerTypes as t (t.id)}
 							<Select.Item value={t.id} label={t.label}>{t.label}</Select.Item>
 						{/each}
 					</Select.Content>
@@ -258,14 +295,14 @@
 			</div>
 
 			<div class="space-y-1.5">
-				<Label for="llm-name">Display name</Label>
-				<Input id="llm-name" bind:value={formDisplayName} placeholder="My assistant" />
+				<Label for="{domain}-name">Display name</Label>
+				<Input id="{domain}-name" bind:value={formDisplayName} placeholder={copy.namePlaceholder} />
 			</div>
 
 			<div class="space-y-1.5">
-				<Label for="llm-model">Model</Label>
+				<Label for="{domain}-model">Model</Label>
 				<Input
-					id="llm-model"
+					id="{domain}-model"
 					bind:value={formModel}
 					placeholder={selectedTypeOption.defaultModel}
 				/>
@@ -273,9 +310,9 @@
 
 			{#if selectedTypeOption.needsBaseUrl}
 				<div class="space-y-1.5">
-					<Label for="llm-baseurl">Base URL</Label>
+					<Label for="{domain}-baseurl">Base URL</Label>
 					<Input
-						id="llm-baseurl"
+						id="{domain}-baseurl"
 						bind:value={formBaseUrl}
 						placeholder={selectedTypeOption.defaultBaseUrl}
 					/>
@@ -284,9 +321,9 @@
 
 			{#if !selectedTypeOption.keyless}
 				<div class="space-y-1.5">
-					<Label for="llm-key">API key</Label>
+					<Label for="{domain}-key">API key</Label>
 					<Input
-						id="llm-key"
+						id="{domain}-key"
 						type="password"
 						bind:value={formApiKey}
 						placeholder={editingId === null ? 'sk-…' : 'Leave blank to keep current key'}
@@ -300,7 +337,11 @@
 			<Button variant="outline" onclick={() => (dialogOpen = false)} disabled={isSaving}>
 				Cancel
 			</Button>
-			<Button onclick={handleSave} disabled={!canSave || isSaving} data-testid="llm-save-provider">
+			<Button
+				onclick={handleSave}
+				disabled={!canSave || isSaving}
+				data-testid="{domain}-save-provider"
+			>
 				{#if isSaving}
 					<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
 					Saving...

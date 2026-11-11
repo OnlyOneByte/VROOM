@@ -105,15 +105,6 @@ export class UserActivityTracker {
     this.userActivities.delete(userId);
   }
 
-  cleanupInactiveUsers(maxInactiveHours: number = 24): void {
-    const cutoffTime = new Date(Date.now() - maxInactiveHours * 60 * 60 * 1000);
-    for (const [userId, activity] of this.userActivities.entries()) {
-      if (activity.lastActivity < cutoffTime && !activity.syncInProgress) {
-        this.stopTracking(userId);
-      }
-    }
-  }
-
   async markDataChanged(userId: string): Promise<void> {
     try {
       await syncStateRepository.markDataChanged(userId);

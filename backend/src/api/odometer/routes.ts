@@ -4,9 +4,9 @@ import { NotFoundError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { buildPaginatedResponse, clampPagination } from '../../utils/pagination';
 import {
+  requireVehicleOwnerScope,
   requireVehicleRead,
   requireVehicleWrite,
-  resolveVehicleOwnerId,
 } from '../../utils/sharing';
 import { commonSchemas, zValidator } from '../../utils/validation';
 import { deleteAllPhotosForEntity } from '../photos/photo-service';
@@ -42,9 +42,7 @@ routes.get(
     const query = c.req.valid('query');
 
     // Odometer rows are stamped with the owner's id, so the query scopes to the owner, not the invitee.
-    await requireVehicleRead(vehicleId, user.id);
-    const ownerId = await resolveVehicleOwnerId(vehicleId);
-    if (!ownerId) throw new NotFoundError('Vehicle');
+    const ownerId = await requireVehicleOwnerScope(vehicleId, user.id, 'read');
 
     const { limit, offset } = clampPagination(query);
 
@@ -68,9 +66,7 @@ routes.get(
     const { vehicleId } = c.req.valid('param');
     const query = c.req.valid('query');
 
-    await requireVehicleRead(vehicleId, user.id);
-    const ownerId = await resolveVehicleOwnerId(vehicleId);
-    if (!ownerId) throw new NotFoundError('Vehicle');
+    const ownerId = await requireVehicleOwnerScope(vehicleId, user.id, 'read');
 
     const { limit, offset } = clampPagination(query);
 
@@ -106,9 +102,7 @@ routes.post(
 
     // Editors write into the owner's books: the row is stamped with the owner's userId, since odometer
     // rows have no createdBy column to record the editor.
-    await requireVehicleWrite(vehicleId, user.id);
-    const ownerId = await resolveVehicleOwnerId(vehicleId);
-    if (!ownerId) throw new NotFoundError('Vehicle');
+    const ownerId = await requireVehicleOwnerScope(vehicleId, user.id, 'write');
 
     const entry = await odometerRepository.create({
       vehicleId,

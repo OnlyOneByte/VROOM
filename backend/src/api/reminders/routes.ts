@@ -9,11 +9,7 @@ import {
   reminderToApi,
   reminderWithVehiclesToApi,
 } from '../../utils/money';
-import {
-  requireVehicleRead,
-  requireVehicleWrite,
-  resolveVehicleOwnerId,
-} from '../../utils/sharing';
+import { requireVehicleOwnerScope } from '../../utils/sharing';
 import { commonSchemas, validateReminderOwnership, zValidator } from '../../utils/validation';
 import { expenseRepository } from '../expenses/repository';
 import { odometerRepository } from '../odometer/repository';
@@ -71,9 +67,7 @@ async function requireReminderVehiclesWrite(
 ): Promise<{ ownerId: string }> {
   let ownerId: string | undefined;
   for (const vehicleId of vehicleIds) {
-    await requireVehicleWrite(vehicleId, actingUserId);
-    const vehicleOwner = await resolveVehicleOwnerId(vehicleId);
-    if (!vehicleOwner) throw new NotFoundError('Vehicle');
+    const vehicleOwner = await requireVehicleOwnerScope(vehicleId, actingUserId, 'write');
     if (ownerId === undefined) {
       ownerId = vehicleOwner;
     } else if (ownerId !== vehicleOwner) {
@@ -227,9 +221,7 @@ routes.get('/', async (c) => {
   // list stays scoped to the acting user, so shared reminders never mix into the all-reminders list.
   let listUserId = user.id;
   if (vehicleId) {
-    await requireVehicleRead(vehicleId, user.id);
-    const ownerId = await resolveVehicleOwnerId(vehicleId);
-    if (!ownerId) throw new NotFoundError('Vehicle');
+    const ownerId = await requireVehicleOwnerScope(vehicleId, user.id, 'read');
     listUserId = ownerId;
   }
 
@@ -276,7 +268,7 @@ routes.put(
         partialUpdate.vehicleIds,
         user.id
       );
-      if (partialUpdate.vehicleIds.length > 0 && newOwnerId !== ownerId) {
+      if (newOwnerId !== ownerId) {
         throw new ValidationError(
           'A reminder cannot be moved to a vehicle owned by a different user'
         );
@@ -331,13 +323,9 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   if (!existing) throw new NotFoundError('Reminder');
   const { ownerId } = await requireReminderVehiclesWrite(existing.vehicleIds, user.id);
 
-  // Materialized expenses are history, so sever their link instead of deleting them.
-  // Best-effort: a dangling sourceId is harmless, and the delete is what the user asked for.
-  try {
-    await expenseRepository.clearSource('reminder', id, ownerId);
-  } catch {
-    // Intentionally ignored; see above.
-  }
+  // Materialized expenses are history, so sever their link instead of deleting them. This must succeed
+  // before the delete: a dangling reminder sourceId fails backup validation on restore.
+  await expenseRepository.clearSource('reminder', id, ownerId);
 
   await reminderRepository.delete(id);
   return c.json({ success: true, message: 'Reminder deleted successfully' });

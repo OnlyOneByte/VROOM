@@ -1,4 +1,4 @@
-import { and, eq, getTableColumns, inArray } from 'drizzle-orm';
+import { and, eq, getTableColumns, inArray, type Table } from 'drizzle-orm';
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
 import { CONFIG, TABLE_SCHEMA_MAP } from '../../config';
 import type { AppDatabase } from '../../db/connection';
@@ -73,14 +73,43 @@ const shareConsentKey = (vehicleId: string, sharedWithId: string): string =>
 /** Narrows an untrusted share level to a value the routes could have written. */
 const clampShareLevel = (level: unknown): string => (level === 'editor' ? 'editor' : 'viewer');
 
+type RestoreMode = 'replace' | 'merge' | 'preview';
+
+/** Row counts per table, reported as the preview or as the imported totals. */
+function summarizeBackup(data: ParsedBackupData): ImportSummary {
+  return {
+    vehicles: data.vehicles.length,
+    expenses: data.expenses.length,
+    financing: data.financing.length,
+    insurance: data.insurance.length,
+    insuranceTerms: data.insuranceTerms?.length ?? 0,
+    insuranceTermVehicles: data.insuranceTermVehicles?.length ?? 0,
+    insuranceClaims: data.insuranceClaims?.length ?? 0,
+    reminders: data.reminders?.length ?? 0,
+    reminderVehicles: data.reminderVehicles?.length ?? 0,
+    reminderNotifications: data.reminderNotifications?.length ?? 0,
+    odometer: data.odometer?.length ?? 0,
+    photos: data.photos?.length ?? 0,
+    photoRefs: data.photoRefs?.length ?? 0,
+    userPreferences: data.userPreferences?.length ?? 0,
+    syncState: data.syncState?.length ?? 0,
+    trips: data.trips?.length ?? 0,
+    vehicleShares: data.vehicleShares?.length ?? 0,
+  };
+}
+
+/** Sheet cells arrive as text, so each row is coerced to its table's column types. */
+function coerceRows(rows: Record<string, unknown>[], table: Table): Record<string, unknown>[] {
+  return rows.map((row) => coerceRow(row, table));
+}
+
 class RestoreService {
   private db = getDb();
 
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Restore orchestration requires sequential validation and data insertion steps
   async restoreFromBackup(
     userId: string,
     file: Buffer,
-    mode: 'replace' | 'merge' | 'preview'
+    mode: RestoreMode
   ): Promise<RestoreResponse> {
     const parsedBackup = await this.parseOrReject(file);
 
@@ -101,32 +130,26 @@ class RestoreService {
       );
     }
 
-    const summary: ImportSummary = {
-      vehicles: parsedBackup.vehicles.length,
-      expenses: parsedBackup.expenses.length,
-      financing: parsedBackup.financing.length,
-      insurance: parsedBackup.insurance.length,
-      insuranceTerms: parsedBackup.insuranceTerms?.length ?? 0,
-      insuranceTermVehicles: parsedBackup.insuranceTermVehicles?.length ?? 0,
-      insuranceClaims: parsedBackup.insuranceClaims?.length ?? 0,
-      reminders: parsedBackup.reminders?.length ?? 0,
-      reminderVehicles: parsedBackup.reminderVehicles?.length ?? 0,
-      reminderNotifications: parsedBackup.reminderNotifications?.length ?? 0,
-      odometer: parsedBackup.odometer?.length ?? 0,
-      photos: parsedBackup.photos?.length ?? 0,
-      photoRefs: parsedBackup.photoRefs?.length ?? 0,
-      userPreferences: parsedBackup.userPreferences?.length ?? 0,
-      syncState: parsedBackup.syncState?.length ?? 0,
-      trips: parsedBackup.trips?.length ?? 0,
-      vehicleShares: parsedBackup.vehicleShares?.length ?? 0,
-    };
+    return this.applyRestore(userId, parsedBackup, mode);
+  }
+
+  /**
+   * The restore tail shared by every source: preview, the merge conflict check, the replace guard,
+   * then one transaction that wipes (replace only) and inserts.
+   */
+  private async applyRestore(
+    userId: string,
+    data: ParsedBackupData,
+    mode: RestoreMode
+  ): Promise<RestoreResponse> {
+    const summary = summarizeBackup(data);
 
     if (mode === 'preview') {
       return { success: true, preview: summary };
     }
 
     if (mode === 'merge') {
-      const conflicts = await this.detectConflicts(parsedBackup, userId);
+      const conflicts = await this.detectConflicts(data, userId);
       if (conflicts.length > 0) {
         return { success: false, conflicts };
       }
@@ -143,7 +166,7 @@ class RestoreService {
       if (mode === 'replace') {
         this.deleteUserData(tx, userId);
       }
-      this.insertBackupData(tx, parsedBackup, userId, consented);
+      this.insertBackupData(tx, data, userId, consented);
     });
 
     return { success: true, imported: summary };
@@ -183,11 +206,10 @@ class RestoreService {
     }
   }
 
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Restore orchestration requires sequential validation and data insertion steps
   async restoreFromSheets(
     userId: string,
     providerId: string,
-    mode: 'replace' | 'merge' | 'preview'
+    mode: RestoreMode
   ): Promise<RestoreResponse> {
     const prefs = await preferencesRepository.getOrCreate(userId);
     const backupConfig = prefs?.backupConfig as BackupConfig | null;
@@ -205,20 +227,37 @@ class RestoreService {
       '../providers/services/google-sheets-service'
     );
     const sheetsService = await createSheetsServiceForProvider(providerId, userId);
-    const sheetData = await sheetsService.readSpreadsheetData(sheetsSpreadsheetId);
+    const sheet = await sheetsService.readSpreadsheetData(sheetsSpreadsheetId);
 
     // The sheet mirrors the DB, so its money cells are already in cents and need no shim. Sheets
     // carries no real metadata version, so stamp the current one for validation.
-    for (const [key, table] of Object.entries(TABLE_SCHEMA_MAP)) {
-      const data = sheetData[key as keyof typeof sheetData];
-      if (Array.isArray(data)) {
-        // biome-ignore lint/suspicious/noExplicitAny: Dynamic key assignment on parsed backup data
-        (sheetData as Record<string, any>)[key] = data.map((row: Record<string, unknown>) =>
-          coerceRow(row, table)
-        );
-      }
-    }
-    sheetData.metadata = { ...sheetData.metadata, version: CONFIG.backup.currentVersion };
+    const sheetData: ParsedBackupData = {
+      ...sheet,
+      metadata: { ...sheet.metadata, version: CONFIG.backup.currentVersion },
+      vehicles: coerceRows(sheet.vehicles, TABLE_SCHEMA_MAP.vehicles),
+      expenses: coerceRows(sheet.expenses, TABLE_SCHEMA_MAP.expenses),
+      financing: coerceRows(sheet.financing, TABLE_SCHEMA_MAP.financing),
+      insurance: coerceRows(sheet.insurance, TABLE_SCHEMA_MAP.insurance),
+      insuranceTerms: coerceRows(sheet.insuranceTerms, TABLE_SCHEMA_MAP.insuranceTerms),
+      insuranceTermVehicles: coerceRows(
+        sheet.insuranceTermVehicles,
+        TABLE_SCHEMA_MAP.insuranceTermVehicles
+      ),
+      insuranceClaims: coerceRows(sheet.insuranceClaims, TABLE_SCHEMA_MAP.insuranceClaims),
+      photos: coerceRows(sheet.photos, TABLE_SCHEMA_MAP.photos),
+      odometer: coerceRows(sheet.odometer, TABLE_SCHEMA_MAP.odometer),
+      photoRefs: coerceRows(sheet.photoRefs, TABLE_SCHEMA_MAP.photoRefs),
+      userPreferences: coerceRows(sheet.userPreferences, TABLE_SCHEMA_MAP.userPreferences),
+      syncState: coerceRows(sheet.syncState, TABLE_SCHEMA_MAP.syncState),
+      reminders: coerceRows(sheet.reminders, TABLE_SCHEMA_MAP.reminders),
+      reminderVehicles: coerceRows(sheet.reminderVehicles, TABLE_SCHEMA_MAP.reminderVehicles),
+      reminderNotifications: coerceRows(
+        sheet.reminderNotifications,
+        TABLE_SCHEMA_MAP.reminderNotifications
+      ),
+      trips: coerceRows(sheet.trips, TABLE_SCHEMA_MAP.trips),
+      vehicleShares: coerceRows(sheet.vehicleShares, TABLE_SCHEMA_MAP.vehicleShares),
+    };
 
     if (sheetData.metadata.userId !== userId) {
       throw new SyncError(SyncErrorCode.VALIDATION_ERROR, 'Spreadsheet belongs to different user');
@@ -233,49 +272,7 @@ class RestoreService {
       );
     }
 
-    const summary: ImportSummary = {
-      vehicles: sheetData.vehicles.length,
-      expenses: sheetData.expenses.length,
-      financing: sheetData.financing.length,
-      insurance: sheetData.insurance.length,
-      insuranceTerms: sheetData.insuranceTerms?.length ?? 0,
-      insuranceTermVehicles: sheetData.insuranceTermVehicles?.length ?? 0,
-      insuranceClaims: (sheetData as ParsedBackupData).insuranceClaims?.length ?? 0,
-      reminders: (sheetData as ParsedBackupData).reminders?.length ?? 0,
-      reminderVehicles: (sheetData as ParsedBackupData).reminderVehicles?.length ?? 0,
-      reminderNotifications: (sheetData as ParsedBackupData).reminderNotifications?.length ?? 0,
-      odometer: sheetData.odometer?.length ?? 0,
-      photos: sheetData.photos?.length ?? 0,
-      photoRefs: sheetData.photoRefs?.length ?? 0,
-      userPreferences: sheetData.userPreferences?.length ?? 0,
-      syncState: sheetData.syncState?.length ?? 0,
-      trips: (sheetData as ParsedBackupData).trips?.length ?? 0,
-      vehicleShares: (sheetData as ParsedBackupData).vehicleShares?.length ?? 0,
-    };
-
-    if (mode === 'preview') {
-      return { success: true, preview: summary };
-    }
-
-    if (mode === 'merge') {
-      const conflicts = await this.detectConflicts(sheetData, userId);
-      if (conflicts.length > 0) {
-        return { success: false, conflicts };
-      }
-    }
-
-    this.assertReplaceNotEmpty(summary, mode);
-
-    // Synchronous for the same reason as restoreFromBackup.
-    this.db.transaction((tx) => {
-      const consented = this.consentedShareKeys(tx, userId);
-      if (mode === 'replace') {
-        this.deleteUserData(tx, userId);
-      }
-      this.insertBackupData(tx, sheetData, userId, consented);
-    });
-
-    return { success: true, imported: summary };
+    return this.applyRestore(userId, sheetData, mode);
   }
 
   private async detectConflicts(data: ParsedBackupData, userId: string): Promise<Conflict[]> {

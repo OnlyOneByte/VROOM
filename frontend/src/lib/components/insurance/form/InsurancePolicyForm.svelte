@@ -195,7 +195,6 @@
 					company: company.trim(),
 					terms: [
 						{
-							// Send noon-local: date-only values parsed as UTC midnight land a day early west of UTC.
 							startDate: dateOnlyToISO(startDate),
 							endDate: dateOnlyToISO(endDate),
 							...termData,

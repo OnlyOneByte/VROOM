@@ -1,5 +1,6 @@
 import type { Context } from 'hono';
-import { setCookie } from 'hono/cookie';
+import { deleteCookie, setCookie } from 'hono/cookie';
+import type { CookieOptions } from 'hono/utils/cookie';
 import type { Lucia, Session, User } from 'lucia';
 import { CONFIG } from '../../config';
 import { logger } from '../../utils/logger';
@@ -17,6 +18,29 @@ export interface OAuthStateEntry {
   userId?: string;
   flowType?: 'provider' | 'auth-link';
   nonce?: string;
+}
+
+// Shared by every write and delete: a browser only clears a cookie whose attributes match the write.
+function sessionCookieOptions(): CookieOptions {
+  return {
+    path: '/',
+    secure: CONFIG.env === 'production',
+    httpOnly: true,
+    maxAge: CONFIG.auth.cookieMaxAge,
+    sameSite: 'Lax',
+  };
+}
+
+export function setSessionCookie(
+  c: Context,
+  cookieName: string,
+  session: Pick<Session, 'id' | 'expiresAt'>
+): void {
+  setCookie(c, cookieName, session.id, { ...sessionCookieOptions(), expires: session.expiresAt });
+}
+
+export function clearSessionCookie(c: Context, cookieName: string): void {
+  deleteCookie(c, cookieName, sessionCookieOptions());
 }
 
 /**
@@ -63,17 +87,7 @@ export async function validateAndRefreshSession(
     };
   }
 
-  // Attributes must match the login cookie exactly (see routes.ts createAuthSession).
-  if (c) {
-    setCookie(c, lucia.sessionCookieName, session.id, {
-      path: '/',
-      secure: CONFIG.env === 'production',
-      httpOnly: true,
-      maxAge: CONFIG.auth.cookieMaxAge,
-      expires: session.expiresAt,
-      sameSite: 'Lax',
-    });
-  }
+  if (c) setSessionCookie(c, lucia.sessionCookieName, session);
 
   logger.info('Session cookie re-issued for an extended session', {
     userId: user.id,

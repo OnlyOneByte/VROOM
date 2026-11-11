@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import type { ModelProviderSettings } from '../../model/model-registry';
 import { AnthropicLlmProvider } from '../anthropic';
 import { GeminiLlmProvider } from '../gemini';
 import type { ChatMessage, ToolDefinition } from '../llm-provider';
-import type { LlmProviderSettings } from '../registry';
 
 const realFetch = globalThis.fetch;
 
@@ -26,13 +26,33 @@ function stubFetch(responder: () => Response | Promise<Response>): void {
   }) as any;
 }
 
-const SETTINGS: LlmProviderSettings = { apiKey: 'sk-assistant-key', model: 'claude-3-5-sonnet' };
-const GEMINI_SETTINGS: LlmProviderSettings = { apiKey: 'gm-key-123', model: 'gemini-1.5-pro' };
+const SETTINGS: ModelProviderSettings = { apiKey: 'sk-assistant-key', model: 'claude-3-5-sonnet' };
+const GEMINI_SETTINGS: ModelProviderSettings = { apiKey: 'gm-key-123', model: 'gemini-1.5-pro' };
 
 const MESSAGES: ChatMessage[] = [
   { role: 'system', content: 'You are a car-data assistant.' },
   { role: 'user', content: 'How much did I spend on fuel?' },
 ];
+/** A full tool round-trip: two parallel calls, then both results. */
+const TOOL_TRANSCRIPT: ChatMessage[] = [
+  ...MESSAGES,
+  {
+    role: 'assistant',
+    content: '',
+    toolCalls: [
+      { id: 'tu_a', name: 'getExpenseSummary', argumentsJson: '{"range":"ytd"}' },
+      { id: 'tu_b', name: 'listVehicles', argumentsJson: 'not json' },
+    ],
+  },
+  {
+    role: 'tool',
+    content: '{"totalAmount":50}',
+    toolName: 'getExpenseSummary',
+    toolCallId: 'tu_a',
+  },
+  { role: 'tool', content: '[]', toolName: 'listVehicles', toolCallId: 'tu_b' },
+];
+
 const TOOLS: ToolDefinition[] = [
   {
     name: 'getExpenseSummary',
@@ -117,6 +137,63 @@ describe('AnthropicLlmProvider.chat', () => {
     expect(block.tool_use_id).toBe('tu_1');
   });
 
+  test('tool results go in ONE user turn right after an assistant turn holding the matching tool_use blocks', async () => {
+    stubFetch(() => anthropicText('done'));
+    await new AnthropicLlmProvider(SETTINGS).chat({ messages: TOOL_TRANSCRIPT, tools: TOOLS });
+
+    expect(captured?.body).toEqual({
+      model: 'claude-3-5-sonnet',
+      max_tokens: 1024,
+      temperature: 0,
+      system: 'You are a car-data assistant.',
+      messages: [
+        { role: 'user', content: 'How much did I spend on fuel?' },
+        {
+          role: 'assistant',
+          content: [
+            { type: 'tool_use', id: 'tu_a', name: 'getExpenseSummary', input: { range: 'ytd' } },
+            { type: 'tool_use', id: 'tu_b', name: 'listVehicles', input: {} },
+          ],
+        },
+        {
+          role: 'user',
+          content: [
+            { type: 'tool_result', tool_use_id: 'tu_a', content: '{"totalAmount":50}' },
+            { type: 'tool_result', tool_use_id: 'tu_b', content: '[]' },
+          ],
+        },
+      ],
+      tools: [
+        {
+          name: 'getExpenseSummary',
+          description: 'Total spend over a range.',
+          input_schema: TOOLS[0].parameters,
+        },
+      ],
+    });
+  });
+
+  test('assistant text alongside tool calls becomes a text block before the tool_use blocks', async () => {
+    stubFetch(() => anthropicText('done'));
+    await new AnthropicLlmProvider(SETTINGS).chat({
+      messages: [
+        ...MESSAGES,
+        {
+          role: 'assistant',
+          content: 'Checking.',
+          toolCalls: [{ id: 'tu_1', name: 'listVehicles', argumentsJson: '{}' }],
+        },
+        { role: 'tool', content: '[]', toolName: 'listVehicles', toolCallId: 'tu_1' },
+      ],
+      tools: TOOLS,
+    });
+    const msgs = captured?.body.messages as Array<{ role: string; content: unknown }>;
+    expect(msgs[1]?.content).toEqual([
+      { type: 'text', text: 'Checking.' },
+      { type: 'tool_use', id: 'tu_1', name: 'listVehicles', input: {} },
+    ]);
+  });
+
   test('a non-2xx response throws', async () => {
     stubFetch(() => new Response('overloaded', { status: 529 }));
     await expect(
@@ -190,6 +267,49 @@ describe('GeminiLlmProvider.chat', () => {
     expect(last.role).toBe('function');
     const part = (last.parts as Record<string, { name?: string }>[])[0];
     expect(part.functionResponse?.name).toBe('getFuelStats');
+  });
+
+  test('function responses go in ONE function turn right after a model turn holding the matching functionCall parts', async () => {
+    stubFetch(() => geminiText('done'));
+    await new GeminiLlmProvider(GEMINI_SETTINGS).chat({ messages: TOOL_TRANSCRIPT, tools: TOOLS });
+
+    expect(captured?.body).toEqual({
+      contents: [
+        { role: 'user', parts: [{ text: 'How much did I spend on fuel?' }] },
+        {
+          role: 'model',
+          parts: [
+            { functionCall: { name: 'getExpenseSummary', args: { range: 'ytd' } } },
+            { functionCall: { name: 'listVehicles', args: {} } },
+          ],
+        },
+        {
+          role: 'function',
+          parts: [
+            {
+              functionResponse: {
+                name: 'getExpenseSummary',
+                response: { content: '{"totalAmount":50}' },
+              },
+            },
+            { functionResponse: { name: 'listVehicles', response: { content: '[]' } } },
+          ],
+        },
+      ],
+      systemInstruction: { parts: [{ text: 'You are a car-data assistant.' }] },
+      tools: [
+        {
+          functionDeclarations: [
+            {
+              name: 'getExpenseSummary',
+              description: 'Total spend over a range.',
+              parameters: TOOLS[0].parameters,
+            },
+          ],
+        },
+      ],
+      generationConfig: { temperature: 0, maxOutputTokens: 1024 },
+    });
   });
 
   test('a non-2xx response throws', async () => {

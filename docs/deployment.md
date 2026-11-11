@@ -49,6 +49,10 @@ Examples in [`docs/examples/`](examples/):
 
 `backend/src/config.ts` is the authoritative list.
 
+The example stacks pass through only the variables in their backend `environment:` block. An
+optional variable from the tables below (GitHub login, web push, `TRUSTED_PROXY_IPS`) takes effect
+only after you add it to that block as well as to `.env`.
+
 ### Required in production
 
 The backend logs the missing names and exits at startup without these.
@@ -185,8 +189,7 @@ tunnel hostnames (see [Cloudflare Tunnel](#cloudflare-tunnel)). The `cloudflared
 Every backend route lives under `/api`. `/health` is only used by the container healthcheck
 and needs no external exposure. So: `/api/*` to port 3001, everything else to port 3000.
 
-Do not route `/auth/*` to the backend — `/auth`, `/auth/callback`, and `/auth/oauth-complete`
-are frontend pages.
+Do not route `/auth/*` to the backend: `/auth` and `/auth/callback` are frontend pages.
 
 Set `CORS_ORIGINS` and `FRONTEND_URL` to the public origin, leave `PUBLIC_API_URL` empty, and
 set `TRUSTED_PROXY_IPS` to the proxy's address so rate limiting keys on the real client IP.
@@ -306,12 +309,10 @@ One SQLite file at `DATABASE_URL`, in WAL mode — so the data directory holds `
 plus `vroom.db-wal` and `vroom.db-shm`. The migrations in `backend/drizzle/` are applied
 automatically at startup; there is no manual migration step.
 
-**Upgrading across the migration collapse is not in-place.** The incremental migrations were
-replaced by a single `0000_baseline`, so a database created by an earlier build carries migration
-history the current journal does not recognise and will not upgrade. To move such a database
-forward: export a backup from the running old build, stop it, move `vroom.db*` aside, start the new
-build (which creates a fresh schema), then restore the backup through the UI. Keep the old file
-until the restore is verified.
+**Databases created before `0000_baseline` cannot be upgraded in place.** Their migration history
+no longer matches the journal. To move one forward: export a backup from the old build, stop it,
+move `vroom.db*` aside, start the new build (which creates a fresh schema), then restore the backup
+through the UI. Keep the old file until the restore is verified.
 
 ### Backup
 

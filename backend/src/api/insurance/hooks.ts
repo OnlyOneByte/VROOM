@@ -65,7 +65,8 @@ async function materializeTermExpenses(
       sourceType: 'insurance_term',
       sourceId: termId,
     },
-    userId
+    // Only the policy owner can write terms, so the owner is also the author.
+    { ownerId: userId, createdBy: null }
   );
 
   logger.info('Auto-created insurance expenses for term', {

@@ -70,6 +70,14 @@ export type InsurancePolicyWithVehicles = InsurancePolicy & {
   vehicleIds: string[];
 };
 
+/**
+ * Every write scopes the policy row by owner, so a caller that skips the route-level ownership check
+ * still cannot touch another user's policy: the lookup misses and the write reports NotFound.
+ */
+function ownedPolicy(policyId: string, userId: string) {
+  return and(eq(insurancePolicies.id, policyId), eq(insurancePolicies.userId, userId));
+}
+
 export class InsurancePolicyRepository {
   private db: AppDatabase;
 
@@ -269,14 +277,14 @@ export class InsurancePolicyRepository {
   async update(
     id: string,
     data: UpdatePolicyData,
-    _userId: string
+    userId: string
   ): Promise<InsurancePolicyWithVehicles> {
     try {
       return await this.db.transaction(async (tx) => {
         const existing = await tx
           .select()
           .from(insurancePolicies)
-          .where(eq(insurancePolicies.id, id))
+          .where(ownedPolicy(id, userId))
           .limit(1);
 
         if (existing.length === 0) {
@@ -291,7 +299,7 @@ export class InsurancePolicyRepository {
         const updatedResult = await tx
           .update(insurancePolicies)
           .set(fields)
-          .where(eq(insurancePolicies.id, id))
+          .where(ownedPolicy(id, userId))
           .returning();
 
         const coverage = await this.fetchTermsAndCoverage(tx, id);
@@ -308,13 +316,13 @@ export class InsurancePolicyRepository {
     }
   }
 
-  async delete(id: string, _userId: string): Promise<void> {
+  async delete(id: string, userId: string): Promise<void> {
     try {
       await this.db.transaction(async (tx) => {
         const existing = await tx
           .select()
           .from(insurancePolicies)
-          .where(eq(insurancePolicies.id, id))
+          .where(ownedPolicy(id, userId))
           .limit(1);
 
         if (existing.length === 0) {
@@ -322,7 +330,7 @@ export class InsurancePolicyRepository {
         }
 
         // Delete the policy — terms and junction rows cascade via FK ON DELETE CASCADE
-        await tx.delete(insurancePolicies).where(eq(insurancePolicies.id, id));
+        await tx.delete(insurancePolicies).where(ownedPolicy(id, userId));
       });
     } catch (error) {
       if (error instanceof NotFoundError) throw error;
@@ -348,7 +356,7 @@ export class InsurancePolicyRepository {
         const existing = tx
           .select()
           .from(insurancePolicies)
-          .where(eq(insurancePolicies.id, policyId))
+          .where(ownedPolicy(policyId, userId))
           .limit(1)
           .all();
 
@@ -424,7 +432,7 @@ export class InsurancePolicyRepository {
         const existing = tx
           .select()
           .from(insurancePolicies)
-          .where(eq(insurancePolicies.id, policyId))
+          .where(ownedPolicy(policyId, userId))
           .limit(1)
           .all();
 
@@ -499,14 +507,14 @@ export class InsurancePolicyRepository {
   async deleteTerm(
     policyId: string,
     termId: string,
-    _userId: string
+    userId: string
   ): Promise<InsurancePolicyWithVehicles> {
     try {
       return await this.db.transaction(async (tx) => {
         const existing = await tx
           .select()
           .from(insurancePolicies)
-          .where(eq(insurancePolicies.id, policyId))
+          .where(ownedPolicy(policyId, userId))
           .limit(1);
 
         if (existing.length === 0) {
@@ -552,21 +560,6 @@ export class InsurancePolicyRepository {
     }
   }
 
-  async getCurrentTermDates(policyId: string): Promise<{ startDate: Date; endDate: Date } | null> {
-    const result = await this.db
-      .select({
-        startDate: insuranceTerms.startDate,
-        endDate: insuranceTerms.endDate,
-      })
-      .from(insuranceTerms)
-      .where(eq(insuranceTerms.policyId, policyId))
-      .orderBy(desc(insuranceTerms.endDate))
-      .limit(1);
-
-    if (result.length === 0) return null;
-    return { startDate: result[0].startDate, endDate: result[0].endDate };
-  }
-
   /**
    * Terms ending in the range, for active policies only. A cancelled policy must not show as expiring.
    */
@@ -594,26 +587,6 @@ export class InsurancePolicyRepository {
     } catch (error) {
       logger.error('Error finding expiring insurance terms', { error });
       throw new DatabaseError('Failed to find expiring insurance terms', error);
-    }
-  }
-
-  async getActiveInsurancePolicyId(vehicleId: string): Promise<string | null> {
-    try {
-      const result = await this.db
-        .select({ id: insurancePolicies.id })
-        .from(insurancePolicies)
-        .innerJoin(insuranceTerms, eq(insuranceTerms.policyId, insurancePolicies.id))
-        .innerJoin(insuranceTermVehicles, eq(insuranceTermVehicles.termId, insuranceTerms.id))
-        .where(
-          and(eq(insuranceTermVehicles.vehicleId, vehicleId), eq(insurancePolicies.isActive, true))
-        )
-        .orderBy(desc(insuranceTerms.endDate))
-        .limit(1);
-
-      return result[0]?.id ?? null;
-    } catch (error) {
-      logger.error('Error deriving active insurance policy for vehicle', { vehicleId, error });
-      throw new DatabaseError('Failed to derive active insurance policy', error);
     }
   }
 }

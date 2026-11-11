@@ -159,7 +159,7 @@ describe('Split expense update preserves groupId and migrates photos', () => {
               date: new Date(2024, 5, 15),
               totalAmount: initial.totalAmount,
             },
-            USER_ID
+            { ownerId: USER_ID, createdBy: null }
           );
 
           const originalGroupId = oldSiblings[0]?.groupId;
@@ -202,7 +202,7 @@ describe('Split expense update preserves groupId and migrates photos', () => {
         sourceType: 'reminder',
         sourceId: reminderId,
       },
-      USER_ID
+      { ownerId: USER_ID, createdBy: null }
     );
     const groupId = oldSiblings[0]?.groupId as string;
     expect(groupId).toBeTruthy();
@@ -246,7 +246,7 @@ describe('Split expense update preserves groupId and migrates photos', () => {
               date: new Date(2024, 5, 15),
               totalAmount: initial.totalAmount,
             },
-            USER_ID
+            { ownerId: USER_ID, createdBy: null }
           );
 
           const originalGroupId = oldSiblings[0]?.groupId;
@@ -314,7 +314,7 @@ describe('split delete/update is userId-scoped at the destructive write (cross-t
         date: new Date(2024, 5, 15),
         totalAmount: 100,
       },
-      USER_ID
+      { ownerId: USER_ID, createdBy: null }
     );
     const groupId = siblings[0]?.groupId as string;
     injectForeignSibling(groupId, 'foreign-del');
@@ -335,7 +335,7 @@ describe('split delete/update is userId-scoped at the destructive write (cross-t
         date: new Date(2024, 5, 15),
         totalAmount: 100,
       },
-      USER_ID
+      { ownerId: USER_ID, createdBy: null }
     );
     const groupId = siblings[0]?.groupId as string;
     injectForeignSibling(groupId, 'foreign-upd');
@@ -364,7 +364,7 @@ describe('absolute split edit recomputes groupTotal from allocations (no stale h
         date: new Date(2024, 5, 15),
         totalAmount: total,
       },
-      USER_ID
+      { ownerId: USER_ID, createdBy: null }
     );
     return siblings[0]?.groupId as string;
   }
@@ -439,7 +439,7 @@ describe('absolute split edit recomputes groupTotal from allocations (no stale h
         date: new Date(2024, 5, 15),
         totalAmount: 60,
       },
-      USER_ID
+      { ownerId: USER_ID, createdBy: null }
     );
     const groupId = siblings[0]?.groupId as string;
 

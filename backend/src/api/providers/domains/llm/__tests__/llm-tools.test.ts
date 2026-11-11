@@ -141,6 +141,46 @@ describe('assistant tool layer arg validation and frozen allowlist', () => {
   });
 });
 
+describe('tool JSON schemas are derived from the Zod schemas', () => {
+  function paramsOf(name: string): Record<string, unknown> | undefined {
+    return tools.toolDefinitions().find((d) => d.name === name)?.parameters;
+  }
+
+  test('each argument shape advertises exactly the fields its Zod schema validates', () => {
+    const range = { type: 'string', enum: [...tools.RANGE_VALUES] };
+    expect(paramsOf('listVehicles')).toEqual({
+      type: 'object',
+      properties: {},
+      additionalProperties: false,
+    });
+    expect(paramsOf('getCrossVehicle')).toEqual({
+      type: 'object',
+      properties: { range },
+      required: ['range'],
+      additionalProperties: false,
+    });
+    expect(paramsOf('getFuelStats')).toEqual({
+      type: 'object',
+      properties: { range, vehicleId: { type: 'string', minLength: 1 } },
+      required: ['range'],
+      additionalProperties: false,
+    });
+  });
+
+  test('every advertised schema lists the same properties the Zod schema accepts', () => {
+    for (const def of tools.toolDefinitions()) {
+      const schema = tools.ASSISTANT_TOOLS[def.name]?.schema as unknown as {
+        shape: Record<string, unknown>;
+      };
+      const shape = schema.shape;
+      expect(Object.keys(def.parameters.properties as object).sort()).toEqual(
+        Object.keys(shape).sort()
+      );
+      expect(def.parameters.$schema).toBeUndefined();
+    }
+  });
+});
+
 describe('resolveRange maps range values to unix-second windows', () => {
   test('maps each enum to a sane unix-seconds window ending at now', () => {
     const end = Math.floor(NOW_MS / 1000);

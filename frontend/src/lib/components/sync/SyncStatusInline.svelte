@@ -19,6 +19,8 @@
 	import { countParked, countPendingSync } from '$lib/utils/sync/pending-expenses';
 	import { routes } from '$lib/routes';
 	import { resolve } from '$app/paths';
+	import { appStore } from '$lib/stores/app.svelte';
+	import { handleErrorWithNotification } from '$lib/utils/error-handling';
 
 	let { isExpanded = true } = $props();
 
@@ -51,6 +53,31 @@
 
 		return () => clearInterval(interval);
 	});
+
+	let isRetryingParked = $state(false);
+
+	async function handleRetryParked() {
+		if (!onlineStatus.current || parkedCount === 0 || isRetryingParked) return;
+		isRetryingParked = true;
+		try {
+			const result = await syncManager.retryParked();
+			if (result.needsAttention > 0) {
+				appStore.showWarning(
+					result.needsAttention === 1
+						? '1 expense still needs attention — open expenses to fix it'
+						: `${result.needsAttention} expenses still need attention — open expenses to fix them`
+				);
+			} else if (result.synced > 0) {
+				appStore.showSuccess(
+					result.synced === 1 ? '1 expense synced' : `${result.synced} expenses synced`
+				);
+			}
+		} catch (error) {
+			handleErrorWithNotification(error, 'Retry failed');
+		} finally {
+			isRetryingParked = false;
+		}
+	}
 
 	async function handleManualSync() {
 		if (onlineStatus.current && pendingCount > 0) {
@@ -144,6 +171,20 @@
 						>{formatCompactRelativeTime(lastDataChangeTime.current)}</span
 					>
 				</div>
+			{/if}
+
+			{#if onlineStatus.current && parkedCount > 0}
+				<Button
+					size="sm"
+					variant="outline"
+					onclick={handleRetryParked}
+					disabled={isRetryingParked || syncState.current === 'syncing'}
+					aria-busy={isRetryingParked}
+					class="w-full h-7 text-xs"
+				>
+					<RefreshCw class="h-3 w-3 mr-1.5 {isRetryingParked ? 'animate-spin' : ''}" />
+					{isRetryingParked ? 'Retrying...' : `Retry ${parkedCount} needing attention`}
+				</Button>
 			{/if}
 
 			{#if onlineStatus.current && pendingCount > 0}

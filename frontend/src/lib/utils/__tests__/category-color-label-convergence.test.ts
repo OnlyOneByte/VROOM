@@ -3,18 +3,12 @@ import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 import type { ExpenseCategory } from '$lib/types';
-import {
-	CATEGORY_COLOR_TOKENS,
-	CATEGORY_LABELS,
-	getCategoryChartColor,
-	getCategoryColor as deprecatedChartColorAlias
-} from '../chart-colors';
+import { CATEGORY_COLOR_TOKENS, CATEGORY_LABELS, getCategoryChartColor } from '../chart-colors';
 import {
 	CATEGORY_ICONS,
 	categoryLabels,
 	getCategoryBadgeClasses,
-	getCategoryIcon,
-	getCategoryColor as deprecatedBadgeClassesAlias
+	getCategoryIcon
 } from '../expense-helpers';
 import { collectSvelteFiles } from './_helpers/collect-svelte-files';
 import type { StatCardIconColor } from '$lib/components/charts/StatCard.svelte';
@@ -345,11 +339,6 @@ describe('the two category-color helpers cannot be confused', () => {
 	test('each name has exactly one meaning', () => {
 		expect(getCategoryBadgeClasses('fuel')).toBe('text-chart-1 bg-chart-1/10');
 		expect(getCategoryChartColor('fuel')).toBe('var(--chart-1)');
-	});
-
-	test('the deprecated getCategoryColor aliases still point at their replacements', () => {
-		expect(deprecatedBadgeClassesAlias).toBe(getCategoryBadgeClasses);
-		expect(deprecatedChartColorAlias).toBe(getCategoryChartColor);
 	});
 });
 

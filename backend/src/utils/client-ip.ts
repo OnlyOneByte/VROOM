@@ -5,7 +5,7 @@ import type { Context } from 'hono';
 import { getConnInfo } from 'hono/bun';
 import { CONFIG } from '../config';
 
-export function getSocketIp(c: Context): string | undefined {
+function getSocketIp(c: Context): string | undefined {
   try {
     return getConnInfo(c).remote.address;
   } catch {

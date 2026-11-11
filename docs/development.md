@@ -42,11 +42,28 @@ cd backend  && bun run all:fix && bun run validate
 cd frontend && npm run all:fix && npm run validate
 ```
 
-`all:fix` auto-fixes lint and formatting; `validate` runs lint, format check, type check,
-tests, and the build. CI runs the same checks as separate steps; only the frontend format
-check is skipped (the backend's `bun run check` covers formatting too).
+`all:fix` auto-fixes lint and formatting. `validate` runs the checks: the backend also builds,
+while the frontend runs lint, format check, type check, and tests (`npm run validate:local` adds
+the build). CI runs the same checks as separate steps and skips only the frontend format check.
+The backend's `bun run check` covers formatting too.
 
-E2E tests are separate, and need neither a backend nor a database — Playwright starts the
+The frontend type check runs through `frontend/scripts/type-check.mjs`, a guarded wrapper around
+svelte-check. Exit code 2 means the guard failed, so the result cannot be trusted. It does not
+mean a type error. The wrapper cannot prove the following:
+
+- It reads svelte-check's output as text. A release that keeps the completion summary but stops
+  reporting errors through it would pass. The script's pattern fixtures only prove that the
+  regexes match the current format.
+- It detects the compiler by patching `child_process.spawn`. If svelte-check starts the compiler
+  another way, the guard reports that nothing was checked, and the script needs updating.
+- The minimum file count (50, or `VROOM_TYPE_CHECK_MIN_FILES`) applies only to machine output,
+  which CI and non-TTY runs use. An interactive run skips it.
+- It checks only the app program. The e2e harness is checked separately with
+  `npx tsc -p tsconfig.e2e.json --noEmit`.
+- Compiler output is captured up to 1 MiB. A failing compiler whose diagnostics fall past that
+  limit is reported as a failure, not as a clean pass.
+
+E2E tests are separate, and need neither a backend nor a database. Playwright starts the
 frontend dev server itself and mocks every `/api/v1` call in the browser. One-time setup is
 `npx playwright install` for the browser binaries. See `frontend/e2e/README.md`.
 

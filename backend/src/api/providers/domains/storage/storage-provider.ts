@@ -1,6 +1,6 @@
 /** Storage backend contract: upload, download, delete and list photos across providers. */
 
-import type { PhotoCategory } from '../../../../types';
+import { PHOTO_CATEGORIES, type PhotoCategory } from '../../../../types';
 
 export type { PhotoCategory };
 
@@ -66,3 +66,12 @@ export const ENTITY_TO_CATEGORY: Record<string, PhotoCategory> = {
   insurance_claim: 'insurance_docs',
   odometer_entry: 'odometer_readings',
 };
+
+export const CATEGORY_TO_ENTITY_TYPES: Record<PhotoCategory, string[]> = Object.fromEntries(
+  PHOTO_CATEGORIES.map((category) => [
+    category,
+    Object.keys(ENTITY_TO_CATEGORY).filter(
+      (entityType) => ENTITY_TO_CATEGORY[entityType] === category
+    ),
+  ])
+) as Record<PhotoCategory, string[]>;

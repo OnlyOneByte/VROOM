@@ -27,20 +27,17 @@ try {
   process.exit(1);
 }
 
+// Re-running applied migrations is a no-op, so any failure here means the schema is not what the
+// code expects. A database bootstrapped with db:push fails with "already exists" and must be
+// recovered per DatabaseMigrations.md rather than served on an unknown schema.
 try {
   await runMigrations();
 } catch (error) {
-  // Existing tables are not fatal.
-  const errorMessage = extractErrorMessage(error);
-  if (errorMessage.includes('already exists')) {
-    logger.info('Database tables already exist, skipping migrations');
-  } else {
-    logger.error('Failed to run migrations on startup', {
-      error,
-      message: errorMessage,
-    });
-    process.exit(1);
-  }
+  logger.error('Failed to run migrations on startup', {
+    error,
+    message: extractErrorMessage(error),
+  });
+  process.exit(1);
 }
 
 const checkpointInterval = setInterval(

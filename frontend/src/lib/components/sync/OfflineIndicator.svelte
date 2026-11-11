@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onlineStatus, syncState, offlineExpenseQueue } from '$lib/stores/offline.svelte';
-	import { syncOfflineExpenses } from '$lib/utils/offline-storage';
+	import { syncManager } from '$lib/utils/sync/sync-manager';
+	import { handleErrorWithNotification } from '$lib/utils/error-handling';
 	import { countPendingSync } from '$lib/utils/sync/pending-expenses';
 	import { Wifi, WifiOff, RefreshCw, CircleCheck, CircleAlert } from '@lucide/svelte';
 	import { Badge } from '$lib/components/ui/badge';
@@ -9,8 +10,11 @@
 	let pendingCount = $derived(countPendingSync(offlineExpenseQueue.current));
 
 	async function handleSync() {
-		if (onlineStatus.current && pendingCount > 0) {
-			await syncOfflineExpenses();
+		if (!onlineStatus.current || pendingCount === 0) return;
+		try {
+			await syncManager.syncAll();
+		} catch (error) {
+			handleErrorWithNotification(error, 'Sync failed');
 		}
 	}
 </script>

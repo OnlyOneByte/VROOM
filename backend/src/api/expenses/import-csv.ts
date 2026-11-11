@@ -11,6 +11,7 @@ import { EXPENSE_CATEGORIES, isElectricFuelType } from '../../db/types';
 import { denormalizeCsvCell } from '../../utils/csv-safety';
 import { dollarsToCents } from '../../utils/money';
 import { buildLocalDate } from './local-date';
+import { clearFuelFieldsIfNotFuel } from './validation';
 
 export interface ImportVehicle {
   id: string;
@@ -140,13 +141,18 @@ function parseTags(raw: string): { value: string[] } | { error: string } {
   return { value: tags };
 }
 
+// Every vehicle-name match (row resolution and target-unit lookup) compares through this key.
+export function vehicleNameKey(name: string): string {
+  return name.trim().toLowerCase();
+}
+
 // `null` in the map marks a name shared by several vehicles, which must never resolve silently.
 function resolveImportVehicleId(
   vehicleName: string,
   vehicleByName: Map<string, string | null>
 ): { vehicleId: string } | { error: string } {
   if (!vehicleName) return { error: 'Missing vehicle' };
-  const match = vehicleByName.get(vehicleName.toLowerCase());
+  const match = vehicleByName.get(vehicleNameKey(vehicleName));
   if (match === null) {
     return {
       error: `"${vehicleName}" matches more than one vehicle in your garage; give them distinct nicknames and use those`,
@@ -205,7 +211,7 @@ function parseRow(
   }
 
   return {
-    expense: clearImportedFuelFields({
+    expense: clearFuelFieldsIfNotFuel({
       vehicleId,
       category,
       expenseAmount: amountResult.value,
@@ -222,12 +228,6 @@ function parseRow(
   };
 }
 
-// Non-fuel rows must not keep an odometer reading, which would skew the current-odometer calculation.
-function clearImportedFuelFields(expense: ImportableExpense): ImportableExpense {
-  if (expense.category === 'fuel') return expense;
-  return { ...expense, mileage: null, volume: null, fuelType: null, missedFillup: false };
-}
-
 // The occurrence index lets identical rows in one file both import, while re-importing the same file
 // yields the same keys in the same order. The `csv:` prefix keeps them apart from offline client ids.
 export function deriveImportClientId(expense: ImportableExpense, occurrence: number): string {
@@ -241,10 +241,10 @@ export function deriveImportClientId(expense: ImportableExpense, occurrence: num
     expense.fuelType ?? '',
     expense.description ?? '',
     expense.location ?? '',
-    expense.tags.join(''),
+    expense.tags.join('\x01'),
     expense.missedFillup ? '1' : '0',
     occurrence,
-  ].join(' ');
+  ].join('\x00');
   return `csv:${createHash('sha256').update(content).digest('hex').slice(0, 32)}`;
 }
 
@@ -279,12 +279,13 @@ export function buildImportPlan(csv: string, vehicles: ImportVehicle[]): ImportP
   }
 
   const vehicleByName = new Map<string, string | null>();
-  const register = (key: string, id: string) => {
+  const register = (name: string, id: string) => {
+    const key = vehicleNameKey(name);
     vehicleByName.set(key, vehicleByName.has(key) ? null : id);
   };
   for (const v of vehicles) {
-    if (v.nickname) register(v.nickname.toLowerCase(), v.id);
-    register(`${v.year} ${v.make} ${v.model}`.toLowerCase(), v.id);
+    if (v.nickname) register(v.nickname, v.id);
+    register(`${v.year} ${v.make} ${v.model}`, v.id);
   }
 
   const occurrences = new Map<string, number>();

@@ -1,6 +1,5 @@
 /**
  * In-process HTTP tests for the reminders routes, through the real middleware, validation, and DB stack.
- * Keep imports limited to the harness and bun:test: createTestApp sets env before config loads.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';

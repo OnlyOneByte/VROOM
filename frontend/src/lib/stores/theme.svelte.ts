@@ -1,10 +1,9 @@
 import { browser } from '$app/environment';
 import { settingsApi } from '$lib/services/settings-api';
+// The generated chrome module, not theme-registry, which would put every token on the root layout's path.
+import { DEFAULT_THEME_ID, THEME_BACKGROUND_HEX } from '$lib/theme/theme-chrome';
 
 export type ThemePreference = 'light' | 'dark' | 'system';
-
-// Literal rather than imported from theme-registry, which would put every token on the root layout's path.
-const DEFAULT_THEME_ID = 'default';
 
 const STORAGE_KEY = 'vroom-theme-preference';
 // Stored separately from the light/dark mode so the anti-FOUC head script in app.html reads the same key.
@@ -31,22 +30,6 @@ export function getSystemTheme(): 'light' | 'dark' {
 
 // Used when the theme's background cannot be resolved, so the theme-color meta is never blank.
 const FALLBACK_THEME_COLOR = { light: '#2563eb', dark: '#1a1a2e' } as const;
-
-// Each theme's background as hex: browser chrome does not reliably honor oklch() in theme-color.
-// theme-background-hex.test.ts fails if this drifts from THEME_REGISTRY.
-const THEME_BACKGROUND_HEX: Record<string, { light: string; dark: string }> = {
-	default: { light: '#ffffff', dark: '#09090b' },
-	blueprint: { light: '#f2fafe', dark: '#091c2c' },
-	bento: { light: '#f3f5f9', dark: '#0d0f15' },
-	vaporwave: { light: '#fbf1fe', dark: '#2a013f' },
-	cyberpunk: { light: '#eef7fa', dark: '#060e15' },
-	aurora: { light: '#f5f8ff', dark: '#091123' },
-	solarpunk: { light: '#f2efe0', dark: '#201910' },
-	editorial: { light: '#f9f5ec', dark: '#1b1715' },
-	tui: { light: '#f4f2ea', dark: '#0e0d0b' },
-	y2k: { light: '#eefbff', dark: '#0c0e1c' },
-	neobrutalist: { light: '#f7f5ee', dark: '#0c0d12' }
-};
 
 // Unknown ids fall back to the default theme; a missing entry falls back to the mode hex.
 function resolveThemeColor(themeId: string, resolved: 'light' | 'dark'): string {

@@ -23,8 +23,7 @@
 	import BackupNowDialog from '$lib/components/settings/storage-provider/backup/BackupDialog.svelte';
 	import UnifiedRestoreDialog from '$lib/components/settings/storage-provider/backup/RestoreDialog.svelte';
 	import PhotoStorageSettings from '$lib/components/settings/cards/StorageProvidersCard.svelte';
-	import VlmProvidersCard from '$lib/components/settings/cards/VlmProvidersCard.svelte';
-	import LlmProvidersCard from '$lib/components/settings/cards/LlmProvidersCard.svelte';
+	import ModelProvidersCard from '$lib/components/settings/cards/ModelProvidersCard.svelte';
 	import MigrateFromTrackerCard from '$lib/components/settings/cards/MigrateFromTrackerCard.svelte';
 	import { fetchLastSyncTime } from '$lib/utils/sync/sync-manager';
 	import { providerApi } from '$lib/services/provider-api';
@@ -276,8 +275,8 @@
 				onRestore={handleRestoreClick}
 				onDownloadBackup={handleBackup}
 			/>
-			<VlmProvidersCard />
-			<LlmProvidersCard />
+			<ModelProvidersCard domain="vlm" />
+			<ModelProvidersCard domain="llm" />
 			<MigrateFromTrackerCard />
 		</div>
 	{/if}

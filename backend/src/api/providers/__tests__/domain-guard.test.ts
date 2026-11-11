@@ -1,64 +1,56 @@
-import { describe, expect, test } from 'bun:test';
-import fc from 'fast-check';
+import { beforeEach, describe, expect, test } from 'bun:test';
+import { eq } from 'drizzle-orm';
+import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 
-describe('Domain guard on provider routes', () => {
-  test('DELETE handler rejects auth-domain rows with ValidationError', async () => {
-    const routesSource = await Bun.file(`${import.meta.dir}/../routes.ts`).text();
+// Auth-domain providers are sign-in identities, managed only by the auth flow. The provider routes
+// must refuse to modify or delete them, and leave the row untouched.
 
-    fc.assert(
-      fc.property(fc.constant(null), () => {
-        const deleteIdx = routesSource.indexOf("routes.delete('/:id'");
-        expect(deleteIdx).not.toBe(-1);
+let ctx: TestApp;
+let authProviderId: string;
 
-        const nextRouteIdx = routesSource.indexOf('routes.', deleteIdx + 1);
-        const deleteBody = routesSource.slice(
-          deleteIdx,
-          nextRouteIdx !== -1 ? nextRouteIdx : undefined
-        );
+beforeEach(async () => {
+  ctx = await createTestApp();
+  const { db } = await import('../../../db/connection');
+  const schema = await import('../../../db/schema');
+  const [row] = await db
+    .insert(schema.userProviders)
+    .values({
+      userId: ctx.user.id,
+      domain: 'auth',
+      providerType: 'google',
+      providerAccountId: `acct-${ctx.user.id}`,
+      displayName: 'Google sign-in',
+      credentials: 'opaque',
+      status: 'active',
+    })
+    .returning();
+  authProviderId = row.id;
+});
 
-        expect(deleteBody).toContain("domain === 'auth'");
-        expect(deleteBody).toContain('ValidationError');
-      }),
-      { numRuns: 100 }
-    );
+async function storedDisplayName(): Promise<string | undefined> {
+  const { db } = await import('../../../db/connection');
+  const schema = await import('../../../db/schema');
+  const [row] = await db
+    .select()
+    .from(schema.userProviders)
+    .where(eq(schema.userProviders.id, authProviderId));
+  return row?.displayName;
+}
+
+describe('Provider routes refuse auth-domain rows', () => {
+  test('PUT rejects an auth-domain provider with 400 and does not rename it', async () => {
+    const res = await ctx.authed('PUT', `/api/v1/providers/${authProviderId}`, {
+      displayName: 'Renamed',
+    });
+
+    expect(res.status).toBe(400);
+    expect(await storedDisplayName()).toBe('Google sign-in');
   });
 
-  test('PUT handler rejects auth-domain rows with ValidationError', async () => {
-    const routesSource = await Bun.file(`${import.meta.dir}/../routes.ts`).text();
+  test('DELETE rejects an auth-domain provider with 400 and keeps the row', async () => {
+    const res = await ctx.authed('DELETE', `/api/v1/providers/${authProviderId}`);
 
-    fc.assert(
-      fc.property(fc.constant(null), () => {
-        const putIdx = routesSource.indexOf('routes.put(');
-        expect(putIdx).not.toBe(-1);
-
-        const nextRouteIdx = routesSource.indexOf('routes.', putIdx + 1);
-        const putBody = routesSource.slice(putIdx, nextRouteIdx !== -1 ? nextRouteIdx : undefined);
-
-        expect(putBody).toContain("domain === 'auth'");
-        expect(putBody).toContain('ValidationError');
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  test('POST handler rejects auth-domain creation with ValidationError', async () => {
-    const routesSource = await Bun.file(`${import.meta.dir}/../routes.ts`).text();
-
-    fc.assert(
-      fc.property(fc.constant(null), () => {
-        const postIdx = routesSource.indexOf("routes.post('/'");
-        expect(postIdx).not.toBe(-1);
-
-        const nextRouteIdx = routesSource.indexOf('routes.', postIdx + 1);
-        const postBody = routesSource.slice(
-          postIdx,
-          nextRouteIdx !== -1 ? nextRouteIdx : undefined
-        );
-
-        expect(postBody).toContain("=== 'auth'");
-        expect(postBody).toContain('ValidationError');
-      }),
-      { numRuns: 100 }
-    );
+    expect(res.status).toBe(400);
+    expect(await storedDisplayName()).toBe('Google sign-in');
   });
 });

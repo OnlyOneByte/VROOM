@@ -6,7 +6,7 @@ import {
 	CHART_COLORS,
 	buildChartConfig,
 	buildCategoryPieData,
-	getCategoryColor,
+	getCategoryChartColor,
 	getCategoryLabel
 } from '$lib/utils/chart-colors';
 
@@ -103,7 +103,7 @@ describe('buildCategoryPieData correctness', () => {
 			fc.property(breakdownArb, breakdown => {
 				const result = buildCategoryPieData(breakdown);
 				for (const item of result) {
-					expect(item.color).toBe(getCategoryColor(item.key));
+					expect(item.color).toBe(getCategoryChartColor(item.key));
 					expect(item.label).toBe(getCategoryLabel(item.key));
 				}
 			}),
@@ -132,7 +132,7 @@ describe('Category key fallback safety', () => {
 	test('∀ unknown key, color falls back to var(--primary)', () => {
 		fc.assert(
 			fc.property(unknownKeyArb, key => {
-				expect(getCategoryColor(key)).toBe('var(--primary)');
+				expect(getCategoryChartColor(key)).toBe('var(--primary)');
 			}),
 			{ numRuns: 100 }
 		);

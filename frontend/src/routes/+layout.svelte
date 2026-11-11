@@ -144,7 +144,9 @@
 </script>
 
 <svelte:head>
-	<!-- app.html owns viewport and theme-color; a second declaration here overrides it. -->
+	<!-- Do not redeclare viewport or theme-color here: the copy lands later and overrides app.html's.
+	     viewport-fit=cover is then lost (safe-area insets read 0), and theme-color stops following the
+	     active theme, because themeStore rewrites only app.html's tag. -->
 	<!-- eslint-disable-next-line svelte/no-at-html-tags -- PWA manifest link from @vite-pwa/sveltekit -->
 	{@html webManifestLink}
 </svelte:head>

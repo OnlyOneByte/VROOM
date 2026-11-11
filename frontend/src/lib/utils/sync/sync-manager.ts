@@ -12,7 +12,9 @@ import {
 	type SyncConfig
 } from './sync-state.svelte';
 import {
+	clearNeedsAttention,
 	clearSyncedExpenses,
+	getNeedsAttentionExpenses,
 	getPendingExpenses,
 	INCOMPLETE_FUEL_REASON,
 	isIncompleteFuelExpense,
@@ -24,7 +26,8 @@ import {
 import { extractErrorMessage } from '$lib/utils/error-handling';
 import { classifySyncFailure, type SyncFailureKind } from './classify-failure';
 import { apiClient } from '$lib/services/api-client';
-import { type BackendExpenseResponse, fromBackendExpense } from '$lib/services/api-transformer';
+import { fromBackendExpense } from '$lib/services/api-transformer';
+import type { BackendExpenseResponse } from '$lib/types';
 import { browser } from '$app/environment';
 
 export type { SyncConflict, SyncConfig };
@@ -47,8 +50,6 @@ interface SyncResult {
 	conflicts: SyncConflict[];
 	errors: string[];
 }
-
-export { classifySyncFailure, type SyncFailureKind } from './classify-failure';
 
 export async function fetchLastSyncTime(): Promise<void> {
 	try {
@@ -132,6 +133,23 @@ class SyncManager {
 		} finally {
 			this.syncInProgress = false;
 		}
+	}
+
+	// Guards run before re-admitting so a refused sync never silently un-parks rows the user still has to act on.
+	async retryParked(): Promise<SyncResult> {
+		if (this.syncInProgress) {
+			throw new Error('Sync already in progress');
+		}
+
+		if (!onlineStatus.current) {
+			throw new Error('Cannot sync while offline');
+		}
+
+		for (const expense of getNeedsAttentionExpenses()) {
+			clearNeedsAttention(expense.id);
+		}
+
+		return this.syncAll();
 	}
 
 	private async syncExpenses(expenses: OfflineExpense[]): Promise<SyncResult> {
@@ -324,10 +342,6 @@ class SyncManager {
 			if (import.meta.env.DEV) console.error('Failed to resolve conflict:', error);
 		}
 		return false;
-	}
-
-	getRetryCount(expenseId: string): number {
-		return this.retryCount.get(expenseId) || 0;
 	}
 
 	setupAutoSync(): void {

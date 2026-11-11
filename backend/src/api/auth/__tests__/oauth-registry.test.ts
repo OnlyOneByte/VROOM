@@ -93,7 +93,6 @@ describe('Provider interface', () => {
       expect(typeof provider?.id).toBe('string');
       expect(typeof provider?.displayName).toBe('string');
       expect(typeof provider?.supportsPKCE).toBe('boolean');
-      expect(Array.isArray(provider?.scopes)).toBe(true);
     }
   });
 });

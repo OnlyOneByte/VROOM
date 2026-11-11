@@ -52,8 +52,6 @@ export function getCategoryChartColor(key: string): string {
 	return Object.hasOwn(CATEGORY_COLORS, key) ? (CATEGORY_COLORS[key] as string) : 'var(--primary)';
 }
 
-export const getCategoryColor = getCategoryChartColor;
-
 export function getCategoryLabel(key: string): string {
 	return Object.hasOwn(CATEGORY_LABELS, key) ? (CATEGORY_LABELS[key] as string) : key;
 }

@@ -8,13 +8,12 @@
 	import { Label } from '$lib/components/ui/label';
 	import { Checkbox } from '$lib/components/ui/checkbox';
 	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { dateOnlyToISO } from '$lib/utils/formatters';
+	import { dateOnlyToISO, toDateInputValue } from '$lib/utils/formatters';
 	import { Images, LoaderCircle, CircleAlert, ImageOff } from '@lucide/svelte';
 	import { photosImportApi, type ReceiptDraftItem } from '$lib/services/photos-import-api';
 	import { appStore } from '$lib/stores/app.svelte';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
 	import { categoryLabels } from '$lib/utils/expense-helpers';
-	import { toDateInputValue } from '$lib/utils/formatters';
 	import type { ExpenseCategory, Vehicle } from '$lib/types';
 
 	interface Props {
@@ -115,8 +114,6 @@
 					vehicleId: row.vehicleId,
 					category: row.category,
 					amount: Number(row.amount),
-					// The review row holds a date-only picker value; the API coerces whatever it gets,
-					// so send noon-local or the expense lands a day early west of UTC.
 					date: dateOnlyToISO(row.date)
 				});
 				created++;

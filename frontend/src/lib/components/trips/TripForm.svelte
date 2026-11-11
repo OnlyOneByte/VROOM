@@ -68,8 +68,7 @@
 			startOdometer = trip.startOdometer;
 			endOdometer = trip.endOdometer;
 			purpose = trip.purpose;
-			// Read the stored ISO as the local calendar day; a bare slice would shift the date back for UTC+ users.
-			tripDate = toDateInputValue(new Date(trip.tripDate));
+			tripDate = toDateInputValue(trip.tripDate);
 			startLocation = trip.startLocation ?? '';
 			endLocation = trip.endLocation ?? '';
 			note = trip.note ?? '';

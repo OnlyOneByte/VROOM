@@ -20,7 +20,7 @@ export async function deactivateFinancing(
 }
 
 /** Clears the source link on expenses for a financing; the expense rows themselves are kept. */
-export async function onFinancingDeactivated(financingId: string, userId: string): Promise<void> {
+async function onFinancingDeactivated(financingId: string, userId: string): Promise<void> {
   try {
     const cleared = await expenseRepository.clearSource('financing', financingId, userId);
     if (cleared > 0) {

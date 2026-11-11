@@ -39,7 +39,6 @@ describe('activityTracker arms the inactivity timer for a Sheets-only-sync provi
     });
     expect(put.status, await put.text()).toBeLessThan(300);
 
-    // Dynamic import: a top-level import would bind the DB singleton before createTestApp points DATABASE_URL at :memory:.
     const { activityTracker: userActivityTracker } = await import(
       '../../api/sync/activity-tracker'
     );

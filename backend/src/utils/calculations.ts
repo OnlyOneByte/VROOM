@@ -1,5 +1,3 @@
-import type { Expense } from '../db/schema';
-
 interface EfficiencyExpense {
   mileage: number | null;
   volume: number | null;
@@ -19,7 +17,7 @@ export const MAX_VALID_MPG = 100;
 export const MIN_VALID_MI_KWH = 1;
 export const MAX_VALID_MI_KWH = 10;
 
-export function calculateMPG(miles: number, fuel: number): number {
+function calculateMPG(miles: number, fuel: number): number {
   return fuel > 0 ? miles / fuel : 0;
 }
 
@@ -60,15 +58,7 @@ export function averageConsecutiveMpg(sortedExpenses: MpgPairRow[]): number | nu
   return sum / mpgValues.length;
 }
 
-export function calculateAverageMPG(fuelExpenses: Expense[]): number | null {
-  if (fuelExpenses.length < 2) {
-    return null;
-  }
-
-  return averageConsecutiveMpg(sortExpensesByDate(fuelExpenses));
-}
-
-export function calculateMilesPerKwh(miles: number, kwh: number): number {
+function calculateMilesPerKwh(miles: number, kwh: number): number {
   return kwh > 0 ? miles / kwh : 0;
 }
 

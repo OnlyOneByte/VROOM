@@ -6,9 +6,9 @@ import { moneyDollarsToCents } from '../../utils/money';
 
 const ins = CONFIG.validation.insurance;
 
-export const CLAIM_TYPES = ['collision', 'theft', 'weather', 'vandalism', 'other'] as const;
-export const CLAIM_STATUSES = ['filed', 'in_progress', 'settled', 'denied'] as const;
-export const FAULT_DESIGNATIONS = ['at_fault', 'not_at_fault', 'shared'] as const;
+const CLAIM_TYPES = ['collision', 'theft', 'weather', 'vandalism', 'other'] as const;
+const CLAIM_STATUSES = ['filed', 'in_progress', 'settled', 'denied'] as const;
+const FAULT_DESIGNATIONS = ['at_fault', 'not_at_fault', 'shared'] as const;
 
 export const createClaimSchema = z.object({
   claimDate: z.coerce.date(),

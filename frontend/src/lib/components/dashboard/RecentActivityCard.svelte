@@ -7,7 +7,11 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import EmptyState from '$lib/components/common/empty-state.svelte';
 	import { formatCurrency, formatRelativeTime } from '$lib/utils/formatters';
-	import { categoryLabels, getCategoryColor, getCategoryIcon } from '$lib/utils/expense-helpers';
+	import {
+		categoryLabels,
+		getCategoryBadgeClasses,
+		getCategoryIcon
+	} from '$lib/utils/expense-helpers';
 	import type { ExpenseCategory } from '$lib/types';
 
 	interface RecentExpense {
@@ -57,7 +61,7 @@
 							<div class="flex items-center gap-2 mb-1">
 								<!-- Neutral label text: the category colour is carried by the icon chip only. -->
 								<span
-									class="flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium {getCategoryColor(
+									class="flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium {getCategoryBadgeClasses(
 										expense.category
 									)}"
 								>

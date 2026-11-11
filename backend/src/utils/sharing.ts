@@ -77,3 +77,20 @@ export async function resolveVehicleOwnerId(
     .limit(1);
   return owned[0]?.userId ?? null;
 }
+
+// Rows on a shared vehicle are stamped with the owner's id, so shared reads and writes scope to the owner.
+export async function requireVehicleOwnerScope(
+  vehicleId: string,
+  userId: string,
+  mode: 'read' | 'write',
+  db: AppDatabase = getDb()
+): Promise<string> {
+  const access =
+    mode === 'write'
+      ? await requireVehicleWrite(vehicleId, userId, db)
+      : await requireVehicleRead(vehicleId, userId, db);
+  if (access.role === 'owner') return userId;
+  const ownerId = await resolveVehicleOwnerId(vehicleId, db);
+  if (!ownerId) throw new NotFoundError('Vehicle');
+  return ownerId;
+}

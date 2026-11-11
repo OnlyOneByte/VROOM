@@ -391,4 +391,65 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
     expect(a?.fuelEfficiency).toBe(0);
     expect(a?.fuelEfficiency).not.toBe(100);
   });
+
+  test('year-end efficiencyTrend, avgEfficiency and totalDistance convert each vehicle before pooling on a MIXED mi/gal+km/L fleet', async () => {
+    seedUser(testDb.sqlite, USER);
+    seedVehicle(testDb.sqlite, VEH_A);
+    seedVehicle(testDb.sqlite, VEH_B);
+    testDb.sqlite.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
+      JSON.stringify({ distanceUnit: 'kilometers', volumeUnit: 'liters', chargeUnit: 'kwh' }),
+      VEH_B.id,
+    ]);
+    const jan = (day: number) => new Date(2024, 0, day);
+    const fuelOn = (id: string, vid: string, mileage: number, vol: number, day: number) => ({
+      id,
+      vehicleId: vid,
+      category: 'fuel',
+      expenseAmount: 50,
+      date: jan(day),
+      mileage,
+      volume: vol,
+      fuelType: 'Regular',
+      missedFillup: false,
+    });
+    seedExpense(testDb.sqlite, fuelOn('a1', VEH_A.id, 10_000, 10, 5));
+    seedExpense(testDb.sqlite, fuelOn('a2', VEH_A.id, 10_300, 10, 10));
+    seedExpense(testDb.sqlite, fuelOn('b1', VEH_B.id, 50_000, 8, 6));
+    seedExpense(testDb.sqlite, fuelOn('b2', VEH_B.id, 50_320, 8, 11));
+
+    const ye = await repo.getYearEnd(USER.id, 2024);
+    const expectedAvg = (30 + (40 / 1.609344) * 3.785411784) / 2;
+
+    expect(ye.avgEfficiency).toBeCloseTo(expectedAvg, 1);
+    expect(ye.efficiencyTrend).toHaveLength(1);
+    expect(ye.efficiencyTrend[0]?.efficiency).toBeCloseTo(expectedAvg, 1);
+    expect(ye.totalDistance).toBeCloseTo(300 + 320 / 1.609344, 1);
+  });
+
+  test('summary converts the same as the standalone getters on a MIXED fleet', async () => {
+    seedUser(testDb.sqlite, USER);
+    seedVehicle(testDb.sqlite, VEH_A);
+    seedVehicle(testDb.sqlite, VEH_B);
+    testDb.sqlite.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
+      JSON.stringify({ distanceUnit: 'kilometers', volumeUnit: 'liters', chargeUnit: 'kwh' }),
+      VEH_B.id,
+    ]);
+    seedExpense(testDb.sqlite, fillup('a1', VEH_A.id, 10_000, 40, 60, 10));
+    seedExpense(testDb.sqlite, fillup('a2', VEH_A.id, 10_300, 40, 30, 10));
+    seedExpense(testDb.sqlite, fillup('b1', VEH_B.id, 50_000, 40, 60, 20));
+    seedExpense(testDb.sqlite, fillup('b2', VEH_B.id, 50_360, 40, 30, 20));
+
+    const summary = await repo.getSummary(USER.id, rangeAll());
+    const [quick, stats, adv] = await Promise.all([
+      repo.getQuickStats(USER.id, rangeAll()),
+      repo.getFuelStats(USER.id, rangeAll()),
+      repo.getFuelAdvanced(USER.id, rangeAll()),
+    ]);
+
+    expect(summary.quickStats.avgEfficiency).toBeCloseTo(quick.avgEfficiency ?? Number.NaN, 6);
+    expect(summary.fuelStats.distance.totalDistance).toBeCloseTo(stats.distance.totalDistance, 6);
+    expect(summary.fuelStats.volume.currentYear).toBeCloseTo(stats.volume.currentYear, 6);
+    expect(summary.fuelAdvanced.seasonalEfficiency).toEqual(adv.seasonalEfficiency);
+    expect(stats.distance.totalDistance).toBeCloseTo(300 + 360 / 1.609344, 1);
+  });
 });

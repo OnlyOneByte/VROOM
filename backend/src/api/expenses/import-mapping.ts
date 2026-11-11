@@ -78,7 +78,7 @@ export interface ApplyMappingResult {
 
 export class CsvMappingError extends Error {}
 
-export const NATIVE_HEADER: NativeField[] = [
+const NATIVE_HEADER: NativeField[] = [
   'date',
   'vehicle',
   'category',
@@ -188,7 +188,7 @@ export function mapMileage(
   return String(Math.round(dist));
 }
 
-export function csvCell(value: string): string {
+function csvCell(value: string): string {
   return /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }
 

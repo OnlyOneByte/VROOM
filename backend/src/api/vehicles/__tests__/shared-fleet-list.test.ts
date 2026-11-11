@@ -9,27 +9,21 @@ import {
   createTestApp,
   type DataEnvelope,
   json,
+  type RequestFn,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { createInvitee } from '../../../test-helpers/invitee';
 import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp; // owner (user A)
-let bCookie: string; // invitee B's session
-let bId: string;
+let asB: RequestFn;
 let bEmail: string;
-let bCounter = 0;
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  const { db } = await import('../../../db/connection');
-  const schema = await import('../../../db/schema');
-  const { lucia } = await import('../../auth/lucia');
-  bId = `fleet-invitee-${++bCounter}`;
-  bEmail = `fleet-invitee-${bCounter}@test.com`;
-  await db.insert(schema.users).values({ id: bId, email: bEmail, displayName: 'Invitee B' });
-  const session = await lucia.createSession(bId, {});
-  const sc = lucia.createSessionCookie(session.id);
-  bCookie = `${sc.name}=${sc.value}`;
+  const b = await createInvitee(ctx, 'fleet-invitee', 'Invitee B');
+  bEmail = b.email;
+  asB = b.request;
 });
 afterEach(() => ctx.close());
 
@@ -37,16 +31,6 @@ interface VehicleRow {
   id: string;
   make: string;
   sharedAccess?: { level: string; sharedBy: string };
-}
-
-async function asB(method: string, path: string, body?: unknown): Promise<Response> {
-  const headers: Record<string, string> = { Cookie: bCookie, 'Sec-Fetch-Site': 'same-origin' };
-  let init: RequestInit = { method, headers };
-  if (body !== undefined) {
-    headers['Content-Type'] = 'application/json';
-    init = { ...init, body: JSON.stringify(body) };
-  }
-  return ctx.app.request(path, init);
 }
 
 /** A owns a vehicle and invites B at `level`; returns [vehicleId, shareId]. */

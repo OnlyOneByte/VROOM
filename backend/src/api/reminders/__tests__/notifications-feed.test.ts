@@ -1,7 +1,6 @@
 /**
  * HTTP tests for the reminder notification feed: newest-first ordering, marking a notification read, and
  * ownership. Drives the real trigger and list/mark routes, then reads rows from sqlite.
- * Keep static imports to the harness and bun:test: createTestApp sets env before config loads.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';

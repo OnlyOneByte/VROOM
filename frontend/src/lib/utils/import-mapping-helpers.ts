@@ -1,4 +1,5 @@
-import type { NativeImportField } from '$lib/types';
+import type { ExpenseCategory, ImportColumnMapping, NativeImportField } from '$lib/types';
+import type { ImportMappingPreset } from '$lib/types/import-mapping';
 
 const NATIVE_HEADERS = ['date', 'vehicle', 'category', 'amount'] as const;
 
@@ -30,4 +31,21 @@ export function guessManualColumns(headers: string[]): Partial<Record<NativeImpo
 	set('description', 'note', 'description', 'comment');
 	set('tags', 'tag');
 	return guess;
+}
+
+export function presetImportMapping(
+	preset: ImportMappingPreset,
+	targetVehicle: string,
+	categoryRemap: Record<string, ExpenseCategory>
+): ImportColumnMapping {
+	return {
+		source: preset.id,
+		columns: preset.columns,
+		targetVehicle,
+		dateFormat: preset.dateFormat,
+		distanceUnit: preset.distanceUnit,
+		volumeUnit: preset.volumeUnit,
+		categoryMap: { ...preset.categoryMap, ...categoryRemap },
+		defaultCategory: preset.defaultCategory
+	};
 }

@@ -14,34 +14,37 @@ import {
   partialUnitPreferencesSchema,
 } from '../../utils/unit-preferences-schema';
 import { preferencesRepository, syncStateRepository } from './repository';
+import {
+  type BackupConfigUpdate,
+  backupConfigSchema,
+  type StorageConfigUpdate,
+  storageConfigSchema,
+} from './validation';
 
-async function validateStorageConfig(
-  storageConfig: z.infer<typeof storageConfigSchema>,
-  userId: string
-): Promise<void> {
-  const db = getDb();
+async function assertProvidersOwned(providerIds: string[], userId: string): Promise<void> {
+  if (providerIds.length === 0) return;
 
+  const ownedProviders = await getDb()
+    .select({ id: userProviders.id })
+    .from(userProviders)
+    .where(and(inArray(userProviders.id, providerIds), eq(userProviders.userId, userId)));
+
+  const ownedIds = new Set(ownedProviders.map((p) => p.id));
+  for (const providerId of providerIds) {
+    if (!ownedIds.has(providerId)) {
+      throw new ValidationError(
+        `Provider '${providerId}' not found or does not belong to this user`
+      );
+    }
+  }
+}
+
+async function validateStorageConfig(storageConfig: StorageConfig, userId: string): Promise<void> {
   const defaultProviderIds = Object.values(storageConfig.defaults).filter(
     (id): id is string => id !== null
   );
   const categoryProviderIds = Object.keys(storageConfig.providerCategories);
-  const allProviderIds = [...new Set([...defaultProviderIds, ...categoryProviderIds])];
-
-  if (allProviderIds.length > 0) {
-    const ownedProviders = await db
-      .select({ id: userProviders.id })
-      .from(userProviders)
-      .where(and(inArray(userProviders.id, allProviderIds), eq(userProviders.userId, userId)));
-
-    const ownedIds = new Set(ownedProviders.map((p) => p.id));
-    for (const providerId of allProviderIds) {
-      if (!ownedIds.has(providerId)) {
-        throw new ValidationError(
-          `Provider '${providerId}' not found or does not belong to this user`
-        );
-      }
-    }
-  }
+  await assertProvidersOwned([...new Set([...defaultProviderIds, ...categoryProviderIds])], userId);
 
   for (const [category, providerId] of Object.entries(storageConfig.defaults)) {
     if (providerId === null) continue;
@@ -60,32 +63,9 @@ async function validateStorageConfig(
   }
 }
 
-async function validateBackupConfig(
-  backupConfig: z.infer<typeof backupConfigSchema>,
-  userId: string
-): Promise<void> {
-  const providerIds = Object.keys(backupConfig.providers);
-  if (providerIds.length === 0) return;
-
-  const db = getDb();
-  const ownedProviders = await db
-    .select({ id: userProviders.id })
-    .from(userProviders)
-    .where(and(inArray(userProviders.id, providerIds), eq(userProviders.userId, userId)));
-
-  const ownedIds = new Set(ownedProviders.map((p) => p.id));
-  for (const providerId of providerIds) {
-    if (!ownedIds.has(providerId)) {
-      throw new ValidationError(
-        `Provider '${providerId}' not found or does not belong to this user`
-      );
-    }
-  }
-}
-
 function mergeStorageConfig(
   existing: StorageConfig | null | undefined,
-  incoming: z.infer<typeof storageConfigSchema>
+  incoming: StorageConfigUpdate
 ): StorageConfig {
   const existingConfig = (existing ?? {
     defaults: {
@@ -109,7 +89,7 @@ function mergeStorageConfig(
 // Providers absent from a partial PUT must survive; a named provider's entry is replaced whole.
 function mergeBackupConfig(
   existing: BackupConfig | null | undefined,
-  incoming: z.infer<typeof backupConfigSchema>
+  incoming: BackupConfigUpdate
 ): BackupConfig {
   const existingProviders = existing?.providers ?? {};
   return {
@@ -121,48 +101,6 @@ const routes = new Hono();
 
 routes.use('*', requireAuth);
 routes.use('*', changeTracker);
-
-const categorySettingSchema = z.object({
-  enabled: z.boolean(),
-  folderPath: z.string(),
-});
-
-const photoCategoryEnum = z.enum([
-  'vehicle_photos',
-  'expense_receipts',
-  'insurance_docs',
-  'odometer_readings',
-]);
-
-const storageConfigSchema = z.object({
-  defaults: z.record(photoCategoryEnum, z.string().nullable()),
-  providerCategories: z
-    .record(z.string().max(64), z.record(photoCategoryEnum, categorySettingSchema))
-    .refine((obj) => Object.keys(obj).length <= 20, {
-      message: 'Too many provider entries (max 20)',
-    }),
-});
-
-const providerBackupSettingsSchema = z.object({
-  enabled: z.boolean(),
-  folderPath: z
-    .string()
-    .min(1)
-    .max(255)
-    .refine((s) => !s.includes('..'), { message: 'Path traversal not allowed' }),
-  retentionCount: z.number().int().min(1).max(100),
-  lastBackupAt: z.string().datetime().optional(),
-  sheetsSyncEnabled: z.boolean().optional(),
-  sheetsSpreadsheetId: z.string().optional(),
-});
-
-const backupConfigSchema = z.object({
-  providers: z
-    .record(z.string().max(64), providerBackupSettingsSchema)
-    .refine((obj) => Object.keys(obj).length <= 20, {
-      message: 'Too many provider entries (max 20)',
-    }),
-});
 
 const baseSettingsSchema = createInsertSchema(userPreferences, {
   syncInactivityMinutes: z
@@ -231,7 +169,7 @@ routes.put('/', async (c) => {
 
   let mergedBackupConfig: BackupConfig | undefined;
   if (backupConfig) {
-    await validateBackupConfig(backupConfig, user.id);
+    await assertProvidersOwned(Object.keys(backupConfig.providers), user.id);
     mergedBackupConfig = mergeBackupConfig(existingSettings.backupConfig, backupConfig);
   }
 
@@ -257,13 +195,6 @@ routes.post('/backup', async (c) => {
     success: true,
     message: 'Backup completed successfully',
     timestamp: new Date().toISOString(),
-  });
-});
-
-routes.post('/restore', async (c) => {
-  return c.json({
-    success: true,
-    message: 'Data restored successfully',
   });
 });
 

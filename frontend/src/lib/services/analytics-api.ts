@@ -14,6 +14,7 @@ import type {
 } from '$lib/types';
 import { ApiError } from '$lib/utils/error-handling';
 import { apiClient } from './api-client';
+import { NetworkError } from '$lib/utils/error-handling';
 import { buildQueryString } from './api-utils';
 
 interface FuelEfficiencyParams {
@@ -40,20 +41,16 @@ export function getDefaultDateRange(): { startDate: number; endDate: number } {
 	return { startDate: start, endDate: end };
 }
 
-function buildQuery(params: Record<string, string | number | undefined>): string {
-	return buildQueryString(params);
-}
-
 export const analyticsApi = {
 	async getFuelEfficiency(params?: FuelEfficiencyParams): Promise<FuelEfficiencyResponse> {
 		return apiClient.get<FuelEfficiencyResponse>(
-			`/api/v1/analytics/fuel-efficiency${buildQuery({ vehicleId: params?.vehicleId })}`
+			`/api/v1/analytics/fuel-efficiency${buildQueryString({ vehicleId: params?.vehicleId })}`
 		);
 	},
 
 	async getQuickStats(params: { startDate: number; endDate: number }): Promise<QuickStatsResponse> {
 		return apiClient.get<QuickStatsResponse>(
-			`/api/v1/analytics/quick-stats${buildQuery({ startDate: params.startDate, endDate: params.endDate })}`
+			`/api/v1/analytics/quick-stats${buildQueryString({ startDate: params.startDate, endDate: params.endDate })}`
 		);
 	},
 
@@ -63,7 +60,7 @@ export const analyticsApi = {
 		vehicleId?: string;
 	}): Promise<FuelStatsResponse> {
 		return apiClient.get<FuelStatsResponse>(
-			`/api/v1/analytics/fuel-stats${buildQuery({ startDate: params.startDate, endDate: params.endDate, vehicleId: params.vehicleId })}`
+			`/api/v1/analytics/fuel-stats${buildQueryString({ startDate: params.startDate, endDate: params.endDate, vehicleId: params.vehicleId })}`
 		);
 	},
 
@@ -73,7 +70,7 @@ export const analyticsApi = {
 		vehicleId?: string;
 	}): Promise<FuelAdvancedResponse> {
 		return apiClient.get<FuelAdvancedResponse>(
-			`/api/v1/analytics/fuel-advanced${buildQuery({ startDate: params.startDate, endDate: params.endDate, vehicleId: params.vehicleId })}`
+			`/api/v1/analytics/fuel-advanced${buildQueryString({ startDate: params.startDate, endDate: params.endDate, vehicleId: params.vehicleId })}`
 		);
 	},
 
@@ -82,7 +79,7 @@ export const analyticsApi = {
 		endDate: number;
 	}): Promise<CrossVehicleResponse> {
 		return apiClient.get<CrossVehicleResponse>(
-			`/api/v1/analytics/cross-vehicle${buildQuery({ startDate: params.startDate, endDate: params.endDate })}`
+			`/api/v1/analytics/cross-vehicle${buildQueryString({ startDate: params.startDate, endDate: params.endDate })}`
 		);
 	},
 
@@ -96,13 +93,13 @@ export const analyticsApi = {
 
 	async getVehicleHealth(vehicleId: string): Promise<VehicleHealthResponse> {
 		return apiClient.get<VehicleHealthResponse>(
-			`/api/v1/analytics/vehicle-health${buildQuery({ vehicleId })}`
+			`/api/v1/analytics/vehicle-health${buildQueryString({ vehicleId })}`
 		);
 	},
 
 	async getVehicleTCO(vehicleId: string, params?: { year?: number }): Promise<VehicleTCOResponse> {
 		return apiClient.get<VehicleTCOResponse>(
-			`/api/v1/analytics/vehicle-tco${buildQuery({ vehicleId, year: params?.year })}`
+			`/api/v1/analytics/vehicle-tco${buildQueryString({ vehicleId, year: params?.year })}`
 		);
 	},
 
@@ -111,13 +108,13 @@ export const analyticsApi = {
 		params: { startDate: number; endDate: number }
 	): Promise<VehicleExpensesResponse> {
 		return apiClient.get<VehicleExpensesResponse>(
-			`/api/v1/analytics/vehicle-expenses${buildQuery({ vehicleId, startDate: params.startDate, endDate: params.endDate })}`
+			`/api/v1/analytics/vehicle-expenses${buildQueryString({ vehicleId, startDate: params.startDate, endDate: params.endDate })}`
 		);
 	},
 
 	async getYearEnd(params?: { year?: number }): Promise<YearEndResponse> {
 		return apiClient.get<YearEndResponse>(
-			`/api/v1/analytics/year-end${buildQuery({ year: params?.year })}`
+			`/api/v1/analytics/year-end${buildQueryString({ year: params?.year })}`
 		);
 	},
 
@@ -127,13 +124,12 @@ export const analyticsApi = {
 	}): Promise<AnalyticsSummaryResponse> {
 		try {
 			return await apiClient.get<AnalyticsSummaryResponse>(
-				`/api/v1/analytics/summary${buildQuery({ startDate: params.startDate, endDate: params.endDate })}`
+				`/api/v1/analytics/summary${buildQueryString({ startDate: params.startDate, endDate: params.endDate })}`
 			);
 		} catch (error: unknown) {
 			// Fall back only for 404 (endpoint not deployed yet) or network errors.
 			const is404 = error instanceof ApiError && error.statusCode === 404;
-			const isNetworkError = error instanceof TypeError;
-			if (!is404 && !isNetworkError) throw error;
+			if (!is404 && !(error instanceof NetworkError)) throw error;
 
 			const [quickStats, fuelStats, fuelAdvanced] = await Promise.all([
 				analyticsApi.getQuickStats(params),

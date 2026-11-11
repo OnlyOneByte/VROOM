@@ -1,10 +1,9 @@
 /**
  * Deleting an expense reminder keeps the expenses it materialized, but clears their source link. Runs
  * through the real route, trigger, and delete stack.
- * Keep static imports to the harness and bun:test: createTestApp sets env before config loads.
  */
 
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import {
   createTestApp,
   type DataEnvelope,
@@ -107,5 +106,25 @@ describe('reminder delete cascade', () => {
     expect(delRes.status).toBe(200);
 
     expect(materializedExpenseIds(reminderId)).toHaveLength(0);
+  });
+
+  test('a failure clearing the source link fails the delete and keeps the reminder', async () => {
+    // A dangling reminder source fails backup validation, so the delete must not proceed without it.
+    const { expenseRepository } = await import('../../expenses/repository');
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
+    const reminderId = await createOverdueExpenseReminder(vehicleId);
+    const spy = spyOn(expenseRepository, 'clearSource').mockRejectedValue(
+      new Error('connection lost')
+    );
+
+    try {
+      const delRes = await ctx.authed('DELETE', `/api/v1/reminders/${reminderId}`);
+      expect(delRes.status).toBeGreaterThanOrEqual(500);
+    } finally {
+      spy.mockRestore();
+    }
+
+    const remRow = ctx.sqlite.query('SELECT id FROM reminders WHERE id = ?').get(reminderId);
+    expect(remRow).not.toBeNull();
   });
 });

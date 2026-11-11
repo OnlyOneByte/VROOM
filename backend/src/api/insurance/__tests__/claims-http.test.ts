@@ -1,6 +1,6 @@
 /**
  * HTTP tests for insurance claims: the file, list, update, and delete lifecycle, ownership scoping, and enum
- * validation. Imports only the harness: createTestApp sets env before config loads.
+ * validation.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -166,6 +166,27 @@ describe('insurance claims HTTP routes', () => {
     });
     expect(file.status).toBeGreaterThanOrEqual(400);
     expect(file.status).toBeLessThan(500);
+  });
+
+  test('updating a claim that is missing or belongs to another policy → 404', async () => {
+    const vehicleId = await seedVehicle(ctx);
+    const policyId = await seedPolicy(vehicleId);
+    const otherPolicyId = await seedPolicy(vehicleId);
+    const filed = await ctx.authed('POST', `/api/v1/insurance/${otherPolicyId}/claims`, {
+      claimDate: '2024-06-15T00:00:00.000Z',
+      claimType: 'collision',
+    });
+    const claimId = (await json<DataEnvelope<ClaimRow>>(filed)).data.id;
+
+    const missing = await ctx.authed('PUT', `/api/v1/insurance/${policyId}/claims/no-such-claim`, {
+      status: 'settled',
+    });
+    expect(missing.status).toBe(404);
+
+    const crossPolicy = await ctx.authed('PUT', `/api/v1/insurance/${policyId}/claims/${claimId}`, {
+      status: 'settled',
+    });
+    expect(crossPolicy.status).toBe(404);
   });
 
   test('anonymous access is unauthorized', async () => {

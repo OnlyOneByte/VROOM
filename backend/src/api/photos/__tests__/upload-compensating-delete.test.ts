@@ -1,36 +1,80 @@
 /**
- * Source guard: if the DB writes after a provider upload fail, the uploaded object must be deleted,
- * or it is orphaned with no row pointing at it. Scans the source because a real upload needs
- * provider bytes.
+ * Upload compensation. The bytes reach the provider before the DB rows are written, so a failed DB
+ * write must leave neither a photo row nor an uploaded object behind, and the original error must
+ * still reach the caller.
  */
 
-import { describe, expect, test } from 'bun:test';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
+import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { logger } from '../../../utils/logger';
+import type { StorageRef } from '../../providers/domains/storage/storage-provider';
+import { photoRefRepository } from '../photo-ref-repository';
+import { uploadPhotoForEntity } from '../photo-service';
+import { type FakePhotoStorage, installFakePhotoStorage } from './fake-photo-storage';
 
-const SERVICE_SRC = readFileSync(join(import.meta.dir, '..', 'photo-service.ts'), 'utf-8');
+let ctx: TestApp;
+let storage: FakePhotoStorage;
 
-describe('photo upload compensates on a failed DB write (orphan-byte source guard)', () => {
-  test('the persist helper exists and is invoked by uploadPhotoForEntity', () => {
-    expect(SERVICE_SRC).toContain('async function persistUploadedPhotoOrCleanup(');
-    expect(SERVICE_SRC).toContain('await persistUploadedPhotoOrCleanup(');
+beforeEach(async () => {
+  ctx = await createTestApp();
+  ctx.sqlite.run(
+    `INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('veh-1', ?, 'Toyota', 'Camry', 2022)`,
+    [ctx.user.id]
+  );
+  storage = installFakePhotoStorage(ctx);
+});
+
+afterEach(() => {
+  storage.restore();
+  ctx.close();
+});
+
+function jpeg(): File {
+  return new File([new Uint8Array([1, 2, 3])], 'receipt.jpg', { type: 'image/jpeg' });
+}
+
+function photoRowCount(): number {
+  return (ctx.sqlite.query('SELECT COUNT(*) AS n FROM photos').get() as { n: number }).n;
+}
+
+describe('upload compensates when the DB write fails after the provider upload', () => {
+  test('a failed photo_refs insert removes the photo row and the uploaded object, then rethrows', async () => {
+    const dbError = new Error('disk I/O error');
+    const uploadSpy = spyOn(storage.provider, 'upload');
+    const refSpy = spyOn(photoRefRepository, 'create').mockRejectedValueOnce(dbError);
+
+    await expect(uploadPhotoForEntity('vehicle', 'veh-1', ctx.user.id, jpeg())).rejects.toBe(
+      dbError
+    );
+
+    const uploaded = (await uploadSpy.mock.results[0].value) as StorageRef;
+    expect(await storage.provider.getExternalUrl(uploaded)).toBeNull();
+    expect(photoRowCount()).toBe(0);
+
+    refSpy.mockRestore();
+    uploadSpy.mockRestore();
   });
 
-  test('the persist path catches a DB-write failure and best-effort deletes the uploaded object', () => {
-    // Isolate the helper body, then assert it has a catch that calls provider.delete with the
-    // upload's storageRef.externalId (the just-uploaded object) — the compensating delete.
-    const start = SERVICE_SRC.indexOf('async function persistUploadedPhotoOrCleanup(');
-    expect(start).toBeGreaterThan(-1);
-    const next = SERVICE_SRC.indexOf('\nexport async function uploadPhotoForEntity(', start);
-    const body = SERVICE_SRC.slice(start, next === -1 ? undefined : next);
+  test('a failed compensating delete is logged and the original DB error still reaches the caller', async () => {
+    const dbError = new Error('disk I/O error');
+    const refSpy = spyOn(photoRefRepository, 'create').mockRejectedValueOnce(dbError);
+    const deleteSpy = spyOn(storage.provider, 'delete').mockRejectedValueOnce(
+      new Error('network down')
+    );
+    const warnSpy = spyOn(logger, 'warn');
 
-    expect(body).toMatch(/}\s*catch\s*\(error\)\s*{/);
-    expect(body).toMatch(/provider\.delete\(\s*{[^}]*externalId:\s*storageRef\.externalId/);
-    // The original error must NOT be swallowed — it re-throws after the cleanup attempt.
-    expect(body).toContain('throw error;');
-  });
+    await expect(uploadPhotoForEntity('vehicle', 'veh-1', ctx.user.id, jpeg())).rejects.toBe(
+      dbError
+    );
 
-  test('a failed compensating delete is logged (reconcilable), not silently dropped', () => {
-    expect(SERVICE_SRC).toMatch(/Failed to clean up orphaned upload/);
+    expect(deleteSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Failed to clean up orphaned upload after a DB write error',
+      expect.objectContaining({ error: 'network down' })
+    );
+
+    warnSpy.mockRestore();
+    deleteSpy.mockRestore();
+    refSpy.mockRestore();
   });
 });

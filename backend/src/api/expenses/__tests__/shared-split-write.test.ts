@@ -3,43 +3,29 @@ import {
   createTestApp,
   type DataEnvelope,
   json,
+  type RequestFn,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { createInvitee } from '../../../test-helpers/invitee';
 import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
-let bCookie: string;
+let asB: RequestFn;
 let bId: string;
 let bEmail: string;
-let bCounter = 0;
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  const { db } = await import('../../../db/connection');
-  const schema = await import('../../../db/schema');
-  const { lucia } = await import('../../auth/lucia');
-  bId = `splitw-invitee-${++bCounter}`;
-  bEmail = `splitw-invitee-${bCounter}@test.com`;
-  await db.insert(schema.users).values({ id: bId, email: bEmail, displayName: 'Editor B' });
-  const session = await lucia.createSession(bId, {});
-  const sc = lucia.createSessionCookie(session.id);
-  bCookie = `${sc.name}=${sc.value}`;
+  const b = await createInvitee(ctx, 'splitw-invitee', 'Editor B');
+  bId = b.id;
+  bEmail = b.email;
+  asB = b.request;
 });
 afterEach(() => ctx.close());
 
 interface SplitData {
   siblings: Array<{ id: string; vehicleId: string; expenseAmount: number }>;
   groupId: string;
-}
-
-async function asB(method: string, path: string, body?: unknown): Promise<Response> {
-  const headers: Record<string, string> = { Cookie: bCookie, 'Sec-Fetch-Site': 'same-origin' };
-  let init: RequestInit = { method, headers };
-  if (body !== undefined) {
-    headers['Content-Type'] = 'application/json';
-    init = { ...init, body: JSON.stringify(body) };
-  }
-  return ctx.app.request(path, init);
 }
 
 async function shareAccepted(level: 'viewer' | 'editor'): Promise<string> {
@@ -180,6 +166,35 @@ describe('shared split writes stamp the owner and createdBy', () => {
     const del = await asB('DELETE', `/api/v1/expenses/split/${gid}`);
     expect(del.status, 'editor can delete a shared split').toBe(200);
     expect(ctx.sqlite.query('SELECT id FROM expenses WHERE group_id = ?').get(gid)).toBeNull();
+  });
+
+  test('an EDITOR cannot PUT a shared split onto their own vehicle (owner of the group must not change)', async () => {
+    const vehicleId = await shareAccepted('editor');
+    const bVehRes = await asB('POST', '/api/v1/vehicles', {
+      make: 'BOwn',
+      model: 'Car',
+      year: 2023,
+    });
+    expect(bVehRes.status, 'B seeds own vehicle').toBeLessThan(300);
+    const bOwn = (await json<DataEnvelope<{ id: string }>>(bVehRes)).data.id;
+
+    const created = await ctx.authed('POST', '/api/v1/expenses/split', {
+      splitConfig: { method: 'even', vehicleIds: [vehicleId] },
+      category: 'misc',
+      totalAmount: 30,
+      date: '2024-06-06T00:00:00.000Z',
+    });
+    const gid = (await json<DataEnvelope<SplitData>>(created)).data.groupId;
+
+    const put = await asB('PUT', `/api/v1/expenses/split/${gid}`, {
+      splitConfig: { method: 'even', vehicleIds: [bOwn] },
+      totalAmount: 30,
+    });
+    expect(put.status, 'moving the split to another owner is rejected').toBe(400);
+    const rows = ctx.sqlite
+      .query('SELECT vehicle_id, user_id FROM expenses WHERE group_id = ?')
+      .all(gid) as Array<{ vehicle_id: string; user_id: string }>;
+    expect(rows).toEqual([{ vehicle_id: vehicleId, user_id: ctx.user.id }]);
   });
 
   test('an EDITOR (and a VIEWER) can GET a shared split group; a non-shared third party cannot', async () => {

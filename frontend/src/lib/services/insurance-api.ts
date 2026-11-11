@@ -10,7 +10,8 @@ import type {
 	UpdatePolicyRequest,
 	UpdateTermRequest
 } from '$lib/types';
-import { apiClient, getApiBaseUrl, withPagination } from './api-client';
+import { apiClient } from './api-client';
+import { entityPhotos } from './photo-api';
 
 export const insuranceApi = {
 	async getAllPolicies(): Promise<InsurancePolicy[]> {
@@ -54,28 +55,24 @@ export const insuranceApi = {
 	},
 
 	// entityType is 'insurance_policy' or 'insurance_claim'; both are stored in the insurance_docs category.
-	async getEntityDocuments(
+	getEntityDocuments(
 		entityType: string,
 		entityId: string,
 		params?: { limit?: number; offset?: number }
 	): Promise<PaginatedResponse<Photo>> {
-		return apiClient.getPaginated<Photo>(
-			withPagination(`/api/v1/photos/${entityType}/${entityId}`, params)
-		);
+		return entityPhotos(entityType, entityId).list(params);
 	},
 
-	async uploadEntityDocument(entityType: string, entityId: string, file: File): Promise<Photo> {
-		const formData = new FormData();
-		formData.append('photo', file);
-		return apiClient.post<Photo>(`/api/v1/photos/${entityType}/${entityId}`, formData);
+	uploadEntityDocument(entityType: string, entityId: string, file: File): Promise<Photo> {
+		return entityPhotos(entityType, entityId).upload(file);
 	},
 
-	async deleteEntityDocument(entityType: string, entityId: string, photoId: string): Promise<void> {
-		await apiClient.delete(`/api/v1/photos/${entityType}/${entityId}/${photoId}`);
+	deleteEntityDocument(entityType: string, entityId: string, photoId: string): Promise<void> {
+		return entityPhotos(entityType, entityId).remove(photoId);
 	},
 
 	getEntityDocumentThumbnailUrl(entityType: string, entityId: string, photoId: string): string {
-		return `${getApiBaseUrl()}/api/v1/photos/${entityType}/${entityId}/${photoId}/thumbnail`;
+		return entityPhotos(entityType, entityId).thumbnailUrl(photoId);
 	},
 
 	async getClaims(policyId: string): Promise<InsuranceClaim[]> {

@@ -14,6 +14,14 @@ import {
 const mockServiceWorker = (global as any).mockServiceWorker;
 
 describe('PWA Utils', () => {
+	const realAddEventListener = window.addEventListener;
+	const realRemoveEventListener = window.removeEventListener;
+
+	afterEach(() => {
+		window.addEventListener = realAddEventListener;
+		window.removeEventListener = realRemoveEventListener;
+	});
+
 	beforeEach(() => {
 		vi.clearAllMocks();
 
@@ -97,8 +105,6 @@ describe('PWA Utils', () => {
 	describe('initializePWA — idempotent registration', () => {
 		type WindowListener = (event: Event) => void;
 
-		const setupRemoveEventListener = window.removeEventListener;
-
 		function trackWindowListeners(): Map<string, Set<WindowListener>> {
 			const live = new Map<string, Set<WindowListener>>();
 			const listenersFor = (type: string): Set<WindowListener> => {
@@ -116,10 +122,6 @@ describe('PWA Utils', () => {
 			) as unknown as typeof window.removeEventListener;
 			return live;
 		}
-
-		afterEach(() => {
-			window.removeEventListener = setupRemoveEventListener;
-		});
 
 		it('leaves exactly one listener per event after repeated calls', () => {
 			const live = trackWindowListeners();

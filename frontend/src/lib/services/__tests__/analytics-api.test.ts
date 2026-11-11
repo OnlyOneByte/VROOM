@@ -8,13 +8,15 @@ import type {
 import { ApiError } from '$lib/utils/error-handling';
 import { dateOnlyToISO, toDateInputValue } from '$lib/utils/formatters';
 
-vi.mock('../api-client', () => ({
+vi.mock('../api-client', async importOriginal => ({
+	...(await importOriginal<typeof import('../api-client')>()),
 	apiClient: {
 		get: vi.fn()
 	}
 }));
 
 const { apiClient } = await import('../api-client');
+const { NetworkError } = await import('$lib/utils/error-handling');
 const { analyticsApi, getDefaultDateRange } = await import('../analytics-api');
 
 const mockGet = vi.mocked(apiClient.get);
@@ -144,7 +146,7 @@ describe('analyticsApi.getSummary()', () => {
 
 	it('falls back to individual endpoints on network error', async () => {
 		mockGet
-			.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+			.mockRejectedValueOnce(new NetworkError(new TypeError('Load failed')))
 			.mockResolvedValueOnce(mockQuickStats)
 			.mockResolvedValueOnce(mockFuelStats)
 			.mockResolvedValueOnce(mockFuelAdvanced);
@@ -153,6 +155,14 @@ describe('analyticsApi.getSummary()', () => {
 
 		expect(mockGet).toHaveBeenCalledTimes(4);
 		expect(result).toEqual(mockSummaryResponse);
+	});
+
+	it('re-throws a TypeError that is not a network failure instead of falling back', async () => {
+		const bug = new TypeError("Cannot read properties of undefined (reading 'quickStats')");
+		mockGet.mockRejectedValueOnce(bug);
+
+		await expect(analyticsApi.getSummary(dateParams)).rejects.toBe(bug);
+		expect(mockGet).toHaveBeenCalledTimes(1);
 	});
 
 	it('re-throws non-404 API errors instead of falling back', async () => {
@@ -260,7 +270,7 @@ describe('analyticsApi — method→endpoint wiring', () => {
 		return mockGet.mock.calls[0]?.[0] as string;
 	}
 
-	it('getFuelEfficiency: no vehicleId → bare path (buildQuery emits no "?")', async () => {
+	it('getFuelEfficiency: no vehicleId → bare path (no "?")', async () => {
 		await analyticsApi.getFuelEfficiency();
 		expect(calledUrl()).toBe('/api/v1/analytics/fuel-efficiency');
 	});

@@ -4,7 +4,6 @@
 import { tripDistance } from '../api/trips/repository';
 import { TRIP_PURPOSES, type TripPurpose } from '../api/trips/validation';
 import type { Trip } from '../db/schema';
-import { toMonthKey } from './analytics-charts';
 
 export type MilesByPurpose = Record<TripPurpose, number>;
 
@@ -51,20 +50,4 @@ export function buildTripSummary(trips: Trip[], rate = 0): TripSummary {
     businessMileageValue: businessMiles * rate,
     rate,
   };
-}
-
-// Groups by the local calendar month of tripDate.
-export function buildTripSummaryByMonth(trips: Trip[], rate = 0): Record<string, TripSummary> {
-  const byMonth = new Map<string, Trip[]>();
-  for (const trip of trips) {
-    const key = toMonthKey(trip.tripDate);
-    const bucket = byMonth.get(key);
-    if (bucket) bucket.push(trip);
-    else byMonth.set(key, [trip]);
-  }
-  const out: Record<string, TripSummary> = {};
-  for (const [month, monthTrips] of byMonth) {
-    out[month] = buildTripSummary(monthTrips, rate);
-  }
-  return out;
 }

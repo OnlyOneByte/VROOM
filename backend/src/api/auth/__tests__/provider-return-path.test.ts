@@ -6,11 +6,13 @@
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
-import { isSafeReturnPath } from '../routes';
 
 let ctx: TestApp;
+let isSafeReturnPath: typeof import('../routes').isSafeReturnPath;
+// Imported after createTestApp: a static import would build CONFIG before the test DB URL is set.
 beforeEach(async () => {
   ctx = await createTestApp();
+  ({ isSafeReturnPath } = await import('../routes'));
 });
 afterEach(() => ctx.close());
 

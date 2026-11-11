@@ -2,8 +2,10 @@ import { describe, expect, test } from 'vitest';
 import {
 	guessManualColumns,
 	isNativeImportHeaders,
-	parseCsvHeaders
+	parseCsvHeaders,
+	presetImportMapping
 } from '$lib/utils/import-mapping-helpers';
+import type { ImportMappingPreset } from '$lib/types/import-mapping';
 
 describe('parseCsvHeaders', () => {
 	test('splits the FIRST line on commas, trimming + de-quoting each cell', () => {
@@ -79,5 +81,33 @@ describe('guessManualColumns', () => {
 
 	test('an un-guessable header set leaves fields unmapped (no invented columns)', () => {
 		expect(guessManualColumns(['col1', 'col2', 'xyz'])).toEqual({});
+	});
+});
+
+describe('presetImportMapping', () => {
+	const preset: ImportMappingPreset = {
+		id: 'fuelly',
+		label: 'Fuelly',
+		signature: ['fuelup_date', 'price'],
+		columns: { date: 'fuelup_date', amount: 'price' },
+		dateFormat: 'mdy',
+		distanceUnit: 'miles',
+		volumeUnit: 'gallons_us',
+		categoryMap: { gas: 'fuel' },
+		defaultCategory: 'fuel'
+	};
+
+	test('carries the preset default category so files without a category column still import', () => {
+		expect(presetImportMapping(preset, 'My Car', {}).defaultCategory).toBe('fuel');
+	});
+
+	test('layers the user remap over the preset category map and stamps the target vehicle', () => {
+		const mapping = presetImportMapping(preset, 'My Car', { gas: 'misc', wash: 'maintenance' });
+		expect(mapping).toMatchObject({
+			source: 'fuelly',
+			targetVehicle: 'My Car',
+			dateFormat: 'mdy',
+			categoryMap: { gas: 'misc', wash: 'maintenance' }
+		});
 	});
 });

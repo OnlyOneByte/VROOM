@@ -84,6 +84,25 @@ describe('POST /api/v1/providers — VLM domain', () => {
     expect(res.status).toBe(400);
   });
 
+  test('validation messages name the VLM domain, not LLM', async () => {
+    const noModel = await ctx.authed(
+      'POST',
+      '/api/v1/providers',
+      vlmBody({ config: { baseUrl: 'https://x/v1' } })
+    );
+    const noBaseUrl = await ctx.authed(
+      'POST',
+      '/api/v1/providers',
+      vlmBody({ config: { model: 'gpt-4o-mini' } })
+    );
+    const noKey = await ctx.authed('POST', '/api/v1/providers', vlmBody({ credentials: {} }));
+    const bodies = [await noModel.text(), await noBaseUrl.text(), await noKey.text()];
+    expect(bodies[0]).toContain('VLM config must include a model name');
+    expect(bodies[1]).toContain('Self-hosted or OpenAI-compatible VLM requires a base URL');
+    expect(bodies[2]).toContain('VLM provider requires an API key');
+    for (const b of bodies) expect(b).not.toContain('LLM');
+  });
+
   test('allows an ollama (self-hosted, KEYLESS) provider — the no-data-leaves-host path', async () => {
     const res = await ctx.authed(
       'POST',

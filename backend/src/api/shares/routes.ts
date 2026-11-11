@@ -26,11 +26,6 @@ const inviteSchema = z.object({
 
 const levelSchema = z.object({ level: z.enum(LEVELS) });
 
-/** The raw row carries no cross-tenant data, so it is returned unchanged. */
-function shareToApi(share: VehicleShare): VehicleShare {
-  return share;
-}
-
 routes.post('/', zValidator('json', inviteSchema), async (c) => {
   const user = c.get('user');
   const { vehicleId, email, level } = c.req.valid('json');
@@ -70,7 +65,7 @@ routes.post('/', zValidator('json', inviteSchema), async (c) => {
 
   const response: ApiResponse<VehicleShare> = {
     success: true,
-    data: shareToApi(created),
+    data: created,
     message: 'Invitation sent',
   };
   return c.json(response, 201);
@@ -81,7 +76,7 @@ routes.get('/granted', async (c) => {
   const shares = await vehicleShareRepository.findByOwner(user.id);
   const response: ApiResponse<VehicleShare[]> = {
     success: true,
-    data: shares.map(shareToApi),
+    data: shares,
     message: `Found ${shares.length} share${shares.length !== 1 ? 's' : ''}`,
   };
   return c.json(response);
@@ -103,7 +98,7 @@ routes.put(
     }
 
     const updated = await vehicleShareRepository.update(id, { level, updatedAt: new Date() });
-    return c.json({ success: true, data: shareToApi(updated), message: 'Share level updated' });
+    return c.json({ success: true, data: updated, message: 'Share level updated' });
   }
 );
 
@@ -150,7 +145,7 @@ routes.post('/:id/accept', zValidator('param', commonSchemas.idParam), async (c)
     status: 'accepted',
     updatedAt: new Date(),
   });
-  return c.json({ success: true, data: shareToApi(updated), message: 'Invitation accepted' });
+  return c.json({ success: true, data: updated, message: 'Invitation accepted' });
 });
 
 // Declining a pending invite or leaving an accepted share both set the status to declined.

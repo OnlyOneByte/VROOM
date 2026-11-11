@@ -1,5 +1,4 @@
 import { DrizzleSQLiteAdapter } from '@lucia-auth/adapter-drizzle';
-import { Google } from 'arctic';
 import { Lucia, TimeSpan } from 'lucia';
 import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
@@ -28,13 +27,6 @@ export const lucia = new Lucia(adapter, {
   },
 });
 
-// Storage-provider Google client. The login client in providers/google.ts uses another redirect URI.
-export const googleProvider = new Google(
-  CONFIG.auth.googleClientId || '',
-  CONFIG.auth.googleClientSecret || '',
-  CONFIG.auth.googleProviderRedirectUri
-);
-
 declare module 'lucia' {
   interface Register {
     Lucia: typeof lucia;
@@ -59,7 +51,3 @@ interface DatabaseUserAttributes {
 }
 
 export type AuthUser = User;
-
-export function getLucia(): Lucia {
-  return lucia;
-}

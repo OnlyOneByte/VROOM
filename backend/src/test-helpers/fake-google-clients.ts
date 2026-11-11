@@ -41,6 +41,8 @@ interface FaultRule {
   method: string;
   error: Error;
   remaining: number;
+  // Matching calls to let through before failing, so a fault can target a later call of the same method.
+  skip: number;
 }
 
 const EPOCH = new Date(0).toISOString();
@@ -75,16 +77,19 @@ export class FakeGoogleStore {
     return `${prefix}-${this.idCounter}`;
   }
 
-  injectFault(method: string, error: Error, times = 1): void {
-    this.faults.push({ method, error, remaining: times });
+  injectFault(method: string, error: Error, times = 1, skip = 0): void {
+    this.faults.push({ method, error, remaining: times, skip });
   }
 
   maybeFail(method: string): void {
     const rule = this.faults.find((f) => f.method === method && f.remaining > 0);
-    if (rule) {
-      rule.remaining -= 1;
-      throw rule.error;
+    if (!rule) return;
+    if (rule.skip > 0) {
+      rule.skip -= 1;
+      return;
     }
+    rule.remaining -= 1;
+    throw rule.error;
   }
 
   seedFolder(name: string, parentId = ''): string {
@@ -441,10 +446,8 @@ export function makeFakeSheets(store: FakeGoogleStore): sheets_v4.Sheets {
 
 // Sheets, Drive, and a real GoogleDriveService share one store, so folder walks and file moves stay coherent.
 export function makeFakeSheetsClients(store: FakeGoogleStore): GoogleSheetsClients {
-  const drive = makeFakeDrive(store);
   return {
     sheets: makeFakeSheets(store),
-    drive,
-    driveService: new GoogleDriveService('fake-refresh-token', drive),
+    driveService: new GoogleDriveService('fake-refresh-token', makeFakeDrive(store)),
   };
 }

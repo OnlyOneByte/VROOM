@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
 const { apiClient, getApiBaseUrl, withPagination } = await import('../api-client');
+const { NetworkError } = await import('$lib/utils/error-handling');
 const { ApiError } = await import('$lib/utils/error-handling');
 
 const mockFetch = vi.fn();
@@ -221,5 +222,40 @@ describe('apiClient.raw', () => {
 		expect(init?.method).toBe('POST');
 		expect(init?.headers).toEqual({ 'X-Test': '1' });
 		expect(init?.credentials).toBe('include');
+	});
+
+	test('a non-ok download rejects with the backend ApiError instead of resolving', async () => {
+		mockFetch.mockResolvedValueOnce(
+			jsonResponse(
+				{ error: { message: 'Backup not found', code: 'NOT_FOUND' } },
+				{ ok: false, status: 404 }
+			)
+		);
+		const err = await captureError(apiClient.raw('/api/v1/sync/backups/download'));
+		expect(err).toBeInstanceOf(ApiError);
+		expect(err.statusCode).toBe(404);
+		expect(err.message).toBe('Backup not found');
+	});
+});
+
+describe('network failures', () => {
+	test('a fetch that never gets a response rejects with NetworkError, keeping the cause', async () => {
+		const cause = new TypeError('Load failed');
+		mockFetch.mockRejectedValueOnce(cause);
+		const err = await captureError(apiClient.get('/api/v1/vehicles'));
+		expect(err).toBeInstanceOf(NetworkError);
+		expect(err).toBeInstanceOf(TypeError);
+		expect((err as Error).cause).toBe(cause);
+	});
+
+	test('a caller-aborted request rejects with the abort error, not NetworkError', async () => {
+		const controller = new AbortController();
+		controller.abort();
+		const abortError = new DOMException('The operation was aborted.', 'AbortError');
+		mockFetch.mockRejectedValueOnce(abortError);
+		const err = await captureError(
+			apiClient.get('/api/v1/vehicles', { signal: controller.signal })
+		);
+		expect(err).toBe(abortError);
 	});
 });

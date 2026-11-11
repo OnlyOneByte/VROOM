@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { AnalyticsRepository } from '../repository';
-import { vehicleIdQuerySchema, yearQuerySchema, yearVehicleQuerySchema } from '../routes';
 import {
   createTestDb,
   expenseArb,
@@ -246,56 +245,6 @@ describe('User data isolation', () => {
       ),
       { numRuns: 100 }
     );
-  });
-});
-
-describe('Invalid parameters rejected with 400', () => {
-  test('yearQuerySchema rejects non-integer and non-positive year values', () => {
-    const invalidYears = ['abc', '-1', '0', '3.5', '', 'null'];
-    for (const val of invalidYears) {
-      const result = yearQuerySchema.safeParse({ year: val });
-      if (result.success && result.data.year != null) {
-        expect(Number.isInteger(result.data.year)).toBe(true);
-        expect(result.data.year).toBeGreaterThan(0);
-      }
-    }
-  });
-
-  test('yearQuerySchema accepts valid year values', () => {
-    fc.assert(
-      fc.property(fc.integer({ min: 1, max: 9999 }), (year) => {
-        const result = yearQuerySchema.safeParse({ year: String(year) });
-        expect(result.success).toBe(true);
-        if (result.success) {
-          expect(result.data.year).toBe(year);
-        }
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  test('vehicleIdQuerySchema rejects missing vehicleId', () => {
-    const result = vehicleIdQuerySchema.safeParse({});
-    expect(result.success).toBe(false);
-  });
-
-  test('yearVehicleQuerySchema rejects missing vehicleId', () => {
-    const result = yearVehicleQuerySchema.safeParse({ year: '2024' });
-    expect(result.success).toBe(false);
-  });
-
-  test('yearVehicleQuerySchema rejects invalid year with valid vehicleId', () => {
-    const invalidYears = ['abc', '-1', '0', '3.5'];
-    for (const val of invalidYears) {
-      const result = yearVehicleQuerySchema.safeParse({
-        year: val,
-        vehicleId: 'vehicle-1',
-      });
-      if (result.success && result.data.year != null) {
-        expect(Number.isInteger(result.data.year)).toBe(true);
-        expect(result.data.year).toBeGreaterThan(0);
-      }
-    }
   });
 });
 

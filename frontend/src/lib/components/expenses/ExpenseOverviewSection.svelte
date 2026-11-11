@@ -8,7 +8,11 @@
 		CollapsibleTrigger
 	} from '$lib/components/ui/collapsible';
 	import StatCardGrid from '$lib/components/charts/StatCardGrid.svelte';
-	import { categoryLabels, getCategoryIcon, getCategoryColor } from '$lib/utils/expense-helpers';
+	import {
+		categoryLabels,
+		getCategoryIcon,
+		getCategoryBadgeClasses
+	} from '$lib/utils/expense-helpers';
 	import { formatCurrency } from '$lib/utils/formatters';
 	import type { ExpenseSummary, ExpenseCategory } from '$lib/types';
 	import { EXPENSE_MESSAGES } from '$lib/constants/messages';
@@ -64,7 +68,7 @@
 								<div class="p-3 rounded-lg border hover:bg-muted/50 transition-colors">
 									<div class="flex items-center gap-2">
 										<div
-											class="p-1.5 rounded-lg {getCategoryColor(
+											class="p-1.5 rounded-lg {getCategoryBadgeClasses(
 												item.category as ExpenseCategory
 											)} shrink-0"
 										>

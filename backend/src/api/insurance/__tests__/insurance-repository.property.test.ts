@@ -11,6 +11,7 @@ import { applyMigration, loadMigrations } from '../../../db/__tests__/migration-
 import type { AppDatabase } from '../../../db/connection';
 import * as schema from '../../../db/schema';
 import { insuranceTerms, insuranceTermVehicles } from '../../../db/schema';
+import { NotFoundError } from '../../../errors';
 import { InsurancePolicyRepository } from '../repository';
 import { companyNameArb, validTermInputArb } from './insurance-test-generators';
 
@@ -62,162 +63,6 @@ afterEach(() => {
 const userVehicleIdsArb = fc
   .subarray(VEHICLE_IDS, { minLength: 1, maxLength: VEHICLE_IDS.length })
   .filter((arr) => arr.length > 0);
-
-describe('current term derivation returns the latest term', () => {
-  test('getCurrentTermDates returns the term with the latest end_date', async () => {
-    await fc.assert(
-      fc.asyncProperty(
-        companyNameArb,
-        userVehicleIdsArb,
-        fc.array(validTermInputArb, { minLength: 1, maxLength: 5 }),
-        async (company, vehicleIds, terms) => {
-          const termsWithCoverage = terms.map((t) => ({
-            ...t,
-            vehicleCoverage: { vehicleIds },
-          }));
-
-          const created = await repo.create(
-            { company, terms: termsWithCoverage, isActive: true },
-            USER_ID
-          );
-
-          const currentDates = await repo.getCurrentTermDates(created.id);
-          if (!currentDates) throw new Error('expected a current term');
-
-          // Ordering is by end_date alone, so a tie may return either term. Assert that the returned
-          // end_date is the maximum and that the pair matches one of the created terms.
-          const maxEnd = Math.max(...created.terms.map((t) => t.endDate.getTime()));
-          expect(currentDates.endDate.getTime()).toBe(maxEnd);
-
-          const matchesACreatedTermAtMaxEnd = created.terms.some(
-            (t) =>
-              t.endDate.getTime() === maxEnd &&
-              t.startDate.getTime() === currentDates.startDate.getTime() &&
-              t.endDate.getTime() === currentDates.endDate.getTime()
-          );
-          expect(matchesACreatedTermAtMaxEnd).toBe(true);
-        }
-      ),
-      { numRuns: 50 }
-    );
-  }, 20_000);
-
-  test('getCurrentTermDates returns null for policy with no terms', async () => {
-    const created = await repo.create({ company: 'TestCo', terms: [], isActive: true }, USER_ID);
-    const result = await repo.getCurrentTermDates(created.id);
-    expect(result).toBeNull();
-  });
-
-  test('on an end_date TIE, returns a real term at the max end_date (tie-tolerant, no startDate assumption)', async () => {
-    const sharedEnd = new Date('2027-06-30T00:00:00.000Z');
-    const created = await repo.create(
-      {
-        company: 'TieCo',
-        terms: [
-          {
-            startDate: new Date('2026-07-01T00:00:00.000Z'),
-            endDate: sharedEnd,
-            vehicleCoverage: { vehicleIds: [VEHICLE_IDS[0]] },
-          },
-          {
-            startDate: new Date('2027-01-01T00:00:00.000Z'),
-            endDate: sharedEnd,
-            vehicleCoverage: { vehicleIds: [VEHICLE_IDS[0]] },
-          },
-        ],
-        isActive: true,
-      },
-      USER_ID
-    );
-
-    const currentDates = await repo.getCurrentTermDates(created.id);
-    if (!currentDates) throw new Error('expected a current term');
-    expect(currentDates.endDate.getTime()).toBe(sharedEnd.getTime());
-
-    const validStarts = created.terms
-      .filter((t) => t.endDate.getTime() === sharedEnd.getTime())
-      .map((t) => t.startDate.getTime());
-    expect(validStarts).toContain(currentDates.startDate.getTime());
-  });
-});
-
-describe('active policy derivation for a vehicle', () => {
-  test('getActiveInsurancePolicyId returns a non-null active policy for a covered vehicle', async () => {
-    await fc.assert(
-      fc.asyncProperty(
-        companyNameArb,
-        userVehicleIdsArb,
-        validTermInputArb,
-        async (company, vehicleIds, term) => {
-          await repo.create(
-            {
-              company,
-              terms: [{ ...term, vehicleCoverage: { vehicleIds } }],
-              isActive: true,
-            },
-            USER_ID
-          );
-
-          for (const vid of vehicleIds) {
-            const activePolicyId = await repo.getActiveInsurancePolicyId(vid);
-            expect(activePolicyId).not.toBeNull();
-          }
-        }
-      ),
-      { numRuns: 50 }
-    );
-  });
-
-  test('getActiveInsurancePolicyId returns null when only inactive policies exist', async () => {
-    const testVid = 'v-inactive-test';
-    sqliteDb.run(
-      `INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('${testVid}', '${USER_ID}', 'Nissan', 'Leaf', 2023)`
-    );
-
-    const term = fc.sample(validTermInputArb, 1)[0];
-    await repo.create(
-      {
-        company: 'InactiveCo',
-        terms: [{ ...term, vehicleCoverage: { vehicleIds: [testVid] } }],
-        isActive: false,
-      },
-      USER_ID
-    );
-
-    const activePolicyId = await repo.getActiveInsurancePolicyId(testVid);
-    expect(activePolicyId).toBeNull();
-  });
-
-  test('getActiveInsurancePolicyId returns null for uncovered vehicle', async () => {
-    const result = await repo.getActiveInsurancePolicyId('v-nonexistent');
-    expect(result).toBeNull();
-  });
-
-  test('getActiveInsurancePolicyId returns policy with latest term end_date when multiple active policies exist', async () => {
-    const vid = VEHICLE_IDS[0];
-    const earlyTerm = {
-      ...fc.sample(validTermInputArb, 1)[0],
-      startDate: new Date('2020-01-01'),
-      endDate: new Date('2020-12-31'),
-      vehicleCoverage: { vehicleIds: [vid] },
-    };
-    const lateTerm = {
-      ...fc.sample(validTermInputArb, 1)[0],
-      startDate: new Date('2025-01-01'),
-      endDate: new Date('2025-12-31'),
-      vehicleCoverage: { vehicleIds: [vid] },
-    };
-
-    await repo.create({ company: 'EarlyCo', terms: [earlyTerm], isActive: true }, USER_ID);
-    const laterPolicy = await repo.create(
-      { company: 'LateCo', terms: [lateTerm], isActive: true },
-      USER_ID
-    );
-
-    const activePolicyId = await repo.getActiveInsurancePolicyId(vid);
-    expect(activePolicyId).toBe(laterPolicy.id);
-  });
-});
 
 describe('insurance term CRUD round-trip', () => {
   test('addTerm inserts a term row and junction rows retrievable via findById', async () => {
@@ -546,5 +391,73 @@ describe('insurance term-vehicle junction FK cascade', () => {
       ),
       { numRuns: 30 }
     );
+  });
+});
+
+describe('writes are scoped to the policy owner', () => {
+  async function createOwnersPolicy() {
+    return repo.create(
+      {
+        company: 'OwnerCo',
+        notes: 'original',
+        terms: [
+          {
+            startDate: new Date('2026-01-01'),
+            endDate: new Date('2026-12-31'),
+            coverageDescription: 'original',
+            vehicleCoverage: { vehicleIds: [VEHICLE_IDS[0]] },
+          },
+        ],
+        isActive: true,
+      },
+      USER_ID
+    );
+  }
+
+  test('update by another user throws NotFound and leaves the policy unchanged', async () => {
+    const created = await createOwnersPolicy();
+    await expect(repo.update(created.id, { company: 'Hijacked' }, OTHER_USER_ID)).rejects.toThrow(
+      NotFoundError
+    );
+    expect((await repo.findById(created.id))?.company).toBe('OwnerCo');
+  });
+
+  test('delete by another user throws NotFound and keeps the policy', async () => {
+    const created = await createOwnersPolicy();
+    await expect(repo.delete(created.id, OTHER_USER_ID)).rejects.toThrow(NotFoundError);
+    expect(await repo.findById(created.id)).not.toBeNull();
+  });
+
+  test('addTerm by another user throws NotFound and adds nothing', async () => {
+    const created = await createOwnersPolicy();
+    await expect(
+      repo.addTerm(
+        created.id,
+        {
+          startDate: new Date('2027-01-01'),
+          endDate: new Date('2027-12-31'),
+          vehicleCoverage: { vehicleIds: [OTHER_VEHICLE_IDS[0]] },
+        },
+        OTHER_USER_ID
+      )
+    ).rejects.toThrow(NotFoundError);
+    expect((await repo.findById(created.id))?.terms.length).toBe(1);
+  });
+
+  test('updateTerm by another user throws NotFound and leaves the term unchanged', async () => {
+    const created = await createOwnersPolicy();
+    const termId = created.terms[0].id;
+    await expect(
+      repo.updateTerm(created.id, termId, { coverageDescription: 'Hijacked' }, OTHER_USER_ID)
+    ).rejects.toThrow(NotFoundError);
+    const term = (await repo.findById(created.id))?.terms.find((t) => t.id === termId);
+    expect(term?.coverageDescription).toBe('original');
+  });
+
+  test('deleteTerm by another user throws NotFound and keeps the term', async () => {
+    const created = await createOwnersPolicy();
+    const termId = created.terms[0].id;
+    await expect(repo.deleteTerm(created.id, termId, OTHER_USER_ID)).rejects.toThrow(NotFoundError);
+    expect((await repo.findById(created.id))?.terms.map((t) => t.id)).toEqual([termId]);
   });
 });

@@ -1,6 +1,6 @@
 /** Maps frontend expense models to and from the backend API contract. */
 
-import type { Expense, ExpenseCategory } from '$lib/types';
+import type { BackendExpenseResponse, Expense, ExpenseCategory } from '$lib/types';
 import { isElectricFuelType } from '$lib/utils/units';
 
 interface BackendExpenseRequest {
@@ -23,29 +23,6 @@ interface BackendExpenseRequest {
 interface ToBackendOptions {
 	// Edit only: an emptied description/location is sent as null so it gets cleared.
 	isEdit?: boolean;
-}
-
-export interface BackendExpenseResponse {
-	id: string;
-	vehicleId: string;
-	userId: string;
-	tags: string[];
-	category: string;
-	expenseAmount: number;
-	date: string;
-	mileage?: number;
-	volume?: number;
-	fuelType?: string;
-	description?: string | null;
-	location?: string | null;
-	missedFillup?: boolean;
-	sourceType?: string;
-	sourceId?: string;
-	groupId?: string;
-	groupTotal?: number;
-	splitMethod?: string;
-	createdAt: string;
-	updatedAt: string;
 }
 
 export function toBackendExpense(

@@ -71,7 +71,6 @@ npm run dev             # http://localhost:5173, proxies /api to :3001
 cp docs/examples/.env.example .env
 cp docs/examples/docker-compose.yml .
 mkdir -p data                                  # the DATA_PATH bind mount; Docker won't create it
-mkdir -p config && touch config/backend.env    # or delete that mount from the compose file
 docker compose up -d
 # Frontend: http://localhost:3000
 # Backend:  http://localhost:3001

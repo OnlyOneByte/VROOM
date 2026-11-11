@@ -5,6 +5,8 @@ import { beforeAll, describe, expect, test } from 'bun:test';
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { GLOBAL_MAX_BODY_SIZE } from '../app';
+import { CONFIG } from '../config';
 import { createTestApp, type TestApp } from '../test-helpers/http-client';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -77,16 +79,6 @@ const NGINX_EXAMPLE = /```nginx\n([\s\S]*?)```/;
 // The example has no nested blocks.
 const NGINX_LOCATION = /location\s+([^{]+?)\s*\{([^}]*)\}/g;
 const BODY_SIZE_CAP = /client_max_body_size\s+(\d+)m;/;
-const GLOBAL_CAP_SOURCE = /GLOBAL_MAX_BODY_SIZE = (\d+) \* 1024 \* 1024/;
-const RESTORE_CAP_SOURCE = /maxFileSize: (\d+) \* 1024 \* 1024/;
-
-// Read from source, not imported: importing config.ts here would bind the DB singleton before createTestApp() sets :memory:.
-function capFromSource(file: string, pattern: RegExp): number {
-  const mb = Number(repoFile(file).match(pattern)?.[1] ?? Number.NaN);
-  expect(mb, `could not read ${pattern} from ${file} — the scan has drifted`).not.toBeNaN();
-  return mb;
-}
-
 function nginxExample(): string {
   const example = repoFile(DEPLOYMENT_GUIDE).match(NGINX_EXAMPLE)?.[1];
   expect(example, `no nginx example found in ${DEPLOYMENT_GUIDE}`).toBeTruthy();
@@ -227,13 +219,11 @@ describe('documented deployment examples match the backend', () => {
           'applies and a backup over that size is 413d at the proxy'
       ).toBeTruthy();
       const allowed = (capMb(restore?.body ?? '') ?? 0) * MEGABYTE;
-      expect(allowed).toBeGreaterThanOrEqual(
-        capFromSource('backend/src/config.ts', RESTORE_CAP_SOURCE) * MEGABYTE
-      );
+      expect(allowed).toBeGreaterThanOrEqual(CONFIG.backup.maxFileSize);
     });
 
     test('does not raise the cap for every other route', () => {
-      const appCapMb = capFromSource('backend/src/app.ts', GLOBAL_CAP_SOURCE);
+      const appCapMb = GLOBAL_MAX_BODY_SIZE / MEGABYTE;
       const serverCap = serverCapMb();
       expect(serverCap, 'the example must still cap bodies: nginx defaults to 1MB').not.toBeNull();
       // Matches the app's global cap. A server-wide restore-sized cap would widen every JSON route.

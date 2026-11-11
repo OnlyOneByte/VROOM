@@ -14,7 +14,6 @@ afterEach(() => ctx.close());
 
 describe('createBackup output stays in sync with the registry', () => {
   test('createBackup() emits exactly the registry keys (plus metadata)', async () => {
-    // A static config import would bind the persistent dev DB before DATABASE_URL is rewritten.
     const { backupService } = await import('../backup');
     const { TABLE_SCHEMA_MAP } = await import('../../../config');
     // An empty user suffices: the guard checks the object's keys, not its contents.

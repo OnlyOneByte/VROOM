@@ -5,7 +5,7 @@ vi.mock('$lib/stores/app.svelte', () => ({
 	appStore: { addNotification }
 }));
 
-const { ApiError, handleErrorWithNotification } = await import('../error-handling');
+const { ApiError, NetworkError, handleErrorWithNotification } = await import('../error-handling');
 
 interface NotificationArg {
 	type: string;
@@ -63,9 +63,17 @@ describe('handleErrorWithNotification (drives handleApiError)', () => {
 		expect(notified().message).toBe('Specific failure detail');
 	});
 
-	test('a network TypeError (fetch) maps to the connection message', () => {
-		handleErrorWithNotification(new TypeError('Failed to fetch'));
-		expect(notified().message).toBe('Network error. Please check your connection and try again.');
+	test.each(['Failed to fetch', 'Load failed'])(
+		'a NetworkError (%s) maps to the connection message',
+		browserMessage => {
+			handleErrorWithNotification(new NetworkError(new TypeError(browserMessage)));
+			expect(notified().message).toBe('Network error. Please check your connection and try again.');
+		}
+	);
+
+	test('a bare TypeError is a bug, not a network failure', () => {
+		handleErrorWithNotification(new TypeError('x.fetchAll is not a function'));
+		expect(notified().message).toBe('x.fetchAll is not a function');
 	});
 
 	test('a plain Error (not Vroom, not network) surfaces its own message under UNKNOWN_ERROR', () => {

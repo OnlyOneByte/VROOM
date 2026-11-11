@@ -34,7 +34,7 @@ const app = new Hono();
 
 app.onError(errorHandler);
 
-const GLOBAL_MAX_BODY_SIZE = 10 * 1024 * 1024;
+export const GLOBAL_MAX_BODY_SIZE = 10 * 1024 * 1024;
 
 // Paths whose bodies may exceed the global cap. A route-level bodyLimit can only tighten the global
 // check, which runs first, so these paths are exempted here. The unversioned alias is listed because its

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { CONFIG } from '../../config';
+import type { SplitConfig } from '../../db/types';
 import { dollarsToCents } from '../../utils/money';
 
 // Tags cannot contain separators: the CSV export joins tags with '; ' and the importer splits
@@ -15,9 +16,23 @@ export const tagElementSchema = z
     message: 'Tag cannot contain a semicolon or comma',
   });
 
+// A stray mileage on a non-fuel row would skew getCurrentOdometer, which reads across categories.
+export function clearFuelFieldsIfNotFuel<
+  T extends {
+    category?: string;
+    volume?: number | null;
+    fuelType?: string | null;
+    mileage?: number | null;
+    missedFillup?: boolean;
+  },
+>(data: T, effectiveCategory: string | undefined = data.category): T {
+  if (effectiveCategory === undefined || effectiveCategory === 'fuel') return data;
+  return { ...data, volume: null, fuelType: null, mileage: null, missedFillup: false };
+}
+
 const centsAmount = z.number().positive('Amount must be positive').transform(dollarsToCents);
 
-export const evenSplitSchema = z.object({
+const evenSplitSchema = z.object({
   method: z.literal('even'),
   vehicleIds: z.array(z.string().min(1)).min(1),
 });
@@ -27,7 +42,7 @@ const absoluteAllocationSchema = z.object({
   amount: z.number().min(0, 'Amount must be non-negative').transform(dollarsToCents),
 });
 
-export const absoluteSplitSchema = z.object({
+const absoluteSplitSchema = z.object({
   method: z.literal('absolute'),
   allocations: z.array(absoluteAllocationSchema).min(1),
 });
@@ -37,7 +52,7 @@ const percentageAllocationSchema = z.object({
   percentage: z.number().min(0).max(100, 'Percentage must be 0-100'),
 });
 
-export const percentageSplitSchema = z.object({
+const percentageSplitSchema = z.object({
   method: z.literal('percentage'),
   allocations: z.array(percentageAllocationSchema).min(1),
 });
@@ -46,7 +61,7 @@ export const splitConfigSchema = z.discriminatedUnion('method', [
   evenSplitSchema,
   absoluteSplitSchema,
   percentageSplitSchema,
-]);
+]) satisfies z.ZodType<SplitConfig>;
 
 // Transform-free twin for re-validating values already stored in cents (the reminder merge gate);
 // running the dollars-to-cents transform again would double-convert them.
@@ -64,7 +79,7 @@ export const splitConfigStructuralSchema = z.discriminatedUnion('method', [
   percentageSplitSchema,
 ]);
 
-export type SplitConfig = z.infer<typeof splitConfigSchema>;
+export type { SplitConfig };
 
 export function splitConfigVehicleIds(
   config:

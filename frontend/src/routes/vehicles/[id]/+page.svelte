@@ -50,6 +50,7 @@
 		FuelEfficiencyPoint,
 		ExpenseCategory
 	} from '$lib/types';
+	import { useExpenseListReload } from '../../expenses/expense-list-reload.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -191,24 +192,6 @@
 		}
 	});
 
-	// Debounced search, re-fetching from page 0.
-	let searchDebounce: ReturnType<typeof setTimeout> | undefined;
-	// Plain (non-reactive) guard: writing it must not re-run this effect.
-	let prevSearchTerm = '';
-	$effect(() => {
-		const term = searchTerm;
-		if (!hasLoadedExpensesTab) {
-			prevSearchTerm = term;
-			return;
-		}
-		if (term === prevSearchTerm) return;
-		prevSearchTerm = term;
-		clearTimeout(searchDebounce);
-		searchDebounce = setTimeout(() => void fetchExpensesPage(0), 300);
-		// Cancels the pending debounce on change or unmount.
-		return () => clearTimeout(searchDebounce);
-	});
-
 	function filterKey(): string {
 		return JSON.stringify([
 			expenseCategoryFilter,
@@ -218,18 +201,12 @@
 		]);
 	}
 
-	// Tag and date filters arrive via bind:filters, so changes are detected by comparing snapshots.
-	let prevFilterKey = '';
-	$effect(() => {
-		const key = filterKey();
-		if (!hasLoadedExpensesTab) {
-			// Skip the first activation so opening the tab is not treated as a filter change.
-			prevFilterKey = key;
-			return;
-		}
-		if (key === prevFilterKey) return;
-		prevFilterKey = key;
-		void fetchExpensesPage(0);
+	// Search and filter changes refetch the expenses tab from page 0 once it has loaded.
+	const expenseListReload = useExpenseListReload({
+		ready: () => hasLoadedExpensesTab,
+		search: () => searchTerm,
+		filterKey,
+		reload: () => fetchExpensesPage(0)
 	});
 
 	async function loadVehicle() {
@@ -307,8 +284,7 @@
 
 	function handleExpenseCategoryChange(category: string) {
 		expenseCategoryFilter = category;
-		prevFilterKey = filterKey();
-		fetchExpensesPage(0);
+		expenseListReload.reloadNow();
 	}
 
 	async function loadVehicleStats() {
@@ -339,10 +315,7 @@
 		filters = {};
 		expenseCategoryFilter = '';
 		// Clearing several axes triggers one refetch from page 0.
-		clearTimeout(searchDebounce);
-		prevSearchTerm = '';
-		prevFilterKey = filterKey();
-		if (hasLoadedExpensesTab) void fetchExpensesPage(0);
+		expenseListReload.reloadNow();
 	}
 
 	// Vehicle-scoped CSV export; the endpoint filters by vehicleId.

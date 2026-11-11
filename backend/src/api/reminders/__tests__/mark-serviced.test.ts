@@ -1,6 +1,5 @@
 /**
  * Tests POST /:id/mark-serviced, which re-arms a reminder on each axis, through the real route and DB.
- * Keep imports limited to the harness and bun:test: createTestApp sets env before config loads.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -11,6 +10,7 @@ import {
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
+import { addOdometerReading } from './_helpers';
 
 let ctx: TestApp;
 
@@ -18,14 +18,6 @@ beforeEach(async () => {
   ctx = await createTestApp();
 });
 afterEach(() => ctx.close());
-
-async function addOdometerReading(vehicleId: string, odometer: number): Promise<void> {
-  const res = await ctx.authed('POST', `/api/v1/odometer/${vehicleId}`, {
-    odometer,
-    recordedAt: '2024-06-01T00:00:00.000Z',
-  });
-  expect(res.status, `odometer ${odometer}`).toBe(201);
-}
 
 interface ReminderRowDb {
   trigger_mode: string;
@@ -72,7 +64,7 @@ describe('POST /:id/mark-serviced re-arms the reminder', () => {
     expect(reminderRow(id).next_due_odometer).toBe(35000);
 
     // Vehicle has driven to 36500; servicing now should re-anchor there.
-    await addOdometerReading(vehicleId, 36500);
+    await addOdometerReading(ctx, vehicleId, 36500);
     const res = await ctx.authed('POST', `/api/v1/reminders/${id}/mark-serviced`);
     expect(res.status, await res.text()).toBe(200);
 
@@ -85,7 +77,7 @@ describe('POST /:id/mark-serviced re-arms the reminder', () => {
   test('a re-armed mileage reminder that was due is no longer due at the trigger', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Mazda', model: 'CX-5', year: 2020 });
     const id = await createMileageReminder(vehicleId); // next milestone 35000
-    await addOdometerReading(vehicleId, 35200); // past it → due
+    await addOdometerReading(ctx, vehicleId, 35200); // past it → due
 
     // Fires once.
     await ctx.authed('POST', '/api/v1/reminders/trigger');
@@ -192,7 +184,7 @@ describe('POST /:id/mark-serviced re-arms the reminder', () => {
       triggerMode: 'both',
       startDate: '2024-02-15T00:00:00.000Z',
     });
-    await addOdometerReading(vehicleId, 38000);
+    await addOdometerReading(ctx, vehicleId, 38000);
     const before = reminderRow(id);
     expect(before.next_due_date).not.toBeNull();
 

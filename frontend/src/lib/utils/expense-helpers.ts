@@ -96,5 +96,3 @@ const UNKNOWN_CATEGORY_BADGE_CLASSES = BADGE_CLASSES_BY_TOKEN.neutral;
 export function getCategoryBadgeClasses(category: ExpenseCategory): string {
 	return CATEGORY_BADGE_CLASSES[category] || UNKNOWN_CATEGORY_BADGE_CLASSES;
 }
-
-export const getCategoryColor = getCategoryBadgeClasses;

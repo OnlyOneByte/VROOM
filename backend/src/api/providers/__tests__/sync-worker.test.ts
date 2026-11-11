@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
 import type { Photo, PhotoRef } from '../../../db/schema';
+import { logger } from '../../../utils/logger';
 import type { StorageRef } from '../domains/storage/storage-provider';
 import {
   MAX_RETRY_COUNT,
@@ -286,7 +287,7 @@ describe('processBatch', () => {
     });
   });
 
-  test('path-resolution failure is swallowed — the sync still completes with an empty pathHint', async () => {
+  test('a path-resolution failure is logged with context, then the sync uploads with an empty pathHint', async () => {
     const pendingRef = makePhotoRef({ status: 'pending' });
     const activeRef = makeActiveRef();
     const photo = makePhoto();
@@ -303,9 +304,24 @@ describe('processBatch', () => {
     });
     mockGetProvider.mockResolvedValue(makeMockProvider('s3'));
 
-    await processBatch(makeDeps());
+    const warn = spyOn(logger, 'warn');
+    try {
+      await processBatch(makeDeps());
 
-    expect(mockResolveFolderPath).toHaveBeenCalled();
+      expect(mockResolveFolderPath).toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('folder path lookup failed'),
+        expect.objectContaining({
+          refId: 'ref-1',
+          photoId: 'photo-1',
+          providerId: 'provider-target',
+          error: 'storage_config unreadable',
+        })
+      );
+    } finally {
+      warn.mockRestore();
+    }
+
     expect(mockUpload).toHaveBeenCalledWith(expect.objectContaining({ pathHint: '' }));
     expect(mockUpdateStatus).toHaveBeenCalledWith('ref-1', {
       status: 'active',

@@ -2,7 +2,6 @@
  * A term update whose premium expense cannot be recreated must report failure, not success. The old
  * premium is deleted first, so a silent swallow would lose it. The failure is forced by a spy, since the
  * route cannot reach the realistic triggers.
- * Keep imports to the harness: createTestApp sets env before config loads.
  */
 
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';

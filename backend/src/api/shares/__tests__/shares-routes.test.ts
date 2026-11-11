@@ -9,22 +9,23 @@ import {
   createTestApp,
   type DataEnvelope,
   json,
+  type RequestFn,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { createInvitee } from '../../../test-helpers/invitee';
 import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp; // owner (user A)
+let asInvitee: RequestFn;
 let bId: string; // invitee (user B)
 let bEmail: string;
-let bCounter = 0;
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  const { db } = await import('../../../db/connection');
-  const schema = await import('../../../db/schema');
-  bId = `share-invitee-${++bCounter}`;
-  bEmail = `invitee-${bCounter}@test.com`;
-  await db.insert(schema.users).values({ id: bId, email: bEmail, displayName: 'Invitee B' });
+  const b = await createInvitee(ctx, 'share-invitee', 'Invitee B');
+  bId = b.id;
+  bEmail = b.email;
+  asInvitee = b.request;
 });
 afterEach(() => ctx.close());
 
@@ -129,22 +130,6 @@ describe('PUT and DELETE /api/v1/shares/:id', () => {
 });
 
 describe('invitee side: received, accept, decline', () => {
-  async function asInvitee(method: string, path: string, body?: unknown): Promise<Response> {
-    const { lucia } = await import('../../auth/lucia');
-    const session = await lucia.createSession(bId, {});
-    const sc = lucia.createSessionCookie(session.id);
-    const headers: Record<string, string> = {
-      Cookie: `${sc.name}=${sc.value}`,
-      'Sec-Fetch-Site': 'same-origin',
-    };
-    let init: RequestInit = { method, headers };
-    if (body !== undefined) {
-      headers['Content-Type'] = 'application/json';
-      init = { ...init, body: JSON.stringify(body) };
-    }
-    return ctx.app.request(path, init);
-  }
-
   test('invitee sees a pending invite in /received, accepts it → accepted', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const created = await json<DataEnvelope<Share>>(await invite(vehicleId, bEmail, 'viewer'));

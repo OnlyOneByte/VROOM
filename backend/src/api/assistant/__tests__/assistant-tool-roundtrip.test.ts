@@ -12,63 +12,19 @@ import {
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
+import {
+  answerTurn,
+  type ChatReply,
+  callTurn,
+  type SentBody,
+  seedLlmProvider,
+  stubScript,
+} from './assistant-test-helpers';
 
 let ctx: TestApp;
 const realFetch = globalThis.fetch;
-
-/** Each scripted entry is one model turn's OpenAI-style response body. */
-let script: Record<string, unknown>[];
-let scriptIdx: number;
-/** Every outbound request body the adapter sent, in order — so we can inspect what the model "saw". */
-let sentBodies: Array<{ messages: Array<{ role: string; content?: unknown }> }>;
-
-function callTurn(name: string, argsJson: string): Record<string, unknown> {
-  return {
-    choices: [{ message: { tool_calls: [{ id: 'c1', function: { name, arguments: argsJson } }] } }],
-  };
-}
-function answerTurn(text: string): Record<string, unknown> {
-  return { choices: [{ message: { content: text } }] };
-}
-
-/** Stateful stub that records each request body AND yields the next scripted response per model turn. */
-function stubScriptCapturing(turns: Record<string, unknown>[]): void {
-  script = turns;
-  scriptIdx = 0;
-  sentBodies = [];
-  globalThis.fetch = (async (_url: string, init?: { body?: string }) => {
-    if (init?.body) {
-      try {
-        sentBodies.push(JSON.parse(init.body));
-      } catch {
-        // non-JSON body — ignore (the assistant adapter always sends JSON)
-      }
-    }
-    const body = script[Math.min(scriptIdx, script.length - 1)];
-    scriptIdx++;
-    return new Response(JSON.stringify(body), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
-    // biome-ignore lint/suspicious/noExplicitAny: test fetch stub.
-  }) as any;
-}
-
-async function seedLlmProvider(): Promise<void> {
-  const res = await ctx.authed('POST', '/api/v1/providers', {
-    domain: 'llm',
-    providerType: 'openai-compatible',
-    displayName: 'My Assistant',
-    credentials: { apiKey: 'sk-secret-llm-key' },
-    config: { model: 'gpt-4o', baseUrl: 'https://api.openai.com/v1' },
-  });
-  expect(res.status).toBe(201);
-}
-
-interface ChatReply {
-  reply: string;
-  toolsUsed: string[];
-}
+/** Every outbound request body the adapter sent, in order, so a test can inspect what the model saw. */
+let sentBodies: SentBody[];
 
 /** Collect every `role:'tool'` message content the orchestrator sent back to the model (all turns). */
 function toolMessagesSent(): string[] {
@@ -91,14 +47,14 @@ afterEach(() => {
 
 describe('assistant tool results are fed back to the model', () => {
   test('listVehicles result (real seeded rows) is sent back to the model on the next turn', async () => {
-    await seedLlmProvider();
+    await seedLlmProvider(ctx);
     const v1 = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2020 });
     const v2 = await seedVehicle(ctx, { make: 'Tesla', model: 'Model 3', year: 2023 });
     expect(v1).toBeTruthy();
     expect(v2).toBeTruthy();
 
     // The answer can only mention two vehicles if the tool result was sent back.
-    stubScriptCapturing([
+    sentBodies = stubScript([
       callTurn('listVehicles', '{}'),
       answerTurn('You have 2 vehicles: a Honda Civic and a Tesla Model 3.'),
     ]);
@@ -120,7 +76,7 @@ describe('assistant tool results are fed back to the model', () => {
   });
 
   test('getExpenseSummary result reflects a REAL seeded expense fed back to the model', async () => {
-    await seedLlmProvider();
+    await seedLlmProvider(ctx);
     const vehicleId = await seedVehicle(ctx, { make: 'Ford', model: 'F150', year: 2021 });
     // Seeds a $120 fuel expense through the create route.
     const created = await ctx.authed('POST', '/api/v1/expenses', {
@@ -133,7 +89,7 @@ describe('assistant tool results are fed back to the model', () => {
     });
     expect(created.status, await created.clone().text()).toBe(201);
 
-    stubScriptCapturing([
+    sentBodies = stubScript([
       callTurn('getExpenseSummary', '{"range":"all"}'),
       answerTurn('You have spent $120.00 in total.'),
     ]);
@@ -151,11 +107,11 @@ describe('assistant tool results are fed back to the model', () => {
   });
 
   test('a two-tool conversation threads BOTH results back before the final answer', async () => {
-    await seedLlmProvider();
+    await seedLlmProvider(ctx);
     await seedVehicle(ctx, { make: 'Mazda', model: 'CX5', year: 2022 });
 
     // Turn 1: listVehicles. Turn 2: getAnalyticsSummary. Turn 3: the grounded answer.
-    stubScriptCapturing([
+    sentBodies = stubScript([
       callTurn('listVehicles', '{}'),
       callTurn('getAnalyticsSummary', '{"range":"all"}'),
       answerTurn('Here is a summary of your 1 vehicle.'),
@@ -170,5 +126,49 @@ describe('assistant tool results are fed back to the model', () => {
 
     expect(toolMessagesSent().length).toBeGreaterThanOrEqual(2);
     expect(toolMessagesSent().join('\n')).toContain('Mazda');
+  });
+
+  test('each tool result is preceded by an assistant turn whose tool_calls carry its id', async () => {
+    await seedLlmProvider(ctx);
+    sentBodies = stubScript([
+      callTurn('listVehicles', '{}', 'call_one'),
+      callTurn('getAnalyticsSummary', '{"range":"all"}', 'call_two'),
+      answerTurn('Done.'),
+    ]);
+
+    const res = await ctx.authed('POST', '/api/v1/assistant/chat', { message: 'summarize' });
+    expect(res.status, await res.clone().text()).toBe(200);
+
+    expect(sentBodies).toHaveLength(3);
+    const tail = (sentBodies[2]?.messages ?? []).slice(2);
+    expect(
+      tail.map(
+        (m): Record<string, unknown> => ({
+          ...m,
+          content: m.role === 'tool' ? '<result>' : m.content,
+        })
+      )
+    ).toEqual([
+      {
+        role: 'assistant',
+        content: null,
+        tool_calls: [
+          { id: 'call_one', type: 'function', function: { name: 'listVehicles', arguments: '{}' } },
+        ],
+      },
+      { role: 'tool', tool_call_id: 'call_one', name: 'listVehicles', content: '<result>' },
+      {
+        role: 'assistant',
+        content: null,
+        tool_calls: [
+          {
+            id: 'call_two',
+            type: 'function',
+            function: { name: 'getAnalyticsSummary', arguments: '{"range":"all"}' },
+          },
+        ],
+      },
+      { role: 'tool', tool_call_id: 'call_two', name: 'getAnalyticsSummary', content: '<result>' },
+    ]);
   });
 });

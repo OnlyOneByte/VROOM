@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
-import { type NewPhotoRef, type PhotoRef, photoRefs, photos } from '../../db/schema';
+import { type NewPhotoRef, type PhotoRef, photoRefs } from '../../db/schema';
 import { chunk } from '../../utils/chunk';
 
 export interface UpdateStatusOptions {
@@ -33,10 +33,6 @@ export class PhotoRefRepository {
       )
       .limit(1);
     return result[0] ?? null;
-  }
-
-  async findAllByPhoto(photoId: string): Promise<PhotoRef[]> {
-    return this.db.select().from(photoRefs).where(eq(photoRefs.photoId, photoId));
   }
 
   async findActiveByPhoto(photoId: string): Promise<PhotoRef | null> {
@@ -76,27 +72,8 @@ export class PhotoRefRepository {
       .limit(limit);
   }
 
-  async countByProviderAndCategory(providerId: string, entityTypes: string[]): Promise<number> {
-    const result = await this.db
-      .select({ count: sql<number>`count(*)` })
-      .from(photoRefs)
-      .innerJoin(photos, eq(photoRefs.photoId, photos.id))
-      .where(
-        and(
-          eq(photoRefs.providerId, providerId),
-          eq(photoRefs.status, 'active'),
-          inArray(photos.entityType, entityTypes)
-        )
-      );
-    return result[0]?.count ?? 0;
-  }
-
   async deleteByProvider(providerId: string): Promise<void> {
     await this.db.delete(photoRefs).where(eq(photoRefs.providerId, providerId));
-  }
-
-  async deleteByPhoto(photoId: string): Promise<void> {
-    await this.db.delete(photoRefs).where(eq(photoRefs.photoId, photoId));
   }
 
   async findAllByPhotos(photoIds: string[]): Promise<PhotoRef[]> {
@@ -117,18 +94,4 @@ export class PhotoRefRepository {
   }
 }
 
-// Defers getDb() until first use to avoid init-order coupling.
-let _instance: PhotoRefRepository | null = null;
-export function getPhotoRefRepository(): PhotoRefRepository {
-  if (!_instance) {
-    _instance = new PhotoRefRepository(getDb());
-  }
-  return _instance;
-}
-
-/** Proxy over getPhotoRefRepository(); defers getDb() until the first property access. */
-export const photoRefRepository: PhotoRefRepository = new Proxy({} as PhotoRefRepository, {
-  get(_target, prop, receiver) {
-    return Reflect.get(getPhotoRefRepository(), prop, receiver);
-  },
-});
+export const photoRefRepository = new PhotoRefRepository(getDb());

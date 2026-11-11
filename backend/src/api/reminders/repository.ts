@@ -5,7 +5,7 @@ import { getDb, transaction } from '../../db/connection';
 import type { NewReminder, Reminder, ReminderNotification } from '../../db/schema';
 import { reminderNotifications, reminders, reminderVehicles } from '../../db/schema';
 import type { DrizzleTransaction } from '../../db/types';
-import { DatabaseError, NotFoundError } from '../../errors';
+import { DatabaseError, isUniqueConstraintError, NotFoundError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { BaseRepository } from '../../utils/repository';
 import { pruneVehicleFromSplitConfig } from './split-config-helpers';
@@ -26,12 +26,19 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     super(db, reminders);
   }
 
-  private async getVehicleIds(reminderId: string): Promise<string[]> {
-    const rows = await this.db
+  /**
+   * Synchronous so it can run inside a synchronous write transaction (see insertVehicleJunctionsSync).
+   */
+  private getVehicleIdsSync(
+    handle: AppDatabase | DrizzleTransaction,
+    reminderId: string
+  ): string[] {
+    return handle
       .select({ vehicleId: reminderVehicles.vehicleId })
       .from(reminderVehicles)
-      .where(eq(reminderVehicles.reminderId, reminderId));
-    return rows.map((r) => r.vehicleId);
+      .where(eq(reminderVehicles.reminderId, reminderId))
+      .all()
+      .map((r) => r.vehicleId);
   }
 
   /**
@@ -125,7 +132,7 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     const reminder = result[0];
     if (!reminder) return null;
 
-    const vehicleIds = await this.getVehicleIds(id);
+    const vehicleIds = this.getVehicleIdsSync(this.db, id);
     return { reminder, vehicleIds };
   }
 
@@ -137,7 +144,7 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     const result = await this.db.select().from(reminders).where(eq(reminders.id, id)).limit(1);
     const reminder = result[0];
     if (!reminder) return null;
-    const vehicleIds = await this.getVehicleIds(id);
+    const vehicleIds = this.getVehicleIdsSync(this.db, id);
     return { reminder, vehicleIds };
   }
 
@@ -225,7 +232,7 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
         .returning();
       return created ?? null;
     } catch (error) {
-      if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
+      if (isUniqueConstraintError(error)) {
         return null;
       }
       throw new DatabaseError('Failed to create mileage notification', error);
@@ -289,16 +296,7 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
           this.insertVehicleJunctionsSync(tx, id, vehicleIds);
         }
 
-        const currentVehicleIds =
-          vehicleIds ??
-          tx
-            .select({ vehicleId: reminderVehicles.vehicleId })
-            .from(reminderVehicles)
-            .where(eq(reminderVehicles.reminderId, id))
-            .all()
-            .map((r) => r.vehicleId);
-
-        return { reminder, vehicleIds: currentVehicleIds };
+        return { reminder, vehicleIds: vehicleIds ?? this.getVehicleIdsSync(tx, id) };
       });
     } catch (error) {
       if (error instanceof NotFoundError) throw error;

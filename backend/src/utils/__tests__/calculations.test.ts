@@ -1,4 +1,4 @@
-// Unit tests for calculateMilesPerKwh, calculateAverageMilesPerKwh, averageConsecutiveMpg,
+// Unit tests for calculateAverageMilesPerKwh, averageConsecutiveMpg,
 // parseClampedInt and sortExpensesByDate.
 
 import { describe, expect, test } from 'bun:test';
@@ -6,7 +6,6 @@ import type { Expense } from '../../db/schema';
 import {
   averageConsecutiveMpg,
   calculateAverageMilesPerKwh,
-  calculateMilesPerKwh,
   parseClampedInt,
   sortExpensesByDate,
 } from '../calculations';
@@ -42,30 +41,6 @@ function makeChargeExpense(overrides: {
     updatedAt: new Date(),
   };
 }
-
-describe('calculateMilesPerKwh', () => {
-  test('returns miles / kwh for positive kwh', () => {
-    expect(calculateMilesPerKwh(100, 25)).toBe(4);
-  });
-
-  test('returns 0 when kwh is 0', () => {
-    expect(calculateMilesPerKwh(100, 0)).toBe(0);
-  });
-
-  test('returns 0 when kwh is negative', () => {
-    expect(calculateMilesPerKwh(100, -5)).toBe(0);
-  });
-
-  test('result is never NaN', () => {
-    const result = calculateMilesPerKwh(0, 0);
-    expect(Number.isNaN(result)).toBe(false);
-  });
-
-  test('result is never Infinity', () => {
-    const result = calculateMilesPerKwh(100, 0);
-    expect(Number.isFinite(result)).toBe(true);
-  });
-});
 
 describe('calculateAverageMilesPerKwh', () => {
   test('returns null for fewer than 2 expenses', () => {
@@ -141,7 +116,7 @@ describe('calculateAverageMilesPerKwh', () => {
   });
 });
 
-// Shared by calculateAverageMPG and vehicle-stats. Takes pre-sorted rows and applies the inclusive
+// Used by vehicle-stats. Takes pre-sorted rows and applies the inclusive
 // [5,100] band from analytics charts.
 describe('averageConsecutiveMpg', () => {
   test('averages consecutive pairs: miles-driven / current.volume', () => {

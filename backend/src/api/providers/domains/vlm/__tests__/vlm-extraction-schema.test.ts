@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import { encrypt } from '../../../../../utils/encryption';
+import { resolveModelSettings } from '../../model/model-registry';
 import { parseExtraction, receiptExtractionSchema } from '../prompt';
-import { getVlmProvider, resolveVlmSettings } from '../registry';
+import { getVlmProvider } from '../registry';
 
 describe('parseExtraction — clean inputs map to a trusted draft', () => {
   test('a well-formed JSON object maps every field', () => {
@@ -122,7 +123,7 @@ describe('receiptExtractionSchema — direct shape checks', () => {
   });
 });
 
-describe('getVlmProvider / resolveVlmSettings dispatch by provider type', () => {
+describe('getVlmProvider / resolveModelSettings dispatch by provider type', () => {
   function vlmRow(
     over: Partial<{ providerType: string; config: unknown; credentials: unknown }> = {}
   ) {
@@ -146,8 +147,8 @@ describe('getVlmProvider / resolveVlmSettings dispatch by provider type', () => 
     } as any;
   }
 
-  test('resolveVlmSettings decrypts the api key + reads model/baseUrl', () => {
-    const s = resolveVlmSettings(vlmRow());
+  test('resolveModelSettings decrypts the api key + reads model/baseUrl', () => {
+    const s = resolveModelSettings(vlmRow(), 'VLM');
     expect(s).toEqual({
       apiKey: 'sk-x',
       model: 'gpt-4o-mini',
@@ -155,8 +156,10 @@ describe('getVlmProvider / resolveVlmSettings dispatch by provider type', () => 
     });
   });
 
-  test('resolveVlmSettings throws when the model is missing (defense-in-depth vs a restored bad row)', () => {
-    expect(() => resolveVlmSettings(vlmRow({ config: { baseUrl: 'https://x' } }))).toThrow();
+  test('resolveModelSettings throws when the model is missing (defense-in-depth vs a restored bad row)', () => {
+    expect(() => resolveModelSettings(vlmRow({ config: { baseUrl: 'https://x' } }), 'VLM')).toThrow(
+      /VLM provider config is missing a model name/
+    );
   });
 
   test('getVlmProvider throws on an unknown/non-VLM provider type', () => {

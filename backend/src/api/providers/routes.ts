@@ -6,8 +6,8 @@ import { getDb } from '../../db/connection';
 import { photoRefs, photos, type UserProvider, userProviders } from '../../db/schema';
 import { ConflictError, NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
-import type { PhotoCategory, StorageConfig } from '../../types';
-import { DEFAULT_STORAGE_CONFIG } from '../../types';
+import type { CategorySetting, PhotoCategory, StorageConfig } from '../../types';
+import { DEFAULT_STORAGE_CONFIG, PHOTO_CATEGORIES } from '../../types';
 import { encrypt } from '../../utils/encryption';
 import { logger } from '../../utils/logger';
 import { consumePending, getPendingEmail } from '../../utils/pending-credentials';
@@ -15,13 +15,11 @@ import { commonSchemas, zValidator } from '../../utils/validation';
 import { photoRefRepository } from '../photos/photo-ref-repository';
 import { preferencesRepository } from '../settings/repository';
 import { storageProviderRegistry } from './domains/storage/registry';
+import { CATEGORY_TO_ENTITY_TYPES } from './domains/storage/storage-provider';
 
-const CATEGORY_TO_ENTITY_TYPES: Record<string, string[]> = {
-  vehicle_photos: ['vehicle'],
-  expense_receipts: ['expense'],
-  insurance_docs: ['insurance_policy', 'insurance_claim'],
-  odometer_readings: ['odometer_entry'],
-};
+function isPhotoCategory(value: string): value is PhotoCategory {
+  return (PHOTO_CATEGORIES as readonly string[]).includes(value);
+}
 
 const routes = new Hono();
 
@@ -120,15 +118,18 @@ routes.get('/pending/:nonce', async (c) => {
 const MODEL_PROVIDER_TYPES = ['openai-compatible', 'anthropic', 'gemini', 'ollama'] as const;
 type ModelProviderType = (typeof MODEL_PROVIDER_TYPES)[number];
 const MODEL_DOMAINS = ['vlm', 'llm'] as const;
+type ModelDomain = (typeof MODEL_DOMAINS)[number];
 const SUPPORTED_PROVIDER_TYPES = ['google-drive', 's3', 'fake', ...MODEL_PROVIDER_TYPES] as const;
 
 function isModelProviderType(providerType: string): providerType is ModelProviderType {
   return (MODEL_PROVIDER_TYPES as readonly string[]).includes(providerType);
 }
-function isModelDomain(domain: string): boolean {
+function isModelDomain(domain: string): domain is ModelDomain {
   return (MODEL_DOMAINS as readonly string[]).includes(domain);
 }
-const isVlmProviderType = isModelProviderType;
+function modelDomainLabel(domain: string): string {
+  return domain === 'llm' ? 'LLM' : 'VLM';
+}
 
 const createProviderSchema = z.object({
   domain: z.string().min(1, 'Domain is required'),
@@ -150,23 +151,33 @@ const updateProviderSchema = z.object({
   config: z.record(z.string(), z.unknown()).optional(),
 });
 
-const DEFAULT_FOLDER_PATHS: Record<
-  string,
-  Record<PhotoCategory, { enabled: boolean; folderPath: string }>
-> = {
+const DEFAULT_FOLDER_PATHS: Record<string, Record<PhotoCategory, string>> = {
   'google-drive': {
-    vehicle_photos: { enabled: true, folderPath: 'Vehicle' },
-    expense_receipts: { enabled: true, folderPath: 'Receipts' },
-    insurance_docs: { enabled: true, folderPath: 'Insurance' },
-    odometer_readings: { enabled: true, folderPath: 'Odometer' },
+    vehicle_photos: 'Vehicle',
+    expense_receipts: 'Receipts',
+    insurance_docs: 'Insurance',
+    odometer_readings: 'Odometer',
   },
   s3: {
-    vehicle_photos: { enabled: true, folderPath: 'vehicles' },
-    expense_receipts: { enabled: true, folderPath: 'receipts' },
-    insurance_docs: { enabled: true, folderPath: 'insurance' },
-    odometer_readings: { enabled: true, folderPath: 'odometer' },
+    vehicle_photos: 'vehicles',
+    expense_receipts: 'receipts',
+    insurance_docs: 'insurance',
+    odometer_readings: 'odometer',
   },
 };
+const FALLBACK_FOLDER_PATHS: Record<PhotoCategory, string> = {
+  vehicle_photos: 'vehicle-photos',
+  expense_receipts: 'receipts',
+  insurance_docs: 'insurance',
+  odometer_readings: 'odometer',
+};
+
+function defaultCategorySettings(providerType: string): Record<PhotoCategory, CategorySetting> {
+  const paths = DEFAULT_FOLDER_PATHS[providerType] ?? FALLBACK_FOLDER_PATHS;
+  return Object.fromEntries(
+    PHOTO_CATEGORIES.map((cat) => [cat, { enabled: true, folderPath: paths[cat] }])
+  ) as Record<PhotoCategory, CategorySetting>;
+}
 
 routes.get('/', async (c) => {
   const user = c.get('user');
@@ -203,44 +214,36 @@ function validateStorageProviderConfig(
  * again; the key is already stored encrypted.
  */
 function validateModelConfigShape(
-  providerType: string,
+  domain: string,
+  providerType: ModelProviderType,
   config: Record<string, unknown> | null
 ): void {
+  const label = modelDomainLabel(domain);
   const cfg = config ?? {};
   if (!cfg.model || typeof cfg.model !== 'string') {
-    throw new ValidationError('VLM config must include a model name');
+    throw new ValidationError(`${label} config must include a model name`);
   }
   if (
     (providerType === 'ollama' || providerType === 'openai-compatible') &&
     (!cfg.baseUrl || typeof cfg.baseUrl !== 'string')
   ) {
-    throw new ValidationError('Self-hosted or OpenAI-compatible VLM requires a base URL');
+    throw new ValidationError(`Self-hosted or OpenAI-compatible ${label} requires a base URL`);
   }
 }
 
 function validateModelCredentials(
-  providerType: string,
+  domain: string,
+  providerType: ModelProviderType,
   credentials: Record<string, unknown>
 ): void {
   if (providerType !== 'ollama' && !credentials.apiKey) {
-    throw new ValidationError('VLM provider requires an API key');
+    throw new ValidationError(`${modelDomainLabel(domain)} provider requires an API key`);
   }
 }
 
-function validateModelProviderConfig(
-  providerType: string,
-  config: Record<string, unknown> | null,
-  credentials: Record<string, unknown>
-): void {
-  validateModelConfigShape(providerType, config);
-  validateModelCredentials(providerType, credentials);
-}
-
-const validateVlmConfigShape = validateModelConfigShape;
-const validateVlmCredentials = validateModelCredentials;
-
 function resolveProviderCredentials(
   userId: string,
+  domain: string,
   providerType: string,
   credentials: Record<string, unknown>,
   config: Record<string, unknown> | null,
@@ -260,7 +263,8 @@ function resolveProviderCredentials(
     };
   }
   if (isModelProviderType(providerType)) {
-    validateModelProviderConfig(providerType, config, credentials);
+    validateModelConfigShape(domain, providerType, config);
+    validateModelCredentials(domain, providerType, credentials);
     return {
       encryptedCredentials: encrypt(JSON.stringify(credentials)),
       resolvedConfig: config,
@@ -296,6 +300,7 @@ routes.post('/', zValidator('json', createProviderSchema), async (c) => {
 
   const { encryptedCredentials, resolvedConfig } = resolveProviderCredentials(
     user.id,
+    body.domain,
     body.providerType,
     body.credentials,
     body.config ?? null,
@@ -357,17 +362,7 @@ routes.post('/', zValidator('json', createProviderSchema), async (c) => {
 
     storageConfig.providerCategories = { ...storageConfig.providerCategories };
 
-    const defaultPaths = DEFAULT_FOLDER_PATHS[body.providerType];
-    if (defaultPaths) {
-      storageConfig.providerCategories[created.id] = { ...defaultPaths };
-    } else {
-      storageConfig.providerCategories[created.id] = {
-        vehicle_photos: { enabled: true, folderPath: 'vehicle-photos' },
-        expense_receipts: { enabled: true, folderPath: 'receipts' },
-        insurance_docs: { enabled: true, folderPath: 'insurance' },
-        odometer_readings: { enabled: true, folderPath: 'odometer' },
-      };
-    }
+    storageConfig.providerCategories[created.id] = defaultCategorySettings(body.providerType);
 
     await preferencesRepository.update(user.id, { storageConfig });
   }
@@ -386,9 +381,9 @@ routes.put(
 
     const db = getDb();
 
-    const existing = [await findOwnedProviderOrThrow(db, id, user.id)];
+    const existing = await findOwnedProviderOrThrow(db, id, user.id);
 
-    if (existing[0].domain === 'auth') {
+    if (existing.domain === 'auth') {
       throw new ValidationError('Auth providers cannot be modified through this endpoint');
     }
 
@@ -397,21 +392,21 @@ routes.put(
     if (body.displayName !== undefined) {
       updates.displayName = body.displayName;
     }
-    const existingType = existing[0].providerType;
+    const existingType = existing.providerType;
     if (body.config !== undefined) {
       // Validates the payload, not the merged result, so required fields are edited as a unit.
-      if (isVlmProviderType(existingType)) {
-        validateVlmConfigShape(existingType, body.config);
+      if (isModelProviderType(existingType)) {
+        validateModelConfigShape(existing.domain, existingType, body.config);
       } else {
         validateStorageProviderConfig(existingType, body.config);
       }
       // Partial merge: server-written keys such as accountEmail and albumId are not echoed by forms,
       // so a wholesale replace would drop them. PUT cannot delete a config key as a result.
-      updates.config = { ...(existing[0].config ?? {}), ...body.config };
+      updates.config = { ...(existing.config ?? {}), ...body.config };
     }
     if (body.credentials !== undefined) {
-      if (isVlmProviderType(existingType)) {
-        validateVlmCredentials(existingType, body.credentials);
+      if (isModelProviderType(existingType)) {
+        validateModelCredentials(existing.domain, existingType, body.credentials);
       }
       updates.credentials = encrypt(JSON.stringify(body.credentials));
     }
@@ -440,13 +435,7 @@ async function cleanupStorageConfig(userId: string, providerId: string): Promise
   delete storageConfig.providerCategories[providerId];
 
   storageConfig.defaults = { ...storageConfig.defaults };
-  const categories: PhotoCategory[] = [
-    'vehicle_photos',
-    'expense_receipts',
-    'insurance_docs',
-    'odometer_readings',
-  ];
-  for (const cat of categories) {
+  for (const cat of PHOTO_CATEGORIES) {
     if (storageConfig.defaults[cat] === providerId) {
       storageConfig.defaults[cat] = null;
     }
@@ -470,13 +459,13 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
 
   const db = getDb();
 
-  const existing = [await findOwnedProviderOrThrow(db, id, user.id)];
+  const existing = await findOwnedProviderOrThrow(db, id, user.id);
 
-  if (existing[0].domain === 'auth') {
+  if (existing.domain === 'auth') {
     throw new ValidationError('Auth providers cannot be modified through this endpoint');
   }
 
-  if (existing[0].domain === 'storage') {
+  if (existing.domain === 'storage') {
     await cleanupStorageConfig(user.id, id);
     await cleanupBackupConfig(user.id, id);
 
@@ -503,9 +492,9 @@ routes.post('/:id/test', zValidator('param', commonSchemas.idParam), async (c) =
 
   const db = getDb();
 
-  const existing = [await findOwnedProviderOrThrow(db, id, user.id)];
+  const existing = await findOwnedProviderOrThrow(db, id, user.id);
 
-  const providerInstance = storageProviderRegistry.createProviderInstance(existing[0]);
+  const providerInstance = storageProviderRegistry.createProviderInstance(existing);
   const healthy = await providerInstance.healthCheck();
 
   return c.json({ success: true, data: { healthy } });
@@ -530,9 +519,8 @@ routes.post('/:id/backfill', zValidator('param', commonSchemas.idParam), async (
   // Synchronous so bun-sqlite keeps the whole backfill in one transaction that rolls back on error.
   db.transaction((tx) => {
     for (const [category, setting] of Object.entries(providerCategories)) {
-      if (!setting?.enabled) continue;
+      if (!setting?.enabled || !isPhotoCategory(category)) continue;
       const entityTypes = CATEGORY_TO_ENTITY_TYPES[category];
-      if (!entityTypes) continue;
 
       for (const entityType of entityTypes) {
         const notExistsClause = notExists(
@@ -578,7 +566,8 @@ routes.get('/:id/sync-status', zValidator('param', commonSchemas.idParam), async
 
   const result: Record<string, { total: number; synced: number; failed: number }> = {};
 
-  for (const [category, entityTypes] of Object.entries(CATEGORY_TO_ENTITY_TYPES)) {
+  for (const category of PHOTO_CATEGORIES) {
+    const entityTypes = CATEGORY_TO_ENTITY_TYPES[category];
     let total = 0;
     for (const entityType of entityTypes) {
       total += await countUserPhotos(db, entityType, user.id);

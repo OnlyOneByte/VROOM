@@ -34,8 +34,9 @@ export const EXPENSE_CATEGORY_DESCRIPTIONS: Record<ExpenseCategory, string> = {
 
 export type PaymentFrequency = 'monthly' | 'bi-weekly' | 'weekly' | 'custom';
 
-// Mirrors the SplitConfig in api/expenses/validation.ts. Duplicated here to avoid a db -> api dependency.
-export type ReminderSplitConfig =
+// Defined in db so the reminders column type and the expense split API share one shape without db
+// depending on api. Absolute amounts are cents.
+export type SplitConfig =
   | { method: 'even'; vehicleIds: string[] }
   | { method: 'absolute'; allocations: { vehicleId: string; amount: number }[] }
   | { method: 'percentage'; allocations: { vehicleId: string; percentage: number }[] };

@@ -1,4 +1,3 @@
-import type { OAuth2Client } from 'google-auth-library';
 import { type drive_v3, google } from 'googleapis';
 import { SyncError, SyncErrorCode } from '../../../errors';
 
@@ -25,7 +24,6 @@ function escapeDriveQuery(value: string): string {
 }
 
 export class GoogleDriveService {
-  private oauth2Client?: OAuth2Client;
   private drive: drive_v3.Drive;
 
   constructor(refreshToken: string, driveClient?: drive_v3.Drive) {
@@ -34,17 +32,17 @@ export class GoogleDriveService {
       return;
     }
 
-    this.oauth2Client = new google.auth.OAuth2(
+    const oauth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
       process.env.GOOGLE_REDIRECT_URI
     );
 
-    this.oauth2Client.setCredentials({
+    oauth2Client.setCredentials({
       refresh_token: refreshToken,
     });
 
-    this.drive = google.drive({ version: 'v3', auth: this.oauth2Client });
+    this.drive = google.drive({ version: 'v3', auth: oauth2Client });
   }
 
   async findFolder(name: string, parentId?: string): Promise<DriveFolder | null> {
@@ -125,22 +123,12 @@ export class GoogleDriveService {
     return allFiles;
   }
 
-  async getFolderPermissions(folderId: string): Promise<drive_v3.Schema$Permission[]> {
-    const response = await this.drive.permissions.list({
-      fileId: folderId,
-      fields: 'permissions(id, type, role, emailAddress)',
-    });
-    return response.data.permissions || [];
-  }
-
-  async setFolderPermissions(
-    folderId: string,
-    email: string,
-    role: 'reader' | 'writer' | 'owner' = 'writer'
-  ): Promise<void> {
-    await this.drive.permissions.create({
-      fileId: folderId,
-      requestBody: { type: 'user', role, emailAddress: email },
+  /** Moves a file by swapping its parent in one call, so it is never listed under both folders. */
+  async moveFile(fileId: string, newParentId: string, oldParentId: string): Promise<void> {
+    await this.drive.files.update({
+      fileId,
+      addParents: newParentId,
+      removeParents: oldParentId,
     });
   }
 
@@ -182,13 +170,6 @@ export class GoogleDriveService {
       { responseType: 'arraybuffer' }
     );
     return Buffer.from(response.data as ArrayBuffer);
-  }
-
-  async renameFolder(folderId: string, newName: string): Promise<void> {
-    await this.drive.files.update({
-      fileId: folderId,
-      requestBody: { name: newName },
-    });
   }
 
   async folderExists(folderId: string): Promise<boolean> {

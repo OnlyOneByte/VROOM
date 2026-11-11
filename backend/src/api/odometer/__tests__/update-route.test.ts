@@ -5,7 +5,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
-import { seedVehicle as seedVehicleShared } from '../../../test-helpers/seed';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -13,9 +13,6 @@ beforeEach(async () => {
   ctx = await createTestApp();
 });
 afterEach(() => ctx.close());
-
-const seedVehicle = (make = 'Honda'): Promise<string> =>
-  seedVehicleShared(ctx, { make, model: 'Civic', year: 2021 });
 
 interface OdometerEntry {
   id: string;
@@ -43,7 +40,7 @@ function rowOdometer(id: string): { odometer: number; note: string | null } {
 
 describe('odometer PUT /:id (update contract)', () => {
   test('a valid update persists the new reading', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx);
     const id = await createEntry(vehicleId, 30_000, 'before service');
 
     const res = await ctx.authed('PUT', `/api/v1/odometer/${id}`, { odometer: 31_500 });
@@ -52,7 +49,7 @@ describe('odometer PUT /:id (update contract)', () => {
   });
 
   test('a future recordedAt is rejected on edit (partial schema keeps the refine)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx);
     const id = await createEntry(vehicleId, 30_000);
 
     const future = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -62,7 +59,7 @@ describe('odometer PUT /:id (update contract)', () => {
   });
 
   test('a negative odometer is rejected on edit', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx);
     const id = await createEntry(vehicleId, 30_000);
 
     const res = await ctx.authed('PUT', `/api/v1/odometer/${id}`, { odometer: -5 });
@@ -71,7 +68,7 @@ describe('odometer PUT /:id (update contract)', () => {
   });
 
   test('a non-integer odometer is rejected on edit', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx);
     const id = await createEntry(vehicleId, 30_000);
 
     const res = await ctx.authed('PUT', `/api/v1/odometer/${id}`, { odometer: 30_000.5 });
@@ -80,7 +77,7 @@ describe('odometer PUT /:id (update contract)', () => {
   });
 
   test('updating only the note leaves the odometer reading intact', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx);
     const id = await createEntry(vehicleId, 42_000, 'original');
 
     const res = await ctx.authed('PUT', `/api/v1/odometer/${id}`, { note: 'corrected note' });

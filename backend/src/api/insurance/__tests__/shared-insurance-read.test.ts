@@ -12,24 +12,15 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { createInvitee, type Invitee } from '../../../test-helpers/invitee';
 import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp; // owner (user A)
-let bCookie: string; // invitee B
-let bEmail: string;
-let bCounter = 0;
+let b: Invitee; // invitee B
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  const { db } = await import('../../../db/connection');
-  const schema = await import('../../../db/schema');
-  const { lucia } = await import('../../auth/lucia');
-  const bId = `ins-invitee-${++bCounter}`;
-  bEmail = `ins-invitee-${bCounter}@test.com`;
-  await db.insert(schema.users).values({ id: bId, email: bEmail, displayName: 'Ins B' });
-  const session = await lucia.createSession(bId, {});
-  const sc = lucia.createSessionCookie(session.id);
-  bCookie = `${sc.name}=${sc.value}`;
+  b = await createInvitee(ctx, 'ins-invitee');
 });
 afterEach(() => ctx.close());
 
@@ -38,22 +29,6 @@ interface PolicyRow {
   terms: Array<{ id: string }>;
   termVehicleCoverage: Array<{ termId: string; vehicleId: string }>;
   vehicleIds: string[];
-}
-
-async function asB(method: string, path: string, body?: unknown): Promise<Response> {
-  const headers: Record<string, string> = { Cookie: bCookie, 'Sec-Fetch-Site': 'same-origin' };
-  let init: RequestInit = { method, headers };
-  if (body !== undefined) {
-    headers['Content-Type'] = 'application/json';
-    init = { ...init, body: JSON.stringify(body) };
-  }
-  return ctx.app.request(path, init);
-}
-
-async function acceptShare(vehicleId: string, level: 'viewer' | 'editor'): Promise<void> {
-  const invite = await ctx.authed('POST', '/api/v1/shares', { vehicleId, email: bEmail, level });
-  const inviteId = (await json<DataEnvelope<{ id: string }>>(invite)).data.id;
-  expect((await asB('POST', `/api/v1/shares/${inviteId}/accept`)).status).toBe(200);
 }
 
 describe('insurance per-vehicle reads for shared vehicles', () => {
@@ -71,9 +46,9 @@ describe('insurance per-vehicle reads for shared vehicles', () => {
       ],
     });
     expect(policyRes.status).toBe(201);
-    await acceptShare(vehicleA, 'viewer');
+    await b.acceptShare(vehicleA, 'viewer');
 
-    const res = await asB('GET', `/api/v1/insurance/vehicles/${vehicleA}/policies`);
+    const res = await b.request('GET', `/api/v1/insurance/vehicles/${vehicleA}/policies`);
     const body = await json<DataEnvelope<PolicyRow[]>>(res);
     expect(res.status).toBe(200);
     expect(body.data.length).toBe(1);
@@ -122,10 +97,10 @@ describe('insurance per-vehicle reads for shared vehicles', () => {
         },
       ],
     });
-    await acceptShare(vehicleA, 'editor');
+    await b.acceptShare(vehicleA, 'editor');
 
     const body = await json<DataEnvelope<PolicyRow[]>>(
-      await asB('GET', `/api/v1/insurance/vehicles/${vehicleA}/policies`)
+      await b.request('GET', `/api/v1/insurance/vehicles/${vehicleA}/policies`)
     );
     expect(body.data.length).toBe(1);
     const policy = body.data[0];
@@ -146,7 +121,9 @@ describe('insurance per-vehicle reads for shared vehicles', () => {
         },
       ],
     });
-    expect((await asB('GET', `/api/v1/insurance/vehicles/${vehicleId}/policies`)).status).toBe(404);
+    expect(
+      (await b.request('GET', `/api/v1/insurance/vehicles/${vehicleId}/policies`)).status
+    ).toBe(404);
   });
 
   test('a pending invite grants no insurance read', async () => {
@@ -161,8 +138,10 @@ describe('insurance per-vehicle reads for shared vehicles', () => {
         },
       ],
     });
-    await ctx.authed('POST', '/api/v1/shares', { vehicleId, email: bEmail, level: 'viewer' });
-    expect((await asB('GET', `/api/v1/insurance/vehicles/${vehicleId}/policies`)).status).toBe(404);
+    await ctx.authed('POST', '/api/v1/shares', { vehicleId, email: b.email, level: 'viewer' });
+    expect(
+      (await b.request('GET', `/api/v1/insurance/vehicles/${vehicleId}/policies`)).status
+    ).toBe(404);
   });
 });
 
@@ -208,9 +187,9 @@ describe('insurance claim reads for shared vehicles', () => {
     const claimA = await fileClaim(policyId, 'collision', vehicleA);
     await fileClaim(policyId, 'theft', vehicleB);
     await fileClaim(policyId, 'weather');
-    await acceptShare(vehicleA, 'viewer');
+    await b.acceptShare(vehicleA, 'viewer');
 
-    const res = await asB('GET', `/api/v1/insurance/${policyId}/claims`);
+    const res = await b.request('GET', `/api/v1/insurance/${policyId}/claims`);
     const body = await json<DataEnvelope<ClaimRow[]>>(res);
     expect(res.status).toBe(200);
     expect(body.data.length).toBe(1);
@@ -238,10 +217,10 @@ describe('insurance claim reads for shared vehicles', () => {
     const policyId = await createTwoVehiclePolicy(vehicleA, vehicleB);
     const claimA = await fileClaim(policyId, 'collision', vehicleA);
     await fileClaim(policyId, 'theft', vehicleB);
-    await acceptShare(vehicleA, 'editor');
+    await b.acceptShare(vehicleA, 'editor');
 
     const body = await json<DataEnvelope<ClaimRow[]>>(
-      await asB('GET', `/api/v1/insurance/${policyId}/claims`)
+      await b.request('GET', `/api/v1/insurance/${policyId}/claims`)
     );
     expect(body.data.length).toBe(1);
     expect(body.data[0].id).toBe(claimA);
@@ -254,7 +233,7 @@ describe('insurance claim reads for shared vehicles', () => {
       await seedVehicle(ctx, { make: 'NoShare2', model: 'Car', year: 2022 })
     );
     await fileClaim(policyId, 'collision', vehicleId);
-    expect((await asB('GET', `/api/v1/insurance/${policyId}/claims`)).status).toBe(404);
+    expect((await b.request('GET', `/api/v1/insurance/${policyId}/claims`)).status).toBe(404);
   });
 
   test('a pending invite grants no claims read', async () => {
@@ -264,7 +243,7 @@ describe('insurance claim reads for shared vehicles', () => {
       await seedVehicle(ctx, { make: 'Pending2', model: 'Car', year: 2022 })
     );
     await fileClaim(policyId, 'collision', vehicleId);
-    await ctx.authed('POST', '/api/v1/shares', { vehicleId, email: bEmail, level: 'viewer' });
-    expect((await asB('GET', `/api/v1/insurance/${policyId}/claims`)).status).toBe(404);
+    await ctx.authed('POST', '/api/v1/shares', { vehicleId, email: b.email, level: 'viewer' });
+    expect((await b.request('GET', `/api/v1/insurance/${policyId}/claims`)).status).toBe(404);
   });
 });

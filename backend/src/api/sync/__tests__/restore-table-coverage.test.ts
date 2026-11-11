@@ -59,8 +59,8 @@ describe('restore table coverage', () => {
       insuranceTermVehicles: 'insurance_terms → insurance_policies (probed ancestor)',
       insuranceClaims: 'insurance_policies (FK policyId → probed parent)',
       odometerEntries: 'vehicles (FK vehicleId → probed parent)',
-      reminderVehicles: 'reminders (FK reminderId → a now-probed parent)',
-      reminderNotifications: 'reminders (FK reminderId → a now-probed parent)',
+      reminderVehicles: 'reminders (FK reminderId → a probed parent)',
+      reminderNotifications: 'reminders (FK reminderId → a probed parent)',
     };
 
     const insertedExportNames = [

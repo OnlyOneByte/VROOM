@@ -10,9 +10,9 @@ import { getPeriodStartDate } from '../../utils/calculations';
 import { logger } from '../../utils/logger';
 import { clampPagination, type PaginatedResult } from '../../utils/pagination';
 import { BaseRepository } from '../../utils/repository';
-import { assertVehiclesOwned } from '../../utils/vehicle-ownership';
 import { expenseSplitService } from './split-service';
-import { type SplitConfig, splitConfigVehicleIds } from './validation';
+import type { SplitConfig } from './validation';
+
 export interface ExpenseFilters {
   vehicleId?: string;
   userId?: string;
@@ -26,8 +26,8 @@ export interface ExpenseFilters {
 }
 
 /** Columns a caller may sort the expense list by. */
-export type ExpenseSortBy = 'date' | 'amount' | 'category';
-export type SortDirection = 'asc' | 'desc';
+type ExpenseSortBy = 'date' | 'amount' | 'category';
+type SortDirection = 'asc' | 'desc';
 
 export interface PaginatedExpenseFilters extends ExpenseFilters {
   limit?: number;
@@ -93,7 +93,7 @@ function buildExpenseConditions(filters: ExpenseFilters): SQL[] {
 
 export type { PaginatedResult } from '../../utils/pagination';
 
-export interface ExpenseSummaryFilters {
+interface ExpenseSummaryFilters {
   userId: string;
   vehicleId?: string;
   period?: '7d' | '30d' | '90d' | '1y' | 'all';
@@ -506,10 +506,6 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     }
   }
 
-  private async validateVehicleOwnership(splitConfig: SplitConfig, userId: string): Promise<void> {
-    await assertVehiclesOwned(this.db, splitConfigVehicleIds(splitConfig), userId);
-  }
-
   async createSplitExpense(
     data: {
       splitConfig: SplitConfig;
@@ -521,10 +517,8 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       sourceType?: string;
       sourceId?: string;
     },
-    userId: string,
-    // ownerId stamps every sibling; createdBy records the acting author. The route checks access.
-    ownerId: string = userId,
-    createdBy: string | null = null
+    // ownerId stamps every sibling; createdBy is the acting author when not the owner. Callers check access.
+    { ownerId, createdBy }: { ownerId: string; createdBy: string | null }
   ): Promise<Expense[]> {
     try {
       const allocations = expenseSplitService.computeAllocations(
@@ -555,7 +549,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     } catch (error) {
       if (error instanceof NotFoundError) throw error;
       logger.error('Failed to create split expense', {
-        userId,
+        ownerId,
         error: error instanceof Error ? error.message : String(error),
       });
       throw new DatabaseError('Failed to create split expense', error);
@@ -619,9 +613,8 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       throw new NotFoundError('Split expense');
     }
 
+    // Vehicle access and the single-owner rule are enforced by the route before this runs.
     try {
-      await this.validateVehicleOwnership(data.splitConfig, userId);
-
       const firstOld = oldSiblings[0];
       if (!firstOld) {
         throw new NotFoundError('Split expense');

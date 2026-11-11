@@ -19,9 +19,39 @@ export const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'app
 export const MAX_FILE_SIZE = 10_485_760;
 
 /**
+ * Undoes a partial persist: the photo row (if it was written) and the uploaded object. Each step is
+ * best-effort and logged, so the caller still sees the original DB error.
+ */
+async function removeFailedUpload(
+  provider: StorageProvider,
+  providerId: string,
+  storageRef: StorageRef,
+  photoId: string | undefined
+): Promise<void> {
+  if (photoId) {
+    try {
+      await photoRepository.delete(photoId);
+    } catch (cleanupError) {
+      logger.warn('Failed to remove photo row after a DB write error', {
+        photoId,
+        error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+      });
+    }
+  }
+  try {
+    await provider.delete({ providerType: provider.type, externalId: storageRef.externalId });
+  } catch (cleanupError) {
+    logger.warn('Failed to clean up orphaned upload after a DB write error', {
+      providerId,
+      storageRef: storageRef.externalId,
+      error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+    });
+  }
+}
+
+/**
  * Writes the DB side of an upload after the bytes are already in the provider. If either insert
- * fails, the uploaded object is deleted so nothing is orphaned. A failed cleanup is logged and does
- * not mask the original error.
+ * fails, the photo row and the uploaded object are both removed so nothing is orphaned.
  */
 async function persistUploadedPhotoOrCleanup(
   provider: StorageProvider,
@@ -36,12 +66,14 @@ async function persistUploadedPhotoOrCleanup(
     fileSize: number;
   }
 ): Promise<Photo> {
+  let photoId: string | undefined;
   try {
     const photo = await photoRepository.create({
       ...meta,
       isCover: false,
       sortOrder: 0,
     });
+    photoId = photo.id;
 
     await photoRefRepository.create({
       photoId: photo.id,
@@ -54,15 +86,7 @@ async function persistUploadedPhotoOrCleanup(
 
     return photo;
   } catch (error) {
-    try {
-      await provider.delete({ providerType: provider.type, externalId: storageRef.externalId });
-    } catch (cleanupError) {
-      logger.warn('Failed to clean up orphaned upload after a DB write error', {
-        providerId,
-        storageRef: storageRef.externalId,
-        error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
-      });
-    }
+    await removeFailedUpload(provider, providerId, storageRef, photoId);
     throw error;
   }
 }
@@ -307,27 +331,7 @@ export async function deletePhotoForEntity(
 
   const wasCover = photo.isCover;
 
-  // Provider-side deletes are best-effort; the DB rows are removed regardless.
-  const refs = await photoRefRepository.findAllByPhoto(photoId);
-  for (const ref of refs) {
-    if (ref.status !== 'active') continue;
-    try {
-      const provider = await storageProviderRegistry.getProvider(ref.providerId, userId);
-      await provider.delete({
-        providerType: provider.type,
-        externalId: ref.storageRef,
-      });
-    } catch (error) {
-      logger.warn('Failed to delete photo from storage provider', {
-        photoId,
-        providerId: ref.providerId,
-        storageRef: ref.storageRef,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
-
-  await photoRefRepository.deleteByPhoto(photoId);
+  await deletePhotoRowsAndObjects([photoId], userId);
   await photoRepository.delete(photoId);
 
   if (wasCover) {
@@ -338,28 +342,58 @@ export async function deletePhotoForEntity(
   }
 }
 
-/** Best-effort: provider failures are logged and never thrown. */
-async function deleteRefsFromProviders(
-  refsByProvider: Map<string, PhotoRef[]>,
+/**
+ * Removes the storage objects behind the given photos' active refs, then their photo_refs rows.
+ * Provider-side deletes are best-effort: failures are logged and never thrown, and the DB rows are
+ * removed regardless. The photo rows themselves are left to the caller.
+ */
+async function deletePhotoRowsAndObjects(photoIds: string[], userId: string): Promise<void> {
+  if (photoIds.length === 0) return;
+
+  const refs = await photoRefRepository.findAllByPhotos(photoIds);
+  for (const [providerId, providerRefs] of groupActiveRefsByProvider(refs)) {
+    await deleteObjectsFromProvider(providerId, providerRefs, userId);
+  }
+
+  await photoRefRepository.deleteByPhotos(photoIds);
+}
+
+/** Active refs bucketed by provider, so each provider instance is built once per cascade. */
+function groupActiveRefsByProvider(refs: PhotoRef[]): Map<string, PhotoRef[]> {
+  const byProvider = new Map<string, PhotoRef[]>();
+  for (const ref of refs) {
+    if (ref.status !== 'active') continue;
+    const bucket = byProvider.get(ref.providerId) ?? [];
+    bucket.push(ref);
+    byProvider.set(ref.providerId, bucket);
+  }
+  return byProvider;
+}
+
+async function deleteObjectsFromProvider(
+  providerId: string,
+  refs: PhotoRef[],
   userId: string
 ): Promise<void> {
-  for (const [providerId, refs] of refsByProvider) {
+  let provider: StorageProvider;
+  try {
+    provider = await storageProviderRegistry.getProvider(providerId, userId);
+  } catch (error) {
+    logger.warn('Failed to get provider for photo delete', {
+      providerId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return;
+  }
+
+  for (const ref of refs) {
     try {
-      const provider = await storageProviderRegistry.getProvider(providerId, userId);
-      for (const ref of refs) {
-        try {
-          await provider.delete({ providerType: provider.type, externalId: ref.storageRef });
-        } catch (error) {
-          logger.warn('Failed to delete photo from provider during cascade', {
-            photoId: ref.photoId,
-            providerId: ref.providerId,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-      }
+      await provider.delete({ providerType: provider.type, externalId: ref.storageRef });
     } catch (error) {
-      logger.warn('Failed to get provider for cascade delete', {
+      logger.warn('Failed to delete photo from storage provider', {
+        photoId: ref.photoId,
         providerId,
+        storageRef: ref.storageRef,
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -376,21 +410,10 @@ export async function deleteAllPhotosForEntity(
   const entityPhotos = await photoRepository.findByEntity(entityType, entityId);
   if (entityPhotos.length === 0) return;
 
-  const photoIds = entityPhotos.map((p) => p.id);
-  const allRefs = await photoRefRepository.findAllByPhotos(photoIds);
-
-  // Group active refs by provider to reuse provider instances
-  const refsByProvider = new Map<string, PhotoRef[]>();
-  for (const ref of allRefs) {
-    if (ref.status !== 'active') continue;
-    const existing = refsByProvider.get(ref.providerId) ?? [];
-    existing.push(ref);
-    refsByProvider.set(ref.providerId, existing);
-  }
-
-  await deleteRefsFromProviders(refsByProvider, userId);
-
-  await photoRefRepository.deleteByPhotos(photoIds);
+  await deletePhotoRowsAndObjects(
+    entityPhotos.map((p) => p.id),
+    userId
+  );
   await photoRepository.deleteByEntity(entityType, entityId);
 }
 
@@ -409,19 +432,9 @@ export async function deletePhotosForEntities(
   const entityPhotos = await photoRepository.findByEntities(entityType, entityIds);
   if (entityPhotos.length === 0) return;
 
-  const photoIds = entityPhotos.map((p) => p.id);
-  const allRefs = await photoRefRepository.findAllByPhotos(photoIds);
-
-  const refsByProvider = new Map<string, PhotoRef[]>();
-  for (const ref of allRefs) {
-    if (ref.status !== 'active') continue;
-    const existing = refsByProvider.get(ref.providerId) ?? [];
-    existing.push(ref);
-    refsByProvider.set(ref.providerId, existing);
-  }
-
-  await deleteRefsFromProviders(refsByProvider, userId);
-
-  await photoRefRepository.deleteByPhotos(photoIds);
+  await deletePhotoRowsAndObjects(
+    entityPhotos.map((p) => p.id),
+    userId
+  );
   await photoRepository.deleteByEntities(entityType, entityIds);
 }

@@ -1,8 +1,9 @@
 /**
- * Source guard: validateEntityOwnership must delegate to shared seams, not a local copy or an inlined
- * repository check. Vehicle and insurance policy use the strict validators. Expenses and odometer
- * entries are owner-stamped on shared vehicles, so they must use requireVehicleWrite instead of a
- * userId match.
+ * Source guard: photo entity-ownership must delegate to the shared seams in utils/validation.ts and
+ * utils/sharing.ts, not a local copy or an inlined repository query. The behavior of each leg (strict
+ * vehicle and policy checks, editor access to owner-stamped expenses and odometer readings) is
+ * covered over HTTP by shared-entity-photo-access.test.ts and entity-ownership-gate.test.ts, so this
+ * file only pins the structure that behavior cannot see.
  */
 
 import { describe, expect, test } from 'bun:test';
@@ -22,47 +23,42 @@ describe('photo entity-ownership uses the shared validators', () => {
     expect(readHelpers().length, `unreadable/empty: ${HELPERS}`).toBeGreaterThan(200);
   });
 
-  test('routes vehicle / insurance_policy through the strict shared validators', () => {
+  test('routes vehicle and insurance_policy through the strict shared validators', () => {
     const src = readHelpers();
     for (const fn of ['validateVehicleOwnership', 'validateInsuranceOwnership']) {
       expect(
-        src.includes(`${fn}(`),
-        `validateEntityOwnership must call the shared ${fn} from utils/validation.ts. ` +
-          `Missing call site.`
+        new RegExp(`\\b${fn}\\s*\\(`).test(src),
+        `validateEntityOwnership must call the shared ${fn} from utils/validation.ts.`
       ).toBe(true);
     }
   });
 
-  test('routes the owner-stamped entities through the vehicle-sharing seam', () => {
-    const src = readHelpers();
+  test('the owner-stamped legs authorize through the vehicle-sharing seam', () => {
     expect(
-      src.includes('requireVehicleWrite('),
+      /\brequireVehicleWrite\s*\(/.test(readHelpers()),
       'the expense and odometer_entry legs must authorize via requireVehicleWrite (utils/sharing.ts). ' +
         'A userId-match check there denies an accepted editor the photo on their own owner-stamped row.'
     ).toBe(true);
-    // Two call sites, one per owner-stamped entity type — not one leg quietly left behind.
-    expect(src.match(/requireVehicleWrite\(/g)?.length).toBe(2);
   });
 
   test('does NOT locally re-declare a shared ownership validator (no shadowing duplicate)', () => {
-    const src = readHelpers();
     const localDecl =
-      /(?:function|const|let)\s+(validateVehicleOwnership|validateInsuranceOwnership|requireVehicleWrite)\b/;
-    const m = localDecl.exec(src);
+      /\b(?:function|const|let)\s+(validateVehicleOwnership|validateInsuranceOwnership|requireVehicleWrite)\b/;
+    const match = localDecl.exec(readHelpers());
     expect(
-      m,
+      match,
       `photos/helpers.ts re-declares a shared ownership validator locally ` +
-        `(${m?.[1]}). Import it from utils/validation.ts instead.`
+        `(${match?.[1]}). Import it from its shared module instead.`
     ).toBeNull();
   });
 
-  test('does NOT re-import vehicle/policy repositories to inline ownership checks', () => {
+  test('does NOT re-import vehicle or policy repositories to inline ownership checks', () => {
     const src = readHelpers();
     for (const repo of ['vehicleRepository', 'insurancePolicyRepository']) {
       expect(
-        src.includes(repo),
-        `photos/helpers.ts references ${repo} again — vehicle/policy ownership should go ` +
-          `through the shared validator, not an inlined repository query.`
+        new RegExp(`\\b${repo}\\b`).test(src),
+        `photos/helpers.ts references ${repo} again. Ownership should go through the shared validator, ` +
+          `not an inlined repository query.`
       ).toBe(false);
     }
   });

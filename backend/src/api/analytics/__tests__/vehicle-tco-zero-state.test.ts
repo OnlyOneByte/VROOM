@@ -5,7 +5,7 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
-import { seedVehicle as seedVehicleShared } from '../../../test-helpers/seed';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -21,9 +21,6 @@ interface VehicleTCO {
   costPerDistance: number | null;
   costPerMonth: number;
 }
-
-const seedVehicle = (extra: Record<string, unknown> = {}): Promise<string> =>
-  seedVehicleShared(ctx, { make: 'Honda', model: 'Civic', year: 2021, extra });
 
 async function getTCO(vehicleId: string): Promise<VehicleTCO> {
   const res = await ctx.authed('GET', `/api/v1/analytics/vehicle-tco?vehicleId=${vehicleId}`);
@@ -42,7 +39,7 @@ function expectAllFinite(tco: VehicleTCO): void {
 
 describe('vehicle TCO money math — zero/empty denominators stay finite', () => {
   test('a brand-new vehicle (no expenses, no purchaseDate, no mileage) yields finite, sane numbers', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx);
     const tco = await getTCO(vehicleId);
 
     expectAllFinite(tco);
@@ -54,7 +51,7 @@ describe('vehicle TCO money math — zero/empty denominators stay finite', () =>
   });
 
   test('an expense but still zero distance keeps costPerDistance null (no x/0 Infinity)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx);
     const exp = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId,
       category: 'maintenance',
@@ -73,9 +70,11 @@ describe('vehicle TCO money math — zero/empty denominators stay finite', () =>
   });
 
   test('a future purchaseDate does not produce a negative or non-finite cost-per-month', async () => {
-    const vehicleId = await seedVehicle({
-      purchaseDate: '2099-01-01T00:00:00.000Z',
-      purchasePrice: 30000,
+    const vehicleId = await seedVehicle(ctx, {
+      extra: {
+        purchaseDate: '2099-01-01T00:00:00.000Z',
+        purchasePrice: 30000,
+      },
     });
     const tco = await getTCO(vehicleId);
 

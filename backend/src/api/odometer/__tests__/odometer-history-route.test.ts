@@ -6,7 +6,7 @@ import {
   type PaginatedEnvelope,
   type TestApp,
 } from '../../../test-helpers/http-client';
-import { seedVehicle as seedVehicleShared } from '../../../test-helpers/seed';
+import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
 
@@ -14,9 +14,6 @@ beforeEach(async () => {
   ctx = await createTestApp();
 });
 afterEach(() => ctx.close());
-
-const seedVehicle = (): Promise<string> =>
-  seedVehicleShared(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
 
 interface HistoryRow {
   odometer: number;
@@ -57,7 +54,7 @@ async function createFuelExpenseWithMileage(
 
 describe('odometer GET /:vehicleId/history (route contract)', () => {
   test('merges manual entries and expense-mileage rows, newest first', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx);
     const expId = await createFuelExpenseWithMileage(vehicleId, 30_000, '2024-06-01T12:00:00.000Z');
     const manualId = await createManualEntry(vehicleId, 31_000, '2024-06-15T12:00:00.000Z');
 
@@ -76,7 +73,7 @@ describe('odometer GET /:vehicleId/history (route contract)', () => {
   });
 
   test('an empty vehicle returns an empty history with a well-formed envelope', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx);
     const res = await ctx.authed('GET', `/api/v1/odometer/${vehicleId}/history`);
     expect(res.status).toBe(200);
     const body = await json<PaginatedEnvelope<HistoryRow>>(res);
@@ -86,7 +83,7 @@ describe('odometer GET /:vehicleId/history (route contract)', () => {
   });
 
   test('limit truncates the page and flips hasMore', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx);
     await createManualEntry(vehicleId, 10_000, '2024-06-01T12:00:00.000Z');
     await createManualEntry(vehicleId, 11_000, '2024-06-02T12:00:00.000Z');
     await createManualEntry(vehicleId, 12_000, '2024-06-03T12:00:00.000Z');

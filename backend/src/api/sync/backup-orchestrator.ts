@@ -5,10 +5,12 @@ import type { BackupConfig, ProviderBackupSettings } from '../../types';
 import { decrypt } from '../../utils/encryption';
 import { logger } from '../../utils/logger';
 import { OPERATION_TIMEOUTS, withTimeout } from '../../utils/timeout';
-import type {
-  BackupOrchestratorResult,
-  BackupOutcome,
-  BackupStrategyResult,
+import {
+  type BackupOrchestratorResult,
+  type BackupOutcome,
+  type BackupStrategyResult,
+  hasZipBackup,
+  isSyncEnabled,
 } from './backup-strategy';
 import { backupStrategyRegistry } from './backup-strategy-registry';
 
@@ -17,13 +19,11 @@ const MUTEX_MAX_SIZE = 500;
 const backupMutex = new Map<string, number>();
 
 export function filterEnabledProviders(config: BackupConfig): [string, ProviderBackupSettings][] {
-  return Object.entries(config.providers).filter(
-    ([, s]) => s.enabled || s.sheetsSyncEnabled === true
-  );
+  return Object.entries(config.providers).filter(([, s]) => isSyncEnabled(s));
 }
 
 export function needsZipGeneration(enabledProviders: [string, ProviderBackupSettings][]): boolean {
-  return enabledProviders.some(([, s]) => s.enabled);
+  return enabledProviders.some(([, s]) => hasZipBackup(s));
 }
 
 function acquireMutex(userId: string): boolean {
@@ -45,6 +45,10 @@ function acquireMutex(userId: string): boolean {
 
 function releaseMutex(userId: string): void {
   backupMutex.delete(userId);
+}
+
+function failedAttempt(message: string): BackupStrategyResult {
+  return { success: false, message, capabilities: {} };
 }
 
 export class BackupOrchestrator {
@@ -162,7 +166,7 @@ export class BackupOrchestrator {
             providerId,
             error: message,
           });
-          return { providerId, result: { success: false, message, capabilities: {} } };
+          return { providerId, result: failedAttempt(message) };
         }
       });
 
@@ -173,15 +177,25 @@ export class BackupOrchestrator {
       let anySuccess = false;
       const failedProviders: string[] = [];
 
-      for (const outcome of settled) {
-        // A null result means the provider was never attempted (no strategy, row, or decryptable
-        // credentials). That is a skip, not a failure.
-        if (outcome.status !== 'fulfilled' || !outcome.value.result) {
-          if (outcome.status === 'rejected') {
-            logger.warn('Strategy execution rejected', { error: outcome.reason });
-          }
+      for (const [index, outcome] of settled.entries()) {
+        if (outcome.status === 'rejected') {
+          // The per-provider body catches its own failures, so a rejection is an unexpected throw
+          // outside them. The provider was still attempted, so it counts as failed.
+          const [providerId] = enabledProviders[index];
+          const reason = outcome.reason;
+          const message = reason instanceof Error ? reason.message : 'Backup strategy failed';
+          logger.warn('Backup strategy rejected, marking provider failed', {
+            providerId,
+            error: message,
+          });
+          results[providerId] = failedAttempt(message);
+          failedProviders.push(providerId);
           continue;
         }
+
+        // A null result means the provider was never attempted (no strategy, row, or decryptable
+        // credentials). That is a skip, not a failure.
+        if (!outcome.value.result) continue;
 
         const { providerId, result } = outcome.value;
         results[providerId] = result;

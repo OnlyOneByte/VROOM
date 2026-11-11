@@ -1,7 +1,6 @@
 /**
  * Pins reminder-trigger idempotency. advanceNextDueDate is a compare-and-swap on nextDueDate. A stale
  * expected date matches no rows and is a silent no-op, so the trigger loop must supply the current value.
- * Keep static imports to the harness and bun:test: createTestApp sets env before config loads.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';

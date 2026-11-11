@@ -1,10 +1,19 @@
-import { describe, expect, test } from 'bun:test';
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { beforeEach, describe, expect, test } from 'bun:test';
 import { getTableColumns } from 'drizzle-orm';
 import { TABLE_SCHEMA_MAP } from '../../../../config';
-import { SHEET_HEADERS, SHEET_NAMES } from '../google-sheets-service';
+import {
+  FakeGoogleStore,
+  makeFakeSheetsClients,
+} from '../../../../test-helpers/fake-google-clients';
+import { createTestApp, type TestApp } from '../../../../test-helpers/http-client';
+import {
+  GoogleSheetsService,
+  SHEET_HEADERS,
+  SHEET_NAMES,
+  SHEET_TABS,
+} from '../google-sheets-service';
+
+type SheetTableKey = keyof typeof SHEET_TABS;
 
 describe('Google Sheets header coverage (column drift guard)', () => {
   test('SHEET_HEADERS covers exactly the same table keys as TABLE_SCHEMA_MAP', () => {
@@ -65,29 +74,29 @@ describe('Google Sheets tab roster (SHEET_NAMES drift guard)', () => {
   });
 });
 
-describe('Google Sheets populate-array coverage (updateSpreadsheetWithUserData ≡ SHEET_NAMES)', () => {
-  const HERE = dirname(fileURLToPath(import.meta.url));
-  const SERVICE_SRC = readFileSync(join(HERE, '..', 'google-sheets-service.ts'), 'utf-8');
+describe('Google Sheets backup writes every tab (populate coverage)', () => {
+  let ctx: TestApp;
 
-  function populateTitles(): string[] {
-    const start = SERVICE_SRC.indexOf('updateSpreadsheetWithUserData');
-    const end = SERVICE_SRC.indexOf('writeAllSheetsAtomically(spreadsheetId, tables)', start);
-    const body = SERVICE_SRC.slice(start, end > start ? end : undefined);
-    return [...body.matchAll(/title:\s*'([^']+)'/g)].map((m) => m[1]);
-  }
-
-  test('the populate `tables` array names every SHEET_NAMES tab, in the same order', () => {
-    const titles = populateTitles();
-    expect(
-      titles,
-      `The hand-built tables array in updateSpreadsheetWithUserData must list one { title, rows, headers } ` +
-        `entry per SHEET_NAMES tab, in order — an omitted table creates an empty tab whose data is silently ` +
-        `dropped on a Sheets backup. Add the missing { title: '<tab>', rows: …, headers: … }:`
-    ).toEqual([...SHEET_NAMES]);
+  beforeEach(async () => {
+    ctx = await createTestApp();
   });
 
-  test('the scan is non-vacuous (it actually found the populate titles)', () => {
-    expect(populateTitles().length).toBe(SHEET_NAMES.length);
-    expect(populateTitles().length).toBeGreaterThanOrEqual(15);
+  test('a backup writes a header row to every table tab', async () => {
+    const store = new FakeGoogleStore();
+    const svc = new GoogleSheetsService('fake-refresh-token', makeFakeSheetsClients(store));
+    const info = await svc.createOrUpdateVroomSpreadsheet(ctx.user.id, 'VROOM', 'Demo User');
+    const grids = store.spreadsheets.get(info.id)?.values;
+
+    const tableKeys = Object.keys(SHEET_TABS) as SheetTableKey[];
+    const unwritten = tableKeys.filter((key) => !grids?.has(SHEET_TABS[key]));
+    expect(unwritten, 'tables whose tab was never written (their data would be dropped)').toEqual(
+      []
+    );
+
+    for (const key of tableKeys) {
+      expect(grids?.get(SHEET_TABS[key])?.[0], `${key} header row`).toEqual([
+        ...SHEET_HEADERS[key],
+      ]);
+    }
   });
 });

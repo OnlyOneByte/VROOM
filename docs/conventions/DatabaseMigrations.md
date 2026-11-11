@@ -38,18 +38,15 @@ just invokes it standalone (plus `--seed` via `bun run db:seed`).
   new one.
 - **Every constraint must live in `schema.ts`.** A hand-written `CREATE UNIQUE INDEX` appended to a
   migration file is invisible to drizzle-kit: it is absent from the snapshot, so the next
-  regenerate neither preserves nor drops it — it simply never knows it existed. Four partial
-  indexes were carried that way, and the baseline collapse silently lost three of them until a
-  schema diff caught it. Partial indexes ARE expressible: `uniqueIndex(...).on(...).where(sql\`…\`)`.
+  regenerate neither preserves nor drops it — it simply never knows it existed. Partial indexes are expressible: `uniqueIndex(...).on(...).where(sql\`…\`)`.
 - Drizzle decides what to apply by comparing each `_journal.json` `when` against the newest
   `created_at` in `__drizzle_migrations`, and applies everything greater. A hand-written migration
   (a data backfill that drizzle-kit cannot generate) therefore needs a journal entry whose `when`
   is higher than the previous entry's — a lower one is skipped forever on any DB that stops at the
   preceding migration.
 - A data backfill that changes a column's *declared* type must also change `schema.ts` and ship a
-  snapshot. The money-to-cents backfill rewrote values with `UPDATE`s only, so the columns stayed
-  `real` in the database while `schema.ts` said `integer` — a disagreement SQLite's loose typing
-  hid until the collapse surfaced it.
+  snapshot. An `UPDATE`-only backfill rewrites values and leaves the stored column type alone, and
+  SQLite's loose typing hides the mismatch with `schema.ts`.
 - Do not modify `__drizzle_migrations` by hand except to recover a DB bootstrapped by `db:push`
   (see Production).
 
@@ -90,7 +87,7 @@ list you missed. What they point at:
 | `backend/src/types.ts` | `BackupData` and `ParsedBackupData`. |
 | `backend/src/api/sync/backup.ts` | Query the table in `createBackup()`; emit its CSV in `exportAsZip()`; check its FKs in `validateReferentialIntegrity()`. |
 | `backend/src/api/sync/restore.ts` | `insertBackupData()` (FK order), `deleteUserData()`, and the per-table count in `ImportSummary`. |
-| `backend/src/api/providers/services/google-sheets-service.ts` | `SHEET_HEADERS` (one entry per table, covering every column) and `SHEET_NAMES` (tab roster, consumed by both `createSpreadsheet` and `ensureRequiredSheets`). The `updateSpreadsheetWithUserData()` write fan-out and `readSpreadsheetData()` read ranges are both per-table; only the write side has a drift guard. |
+| `backend/src/api/providers/services/google-sheets-service.ts` | `SHEET_HEADERS` (one entry per table, covering every column) and `SHEET_TABS` (the title of each tab, keyed like `SHEET_HEADERS`; `SHEET_NAMES` is derived from it and consumed by `createSpreadsheet` and `ensureRequiredSheets`). The `updateSpreadsheetWithUserData()` write fan-out is typed `Record<table key, rows>` and `readSpreadsheetData()` reads through `readTab`, both keyed by `SHEET_TABS`; `sheets-header-coverage.test.ts` guards the written tabs. |
 
 `coerceRow()` in `backup.ts` derives CSV-string → JS-value coercion from Drizzle column metadata,
 so most new columns need no mapping. Two cases to confirm with a round-trip test:

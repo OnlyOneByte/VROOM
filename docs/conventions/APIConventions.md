@@ -71,12 +71,11 @@ export const entityRepository = new EntityRepository(getDb());
 `NotFoundError` on a missing row). Take `AppDatabase`, never `BunSQLiteDatabase` — the alias
 is the seam for a future non-SQLite dialect.
 
-Extending it is the default, not a requirement: 8 of the 15 repositories do. Its signature is
-`table: Table & { id: Column }`, so a table without a single `id` column cannot extend it —
-`settings` (keyed on `user_id`) is the structural case. `analytics` runs read-only aggregations and
-has no row CRUD to inherit. The rest (`auth`, both `insurance`, both `photos`) own enough
-domain-specific query shape that the four inherited methods carry little of their weight. Extend it
-when the generic CRUD is genuinely what you need; don't reshape a repository to qualify.
+Extending it is the default, not a requirement: 8 repositories do. Its signature is
+`table: Table & { id: Column }`, so a table without a single `id` column cannot extend it.
+`user_preferences` (keyed on `user_id`) is the structural case. `analytics` runs read-only
+aggregations and has no row CRUD to inherit. Extend it when the generic CRUD is genuinely what you
+need; don't reshape a repository to qualify.
 
 ## Rules
 
@@ -124,8 +123,7 @@ when the generic CRUD is genuinely what you need; don't reshape a repository to 
 - Every POST/PUT/DELETE verifies the resource belongs to `c.get('user')` *before* the repository
   call, via the `validate*Ownership` helpers in `utils/validation.ts`. Don't delegate it downstream.
 - A repository method taking `userId` must scope its query by it. Never `_`-prefix the param to
-  silence `noUnusedVariables` after dropping a check (insurance's `_userId` params are the
-  pre-existing route-validated case, not a pattern to copy).
+  silence `noUnusedVariables` after dropping a check.
 - Shared-vehicle access goes through `utils/sharing.ts` (`resolveVehicleAccess`,
   `requireVehicleRead`, `requireVehicleWrite`, `resolveVehicleOwnerId`), not a raw `userId` compare.
 
@@ -133,8 +131,8 @@ when the generic CRUD is genuinely what you need; don't reshape a repository to 
 - Build any `inArray`/`IN (...)` clause over an unbounded id list with `chunk()`
   (`utils/chunk.ts`, batch 500) — SQLite's variable limit is 999.
 - Prefer one batched query to a per-item loop in cascade operations.
-- Anything added to `db/data-migration.ts` (runs after the Drizzle migrations) must be idempotent.
-- `createProviderInstance` decrypts credentials on every call — resolve a provider once and reuse it.
+- `storageProviderRegistry.createProviderInstance` decrypts credentials on every call, so resolve a
+  provider once and reuse it.
 
 ### Photo Entity Types
 The photo-bearing entities are `vehicle`, `expense`, `insurance_policy`, `insurance_claim`,

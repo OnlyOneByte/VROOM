@@ -119,14 +119,6 @@ describe('TripRepository', () => {
     expect(page.data).toHaveLength(2);
   });
 
-  test('findIdsByVehicleId returns every trip id for the vehicle', async () => {
-    const a = await repo.create(tripData());
-    const b = await repo.create(tripData());
-    await repo.create(tripData({ vehicleId: OTHER_VEHICLE }));
-    const ids = await repo.findIdsByVehicleId(VEHICLE_ID);
-    expect(ids.sort()).toEqual([a.id, b.id].sort());
-  });
-
   // A delete keyed on id alone would let one user remove another user's trip.
   test('deleteByIdAndUserId removes the owner’s trip but refuses a foreign user’s delete', async () => {
     const trip = await repo.create(tripData());

@@ -2,12 +2,12 @@ import { generateCodeVerifier, generateState } from 'arctic';
 import { and, eq } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { Hono } from 'hono';
-import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
+import { getCookie } from 'hono/cookie';
 import { HTTPException } from 'hono/http-exception';
 import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
 import { userProviders, users } from '../../db/schema';
-import { createErrorResponse } from '../../errors';
+import { createErrorResponse, isUniqueConstraintError } from '../../errors';
 import { rateLimiter, requireAuth } from '../../middleware';
 import { getClientIp } from '../../utils/client-ip';
 import { encrypt } from '../../utils/encryption';
@@ -15,9 +15,16 @@ import { logger } from '../../utils/logger';
 import { storePending } from '../../utils/pending-credentials';
 import { readJsonBody } from '../../utils/request-body';
 import { authProviderRepository, buildAuthProviderConfig } from './auth-provider-repository';
-import { getLucia, googleProvider } from './lucia';
+import { lucia } from './lucia';
+import { googleStorageClient, STORAGE_SCOPES } from './providers/google';
 import { getEnabledProvider, getEnabledProviders, getProvider } from './providers/registry';
-import { consumeOAuthState, validateAndRefreshSession } from './utils';
+import { NoVerifiedEmailError } from './providers/types';
+import {
+  clearSessionCookie,
+  consumeOAuthState,
+  setSessionCookie,
+  validateAndRefreshSession,
+} from './utils';
 
 const routes = new Hono();
 
@@ -140,7 +147,7 @@ async function exchangeAuthTokens(
   return userInfo;
 }
 
-async function updateExistingUserProfile(
+export async function updateExistingUserProfile(
   userId: string,
   authRowId: string,
   userInfo: { email: string; displayName: string; avatarUrl?: string }
@@ -173,7 +180,7 @@ async function updateExistingUserProfile(
       .set({ email: userInfo.email, displayName: userInfo.displayName, updatedAt: new Date() })
       .where(eq(users.id, userId));
   } catch (emailErr) {
-    if (emailErr instanceof Error && emailErr.message.includes('UNIQUE constraint failed')) {
+    if (isUniqueConstraintError(emailErr)) {
       logger.warn(
         'Skipped email backfill due to UNIQUE conflict — another user already has this email',
         {
@@ -191,7 +198,7 @@ async function updateExistingUserProfile(
   }
 }
 
-async function resolveNewUser(
+export async function resolveNewUser(
   authProviderId: string,
   userInfo: { providerAccountId: string; email: string; displayName: string; avatarUrl?: string }
 ): Promise<{ userId: string } | { redirect: string }> {
@@ -234,7 +241,7 @@ async function resolveNewUser(
     });
     return result;
   } catch (txErr) {
-    if (txErr instanceof Error && txErr.message.includes('UNIQUE constraint failed')) {
+    if (isUniqueConstraintError(txErr)) {
       const retryRow = await authProviderRepository.findByProviderIdentity(
         authProviderId,
         userInfo.providerAccountId
@@ -287,7 +294,6 @@ routes.get('/callback/link/:authProvider', authRateLimiter, async (c) => {
   if ('error' in stateResult) return c.redirect(profileRedirect('link_error=invalid_state'));
   const storedData = stateResult.data;
 
-  const lucia = getLucia();
   const sessionId = getCookie(c, lucia.sessionCookieName);
   const authResult = await validateProviderSession(sessionId);
   if (!authResult) return c.redirect(`${CONFIG.frontend.url}/auth?auth_error=invalid_state`);
@@ -334,16 +340,8 @@ routes.get('/callback/link/:authProvider', authRateLimiter, async (c) => {
 });
 
 async function createAuthSession(c: Context, userId: string) {
-  const lucia = getLucia();
   const session = await lucia.createSession(userId, {});
-  setCookie(c, lucia.sessionCookieName, session.id, {
-    path: '/',
-    secure: CONFIG.env === 'production',
-    httpOnly: true,
-    maxAge: CONFIG.auth.cookieMaxAge,
-    expires: session.expiresAt,
-    sameSite: 'Lax',
-  });
+  setSessionCookie(c, lucia.sessionCookieName, session);
 }
 
 async function exchangeAuthTokensOrRedirect(
@@ -363,8 +361,7 @@ async function exchangeAuthTokensOrRedirect(
       error: err instanceof Error ? err.message : String(err),
       provider: authProviderId,
     });
-    const isNoEmail = err instanceof Error && err.message.includes('No verified email');
-    return { redirect: isNoEmail ? 'no_email' : 'provider_unavailable' };
+    return { redirect: err instanceof NoVerifiedEmailError ? 'no_email' : 'provider_unavailable' };
   }
 }
 
@@ -417,7 +414,6 @@ routes.get('/callback/:authProvider', authRateLimiter, async (c) => {
 });
 
 routes.get('/me', async (c) => {
-  const lucia = getLucia();
   const sessionId = getCookie(c, lucia.sessionCookieName);
 
   if (!sessionId) {
@@ -428,13 +424,7 @@ routes.get('/me', async (c) => {
 
   if (!session) {
     // Clear the dead cookie so the browser stops resending it.
-    deleteCookie(c, lucia.sessionCookieName, {
-      path: '/',
-      secure: CONFIG.env === 'production',
-      httpOnly: true,
-      maxAge: CONFIG.auth.cookieMaxAge,
-      sameSite: 'Lax',
-    });
+    clearSessionCookie(c, lucia.sessionCookieName);
     throw new HTTPException(401, { message: 'Invalid session' });
   }
 
@@ -483,26 +473,18 @@ routes.patch('/me', requireAuth, async (c) => {
 });
 
 routes.post('/logout', async (c) => {
-  const lucia = getLucia();
   const sessionId = getCookie(c, lucia.sessionCookieName);
 
   if (sessionId) {
     await lucia.invalidateSession(sessionId);
   }
 
-  deleteCookie(c, lucia.sessionCookieName, {
-    path: '/',
-    secure: CONFIG.env === 'production',
-    httpOnly: true,
-    maxAge: CONFIG.auth.cookieMaxAge,
-    sameSite: 'Lax',
-  });
+  clearSessionCookie(c, lucia.sessionCookieName);
 
   return c.json({ success: true, message: 'Logged out successfully' });
 });
 
 routes.post('/refresh', async (c) => {
-  const lucia = getLucia();
   const sessionId = getCookie(c, lucia.sessionCookieName);
 
   if (!sessionId) {
@@ -512,13 +494,7 @@ routes.post('/refresh', async (c) => {
   const result = await validateAndRefreshSession(sessionId, lucia, c);
 
   if (!result) {
-    deleteCookie(c, lucia.sessionCookieName, {
-      path: '/',
-      secure: CONFIG.env === 'production',
-      httpOnly: true,
-      maxAge: CONFIG.auth.cookieMaxAge,
-      sameSite: 'Lax',
-    });
+    clearSessionCookie(c, lucia.sessionCookieName);
     throw new HTTPException(401, { message: 'Invalid session' });
   }
 
@@ -630,14 +606,7 @@ routes.get('/providers/connect/google', requireAuth, async (c) => {
 
   const state = generateState();
   const codeVerifier = generateCodeVerifier();
-  const url = googleProvider.createAuthorizationURL(state, codeVerifier, [
-    'openid',
-    'profile',
-    'email',
-    'https://www.googleapis.com/auth/drive.file',
-    // Narrowest Photos scope: read-only, and only items this app created, never the camera roll.
-    'https://www.googleapis.com/auth/photoslibrary.readonly.appcreateddata',
-  ]);
+  const url = googleStorageClient.createAuthorizationURL(state, codeVerifier, STORAGE_SCOPES);
 
   url.searchParams.set('access_type', 'offline');
   url.searchParams.set('prompt', 'consent');
@@ -663,14 +632,13 @@ async function validateProviderSession(
   sessionId: string | undefined
 ): Promise<{ user: { id: string }; session: { id: string } } | null> {
   if (!sessionId) return null;
-  const lucia = getLucia();
   const { session, user } = await lucia.validateSession(sessionId);
   if (!session || !user) return null;
   return { user, session };
 }
 
 async function exchangeProviderTokens(code: string, codeVerifier: string) {
-  const tokens = await googleProvider.validateAuthorizationCode(code, codeVerifier);
+  const tokens = await googleStorageClient.validateAuthorizationCode(code, codeVerifier);
   if (!tokens.hasRefreshToken()) return { tokens, refreshToken: null, email: null };
 
   const email = await fetchGoogleEmail(tokens.accessToken());
@@ -787,7 +755,6 @@ routes.get('/callback/provider/google', async (c) => {
   // resolveProviderState returns an error whenever code is missing.
   const authCode = code as string;
 
-  const lucia = getLucia();
   const sessionId = getCookie(c, lucia.sessionCookieName);
   const validated = await validateProviderCsrf(sessionId, state.userId);
   if (!validated) {

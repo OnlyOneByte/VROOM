@@ -54,14 +54,11 @@ export async function transaction<T>(
   }
 }
 
-export async function runMigrations() {
+export function runMigrations(): void {
   try {
     logger.info('Running database migrations...');
     migrate(db, { migrationsFolder: './drizzle' });
     logger.info('Database migrations completed successfully');
-
-    const { runDataMigration } = await import('./data-migration');
-    await runDataMigration(sqlite);
   } catch (error) {
     const message = extractErrorMessage(error);
     const cause = error instanceof Error && 'cause' in error ? error.cause : undefined;

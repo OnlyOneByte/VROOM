@@ -54,6 +54,14 @@ describe('api client — global session expiry on 401', () => {
 		expect(goto).toHaveBeenCalledWith('/auth');
 	});
 
+	it('handles a 401 on a raw download the same way', async () => {
+		await expect(apiClient.raw('/api/v1/sync/backups/download')).rejects.toThrow();
+
+		expect(authStore.isAuthenticated).toBe(false);
+		expect(expiryWarningShown()).toBe(true);
+		expect(goto).toHaveBeenCalledWith('/auth');
+	});
+
 	it('leaves the startup auth probe to report its own 401', async () => {
 		await expect(apiClient.get('/api/v1/auth/me')).rejects.toThrow();
 

@@ -79,7 +79,7 @@
 	let expenseAmount = $state('');
 	let expenseTags = $state<string[]>([]);
 
-	// 'even' stores no per-vehicle rows (the backend splits cents); absolute and percentage store allocations. resetSplitAllocations is shared with the other expense forms.
+	// 'even' stores no per-vehicle rows (the backend splits cents); absolute and percentage store allocations.
 	let splitMethod = $state<'even' | 'absolute' | 'percentage'>('even');
 	let splitAllocations = $state<SplitAllocationDraft[]>([]);
 	// The split editor is only relevant for an expense reminder spanning ≥2 vehicles with a positive
@@ -118,9 +118,8 @@
 			intervalUnit = (INTERVAL_UNITS as readonly string[]).includes(r.intervalUnit ?? '')
 				? (r.intervalUnit as IntervalUnit)
 				: 'month';
-			// Read the stored ISO back as the local calendar date; a UTC slice shows the prior day for UTC+13/+14 users.
-			startDate = toDateInputValue(new Date(r.startDate));
-			endDate = r.endDate ? toDateInputValue(new Date(r.endDate)) : '';
+			startDate = toDateInputValue(r.startDate);
+			endDate = r.endDate ? toDateInputValue(r.endDate) : '';
 			selectedVehicleIds = [...reminder.vehicleIds];
 			expenseCategory = (EXPENSE_CATEGORIES as readonly string[]).includes(r.expenseCategory ?? '')
 				? (r.expenseCategory as ExpenseCategory)

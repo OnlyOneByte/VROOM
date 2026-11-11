@@ -1,5 +1,5 @@
 import { logger } from '../../../utils/logger';
-import { resolveBackupFolderPath } from '../../sync/backup';
+import { backupService, resolveBackupFolderPath } from '../../sync/backup';
 import type {
   BackupCapabilityResult,
   BackupStrategy,
@@ -74,7 +74,6 @@ export class GoogleDriveStrategy implements BackupStrategy {
         rawPath: folderPath,
       });
 
-      const { backupService } = await import('../../sync/backup');
       const deletedOldBackups = await backupService.enforceRetention(
         context.userId,
         context.providerId

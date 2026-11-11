@@ -10,22 +10,21 @@ import {
   createTestApp,
   type DataEnvelope,
   json,
+  type RequestFn,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { createInvitee } from '../../../test-helpers/invitee';
 import { pushSubscriptionRepository } from '../repository';
 
 let ctx: TestApp;
+let asB: RequestFn;
 let bId: string;
-let bCounter = 0;
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  const { db } = await import('../../../db/connection');
-  const schema = await import('../../../db/schema');
-  bId = `push-user-b-${++bCounter}`;
-  await db
-    .insert(schema.users)
-    .values({ id: bId, email: `pushb-${bCounter}@test.com`, displayName: 'B' });
+  const b = await createInvitee(ctx, 'push-user-b', 'B');
+  bId = b.id;
+  asB = b.request;
 });
 afterEach(() => ctx.close());
 
@@ -34,23 +33,6 @@ const SUB = {
   keys: { p256dh: 'BPp256dhKeyAAA', auth: 'authSecretAAA' },
   userAgent: 'Chrome on Pixel',
 };
-
-/** Sends a request as user B with a real session cookie. */
-async function asB(method: string, path: string, body?: unknown): Promise<Response> {
-  const { lucia } = await import('../../auth/lucia');
-  const session = await lucia.createSession(bId, {});
-  const sc = lucia.createSessionCookie(session.id);
-  const headers: Record<string, string> = {
-    Cookie: `${sc.name}=${sc.value}`,
-    'Sec-Fetch-Site': 'same-origin',
-  };
-  let init: RequestInit = { method, headers };
-  if (body !== undefined) {
-    headers['Content-Type'] = 'application/json';
-    init = { ...init, body: JSON.stringify(body) };
-  }
-  return ctx.app.request(path, init);
-}
 
 describe('POST /api/v1/push/subscribe', () => {
   test('persists a subscription for the session user and returns 201 with the id only', async () => {

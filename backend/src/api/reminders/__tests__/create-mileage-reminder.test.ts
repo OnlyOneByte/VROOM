@@ -1,7 +1,6 @@
 /**
  * Creating mileage reminders through the API: nextDueOdometer is derived server-side, a pure-mileage
  * reminder has no due date, and malformed mileage shapes are rejected.
- * Keep imports limited to the harness and bun:test: createTestApp sets env before config loads.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -12,6 +11,7 @@ import {
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
+import { addOdometerReading } from './_helpers';
 
 let ctx: TestApp;
 
@@ -19,14 +19,6 @@ beforeEach(async () => {
   ctx = await createTestApp();
 });
 afterEach(() => ctx.close());
-
-async function addOdometerReading(vehicleId: string, odometer: number): Promise<void> {
-  const res = await ctx.authed('POST', `/api/v1/odometer/${vehicleId}`, {
-    odometer,
-    recordedAt: '2024-06-01T00:00:00.000Z',
-  });
-  expect(res.status, `odometer ${odometer}`).toBe(201);
-}
 
 interface ReminderRowDb {
   trigger_mode: string;
@@ -76,7 +68,7 @@ describe('create mileage reminder', () => {
 
   test('omitted lastServiceOdometer defaults to the vehicle current odometer', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'CR-V', year: 2021 });
-    await addOdometerReading(vehicleId, 42000);
+    await addOdometerReading(ctx, vehicleId, 42000);
 
     const res = await ctx.authed('POST', '/api/v1/reminders', {
       ...MILEAGE_BASE,

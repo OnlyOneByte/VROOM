@@ -1,151 +1,101 @@
-// Copies of the restore route's provider and Sheets checks, tested in isolation. The copies can
-// drift from routes.ts.
+// POST /sync/restore/from-provider's preconditions, over the real route and in-memory DB. The route
+// requires an Idempotency-Key header, which the shared harness cannot set, so requests go through
+// app.request directly. A ZIP restore needs a live provider download, so its restore orchestration
+// is covered by the restore-* suites, which drive restoreFromBackup with a real archive.
 
-import { describe, expect, test } from 'bun:test';
-import { SyncError, SyncErrorCode } from '../../../errors';
-import type { BackupConfig } from '../../../types';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { createTestApp, json, type TestApp } from '../../../test-helpers/http-client';
 
-/** Copy of the route's provider lookup. */
-function validateProvider(
-  providers: Array<{ id: string; userId: string; status: string }>,
-  providerId: string,
-  userId: string
-): { id: string; userId: string; status: string } {
-  const row = providers.find(
-    (p) => p.id === providerId && p.userId === userId && p.status === 'active'
+let ctx: TestApp;
+
+beforeEach(async () => {
+  ctx = await createTestApp();
+});
+afterEach(() => ctx.close());
+
+interface ErrorBody {
+  success: boolean;
+  error: { code: string; message: string };
+}
+
+function seedProvider(id: string, userId: string, status = 'active'): void {
+  ctx.sqlite.run(
+    `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
+     VALUES (?, ?, 'storage', 'google-drive', 'Drive', 'enc', '{}', ?)`,
+    [id, userId, status]
   );
-  if (!row) {
-    throw new SyncError(SyncErrorCode.VALIDATION_ERROR, 'Provider not found or inactive');
-  }
-  return row;
 }
 
-/** Copy of the Sheets spreadsheetId lookup. */
-function getSheetsSpreadsheetId(backupConfig: BackupConfig | null, providerId: string): string {
-  const providerConfig = backupConfig?.providers?.[providerId];
-  const sheetsSpreadsheetId = providerConfig?.sheetsSpreadsheetId;
-  if (!sheetsSpreadsheetId) {
-    throw new SyncError(
-      SyncErrorCode.VALIDATION_ERROR,
-      'No Google Sheets spreadsheet found for this provider'
-    );
-  }
-  return sheetsSpreadsheetId;
+function seedBackupConfig(providers: Record<string, unknown>): void {
+  ctx.sqlite.run('INSERT OR REPLACE INTO user_preferences (user_id, backup_config) VALUES (?, ?)', [
+    ctx.user.id,
+    JSON.stringify({ providers }),
+  ]);
 }
 
-/** Copy of the ZIP download-and-restore flow. */
-async function simulateZipRestore(
-  downloadFn: (userId: string, providerId: string, fileRef: string) => Promise<Buffer>,
-  restoreFn: (
-    userId: string,
-    buffer: Buffer,
-    mode: string
-  ) => Promise<{ success: boolean; imported?: object }>,
-  userId: string,
-  providerId: string,
-  fileRef: string,
-  mode: string
-): Promise<{ success: boolean; imported?: object }> {
-  const zipBuffer = await downloadFn(userId, providerId, fileRef);
-  return restoreFn(userId, zipBuffer, mode);
-}
-
-describe('Unified restore', () => {
-  const activeProviders = [
-    { id: 'prov-1', userId: 'user-1', status: 'active' },
-    { id: 'prov-2', userId: 'user-1', status: 'active' },
-    { id: 'prov-inactive', userId: 'user-1', status: 'inactive' },
-  ];
-
-  const backupConfig: BackupConfig = {
-    providers: {
-      'prov-1': {
-        enabled: true,
-        folderPath: 'Backups',
-        retentionCount: 10,
-        lastBackupAt: '2024-01-01T00:00:00Z',
-        sheetsSyncEnabled: true,
-        sheetsSpreadsheetId: 'sheet-abc-123',
-      },
-      'prov-2': {
-        enabled: true,
-        folderPath: 'Backups',
-        retentionCount: 5,
-        lastBackupAt: '2024-01-02T00:00:00Z',
-      },
+/** POSTs to the restore route with a fresh Idempotency-Key, as a browser would. */
+async function postFromProvider(body: unknown): Promise<Response> {
+  return ctx.app.request('/api/v1/sync/restore/from-provider', {
+    method: 'POST',
+    headers: {
+      Cookie: ctx.cookie,
+      'Sec-Fetch-Site': 'same-origin',
+      'Content-Type': 'application/json',
+      'Idempotency-Key': crypto.randomUUID(),
     },
-  };
+    body: JSON.stringify(body),
+  });
+}
 
-  test('ZIP download+restore — downloads and restores successfully', async () => {
-    const mockDownload = async () => Buffer.from('zip-content');
-    const mockRestore = async () => ({
-      success: true,
-      imported: {
-        vehicles: 3,
-        expenses: 10,
-        financing: 0,
-        insurance: 0,
-        insuranceTerms: 0,
-        insuranceTermVehicles: 0,
-        odometer: 0,
-        photos: 0,
-        photoRefs: 0,
-        userPreferences: 0,
-        syncState: 0,
-      },
-    });
+const sheetsRestore = (providerId: string) => ({
+  sourceType: 'sheets',
+  providerId,
+  mode: 'preview',
+});
 
-    const result = await simulateZipRestore(
-      mockDownload,
-      mockRestore,
-      'user-1',
-      'prov-1',
-      'file-ref-xyz',
-      'replace'
+describe('POST /sync/restore/from-provider: provider lookup', () => {
+  test('an unknown provider id is rejected as not found', async () => {
+    const res = await postFromProvider(sheetsRestore('prov-missing'));
+    const body = await json<ErrorBody>(res);
+    expect(res.status).toBe(400);
+    expect(body.error.message).toBe('Provider not found or inactive');
+  });
+
+  test('an inactive provider is rejected as not found', async () => {
+    seedProvider('prov-inactive', ctx.user.id, 'inactive');
+    const res = await postFromProvider(sheetsRestore('prov-inactive'));
+    const body = await json<ErrorBody>(res);
+    expect(res.status).toBe(400);
+    expect(body.error.message).toBe('Provider not found or inactive');
+  });
+
+  test("another user's provider is rejected as not found", async () => {
+    ctx.sqlite.run(
+      "INSERT INTO users (id, email, display_name) VALUES ('other-user', 'other@example.com', 'Other')"
     );
+    seedProvider('prov-foreign', 'other-user');
+    const res = await postFromProvider(sheetsRestore('prov-foreign'));
+    const body = await json<ErrorBody>(res);
+    expect(res.status).toBe(400);
+    expect(body.error.message).toBe('Provider not found or inactive');
+  });
+});
 
-    expect(result.success).toBe(true);
-    expect(result.imported).toBeDefined();
+describe('POST /sync/restore/from-provider: Sheets source precondition', () => {
+  test('an active provider with no spreadsheet id is rejected before any Sheets call', async () => {
+    seedProvider('prov-nosheet', ctx.user.id);
+    seedBackupConfig({ 'prov-nosheet': { enabled: true, folderPath: 'B', retentionCount: 5 } });
+    const res = await postFromProvider(sheetsRestore('prov-nosheet'));
+    const body = await json<ErrorBody>(res);
+    expect(res.status).toBe(400);
+    expect(body.error.message).toBe('No Google Sheets spreadsheet found for this provider');
   });
 
-  test('Sheets via provider credentials — reads sheetsSpreadsheetId from config', () => {
-    const spreadsheetId = getSheetsSpreadsheetId(backupConfig, 'prov-1');
-    expect(spreadsheetId).toBe('sheet-abc-123');
-  });
-
-  test('missing sheetsSpreadsheetId — throws SyncError', () => {
-    expect(() => getSheetsSpreadsheetId(backupConfig, 'prov-2')).toThrow(
-      'No Google Sheets spreadsheet found for this provider'
-    );
-  });
-
-  test('missing sheetsSpreadsheetId — null config throws', () => {
-    expect(() => getSheetsSpreadsheetId(null, 'prov-1')).toThrow(
-      'No Google Sheets spreadsheet found for this provider'
-    );
-  });
-
-  test('invalid provider — not found throws SyncError', () => {
-    expect(() => validateProvider(activeProviders, 'prov-nonexistent', 'user-1')).toThrow(
-      'Provider not found or inactive'
-    );
-  });
-
-  test('invalid provider — inactive status throws SyncError', () => {
-    expect(() => validateProvider(activeProviders, 'prov-inactive', 'user-1')).toThrow(
-      'Provider not found or inactive'
-    );
-  });
-
-  test('invalid provider — wrong userId throws SyncError', () => {
-    expect(() => validateProvider(activeProviders, 'prov-1', 'user-other')).toThrow(
-      'Provider not found or inactive'
-    );
-  });
-
-  test('valid provider — returns provider row', () => {
-    const row = validateProvider(activeProviders, 'prov-1', 'user-1');
-    expect(row.id).toBe('prov-1');
-    expect(row.status).toBe('active');
+  test('a user with no backup config at all gets the same spreadsheet error', async () => {
+    seedProvider('prov-noconfig', ctx.user.id);
+    const res = await postFromProvider(sheetsRestore('prov-noconfig'));
+    const body = await json<ErrorBody>(res);
+    expect(res.status).toBe(400);
+    expect(body.error.message).toBe('No Google Sheets spreadsheet found for this provider');
   });
 });

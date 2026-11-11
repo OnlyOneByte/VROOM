@@ -1,7 +1,8 @@
 /**
  * Built-in column presets for common fuel trackers, used to auto-detect the source from a
  * file's header row. Column names are best-effort from each tracker's CSV export and matched
- * loosely; a null detection is the safe failure (the user maps manually).
+ * loosely; a null detection is the safe failure (the user maps manually). These exports are
+ * fill-up logs with no category column, so each preset defaults blank categories to fuel.
  */
 
 import type { ExpenseCategory } from '../../db/types';
@@ -19,6 +20,7 @@ export interface MappingPreset {
   distanceUnit?: DistanceUnit;
   volumeUnit?: VolumeUnit;
   categoryMap?: Record<string, ExpenseCategory>;
+  defaultCategory?: ExpenseCategory;
 }
 
 export function normalizeHeader(header: string): string {
@@ -42,6 +44,7 @@ export const MAPPING_PRESETS: MappingPreset[] = [
     distanceUnit: DistanceUnit.MILES,
     volumeUnit: VolumeUnit.GALLONS_US,
     categoryMap: { gas: 'fuel', fuel: 'fuel', service: 'maintenance' },
+    defaultCategory: 'fuel',
   },
   {
     id: 'fuelio',
@@ -58,6 +61,7 @@ export const MAPPING_PRESETS: MappingPreset[] = [
     distanceUnit: DistanceUnit.KILOMETERS,
     volumeUnit: VolumeUnit.LITERS,
     categoryMap: { gas: 'fuel', fuel: 'fuel', petrol: 'fuel', service: 'maintenance' },
+    defaultCategory: 'fuel',
   },
   {
     id: 'drivvo',
@@ -81,6 +85,7 @@ export const MAPPING_PRESETS: MappingPreset[] = [
       service: 'maintenance',
       maintenance: 'maintenance',
     },
+    defaultCategory: 'fuel',
   },
 ];
 
@@ -102,5 +107,6 @@ export function presetToMapping(preset: MappingPreset, targetVehicle?: string): 
     distanceUnit: preset.distanceUnit,
     volumeUnit: preset.volumeUnit,
     categoryMap: preset.categoryMap,
+    defaultCategory: preset.defaultCategory,
   };
 }

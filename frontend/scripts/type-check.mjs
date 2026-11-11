@@ -156,6 +156,10 @@ async function main() {
 		);
 	}
 
+	// --tsgo writes a shadow .ts per component here and never prunes it, so a deleted component's
+	// stale shadow would keep reporting errors against code that no longer exists.
+	rmSync(path.join(frontendDir, '.svelte-kit', '.svelte-check'), { recursive: true, force: true });
+
 	const reportDir = mkdtempSync(path.join(tmpdir(), 'vroom-type-check-'));
 	const reportPath = path.join(reportDir, 'tsgo-guard.json');
 	const guardUrl = pathToFileURL(selfPath);

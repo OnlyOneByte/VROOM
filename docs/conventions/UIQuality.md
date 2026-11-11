@@ -1,6 +1,6 @@
 # UI Quality — "human-ready, not junk"
 
-CI runs type-check, lint, the unit suite, and a build. All of that proves a page
+CI runs type-check, lint, the unit suite, a build, and the Chromium e2e project. All of that proves a page
 **compiles** — none of it proves quality. A page can be green and still be ugly, unusable
 on a phone, inaccessible, or missing the states a real user hits. This doc is the bar every
 UI feature must clear before it's "done". Treat the checklist as blocking, the same way you
@@ -33,15 +33,15 @@ VROOM installs to phones. Mobile is the primary form factor, not an afterthought
 - No horizontal overflow / clipped content at 390px. Tables either scroll-x deliberately
   or collapse to cards.
 - Tap targets ≥ 40px. Inputs and primary buttons are full-width or comfortably thumbable.
-- Respect safe areas (`app.html` already applies `safe-top`/`safe-bottom`).
+- Respect safe areas (`app.css` defines `.safe-top` and `.safe-bottom`).
 
 ## Accessibility
 
-`e2e/pwa.spec.ts` runs `@axe-core/playwright` over `/`, `/auth` and `/dashboard` at the
+`e2e/pwa.spec.ts` (`A11Y_ROUTES`) runs `@axe-core/playwright` over eleven routes, and
+`e2e/expenses-a11y.spec.ts` covers the expense table's interactive states, at the
 `wcag2a`/`wcag2aa`/`wcag21a`/`wcag21aa` tags. It is a ratchet, not a gate: each route carries a
-list of rule ids it already violates (all three are empty today) and fails only on an id that is
-not on its list. So a new violation class on those three routes is caught, and nothing else is —
-every other route, and every item below, is yours to verify by hand:
+list of rule ids it already violates (all currently empty) and fails only on an id not on its list.
+A new violation class on those routes is caught. Everything else is yours to verify by hand:
 - Every interactive control has an accessible name (visible `<label for>`, `aria-label`,
   or text content). Icon-only buttons MUST have `aria-label` (see profile's
   `aria-label="Edit display name"`).
@@ -83,5 +83,5 @@ A UI feature is done when ALL are true:
 - [ ] Reuses the kit + theme tokens + formatters (no hardcoded colors, paths, or number
       formatting).
 - [ ] Destructive actions confirmed; in-flight mutations disable + spinner.
-- [ ] `npm run test:e2e` green (it is NOT in CI — run it locally); a new user journey gets
-      a spec in `frontend/e2e/`.
+- [ ] `npm run test:e2e` green locally (CI runs only the Chromium project); a new user journey
+      gets a spec in `frontend/e2e/`.

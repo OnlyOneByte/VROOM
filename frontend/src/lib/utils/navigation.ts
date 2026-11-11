@@ -2,8 +2,8 @@ import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 
 export function gotoDynamic(path: string): ReturnType<typeof goto> {
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	return goto(resolve(path as any));
+	// Runtime paths (e.g. a ?returnTo= value) cannot be checked against the generated route union.
+	return goto(resolve(...([path] as Parameters<typeof resolve>)));
 }
 
 export function gotoWithQuery(

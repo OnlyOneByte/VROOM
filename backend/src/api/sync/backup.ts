@@ -47,6 +47,7 @@ import { chunk } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
 import { joinStoragePath } from '../../utils/paths';
 import { unitPreferencesSchema } from '../../utils/unit-preferences-schema';
+import { hasZipBackup } from './backup-strategy';
 
 export interface ValidationResult {
   valid: boolean;
@@ -179,19 +180,15 @@ export function resolveBackupFolderPath(
 }
 
 export class BackupService {
-  async loadBackupConfig(
-    userId: string
-  ): Promise<{ config: BackupConfig; enabledProviders: [string, ProviderBackupSettings][] }> {
+  async loadBackupConfig(userId: string): Promise<BackupConfig> {
     const { preferencesRepository } = await import('../settings/repository');
     const prefs = await preferencesRepository.getOrCreate(userId);
-    const config: BackupConfig = prefs.backupConfig ?? { providers: {} };
-    const enabledProviders = Object.entries(config.providers).filter(([_, s]) => s.enabled);
-    return { config, enabledProviders };
+    return prefs.backupConfig ?? { providers: {} };
   }
 
   /** Returns the number of files actually deleted. */
   async enforceRetention(userId: string, providerId: string): Promise<number> {
-    const { config } = await this.loadBackupConfig(userId);
+    const config = await this.loadBackupConfig(userId);
     const settings = config.providers[providerId];
     if (!settings) return 0;
 
@@ -248,7 +245,7 @@ export class BackupService {
       .get();
     if (!providerRow) return [];
 
-    const { config } = await this.loadBackupConfig(userId);
+    const config = await this.loadBackupConfig(userId);
     const settings = config.providers[providerId];
     if (!settings) return [];
 
@@ -273,10 +270,15 @@ export class BackupService {
   }
 
   async listAllBackups(userId: string): Promise<ProviderBackupList[]> {
-    const { enabledProviders } = await this.loadBackupConfig(userId);
+    const config = await this.loadBackupConfig(userId);
+    // Only ZIP backups have files to list. A Sheets-only provider is excluded here even though a
+    // sync run includes it.
+    const zipProviderIds = Object.entries(config.providers)
+      .filter(([, settings]) => hasZipBackup(settings))
+      .map(([providerId]) => providerId);
     const results: ProviderBackupList[] = [];
 
-    for (const [providerId] of enabledProviders) {
+    for (const providerId of zipProviderIds) {
       try {
         const backups = await this.listBackups(userId, providerId);
 
@@ -313,10 +315,6 @@ export class BackupService {
     const { storageProviderRegistry } = await import('../providers/domains/storage/registry');
     const provider = await storageProviderRegistry.getProvider(providerId, userId);
     return provider.download({ providerType: provider.type, externalId: fileRef });
-  }
-
-  private getColumnNames(table: Parameters<typeof getTableColumns>[0]): string[] {
-    return Object.keys(getTableColumns(table));
   }
 
   async createBackup(userId: string): Promise<BackupData> {
@@ -442,7 +440,7 @@ export class BackupService {
       const filename = TABLE_FILENAME_MAP[key];
       if (table && filename) {
         const data = backup[key as keyof BackupData] as Record<string, unknown>[];
-        const csv = this.convertToCSV(data, this.getColumnNames(table));
+        const csv = this.convertToCSV(data, Object.keys(getTableColumns(table)));
         zip.addFile(filename, Buffer.from(csv, 'utf-8'));
       }
     }
@@ -527,7 +525,7 @@ export class BackupService {
       const table = TABLE_SCHEMA_MAP[key];
       const rawRows = getCSVData(filename);
       const coercedRows = table
-        ? rawRows.map((row) => this.coerceCSVRow(row, table, shimMoneyToCents))
+        ? rawRows.map((row) => coerceRow(row, table, { shimMoneyToCents }))
         : rawRows;
       // biome-ignore lint/suspicious/noExplicitAny: Dynamic key assignment
       parsedData[key as keyof ParsedBackupData] = coercedRows as any;
@@ -551,14 +549,6 @@ export class BackupService {
       quote: '"',
     }) as Record<string, string>[];
   }
-  private coerceCSVRow(
-    row: Record<string, unknown>,
-    table: Table,
-    shimMoneyToCents = false
-  ): Record<string, unknown> {
-    return coerceRow(row, table, { shimMoneyToCents });
-  }
-
   validateBackupData(backup: ParsedBackupData): ValidationResult {
     const errors: string[] = [];
 
@@ -644,7 +634,7 @@ export class BackupService {
     return [
       ...this.validateExpenseRefs(backup.expenses, vehicleIds, userIds),
       ...this.validateExpenseSourceRefs(backup.expenses, reminderIds),
-      ...this.validateFinancingRefs(backup.financing, vehicleIds),
+      ...this.validateVehicleFkRefs(backup.financing, vehicleIds, 'Financing'),
       ...this.validateInsuranceRefs(backup.insurance),
       ...this.validateInsuranceTermRefs(backup.insuranceTerms ?? [], policyIds),
       ...this.validateTermVehicleJunctionRefs(
@@ -653,8 +643,8 @@ export class BackupService {
         vehicleIds
       ),
       ...this.validateClaimRefs(backup.insuranceClaims ?? [], policyIds, termIds, vehicleIds),
-      ...this.validateOdometerRefs(backup.odometer ?? [], vehicleIds),
-      ...this.validateTripRefs(backup.trips ?? [], vehicleIds),
+      ...this.validateVehicleFkRefs(backup.odometer ?? [], vehicleIds, 'Odometer entry'),
+      ...this.validateVehicleFkRefs(backup.trips ?? [], vehicleIds, 'Trip'),
       ...this.validateShareRefs(backup.vehicleShares ?? [], vehicleIds, userIds),
       ...this.validatePhotoRefs(backup.photos ?? [], {
         vehicleIds,
@@ -763,13 +753,6 @@ export class BackupService {
     return errors;
   }
 
-  private validateFinancingRefs(
-    financingList: Record<string, unknown>[],
-    vehicleIds: Set<string>
-  ): string[] {
-    return this.validateVehicleFkRefs(financingList, vehicleIds, 'Financing');
-  }
-
   /**
    * The vehicle must be in this backup and the owner must be the backup creator. The invitee is not
    * checked: users are not backed up, and restore skips grants whose invitee is absent.
@@ -857,17 +840,6 @@ export class BackupService {
       }
     }
     return errors;
-  }
-
-  private validateOdometerRefs(
-    odometerList: Record<string, unknown>[],
-    vehicleIds: Set<string>
-  ): string[] {
-    return this.validateVehicleFkRefs(odometerList, vehicleIds, 'Odometer entry');
-  }
-
-  private validateTripRefs(tripList: Record<string, unknown>[], vehicleIds: Set<string>): string[] {
-    return this.validateVehicleFkRefs(tripList, vehicleIds, 'Trip');
   }
 
   private validatePhotoRefs(

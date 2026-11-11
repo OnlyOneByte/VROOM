@@ -14,8 +14,15 @@ export interface OAuthProviderConfig {
   id: string;
   displayName: string;
   supportsPKCE: boolean;
-  scopes: string[];
   createAuthorizationURL: (state: string, codeVerifier?: string) => URL;
   validateAuthorizationCode: (code: string, codeVerifier?: string) => Promise<OAuthTokens>;
   fetchUserInfo: (accessToken: string) => Promise<OAuthUserInfo>;
+}
+
+/** The provider authenticated the user but has no verified email to bind the account to. */
+export class NoVerifiedEmailError extends Error {
+  constructor(provider: string) {
+    super(`No verified email found for ${provider} account`);
+    this.name = 'NoVerifiedEmailError';
+  }
 }

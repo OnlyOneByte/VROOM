@@ -3,7 +3,5 @@ export const NOTIFICATION_LIMITS = {
 } as const;
 
 export const DISPLAY_LIMITS = {
-	RECENT_SYNCED_EXPENSES: 5,
-
-	PREVIEW_LIST_MAX: 10
+	RECENT_SYNCED_EXPENSES: 5
 } as const;

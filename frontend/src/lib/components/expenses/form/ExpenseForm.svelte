@@ -5,7 +5,7 @@
 	import { gotoDynamic, gotoWithQuery } from '$lib/utils/navigation';
 	import { onlineStatus } from '$lib/stores/offline.svelte';
 	import { addOfflineExpense } from '$lib/utils/offline-storage';
-	import { classifySyncFailure, type SyncFailureKind } from '$lib/utils/sync/sync-manager';
+	import { classifySyncFailure, type SyncFailureKind } from '$lib/utils/sync/classify-failure';
 	import { extractErrorMessage } from '$lib/utils/error-handling';
 	import { appStore } from '$lib/stores/app.svelte';
 	import { settingsStore } from '$lib/stores/settings.svelte';
@@ -41,6 +41,7 @@
 	import type { ReceiptDraft } from '$lib/services/vlm-api';
 	import SplitConfigEditor from '../split/SplitConfigEditor.svelte';
 	import { validateExpenseField } from './expense-form-validation';
+	import { toOfflineExpense } from './offline-expense';
 	import { Checkbox } from '$lib/components/ui/checkbox';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
 	import {
@@ -235,7 +236,7 @@
 						formData.category = first.category;
 						formData.amount = splitGroup.groupTotal.toString();
 						formData.tags = first.tags || [];
-						formData.date = toDateInputValue(new Date(first.date));
+						formData.date = toDateInputValue(first.date);
 						formData.description = first.description || '';
 						isLoading = false;
 						return;
@@ -245,7 +246,7 @@
 					formData.category = first.category;
 					formData.amount = splitGroup.groupTotal.toString();
 					formData.tags = first.tags || [];
-					formData.date = toDateInputValue(new Date(first.date));
+					formData.date = toDateInputValue(first.date);
 					formData.description = first.description || '';
 
 					isSplit = true;
@@ -285,7 +286,7 @@
 			formData.tags = expense.tags || [];
 			formData.category = expense.category;
 			formData.amount = expense.amount.toString();
-			formData.date = toDateInputValue(new Date(expense.date));
+			formData.date = toDateInputValue(expense.date);
 			formData.mileage = expense.mileage?.toString() ?? '';
 			formData.volume = expense.volume?.toString() ?? '';
 			formData.charge = expense.charge?.toString() ?? '';
@@ -494,28 +495,27 @@
 		isSubmitting = true;
 		submitError = null;
 
-		// Noon local avoids a timezone day-shift; computed outside try so the offline fallback saves the same instant.
+		// Built outside try so the offline fallback queues exactly what the server would have received.
 		const dateISO = dateOnlyToISO(formData.date);
+		const expenseData = {
+			vehicleId: formData.vehicleId,
+			tags: formData.tags,
+			category: formData.category as ExpenseCategory,
+			amount: parseFloat(formData.amount),
+			date: dateISO,
+			mileage: formData.mileage ? parseInt(formData.mileage) : undefined,
+			volume: formData.volume ? parseFloat(formData.volume) : undefined,
+			charge: formData.charge ? parseFloat(formData.charge) : undefined,
+			fuelType: formData.fuelType || undefined,
+			description: formData.description || undefined,
+			location: formData.location || undefined,
+			currency: currencyUnit,
+			sourceType: sourceType ?? undefined,
+			sourceId: sourceId ?? undefined,
+			missedFillup: formData.missedFillup
+		};
 
 		try {
-			const expenseData = {
-				vehicleId: formData.vehicleId,
-				tags: formData.tags,
-				category: formData.category as ExpenseCategory,
-				amount: parseFloat(formData.amount),
-				date: dateISO,
-				mileage: formData.mileage ? parseInt(formData.mileage) : undefined,
-				volume: formData.volume ? parseFloat(formData.volume) : undefined,
-				charge: formData.charge ? parseFloat(formData.charge) : undefined,
-				fuelType: formData.fuelType || undefined,
-				description: formData.description || undefined,
-				location: formData.location || undefined,
-				currency: currencyUnit,
-				sourceType: sourceType ?? undefined,
-				sourceId: sourceId ?? undefined,
-				missedFillup: formData.missedFillup
-			};
-
 			if (isGroupEditMode && groupId) {
 				const splitConfig = buildSplitConfig(splitMethod, selectedVehicleIds, splitAllocations);
 				await expenseApi.updateSplitExpense(groupId, {
@@ -569,23 +569,7 @@
 					});
 					gotoDynamic(returnTo);
 				} else {
-					const queued = addOfflineExpense({
-						vehicleId: expenseData.vehicleId,
-						tags: expenseData.tags,
-						category: expenseData.category,
-						amount: expenseData.amount,
-						date: expenseData.date ?? '',
-						description: expenseData.description ?? '',
-						...(expenseData.mileage !== undefined && { mileage: expenseData.mileage }),
-						...(expenseData.volume !== undefined && { volume: expenseData.volume }),
-						...(expenseData.charge !== undefined && { charge: expenseData.charge }),
-						// Carry fuelType: the sync transform needs it to keep an electric charge.
-						...(expenseData.fuelType !== undefined && { fuelType: expenseData.fuelType }),
-						// Carry missedFillup: dropping it on sync corrupts consecutive-fillup MPG pairing.
-						...(expenseData.missedFillup !== undefined && {
-							missedFillup: expenseData.missedFillup
-						})
-					});
+					const queued = addOfflineExpense(toOfflineExpense(expenseData));
 
 					if (!queued) {
 						reportUnqueuedSave();
@@ -604,38 +588,13 @@
 			if (import.meta.env.DEV) console.error('Failed to save expense:', error);
 
 			// Server-decided failures stay on screen; only failures that can succeed later may be queued.
+			// The outbox holds single expenses only, so a split create is never queued: it would land as
+			// one full-total expense on the first vehicle.
 			const failureKind = classifySyncFailure(error);
+			const isSplitCreate = isSplit && selectedVehicleIds.length >= 2;
 
-			if (!isEditMode && failureKind !== 'terminal') {
-				const expenseData = {
-					vehicleId: formData.vehicleId,
-					tags: formData.tags,
-					category: formData.category,
-					amount: parseFloat(formData.amount),
-					date: dateISO,
-					mileage: formData.mileage ? parseInt(formData.mileage) : undefined,
-					volume: formData.volume ? parseFloat(formData.volume) : undefined,
-					charge: formData.charge ? parseFloat(formData.charge) : undefined,
-					fuelType: formData.fuelType || undefined,
-					description: formData.description || undefined,
-					location: formData.location || undefined,
-					missedFillup: formData.missedFillup
-				};
-
-				const queued = addOfflineExpense({
-					vehicleId: expenseData.vehicleId,
-					tags: expenseData.tags,
-					category: expenseData.category,
-					amount: expenseData.amount,
-					date: expenseData.date ?? '',
-					description: expenseData.description ?? '',
-					...(expenseData.mileage !== undefined && { mileage: expenseData.mileage }),
-					...(expenseData.volume !== undefined && { volume: expenseData.volume }),
-					...(expenseData.charge !== undefined && { charge: expenseData.charge }),
-					...(expenseData.fuelType !== undefined && { fuelType: expenseData.fuelType }),
-					// Must stay field-for-field identical to the offline-first save above, or fields are silently lost.
-					...(expenseData.missedFillup !== undefined && { missedFillup: expenseData.missedFillup })
-				});
+			if (!isEditMode && !isSplitCreate && failureKind !== 'terminal') {
+				const queued = addOfflineExpense(toOfflineExpense(expenseData));
 
 				if (!queued) {
 					reportUnqueuedSave();
@@ -752,11 +711,6 @@
 
 	function handleMethodChange(method: 'even' | 'absolute' | 'percentage') {
 		splitMethod = method;
-		resetAllocationsForMethod(method);
-	}
-
-	function resetAllocationsForMethod(method: 'even' | 'absolute' | 'percentage') {
-		// Shared with the insurance-term form so the 100/N percentage seed cannot drift between them.
 		splitAllocations = resetSplitAllocations(method, selectedVehicleIds);
 	}
 
@@ -937,7 +891,7 @@
 											} else {
 												selectedVehicleIds = [...selectedVehicleIds, v.id];
 											}
-											resetAllocationsForMethod(splitMethod);
+											splitAllocations = resetSplitAllocations(splitMethod, selectedVehicleIds);
 										}}
 									/>
 									<span class="text-sm text-foreground">{getVehicleDisplayName(v)}</span>

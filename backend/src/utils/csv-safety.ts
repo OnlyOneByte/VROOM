@@ -1,5 +1,5 @@
-// Neutralizes spreadsheet formula injection (CWE-1236) for one-way CSV export. Do not use it on
-// round-trip data unless the reader strips the prefix symmetrically.
+// Neutralizes spreadsheet formula injection (CWE-1236) on CSV export. Every CSV reader of VROOM
+// exports must undo it with denormalizeCsvCell, or re-imported cells gain a leading apostrophe.
 
 /** First-character triggers a spreadsheet treats as the start of a formula. */
 const FORMULA_TRIGGERS = new Set(['=', '+', '-', '@', '\t', '\r']);

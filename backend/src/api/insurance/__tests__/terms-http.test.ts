@@ -2,7 +2,6 @@
  * HTTP tests for the insurance term and policy update routes. An optional field sent as null clears the
  * column, and an omitted field keeps its value. Vehicle links must be owned by the caller, and a term
  * update replaces its premium expense.
- * Imports only the harness: createTestApp sets env before config loads.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';

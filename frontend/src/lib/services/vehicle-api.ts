@@ -7,7 +7,11 @@ import type {
 	VehicleStats
 } from '$lib/types';
 import type { TimePeriod } from '$lib/constants/time-periods';
-import { apiClient, getApiBaseUrl, withPagination } from './api-client';
+import { apiClient } from './api-client';
+import { photoCollection } from './photo-api';
+
+const vehiclePhotos = (vehicleId: string) =>
+	photoCollection(`/api/v1/vehicles/${vehicleId}/photos`);
 
 export const vehicleApi = {
 	async getVehicle(vehicleId: string): Promise<Vehicle> {
@@ -33,17 +37,14 @@ export const vehicleApi = {
 	},
 
 	async deleteVehicle(vehicleId: string): Promise<void> {
-		await apiClient.delete('/api/v1/vehicles/' + vehicleId);
+		await apiClient.delete(`/api/v1/vehicles/${vehicleId}`);
 	},
 
+	// The backend answers 200 with data: null when the vehicle has no financing; any error is real.
 	async getFinancing(vehicleId: string): Promise<VehicleFinancing | null> {
-		try {
-			return await apiClient.get<VehicleFinancing>(
-				`/api/v1/financing/vehicles/${vehicleId}/financing`
-			);
-		} catch {
-			return null;
-		}
+		return apiClient.get<VehicleFinancing | null>(
+			`/api/v1/financing/vehicles/${vehicleId}/financing`
+		);
 	},
 
 	async createFinancing(
@@ -62,13 +63,11 @@ export const vehicleApi = {
 		});
 	},
 
-	async getPhotos(
+	getPhotos(
 		vehicleId: string,
 		params?: { limit?: number; offset?: number }
 	): Promise<PaginatedResponse<Photo>> {
-		return apiClient.getPaginated<Photo>(
-			withPagination(`/api/v1/vehicles/${vehicleId}/photos`, params)
-		);
+		return vehiclePhotos(vehicleId).list(params);
 	},
 
 	// One request for every vehicle's photos, keyed by vehicleId, instead of one getPhotos call per vehicle.
@@ -76,21 +75,19 @@ export const vehicleApi = {
 		return apiClient.get<Record<string, Photo[]>>('/api/v1/photos?entityType=vehicle');
 	},
 
-	async uploadPhoto(vehicleId: string, file: File): Promise<Photo> {
-		const formData = new FormData();
-		formData.append('photo', file);
-		return apiClient.post<Photo>(`/api/v1/vehicles/${vehicleId}/photos`, formData);
+	uploadPhoto(vehicleId: string, file: File): Promise<Photo> {
+		return vehiclePhotos(vehicleId).upload(file);
 	},
 
 	async setCoverPhoto(vehicleId: string, photoId: string): Promise<Photo> {
 		return apiClient.put<Photo>(`/api/v1/vehicles/${vehicleId}/photos/${photoId}/cover`);
 	},
 
-	async deletePhoto(vehicleId: string, photoId: string): Promise<void> {
-		await apiClient.delete(`/api/v1/vehicles/${vehicleId}/photos/${photoId}`);
+	deletePhoto(vehicleId: string, photoId: string): Promise<void> {
+		return vehiclePhotos(vehicleId).remove(photoId);
 	},
 
 	getPhotoThumbnailUrl(vehicleId: string, photoId: string): string {
-		return `${getApiBaseUrl()}/api/v1/vehicles/${vehicleId}/photos/${photoId}/thumbnail`;
+		return vehiclePhotos(vehicleId).thumbnailUrl(photoId);
 	}
 };

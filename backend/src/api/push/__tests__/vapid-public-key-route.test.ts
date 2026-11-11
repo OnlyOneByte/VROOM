@@ -1,20 +1,29 @@
 /**
- * VAPID public-key route. The test environment has no VAPID config, so the route must answer 503
- * PUSH_NOT_CONFIGURED and require auth. A source scan checks that the route never reads the private
- * key. CONFIG is cached per process, so the configured branch is not exercised here.
+ * VAPID public-key route. The route reads CONFIG.push on every request, so each branch is driven by
+ * setting the push fields directly and restoring them afterwards.
  */
 
-import { describe, expect, test } from 'bun:test';
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { afterEach, describe, expect, test } from 'bun:test';
+import { CONFIG } from '../../../config';
 import { createTestApp } from '../../../test-helpers/http-client';
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-const ROUTE_SRC = readFileSync(join(HERE, '..', 'routes.ts'), 'utf-8');
+const PUBLIC_KEY = 'BPublicKeySentinelValue';
+const PRIVATE_KEY = 'PrivateKeySentinelMustNotLeak';
+
+const savedPush = { ...CONFIG.push };
+
+/** CONFIG is typed read-only, but the route reads it per request, so a test can override fields. */
+function stubPushConfig(fields: Partial<typeof savedPush>): void {
+  Object.assign(CONFIG.push, fields);
+}
+
+afterEach(() => {
+  stubPushConfig(savedPush);
+});
 
 describe('push VAPID public-key route', () => {
   test('unconfigured server → 503 PUSH_NOT_CONFIGURED (honest, not 500/blank)', async () => {
+    stubPushConfig({ enabled: false });
     const ctx = await createTestApp();
     const res = await ctx.authed('GET', '/api/v1/push/vapid-public-key');
     expect(res.status).toBe(503);
@@ -24,19 +33,21 @@ describe('push VAPID public-key route', () => {
     ctx.close();
   });
 
+  test('configured server → 200 with the public key only', async () => {
+    stubPushConfig({ enabled: true, vapidPublicKey: PUBLIC_KEY, vapidPrivateKey: PRIVATE_KEY });
+    const ctx = await createTestApp();
+    const res = await ctx.authed('GET', '/api/v1/push/vapid-public-key');
+    const raw = await res.text();
+    expect(res.status).toBe(200);
+    expect(JSON.parse(raw)).toEqual({ success: true, data: { publicKey: PUBLIC_KEY } });
+    expect(raw).not.toContain(PRIVATE_KEY);
+    ctx.close();
+  });
+
   test('requires auth (anon → 401)', async () => {
     const ctx = await createTestApp();
     const res = await ctx.anon('GET', '/api/v1/push/vapid-public-key');
     expect(res.status).toBe(401);
     ctx.close();
-  });
-
-  test('the route source never reads the VAPID private key', () => {
-    expect(ROUTE_SRC.includes('vapidPrivateKey')).toBe(false);
-  });
-
-  test('the route source references the public key and the not-configured code', () => {
-    expect(ROUTE_SRC.includes('vapidPublicKey')).toBe(true);
-    expect(ROUTE_SRC.includes('PUSH_NOT_CONFIGURED')).toBe(true);
   });
 });

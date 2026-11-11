@@ -11,8 +11,7 @@ vi.mock('$app/state', () => ({
 }));
 
 vi.mock('$lib/utils/offline-storage', () => ({
-	addOfflineExpense: vi.fn(),
-	syncOfflineExpenses: vi.fn()
+	addOfflineExpense: vi.fn()
 }));
 
 vi.mock('$lib/utils/pwa', () => ({

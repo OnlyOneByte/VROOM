@@ -20,7 +20,8 @@
 	import {
 		guessManualColumns,
 		isNativeImportHeaders,
-		parseCsvHeaders
+		parseCsvHeaders,
+		presetImportMapping
 	} from '$lib/utils/import-mapping-helpers';
 	import type {
 		DistanceUnit,
@@ -99,15 +100,7 @@
 		const remap = assignedCategoryMap();
 		const hasRemap = Object.keys(remap).length > 0;
 		if (detectedPreset && targetVehicle) {
-			return {
-				source: detectedPreset.id,
-				columns: detectedPreset.columns,
-				targetVehicle: getVehicleDisplayName(targetVehicle),
-				dateFormat: detectedPreset.dateFormat,
-				distanceUnit: detectedPreset.distanceUnit,
-				volumeUnit: detectedPreset.volumeUnit,
-				categoryMap: { ...detectedPreset.categoryMap, ...remap }
-			};
+			return presetImportMapping(detectedPreset, getVehicleDisplayName(targetVehicle), remap);
 		}
 		if (manualMapping && manualColumns.date && manualColumns.amount && manualHasVehicle) {
 			const columns = Object.fromEntries(

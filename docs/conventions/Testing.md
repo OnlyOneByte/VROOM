@@ -50,10 +50,16 @@ expect(res.status, JSON.stringify(body)).toBe(200);
 Single-resource routes return `DataEnvelope<T>` (`{ data: T }`); list routes return
 `PaginatedEnvelope<T>` (adds `pagination`). Always pass the body as the assertion message.
 
-Import order is load-bearing: `CONFIG` and the DB singleton snapshot `process.env` at
-import time, so call `createTestApp()` before statically importing anything DB-bound.
-Env-gated branches therefore can't be flipped per-file in a full-suite run — pick a path
-that doesn't need the gate.
+The bunfig preload (`src/test-helpers/preload.ts`) sets `NODE_ENV=test` and
+`DATABASE_URL=:memory:` before any test file loads, so a test never opens the `.env` database
+and static imports of DB-bound modules are safe. `CONFIG` and the DB singleton still snapshot
+`process.env` once per process, so env-gated branches can't be flipped per-file in a full-suite
+run — pick a path that doesn't need the gate.
+
+For a second signed-in user, use `createInvitee(ctx, idPrefix)` (`test-helpers/invitee.ts`): it
+returns the user's id, email, cookie, a JSON `request` function, and `acceptShare(vehicleId,
+level)`. `requestAs(ctx, userId)` (`http-client.ts`) gives the same request function for an
+existing user.
 
 Never `mock.module` a VROOM module — inject the collaborator. See `TestingExternalAPIs.md`.
 
@@ -89,7 +95,7 @@ export const validExpenseArb = fc.record({
 
 ### Migration tests
 
-Full pattern in `DatabaseMigrations.md` (which does not load for a test file). Key points:
+Full pattern in `DatabaseMigrations.md`. Key points:
 
 - In-memory SQLite (`new Database(':memory:')`), then `db.run('PRAGMA foreign_keys = ON')`
 - Use `migration-helpers.ts`: `loadMigrations`, `applyMigration`, `applyMigrationsUpTo`,

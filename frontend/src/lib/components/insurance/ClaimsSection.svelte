@@ -115,7 +115,6 @@
 
 	function openEdit(claim: InsuranceClaim) {
 		editingId = claim.id;
-		// Use the local calendar date: the save persists via noon-local dateOnlyToISO, so a UTC slice shifts it for UTC+13/+14.
 		claimDate = claim.claimDate ? toDateInputValue(claim.claimDate) : '';
 		vehicleId = claim.vehicleId ?? '';
 		claimType = claim.claimType;

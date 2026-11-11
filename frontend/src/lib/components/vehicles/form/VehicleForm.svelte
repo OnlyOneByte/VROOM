@@ -163,13 +163,9 @@
 		try {
 			vehicle = await vehicleApi.getVehicle(vehicleId!);
 
-			try {
-				const financingData = await vehicleApi.getFinancing(vehicleId!);
-				if (financingData && vehicle) {
-					vehicle.financing = financingData;
-				}
-			} catch {
-				// Financing may not exist — that's fine
+			const financingData = await vehicleApi.getFinancing(vehicleId!);
+			if (financingData && vehicle) {
+				vehicle.financing = financingData;
 			}
 
 			populateForm();

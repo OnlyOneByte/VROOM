@@ -115,10 +115,6 @@ export class GooglePhotosService {
       return false;
     }
   }
-
-  get cachedAlbumId(): string | undefined {
-    return this.albumId;
-  }
 }
 
 /** Uses fetch rather than the googleapis SDK because the Library API upload is a raw bytes POST. */

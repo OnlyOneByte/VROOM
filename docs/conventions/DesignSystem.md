@@ -82,7 +82,7 @@ Match neighbors; don't invent values. The conventions in this codebase:
 | Tabs | `import * as Tabs from '$lib/components/ui/tabs'` | |
 | Dialog | `import * as Dialog from '$lib/components/ui/dialog'` / `* as AlertDialog` | AlertDialog backs destructive confirms — prefer `common/ConfirmDialog.svelte` |
 | Table | `import * as Table from '$lib/components/ui/table'` | |
-| Popover/Tooltip/Sheet/DropdownMenu | `import * as Popover from '$lib/components/ui/popover'` … | floating layers |
+| Popover/Sheet | `import * as Popover from '$lib/components/ui/popover'` / `* as Sheet` | floating layers |
 
 ### App-level — `$lib/components/common/*` (direct `.svelte` imports)
 | Need | Import | Props |
@@ -102,7 +102,7 @@ Match neighbors; don't invent values. The conventions in this codebase:
 | Need | Import | Notes |
 |---|---|---|
 | Any chart | `import { AppLineChart, AppBarChart, AppPieChart, AppAreaChart } from '$lib/components/charts'` | all wrap `ChartCard` → loading/empty/error handled for you |
-| KPI tiles | `import { StatCard, StatCardGrid } from '$lib/components/charts'` | `iconColor` (`StatCardIconColor`): `primary` · `chart-1`…`chart-8` · `destructive` · `muted` — 11 tokens, one per `--chart-N` the theme defines. An unknown token still falls back to the primary tint, but warns under `import.meta.env.DEV`; `category-color-label-convergence.test.ts` fails if the map stops covering a theme token |
+| KPI tiles | `import { StatCard, StatCardGrid } from '$lib/components/charts'` | `iconColor` (`StatCardIconColor`): `primary` · `chart-1`…`chart-8` · `destructive` · `muted`. An unknown token still falls back to the primary tint, but warns under `import.meta.env.DEV`; `category-color-label-convergence.test.ts` fails if the map stops covering a theme token |
 | Custom chart container | `import ChartCard from '$lib/components/charts/ChartCard.svelte'` | not in the barrel; pass `isLoading`/`error`/`isEmpty`/`emptyTitle` — never render a raw chart in a bare div |
 
 ## The Four-States contract (cross-ref UIQuality.md)

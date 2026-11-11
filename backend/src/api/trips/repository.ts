@@ -101,10 +101,6 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
     return { data, totalCount: result?.count ?? 0 };
   }
 
-  async findIdsByVehicleId(vehicleId: string): Promise<string[]> {
-    return this.findIdsByColumn(trips.vehicleId, vehicleId);
-  }
-
   /** Deletes only when the row belongs to userId. False means nothing matched. */
   async deleteByIdAndUserId(id: string, userId: string): Promise<boolean> {
     const deleted = await this.db

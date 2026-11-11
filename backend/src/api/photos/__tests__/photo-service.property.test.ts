@@ -1,289 +1,256 @@
 /**
- * Property tests for photo upload validation: the MIME allowlist and the size limit, plus the
- * cover-on-upload and cover-promotion rules. Pure, with no database.
+ * Property tests for the photo service's upload validation and cover rules. The real upload, cover,
+ * and delete functions run against the migrated database; storage is an in-memory fake. A model
+ * predicts each cover state, and the database must match it after every operation.
  */
 
-import { describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
-import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE } from '../photo-service';
+import { AppError, NotFoundError } from '../../../errors';
+import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import {
+  ALLOWED_MIME_TYPES,
+  deletePhotoForEntity,
+  MAX_FILE_SIZE,
+  setCoverPhotoForEntity,
+  uploadPhotoForEntity,
+} from '../photo-service';
+import { type FakePhotoStorage, installFakePhotoStorage } from './fake-photo-storage';
 
-describe('MIME type validation', () => {
-  test('any MIME type in ALLOWED_MIME_TYPES is accepted', () => {
-    fc.assert(
-      fc.property(fc.constantFrom(...ALLOWED_MIME_TYPES), (mimeType) => {
-        expect(ALLOWED_MIME_TYPES.includes(mimeType)).toBe(true);
-      }),
+const VEHICLES = ['veh-1', 'veh-2'];
+
+let ctx: TestApp;
+let storage: FakePhotoStorage;
+
+beforeEach(async () => {
+  ctx = await createTestApp();
+  for (const id of VEHICLES) {
+    ctx.sqlite.run('INSERT INTO vehicles (id, user_id, make, model, year) VALUES (?, ?, ?, ?, ?)', [
+      id,
+      ctx.user.id,
+      'Toyota',
+      'Camry',
+      2022,
+    ]);
+  }
+  storage = installFakePhotoStorage(ctx);
+});
+
+afterEach(() => {
+  storage.restore();
+  ctx.close();
+});
+
+let uploadCounter = 0;
+
+function jpeg(): File {
+  return new File([new Uint8Array([1, 2, 3])], `photo-${++uploadCounter}.jpg`, {
+    type: 'image/jpeg',
+  });
+}
+
+function photoCount(vehicleId: string): number {
+  return (
+    ctx.sqlite
+      .query("SELECT COUNT(*) AS n FROM photos WHERE entity_type = 'vehicle' AND entity_id = ?")
+      .get(vehicleId) as { n: number }
+  ).n;
+}
+
+/** Database view of one vehicle's photos: id and cover flag, sorted by id. */
+function dbState(vehicleId: string): { id: string; isCover: boolean }[] {
+  const rows = ctx.sqlite
+    .query(
+      "SELECT id, is_cover FROM photos WHERE entity_type = 'vehicle' AND entity_id = ? ORDER BY id"
+    )
+    .all(vehicleId) as { id: string; is_cover: number }[];
+  return rows.map((r) => ({ id: r.id, isCover: r.is_cover === 1 }));
+}
+
+describe('upload validation (before any storage work)', () => {
+  test('any MIME type outside the allowlist is rejected with 400 and writes nothing', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.string({ maxLength: 40 }).filter((t) => !ALLOWED_MIME_TYPES.includes(t)),
+        async (type) => {
+          const file = {
+            name: 'x.bin',
+            type,
+            size: 10,
+            arrayBuffer: async () => new ArrayBuffer(0),
+          };
+          await expect(
+            uploadPhotoForEntity('vehicle', 'veh-1', ctx.user.id, file as unknown as File)
+          ).rejects.toMatchObject({ statusCode: 400 });
+        }
+      ),
       { numRuns: 100 }
     );
+    expect(photoCount('veh-1')).toBe(0);
   });
 
-  test('any MIME type not in ALLOWED_MIME_TYPES is rejected', () => {
-    const invalidMimeArb = fc
-      .oneof(
-        fc.string({ minLength: 0, maxLength: 50 }),
-        fc.constantFrom(
-          '',
-          'image/gif',
-          'image/bmp',
-          'image/tiff',
-          'image/svg+xml',
-          'application/pdf',
-          'text/plain',
-          'video/mp4',
-          'image/jpeg2',
-          'image/jp',
-          'image/web',
-          'image/webpp',
-          'image/ jpeg',
-          'IMAGE/JPEG',
-          'image/PNG',
-          'jpeg',
-          'png',
-          'webp'
-        )
-      )
-      .filter((s) => !ALLOWED_MIME_TYPES.includes(s));
-
-    fc.assert(
-      fc.property(invalidMimeArb, (mimeType) => {
-        expect(ALLOWED_MIME_TYPES.includes(mimeType)).toBe(false);
-      }),
+  test('any size above MAX_FILE_SIZE is rejected with 413 and writes nothing', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.integer({ min: MAX_FILE_SIZE + 1, max: MAX_FILE_SIZE * 4 }),
+        async (size) => {
+          const file = {
+            name: 'big.jpg',
+            type: 'image/jpeg',
+            size,
+            arrayBuffer: async () => new ArrayBuffer(0),
+          };
+          await expect(
+            uploadPhotoForEntity('vehicle', 'veh-1', ctx.user.id, file as unknown as File)
+          ).rejects.toMatchObject({ statusCode: 413 });
+        }
+      ),
       { numRuns: 100 }
     );
+    expect(photoCount('veh-1')).toBe(0);
   });
 
-  test('allowed set contains exactly image/jpeg, image/png, image/webp, application/pdf', () => {
+  test('an allowed type at or under the size limit is accepted', async () => {
+    const file = new File([new Uint8Array([9])], 'ok.png', { type: 'image/png' });
+    const photo = await uploadPhotoForEntity('vehicle', 'veh-1', ctx.user.id, file);
+    expect(photo.mimeType).toBe('image/png');
+    expect(photoCount('veh-1')).toBe(1);
+  });
+
+  test('the allowlist is exactly JPEG, PNG, WebP, and PDF; the size cap is 10 MiB', () => {
     expect(new Set(ALLOWED_MIME_TYPES)).toEqual(
       new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
     );
-  });
-});
-
-describe('file size validation', () => {
-  test('any file size > MAX_FILE_SIZE is rejected', () => {
-    const oversizedArb = fc.integer({ min: MAX_FILE_SIZE + 1, max: MAX_FILE_SIZE * 10 });
-
-    fc.assert(
-      fc.property(oversizedArb, (size) => {
-        expect(size > MAX_FILE_SIZE).toBe(true);
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  test('any file size > 0 and <= MAX_FILE_SIZE is accepted', () => {
-    const validSizeArb = fc.integer({ min: 1, max: MAX_FILE_SIZE });
-
-    fc.assert(
-      fc.property(validSizeArb, (size) => {
-        expect(size > MAX_FILE_SIZE).toBe(false);
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  test('MAX_FILE_SIZE boundary: exactly at limit is accepted, one byte over is rejected', () => {
-    const atLimit = MAX_FILE_SIZE;
-    const overLimit = MAX_FILE_SIZE + 1;
-    expect(atLimit > MAX_FILE_SIZE).toBe(false);
-    expect(overLimit > MAX_FILE_SIZE).toBe(true);
-  });
-
-  test('MAX_FILE_SIZE equals 10,485,760 bytes (10MB)', () => {
     expect(MAX_FILE_SIZE).toBe(10_485_760);
   });
 });
 
-interface RefPhoto {
+interface ModelPhoto {
   id: string;
   isCover: boolean;
-  createdAt: number;
+  seq: number;
 }
 
-class ReferencePhotoModel {
-  photos: RefPhoto[] = [];
+type Op =
+  | { type: 'upload'; vehicle: number }
+  | { type: 'setCover'; vehicle: number; pick: number }
+  | { type: 'delete'; vehicle: number; pick: number };
 
-  /** Mirrors uploadPhotoForEntity's auto-cover rule. */
-  upload(id: string, createdAt: number): RefPhoto {
-    const isFirst = this.photos.length === 0;
-    const photo: RefPhoto = { id, isCover: isFirst, createdAt };
-    this.photos.push(photo);
-    return photo;
+const opArb: fc.Arbitrary<Op> = fc.oneof(
+  fc.record({ type: fc.constant('upload' as const), vehicle: fc.nat({ max: 1 }) }),
+  fc.record({
+    type: fc.constant('setCover' as const),
+    vehicle: fc.nat({ max: 1 }),
+    pick: fc.nat({ max: 9 }),
+  }),
+  fc.record({
+    type: fc.constant('delete' as const),
+    vehicle: fc.nat({ max: 1 }),
+    pick: fc.nat({ max: 9 }),
+  })
+);
+
+type Model = Map<string, ModelPhoto[]>;
+
+async function uploadOp(photos: ModelPhoto[], vehicleId: string, seq: number): Promise<void> {
+  const photo = await uploadPhotoForEntity('vehicle', vehicleId, ctx.user.id, jpeg());
+  // Auto-cover: the first photo an entity receives becomes its cover.
+  photos.push({ id: photo.id, isCover: photos.length === 0, seq });
+  // created_at has 1s resolution, so pin the creation order for deterministic promotion.
+  ctx.sqlite.run('UPDATE photos SET created_at = ? WHERE id = ?', [seq, photo.id]);
+}
+
+async function setCoverOp(photos: ModelPhoto[], vehicleId: string, target: ModelPhoto) {
+  await setCoverPhotoForEntity('vehicle', vehicleId, target.id, ctx.user.id);
+  for (const p of photos) p.isCover = p.id === target.id;
+}
+
+async function deleteOp(photos: ModelPhoto[], vehicleId: string, target: ModelPhoto) {
+  await deletePhotoForEntity('vehicle', vehicleId, target.id, ctx.user.id);
+  photos.splice(photos.indexOf(target), 1);
+  // Cover deletion promotes the oldest remaining photo.
+  if (target.isCover && photos.length > 0) {
+    const oldest = photos.reduce((a, b) => (a.seq <= b.seq ? a : b));
+    oldest.isCover = true;
   }
+}
 
-  /** Mirrors deletePhotoForEntity's cover promotion. */
-  delete(photoId: string): void {
-    const idx = this.photos.findIndex((p) => p.id === photoId);
-    if (idx === -1) return;
-    const wasCover = this.photos[idx].isCover;
-    this.photos.splice(idx, 1);
+/** Runs one operation against the real service and mirrors it in the model. Returns the next seq. */
+async function applyOp(model: Model, op: Op, seq: number): Promise<number> {
+  const vehicleId = VEHICLES[op.vehicle];
+  const photos = model.get(vehicleId) ?? [];
 
-    if (wasCover && this.photos.length > 0) {
-      const oldest = this.photos.reduce((a, b) => (a.createdAt <= b.createdAt ? a : b));
-      oldest.isCover = true;
+  if (op.type === 'upload') {
+    await uploadOp(photos, vehicleId, seq);
+    return seq + 1;
+  }
+  if (photos.length > 0) {
+    const target = photos[op.pick % photos.length];
+    if (op.type === 'setCover') {
+      await setCoverOp(photos, vehicleId, target);
+    } else {
+      await deleteOp(photos, vehicleId, target);
     }
   }
+  return seq;
+}
 
-  get coverPhoto(): RefPhoto | undefined {
-    return this.photos.find((p) => p.isCover);
+function expectDbMatchesModel(model: Model): void {
+  for (const vehicleId of VEHICLES) {
+    const expected = (model.get(vehicleId) ?? []).map((p) => ({ id: p.id, isCover: p.isCover }));
+    const actual = dbState(vehicleId);
+    expect(actual.sort(byId)).toEqual(expected.sort(byId));
+    expect(actual.filter((p) => p.isCover).length).toBeLessThanOrEqual(1);
   }
 }
 
-const tsArb = fc.integer({ min: 1672531200000, max: 1767139200000 });
+describe('cover rules through the real service', () => {
+  test('after every upload, cover change, or delete, the database matches the cover model on both vehicles', async () => {
+    await fc.assert(
+      fc.asyncProperty(fc.array(opArb, { minLength: 1, maxLength: 20 }), async (ops) => {
+        // Fresh state per run: remove the photos the previous run created.
+        ctx.sqlite.run('DELETE FROM photos');
+        const model: Model = new Map(VEHICLES.map((v) => [v, []]));
+        let seq = 0;
 
-/**
- * Generate an array of N distinct timestamps so each photo has a unique
- * createdAt, making "oldest remaining" deterministic.
- */
-const distinctTimestampsArb = (min: number, max: number) =>
-  fc.uniqueArray(tsArb, { minLength: min, maxLength: max }).filter((arr) => arr.length >= min);
-
-describe('auto-cover on first upload', () => {
-  test('first photo uploaded always becomes cover', () => {
-    fc.assert(
-      fc.property(tsArb, (createdAt) => {
-        const model = new ReferencePhotoModel();
-        const photo = model.upload('photo-0', createdAt);
-        expect(photo.isCover).toBe(true);
-        expect(model.coverPhoto?.id).toBe('photo-0');
+        for (const op of ops) {
+          seq = await applyOp(model, op, seq);
+          expectDbMatchesModel(model);
+        }
       }),
-      { numRuns: 100 }
+      { numRuns: 40 }
     );
   });
 
-  test('subsequent uploads do not become cover and leave existing cover unchanged', () => {
-    fc.assert(
-      fc.property(distinctTimestampsArb(2, 20), (timestamps) => {
-        const model = new ReferencePhotoModel();
+  test('setCoverPhotoForEntity rejects a photo that belongs to another vehicle', async () => {
+    const other = await uploadPhotoForEntity('vehicle', 'veh-2', ctx.user.id, jpeg());
+    await uploadPhotoForEntity('vehicle', 'veh-1', ctx.user.id, jpeg());
 
-        // Upload all photos sequentially
-        for (let i = 0; i < timestamps.length; i++) {
-          model.upload(`photo-${i}`, timestamps[i]);
-        }
-
-        // First photo must still be the cover
-        expect(model.photos[0].isCover).toBe(true);
-        expect(model.coverPhoto?.id).toBe('photo-0');
-
-        // All subsequent photos must NOT be cover
-        for (let i = 1; i < model.photos.length; i++) {
-          expect(model.photos[i].isCover).toBe(false);
-        }
-      }),
-      { numRuns: 100 }
-    );
+    await expect(
+      setCoverPhotoForEntity('vehicle', 'veh-1', other.id, ctx.user.id)
+    ).rejects.toBeInstanceOf(NotFoundError);
+    expect(dbState('veh-2').find((p) => p.id === other.id)?.isCover).toBe(true);
   });
 
-  test('exactly one cover exists after N sequential uploads', () => {
-    fc.assert(
-      fc.property(distinctTimestampsArb(1, 20), (timestamps) => {
-        const model = new ReferencePhotoModel();
-        for (let i = 0; i < timestamps.length; i++) {
-          model.upload(`photo-${i}`, timestamps[i]);
+  test('deleting a non-cover photo leaves the cover unchanged', async () => {
+    await uploadPhotoForEntity('vehicle', 'veh-1', ctx.user.id, jpeg());
+    const second = await uploadPhotoForEntity('vehicle', 'veh-1', ctx.user.id, jpeg());
+    const cover = dbState('veh-1').find((p) => p.isCover);
 
-          // After every upload, exactly one cover exists
-          const coverCount = model.photos.filter((p) => p.isCover).length;
-          expect(coverCount).toBe(1);
-        }
-      }),
-      { numRuns: 100 }
-    );
+    await deletePhotoForEntity('vehicle', 'veh-1', second.id, ctx.user.id);
+
+    expect(dbState('veh-1').find((p) => p.isCover)?.id).toBe(cover?.id);
+  });
+
+  test('a photo cannot be deleted through another entity type that shares its entity id', async () => {
+    const photo = await uploadPhotoForEntity('vehicle', 'veh-1', ctx.user.id, jpeg());
+    await expect(
+      deletePhotoForEntity('expense', 'veh-1', photo.id, ctx.user.id)
+    ).rejects.toBeInstanceOf(AppError);
+    expect(dbState('veh-1').map((p) => p.id)).toContain(photo.id);
   });
 });
 
-describe('cover promotion on delete', () => {
-  test('deleting cover promotes oldest remaining photo to cover', () => {
-    fc.assert(
-      fc.property(distinctTimestampsArb(2, 15), (timestamps) => {
-        const model = new ReferencePhotoModel();
-        for (let i = 0; i < timestamps.length; i++) {
-          model.upload(`photo-${i}`, timestamps[i]);
-        }
-
-        // Delete the cover photo
-        const cover = model.coverPhoto;
-        expect(cover).toBeDefined();
-        if (!cover) return;
-        model.delete(cover.id);
-
-        // Exactly one cover must exist among remaining photos
-        const coverCount = model.photos.filter((p) => p.isCover).length;
-        expect(coverCount).toBe(1);
-
-        // The new cover must be the oldest remaining by createdAt
-        const newCover = model.coverPhoto;
-        expect(newCover).toBeDefined();
-        if (!newCover) return;
-        const oldest = model.photos.reduce((a, b) => (a.createdAt <= b.createdAt ? a : b));
-        expect(newCover.id).toBe(oldest.id);
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  test('deleting cover when only one photo remains leaves no cover', () => {
-    fc.assert(
-      fc.property(tsArb, (createdAt) => {
-        const model = new ReferencePhotoModel();
-        model.upload('only-photo', createdAt);
-        expect(model.coverPhoto?.id).toBe('only-photo');
-
-        model.delete('only-photo');
-        expect(model.photos.length).toBe(0);
-        expect(model.coverPhoto).toBeUndefined();
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  test('deleting a non-cover photo does not change the cover', () => {
-    fc.assert(
-      fc.property(distinctTimestampsArb(3, 15), fc.nat(), (timestamps, deleteIdx) => {
-        const model = new ReferencePhotoModel();
-        for (let i = 0; i < timestamps.length; i++) {
-          model.upload(`photo-${i}`, timestamps[i]);
-        }
-
-        const coverBefore = model.coverPhoto;
-        expect(coverBefore).toBeDefined();
-
-        // Pick a non-cover photo to delete
-        const nonCoverPhotos = model.photos.filter((p) => !p.isCover);
-        if (nonCoverPhotos.length === 0) return;
-        const target = nonCoverPhotos[deleteIdx % nonCoverPhotos.length];
-        model.delete(target.id);
-
-        // Cover must be unchanged
-        expect(model.coverPhoto?.id).toBe(coverBefore?.id);
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  test('repeated cover deletions always promote oldest remaining', () => {
-    fc.assert(
-      fc.property(distinctTimestampsArb(3, 10), (timestamps) => {
-        const model = new ReferencePhotoModel();
-        for (let i = 0; i < timestamps.length; i++) {
-          model.upload(`photo-${i}`, timestamps[i]);
-        }
-
-        // Keep deleting the cover until one photo remains
-        while (model.photos.length > 1) {
-          const currentCover = model.coverPhoto;
-          expect(currentCover).toBeDefined();
-          if (!currentCover) return;
-          model.delete(currentCover.id);
-
-          // After each deletion, cover is the oldest remaining
-          const newCover = model.coverPhoto;
-          expect(newCover).toBeDefined();
-          if (!newCover) return;
-          const oldest = model.photos.reduce((a, b) => (a.createdAt <= b.createdAt ? a : b));
-          expect(newCover.id).toBe(oldest.id);
-        }
-      }),
-      { numRuns: 100 }
-    );
-  });
-});
+function byId(a: { id: string }, b: { id: string }): number {
+  return a.id.localeCompare(b.id);
+}

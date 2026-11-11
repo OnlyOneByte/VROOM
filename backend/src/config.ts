@@ -132,8 +132,8 @@ export const CONFIG = {
   auth: {
     googleClientId: env.GOOGLE_CLIENT_ID,
     googleClientSecret: env.GOOGLE_CLIENT_SECRET,
-    googleRedirectUri: env.GOOGLE_REDIRECT_URI,
-    googleProviderRedirectUri:
+    googleLoginRedirectUri: env.GOOGLE_REDIRECT_URI,
+    googleStorageRedirectUri:
       env.GOOGLE_PROVIDER_REDIRECT_URI ||
       env.GOOGLE_REDIRECT_URI.replace('/callback/google', '/callback/provider/google'),
     githubClientId: env.GITHUB_CLIENT_ID,
@@ -141,7 +141,6 @@ export const CONFIG = {
     githubRedirectUri: env.GITHUB_REDIRECT_URI,
     cookieMaxAge: 30 * 24 * 60 * 60,
     sessionDuration: 30 * 24 * 60 * 60 * 1000,
-    refreshThreshold: 24 * 60 * 60 * 1000,
     oauthStateExpiry: 10 * 60 * 1000,
   },
   frontend: { url: env.FRONTEND_URL || getDefaultFrontendUrl(env.NODE_ENV as Environment) },

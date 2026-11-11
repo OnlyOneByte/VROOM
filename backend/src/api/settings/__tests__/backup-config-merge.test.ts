@@ -14,7 +14,7 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-/** Raw-seed an owned storage provider so validateBackupConfig accepts it in backupConfig. */
+/** Raw-seed an owned storage provider so its backupConfig entry passes the ownership check. */
 function seedProvider(id: string, displayName: string): void {
   ctx.sqlite.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, status)

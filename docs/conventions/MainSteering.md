@@ -116,7 +116,7 @@ Routes live in `frontend/src/routes/` under SvelteKit file-based routing; `$lib/
 
 ### Rules
 
-- Every domain under `api/` has a `routes.ts` with its Hono route definitions. Most also have a `repository.ts` (or a domain-named one like `photo-repository.ts`) holding the data access — follow the split the domain you're touching already uses.
+- Every domain under `api/` has a `routes.ts` with its Hono route definitions. Most also have a `repository.ts` (or a domain-named one such as `insurance/claims-repository.ts`) holding the data access — follow the split the domain you're touching already uses.
 - Use Biome for linting and formatting (not ESLint/Prettier). `bun run all:fix` chains `lint:fix`, `format:fix`, and `check:fix`.
 - Schema changes go through generated migrations in `backend/drizzle/`: edit `db/schema.ts`, then `bun run db:generate`. Migrations apply automatically at startup via `runMigrations()`. Never use `db:push` for a schema change — see `DatabaseMigrations.md`.
 
@@ -132,7 +132,7 @@ All monetary values are stored AND computed as **integer cents** — the 14 mone
 
 ## Code Hygiene
 
-`CodeQualityRules.md` (loads for `frontend/**` only) adds the shadcn/Tailwind styling rules, the status/accent-color tokens, the ESLint-config rule, the static source-scan guards and the chart-color contract. Everything below is always on:
+`CodeQualityRules.md` adds the frontend-only rules: the shadcn/Tailwind styling rules, the status and accent color tokens, the ESLint-config rule, the static source-scan guards and the chart-color contract. The rules below apply to the whole repo:
 
 - Floating action buttons paint with `bg-foreground` / `text-background`, as `common/floating-action-button.svelte` does — never `bg-gray-900 text-white`, and never a gradient stack with `!text-white` overrides.
 - Pages with a floating action button must add `pb-24` to the main content wrapper so the fixed FAB doesn't cover the last row. `fab-bottom-clearance.test.ts` enforces this.
