@@ -1,24 +1,5 @@
-/**
- * Characterization net for the body-limit middleware.
- *
- * bodyLimit is a DoS guard wired LIVE in two places — globally (app.ts:41) and on the backup upload
- * (sync/routes.ts:209, maxSize=CONFIG.backup.maxFileSize) — yet sat ~35% line: only the happy path was
- * incidentally exercised, leaving the 413 rejection branch, its MB-formatted message, the strict-`>`
- * boundary, and the header-absent/malformed passthroughs unpinned. These drive the middleware through a
- * minimal Hono app (the rate-limit/idempotency convention) with a handler-run counter that proves whether
- * `next()` ran, pinning the full contract:
- *  1. under the limit → handler runs, 200;
- *  2. over the limit → 413 PAYLOAD_TOO_LARGE, handler NOT run, MB-formatted default message;
- *  3. EXACTLY at the limit → passes (the check is strict `size > maxSize`);
- *  4. no Content-Length header → passthrough (a chunked/streaming request isn't size-checked here —
- *  documenting the known gap, which the uncompressed-size guards backstop for the backup path);
- *  5. a malformed Content-Length (NaN) → passthrough (NaN > maxSize is false);
- *  6. a custom `message` overrides the default copy.
- *
- * `maxSize`/`message` come from the config ARG (not a frozen CONFIG singleton), so the harness controls
- * them directly — no vacuity trap. Content-Length is a request header, so the body need not actually be
- * that large; the middleware trusts the declared header (its documented contract).
- */
+// Pins bodyLimit: a strict size check, a 413 with an MB-formatted message, and passthrough when
+// Content-Length is absent or malformed. The middleware trusts the declared header, so the body need not be that large.
 
 import { describe, expect, test } from 'bun:test';
 import { type Context, Hono } from 'hono';
@@ -29,10 +10,7 @@ interface BodyLimitErrorBody {
   error: { code: string; message: string };
 }
 
-/**
- * Minimal app: bodyLimit(maxSize) in front of a trivial 200 handler that bumps a run-counter, so a test
- * can assert whether the downstream handler actually ran (i.e. whether next() was called).
- */
+// The run counter shows whether next() reached the handler.
 function makeApp(opts: { maxSize: number; message?: string }) {
   let handlerRuns = 0;
   const app = new Hono();
@@ -44,7 +22,6 @@ function makeApp(opts: { maxSize: number; message?: string }) {
   return { app, runs: () => handlerRuns };
 }
 
-/** POST /upload with an explicit Content-Length header (string, as a real client sends it). */
 function uploadWithLength(app: Hono, contentLength: string) {
   return app.request('/upload', {
     method: 'POST',
@@ -67,10 +44,8 @@ describe('body-limit middleware — size enforcement', () => {
     const body = (await res.json()) as BodyLimitErrorBody;
     expect(body.success).toBe(false);
     expect(body.error.code).toBe('PAYLOAD_TOO_LARGE');
-    // Default message is MB-formatted (maxSize/1024/1024 to 2dp) — these are sub-MB, so both read 0.00MB.
     expect(body.error.message).toContain('maximum size of');
     expect(body.error.message).toContain('MB');
-    // The downstream handler must NOT run when the request is rejected.
     expect(runs()).toBe(0);
   });
 
@@ -83,7 +58,6 @@ describe('body-limit middleware — size enforcement', () => {
 
   test('a request with NO Content-Length header passes through (the header-absent / streaming gap)', async () => {
     const { app, runs } = makeApp({ maxSize: 10 });
-    // No content-length header at all — Hono's app.request without a body sets none.
     const res = await app.request('/upload', { method: 'POST' });
     expect(res.status).toBe(200);
     expect(runs()).toBe(1);

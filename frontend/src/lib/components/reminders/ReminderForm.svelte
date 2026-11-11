@@ -27,10 +27,8 @@
 
 	interface Props {
 		open: boolean;
-		/** When set, the form edits this reminder; otherwise it creates a new one. */
 		reminder?: ReminderWithVehicles | null;
 		vehicles: Vehicle[];
-		/** Called after a successful create/edit so the parent can refetch. */
 		onSaved: () => void;
 	}
 
@@ -53,17 +51,11 @@
 
 	let isEdit = $derived(!!reminder);
 
-	// Form fields. type 'notification' just notifies; type 'expense' auto-creates
-	// an expense (category + amount, applied to the vehicle[s]) when due. When an
-	// expense reminder spans >1 vehicle, the optional expenseSplitConfig controls
-	// how the materialized amount is divided per vehicle (even / fixed-$ / %), reusing
-	// the same SplitConfigEditor as the expense + insurance-term forms.
+	// Expense reminders auto-create an expense when due; with more than one vehicle, expenseSplitConfig divides the amount.
 	let kind = $state<ReminderKind>('notification');
 	let name = $state('');
 	let description = $state('');
-	// Trigger axis (maintenance-schedule): by time, by odometer mileage, or both. 'time' is the
-	// default + keeps the form behaving exactly as before. Mileage/both reveal the mileage fields and
-	// constrain to a single vehicle (the odometer is per-vehicle, D4).
+	// 'time' is the default; mileage and both reveal the mileage fields and are limited to one vehicle, since odometers are per-vehicle.
 	let triggerMode = $state<TriggerMode>('time');
 	let intervalMileage = $state('');
 	let lastServiceOdometer = $state('');
@@ -74,8 +66,6 @@
 	let endDate = $state('');
 	let selectedVehicleIds = $state<string[]>([]);
 
-	// Which axes are active. The time fields (frequency/dates) only matter when the time axis is on;
-	// the mileage fields only when the mileage axis is on.
 	let hasTimeAxis = $derived(triggerMode === 'time' || triggerMode === 'both');
 	let hasMileageAxis = $derived(triggerMode === 'mileage' || triggerMode === 'both');
 
@@ -85,15 +75,11 @@
 		const v = vehicles.find(veh => veh.id === selectedVehicleIds[0]);
 		return getDistanceUnitLabel(v?.unitPreferences?.distanceUnit ?? 'miles', true);
 	});
-	// Expense-type fields (only used/validated when kind === 'expense').
 	let expenseCategory = $state<ExpenseCategory>('financial');
 	let expenseAmount = $state('');
 	let expenseTags = $state<string[]>([]);
 
-	// Multi-vehicle split: how an expense reminder divides its amount across vehicles.
-	// 'even' carries no per-vehicle rows (backend splits via largest-remainder cents); 'absolute'/
-	// 'percentage' carry per-vehicle allocations. resetSplitAllocations is the shared source of truth
-	//  so the seed can't drift from the expense/insurance forms.
+	// 'even' stores no per-vehicle rows (the backend splits cents); absolute and percentage store allocations. resetSplitAllocations is shared with the other expense forms.
 	let splitMethod = $state<'even' | 'absolute' | 'percentage'>('even');
 	let splitAllocations = $state<SplitAllocationDraft[]>([]);
 	// The split editor is only relevant for an expense reminder spanning ≥2 vehicles with a positive
@@ -107,9 +93,7 @@
 	let isSubmitting = $state(false);
 	let errors = $state<Record<string, string>>({});
 
-	// Re-seed the form whenever it opens (or the target reminder changes), so an
-	// edit shows current values and a create starts blank. Keyed on `open` so
-	// reopening after a cancel resets cleanly.
+	// Keyed on open so reopening after a cancel starts clean.
 	let lastKey = $state('');
 	$effect(() => {
 		const key = `${open}:${reminder?.reminder.id ?? 'new'}`;
@@ -134,11 +118,7 @@
 			intervalUnit = (INTERVAL_UNITS as readonly string[]).includes(r.intervalUnit ?? '')
 				? (r.intervalUnit as IntervalUnit)
 				: 'month';
-			// Read the stored ISO back as the LOCAL calendar date (not a bare UTC .slice(0,10)). The save
-			// path persists via dateOnlyToISO → NOON LOCAL (:205-206), so for a UTC+13/+14 user noon-local
-			// lands on the prior UTC day and `.slice(0,10)` would show the day before — shifting the date
-			// back every edit-open. toDateInputValue reads local Y/M/D, matching
-			// the create path (:66/:134) and the sibling-form fixes.
+			// Read the stored ISO back as the local calendar date; a UTC slice shows the prior day for UTC+13/+14 users.
 			startDate = toDateInputValue(new Date(r.startDate));
 			endDate = r.endDate ? toDateInputValue(new Date(r.endDate)) : '';
 			selectedVehicleIds = [...reminder.vehicleIds];
@@ -169,7 +149,6 @@
 			intervalUnit = 'month';
 			startDate = toDateInputValue(new Date());
 			endDate = '';
-			// Default to the only vehicle when the user owns exactly one.
 			selectedVehicleIds = vehicles.length === 1 && vehicles[0] ? [vehicles[0].id] : [];
 			expenseCategory = 'financial';
 			expenseAmount = '';
@@ -183,8 +162,6 @@
 		selectedVehicleIds = selectedVehicleIds.includes(id)
 			? selectedVehicleIds.filter(v => v !== id)
 			: [...selectedVehicleIds, id];
-		// Re-seed split allocations to the new vehicle set so absolute/percentage rows track the
-		// selection (mirrors the expense + insurance-term forms' toggle behavior).
 		splitAllocations = resetSplitAllocations(splitMethod, selectedVehicleIds);
 	}
 
@@ -197,9 +174,7 @@
 		splitAllocations = allocs;
 	}
 
-	// Build the ReminderSplitConfig payload — null unless this is a multi-vehicle expense reminder with
-	// an editor showing. The union itself is built by the shared buildSplitConfig helper (the ONE
-	// source of truth ExpenseForm also uses); ReminderSplitConfig is structurally identical to SplitConfig.
+	// Null unless this is a multi-vehicle expense reminder with the editor showing; buildSplitConfig is the shared builder.
 	function reminderSplitConfig(): ReminderSplitConfig | null {
 		if (!showSplitEditor) return null;
 		return buildSplitConfig(splitMethod, selectedVehicleIds, splitAllocations);
@@ -209,16 +184,13 @@
 		const e: Record<string, string> = {};
 		if (!name.trim()) e['name'] = 'Name is required';
 		if (selectedVehicleIds.length === 0) e['vehicleIds'] = 'Select at least one vehicle';
-		// D4: the mileage axis is per-vehicle → exactly one vehicle when mileage is involved.
 		if (hasMileageAxis && selectedVehicleIds.length > 1) {
 			e['vehicleIds'] = 'A mileage reminder must track exactly one vehicle';
 		}
-		// Custom interval only matters when the time axis is active.
 		if (hasTimeAxis && frequency === 'custom') {
 			const n = parseInt(intervalValue, 10);
 			if (!Number.isInteger(n) || n < 1) e['intervalValue'] = 'Enter a positive interval';
 		}
-		// Mileage axis: a positive service interval is required (the milestone driver).
 		if (hasMileageAxis) {
 			const m = parseInt(intervalMileage, 10);
 			if (!Number.isInteger(m) || m < 1)
@@ -235,8 +207,7 @@
 		if (kind === 'expense') {
 			const amt = parseFloat(expenseAmount);
 			if (!(amt > 0)) e['expenseAmount'] = 'Enter an amount greater than 0';
-			// Multi-vehicle split sums must reconcile (mirrors the backend refineSplitConfig so we block
-			// before a 400): percentages → 100; fixed-$ → the expense amount. 'even' needs no check.
+			// Mirrors the backend refineSplitConfig so the form blocks invalid splits before a 400.
 			if (showSplitEditor && splitMethod === 'percentage') {
 				const sum = splitAllocations.reduce((s, a) => s + (a.percentage ?? 0), 0);
 				if (Math.abs(sum - 100) > 0.01) e['split'] = 'Split percentages must total 100%';
@@ -260,9 +231,7 @@
 				description: description.trim() || null,
 				type: kind,
 				triggerMode,
-				// Mileage axis: send the interval when active, else null (clears on edit when switching to
-				// pure time). lastServiceOdometer is OMITTED when blank so the backend defaults it to the
-				// vehicle's current odometer (D4); sent when the user typed an explicit anchor.
+				// Omit lastServiceOdometer when blank so the backend defaults it to the vehicle's current odometer.
 				intervalMileage: hasMileageAxis ? parseInt(intervalMileage, 10) : null,
 				...(hasMileageAxis && lastServiceOdometer.trim() !== ''
 					? { lastServiceOdometer: parseInt(lastServiceOdometer, 10) }
@@ -278,10 +247,7 @@
 				expenseCategory: isExpense ? expenseCategory : null,
 				expenseAmount: isExpense ? parseFloat(expenseAmount) : null,
 				expenseTags: isExpense && expenseTags.length > 0 ? expenseTags : null,
-				// Multi-vehicle split: the per-vehicle division for an expense reminder spanning ≥2
-				// vehicles; null for a notification, single-vehicle, or unsplit expense reminder (so the
-				// trigger materializes one row on vehicleIds[0], unchanged). Explicit null on edit clears
-				// a stale config when the reminder drops back to one vehicle / notification.
+				// Explicit null clears a stale split config when the reminder drops back to one vehicle or to a notification.
 				expenseSplitConfig: isExpense ? reminderSplitConfig() : null
 			};
 			if (reminder) {
@@ -321,7 +287,6 @@
 			}}
 			class="space-y-4"
 		>
-			<!-- Type: notification (just notify) vs expense (auto-create an expense) -->
 			<div class="space-y-2">
 				<Label for="reminder-type">Type *</Label>
 				<Select.Root type="single" bind:value={kind}>
@@ -340,7 +305,6 @@
 				</p>
 			</div>
 
-			<!-- Name -->
 			<div class="space-y-2">
 				<Label for="reminder-name">Name *</Label>
 				<Input
@@ -352,7 +316,6 @@
 				{#if errors['name']}<FormFieldError>{errors['name']}</FormFieldError>{/if}
 			</div>
 
-			<!-- Trigger axis: by time, by odometer mileage, or whichever comes first -->
 			<div class="space-y-2">
 				<Label for="reminder-trigger-mode">Trigger when</Label>
 				<Select.Root type="single" bind:value={triggerMode}>
@@ -382,7 +345,6 @@
 				</p>
 			</div>
 
-			<!-- Expense template (expense type only): category + amount + tags -->
 			{#if kind === 'expense'}
 				<div class="grid grid-cols-2 gap-3">
 					<div class="space-y-2">
@@ -422,7 +384,6 @@
 				<TagInput bind:tags={expenseTags} />
 			{/if}
 
-			<!-- Mileage interval (mileage / both axes) -->
 			{#if hasMileageAxis}
 				<div class="grid grid-cols-2 gap-3">
 					<div class="space-y-2">
@@ -471,7 +432,6 @@
 				</p>
 			{/if}
 
-			<!-- Frequency (time / both axes) -->
 			{#if hasTimeAxis}
 				<div class="space-y-2">
 					<Label for="reminder-frequency">Frequency *</Label>
@@ -489,7 +449,6 @@
 					</Select.Root>
 				</div>
 
-				<!-- Custom interval (only for custom frequency) -->
 				{#if frequency === 'custom'}
 					<div class="grid grid-cols-2 gap-3">
 						<div class="space-y-2">
@@ -521,13 +480,11 @@
 					</div>
 				{/if}
 
-				<!-- Start date -->
 				<div class="space-y-2">
 					<Label for="reminder-start">Start date *</Label>
 					<DatePicker id="reminder-start" bind:value={startDate} placeholder="Select start date" />
 				</div>
 
-				<!-- End date (optional) -->
 				<div class="space-y-2">
 					<Label for="reminder-end">End date (optional)</Label>
 					<DatePicker id="reminder-end" bind:value={endDate} placeholder="No end date" />
@@ -535,7 +492,6 @@
 				</div>
 			{/if}
 
-			<!-- Vehicles -->
 			<div class="space-y-2">
 				<Label>Vehicles *</Label>
 				{#if vehicles.length === 0}
@@ -556,8 +512,7 @@
 				{#if errors['vehicleIds']}<FormFieldError>{errors['vehicleIds']}</FormFieldError>{/if}
 			</div>
 
-			<!-- Multi-vehicle split (expense reminder spanning ≥2 vehicles): how the materialized
-			     amount divides per vehicle. Single-vehicle keeps the no-split path (editor hidden). -->
+			<!-- Single-vehicle expenses keep the no-split path, so the editor is hidden. -->
 			{#if showSplitEditor}
 				<div class="space-y-2">
 					<Label>Split across vehicles</Label>
@@ -573,7 +528,6 @@
 				</div>
 			{/if}
 
-			<!-- Description (optional) -->
 			<div class="space-y-2">
 				<Label for="reminder-description">Notes (optional)</Label>
 				<Textarea

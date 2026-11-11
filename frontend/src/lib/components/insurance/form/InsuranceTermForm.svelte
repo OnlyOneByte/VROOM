@@ -38,8 +38,7 @@
 
 	let { policyId, termId, renewFrom, returnTo = '/insurance' }: Props = $props();
 
-	// Money-field labels follow the user's currency symbol, not a hardcoded "$"
-	// (EUR/GBP users would otherwise see the wrong unit). Same class as.
+	// Money labels use the user's currency symbol; a hardcoded $ would show the wrong unit for EUR/GBP users.
 	const currencySymbol = $derived(getCurrencySymbol());
 
 	const isEditMode = $derived(!!termId);
@@ -49,7 +48,6 @@
 	let policy = $state<InsurancePolicy | null>(null);
 	let vehicles = $state<Vehicle[]>([]);
 
-	// Form fields
 	let startDate = $state('');
 	let endDate = $state('');
 	let policyNumber = $state('');
@@ -65,7 +63,6 @@
 	let paymentAmount = $state('');
 	let selectedVehicleIds = $state<string[]>([]);
 
-	// Split state
 	let splitMethod = $state<'even' | 'absolute' | 'percentage'>('even');
 	let splitAllocations = $state<Array<{ vehicleId: string; amount?: number; percentage?: number }>>(
 		[]
@@ -74,7 +71,6 @@
 	let parsedTotalCost = $derived(parseFloat(totalCost) || 0);
 	let showSplitEditor = $derived(parsedTotalCost > 0 && selectedVehicleIds.length >= 2);
 
-	// Validation
 	interface FormErrors {
 		startDate?: string;
 		endDate?: string;
@@ -87,7 +83,6 @@
 	}
 	let errors = $state<FormErrors>({});
 
-	// Derive title
 	let pageTitle = $derived(isEditMode ? 'Edit Term' : renewFrom ? 'Renew Term' : 'Add Term');
 
 	onMount(async () => {
@@ -130,10 +125,7 @@
 	});
 
 	function populateFromTerm(source: InsuranceTerm | Partial<InsuranceTerm>) {
-		// Read the stored ISO back as the LOCAL calendar date, NOT a bare UTC `.split('T')[0]` (, the
-		// family). The save path persists via dateOnlyToISO → NOON LOCAL, so for a UTC+13/+14 user
-		// noon-local lands on the prior UTC day and the slice would show the day before — shifting the term
-		// start/end back a day every edit-open. toDateInputValue reads local Y/M/D (the sibling-form fix).
+		// Read the stored ISO back as the local calendar date; a UTC slice shows the prior day for UTC+13/+14 users.
 		if (source.startDate && typeof source.startDate === 'string') {
 			startDate = toDateInputValue(source.startDate);
 		}
@@ -168,8 +160,7 @@
 	}
 
 	function resetAllocationsForMethod(method: 'even' | 'absolute' | 'percentage') {
-		// resetSplitAllocations is the shared source of truth — the expense form runs the identical
-		// reset, so the 100/N rounded-to-1-decimal percentage seed can't drift between them.
+		// Same reset as the expense form, so the 100/N percentage seed cannot drift between them.
 		splitAllocations = resetSplitAllocations(method, selectedVehicleIds);
 	}
 
@@ -198,13 +189,7 @@
 		return Object.keys(newErrors).length === 0;
 	}
 
-	/**
-	 * Build the optional term fields for the request.
-	 * - forEdit=false (add/renew): omit empty fields — there's no value to clear.
-	 * - forEdit=true (edit): send `null` for an emptied field so the backend
-	 *  CLEARS the column. Omitting it (undefined) would be dropped by
-	 *  JSON.stringify and the repo would keep the old value — silent data loss.
-	 */
+	/** Builds the optional term fields. On edit, emptied fields are sent as null so the backend clears them; undefined would silently keep the old value. */
 	function buildTermData(forEdit = false): Record<string, unknown> {
 		const data: Record<string, unknown> = {};
 		const str = (key: string, raw: string) => {
@@ -245,12 +230,8 @@
 			};
 
 			if (isEditMode && termId) {
-				// forEdit=true → emptied optionals are sent as null to clear them.
 				await insuranceApi.updateTerm(policyId, termId, {
-					// Persist date-only inputs at NOON LOCAL so the stored ISO round-trips to the same
-					// calendar day under formatDate in every timezone — the dateOnlyToISO convention every other
-					// date-only form uses (Expense/Reminder/Vehicle/Claims). Raw "YYYY-MM-DD" → z.coerce.date()
-					// → UTC midnight → displayed a day early for Americas users.
+					// Noon local keeps the stored date on the same calendar day in every timezone (see dateOnlyToISO).
 					startDate: dateOnlyToISO(startDate),
 					endDate: dateOnlyToISO(endDate),
 					...buildTermData(true),
@@ -259,7 +240,6 @@
 				appStore.showSuccess('Term updated successfully');
 			} else {
 				await insuranceApi.addTerm(policyId, {
-					// Noon-local persistence — see the updateTerm note above.
 					startDate: dateOnlyToISO(startDate),
 					endDate: dateOnlyToISO(endDate),
 					...buildTermData(),
@@ -288,7 +268,6 @@
 		</div>
 	{:else}
 		<div class="space-y-6">
-			<!-- Header -->
 			<div class="flex items-center gap-4">
 				<Button variant="outline" size="icon" aria-label="Go back" onclick={handleBack}>
 					<ArrowLeft class="h-4 w-4" />
@@ -302,7 +281,6 @@
 			</div>
 
 			<form onsubmit={handleSubmit} class="space-y-6 pb-32 sm:pb-24">
-				<!-- Coverage Period -->
 				<Card>
 					<CardHeader>
 						<CardTitle>Coverage Period</CardTitle>
@@ -338,7 +316,6 @@
 					</CardContent>
 				</Card>
 
-				<!-- Finance Details -->
 				<Card>
 					<CardHeader>
 						<CardTitle>Finance Details</CardTitle>
@@ -416,7 +393,6 @@
 					</CardContent>
 				</Card>
 
-				<!-- Vehicle Coverage -->
 				<Card>
 					<CardHeader>
 						<CardTitle>Covered Vehicles</CardTitle>
@@ -457,7 +433,6 @@
 					</CardContent>
 				</Card>
 
-				<!-- Policy Details -->
 				<Card>
 					<CardHeader>
 						<div class="flex items-center gap-2">
@@ -533,7 +508,6 @@
 				</Card>
 			</form>
 
-			<!-- Floating Action Bar -->
 			<div class="fixed bottom-4 left-4 right-4 z-50 sm:bottom-8 sm:right-8 sm:left-auto sm:w-auto">
 				<div
 					class="flex flex-row gap-3 sm:gap-4 justify-center sm:justify-end items-center bg-background sm:bg-transparent p-3 sm:p-0 rounded-full sm:rounded-none shadow-2xl sm:shadow-none border sm:border-0"

@@ -1,28 +1,3 @@
-/**
- * General migration tests — applies to the full migration set.
- *
- * Three jobs:
- *  1. The SQL applies in sequence on a fresh database and lands on the schema `schema.ts` declares
- *     (every table, nothing extra) with working foreign-key cascades.
- *  2. Each migration keeps its own `migration-NNNN` test, so a new one cannot ship unpinned.
- *  3. The `drizzle/` bookkeeping stays self-consistent, which is what keeps the next
- *     `bun run db:generate` honest:
- *       - `meta/_journal.json` `when` values must INCREASE with `idx`, and the rows of already
- *         shipped migrations must not change at all. The runtime migrator reads MAX(created_at)
- *         from `__drizzle_migrations` ONCE, then applies every journal entry whose `when` exceeds
- *         it — so a later migration carrying an earlier `when` than one already recorded is
- *         skipped FOREVER on a database that stopped in between, and a shipped migration whose
- *         `when` is raised above a value some database already recorded is re-applied on its next
- *         boot (which throws the moment it re-adds an existing column).
- *       - the newest snapshot in `meta/` must describe the newest migration that actually changed
- *         the schema, and its CONTENT must still match `schema.ts`. drizzle-kit diffs `schema.ts`
- *         against the lexicographically last snapshot file, so a missing OR stale head snapshot
- *         makes the next generate re-emit work that already shipped. A data-only migration needs
- *         no snapshot of its own — the previous one still describes the database.
- *       - the snapshot `prevId` chain must be unbroken and collision-free (drizzle-kit aborts on
- *         two snapshots sharing a parent).
- */
-
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { readdirSync } from 'node:fs';
@@ -41,10 +16,7 @@ import {
   seedCoreData,
 } from './migration-helpers';
 
-/**
- * The tables and columns `schema.ts` declares, derived from the schema itself: a hand-written list
- * silently stops covering tables added later, which is the one failure this test exists to catch.
- */
+// Derived from schema.ts so tables added later are covered without editing this file.
 const schemaColumns = new Map(
   Object.values<unknown>(schema)
     .filter((value): value is SQLiteTable => is(value, SQLiteTable))
@@ -55,20 +27,8 @@ const schemaColumns = new Map(
 );
 const schemaTables = [...schemaColumns.keys()].sort();
 
-/**
- * The same tables with each column's full SQL shape, plus the index names, in the vocabulary a
- * drizzle snapshot uses.
- *
- * A name-only comparison catches the BENIGN kind of snapshot staleness: a missing column makes the
- * next `db:generate` re-emit an additive `ADD COLUMN`. The kinds that are destructive are a column
- * whose TYPE or nullability drifted — SQLite cannot alter a column in place, so drizzle-kit emits a
- * 12-step table rebuild whose `DROP TABLE` takes the rows with it — and a drifted index set, which
- * re-emits a `CREATE INDEX` that throws inside the migrator's transaction and stops an existing
- * install from booting. Both are invisible unless the shape itself is compared, and both have
- * happened here: a money-to-cents change flipped those columns real -> integer in `schema.ts` and
- * shipped a data-only migration, so the head snapshot still said `real` and the next generate
- * queued six table rebuilds.
- */
+// Compared by SQL type, nullability and index set, not just names. Type drift makes drizzle-kit emit a
+// table rebuild that drops rows, and index drift makes it emit a CREATE INDEX that fails on existing installs.
 const schemaShapes = new Map(
   Object.values<unknown>(schema)
     .filter((value): value is SQLiteTable => is(value, SQLiteTable))
@@ -83,9 +43,7 @@ const schemaShapes = new Map(
               { type: column.getSQLType(), notNull: column.notNull, primaryKey: column.primary },
             ])
           ),
-          // A column-level `.unique()` is not a table index in drizzle's schema API, but
-          // drizzle-kit records it as one in the snapshot, so fold those in or the two sides
-          // cannot be compared.
+          // drizzle-kit records column-level unique constraints as indexes in the snapshot.
           indexes: [
             ...indexes.map((index) => index.config.name),
             ...columns.filter((column) => column.isUnique).map((column) => column.uniqueName),
@@ -97,20 +55,8 @@ const schemaShapes = new Map(
     })
 );
 
-/**
- * The journal rows exactly as they ship today — frozen here, not derived from the journal.
- *
- * `when` is the migrator's only ordering key: it is what lands in `__drizzle_migrations`, and the
- * migrator replays every entry whose `when` exceeds the newest value recorded there. Editing a
- * shipped row therefore rewrites history on every database that already ran it. Raising a `when`
- * replays that migration (the replay dies on the first re-added column); lowering one hides it from
- * a database that stopped just before it. Append a row when a migration ships; never edit one.
- *
- * The fourteen incremental migrations that preceded this were collapsed into one baseline. Editing
- * the row below is NOT an ordinary change: any database carrying a `__drizzle_migrations` row from
- * the old chain will not match it, which is why the collapse was a declared break requiring a
- * backup/restore rather than an in-place upgrade.
- */
+// Frozen. The migrator replays entries whose `when` exceeds the newest recorded value, so editing a
+// shipped row replays or hides that migration on existing databases. Append rows when migrations ship.
 const SHIPPED_JOURNAL: readonly { idx: number; tag: string; when: number }[] = [
   { idx: 0, tag: '0000_baseline', when: 1794413530056 },
 ];
@@ -136,7 +82,7 @@ describe('Migrations: General', () => {
   });
 
   test('the schema-derived table and column lists are populated', () => {
-    // Guards the derivation itself: a broken filter would yield [] and silently pass the set checks.
+    // A broken filter would yield [] and silently pass the set checks below.
     expect(schemaTables.length).toBeGreaterThanOrEqual(21);
     expect(schemaTables).toContain('users');
     expect(schemaColumns.get('users')).toContain('email');
@@ -147,8 +93,6 @@ describe('Migrations: General', () => {
       applyMigration(db, migration);
     }
 
-    // Set equality in both directions: a table the migrations forget to create fails, and so does a
-    // table the migrations create that nobody declared in schema.ts.
     expect(getTables(db)).toEqual(schemaTables);
   });
 
@@ -192,18 +136,14 @@ describe('Migrations: General', () => {
     const schemaChanging = migrations.filter(migrationChangesSchema);
 
     expect(snapshots.length).toBeGreaterThanOrEqual(1);
-    // Guards the DDL classifier: if it called everything data-only the comparison below would
-    // compare the head snapshot against the wrong end of an empty list.
+    // If the DDL classifier marked everything data-only, the comparison below would be against an empty list.
     expect(schemaChanging.map((m) => m.tag)).toContain(migrations[0].tag);
 
-    // No snapshot may name a migration the journal does not have — drizzle-kit would diff against
-    // a state the migrator never reaches.
+    // A snapshot naming a migration the journal lacks would diff against a state the migrator never reaches.
     const journalIdxs = new Set(entries.map((entry) => entry.idx));
     expect(snapshots.filter((s) => !journalIdxs.has(s.idx)).map((s) => s.file)).toEqual([]);
 
-    // drizzle-kit diffs against the LAST snapshot in this order, so it must describe the newest
-    // migration that actually moved the schema — a data-only head migration has no snapshot of its
-    // own, and correctly needs none.
+    // Data-only migrations need no snapshot of their own.
     expect(snapshots[snapshots.length - 1].idx).toBe(schemaChanging[schemaChanging.length - 1].idx);
   });
 
@@ -214,7 +154,7 @@ describe('Migrations: General', () => {
     for (let i = 1; i < snapshots.length; i++) {
       expect(snapshots[i].prevId).toBe(snapshots[i - 1].id);
     }
-    // A shared parent is the "collision" drizzle-kit refuses to generate against.
+    // A shared parent is the collision drizzle-kit refuses to generate against.
     expect(new Set(snapshots.map((s) => s.prevId)).size).toBe(snapshots.length);
   });
 
@@ -223,8 +163,7 @@ describe('Migrations: General', () => {
 
     expect(Object.keys(head.tables).sort()).toEqual(schemaTables);
 
-    // Content, not just the file name: a snapshot that exists but has drifted from schema.ts is
-    // exactly what makes `bun run db:generate` re-emit DDL that already shipped.
+    // Content, not just the file name: a drifted head makes db:generate re-emit DDL that already shipped.
     const snapshotColumns = Object.fromEntries(
       Object.entries(head.tables).map(([table, { columns }]) => [
         table,
@@ -237,9 +176,6 @@ describe('Migrations: General', () => {
   test('the head snapshot matches each column SQL TYPE, nullability and the index set', () => {
     const head = loadHeadSnapshot();
 
-    // The destructive half of snapshot staleness — see schemaShapes. A type or notNull drift makes
-    // the next generate emit a table rebuild (DROP included); an index drift makes it re-emit a
-    // CREATE INDEX that throws mid-migration on an existing install.
     const snapshotShapes = Object.fromEntries(
       Object.entries(head.tables).map(([table, { columns, indexes }]) => [
         table,

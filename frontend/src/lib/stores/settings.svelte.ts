@@ -18,9 +18,6 @@ const DEFAULT_UNIT_PREFERENCES: UnitPreferences = {
 	chargeUnit: 'kwh'
 };
 
-// The local handleError was a byte-identical reimplementation of the shared
-// extractErrorMessage (— error-wins precedence). Converged onto the shared helper; the fallback
-// string is passed explicitly. (NOT handleApiError, whose fallback-wins precedence is a different contract.)
 const UNEXPECTED_ERROR = 'An unexpected error occurred';
 
 function createSettingsStore() {
@@ -48,9 +45,8 @@ function createSettingsStore() {
 			error = null;
 			try {
 				settings = await settingsApi.getSettings();
-				// Theming engine (T9/D2): server-wins reconcile of the theme id. If the server's
-				// themePreference differs from the local mirror (e.g. set on another device), adopt it. The
-				// theme store no-ops when they already agree + never re-pushes (server already has it).
+				// Server wins: adopt the theme id if it differs from the local mirror (e.g. set on another device).
+				// The theme store no-ops when they already agree, so this never re-pushes.
 				themeStore.reconcileServerTheme(settings.themePreference);
 				isLoading = false;
 			} catch (err) {

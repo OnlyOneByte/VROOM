@@ -1,13 +1,6 @@
 /**
- * Anthropic (Claude) VLM adapter (vlm-receipt-parsing T3b). Implements `VlmProvider.extractReceipt`
- * against the Anthropic Messages API (`POST https://api.anthropic.com/v1/messages` with a base64
- * `image` content block + a `text` block carrying the FIXED prompt).
- *
- * Same DUMB-TRANSPORT contract as the OpenAI-compatible adapter (T3a): send the fixed prompt + image,
- * return the model's RAW text; the shared `parseExtraction` (prompt.ts) is the SOLE validator. A
- * non-2xx / network / timeout failure THROWS (the parse route maps it to 502; never a faked success —
- * the anti-fail-open lesson). The api key goes in the `x-api-key` header (Anthropic's
- * scheme, NOT Bearer), and the required `anthropic-version` header pins the wire format.
+ * Anthropic Messages API adapter for receipt extraction. Dumb transport: parseExtraction validates the
+ * output. Failures throw so the parse route can answer 502.
  */
 
 import { logger } from '../../../../utils/logger';
@@ -15,13 +8,10 @@ import { RECEIPT_EXTRACTION_PROMPT } from './prompt';
 import type { VlmProviderSettings } from './registry';
 import type { RawExtraction, ReceiptImage, VlmProvider } from './vlm-provider';
 
-/** Hard ceiling on a single parse call (cost + a hung-endpoint guard). */
 const REQUEST_TIMEOUT_MS = 30_000;
-/** Cap the completion size — a receipt extraction is a small JSON object. */
 const MAX_TOKENS = 1024;
-/** Anthropic requires this header; pin a stable version so the wire format cannot drift under us. */
+/** Pinned so the wire format cannot drift. */
 const ANTHROPIC_VERSION = '2023-06-01';
-/** Default endpoint; `baseUrl` can override for a compatible proxy. */
 const DEFAULT_BASE_URL = 'https://api.anthropic.com';
 
 export class AnthropicVlmProvider implements VlmProvider {
@@ -31,7 +21,6 @@ export class AnthropicVlmProvider implements VlmProvider {
 
   constructor(settings: VlmProviderSettings) {
     if (!settings.apiKey) {
-      // Defense-in-depth: the create/PUT gate already requires a key for non-ollama types.
       throw new Error('Anthropic VLM requires an API key');
     }
     this.apiKey = settings.apiKey;
@@ -43,7 +32,6 @@ export class AnthropicVlmProvider implements VlmProvider {
     const body = {
       model: this.model,
       max_tokens: MAX_TOKENS,
-      // Deterministic extraction — no creativity wanted.
       temperature: 0,
       messages: [
         {
@@ -76,7 +64,7 @@ export class AnthropicVlmProvider implements VlmProvider {
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
     } catch (err) {
-      // Network failure / timeout — surface honestly (route → 502). Do NOT log the api key.
+      // Never log the api key.
       const message = err instanceof Error ? err.message : 'network error';
       logger.warn('VLM anthropic request failed', { model: this.model, error: message });
       throw new Error(`VLM request failed: ${message}`);
@@ -96,8 +84,7 @@ export class AnthropicVlmProvider implements VlmProvider {
       content?: { type?: string; text?: unknown }[];
     } | null;
 
-    // Anthropic returns content[] blocks; the model's text is the first text block. RAW output —
-    // parseExtraction (the caller) validates it. Missing/non-string → '' (empty draft, no throw).
+    // Missing or non-string text becomes an empty draft.
     const textBlock = json?.content?.find((b) => b.type === 'text');
     return typeof textBlock?.text === 'string' ? textBlock.text : '';
   }

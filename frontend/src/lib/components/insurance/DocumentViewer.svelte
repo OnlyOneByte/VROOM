@@ -12,11 +12,9 @@
 	const ALLOWED_TYPES = [...IMAGE_TYPES, 'application/pdf'];
 
 	interface Props {
-		// The entity the documents hang off. Defaults to insurance_policy for
-		// back-compat; ClaimsSection passes 'insurance_claim'.
+		// The entity the documents attach to; defaults to insurance_policy.
 		entityId: string;
 		entityType?: string;
-		// T12b-3c: read-only shared view hides upload + per-document delete (documents stay viewable).
 		readOnly?: boolean;
 	}
 
@@ -50,8 +48,6 @@
 		documents = [...documents, result as Photo];
 	}
 
-	// Styled confirm dialog (replaces native confirm()) — deletion is permanent
-	// (removes the file from storage too).
 	let confirmOpen = $state(false);
 	let pendingDeleteId = $state<string | null>(null);
 

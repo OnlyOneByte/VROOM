@@ -1,17 +1,6 @@
-/**
- * Guard for `readJsonBody`: a body the CLIENT got wrong must answer 400, not 500.
- *
- * `c.req.json()` throws a bare SyntaxError, which is not a ZodError, HTTPException, SyncError,
- * AppError or SQLITE_ error — so an unguarded call falls through every branch of the global error
- * handler onto the generic 500 "An internal error occurred": a truncated upload or a client-side
- * JSON-building bug reads as a VROOM crash and writes an unactionable `[ERROR] Server error` line.
- * The translation belongs at the request boundary rather than in the error handler because several
- * live paths `JSON.parse` a decrypted provider credential, where a SyntaxError means a mis-keyed
- * server and really is a 500.
- *
- * Driven through the REAL HTTP stack with raw (unserialized) bodies, plus a source scan so a new
- * hand-rolled `c.req.json()` cannot reintroduce the bug class at another call site.
- */
+// A malformed body from the client must answer 400, not 500. Driven through the real HTTP stack
+// with raw bodies. The source scan at the end stops new direct c.req.json() calls from
+// reintroducing the bug.
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -21,9 +10,7 @@ import { createTestApp, json, type TestApp } from '../../test-helpers/http-clien
 
 let ctx: TestApp;
 
-// createTestApp dynamic-imports the whole app; from a cold module cache that can exceed bun's
-// default 5s HOOK budget, which bunfig's `[test] timeout` does not raise. Give the hook headroom
-// so a cold first run reports route behaviour rather than a hook timeout.
+// A cold module load can exceed bun's 5s hook budget, which bunfig's test timeout does not raise.
 beforeEach(async () => {
   ctx = await createTestApp();
 }, 20_000);
@@ -34,10 +21,8 @@ interface ErrorBody {
   error: { code: string; message: string };
 }
 
-/**
- * Send a RAW string body — `ctx.authed` JSON.stringifies its argument, which can never produce the
- * malformed bytes under test.
- */
+// Sends a raw string body. ctx.authed JSON.stringifies its argument and cannot produce malformed
+// JSON.
 function rawBody(
   method: string,
   path: string,
@@ -99,8 +84,7 @@ describe('a malformed JSON body is a client error', () => {
   }
 
   test('a well-formed body on the same route still reaches the handler', async () => {
-    // Positive control: the helper must not swallow valid input (it would be an easy way to make
-    // the assertions above pass for the wrong reason).
+    // Positive control: valid bodies must still reach the handler.
     const res = await rawBody('PATCH', '/api/v1/auth/me', '{"displayName":"Renamed User"}');
     const body = await json<{ data: { user: { displayName: string } } }>(res);
 
@@ -109,7 +93,7 @@ describe('a malformed JSON body is a client error', () => {
   });
 
   test('a well-formed body that fails validation keeps its own 400 message', async () => {
-    // The helper only classifies PARSE failures — schema validation still speaks for itself.
+    // Schema failures keep their own message.
     const res = await rawBody('POST', '/api/v1/sync', '{"syncTypes": []}');
     const body = await json<ErrorBody>(res);
 
@@ -119,9 +103,7 @@ describe('a malformed JSON body is a client error', () => {
 });
 
 describe('a body that parses but is not an object is a client error too', () => {
-  // `null`, a number and an array are all valid JSON, so they get PAST the parse guard and reach
-  // code written for an object. Dereferencing one is a TypeError — a 500 for a request the client
-  // got wrong, which is the same defect in a different disguise.
+  // These parse as JSON but are not objects, so they must be rejected before any property access.
   const SHAPES = ['null', '5', '"nope"', '[1,2]'];
 
   for (const shape of SHAPES) {

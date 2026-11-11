@@ -1,11 +1,7 @@
-// Feature: unified-backup-providers, Property 15: Frontend derivation correctness
-// **Validates: Requirements 13.4, 13.5**
-
 import { describe, expect, test } from 'vitest';
 import fc from 'fast-check';
 import type { BackupConfig, ProviderBackupSettings } from '$lib/types';
 
-// Pure derivation functions matching the logic in StorageProvidersCard.svelte
 function deriveSheetsSyncEnabled(backupConfig: BackupConfig): boolean {
 	return Object.values(backupConfig.providers).some(p => p.sheetsSyncEnabled === true);
 }
@@ -20,10 +16,8 @@ function deriveLastBackupDate(backupConfig: BackupConfig): string | null {
 	return latest;
 }
 
-// --- Generators ---
-
 const isoDateArb = fc
-	.integer({ min: 1577836800000, max: 1924991999000 }) // 2020-01-01 to 2030-12-31 in ms
+	.integer({ min: 1577836800000, max: 1924991999000 })
 	.map(ms => new Date(ms).toISOString());
 
 const providerIdArb = fc.stringMatching(/^[a-z0-9-]{1,20}$/);
@@ -43,10 +37,7 @@ const backupConfigArb: fc.Arbitrary<BackupConfig> = fc
 		providers: Object.fromEntries(entries)
 	}));
 
-// ---------------------------------------------------------------------------
-// Property 15: Frontend derivation correctness
-// ---------------------------------------------------------------------------
-describe('Property 15: Frontend derivation correctness', () => {
+describe('Frontend derivation correctness', () => {
 	test('sheetsSyncEnabled is true iff at least one provider has sheetsSyncEnabled: true', () => {
 		fc.assert(
 			fc.property(backupConfigArb, config => {

@@ -1,23 +1,6 @@
-/**
- * Characterization tests for the MAINTENANCE + GAS-PRICE chart builder family in analytics-charts.ts
- *  Three more zero-coverage builders the (fuel/date) +
- * (expense-summary) audits did not reach — `buildGasPriceHistory`, `buildVehicleMaintenanceCosts`,
- * `buildMaintenanceTimeline` (the last drives the private buildTimelineEntry / estimateServiceInterval
- * / assignTimelineStatus trio). Read each against source firsthand and found CORRECT; this locks the
- * conclusion so a future edit can't silently regress it. Each test pins an invariant
- * the audit verified:
- *
- *  - buildGasPriceHistory — keeps only priced fillups (volume>0 ∧ amount>0 ∧ date present),
- *  pricePerVolume = amount/volume, fuelType ?? 'Regular', slice(-100).
- *  - buildVehicleMaintenanceCosts— category==='maintenance' ONLY (fuel/financial excluded), month-bucket
- *  sum, ascending month sort, dateless dropped.
- *  - buildMaintenanceTimeline — groups by description (case-insensitive; null→'general maintenance');
- *  assignTimelineStatus thresholds (<0 overdue / <30 warning / else good);
- *  a single-occurrence group defaults the interval to 180 days; output
- *  sorted by daysRemaining ascending (most-overdue first).
- *
- * Pure module → no DB, no server.
- */
+// Gas-price and maintenance chart builders. Gas price keeps only priced fill-ups. Maintenance costs
+// count maintenance rows only. The timeline groups by description case-insensitively, and a single
+// occurrence defaults the interval to 180 days.
 
 import { describe, expect, test } from 'bun:test';
 import {
@@ -30,7 +13,7 @@ import {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// Local-time date so bucketing assertions are timezone-independent (the C6/ discipline).
+// Local time, so bucketing does not depend on the timezone.
 function d(year: number, month1to12: number, day: number): Date {
   return new Date(year, month1to12 - 1, day);
 }
@@ -155,8 +138,8 @@ describe('buildMaintenanceTimeline', () => {
     expect(out[0]?.service).toBe('general maintenance');
   });
 
-  // A single-occurrence group defaults the interval to 180 days, so daysRemaining ≈
-  // (lastDate - now)/day + 180. We anchor lastDate relative to `now` to drive each status.
+  // A single occurrence defaults the interval to 180 days, so daysRemaining is days since the last
+  // service plus 180.
   test('status is "warning" when the next service is ~10 days out (single-row interval=180)', () => {
     const lastDate = new Date(now.getTime() - 170 * DAY_MS); // nextDue ≈ now + 10d
     const out = buildMaintenanceTimeline([genRow({ description: 'tires', date: lastDate })], now);

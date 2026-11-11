@@ -1,15 +1,6 @@
 /**
- * FakeStorageProvider — in-memory StorageProvider for tests and local E2E.
- *
- * Implements the real StorageProvider interface with a process-local Map, so the
- * full stack (routes → photo-service → registry → provider) can be exercised
- * end-to-end with ZERO network. This is the seam every external-provider feature
- * (Google Photos, S3, OneDrive, …) should reuse: implement the interface for
- * real, and test against this fake selected via a `providerType: 'fake'` row.
- *
- * It is wired into the registry factory ONLY when fakes are explicitly allowed
- * (CONFIG.allowFakeStorageProvider, gated to non-production) — production never
- * instantiates it.
+ * In-memory StorageProvider for tests and local E2E. Only instantiated when
+ * CONFIG.allowFakeStorageProvider is set, which is never true in production.
  */
 
 import type {
@@ -31,8 +22,6 @@ interface StoredFile {
 export class FakeStorageProvider implements StorageProvider {
   readonly type = 'fake';
 
-  // Process-local store. A fresh instance per construction keeps tests isolated;
-  // seed canned files via the constructor when a test needs pre-existing content.
   private files = new Map<string, StoredFile>();
 
   constructor(seed?: StorageFileInfo[]) {

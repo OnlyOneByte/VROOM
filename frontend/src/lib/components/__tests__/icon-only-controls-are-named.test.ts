@@ -1,15 +1,4 @@
-/**
- * An icon-only control needs an `aria-label`. A `title` is not a substitute: it is a mouse-only
- * tooltip, it never appears on a touch device, and the kit sets `pointer-events: none` on a
- * disabled control so the browser does not even hover-test it. `UIQuality.md` says so outright —
- * "Icon-only buttons MUST have aria-label" — but axe accepts `title` as an accessible name, so
- * the sweep that found the unnamed controls could not find the badly-named ones.
- *
- * These two files were the surviving instances. The offline cards are asserted by rendering them
- * and reading the names off the DOM; the odometer tab pulls in a chart and an API client, so it is
- * asserted against its source with a rule that generalises past today's two controls: a literal
- * `title` in that file must be matched by an `aria-label` carrying the same words.
- */
+// Icon-only controls need an aria-label; a title alone does not name them for touch or keyboard users.
 
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -51,7 +40,6 @@ describe('the offline expense cards', () => {
 		expect(buttons.length).toBeGreaterThan(0);
 
 		for (const button of buttons) {
-			// Icon-only: the control renders an svg and no text of its own.
 			if (button.textContent?.trim()) continue;
 			expect(
 				button.getAttribute('aria-label'),
@@ -67,11 +55,7 @@ describe('the offline expense cards', () => {
 
 const CONTROL_TAGS = new Set(['a', 'button', 'Button']);
 
-/**
- * Every `title="…"` set on a control in `source`. The owning tag is found by walking back to the
- * nearest `<`, which is reliable in Svelte markup: an attribute value may hold `=>` but not `<`.
- * A `title` on a `<div>` is a truncation tooltip, not a name, so only controls are collected.
- */
+/** Collects the title attribute of every control; a title on a non-control is a tooltip, not a name. */
 function controlTitles(source: string): string[] {
 	return [...source.matchAll(/\btitle="([^"]+)"/g)]
 		.filter(match => {

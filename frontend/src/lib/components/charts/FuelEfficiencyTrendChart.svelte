@@ -14,7 +14,6 @@
 	import type { UnitPreferences } from '$lib/types';
 	import { settingsStore } from '$lib/stores/settings.svelte';
 
-	// Chart configuration constants
 	const CHART_HEIGHT = 280;
 	const MIN_DATA_POINTS = 1;
 
@@ -36,7 +35,6 @@
 
 	let units = $derived(unitPreferences ?? settingsStore.unitPreferences);
 
-	// Title and unit label based on fuel type
 	let title = $derived(fuelType === 'electric' ? 'Electric Efficiency' : 'Fuel Efficiency');
 	let unitLabel = $derived(
 		fuelType === 'electric'
@@ -45,7 +43,6 @@
 	);
 	let description = $derived(`Measured in ${unitLabel}`);
 
-	// Chart configuration for shadcn styling
 	const chartConfig: Chart.ChartConfig = {
 		efficiency: {
 			label: 'Efficiency',
@@ -53,7 +50,6 @@
 		}
 	};
 
-	// Series configuration for the chart
 	const series = $derived([
 		{
 			key: 'efficiency',

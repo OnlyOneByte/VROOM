@@ -1,10 +1,6 @@
 /**
- * Unit tests for pruneVehicleFromSplitConfig — the pure renormalizer that drops a deleted
- * vehicle's leg from a reminder's expenseSplitConfig blob.
- *
- * The blob is NOT FK-managed (unlike the reminder_vehicles junction), so a deleted vehicle lingers in it
- * and the next trigger builds a split sibling for the dead vehicleId → FK violation + half-committed
- * surviving legs (async-tx footgun). These pin the renormalize contract per split method.
+ * Unit tests for pruneVehicleFromSplitConfig, which removes a deleted vehicle's leg from a split config
+ * and renormalizes the remaining legs for each split method.
  */
 
 import { describe, expect, test } from 'bun:test';
@@ -12,7 +8,7 @@ import type { ReminderSplitConfig } from '../../../db/types';
 import { pruneVehicleFromSplitConfig } from '../split-config-helpers';
 
 describe('pruneVehicleFromSplitConfig — even', () => {
-  test('drops the deleted id; ≥2 legs remain → still an even split', () => {
+  test('drops the deleted id and keeps the split when two or more legs remain', () => {
     const config: ReminderSplitConfig = { method: 'even', vehicleIds: ['a', 'b', 'c'] };
     expect(pruneVehicleFromSplitConfig(config, 'b')).toEqual({
       method: 'even',
@@ -20,19 +16,19 @@ describe('pruneVehicleFromSplitConfig — even', () => {
     });
   });
 
-  test('collapses to null when only 1 leg would remain (caller clears the blob)', () => {
+  test('collapses to null when only one leg would remain', () => {
     const config: ReminderSplitConfig = { method: 'even', vehicleIds: ['a', 'b'] };
     expect(pruneVehicleFromSplitConfig(config, 'b')).toBeNull();
   });
 
-  test('returns the SAME reference when the deleted id is absent (no-op → caller skips the write)', () => {
+  test('returns the same reference when the deleted id is absent', () => {
     const config: ReminderSplitConfig = { method: 'even', vehicleIds: ['a', 'b'] };
     expect(pruneVehicleFromSplitConfig(config, 'zzz')).toBe(config);
   });
 });
 
 describe('pruneVehicleFromSplitConfig — absolute', () => {
-  test('drops the allocation; remaining fixed amounts stand (group total shrinks honestly)', () => {
+  test('drops the allocation and keeps the remaining fixed amounts', () => {
     const config: ReminderSplitConfig = {
       method: 'absolute',
       allocations: [
@@ -64,7 +60,6 @@ describe('pruneVehicleFromSplitConfig — absolute', () => {
 
 describe('pruneVehicleFromSplitConfig — percentage (rescale to 100)', () => {
   test('drops the leg + RESCALES survivors proportionally back to 100%', () => {
-    // a:25 b:25 c:50; drop b → survivors a:25 c:50 (sum 75) → rescale → a:33.33 c:66.67.
     const config: ReminderSplitConfig = {
       method: 'percentage',
       allocations: [
@@ -81,11 +76,10 @@ describe('pruneVehicleFromSplitConfig — percentage (rescale to 100)', () => {
     const byId = new Map(allocations.map((a) => [a.vehicleId, a.percentage]));
     expect(byId.get('a')).toBeCloseTo(33.333, 2);
     expect(byId.get('c')).toBeCloseTo(66.667, 2);
-    // The load-bearing invariant: survivors sum back to 100 (refineSplitConfig requires it).
     expect(allocations.reduce((s, a) => s + a.percentage, 0)).toBeCloseTo(100, 5);
   });
 
-  test('survivors that all summed to 0% fall back to an even percentage split (still sums to 100)', () => {
+  test('survivors that all summed to 0% fall back to an even split', () => {
     const config: ReminderSplitConfig = {
       method: 'percentage',
       allocations: [
@@ -94,7 +88,6 @@ describe('pruneVehicleFromSplitConfig — percentage (rescale to 100)', () => {
         { vehicleId: 'c', percentage: 100 },
       ],
     };
-    // Drop c → survivors a:0 b:0 (sum 0) → even fallback 50/50.
     const result = pruneVehicleFromSplitConfig(config, 'c');
     const allocations = (result as { allocations: { vehicleId: string; percentage: number }[] })
       .allocations;

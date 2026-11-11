@@ -39,7 +39,6 @@
 
 	const authState = authStore;
 
-	// Redirect if already authenticated
 	$effect(() => {
 		if (!authState.isLoading && authState.isAuthenticated) {
 			goto(resolve(routes.dashboard));
@@ -71,7 +70,6 @@
 	class="min-h-screen flex items-center justify-center bg-gradient-to-br from-muted to-muted/50 p-4"
 >
 	<div class="w-full max-w-md space-y-6">
-		<!-- Back to home -->
 		<Button
 			variant="ghost"
 			size="sm"
@@ -82,7 +80,6 @@
 			Back to home
 		</Button>
 
-		<!-- Logo and Title -->
 		<div class="text-center space-y-2">
 			<div
 				class="inline-flex items-center justify-center w-20 h-20 bg-primary rounded-3xl shadow-lg mb-4"
@@ -93,7 +90,6 @@
 			<p class="text-muted-foreground">Sign in to continue to your dashboard</p>
 		</div>
 
-		<!-- Auth Error Message -->
 		{#if authErrorMessage}
 			<div
 				class="flex items-start gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4"
@@ -103,7 +99,6 @@
 			</div>
 		{/if}
 
-		<!-- Auth Card -->
 		<Card.Root class="border-2">
 			<Card.Content class="pt-6 space-y-4">
 				{#if isLoadingProviders}
@@ -152,7 +147,6 @@
 			</Card.Content>
 		</Card.Root>
 
-		<!-- Footer -->
 		<p class="text-center text-sm text-muted-foreground">
 			No account needed · Sign in with a provider to get started
 		</p>

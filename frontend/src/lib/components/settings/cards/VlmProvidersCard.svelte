@@ -1,16 +1,5 @@
 <script lang="ts">
-	/**
-	 * VLM (receipt-parsing) provider settings card — vlm-receipt-parsing T5b.
-	 *
-	 * Lists the user's `domain:'vlm'` providers and offers an inline add/edit dialog. A VLM provider is
-	 * just { providerType, apiKey, model, baseUrl? } — far simpler than a storage provider (no folder /
-	 * backup config), so it lives in one self-contained card + dialog rather than a separate route.
-	 *
-	 * SECURITY: the API key field is WRITE-ONLY — the server strips credentials from every response, so
-	 * we never display a stored key. On edit we leave the field blank and only send `credentials` when
-	 * the user types a new key (an empty key on edit means "keep the existing one" — config-only PUT).
-	 * The providerType picker offers the D1-ruled set (VLM_PROVIDER_TYPES). Ollama is keyless.
-	 */
+	/** VLM provider settings: a self-contained card and dialog. The API key is write-only; blank on edit keeps the stored key. */
 	import { onMount } from 'svelte';
 	import { Sparkles, Plus, LoaderCircle, Pencil, Trash2 } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
@@ -34,7 +23,6 @@
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
 
-	// --- Add/edit dialog state ---
 	let dialogOpen = $state(false);
 	let editingId = $state<string | null>(null); // null = creating
 	let formType = $state<string>('openai-compatible');
@@ -44,8 +32,7 @@
 	let formBaseUrl = $state('');
 	let isSaving = $state(false);
 
-	// The D1 set is non-empty, so [0] is always defined; assert it for the type-checker
-	// (noUncheckedIndexedAccess widens an array index to `T | undefined`).
+	// The provider type set is non-empty, so [0] is defined; the assertion satisfies noUncheckedIndexedAccess.
 	const FALLBACK_TYPE: VlmProviderTypeOption = VLM_PROVIDER_TYPES[0] as VlmProviderTypeOption;
 	let selectedTypeOption = $derived<VlmProviderTypeOption>(
 		VLM_PROVIDER_TYPES.find(t => t.id === formType) ?? FALLBACK_TYPE
@@ -85,7 +72,6 @@
 		dialogOpen = true;
 	}
 
-	/** When the type changes (create flow), pre-fill model + baseUrl with that type's suggestions. */
 	function applyTypeDefaults() {
 		formModel = selectedTypeOption.defaultModel;
 		formBaseUrl = selectedTypeOption.defaultBaseUrl ?? '';

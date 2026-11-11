@@ -1,13 +1,6 @@
 /**
- * Google Gemini VLM adapter (vlm-receipt-parsing T3b). Implements `VlmProvider.extractReceipt` against
- * the Gemini generateContent API (`POST {baseUrl}/v1beta/models/{model}:generateContent?key=...` with
- * an `inline_data` base64 image part + a `text` part carrying the FIXED prompt).
- *
- * Same DUMB-TRANSPORT contract as the other adapters: send the fixed prompt + image, return the model's
- * RAW text; the shared `parseExtraction` (prompt.ts) is the SOLE validator. A non-2xx / network /
- * timeout failure THROWS (the parse route maps it to 502; never a faked success — the
- * anti-fail-open lesson). Gemini authenticates with the api key as a `?key=` QUERY param (not a header),
- * so the key is kept OUT of logs (only the model + status are logged, never the URL).
+ * Gemini generateContent adapter for receipt extraction. Dumb transport: parseExtraction validates the
+ * output. Failures throw so the parse route can answer 502.
  */
 
 import { logger } from '../../../../utils/logger';
@@ -15,11 +8,8 @@ import { RECEIPT_EXTRACTION_PROMPT } from './prompt';
 import type { VlmProviderSettings } from './registry';
 import type { RawExtraction, ReceiptImage, VlmProvider } from './vlm-provider';
 
-/** Hard ceiling on a single parse call (cost + a hung-endpoint guard). */
 const REQUEST_TIMEOUT_MS = 30_000;
-/** Cap the completion size — a receipt extraction is a small JSON object. */
 const MAX_OUTPUT_TOKENS = 1024;
-/** Default endpoint; `baseUrl` can override for a compatible proxy. */
 const DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com';
 
 export class GeminiVlmProvider implements VlmProvider {
@@ -29,7 +19,6 @@ export class GeminiVlmProvider implements VlmProvider {
 
   constructor(settings: VlmProviderSettings) {
     if (!settings.apiKey) {
-      // Defense-in-depth: the create/PUT gate already requires a key for non-ollama types.
       throw new Error('Gemini VLM requires an API key');
     }
     this.apiKey = settings.apiKey;
@@ -48,11 +37,10 @@ export class GeminiVlmProvider implements VlmProvider {
           ],
         },
       ],
-      // Deterministic extraction — no creativity wanted.
       generationConfig: { temperature: 0, maxOutputTokens: MAX_OUTPUT_TOKENS },
     };
 
-    // The api key is a query param, not a header — keep it out of every log line.
+    // The key travels in the query string, so the URL must never be logged.
     const url = `${this.baseUrl}/v1beta/models/${this.model}:generateContent?key=${encodeURIComponent(this.apiKey)}`;
 
     let res: Response;
@@ -83,8 +71,7 @@ export class GeminiVlmProvider implements VlmProvider {
       candidates?: { content?: { parts?: { text?: unknown }[] } }[];
     } | null;
 
-    // Gemini returns candidates[].content.parts[].text. RAW output — parseExtraction (the caller)
-    // validates it. Missing/non-string → '' (empty draft, no throw).
+    // Missing or non-string text becomes an empty draft.
     const text = json?.candidates?.[0]?.content?.parts?.find(
       (p) => typeof p.text === 'string'
     )?.text;

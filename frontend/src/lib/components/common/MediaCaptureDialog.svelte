@@ -12,25 +12,18 @@
 	import CameraTab from './media/CameraTab.svelte';
 
 	const DEFAULT_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-	const DEFAULT_MAX_SIZE = 10_485_760; // 10MB
+	const DEFAULT_MAX_SIZE = 10_485_760;
 
 	interface Props {
 		open: boolean;
-		/** Dialog title */
 		title?: string;
-		/** Dialog description */
 		description?: string;
-		/** Accepted MIME types */
 		acceptedTypes?: string[];
-		/** Max file size in bytes */
 		maxFileSize?: number;
-		/** Allow selecting multiple files */
 		multiple?: boolean;
 		/** Called for each file to upload. Return value is passed to onUploadComplete. */
 		onUpload: (_file: File) => Promise<unknown>;
-		/** Called after each successful upload */
 		onUploadComplete?: (_result: unknown) => void;
-		/** Called when dialog closes */
 		onClose: () => void;
 	}
 
@@ -46,7 +39,6 @@
 		onClose
 	}: Props = $props();
 
-	// --- Orchestrator state ---
 	let activeTab = $state('upload');
 	let uploading = $state(false);
 	let uploadIndex = $state(0);
@@ -74,11 +66,9 @@
 		}
 	}
 
-	// Child component refs
 	let uploadTabRef = $state<ReturnType<typeof UploadTab> | null>(null);
 	let cameraTabRef = $state<ReturnType<typeof CameraTab> | null>(null);
 
-	// --- Reset on open/close ---
 	let previousOpen = $state(false);
 	$effect(() => {
 		const isOpen = open;
@@ -97,7 +87,6 @@
 		previousOpen = isOpen;
 	});
 
-	// --- Upload loop (orchestrated by parent) ---
 	async function handleFilesReady(files: File[]) {
 		if (files.length === 0 || uploading) return;
 		uploading = true;
@@ -121,7 +110,6 @@
 		uploading = false;
 	}
 
-	// --- Camera capture upload ---
 	async function handleUploadCapture(file: File) {
 		try {
 			const result = await onUpload(file);
@@ -134,7 +122,6 @@
 		}
 	}
 
-	// --- Dialog close ---
 	function handleClose() {
 		if (uploading) return;
 		open = false;
@@ -150,7 +137,6 @@
 		</Dialog.Header>
 
 		{#if allDone}
-			<!-- Done state -->
 			<div class="py-4 text-center">
 				<p class="text-sm font-medium text-foreground">
 					Upload complete{uploadErrors.length > 0

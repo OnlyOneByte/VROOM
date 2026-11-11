@@ -1,14 +1,5 @@
-/**
- * Guard: an unmatched route answers the SAME error envelope as a thrown error.
- *
- * `app.notFound` shaped its own body with a string-valued `error` ("Not Found") instead of the
- * `{ code, message, details }` object every other error path produces. The frontend's api-client
- * reads `errorBody.error?.message` — on a string that is `undefined`, so a typo'd or moved endpoint
- * surfaced to the user as a bare "Request failed with status 404" with no `code` for the
- * error-message map to key on.
- *
- * createTestApp() must run before static config/connection imports — keep imports to the harness.
- */
+// An unmatched route must answer the same error envelope as a thrown error. A string-valued error
+// leaves the client's error.message undefined.
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, json, type TestApp } from '../test-helpers/http-client';
@@ -32,8 +23,7 @@ describe('the 404 handler', () => {
 
     const body = await json<ErrorBody>(res);
     expect(body.success).toBe(false);
-    // An object with a readable `message` is the whole contract: `typeof error === 'string'` is the
-    // defect, because `error.message` is then undefined at every client.
+    // A string error would leave error.message undefined on the client.
     expect(typeof body.error).toBe('object');
     expect(body.error.code).toBe('NotFoundError');
     expect(body.error.message).toBe('The requested endpoint does not exist');

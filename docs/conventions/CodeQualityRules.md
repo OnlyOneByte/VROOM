@@ -1,8 +1,3 @@
----
-inclusion: fileMatch
-fileMatchPattern: "frontend/**"
----
-
 # Frontend Code Quality Rules
 
 MainSteering.md is always on and carries the shared rules, under three headings:

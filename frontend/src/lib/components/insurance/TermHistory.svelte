@@ -13,7 +13,6 @@
 		termVehicleCoverage?: TermCoverageRow[];
 		onRefresh?: () => Promise<void>;
 		onDeleteTerm?: (_term: InsuranceTerm) => void;
-		// T12b-3c: read-only shared view hides the past-term edit/delete affordances.
 		readOnly?: boolean;
 	}
 

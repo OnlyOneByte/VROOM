@@ -1,9 +1,3 @@
-/**
- * Authentication Middleware
- *
- * Provides authentication guards for protected routes.
- */
-
 import type { MiddlewareHandler } from 'hono';
 import { deleteCookie, getCookie } from 'hono/cookie';
 import type { AuthUser } from '../api/auth/lucia';
@@ -20,10 +14,6 @@ declare module 'hono' {
   }
 }
 
-/**
- * Require authentication middleware
- * Throws 401 if user is not authenticated
- */
 export const requireAuth: MiddlewareHandler = async (c, next) => {
   const lucia = getLucia();
   const sessionId = getCookie(c, lucia.sessionCookieName);
@@ -49,17 +39,9 @@ export const requireAuth: MiddlewareHandler = async (c, next) => {
   return next();
 };
 
-/**
- * Optional authentication middleware
- * Sets user context if authenticated, but doesn't throw if not
- *
- * Goes through validateAndRefreshSession rather than calling lucia directly, because
- * `lucia.validateSession` is the write that slides a past-half-life session's expiry forward and
- * reports it ONCE via `session.fresh`. This middleware runs on every `/api/*` request ahead of
- * requireAuth, so calling lucia here would consume that one signal and leave the browser cookie
- * stranded on its original login deadline — the session lifetime must be handled by whoever
- * observes the extension first.
- */
+// Must go through validateAndRefreshSession, not lucia.validateSession. validateSession reports a
+// sliding-expiry refresh only once, and this middleware runs on every /api request ahead of requireAuth,
+// so calling it here would leave the browser cookie on its original deadline.
 export const optionalAuth: MiddlewareHandler = async (c, next) => {
   try {
     const lucia = getLucia();

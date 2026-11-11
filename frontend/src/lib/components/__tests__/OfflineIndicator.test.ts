@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { onlineStatus, syncState, offlineExpenseQueue } from '../../stores/offline.svelte';
 import { syncOfflineExpenses } from '../../utils/offline-storage';
 
-// Mock the sync function
 vi.mock('../../utils/offline-storage', () => ({
 	syncOfflineExpenses: vi.fn()
 }));
@@ -11,7 +10,6 @@ describe('OfflineIndicator Store Logic', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 
-		// Reset stores to default state
 		onlineStatus.current = true;
 		syncState.current = 'idle';
 		offlineExpenseQueue.current = [];

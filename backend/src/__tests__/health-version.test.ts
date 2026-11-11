@@ -1,16 +1,4 @@
-/**
- * Regression GUARD: the version `GET /health` and `GET /api` report is the build's real version.
- *
- * The health endpoint is what the container healthcheck, the deployment docs and the bug-report
- * template all point at, and the reported version is what a user pastes into an issue. It was a
- * literal `'1.0.0'` with no link to the package or the build, so it would have stayed `1.0.0`
- * through every release — a confidently wrong answer in every bug report.
- *
- * The HTTP assertions below cannot distinguish a literal from the real value while package.json
- * still says 1.0.0, so the source-scan is the part that bites: app.ts must read `CONFIG.version`
- * (which is sourced from package.json) and must not carry a version literal. Re-hardcode either
- * endpoint and this goes RED; bump package.json and the responses follow.
- */
+// GET /health and GET /api must report the package version. app.ts must read CONFIG.version and carry no literal.
 
 import { beforeAll, describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
@@ -22,7 +10,7 @@ import { createTestApp, type TestApp } from '../test-helpers/http-client';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const APP = join(HERE, '..', 'app.ts');
 
-/** Any `version: '...'` / `version: "..."` literal — what this guard forbids in app.ts. */
+// Any version string literal, which app.ts must not contain.
 const VERSION_LITERAL = /version\s*:\s*['"][^'"]+['"]/g;
 
 describe('reported version comes from the package, not a literal', () => {

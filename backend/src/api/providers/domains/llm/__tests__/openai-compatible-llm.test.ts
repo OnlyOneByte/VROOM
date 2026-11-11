@@ -1,18 +1,3 @@
-/**
- * OpenAiCompatibleLlmProvider adapter (llm-assistant T3a). Drives the REAL adapter against a stubbed
- * global fetch (no live key/endpoint) and pins the request SHAPE + the dumb-transport normalization +
- * the failure-honesty rules:
- *  - POSTs to {baseUrl}/chat/completions with the transcript messages + a `tools` array (function shape);
- *  - a Bearer Authorization header is present with a key, ABSENT for keyless self-hosted (Ollama);
- *  - a model response with `tool_calls` normalizes to ChatResult.toolCalls (name + RAW args string), and
- *  a plain content response normalizes to ChatResult.text — the orchestrator (T4) validates either;
- *  - a non-2xx / network failure THROWS (the chat route maps it to 502 — never a faked success);
- *  - a missing/non-string content with no tool calls returns { text: '' } (no throw).
- *
- * Adapter = dumb transport: it does NOT execute tools or validate args (that is the orchestrator), so
- * these tests assert transport + headers + the wire mapping + error-honesty, not tool semantics.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type { UserProvider } from '../../../../../db/schema';
 import { encrypt } from '../../../../../utils/encryption';
@@ -170,7 +155,7 @@ describe('OpenAiCompatibleLlmProvider.chat — response normalization (dumb tran
   });
 });
 
-describe('OpenAiCompatibleLlmProvider.chat — failure honesty (anti-fail-open)', () => {
+describe('OpenAiCompatibleLlmProvider.chat failures', () => {
   test('a non-2xx response THROWS (the route maps it to 502, never a fake answer)', async () => {
     stubFetch(() => new Response('rate limited', { status: 429 }));
     await expect(
@@ -193,7 +178,7 @@ describe('OpenAiCompatibleLlmProvider.chat — failure honesty (anti-fail-open)'
   });
 });
 
-describe('getLlmProvider / resolveLlmSettings — registry dispatch (T3a)', () => {
+describe('getLlmProvider / resolveLlmSettings dispatch by provider type', () => {
   function llmRow(
     over: Partial<{ providerType: string; config: unknown; credentials: unknown }> = {}
   ): UserProvider {
@@ -217,7 +202,7 @@ describe('getLlmProvider / resolveLlmSettings — registry dispatch (T3a)', () =
     expect(() => resolveLlmSettings(llmRow({ config: { baseUrl: 'https://x' } }))).toThrow();
   });
 
-  test('getLlmProvider returns a live adapter for openai-compatible + ollama (T3a)', () => {
+  test('getLlmProvider returns a live adapter for openai-compatible and ollama', () => {
     expect(getLlmProvider(llmRow({ providerType: 'openai-compatible' }))).toBeInstanceOf(
       OpenAiCompatibleLlmProvider
     );
@@ -232,8 +217,7 @@ describe('getLlmProvider / resolveLlmSettings — registry dispatch (T3a)', () =
     ).toBeInstanceOf(OpenAiCompatibleLlmProvider);
   });
 
-  test('getLlmProvider returns a live adapter for anthropic + gemini (T3b)', () => {
-    // T3b wired both first-party adapters; the registry now resolves all four D1 types live.
+  test('getLlmProvider returns a live adapter for anthropic and gemini', () => {
     expect(
       getLlmProvider(llmRow({ providerType: 'anthropic', config: { model: 'claude-3-5-sonnet' } }))
     ).toBeDefined();

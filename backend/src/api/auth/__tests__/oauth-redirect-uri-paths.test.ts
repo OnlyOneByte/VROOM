@@ -1,18 +1,7 @@
 /**
- * Regression GUARD: every OAuth redirect-URI DEFAULT in config.ts must name a path this backend
- * actually serves.
- *
- * A redirect URI is registered with the identity provider and then called by the user's browser,
- * so a wrong path fails at the end of a real login — after consent — with a 404 the operator has
- * to reverse-engineer. The Google login default pointed at `/auth/callback/google` while the auth
- * routes mount under `/api/v1/auth`, and the `/api/*` -> `/api/v1/*` compatibility redirect never
- * sees a bare `/auth/...` path; the storage-provider URI is derived from the same value, so one
- * wrong default broke both flows for anyone trusting it.
- *
- * The defaults are read out of the config SOURCE rather than from `CONFIG`, because a developer's
- * `.env` (which Bun auto-loads) would otherwise silently substitute its own value and the default
- * could rot untested. Each default's pathname is then probed against the real app: a mounted route
- * answers (a redirect/validation error for a callback with no `code`), an unmounted one 404s.
+ * Every OAuth redirect-URI default in config.ts must name a path the backend serves; a wrong path
+ * 404s after the user grants consent. Defaults are read from the config source, not CONFIG, because
+ * a developer's .env would otherwise replace them. Each path is probed against the real app.
  */
 
 import { beforeAll, describe, expect, test } from 'bun:test';
@@ -27,10 +16,7 @@ const CONFIG_SRC = join(HERE, '..', '..', '..', 'config.ts');
 /** e.g. `GOOGLE_REDIRECT_URI: z.string().default('http://localhost:3001/api/v1/auth/...')`. */
 const REDIRECT_URI_DEFAULT = /(\w*REDIRECT_URI):\s*z\s*\.string\(\)\s*\.default\('([^']+)'\)/g;
 
-/**
- * GOOGLE_PROVIDER_REDIRECT_URI has no literal default — it is derived from the login URI by this
- * substitution (config.ts). Kept in sync by the "derivation still applies" test below.
- */
+// GOOGLE_PROVIDER_REDIRECT_URI is derived from the login URI by this substitution in config.ts.
 const PROVIDER_DERIVATION = ['/callback/google', '/callback/provider/google'] as const;
 
 function configSrc(): string {
@@ -44,7 +30,7 @@ function redirectUriDefaults(): { name: string; uri: string }[] {
 describe('OAuth redirect-URI defaults resolve to mounted routes', () => {
   let ctx: TestApp;
 
-  // Read-only probes (unauthenticated GETs that write nothing), so one app for the suite.
+  // Unauthenticated GETs that write nothing, so one app serves the whole suite.
   beforeAll(async () => {
     ctx = await createTestApp();
   });
@@ -81,7 +67,6 @@ describe('OAuth redirect-URI defaults resolve to mounted routes', () => {
     const googleDefault = redirectUriDefaults().find((d) => d.name === 'GOOGLE_REDIRECT_URI');
     expect(googleDefault).toBeTruthy();
     const derived = (googleDefault?.uri ?? '').replace(...PROVIDER_DERIVATION);
-    // The substitution must actually apply, or the derived URI silently equals the login one.
     expect(derived).not.toBe(googleDefault?.uri);
     expect(await statusFor(derived)).not.toBe(404);
   });

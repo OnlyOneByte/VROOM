@@ -9,7 +9,6 @@
 		vehicles?: Vehicle[];
 		onEdit: (_policy: InsurancePolicy) => void;
 		onRefresh: () => Promise<void>;
-		// T12b-3c: read-only shared view hides every mutate affordance in the policy tree.
 		readOnly?: boolean;
 	}
 

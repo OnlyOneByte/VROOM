@@ -1,26 +1,5 @@
-/**
- * TRUE backup → restore round-trip for free-text values containing RFC-4180 special characters
- * (deep-review→guard). Data-safety quality bar: no silent loss.
- *
- * The CSV backup serializes via csv-stringify (`quoted: true`) and restores via csv-parse — a pairing
- * that IS correct (the library escapes embedded delimiters/quotes/newlines per RFC-4180). But the
- * existing round-trip tests (claims / maintenance-fields / reminder-split-config) only seed plain
- * values — NONE drives a free-text field carrying a comma, an embedded double-quote, or a newline
- * through the real export→import. So the quoting contract that stands between a comma in a description
- * and a column-shifted/corrupted restore was unpinned. These pin it FIRSTHAND through the REAL
- * backupService.exportAsZip → restoreService.restoreFromBackup (NOT a local re-implementation of the
- * stringifier — that's the coverage-theater trap), asserting the value survives byte-for-byte.
- *
- * Free-text columns are the live surface: vehicles.nickname, expenses.description,
- * insurancePolicies.notes, reminders.description are all user free-text that routinely contain commas,
- * quotes, and pasted multi-line text. NOTE: the backup path deliberately does NOT neutralize CSV
- * formula-injection (csv-safety.ts:16 — that's one-way human-export only; the round-trip ZIP must
- * preserve the value verbatim so restore is lossless), so a leading-`=` value must come back EXACTLY,
- * apostrophe-free — that's the assertion here, NOT a neutralized form.
- *
- * createTestApp() rewrites env then dynamic-imports the DB-bound backup/restore modules, so they're
- * imported dynamically AFTER createTestApp (the harness pattern).
- */
+// Free-text values with commas, quotes and newlines must survive a backup and restore byte-for-byte.
+// Backups keep a leading '=' verbatim; only human-facing exports neutralize formula triggers.
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
@@ -62,10 +41,7 @@ function expenseDescription(id: string): string | null {
 }
 
 describe('backup → restore round-trip preserves RFC-4180 special characters in free text', () => {
-  // A single value exercising every CSV-hostile construct at once: a comma (field separator), a
-  // double-quote (the quoting char — must be doubled then un-doubled), and an embedded newline (would
-  // otherwise look like a new record). If any of the three breaks the quoting, the field shifts or
-  // truncates and this byte-for-byte assertion fails.
+  // A comma, a double quote and an embedded newline. Breaking any of them shifts or truncates the field.
   const HOSTILE = 'Joe\'s "Daily", commute\nsecond line';
 
   test('a vehicle nickname with comma + quote + embedded newline survives byte-for-byte', async () => {
@@ -78,7 +54,7 @@ describe('backup → restore round-trip preserves RFC-4180 special characters in
     const body = await json<DataEnvelope<{ id: string }>>(res);
     expect(res.status, JSON.stringify(body)).toBeLessThan(300);
     const id = body.data.id;
-    // Sanity: it persisted as typed pre-round-trip (rules out a write-path mangle masking the result).
+    // Confirms the value was stored as typed before the round-trip.
     expect(vehicleNickname(id)).toBe(HOSTILE);
 
     await roundTrip();
@@ -107,8 +83,6 @@ describe('backup → restore round-trip preserves RFC-4180 special characters in
     expect(eRes.status, JSON.stringify(eBody)).toBeLessThan(300);
     const eId = eBody.data.id;
 
-    // A formula-trigger-led value: the round-trip ZIP must NOT neutralize it (no leading apostrophe
-    // added) — backup is a restore artifact, not a human export (csv-safety.ts:16).
     const fRes = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId,
       category: 'maintenance',

@@ -14,7 +14,7 @@ interface CreateTripRequest {
 	startOdometer: number;
 	endOdometer: number;
 	purpose: TripPurpose;
-	/** ISO timestamp. The form sends a local day as a noon-local ISO via dateOnlyToISO. */
+	/** ISO timestamp; send noon-local (see dateOnlyToISO) so the calendar day does not shift across timezones. */
 	tripDate: string;
 	startLocation?: string;
 	endLocation?: string;
@@ -23,19 +23,8 @@ interface CreateTripRequest {
 
 type UpdateTripRequest = Partial<Omit<CreateTripRequest, 'vehicleId'>>;
 
-/**
- * Trip API service (trips-location T6 FE seam) — the service pattern over the routes:
- *  GET /api/v1/trips — paginated list (optional vehicleId/purpose filter)
- *  GET /api/v1/trips/summary — the R4 mileage rollup (optional vehicleId scope + business rate)
- *  GET /api/v1/trips/vehicle/:id — one vehicle's trips (newest first)
- *  GET /api/v1/trips/:id — one trip
- *  POST /api/v1/trips — create (vehicleId in body)
- *  PUT /api/v1/trips/:id — update
- *  DELETE /api/v1/trips/:id — delete
- */
 export const tripApi = {
 	async list(filters?: TripListFilters): Promise<PaginatedResponse<Trip>> {
-		// vehicleId/purpose drop when empty (|| undefined → omitted from the query string).
 		const qs = buildQueryString({
 			vehicleId: filters?.vehicleId || undefined,
 			purpose: filters?.purpose || undefined,
@@ -53,10 +42,6 @@ export const tripApi = {
 		return apiClient.get<Trip>(`/api/v1/trips/${id}`);
 	},
 
-	/**
-	 * The mileage-summary rollup (R4). `vehicleId` scopes to one vehicle (else cross-fleet); `rate` is the
-	 * business-mileage reimbursement rate ($/mile) — both optional, dropped from the query when absent.
-	 */
 	async getSummary(params?: { vehicleId?: string; rate?: number }): Promise<TripSummary> {
 		const qs = buildQueryString({
 			vehicleId: params?.vehicleId || undefined,
@@ -73,11 +58,7 @@ export const tripApi = {
 		return apiClient.put<Trip>(`/api/v1/trips/${id}`, data);
 	},
 
-	/**
-	 * Delete a trip. The lifecycle: the trip's create wrote a linked odometer entry (D2), so the
-	 * caller chooses whether to KEEP it (default — non-destructive) or remove it with the trip. Passes
-	 * `?keepOdometer=false` ONLY when the user opts to remove the linked entry; absent → the backend keeps.
-	 */
+	// Creating a trip also writes an odometer entry. Keeping it is the default; keepOdometer=false removes it too.
 	async delete(id: string, keepOdometer = true): Promise<void> {
 		const qs = keepOdometer ? '' : '?keepOdometer=false';
 		await apiClient.delete(`/api/v1/trips/${id}${qs}`);

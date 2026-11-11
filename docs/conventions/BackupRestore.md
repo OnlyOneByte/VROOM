@@ -1,8 +1,3 @@
----
-inclusion: fileMatch
-fileMatchPattern: "backend/src/api/sync/backup.ts,backend/src/api/sync/restore.ts"
----
-
 # Backup & Restore
 
 ## Row Type Coercion

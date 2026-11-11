@@ -1,26 +1,5 @@
-/**
- * Regression GUARD for `backend/.env.example` — the file README.md, docs/development.md and
- * CLAUDE.md all tell a developer to copy to `backend/.env`.
- *
- * Its sibling guard (deployment-examples.test.ts) scans `docs/examples/.env.example`, the file the
- * deployment quick start copies, so three defects survived in THIS one:
- *  - `HOST=localhost` put back the exact value the hardened `127.0.0.1` default removed. A name
- *    binds whichever loopback family the resolver answers first, so on an IPv6-first host the
- *    backend listened on `[::1]:3001` only and both documented reverse-proxy upstreams
- *    (`proxy_pass http://127.0.0.1:3001`) got ECONNREFUSED — a 502 on the whole site, while
- *    `curl http://localhost:3001/health` still passed because curl retries across families.
- *  - `GOOGLE_REDIRECT_URI=.../auth/callback/google` in the production block named a bare
- *    `/auth/...` path the backend does not serve (auth mounts under `/api/v1/auth`, and the
- *    `/api/*` -> `/api/v1/*` compatibility redirect never sees it), so login 404'd AFTER the user
- *    had already granted consent.
- *  - `SESSION_SECRET` was still documented, with `openssl rand -base64 32` instructions, after
- *    nothing read it — a dead variable in an example env reads as a live secret to generate,
- *    protect and rotate.
- *
- * Everything is derived from the real sources — the readable set from config.ts's env schema plus
- * every `process.env` read in non-test source, the routes from the live app — so dropping a reader
- * or moving a callback fails here until this file follows.
- */
+// Guards backend/.env.example against drift from the backend: every variable it sets must be read,
+// HOST must be an address literal, and every documented OAuth callback must be a mounted route.
 
 import { beforeAll, describe, expect, test } from 'bun:test';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -34,19 +13,18 @@ const REPO_ROOT = join(HERE, '..', '..', '..');
 
 const BACKEND_ENV_EXAMPLE = 'backend/.env.example';
 
-/** A key of config.ts's `envSchema`, e.g. `  DATABASE_URL: z.string()...`. */
+// Keys of config.ts's envSchema.
 const SCHEMA_KEY = /^ {2}([A-Z][A-Z0-9_]*):/gm;
-/** An ACTIVE assignment in an env file — a commented-out line does not match. */
+// Active assignments only: commented-out lines do not match.
 const ENV_FILE_KEY = /^([A-Z][A-Z0-9_]*)=(.*)$/gm;
 const PROCESS_ENV_READ = /process\.env\.([A-Z][A-Z0-9_]*)/g;
-/** Any absolute URL naming an OAuth callback, active or commented. */
+// Matches callback URLs whether active or commented out.
 const CALLBACK_URL = /https?:\/\/[^\s`'"<>)|]*\/auth\/callback\/[^\s`'"<>),|]*/g;
 
 function exampleEnv(): string {
   return readFileSync(join(REPO_ROOT, BACKEND_ENV_EXAMPLE), 'utf8');
 }
 
-/** Active `NAME=value` assignments, in file order. */
 function assignments(): { name: string; value: string }[] {
   return [...exampleEnv().matchAll(ENV_FILE_KEY)].map(([, name, value]) => ({
     name,
@@ -55,7 +33,7 @@ function assignments(): { name: string; value: string }[] {
   }));
 }
 
-/** Every variable the backend actually consumes: the env schema plus direct `process.env` reads. */
+// Everything the backend consumes: schema keys plus direct process.env reads.
 function backendReadsEnvVars(): Set<string> {
   const config = readFileSync(join(SRC_ROOT, 'config.ts'), 'utf8');
   const read = new Set([...config.matchAll(SCHEMA_KEY)].map((match) => match[1]));
@@ -81,9 +59,7 @@ describe('backend/.env.example matches the backend', () => {
 
   test('HOST is a literal address, not a resolvable name', () => {
     const host = assignments().find((entry) => entry.name === 'HOST')?.value;
-    // IPv4 dotted quad, or a bracketed/bare IPv6 literal. `localhost` (or any other name) is the
-    // defect: the bind family becomes resolver-dependent, so a proxy dialing the other loopback
-    // family gets ECONNREFUSED on every request.
+    // A name makes the bind family resolver-dependent, so one loopback family refuses clients.
     expect(host, 'HOST must be an address literal so the bind family is deterministic').toMatch(
       /^(\d{1,3}(\.\d{1,3}){3}|\[?[0-9a-fA-F:]+\]?)$/
     );
@@ -104,9 +80,7 @@ describe('backend/.env.example matches the backend', () => {
   describe('its OAuth callback URLs', () => {
     let ctx: TestApp;
 
-    // Unauthenticated GETs that write nothing, so one app for the whole block. The generous
-    // timeout covers the first load of the app's module graph, which follows this file's
-    // source-wide scan and so runs with a cold cache on a loaded machine.
+    // Unauthenticated GETs that write nothing. The timeout covers the cold module load behind the source scan.
     beforeAll(async () => {
       ctx = await createTestApp();
     }, 30_000);

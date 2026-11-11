@@ -34,21 +34,17 @@
 
 	interface Props {
 		policyId: string;
-		// Vehicles covered by this policy — lets a claim be attributed to one.
 		vehicles?: Vehicle[];
-		// T12b-3c: read-only shared view hides File/Edit/Delete claim (claims + their docs stay viewable).
 		readOnly?: boolean;
 	}
 
 	let { policyId, vehicles = [], readOnly = false }: Props = $props();
 
-	// vehicleId → display name, for showing/selecting the claim's vehicle.
 	let vehicleNameMap = $derived(new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)])));
 
 	let claims = $state<InsuranceClaim[]>([]);
 	let isLoading = $state(true);
 	let loadError = $state<string | null>(null);
-	// Claim ids whose document drawer is open.
 	const expandedDocs = new SvelteSet<string>();
 
 	function toggleDocs(claimId: string) {
@@ -56,7 +52,6 @@
 		else expandedDocs.add(claimId);
 	}
 
-	// Inline form state. editingId === null while filing a new claim.
 	let showForm = $state(false);
 	let editingId = $state<string | null>(null);
 	let isSaving = $state(false);
@@ -68,7 +63,6 @@
 	let faultDesignation = $state<FaultDesignation | ''>('');
 	let description = $state('');
 
-	// Human-friendly labels for the snake_case enum values.
 	const STATUS_LABELS: Record<ClaimStatus, string> = {
 		filed: 'Filed',
 		in_progress: 'In progress',
@@ -80,10 +74,7 @@
 		not_at_fault: 'Not at fault',
 		shared: 'Shared fault'
 	};
-	// Badge variants are token-based and WCAG-AA verified. We deliberately do NOT
-	// use `text-chart-*` on a `bg-chart-*/10` tint — that combo (esp. chart-2 teal
-	// at 3.26:1) fails the AA color-contrast gate. 'denied' uses destructive;
-	// everything else uses secondary/outline, distinguished by the label text.
+	// Token-based badge colours that pass WCAG AA; text-chart-* on a chart tint fails contrast for some palette entries.
 	const STATUS_VARIANT: Record<ClaimStatus, 'secondary' | 'outline' | 'destructive'> = {
 		filed: 'outline',
 		in_progress: 'secondary',
@@ -124,9 +115,7 @@
 
 	function openEdit(claim: InsuranceClaim) {
 		editingId = claim.id;
-		// Local calendar date, not a bare UTC `.split('T')[0]`: the save persists via
-		// dateOnlyToISO → noon-local, so slicing the UTC date shifts the claim date back a day on edit for
-		// UTC+13/+14 users. toDateInputValue reads local Y/M/D, matching the InsuranceTermForm + fix.
+		// Use the local calendar date: the save persists via noon-local dateOnlyToISO, so a UTC slice shifts it for UTC+13/+14.
 		claimDate = claim.claimDate ? toDateInputValue(claim.claimDate) : '';
 		vehicleId = claim.vehicleId ?? '';
 		claimType = claim.claimType;
@@ -155,10 +144,7 @@
 		};
 		try {
 			if (editingId) {
-				// On EDIT, an emptied optional field must be sent as null (not
-				// undefined) so the column can be cleared — JSON.stringify drops
-				// undefined keys, so the backend would otherwise keep the old value.
-				// updateClaim's schema accepts nullish for all of these.
+				// On edit, send null for emptied optionals: JSON.stringify drops undefined, so the old value would survive.
 				await insuranceApi.updateClaim(policyId, editingId, {
 					...common,
 					description: description.trim() || null,
@@ -167,7 +153,6 @@
 					vehicleId: vehicleId || null
 				});
 			} else {
-				// On CREATE, omit empty optionals (no value to clear).
 				await insuranceApi.createClaim(policyId, {
 					...common,
 					description: description.trim() || undefined,
@@ -185,7 +170,6 @@
 		}
 	}
 
-	// Styled confirm dialog (replaces native confirm()).
 	let confirmOpen = $state(false);
 	let pendingDeleteId = $state<string | null>(null);
 
@@ -269,9 +253,7 @@
 							</div>
 							<div class="flex shrink-0 items-center gap-0.5">
 								{#if !readOnly}
-									<!-- Paperclip toggles the claim DocumentViewer (GET /photos/insurance_claim/:id),
-									     which is NOT widened for a shared viewer (T12b-3c) → hide it read-only, same
-									     reason the policy DocumentViewer is hidden in PolicyCard. -->
+									<!-- Paperclip toggles the claim's document drawer; the policy drawer lives in PolicyCard. -->
 									<Button
 										variant="ghost"
 										size="icon"

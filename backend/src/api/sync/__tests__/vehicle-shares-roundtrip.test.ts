@@ -1,19 +1,6 @@
-/**
- * TRUE backup → restore round-trip for vehicle_shares (vehicle-sharing T9, design §4/§6.4, R7/D7/D8,
- * ). vehicle_shares is threaded through the pipeline by hand (config maps +
- * OPTIONAL_BACKUP_FILES, createBackup query + validateShareRefs, restore FK-ordered insert +
- * ImportSummary + conflict-probe); the drift guards prove the wiring EXISTS — this proves the round-trip
- * preserves an owner's accepted grant AND honors the cross-tenant guarantees:
- *  - the OWNER's export carries their ACCEPTED grants (D7 — pending/declined/revoked are NOT exported),
- *  - the INVITEE's export does NOT pull the owner's shares (blast-radius, §6.4 — createBackup scopes by
- *  ownerId, and the invitee is never an ownerId),
- *  - restore re-stamps ownerId to the importer and (cross-instance) SKIPS a grant whose invitee user is
- *  absent rather than FK-aborting the whole restore (data-loss class).
- *
- * Shares are seeded directly via ctx.sqlite (the round-trip path — CSV serialize → parse → FK-ordered
- * insert — is independent of the share routes, same approach trips-roundtrip uses). createTestApp()
- * rewrites env then dynamic-imports DB-bound modules, so keep static imports to the harness + bun:test.
- */
+// Backup and restore of vehicle_shares. Only accepted grants are exported, and an invitee's export
+// never includes the owner's shares. Restore re-stamps the owner, and skips a grant whose invitee
+// is absent instead of failing the whole restore. Shares are seeded directly into SQLite.
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
@@ -59,7 +46,7 @@ function seedShare(
   );
 }
 
-describe('backup → restore round-trip preserves vehicle_shares (T9)', () => {
+describe('backup → restore round-trip preserves vehicle_shares', () => {
   test('an ACCEPTED grant survives export + restore with its fields intact', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const invitee = seedUser('invitee-rt', 'invitee-rt@test.com');
@@ -85,7 +72,7 @@ describe('backup → restore round-trip preserves vehicle_shares (T9)', () => {
     expect(rows[0].status).toBe('accepted');
   });
 
-  test('D7: only ACCEPTED grants are exported — pending/declined/revoked are NOT re-created', async () => {
+  test('only accepted grants are exported; pending, declined and revoked grants are not re-created', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const a = seedUser('inv-acc', 'acc@test.com');
     const p = seedUser('inv-pend', 'pend@test.com');
@@ -103,7 +90,6 @@ describe('backup → restore round-trip preserves vehicle_shares (T9)', () => {
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 
-    // Replace mode wiped everything; only the accepted grant was exported → only it returns.
     const rows = shareRows();
     expect(rows).toHaveLength(1);
     expect(rows[0].id).toBe('s-acc');
@@ -116,13 +102,11 @@ describe('backup → restore round-trip preserves vehicle_shares (T9)', () => {
     seedShare('s-blast', vehicleId, invitee, 'accepted');
 
     const { backupService } = await import('../backup');
-    // The invitee is sharedWithId, never ownerId → createBackup(invitee) scopes by ownerId=invitee → none.
+    // The invitee is never an ownerId, so their export scopes to nothing.
     const inviteeBackup = await backupService.createBackup(invitee);
     expect(inviteeBackup.vehicleShares ?? []).toHaveLength(0);
-    // And the invitee's backup does NOT carry the owner's vehicle either (it isn't theirs).
     expect(inviteeBackup.vehicles.find((v) => v.id === vehicleId)).toBeUndefined();
 
-    // The owner's backup DOES carry the grant.
     const ownerBackup = await backupService.createBackup(ctx.user.id);
     expect(ownerBackup.vehicleShares ?? []).toHaveLength(1);
   });
@@ -138,12 +122,11 @@ describe('backup → restore round-trip preserves vehicle_shares (T9)', () => {
     const { restoreService } = await import('../restore');
     const zip = await backupService.exportAsZip(ctx.user.id);
 
-    // Simulate a cross-instance restore: the 'absent' invitee does not exist at restore time. Replace mode
-    // wipes shares but NOT users; remove the absent invitee so its FK target is gone.
+    // The invitee is removed before restore, as in a cross-instance restore.
     ctx.sqlite.run('DELETE FROM users WHERE id = ?', [absent]);
 
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
-    // The whole restore SUCCEEDS (no FK abort) — the absent-invitee grant is silently skipped.
+    // The restore succeeds, skipping the absent-invitee grant.
     expect(result.success, JSON.stringify(result)).toBe(true);
     const rows = shareRows();
     expect(rows).toHaveLength(1);

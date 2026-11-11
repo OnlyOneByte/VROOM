@@ -39,9 +39,7 @@
 		photos = [...photos, result as Photo];
 	}
 
-	// Styled confirm dialog (replaces native confirm()) — deletion is permanent
-	// (removes the file from storage too) and the trash button sits on a hover
-	// overlay where a misclick is easy.
+	// Styled dialog: deletion also removes the stored file, and the trash button sits where misclicks are easy.
 	let confirmOpen = $state(false);
 	let pendingDeleteId = $state<string | null>(null);
 

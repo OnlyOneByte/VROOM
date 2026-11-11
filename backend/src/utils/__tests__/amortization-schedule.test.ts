@@ -1,14 +1,3 @@
-/**
- * buildAmortizationSchedule.
- *
- * The old buildLoanBreakdown read each loan's balance into a Map then NEVER decremented it across
- * the 12-month loop — so every month reported identical interest/principal (interest never declined,
- * principal never rose), and a loan that pays off mid-window was over-projected. These tests pin the
- * corrected amortization: balance walks down by principal each month, interest declines, principal
- * rises, and a paid-off loan stops contributing (clamped at 0, no negative interest / phantom
- * principal).
- */
-
 import { describe, expect, test } from 'bun:test';
 import { buildAmortizationSchedule } from '../analytics-charts';
 
@@ -16,7 +5,7 @@ const KEYS = (n: number) =>
   Array.from({ length: n }, (_, i) => `2024-${String(i + 1).padStart(2, '0')}`);
 
 describe('buildAmortizationSchedule', () => {
-  test('interest DECLINES and principal RISES month over month (the bug fix)', () => {
+  test('interest declines and principal rises month over month', () => {
     // $20,000 @ 6% APR, $400/mo. Month 1 interest = 20000 * 0.005 = 100; principal = 300.
     const sched = buildAmortizationSchedule(
       [{ balance: 20000, apr: 6, paymentAmount: 400 }],
@@ -24,25 +13,20 @@ describe('buildAmortizationSchedule', () => {
     );
     expect(sched).toHaveLength(3);
 
-    // Month 1 baseline.
     expect(sched[0].interest).toBeCloseTo(100, 6);
     expect(sched[0].principal).toBeCloseTo(300, 6);
 
-    // The defining assertion: each subsequent month's interest is strictly LESS and principal
-    // strictly MORE than the prior month (the old code made these all equal).
     expect(sched[1].interest).toBeLessThan(sched[0].interest);
     expect(sched[1].principal).toBeGreaterThan(sched[0].principal);
     expect(sched[2].interest).toBeLessThan(sched[1].interest);
     expect(sched[2].principal).toBeGreaterThan(sched[1].principal);
 
-    // Each month's interest + principal still equals the fixed payment (until payoff).
     for (const row of sched) {
       expect(row.interest + row.principal).toBeCloseTo(400, 6);
     }
   });
 
   test('a loan that pays off mid-window stops contributing (clamped, no negative/phantom)', () => {
-    // Small balance relative to payment → pays off within a couple months.
     const sched = buildAmortizationSchedule(
       [{ balance: 500, apr: 12, paymentAmount: 400 }],
       KEYS(4)
@@ -52,7 +36,6 @@ describe('buildAmortizationSchedule', () => {
     expect(sched[0].principal).toBeCloseTo(395, 6);
     // Month 2: interest = 105 * 0.01 = 1.05; principal = min(398.95, 105) = 105 → balance 0.
     expect(sched[1].principal).toBeCloseTo(105, 6);
-    // Months 3-4: balance is 0 → no contribution at all (not a phantom full payment).
     expect(sched[2].interest).toBe(0);
     expect(sched[2].principal).toBe(0);
     expect(sched[3].interest).toBe(0);
@@ -86,24 +69,16 @@ describe('buildAmortizationSchedule', () => {
     ]);
   });
 
-  // deep-review: the negative-amortization edge — a payment that doesn't even cover the monthly
-  // interest. principal = Math.max(0, payment − interest) clamps to 0, so the balance NEVER decreases
-  // and the loan never pays off in the projection (a genuinely under-water loan — correct behavior,
-  // but the prior tests all used payment > interest, leaving this branch unpinned).
+  // The balance is frozen here, so the loan never pays down and interest never declines.
   test('a payment below the monthly interest → principal 0, balance never moves (negative amortization)', () => {
-    // $10,000 @ 24% APR → monthly interest = 10000 * 0.02 = $200, but payment is only $150 (< interest).
     const sched = buildAmortizationSchedule(
       [{ balance: 10000, apr: 24, paymentAmount: 150 }],
       KEYS(3)
     );
     for (const row of sched) {
-      // Interest is the full monthly accrual on the UNCHANGED balance (200), every month identically —
-      // because principal=0 means the balance is frozen, so the interest doesn't decline.
       expect(row.interest).toBeCloseTo(200, 6);
-      // No principal is ever paid down (the payment is fully consumed by interest, and then some).
       expect(row.principal).toBe(0);
     }
-    // The balance is the same every month (frozen) → interest is identical across all rows.
     expect(sched[0].interest).toBeCloseTo(sched[2].interest, 6);
   });
 });

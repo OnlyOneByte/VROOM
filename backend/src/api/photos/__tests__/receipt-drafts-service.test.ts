@@ -1,14 +1,8 @@
 /**
- * Photos → auto-expense STAGE orchestration (photos-auto-expense T2) — the pure {@link
- * stageReceiptDrafts} logic, driven via injected fakes (NO DB, NO HTTP). Pins the design-§2 contract:
- *  - a clean multi-photo sweep returns one draft per photo (download → parse → fresh thumbnail);
- *  - an already-imported photo is FILTERED OUT (the idempotency cross-ref, D3/R5);
- *  - a per-item VLM/download failure degrades to an EMPTY draft for THAT item (never a batch fail);
- *  - a thumbnail-URL failure degrades that item's thumbnailUrl to null (not fatal);
- *  - a Photos LIST/transport failure PROPAGATES (the route maps it to 502 — anti-fail-open);
- *  - the D4 cap is honored (listReceiptPhotos is called with the cap).
- *
- * The HTTP wiring (provider resolution, the 400/502 mapping) is pinned separately by the route test.
+ * stageReceiptDrafts with injected fakes and no DB or HTTP. Covers one draft per photo, skipping
+ * already-imported photos, per-item parse or download failures becoming an empty draft, thumbnail
+ * failures becoming null, list failures propagating, and the per-run cap. HTTP wiring is tested in
+ * the route test.
  */
 
 import { describe, expect, test } from 'bun:test';
@@ -36,7 +30,7 @@ function photo(id: string, mimeType = 'image/jpeg'): PhotosMediaItem {
   return { id, filename: `${id}.jpg`, baseUrl: `https://photos.fake/${id}`, mimeType };
 }
 
-describe('stageReceiptDrafts — the stage orchestration (T2)', () => {
+describe('stageReceiptDrafts', () => {
   test('a clean multi-photo sweep returns one draft per photo, with thumbnails', async () => {
     const parsed: Record<string, ReceiptDraft> = {
       'm-1': { amount: 12.5, category: 'fuel' },
@@ -45,7 +39,7 @@ describe('stageReceiptDrafts — the stage orchestration (T2)', () => {
     const deps = makeDeps({
       listReceiptPhotos: async () => [photo('m-1'), photo('m-2')],
       parseImage: async (bytes) => {
-        // The bytes carry the id (the fake download returns `bytes-<id>`), so we can route the parse.
+        // Downloaded bytes encode the photo id, so the parse can be routed per photo.
         const id = bytes.toString().replace('bytes-', '');
         return parsed[id] ?? {};
       },
@@ -61,10 +55,9 @@ describe('stageReceiptDrafts — the stage orchestration (T2)', () => {
     expect(drafts[1]?.draft).toEqual({ amount: 40, vendor: 'Shell' });
   });
 
-  test('an already-imported photo is filtered out (the idempotency cross-ref, D3)', async () => {
+  test('an already-imported photo is filtered out', async () => {
     const deps = makeDeps({
       listReceiptPhotos: async () => [photo('m-1'), photo('m-2'), photo('m-3')],
-      // m-2 already backs an expense (its photos:<id> clientId exists) → skip it.
       isAlreadyImported: async (id) => id === 'm-2',
     });
     const drafts = await stageReceiptDrafts(deps);
@@ -81,7 +74,7 @@ describe('stageReceiptDrafts — the stage orchestration (T2)', () => {
     });
     const drafts = await stageReceiptDrafts(deps);
     expect(drafts).toHaveLength(3);
-    expect(drafts.find((d) => d.photoId === 'boom')?.draft).toEqual({}); // empty draft, not a throw
+    expect(drafts.find((d) => d.photoId === 'boom')?.draft).toEqual({});
     expect(drafts.find((d) => d.photoId === 'ok')?.draft).toEqual({ amount: 5 });
   });
 
@@ -106,7 +99,7 @@ describe('stageReceiptDrafts — the stage orchestration (T2)', () => {
     });
     const drafts = await stageReceiptDrafts(deps);
     expect(drafts[0]?.thumbnailUrl).toBeNull();
-    expect(drafts[0]?.draft).toEqual({ amount: 10 }); // the parse still ran
+    expect(drafts[0]?.draft).toEqual({ amount: 10 });
   });
 
   test('a Photos LIST/transport failure PROPAGATES (the route maps it to 502)', async () => {
@@ -118,7 +111,7 @@ describe('stageReceiptDrafts — the stage orchestration (T2)', () => {
     await expect(stageReceiptDrafts(deps)).rejects.toThrow('Photos API 503');
   });
 
-  test('the D4 per-run cap is passed through to the Photos read', async () => {
+  test('the per-run cap is passed through to the Photos read', async () => {
     let calledWith = -1;
     const deps = makeDeps({
       listReceiptPhotos: async (max) => {
@@ -128,14 +121,12 @@ describe('stageReceiptDrafts — the stage orchestration (T2)', () => {
     });
     await stageReceiptDrafts(deps);
     expect(calledWith).toBe(MAX_RECEIPT_PHOTOS_PER_RUN);
-    // And an explicit override is honored.
     await stageReceiptDrafts(deps, 5);
     expect(calledWith).toBe(5);
   });
 
   test('PERSISTS NOTHING — the orchestration only reads (no write seam in StageDeps)', () => {
-    // Structural guard: StageDeps exposes ONLY read seams (list/download/freshUrl/parse/isImported).
-    // There is no create/write dependency, so the stage cannot persist an expense (design §2).
+    // No write seam exists in StageDeps, so staging cannot persist an expense.
     const deps = makeDeps();
     expect(Object.keys(deps).sort()).toEqual([
       'downloadPhoto',

@@ -1,19 +1,3 @@
-/**
- * Migration 0000: the collapsed baseline — the whole schema in one file.
- *
- * The fourteen incremental migrations this replaces are gone; `docs/architecture.md` records the
- * break. What matters here is that the baseline lands on the EXACT schema `schema.ts` declares,
- * because a regenerated baseline is only as good as its diff against what shipped before.
- *
- * The index inventory below is asserted as SET EQUALITY, not `toContain`, and that is the point.
- * Four of the eight partial indexes only ever existed as hand-written SQL appended to a migration —
- * absent from `schema.ts`, therefore invisible to `drizzle-kit generate`, therefore silently
- * dropped by exactly the regenerate that produced this file. Three of them (`pr_pending_idx`,
- * `up_auth_identity_idx`, `vf_active_vehicle_idx`) were in fact lost and restored by hand before
- * this landed. Set equality is what makes the next such loss loud: a `toContain` wall grows a hole
- * the moment someone deletes the matching line, while a missing key fails here with its own name.
- */
-
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
@@ -26,7 +10,6 @@ import {
   loadMigrations,
 } from './migration-helpers';
 
-/** Every table the baseline creates. Set-compared, so an addition or a drop must be deliberate. */
 const EXPECTED_TABLES = [
   'expenses',
   'insurance_claims',
@@ -51,20 +34,7 @@ const EXPECTED_TABLES = [
   'vehicles',
 ];
 
-/**
- * Every explicit index, per table. The eight PARTIAL ones are the fragile population — each
- * encodes a uniqueness rule the application relies on and cannot restate, so losing one converts a
- * hard database constraint into silent data corruption:
- *
- *  - `expenses_user_client_idx`     offline-sync idempotency: one row per (user, client_id)
- *  - `rn_reminder_odo_idx`          one notification per (reminder, due_odometer)
- *  - `up_auth_identity_idx`         one auth identity per external account
- *  - `vehicle_shares_active_idx`    one live invite per (vehicle, invitee)
- *  - `vehicles_user_license_plate_idx`  one plate per user, NULLs exempt
- *  - `vf_active_vehicle_idx`        one ACTIVE financing per vehicle
- *  - `pr_pending_idx`               (non-unique) keeps the retry sweep off the `active` majority
- *  - `ps_user_endpoint_idx`         one subscription per (user, endpoint)
- */
+// Set equality, not toContain: a dropped index fails by name, and an unexpected one fails too.
 const EXPECTED_INDEXES: Record<string, string[]> = {
   expenses: [
     'expenses_category_date_idx',
@@ -99,7 +69,7 @@ const EXPECTED_INDEXES: Record<string, string[]> = {
   vehicles: ['vehicles_user_id_idx', 'vehicles_user_license_plate_idx'],
 };
 
-/** Money is stored as integer CENTS everywhere. Float dollars round-trip wrong; see `money.ts`. */
+// Money is integer cents; float dollars do not round-trip. See utils/money.ts.
 const MONEY_COLUMNS: Record<string, string[]> = {
   expenses: ['expense_amount', 'group_total'],
   insurance_claims: ['payout_amount'],
@@ -115,7 +85,7 @@ const MONEY_COLUMNS: Record<string, string[]> = {
   vehicles: ['purchase_price'],
 };
 
-describe('Migration 0000: collapsed baseline schema', () => {
+describe('Migration 0000: baseline schema', () => {
   let db: Database;
   const migrations = loadMigrations();
 
@@ -130,8 +100,7 @@ describe('Migration 0000: collapsed baseline schema', () => {
   });
 
   test('the baseline is the only migration', () => {
-    // The collapse's defining property. A second file here means someone added a migration, which
-    // is fine — but then `migration-general`'s journal guard must have been updated to match.
+    // Adding a migration means updating this expectation and the journal checks in migration-general.
     expect(migrations.map((m) => m.tag)).toEqual(['0000_baseline']);
   });
 
@@ -154,9 +123,8 @@ describe('Migration 0000: collapsed baseline schema', () => {
   });
 
   test('every partial index really is partial (a WHERE clause, not just the right name)', () => {
-    // An index can keep its name and lose its predicate — a regenerate that drops the `.where()`
-    // turns `vf_active_vehicle_idx` into a plain unique on vehicle_id, which rejects the SECOND
-    // financing agreement a vehicle ever has rather than the second ACTIVE one.
+    // A regenerate can drop a .where() and keep the index name. A name check alone would miss that,
+    // and a non-partial unique on vehicle_id would reject a vehicle's second financing, not second active one.
     const partial = db
       .query<{ name: string; sql: string }, []>(
         "SELECT name, sql FROM sqlite_master WHERE type = 'index' AND sql LIKE '%WHERE%'"
@@ -176,9 +144,6 @@ describe('Migration 0000: collapsed baseline schema', () => {
   });
 
   test('every money column has INTEGER affinity (cents, not float dollars)', () => {
-    // The chain this baseline replaces never got here: its money-to-cents migration rewrote the
-    // VALUES with fourteen UPDATEs and left the declared types `real`, so the database disagreed
-    // with `schema.ts` for the rest of its life. SQLite's loose typing hid it.
     const wrong: string[] = [];
     for (const [table, columns] of Object.entries(MONEY_COLUMNS)) {
       const info = db
@@ -194,7 +159,7 @@ describe('Migration 0000: collapsed baseline schema', () => {
     expect(wrong).toEqual([]);
   });
 
-  test('vehicles carries the v2 column set (no current_insurance_policy_id)', () => {
+  test('vehicles has the expected column set (no current_insurance_policy_id)', () => {
     const cols = getColumnNames(db, 'vehicles');
     for (const column of [
       'id',
@@ -212,14 +177,13 @@ describe('Migration 0000: collapsed baseline schema', () => {
     expect(cols).not.toContain('current_insurance_policy_id');
   });
 
-  test('expenses carries volume, the polymorphic source pair, and the late additions', () => {
+  test('expenses carries volume, the polymorphic source pair, and the later-added columns', () => {
     const cols = getColumnNames(db, 'expenses');
     for (const column of [
       'volume',
       'source_type',
       'source_id',
       'user_id',
-      // Added by the migrations this baseline absorbed, so easy to lose in a regenerate.
       'client_id',
       'created_by',
       'location',
@@ -252,7 +216,7 @@ describe('Migration 0000: collapsed baseline schema', () => {
     expect(getColumnNames(db, 'photos')).toContain('user_id');
   });
 
-  test('user_preferences carries the config blobs and both late scalar columns', () => {
+  test('user_preferences carries the config blobs and the newer scalar columns', () => {
     const cols = getColumnNames(db, 'user_preferences');
     for (const column of [
       'user_id',
@@ -326,7 +290,6 @@ describe('Migration 0000: collapsed baseline schema', () => {
       'last_triggered_at',
       'created_at',
       'updated_at',
-      // Mileage triggering, absorbed from a later migration.
       'trigger_mode',
       'interval_mileage',
       'last_service_odometer',
@@ -368,7 +331,6 @@ describe('Migration 0000: collapsed baseline schema', () => {
   });
 
   test('the same external account may be linked twice outside the auth domain', () => {
-    // The predicate's whole purpose: storage/llm rows legitimately repeat a provider account.
     db.run("INSERT INTO users (id, email, display_name) VALUES ('u1', 'a@test.com', 'User A')");
     db.run(
       "INSERT INTO user_providers (id, user_id, domain, provider_type, provider_account_id, display_name, credentials, status) VALUES ('s1', 'u1', 'storage', 'google-drive', 'goog-123', 'Drive A', 'enc1', 'active')"
@@ -430,8 +392,7 @@ describe('Migration 0000: collapsed baseline schema', () => {
     db.run("DELETE FROM insurance_terms WHERE id = 'it1'");
 
     expect(countRows(db, 'insurance_term_vehicles')).toBe(0);
-    // `source_type`/`source_id` are a polymorphic pair, not a foreign key, so nothing cascades
-    // through them — the cost-history row survives and app-level cleanup owns the dangling ref.
+    // source_type/source_id are a polymorphic pair, not a foreign key, so nothing cascades through them.
     const expense = db
       .query<{ source_type: string | null; source_id: string | null }, []>(
         "SELECT source_type, source_id FROM expenses WHERE id = 'e1'"
@@ -443,15 +404,10 @@ describe('Migration 0000: collapsed baseline schema', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Property: license plate partial unique index enforcement
-// ---------------------------------------------------------------------------
-
 describe('Property: license plate partial unique index enforcement', () => {
   let db: Database;
   const migrations = loadMigrations();
 
-  /** A fresh schema per property run — the constraint under test is per-database. */
   function freshDb(): Database {
     const local = new Database(':memory:');
     local.run('PRAGMA foreign_keys = ON');
@@ -537,8 +493,7 @@ describe('Property: license plate partial unique index enforcement', () => {
   });
 
   test('the plate index is scoped PER USER — two users may hold the same plate', () => {
-    // The index is keyed (user_id, license_plate), not (license_plate). A global unique would
-    // reject the second user here, which is what it did before the per-user swap.
+    // A global unique index would reject the second user here.
     db.run("INSERT INTO users (id, email, display_name) VALUES ('u2', 'b@test.com', 'User B')");
     db.run(
       "INSERT INTO vehicles (id, user_id, make, model, year, license_plate) VALUES ('v1', 'u1', 'Toyota', 'Camry', 2022, 'ABC123')"
@@ -549,10 +504,6 @@ describe('Property: license plate partial unique index enforcement', () => {
     expect(countRows(db, 'vehicles')).toBe(2);
   });
 });
-
-// ---------------------------------------------------------------------------
-// Property: active financing partial unique index enforcement
-// ---------------------------------------------------------------------------
 
 describe('Property: active financing partial unique index enforcement', () => {
   let db: Database;

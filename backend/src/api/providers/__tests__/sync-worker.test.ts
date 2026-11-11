@@ -10,16 +10,6 @@ import {
   stopSyncWorker,
 } from '../sync-worker';
 
-// --- Collaborators are INJECTED, not mock.module'd ---
-//
-// This suite used to `mock.module('../../photos/photo-repository', ...)` (+ the
-// ref-repository and the registry). Bun's mock.module is process-global and
-// CANNOT be restored (mock.restore() only undoes mock() spies), so those stubs
-// leaked into every later file — a stubbed `photoRepository` missing
-// `findByUser` made real photos-route tests 500 in the full suite. The sync
-// worker now takes an optional `deps` arg (real default); tests pass fakes.
-// See .kiro/steering/TestingExternalAPIs.md (inject-don't-mock.module).
-
 const mockFindPendingOrFailed = mock<() => Promise<PhotoRef[]>>(() => Promise.resolve([]));
 const mockFindActiveByPhoto = mock<() => Promise<PhotoRef | null>>(() => Promise.resolve(null));
 const mockUpdateStatus = mock(() => Promise.resolve());
@@ -48,7 +38,6 @@ function makeMockProvider(type = 'google-drive') {
 const mockGetProvider = mock(() => Promise.resolve(makeMockProvider()));
 const mockResolveFolderPath = mock(() => Promise.resolve(''));
 
-/** Build the injected deps bundle from the per-test mocks above. */
 function makeDeps(): SyncWorkerDeps {
   return {
     photoRefRepository: {
@@ -65,8 +54,6 @@ function makeDeps(): SyncWorkerDeps {
     },
   } as unknown as SyncWorkerDeps;
 }
-
-// --- Test fixtures ---
 
 function makePhotoRef(overrides: Partial<PhotoRef> = {}): PhotoRef {
   return {
@@ -112,8 +99,6 @@ function makePhoto(overrides: Partial<Photo> = {}): Photo {
   };
 }
 
-// --- Tests ---
-
 describe('shouldSkipDueToBackoff', () => {
   test('returns false for pending refs (not failed)', () => {
     const ref = makePhotoRef({ status: 'pending' });
@@ -127,63 +112,61 @@ describe('shouldSkipDueToBackoff', () => {
 
   test('returns true when not enough time has passed (retryCount=0, need 30s)', () => {
     const lastAttempt = new Date('2025-01-01T00:00:00Z');
-    const now = new Date('2025-01-01T00:00:15Z'); // 15s later — need 30s
+    const now = new Date('2025-01-01T00:00:15Z');
     const ref = makePhotoRef({ status: 'failed', retryCount: 0, syncedAt: lastAttempt });
     expect(shouldSkipDueToBackoff(ref, now)).toBe(true);
   });
 
   test('returns false when enough time has passed (retryCount=0, 30s elapsed)', () => {
     const lastAttempt = new Date('2025-01-01T00:00:00Z');
-    const now = new Date('2025-01-01T00:00:31Z'); // 31s later — need 30s
+    const now = new Date('2025-01-01T00:00:31Z');
     const ref = makePhotoRef({ status: 'failed', retryCount: 0, syncedAt: lastAttempt });
     expect(shouldSkipDueToBackoff(ref, now)).toBe(false);
   });
 
   test('returns true for retryCount=1 when less than 60s elapsed', () => {
     const lastAttempt = new Date('2025-01-01T00:00:00Z');
-    const now = new Date('2025-01-01T00:00:50Z'); // 50s — need 60s (30 * 2^1)
+    const now = new Date('2025-01-01T00:00:50Z');
     const ref = makePhotoRef({ status: 'failed', retryCount: 1, syncedAt: lastAttempt });
     expect(shouldSkipDueToBackoff(ref, now)).toBe(true);
   });
 
   test('returns false for retryCount=1 when 60s+ elapsed', () => {
     const lastAttempt = new Date('2025-01-01T00:00:00Z');
-    const now = new Date('2025-01-01T00:01:01Z'); // 61s — need 60s
+    const now = new Date('2025-01-01T00:01:01Z');
     const ref = makePhotoRef({ status: 'failed', retryCount: 1, syncedAt: lastAttempt });
     expect(shouldSkipDueToBackoff(ref, now)).toBe(false);
   });
 
   test('returns true for retryCount=2 when less than 120s elapsed', () => {
     const lastAttempt = new Date('2025-01-01T00:00:00Z');
-    const now = new Date('2025-01-01T00:01:50Z'); // 110s — need 120s (30 * 2^2)
+    const now = new Date('2025-01-01T00:01:50Z');
     const ref = makePhotoRef({ status: 'failed', retryCount: 2, syncedAt: lastAttempt });
     expect(shouldSkipDueToBackoff(ref, now)).toBe(true);
   });
 
   test('falls back to createdAt when syncedAt is null', () => {
     const createdAt = new Date('2025-01-01T00:00:00Z');
-    const now = new Date('2025-01-01T00:00:15Z'); // 15s — need 30s
+    const now = new Date('2025-01-01T00:00:15Z');
     const ref = makePhotoRef({ status: 'failed', retryCount: 0, syncedAt: null, createdAt });
     expect(shouldSkipDueToBackoff(ref, now)).toBe(true);
   });
 });
 
 describe('startSyncWorker / stopSyncWorker', () => {
-  // CONFIG.syncWorker.enabled is false in NODE_ENV=test, so startSyncWorker is a
-  // no-op here — these assert the lifecycle is safe to call regardless.
   afterEach(() => {
     stopSyncWorker();
   });
 
   test('startSyncWorker is a no-op in the test environment (disabled)', () => {
     startSyncWorker();
-    stopSyncWorker(); // safe even with no interval to clear
+    stopSyncWorker();
   });
 
   test('stopSyncWorker is safe to call multiple times', () => {
     startSyncWorker();
     stopSyncWorker();
-    stopSyncWorker(); // second call should not throw
+    stopSyncWorker();
   });
 });
 
@@ -198,7 +181,6 @@ describe('processBatch', () => {
     mockDownload.mockReset();
     mockUpload.mockReset();
 
-    // Default: no pending refs
     mockFindPendingOrFailed.mockResolvedValue([]);
     mockResolveFolderPath.mockResolvedValue('');
   });
@@ -214,20 +196,16 @@ describe('processBatch', () => {
     const recentFailure = makePhotoRef({
       status: 'failed',
       retryCount: 0,
-      syncedAt: new Date(), // just now — within 30s backoff
+      syncedAt: new Date(),
     });
     mockFindPendingOrFailed.mockResolvedValue([recentFailure]);
 
     await processBatch(makeDeps());
 
-    // Should not attempt to process (no updateStatus calls)
     expect(mockUpdateStatus).not.toHaveBeenCalled();
     expect(mockFindActiveByPhoto).not.toHaveBeenCalled();
   });
 
-  // A ref with nothing to sync FROM must be written, not skipped: an untouched row comes straight
-  // back out of findPendingOrFailed (oldest first, LIMIT batchSize) on the next poll, forever, and
-  // starves every newer ref behind it. See sync-worker-stuck-ref-liveness.test.ts.
   test('records a failure when no active source ref exists for the photo', async () => {
     const pendingRef = makePhotoRef({ status: 'pending' });
     mockFindPendingOrFailed.mockResolvedValue([pendingRef]);
@@ -280,19 +258,17 @@ describe('processBatch', () => {
     const sourceProvider = makeMockProvider('google-drive');
     const targetProvider = makeMockProvider('s3');
     mockGetProvider
-      .mockResolvedValueOnce(sourceProvider) // for download
-      .mockResolvedValueOnce(targetProvider) // for path resolution
-      .mockResolvedValueOnce(targetProvider); // for upload
+      .mockResolvedValueOnce(sourceProvider)
+      .mockResolvedValueOnce(targetProvider)
+      .mockResolvedValueOnce(targetProvider);
 
     await processBatch(makeDeps());
 
-    // Should have downloaded from source
     expect(mockDownload).toHaveBeenCalledWith({
       providerType: 'google-drive',
       externalId: 'existing-file-id',
     });
 
-    // Should have uploaded to target with photo metadata
     expect(mockUpload).toHaveBeenCalledWith(
       expect.objectContaining({
         fileName: 'car.jpg',
@@ -302,7 +278,6 @@ describe('processBatch', () => {
       })
     );
 
-    // Should have updated status to active
     expect(mockUpdateStatus).toHaveBeenCalledWith('ref-1', {
       status: 'active',
       storageRef: 'new-file-id',
@@ -311,14 +286,10 @@ describe('processBatch', () => {
     });
   });
 
-  // The folder-path resolution is wrapped in its OWN try/catch (sync-worker.ts:228-234) so a
-  // storage_config glitch can't strand a photo in `failed` forever (— no silent loss).
-  // Every other test resolves the path cleanly, leaving this resilience branch unpinned: a throwing
-  // resolveProviderFolderPath must be swallowed and the upload must still proceed with an empty pathHint.
   test('path-resolution failure is swallowed — the sync still completes with an empty pathHint', async () => {
     const pendingRef = makePhotoRef({ status: 'pending' });
     const activeRef = makeActiveRef();
-    const photo = makePhoto(); // entityType 'vehicle' → IS in ENTITY_TO_CATEGORY, so resolve IS attempted
+    const photo = makePhoto();
 
     mockFindPendingOrFailed.mockResolvedValue([pendingRef]);
     mockFindActiveByPhoto.mockResolvedValue(activeRef);
@@ -334,11 +305,8 @@ describe('processBatch', () => {
 
     await processBatch(makeDeps());
 
-    // The resolve was attempted (vehicle maps to a category) and threw...
     expect(mockResolveFolderPath).toHaveBeenCalled();
-    // ...but the upload still happened, with the empty-string pathHint fallback.
     expect(mockUpload).toHaveBeenCalledWith(expect.objectContaining({ pathHint: '' }));
-    // ...and the ref ends up ACTIVE, not failed — the photo is not stranded.
     expect(mockUpdateStatus).toHaveBeenCalledWith('ref-1', {
       status: 'active',
       storageRef: 'new-file-id',
@@ -347,13 +315,10 @@ describe('processBatch', () => {
     });
   });
 
-  // An entityType absent from ENTITY_TO_CATEGORY yields an undefined category, so path
-  // resolution is SKIPPED entirely (the `if (category)` guard at sync-worker.ts:228) — the sync must
-  // still upload with the empty pathHint rather than crash on a missing map entry.
   test('unknown entityType skips path resolution and still uploads (empty pathHint)', async () => {
     const pendingRef = makePhotoRef({ status: 'pending' });
     const activeRef = makeActiveRef();
-    const photo = makePhoto({ entityType: 'not_a_known_entity' }); // NOT in ENTITY_TO_CATEGORY
+    const photo = makePhoto({ entityType: 'not_a_known_entity' });
 
     mockFindPendingOrFailed.mockResolvedValue([pendingRef]);
     mockFindActiveByPhoto.mockResolvedValue(activeRef);
@@ -368,9 +333,7 @@ describe('processBatch', () => {
 
     await processBatch(makeDeps());
 
-    // category undefined → the resolve branch is never entered.
     expect(mockResolveFolderPath).not.toHaveBeenCalled();
-    // Upload still proceeds with the empty pathHint default.
     expect(mockUpload).toHaveBeenCalledWith(expect.objectContaining({ pathHint: '' }));
     expect(mockUpdateStatus).toHaveBeenCalledWith('ref-1', {
       status: 'active',
@@ -400,7 +363,6 @@ describe('processBatch', () => {
 
     await processBatch(makeDeps());
 
-    // Should mark as failed with incremented retry count and error message
     expect(mockUpdateStatus).toHaveBeenCalledWith('ref-1', {
       status: 'failed',
       errorMessage: 'Upload failed: network timeout',
@@ -432,11 +394,6 @@ describe('processBatch', () => {
     });
   });
 
-  // A revoked/expired token (AUTH_INVALID) is TERMINAL — the provider adapters map a 401/403
-  // to it "so the user re-connects". The worker must NOT retry it: jump retryCount to the cap
-  // (so findPendingOrFailed's `retryCount < 3` stops re-picking it) + prefix the message so the
-  // provider-stats `failed` count means "reconnect required", not a transient flake. Pre-fix this
-  // ref would get retryCount:1 and a bare message + burn 3 backoff cycles. The family.
   test('parks a ref terminally (no retry) on a TERMINAL auth error', async () => {
     const { SyncError, SyncErrorCode } = await import('../../../errors');
     const pendingRef = makePhotoRef({ status: 'pending', retryCount: 0 });
@@ -460,10 +417,6 @@ describe('processBatch', () => {
 
     await processBatch(makeDeps());
 
-    // retryCount jumps straight to the cap (MAX_RETRY_COUNT) — NOT 1 — so the ref drops out of the
-    // work set (findPendingOrFailed's `retryCount < MAX_RETRY_COUNT`), and the message is reconnect-
-    // prefixed. Referencing the real constant (not a magic 3) keeps this in lockstep with the cap +
-    // the sync-worker-retry-ceiling-sync source-scan guard.
     expect(mockUpdateStatus).toHaveBeenCalledWith('ref-1', {
       status: 'failed',
       errorMessage: 'Reconnect required: Google Photos token revoked',
@@ -495,7 +448,6 @@ describe('processBatch', () => {
 
     await processBatch(makeDeps());
 
-    // Both refs should have been updated to active
     expect(mockUpdateStatus).toHaveBeenCalledTimes(2);
   });
 });

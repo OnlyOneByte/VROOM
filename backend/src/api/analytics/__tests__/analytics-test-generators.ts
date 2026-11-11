@@ -1,10 +1,3 @@
-/**
- * Shared test generators for analytics property tests.
- *
- * Provides fast-check arbitraries for users, vehicles, expenses,
- * and a helper to set up an in-memory SQLite DB with the full schema.
- */
-
 import { Database } from 'bun:sqlite';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import fc from 'fast-check';
@@ -12,9 +5,6 @@ import { applyMigrationsUpTo, loadMigrations } from '../../../db/__tests__/migra
 import type { AppDatabase } from '../../../db/connection';
 import * as schema from '../../../db/schema';
 
-// ---------------------------------------------------------------------------
-// Types for generated test data
-// ---------------------------------------------------------------------------
 export interface TestUser {
   id: string;
   email: string;
@@ -49,9 +39,6 @@ export interface TestInsurancePolicy {
   isActive: boolean;
 }
 
-// ---------------------------------------------------------------------------
-// Expense categories — must match the actual enum
-// ---------------------------------------------------------------------------
 const EXPENSE_CATEGORIES = [
   'fuel',
   'maintenance',
@@ -61,11 +48,6 @@ const EXPENSE_CATEGORIES = [
   'misc',
 ] as const;
 
-// ---------------------------------------------------------------------------
-// Arbitraries
-// ---------------------------------------------------------------------------
-
-/** Generate a unique test user. */
 export function userArb(index: number): fc.Arbitrary<TestUser> {
   return fc.constant({
     id: `user-${index}`,
@@ -74,7 +56,6 @@ export function userArb(index: number): fc.Arbitrary<TestUser> {
   });
 }
 
-/** Generate a test vehicle linked to a user. */
 export function vehicleArb(userId: string, vehicleIndex: number): fc.Arbitrary<TestVehicle> {
   return fc.record({
     id: fc.constant(`vehicle-${userId}-${vehicleIndex}`),
@@ -85,13 +66,11 @@ export function vehicleArb(userId: string, vehicleIndex: number): fc.Arbitrary<T
   });
 }
 
-/** Generate a test expense linked to a vehicle with realistic values. */
 export function expenseArb(
   vehicleId: string,
   expenseIndex: number,
   yearConstraint?: number
 ): fc.Arbitrary<TestExpense> {
-  // Use integer timestamps to avoid invalid Date edge cases
   const minTs = yearConstraint
     ? new Date(yearConstraint, 0, 2).getTime()
     : new Date(2020, 0, 2).getTime();
@@ -114,7 +93,6 @@ export function expenseArb(
   });
 }
 
-/** Generate a list of expenses for a vehicle. */
 export function expenseListArb(
   vehicleId: string,
   opts?: { minLength?: number; maxLength?: number; yearConstraint?: number }
@@ -131,16 +109,11 @@ export function expenseListArb(
   });
 }
 
-// ---------------------------------------------------------------------------
-// In-memory DB helpers
-// ---------------------------------------------------------------------------
-
 export interface TestDb {
   sqlite: Database;
   drizzle: AppDatabase;
 }
 
-/** Create an in-memory SQLite DB with the full schema applied. */
 export function createTestDb(): TestDb {
   const migrations = loadMigrations();
   const sqlite = new Database(':memory:');
@@ -149,7 +122,6 @@ export function createTestDb(): TestDb {
   return { sqlite, drizzle: drizzle(sqlite, { schema }) };
 }
 
-/** Insert a test user into the DB. */
 export function seedUser(db: Database, user: TestUser): void {
   db.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
     user.id,
@@ -158,7 +130,6 @@ export function seedUser(db: Database, user: TestUser): void {
   ]);
 }
 
-/** Insert a test vehicle into the DB. */
 export function seedVehicle(db: Database, vehicle: TestVehicle): void {
   db.run('INSERT INTO vehicles (id, user_id, make, model, year) VALUES (?, ?, ?, ?, ?)', [
     vehicle.id,
@@ -169,13 +140,11 @@ export function seedVehicle(db: Database, vehicle: TestVehicle): void {
   ]);
 }
 
-/** Insert a test expense into the DB. */
 export function seedExpense(db: Database, expense: TestExpense): void {
   const dateUnix = Math.floor(expense.date.getTime() / 1000);
   if (Number.isNaN(dateUnix)) {
     throw new Error(`Invalid date for expense ${expense.id}: ${expense.date}`);
   }
-  // Resolve userId: use explicit value, or look up from vehicle
   let userId = expense.userId;
   if (!userId) {
     const row = db.query('SELECT user_id FROM vehicles WHERE id = ?').get(expense.vehicleId) as {
@@ -200,7 +169,6 @@ export function seedExpense(db: Database, expense: TestExpense): void {
   );
 }
 
-/** Insert a test insurance policy into the DB. */
 export function seedInsurancePolicy(db: Database, policy: TestInsurancePolicy): void {
   db.run('INSERT INTO insurance_policies (id, user_id, company, is_active) VALUES (?, ?, ?, ?)', [
     policy.id,
@@ -210,9 +178,6 @@ export function seedInsurancePolicy(db: Database, policy: TestInsurancePolicy): 
   ]);
 }
 
-// ---------------------------------------------------------------------------
-// Vehicle Financing helpers
-// ---------------------------------------------------------------------------
 export interface TestVehicleFinancing {
   id: string;
   vehicleId: string;
@@ -226,7 +191,6 @@ export interface TestVehicleFinancing {
   isActive: boolean;
 }
 
-/** Insert a test vehicle financing record into the DB. */
 export function seedVehicleFinancing(db: Database, fin: TestVehicleFinancing): void {
   const startDateUnix = Math.floor(fin.startDate.getTime() / 1000);
   db.run(
@@ -246,15 +210,11 @@ export function seedVehicleFinancing(db: Database, fin: TestVehicleFinancing): v
   );
 }
 
-// ---------------------------------------------------------------------------
-// Insurance Term Vehicle helpers
-// ---------------------------------------------------------------------------
 export interface TestInsuranceTermVehicle {
   termId: string;
   vehicleId: string;
 }
 
-/** Insert a test insurance term vehicle junction record into the DB. */
 export function seedInsuranceTermVehicle(db: Database, row: TestInsuranceTermVehicle): void {
   db.run('INSERT INTO insurance_term_vehicles (term_id, vehicle_id) VALUES (?, ?)', [
     row.termId,
@@ -262,11 +222,6 @@ export function seedInsuranceTermVehicle(db: Database, row: TestInsuranceTermVeh
   ]);
 }
 
-// ---------------------------------------------------------------------------
-// DateRange helpers
-// ---------------------------------------------------------------------------
-
-/** Convert a year number to a DateRange (unix timestamps in seconds). */
 export function yearToRange(year: number): { start: number; end: number } {
   return {
     start: Math.floor(new Date(year, 0, 1).getTime() / 1000),

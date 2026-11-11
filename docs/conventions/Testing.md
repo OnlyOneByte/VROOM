@@ -1,8 +1,3 @@
----
-inclusion: fileMatch
-fileMatchPattern: "**/*.test.ts,**/*.test.js,**/*.spec.ts,**/playwright/**,**/e2e/**"
----
-
 # Testing Conventions
 
 ## Frameworks

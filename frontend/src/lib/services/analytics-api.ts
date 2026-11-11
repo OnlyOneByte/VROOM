@@ -16,46 +16,34 @@ import { ApiError } from '$lib/utils/error-handling';
 import { apiClient } from './api-client';
 import { buildQueryString } from './api-utils';
 
-/** Parameters accepted by the fuel efficiency endpoint. */
 interface FuelEfficiencyParams {
 	vehicleId?: string;
 }
 
-/** Response shape returned by the fuel efficiency endpoint. */
 interface FuelEfficiencyResponse {
 	fuelEfficiencyTrend: FuelEfficiencyPoint[];
 }
 
 /**
- * Default analytics window: the twelve local calendar months ending with TODAY, as unix seconds.
- *
- * Both bounds are LOCAL midnights, never the current instant. A date-only expense is stored
- * anchored at NOON local (`dateOnlyToISO`) and the backend's upper bound is exclusive
- * (`date < end`), so an end bound at "now" puts everything dated today in the FUTURE until the
- * clock passes noon — a fill-up logged at 08:00 would be missing from every chart and total on the
- * page. Ending at the start of TOMORROW covers the whole local day whatever time-of-day a row is
- * anchored at. Same exclusive-day-after bound the list filter uses.
+ * Twelve local months ending at the start of tomorrow, in unix seconds. Not "now": date-only expenses
+ * are anchored at noon and the upper bound is exclusive, so an end of "now" would hide today's rows
+ * until noon.
  */
 export function getDefaultDateRange(): { startDate: number; endDate: number } {
 	const now = new Date();
 	const year = now.getFullYear();
 	const month = now.getMonth();
 	const day = now.getDate();
-	// Day/month overflow is normalized by the Date constructor, so day + 1 is rollover-safe.
+	// The Date constructor normalizes day/month overflow, so day + 1 is safe.
 	const start = Math.floor(new Date(year - 1, month, day).getTime() / 1000);
 	const end = Math.floor(new Date(year, month, day + 1).getTime() / 1000);
 	return { startDate: start, endDate: end };
 }
 
-/** Build a query string from optional params, prepending '?' if non-empty. */
 function buildQuery(params: Record<string, string | number | undefined>): string {
 	return buildQueryString(params);
 }
 
-/**
- * Analytics API service
- * Centralized API calls for analytics-related operations
- */
 export const analyticsApi = {
 	async getFuelEfficiency(params?: FuelEfficiencyParams): Promise<FuelEfficiencyResponse> {
 		return apiClient.get<FuelEfficiencyResponse>(
@@ -142,8 +130,7 @@ export const analyticsApi = {
 				`/api/v1/analytics/summary${buildQuery({ startDate: params.startDate, endDate: params.endDate })}`
 			);
 		} catch (error: unknown) {
-			// Only fall back to individual endpoints for 404 (endpoint not deployed yet)
-			// or network errors. Other errors (401, 500, etc.) should propagate.
+			// Fall back only for 404 (endpoint not deployed yet) or network errors.
 			const is404 = error instanceof ApiError && error.statusCode === 404;
 			const isNetworkError = error instanceof TypeError;
 			if (!is404 && !isNetworkError) throw error;

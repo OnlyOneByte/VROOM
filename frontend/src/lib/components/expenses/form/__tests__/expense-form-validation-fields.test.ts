@@ -1,12 +1,4 @@
-/**
- * Coverage for validateExpenseField's non-date branches + validateMileage (guard ratchet —
- * expense-form-validation.ts was ~15% covered; only the date slice had a test). These are PURE
- * (a ValidationContext in, an error-string-or-null out — no DOM/network), and carry real form rules:
- * the amount/volume/charge bounds, the fuel-vs-charging unit gating (electric fuelType routes to
- * `charge`, else `volume`), and — the load-bearing one — validateMileage's MONOTONICITY check (a
- * fuel entry's odometer must sit strictly between the nearest earlier-dated and later-dated entries).
- * A regression in that ordering logic would silently let out-of-order odometer readings through.
- */
+// Non-date branches of validateExpenseField, plus the validateMileage odometer monotonicity check.
 
 import { describe, expect, test } from 'vitest';
 import type { Vehicle } from '$lib/types';

@@ -1,17 +1,6 @@
-/**
- * HTTP success-path coverage for sync/routes.ts (guard ratchet — the 31%-line low spot).
- *
- * sync-route-errors.test.ts pins the ERROR paths (validation 400s, auth 401, health). This
- * complements it with the uncovered SUCCESS/derivation handlers — all pure DB-read + in-handler
- * derivation, so they drive the REAL routes via createTestApp() over in-memory SQLite with NO provider
- * network and NO mock.module (avoiding the cross-suite trap + the restoreFromSheets gap):
- *  - GET /status — the backupEnabled / sheetsSyncEnabled derivation from backupConfig (lines 105-110),
- *  - GET /restore/providers — the sourceTypes (zip needs enabled+lastBackupAt; sheets needs
- *  sheetsSyncEnabled+sheetsSpreadsheetId) derivation + the skip-when-neither branch (280-298),
- *  - POST / — the no-enabled-providers success envelope (the 95 happy path).
- *
- * createTestApp() rewrites env then dynamic-imports DB-bound modules; keep imports to the harness.
- */
+// Success and derivation paths of the sync routes, driven through the real routes over in-memory
+// SQLite with no provider network: status flags, restore provider sourceTypes, the empty-backup
+// success envelope, and the backup download.
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, json, type TestApp } from '../../../test-helpers/http-client';
@@ -59,7 +48,6 @@ describe('GET /api/v1/sync/status — derived flags from backupConfig', () => {
     expect(body.success).toBe(true);
     expect(body.data.backupEnabled).toBe(false);
     expect(body.data.sheetsSyncEnabled).toBe(false);
-    // A field from the prefs row proves the handler assembled the real response.
     expect(typeof body.data.syncOnInactivity).toBe('boolean');
   });
 
@@ -147,8 +135,6 @@ describe('GET /api/v1/sync/restore/providers — sourceTypes derivation', () => 
 
 describe('POST /api/v1/sync — success envelope', () => {
   test('valid syncTypes with NO enabled providers → 200 success (orchestrator no-op)', async () => {
-    // validateSyncTypes passes; backupOrchestrator.execute with no enabled providers returns
-    // { results: {} } (not in_progress), so the route hits createSuccessResponse — the 95 happy path.
     const res = await ctx.authed('POST', '/api/v1/sync', { syncTypes: ['backup'] });
     const body = await json<{ success: boolean; message: string; data: { results: unknown } }>(res);
     expect(res.status, JSON.stringify(body)).toBe(200);
@@ -157,9 +143,8 @@ describe('POST /api/v1/sync — success envelope', () => {
   });
 });
 
-// The route must NOT report 200 when every backup provider failed. Drive the REAL route with a
-// fake failing strategy registered in the registry + a seeded enabled provider (leak-free: overwrite
-// the custom type with a no-op afterwards; real google-drive untouched).
+// A backup where every provider failed must not return 200. A failing fake strategy is registered
+// for the test and overwritten with a no-op afterwards.
 describe('POST /api/v1/sync — honest HTTP status on backup failure', () => {
   test('all providers fail → 502 error envelope (not a 200 false success)', async () => {
     const { backupStrategyRegistry } = await import('../backup-strategy-registry');
@@ -200,10 +185,8 @@ describe('POST /api/v1/sync — honest HTTP status on backup failure', () => {
   });
 });
 
-// The backups download + list-providers route slices were uncovered (sync/routes.ts 139-154,
-// 126-137). Both are PROVIDER-FREE: download reads the user's OWN db data via exportAsZip; the
-// no-providerId list path returns [] when no backup providers are enabled. (The byte/provider-bound
-// restore-from-provider paths stay the mock-trap territory, deliberately left.)
+// Provider-free paths: the download exports the user's own data, and the list is empty when no
+// backup provider is enabled.
 describe('GET /api/v1/sync/backups/download — the manual backup-export route', () => {
   test('returns a real ZIP with the attachment headers (no provider needed — own-data export)', async () => {
     // Seed a row so the export has content (the user already exists via the harness).

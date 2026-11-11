@@ -13,10 +13,6 @@ interface UpdateOdometerRequest {
 	note?: string;
 }
 
-/**
- * Odometer API service
- * Handles all odometer entry CRUD operations
- */
 export const odometerApi = {
 	async getEntries(
 		vehicleId: string,

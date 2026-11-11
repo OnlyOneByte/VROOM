@@ -1,19 +1,5 @@
-/**
- * Data-recovery guard: a backup restored onto a DIFFERENT instance must not be rejected by an FK to a
- * user that only existed on the old one.
- *
- * `expenses.created_by` is PROVENANCE — who physically entered a row on a shared vehicle — and the
- * column's documented NULL means legacy/self. Users are deliberately NOT part of a backup (identity and
- * credentials stay out), yet the schema-derived export ships created_by, so restoring a shared-fleet
- * backup onto a fresh self-hosted instance used to hit a raw `FOREIGN KEY constraint failed` and abort
- * the whole restore — the user could not recover their own data at all. insertBackupData already
- * filtered exactly this class for vehicle_shares.shared_with_id and photo_refs.provider_id; the
- * provenance column now gets the same treatment, dropping to NULL when the author is absent while every
- * other column rides through.
- *
- * createTestApp() rewrites env then dynamic-imports DB-bound modules, so import backup/restore
- * dynamically AFTER createTestApp.
- */
+// A backup restored onto another instance must not fail on an expenses.created_by that names a user
+// absent here. Such an author is dropped to NULL, and the rest of the row is kept.
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import AdmZip from 'adm-zip';
@@ -65,9 +51,7 @@ describe('restore of a backup whose created_by names a user absent from this ins
       [vehicleId, ctx.user.id]
     );
 
-    // A genuine export, then the one edit that makes it a FOREIGN instance's backup: the author id is
-    // one this instance has never issued. (Rewriting the file is how a cross-instance restore actually
-    // presents — the backup is just bytes naming an account that lives somewhere else.)
+    // The author id is one this instance never issued, as in a backup from another instance.
     const zip = new AdmZip(await backupService.exportAsZip(ctx.user.id));
     const entry = zip.getEntry('expenses.csv');
     if (!entry) throw new Error('expenses.csv missing from the exported backup');

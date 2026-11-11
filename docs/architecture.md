@@ -134,7 +134,7 @@ raw hex, so theming and dark mode work everywhere at once.
 Expense categories are a closed set: `fuel`, `maintenance`, `financial`, `regulatory`,
 `enhancement`, `misc`.
 
-Full conventions, including the Svelte 5 decision trees, are in `.kiro/steering/`.
+Full conventions, including the Svelte 5 decision trees, are in `docs/conventions/`.
 
 ### Offline
 

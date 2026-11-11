@@ -152,17 +152,13 @@
 
 	let Icon = $derived(getProviderIcon(provider.providerType));
 
-	// Google Photos is a photo destination only — it can't store ZIP backups (the
-	// Library API is append-only/photos-only, no folder listing). Hide the ZIP toggle
-	// for it; Drive/S3 keep it. Mirrors the backend capability gate (D3b/D2a).
+	// Google Photos is photo-only (no ZIP backups), so the ZIP toggle is hidden for it.
 	let supportsZipBackup = $derived(provider.providerType !== 'google-photos');
 </script>
 
 <Card>
 	<CardHeader class="pb-3">
-		<!-- min-w-0: CardHeader is a CSS grid; a grid item defaults to min-width:auto,
-		     so a long provider name would expand the track past the viewport and
-		     overflow on mobile until the item is allowed to shrink. -->
+		<!-- min-w-0 lets the grid item shrink so long text does not overflow on mobile. -->
 		<div class="flex items-center justify-between gap-2 min-w-0">
 			<div class="flex items-center gap-3 min-w-0">
 				<div class="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
@@ -268,7 +264,6 @@
 		<CardContent class="pt-0">
 			<Separator class="mb-4" />
 
-			<!-- Provider-specific info -->
 			<div class="space-y-3 mb-4">
 				<p class="text-sm font-medium text-muted-foreground">Provider Settings</p>
 				{#if provider.providerType === 's3'}
@@ -291,7 +286,6 @@
 
 			<Separator class="mb-4" />
 
-			<!-- Sync & Storage -->
 			<div class="space-y-3">
 				<div class="flex items-center justify-between">
 					<p class="text-sm font-medium text-muted-foreground">

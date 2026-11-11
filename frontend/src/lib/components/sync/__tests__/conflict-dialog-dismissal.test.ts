@@ -1,13 +1,4 @@
-/**
- * The conflict dialog's dismissal controls must actually dismiss it.
- *
- * The dialog auto-opens from an effect that fires whenever a conflict is queued. Every exit — the
- * footer's Skip, the X, Escape, an overlay click — only sets `open` false, which re-satisfies that
- * effect in the same flush, so the dialog reopened immediately and the only way out was to resolve
- * every conflict. Deferring now records WHICH batch was dismissed, by identity: the conflicts stay
- * queued (the sidebar keeps counting them) and the next sync run, which replaces the array
- * wholesale, brings the dialog back.
- */
+// Dismissing the conflict dialog must stick: the auto-open effect must not reopen it, but a new sync batch does.
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
@@ -42,7 +33,6 @@ function conflict(id: string): SyncConflict {
 	};
 }
 
-/** Let the auto-open effect and the dialog's own transitions settle. */
 async function settle(): Promise<void> {
 	for (let i = 0; i < 5; i++) {
 		await new Promise(resolve => setTimeout(resolve, 0));

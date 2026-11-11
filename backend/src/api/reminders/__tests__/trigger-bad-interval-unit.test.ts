@@ -1,17 +1,7 @@
 /**
- * Bug (audit, severity-raised, fixed): an invalid custom `intervalUnit` must not
- * hang the trigger.
- *
- * advanceCustom switches on intervalUnit (day|week|month|year). Before the fix it had no default, so
- * an unknown unit left the date UNCHANGED — and because fastForwardPastNow loops `while (nextDue <=
- * now)` with no iteration cap, a custom reminder lapsed past the catch-up limit (12) with a corrupt
- * unit would spin forever, hanging the POST /trigger endpoint. Zod blocks bad units on the create +
- * update API paths, so this is only reachable via DB corruption / a validation bypass — hence the row
- * is seeded directly via sqlite here.
- *
- * The fix (advanceCustom throws on an unknown unit + a non-progress backstop in fastForwardPastNow)
- * turns the hang into a per-reminder SKIP: the trigger returns, the bad reminder is reported in
- * `skipped` with an error reason, and well-formed reminders in the same batch still process.
+ * An invalid custom intervalUnit must not hang the trigger. The bad reminder is reported as a per-reminder
+ * skip, and well-formed reminders in the same batch still process. Zod blocks bad units on write, so the
+ * row is seeded directly via sqlite.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -36,13 +26,7 @@ interface TriggerResultShape {
   skipped: Array<{ reminderId: string; reason: string; message?: string }>;
 }
 
-/**
- * Seed a custom-frequency reminder with a CORRUPT intervalUnit, lapsed far in the past so it blows
- * through the maxCatchUp cap (12) and reaches fastForwardPastNow. next_due_date is in 2020 → fully
- * overdue, so findOverdue returns it and the time pass processes it. Links a vehicle (processReminder
- * skips a vehicle-less reminder with reason 'no_vehicles' BEFORE the date math, which wouldn't
- * exercise the advance path that hangs).
- */
+/** Seeds a custom reminder with a corrupt intervalUnit, overdue since 2020, with a linked vehicle. */
 function seedCorruptCustomReminder(id: string, vehicleId: string): void {
   ctx.sqlite.run(
     `INSERT INTO reminders
@@ -58,13 +42,11 @@ function seedCorruptCustomReminder(id: string, vehicleId: string): void {
   ]);
 }
 
-describe('bug — invalid custom intervalUnit is skipped, never hangs', () => {
-  test('a corrupt-intervalUnit reminder is reported in skipped, not an infinite loop', async () => {
+describe('invalid custom intervalUnit is skipped, never hangs', () => {
+  test('a corrupt-intervalUnit reminder is reported in skipped', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Kia', model: 'Soul', year: 2018 });
     seedCorruptCustomReminder('bad1', vehicleId);
 
-    // If the bug were present this POST would never return (spin in fastForwardPastNow). The fix
-    // turns it into a clean skip, so the request completes with a 200 + a skipped entry.
     const res = await ctx.authed('POST', '/api/v1/reminders/trigger');
     const body = await json<DataEnvelope<TriggerResultShape>>(res);
     expect(res.status, JSON.stringify(body)).toBe(200);
@@ -97,7 +79,6 @@ describe('bug — invalid custom intervalUnit is skipped, never hangs', () => {
 
     // Bad one skipped...
     expect(body.data.skipped.some((s) => s.reminderId === 'bad2')).toBe(true);
-    // ...good one still produced at least one notification (processing wasn't aborted by the bad one).
     const goodNotifs = ctx.sqlite
       .query('SELECT COUNT(*) AS n FROM reminder_notifications WHERE reminder_id = ?')
       .get(goodId) as { n: number };

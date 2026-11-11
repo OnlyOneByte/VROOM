@@ -60,7 +60,6 @@
 	import PaginationControls from '$lib/components/common/pagination-controls.svelte';
 	import { IsMobile } from '$lib/hooks/is-mobile.svelte';
 
-	// Types for grouped display
 	interface ExpenseRow {
 		type: 'standalone';
 		expense: Expense;
@@ -80,19 +79,14 @@
 
 	type DisplayRow = ExpenseRow | GroupRow;
 
-	// Columns the table can sort by. Mirrors the backend allowlist (date|amount);
-	// the old client-only first-tag "type" sort had no server equivalent and was
-	// already dead (tableRows re-sorted by date regardless), so it's dropped.
+	// Mirrors the backend sort allowlist (date|amount).
 	type SortField = 'date' | 'amount';
 
 	interface Props {
 		expenses: Expense[];
 		vehicles?: Vehicle[];
 		showVehicleColumn?: boolean;
-		/** Editing or deleting an expense is a write, so a vehicle shared read-only renders the table
-		 *  without either. When false the Edit links are hidden AND `onDelete` is suppressed, so every
-		 *  `{#if onDelete}` delete gate hides with it. Defaults true: a caller that does not mention
-		 *  sharing is the owner's own view. */
+		/** When false, Edit links and delete are hidden; defaults to true for the owner's own view. */
 		canWrite?: boolean;
 		returnTo?: string;
 		onDelete?: (_expense: Expense) => Promise<void>;
@@ -108,22 +102,11 @@
 		pageSize?: number;
 		isLoadingPage?: boolean;
 		onPageChange?: (_offset: number) => void;
-		// Server-side sort (controlled mode). When onSortChange is provided, the
-		// sortable headers report intent to the parent (which re-fetches the page
-		// server-sorted) instead of sorting the current page client-side — the latter
-		// only reorders the visible slice, so "sort by amount" would surface the
-		// biggest expense ON THIS PAGE, not overall. activeSortBy/Dir drive the header
-		// indicator. With no onSortChange the table falls back to local client sort.
+		// Controlled mode: client-side sorting would only reorder the visible page, so the parent owns the sort.
 		activeSortBy?: SortField;
 		activeSortDir?: 'asc' | 'desc';
 		onSortChange?: (_by: SortField, _dir: 'asc' | 'desc') => void;
-		// Server-side category filter (controlled mode), same opt-in shape as sort.
-		// When onCategoryChange is provided the category Select reports to the parent
-		// (which re-fetches the page server-filtered across ALL rows) instead of
-		// filtering the current page client-side — the latter only narrows the visible
-		// 20-row slice, so picking a category hides matching rows on other pages.
-		// activeCategory drives the trigger label. With no handler the table falls back
-		// to the local client-side category filter (used by the vehicle-detail tab).
+		// Controlled mode: client-side filtering would only narrow the visible page, so the parent owns the filter.
 		activeCategory?: string;
 		onCategoryChange?: (_category: string) => void;
 	}
@@ -154,9 +137,7 @@
 		onCategoryChange
 	}: Props = $props();
 
-	// A read-only viewer gets no delete. Suppressing the callback here — rather than at each site —
-	// hides every `{#if onDelete}` affordance (mobile + desktop, standalone + split) in one place.
-	// The Edit links are gated separately on `canWrite` at each href site.
+	// Suppressing onDelete here hides every delete affordance in one place; Edit links are gated on canWrite per href.
 	let onDelete = $derived(canWrite ? onDeleteProp : undefined);
 
 	// O(1) vehicle lookups — avoids an O(n) vehicles.find() per row per render
@@ -171,9 +152,6 @@
 
 	const isMobile = new IsMobile();
 
-	// Sorting. In controlled mode (onSortChange provided) the parent owns the sort
-	// and re-fetches the page server-sorted; the header indicator reads the active*
-	// props. In uncontrolled mode the table sorts the rows it was given locally.
 	let localSortBy = $state<SortField>('date');
 	let localSortOrder = $state<'asc' | 'desc'>('desc');
 	const controlled = $derived(onSortChange !== undefined);
@@ -182,44 +160,31 @@
 		controlled ? (activeSortDir ?? 'desc') : localSortOrder
 	);
 
-	// Category filter. In controlled mode (onCategoryChange provided) the parent owns
-	// it and re-fetches the page server-filtered; the Select reads activeCategory. In
-	// uncontrolled mode the table filters the rows it was given locally.
 	let localCategoryFilter = $state<string>('');
 	const categoryControlled = $derived(onCategoryChange !== undefined);
 	const categoryFilter = $derived<string>(
 		categoryControlled ? (activeCategory ?? '') : localCategoryFilter
 	);
 
-	// Delete modal state
 	let showDeleteModal = $state(false);
 	let expenseToDelete = $state<Expense | null>(null);
 	let isDeleting = $state(false);
 
-	// Filtered and sorted expenses.
-	// In controlled mode the server already sorted/filtered across the whole dataset,
-	// so we MUST preserve the received rows+order (re-doing it here would only act on
-	// the page slice and undo the point of going server-side). In uncontrolled mode we
-	// sort + category-filter the given rows locally.
+	// Controlled mode trusts the server's order and filtering; re-sorting here would only act on the current page.
 	let sortedExpenses = $derived.by(() => {
 		let filtered = [...expenses];
 
-		// Apply category filter locally ONLY when the parent isn't doing it server-side
-		// (controlled mode already returns rows pre-filtered to the chosen category).
 		if (categoryFilter && !categoryControlled) {
 			filtered = filtered.filter(e => e.category === categoryFilter);
 		}
 
 		if (controlled) return filtered;
 
-		// Sort via the shared comparator, which carries a stable id tiebreaker in the
-		// server's direction so equal date/amount rows don't reshuffle.
 		filtered.sort((a, b) => compareExpenseRows(a, b, sortBy, sortOrder));
 
 		return filtered;
 	});
 
-	// Group expenses: children with same groupId become collapsible groups
 	let tableRows = $derived.by((): DisplayRow[] => {
 		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- Map used within $derived computation, not mutated reactively
 		const grouped = new Map<string, Expense[]>();
@@ -240,12 +205,10 @@
 
 		const rows: DisplayRow[] = [];
 
-		// Add standalone expenses
 		for (const expense of standalone) {
 			rows.push({ type: 'standalone' as const, expense });
 		}
 
-		// Add group rows
 		for (const [groupId, children] of grouped) {
 			const first = children[0];
 			if (!first) continue;
@@ -269,16 +232,7 @@
 			});
 		}
 
-		// Re-order the combined rows by the ACTIVE sort field (not always date — the
-		// old hardcoded date sort here is what made the Amount header a no-op). Group
-		// rows use their representative value: total amount, or the group's date, and
-		// the first child's id as their stable key. This runs in both modes so a
-		// collapsed split group sits in the right place among standalone rows; in
-		// controlled mode it re-imposes the server's chosen order onto the grouped view
-		// (consistent, since both use the same field+direction). Via compareExpenseRows
-		// so equal date/amount rows break ties by id in the server's direction
-		// — grouping concatenates standalone-then-group, which would otherwise reshuffle
-		// same-key rows out of the server's order.
+		// Re-sort grouped rows by the active field so they match the header; the id tiebreak keeps server order for equal keys.
 		rows.sort((a, b) => {
 			const rowA: SortableRow =
 				a.type === 'standalone'
@@ -294,16 +248,11 @@
 		return rows;
 	});
 
-	// Expand state for groups
 	let expandedGroups = new SvelteSet<string>();
 
-	// Mobile: selected row for showing actions
 	let selectedRowId = $state<string | null>(null);
 
-	/** An insurance premium belongs to its policy, so the expense rows it materializes cannot be
-	 *  deleted from here. The reason must travel with the control: a `title` on a disabled button
-	 *  reaches nobody — the browser never hover-tests a `pointer-events-none` element and assistive
-	 *  tech skips a control that is out of the tab order. */
+	/** Insurance-generated expenses cannot be deleted here; the reason is visible text because a title on a disabled control is unreachable. */
 	const INSURANCE_DELETE_BLOCKED = 'Delete the insurance policy to remove this expense';
 
 	function isInsuranceLinked(row: GroupRow) {
@@ -336,11 +285,9 @@
 	}
 
 	function handleSort(newSortBy: SortField) {
-		// Toggle direction when re-selecting the active column, else default to desc.
 		const nextDir: 'asc' | 'desc' =
 			sortBy === newSortBy ? (sortOrder === 'asc' ? 'desc' : 'asc') : 'desc';
 		if (controlled) {
-			// Parent re-fetches the page server-sorted across the WHOLE dataset.
 			onSortChange?.(newSortBy, nextDir);
 		} else {
 			localSortBy = newSortBy;
@@ -350,7 +297,6 @@
 
 	function handleCategoryChange(value: string) {
 		if (categoryControlled) {
-			// Parent re-fetches the page server-filtered across the WHOLE dataset.
 			onCategoryChange?.(value);
 		} else {
 			localCategoryFilter = value;
@@ -368,10 +314,7 @@
 		isDeleting = true;
 
 		try {
-			// A split sibling carries a groupId; deleting it by its own id only removes
-			// that one row and orphans the rest of the split (the remaining rows no
-			// longer sum to the group total). Route it through the group-delete
-			// endpoint so every vehicle's portion goes — matching what the dialog says.
+			// Deleting one split sibling would orphan the rest, so route through the group-delete endpoint.
 			if (expenseToDelete.groupId) {
 				await expenseApi.deleteSplitExpense(expenseToDelete.groupId);
 			} else {
@@ -400,17 +343,9 @@
 		return vehicleMap.get(expense.vehicleId);
 	}
 
-	/** Layout of a compact row's summary, shared by its interactive and read-only forms. */
 	const MOBILE_ROW_SUMMARY_CLASS = 'flex w-full items-start gap-3 px-3 py-3 text-left';
 
-	/**
-	 * A compact row's Edit/Delete pair. They are drawn small so the revealed strip does not
-	 * dominate the card, which leaves them under the 40px tap-target floor — so each carries an
-	 * invisible 6px-per-side vertical hit area (28px drawn, 40px touchable) instead of growing.
-	 * `inset-x-0` keeps the extension vertical only: the two sit side by side and one of them is
-	 * destructive, so their hit areas must never overlap. Their container pads the top by the same
-	 * 6px so the extension stays inside the strip rather than stealing from the row above.
-	 */
+	/** Edit/Delete are drawn at 28px but keep 40px touch targets via a vertical hit-area extension that must not overlap. */
 	const MOBILE_ROW_ACTION_CLASS =
 		"h-7 px-2 text-xs relative before:absolute before:inset-x-0 before:-inset-y-1.5 before:content-['']";
 	const MOBILE_ROW_ACTIONS_CONTAINER_CLASS = 'flex items-center justify-end gap-2 px-3 pt-1.5 pb-3';
@@ -482,9 +417,7 @@
 		</EmptyContent>
 	</Empty>
 {:else if isMobile.current}
-	<!-- Mobile: compact card-style rows -->
 	<div class="rounded-md border bg-card">
-		<!-- Mobile sort/filter toolbar -->
 		<div class="flex items-center gap-2 border-b px-3 py-2">
 			<Select.Root
 				type="single"
@@ -540,7 +473,6 @@
 			</div>
 		</div>
 
-		<!-- Mobile rows -->
 		<div class="divide-y">
 			{#if tableRows.length === 0}
 				<div class="py-8 text-center">
@@ -554,10 +486,7 @@
 						{@const isSelected = selectedRowId === expense.id}
 						<div class="transition-colors {isSelected ? 'bg-muted/50' : ''}">
 							{#if canWrite}
-								<!-- The summary is the disclosure and the Edit/Delete cluster is its SIBLING below,
-								     never a descendant. A button may not contain interactive content (axe
-								     nested-interactive), and a keydown inside one bubbles out to close the row,
-								     unmounting the control before its activation click can land. -->
+								<!-- The summary is the disclosure; actions are its sibling, since a button cannot contain interactive content. -->
 								<button
 									type="button"
 									class="{MOBILE_ROW_SUMMARY_CLASS} cursor-pointer"
@@ -567,7 +496,6 @@
 									{@render mobileExpenseSummary(expense, vehicle)}
 								</button>
 							{:else}
-								<!-- A read-only viewer has no actions to reveal, so the row is not a control. -->
 								<div class={MOBILE_ROW_SUMMARY_CLASS}>
 									{@render mobileExpenseSummary(expense, vehicle)}
 								</div>
@@ -600,9 +528,7 @@
 					{:else}
 						{@const IconComponent = getCategoryIcon(row.category)}
 						{@const isSelected = selectedRowId === row.groupId}
-						<!-- Group parent row (mobile). Same shape as the standalone row: a disclosure
-						     button carrying the summary, with the actions as its sibling. This one always
-						     has something to reveal — the per-vehicle portions — so it is always a control. -->
+						<!-- Group parent row: the per-vehicle portions are always revealable, so this is always a control. -->
 						<div class="transition-colors {isSelected ? 'bg-muted/50' : ''}">
 							<button
 								type="button"
@@ -684,7 +610,6 @@
 								</div>
 							{/if}
 						</div>
-						<!-- Children visible when selected (mobile) -->
 						{#if isSelected}
 							{#each row.children as child (child.id)}
 								{@const childVehicle = getVehicleForExpense(child)}
@@ -712,13 +637,8 @@
 		</div>
 	</div>
 {:else}
-	<!-- Desktop: full table -->
 	<div class="rounded-md border bg-card overflow-hidden">
-		<!-- height MUST be an inline style, not `h-[{scrollHeight}]`: Tailwind only generates
-		     arbitrary-value classes it can see as STATIC literals at build time, so a runtime-
-		     interpolated `h-[600px]` produces no CSS rule — the cap
-		     + internal scroll never engage and a many-row vehicle grows unbounded. Inline style is
-		     the ChartCard idiom for a dynamic height. -->
+		<!-- Height must be an inline style: Tailwind cannot generate arbitrary classes from a runtime value. -->
 		<ScrollArea class="w-full" style="height: {scrollHeight}">
 			<Table>
 				<TableHeader>
@@ -848,9 +768,7 @@
 										{formatCurrency(expense.amount)}
 									</TableCell>
 									<TableCell class="text-right">
-										<!-- `opacity-0` leaves these controls in the tab order, so the focus variant is
-										     not decoration: without it Tab lands on an invisible link with no focus
-										     ring anywhere on screen. -->
+										<!-- Focus variant is required: opacity-0 keeps these controls in the tab order. -->
 										<div
 											class="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100"
 										>
@@ -884,16 +802,13 @@
 							{:else}
 								{@const IconComponent = getCategoryIcon(row.category)}
 								{@const isExpanded = expandedGroups.has(row.groupId)}
-								<!-- Group parent row -->
 								<TableRow
 									class="group cursor-pointer hover:bg-muted/50"
 									onclick={() => toggleGroup(row.groupId)}
 								>
 									<TableCell class="font-medium text-muted-foreground">
 										<div class="flex items-center gap-1.5">
-											<!-- The row's click handler is a mouse convenience; this button is what makes
-											     the per-vehicle portions reachable at all by keyboard and what reports the
-											     expanded state. `stopPropagation` keeps a click on it from toggling twice. -->
+											<!-- Keyboard-accessible toggle; the row click is only a mouse convenience. -->
 											<Button
 												variant="ghost"
 												size="icon-sm"
@@ -955,9 +870,6 @@
 										</div>
 									</TableCell>
 									<TableCell class="text-right">
-										<!-- `opacity-0` leaves these controls in the tab order, so the focus variant is
-										     not decoration: without it Tab lands on an invisible link with no focus
-										     ring anywhere on screen. -->
 										<div
 											class="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100"
 										>
@@ -976,11 +888,7 @@
 											{/if}
 											{#if onDelete}
 												{@const blockedId = blockedReasonId(row.groupId)}
-												<!-- `aria-disabled` rather than `disabled`: the kit's disabled styling is
-												     `pointer-events-none`, which hides the tooltip from the mouse, and
-												     `disabled` hides the control from the keyboard and from assistive tech
-												     — leaving the reason it cannot be used reachable by nobody. Restoring
-												     pointer events keeps the explanation one click (and one hover) away. -->
+												<!-- aria-disabled rather than disabled keeps the reason tooltip reachable by hover and keyboard. -->
 												<Button
 													variant="ghost"
 													size="icon"
@@ -1007,7 +915,6 @@
 										</div>
 									</TableCell>
 								</TableRow>
-								<!-- Expanded child rows -->
 								{#if isExpanded}
 									{#each row.children as child (child.id)}
 										{@const childVehicle = getVehicleForExpense(child)}
@@ -1054,7 +961,6 @@
 	/>
 {/if}
 
-<!-- Delete Confirmation AlertDialog -->
 {#if onDelete}
 	<AlertDialog bind:open={showDeleteModal}>
 		<AlertDialogContent>

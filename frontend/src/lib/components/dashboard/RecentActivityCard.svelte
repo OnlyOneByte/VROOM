@@ -55,12 +55,7 @@
 					>
 						<div class="flex-1 min-w-0">
 							<div class="flex items-center gap-2 mb-1">
-								<!-- Category as a colored icon chip + NEUTRAL label text. Coloring the
-								     label text itself (text-chart-N on a same-hue 10% tint) failed WCAG AA
-								     contrast — e.g. chart-2 #009689 on #e5f5f3 is only 3.26:1, and the
-								     lighter chart-4/5 tints fail worse. The color lives on the icon
-								     (graphical, exempt) so the category affordance survives at AA. Mirrors
-								     the canonical category row in ExpensesTable. -->
+								<!-- Neutral label text: the category colour is carried by the icon chip only. -->
 								<span
 									class="flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium {getCategoryColor(
 										expense.category

@@ -60,16 +60,13 @@
 		loadData(selectedYear);
 	});
 
-	// Dynamic unit labels — year-end view uses global unit preferences
 	let units = $derived(yearEnd?.units ?? settingsStore.unitPreferences);
 	let efficiencyLabel = $derived(getFuelEfficiencyLabel(units.distanceUnit, units.volumeUnit));
 	let costPerDistLabel = $derived(getCostPerDistanceLabel(units.distanceUnit));
 	let distLongLabel = $derived(getDistanceUnitLabel(units.distanceUnit));
 
-	// --- Category Breakdown Pie ---
 	let pieData = $derived(buildCategoryPieData(yearEnd?.categoryBreakdown ?? []));
 
-	// --- Efficiency Trend Line ---
 	let effTrendData = $derived(
 		(yearEnd?.efficiencyTrend ?? []).map(d => ({ ...d, date: parseMonthToDate(d.month) }))
 	);
@@ -78,12 +75,9 @@
 		{ key: 'efficiency', label: efficiencyLabel, color: 'var(--chart-1)' }
 	]);
 	let effTrendConfig = $derived(buildChartConfig(effTrendSeries));
-
-	// --- Key Metrics ---
 </script>
 
 <div class="space-y-6">
-	<!-- Gradient Header Card with Year Selector -->
 	<Card.Root class="bg-gradient-to-br from-primary/5 to-chart-3/5">
 		<Card.Content class="p-4 sm:p-6">
 			<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -123,7 +117,6 @@
 			<Button onclick={() => loadData(selectedYear)}>Retry</Button>
 		</div>
 	{:else if yearEnd}
-		<!-- Key Metrics — StatCardGrid -->
 		<StatCardGrid
 			items={[
 				{
@@ -160,12 +153,9 @@
 			columns={4}
 		/>
 
-		<!-- Category Breakdown + MPG Trend in 2-col grid -->
 		<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-			<!-- Category Breakdown (Pie Chart) -->
 			<AppPieChart title="Expense Breakdown" description="Spending by category" data={pieData} />
 
-			<!-- Efficiency Trend (Line Chart) -->
 			<AppLineChart
 				title="{efficiencyLabel} Trend"
 				description="Fuel efficiency over the year"
@@ -178,7 +168,6 @@
 			/>
 		</div>
 
-		<!-- Biggest Expense + Year-over-Year Comparison (side by side on desktop) -->
 		<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
 			{#if yearEnd.biggestExpense}
 				<Card.Root class="border-destructive">
@@ -227,9 +216,7 @@
 										+{yearEnd.previousYearComparison.percentageChange.toFixed(1)}%
 									</span>
 								{:else if yearEnd.previousYearComparison.percentageChange < 0}
-									<!-- Icon keeps the chart-2 "good / spending down" hue (graphical, exempt);
-									     the TEXT is text-foreground because chart-2 (#009689) on white is 3.66:1,
-									     below WCAG AA 4.5:1 for this 18px medium text. -->
+									<!-- Icon carries the hue; the text stays neutral because tinted text falls below WCAG AA at this size. -->
 									<TrendingDown class="h-5 w-5 text-chart-2" />
 									<span class="text-lg font-medium text-foreground">
 										{yearEnd.previousYearComparison.percentageChange.toFixed(1)}%

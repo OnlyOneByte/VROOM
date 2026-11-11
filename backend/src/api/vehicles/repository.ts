@@ -37,12 +37,7 @@ export class VehicleRepository extends BaseRepository<Vehicle, NewVehicle> {
     }
   }
 
-  /**
-   * Fetch vehicles by an explicit id set (with financing), NOT userId-scoped — used by the
-   * shared-fleet widening (vehicle-sharing T5a): the caller has already resolved which vehicleIds the
-   * acting user has ACCEPTED-share access to, so this just hydrates those rows. Returns [] for an empty
-   * id list (no query). Order is unspecified; the caller sorts/annotates.
-   */
+  /** Hydrates vehicles by id without a user scope; the caller must have checked access. */
   async findByIds(vehicleIds: string[]): Promise<VehicleWithFinancing[]> {
     if (vehicleIds.length === 0) return [];
     const result = await this.db
@@ -65,14 +60,7 @@ export class VehicleRepository extends BaseRepository<Vehicle, NewVehicle> {
     return result[0] || null;
   }
 
-  /**
-   * Find a vehicle by license plate WITHIN ONE USER'S fleet. Scoped by userId (the
-   * tenant-scope-at-the-read class): the plate-uniqueness check that backs vehicle create/update is
-   * a per-user constraint, not a global one — two different users may legitimately register the same
-   * plate (e.g. a reissued plate across states, or a sold-then-rebought car), and a GLOBAL lookup
-   * both wrongly 409'd the second user AND leaked plate existence across tenants (an enumeration
-   * oracle via the conflict message). Plates carry no cross-user meaning here, so scope to the owner.
-   */
+  /** Plate lookup within one user's fleet. A global lookup would leak plate existence across tenants. */
   async findByLicensePlate(licensePlate: string, userId: string): Promise<Vehicle | null> {
     const result = await this.db
       .select()
@@ -113,5 +101,4 @@ export class VehicleRepository extends BaseRepository<Vehicle, NewVehicle> {
   }
 }
 
-// Export singleton instance
 export const vehicleRepository = new VehicleRepository(getDb());

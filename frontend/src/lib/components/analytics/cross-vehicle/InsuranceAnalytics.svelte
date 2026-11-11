@@ -11,7 +11,6 @@
 
 	let { insurance }: { insurance: InsuranceResponse } = $props();
 
-	// --- Premium Trends ---
 	let premiumTrendData = $derived(
 		(insurance.monthlyPremiumTrend ?? []).map(d => ({ ...d, date: parseMonthToDate(d.month) }))
 	);
@@ -22,7 +21,6 @@
 
 	const premiumSeries = [{ key: 'premiums', label: 'Premiums', color: 'var(--chart-4)' }];
 
-	// --- Cost by Carrier ---
 	let carrierData = $derived(insurance.costByCarrier ?? []);
 
 	const carrierChartConfig: Chart.ChartConfig = {
@@ -33,7 +31,6 @@
 		{ key: 'annualPremium', label: 'Annual Premium', color: 'var(--chart-4)' }
 	];
 
-	// --- Summary Items ---
 	let insuranceSummaryItems = $derived.by(() => {
 		const s = insurance.summary;
 		return [
@@ -55,7 +52,6 @@
 		];
 	});
 
-	// --- Cost Analysis ---
 	let avgCostPerVehicle = $derived.by(() => {
 		if (insurance.vehicleDetails.length === 0) return 0;
 		return insurance.summary.totalMonthlyPremiums / insurance.vehicleDetails.length;
@@ -69,16 +65,13 @@
 	});
 </script>
 
-<!-- Section 5: Insurance Overview -->
 <div class="flex items-center gap-2 mt-4">
 	<Shield class="h-5 w-5 text-muted-foreground" />
 	<h2 class="text-xl font-bold">Insurance Overview</h2>
 </div>
 
-<!-- Insurance Summary Cards -->
 <StatCardGrid items={insuranceSummaryItems} columns={3} />
 
-<!-- Insurance Coverage Details -->
 {#if insurance.vehicleDetails.length > 0}
 	<Card.Root class="p-4 sm:p-6">
 		<div class="space-y-4">
@@ -125,9 +118,7 @@
 	</Card.Root>
 {/if}
 
-<!-- Insurance Charts: 2-col grid -->
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-	<!-- Monthly Premium Trends -->
 	{#if premiumTrendData.length > 0}
 		<AppLineChart
 			title="Monthly Premium Trends"
@@ -140,7 +131,6 @@
 		/>
 	{/if}
 
-	<!-- Cost by Carrier -->
 	{#if carrierData.length > 0}
 		<AppBarChart
 			title="Cost by Insurance Carrier"
@@ -158,7 +148,6 @@
 	{/if}
 </div>
 
-<!-- Insurance Cost Analysis -->
 <Card.Root class="p-4 sm:p-6 border-chart-4/30">
 	<div class="space-y-3">
 		<div class="flex items-center gap-2">

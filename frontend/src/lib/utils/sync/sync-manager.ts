@@ -27,7 +27,6 @@ import { apiClient } from '$lib/services/api-client';
 import { type BackendExpenseResponse, fromBackendExpense } from '$lib/services/api-transformer';
 import { browser } from '$app/environment';
 
-// Re-export types and state for consumers
 export type { SyncConflict, SyncConfig };
 export {
 	syncConfig,
@@ -44,17 +43,13 @@ interface SyncResult {
 	success: boolean;
 	synced: number;
 	failed: number;
-	/** Count of rows parked as permanently-unsyncable this run — surfaced, not retried. */
 	needsAttention: number;
 	conflicts: SyncConflict[];
 	errors: string[];
 }
 
-// What a failed write means for the queue. Defined in ./classify-failure so this module and
-// offline-storage can share it without importing each other; re-exported here for existing callers.
 export { classifySyncFailure, type SyncFailureKind } from './classify-failure';
 
-// Fetch last sync time from server
 export async function fetchLastSyncTime(): Promise<void> {
 	try {
 		const result = await apiClient.get<{
@@ -115,12 +110,6 @@ class SyncManager {
 			const pendingExpenses = getPendingExpenses();
 			const result = await this.syncExpenses(pendingExpenses);
 
-			// Reap the rows that successfully synced this run so localStorage does not grow unbounded.
-			// syncExpenses marks each successful row `synced:true` (leaving pending/conflict/needs-attention
-			// rows untouched), and clearSyncedExpenses drops ONLY `synced` rows — so this is safe to run
-			// regardless of the run's overall outcome: a partial run reaps just the synced rows and keeps the
-			// rest for the next attempt. (The legacy syncOfflineExpenses already reaped this way; SyncManager
-			// previously only marked synced and never cleared, so synced rows lingered forever — the leak.)
 			clearSyncedExpenses();
 
 			if (result.success && result.conflicts.length === 0) {
@@ -171,21 +160,12 @@ class SyncManager {
 					} else if (syncResult.conflict) {
 						result.conflicts.push(syncResult.conflict);
 					} else if (syncResult.failureKind === 'terminal') {
-						// A row the server (or the local completeness gate) rejects on its own merits fails the
-						// same way every attempt. PARK it as needs-attention instead of scheduling retries — it
-						// drops out of getPendingExpenses so it's never silently re-attempted again, and is
-						// surfaced via getNeedsAttentionExpenses for the user to fix or discard. NOT counted as a
-						// transient failure (it won't self-resolve), so it doesn't flip result.success on its own.
 						const reason = syncResult.error || 'Entry needs attention';
 						markExpenseNeedsAttention(expense.id, reason);
 						this.retryCount.delete(expense.id);
 						result.needsAttention++;
 						result.errors.push(reason);
 					} else if (syncResult.failureKind === 'auth') {
-						// Signed out: the row is valid and will sync as soon as the user signs in again, so it
-						// stays pending — not parked (nothing is wrong with it) and not retried on a timer
-						// (a backoff cannot restore a session), which also keeps its retry budget intact for
-						// the real transient failures.
 						result.failed++;
 						result.errors.push(syncResult.error || 'Sign in to sync this entry');
 					} else {
@@ -218,7 +198,6 @@ class SyncManager {
 		success: boolean;
 		conflict?: SyncConflict;
 		error?: string;
-		/** How the caller must treat the failure — see SyncFailureKind. Absent on success. */
 		failureKind?: SyncFailureKind;
 	}> {
 		try {
@@ -235,16 +214,11 @@ class SyncManager {
 			}
 
 			if (isIncompleteFuelExpense(expense)) {
-				// A malformed fuel row (no volume/charge or no mileage) fails IDENTICALLY on every attempt —
-				// it's unsyncable until the user edits it. Terminal, so syncExpenses parks it
-				// (needsAttention) instead of burning retries + silently re-attempting it forever.
 				return { success: false, failureKind: 'terminal', error: INCOMPLETE_FUEL_REASON };
 			}
 
 			const backendExpense = offlineExpenseToBackend(expense);
 
-			// Send the idempotency key so a retried POST returns the original row
-			// instead of creating a duplicate.
 			await apiClient.post('/api/v1/expenses', { ...backendExpense, clientId: expense.clientId });
 			return { success: true };
 		} catch (error) {
@@ -260,25 +234,11 @@ class SyncManager {
 		expense: OfflineExpense
 	): Promise<{ date: string; amount: number; tags: string[] } | null> {
 		try {
-			// Narrow to the expense's OWN day using the filters GET /expenses actually implements.
-			// The query previously sent `date` and `amount`, neither of which exists on the route's
-			// query schema — Zod strips unknown keys, so the server answered with the vehicle's recent
-			// expenses UNFILTERED and the tag-overlap match below then flagged an unrelated expense from
-			// any date, for any amount, as a conflict with this one. `startDate`/`endDate` are the real
-			// parameters, and the route treats a date-only `endDate` as inclusive of its whole day. A
-			// stored date is the DatePicker's `YYYY-MM-DD`; should one ever carry a time, the slice
-			// yields its UTC day, so the window can only ever be too narrow — and a check that finds
-			// nothing falls back on the clientId idempotency the POST already carries.
 			const filters = new URLSearchParams({
 				vehicleId: expense.vehicleId,
 				startDate: expense.date.slice(0, 10),
 				endDate: expense.date.slice(0, 10)
 			});
-			// GET /expenses returns RAW backend rows (expenseAmount, un-split volume) — map each through
-			// fromBackendExpense like every other expense read. Skipping it left
-			// `existing.amount` undefined, so determineConflictType's `Math.abs(local.amount - server.amount)`
-			// was NaN → amountMatch always false → a genuine duplicate mis-classified 'modified', and the
-			// SyncConflictResolver dialog rendered a blank server amount.
 			const rows = await apiClient.get<BackendExpenseResponse[]>(
 				`/api/v1/expenses?${filters.toString()}`
 			);
@@ -305,14 +265,6 @@ class SyncManager {
 	private async retrySingleExpense(expense: OfflineExpense): Promise<void> {
 		if (!onlineStatus.current) return;
 
-		// The expense may have been resolved/synced between this backoff retry being SCHEDULED (on an
-		// earlier failed POST) and its firing — e.g. an interleaving syncAll surfaced the conflict (a
-		// lost-response duplicate) and the user resolved it (markExpenseAsSynced). The setTimeout is
-		// detached from retryCount, so it fires regardless; without this re-check it would re-run the
-		// conflict-check, find the committed server row, and RESURRECT the already-resolved conflict —
-		// re-listing it in syncConflicts.current + flipping syncState back to 'error' (the dedup
-		// doesn't catch it because resolution already removed it from the live set). getPendingExpenses()
-		// is the !synced source of truth: if the row is no longer pending, the retry is a no-op.
 		if (!getPendingExpenses().some(e => e.id === expense.id)) return;
 
 		try {
@@ -325,14 +277,6 @@ class SyncManager {
 					e.id === expense.id ? { ...e, synced: true } : e
 				);
 			} else if (result.conflict) {
-				// A conflict detected ON A RETRY must be SURFACED for resolution, just like the
-				// main syncExpenses loop does (which pushes to result.conflicts → syncConflicts.current). The
-				// realistic trigger: the first POST committed server-side but its response was lost → the
-				// expense stayed pending + a retry was scheduled → on retry checkForExistingExpense now finds
-				// the committed row → conflict. Without this branch the conflict was silently dropped: no
-				// SyncConflictResolver dialog, the expense stuck pending, retryCount never cleared. Append
-				// (don't replace) since the retry runs async AFTER syncAll returned — other conflicts may
-				// already be displayed; dedup by expense id so a re-retry can't double-list it.
 				this.retryCount.delete(expense.id);
 				const already = syncConflicts.current.some(
 					c => c.localExpense.id === result.conflict?.localExpense.id
@@ -342,8 +286,6 @@ class SyncManager {
 					syncState.current = 'error';
 				}
 			} else if (result.failureKind === 'terminal') {
-				// The retry came back with a verdict, not a transport failure: park it here exactly as the
-				// main loop would, so a row that turned out to be unsyncable stops being re-POSTed.
 				markExpenseNeedsAttention(expense.id, result.error || 'Entry needs attention');
 				this.retryCount.delete(expense.id);
 			}
@@ -361,11 +303,6 @@ class SyncManager {
 				case 'keep_local': {
 					const backendExpense = offlineExpenseToBackend(conflict.localExpense);
 					try {
-						// POST to the create endpoint with `forceOverwrite: true` + the local
-						// row's clientId. The backend now HONORS the flag (createExpenseSchema accepts it;
-						// createIdempotent updates the existing (userId, clientId) row in place rather than
-						// no-op-returning it) — so on a GENUINE clientId collision the local edit is APPLIED,
-						// not silently dropped. A clean insert (new clientId) is unaffected.
 						await apiClient.post('/api/v1/expenses', {
 							...backendExpense,
 							clientId: conflict.localExpense.clientId,
@@ -400,14 +337,6 @@ class SyncManager {
 		fetchLastSyncTime();
 
 		if (browser) {
-			// Deliver whatever is already queued at mount. The 'online' event below fires only on a
-			// TRANSITION, so the ordinary PWA sequence — log an expense in a garage, close the app,
-			// reopen it the next day on wifi — never triggered delivery at all, and the rows sat in
-			// localStorage until the user happened to notice the pending badge, despite the app having
-			// promised they would "sync when online". Same 2s settle delay as the transition path;
-			// getPendingExpenses() already excludes parked rows, so a permanently-unsyncable row cannot
-			// make this re-POST on every app open, and a manual tap landing inside the delay is absorbed
-			// by syncAll's own in-progress guard (whose rejection is what the catch below swallows).
 			if (onlineStatus.current && getPendingExpenses().length > 0) {
 				setTimeout(() => {
 					this.syncAll().catch(error => {

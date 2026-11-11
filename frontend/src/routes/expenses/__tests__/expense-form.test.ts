@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { vehicleApi } from '$lib/services/vehicle-api';
 import { expenseApi } from '$lib/services/expense-api';
 
-// Mock SvelteKit modules
 vi.mock('$app/navigation', () => ({
 	goto: vi.fn()
 }));
@@ -11,23 +10,19 @@ vi.mock('$app/state', () => ({
 	page: { url: { pathname: '/expenses/new' } }
 }));
 
-// Mock offline storage utilities
 vi.mock('$lib/utils/offline-storage', () => ({
 	addOfflineExpense: vi.fn(),
 	syncOfflineExpenses: vi.fn()
 }));
 
-// Mock PWA utilities
 vi.mock('$lib/utils/pwa', () => ({
 	requestBackgroundSync: vi.fn()
 }));
 
-// Mock fetch. `apiClient` calls the global, so mocking it here lets the tests below drive
-// the real service modules and assert the URLs the APP sends.
+// apiClient calls the global fetch, so tests assert the URLs the app actually sends.
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
-/** A minimal `Response` double shaped like the backend's `{ success, data }` envelope. */
 const jsonResponse = (data: unknown) => ({
 	ok: true,
 	status: 200,
@@ -35,10 +30,8 @@ const jsonResponse = (data: unknown) => ({
 	json: () => Promise.resolve({ success: true, data })
 });
 
-/** The URL passed to the nth `fetch` call. */
 const requestedUrl = (call: number) => mockFetch.mock.calls[call]?.[0];
 
-// Mock vehicles data
 const mockVehicles = [
 	{
 		id: '1',
@@ -60,8 +53,7 @@ describe('Expense Form Logic', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 
-		// Default: a successful vehicles fetch. A test that cares about the body overrides
-		// this with `mockResolvedValueOnce`.
+		// Overridden per test with mockResolvedValueOnce.
 		mockFetch.mockResolvedValue(jsonResponse(mockVehicles));
 	});
 
@@ -88,10 +80,7 @@ describe('Expense Form Logic', () => {
 		});
 
 		it('loads vehicles from the versioned vehicles endpoint', async () => {
-			// Drives the REAL service, so the asserted URL is the one the app sends. The
-			// previous version declared its own `loadVehicles` that fetched `/api/vehicles`
-			// and asserted that same literal back — a tautology that stayed green while the
-			// app moved to `/api/v1`.
+			// Drives the real service, so the asserted URL is the one the app sends.
 			mockFetch.mockResolvedValueOnce(jsonResponse(mockVehicles));
 
 			const vehicles = await vehicleApi.getVehicles();
@@ -302,9 +291,7 @@ describe('Expense Form Logic', () => {
 		});
 
 		it('POSTs a new expense to the collection endpoint with backend field names', async () => {
-			// Drives the REAL service. The previous version POSTed to
-			// `/api/vehicles/<id>/expenses` — a route that does not exist on the backend at
-			// all — and asserted that literal back, so it could never catch the mismatch.
+			// Drives the real service so the assertion can catch a wrong URL.
 			mockFetch.mockResolvedValueOnce(
 				jsonResponse({ id: 'expense-1', vehicleId: '1', category: 'fuel', expenseAmount: 50 })
 			);
@@ -321,8 +308,7 @@ describe('Expense Form Logic', () => {
 			expect(requestedUrl(0)).toBe('/api/v1/expenses');
 			const init = mockFetch.mock.calls[0]?.[1];
 			expect(init.method).toBe('POST');
-			// `amount` is renamed on the wire by `toBackendExpense`; the vehicle is a BODY
-			// field, not a path segment.
+			// amount is renamed on the wire; the vehicle is a body field, not a path segment.
 			expect(JSON.parse(init.body)).toMatchObject({
 				vehicleId: '1',
 				category: 'fuel',
@@ -334,7 +320,6 @@ describe('Expense Form Logic', () => {
 
 		it('handles offline storage fallback', () => {
 			const saveOffline = (expenseData: any) => {
-				// Mock offline storage
 				const offlineExpense = {
 					...expenseData,
 					id: `offline-${Date.now()}`,

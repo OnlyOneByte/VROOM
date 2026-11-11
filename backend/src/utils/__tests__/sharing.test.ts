@@ -1,13 +1,6 @@
-/**
- * vehicle-sharing T2 — the access-resolver seam (utils/sharing.ts, design §2).
- *
- * Drives the REAL resolveVehicleAccess / requireVehicleRead / requireVehicleWrite against a migrated
- * throwaway DB seeded with an owner, an invitee, a third party, and shares at every status/level.
- * This is the ONE seam every shared route routes through, so its matrix is the load-bearing
- * cross-tenant proof: owner→full, accepted-viewer→read-only, accepted-editor→
- * read+write, pending/declined/revoked→NONE, non-share third party→404, nonexistent vehicle→404.
- * 404 (NotFoundError) — never 403 — is asserted on every denial (the enumeration-oracle rule).
- */
+// Access matrix for the sharing resolver, run against a migrated throwaway DB. Owner gets full
+// access, accepted viewers read only, accepted editors read and write, and pending, declined,
+// revoked, or absent access gets nothing. Every denial is a 404, never a 403.
 
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -64,7 +57,7 @@ describe('resolveVehicleAccess — owner / accepted-share / none', () => {
     expect(await resolveVehicleAccess(VEHICLE, OWNER, db)).toEqual({ role: 'owner' });
   });
 
-  test('an ACCEPTED viewer share resolves to viewer; an ACCEPTED editor share to editor', async () => {
+  test('an ACCEPTED viewer share resolves to viewer', async () => {
     share('accepted', 'viewer');
     expect(await resolveVehicleAccess(VEHICLE, INVITEE, db)).toEqual({ role: 'viewer' });
   });
@@ -95,15 +88,12 @@ describe('resolveVehicleAccess — owner / accepted-share / none', () => {
   });
 
   test('the OWNER truth is vehicles.userId, not the denormalized share.ownerId', async () => {
-    // A share row that LIES about ownerId (names the stranger as owner) must NOT grant the stranger
-    // owner access — ownership is vehicles.userId only. The stranger has no accepted share → null.
     share('accepted', 'editor', STRANGER);
     sqlite.run('UPDATE vehicle_shares SET owner_id = ? WHERE shared_with_id = ?', [
       STRANGER,
       STRANGER,
     ]);
-    // The stranger DOES have an accepted editor share here, so they get editor (not owner) — the
-    // point: they are never elevated to OWNER by the ownerId column.
+    // A share whose ownerId names the stranger must not elevate them to owner.
     expect(await resolveVehicleAccess(VEHICLE, STRANGER, db)).toEqual({ role: 'editor' });
     // And the real owner is still owner.
     expect(await resolveVehicleAccess(VEHICLE, OWNER, db)).toEqual({ role: 'owner' });
@@ -134,11 +124,9 @@ describe('requireVehicleWrite — owner|editor or 404 (viewer denied)', () => {
     expect(await requireVehicleWrite(VEHICLE, INVITEE, db)).toEqual({ role: 'editor' });
   });
 
-  test('an accepted VIEWER is denied write with NotFoundError (→404, never 403 — no capability oracle)', async () => {
+  test('an accepted viewer is denied write with NotFoundError', async () => {
     share('accepted', 'viewer');
-    // The viewer CAN read…
     expect(await requireVehicleRead(VEHICLE, INVITEE, db)).toEqual({ role: 'viewer' });
-    // …but is denied write with the SAME 404 a stranger gets.
     await expect(requireVehicleWrite(VEHICLE, INVITEE, db)).rejects.toBeInstanceOf(NotFoundError);
   });
 

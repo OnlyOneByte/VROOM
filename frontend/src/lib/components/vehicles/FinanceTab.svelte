@@ -28,22 +28,18 @@
 		vehicle: Vehicle;
 		vehicleId: string;
 		vehicleStatsData: VehicleStats | null;
-		/** vehicle-sharing T12b-3b: financing add/edit/payoff is owner-ONLY (the server keeps strict
-		 *  validateVehicleOwnership on /financing — an editor is NOT enough). A shared invitee sees the
-		 *  finance summary read-only. Default true so the owner [id] tab is unchanged. */
+		/** Financing changes are owner-only on the server; a shared invitee sees the summary read-only. Defaults to true for the owner. */
 		isOwner?: boolean;
 	}
 
 	let { vehicle, vehicleId, vehicleStatsData, isOwner = true }: Props = $props();
 
-	// Payment state
 	let payments = $state<DerivedPaymentEntry[]>([]);
 	let isLoadingPayments = $state(false);
 	let paymentHistoryError = $state<string | null>(null);
 	let hasAttemptedPaymentLoad = $state(false);
 	let showPaymentPlanner = $state(false);
 
-	// Financing derived state
 	let progressPercentage = $derived.by(() => {
 		try {
 			if (!vehicle?.financing?.isActive) return 0;
@@ -97,7 +93,6 @@
 		}
 	});
 
-	// Load payment history on mount
 	onMount(() => {
 		if (vehicle?.financing?.isActive && !hasAttemptedPaymentLoad) {
 			loadPaymentHistory();
@@ -147,11 +142,7 @@
 		{/if}
 
 		{#if vehicle.financing.paymentAmount && vehicle.financing.paymentAmount > 0}
-			<!-- Loan miles-used consumes the ALL-TIME `currentOdometer`, NOT the period-scoped,
-			     fuel-only `currentMileage`. Miles-used is inherently all-time, so a "7d"/"30d" stats-period
-			     selection must not shrink it, and it must see manual odometer entries too. `currentOdometer`
-			     is the canonical all-sources, period-independent reading; it falls back to currentMileage
-			     then initialMileage if absent. -->
+			<!-- Loan miles-used uses the all-time odometer, not the period-scoped one; falls back to initialMileage. -->
 			<PaymentMetricsGrid
 				financing={vehicle.financing}
 				{totalInterestPaid}
@@ -182,10 +173,7 @@
 	{/if}
 
 	{#if vehicle.financing.financingType === 'lease'}
-		<!-- Same rule as PaymentMetricsGrid: lease overage consumes the ALL-TIME, all-sources
-		     `currentOdometer`, not the period-scoped, fuel-only `currentMileage`, so a non-'all' stats
-		     period can't understate the projected excess-fee $. calculateLeaseMetrics itself is correct;
-		     this only feeds it the right odometer. Falls back to currentMileage then initialMileage. -->
+		<!-- Lease overage uses the all-time odometer, matching PaymentMetricsGrid; falls back to currentMileage then initialMileage. -->
 		<LeaseMetricsCard
 			financing={vehicle.financing}
 			currentMileage={resolveCurrentOdometer(

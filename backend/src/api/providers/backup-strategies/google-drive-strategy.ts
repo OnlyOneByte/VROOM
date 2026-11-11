@@ -9,12 +9,7 @@ import type {
 import { GoogleDriveProvider } from '../domains/storage/google-drive-provider';
 import { GoogleSheetsService } from '../services/google-sheets-service';
 
-/**
- * Factories for the Drive provider + Sheets service this strategy uses. Injected
- * in tests (via the constructor) to substitute fakes WITHOUT `mock.module` — whose
- * process-global stubs leak across files. Production omits them and the real
- * `new GoogleDriveProvider` / `new GoogleSheetsService` are built per refresh token.
- */
+/** Tests inject fakes here; module mocks would leak into other test files. */
 export interface GoogleDriveStrategyDeps {
   createDriveProvider: (refreshToken: string) => GoogleDriveProvider;
   createSheetsService: (refreshToken: string) => GoogleSheetsService;
@@ -44,11 +39,8 @@ export class GoogleDriveStrategy implements BackupStrategy {
       capabilities.sheets = await this.executeSheetsSync(context, refreshToken);
     }
 
-    // HONEST partial-failure reporting: a provider's backup is `success` ONLY when EVERY
-    // attempted capability (ZIP + Sheets) succeeded. The old `.some()` marked a run successful when
-    // ANY capability worked — so a failed ZIP beside an OK Sheets advanced the sync anchor and the
-    // failed ZIP was NEVER retried (silent backup loss). A run with no attempted
-    // capability (neither enabled) is vacuously successful (nothing failed).
+    // Every attempted capability must succeed. A partial success would advance the sync anchor and the
+    // failed capability would never be retried.
     const attempted = Object.values(capabilities);
     const failed = attempted.filter((c) => !c.success);
     return {

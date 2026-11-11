@@ -1,8 +1,4 @@
-/**
- * Smoke test for the in-process HTTP harness itself (createTestApp).
- * Proves the wiring: in-memory DB + migrations + seeded session reach a real
- * authed route, and that an anonymous request is rejected.
- */
+// Smoke test for createTestApp: the seeded session reaches an authed route, and anonymous requests are rejected.
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type DataEnvelope, json, type TestApp } from '../http-client';

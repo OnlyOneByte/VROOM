@@ -1,10 +1,4 @@
-/**
- * Property-Based Tests for Financing Balance Computation and Payoff Eligibility
- *
- * Tests Properties 5 and 6 against a real in-memory SQLite database.
- *
- * **Validates: Requirements 4.2, 4.4, 17.1, 17.3**
- */
+/** Property-based checks of financing balance and payoff eligibility against in-memory SQLite. */
 
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -47,22 +41,13 @@ afterEach(() => {
   sqliteDb.close();
 });
 
-// ---------------------------------------------------------------------------
-// Generators
-// ---------------------------------------------------------------------------
-
-/** Positive dollar amount between 1000 and 100000 */
 const originalAmountArb = fc
   .double({ min: 1000, max: 100000, noNaN: true })
   .map((v) => Math.round(v * 100) / 100);
 
-/** Payment amount between 1 and 5000 */
 const paymentAmountArb = fc
   .double({ min: 1, max: 5000, noNaN: true })
   .map((v) => Math.round(v * 100) / 100);
-
-/** Number of financing payment expenses (0–10) */
-const _paymentCountArb = fc.integer({ min: 0, max: 10 });
 
 let financingCounter = 0;
 let expenseCounter = 0;
@@ -92,11 +77,7 @@ function createNonFinancingExpense(amount: number): void {
   );
 }
 
-// ===========================================================================
-// Property 5: Financing balance computation
-// **Validates: Requirements 4.2, 17.1**
-// ===========================================================================
-describe('Property 5: Financing balance computation', () => {
+describe('financing balance computation', () => {
   test('balance = max(0, originalAmount - sum of financing payments)', async () => {
     await fc.assert(
       fc.asyncProperty(
@@ -116,7 +97,6 @@ describe('Property 5: Financing balance computation', () => {
           // Allow small floating point tolerance
           expect(Math.abs(computedBalance - expectedBalance)).toBeLessThan(0.02);
 
-          // Clean up for next iteration
           sqliteDb.run(`DELETE FROM expenses WHERE vehicle_id = '${VEHICLE_ID}'`);
           sqliteDb.run(`DELETE FROM vehicle_financing WHERE id = '${financingId}'`);
         }
@@ -171,12 +151,8 @@ describe('Property 5: Financing balance computation', () => {
   });
 });
 
-// ===========================================================================
-// Property 6: Financing payoff eligibility flag
-// **Validates: Requirements 4.4, 17.3**
-// ===========================================================================
-describe('Property 6: Financing payoff eligibility flag', () => {
-  test('eligibleForPayoff is true when balance <= 0.01, false otherwise', async () => {
+describe('financing payoff eligibility flag', () => {
+  test('eligibleForPayoff is true when the balance is within the payoff threshold, false otherwise', async () => {
     await fc.assert(
       fc.asyncProperty(
         originalAmountArb,
@@ -189,8 +165,6 @@ describe('Property 6: Financing payoff eligibility flag', () => {
           }
 
           const computedBalance = await repo.computeBalance(financingId);
-          // Call the REAL exported rule (was a local `<= 0.01` copy — the theater
-          // pattern). isEligibleForPayoff is now the one source of truth the 3 route sites use.
           const eligibleForPayoff = isEligibleForPayoff(computedBalance);
 
           const totalPayments = payments.reduce((sum, p) => sum + p, 0);
@@ -228,23 +202,17 @@ describe('Property 6: Financing payoff eligibility flag', () => {
     expect(isEligibleForPayoff(balance)).toBe(false);
   });
 
-  // Pin the extracted predicate's BOUNDARY directly (the 3 route sites + the property
-  // test above all route through it now). Exactly-at-threshold is eligible; a cent above is not.
   test('isEligibleForPayoff boundary: exactly the threshold is eligible, just above is not', () => {
-    expect(isEligibleForPayoff(PAYOFF_BALANCE_THRESHOLD)).toBe(true); // 0.01 → paid off
+    expect(isEligibleForPayoff(PAYOFF_BALANCE_THRESHOLD)).toBe(true);
     expect(isEligibleForPayoff(0)).toBe(true);
-    expect(isEligibleForPayoff(PAYOFF_BALANCE_THRESHOLD + 0.0001)).toBe(false); // 0.0101 → still owed
+    expect(isEligibleForPayoff(PAYOFF_BALANCE_THRESHOLD + 0.0001)).toBe(false);
     expect(isEligibleForPayoff(100)).toBe(false);
   });
 });
 
-// ===========================================================================
-// Batch balance computation (computeBalances) — must match per-record computeBalance
-// ===========================================================================
 describe('computeBalances (batch) equivalence', () => {
   test('batch result matches per-record computeBalance for many records', async () => {
-    // vehicle_financing has a UNIQUE(vehicle_id) constraint (one financing per
-    // vehicle), so each financing record needs its own vehicle.
+    // vehicle_financing is unique per vehicle, so each financing record needs its own vehicle.
     let vehicleCounter = 0;
     const newVehicle = (): string => {
       const vid = `v-batch-${++vehicleCounter}`;

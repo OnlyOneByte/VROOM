@@ -1,8 +1,3 @@
----
-inclusion: fileMatch
-fileMatchPattern: "frontend/src/service-worker.ts,frontend/vite.config.ts,frontend/src/lib/utils/pwa.ts,frontend/src/lib/utils/push.ts,frontend/src/lib/utils/offline-storage.ts,frontend/src/lib/components/layout/PWAInstallPrompt.svelte,frontend/src/lib/components/settings/cards/PwaInstallCard.svelte,frontend/src/app.html"
----
-
 # PWA (Progressive Web App)
 
 ## Architecture

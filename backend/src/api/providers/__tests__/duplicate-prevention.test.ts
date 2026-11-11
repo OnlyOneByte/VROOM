@@ -1,12 +1,3 @@
-/**
- * Unit tests for provider duplicate prevention logic.
- * Validates: Requirement 1.6 — different accountEmail allowed, same accountEmail
- * returns 409, different provider types allowed.
- *
- * Tests the pure duplicate-check logic extracted from the POST handler in
- * providers/routes.ts. The real handler runs this inside a transaction.
- */
-
 import { describe, expect, test } from 'bun:test';
 
 interface ExistingProvider {
@@ -14,11 +5,6 @@ interface ExistingProvider {
   config: Record<string, unknown> | null;
 }
 
-/**
- * Pure function replicating the duplicate check from providers/routes.ts POST handler.
- * Given existing providers of the same domain+providerType and the new accountEmail,
- * returns the duplicate provider if found, or undefined if no conflict.
- */
 function findDuplicate(
   existingProviders: ExistingProvider[],
   newAccountEmail: string | undefined
@@ -52,8 +38,6 @@ describe('Provider duplicate prevention', () => {
   });
 
   test('different provider types allowed — empty existing list means no conflict', () => {
-    // When querying for same domain+providerType, a different providerType
-    // would return an empty list from the DB query
     const existing: ExistingProvider[] = [];
 
     const duplicate = findDuplicate(existing, 'alice@gmail.com');
@@ -96,7 +80,6 @@ describe('Provider duplicate prevention', () => {
       { id: 'prov-1', config: { accountEmail: 'Alice@gmail.com' } },
     ];
 
-    // The real code does exact match — different case is allowed
     const duplicate = findDuplicate(existing, 'alice@gmail.com');
     expect(duplicate).toBeUndefined();
   });

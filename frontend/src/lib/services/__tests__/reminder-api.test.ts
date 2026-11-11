@@ -2,8 +2,6 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { BackendExpenseResponse, RecurringCostSummary } from '$lib/types';
 import { ApiError } from '$lib/utils/error-handling';
 
-// Mock apiClient (the analytics-api.test.ts pattern) — apiClient.get already unwraps the
-// { success, data } envelope, so these thin wrappers should return `data` verbatim.
 vi.mock('../api-client', () => ({
 	apiClient: {
 		get: vi.fn(),
@@ -21,10 +19,7 @@ const mockPost = vi.mocked(apiClient.post);
 const mockPut = vi.mocked(apiClient.put);
 const mockDelete = vi.mocked(apiClient.delete);
 
-// The route returns RAW repository rows (backend shape: `expenseAmount`, un-split `volume`). The
-// wrapper must map each through fromBackendExpense — so the mock returns the BACKEND shape and the
-// assertions check the FRONTEND transform (the fix; pre-fix this method returned the raw rows
-// typed as Expense[], so `amount` was undefined + an electric charge stayed in `volume`).
+// The route returns raw backend rows, so the wrapper must map them through fromBackendExpense.
 const mockMaterialized: BackendExpenseResponse[] = [
 	{
 		id: 'e1',
@@ -39,7 +34,6 @@ const mockMaterialized: BackendExpenseResponse[] = [
 		createdAt: '2024-01-15T00:00:00.000Z',
 		updatedAt: '2024-01-15T00:00:00.000Z'
 	},
-	// An electric charge row: backend keeps kWh in `volume`; fromBackendExpense must move it to `charge`.
 	{
 		id: 'e2',
 		vehicleId: 'v1',
@@ -59,7 +53,7 @@ const mockMaterialized: BackendExpenseResponse[] = [
 
 const mockSummary: RecurringCostSummary = { count: 3, monthlyTotal: 142.5 };
 
-describe('reminderApi.getMaterializedExpenses() (T6 seam)', () => {
+describe('reminderApi.getMaterializedExpenses()', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 	});
@@ -70,16 +64,11 @@ describe('reminderApi.getMaterializedExpenses() (T6 seam)', () => {
 		const result = await reminderApi.getMaterializedExpenses('r1');
 
 		expect(mockGet).toHaveBeenCalledTimes(1);
-		// Exact path — guards against a future wrong-segment typo (e.g. /expenses/:id).
 		expect(mockGet).toHaveBeenCalledWith('/api/v1/reminders/r1/expenses');
-		// NON-VACUOUS: pre-fix this returned the raw backend rows, so `amount` was undefined. The
-		// wrapper must run fromBackendExpense: expenseAmount → amount.
 		expect(result[0]?.amount).toBe(49.99);
 		expect(result[0]).not.toHaveProperty('expenseAmount');
-		// An electric charge's kWh must be split out of `volume` into `charge`.
 		expect(result[1]?.charge).toBe(30);
 		expect(result[1]?.volume).toBeUndefined();
-		// The source link the T6 badge reads must survive the transform untouched.
 		expect(result[0]?.sourceType).toBe('reminder');
 		expect(result[0]?.sourceId).toBe('r1');
 	});
@@ -96,7 +85,7 @@ describe('reminderApi.getMaterializedExpenses() (T6 seam)', () => {
 	});
 });
 
-describe('reminderApi.getRecurringCost() (T7 seam)', () => {
+describe('reminderApi.getRecurringCost()', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 	});
@@ -124,8 +113,6 @@ describe('reminderApi.getRecurringCost() (T7 seam)', () => {
 	});
 });
 
-// Cover the remaining 9 reminderApi methods + buildReminderQuery — the module sat ~12% line
-// (the tests above only exercised the T6/T7 seams). Each asserts the exact URL + verb + payload.
 describe('reminderApi — CRUD + trigger + mark-serviced wiring', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -202,7 +189,6 @@ describe('reminderApi.list — buildReminderQuery filter construction', () => {
 	it('isActive=false MUST survive (the !== undefined edge, not a truthiness check)', async () => {
 		mockGet.mockResolvedValueOnce([]);
 		await reminderApi.list({ isActive: false });
-		// A `if (filters.isActive)` bug would drop the param; it must serialize as "false".
 		expect(mockGet).toHaveBeenCalledWith('/api/v1/reminders?isActive=false');
 	});
 

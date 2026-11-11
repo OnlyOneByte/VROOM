@@ -7,12 +7,7 @@
 		tags: string[];
 		error?: string;
 		touched?: boolean;
-		/**
-		 * The pool of suggested tags. Defaults to the static COMMON_EXPENSE_TAGS so
-		 * existing callers keep their behavior; callers can pass a wider list (e.g.
-		 * the common tags plus the user's previously-used tags) to surface history.
-		 * `readonly` so the `as const` COMMON_EXPENSE_TAGS tuple is assignable.
-		 */
+		/** Suggestion pool; defaults to COMMON_EXPENSE_TAGS, and callers may widen it with history. */
 		suggestions?: readonly string[];
 	}
 

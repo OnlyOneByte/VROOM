@@ -1,19 +1,4 @@
-/**
- * Camera lifecycle: one hardware open per switch, and no blob URL left behind.
- *
- * Two defects, one root shape — the component did work twice, or not at all, because ownership of a
- * resource was unclear.
- *
- * 1. `startCamera` reads `facingMode` to build its getUserMedia constraints, so calling it from a
- *    tracked `$effect` body made the lifecycle effect depend on it. "Switch camera" wrote
- *    `facingMode` and restarted the camera itself, which ALSO invalidated the effect: its teardown
- *    stopped the stream the switch had just acquired and its body opened the hardware a second time.
- *    A generation counter kept the state correct, so the only symptom was a wasted camera
- *    acquisition — hundreds of milliseconds and a blanked viewfinder on a phone.
- * 2. `uploadCapture` cleared `capturedPreview` without revoking it, so the full-resolution JPEG
- *    behind the blob URL stayed resident for the life of the page — once per receipt uploaded. Only
- *    the upload path had this hole; retake, reset and unmount all revoked.
- */
+// Camera lifecycle: one hardware open per switch, and every capture's blob URL is revoked after upload.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';

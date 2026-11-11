@@ -18,19 +18,14 @@
 	import type { VehicleStats } from '$lib/types';
 
 	interface Props {
-		/** Unique identifier for the vehicle */
 		vehicleId: string;
-		/** Vehicle statistics data or null if not loaded */
 		vehicleStatsData: VehicleStats | null;
-		/** Loading state for statistics */
 		isLoadingStats: boolean;
-		/** Selected time period for statistics */
 		selectedStatsPeriod: string;
 	}
 
 	let { vehicleId, vehicleStatsData, isLoadingStats, selectedStatsPeriod }: Props = $props();
 
-	// Derived state
 	let hasFuelData = $derived(
 		vehicleStatsData &&
 			(vehicleStatsData.fuelExpenseCount > 0 || vehicleStatsData.chargeExpenseCount > 0)

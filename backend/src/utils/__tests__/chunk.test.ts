@@ -1,15 +1,8 @@
-/**
- * Unit tests for chunk() — the shared batching primitive behind the photo / photo-ref
- * repositories' batched IN-clause loops (cascade-delete fan-outs that must stay under SQLite's
- * variable limit). Pins the boundary math the 4 call sites now delegate: a divergent stride would
- * silently drop or double-process a batch on a destructive cascade DELETE (data loss).
- */
-
 import { describe, expect, test } from 'bun:test';
 import { chunk, rowsPerInsert, SQLITE_BATCH_SIZE, SQLITE_MAX_BIND_PARAMS } from '../chunk';
 
 describe('chunk', () => {
-  test('empty input → no chunks (the cascade no-op path)', () => {
+  test('empty input gives no chunks', () => {
     expect(chunk([], 500)).toEqual([]);
   });
 
@@ -17,7 +10,7 @@ describe('chunk', () => {
     expect(chunk([1, 2, 3], 500)).toEqual([[1, 2, 3]]);
   });
 
-  test('an EXACT multiple of size splits into full chunks with no trailing empty', () => {
+  test('an exact multiple of size splits into full chunks with no trailing empty', () => {
     expect(chunk([1, 2, 3, 4], 2)).toEqual([
       [1, 2],
       [3, 4],
@@ -28,12 +21,12 @@ describe('chunk', () => {
     expect(chunk([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);
   });
 
-  test('every element appears exactly once, in order (no drop / no dup — the data-loss guard)', () => {
-    const items = Array.from({ length: 1250 }, (_, i) => i); // 2 full 500-batches + a 250 remainder
+  test('every element appears exactly once, in order', () => {
+    const items = Array.from({ length: 1250 }, (_, i) => i);
     const chunks = chunk(items, SQLITE_BATCH_SIZE);
     expect(chunks.length).toBe(3);
     expect(chunks.map((c) => c.length)).toEqual([500, 500, 250]);
-    expect(chunks.flat()).toEqual(items); // flatten round-trips the original exactly
+    expect(chunks.flat()).toEqual(items);
   });
 
   test('defaults to SQLITE_BATCH_SIZE (500) when size omitted', () => {
@@ -43,18 +36,15 @@ describe('chunk', () => {
     expect(chunks.map((c) => c.length)).toEqual([500, 1]);
   });
 
-  test('a size < 1 throws (never an infinite loop)', () => {
+  test('a size below 1 throws', () => {
     expect(() => chunk([1, 2], 0)).toThrow(RangeError);
   });
 });
 
-/**
- * rowsPerInsert is what keeps a multi-row INSERT under the bind-parameter ceiling. A batch that binds
- * over the ceiling does not fail legibly: the driver reports the count mod 65536, naming neither the
- * table nor a real number — which is how a restore of a large backup used to die.
- */
+// A multi-row INSERT over the bind-parameter ceiling fails with a count that names neither the
+// table nor a real number.
 describe('rowsPerInsert', () => {
-  test('the widest backed-up table (25 columns) still gets a full SQLITE_BATCH_SIZE batch', () => {
+  test('a 25-column table still gets a full batch', () => {
     expect(rowsPerInsert(25)).toBe(SQLITE_BATCH_SIZE);
     expect(rowsPerInsert(25) * 25).toBeLessThan(SQLITE_MAX_BIND_PARAMS);
   });
@@ -74,7 +64,7 @@ describe('rowsPerInsert', () => {
     }
   });
 
-  test('a columnCount < 1 throws (a table with no columns is a bug, not a batch of Infinity)', () => {
+  test('a column count below 1 throws', () => {
     expect(() => rowsPerInsert(0)).toThrow(RangeError);
   });
 });

@@ -1,17 +1,5 @@
-/**
- * The desktop sidebar's three accessibility defects, and its pending badge.
- *
- * - The active page was signalled by colour alone: `isActive(href)` drove only a class swap, so
- *   assistive tech had no way to report which of the identical-sounding links was the current page.
- * - The labels were revealed by `onmouseenter` only, so a keyboard user tabbing the sidebar got bare
- *   icons — a mouse-only affordance.
- * - The wrapper `<div>` carried `role="navigation"` around the real `<nav>`, giving every
- *   authenticated route two nested, unlabelled navigation landmarks (axe landmark-unique). It still
- *   needs SOME role because it carries pointer handlers, so it is explicitly presentational.
- *
- * The badge assertions belong here because the sidebar is the third of the three chrome surfaces
- * that counted `!synced` and so advertised a parked row as syncable.
- */
+// Desktop sidebar accessibility: the active page is announced, labels show on focus as well as hover, and the wrapper is presentational.
+// Also pins the pending badge, which must not count parked rows.
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';

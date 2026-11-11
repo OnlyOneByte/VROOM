@@ -1,11 +1,5 @@
-/**
- * Characterization tests for `withTimeout` + `OPERATION_TIMEOUTS`. This
- * utility was at 0% coverage (surfaced by the coverage baseline) yet is live in the sync
- * backup path (backup-orchestrator.ts, sync/routes.ts), where a hung Drive/Sheets call must
- * fail as a typed SyncError rather than hang forever. Pins the three race outcomes + the error
- * shape so a future edit can't silently change them. Pure → no DB, no server; uses small REAL
- * timeouts (no fake-timer dependency) with a comfortable margin so it stays deterministic + fast.
- */
+// withTimeout returns the work's result or rejects with a typed SyncError on timeout. Uses short
+// real timers with a wide margin.
 
 import { describe, expect, test } from 'bun:test';
 import { SyncError, SyncErrorCode } from '../../errors';
@@ -22,13 +16,11 @@ function rejectAfter(ms: number, err: Error): Promise<never> {
 
 describe('withTimeout', () => {
   test('returns the promise value when it resolves before the timeout', async () => {
-    // resolves at ~5ms, timeout at 200ms → the value wins.
     const result = await withTimeout(resolveAfter(5, 'done'), 200, 'fast op');
     expect(result).toBe('done');
   });
 
   test('throws a SyncError(NETWORK_ERROR) with the operation + ms in the message when it times out', async () => {
-    // promise would take 200ms, timeout fires at 10ms → the timeout wins.
     let thrown: unknown;
     try {
       await withTimeout(resolveAfter(200, 'too-slow'), 10, 'slow op');
@@ -41,8 +33,7 @@ describe('withTimeout', () => {
   });
 
   test("the underlying promise's OWN rejection wins when it rejects before the timeout", async () => {
-    // The promise rejects at ~5ms with its own error; timeout is 200ms → its rejection propagates,
-    // NOT a timeout SyncError. (A genuine error must not be masked as a timeout.)
+    // A genuine error must not be masked as a timeout.
     const ownError = new Error('upstream failure');
     let thrown: unknown;
     try {

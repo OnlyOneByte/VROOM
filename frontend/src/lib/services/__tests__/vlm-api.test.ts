@@ -1,9 +1,3 @@
-/**
- * vlm-api.ts client (vlm-receipt-parsing T5a) — the service-test pattern: apiClient is
- * mocked so we assert the exact endpoint + multipart payload parseReceipt builds, and that it unwraps
- * the `{ draft }` envelope. The fork-free FE wrapper over the shipped POST /api/v1/receipts/parse.
- */
-
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 const post = vi.fn();
@@ -39,7 +33,6 @@ describe('vlmApi.parseReceipt', () => {
 		expect((body as FormData).get('image')).toBeInstanceOf(File);
 		expect(((body as FormData).get('image') as File).name).toBe('receipt.jpg');
 
-		// The envelope's `draft` is returned directly.
 		expect(draft).toEqual({ amount: 42.5, date: '2024-03-15', category: 'fuel', vendor: 'Shell' });
 	});
 

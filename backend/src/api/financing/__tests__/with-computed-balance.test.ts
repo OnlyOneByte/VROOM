@@ -1,9 +1,6 @@
 /**
- * Unit tests for withComputedBalance. The `{ ...financing, computedBalance,
- * eligibleForPayoff: isEligibleForPayoff(...) }` enrichment shape was hand-rolled at 3 route sites
- * (vehicles list + single GET, financing GET); this pure helper is now the single source of truth, so
- * pin its contract here: it spreads the financing object, attaches computedBalance verbatim, and
- * derives eligibleForPayoff from the PAYOFF_BALANCE_THRESHOLD boundary.
+ * withComputedBalance spreads the financing object, attaches computedBalance verbatim, and derives
+ * eligibleForPayoff from the payoff threshold.
  */
 
 import { describe, expect, test } from 'bun:test';
@@ -19,19 +16,16 @@ describe('withComputedBalance', () => {
     };
     const enriched = withComputedBalance(financing, 12000);
 
-    // Original fields preserved verbatim.
     expect(enriched.id).toBe('fin-1');
     expect(enriched.vehicleId).toBe('v-1');
     expect(enriched.originalAmount).toBe(20000);
     expect(enriched.financingType).toBe('loan');
-    // Derived fields attached.
     expect(enriched.computedBalance).toBe(12000);
-    expect(enriched.eligibleForPayoff).toBe(false); // 12000 > threshold
+    expect(enriched.eligibleForPayoff).toBe(false);
   });
 
   test('eligibleForPayoff tracks the payoff threshold boundary', () => {
     const fin = { id: 'fin-2' };
-    // At or below the threshold → eligible; just above → not.
     expect(withComputedBalance(fin, 0).eligibleForPayoff).toBe(true);
     expect(withComputedBalance(fin, PAYOFF_BALANCE_THRESHOLD).eligibleForPayoff).toBe(true);
     expect(withComputedBalance(fin, PAYOFF_BALANCE_THRESHOLD + 0.001).eligibleForPayoff).toBe(

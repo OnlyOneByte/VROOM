@@ -1,7 +1,3 @@
-/**
- * Provider-related constants shared across settings components.
- */
-
 import type { Component } from 'svelte';
 import type { PhotoCategory, CategorySetting } from '$lib/types';
 
@@ -13,9 +9,6 @@ export interface ProviderTypeOption {
 	disabled: boolean;
 }
 
-/**
- * Default folder settings for new providers — all categories enabled with sensible paths.
- */
 export const DEFAULT_FOLDER_SETTINGS: Record<PhotoCategory, CategorySetting> = {
 	vehicle_photos: { enabled: true, folderPath: 'Vehicle' },
 	expense_receipts: { enabled: true, folderPath: 'Receipts' },
@@ -23,12 +16,6 @@ export const DEFAULT_FOLDER_SETTINGS: Record<PhotoCategory, CategorySetting> = {
 	odometer_readings: { enabled: true, folderPath: 'Odometer' }
 };
 
-/**
- * VLM (vision-LLM) provider types for receipt parsing — the D1-ruled set:
- * OpenAI-compatible + Anthropic + Gemini + Ollama. Mirrors the backend SUPPORTED_PROVIDER_TYPES
- * vlm subset. `keyless` types (ollama) do not require an API key; `needsBaseUrl` types require one.
- * `defaultModel`/`defaultBaseUrl` pre-fill the form so the user only edits to change them.
- */
 export interface VlmProviderTypeOption {
 	id: string;
 	label: string;
@@ -71,18 +58,8 @@ export const VLM_PROVIDER_TYPES: VlmProviderTypeOption[] = [
 	}
 ];
 
-/**
- * Semantic alias — the same option shape backs both the VLM (receipt-parsing) and the LLM
- * (assistant) provider pickers, since both domains share the four model provider types.
- */
 export type ModelProviderTypeOption = VlmProviderTypeOption;
 
-/**
- * LLM (assistant) provider types — the D1-ruled set: the SAME four model
- * provider types as VLM (the backend `MODEL_PROVIDER_TYPES` serves both domains). The default
- * MODELS differ: a chat assistant needs a TOOL-CALLING text model, not a vision model — so
- * Ollama defaults to `llama3.1` (tool-call capable) rather than the VLM card's vision `llava`.
- */
 export const LLM_PROVIDER_TYPES: ModelProviderTypeOption[] = [
 	{
 		id: 'openai-compatible',

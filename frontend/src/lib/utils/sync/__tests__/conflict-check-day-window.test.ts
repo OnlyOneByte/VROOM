@@ -1,20 +1,3 @@
-/**
- * The duplicate check that runs before an offline expense is POSTed used to query
- * `?vehicleId=…&date=…&amount=…`. Neither `date` nor `amount` exists on the expenses route's query
- * schema, and Zod strips unknown keys, so the server answered with the vehicle's recent expenses
- * UNFILTERED — and the tag-overlap match that follows then reported an unrelated expense, from any
- * date and for any amount, as a conflict with the row being synced.
- *
- * A false conflict is not merely a delay. The resolver's "Keep Server Version" marks the local row
- * synced WITHOUT ever POSTing it, so a user who believes that (actually unrelated) server row is
- * their expense discards the offline one permanently.
- *
- * The fake backend below honours `startDate`/`endDate` the way the route does — a date-only bound
- * covers its whole day — so a query carrying no date window sees every row, exactly as the real
- * server did. The second case pins that the check was NARROWED rather than disabled: a genuine
- * same-day duplicate must still be caught.
- */
-
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { onlineStatus, syncState } from '../../../stores/offline.svelte';
 import { type OfflineExpense, saveOfflineExpenses } from '../../offline-storage';
@@ -32,7 +15,6 @@ function apiOk(data: unknown): Response {
 	});
 }
 
-/** One stored server row, in the RAW backend shape the list endpoint actually returns. */
 function serverRow(date: string, amount: number) {
 	return {
 		id: 'server-1',
@@ -50,11 +32,6 @@ function serverRow(date: string, amount: number) {
 const getQueries: URLSearchParams[] = [];
 const posts: string[] = [];
 
-/**
- * Stand in for GET /expenses with the route's REAL filter contract: `vehicleId` plus an inclusive
- * `startDate`/`endDate` day window, and nothing else. Anything the query asks for that the route
- * does not implement is simply ignored — which is the whole defect being guarded.
- */
 function serveFiltered(rows: ReturnType<typeof serverRow>[]): void {
 	mockFetch.mockImplementation((url: string, init?: { method?: string }) => {
 		const method = init?.method ?? 'GET';
@@ -80,7 +57,6 @@ function serveFiltered(rows: ReturnType<typeof serverRow>[]): void {
 	});
 }
 
-/** A COMPLETE fuel row dated 2024-06-02 — nothing local can reject it. */
 function localFillUp(): OfflineExpense {
 	return {
 		id: 'local-1',

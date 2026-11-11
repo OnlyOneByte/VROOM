@@ -24,10 +24,8 @@
 
 	let { fuelStats, dayOfWeekPatterns }: Props = $props();
 
-	// Resolve units from response metadata, falling back to global settings
 	let units: UnitsMetadata = $derived(fuelStats.units ?? settingsStore.unitPreferences);
 
-	// Dynamic labels
 	let efficiencyLabel = $derived(getFuelEfficiencyLabel(units.distanceUnit, units.volumeUnit));
 	let volumeLabel = $derived(getLongFormLabel(units.volumeUnit));
 	let costPerDistLabel = $derived(getCostPerDistanceLabel(units.distanceUnit));
@@ -35,7 +33,6 @@
 		`Price per ${getLongFormLabel(units.volumeUnit).toLowerCase()} by fuel type over time`
 	);
 
-	// --- 1. Fuel Consumption (Efficiency + Volume) ---
 	let consumptionData = $derived(
 		fuelStats.monthlyConsumption.map(d => ({ ...d, date: parseMonthToDate(d.month) }))
 	);
@@ -47,7 +44,6 @@
 
 	let consumptionConfig = $derived(buildChartConfig(consumptionSeries));
 
-	// --- 2. Gas Price History ---
 	let gasPriceFuelTypes = $derived([...new Set(fuelStats.gasPriceHistory.map(d => d.fuelType))]);
 
 	let gasPriceData = $derived.by(() => {
@@ -74,7 +70,6 @@
 
 	let gasPriceConfig = $derived(buildChartConfig(gasPriceSeries));
 
-	// --- 3. Fill-up Cost by Vehicle ---
 	let costVehicleNames = $derived([
 		...new Set(fuelStats.fillupCostByVehicle.map(d => d.vehicleName))
 	]);
@@ -103,7 +98,6 @@
 
 	let fillupCostConfig = $derived(buildChartConfig(fillupCostSeries));
 
-	// --- 4. Odometer Progression ---
 	let odometerVehicleNames = $derived([
 		...new Set(fuelStats.odometerProgression.map(d => d.vehicleName))
 	]);
@@ -132,7 +126,6 @@
 
 	let odometerConfig = $derived(buildChartConfig(odometerSeries));
 
-	// --- 5. Cost per Distance ---
 	let cpmVehicleNames = $derived([...new Set(fuelStats.costPerDistance.map(d => d.vehicleName))]);
 
 	let costPerMileData = $derived.by(() => {
@@ -159,7 +152,6 @@
 
 	let costPerMileConfig = $derived(buildChartConfig(costPerMileSeries));
 
-	// --- 6. Fill-up Patterns by Day of Week ---
 	const dayPatternConfig: Chart.ChartConfig = {
 		fillupCount: { label: 'Fill-ups', color: 'var(--chart-1)' }
 	};
@@ -168,10 +160,7 @@
 		{ key: 'fillupCount', label: 'Fill-ups', color: CHART_COLORS[0] as string }
 	];
 
-	// The backend always returns all 7 days (fillupCount 0 when there's no fuel data),
-	// so a length check is always true and the chart would render a bare empty axis.
-	// Gate on REAL data; when there's none, pass [] so AppBarChart shows its kit
-	// empty-state ("No data available"), matching the sibling charts.
+	// Gate on real data: the backend always returns all 7 days, so a length check would show an empty axis.
 	let dayPatternData = $derived(
 		(dayOfWeekPatterns ?? []).some(d => d.fillupCount > 0) ? (dayOfWeekPatterns ?? []) : []
 	);
@@ -182,7 +171,6 @@
 </script>
 
 <div class="space-y-6">
-	<!-- Row 1: Fuel Consumption + Gas Price on Fill-up -->
 	<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
 		<AppLineChart
 			title="Fuel Consumption"
@@ -207,7 +195,6 @@
 		/>
 	</div>
 
-	<!-- Row 2: Fill-up Cost by Vehicle + Cost per Distance -->
 	<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
 		<AppLineChart
 			title="Fill-up Cost by Vehicle"
@@ -231,7 +218,6 @@
 		/>
 	</div>
 
-	<!-- Row 3: Total Odometer + Fill-up Patterns by Day of Week -->
 	<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
 		<AppAreaChart
 			title="Total Odometer"

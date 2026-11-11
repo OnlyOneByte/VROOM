@@ -1,7 +1,3 @@
-/**
- * Error Module - Error classes, handlers, and response formatters
- */
-
 export class AppError extends Error {
   public readonly statusCode: number;
   public readonly isOperational: boolean;
@@ -116,7 +112,7 @@ export function formatErrorResponse(error: unknown, includeStack: boolean = fals
   }
 
   if (error instanceof Error) {
-    // In production, don't expose raw error messages — they may contain internal details
+    // Raw messages can contain internal details, so they are shown only in development.
     const message = includeStack ? error.message : 'An internal error occurred';
     return createErrorResponse(
       'InternalServerError',
@@ -152,18 +148,12 @@ export const handleDatabaseError = (error: unknown): AppError => {
       return new ValidationError('Invalid reference to related resource');
     if (error.message.includes('NOT NULL constraint failed'))
       return new ValidationError('Required field is missing');
-    // Don't leak raw SQLite error messages to clients
     return new DatabaseError('A database error occurred');
   }
   return new DatabaseError('A database error occurred');
 };
 
-/**
- * Canonical SyncError → HTTP response shaping, used by the global `errorHandler` middleware — the
- * one path that answers a thrown SyncError, since no route hand-rolls a catch block for one. The
- * body is the standard error envelope keyed on the SyncErrorCode; the status comes from
- * ERROR_STATUS_MAP (defaulting to 500 for an unmapped code).
- */
+// The errorHandler middleware is the only place a thrown SyncError becomes a response.
 export function syncErrorResponse(error: SyncError): { body: ErrorResponse; status: number } {
   const status = ERROR_STATUS_MAP[error.code] || 500;
   return { body: createErrorResponse(error.code, error.message, error.details), status };

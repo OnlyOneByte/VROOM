@@ -1,16 +1,4 @@
-/**
- * A 401 on an app request means the server-side session is gone, so the auth store still reporting
- * an authenticated user is a lie. The handler that clears it, warns the user and sends them to sign
- * in used to live in `hooks.client.ts` as a `handleFetch` export — a SERVER hook the generated
- * client manifest never reads — so it had never run: an expired session left the signed-in shell
- * rendered, every surface showing its own generic failure, and no way back to /auth. It now lives
- * in the api client, the single place app code reaches the network and therefore the only place
- * that sees every 401.
- *
- * The auth probe and refresh endpoints are excluded deliberately: both read a 401 as "not signed
- * in" and report it themselves, so running the global handler for them would warn and redirect
- * every logged-out visitor on page load.
- */
+// A 401 clears the auth store and redirects to sign-in. The auth probe and refresh endpoints are excluded because they report 401 themselves.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { goto } from '$app/navigation';
@@ -54,7 +42,6 @@ describe('api client — global session expiry on 401', () => {
 	});
 
 	afterEach(() => {
-		// Release the once-per-expiry latch so the next case starts from a clean slate.
 		vi.advanceTimersByTime(2000);
 		vi.useRealTimers();
 	});
@@ -70,7 +57,6 @@ describe('api client — global session expiry on 401', () => {
 	it('leaves the startup auth probe to report its own 401', async () => {
 		await expect(apiClient.get('/api/v1/auth/me')).rejects.toThrow();
 
-		// Untouched — not merely un-redirected, which is what a latched handler would also look like.
 		expect(authStore.isAuthenticated).toBe(true);
 		expect(expiryWarningShown()).toBe(false);
 		expect(goto).not.toHaveBeenCalled();

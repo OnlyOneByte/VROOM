@@ -1,31 +1,3 @@
-/**
- * Property-Based Tests for Per-Vehicle Analytics (Health, TCO, Expenses)
- *
- * Property 10: Health score formula
- * overallScore = round(regularity * 0.4 + mileage * 0.35 + insurance * 0.25)
- * **Validates: Requirement 9.2**
- *
- * Property 11: Insurance coverage is binary
- * 100 with active policy, 0 without
- * **Validates: Requirement 9.4**
- *
- * Property 12: Maintenance regularity penalizes large gaps
- * Score decreases as proportion of >90-day gaps increases
- * **Validates: Requirement 9.5**
- *
- * Property 13: Mileage adherence scores good intervals
- * Score increases as proportion of 3000-7000 mile intervals increases
- * **Validates: Requirement 9.6**
- *
- * Property 14: TCO total equals sum of components
- * totalCost = purchasePrice + financingInterest + insuranceCost + fuelCost + maintenanceCost + otherCosts
- * **Validates: Requirement 10.2**
- *
- * Property 15: Cost per month formula
- * costPerMonth = totalCost / ownershipMonths when ownershipMonths > 0
- * **Validates: Requirement 10.4**
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { AnalyticsRepository } from '../repository';
@@ -42,9 +14,6 @@ import {
   type TestVehicle,
 } from './analytics-test-generators';
 
-// ---------------------------------------------------------------------------
-// Shared setup
-// ---------------------------------------------------------------------------
 let testDb: TestDb;
 let repo: AnalyticsRepository;
 
@@ -57,25 +26,19 @@ afterEach(() => {
   testDb.sqlite.close();
 });
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 const TEST_YEAR = 2024;
 
-/** Reset DB and repo for a fresh property test iteration. */
 function resetDb(): void {
   testDb.sqlite.close();
   testDb = createTestDb();
   repo = new AnalyticsRepository(testDb.drizzle);
 }
 
-/** Create user and a single vehicle, returning IDs. */
 function setupUserAndVehicle(opts?: {
   purchasePrice?: number | null;
   purchaseDate?: Date | null;
 }): { userId: string; vehicle: TestVehicle } {
   const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
-  // Use INSERT OR IGNORE so this is safe to call even if user was pre-seeded (e.g., for insurance FK)
   testDb.sqlite.run('INSERT OR IGNORE INTO users (id, email, display_name) VALUES (?, ?, ?)', [
     user.id,
     user.email,
@@ -91,7 +54,6 @@ function setupUserAndVehicle(opts?: {
   };
   seedVehicle(testDb.sqlite, v);
 
-  // Set purchase price/date if provided
   if (opts?.purchasePrice != null || opts?.purchaseDate != null) {
     const priceVal = opts?.purchasePrice ?? null;
     const dateVal = opts?.purchaseDate ? Math.floor(opts.purchaseDate.getTime() / 1000) : null;
@@ -105,7 +67,6 @@ function setupUserAndVehicle(opts?: {
   return { userId: user.id, vehicle: v };
 }
 
-/** Seed maintenance expenses with specific dates for regularity testing. */
 function seedMaintenanceWithDates(vehicleId: string, dates: Date[]): void {
   for (let i = 0; i < dates.length; i++) {
     const d = dates[i];
@@ -124,7 +85,6 @@ function seedMaintenanceWithDates(vehicleId: string, dates: Date[]): void {
   }
 }
 
-/** Seed maintenance expenses with specific mileages for mileage adherence testing. */
 function seedMaintenanceWithMileages(vehicleId: string, mileages: number[]): void {
   const baseDate = new Date(TEST_YEAR, 0, 1);
   for (let i = 0; i < mileages.length; i++) {
@@ -144,7 +104,6 @@ function seedMaintenanceWithMileages(vehicleId: string, mileages: number[]): voi
   }
 }
 
-/** Seed random expenses for a vehicle. */
 function seedRandomExpenses(vehicleId: string, count: number): void {
   const generated = fc.sample(expenseArb(vehicleId, 0, TEST_YEAR), count);
   for (let i = 0; i < generated.length; i++) {
@@ -154,11 +113,7 @@ function seedRandomExpenses(vehicleId: string, count: number): void {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Property 10: Health score formula
-// **Validates: Requirement 9.2**
-// ---------------------------------------------------------------------------
-describe('Property 10: Health score formula', () => {
+describe('Health score formula', () => {
   test('overallScore = round(regularity * 0.4 + mileage * 0.35 + insurance * 0.25)', async () => {
     await fc.assert(
       fc.asyncProperty(
@@ -170,7 +125,6 @@ describe('Property 10: Health score formula', () => {
           let policyId: string | null = null;
           if (hasInsurance) {
             policyId = 'policy-1';
-            // Seed user first so the FK on insurance_policies.user_id is satisfied
             seedUser(testDb.sqlite, { id: 'user-1', email: 'test@test.com', displayName: 'Test' });
             const policy: TestInsurancePolicy = {
               id: policyId,
@@ -186,7 +140,6 @@ describe('Property 10: Health score formula', () => {
 
           const result = await repo.getVehicleHealth(userId, vehicle.id);
 
-          // Verify the weighted formula
           const expected = Math.round(
             result.maintenanceRegularity * 0.4 +
               result.mileageIntervalAdherence * 0.35 +
@@ -195,7 +148,6 @@ describe('Property 10: Health score formula', () => {
           const clamped = Math.max(0, Math.min(100, expected));
           expect(result.overallScore).toBe(clamped);
 
-          // All sub-scores bounded [0, 100]
           expect(result.maintenanceRegularity).toBeGreaterThanOrEqual(0);
           expect(result.maintenanceRegularity).toBeLessThanOrEqual(100);
           expect(result.mileageIntervalAdherence).toBeGreaterThanOrEqual(0);
@@ -209,11 +161,7 @@ describe('Property 10: Health score formula', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Property 11: Insurance coverage is binary
-// **Validates: Requirement 9.4**
-// ---------------------------------------------------------------------------
-describe('Property 11: Insurance coverage is binary', () => {
+describe('Insurance coverage is binary', () => {
   test('100 with active policy, 0 without', async () => {
     await fc.assert(
       fc.asyncProperty(fc.boolean(), fc.boolean(), async (hasPolicy, isActive) => {
@@ -230,7 +178,6 @@ describe('Property 11: Insurance coverage is binary', () => {
             company: 'Test Co',
             isActive,
           });
-          // Create insurance term for the policy
           testDb.sqlite.run(
             'INSERT INTO insurance_terms (id, policy_id, start_date, end_date) VALUES (?, ?, ?, ?)',
             [
@@ -240,7 +187,6 @@ describe('Property 11: Insurance coverage is binary', () => {
               Math.floor(Date.now() / 1000) + 86400 * 365,
             ]
           );
-          // Create junction row linking term to vehicle
           testDb.sqlite.run(
             'INSERT INTO insurance_term_vehicles (term_id, vehicle_id) VALUES (?, ?)',
             [termId, vehicle.id]
@@ -260,11 +206,7 @@ describe('Property 11: Insurance coverage is binary', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Property 12: Maintenance regularity penalizes large gaps
-// **Validates: Requirement 9.5**
-// ---------------------------------------------------------------------------
-describe('Property 12: Maintenance regularity penalizes large gaps', () => {
+describe('Maintenance regularity penalizes large gaps', () => {
   test('score decreases as proportion of >90-day gaps increases', async () => {
     await fc.assert(
       fc.asyncProperty(
@@ -279,12 +221,10 @@ describe('Property 12: Maintenance regularity penalizes large gaps', () => {
           let current = new Date(TEST_YEAR, 0, 1);
           dates.push(current);
 
-          // Add good gaps (30 days apart, well under 90)
           for (let i = 0; i < goodGapCount; i++) {
             current = new Date(current.getTime() + 30 * 24 * 60 * 60 * 1000);
             dates.push(current);
           }
-          // Add bad gaps (120 days apart, over 90)
           for (let i = 0; i < badGapCount; i++) {
             current = new Date(current.getTime() + 120 * 24 * 60 * 60 * 1000);
             dates.push(current);
@@ -295,7 +235,6 @@ describe('Property 12: Maintenance regularity penalizes large gaps', () => {
           const result = await repo.getVehicleHealth(userId, vehicle.id);
 
           if (totalRecords < 2) {
-            // With 0 records: 50, with 1 record: 75
             expect(result.maintenanceRegularity).toBeGreaterThanOrEqual(50);
           } else {
             const totalGaps = goodGapCount + badGapCount;
@@ -312,11 +251,7 @@ describe('Property 12: Maintenance regularity penalizes large gaps', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Property 13: Mileage adherence scores good intervals
-// **Validates: Requirement 9.6**
-// ---------------------------------------------------------------------------
-describe('Property 13: Mileage adherence scores good intervals', () => {
+describe('Mileage adherence scores good intervals', () => {
   test('score increases as proportion of 3000-7000 mile intervals increases', async () => {
     await fc.assert(
       fc.asyncProperty(
@@ -331,12 +266,10 @@ describe('Property 13: Mileage adherence scores good intervals', () => {
           let currentMileage = 10000;
           mileages.push(currentMileage);
 
-          // Add good intervals (5000 miles, within 3000-7000)
           for (let i = 0; i < goodIntervalCount; i++) {
             currentMileage += 5000;
             mileages.push(currentMileage);
           }
-          // Add bad intervals (15000 miles, outside 3000-7000)
           for (let i = 0; i < badIntervalCount; i++) {
             currentMileage += 15000;
             mileages.push(currentMileage);
@@ -362,11 +295,7 @@ describe('Property 13: Mileage adherence scores good intervals', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Property 14: TCO total equals sum of components
-// **Validates: Requirement 10.2**
-// ---------------------------------------------------------------------------
-describe('Property 14: TCO total equals sum of components', () => {
+describe('TCO total equals sum of components', () => {
   test('totalCost = purchasePrice + financingInterest + insuranceCost + fuelCost + maintenanceCost + otherCosts', async () => {
     await fc.assert(
       fc.asyncProperty(
@@ -400,16 +329,7 @@ describe('Property 14: TCO total equals sum of components', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// TCO must not double-count a financed vehicle's principal.
-// The `financingInterest` bucket sums WHOLE financing-sourced expense rows (full loan payments =
-// principal + interest), so counting both purchasePrice AND those payments counts the principal twice.
-// Decided model: when purchasePrice is counted, EXCLUDE the financing-payment rows from the total (they
-// retire the already-counted price). seedExpense can't set source_type, so we insert the financing row
-// directly. Pre-fix this asserted ~price+payments (double); post-fix it asserts price only.
-// ---------------------------------------------------------------------------
 describe('financed vehicle TCO does not double-count principal', () => {
-  /** Insert a financing-sourced expense row (category 'financial' + source_type 'financing'). */
   function seedFinancingPayment(vehicleId: string, id: string, amount: number, date: Date): void {
     testDb.sqlite.run(
       'INSERT INTO expenses (id, vehicle_id, user_id, category, expense_amount, date, source_type, missed_fillup) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -431,7 +351,6 @@ describe('financed vehicle TCO does not double-count principal', () => {
       purchasePrice: 30000,
       purchaseDate: new Date(2020, 0, 1),
     });
-    // Three loan payments of $500 (full payments retiring principal), plus one real fuel cost.
     seedFinancingPayment(vehicle.id, 'fin-1', 500, new Date(2024, 0, 15));
     seedFinancingPayment(vehicle.id, 'fin-2', 500, new Date(2024, 1, 15));
     seedFinancingPayment(vehicle.id, 'fin-3', 500, new Date(2024, 2, 15));
@@ -449,9 +368,7 @@ describe('financed vehicle TCO does not double-count principal', () => {
 
     const result = await repo.getVehicleTCO(userId, vehicle.id);
 
-    // Total = purchasePrice + fuel ONLY — the $1500 of payments are excluded (they retire the price).
     expect(result.totalCost).toBe(30060);
-    // The reported financing bucket is 0 (the counted value), so the breakdown still sums.
     expect(result.financingInterest).toBe(0);
     const componentSum =
       (result.purchasePrice ?? 0) +
@@ -473,25 +390,11 @@ describe('financed vehicle TCO does not double-count principal', () => {
 
     const result = await repo.getVehicleTCO(userId, vehicle.id);
 
-    // Without a recorded price, the financing outflow IS the cost signal — keep it.
     expect(result.totalCost).toBe(1000);
     expect(result.financingInterest).toBe(1000);
   });
 });
 
-// ---------------------------------------------------------------------------
-// deep-review CERT: categorizeTCOExpenses buckets a `financial` row by its sourceType, NOT by
-// category alone. The predicate is `category==='financial' && sourceType==='financing'` → financingInterest;
-// `financial` + 'insurance_term' → insuranceCost; ANY OTHER `financial` row (sourceType 'reminder' from a
-// recurring expense [], or null from a manual financial entry) falls through to otherCosts. This is the
-// money-facing seam recurring-expenses now exercises (it materializes financial+'reminder' rows), and
-// it was UNPINNED — the prior tests only seed financing-sourced financial rows. Certified firsthand
-// (probe): reminder/null financial → otherCosts, NOT financingInterest. NON-VACUOUS: dropping the
-// `sourceType==='financing'` clause (bucketing by category alone) would pull the reminder+null rows into
-// financingInterest → and since this vehicle is PRICED, computeTCOTotal would then EXCLUDE them as
-// "principal-retiring payments", silently dropping a recurring financial cost from TCO. This pins the
-// guard so that mis-edit turns RED.
-// ---------------------------------------------------------------------------
 describe('TCO buckets financial rows by sourceType (recurring/manual → otherCosts, not financing)', () => {
   function seedFinancialRow(
     vehicleId: string,
@@ -515,48 +418,32 @@ describe('TCO buckets financial rows by sourceType (recurring/manual → otherCo
   }
 
   test('a recurring (reminder) + a manual (null) financial row land in otherCosts, not financingInterest', async () => {
-    // No purchasePrice → financing payments are kept (the unpriced cost-signal path), so a mis-bucket
-    // would show up directly in financingInterest rather than being masked by the exclusion.
     const { userId, vehicle } = setupUserAndVehicle({ purchasePrice: null });
-    seedFinancialRow(vehicle.id, 'fin', 200, 'financing'); // a real loan payment
-    seedFinancialRow(vehicle.id, 'ins', 75, 'insurance_term'); // an insurance premium
-    seedFinancialRow(vehicle.id, 'rem', 100, 'reminder'); // a recurring financial expense
-    seedFinancialRow(vehicle.id, 'man', 50, null); // a manual financial expense
+    seedFinancialRow(vehicle.id, 'fin', 200, 'financing');
+    seedFinancialRow(vehicle.id, 'ins', 75, 'insurance_term');
+    seedFinancialRow(vehicle.id, 'rem', 100, 'reminder');
+    seedFinancialRow(vehicle.id, 'man', 50, null);
 
     const result = await repo.getVehicleTCO(userId, vehicle.id);
 
-    expect(result.financingInterest).toBe(200); // ONLY the 'financing' row
-    expect(result.insuranceCost).toBe(75); // ONLY the 'insurance_term' row
-    expect(result.otherCosts).toBe(150); // reminder ($100) + manual ($50) — NOT financing
+    expect(result.financingInterest).toBe(200);
+    expect(result.insuranceCost).toBe(75);
+    expect(result.otherCosts).toBe(150);
     expect(result.totalCost).toBe(425);
   });
 
   test('PRICED + a recurring financial row → the recurring cost survives in otherCosts', async () => {
-    // The dangerous mis-bucket: if a reminder financial row were treated as financing, computeTCOTotal
-    // would EXCLUDE it (purchasePrice counted), silently dropping the cost. Pin that it's kept.
     const { userId, vehicle } = setupUserAndVehicle({ purchasePrice: 30000 });
     seedFinancialRow(vehicle.id, 'rem', 100, 'reminder');
 
     const result = await repo.getVehicleTCO(userId, vehicle.id);
 
-    expect(result.financingInterest).toBe(0); // no financing-sourced row
-    expect(result.otherCosts).toBe(100); // the recurring cost is kept
-    expect(result.totalCost).toBe(30100); // price + the recurring expense
+    expect(result.financingInterest).toBe(0);
+    expect(result.otherCosts).toBe(100);
+    expect(result.totalCost).toBe(30100);
   });
 });
 
-// ---------------------------------------------------------------------------
-// +, YEAR-SCOPED arm (deep-review → guard). Every getVehicleTCO call in the suite
-// omitted the optional `year` arg, so the year-scoped accounting path was UNPINNED — including the
-// load-bearing rule computeTCOTotal documents (repository.ts:1081): purchasePrice is an all-time-only
-// acquisition cost (EXCLUDED from any year window since the window's expenses are already
-// date-filtered), and because the price is NOT counted in a year window, the financing-payment rows
-// for that year ARE kept (they're the cost signal for the window — NOT a double-count, since the
-// acquisition isn't in the window). A audit flagged the year+unpriced+financed case as a
-// "double-count bug" — it is NOT (the price was a prior-year acquisition, absent from the window);
-// these pin the DECIDED semantics so a future "fix" to that branch is a deliberate, RED-turning
-// change, not a silent regression. seedExpense can't set source_type → insert the financing row raw.
-// ---------------------------------------------------------------------------
 describe('year-scoped: purchasePrice excluded from a year window; that year financing kept', () => {
   function seedFinancingPayment(vehicleId: string, id: string, amount: number, date: Date): void {
     testDb.sqlite.run(
@@ -577,23 +464,16 @@ describe('year-scoped: purchasePrice excluded from a year window; that year fina
   test('PRICED + financed, year-scoped: purchasePrice is EXCLUDED, the year financing IS counted', async () => {
     const { userId, vehicle } = setupUserAndVehicle({
       purchasePrice: 30000,
-      purchaseDate: new Date(2020, 0, 1), // a prior-year acquisition
+      purchaseDate: new Date(2020, 0, 1),
     });
-    // Two financing payments inside the queried year, one in a DIFFERENT year (must be excluded by the window).
     seedFinancingPayment(vehicle.id, 'fin-in-1', 500, new Date(TEST_YEAR, 0, 15));
     seedFinancingPayment(vehicle.id, 'fin-in-2', 500, new Date(TEST_YEAR, 5, 15));
     seedFinancingPayment(vehicle.id, 'fin-out', 999, new Date(TEST_YEAR - 1, 11, 15));
 
     const result = await repo.getVehicleTCO(userId, vehicle.id, TEST_YEAR);
 
-    // The $30k prior-year purchase is NOT in this window; the two in-year payments ARE the
-    // window's cost signal (not a double-count — the acquisition isn't counted here). Out-of-year
-    // payment excluded by the date filter.
     expect(result.totalCost).toBe(1000);
     expect(result.financingInterest).toBe(1000);
-    // The response still REPORTS the vehicle's stored purchasePrice (it's a vehicle attribute), but a
-    // year-scoped totalCost EXCLUDES it — so in a year window the breakdown fields intentionally
-    // do NOT sum to totalCost by exactly purchasePrice. That divergence is the design, pinned here.
     expect(result.purchasePrice).toBe(30000);
     expect(result.totalCost).toBe(
       result.financingInterest +
@@ -601,10 +481,10 @@ describe('year-scoped: purchasePrice excluded from a year window; that year fina
         result.fuelCost +
         result.maintenanceCost +
         result.otherCosts
-    ); // year total = the windowed buckets, purchasePrice NOT added
+    );
   });
 
-  test('UNPRICED + financed, year-scoped: the year financing IS counted (the documented branch)', async () => {
+  test('UNPRICED + financed, year-scoped: the year financing IS counted', async () => {
     const { userId, vehicle } = setupUserAndVehicle({
       purchasePrice: null,
       purchaseDate: new Date(2020, 0, 1),
@@ -614,33 +494,22 @@ describe('year-scoped: purchasePrice excluded from a year window; that year fina
 
     const result = await repo.getVehicleTCO(userId, vehicle.id, TEST_YEAR);
 
-    // No price to double-count against → the year's financing outflow is the cost signal. Kept.
     expect(result.totalCost).toBe(1000);
     expect(result.financingInterest).toBe(1000);
   });
 
-  test('year-scoped costPerMonth divides by monthsOwnedInYear (≤12), NOT full-ownership monthsBetween (divisor)', async () => {
-    // The year arm selects ownershipMonths = monthsOwnedInYear(start, now, year) (repository.ts:1907),
-    // capped at 12 for a fully-owned past year — so a year-windowed numerator is divided by a matching
-    // ≤12 span, not the purchase→now full-ownership months (the mistake). monthsOwnedInYear is
-    // unit-tested in isolation + the ALL-TIME costPerMonth is pinned by Property 15, but NOTHING drove
-    // the REAL getVehicleTCO through the YEAR branch to confirm the divisor SELECTION — a refactor
-    // swapping to monthsBetween would turn no test red (the helper-tested-in-isolation gap).
+  test('year-scoped costPerMonth divides by months owned in that year, not full ownership', async () => {
     const { userId, vehicle } = setupUserAndVehicle({
       purchasePrice: 30000,
-      purchaseDate: new Date(2020, 0, 1), // owned ALL of TEST_YEAR (a prior-year acquisition)
+      purchaseDate: new Date(2020, 0, 1),
     });
-    // One $1200 financing payment inside TEST_YEAR → year totalCost = 1200.
     seedFinancingPayment(vehicle.id, 'fin-cpm', 1200, new Date(TEST_YEAR, 5, 15));
 
     const result = await repo.getVehicleTCO(userId, vehicle.id, TEST_YEAR);
 
     expect(result.totalCost).toBe(1200);
-    // TEST_YEAR (2024) is fully past relative to `now`, and ownership began 2020 → all 12 months owned.
-    // NON-VACUOUS: full-ownership monthsBetween(2020→now) is ~70+, so a divisor regression to that branch
-    // would make ownershipMonths ≫ 12 and costPerMonth ≪ 100.
     expect(result.ownershipMonths).toBe(12);
-    expect(result.costPerMonth).toBe(100); // 1200 / 12
+    expect(result.costPerMonth).toBe(100);
   });
 
   test('year-scoped total = the windowed buckets (financing + fuel), purchasePrice NOT added', async () => {
@@ -663,7 +532,6 @@ describe('year-scoped: purchasePrice excluded from a year window; that year fina
 
     const result = await repo.getVehicleTCO(userId, vehicle.id, TEST_YEAR);
 
-    // The windowed buckets (everything EXCEPT the all-time-only purchasePrice) sum to totalCost.
     const windowedBuckets =
       result.financingInterest +
       result.insuranceCost +
@@ -671,15 +539,11 @@ describe('year-scoped: purchasePrice excluded from a year window; that year fina
       result.maintenanceCost +
       result.otherCosts;
     expect(Math.abs(result.totalCost - windowedBuckets)).toBeLessThan(0.01);
-    expect(result.totalCost).toBe(560); // 500 financing + 60 fuel, NO purchasePrice
+    expect(result.totalCost).toBe(560);
   });
 });
 
-// ---------------------------------------------------------------------------
-// Property 15: Cost per month formula
-// **Validates: Requirement 10.4**
-// ---------------------------------------------------------------------------
-describe('Property 15: Cost per month formula', () => {
+describe('Cost per month formula', () => {
   test('costPerMonth = totalCost / ownershipMonths when ownershipMonths > 0', async () => {
     await fc.assert(
       fc.asyncProperty(
@@ -711,14 +575,6 @@ describe('Property 15: Cost per month formula', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// FE↔BE response contract-drift guard for getVehicleHealth — the FINAL hand-assembled surface
-// in loop-improvement (/stats, /vehicles list, single-financing,
-// /analytics/insurance, /analytics/year-end). getVehicleHealth hand-assembles a 6-field
-// literal (repository.ts:1713) with NO type binding to the frontend VehicleHealthResponse
-// (types/analytics.ts:199). Property 10 above pins the SCORE MATH but NOT the key shape, so a
-// dropped/renamed field would silently break the health card. Exact top-level key equality.
-// ---------------------------------------------------------------------------
 const VEHICLE_HEALTH_KEYS = [
   'vehicleId',
   'vehicleName',
@@ -728,7 +584,7 @@ const VEHICLE_HEALTH_KEYS = [
   'insuranceCoverage',
 ].sort();
 
-describe('getVehicleHealth — FE↔BE response contract shape (drift guard)', () => {
+describe('getVehicleHealth — response shape matches the frontend contract', () => {
   test('the response has exactly the frontend VehicleHealthResponse top-level keys', async () => {
     const { userId, vehicle } = setupUserAndVehicle({});
     const result = await repo.getVehicleHealth(userId, vehicle.id);

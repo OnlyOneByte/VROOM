@@ -1,19 +1,3 @@
-/**
- * The assistant's read-tool layer and the HTTP API answer the same questions over the same rows, so
- * they MUST report the same money. Money is stored and computed in integer CENTS; dollars exist only at
- * the display edge, and the tool layer is a second consumer of that edge — one the model cannot
- * sanity-check, because its system prompt states the amounts are already in the user's currency. A tool
- * that hands back raw cents therefore makes the assistant read every figure out 100x too large.
- *
- * Each test pins one tool against the route that answers the same question over the SAME seeded data.
- * That is the assertion that cannot drift: the route is the dollar contract the frontend already
- * consumes, so it is the oracle rather than a second hand-written expectation.
- *
- * The scope half is pinned the same way. A shared vehicle's rows are OWNER-stamped, so a sharee's
- * per-vehicle question has to resolve to the owner's books exactly as the route does, or the assistant
- * reports zeros for data the API shows them.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -25,11 +9,9 @@ import { seedVehicle } from '../../../../../test-helpers/seed';
 
 let ctx: TestApp;
 
-// Dynamically imported AFTER createTestApp so the repos the tools wrap bind the test DB singleton.
 type ToolsModule = typeof import('../tools');
 let tools: ToolsModule;
 
-// Seeded DOLLAR amounts — what both surfaces must report (the cents bug reports each one 100x larger).
 const PURCHASE_PRICE = 20_000;
 const FUEL_ONE = 50.25;
 const FUEL_TWO = 60.5;
@@ -41,8 +23,6 @@ const INSURANCE_MONTHLY = 100.25;
 const INSURANCE_DEDUCTIBLE = 500;
 const REMINDER_AMOUNT = 75.5;
 
-// Creating the insurance term auto-materializes its premium as a dated expense, so the all-time books
-// carry it alongside the three seeded rows. It falls OUTSIDE the 30-day analytics window.
 const WINDOW_EXPENSES = FUEL_ONE + FUEL_TWO + MAINTENANCE;
 const ALL_TIME_EXPENSES = WINDOW_EXPENSES + INSURANCE_TOTAL;
 const ALL_TIME_EXPENSE_COUNT = 4;
@@ -51,13 +31,11 @@ const nowMs = Date.now();
 const ago = (days: number): string => new Date(nowMs - days * 86_400_000).toISOString();
 const ahead = (days: number): string => new Date(nowMs + days * 86_400_000).toISOString();
 
-/** The analytics window the tool's `30d` range resolves to, as the route's epoch-seconds query. */
 function analyticsRange(): string {
   const { start, end } = tools.resolveRange('30d', nowMs);
   return `startDate=${start}&endDate=${end}`;
 }
 
-/** Dates serialize to ISO strings over HTTP; normalize the tool's Date objects the same way. */
 function overTheWire<T>(value: unknown): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
@@ -82,7 +60,6 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-/** An authenticated request as the INVITEE (user B), not the harness session user. */
 async function asB(method: string, path: string, body?: unknown): Promise<Response> {
   const headers: Record<string, string> = { Cookie: bCookie, 'Sec-Fetch-Site': 'same-origin' };
   let init: RequestInit = { method, headers };
@@ -98,11 +75,6 @@ async function expectCreated(res: Response, label: string): Promise<void> {
   expect(res.status, `${label}: ${JSON.stringify(body)}`).toBeLessThan(300);
 }
 
-/**
- * One vehicle carrying every money surface the tools expose: purchase price, two fuel fill-ups, a
- * maintenance expense, a loan, an insurance term and an expense reminder (dated ahead so the trigger
- * service does not materialize it mid-test).
- */
 async function seedFullFixture(): Promise<string> {
   const vehicleId = await seedVehicle(ctx, {
     extra: { purchasePrice: PURCHASE_PRICE, initialMileage: 30_000, purchaseDate: ago(400) },
@@ -187,14 +159,12 @@ async function seedFullFixture(): Promise<string> {
   return vehicleId;
 }
 
-/** Run a tool as the session user and return its result as it would reach the model. */
 async function runTool<T>(name: string, args: unknown, userId = ctx.user.id): Promise<T> {
   const tool = tools.ASSISTANT_TOOLS[name];
   expect(tool, `tool ${name} must be in the allowlist`).toBeDefined();
   return overTheWire<T>(await tool.run(args, userId, nowMs));
 }
 
-/** GET a route as the session user and return its `data` payload. */
 async function routeData<T>(path: string): Promise<T> {
   const res = await ctx.authed('GET', path);
   const body = await json<DataEnvelope<T>>(res);
@@ -341,7 +311,6 @@ describe('assistant tools report the SAME money as the HTTP routes (dollars, not
 });
 
 describe('assistant tools scope a shared vehicle to the OWNER books, like the routes', () => {
-  /** The owner shares the seeded vehicle with B at `level`; B accepts. */
   async function share(vehicleId: string, level: 'viewer' | 'editor'): Promise<void> {
     const invite = await ctx.authed('POST', '/api/v1/shares', { vehicleId, email: bEmail, level });
     const body = await json<DataEnvelope<{ id: string }>>(invite);
@@ -369,7 +338,6 @@ describe('assistant tools scope a shared vehicle to the OWNER books, like the ro
       `/api/v1/expenses/summary?vehicleId=${vehicleId}&period=all`
     );
 
-    // The sharee owns none of the vehicle's rows — an acting-user-scoped query reports zeros.
     expect(tool.expenseCount).toBe(ALL_TIME_EXPENSE_COUNT);
     expect(tool.totalAmount).toBe(ALL_TIME_EXPENSES);
     expect(tool).toEqual(route);

@@ -34,13 +34,7 @@ export function validateExpenseField(field: string, ctx: ValidationContext): str
 		}
 		case 'date': {
 			if (!value) return 'Date is required';
-			// Compare CALENDAR DAYS, not Date instants. `new Date('YYYY-MM-DD')` parses as UTC
-			// midnight, so for a user at a positive UTC offset it lands on tomorrow-morning-local
-			// and a Date-instant `> new Date()` wrongly rejects TODAY as "in the future" (the
-			// C6/ local-vs-UTC class). The date-picker value is already a local 'YYYY-MM-DD';
-			// toDateInputValue reads today's LOCAL calendar parts (the canonical helper — one
-			// source of truth for the local-date string this file builds 3×). String compare is
-			// timezone-safe.
+			// Compare calendar days as strings: new Date('YYYY-MM-DD') parses as UTC and would reject today in positive offsets.
 			const todayStr = toDateInputValue(new Date());
 			if ((value as string) > todayStr) return 'Date cannot be in the future';
 			break;

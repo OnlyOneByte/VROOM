@@ -1,14 +1,3 @@
-/**
- * "Pending sync" has exactly one meaning, and every count the UI shows must use it.
- *
- * A row parked as `needsAttention` is unsynced but NOT pending: the sync loop skips it by design, so
- * counting it produced a "Sync 1" badge that offered work the app would never do — tapping it synced
- * the empty pending set, flashed "Synced", and the count came straight back. Three chrome badges
- * computed `!synced` while the persisted-outbox reader `getPendingExpenses` applied
- * `!synced && !needsAttention`; the parity test below pins the two definitions together so the next
- * tightening of one cannot silently skip the other.
- */
-
 import { describe, expect, it, beforeEach } from 'vitest';
 import {
 	countParked,

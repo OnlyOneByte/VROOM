@@ -1,19 +1,3 @@
-/**
- * Characterizes what `DELETE /api/v1/expenses/:id` does to a SPLIT sibling.
- *
- * Both UI delete paths for a split — the ExpensesTable list row and the
- * non-insurance branch of ExpenseForm.handleDelete — call
- * expenseApi.deleteExpense(child.id), which hits this single-row route. The
- * dialogs imply the whole split goes away ("removes the entire split — every
- * vehicle's portion"), and the intended group-delete route /split/:id deletes
- * every sibling (and cleans their photos). This test pins the actual behavior so
- * the fix (route the split delete through the group endpoint) has a failing-first
- * proof and a regression guard.
- *
- * createTestApp() rewrites env + dynamic-imports DB-bound modules, so keep static
- * imports to the harness + bun:test.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, json, type TestApp } from '../../../test-helpers/http-client';
 import { seedVehicle as seedVehicleShared } from '../../../test-helpers/seed';
@@ -25,9 +9,6 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-// This file's fixtures are make-only ("Honda"/"Toyota" with a constant model/year); converge onto the
-// shared seedVehicle  via a thin make-param wrapper that preserves the
-// exact prior payload (model 'Test', year 2021) so behavior is unchanged (the shared default is a Camry).
 const seedVehicle = (make: string): Promise<string> =>
   seedVehicleShared(ctx, { make, model: 'Test', year: 2021 });
 
@@ -66,13 +47,9 @@ describe('deleting a split sibling via DELETE /:id', () => {
     expect(group.siblings).toHaveLength(2);
     expect(rowCountForGroup(group.groupId)).toBe(2);
 
-    // What the ExpensesTable row delete (and the non-insurance ExpenseForm delete)
-    // actually call: a single-row delete on children[0].
     const del = await ctx.authed('DELETE', `/api/v1/expenses/${group.siblings[0].id}`);
     expect(del.status).toBe(200);
 
-    // The OTHER sibling survives — the group is now a broken partial split whose
-    // remaining rows no longer sum to groupTotal. This is the bug the dialog hides.
     expect(rowCountForGroup(group.groupId)).toBe(1);
   });
 
@@ -82,8 +59,6 @@ describe('deleting a split sibling via DELETE /:id', () => {
     const group = await createEvenSplit([v1, v2], 30);
     expect(rowCountForGroup(group.groupId)).toBe(2);
 
-    // Deleting via the group endpoint (passing ANY member's id is how the UI calls
-    // it) clears the whole group — what "removes the entire split" should mean.
     const del = await ctx.authed('DELETE', `/api/v1/expenses/split/${group.groupId}`);
     expect(del.status).toBe(200);
     expect(rowCountForGroup(group.groupId)).toBe(0);

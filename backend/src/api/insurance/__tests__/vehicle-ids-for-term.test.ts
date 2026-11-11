@@ -1,9 +1,6 @@
 /**
- * Unit tests for vehicleIdsForTerm — the pure junction→vehicleIds derivation extracted from the
- * three byte-identical sites in insurance/routes.ts (create-policy loop, addTerm, updateTerm). Pins the
- * behavior the dedup must preserve: filter the policy's termVehicleCoverage to one termId, project the
- * vehicleId, preserving order and NOT de-duplicating (each call site fed the result straight to
- * createTermExpenses/updateTermExpenses, which dedup downstream — so this helper is a faithful 1:1 map).
+ * Unit tests for vehicleIdsForTerm. It preserves order and does not de-duplicate, and it never returns
+ * vehicles from another term.
  */
 
 import { describe, expect, test } from 'bun:test';
@@ -27,7 +24,7 @@ describe('vehicleIdsForTerm', () => {
     expect(vehicleIdsForTerm([], 't1')).toEqual([]);
   });
 
-  test('does not cross terms — a vehicle on another term never leaks in', () => {
+  test('does not cross terms', () => {
     const result = vehicleIdsForTerm(COVERAGE, 't1');
     expect(result).not.toContain('v-c');
   });

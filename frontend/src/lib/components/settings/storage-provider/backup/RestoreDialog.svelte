@@ -18,17 +18,7 @@
 
 	type FlowType = 'file' | 'provider';
 
-	/**
-	 * Steps:
-	 * 1 = choose entry point (file upload vs provider)
-	 * 2 = file: upload ZIP / provider: pick file from backup list (ZIP) or loading sheets preview
-	 * 3 = preview + mode + execute
-	 *
-	 * Provider sub-steps handled via providerStep:
-	 * 'pick-provider' = pick provider + source type (ProviderPicker)
-	 * 'pick-file' = pick ZIP file from provider backup list
-	 * 'loading-sheets' = loading sheets preview (auto-advances to step 3)
-	 */
+	/** Steps: 1 = entry point, 2 = file or provider flow, 3 = preview and execute. */
 	type ProviderSubStep = 'pick-provider' | 'pick-file' | 'loading-sheets';
 
 	interface Props {
@@ -51,21 +41,17 @@
 	let flowType = $state<FlowType | null>(null);
 	let providerSubStep = $state<ProviderSubStep>('pick-provider');
 
-	// Provider-based restore state
 	let restoreProviders = $state<RestoreProviderInfo[]>([]);
 	let isLoadingProviders = $state(false);
 	let selectedProviderId = $state<string | null>(null);
 	let selectedSourceType = $state<'zip' | 'sheets' | null>(null);
 
-	// ZIP from provider state
 	let providerBackups = $state<BackupFileInfo[]>([]);
 	let isLoadingBackups = $state(false);
 	let selectedBackup = $state<BackupFileInfo | null>(null);
 
-	// File upload state
 	let selectedFile = $state<File | null>(null);
 
-	// Preview state
 	let restorePreview = $state<Record<string, number> | null>(null);
 	let restoreConflicts = $state<Array<{ table: string; id: string }>>([]);
 	let restoreMode = $state<'replace' | 'merge'>('replace');
@@ -99,7 +85,6 @@
 		error = null;
 		try {
 			restoreProviders = await settingsStore.loadRestoreProviders();
-			// Auto-select: one provider + one source type -> skip picker
 			if (restoreProviders.length === 1) {
 				const singleProvider = restoreProviders[0];
 				if (singleProvider && singleProvider.sourceTypes.length === 1) {
@@ -132,7 +117,6 @@
 				isLoadingBackups = false;
 			}
 		} else {
-			// Sheets: preview directly
 			providerSubStep = 'loading-sheets';
 			isProcessing = true;
 			try {
@@ -233,7 +217,6 @@
 			open = false;
 		} catch (err) {
 			const msg = err instanceof Error ? err.message : 'Restore failed';
-			// Handle 409 backup-in-progress
 			if (msg.includes('BACKUP_IN_PROGRESS') || msg.includes('backup is already in progress')) {
 				appStore.showError('A backup is currently in progress. Please try again later.');
 			}
@@ -327,7 +310,6 @@
 				</div>
 			{/if}
 
-			<!-- Step 1: Source Selection -->
 			{#if step === 1}
 				<div class="grid gap-3">
 					<button
@@ -367,7 +349,6 @@
 				</div>
 			{/if}
 
-			<!-- Step 2: File Upload -->
 			{#if step === 2 && flowType === 'file'}
 				<div class="space-y-3">
 					<Label for="backup-file">Backup File</Label>
@@ -380,7 +361,6 @@
 				</div>
 			{/if}
 
-			<!-- Step 2: Provider Flow — Pick Provider -->
 			{#if step === 2 && flowType === 'provider' && providerSubStep === 'pick-provider'}
 				{#if isLoadingProviders}
 					<div class="flex items-center gap-2 py-4 text-sm text-muted-foreground">
@@ -391,7 +371,6 @@
 				{/if}
 			{/if}
 
-			<!-- Step 2: Provider Flow — Pick ZIP File -->
 			{#if step === 2 && flowType === 'provider' && providerSubStep === 'pick-file'}
 				{#if isLoadingBackups}
 					<div class="flex items-center gap-2 py-4 text-sm text-muted-foreground">
@@ -441,14 +420,12 @@
 				{/if}
 			{/if}
 
-			<!-- Step 2: Provider Flow — Loading Sheets -->
 			{#if step === 2 && flowType === 'provider' && providerSubStep === 'loading-sheets'}
 				<div class="flex items-center gap-2 py-4 text-sm text-muted-foreground">
 					<LoaderCircle class="h-4 w-4 animate-spin" /><span>Loading from Google Sheets...</span>
 				</div>
 			{/if}
 
-			<!-- Step 3: Preview + Mode + Execute -->
 			{#if step === 3 && restorePreview}
 				<div class="rounded-lg border border-border bg-muted p-4">
 					<h4 class="mb-3 font-medium text-foreground">Import Summary</h4>

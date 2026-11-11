@@ -1,23 +1,6 @@
 /**
- * FE↔BE contract-drift guard for the single-financing GET response's enriched shape
- * (loop-improvement; locked /stats, the /vehicles LIST enrichment — this locks the
- * single-financing GET, a SEPARATE hand-assembled surface).
- *
- * `GET /api/v1/financing/vehicles/:vehicleId/financing` runs `enrichWithBalance` (routes.ts:82),
- * which spreads the repository financing row and INJECTS two computed fields the repository never
- * stores — `computedBalance` (from `financingRepository.computeBalance`) and `eligibleForPayoff`.
- * This is the endpoint `FinanceTab` fetches directly, and the frontend `VehicleFinancing` contract
- * (vehicle.ts:65-66) declares both; the FE reads `computedBalance` for payoff-date math, the payment
- * planner, lease metrics, and the financing-form payoff display.
- *
- * Nothing else pins that THIS route keeps emitting them (the guard covers only the list route):
- * a refactor of `enrichWithBalance` that returned the raw row would silently drop both here, every
- * consumer would fall back to `?? 0`, and payoff logic would break with no failing test. This asserts
- * the two computed keys are present (+ the base fields survive the spread) + the no-financing null
- * branch, so the drift fails loudly here instead.
- *
- * createTestApp() rewrites env + dynamic-imports the DB-bound modules, so this file imports only the
- * harness + bun:test.
+ * Pins the enriched shape of the single-financing GET: the computed computedBalance and
+ * eligibleForPayoff fields the frontend reads, alongside the base row.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -47,10 +30,6 @@ interface FinancingShape {
   eligibleForPayoff?: boolean;
 }
 
-/** Seed a vehicle, returns its id. */
-// This file's fixture is a nickname-required Honda Civic 2022; converge onto the shared test-helpers/seed
-// seedVehicle  via a thin wrapper that keeps make/model/year explicit
-// (the shared default is a Camry) so behavior is preserved.
 const seedVehicle = (nickname: string): Promise<string> =>
   seedVehicleShared(ctx, { make: 'Honda', model: 'Civic', year: 2022, nickname });
 
@@ -86,22 +65,19 @@ describe('GET single financing — enriched contract (FE↔BE drift guard)', () 
     expect(financing, 'financed vehicle should return a financing object').not.toBeNull();
     if (!financing) throw new Error('unreachable');
 
-    // The two COMPUTED fields enrichWithBalance injects (the actual drift surface): present, typed.
     expect(Object.hasOwn(financing, 'computedBalance')).toBe(true);
     expect(typeof financing.computedBalance).toBe('number');
     expect(Object.hasOwn(financing, 'eligibleForPayoff')).toBe(true);
     expect(typeof financing.eligibleForPayoff).toBe('boolean');
 
-    // Base financing fields survive the spread (`...financing`).
     expect(financing.id).toBeDefined();
     expect(financing.vehicleId).toBe(id);
     expect(financing.financingType).toBe('loan');
     expect(financing.originalAmount).toBe(20000);
   });
 
-  test('a fresh loan is NOT eligible for payoff (computedBalance tracks the real balance)', async () => {
-    // Anchors the computed SEMANTICS, not just key presence: a brand-new 20k loan has a positive
-    // balance, so eligibleForPayoff (balance <= 0.01) must be false. A hardcoded/zeroed balance fails.
+  test('a fresh loan is not eligible for payoff and its computedBalance is the real balance', async () => {
+    // Guards against a hardcoded or zeroed balance, not just the presence of the keys.
     const id = await seedVehicle('FreshLoan');
     await seedLoan(id);
 
@@ -118,34 +94,22 @@ describe('GET single financing — enriched contract (FE↔BE drift guard)', () 
   });
 });
 
-/**
- * Re-financing a vehicle whose prior financing was paid off must
- * produce an ACTIVE record. The POST endpoint is a create-or-replace keyed on vehicleId; when a prior
- * row exists it reuses it via update(). `isActive` is .optional() in the create schema (a
- * .notNull().default(true) column → drizzle-zod omits it), and the FE financing payload never sends it,
- * so the update LEFT the prior isActive=false → the new active loan was silently dropped from
- * the isActive-filtered queries (loanBreakdown/analytics) + the FE's isActive gate. The fix re-activates (+ clears
- * endDate) on the upsert. These pin that contract over the real HTTP stack.
- */
-describe('POST financing upsert — re-activates a paid-off record', () => {
-  test('re-financing a paid-off vehicle yields an ACTIVE record (the regression)', async () => {
+describe('POST financing upsert re-activates a paid-off record', () => {
+  test('re-financing a paid-off vehicle yields an active record', async () => {
     const id = await seedVehicle('Refinanced');
     await seedLoan(id);
 
-    // Pay off the financing → isActive=false, endDate set. PUT /:financingId/payoff keys on the
-    // financingId, so resolve it from the GET first.
     const seeded = (await getFinancing(id)).data;
     expect(seeded, 'seeded loan should be present').not.toBeNull();
     if (!seeded) throw new Error('unreachable');
     const payoff = await ctx.authed('PUT', `/api/v1/financing/${seeded.id}/payoff`);
     expect(payoff.status, 'payoff should succeed').toBeLessThan(300);
 
-    // Confirm it really is inactive now (the precondition the bug needs).
     const paidOff = (await getFinancing(id)).data;
     expect(paidOff, 'financing row should still exist after payoff').not.toBeNull();
     expect(paidOff?.isActive).toBe(false);
 
-    // Re-finance the SAME vehicle (a fresh lease) — the FE payload omits isActive, as the real form does.
+    // The payload omits isActive, as the real form does.
     const refi = await ctx.authed('POST', `/api/v1/financing/vehicles/${id}/financing`, {
       financingType: 'lease',
       provider: 'New Leasing Co',
@@ -160,7 +124,6 @@ describe('POST financing upsert — re-activates a paid-off record', () => {
     const refiBody = await json<DataEnvelope<FinancingShape>>(refi);
     expect(refi.status, JSON.stringify(refiBody)).toBeLessThan(300);
 
-    // The re-financed record MUST be active again (was the bug: stayed false).
     const after = (await getFinancing(id)).data;
     expect(after, 'refinanced vehicle should return a financing object').not.toBeNull();
     expect(after?.isActive).toBe(true);
@@ -168,11 +131,10 @@ describe('POST financing upsert — re-activates a paid-off record', () => {
     expect(after?.originalAmount).toBe(25000);
   });
 
-  test('updating an already-active financing keeps it active (idempotent, no regression)', async () => {
+  test('updating an already-active financing keeps it active', async () => {
     const id = await seedVehicle('ActiveUpdate');
     await seedLoan(id);
 
-    // Update some terms on the still-active loan (the normal edit path).
     const upd = await ctx.authed('POST', `/api/v1/financing/vehicles/${id}/financing`, {
       financingType: 'loan',
       provider: 'Test Credit Union',

@@ -6,7 +6,7 @@ repo:
 - `backend/` — Hono on Bun, Drizzle ORM + SQLite (WAL), Lucia auth, Biome. Dev port 3001.
 - `frontend/` — SvelteKit + Svelte 5 runes, Tailwind v4, shadcn-svelte, layerchart. Dev port 5173.
 
-Coding conventions live in `.kiro/steering/*.md`. Read `MainSteering.md`, `SveltePatterns.md`,
+Coding conventions live in `docs/conventions/*.md`. Read `MainSteering.md`, `SveltePatterns.md`,
 `CodeQualityRules.md`, `DatabaseMigrations.md`, and `Testing.md` before writing code;
 `DesignSystem.md` + `UIQuality.md` before writing UI.
 

@@ -1,18 +1,7 @@
 /**
- * Source-scan GUARD — a photo upload must compensate (best-effort delete the just-uploaded
- * provider object) if the post-upload DB writes fail.
- *
- * uploadPhotoForEntity does provider.upload (external bytes) → photoRepository.create (photo row) →
- * photoRefRepository.create (active ref). Those last two are not in the same transaction as the
- * upload, so a DB error/constraint after the bytes land would ORPHAN the external object: no DB row
- * references it, so it's never reconcilable or deletable through the app (no silent
- * leak). The fix (persistUploadedPhotoOrCleanup) wraps the inserts in try/catch and best-effort
- * provider.delete(storageRef)s the object before re-throwing.
- *
- * This is a SOURCE SCAN (mirroring photo-change-tracker.test.ts / photo-serve-headers.test.ts,
- * ): a full upload needs a real storage provider's bytes (not exercisable in the in-memory harness
- * without the process-global mock.module leak trap). So we pin that the compensating-delete
- * EXISTS — a refactor that drops it fails here, travelling with the merge.
+ * Source guard: if the DB writes after a provider upload fail, the uploaded object must be deleted,
+ * or it is orphaned with no row pointing at it. Scans the source because a real upload needs
+ * provider bytes.
  */
 
 import { describe, expect, test } from 'bun:test';

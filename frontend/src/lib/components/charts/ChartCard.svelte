@@ -38,19 +38,10 @@
 
 	let placeholderHeight = $derived(height ?? 300);
 
-	// Gate chart rendering until the container is visible with positive dimensions.
-	// Charts in inactive tabs (bits-ui uses `hidden` attribute → display:none) or
-	// below the fold mount into 0×0 containers, causing LayerChart to compute
-	// negative internal widths and emit zero-dimension warnings.
-	//
-	// Uses synchronous visibility detection via offsetParent + MutationObserver
-	// on the hidden ancestor. Unlike IntersectionObserver (async callbacks),
-	// MutationObserver fires synchronously when the `hidden` attribute is
-	// removed, so the visibility flag flips before Svelte renders children.
+	// Hidden or below-the-fold containers measure 0×0 and break LayerChart; gate on visibility using MutationObserver, which fires synchronously.
 	let gate = createVisibilityWatch();
 
-	// The "ready" class hides chart content before the animation fires,
-	// preventing a flash of the fully-drawn chart on tab switch / scroll-in.
+	// Hide chart content until the animation class is applied, to avoid a flash on tab switch.
 	const READY_CLASS_MAP: Record<string, string> = {
 		'chart-line-animated': 'chart-line-animate-ready',
 		'chart-bar-animated': 'chart-bar-animate-ready',
@@ -109,9 +100,7 @@
 						{@render children()}
 					{/if}
 				{:else}
-					<!-- Visibility-gated (below the fold / inactive tab): show a Skeleton,
-					     never a blank box, so the card always reads as "loading" until the
-					     chart mounts on scroll-in. (UIQuality Four-States: no empty white box.) -->
+					<!-- Skeleton until visible, so below-the-fold charts do not show an empty box. -->
 					<Skeleton class="w-full" style="height: {placeholderHeight}px" />
 				{/if}
 			</div>

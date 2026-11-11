@@ -1,9 +1,3 @@
-/**
- * Body Limit Middleware
- *
- * Prevents DoS attacks via large request payloads.
- */
-
 import type { Context, Next } from 'hono';
 import { createErrorResponse } from '../errors';
 
@@ -12,10 +6,6 @@ interface BodyLimitConfig {
   message?: string;
 }
 
-/**
- * Body size limit middleware
- * Checks Content-Length header and rejects requests exceeding maxSize
- */
 export function bodyLimit(config: BodyLimitConfig) {
   return async (c: Context, next: Next) => {
     const contentLength = c.req.header('content-length');

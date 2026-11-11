@@ -48,7 +48,6 @@
 	let fuelAdvanced = $derived(fuelAdvancedProp ?? localFuelAdvanced);
 	let isLoading = $derived((!fuelStats || !fuelAdvanced) && internalLoading);
 
-	// Unit labels derived from response units metadata, falling back to global settings
 	let units = $derived(fuelStats?.units ?? settingsStore.unitPreferences);
 	let distLabelShort = $derived(getDistanceUnitLabel(units.distanceUnit, true));
 	let volLabelShort = $derived(getVolumeUnitLabel(units.volumeUnit, true));
@@ -56,11 +55,7 @@
 	let effLabel = $derived(getFuelEfficiencyLabel(units.distanceUnit, units.volumeUnit));
 	let costPerDistLabel = $derived(getCostPerDistanceLabel(units.distanceUnit));
 
-	// Whether there's ANY fuel data to show. When false, the whole tab is ~10
-	// identical "No data available" cards (6 zero/N-A stat cards + the chart
-	// cards), so we render a single empty state instead. Conservative on purpose:
-	// any fill-up in the year buckets OR any recorded distance shows the full grid,
-	// so we never hide real data.
+	// Show one empty state unless there is any fuel data; any fill-up or recorded distance shows the full grid.
 	let hasFuelData = $derived(
 		!!fuelStats &&
 			(fuelStats.fillups.currentYear > 0 ||
@@ -105,10 +100,7 @@
 {#snippet changeBadge(current: number, previous: number)}
 	{@const change = pctChange(current, previous)}
 	{#if change != null}
-		<!-- Direction hue lives on the ICON (graphical, exempt); the % TEXT is
-		     text-foreground. chart-2 (#009689) on white is 3.66:1 at text-xs — below
-		     WCAG AA 4.5:1. text-destructive is dark enough to pass, but
-		     keeping the text neutral in both branches is simpler and consistent. -->
+		<!-- Direction colour lives on the icon; the percentage text stays neutral in both branches. -->
 		<span class="inline-flex items-center gap-1 text-xs font-medium text-foreground">
 			{#if change >= 0}
 				<TrendingUp class="h-3 w-3 text-chart-2" />
@@ -134,7 +126,6 @@
 		<Button onclick={loadData}>Retry</Button>
 	</div>
 {:else if fuelStats && !hasFuelData}
-	<!-- No fuel data at all → one empty state instead of ~10 zero/N-A cards. -->
 	<EmptyState>
 		{#snippet icon()}
 			<div class="mb-4 rounded-full bg-muted p-4">
@@ -155,9 +146,7 @@
 	</EmptyState>
 {:else if fuelStats}
 	<div class="space-y-6">
-		<!-- Row 1: Fill-ups, Gallons, Fuel Consumption -->
 		<div class="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-3">
-			<!-- Card 1: Fill-ups (ComparisonCard) -->
 			<Card.Root>
 				<Card.Content class="p-6">
 					<div class="mb-4 flex items-center gap-2">
@@ -198,7 +187,6 @@
 				</Card.Content>
 			</Card.Root>
 
-			<!-- Card 2: Volume (ComparisonCard) -->
 			<Card.Root>
 				<Card.Content class="p-6">
 					<div class="mb-4 flex items-center gap-2">
@@ -240,7 +228,6 @@
 				</Card.Content>
 			</Card.Root>
 
-			<!-- Card 3: Fuel Consumption (MetricWithMinMax) -->
 			<Card.Root>
 				<Card.Content class="p-6">
 					<div class="mb-4 flex items-center gap-2">
@@ -285,9 +272,7 @@
 			</Card.Root>
 		</div>
 
-		<!-- Row 2: Fill-up Details, Average Cost, Distance -->
 		<div class="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-3">
-			<!-- Card 4: Fill-up Details (DetailedMetricsCard) -->
 			<Card.Root>
 				<Card.Content class="p-6">
 					<div class="mb-4 flex items-center gap-2">
@@ -327,7 +312,6 @@
 				</Card.Content>
 			</Card.Root>
 
-			<!-- Card 5: Average Cost (DetailedMetricsCard) -->
 			<Card.Root>
 				<Card.Content class="p-6">
 					<div class="mb-4 flex items-center gap-2">
@@ -373,7 +357,6 @@
 				</Card.Content>
 			</Card.Root>
 
-			<!-- Card 6: Distance (DetailedMetricsCard) -->
 			<Card.Root>
 				<Card.Content class="p-6">
 					<div class="mb-4 flex items-center gap-2">
@@ -412,10 +395,8 @@
 			</Card.Root>
 		</div>
 
-		<!-- Fuel Charts -->
 		<FuelCharts {fuelStats} dayOfWeekPatterns={fuelAdvanced?.dayOfWeekPatterns} />
 
-		<!-- Advanced Charts -->
 		{#if fuelAdvanced}
 			<AdvancedCharts {fuelAdvanced} />
 		{/if}

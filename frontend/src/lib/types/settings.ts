@@ -92,7 +92,7 @@ export interface UserSettings {
 	userId: string;
 	unitPreferences: UnitPreferences;
 	currencyUnit: string;
-	/** Theming engine (T9): the selected theme id, synced server-side for cross-device correctness (D2). */
+	/** Selected theme id; synced server-side so it follows the user across devices. */
 	themePreference?: string;
 	autoBackupEnabled: boolean;
 	backupFrequency: 'daily' | 'weekly' | 'monthly';

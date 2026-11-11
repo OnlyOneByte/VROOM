@@ -11,11 +11,7 @@
 	import type { ReceivedShare } from '$lib/types';
 
 	interface Props {
-		/**
-		 * Called after an invite is accepted so the parent can refresh the fleet — the accepted
-		 * vehicle then appears via `GET /vehicles?include=shared` (wired in T12b-2). Optional: the
-		 * card works standalone, this just lets the dashboard reflect the new vehicle without a reload.
-		 */
+		/** Called after an invite is accepted so the dashboard can show the new vehicle without a reload. Optional. */
 		onAccepted?: () => void;
 	}
 
@@ -33,7 +29,7 @@
 		loadError = null;
 		try {
 			const received = await shareApi.listReceived();
-			// Only PENDING invites are actionable here; an accepted share surfaces as a fleet card (T12b-2).
+			// Only pending invites are actionable here.
 			pending = received.filter(s => s.status === 'pending');
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to load invitations:', error);
@@ -75,13 +71,7 @@
 	}
 </script>
 
-<!--
-  This is a NOTIFICATION widget — it only takes up dashboard space when there is something to act on.
-  Its four states map to: loading → absent (no skeleton flash on the common no-invites path), empty →
-  absent, error → a compact retry card (a load failure is surfaced, never silently swallowed — a user
-  must not miss a real invite), data → the actionable list. So nothing renders unless there is a
-  pending invite or a fetch error.
--->
+<!-- Renders only for a pending invite or a load error, so the common no-invite path shows nothing. -->
 {#if loadError && !isLoading}
 	<Card.Root>
 		<Card.Content class="p-4">

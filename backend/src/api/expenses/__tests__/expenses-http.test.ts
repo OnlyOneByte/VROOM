@@ -1,14 +1,3 @@
-/**
- * In-process HTTP tests for expense search/pagination through the REAL stack.
- *
- * Proves the query-param → zValidator coercion → findPaginated → SQL path that
- * the search/pagination UX bug lived in: search applied across the whole result
- * set (server-side), not just the current page.
- *
- * createTestApp() must run before static config/connection imports — keep this
- * file's imports to the harness + bun:test only.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -19,7 +8,6 @@ import {
 } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
 
-/** Minimal shapes the assertions below read off the JSON envelopes. */
 interface ExpenseRow {
   id: string;
   description: string;
@@ -40,8 +28,6 @@ async function createExpense(
   description: string,
   date: string
 ) {
-  // Fuel expenses require fuel amount + mileage (a create-schema refinement) —
-  // provide them so the POST validates. Non-fuel categories don't need them.
   const fuelFields = category === 'fuel' ? { volume: 10, mileage: 30_000 } : {};
   const res = await ctx.authed('POST', '/api/v1/expenses', {
     vehicleId,
@@ -102,7 +88,6 @@ describe('expenses HTTP search/pagination', () => {
     const page2 = await ctx.authed('GET', '/api/v1/expenses?limit=2&offset=2');
     const b2 = await json<PaginatedEnvelope<ExpenseRow>>(page2);
     expect(b2.data).toHaveLength(2);
-    // Different rows than page 1.
     expect(b2.data[0].id).not.toBe(b1.data[0].id);
   });
 
@@ -110,7 +95,6 @@ describe('expenses HTTP search/pagination', () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     await createExpense(vehicleId, 'misc', 5, 'unique-marker-xyz', '2026-01-10T12:00:00.000Z');
 
-    // A second app == a second user with a fresh DB reset; the marker must not leak.
     const other = await createTestApp();
     try {
       const res = await other.authed('GET', '/api/v1/expenses?search=unique-marker-xyz');
@@ -122,15 +106,8 @@ describe('expenses HTTP search/pagination', () => {
   });
 });
 
-/**
- * PUT /:id vehicle-reassignment ownership: the CREATE path validates the target vehicle
- * is the user's (validateVehicleOwnership), but the UPDATE path did NOT — so a PUT could point the
- * (owned) expense at a vehicleId the user doesn't own, corrupting their analytics attribution. The
- * create path's own guard is the model; this pins the symmetric update guard. Raw-seed a FOREIGN
- * user+vehicle that coexists in the shared DB (a second createTestApp would reset it).
- */
 describe('PUT /api/v1/expenses/:id — vehicle reassignment ownership', () => {
-  test('reassigning the expense to a FOREIGN vehicle is rejected 404 (ownership guard)', async () => {
+  test('reassigning an expense to a foreign vehicle is rejected with 404', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const expenseId = await createExpense(
       vehicleId,
@@ -140,7 +117,6 @@ describe('PUT /api/v1/expenses/:id — vehicle reassignment ownership', () => {
       '2026-03-01T12:00:00.000Z'
     );
 
-    // A vehicle owned by ANOTHER user, seeded directly so it coexists with ours.
     ctx.sqlite.run(
       `INSERT INTO users (id, email, display_name) VALUES ('u-foreign-61', 'f61@test.com', 'Foreign')`
     );
@@ -151,15 +127,14 @@ describe('PUT /api/v1/expenses/:id — vehicle reassignment ownership', () => {
     const res = await ctx.authed('PUT', `/api/v1/expenses/${expenseId}`, {
       vehicleId: 'veh-foreign-61',
     });
-    expect(res.status).toBe(404); // validateVehicleOwnership → NotFoundError (not-owned ≡ not-found)
+    expect(res.status).toBe(404);
 
-    // The expense still points at the ORIGINAL (owned) vehicle — the bad write never landed.
     const getRes = await ctx.authed('GET', `/api/v1/expenses/${expenseId}`);
     const body = await json<DataEnvelope<{ vehicleId: string }>>(getRes);
     expect(body.data.vehicleId).toBe(vehicleId);
   });
 
-  test('reassigning to the user’s OWN second vehicle still works (200) — guard isn’t over-broad', async () => {
+  test('reassigning to the user’s own second vehicle still works', async () => {
     const v1 = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const v2 = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const expenseId = await createExpense(v1, 'misc', 9, 'move to v2', '2026-03-02T12:00:00.000Z');
@@ -170,7 +145,7 @@ describe('PUT /api/v1/expenses/:id — vehicle reassignment ownership', () => {
     expect(body.data.vehicleId).toBe(v2);
   });
 
-  test('a PUT that does NOT touch vehicleId still updates normally (no regression)', async () => {
+  test('a PUT that omits vehicleId still updates normally', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const expenseId = await createExpense(
       vehicleId,
@@ -188,9 +163,6 @@ describe('PUT /api/v1/expenses/:id — vehicle reassignment ownership', () => {
   });
 });
 
-// POST /expenses must thread `forceOverwrite` through to createIdempotent so a keep-local
-// conflict resolution APPLIES the local edit on a (userId, clientId) collision. Pre-fix the schema
-// Zod-STRIPPED the flag (an unknown key) → the offline edit was silently lost. This drives the REAL route.
 describe('POST /api/v1/expenses — forceOverwrite keep-local resolution', () => {
   async function postExpense(body: Record<string, unknown>) {
     const res = await ctx.authed('POST', '/api/v1/expenses', body);
@@ -210,7 +182,6 @@ describe('POST /api/v1/expenses — forceOverwrite keep-local resolution', () =>
     });
     expect(first.res.status, JSON.stringify(first.body)).toBe(201);
 
-    // The resolved local edit (different amount) re-POSTs with the same clientId + forceOverwrite.
     const resolved = await postExpense({
       vehicleId,
       category: 'misc',
@@ -224,7 +195,6 @@ describe('POST /api/v1/expenses — forceOverwrite keep-local resolution', () =>
     expect(resolved.body.data.id, 'same row updated in place').toBe(first.body.data.id);
     expect(resolved.body.data.expenseAmount, 'local edit applied').toBe(88);
 
-    // Exactly one row exists for that clientId (no duplicate).
     const list = await ctx.authed('GET', `/api/v1/expenses?vehicleId=${vehicleId}`);
     const listBody = await json<PaginatedEnvelope<ExpenseRow>>(list);
     expect(listBody.data.length).toBe(1);
@@ -254,18 +224,11 @@ describe('POST /api/v1/expenses — forceOverwrite keep-local resolution', () =>
   });
 });
 
-// guard — the keep-local overwrite path INTERSECTS the fuel-field-hygiene class: an overwrite
-// re-runs the create route's clearFuelFieldsIfNotFuel(body) BEFORE the idempotent update, so a resolved
-// edit that CHANGES a fuel row to a non-fuel category must NULL the existing row's stale fuel fields
-// (volume/mileage/fuelType) — not leave them. This is a REAL correctness invariant on the new overwrite
-// branch (a stray mileage poisons getCurrentOdometer cross-category); the tests only changed the
-// amount, so this exercises the category-switch leg of the overwrite. Drives real VROOM logic end-to-end.
 describe('a keep-local overwrite that switches fuel→non-fuel clears the stale fuel fields', () => {
   test('overwriting a fuel row with a maintenance edit nulls volume/mileage/fuelType', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const clientId = 'c52-fuel-switch';
 
-    // Original: a FUEL expense carrying volume + mileage + fuelType.
     const first = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId,
       category: 'fuel',
@@ -280,7 +243,6 @@ describe('a keep-local overwrite that switches fuel→non-fuel clears the stale 
     expect(first.status, JSON.stringify(firstBody)).toBe(201);
     expect(firstBody.data.mileage).toBe(41000);
 
-    // keep-local resolution: the local edit re-categorized it to maintenance (fuel fields dropped).
     const resolved = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId,
       category: 'maintenance',
@@ -301,8 +263,6 @@ describe('a keep-local overwrite that switches fuel→non-fuel clears the stale 
       >(resolved);
     expect(resolved.status, JSON.stringify(resolvedBody)).toBeLessThan(300);
 
-    // Same row, re-categorized, and the stale fuel fields are NULLED (not carried over) — on the
-    // overwrite path. A lingering mileage here would poison getCurrentOdometer cross-category.
     expect(resolvedBody.data.id).toBe(firstBody.data.id);
     expect(resolvedBody.data.category).toBe('maintenance');
     expect(resolvedBody.data.volume, 'stale volume nulled').toBeNull();

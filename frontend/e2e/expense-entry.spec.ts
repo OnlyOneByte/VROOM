@@ -1,16 +1,9 @@
 import { test, expect, type Page } from '@playwright/test';
 import { VEHICLE_CAMRY, addSessionCookie, mockApi } from './support/mock-api';
 
-/**
- * Logging an expense, and seeing it in the list.
- *
- * The expense form is at `/expenses/new` (the previous version of this file navigated to
- * `/vehicles/<id>/expenses/new`, which is not a route) and the API is `/api/v1/expenses`.
- * Category is a button grid, not a `<select>`, so there is no `selectOption` here.
- */
+// Logging an expense at /expenses/new. Category is a button grid, not a <select>.
 
-/** A mileage above both the vehicle's initial mileage and the latest fixture fill-up —
- *  the form rejects a reading that is not strictly increasing. */
+// Must exceed the vehicle's starting mileage and the latest fill-up; readings must increase.
 const NEXT_ODOMETER = '46000';
 
 test.describe('Expense form', () => {
@@ -26,12 +19,9 @@ test.describe('Expense form', () => {
 		await expect(page.getByText('Category *', { exact: true })).toBeVisible();
 		await expect(page.getByLabel('Amount *')).toBeVisible();
 		await expect(page.getByText('Date *', { exact: true })).toBeVisible();
-		// The vehicle picker defaults to the first vehicle.
 		await expect(page.getByText(`${VEHICLE_CAMRY.year} Toyota Camry`)).toBeVisible();
 
-		// The picker offers every expense category. Note there is no `insurance` card —
-		// insurance is logged under Financial — so a spec looking for one is asserting a
-		// taxonomy the app does not have.
+		// There is no insurance category; insurance is logged under Financial.
 		for (const category of [
 			'Fuel',
 			'Maintenance',
@@ -74,7 +64,6 @@ test.describe('Expense form', () => {
 		await expect(page.getByLabel('Gallons (US) *')).toBeVisible();
 		await expect(page.getByLabel('Current Mileage *')).toBeVisible();
 
-		// Switching to a non-fuel category withdraws them again.
 		await page.getByRole('button', { name: /^Maintenance/ }).click();
 		await expect(page.getByLabel('Gallons (US) *')).toBeHidden();
 	});
@@ -93,7 +82,7 @@ test.describe('Expense form', () => {
 		);
 		await page.getByRole('button', { name: 'Save Expense' }).click();
 
-		// `amount` is renamed to `expenseAmount` on the wire — assert the real contract.
+		// The wire field is expenseAmount, not amount.
 		expect((await postRequest).postDataJSON()).toMatchObject({
 			vehicleId: VEHICLE_CAMRY.id,
 			category: 'fuel',
@@ -109,9 +98,7 @@ test.describe('Expense form', () => {
 	test('an expense logged while offline is queued, then drained to the server', async ({
 		page
 	}) => {
-		// Every POST body the app sends to the create endpoint, in order. The drain is the
-		// point data safety is actually at stake, so the test follows the row all the way to
-		// the wire instead of stopping at the "Sync 1" affordance.
+		// Follows the row to the wire, since the drain is where data safety is at stake.
 		const posted: Array<Record<string, unknown>> = [];
 		await page.route(
 			url => url.pathname === '/api/v1/expenses',
@@ -128,10 +115,8 @@ test.describe('Expense form', () => {
 		await page.getByRole('button', { name: /^Maintenance/ }).click();
 		await page.getByLabel('Amount *').fill('25');
 
-		// The form branches on the offline STORE, which flips on the window `offline`
-		// event — dispatching it drives the real code path on every engine. Confirm it
-		// landed (the listener is registered during hydration) before submitting, or the
-		// form takes the ONLINE branch and the test measures nothing.
+		// The form branches on the offline store. Confirm the listener is attached before
+		// submitting, or the online branch runs and the test measures nothing.
 		await expect(async () => {
 			await page.evaluate(() => window.dispatchEvent(new Event('offline')));
 			await expect(page.getByText('Offline mode - will sync when online')).toBeVisible({
@@ -154,22 +139,17 @@ test.describe('Expense form', () => {
 		const queued = await readOutbox();
 		expect(queued).toHaveLength(1);
 		expect(queued[0]).toMatchObject({ category: 'maintenance', amount: 25, synced: false });
-		// Nothing reached the server while offline — the row exists ONLY in the outbox.
+		// Nothing reached the server while offline; the row exists only in the outbox.
 		expect(posted).toEqual([]);
 
-		// Back online, the queue surfaces a sync affordance rather than silently sitting there.
 		await page.evaluate(() => window.dispatchEvent(new Event('online')));
 		const syncButton = page.getByRole('button', { name: /Sync 1/ });
 		await expect(syncButton).toBeVisible();
 
-		// Clicking it drains immediately. Reconnecting ALSO arms `syncManager`'s auto-sync
-		// (a 2s-delayed `syncAll`), so the assertions below deliberately do not care which
-		// of the two paths got there first — only that the row reached the server and left
-		// the outbox. Counting POSTs exactly would race the two.
+		// Either the click or the delayed auto-sync may drain first, so assert the end state, not the POST count.
 		await syncButton.click();
 
-		// The queued row reaches the real create endpoint, renamed to the backend's field
-		// names by the same transformer the online path uses.
+		// Sent through the same transformer as the online path.
 		await expect(async () => {
 			expect(posted.length).toBeGreaterThan(0);
 		}).toPass();
@@ -178,14 +158,12 @@ test.describe('Expense form', () => {
 			category: 'maintenance',
 			expenseAmount: 25
 		});
-		// Every attempt carries the SAME idempotency key, so even if both drain paths fire
-		// the backend collapses them onto one row instead of duplicating the expense.
+		// Same idempotency key on every attempt, so duplicate drains collapse to one row.
 		const clientIds = new Set(posted.map(body => body['clientId']));
 		expect(clientIds.size).toBe(1);
 		expect([...clientIds][0]).toBeTruthy();
 
-		// And the outbox ends EMPTY. A drain that POSTs but leaves the row queued would
-		// re-send it forever; one that clears without POSTing loses the expense outright.
+		// The outbox must end empty: an unremoved row resends forever; a cleared unsent row is lost.
 		await expect(async () => {
 			expect(await readOutbox()).toEqual([]);
 		}).toPass();
@@ -211,10 +189,8 @@ test.describe('Expense list', () => {
 		await mockApi(page);
 	});
 
-	// `ExpensesTable` picks ONE layout at runtime (`{:else if isMobile.current}`), so the
-	// other is absent rather than hidden. `filter({ visible: true })` is still the right
-	// matcher: the same figure can also sit in the page's summary card or in a closed
-	// `Select` portal, and this pins the assertion to what a user can actually see.
+	// Only one table layout renders at a time; filter({ visible: true }) skips matches in
+	// summary cards or closed Select portals.
 	const visibleText = (page: Page, text: string) =>
 		page.getByText(text).filter({ visible: true }).first();
 
@@ -222,9 +198,7 @@ test.describe('Expense list', () => {
 		await page.goto('/expenses');
 
 		await expect(page.getByRole('heading', { name: 'All Expenses' })).toBeVisible();
-		// Amount and category label are the fields BOTH layouts render, so they are what a
-		// viewport-agnostic test can assert. The description is wide-viewport only — see the
-		// next test.
+		// Amount and category are rendered by both layouts; the description is wide-only.
 		await expect(visibleText(page, '$45.50')).toBeVisible();
 		await expect(visibleText(page, '$89.99')).toBeVisible();
 		await expect(visibleText(page, 'Maintenance')).toBeVisible();
@@ -233,17 +207,13 @@ test.describe('Expense list', () => {
 	test('the wide layout carries the description, the compact row deliberately does not', async ({
 		page
 	}) => {
-		// The mobile row is a deliberately compact summary: category, amount, date, vehicle.
-		// Asserting the description without pinning the viewport passes on three projects and
-		// fails on the two mobile ones, which says nothing about the app — so assert both
-		// halves of the actual rule instead.
+		// The mobile row omits the description, so assert both halves of the rule per viewport.
 		await page.setViewportSize({ width: 1280, height: 800 });
 		await page.goto('/expenses');
 		await expect(visibleText(page, 'Oil change')).toBeVisible();
 
 		await page.setViewportSize({ width: 375, height: 667 });
 		await expect(visibleText(page, 'Oil change')).toBeHidden();
-		// Still the same expense, just rendered compactly.
 		await expect(visibleText(page, '$89.99')).toBeVisible();
 	});
 
@@ -256,11 +226,7 @@ test.describe('Expense list', () => {
 			return url.pathname === '/api/v1/expenses' && url.searchParams.get('search') === 'oil';
 		});
 
-		// The page-level search box, not the table's own control: the table's controls differ
-		// between the compact and wide layouts, this input does not. Matched on a prefix because
-		// the accessible name is whatever labels the input — a placeholder today, an explicit
-		// `aria-label` the moment someone gives it one — and this test is about the request it
-		// issues, not about its wording.
+		// Page-level search, which exists in both layouts. Matched by prefix so the label can change.
 		await page.getByRole('textbox', { name: /^Search expenses/i }).fill('oil');
 
 		await filtered;
@@ -277,9 +243,7 @@ test.describe('Expense list', () => {
 			);
 		});
 
-		// The category control is the table's own `Select` (one per layout, and only the
-		// layout in use is in the DOM). Like search it narrows across ALL pages server-side
-		// rather than hiding rows already rendered.
+		// Narrows across all pages server-side, unlike hiding rows already rendered.
 		await page.getByRole('button', { name: /Category/ }).click();
 		await page.getByRole('option', { name: 'Maintenance' }).click();
 
@@ -287,7 +251,7 @@ test.describe('Expense list', () => {
 	});
 
 	test('deleting an expense confirms first, then DELETEs that row', async ({ page }) => {
-		// Wide viewport: the per-row Delete lives in the desktop layout's action cluster.
+		// The per-row Delete only exists in the wide layout.
 		await page.setViewportSize({ width: 1280, height: 800 });
 
 		const deleted: string[] = [];
@@ -304,17 +268,15 @@ test.describe('Expense list', () => {
 		await page.goto('/expenses');
 		await expect(visibleText(page, '$89.99')).toBeVisible();
 
-		// The wide layout's row action is an icon button named by its `title`.
 		await page.getByRole('button', { name: 'Delete expense' }).first().click();
 
-		// `alertdialog`, not `dialog`: the confirmation is a shadcn/bits-ui AlertDialog.
+		// The confirmation is an AlertDialog, so its role is alertdialog.
 		const dialog = page.getByRole('alertdialog', { name: 'Delete Expense' });
 		await expect(dialog.getByText('This action cannot be undone.')).toBeVisible();
-		// Confirmation is not decoration: nothing may be sent until it is accepted.
+		// Nothing may be sent until the confirmation is accepted.
 		expect(deleted).toEqual([]);
 
-		// The dialog names the row it is about to delete. Reading the target from it, rather
-		// than assuming the table's sort order, keeps the id assertion below exact.
+		// Read the target from the dialog rather than assuming sort order.
 		const described = await dialog.getByText(/Costco fill-up|Oil change/).textContent();
 		const expectedId = described?.trim() === 'Costco fill-up' ? 'expense-fuel' : 'expense-maint';
 
@@ -351,9 +313,7 @@ test.describe('Mobile expense entry', () => {
 		const amount = page.getByLabel('Amount *');
 		await expect(amount).toHaveAttribute('type', /number|tel|decimal/);
 
-		// WCAG 2.2 SC 2.5.8 (Target Size, Minimum) is 24x24 CSS px. The design system's
-		// Input is h-9 (36px) — comfortably over that, but under the 44px Apple HIG figure
-		// this project has not adopted, so 24 is the bar asserted here.
+		// 24px is the WCAG 2.5.8 minimum target size, the bar asserted here.
 		const box = await amount.boundingBox();
 		expect(box?.height ?? 0).toBeGreaterThanOrEqual(24);
 	});

@@ -17,7 +17,6 @@ export type ExtractSnippetParams<T> = T extends Snippet<[infer P]> ? P : never;
 
 export type TooltipPayload = Tooltip.TooltipSeries;
 
-// Helper to extract item config from a payload.
 export function getPayloadConfigFromPayload(
 	config: ChartConfig,
 	payload: TooltipPayload,

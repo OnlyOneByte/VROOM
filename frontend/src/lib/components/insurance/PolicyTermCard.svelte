@@ -17,9 +17,7 @@
 
 	let { term, isCurrent = false, vehicleNames = [], onEdit, onDelete, onRenew }: Props = $props();
 
-	// Styled confirm dialog (replaces native confirm()). The backend deletes the
-	// auto-created premium expenses for this term (deleteBySource('insurance_term')),
-	// so the confirmation says so.
+	// Deleting a term also deletes its auto-created premium expenses; the confirmation says so.
 	let confirmOpen = $state(false);
 </script>
 

@@ -1,18 +1,5 @@
 <script lang="ts">
-	/**
-	 * LLM (assistant) provider settings card — llm-assistant T5b.
-	 *
-	 * Lists the user's `domain:'llm'` providers and offers an inline add/edit dialog. An LLM provider
-	 * is just { providerType, apiKey, model, baseUrl? } — the SAME shape the VLM card uses (the backend
-	 * MODEL_PROVIDER_TYPES serve both domains), so this card mirrors VlmProvidersCard but points at the
-	 * `llm` domain with the D1-ruled LLM_PROVIDER_TYPES (whose Ollama default is a tool-call text model,
-	 * not the VLM vision model). It lives in one self-contained card + dialog — no folder/backup config.
-	 *
-	 * SECURITY: the API key field is WRITE-ONLY — the server strips credentials from every response, so
-	 * we never display a stored key. On edit we leave the field blank and only send `credentials` when
-	 * the user types a new key (an empty key on edit means "keep the existing one" — config-only PUT).
-	 * The providerType picker offers the D1-ruled set (LLM_PROVIDER_TYPES). Ollama is keyless.
-	 */
+	/** LLM provider settings: mirrors the VLM card for the llm domain. The API key is write-only; blank on edit keeps the stored key. */
 	import { onMount } from 'svelte';
 	import { Bot, Plus, LoaderCircle, Pencil, Trash2 } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
@@ -36,7 +23,6 @@
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
 
-	// --- Add/edit dialog state ---
 	let dialogOpen = $state(false);
 	let editingId = $state<string | null>(null); // null = creating
 	let formType = $state<string>('openai-compatible');
@@ -46,8 +32,7 @@
 	let formBaseUrl = $state('');
 	let isSaving = $state(false);
 
-	// The D1 set is non-empty, so [0] is always defined; assert it for the type-checker
-	// (noUncheckedIndexedAccess widens an array index to `T | undefined`).
+	// The provider type set is non-empty, so [0] is defined; the assertion satisfies noUncheckedIndexedAccess.
 	const FALLBACK_TYPE: ModelProviderTypeOption = LLM_PROVIDER_TYPES[0] as ModelProviderTypeOption;
 	let selectedTypeOption = $derived<ModelProviderTypeOption>(
 		LLM_PROVIDER_TYPES.find(t => t.id === formType) ?? FALLBACK_TYPE
@@ -87,7 +72,6 @@
 		dialogOpen = true;
 	}
 
-	/** When the type changes (create flow), pre-fill model + baseUrl with that type's suggestions. */
 	function applyTypeDefaults() {
 		formModel = selectedTypeOption.defaultModel;
 		formBaseUrl = selectedTypeOption.defaultBaseUrl ?? '';

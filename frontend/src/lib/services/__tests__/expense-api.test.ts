@@ -1,14 +1,3 @@
-/**
- * Coverage ratchet for expense-api.ts — the-named FE low spot. `buildExpenseQuery`
- * is already pinned (build-expense-query.test.ts); this covers the uncovered LAYER: the method→endpoint
- * wiring + the backend↔frontend transform (fromBackendExpense / toBackendExpense) those methods drive,
- * the getPaginated envelope passthrough, and the downloadExpensesCsv blob→anchor DOM dance.
- *
- * apiClient is mocked (the api-client/reminder-api pattern) so we assert the exact URL + payload each
- * method builds AND that the real transformer ran on the way in/out. The transformer itself is exercised
- * here end-to-end through the public methods (its own field-mapping is the load-bearing contract).
- */
-
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { BackendExpenseResponse } from '../api-transformer';
 
@@ -26,7 +15,6 @@ vi.mock('../api-client', () => ({
 
 const { expenseApi } = await import('../expense-api');
 
-/** A backend expense row (snake of the API contract) for the transform assertions. */
 function backendExpense(over: Partial<BackendExpenseResponse> = {}): BackendExpenseResponse {
 	return {
 		id: 'e1',
@@ -144,12 +132,11 @@ describe('downloadExpensesCsv (blob → anchor download)', () => {
 		const realCreate = document.createElement.bind(document);
 		const createSpy = vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
 			const el = realCreate(tag);
-			if (tag === 'a') el.click = click; // stub only the anchor's click
+			if (tag === 'a') el.click = click;
 			return el;
 		});
 		vi.spyOn(document.body, 'appendChild').mockImplementation(n => n);
 		vi.spyOn(document.body, 'removeChild').mockImplementation(n => n);
-		// jsdom lacks URL.createObjectURL / revokeObjectURL — stub them.
 		(window.URL.createObjectURL as unknown) = vi.fn(() => 'blob:x');
 		(window.URL.revokeObjectURL as unknown) = vi.fn();
 		raw.mockResolvedValueOnce({
@@ -163,7 +150,7 @@ describe('downloadExpensesCsv (blob → anchor download)', () => {
 		const exportUrl = raw.mock.calls[0]?.[0] as string;
 		expect(exportUrl).toContain('/api/v1/expenses/export');
 		expect(exportUrl).toContain('vehicleId=v1');
-		expect(exportUrl).toContain('tags=a%2Cb'); // tags comma-joined for the export schema
+		expect(exportUrl).toContain('tags=a%2Cb');
 		expect(click).toHaveBeenCalledTimes(1);
 		createSpy.mockRestore();
 	});

@@ -1,7 +1,3 @@
-/**
- * Sync Routes - Backup, restore, and sync operations
- */
-
 import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
@@ -37,8 +33,6 @@ const restoreRateLimiter = rateLimiter({
   keyGenerator: (c) => `restore:${c.get('user').id}`,
 });
 
-// --- Zod schemas ---
-
 const restoreFromProviderSchema = z.discriminatedUnion('sourceType', [
   z.object({
     sourceType: z.literal('zip'),
@@ -52,8 +46,6 @@ const restoreFromProviderSchema = z.discriminatedUnion('sourceType', [
     mode: z.enum(['preview', 'replace', 'merge']),
   }),
 ]);
-
-// --- Route handlers ---
 
 routes.get('/health', async (c) => {
   return c.json({ status: 'healthy', timestamp: new Date().toISOString(), service: 'sync' });
@@ -80,8 +72,7 @@ routes.post('/', syncRateLimiter, idempotency({ required: false }), async (c) =>
   const user = c.get('user');
   const userId = user.id;
 
-  // `null` is valid JSON, so the body is optional-chained: dereferencing it would be a TypeError
-  // reported as a 500 for what is the client's own malformed request.
+  // null is valid JSON, so the body is optional-chained.
   const body = await readJsonBody<{ syncTypes?: unknown; force?: unknown } | null>(c);
   validateSyncTypes(body?.syncTypes);
   const force = body?.force === true;
@@ -95,9 +86,8 @@ routes.post('/', syncRateLimiter, idempotency({ required: false }), async (c) =>
     );
   }
 
-  // Honest HTTP status: a backup where every attempted provider failed must NOT report 200.
-  // failed → 502 (upstream provider failure), partial → 207 Multi-Status (some succeeded, some did
-  // not — the failed ones will retry since the sync anchor was not advanced). success/noop → 200.
+  // 502 when every provider failed; 207 when some did. Failed providers retry because the sync
+  // anchor did not advance.
   if (result.outcome === 'failed') {
     return c.json(
       createErrorResponse('BACKUP_FAILED', 'All backup providers failed', {
@@ -121,7 +111,6 @@ routes.get('/status', async (c) => {
   const syncStatus = activityTracker.getSyncStatus(user.id);
   const syncStateData = await syncStateRepository.getOrCreate(user.id);
 
-  // Derive backup/sheets status from backupConfig
   const config = settings.backupConfig as BackupConfig | null;
   const providers = config?.providers;
   const backupEnabled = providers ? Object.values(providers).some((p) => p.enabled) : false;
@@ -181,7 +170,6 @@ routes.post(
     const user = c.get('user');
     const body = restoreFromProviderSchema.parse(await readJsonBody(c));
 
-    // Verify provider exists and is active
     const db = getDb();
     const providerRow = await db
       .select()
@@ -226,9 +214,7 @@ routes.post(
 routes.post(
   '/restore/from-backup',
   restoreRateLimiter,
-  // A whole backup ZIP, so larger than the app-wide body cap. That cap runs FIRST and rejects on
-  // Content-Length, so this allowance only takes effect because app.ts maps this path to it —
-  // keep the two in step or a large backup becomes unrestorable again.
+  // Full backup ZIPs exceed the app-wide body cap, which app.ts must relax for this path.
   bodyLimit({ maxSize: CONFIG.backup.maxFileSize }),
   idempotency({ required: true }),
   async (c) => {

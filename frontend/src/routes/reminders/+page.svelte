@@ -42,12 +42,10 @@
 	let vehicles = $state<Vehicle[]>([]);
 	let notifications = $state<ReminderNotification[]>([]);
 
-	// reminderId -> name, so a notification (which carries only reminderId) can
-	// show which reminder fired. Falls back gracefully if the reminder was deleted.
+	// reminderId -> name; notifications carry only the id, and the reminder may be deleted.
 	let reminderNames = $derived(new Map(reminders.map(r => [r.reminder.id, r.reminder.name])));
 	let unreadNotifications = $derived(notifications.filter(n => !n.isRead));
 
-	// Create/edit form (dialog) state.
 	let formOpen = $state(false);
 	let editingReminder = $state<ReminderWithVehicles | null>(null);
 
@@ -61,7 +59,6 @@
 		formOpen = true;
 	}
 
-	// "Materialized N expenses" view (recurring-expenses T6) — opened from an expense-type reminder card.
 	let materializedOpen = $state(false);
 	let materializedReminderId = $state<string | null>(null);
 	let materializedReminderName = $state('');
@@ -72,11 +69,9 @@
 		materializedOpen = true;
 	}
 
-	// Map vehicleId -> display name for quick lookup.
 	let vehicleNames = $derived(new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)])));
 
-	// Time-due check + mileage-tracking detection live in reminder-helpers (null-safe, unit-tested):
-	// a pure-mileage reminder has a null nextDueDate and must never hit `new Date(...)` (= epoch).
+	// Pure-mileage reminders have a null nextDueDate; never pass it to `new Date`.
 	const isDue = (r: ReminderWithVehicles) => isReminderTimeDue(r.reminder);
 
 	let dueReminders = $derived(reminders.filter(r => r.reminder.isActive && isDue(r)));
@@ -97,9 +92,7 @@
 			notifications = notificationList;
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to load reminders:', error);
-			// Persist the failure so we don't fall through to the "No reminders yet"
-			// empty state — that masquerades a fetch failure as "you have none", which
-			// reads as data loss to a returning user. Mirrors dashboard/expenses.
+			// Persist the failure so it is not rendered as an empty list.
 			loadError = error instanceof Error ? error.message : 'Failed to load reminders';
 			appStore.addNotification({ type: 'error', message: 'Failed to load reminders' });
 		} finally {
@@ -127,7 +120,6 @@
 	}
 
 	async function markNotificationRead(id: string) {
-		// Optimistic: flip locally, then persist. On failure, reload to resync.
 		notifications = notifications.map(n => (n.id === id ? { ...n, isRead: true } : n));
 		try {
 			await reminderApi.markNotificationRead(id);
@@ -161,9 +153,7 @@
 		}
 	}
 
-	// "Mark serviced" re-arms a mileage reminder (D3): the backend re-anchors lastServiceOdometer to
-	// the vehicle's current odometer and recomputes the next milestone (and advances the time axis
-	// for a 'both' reminder). Tracked per-reminder so only the clicked button shows its spinner.
+	// Tracked per reminder so only the clicked button shows a spinner.
 	let servicingId = $state<string | null>(null);
 	async function markServiced(item: ReminderWithVehicles) {
 		servicingId = item.reminder.id;
@@ -179,8 +169,6 @@
 		}
 	}
 
-	// Styled confirm dialog (replaces native confirm()); holds the reminder pending
-	// deletion so the dialog can name it.
 	let deleteConfirmOpen = $state(false);
 	let deletingReminder = $state<ReminderWithVehicles | null>(null);
 
@@ -202,12 +190,9 @@
 		}
 	}
 
-	// Recurrence label, or null for a pure-mileage reminder (no time axis → the stored
-	// frequency is inert and showing it would be a misleading "Monthly" badge). Delegates
-	// to the tested helper; kept as a local so the template reads `frequencyLabel(item)`.
+	// Null for pure-mileage reminders, whose stored frequency is inert.
 	const frequencyLabel = (r: ReminderWithVehicles) => reminderFrequencyLabel(r.reminder);
 
-	// Delegates to the tested helper (kept as a local so the template reads `isMileageTracking(item)`).
 	const isMileageTracking = (r: ReminderWithVehicles) => isMileageTrackingReminder(r.reminder);
 
 	onMount(load);
@@ -273,10 +258,6 @@
 	{:else}
 		{#snippet reminderCard(item: ReminderWithVehicles, due: boolean)}
 			<CardNs.Card data-testid="reminder-card-{item.reminder.id}">
-				<!-- Stack the title block above the action row on mobile (flex-col), side-by-side only at sm:. A
-					     mileage reminder's action cluster is up to 5 buttons (Serviced+Pause+edit+delete) and is
-					     flex-shrink-0, so on a phone the old single-row justify-between starved the min-w-0 title to
-					     a ~1-char sliver. -->
 				<CardNs.CardContent
 					class="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
 				>
@@ -414,10 +395,6 @@
 		{/if}
 	{/if}
 
-	<!-- Notification history: rows the trigger wrote when notification-type reminders
-	     fired. The backend GET/PUT existed but nothing surfaced them, so a fired
-	     reminder was invisible beyond a transient toast. Shown whenever any exist,
-	     independent of the reminders list above. -->
 	{#if !isLoading && !loadError && notifications.length > 0}
 		<section class="space-y-3">
 			<div class="flex items-center justify-between gap-2">

@@ -68,10 +68,7 @@
 							</div>
 						</div>
 					{/if}
-					<!-- Visible unconditionally below `lg`, where there is no hover to reveal it, and
-					     revealed by focus as well as hover above it: an `opacity-0` control still takes
-					     Tab focus, so hover alone would put the focus ring somewhere invisible. Same
-					     class string as VehiclePhotoCarousel's overlay actions. -->
+					<!-- Always visible below lg, where there is no hover to reveal the actions. -->
 					<button
 						type="button"
 						onclick={() => onRemove(i)}

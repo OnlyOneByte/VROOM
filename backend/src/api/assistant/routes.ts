@@ -1,19 +1,9 @@
 /**
- * Assistant chat route (llm-assistant T4) — `POST /api/v1/assistant/chat`.
+ * POST /api/v1/assistant/chat. Stateless: the transcript lives in the client. The orchestrator lets the
+ * model call only a fixed allowlist of read-only tools, scoped to the session user.
  *
- * Takes a user message (+ a bounded prior transcript), resolves the user's enabled `domain:'llm'`
- * provider, and runs the BOUNDED tool-calling orchestrator (design §4): the model may call a FIXED
- * allowlist of READ-ONLY, userId-scoped tools; the orchestrator allowlist-checks + Zod-validates every
- * tool call and runs it scoped to the SESSION user. Returns `{ reply, toolsUsed }`. PERSISTS NOTHING
- * (D3 ephemeral — the transcript lives in the client).
- *
- * Error honesty (the anti-fail-open lesson): no configured provider → 400 with an
- * actionable message; a provider transport/HTTP failure → 502 (never a faked reply); a loop that hits
- * its caps without an answer returns a 200 with an HONEST bounded reply (handled in the orchestrator).
- *
- * SAX-04 input bound: the message + each history turn are length-capped, and the history window is
- * bounded, so the prompt sent to the provider cannot grow unbounded (cost + injection-surface guard).
- * The global rate-limiter (app.ts) already covers request-rate; the LLM cost lands on the user's own key.
+ * Errors: no provider configured returns 400; a provider failure returns 502 rather than a made-up
+ * reply. A loop that hits its caps returns an honest bounded reply.
  */
 
 import { and, eq } from 'drizzle-orm';
@@ -33,7 +23,7 @@ const routes = new Hono();
 
 routes.use('*', requireAuth);
 
-/** SAX-04 input caps: a single message, each prior turn, and the transcript window are all bounded. */
+// Bound the prompt size so provider cost and injection surface stay limited.
 const MAX_MESSAGE_CHARS = 2000;
 const MAX_HISTORY_TURNS = 12;
 
@@ -42,8 +32,7 @@ const chatBodySchema = z.object({
   history: z
     .array(
       z.object({
-        // Only user/assistant turns are accepted from the client — tool turns are produced server-side
-        // by the orchestrator and never trusted from the request.
+        // Tool turns are produced server-side and never accepted from the request.
         role: z.enum(['user', 'assistant']),
         content: z.string().max(MAX_MESSAGE_CHARS),
       })
@@ -52,16 +41,11 @@ const chatBodySchema = z.object({
     .optional(),
 });
 
-/**
- * POST /api/v1/assistant/chat — answer a question over the user's own car data. PERSISTS NOTHING.
- * Body (json): { message, history? }.
- */
 routes.post('/chat', zValidator('json', chatBodySchema), async (c) => {
   const user = c.get('user');
   const body = c.req.valid('json');
   const db = getDb();
 
-  // 1) Resolve the user's enabled LLM provider. None → an actionable 400 (link to add one in Settings).
   const rows = await db
     .select()
     .from(userProviders)
@@ -79,7 +63,6 @@ routes.post('/chat', zValidator('json', chatBodySchema), async (c) => {
     );
   }
 
-  // 2) Run the bounded tool-calling loop. The history is the client-sent prior turns (already bounded).
   const provider = getLlmProvider(providerRow);
   const history: ChatMessage[] = (body.history ?? []).map((m) => ({
     role: m.role,
@@ -96,8 +79,7 @@ routes.post('/chat', zValidator('json', chatBodySchema), async (c) => {
     );
     return c.json({ success: true, data: { reply, toolsUsed } });
   } catch (err) {
-    // Surface a provider transport failure HONESTLY as a 502 (never a faked reply). Do NOT echo the api
-    // key or the provider's raw error; the adapter already logged the detail.
+    // The provider error is not echoed: it may contain credentials. The adapter has already logged it.
     const message = err instanceof Error ? err.message : 'LLM provider error';
     logger.warn('Assistant chat failed', {
       providerType: providerRow.providerType,

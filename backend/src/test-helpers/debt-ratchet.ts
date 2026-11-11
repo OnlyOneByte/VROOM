@@ -1,44 +1,15 @@
 import { describe, expect, test } from 'bun:test';
 
-/**
- * The shared shape for a source-scanning ratchet guard: a scan that finds offending sites, plus the
- * list of sites tolerated today.
- *
- * WHY THIS EXISTS. Hand-written ratchets in this repo kept failing in the same three ways, and all
- * three punished the person doing the right thing:
- *
- *  1. Asserting `expect(offenders).toEqual([...TOLERATED])` means FIXING a site turns the guard RED,
- *     because offenders is now shorter than the list. The fixer gets an array diff and has to work
- *     out that the correct response is to edit the list. Here the two directions are SEPARATE tests
- *     with distinct messages, so a fix either passes or tells you exactly which entry to delete.
- *  2. Proving the matcher is live by asserting a real file still matches (`expect(counts.get(f))
- *     .toBeGreaterThan(0)`) makes the guard UNSATISFIABLE once the list reaches zero — the goal
- *     state. Whoever lands the last fix can then only go green by weakening the guard. Here
- *     non-vacuity is proven against caller-supplied fixtures, which hold at zero.
- *  3. Keeping a ceiling (`MAX_FOO = 6`) beside the list lets the two drift, so the guard silently
- *     re-permits what was already fixed. Here the ceiling IS the list.
- *
- * Both directions still matter: a new offender must fail, and a stale entry must fail, because an
- * entry that no longer corresponds to anything silently re-permits that path.
- */
+// Source-scan ratchet. Both directions fail: a new offender, and a tolerated entry that no longer offends.
+// The matcher is proven on fixtures, not on live offenders, so the guard stays satisfiable at zero.
+// Fixing a site must never turn the guard red on its own.
 export interface RatchetSpec {
-  /** What the guard polices, phrased for a test name. */
   name: string;
-  /** Recomputed per run: the sites that currently offend. */
   scan: () => string[];
-  /** The sites tolerated today. Empty means the class is closed — which must stay green. */
   tolerated: Iterable<string>;
-  /** Shown when a NEW offender appears: say what to do instead, not just what is wrong. */
   guidance: string;
-  /**
-   * Prove the matcher still matches what it claims to, using FIXTURES rather than live offenders.
-   * Assert both polarities here — a matcher that never matches passes a subset check forever.
-   */
   probe: () => void;
-  /**
-   * `debt` is expected to shrink to nothing; `exclusion` is a deliberate permanent choice. Only the
-   * wording differs — an inaccurate exclusion is as dangerous as stale debt, so both are checked.
-   */
+  // 'exclusion' is a deliberate permanent choice. Only the wording differs.
   kind?: 'debt' | 'exclusion';
 }
 
@@ -50,7 +21,6 @@ function staleAdvice(kind: 'debt' | 'exclusion'): string {
         'you; leaving them in silently re-permits the defect at that path';
 }
 
-/** Ratchet over a set of offending sites (paths, ids, rule names). */
 export function ratchet(spec: RatchetSpec): void {
   const kind = spec.kind ?? 'debt';
 
@@ -59,8 +29,6 @@ export function ratchet(spec: RatchetSpec): void {
     const tolerated = [...new Set(spec.tolerated)].sort();
 
     test(`the matcher still matches what it polices (proven on fixtures, not on live ${kind})`, () => {
-      // Deliberately fixture-based: anchoring this on a real offender would make the whole guard
-      // unsatisfiable the moment the tolerated list reaches zero.
       spec.probe();
     });
 
@@ -76,12 +44,9 @@ export function ratchet(spec: RatchetSpec): void {
   });
 }
 
-/** Ratchet where each site tolerates a COUNT rather than merely existing. */
 export function countRatchet(spec: {
   name: string;
-  /** Recomputed per run: site -> how many occurrences it currently has. */
   scan: () => Map<string, number>;
-  /** site -> the most occurrences tolerated today. The ceiling IS this record. */
   tolerated: Record<string, number>;
   guidance: string;
   probe: () => void;
@@ -108,8 +73,7 @@ export function countRatchet(spec: {
     });
 
     test('no tolerated count is stale (fixed sites must be removed, lowered counts tightened)', () => {
-      // The ceiling is derived from this record, so a count left too high re-permits what was
-      // already fixed — the drift a separate MAX_ constant used to hide.
+      // A count left above the actual number would re-permit what was already fixed.
       const stale = toleratedKeys
         .filter((file) => (counts.get(file) ?? 0) < (spec.tolerated[file] ?? 0))
         .map(

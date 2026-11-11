@@ -1,5 +1,3 @@
-// Feature: unit-aware-display, Property 10: Label function output correctness
-
 import { describe, expect, test } from 'vitest';
 import fc from 'fast-check';
 import type { ChargeUnit, DistanceUnit, VolumeUnit } from '$lib/types';
@@ -42,11 +40,7 @@ const EXPECTED_SHORT_CHARGE: Record<ChargeUnit, string> = {
 	kwh: 'kWh'
 };
 
-// ---------------------------------------------------------------------------
-// Property 10: Label function output correctness
-// **Validates: Requirements 4.3, 4.4, 4.5, 4.6**
-// ---------------------------------------------------------------------------
-describe('Property 10: Label function output correctness', () => {
+describe('Label function output correctness', () => {
 	test('getDistanceUnitLabel(d, true) produces correct short labels for all distance units', () => {
 		fc.assert(
 			fc.property(distanceUnitArb, unit => {

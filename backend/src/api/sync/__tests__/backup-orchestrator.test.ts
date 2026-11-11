@@ -1,34 +1,13 @@
-/**
- * Unit tests for BackupOrchestrator logic.
- * Validates: Requirement 2 — fan-out, mutex, TTL eviction, change detection,
- * conditional ZIP, parallel with timeout, lastBackupAt + sheetsSpreadsheetId
- * persistence, updateSyncDate, empty providers, skip unregistered strategy.
- *
- * `filterEnabledProviders` + `needsZipGeneration` are now imported from the REAL
- * orchestrator module (it was previously coverage theater — the test re-implemented those
- * filters locally and asserted against the copies, so the real branches stayed 0%-covered
- * and a divergence between copy and source would go uncaught). execute() now calls these same
- * exported functions, so these assertions pin real code. The remaining sims (acquireMutex,
- * collectResults, simulateFanOut) still mirror logic embedded inside execute()'s body, which
- * is bound to getDb()/dynamic-imports and not reachable from an in-memory harness without the
- * process-global mock.module trap (the same singleton-bound limit deep-review hit
- * on getFinancing) — left as behavioral mirrors + flagged, not falsely claimed as real coverage.
- */
+// filterEnabledProviders and needsZipGeneration are the real exports. The mutex, result collection
+// and fan-out helpers below are copies of logic inside execute(), which needs a DB to run.
 
 import { describe, expect, test } from 'bun:test';
 import type { BackupConfig, ProviderBackupSettings } from '../../../types';
 import { filterEnabledProviders, needsZipGeneration } from '../backup-orchestrator';
 import type { BackupOrchestratorResult, BackupStrategyResult } from '../backup-strategy';
 
-// ---------------------------------------------------------------------------
-// Local mirrors of logic still embedded inside execute() (not yet extractable without
-// the getDb-singleton DI work) — see the file header. filterEnabledProviders +
-// needsZipGeneration are the REAL exports above, not mirrors.
-// ---------------------------------------------------------------------------
-
 const MUTEX_TTL_MS = 5 * 60 * 1000;
 
-/** Simulates the mutex check with TTL eviction. */
 function acquireMutex(mutexMap: Map<string, number>, userId: string, now: number): boolean {
   const existing = mutexMap.get(userId);
   if (existing && now - existing < MUTEX_TTL_MS) {
@@ -38,7 +17,6 @@ function acquireMutex(mutexMap: Map<string, number>, userId: string, now: number
   return true;
 }
 
-/** Simulates result collection and config updates. */
 function collectResults(
   results: Record<string, BackupStrategyResult>,
   originalConfig: BackupConfig,
@@ -68,7 +46,6 @@ function collectResults(
   return { updatedConfig, anySuccess };
 }
 
-/** Simulates fan-out with strategy lookup. */
 async function simulateFanOut(
   enabledProviders: [string, ProviderBackupSettings][],
   registeredTypes: Set<string>,
@@ -96,10 +73,6 @@ async function simulateFanOut(
 
   return results;
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 describe('BackupOrchestrator', () => {
   test('fan-out to multiple providers — one result per enabled provider', async () => {
@@ -139,12 +112,10 @@ describe('BackupOrchestrator', () => {
     const now = Date.now();
 
     expect(acquireMutex(mutexMap, 'user-1', now)).toBe(true);
-    // After TTL expires
     expect(acquireMutex(mutexMap, 'user-1', now + MUTEX_TTL_MS + 1)).toBe(true);
   });
 
   test('change detection skip — returns skipped result', () => {
-    // Pure logic: if force=false and hasChanges=false, return skipped
     const force = false;
     const hasChanges = false;
     const shouldSkip = !force && !hasChanges;
@@ -207,7 +178,6 @@ describe('BackupOrchestrator', () => {
     ]);
     const registered = new Set(['google-drive']);
 
-    // prov-1 succeeds, prov-2 fails — both should be in results
     const results = await simulateFanOut(enabled, registered, typeMap, async (id) => {
       if (id === 'prov-2') {
         return { success: false, capabilities: { zip: { success: false, message: 'timeout' } } };
@@ -314,7 +284,6 @@ describe('BackupOrchestrator', () => {
   });
 
   test('exportAsZip failure — zipBuffer is null, Sheets-only continues', async () => {
-    // Simulate: exportAsZip throws, zipBuffer set to null
     let zipBuffer: Buffer | null = null;
     try {
       throw new Error('ZIP generation failed');
@@ -323,7 +292,6 @@ describe('BackupOrchestrator', () => {
     }
     expect(zipBuffer).toBeNull();
 
-    // Strategy still executes with null zipBuffer
     const config: BackupConfig = {
       providers: {
         'prov-1': {
@@ -383,19 +351,15 @@ describe('BackupOrchestrator', () => {
   });
 });
 
-// Edge cases pinning the REAL exported filters directly (the assertions above repurpose them
-// too; these add the boundaries those don't cover). Guards the real backup-run provider selection.
-describe('filterEnabledProviders / needsZipGeneration (real exports — edge cases)', () => {
+describe('filterEnabledProviders / needsZipGeneration edge cases', () => {
   test('an empty config selects no providers and needs no ZIP', () => {
     const enabled = filterEnabledProviders({ providers: {} });
     expect(enabled).toEqual([]);
     expect(needsZipGeneration(enabled)).toBe(false);
   });
 
-  test('sheetsSyncEnabled uses STRICT === true — a falsy/omitted flag with enabled=false is excluded', () => {
-    // The filter is `s.enabled || s.sheetsSyncEnabled === true`. A provider that is neither
-    // enabled nor explicitly sheets-sync must NOT be selected (else a disabled provider would
-    // get backed up). Pins the strict-equality so `undefined`/`false` both correctly drop out.
+  test('sheetsSyncEnabled uses strict === true', () => {
+    // Strict equality: undefined and false both drop out.
     const config: BackupConfig = {
       providers: {
         off: { enabled: false, folderPath: 'B', retentionCount: 1 }, // no sheetsSyncEnabled → omitted

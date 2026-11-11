@@ -1,13 +1,3 @@
-/**
- * money-cents-migration T6 — analytics display-edge converters (api-transform.ts).
- *
- * These guard the cents→dollars projection applied at the analytics response boundary. The load-bearing
- * `fuelAdvancedToApi` must convert the REAL money fields (dayOfWeekPatterns.avgCost,
- * monthlyCostHeatmap.*) but must NOT touch `vehicleRadar.maintenanceCost`/`annualCost` — despite their
- * cost-y names, those are normalizeScore() 0-100 RADAR SCORES (buildVehicleRadar), and a /100 would
- * corrupt the chart (80 → 0.8). A bug converted them; this pins the correct behavior so it can't return.
- */
-
 import { describe, expect, test } from 'bun:test';
 import {
   crossVehicleToApi,
@@ -30,19 +20,19 @@ describe('analytics api-transform: money cents→dollars, non-money untouched', 
   test('quickStats: ytdSpending cents→dollars; counts/efficiency/score untouched', () => {
     const d: QuickStatsData = {
       vehicleCount: 3,
-      ytdSpending: 123456, // $1234.56
+      ytdSpending: 123456,
       avgEfficiency: 28.5,
       fleetHealthScore: 87,
       units: { distanceUnit: 'mi', volumeUnit: 'gal', chargeUnit: 'kWh' },
     };
     const r = quickStatsToApi(d);
     expect(r.ytdSpending).toBe(1234.56);
-    expect(r.vehicleCount).toBe(3); // count — untouched
-    expect(r.avgEfficiency).toBe(28.5); // mi/gal — untouched
-    expect(r.fleetHealthScore).toBe(87); // score — untouched
+    expect(r.vehicleCount).toBe(3);
+    expect(r.avgEfficiency).toBe(28.5);
+    expect(r.fleetHealthScore).toBe(87);
   });
 
-  test('fuelAdvanced: vehicleRadar SCORES (maintenanceCost/annualCost) are NOT money — left as 0-100', () => {
+  test('fuelAdvanced: vehicleRadar scores stay 0-100 even though their names look like costs', () => {
     const d = {
       maintenanceTimeline: [],
       seasonalEfficiency: [{ season: 'Summer', avgEfficiency: 30, fillupCount: 4 }],
@@ -50,11 +40,11 @@ describe('analytics api-transform: money cents→dollars, non-money untouched', 
         {
           vehicleId: 'v1',
           vehicleName: 'Camry',
-          fuelEfficiency: 75, // score
-          maintenanceCost: 80, // SCORE 0-100, NOT money
-          reliability: 90, // score
-          annualCost: 60, // SCORE 0-100, NOT money
-          mileage: 50, // score
+          fuelEfficiency: 75,
+          maintenanceCost: 80,
+          reliability: 90,
+          annualCost: 60,
+          mileage: 50,
         },
       ],
       dayOfWeekPatterns: [{ day: 'Mon', fillupCount: 2, avgCost: 5000, avgVolume: 12 }],
@@ -72,19 +62,16 @@ describe('analytics api-transform: money cents→dollars, non-money untouched', 
       fillupIntervals: [{ intervalLabel: '0-7d', count: 3 }],
     } as FuelAdvancedData;
     const r = fuelAdvancedToApi(d);
-    // RADAR SCORES: byte-for-byte unchanged (a transform bug divided these by 100).
     expect(r.vehicleRadar[0].maintenanceCost).toBe(80);
     expect(r.vehicleRadar[0].annualCost).toBe(60);
     expect(r.vehicleRadar[0].fuelEfficiency).toBe(75);
     expect(r.vehicleRadar[0].reliability).toBe(90);
     expect(r.vehicleRadar[0].mileage).toBe(50);
-    // REAL money: converted.
-    expect(r.dayOfWeekPatterns[0].avgCost).toBe(50); // 5000c → $50
+    expect(r.dayOfWeekPatterns[0].avgCost).toBe(50);
     expect(r.monthlyCostHeatmap[0].fuel).toBe(100);
     expect(r.monthlyCostHeatmap[0].maintenance).toBe(200);
     expect(r.monthlyCostHeatmap[0].financial).toBe(300);
     expect(r.monthlyCostHeatmap[0].misc).toBe(5);
-    // efficiency untouched.
     expect(r.seasonalEfficiency[0].avgEfficiency).toBe(30);
   });
 
@@ -95,14 +82,14 @@ describe('analytics api-transform: money cents→dollars, non-money untouched', 
       fuelConsumption: { avgEfficiency: 28, bestEfficiency: 35, worstEfficiency: 20 },
       fillupDetails: { avgVolume: 10, minVolume: 5, maxVolume: 15 },
       averageCost: {
-        perFillup: 4500, // $45
-        bestCostPerDistance: 12, // 12c/mi → $0.12
+        perFillup: 4500,
+        bestCostPerDistance: 12,
         worstCostPerDistance: 30,
         avgCostPerDay: 800,
       },
       distance: { totalDistance: 1000, avgPerDay: 30, avgPerMonth: 900 },
       monthlyConsumption: [{ month: '2024-01', efficiency: 28, volume: 40 }],
-      gasPriceHistory: [{ date: '2024-01-01', fuelType: 'regular', pricePerVolume: 350 }], // $3.50/gal
+      gasPriceHistory: [{ date: '2024-01-01', fuelType: 'regular', pricePerVolume: 350 }],
       fillupCostByVehicle: [{ month: '2024-01', vehicleId: 'v1', vehicleName: 'C', avgCost: 5000 }],
       odometerProgression: [
         { month: '2024-01', vehicleId: 'v1', vehicleName: 'C', mileage: 42000 },
@@ -117,7 +104,6 @@ describe('analytics api-transform: money cents→dollars, non-money untouched', 
     expect(r.gasPriceHistory[0].pricePerVolume).toBe(3.5);
     expect(r.fillupCostByVehicle[0].avgCost).toBe(50);
     expect(r.costPerDistance[0].costPerDistance).toBe(0.15);
-    // non-money untouched
     expect(r.volume.currentYear).toBe(100);
     expect(r.fuelConsumption.avgEfficiency).toBe(28);
     expect(r.distance.totalDistance).toBe(1000);
@@ -156,10 +142,10 @@ describe('analytics api-transform: money cents→dollars, non-money untouched', 
     expect(r.summary.totalMonthlyPayments).toBe(500);
     expect(r.summary.remainingBalance).toBe(20000);
     expect(r.vehicleDetails[0].monthlyPayment).toBe(500);
-    expect(r.vehicleDetails[0].apr).toBe(5.5); // percent — untouched
+    expect(r.vehicleDetails[0].apr).toBe(5.5);
     expect(r.monthlyTimeline[0].vehicles[0].amount).toBe(500);
     expect(r.typeDistribution[0].value).toBe(500);
-    expect(r.typeDistribution[0].count).toBe(1); // count — untouched
+    expect(r.typeDistribution[0].count).toBe(1);
     expect(r.loanBreakdown[0].interest).toBe(83.33);
     expect(r.loanBreakdown[0].principal).toBe(416.67);
   });
@@ -179,10 +165,10 @@ describe('analytics api-transform: money cents→dollars, non-money untouched', 
     const r = crossVehicleToApi(d);
     expect(r.monthlyExpenseTrends[0].amount).toBe(123.45);
     expect(r.expenseByCategory[0].amount).toBe(500);
-    expect(r.expenseByCategory[0].percentage).toBe(42.5); // percent — untouched
+    expect(r.expenseByCategory[0].percentage).toBe(42.5);
     expect(r.vehicleCostComparison[0].totalCost).toBe(1000);
     expect(r.vehicleCostComparison[0].costPerDistance).toBe(0.25);
-    expect(r.fuelEfficiencyComparison[0].vehicles[0].efficiency).toBe(28); // untouched
+    expect(r.fuelEfficiencyComparison[0].vehicles[0].efficiency).toBe(28);
   });
 
   test('vehicleTco: all cost buckets + ratios convert; null purchasePrice stays null', () => {
@@ -205,12 +191,12 @@ describe('analytics api-transform: money cents→dollars, non-money untouched', 
       ],
     } as VehicleTCOData;
     const r = vehicleTcoToApi(d);
-    expect(r.purchasePrice).toBeNull(); // null money stays null
+    expect(r.purchasePrice).toBeNull();
     expect(r.totalCost).toBe(1050);
     expect(r.costPerMonth).toBe(87.5);
     expect(r.costPerDistance).toBe(0.09);
     expect(r.monthlyTrend[0].fuel).toBe(30);
-    expect(r.ownershipMonths).toBe(12); // count — untouched
-    expect(r.totalDistance).toBe(12000); // distance — untouched
+    expect(r.ownershipMonths).toBe(12);
+    expect(r.totalDistance).toBe(12000);
   });
 });

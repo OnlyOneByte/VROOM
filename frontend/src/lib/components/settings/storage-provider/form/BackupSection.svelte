@@ -31,7 +31,6 @@
 </script>
 
 <div class="space-y-5">
-	<!-- Backup folder path — always visible, shared by ZIP and Sheets -->
 	<div class="space-y-2">
 		<Label for="backup-folder-path" class="text-sm">Backup folder path</Label>
 		<div
@@ -58,7 +57,6 @@
 		{/if}
 	</div>
 
-	<!-- ZIP backup checkbox -->
 	<div class="space-y-3">
 		<div class="flex items-start gap-3">
 			<Checkbox
@@ -105,7 +103,6 @@
 		{/if}
 	</div>
 
-	<!-- Google Sheets sync checkbox (Google Drive only) -->
 	{#if selectedType === 'google-drive'}
 		<div class="space-y-3">
 			<div class="flex items-start gap-3">

@@ -1,19 +1,8 @@
 import type { BrowserContext, Page, Route } from '@playwright/test';
 
-/**
- * Shared `/api/v1` route mocking for the E2E suite.
- *
- * Why a catch-all instead of one narrow `page.route` per endpoint: the app issues a dozen
- * requests per page (root layout: auth/me, settings, vehicles, reminders; plus each page's
- * own loads). Mocking them one at a time means every spec silently depends on the ones it
- * forgot falling through to a real backend — which is exactly how the previous suite
- * rotted. `mockApi()` answers every `/api/v1` request, and anything it does NOT know about
- * gets a 404 naming the path, so a new app request surfaces as a readable failure instead
- * of an `undefined` field.
- *
- * Playwright runs matching handlers in REVERSE registration order, so a spec overrides a
- * default by calling `page.route()` AFTER `mockApi()`.
- */
+// Catch-all /api/v1 mock: unknown paths get a 404 naming the path, so a new request fails
+// readably. Playwright runs handlers in reverse registration order, so specs override
+// defaults by calling page.route() after mockApi().
 
 export const E2E_USER = {
 	id: 'e2e-user-1',
@@ -21,9 +10,7 @@ export const E2E_USER = {
 	displayName: 'E2E User'
 };
 
-/** The session cookie the backend sets. Under route mocking nothing validates it — the
- *  mocked `/auth/me` is what makes the app consider the visitor signed in — but the real
- *  app only ever sends requests with it present, so the fixture keeps it. */
+// Nothing validates the cookie; the mocked /auth/me signs the visitor in. Kept because the app only sends requests with it.
 export const SESSION_COOKIE = {
 	name: 'auth_session',
 	value: 'e2e-session-token',
@@ -38,8 +25,7 @@ export async function addSessionCookie(context: BrowserContext) {
 	await context.addCookies([SESSION_COOKIE]);
 }
 
-// Must be real `UnitPreferences` values — the unit-label helpers index a Record by them,
-// so an invented unit ('gallons') makes `labels[unit].short` throw and blanks the page.
+// Must be real UnitPreferences values; an invented unit makes labels[unit].short throw.
 const UNITS = { distanceUnit: 'miles', volumeUnit: 'gallons_us', chargeUnit: 'kwh' };
 
 export const VEHICLE_CAMRY = {
@@ -72,7 +58,7 @@ export const VEHICLE_CIVIC = {
 	updatedAt: '2024-01-01T12:00:00.000Z'
 };
 
-/** Backend expense rows (`expenseAmount`, not `amount` — `fromBackendExpense` renames it). */
+// Backend shape: expenseAmount, not amount.
 export const BACKEND_EXPENSES = [
 	{
 		id: 'expense-fuel',
@@ -126,7 +112,6 @@ const SETTINGS = {
 	updatedAt: '2024-01-01T12:00:00.000Z'
 };
 
-/** `GET /analytics/summary` — the single call the analytics page makes on load. */
 export const ANALYTICS_SUMMARY = {
 	quickStats: {
 		vehicleCount: 2,
@@ -164,8 +149,7 @@ export const ANALYTICS_SUMMARY = {
 	}
 };
 
-/** Fulfill with the backend's `{ success, data }` envelope — `apiClient` unwraps `data`, so
- *  a mock returning a bare payload leaves every field `undefined`. */
+// apiClient unwraps `data`; a bare payload would leave every field undefined.
 export async function fulfillData(route: Route, data: unknown, status = 200) {
 	await route.fulfill({
 		status,
@@ -174,8 +158,7 @@ export async function fulfillData(route: Route, data: unknown, status = 200) {
 	});
 }
 
-/** Fulfill a paginated list endpoint. `apiClient.getPaginated` reads `data` AND `pagination`
- *  off the top level, so the metadata cannot be nested inside `data`. */
+// apiClient.getPaginated reads `pagination` from the top level, not inside `data`.
 export async function fulfillPage(route: Route, rows: unknown[]) {
 	await route.fulfill({
 		status: 200,
@@ -200,14 +183,10 @@ export interface MockApiOptions {
 	/** `false` makes `/auth/me` answer 401, i.e. a logged-out visitor. */
 	authenticated?: boolean;
 	vehicles?: unknown[];
-	/** Backend-shaped expense rows for `GET /expenses` and the summary count. */
 	expenses?: unknown[];
 }
 
-/**
- * Install the default `/api/v1/**` mocks on a page. Call once, before any spec-specific
- * `page.route()` override.
- */
+// Call once, before any spec-specific page.route() override.
 export async function mockApi(page: Page, options: MockApiOptions = {}) {
 	const {
 		authenticated = true,
@@ -220,7 +199,6 @@ export async function mockApi(page: Page, options: MockApiOptions = {}) {
 		const method = request.method();
 		const path = new URL(request.url()).pathname.replace(/^\/api\/v1/, '');
 
-		// ── auth ──────────────────────────────────────────────────────────────
 		if (path === '/auth/me') {
 			if (!authenticated) return fulfillError(route, 401, 'Not authenticated');
 			if (method === 'PATCH') return fulfillData(route, { user: E2E_USER });
@@ -238,10 +216,8 @@ export async function mockApi(page: Page, options: MockApiOptions = {}) {
 		if (path === '/auth/accounts') return fulfillData(route, []);
 		if (path === '/auth/logout') return fulfillData(route, { success: true });
 
-		// ── settings ──────────────────────────────────────────────────────────
 		if (path === '/settings') return fulfillData(route, SETTINGS);
 
-		// ── vehicles ──────────────────────────────────────────────────────────
 		if (path === '/vehicles') {
 			if (method === 'POST') {
 				const body = (request.postDataJSON() ?? {}) as Record<string, unknown>;
@@ -262,10 +238,7 @@ export async function mockApi(page: Page, options: MockApiOptions = {}) {
 			}
 			return fulfillData(route, vehicles);
 		}
-		// Exactly one segment. A `startsWith('/vehicles/')` prefix test also swallows
-		// `/vehicles/<id>/stats`, `/vehicles/<id>/photos` and every other sub-resource and
-		// answers each with the VEHICLE body — an unrelated shape the caller then reads
-		// `undefined` fields off, instead of the 404-naming-the-path promised above.
+		// Exactly one segment: a prefix match would answer sub-resources with the vehicle body.
 		const vehicleId = /^\/vehicles\/([^/]+)$/.exec(path)?.[1];
 		if (vehicleId) {
 			const match = (vehicles as Array<{ id: string }>).find(v => v.id === vehicleId);
@@ -274,7 +247,6 @@ export async function mockApi(page: Page, options: MockApiOptions = {}) {
 				: fulfillError(route, 404, `No vehicle fixture for ${vehicleId}`);
 		}
 
-		// ── expenses (specific paths before the `/expenses/:id` catch) ────────
 		if (path === '/expenses/summary') return fulfillData(route, EXPENSE_SUMMARY);
 		if (path === '/expenses/vehicle-stats') {
 			return fulfillData(
@@ -305,10 +277,7 @@ export async function mockApi(page: Page, options: MockApiOptions = {}) {
 			}
 			return fulfillPage(route, expenses);
 		}
-		// Exactly one segment, for the same reason as `/vehicles/<id>`: a prefix test would
-		// also answer `/expenses/split/<groupId>`, `/expenses/export` and `/expenses/import`
-		// with a single expense row. DELETE is exercised by the delete spec in
-		// expense-entry.spec.ts.
+		// Exactly one segment, so /expenses/split, /export and /import are not answered with a row.
 		const expenseId = /^\/expenses\/([^/]+)$/.exec(path)?.[1];
 		if (expenseId) {
 			if (method === 'DELETE') return fulfillData(route, { success: true });
@@ -318,20 +287,13 @@ export async function mockApi(page: Page, options: MockApiOptions = {}) {
 				: fulfillError(route, 404, `No expense fixture for ${expenseId}`);
 		}
 
-		// ── photos ────────────────────────────────────────────────────────────
-		// `GET /photos?entityType=vehicle` is the batch read (map keyed by vehicle id);
-		// `/photos/<entityType>/<entityId>` — exactly two segments — is the per-entity
-		// paginated list. A prefix test would also hand a paginated-list body to the
-		// single-photo delete and the `/photos/receipt-drafts` import feed.
+		// Exactly two segments: a prefix match would also answer the single-photo and import routes.
 		if (path === '/photos') return fulfillData(route, {});
 		if (/^\/photos\/[^/]+\/[^/]+$/.test(path)) return fulfillPage(route, []);
 
-		// ── insurance ─────────────────────────────────────────────────────────
 		if (path === '/insurance') return fulfillData(route, []);
 
-		// ── trips ─────────────────────────────────────────────────────────────
-		// Every `milesByPurpose` key must be present: the page indexes the record per purpose,
-		// so a missing one renders `undefined` where a number belongs.
+		// Every milesByPurpose key must exist, or the page renders undefined.
 		if (path === '/trips/summary') {
 			return fulfillData(route, {
 				tripCount: 0,
@@ -345,7 +307,6 @@ export async function mockApi(page: Page, options: MockApiOptions = {}) {
 		}
 		if (path === '/trips') return fulfillPage(route, []);
 
-		// ── reminders ─────────────────────────────────────────────────────────
 		if (path === '/reminders/recurring-cost') {
 			return fulfillData(route, { count: 0, monthlyTotal: 0 });
 		}
@@ -355,22 +316,16 @@ export async function mockApi(page: Page, options: MockApiOptions = {}) {
 		}
 		if (path === '/reminders') return fulfillData(route, []);
 
-		// ── vehicle shares ────────────────────────────────────────────────────
 		if (path === '/shares/received' || path === '/shares/granted') {
 			return fulfillData(route, []);
 		}
 
-		// ── sync ──────────────────────────────────────────────────────────────
 		if (path === '/sync/status') {
 			return fulfillData(route, { lastSyncDate: null, pendingChanges: false });
 		}
 
-		// ── analytics ─────────────────────────────────────────────────────────
 		if (path === '/analytics/summary') return fulfillData(route, ANALYTICS_SUMMARY);
-		// FuelStatsTab re-fetches these on mount even when the analytics page passes the
-		// same data down from /analytics/summary, because its `if (!fuelStatsProp)` guard
-		// runs before the parent's async load has resolved. Both must be fixtured or the
-		// tab renders its own error state over perfectly good props.
+		// FuelStatsTab refetches on mount; both must be fixtured or it shows an error over good props.
 		if (path === '/analytics/fuel-stats') {
 			return fulfillData(route, ANALYTICS_SUMMARY.fuelStats);
 		}

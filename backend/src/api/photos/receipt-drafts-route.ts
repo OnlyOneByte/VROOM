@@ -1,19 +1,7 @@
 /**
- * Photos → auto-expense STAGE endpoint (photos-auto-expense T2) — `GET /api/v1/photos/receipt-drafts`.
- *
- * Resolves the user's enabled google-photos + vlm providers, walks the receipts VROOM uploaded to its
- * own Photos album, parses each through the user's VLM (the shipped fail-closed seam), filters out
- * already-imported photos, and returns a LIST of drafts — PERSISTING NOTHING. The FE reviews + confirms
- * each via the UNCHANGED POST /expenses (clientId = photos:<mediaId>), so a re-run is idempotent.
- *
- * The orchestration itself is the pure {@link stageReceiptDrafts} (DI-tested with fakes). This route is
- * the thin wiring: resolve rows → build the real seams → map failures honestly (no provider → 400; a
- * Photos transport / read-not-enabled failure → 502, never a faked empty result).
- *
- * The live `mediaItems:search` read (T1) + its `photoslibrary.readonly.appcreateddata` OAuth scope (T5)
- * are ARCC-cleared (design §7) and now LIVE: the real PhotosClient implements searchMediaItems and the
- * connect flow requests the read scope. A Photos transport failure surfaces as a 502 (honest, never a
- * faked empty); the HTTP guard exercises this path against the in-memory fake (zero-network).
+ * GET /api/v1/photos/receipt-drafts. Stages receipt photos from the app's Google Photos album as
+ * expense drafts. Persists nothing: the client confirms each draft through POST /expenses with
+ * clientId `photos:<mediaId>`, which makes re-runs idempotent.
  */
 
 import { and, eq } from 'drizzle-orm';
@@ -35,7 +23,6 @@ const routes = new Hono();
 
 routes.use('*', requireAuth);
 
-/** Fetch the user's single enabled provider in a domain, or null. */
 async function findEnabledProvider(
   db: ReturnType<typeof getDb>,
   userId: string,
@@ -54,7 +41,6 @@ async function findEnabledProvider(
   return rows[0] ?? null;
 }
 
-/** Build a GooglePhotosService from a google-photos provider row (decrypt refreshToken + cached album). */
 function buildRealPhotosService(row: UserProvider): GooglePhotosService {
   const credentials = JSON.parse(decrypt(row.credentials)) as Record<string, unknown>;
   const refreshToken = credentials.refreshToken;
@@ -66,30 +52,18 @@ function buildRealPhotosService(row: UserProvider): GooglePhotosService {
   return new GooglePhotosService(refreshToken, undefined, albumId);
 }
 
-/**
- * How the route builds the Photos service from a provider row. Defaults to the real OAuth2-authed
- * service; the HTTP-harness test overrides it with a fake-PhotosClient-backed service so the live read
- * path is exercised ZERO-network (the live `mediaItems:search` itself needs a real Google token, which
- * the in-process suite cannot mint). This is a USED DI seam — NOT the dead-setter anti-pattern.
- */
 type PhotosServiceBuilder = (row: UserProvider) => GooglePhotosService;
 let photosServiceBuilder: PhotosServiceBuilder = buildRealPhotosService;
 
-/** Test seam: override the Photos-service builder (pass null to restore the real one). */
+/** Test seam: pass null to restore the real builder. */
 export function setPhotosServiceBuilderForTest(builder: PhotosServiceBuilder | null): void {
   photosServiceBuilder = builder ?? buildRealPhotosService;
 }
 
-/**
- * GET /api/v1/photos/receipt-drafts — stage the un-imported receipt photos into expense drafts.
- * PERSISTS NOTHING. 400 if either provider is missing; 502 on a Photos transport / read-not-enabled
- * failure (honest, never a faked empty result).
- */
 routes.get('/receipt-drafts', async (c) => {
   const user = c.get('user');
   const db = getDb();
 
-  // 1) Resolve both providers — either missing → an actionable 400 (link to Settings).
   const photosRow = await findEnabledProvider(db, user.id, 'storage');
   if (photosRow?.providerType !== 'google-photos') {
     throw new ValidationError(
@@ -103,7 +77,6 @@ routes.get('/receipt-drafts', async (c) => {
     );
   }
 
-  // 2) Wire the real seams into the pure orchestration (the builder is overridable in tests).
   const photosService = photosServiceBuilder(photosRow);
   const vlmProvider = getVlmProvider(vlmRow);
   const deps: StageDeps = {
@@ -116,7 +89,7 @@ routes.get('/receipt-drafts', async (c) => {
       (await expenseRepository.findByClientId(`photos:${photoId}`, user.id)) !== null,
   };
 
-  // 3) Run the sweep. A Photos LIST/transport failure (incl. the read-not-enabled signal) → 502.
+  // A Photos read failure is reported as 502 rather than an empty list.
   try {
     const drafts = await stageReceiptDrafts(deps);
     return c.json({ success: true, data: { drafts } });

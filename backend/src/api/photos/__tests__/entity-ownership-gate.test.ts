@@ -1,24 +1,7 @@
 /**
- * Characterization tests for the photo-upload ownership gate
- * (`validateEntityOwnership` in photos/helpers.ts) across EVERY entity type.
- *
- * The photo routes are entityType-generic; the only authorization gate for an
- * upload (or any per-entity photo op) is that switch. `listPhotosForEntity`
- * calls it, so a GET /photos/:entityType/:entityId exercises the exact ownership
- * check an upload would — without needing a storage provider.
- *
- * WHY THIS EXISTS: helpers.ts carries its own ownership logic (a private
- * validateExpenseOwnership + inlined vehicle/policy checks) that DUPLICATES the
- * shared validators in utils/validation.ts — two implementations that can drift,
- * a security-adjacent smell. Before routing the switch through the shared
- * validators (the arch refactor), this pins the OBSERVABLE contract per type:
- *  - own entity → 200 (gate passes; empty photo list)
- *  - another user's entity → 404 (NotFoundError; never leak existence)
- *  - non-existent entity → 404
- *  - unknown entity type → 400 (ValidationError)
- * The refactor must keep every one of these green (behavior-preserving).
- * `insurance_claim` is additionally covered end-to-end in
- * insurance/__tests__/claim-photos-http.test.ts; included here for symmetry.
+ * The photo ownership gate for each entity type, exercised through GET /photos/:entityType/:entityId
+ * (the same check an upload runs). Owned entity: 200. Another user's or a missing entity: 404.
+ * Unknown entity type: 400.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -35,14 +18,11 @@ const OTHER_USER = 'other-owner';
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  // A second user who owns the "foreign" entities the session user must not reach.
   ctx.sqlite.run(
     `INSERT INTO users (id, email, display_name) VALUES ('${OTHER_USER}', 'other@test.com', 'Other Owner')`
   );
 });
 afterEach(() => ctx.close());
-
-// --- Direct row seeders (no storage provider needed for a GET) --------------
 
 function seedVehicle(id: string, userId: string): void {
   ctx.sqlite.run(
@@ -74,15 +54,10 @@ function seedPolicy(id: string, userId: string): void {
   );
 }
 
-/** GET a per-entity photo list — exercises validateEntityOwnership for entityType. */
 async function getPhotos(entityType: string, entityId: string): Promise<Response> {
   return ctx.authed('GET', `/api/v1/photos/${entityType}/${entityId}`);
 }
 
-/**
- * Each case seeds an OWNED entity (session user) and a FOREIGN one (OTHER_USER),
- * then asserts the gate's three observable outcomes.
- */
 const cases: Array<{
   entityType: string;
   seed: (id: string, userId: string) => void;

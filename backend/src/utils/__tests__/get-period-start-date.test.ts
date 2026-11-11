@@ -1,13 +1,3 @@
-/**
- * Unit tests for getPeriodStartDate. This switch was duplicated in
- * vehicles/routes.ts and expenses/repository.ts; extracting it to one source of truth is
- * behavior-preserving, and this pins the contract both call sites now depend on:
- *  - 'all' → null (the caller applies NO lower bound),
- *  - each bounded period → now − N days (7/30/90/365), deterministic given an injected `now`,
- *  - the expenses-repo `?? new Date(0)` fallback is exercised at that call site, not here.
- * Pure → no DB, no server.
- */
-
 import { describe, expect, test } from 'bun:test';
 import { getPeriodStartDate, type StatsPeriod } from '../calculations';
 
@@ -49,7 +39,7 @@ describe('getPeriodStartDate', () => {
     expect(d365).toBeLessThan(d90);
   });
 
-  test('defaults to the real clock when now is omitted (returns a Date, not null, for a bounded period)', () => {
+  test('uses the current time when now is omitted', () => {
     const start = getPeriodStartDate('30d');
     expect(start).toBeInstanceOf(Date);
     expect(Number.isNaN((start as Date).getTime())).toBe(false);

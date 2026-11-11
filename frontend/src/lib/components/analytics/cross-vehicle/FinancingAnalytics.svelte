@@ -17,7 +17,6 @@
 
 	let typeDistGate = createVisibilityWatch();
 
-	// --- Loan Payment Breakdown ---
 	let loanBreakdownData = $derived(
 		(financing.loanBreakdown ?? []).map(d => ({ ...d, date: parseMonthToDate(d.month) }))
 	);
@@ -33,7 +32,6 @@
 		{ key: 'interest', label: 'Interest', color: 'var(--chart-3)' }
 	];
 
-	// --- Type Distribution Pie ---
 	let typeDistData = $derived(
 		(financing.typeDistribution ?? []).map(d => ({
 			...d,
@@ -89,16 +87,13 @@
 	});
 </script>
 
-<!-- Section 4: Financing Overview -->
 <div class="flex items-center gap-2">
 	<CreditCard class="h-5 w-5 text-muted-foreground" />
 	<h2 class="text-xl font-bold">Financing Overview</h2>
 </div>
 
-<!-- Financing Summary Cards -->
 <StatCardGrid items={financingSummaryItems} columns={4} />
 
-<!-- Vehicle Financing Details -->
 {#if financing.vehicleDetails.length > 0}
 	<Card.Root class="p-4 sm:p-6">
 		<div class="space-y-4">
@@ -169,9 +164,7 @@
 	</Card.Root>
 {/if}
 
-<!-- Financing Charts: 2-col grid -->
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-	<!-- Loan Payment Breakdown -->
 	{#if hasLoanBreakdown}
 		<AppBarChart
 			title="Loan Payment Breakdown"
@@ -184,7 +177,6 @@
 		/>
 	{/if}
 
-	<!-- Financing Type Distribution -->
 	{#if typeDistData.length > 0}
 		<Card.Root class="p-4 sm:p-6">
 			<div class="space-y-4">

@@ -11,12 +11,10 @@
 	let status = $state('processing');
 	let error = $state('');
 
-	// Use automatic store subscription
 	const authState = authStore;
 
 	onMount(async () => {
 		try {
-			// Get the current URL parameters
 			const urlParams = new URLSearchParams(page.url.search);
 			const code = urlParams.get('code');
 
@@ -30,8 +28,7 @@
 				throw new Error('No authorization code received');
 			}
 
-			// The backend should handle the OAuth callback and set the session
-			// We just need to check if we're now authenticated
+			// The backend sets the session; this page only checks auth state.
 			await authStore.initialize();
 		} catch (err) {
 			status = 'error';
@@ -39,7 +36,6 @@
 		}
 	});
 
-	// Check auth state and redirect
 	$effect(() => {
 		if (!authState.isLoading) {
 			if (authState.isAuthenticated) {

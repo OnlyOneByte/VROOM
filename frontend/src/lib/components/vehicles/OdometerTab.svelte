@@ -26,20 +26,16 @@
 	const PAGE_SIZE = 20;
 	const MIN_CHART_POINTS = 2;
 
-	// Adding, editing and deleting a reading are writes, which the server allows the owner or an
-	// accepted editor. A vehicle shared read-only therefore renders the readings with no Add Reading
-	// button and no per-row controls. Defaults true: the owner's own tab passes nothing.
+	// Writes are owner or accepted-editor only; a read-only shared view hides the Add and per-row controls.
 	let {
 		vehicleId,
 		unitPreferences,
 		canWrite = true
 	}: { vehicleId: string; unitPreferences?: UnitPreferences; canWrite?: boolean } = $props();
 
-	// Resolve distance label from vehicle unitPreferences, falling back to global settings
 	let units = $derived(unitPreferences ?? settingsStore.unitPreferences);
 	let distLabel = $derived(getDistanceUnitLabel(units.distanceUnit, true));
 
-	// State
 	let entries = $state<OdometerEntry[]>([]);
 	let totalCount = $state(0);
 	let offset = $state(0);
@@ -47,19 +43,16 @@
 	let isPageLoading = $state(false);
 	let error = $state<string | null>(null);
 
-	// Delete dialog state
 	let deleteDialogOpen = $state(false);
 	let deletingEntry = $state<OdometerEntry | null>(null);
 	let isDeleting = $state(false);
 	let deleteError = $state<string | null>(null);
 
-	// Derived pagination
 	let currentPage = $derived(Math.floor(offset / PAGE_SIZE) + 1);
 	let totalPages = $derived(Math.max(1, Math.ceil(totalCount / PAGE_SIZE)));
 	let hasPrevious = $derived(offset > 0);
 	let hasNext = $derived(offset + entries.length < totalCount);
 
-	// Chart data: sorted ascending by date for the line chart
 	let chartData = $derived(
 		entries
 			.filter(e => e.recordedAt)
@@ -189,7 +182,6 @@
 	</EmptyState>
 {:else}
 	<div class="space-y-6">
-		<!-- Add Reading Button (write — owner or accepted editor) -->
 		{#if canWrite}
 			<div class="flex justify-end">
 				<Button href={resolve(paramRoutes.vehicleOdometerNew, { id: vehicleId })}>
@@ -199,7 +191,6 @@
 			</div>
 		{/if}
 
-		<!-- Mileage Over Time Chart -->
 		{#if chartData.length >= MIN_CHART_POINTS}
 			<AppLineChart
 				title="Mileage Over Time"
@@ -214,7 +205,6 @@
 			/>
 		{/if}
 
-		<!-- Entries List -->
 		<Card.Root>
 			<Card.Header>
 				<Card.Title>Readings ({totalCount})</Card.Title>
@@ -257,7 +247,6 @@
 								</div>
 							</div>
 
-							<!-- Edit/Delete buttons (write — owner or accepted editor; hidden for a viewer) -->
 							{#if canWrite}
 								<div class="flex shrink-0 gap-1">
 									<Button
@@ -291,7 +280,6 @@
 			</Card.Content>
 		</Card.Root>
 
-		<!-- Pagination -->
 		{#if totalPages > 1}
 			<div class="flex items-center justify-center gap-4">
 				<Button
@@ -320,7 +308,6 @@
 	</div>
 {/if}
 
-<!-- Delete Confirmation Dialog -->
 <Dialog.Root bind:open={deleteDialogOpen}>
 	<Dialog.Content class="sm:max-w-sm">
 		<Dialog.Header>

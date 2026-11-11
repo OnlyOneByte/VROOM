@@ -9,21 +9,12 @@ import type {
 import type { TimePeriod } from '$lib/constants/time-periods';
 import { apiClient, getApiBaseUrl, withPagination } from './api-client';
 
-/**
- * Vehicle API service
- * Centralized API calls for vehicle-related operations
- */
 export const vehicleApi = {
 	async getVehicle(vehicleId: string): Promise<Vehicle> {
 		return apiClient.get<Vehicle>(`/api/v1/vehicles/${vehicleId}`);
 	},
 
-	/**
-	 * List the user's vehicles. With `{ includeShared: true }` the response ALSO includes vehicles
-	 * owned by others that have been ACCEPTED-shared with the user (T5a `?include=shared`), each
-	 * carrying a `sharedAccess` annotation. Default (no arg) returns owned vehicles only — every
-	 * existing caller is unchanged.
-	 */
+	// includeShared also returns vehicles accepted-shared with the user, each with a sharedAccess annotation.
 	async getVehicles(opts?: { includeShared?: boolean }): Promise<Vehicle[]> {
 		const path = opts?.includeShared ? '/api/v1/vehicles?include=shared' : '/api/v1/vehicles';
 		return apiClient.get<Vehicle[]>(path);
@@ -80,10 +71,7 @@ export const vehicleApi = {
 		);
 	},
 
-	/**
-	 * Batch-fetch all of the user's vehicle photos in a single request, keyed by
-	 * vehicleId. Avoids the dashboard N+1 of one getPhotos() call per vehicle.
-	 */
+	// One request for every vehicle's photos, keyed by vehicleId, instead of one getPhotos call per vehicle.
 	async getAllVehiclePhotos(): Promise<Record<string, Photo[]>> {
 		return apiClient.get<Record<string, Photo[]>>('/api/v1/photos?entityType=vehicle');
 	},

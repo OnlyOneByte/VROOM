@@ -1,21 +1,7 @@
 /**
- * LLM assistant T7 — the tool-RESULT round-trip guard (the merge-surviving half of the feature DoD).
- *
- * The T4 route test (assistant-chat-route.test.ts) pins the route/orchestrator CONTRACT — the guards
- * (allowlist, Zod, IDOR), the K/T caps, the 400/502 honesty — but every one of its tool-call cases runs
- * against an EMPTY DB, so it never inspects WHAT the tool returned or that the model actually SAW it.
- * This pins the OTHER half cares about: that a read tool, run over REAL seeded data, feeds
- * its real aggregate BACK to the model (design §4 step d) so the grounded answer reflects the user's own
- * numbers — the full FE→BE→tool-loop→reply seam, end to end, without a live LLM or a browser.
- *
- * How it proves the feed-back: the fetch stub is STATEFUL and CAPTURES each request body. On turn 2 we
- * assert the messages array the orchestrator sent back contains a `role:'tool'` message whose content is
- * the JSON of the tool's REAL result (the seeded vehicles / the seeded expense summary). If the
- * orchestrator dropped the result, that message would be absent and the assertion fails. The model's
- * "answer" turn is scripted to echo a number we can only know if the result was threaded through.
- *
- * The live-LLM leg (a real key/endpoint) stays the untracked Playwright e2e; this is the committed,
- * merge-surviving net under the seam.
+ * Tool results are fed back to the model. Read tools run over seeded data, and the captured request
+ * bodies must contain each real result. The scripted answer can only mention a figure if the result
+ * was threaded through. Covers the seam without a live LLM.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -103,16 +89,15 @@ afterEach(() => {
   ctx.close();
 });
 
-describe('LLM assistant tool-result round-trip: real data fed back to the model (T7)', () => {
-  test('listVehicles result (real seeded rows) is threaded back to the model on the next turn', async () => {
+describe('assistant tool results are fed back to the model', () => {
+  test('listVehicles result (real seeded rows) is sent back to the model on the next turn', async () => {
     await seedLlmProvider();
     const v1 = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2020 });
     const v2 = await seedVehicle(ctx, { make: 'Tesla', model: 'Model 3', year: 2023 });
     expect(v1).toBeTruthy();
     expect(v2).toBeTruthy();
 
-    // Turn 1: the model asks for listVehicles. Turn 2: it answers using the count it could only know
-    // if the tool result was fed back.
+    // The answer can only mention two vehicles if the tool result was sent back.
     stubScriptCapturing([
       callTurn('listVehicles', '{}'),
       answerTurn('You have 2 vehicles: a Honda Civic and a Tesla Model 3.'),
@@ -125,21 +110,19 @@ describe('LLM assistant tool-result round-trip: real data fed back to the model 
     const data = (await json<DataEnvelope<ChatReply>>(res)).data;
     expect(data.toolsUsed).toEqual(['listVehicles']);
 
-    // The crux: a tool message carrying the REAL seeded rows was sent BACK to the model (design §4 step d).
     const toolMsgs = toolMessagesSent();
     expect(toolMsgs.length).toBeGreaterThan(0);
     const combined = toolMsgs.join('\n');
     expect(combined).toContain('Honda');
     expect(combined).toContain('Civic');
     expect(combined).toContain('Tesla');
-    // And the grounded answer reflects it (the model saw the data).
     expect(data.reply).toContain('2 vehicles');
   });
 
   test('getExpenseSummary result reflects a REAL seeded expense fed back to the model', async () => {
     await seedLlmProvider();
     const vehicleId = await seedVehicle(ctx, { make: 'Ford', model: 'F150', year: 2021 });
-    // Seed one real expense via the UNCHANGED create route ($120.00 fuel).
+    // Seeds a $120 fuel expense through the create route.
     const created = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId,
       category: 'fuel',
@@ -160,10 +143,7 @@ describe('LLM assistant tool-result round-trip: real data fed back to the model 
     const data = (await json<DataEnvelope<ChatReply>>(res)).data;
     expect(data.toolsUsed).toEqual(['getExpenseSummary']);
 
-    // The tool result fed back to the model must carry the real summed total, in the DOLLARS the system
-    // prompt promises ("all amounts are in the user currency"). The summary sums integer cents on the
-    // repo seam, so the tool layer converts at its display edge: the seeded $120 reaches the model as
-    // 120, never as the stored 12000 cents (which the model would read out as $12,000).
+    // Summed cents are converted to dollars before reaching the model; a raw 12000 would read as $12,000.
     const combined = toolMessagesSent().join('\n');
     expect(combined.length).toBeGreaterThan(0);
     expect(combined).toContain('"totalAmount":120');
@@ -188,7 +168,6 @@ describe('LLM assistant tool-result round-trip: real data fed back to the model 
     const data = (await json<DataEnvelope<ChatReply>>(res)).data;
     expect(data.toolsUsed).toEqual(['listVehicles', 'getAnalyticsSummary']);
 
-    // Both tool results were threaded back (≥2 tool messages across the captured turns).
     expect(toolMessagesSent().length).toBeGreaterThanOrEqual(2);
     expect(toolMessagesSent().join('\n')).toContain('Mazda');
   });

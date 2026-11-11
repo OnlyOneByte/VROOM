@@ -1,29 +1,7 @@
 /**
- * Cross-type field reset on create-or-replace financing (bug — the sibling defect to).
- *
- * `POST /api/v1/financing/vehicles/:vehicleId/financing` is a create-OR-REPLACE: when a vehicle
- * already has a financing row it REUSES that row via `financingRepository.update(...financingData,
- * isActive:true, endDate:null)` (routes.ts:156). The route's own comment frames it as "the vehicle's
- * financing is now THIS." But `update()` builds its SET clause from the supplied object and Drizzle
- * SKIPS `undefined` keys — and the cross-type fields are all `.optional()` in the create schema:
- *  - loan-only: `apr`
- *  - lease-only: `residualValue`, `mileageLimit`, `excessMileageFee`
- *  - schedule: `paymentDayOfMonth` / `paymentDayOfWeek`
- *
- * So converting a vehicle's financing TYPE (lease → loan, or loan → lease) leaves the PRIOR type's
- * fields STALE on the reused row. A lease with a `mileageLimit`/`excessMileageFee`, re-saved as a
- * loan that omits them, keeps those lease values — and the FE lease-metrics math
- * (`financing-calculations.ts:419-433`, which reads `mileageLimit`/`excessMileageFee`) and the
- * Google-Sheets export (which serializes all three lease columns) then surface a contradiction:
- * a `financingType:'loan'` record carrying a non-null annual mileage allowance. This violates
- * (correct-for-everyone) — the create-or-replace promise must give the same clean
- * row a fresh `create()` would (absent optional fields default to NULL in the schema), not a merge
- * of old + new.
- *
- * The guard (refinance-balance-reset) pinned the BALANCE reset on this same reuse path but not
- * the field reset. This drives the REAL POST route over createTestApp (which rewrites DATABASE_URL +
- * dynamic-imports the DB-bound modules) so it characterizes the actual HTTP behavior, then asserts
- * the stale-field invariant in BOTH directions.
+ * Switching a vehicle's financing type through create-or-replace must not leave the previous type's
+ * fields on the reused row. update() skips undefined keys and the cross-type fields are optional, so
+ * each one must be reset to null explicitly. Drives the real POST route.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -102,7 +80,6 @@ describe('create-or-replace financing clears stale cross-type fields', () => {
       paymentAmount: 480,
     });
 
-    // The reused row must read as a clean loan — no lingering lease values.
     expect(loan.financingType).toBe('loan');
     expect(loan.apr).toBe(5.9);
     expect(loan.residualValue).toBeNull();

@@ -1,19 +1,6 @@
-/**
- * Unit tests for buildExpenseQuery — the pure params→query-string builder behind
- * every expense list / search / pagination / export request. No IO; straight
- * input→output. Pins the behavior the expense-list correctness depends on
- * (cycle-10 was a whole bug class about this query being built wrong):
- *  - each optional param maps to its query key
- *  - search is trimmed; whitespace-only search is dropped
- *  - tags become REPEATED `tags=` params (not comma-joined)
- *  - falsy guards: offset/limit of 0 are omitted; empty strings omitted
- *  - vehicleId is a separate leading arg
- */
-
 import { describe, expect, test } from 'vitest';
 import { buildExpenseQuery } from '../expense-api';
 
-/** Parse the built query string back into an array of [key,value] for stable assertions. */
 function entries(qs: string): Array<[string, string]> {
 	return [...new URLSearchParams(qs).entries()];
 }
@@ -91,8 +78,6 @@ describe('buildExpenseQuery', () => {
 	});
 
 	test('omits sort params when not set (default date-desc stays a bare query)', () => {
-		// No sortBy/sortDir → no keys, so the default-sort request is byte-identical to
-		// the pre-feature query (nothing else changes for the common path).
 		expect(buildExpenseQuery({ limit: 20, offset: 0 })).toBe('limit=20');
 	});
 });

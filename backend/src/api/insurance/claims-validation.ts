@@ -1,10 +1,4 @@
-/**
- * Insurance Claims Validation Schemas
- *
- * The DB stores claimType / status / faultDesignation as free-text columns; the
- * allowed values are enforced here at the zod layer (same approach as
- * insurance_terms.premiumFrequency).
- */
+// The DB stores these as free text, so the allowed values are enforced here.
 
 import { z } from 'zod';
 import { CONFIG } from '../../config';
@@ -21,10 +15,9 @@ export const createClaimSchema = z.object({
   claimType: z.enum(CLAIM_TYPES),
   description: z.string().max(ins.coverageDescriptionMaxLength).optional(),
   status: z.enum(CLAIM_STATUSES).optional().default('filed'),
-  // money (T3): client sends DOLLARS, store integer CENTS.
   payoutAmount: moneyDollarsToCents((n) => n.min(0, 'Payout must be non-negative')).optional(),
   faultDesignation: z.enum(FAULT_DESIGNATIONS).optional(),
-  // Optional links to a specific term / vehicle on the same policy.
+  // Must belong to the same policy; checked in the route.
   termId: z.string().min(1).optional(),
   vehicleId: z.string().min(1).optional(),
 });
@@ -33,13 +26,10 @@ export const updateClaimSchema = z
   .object({
     claimDate: z.coerce.date().optional(),
     claimType: z.enum(CLAIM_TYPES).optional(),
-    // Optional value fields are nullish on UPDATE: an explicit `null` clears the
-    // column (the user emptied the field in the form). `undefined`/absent leaves
-    // it unchanged. This matters because JSON.stringify drops `undefined`, so the
-    // only way the client can signal "clear this" is to send `null`.
+    // Nullish, so an explicit null clears the column. JSON.stringify drops undefined,
+    // so null is the only clear signal.
     description: z.string().max(ins.coverageDescriptionMaxLength).nullish(),
     status: z.enum(CLAIM_STATUSES).optional(),
-    // money (T3): DOLLARS → CENTS; .nullish() passes null (clear) / undefined (unchanged) untransformed.
     payoutAmount: moneyDollarsToCents((n) => n.min(0, 'Payout must be non-negative')).nullish(),
     faultDesignation: z.enum(FAULT_DESIGNATIONS).nullish(),
     termId: z.string().min(1).nullish(),

@@ -1,30 +1,3 @@
-/**
- * Regression GUARD (committed, travels with the merge) for the sync-worker retry-ceiling coupling
- * (deep-review CERTIFIED).
- *
- * The background photo sync-worker and the repository query that feeds it share ONE retry ceiling that
- * lives in TWO physically separate places:
- *  1. sync-worker.ts `MAX_RETRY_COUNT` — the value a TERMINAL auth failure (AUTH_INVALID /
- *  PERMISSION_DENIED) jumps retryCount straight to, so the ref drops out of the work set instead of
- *  burning backoff cycles on a token that will never succeed.
- *  2. photoRefRepository.findPendingOrFailed's `${photoRefs.retryCount} < N` SQL bound — the predicate
- *  that decides which refs are STILL retryable.
- *
- * They MUST mirror: a terminal-auth ref is parked at exactly `MAX_RETRY_COUNT`, and that value must be
- * the threshold the query excludes (`retryCount < MAX_RETRY_COUNT` → a ref AT the cap is no longer
- * picked). The sync-worker comment says so, but nothing enforced it — the two `3`s are hand-written
- * literals. If they DRIFT (raise the query bound to `< 5` but leave MAX_RETRY_COUNT=3), a terminal-auth
- * ref parked at 3 satisfies `3 < 5` → it gets RE-PICKED every batch → the fix silently breaks
- * (a revoked token retried forever, - backoff/honesty regression) and the existing
- * behavioral test (which asserts the magic literal `retryCount: 3`) stays GREEN, blind to the drift.
- *
- * This guard pins the coupling: (a) MAX_RETRY_COUNT is the real exported constant, and (b) the repository
- * query's ceiling literal equals it. Edit either side out of lockstep → RED here. The one-edit→source-scan
- * pattern (RAW, atomic, convert) applied to the cross-module retry-ceiling invariant.
- *
- * Pure source scan + a constant import — no DB, no network. Runs in the fast suite.
- */
-
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -34,17 +7,14 @@ import { MAX_RETRY_COUNT } from '../sync-worker';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, '..', '..', 'photos', 'photo-ref-repository.ts');
 
-// The retry ceiling in findPendingOrFailed: `sql`${photoRefs.retryCount} < 3`` (whitespace-insensitive).
-// Captures the numeric bound so we can assert it equals MAX_RETRY_COUNT.
 const RETRY_CEILING = /photoRefs\.retryCount\s*}\s*<\s*(\d+)/;
 
-describe('sync-worker retry ceiling stays in lockstep with the repository query (coupling guard)', () => {
+describe('sync-worker retry ceiling matches the repository query', () => {
   test('MAX_RETRY_COUNT is the real exported worker constant', () => {
-    // If someone un-exports or renames it, this import (and the test) breaks loudly — that is the point.
     expect(MAX_RETRY_COUNT).toBe(3);
   });
 
-  test('the scan resolves the photo-ref repository (guard is live, not a no-op)', () => {
+  test('the source scan finds the photo-ref repository', () => {
     expect(readFileSync(REPO, 'utf8').length, `unreadable/empty: ${REPO}`).toBeGreaterThan(100);
   });
 

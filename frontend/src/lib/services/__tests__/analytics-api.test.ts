@@ -8,14 +8,12 @@ import type {
 import { ApiError } from '$lib/utils/error-handling';
 import { dateOnlyToISO, toDateInputValue } from '$lib/utils/formatters';
 
-// Mock apiClient
 vi.mock('../api-client', () => ({
 	apiClient: {
 		get: vi.fn()
 	}
 }));
 
-// Import after mock setup
 const { apiClient } = await import('../api-client');
 const { analyticsApi, getDefaultDateRange } = await import('../analytics-api');
 
@@ -124,7 +122,6 @@ describe('analyticsApi.getSummary()', () => {
 
 		const result = await analyticsApi.getSummary(dateParams);
 
-		// Summary call + 3 individual fallback calls
 		expect(mockGet).toHaveBeenCalledTimes(4);
 		expect(mockGet).toHaveBeenNthCalledWith(
 			1,
@@ -166,13 +163,11 @@ describe('analyticsApi.getSummary()', () => {
 	});
 
 	it('fallback produces the same AnalyticsSummaryResponse shape as direct call', async () => {
-		// Direct success path
 		mockGet.mockResolvedValueOnce(mockSummaryResponse);
 		const directResult = await analyticsApi.getSummary(dateParams);
 
 		vi.clearAllMocks();
 
-		// Fallback path (404 triggers fallback)
 		mockGet
 			.mockRejectedValueOnce(new ApiError('Not Found', 404))
 			.mockResolvedValueOnce(mockQuickStats)
@@ -180,7 +175,6 @@ describe('analyticsApi.getSummary()', () => {
 			.mockResolvedValueOnce(mockFuelAdvanced);
 		const fallbackResult = await analyticsApi.getSummary(dateParams);
 
-		// Both paths produce identical shape and data
 		expect(Object.keys(fallbackResult).sort()).toEqual(Object.keys(directResult).sort());
 		expect(fallbackResult).toEqual(directResult);
 		expect(fallbackResult.quickStats).toBeDefined();
@@ -189,18 +183,12 @@ describe('analyticsApi.getSummary()', () => {
 	});
 });
 
-// ---------------------------------------------------------------------------
-// getDefaultDateRange — the last-12-months window every analytics surface seeds with (summary,
-// cross-vehicle, per-vehicle, fuel stats). The backend reads it as [start, end): gte(date, start)
-// and lt(date, end), so both bounds are asserted against the instants expenses are actually
-// stored at — a skewed bound silently empties every chart on the page.
-// ---------------------------------------------------------------------------
+// The window ends at the start of tomorrow, not now, because date-only expenses are anchored at noon.
 describe('getDefaultDateRange', () => {
 	afterEach(() => {
 		vi.useRealTimers();
 	});
 
-	/** Freeze the clock at a local wall-clock time on a fixed local calendar day. */
 	function freezeLocal(hour: number, minute = 0): Date {
 		const at = new Date(2026, 4, 14, hour, minute, 30, 123);
 		vi.useFakeTimers();
@@ -210,7 +198,6 @@ describe('getDefaultDateRange', () => {
 
 	it('returns unix-SECONDS (not ms) — both bounds are ~10-digit, not ~13', () => {
 		const { startDate, endDate } = getDefaultDateRange();
-		// seconds since epoch are ~1.7e9 (10 digits); ms would be ~1.7e12 (13). Guards the /1000.
 		expect(endDate).toBeLessThan(1e12);
 		expect(startDate).toBeLessThan(1e12);
 		expect(Number.isInteger(startDate)).toBe(true);
@@ -228,10 +215,6 @@ describe('getDefaultDateRange', () => {
 		);
 	});
 
-	// A date-only expense is stored anchored at NOON local (dateOnlyToISO), so a window whose upper
-	// bound is the current instant drops everything logged today until the clock passes noon — and
-	// the bound is exclusive on the backend (`lt`). Sweep the whole day: the window must contain
-	// today's noon anchor no matter what time the user opens the page.
 	for (const hour of [0, 8, 11, 12, 13, 23]) {
 		it(`includes an expense dated today when the local clock reads ${String(hour).padStart(2, '0')}:00`, () => {
 			const now = freezeLocal(hour);
@@ -267,18 +250,12 @@ describe('getDefaultDateRange', () => {
 	});
 });
 
-// ---------------------------------------------------------------------------
-// Method→endpoint wiring + buildQuery. The 12 thin wrappers the getSummary-only suite left
-// uncovered (the ~36% func gap). Mock apiClient, assert the EXACT path + query, and that the wrapper
-// returns the apiClient result verbatim (apiClient.get already unwraps the {success,data} envelope).
-// ---------------------------------------------------------------------------
 describe('analyticsApi — method→endpoint wiring', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		mockGet.mockResolvedValue({} as never);
 	});
 
-	/** The single URL string a wrapper passed to apiClient.get. */
 	function calledUrl(): string {
 		return mockGet.mock.calls[0]?.[0] as string;
 	}

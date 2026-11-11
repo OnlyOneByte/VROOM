@@ -1,22 +1,6 @@
-/**
- * TRUE backup → restore round-trip for the maintenance-schedule reminder fields, through the REAL
- * stack (T5 "Remaining", guard). Data-safety quality bar: no silent loss.
- *
- * added five columns to the reminder graph — reminders.{triggerMode, intervalMileage,
- * lastServiceOdometer, nextDueOdometer} and reminderNotifications.dueOdometer — plus made
- * next_due_date / due_date nullable so a mileage-only reminder/notification carries no date. The
- * CSV backup is schema-derived, so these are *supposed* to ride along automatically — but the
- * coerceRow boundary (integer + nullable columns, and a NULL due_date that must NOT coerce to 0 or
- * "") is exactly where a column silently drops or mangles on the round-trip (the C3 clientId class).
- * Nothing proved a mileage reminder survives export → import intact. This does, and it's a
- * merge-surviving lock: it fails the moment any maintenance field is dropped from the serialize or
- * restore path.
- *
- * Mileage reminders aren't API-creatable yet (validation is T4), so seed the reminder + notification
- * rows directly via sqlite, then run the REAL exportAsZip (CSV serialize) → restoreFromBackup (CSV
- * parse + coerce + FK-ordered insert) and read the rows back. createTestApp() rewrites env then
- * dynamic-imports DB-bound modules, so import backup/restore dynamically AFTER createTestApp.
- */
+// Maintenance-schedule reminder fields must survive a backup and restore. A NULL due date or
+// mileage value must come back NULL rather than 0 or an empty string. Mileage rows are seeded
+// directly into SQLite.
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
@@ -75,7 +59,6 @@ describe('backup → restore round-trip preserves maintenance-schedule fields', 
   test('a mileage-only reminder + its mileage notification survive with every field intact', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Forester', year: 2021 });
 
-    // A pure-mileage reminder: NULL next_due_date, the four mileage columns populated.
     ctx.sqlite.run(
       `INSERT INTO reminders
          (id, user_id, name, type, action_mode, frequency, trigger_mode,
@@ -88,7 +71,6 @@ describe('backup → restore round-trip preserves maintenance-schedule fields', 
     ctx.sqlite.run(`INSERT INTO reminder_vehicles (reminder_id, vehicle_id) VALUES ('mr1', ?)`, [
       vehicleId,
     ]);
-    // A mileage-fired notification: NULL due_date, milestone in due_odometer.
     ctx.sqlite.run(
       `INSERT INTO reminder_notifications (id, reminder_id, user_id, due_date, due_odometer, is_read)
        VALUES ('mn1', 'mr1', ?, NULL, 35000, 0)`,
@@ -119,7 +101,6 @@ describe('backup → restore round-trip preserves maintenance-schedule fields', 
   test('a time+mileage (both) reminder preserves both axes through the round-trip', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Forester', year: 2021 });
 
-    // triggerMode 'both': a real next_due_date AND the mileage columns.
     ctx.sqlite.run(
       `INSERT INTO reminders
          (id, user_id, name, type, action_mode, frequency, trigger_mode,
@@ -146,8 +127,7 @@ describe('backup → restore round-trip preserves maintenance-schedule fields', 
   test('a plain time reminder restores with mileage columns NULL (not 0 or empty)', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Forester', year: 2021 });
 
-    // A normal time reminder created via the real API → triggerMode defaults to 'time',
-    // mileage columns are all NULL. They must come back NULL, not coerced to 0.
+    // Mileage columns must come back NULL, not 0.
     const created = await ctx.authed('POST', '/api/v1/reminders', {
       name: 'Registration renewal',
       type: 'notification',

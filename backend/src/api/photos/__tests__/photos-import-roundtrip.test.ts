@@ -1,17 +1,7 @@
 /**
- * Photos → auto-expense T6 — the full STAGE → CONFIRM → RE-RUN round-trip guard (the merge-surviving half
- * of the feature DoD). The route test (receipt-drafts-route.test.ts) pins the stage endpoint's contract;
- * this pins the OTHER half cares about: that a staged draft, confirmed via the UNCHANGED
- * POST /expenses with `clientId = photos:<mediaId>`, PERSISTS — and that a RE-RUN is idempotent: the
- * re-swept photo is now filtered out (the already-imported cross-ref), AND a re-confirm of the same
- * clientId is a no-op (createIdempotent returns the existing row, never a duplicate). The whole
- * FE→BE→re-run seam, end to end, with the live Photos + VLM legs MOCKED (the fake PhotosClient + a stubbed
- * VLM fetch) — the live legs stay the untracked Playwright e2e.
- *
- * Honest contract note: the v1 dedup key is the `photos:<mediaId>` clientId (the shipped createIdempotent
- * unique index) — NOT an expense_receipts photo-ref row. The Photos import creates the parsed-draft
- * expense; the source image stays in the user's Google Photos. So "a re-run is a no-op" is proven via the
- * clientId filter + the idempotent create, which is exactly what design §3 specifies.
+ * Receipt import round trip: stage, confirm through POST /expenses with clientId `photos:<mediaId>`,
+ * then re-run. A re-run skips imported photos, and re-confirming a clientId never creates a duplicate.
+ * Photos and VLM are faked. The dedup key is the clientId; the source image stays in Google Photos.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -70,8 +60,7 @@ async function seedVlmProvider(): Promise<void> {
 
 let photosProviderSeq = 0;
 function seedPhotosProvider(): void {
-  // Unique id per call — the shared in-memory DB persists across this file's tests, so a fixed id would
-  // collide on the 2nd test (the PK UNIQUE constraint). The userId scope is what the route resolves on.
+  // Unique per call: the in-memory DB persists across tests in this file.
   photosProviderSeq += 1;
   ctx.sqlite.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
@@ -92,9 +81,8 @@ async function sweep(): Promise<ReceiptDraftItem[]> {
 }
 
 /**
- * Confirm a draft exactly as the T3 client does: POST /expenses with the photos:<id> clientId. Uses a
- * non-fuel category by default (fuel rows additionally require mileage/volume, which is the expense
- * route's own validation — not what this round-trip guard exercises; T6 pins the dedup/idempotency seam).
+ * Confirms a draft the way the client does: POST /expenses with the photos:<id> clientId. Defaults to
+ * a non-fuel category because fuel also requires mileage and volume.
  */
 async function confirm(
   photoId: string,
@@ -115,7 +103,7 @@ function expenseCount(): number {
   return (ctx.sqlite.query('SELECT COUNT(*) as n FROM expenses').get() as { n: number }).n;
 }
 
-describe('Photos import round-trip: stage → confirm → re-run idempotency (T6)', () => {
+describe('Photos import round-trip: stage, confirm, re-run', () => {
   test('sweep → confirm N drafts → N expenses persist with the photos:<id> clientId', async () => {
     seedPhotosProvider();
     await seedVlmProvider();
@@ -133,7 +121,7 @@ describe('Photos import round-trip: stage → confirm → re-run idempotency (T6
     }
     expect(expenseCount()).toBe(before + 2);
 
-    // Each created expense carries its photos:<id> clientId (the dedup key, design §3).
+    // Each expense keeps its photos:<id> clientId, which is the dedup key.
     for (const id of ids) {
       const row = ctx.sqlite
         .query('SELECT client_id FROM expenses WHERE client_id = ?')
@@ -142,7 +130,7 @@ describe('Photos import round-trip: stage → confirm → re-run idempotency (T6
     }
   });
 
-  test('a RE-SWEEP after confirm filters out the now-imported photos (the already-imported cross-ref)', async () => {
+  test('a re-sweep after confirm filters out the now-imported photos', async () => {
     seedPhotosProvider();
     await seedVlmProvider();
     const vehicleId = await seedVehicle(ctx, { make: 'Ford', model: 'F150', year: 2022 });
@@ -151,16 +139,14 @@ describe('Photos import round-trip: stage → confirm → re-run idempotency (T6
 
     const first = await sweep();
     expect(first).toHaveLength(2);
-    // Confirm ONLY the first photo.
     const firstId = ids[0] as string;
     expect((await confirm(firstId, vehicleId, 25, 'misc')).status).toBe(201);
 
-    // Re-sweep: the confirmed photo is filtered out; only the un-imported one remains.
     const second = await sweep();
     expect(second.map((d) => d.photoId)).toEqual([ids[1]]);
   });
 
-  test('a re-confirm of the same clientId is a NO-OP (idempotent create, never a duplicate)', async () => {
+  test('a re-confirm of the same clientId creates no duplicate', async () => {
     seedPhotosProvider();
     await seedVlmProvider();
     const vehicleId = await seedVehicle(ctx, { make: 'Mazda', model: 'CX5', year: 2023 });
@@ -173,9 +159,8 @@ describe('Photos import round-trip: stage → confirm → re-run idempotency (T6
     expect(r1.status).toBe(201);
     const afterFirst = expenseCount();
 
-    // Re-confirm the SAME photo (e.g. a double-tap / a retried import) → no duplicate row.
     const r2 = await confirm(photoId, vehicleId, 18.5, 'misc');
-    expect(r2.status).toBe(201); // idempotent create returns the existing row, still a 2xx
-    expect(expenseCount()).toBe(afterFirst); // count UNCHANGED — the crux of D3/R5
+    expect(r2.status).toBe(201);
+    expect(expenseCount()).toBe(afterFirst);
   });
 });

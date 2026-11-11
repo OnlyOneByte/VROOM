@@ -1,19 +1,6 @@
 /**
- * Characterization tests for settings ROUTE error behavior through the REAL HTTP stack (arch
- * prerequisite — characterize, then drop.
- *
- * Unlike the sync routes (handleSyncError), the settings handlers hand-roll try/catch that rethrow
- * as AppError with TRANSFORMED messages: GET / masks any error as AppError('Failed to fetch
- * settings', 500); PUT / maps a ZodError → AppError('Invalid settings data', 400) and re-throws an
- * AppError as-is; POST /backup + /restore wrap as 500. The central errorHandler already shapes
- * AppError by its statusCode, so most of this is boilerplate — BUT the GET catch MASKS typed errors
- * (a NotFoundError/ValidationError would surface as a generic 500), and the PUT ZodError→400 is a
- * message transform. Dropping the try/catch therefore CHANGES some responses (a real improvement —
- * typed errors reach their proper status — but a behavior change), so per arch rule 2/3 this cycle
- * PINS today's behavior; the drop + assertion updates land in the next arch cycle (part 2c-drop).
- *
- * createTestApp() rewrites env then dynamic-imports DB-bound modules; keep imports to harness +
- * bun:test.
+ * Settings route error responses through the HTTP stack. Validation failures must come back as 400
+ * through the central error handler.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -31,7 +18,7 @@ interface ErrorBody {
   error: { code: string; message: string; details?: unknown };
 }
 
-describe('settings route error behavior (characterization — pins today before the arch drop)', () => {
+describe('settings route error responses', () => {
   test('GET /settings returns the user prefs (positive control)', async () => {
     const res = await ctx.authed('GET', '/api/v1/settings');
     expect(res.status).toBe(200);
@@ -44,22 +31,16 @@ describe('settings route error behavior (characterization — pins today before 
   });
 
   test('PUT /settings with an out-of-range syncInactivityMinutes → 400 (ZodError path)', async () => {
-    // maxSyncInactivityMinutes is 30 (config); 9999 fails the schema → ZodError.
     const res = await ctx.authed('PUT', '/api/v1/settings', { syncInactivityMinutes: 9999 });
     expect(res.status).toBe(400);
     const body = (await json<ErrorBody>(res)) as ErrorBody;
     expect(body.success).toBe(false);
-    // POST-DROP: the hand-rolled try/catch is gone, so the ZodError reaches the central
-    // errorHandler → 400 ValidationError ('Invalid request data'), the standard envelope. Status is
-    // unchanged (still 400); only the transformed 'Invalid settings data' message went away. This is
-    // the authorized, reviewed behavior change the characterization flagged.
-    expect(body.error.message, 'post-drop: central errorHandler ZodError message').toBe(
+    expect(body.error.message, 'central error handler maps ZodError to this message').toBe(
       'Invalid request data'
     );
   });
 
   test('PUT /settings with a malformed backupConfig (path traversal) → 400', async () => {
-    // providerBackupSettingsSchema rejects a folderPath containing '..' → ZodError → same 400 path.
     const res = await ctx.authed('PUT', '/api/v1/settings', {
       backupConfig: {
         providers: {
@@ -84,22 +65,18 @@ describe('settings route error behavior (characterization — pins today before 
 });
 
 /**
- * The two POST endpoints — /settings/backup + /settings/restore — had ZERO HTTP
- * coverage. /backup has a real observable SIDE EFFECT (syncStateRepository.updateBackupDate writes
- * sync_state.last_backup_date, which a backup-status UI reads), so pin that it persists; both must be
- * auth-gated (the routes.use('*', requireAuth) chain). Reads the DB row via ctx.sqlite to prove the
- * write actually landed (not just a 200).
+ * POST /settings/backup writes sync_state.last_backup_date, which the backup-status UI reads, so the
+ * test checks the row and not only the response. Both endpoints require auth.
  */
-describe('settings POST /backup + /restore', () => {
+describe('settings POST /backup and /restore', () => {
   function backupDateRow(userId: string): { last_backup_date: number | null } | undefined {
     return ctx.sqlite
       .query('SELECT last_backup_date FROM sync_state WHERE user_id = ?')
       .get(userId) as { last_backup_date: number | null } | undefined;
   }
 
-  test('POST /settings/backup → 200 and stamps sync_state.last_backup_date (was null)', async () => {
-    // Pre-condition: no backup recorded yet (getOrCreate seeds all-NULL timestamps).
-    await ctx.authed('GET', '/api/v1/settings'); // ensure prefs/sync rows exist
+  test('POST /settings/backup returns 200 and stamps sync_state.last_backup_date', async () => {
+    await ctx.authed('GET', '/api/v1/settings');
     const before = backupDateRow(ctx.user.id);
     expect(before?.last_backup_date ?? null).toBeNull();
 
@@ -109,7 +86,6 @@ describe('settings POST /backup + /restore', () => {
     expect(body.success).toBe(true);
     expect(typeof body.timestamp).toBe('string');
 
-    // The side effect landed: last_backup_date is now a real timestamp (unix seconds, mode:'timestamp').
     const after = backupDateRow(ctx.user.id);
     expect(after?.last_backup_date).toBeTruthy();
     const nowSeconds = Math.floor(Date.now() / 1000);

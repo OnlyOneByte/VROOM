@@ -1,10 +1,4 @@
-/**
- * The queued-photo tile reveals its Remove control on hover. Hover is not a thing on a phone —
- * which is where this app mostly runs — and `opacity: 0` does not take a control out of the tab
- * order, so a hover-only reveal leaves Remove unusable by touch and lands keyboard focus on an
- * invisible button. The control must therefore be visible unconditionally on small screens and
- * revealed by focus as well as hover on large ones.
- */
+// The remove control must work without hover: visible on small screens, focus-revealed on large ones.
 
 import { describe, expect, test, vi } from 'vitest';
 import { render } from '@testing-library/svelte';
@@ -32,7 +26,6 @@ describe('the Remove control on a queued photo', () => {
 		expect(remove).not.toBeNull();
 
 		const tokens = (remove.getAttribute('class') ?? '').split(/\s+/);
-		// Visible with no hover at all (the only state a touch device has).
 		expect(tokens).toContain('opacity-100');
 		// And revealed by focus wherever it does hide, so Tab never lands on an invisible control.
 		expect(

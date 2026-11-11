@@ -1,10 +1,5 @@
 /**
- * Property-Based Tests for Insurance Repository (v2 schema)
- *
- * Tests Properties 1, 2, 11, 12, 13 against a real in-memory
- * SQLite database with all migrations applied.
- *
- * **Validates: Requirements 1.6, 3.2, 16.1, 16.3, 16.4, 32.1, 36.1**
+ * Property tests for the insurance repository, run against an in-memory SQLite database with all migrations.
  */
 
 import { Database } from 'bun:sqlite';
@@ -18,10 +13,6 @@ import * as schema from '../../../db/schema';
 import { insuranceTerms, insuranceTermVehicles } from '../../../db/schema';
 import { InsurancePolicyRepository } from '../repository';
 import { companyNameArb, validTermInputArb } from './insurance-test-generators';
-
-// ---------------------------------------------------------------------------
-// Test infrastructure
-// ---------------------------------------------------------------------------
 
 let sqliteDb: Database;
 let db: AppDatabase;
@@ -67,20 +58,12 @@ afterEach(() => {
   sqliteDb.close();
 });
 
-// ---------------------------------------------------------------------------
-// Generators scoped to seeded vehicle IDs
-// ---------------------------------------------------------------------------
-
-/** Pick 1–3 vehicle IDs from the user's vehicles. */
+/** Picks one to three of the user's vehicle ids. */
 const userVehicleIdsArb = fc
   .subarray(VEHICLE_IDS, { minLength: 1, maxLength: VEHICLE_IDS.length })
   .filter((arr) => arr.length > 0);
 
-// ===========================================================================
-// Property 1: Current term derivation returns latest term
-// **Validates: Requirements 1.6**
-// ===========================================================================
-describe('Property 1: Current term derivation returns latest term', () => {
+describe('current term derivation returns the latest term', () => {
   test('getCurrentTermDates returns the term with the latest end_date', async () => {
     await fc.assert(
       fc.asyncProperty(
@@ -88,7 +71,6 @@ describe('Property 1: Current term derivation returns latest term', () => {
         userVehicleIdsArb,
         fc.array(validTermInputArb, { minLength: 1, maxLength: 5 }),
         async (company, vehicleIds, terms) => {
-          // Create policy with multiple terms
           const termsWithCoverage = terms.map((t) => ({
             ...t,
             vehicleCoverage: { vehicleIds },
@@ -99,20 +81,11 @@ describe('Property 1: Current term derivation returns latest term', () => {
             USER_ID
           );
 
-          // Get current term dates
           const currentDates = await repo.getCurrentTermDates(created.id);
           if (!currentDates) throw new Error('expected a current term');
 
-          // The contract is "the term with the latest end_date" — getCurrentTermDates is
-          // `ORDER BY end_date DESC LIMIT 1`, a SINGLE sort key. When two generated terms TIE on
-          // end_date (endDate = startMs + gapMs can collide), SQL breaks the tie arbitrarily, so
-          // BOTH tied terms are valid "current" results. Asserting a specific startDate against a
-          // strict-`>` reference loop was therefore NON-DETERMINISTIC — it failed only when a tie's
-          // two terms had different startDates and SQL picked the other one (the flake; the
-          // false failure then cost ~6.6s of fast-check shrinking, tripping the 5s timeout). Pin the
-          // REAL contract deterministically: the returned end_date IS the maximum, and the returned
-          // (startDate, endDate) pair belongs to SOME created term carrying that max end_date (so the
-          // dates are a real round-tripped row, not mangled). Tie-independent, no behavior change.
+          // Ordering is by end_date alone, so a tie may return either term. Assert that the returned
+          // end_date is the maximum and that the pair matches one of the created terms.
           const maxEnd = Math.max(...created.terms.map((t) => t.endDate.getTime()));
           expect(currentDates.endDate.getTime()).toBe(maxEnd);
 
@@ -135,11 +108,6 @@ describe('Property 1: Current term derivation returns latest term', () => {
     expect(result).toBeNull();
   });
 
-  // Two terms TIE on end_date with DIFFERENT start_dates — the
-  // exact shape that made the old strict-`>` reference assertion non-deterministic. getCurrentTermDates
-  // is ORDER BY end_date DESC LIMIT 1 (single key), so EITHER tied term is a valid result. This pins
-  // the tie-tolerant contract deterministically: the returned end_date is the (shared) max, and the
-  // returned pair is one of the two real terms at that end_date — never a mismatched/mangled row.
   test('on an end_date TIE, returns a real term at the max end_date (tie-tolerant, no startDate assumption)', async () => {
     const sharedEnd = new Date('2027-06-30T00:00:00.000Z');
     const created = await repo.create(
@@ -152,7 +120,7 @@ describe('Property 1: Current term derivation returns latest term', () => {
             vehicleCoverage: { vehicleIds: [VEHICLE_IDS[0]] },
           },
           {
-            startDate: new Date('2027-01-01T00:00:00.000Z'), // different start, SAME end
+            startDate: new Date('2027-01-01T00:00:00.000Z'),
             endDate: sharedEnd,
             vehicleCoverage: { vehicleIds: [VEHICLE_IDS[0]] },
           },
@@ -166,8 +134,6 @@ describe('Property 1: Current term derivation returns latest term', () => {
     if (!currentDates) throw new Error('expected a current term');
     expect(currentDates.endDate.getTime()).toBe(sharedEnd.getTime());
 
-    // The returned (start, end) must be one of the two created terms — whichever SQL's tie-break
-    // picked — not a cross-wired pair. Both candidate starts share the max end, so either is correct.
     const validStarts = created.terms
       .filter((t) => t.endDate.getTime() === sharedEnd.getTime())
       .map((t) => t.startDate.getTime());
@@ -175,11 +141,7 @@ describe('Property 1: Current term derivation returns latest term', () => {
   });
 });
 
-// ===========================================================================
-// Property 2: Active policy derivation for vehicle
-// **Validates: Requirements 3.2, 32.1**
-// ===========================================================================
-describe('Property 2: Active policy derivation for vehicle', () => {
+describe('active policy derivation for a vehicle', () => {
   test('getActiveInsurancePolicyId returns a non-null active policy for a covered vehicle', async () => {
     await fc.assert(
       fc.asyncProperty(
@@ -196,7 +158,6 @@ describe('Property 2: Active policy derivation for vehicle', () => {
             USER_ID
           );
 
-          // Each covered vehicle should have some active policy
           for (const vid of vehicleIds) {
             const activePolicyId = await repo.getActiveInsurancePolicyId(vid);
             expect(activePolicyId).not.toBeNull();
@@ -208,7 +169,6 @@ describe('Property 2: Active policy derivation for vehicle', () => {
   });
 
   test('getActiveInsurancePolicyId returns null when only inactive policies exist', async () => {
-    // Use a dedicated vehicle to avoid interference from other iterations
     const testVid = 'v-inactive-test';
     sqliteDb.run(
       `INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('${testVid}', '${USER_ID}', 'Nissan', 'Leaf', 2023)`
@@ -259,11 +219,7 @@ describe('Property 2: Active policy derivation for vehicle', () => {
   });
 });
 
-// ===========================================================================
-// Property 11: Insurance term CRUD round-trip
-// **Validates: Requirements 16.1, 36.1**
-// ===========================================================================
-describe('Property 11: Insurance term CRUD round-trip', () => {
+describe('insurance term CRUD round-trip', () => {
   test('addTerm inserts a term row and junction rows retrievable via findById', async () => {
     await fc.assert(
       fc.asyncProperty(
@@ -272,7 +228,6 @@ describe('Property 11: Insurance term CRUD round-trip', () => {
         validTermInputArb,
         validTermInputArb,
         async (company, vehicleIds, baseTerm, newTerm) => {
-          // Create policy with one term
           const created = await repo.create(
             {
               company,
@@ -283,7 +238,6 @@ describe('Property 11: Insurance term CRUD round-trip', () => {
           );
           expect(created.terms.length).toBe(1);
 
-          // Add a second term
           const updated = await repo.addTerm(
             created.id,
             { ...newTerm, vehicleCoverage: { vehicleIds } },
@@ -291,12 +245,10 @@ describe('Property 11: Insurance term CRUD round-trip', () => {
           );
           expect(updated.terms.length).toBe(2);
 
-          // Verify via findById
           const retrieved = await repo.findById(created.id);
           expect(retrieved).not.toBeNull();
           expect(retrieved?.terms.length).toBe(2);
 
-          // Junction rows should exist for both terms
           expect(retrieved?.termVehicleCoverage.length).toBe(vehicleIds.length * 2);
         }
       ),
@@ -348,7 +300,6 @@ describe('Property 11: Insurance term CRUD round-trip', () => {
         validTermInputArb,
         validTermInputArb,
         async (company, vehicleIds, term1, term2) => {
-          // Create policy with two terms
           const created = await repo.create(
             {
               company,
@@ -364,12 +315,10 @@ describe('Property 11: Insurance term CRUD round-trip', () => {
 
           const termToDelete = created.terms[0].id;
 
-          // Delete one term
           const updated = await repo.deleteTerm(created.id, termToDelete, USER_ID);
           expect(updated.terms.length).toBe(1);
           expect(updated.terms[0].id).not.toBe(termToDelete);
 
-          // Junction rows for deleted term should be gone
           const junctionRows = await db
             .select()
             .from(insuranceTermVehicles)
@@ -382,11 +331,7 @@ describe('Property 11: Insurance term CRUD round-trip', () => {
   });
 });
 
-// ===========================================================================
-// Property 12: Expiring terms date range query
-// **Validates: Requirements 16.3**
-// ===========================================================================
-describe('Property 12: Expiring terms date range query', () => {
+describe('expiring terms date range query', () => {
   test('findExpiringTerms returns terms with end_date within the range', async () => {
     await fc.assert(
       fc.asyncProperty(
@@ -394,7 +339,6 @@ describe('Property 12: Expiring terms date range query', () => {
         userVehicleIdsArb,
         fc.array(validTermInputArb, { minLength: 1, maxLength: 5 }),
         async (company, vehicleIds, terms) => {
-          // Create policy with multiple terms
           const created = await repo.create(
             {
               company,
@@ -404,18 +348,15 @@ describe('Property 12: Expiring terms date range query', () => {
             USER_ID
           );
 
-          // Pick a date range that covers some terms
           const allEndDates = created.terms.map((t) => t.endDate.getTime());
           const minEnd = Math.min(...allEndDates);
           const maxEnd = Math.max(...allEndDates);
 
-          // Use the full range to ensure all terms are found
           const rangeStart = new Date(minEnd);
           const rangeEnd = new Date(maxEnd);
 
           const expiring = await repo.findExpiringTerms(rangeStart, rangeEnd, USER_ID);
 
-          // All created terms should be in the result (their end_dates are within range)
           const expiringIds = new Set(expiring.map((t) => t.id));
           for (const term of created.terms) {
             const endTime = term.endDate.getTime();
@@ -424,7 +365,6 @@ describe('Property 12: Expiring terms date range query', () => {
             }
           }
 
-          // No term outside the range should be returned
           for (const t of expiring) {
             const endTime = t.endDate.getTime();
             expect(endTime).toBeGreaterThanOrEqual(rangeStart.getTime());
@@ -453,7 +393,6 @@ describe('Property 12: Expiring terms date range query', () => {
       USER_ID
     );
 
-    // Query for 2030 range — should find nothing
     const expiring = await repo.findExpiringTerms(
       new Date('2030-01-01'),
       new Date('2030-12-31'),
@@ -462,11 +401,7 @@ describe('Property 12: Expiring terms date range query', () => {
     expect(expiring.length).toBe(0);
   });
 
-  // A term on a CANCELLED (isActive=false) policy must NOT surface as "expiring soon" —
-  // GET /expiring-soon is an upcoming-renewal nag, and a policy the user cancelled isn't being renewed.
-  // Pre-fix the query joined policies but never filtered isActive, so a cancelled policy's in-range term
-  // still showed. An ACTIVE policy's term in the same window must still appear (the filter isn't over-broad).
-  test('excludes terms of INACTIVE policies; an active policy’s in-range term still shows', async () => {
+  test('excludes terms of inactive policies while keeping active ones', async () => {
     const rangeStart = new Date('2031-01-01');
     const rangeEnd = new Date('2031-12-31');
     const termIn = (s: string, e: string) => ({
@@ -475,12 +410,10 @@ describe('Property 12: Expiring terms date range query', () => {
       vehicleCoverage: { vehicleIds: [VEHICLE_IDS[0]] },
     });
 
-    // Active policy with a term expiring inside the window — SHOULD appear.
     const active = await repo.create(
       { company: 'ActiveCo', terms: [termIn('2031-01-01', '2031-06-30')], isActive: true },
       USER_ID
     );
-    // Cancelled policy with a term expiring in the SAME window — must NOT appear.
     const cancelled = await repo.create(
       { company: 'CancelledCo', terms: [termIn('2031-02-01', '2031-07-31')], isActive: false },
       USER_ID
@@ -489,18 +422,14 @@ describe('Property 12: Expiring terms date range query', () => {
     const expiring = await repo.findExpiringTerms(rangeStart, rangeEnd, USER_ID);
     const ids = new Set(expiring.map((t) => t.id));
 
-    expect(ids.has(active.terms[0].id)).toBe(true); // active renewal still surfaced
+    expect(ids.has(active.terms[0].id)).toBe(true);
     for (const t of cancelled.terms) {
-      expect(ids.has(t.id)).toBe(false); // cancelled policy's term excluded
+      expect(ids.has(t.id)).toBe(false);
     }
   });
 });
 
-// ===========================================================================
-// Property 13: Insurance term-vehicle junction FK cascade
-// **Validates: Requirements 16.4**
-// ===========================================================================
-describe('Property 13: Insurance term-vehicle junction FK cascade', () => {
+describe('insurance term-vehicle junction FK cascade', () => {
   test('deleting a term cascades to junction rows', async () => {
     await fc.assert(
       fc.asyncProperty(
@@ -519,17 +448,14 @@ describe('Property 13: Insurance term-vehicle junction FK cascade', () => {
 
           const termId = created.terms[0].id;
 
-          // Verify junction rows exist
           const beforeJunction = await db
             .select()
             .from(insuranceTermVehicles)
             .where(eq(insuranceTermVehicles.termId, termId));
           expect(beforeJunction.length).toBe(vehicleIds.length);
 
-          // Delete the term directly via SQL to test FK cascade
           sqliteDb.run(`DELETE FROM insurance_terms WHERE id = '${termId}'`);
 
-          // Junction rows should be cascade-deleted
           const afterJunction = await db
             .select()
             .from(insuranceTermVehicles)
@@ -542,7 +468,6 @@ describe('Property 13: Insurance term-vehicle junction FK cascade', () => {
   });
 
   test('deleting a vehicle cascades to junction rows', async () => {
-    // Use a dedicated vehicle for this test to avoid affecting other tests
     const testVehicleId = 'v-cascade-test';
     sqliteDb.run(
       `INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('${testVehicleId}', '${USER_ID}', 'Ford', 'Focus', 2021)`
@@ -560,7 +485,6 @@ describe('Property 13: Insurance term-vehicle junction FK cascade', () => {
 
     const termId = created.terms[0].id;
 
-    // Verify junction row exists
     const beforeJunction = await db
       .select()
       .from(insuranceTermVehicles)
@@ -568,10 +492,8 @@ describe('Property 13: Insurance term-vehicle junction FK cascade', () => {
     expect(beforeJunction.length).toBe(1);
     expect(beforeJunction[0].vehicleId).toBe(testVehicleId);
 
-    // Delete the vehicle
     sqliteDb.run(`DELETE FROM vehicles WHERE id = '${testVehicleId}'`);
 
-    // Junction row should be cascade-deleted
     const afterJunction = await db
       .select()
       .from(insuranceTermVehicles)
@@ -597,7 +519,6 @@ describe('Property 13: Insurance term-vehicle junction FK cascade', () => {
 
           const termIds = created.terms.map((t) => t.id);
 
-          // Verify terms and junction rows exist
           for (const tid of termIds) {
             const termRows = await db
               .select()
@@ -606,10 +527,8 @@ describe('Property 13: Insurance term-vehicle junction FK cascade', () => {
             expect(termRows.length).toBe(1);
           }
 
-          // Delete the policy
           await repo.delete(created.id, USER_ID);
 
-          // All terms should be cascade-deleted
           for (const tid of termIds) {
             const termRows = await db
               .select()
@@ -617,7 +536,6 @@ describe('Property 13: Insurance term-vehicle junction FK cascade', () => {
               .where(eq(insuranceTerms.id, tid));
             expect(termRows.length).toBe(0);
 
-            // Junction rows should also be gone
             const junctionRows = await db
               .select()
               .from(insuranceTermVehicles)

@@ -28,11 +28,8 @@ export interface BackupStrategy {
 }
 
 /**
- * The honest run-level verdict: `success` = every attempted provider backed up cleanly;
- * `partial` = at least one provider succeeded AND at least one failed; `failed` = every attempted
- * provider failed; `noop` = nothing was attempted (no enabled providers / skipped / in-progress).
- * The route maps this to an HTTP status (success/noop → 200, partial → 207, failed → 502) so a
- * failed backup is no longer silently reported as a 200 success.
+ * success: every attempted provider backed up cleanly. partial: some succeeded and some failed.
+ * failed: every attempted provider failed. noop: nothing was attempted.
  */
 export type BackupOutcome = 'success' | 'partial' | 'failed' | 'noop';
 
@@ -41,7 +38,7 @@ export interface BackupOrchestratorResult {
   status?: 'in_progress';
   skipped?: boolean;
   outcome: BackupOutcome;
-  /** Provider ids whose backup did not fully succeed (drives retry — their sync anchor is NOT advanced). */
+  /** Provider ids that did not fully succeed. A non-empty list keeps the sync anchor from advancing. */
   failedProviders: string[];
   results: Record<string, BackupStrategyResult>;
 }

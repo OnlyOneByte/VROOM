@@ -19,9 +19,7 @@ interface ReminderListFilters {
 
 function buildReminderQuery(filters?: ReminderListFilters): string {
 	if (!filters) return '';
-	// vehicleId/type keep their truthy-drop (an empty string is omitted, not serialized) via
-	// `|| undefined`; isActive must SURVIVE when false, so pass the boolean through as-is (the
-	// shared filter drops only null/undefined). Matches the prior hand-rolled construction exactly.
+	// isActive=false must survive the query; empty vehicleId/type are dropped.
 	return buildQueryString({
 		vehicleId: filters.vehicleId || undefined,
 		type: filters.type || undefined,
@@ -29,10 +27,6 @@ function buildReminderQuery(filters?: ReminderListFilters): string {
 	});
 }
 
-/**
- * Reminder API service
- * Centralized API calls for reminder-related operations
- */
 export const reminderApi = {
 	async create(data: Partial<Reminder> & { vehicleIds: string[] }): Promise<ReminderWithVehicles> {
 		return apiClient.post<ReminderWithVehicles>('/api/v1/reminders', data);
@@ -62,35 +56,17 @@ export const reminderApi = {
 		return apiClient.post<TriggerResult>('/api/v1/reminders/trigger');
 	},
 
-	/**
-	 * Mark a maintenance reminder serviced — re-arms it (D3). The backend anchors the mileage axis
-	 * to the vehicle's current odometer (recomputing the next milestone) and/or advances the time
-	 * axis one period. Returns the updated reminder.
-	 */
+	// Re-arms the reminder: the mileage axis re-anchors to the current odometer and/or the time axis advances one period.
 	async markServiced(id: string): Promise<Reminder> {
 		return apiClient.post<Reminder>(`/api/v1/reminders/${id}/mark-serviced`);
 	},
 
-	/**
-	 * The expense rows this reminder has materialized (recurring-expenses T6 — the "this reminder
-	 * created N expenses" view). Backend: GET /:id/expenses → expenseRepository.findBySource
-	 * (ownership-checked, user-scoped), ordered oldest-first.
-	 *
-	 * The route returns RAW repository rows (backend shape: `expenseAmount`, un-split `volume`), so
-	 * map each through `fromBackendExpense` exactly like every other expense read (expense-api.ts) —
-	 * otherwise a consumer reading `expense.amount` gets undefined and an electric charge stays in
-	 * `volume` instead of `charge`. (The FE→BE-seam type-lie warns about.)
-	 */
+	// The route returns raw backend rows, so each must go through fromBackendExpense.
 	async getMaterializedExpenses(id: string): Promise<Expense[]> {
 		const data = await apiClient.get<BackendExpenseResponse[]>(`/api/v1/reminders/${id}/expenses`);
 		return data.map(fromBackendExpense);
 	},
 
-	/**
-	 * The monthly recurring run-rate across the user's active expense reminders (recurring-expenses
-	 * T7). Backend: GET /recurring-cost → recurringCostSummary (a read-only derivation, no new table).
-	 * The dashboard "recurring costs" widget renders this.
-	 */
 	async getRecurringCost(): Promise<RecurringCostSummary> {
 		return apiClient.get<RecurringCostSummary>('/api/v1/reminders/recurring-cost');
 	},

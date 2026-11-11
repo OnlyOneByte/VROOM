@@ -6,8 +6,7 @@
 	import { DISPLAY_LIMITS } from '$lib/constants/limits';
 	import { EXPENSE_MESSAGES } from '$lib/constants/messages';
 	import { formatCurrency, formatDate } from '$lib/utils/formatters';
-	// `OfflineExpense.category` is unvalidated user input typed `string`, so these rows go through
-	// the key-tolerant label helper rather than indexing `categoryLabels` directly.
+	// Category is unvalidated user input, so use the key-tolerant label helper instead of indexing categoryLabels.
 	import { getCategoryLabel } from '$lib/utils/chart-colors';
 
 	interface Props {

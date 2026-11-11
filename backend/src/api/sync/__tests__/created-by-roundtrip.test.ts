@@ -1,20 +1,5 @@
-/**
- * TRUE backup → restore round-trip for `expenses.created_by` (the vehicle-sharing T5b owner-stamp
- * PROVENANCE column, migration 0011). Data-safety quality bar: no silent loss —
- * names backup/restore round-tripping every column as sacred, and this column is load-bearing for the
- * whole shared-write model: `user_id` = the vehicle OWNER (whose books the row rides), `created_by` =
- * who physically entered it (an editor, on a shared row; NULL = legacy/self).
- *
- * The CSV backup is schema-derived (createBackup selects via the table; coerceRow walks getTableColumns),
- * so created_by is *supposed* to ride along automatically — but the coerceRow boundary is exactly where a
- * nullable text column silently drops or mangles (the C3 clientId / maintenance-fields class): a NULL
- * created_by must come back NULL (not "" or 0), and a populated one must survive byte-for-byte. Nothing
- * proved an editor-authored shared expense keeps its authorship across a backup cycle. This does — and it
- * is a merge-surviving lock: it fails the moment created_by is dropped from the serialize or restore path.
- *
- * createTestApp() rewrites env then dynamic-imports DB-bound modules, so import backup/restore + schema
- * dynamically AFTER createTestApp.
- */
+// expenses.created_by records who entered a row. A shared expense must keep its editor as author
+// across a backup cycle, and a NULL must come back NULL rather than an empty string or 0.
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
@@ -48,10 +33,9 @@ async function roundTrip(): Promise<void> {
   expect(result.success, JSON.stringify(result)).toBe(true);
 }
 
-describe('backup → restore round-trip preserves expenses.created_by (T5b provenance)', () => {
+describe('backup → restore round-trip preserves expenses.created_by', () => {
   test('an editor-authored shared expense keeps userId=OWNER AND created_by=editor across the round-trip', async () => {
-    // The seeded harness user is the OWNER. Seed a SECOND user (the editor/author) so created_by points
-    // at a real, distinct id — the owner-stamp shape (user_id = owner, created_by = the editor).
+    // The harness user is the owner. A second user is the author, so created_by is a distinct id.
     const { db } = await import('../../../db/connection');
     const schema = await import('../../../db/schema');
     const editorId = 'editor-author-rt';
@@ -61,8 +45,7 @@ describe('backup → restore round-trip preserves expenses.created_by (T5b prove
 
     const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2022 });
 
-    // A shared-created expense: owner-stamped user_id, created_by = the editor. Seed directly (the
-    // route would require a real accepted share; this test isolates the BACKUP column, not the gate).
+    // Seeded directly: the route requires an accepted share, which this test does not need.
     ctx.sqlite.run(
       `INSERT INTO expenses (id, vehicle_id, category, date, expense_amount, user_id, created_by, missed_fillup)
        VALUES ('exp-shared-rt', ?, 'maintenance', 1700000000, 4200, ?, ?, 0)`,
@@ -81,8 +64,7 @@ describe('backup → restore round-trip preserves expenses.created_by (T5b prove
   test('an owner-self expense keeps created_by NULL (not coerced to empty string or 0)', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
 
-    // The normal owner-self create path leaves created_by NULL (the legacy/self sentinel). Create via
-    // the REAL route so this pins the actual production shape, then assert the NULL survives.
+    // Created through the route so the test uses the production shape.
     const res = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId,
       category: 'misc',

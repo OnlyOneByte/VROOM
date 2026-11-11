@@ -1,22 +1,11 @@
-/**
- * Property-Based Tests for calculations.ts — calculateAverageMPG
- *
- * Property 1: Missed fill-up pairs are excluded from calculations
- * Property 2: Backward compatibility when no expenses are flagged
- *
- * Validates: Requirements 3.1, 3.2, 3.3, 3.4
- */
+// Property-based tests for calculateAverageMPG: missed fill-up pairs are excluded, and unflagged
+// data matches the unfiltered count.
 
 import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import type { Expense } from '../../db/schema';
 import { calculateAverageMPG } from '../calculations';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Build a synthetic Expense for testing calculateAverageMPG. */
 function makeExpense(overrides: {
   mileage: number;
   volume: number;
@@ -49,9 +38,6 @@ function makeExpense(overrides: {
   };
 }
 
-/**
- * Reference implementation: count valid MPG pairs excluding missed fill-ups.
- */
 function countFilteredPairs(expenses: Expense[]): number {
   const sorted = [...expenses].sort(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
@@ -70,9 +56,6 @@ function countFilteredPairs(expenses: Expense[]): number {
   return count;
 }
 
-/**
- * Count valid MPG pairs without missed fill-up filtering.
- */
 function countUnfilteredPairs(expenses: Expense[]): number {
   const sorted = [...expenses].sort(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
@@ -89,10 +72,6 @@ function countUnfilteredPairs(expenses: Expense[]): number {
   }
   return count;
 }
-
-// ---------------------------------------------------------------------------
-// Generators
-// ---------------------------------------------------------------------------
 
 const expenseListArb = fc.integer({ min: 2, max: 20 }).chain((len) =>
   fc.tuple(
@@ -120,12 +99,8 @@ const allUnflaggedListArb = fc.integer({ min: 2, max: 20 }).chain((len) =>
   )
 );
 
-// ---------------------------------------------------------------------------
-// Property 1: Missed fill-up pairs are excluded
-// ---------------------------------------------------------------------------
-describe('Property 1: Missed fill-up pairs are excluded from calculateAverageMPG', () => {
+describe('missed fill-up pairs are excluded from calculateAverageMPG', () => {
   test('result is null when all pairs are skipped due to missed fill-ups', () => {
-    // All expenses flagged as missed → no valid pairs → null
     const expenses = [
       makeExpense({ mileage: 10000, volume: 10, missedFillup: true, index: 0 }),
       makeExpense({ mileage: 10300, volume: 12, missedFillup: true, index: 1 }),
@@ -145,7 +120,6 @@ describe('Property 1: Missed fill-up pairs are excluded from calculateAverageMPG
           expect(result).toBeNull();
         } else {
           expect(result).not.toBeNull();
-          // Result should be within valid MPG bounds
           if (result !== null) {
             expect(result).toBeGreaterThan(0);
             expect(result).toBeLessThan(150);
@@ -157,10 +131,7 @@ describe('Property 1: Missed fill-up pairs are excluded from calculateAverageMPG
   });
 });
 
-// ---------------------------------------------------------------------------
-// Property 2: Backward compatibility when no expenses are flagged
-// ---------------------------------------------------------------------------
-describe('Property 2: Backward compatibility for calculateAverageMPG', () => {
+describe('backward compatibility for calculateAverageMPG', () => {
   test('unflagged expenses produce same pair count as unfiltered calculation', () => {
     fc.assert(
       fc.property(allUnflaggedListArb, (inputs) => {

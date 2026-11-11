@@ -1,40 +1,15 @@
-/**
- * Regression GUARD (committed, travels with the merge) for the bug class:
- * a Google Sheets BACKUP write must use `valueInputOption: 'RAW'`, never 'USER_ENTERED'.
- *
- * USER_ENTERED makes Sheets PARSE each cell as if a human typed it: a value beginning with a
- * formula trigger (`=` `+` `-` `@`) becomes a LIVE formula (injection), and the cell silently
- * round-trips back as the formula RESULT, not the text the user stored — corruption of the user's
- * OWN backup. RAW stores the literal string, so backup→restore is byte-exact and
- * inert. The fix flipped the single write site to RAW.
- *
- * The fake-seam test (google-sheets-service.test.ts) asserts the CURRENT write path sends RAW,
- * but it only drives the one code path that exists today. This SOURCE SCAN is the tree-wide net: it
- * pins that EVERY `valueInputOption:` assignment in the Sheets service is 'RAW', so a future reformat
- * flipping it back, OR a NEW write site added with USER_ENTERED, regresses RED here even if no test
- * happens to exercise that new path. (Source-scan > untracked e2e for merge survival — GUIDE.)
- *
- * It scans the ASSIGNMENT (`valueInputOption: '<x>'`), NOT a bare `USER_ENTERED` substring — the fix's
- * own explanatory comment contains the word USER_ENTERED, which a naive grep would false-positive on.
- *
- * Pure source scan — no DB, no network. Runs in the fast suite.
- */
-
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-// The Sheets service is the only module that writes spreadsheet values.
 const SHEETS_SERVICE = join(HERE, '..', 'google-sheets-service.ts');
 
-// Every `valueInputOption: '<value>'` assignment (single or double quoted). Captures the value so we
-// can assert it positively; whitespace-tolerant.
 const VALUE_INPUT_OPTION = /valueInputOption\s*:\s*['"]([^'"]+)['"]/g;
 
 describe('Sheets backup writes use RAW value-input', () => {
-  test('the scan resolves the real Sheets service file (guard is live, not a no-op)', () => {
+  test('the source scan finds the Sheets service file', () => {
     expect(
       readFileSync(SHEETS_SERVICE, 'utf8').length,
       `unreadable/empty: ${SHEETS_SERVICE}`
@@ -45,8 +20,6 @@ describe('Sheets backup writes use RAW value-input', () => {
     const src = readFileSync(SHEETS_SERVICE, 'utf8');
     const found = [...src.matchAll(VALUE_INPUT_OPTION)].map((m) => m[1]);
 
-    // There must be at least one write site (else the regex broke or the write was removed — a guard
-    // that silently matches nothing is a no-op).
     expect(
       found.length,
       'no valueInputOption assignment found in google-sheets-service.ts — did the write path move?'

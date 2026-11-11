@@ -1,15 +1,5 @@
 <script lang="ts">
-	/**
-	 * Reusable confirmation dialog for destructive (or otherwise consequential)
-	 * actions — a styled, disclosing replacement for the native browser `confirm()`.
-	 * Uses the AlertDialog kit (the semantically-correct role: it interrupts and
-	 * demands an explicit choice). Controlled via `bind:open`.
-	 *
-	 * `onConfirm` may be async: while it runs the confirm button shows a spinner and
-	 * both buttons disable. The dialog closes only on SUCCESS — if `onConfirm` throws,
-	 * the dialog stays open (so the caller's error toast is visible and the user can
-	 * retry or cancel), matching the ExpensesTable delete-dialog ergonomics.
-	 */
+	/** Confirmation dialog for destructive actions. It stays open if onConfirm throws, so the caller's error stays visible. */
 	import {
 		AlertDialog,
 		AlertDialogAction,
@@ -27,12 +17,9 @@
 		open: boolean;
 		title: string;
 		description: string;
-		/** Confirm button label. Defaults to "Delete" (the dominant use). */
 		confirmLabel?: string;
 		cancelLabel?: string;
-		/** Style the confirm button as destructive (red). Default true. */
 		destructive?: boolean;
-		/** The action to run on confirm. May be async; see the stay-open-on-error note. */
 		onConfirm: () => void | Promise<void>;
 	}
 

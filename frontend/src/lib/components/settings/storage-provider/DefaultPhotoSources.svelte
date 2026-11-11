@@ -61,14 +61,12 @@
 		total: number;
 	} | null>(null);
 
-	/** Check if all categories point to the same provider (or all null) */
 	let uniformDefault = $derived.by(() => {
 		const vals = CATEGORIES.map(c => storageConfig.defaults[c]);
 		const first = vals[0];
 		return vals.every(v => v === first) ? first : null;
 	});
 
-	/** Whether per-category overrides differ from each other */
 	let hasPerCategoryOverrides = $derived.by(() => {
 		const vals = CATEGORIES.map(c => storageConfig.defaults[c]);
 		const first = vals[0];
@@ -86,7 +84,6 @@
 		}
 	}
 
-	/** For a given category, return providers that have it enabled */
 	function getEnabledProviders(category: PhotoCategory): UserProviderInfo[] {
 		return providers.filter(p => {
 			const cats = storageConfig.providerCategories[p.id];
@@ -115,11 +112,9 @@
 			return;
 		}
 
-		// Check sync status for the first category as a representative
 		checkingCategory = CATEGORIES[0] ?? 'vehicle_photos';
 		try {
 			const syncStatus = await providerApi.getSyncStatus(providerId);
-			// Check if any category has unsynced photos
 			let totalGap = 0;
 			let totalPhotos = 0;
 			for (const cat of CATEGORIES) {
@@ -188,7 +183,6 @@
 
 	function confirmChange() {
 		if (pendingChange) {
-			// If it was a global change (category is first), apply to all
 			if (!advancedOpen) {
 				applyAllCategories(pendingChange.providerId);
 			} else {
@@ -206,7 +200,6 @@
 		<p class="text-sm font-medium">Default Photo Source</p>
 	</div>
 
-	<!-- Global default provider -->
 	<div class="space-y-2">
 		<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
 			<p class="text-xs text-muted-foreground min-w-0">
@@ -256,7 +249,6 @@
 		</div>
 	</div>
 
-	<!-- Per-category overrides -->
 	<Collapsible.Root bind:open={advancedOpen}>
 		<Collapsible.Trigger
 			class="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full"

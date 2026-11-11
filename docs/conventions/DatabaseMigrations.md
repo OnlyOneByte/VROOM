@@ -1,8 +1,3 @@
----
-inclusion: fileMatch
-fileMatchPattern: "backend/src/db/schema.ts"
----
-
 # Database Migration SOP
 
 A `backend/src/db/schema.ts` change is not done until a migration exists for it.
@@ -106,7 +101,7 @@ so most new columns need no mapping. Two cases to confirm with a round-trip test
 - JSON column: `coerceRow` parses JSON strings, so the export must serialize the value as JSON,
   not `[object Object]`.
 
-Round-trip tests live in `backend/src/api/sync/__tests__/`. See `.kiro/steering/BackupRestore.md`
+Round-trip tests live in `backend/src/api/sync/__tests__/`. See `BackupRestore.md`
 for the coercion and validation pipeline in detail.
 
 ## Production

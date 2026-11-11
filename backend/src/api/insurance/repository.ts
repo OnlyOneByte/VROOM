@@ -9,10 +9,6 @@ import { DatabaseError, NotFoundError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { assertVehiclesOwned } from '../../utils/vehicle-ownership';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 export interface CreateTermInput {
   startDate: Date;
   endDate: Date;
@@ -31,9 +27,7 @@ export interface CreateTermInput {
 }
 
 /**
- * Update shape for a term. Differs from CreateTermInput: the nullable value
- * columns accept `null` to CLEAR them (vs `undefined`/absent = leave unchanged).
- * startDate/endDate map to NOT NULL columns, so they're optional but never null.
+ * Nullable columns accept null to clear them. startDate and endDate are NOT NULL, so they are never null.
  */
 export interface UpdateTermInput {
   startDate?: Date;
@@ -61,7 +55,6 @@ export interface CreatePolicyData {
 
 export interface UpdatePolicyData {
   company?: string;
-  // null clears the notes column (vs undefined = leave unchanged).
   notes?: string | null;
   isActive?: boolean;
 }
@@ -71,16 +64,11 @@ export interface TermCoverageRow {
   vehicleId: string;
 }
 
-/** Policy with terms from insurance_terms table and junction coverage. */
 export type InsurancePolicyWithVehicles = InsurancePolicy & {
   terms: InsuranceTerm[];
   termVehicleCoverage: TermCoverageRow[];
   vehicleIds: string[];
 };
-
-// ============================================================================
-// Repository
-// ============================================================================
 
 export class InsurancePolicyRepository {
   private db: AppDatabase;
@@ -89,14 +77,8 @@ export class InsurancePolicyRepository {
     this.db = db;
   }
 
-  // --------------------------------------------------------------------------
-  // Private helpers
-  // --------------------------------------------------------------------------
-
   /**
-   * Validate that all vehicleIds belong to the given userId. Delegates to the shared
-   * assertVehiclesOwned — ONE source of truth for the cross-tenant ownership query shared with
-   * the expense split path; the insurance term writes run inside a tx, hence the dbOrTx handle.
+   * Accepts a transaction handle so the check can run inside a write.
    */
   private async validateVehicleOwnership(
     dbOrTx: AppDatabase | DrizzleTransaction,
@@ -107,11 +89,8 @@ export class InsurancePolicyRepository {
   }
 
   /**
-   * Insert junction rows for a term's vehicle coverage — SYNCHRONOUS. bun-sqlite is a
-   * sync dialect, so the create/addTerm/updateTerm transactions run their callbacks synchronously for real
-   * atomic rollback — an async callback autocommits each write alone, which could leave
-   * a term with partial or zero vehicle coverage (updateTerm wipes coverage then re-inserts). `.run()`
-   * executes inline in tx. (The async sibling was orphaned by the sync conversion + removed.)
+   * Must stay synchronous: an async transaction callback under bun-sqlite autocommits each write on its own,
+   * which could leave a term with partial coverage.
    */
   private insertJunctionRowsSync(
     tx: DrizzleTransaction,
@@ -124,14 +103,7 @@ export class InsurancePolicyRepository {
   }
 
   /**
-   * Fetch a policy's terms (newest endDate first) + the term→vehicle junction coverage, and derive the
-   * unique vehicleIds. The byte-identical "select terms by policyId ordered by endDate desc → select the
-   * junction rows for those termIds → dedupe vehicleIds" block was hand-repeated at FOUR sites
-   * (attachTermsAndCoverage + the create/update-policy, add-term, and update-term transactions,
-   * dedup). Takes the active handle (`this.db` OR a transaction `tx`) so the in-tx callers read their own
-   * uncommitted writes; pure assembly otherwise. One source of truth for the response's coverage shape so
-   * a junction-schema change can't drift across the four. NOTE: callers spread the result alongside their
-   * own policy row (and some add a `newTermId`), so this returns the three coverage fields only.
+   * Loads a policy's terms and coverage. Accepts a transaction handle so in-transaction callers see their own writes.
    */
   private async fetchTermsAndCoverage(
     handle: AppDatabase | DrizzleTransaction,
@@ -163,9 +135,6 @@ export class InsurancePolicyRepository {
     return { terms, termVehicleCoverage, vehicleIds };
   }
 
-  /**
-   * Attach terms and coverage to a policy, returning InsurancePolicyWithVehicles.
-   */
   private async attachTermsAndCoverage(
     policy: InsurancePolicy
   ): Promise<InsurancePolicyWithVehicles> {
@@ -173,24 +142,14 @@ export class InsurancePolicyRepository {
     return { ...policy, ...coverage };
   }
 
-  // --------------------------------------------------------------------------
-  // Policy CRUD
-  // --------------------------------------------------------------------------
-
   async create(data: CreatePolicyData, userId: string): Promise<InsurancePolicyWithVehicles> {
     try {
-      // Validate vehicle ownership across all terms BEFORE the tx — a pure read precondition independent
-      // of the writes, so it does not belong inside the (now synchronous) write transaction.
       const allVehicleIds = [...new Set(data.terms.flatMap((t) => t.vehicleCoverage.vehicleIds))];
       await this.validateVehicleOwnership(this.db, allVehicleIds, userId);
 
-      // SYNCHRONOUS transaction: policy insert THEN per-term inserts + junction rows.
-      // Under the old async callback a throw mid-loop left an orphan policy with partial/zero terms (the
-      // junction insert could fail after the policy committed). Running synchronously (.returning().get() /
-      // insertJunctionRowsSync inline) keeps every insert in ONE real transaction that rolls back atomically.
+      // Synchronous: see insertJunctionRowsSync.
       // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Policy creation requires sequential steps within a transaction
       return this.db.transaction((tx) => {
-        // Insert policy row
         const policyId = createId();
         const now = new Date();
         const isActive = data.isActive !== false;
@@ -209,7 +168,6 @@ export class InsurancePolicyRepository {
           .returning()
           .get();
 
-        // Insert terms and junction rows
         const insertedTerms: InsuranceTerm[] = [];
         const termCoverage: TermCoverageRow[] = [];
 
@@ -336,7 +294,6 @@ export class InsurancePolicyRepository {
           .where(eq(insurancePolicies.id, id))
           .returning();
 
-        // Fetch terms and coverage for the response (shared assembly)
         const coverage = await this.fetchTermsAndCoverage(tx, id);
 
         return { ...updatedResult[0], ...coverage };
@@ -377,22 +334,15 @@ export class InsurancePolicyRepository {
     }
   }
 
-  // --------------------------------------------------------------------------
-  // Term CRUD
-  // --------------------------------------------------------------------------
-
   async addTerm(
     policyId: string,
     term: CreateTermInput,
     userId: string
   ): Promise<InsurancePolicyWithVehicles & { newTermId: string }> {
     try {
-      // Validate vehicle ownership BEFORE the tx — a pure read precondition (see create()).
       await this.validateVehicleOwnership(this.db, term.vehicleCoverage.vehicleIds, userId);
 
-      // SYNCHRONOUS transaction: term insert + junction rows + policy bump must be
-      // atomic — under the old async callback a throw on the junction insert left a term persisted with
-      // partial/zero coverage. Running synchronously keeps them in ONE real transaction.
+      // Synchronous: see insertJunctionRowsSync.
       const termId = createId();
       this.db.transaction((tx) => {
         const existing = tx
@@ -406,7 +356,6 @@ export class InsurancePolicyRepository {
           throw new NotFoundError('Insurance policy');
         }
 
-        // Insert term row
         const now = new Date();
         tx.insert(insuranceTerms)
           .values({
@@ -430,17 +379,14 @@ export class InsurancePolicyRepository {
           })
           .run();
 
-        // Insert junction rows
         this.insertJunctionRowsSync(tx, termId, term.vehicleCoverage.vehicleIds);
 
-        // Update policy updatedAt
         tx.update(insurancePolicies)
           .set({ updatedAt: now })
           .where(eq(insurancePolicies.id, policyId))
           .run();
       });
 
-      // Assemble the response from now-committed data (reads, outside the write tx).
       const updatedPolicy = await this.db
         .select()
         .from(insurancePolicies)
@@ -467,19 +413,14 @@ export class InsurancePolicyRepository {
     userId: string
   ): Promise<InsurancePolicyWithVehicles> {
     try {
-      // Validate vehicle ownership BEFORE the tx when coverage is changing — a pure read precondition.
       const { vehicleCoverage, ...termFields } = updates;
       if (vehicleCoverage) {
         await this.validateVehicleOwnership(this.db, vehicleCoverage.vehicleIds, userId);
       }
 
-      // SYNCHRONOUS transaction: the coverage change DELETEs all junction rows then
-      // re-inserts — under the old async callback a throw on the re-insert left the term with ZERO
-      // coverage (the money-facing class). Running synchronously keeps the term update +
-      // junction replace + policy bump in ONE real transaction that rolls back atomically.
+      // Synchronous: see insertJunctionRowsSync. A coverage replace deletes then re-inserts junction rows.
       // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Term update requires field-by-field mapping and junction management
       this.db.transaction((tx) => {
-        // Verify policy exists
         const existing = tx
           .select()
           .from(insurancePolicies)
@@ -491,7 +432,6 @@ export class InsurancePolicyRepository {
           throw new NotFoundError('Insurance policy');
         }
 
-        // Verify term exists and belongs to this policy
         const termRows = tx
           .select()
           .from(insuranceTerms)
@@ -503,7 +443,6 @@ export class InsurancePolicyRepository {
           throw new NotFoundError('Term');
         }
 
-        // Build update fields
         const setFields: Record<string, unknown> = { updatedAt: new Date() };
         if (termFields.startDate !== undefined) setFields.startDate = termFields.startDate;
         if (termFields.endDate !== undefined) setFields.endDate = termFields.endDate;
@@ -526,21 +465,17 @@ export class InsurancePolicyRepository {
 
         tx.update(insuranceTerms).set(setFields).where(eq(insuranceTerms.id, termId)).run();
 
-        // Handle vehicle coverage changes (ownership already validated above)
         if (vehicleCoverage) {
-          // Delete old junction rows and insert new ones
           tx.delete(insuranceTermVehicles).where(eq(insuranceTermVehicles.termId, termId)).run();
           this.insertJunctionRowsSync(tx, termId, vehicleCoverage.vehicleIds);
         }
 
-        // Update policy updatedAt
         tx.update(insurancePolicies)
           .set({ updatedAt: new Date() })
           .where(eq(insurancePolicies.id, policyId))
           .run();
       });
 
-      // Assemble the response from now-committed data (reads, outside the write tx).
       const updatedPolicy = await this.db
         .select()
         .from(insurancePolicies)
@@ -578,7 +513,6 @@ export class InsurancePolicyRepository {
           throw new NotFoundError('Insurance policy');
         }
 
-        // Verify term exists
         const termRows = await tx
           .select()
           .from(insuranceTerms)
@@ -589,19 +523,14 @@ export class InsurancePolicyRepository {
           throw new NotFoundError('Term');
         }
 
-        // Delete term — the junction rows cascade via FK. The materialized premium EXPENSES do
-        // NOT: they link to the term by the plain text (sourceType, sourceId) pair, with no FK, so
-        // nothing here touches them and they would stay summed into TCO insurance cost forever.
-        // The caller MUST deleteBySource('insurance_term', termId) first.
+        // Premium expenses link by text columns, not an FK, so the caller must deleteBySource first.
         await tx.delete(insuranceTerms).where(eq(insuranceTerms.id, termId));
 
-        // Update policy updatedAt
         await tx
           .update(insurancePolicies)
           .set({ updatedAt: new Date() })
           .where(eq(insurancePolicies.id, policyId));
 
-        // Fetch full policy with remaining terms
         const updatedPolicy = await tx
           .select()
           .from(insurancePolicies)
@@ -623,14 +552,6 @@ export class InsurancePolicyRepository {
     }
   }
 
-  // --------------------------------------------------------------------------
-  // Derived queries
-  // --------------------------------------------------------------------------
-
-  /**
-   * Get the current (latest) term dates for a policy.
-   * Returns the term with the latest end_date.
-   */
   async getCurrentTermDates(policyId: string): Promise<{ startDate: Date; endDate: Date } | null> {
     const result = await this.db
       .select({
@@ -647,12 +568,7 @@ export class InsurancePolicyRepository {
   }
 
   /**
-   * Find terms expiring within a date range, for ACTIVE policies only.
-   *
-   * The `insurancePolicies.isActive` filter excludes terms of CANCELLED policies: this
-   * backs GET /expiring-soon (upcoming-renewal nags), and a policy the user has cancelled must
-   * not resurface there as "expiring" — they're not renewing it. Mirrors the active-only filter
-   * the per-vehicle coverage query already uses below.
+   * Terms ending in the range, for active policies only. A cancelled policy must not show as expiring.
    */
   async findExpiringTerms(
     startDate: Date,
@@ -681,10 +597,6 @@ export class InsurancePolicyRepository {
     }
   }
 
-  /**
-   * Derive the active insurance policy ID for a vehicle via JOIN.
-   * Returns the policy with the latest term end_date where is_active = 1.
-   */
   async getActiveInsurancePolicyId(vehicleId: string): Promise<string | null> {
     try {
       const result = await this.db
@@ -706,5 +618,4 @@ export class InsurancePolicyRepository {
   }
 }
 
-// Export singleton instance
 export const insurancePolicyRepository = new InsurancePolicyRepository(getDb());

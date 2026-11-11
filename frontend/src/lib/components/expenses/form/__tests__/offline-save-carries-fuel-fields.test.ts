@@ -1,35 +1,13 @@
-/**
- * Regression GUARD (committed, merge-surviving) for the offline-field-dropout class at the ExpenseForm
- * CALL SITES — (fuelType), (missedFillup), (missedFillup again, on the error-fallback save).
- *
- * ExpenseForm saves an offline expense from TWO places: the offline-first path (no network) and the
- * error-fallback path (an online create that throws → catch → save offline). The dropout bug recurs
- * because each `addOfflineExpense({...})` object is hand-built: a fuel field carried in one call but
- * forgotten in the other is silently dropped on that path, and on sync calculateAverageMpg pairs the
- * fill-up across the unlogged gap → corrupted MPG. was fixed on the offline-first
- * path but the SAME field was missing from the error-fallback save until.
- *
- * The mapper side (offlineExpenseToBackend) is fully pinned by offline-storage.test.ts (incl. the
- * completeness pin) — but the mapper can't carry a field the CALL SITE never put in the object. This
- * static scan pins the call sites: EVERY addOfflineExpense(...) in ExpenseForm must carry both
- * missedFillup and fuelType. A component runtime test would need Playwright (the catch path is
- * network-failure-gated) + would re-implement the form, so a source scan is the
- * merge-surviving guard. Fast unit suite — no browser, no server.
- */
+// Every offline save in ExpenseForm carries fuelType and missedFillup, on both the offline-first and error-fallback paths.
 
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 
-// This file lives at .../expenses/form/__tests__/; the component is one level up.
 const COMPONENT = join(dirname(fileURLToPath(import.meta.url)), '..', 'ExpenseForm.svelte');
 
-/**
- * Extract the argument body of every `addOfflineExpense({ ... })` call. The object literal is
- * brace-balanced from the first `{` after the call to its matching `}`, so a simple depth counter
- * isolates each call's body even with nested `{ ... }` spreads inside.
- */
+// Brace-balanced extraction, so nested spreads inside each call body are included.
 function extractAddOfflineExpenseBodies(source: string): string[] {
 	const bodies: string[] = [];
 	const CALL = 'addOfflineExpense(';
@@ -55,13 +33,12 @@ function extractAddOfflineExpenseBodies(source: string): string[] {
 	return bodies;
 }
 
-describe('ExpenseForm offline-save sites carry the fuel fields (dropout guard)', () => {
+describe('ExpenseForm offline-save sites carry the fuel fields', () => {
 	const source = readFileSync(COMPONENT, 'utf8');
 	const bodies = extractAddOfflineExpenseBodies(source);
 
-	test('the scan found BOTH offline-save call sites (guard is live, not a no-op)', () => {
-		// The offline-first path + the error-fallback path. If a refactor changes the count, revisit
-		// this guard rather than letting it silently pass on a single (or zero) site.
+	test('the scan finds both offline-save call sites', () => {
+		// A refactor that changes the call-site count must revisit this check rather than pass silently.
 		expect(bodies.length).toBe(2);
 	});
 

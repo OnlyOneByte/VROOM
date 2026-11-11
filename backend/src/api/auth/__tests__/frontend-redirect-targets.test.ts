@@ -1,20 +1,7 @@
 /**
- * Regression GUARD: every frontend page the auth routes redirect to must actually exist.
- *
- * The OAuth flows end by bouncing the browser to `${CONFIG.frontend.url}<path>` — that is how a
- * user learns the outcome (`/dashboard` on success, `/auth?auth_error=...`, `/profile?link_error=
- * ...`, the provider form's `?provider_error=...`). Nothing couples those literals to the
- * SvelteKit route tree, so a renamed or never-existing page turns a handled error into a 404: the
- * provider callback redirected to `/auth/login`, which has never been a route (the login page is
- * `/auth`), and the provider-state fallback pointed at `/settings/providers`, which is only a
- * directory of two real pages (`new`, `[id]/edit`), not a page itself.
- *
- * The scan takes every literal path interpolated after `CONFIG.frontend.url`, plus the hardcoded
- * `returnTo` fallback, and resolves each against `frontend/src/routes/**\/+page.svelte`. Dynamic
- * targets (`${CONFIG.frontend.url}${path}`, where the path is a caller-supplied returnTo) have no
- * literal to check and are skipped — the fallback literal is what this guard pins.
- *
- * Pure source scan over both trees — no DB, no network.
+ * Every frontend page the auth routes redirect to must exist in the SvelteKit route tree. A
+ * missing page turns a handled OAuth error into a 404. Dynamic targets built from a caller-supplied
+ * returnTo cannot be checked statically and are skipped. Pure source scan, no DB or network.
  */
 
 import { describe, expect, test } from 'bun:test';
@@ -41,7 +28,6 @@ function redirectPaths(): string[] {
   const found = new Set<string>();
   for (const [, raw] of src.matchAll(FRONTEND_REDIRECT)) {
     const path = raw.split('?')[0];
-    // '' is the `${CONFIG.frontend.url}${path}` helper — a runtime returnTo, nothing to resolve.
     if (path) found.add(path);
   }
   for (const [, raw] of src.matchAll(RETURN_TO_FALLBACK)) {
@@ -50,11 +36,6 @@ function redirectPaths(): string[] {
   return [...found];
 }
 
-/**
- * Resolve a URL path against the SvelteKit route tree: each segment must be a directory of that
- * name, or the one dynamic `[param]` directory at that level, and the leaf must hold a
- * `+page.svelte`.
- */
 function pageExists(urlPath: string): boolean {
   let dir = FRONTEND_ROUTES;
   for (const segment of urlPath.split('/').filter(Boolean)) {
@@ -78,7 +59,6 @@ describe('auth route redirects point at frontend pages that exist', () => {
     expect(existsSync(join(FRONTEND_ROUTES, '+page.svelte')), `missing: ${FRONTEND_ROUTES}`).toBe(
       true
     );
-    // The known redirect targets must all be found, or the regexes have drifted.
     expect(redirectPaths().length).toBeGreaterThanOrEqual(4);
   });
 
@@ -92,8 +72,6 @@ describe('auth route redirects point at frontend pages that exist', () => {
   });
 
   test('a path that is only a directory of pages is NOT accepted as a page', () => {
-    // Pins the resolver itself: /settings/providers holds new/ and [id]/ but no +page.svelte,
-    // which is exactly the shape that made the old fallback a 404.
     expect(pageExists('/settings/providers')).toBe(false);
     expect(pageExists('/settings/providers/new')).toBe(true);
     expect(pageExists('/auth/login')).toBe(false);

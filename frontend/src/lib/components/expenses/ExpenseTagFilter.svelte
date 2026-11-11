@@ -12,7 +12,6 @@
 
 	let { allTags, selectedTags, tagMatchMode, onTagsChange, onMatchModeChange }: Props = $props();
 
-	// Internal state
 	let tagSearchTerm = $state('');
 	let tagSearchFocused = $state(false);
 	let tagInputEl = $state<HTMLInputElement | null>(null);

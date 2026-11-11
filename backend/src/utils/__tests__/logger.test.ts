@@ -1,23 +1,13 @@
-/**
- * Guard for the ONE thing a log line about a failure has to carry: the failure.
- *
- * An Error's `message` and `stack` are non-enumerable own properties, so `JSON.stringify({ error })`
- * is `{"error":{}}`. The logger serializes its context with JSON.stringify, and ~25 call sites pass
- * an Error (or a value built from one) — including the global error handler's `logger.error('Server
- * error', { error: err })`, which is the only forensics a self-hosted operator has for an
- * unexpected 500. These tests pin that an Error survives serialization wherever it sits in the
- * context, that the `cause` chain comes with it, and that a context JSON cannot represent degrades
- * to a marker instead of throwing out of the log call.
- *
- * Pure: no DB, no server. Captures the console sink the logger writes to.
- */
+// Logged errors must keep their name, message, stack and cause. JSON.stringify drops an Error's
+// non-enumerable fields, and the global error handler's log line is the only record of an
+// unexpected 500.
 
 import { describe, expect, test } from 'bun:test';
 import { logger } from '../logger';
 
 type LogMethod = 'error' | 'warn' | 'info';
 
-/** Run `emit` with the matching console sink captured, returning the single line written. */
+/** Runs emit with the matching console sink captured, and returns the one line written. */
 function captureLine(method: LogMethod, emit: () => void): string {
   const sinkName = method === 'error' ? 'error' : method === 'warn' ? 'warn' : 'info';
   const original = console[sinkName];
@@ -34,7 +24,7 @@ function captureLine(method: LogMethod, emit: () => void): string {
   return lines[0];
 }
 
-/** The logged line is `[ts] [LEVEL] message <json>` — return the parsed context object. */
+/** The logged line is `[ts] [LEVEL] message <json>`. Returns the parsed context object. */
 function parseContext(line: string): Record<string, unknown> {
   const start = line.indexOf('{');
   expect(start, `no JSON context in log line: ${line}`).toBeGreaterThan(-1);
@@ -91,9 +81,9 @@ describe('logger context serialization', () => {
     expect((error.cause as LoggedError).message).toBe('ECONNRESET');
   });
 
+  // JSON.stringify cannot see this cycle, because each level is a fresh plain object. Only the
+  // depth bound stops it.
   test('a looping cause chain terminates instead of exhausting the stack', () => {
-    // JSON.stringify cannot detect this cycle — each level is a freshly built plain object — so
-    // the depth bound is the only thing between it and a RangeError inside the error handler.
     const outer = new Error('outer');
     const inner = new Error('inner', { cause: outer });
     (outer as { cause?: unknown }).cause = inner;
@@ -130,7 +120,7 @@ describe('logger context serialization', () => {
     expect(context.duration).toBe(12);
     expect(context.ok).toBe(true);
     expect(context.at).toBe('2026-01-15T00:00:00.000Z');
-    // JSON.stringify THROWS on a bigint, which would take the whole line down.
+    // JSON.stringify throws on a bigint, which would take the whole line down.
     expect(context.big).toBe('9007199254740993');
   });
 

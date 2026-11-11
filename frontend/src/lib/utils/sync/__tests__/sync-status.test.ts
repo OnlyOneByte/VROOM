@@ -1,22 +1,7 @@
-/**
- * Pin getSyncStatusInfo, the user-facing sync-indicator derivation.
- *
- * sync/sync-status.ts had ZERO test coverage. It's the centralized logic behind BOTH SyncStatusIndicator
- * and SyncStatusInline (the persistent sync badge), and its branch ORDER is load-bearing: the conditions
- * are evaluated as a PRIORITY CASCADE, not independent flags —
- *  offline > conflicts > syncing > error > success > pending > up-to-date
- * so a refactor that reordered the `if`s (or flipped a comparison) would silently surface the WRONG status
- * — e.g. show "Synced" while offline, or hide an unresolved conflict behind a "Syncing…" spinner. These
- * pin every branch's {color, icon, text} AND the precedence between branches that can be true at once
- * (the part a naive per-branch test misses), plus the singular/plural conflict copy. NON-VACUOUS:
- * reordering any pair of branches, or dropping the `> 1` plural guard, turns a case RED.
- */
-
 import { describe, expect, test } from 'vitest';
 import { Wifi, WifiOff, RefreshCw, CircleCheck, CircleAlert, Clock } from '@lucide/svelte';
 import { getSyncStatusInfo, type SyncStatusParams } from '$lib/utils/sync/sync-status';
 
-/** A "nothing going on, online" baseline; override per case. */
 function params(overrides: Partial<SyncStatusParams> = {}): SyncStatusParams {
 	return {
 		isOnline: true,
@@ -89,31 +74,31 @@ describe('getSyncStatusInfo — precedence cascade (the load-bearing part)', () 
 			pendingCount: 5,
 			conflictsCount: 4
 		});
-		expect(info.text).toBe('Offline'); // not "4 conflicts", not "Syncing..."
+		expect(info.text).toBe('Offline');
 	});
 
 	test('conflicts BEAT syncing — an unresolved conflict is not hidden behind the sync spinner', () => {
 		const info = getSyncStatusInfo(params({ syncStatus: 'syncing', conflictsCount: 1 }));
-		expect(info.text).toBe('1 conflict'); // not "Syncing..."
+		expect(info.text).toBe('1 conflict');
 	});
 
 	test('conflicts BEAT a success status', () => {
 		const info = getSyncStatusInfo(params({ syncStatus: 'success', conflictsCount: 2 }));
-		expect(info.text).toBe('2 conflicts'); // not "Synced"
+		expect(info.text).toBe('2 conflicts');
 	});
 
 	test('syncing BEATS pending — an in-flight sync outranks the queued count', () => {
 		const info = getSyncStatusInfo(params({ syncStatus: 'syncing', pendingCount: 9 }));
-		expect(info.text).toBe('Syncing...'); // not "9 pending"
+		expect(info.text).toBe('Syncing...');
 	});
 
 	test('error BEATS pending — a failed sync is shown over the still-queued count', () => {
 		const info = getSyncStatusInfo(params({ syncStatus: 'error', pendingCount: 9 }));
-		expect(info.text).toBe('Sync failed'); // not "9 pending"
+		expect(info.text).toBe('Sync failed');
 	});
 
 	test('success BEATS pending', () => {
 		const info = getSyncStatusInfo(params({ syncStatus: 'success', pendingCount: 9 }));
-		expect(info.text).toBe('Synced'); // not "9 pending"
+		expect(info.text).toBe('Synced');
 	});
 });

@@ -158,8 +158,7 @@
 		try {
 			await settingsApi.updateSettings({ backupConfig: updatedConfig });
 			backupConfig = updatedConfig;
-			// Refresh the sync-status store so the menu's backup state/time updates
-			// immediately instead of staying stale until the next poll or a reload.
+			// Refresh sync status now so the menu's backup state is not stale until the next poll.
 			await fetchLastSyncTime();
 			appStore.showSuccess(
 				enabled ? 'ZIP backup enabled for provider' : 'ZIP backup disabled for provider'
@@ -187,7 +186,6 @@
 		try {
 			await settingsApi.updateSettings({ backupConfig: updatedConfig });
 			backupConfig = updatedConfig;
-			// Refresh the sync-status store so the menu reflects the change immediately.
 			await fetchLastSyncTime();
 			appStore.showSuccess(
 				enabled ? 'Sheets sync enabled for provider' : 'Sheets sync disabled for provider'
@@ -214,7 +212,6 @@
 		{:else if error}
 			<p class="text-sm text-destructive">{error}</p>
 		{:else}
-			<!-- Backup & Restore -->
 			<div class="space-y-4">
 				<p class="text-sm font-medium">Data Backups</p>
 
@@ -280,12 +277,10 @@
 
 			<Separator class="my-6" />
 
-			<!-- Default Photo Sources -->
 			<DefaultPhotoSources {storageConfig} {providers} onUpdate={handleConfigUpdate} />
 
 			<Separator class="my-6" />
 
-			<!-- Providers -->
 			<div class="space-y-3">
 				<div class="flex items-center justify-between">
 					<p class="text-sm font-medium">Providers</p>

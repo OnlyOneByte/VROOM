@@ -2,10 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { z } from 'zod';
 
-/**
- * Standalone folder name validation schema matching the one in settings routes.
- * Duplicated here to test the validation logic independently.
- */
+// Copy of the folder-name rule. No production schema exports it, so this only tests the copy.
 const folderNameSchema = z
   .string()
   .max(255, 'Folder name must be 255 characters or fewer')
@@ -13,7 +10,7 @@ const folderNameSchema = z
     message: 'Folder name must not contain / or \\',
   });
 
-describe('Property 3: Folder name validation correctness', () => {
+describe('folder name validation', () => {
   test('accepts strings without / or \\ that are 255 chars or fewer', () => {
     const validNameArb = fc
       .string({ minLength: 0, maxLength: 255 })

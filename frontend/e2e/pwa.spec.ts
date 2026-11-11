@@ -3,18 +3,9 @@ import { scanA11y } from './support/axe';
 import { addSessionCookie, mockApi } from './support/mock-api';
 import { THEME_REGISTRY, DEFAULT_THEME_ID } from '../src/lib/theme/theme-registry';
 
-/**
- * App-shell smoke: the PWA surface (manifest, service worker, asset caching, meta tags),
- * the offline indicator, responsive layout, and an axe accessibility scan.
- *
- * THREE TESTS NEED THE REAL BUNDLE. `SvelteKitPWA` is configured with no `devOptions`, so
- * `vite dev` serves neither a manifest link nor a service worker, and with no service worker
- * nothing populates the Cache Storage either. Those three run only on the preview target
- * (`E2E_TARGET=preview npx playwright test`) and are skipped on the dev default — see
- * playwright.config.ts. Turning on `devOptions` would make them green against a DEV service
- * worker, a different artifact from the one that ships: green without testing the thing that
- * matters.
- */
+// Manifest, service worker, install meta tags, offline badge, responsive layout and axe scans.
+// The manifest and service-worker tests need the production bundle (E2E_TARGET=preview); the
+// dev server serves neither, and enabling devOptions would test a different artifact.
 const PREVIEW = process.env['E2E_TARGET'] === 'preview';
 const needsRealBundle = () =>
 	test.skip(!PREVIEW, 'needs the production bundle; run with E2E_TARGET=preview');
@@ -63,8 +54,7 @@ test.describe('PWA surface', () => {
 		needsRealBundle();
 		await page.goto('/');
 
-		// Wait on the registration, not a sleep: `ready` resolves once a worker is active,
-		// which is the point `injectManifest`'s precache list has been written.
+		// `ready` resolves once the worker is active, after the precache list is written.
 		const cachedAssets = await page.evaluate(async () => {
 			if (!('serviceWorker' in navigator) || !('caches' in window)) return null;
 			await navigator.serviceWorker.ready;
@@ -77,9 +67,7 @@ test.describe('PWA surface', () => {
 			return urls;
 		});
 
-		// Not just "some cache exists" — a non-empty Cache Storage is also what an unrelated
-		// library leaves behind. The precache manifest is built from the built client assets,
-		// so at least one hashed JS chunk must be in there.
+		// Any non-empty cache would pass; the precache list must contain a built JS chunk.
 		expect(cachedAssets).not.toBeNull();
 		expect(cachedAssets!.some(path => path.endsWith('.js'))).toBe(true);
 	});
@@ -87,8 +75,7 @@ test.describe('PWA surface', () => {
 	test('declares the install meta tags exactly once', async ({ page }) => {
 		await page.goto('/');
 
-		// app.html is the single source of truth for both; a second copy in a
-		// `<svelte:head>` would land later in the document and silently win.
+		// app.html owns these tags; a copy in <svelte:head> would land later and win.
 		await expect(page.locator('meta[name="theme-color"]')).toHaveCount(1);
 		const viewport = page.locator('meta[name="viewport"]');
 		await expect(viewport).toHaveCount(1);
@@ -101,12 +88,8 @@ test.describe('PWA surface', () => {
 	test('shows the offline badge when the browser goes offline', async ({ page }) => {
 		await page.goto('/');
 
-		// The store flips on the window `offline`/`online` EVENTS, not by polling
-		// navigator.onLine, so dispatching the event exercises the real code path and
-		// works identically on all five engines (context.setOffline support varies).
-		// Re-dispatch until it takes: the listener is registered when the offline store
-		// module is evaluated during hydration, and `goto` resolves before that, so a
-		// single dispatch can land before anything is listening.
+		// The store listens for window offline/online events, so dispatch them directly.
+		// Re-dispatch until it takes: the listener is attached during hydration, after goto resolves.
 		const offlineBadge = page.getByText('Offline', { exact: true });
 		await expect(async () => {
 			await page.evaluate(() => window.dispatchEvent(new Event('offline')));
@@ -154,42 +137,20 @@ test.describe('Responsive layout', () => {
 	});
 });
 
-/**
- * Accessibility ratchet.
- *
- * `@axe-core/playwright` was a devDependency with no consumer; this and expenses-a11y.spec.ts
- * are its only uses. It is a RATCHET, not a gate on today's debt: each route carries the set
- * of WCAG rule ids it currently violates, and the test fails only on a rule id that is NOT
- * already on that list. So pre-existing violations do not block anyone, a NEW class of
- * violation does, and the full violation detail is attached to the report either way.
- *
- * Shrink a list when you fix something — an id left here after the fix makes the ratchet
- * permanently looser than the app.
- *
- * Every entry also says how to REACH its route and what proves it arrived, because the
- * failure mode of a route-keyed scan is silence rather than red: a route reached without a
- * session is bounced to the sign-in page, and a readiness assertion generic enough to pass
- * there leaves axe scanning /auth under this route's name, forever, with an empty allowlist
- * that reads as a clean bill of health. The URL re-check after the scan is the backstop.
- *
- * Not every route is here. The expenses table's post-interaction states live in
- * expenses-a11y.spec.ts (its controls exist only after a tap), and the remaining routes are
- * edit forms that need a fixture id. Add a page here when you add one.
- */
+// Ratchet: each route lists the WCAG rule ids it violates today, and only a rule id outside
+// that list fails. Remove an id once it is fixed, or the ratchet stays looser than the app.
+// Routes that need a tap or a fixture id are covered in expenses-a11y.spec.ts instead.
 interface A11yRoute {
-	/** WCAG rule ids this route violates today. A rule id outside this set fails the test. */
+	/** WCAG rule ids this route violates today. */
 	debt: string[];
-	/** Signed-out surfaces. Every other route needs the session cookie or it redirects. */
+	/** Signed-out surfaces; every other route needs the session cookie. */
 	anonymous?: true;
-	/** Content only this route renders — the app shell's loading state does not count. */
 	ready: (page: Page) => Locator;
 }
 
-/** Both signed-out surfaces end at the same control, under different copy. */
 const signInControl = (page: Page) =>
 	page.getByRole('button', { name: /Sign In|Continue with/i }).first();
-/** `.first()`: this is a readiness check, not a uniqueness one — several pages repeat their
- *  own name on a card heading below the page title. */
+// Pages repeat their name on card headings, so readiness takes the first match.
 const pageHeading = (name: string) => (page: Page) => page.getByRole('heading', { name }).first();
 
 const A11Y_ROUTES: Record<string, A11yRoute> = {
@@ -206,7 +167,6 @@ const A11Y_ROUTES: Record<string, A11yRoute> = {
 	'/profile': { debt: [], ready: pageHeading('Profile') }
 };
 
-/** `/` → `root`, `/expenses/new` → `expenses-new`: a filename-safe attachment label. */
 const attachmentLabel = (route: string) => route.replace(/^\//, '').replace(/\//g, '-') || 'root';
 
 async function expectNoNewViolations(
@@ -241,38 +201,19 @@ test.describe('Accessibility (axe)', () => {
 			await mockApi(page, { authenticated: !anonymous });
 
 			await page.goto(route);
-			// The route's own content, not the app shell's loading state — scanning the shell
-			// measures nothing, and a readiness locator generic enough to match the shell (or
-			// the sign-in page the auth gate redirects to) is how a route-keyed ratchet ends up
-			// reporting a permanently empty allowlist for a page it never rendered.
+			// Must match the route's own content, or the scan covers the shell or a redirect.
 			await expect(ready(page)).toBeVisible();
 
 			await expectNoNewViolations(page, testInfo, attachmentLabel(route), debt);
 
-			// LAST, deliberately. Route protection runs in an effect once `/auth/me` resolves,
-			// so immediately after `goto` the URL is still the requested one whether or not the
-			// app is about to bounce you; by the time axe has run, it has settled. This is the
-			// backstop for the case the readiness locator cannot see: a scan that passed, on
-			// some other page, recorded under this route's name.
+			// Last on purpose: route protection redirects asynchronously after /auth/me.
 			await expect(page).toHaveURL(route);
 		});
 	}
 });
 
-/**
- * The same scan under every non-default theme, in dark mode.
- *
- * A theme swaps the CSS custom properties the entire app paints from, so a palette with too
- * little contrast is a WCAG failure on every route at once — the one defect class that
- * scanning routes under the default theme cannot see. The two localStorage keys below are
- * the app's own persistence, set before the first script runs so no flash of the default
- * palette is scanned.
- *
- * `/dashboard` is the sample: cards, stat tiles, badges, charts and the nav shell, which
- * between them paint most of the token set. Chromium only — axe derives these violations
- * from computed colour, which does not differ by engine, so the other four projects would
- * pay full price for the same answer.
- */
+// A low-contrast palette fails on every route at once, which default-theme scans cannot see.
+// Dashboard paints most of the token set. Chromium only: axe contrast does not vary by engine.
 const NON_DEFAULT_THEMES = Object.keys(THEME_REGISTRY).filter(id => id !== DEFAULT_THEME_ID);
 
 test.describe('Accessibility (axe) — theme palettes', () => {
@@ -298,8 +239,7 @@ test.describe('Accessibility (axe) — theme palettes', () => {
 
 			await page.goto('/dashboard');
 			await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
-			// The theme actually took: both axes are applied to <html> by the store, and a
-			// mis-set key would otherwise scan the default palette and pass.
+			// A mis-set storage key would silently scan the default palette.
 			await expect(page.locator('html')).toHaveAttribute('data-theme', themeId);
 			await expect(page.locator('html')).toHaveClass(/dark/);
 

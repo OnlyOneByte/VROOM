@@ -1,12 +1,6 @@
 /**
- * Property-Based Tests for Settings Repository Split
- *
- * **Property 23: Settings repository split — preferences and sync state separate**
- * **Validates: Requirements 27.1, 27.2**
- *
- * Tests that preferences and sync state are stored/retrieved independently,
- * that markDataChanged updates sync_state without affecting user_preferences,
- * and that getOrCreate creates default rows when none exist.
+ * Property-based tests for PreferencesRepository and SyncStateRepository. Preferences and sync
+ * state are stored independently, and getOrCreate creates default rows.
  */
 
 import { Database } from 'bun:sqlite';
@@ -18,10 +12,6 @@ import { applyMigration, loadMigrations } from '../../../db/__tests__/migration-
 import type { AppDatabase } from '../../../db/connection';
 import * as schema from '../../../db/schema';
 import { PreferencesRepository, SyncStateRepository } from '../repository';
-
-// ---------------------------------------------------------------------------
-// Test infrastructure
-// ---------------------------------------------------------------------------
 
 let sqliteDb: Database;
 let db: AppDatabase;
@@ -57,18 +47,9 @@ afterEach(() => {
   sqliteDb.close();
 });
 
-// ---------------------------------------------------------------------------
-// Generators
-// ---------------------------------------------------------------------------
-
 const currencyArb = fc.constantFrom('USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY');
 const backupFrequencyArb = fc.constantFrom('daily', 'weekly', 'monthly');
 const syncInactivityMinutesArb = fc.integer({ min: 1, max: 60 });
-
-// ---------------------------------------------------------------------------
-// Property: getOrCreate creates default preferences when none exist
-// **Validates: Requirements 27.1**
-// ---------------------------------------------------------------------------
 
 describe('PreferencesRepository', () => {
   test('getOrCreate creates default preferences for a new user', async () => {
@@ -104,7 +85,6 @@ describe('PreferencesRepository', () => {
         backupFrequencyArb,
         syncInactivityMinutesArb,
         async (currency, frequency, minutes) => {
-          // Ensure row exists
           await prefsRepo.getOrCreate(USER_ID);
 
           await prefsRepo.update(USER_ID, {
@@ -139,11 +119,6 @@ describe('PreferencesRepository', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Property: SyncStateRepository getOrCreate creates row with NULL timestamps
-// **Validates: Requirements 27.2**
-// ---------------------------------------------------------------------------
-
 describe('SyncStateRepository', () => {
   test('getOrCreate creates sync state with all NULL timestamps', async () => {
     const state = await syncRepo.getOrCreate(USER_ID);
@@ -164,24 +139,20 @@ describe('SyncStateRepository', () => {
   });
 
   test('markDataChanged updates sync_state without affecting user_preferences', async () => {
-    // Create both rows
     const prefsBefore = await prefsRepo.getOrCreate(USER_ID);
 
     await syncRepo.markDataChanged(USER_ID);
 
-    // Preferences unchanged
     const prefsAfter = await prefsRepo.getByUserId(USER_ID);
     expect(prefsAfter?.currencyUnit).toBe(prefsBefore.currencyUnit);
     expect(prefsAfter?.autoBackupEnabled).toBe(prefsBefore.autoBackupEnabled);
     expect(prefsAfter?.backupFrequency).toBe(prefsBefore.backupFrequency);
 
-    // Sync state updated
     const state = await syncRepo.getOrCreate(USER_ID);
     expect(state.lastDataChangeDate).not.toBeNull();
   });
 
-  test('markDataChanged handles missing rows (upsert pattern)', async () => {
-    // No sync_state row exists yet — markDataChanged should create one
+  test('markDataChanged creates the sync_state row when it is missing', async () => {
     await syncRepo.markDataChanged(USER_ID);
 
     const state = await syncRepo.getOrCreate(USER_ID);
@@ -201,7 +172,6 @@ describe('SyncStateRepository', () => {
 
   test('hasChangesSinceLastSync returns false after sync catches up', async () => {
     await syncRepo.markDataChanged(USER_ID);
-    // Small delay to ensure sync date is after data change date
     await new Promise((r) => setTimeout(r, 10));
     await syncRepo.updateSyncDate(USER_ID);
 
@@ -224,11 +194,6 @@ describe('SyncStateRepository', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Property: Preferences and sync state are fully independent
-// **Validates: Requirements 27.1, 27.2**
-// ---------------------------------------------------------------------------
-
 describe('Independence: preferences and sync state', () => {
   test('updating preferences does not create or modify sync_state', async () => {
     await fc.assert(
@@ -236,7 +201,6 @@ describe('Independence: preferences and sync state', () => {
         await prefsRepo.getOrCreate(USER_ID);
         await prefsRepo.update(USER_ID, { currencyUnit: currency });
 
-        // sync_state row should not exist unless explicitly created
         const rawRow = sqliteDb
           .query(`SELECT * FROM sync_state WHERE user_id = '${USER_ID}'`)
           .get() as Record<string, unknown> | null;
@@ -266,34 +230,22 @@ describe('Independence: preferences and sync state', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Regression: updateSyncDate must stamp lastSyncDate from the SNAPSHOT time, not
-// end-of-run — else a data change made DURING a long backup is silently dropped from all future
-// backups. A backup snapshots the DB at T_snap; if it finishes at T_end and stamps lastSyncDate=T_end,
-// an edit at T_edit (T_snap < T_edit < T_end) gets lastDataChangeDate=T_edit < T_end → marked
-// "already synced" forever. Stamping from T_snap keeps that edit "unsynced" for the next run.
-// ---------------------------------------------------------------------------
-
+// updateSyncDate stamps the snapshot time, so a change made mid-run stays unsynced for the next run.
 describe('SyncStateRepository.updateSyncDate snapshot-time semantics', () => {
-  test('a change made AFTER the snapshot but BEFORE the run stamps still reports unsynced', async () => {
-    const tSnap = new Date('2026-01-01T10:00:00.000Z'); // backup snapshot (ZIP generated)
-    const tEdit = new Date('2026-01-01T10:02:00.000Z'); // user edits mid-run
-    const tEnd = new Date('2026-01-01T10:05:00.000Z'); // run finishes
+  test('a change made after the snapshot but before the run finishes stays unsynced', async () => {
+    const tSnap = new Date('2026-01-01T10:00:00.000Z');
+    const tEdit = new Date('2026-01-01T10:02:00.000Z');
+    const tEnd = new Date('2026-01-01T10:05:00.000Z');
 
-    // The mid-run edit lands first (set lastDataChangeDate = tEdit directly — markDataChanged stamps
-    // `now`, which isn't injectable; a direct write models "the edit happened at tEdit" deterministically).
+    // Set directly so the edit time is deterministic; markDataChanged stamps "now".
     await syncRepo.getOrCreate(USER_ID);
     await db
       .update(schema.syncState)
       .set({ lastDataChangeDate: tEdit })
       .where(eq(schema.syncState.userId, USER_ID));
-    // …then the run completes and stamps lastSyncDate from the SNAPSHOT time, not tEnd.
     await syncRepo.updateSyncDate(USER_ID, tSnap);
-
-    // The edit (tEdit > tSnap) must still count as a pending change for the NEXT backup.
     expect(await syncRepo.hasChangesSinceLastSync(USER_ID)).toBe(true);
 
-    // Negative control: had we stamped end-of-run (tEnd > tEdit), the change would be lost.
     await syncRepo.updateSyncDate(USER_ID, tEnd);
     expect(await syncRepo.hasChangesSinceLastSync(USER_ID)).toBe(false);
   });
@@ -305,7 +257,7 @@ describe('SyncStateRepository.updateSyncDate snapshot-time semantics', () => {
     expect(row.lastSyncDate?.getTime()).toBe(t.getTime());
   });
 
-  test('updateSyncDate defaults to ~now when no timestamp is given (backward-compat)', async () => {
+  test('updateSyncDate defaults to about now when no timestamp is given', async () => {
     const before = Date.now();
     await syncRepo.updateSyncDate(USER_ID);
     const row = await syncRepo.getOrCreate(USER_ID);

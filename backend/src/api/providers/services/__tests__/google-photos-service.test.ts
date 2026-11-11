@@ -1,12 +1,3 @@
-/**
- * GooglePhotosService against an in-memory fake PhotosClient (injected via the
- * constructor seam — NO mock.module). Exercises the real service logic: album
- * resolve-or-create + caching, 2-step upload, fresh-URL fetch, download, and
- * error/resilience paths — all zero-network.
- *
- * Pattern doc: .kiro/steering/TestingExternalAPIs.md
- */
-
 import { beforeEach, describe, expect, test } from 'bun:test';
 import {
   FakePhotosStore,
@@ -42,7 +33,7 @@ describe('GooglePhotosService — album resolution', () => {
   test('a constructor-cached album id skips the resolve round-trip', async () => {
     const cached = new GooglePhotosService('t', makeFakePhotosClient(store), 'album-cached');
     expect(await cached.resolveAlbumId()).toBe('album-cached');
-    expect(store.albums.size).toBe(0); // never listed or created
+    expect(store.albums.size).toBe(0);
   });
 });
 

@@ -1,29 +1,14 @@
 /**
- * Login email-preservation guard.
- *
- * `updateExistingUserProfile` (auth/routes.ts) runs on EVERY OAuth login. It used to OVERWRITE
- * `users.email` (the VROOM login identity) with the provider's currently-reported email each time, so a
- * user who changed their Google/GitHub primary email had their VROOM login email silently swapped on the
- * next login — a within-account identity drift with no notice. sync email
- * ONLY as a first-link BACKFILL (when the stored email is empty/unset); otherwise PRESERVE it. displayName
- * stays synced unconditionally; the cross-account UNIQUE-collision fallback is kept for the backfill write.
- *
- * `updateExistingUserProfile` is a private (un-exported) handler helper, so this guard pins the behavior
- * two ways that BOTH break if the fix regresses to the old unconditional overwrite:
- *  (A) a behavioral model of the EXACT decision logic against a real in-memory users table (the SQL
- *  contract the handler runs): existing non-empty email preserved across a re-login with a different
- *  provider email; an empty email backfilled.
- *  (B) a source-scan asserting routes.ts gates the email write on the stored email being empty (so a
- *  future edit can't silently restore `set({ email: userInfo.email, ... })` unconditionally).
+ * Login must not overwrite users.email with the provider's current email. The email is only
+ * backfilled when empty; displayName always syncs. The handler is private, so this checks the
+ * decision against an in-memory users table and also scans routes.ts for the gate.
  */
 
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { applyMigration, loadMigrations } from '../../../db/__tests__/migration-helpers';
 
-// The decision's logic, applied to the users row exactly as updateExistingUserProfile does: email is
-// adopted ONLY when the current stored email is empty/unset; displayName always refreshed. (users.email
-// is NOT NULL, so "unset" means the empty string — the first-link backfill state.)
+// Mirrors updateExistingUserProfile. users.email is NOT NULL, so "unset" is the empty string.
 function applyLoginProfileSync(
   db: Database,
   userId: string,
@@ -45,7 +30,7 @@ function applyLoginProfileSync(
   }
 }
 
-describe('login email-preservation — behavioral model (A)', () => {
+describe('login email preservation — behavioral model', () => {
   let db: Database;
   beforeEach(() => {
     db = new Database(':memory:');
@@ -54,23 +39,22 @@ describe('login email-preservation — behavioral model (A)', () => {
   });
   afterEach(() => db.close());
 
-  test('an existing NON-empty login email is PRESERVED across a re-login with a different provider email', () => {
+  test('an existing non-empty login email is preserved across a re-login with a different provider email', () => {
     db.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
       'google_1',
       'original@example.com',
       'Original Name',
     ]);
-    // The user changed their Google primary email; the next login reports the NEW one.
     applyLoginProfileSync(db, 'google_1', 'changed@gmail.com', 'Updated Name');
     const row = db.query('SELECT email, display_name FROM users WHERE id = ?').get('google_1') as {
       email: string;
       display_name: string;
     };
-    expect(row.email).toBe('original@example.com'); // identity PRESERVED, not silently swapped
-    expect(row.display_name).toBe('Updated Name'); // displayName still synced
+    expect(row.email).toBe('original@example.com');
+    expect(row.display_name).toBe('Updated Name');
   });
 
-  test('an EMPTY stored email IS backfilled from the provider (first-link)', () => {
+  test('an empty stored email is backfilled from the provider', () => {
     db.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
       'google_2',
       '',
@@ -84,26 +68,21 @@ describe('login email-preservation — behavioral model (A)', () => {
   });
 });
 
-describe('login email-preservation — source-scan (B)', () => {
+describe('login email preservation — source scan', () => {
   test('updateExistingUserProfile gates the email write on the stored email being empty', async () => {
     const src = await Bun.file(`${import.meta.dir}/../routes.ts`).text();
     const start = src.indexOf('async function updateExistingUserProfile');
     expect(start).toBeGreaterThan(-1);
-    // Bound the scan to the function body (until the next top-level `async function`/`function ` after it).
     const rest = src.slice(start + 1);
     const nextFn = rest.search(/\n(async function |function )/);
     const body = nextFn === -1 ? rest : rest.slice(0, nextFn);
 
-    // It must READ the current email and gate the backfill on it being empty — not overwrite blindly.
     expect(body).toContain('.select({ email: users.email })');
     expect(body).toMatch(/shouldBackfillEmail\s*=\s*!current\?\.email/);
-    // The display-only update (the preserve path) must exist.
     expect(body).toContain('.set({ displayName: userInfo.displayName, updatedAt: new Date() })');
-    // The email write must be REACHED ONLY in the backfill branch — guard against a regression that
-    // restores an unconditional email overwrite by requiring the gate variable to exist before it.
     const gateIdx = body.indexOf('shouldBackfillEmail');
     const emailWriteIdx = body.indexOf('.set({ email: userInfo.email');
     expect(gateIdx).toBeGreaterThan(-1);
-    expect(emailWriteIdx).toBeGreaterThan(gateIdx); // the email write comes AFTER the gate is computed
+    expect(emailWriteIdx).toBeGreaterThan(gateIdx);
   });
 });

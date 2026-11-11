@@ -1,11 +1,3 @@
-/**
- * Backup Service Tests — coerceRow, validation, and round-trip integrity
- *
- * These tests verify that CSV/Sheets data is correctly coerced into JS types
- * that pass Zod validation from Drizzle insert schemas. They catch regressions
- * like NOT NULL boolean columns receiving null from empty CSV cells.
- */
-
 import { describe, expect, test } from 'bun:test';
 import { getTableColumns } from 'drizzle-orm';
 import { createInsertSchema } from 'drizzle-zod';
@@ -26,10 +18,6 @@ import {
 } from '../../../db/schema';
 import { DEFAULT_UNIT_PREFERENCES, type ParsedBackupData } from '../../../types';
 import { backupService, coerceRow } from '../backup';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 /** Default string values by SQLite column type (mimics CSV output). */
 const COLUMN_TYPE_DEFAULTS: Record<string, string> = {
@@ -75,10 +63,6 @@ function buildMinimalStringRow(
   }
   return row;
 }
-
-// ---------------------------------------------------------------------------
-// coerceRow: Boolean column handling
-// ---------------------------------------------------------------------------
 
 describe('coerceRow: Boolean columns', () => {
   test('empty string on NOT NULL boolean defaults to false', () => {
@@ -156,10 +140,6 @@ describe('coerceRow: Boolean columns', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// coerceRow: Timestamp columns
-// ---------------------------------------------------------------------------
-
 describe('coerceRow: Timestamp columns', () => {
   test('valid ISO string coerces to Date', () => {
     const row = buildMinimalStringRow(expenses, { date: '2025-06-15T10:30:00.000Z' });
@@ -181,10 +161,6 @@ describe('coerceRow: Timestamp columns', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// coerceRow: JSON columns
-// ---------------------------------------------------------------------------
-
 describe('coerceRow: JSON columns', () => {
   test('tags JSON array on expenses is parsed', () => {
     const row = buildMinimalStringRow(expenses, { tags: '["oil-change","filter"]' });
@@ -205,10 +181,6 @@ describe('coerceRow: JSON columns', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// coerceRow: Numeric columns
-// ---------------------------------------------------------------------------
-
 describe('coerceRow: Numeric columns', () => {
   test('integer string coerces to number', () => {
     const row = buildMinimalStringRow(expenses, { mileage: '45000' });
@@ -217,17 +189,14 @@ describe('coerceRow: Numeric columns', () => {
   });
 
   test('real string coerces to float', () => {
-    // volume (gal/kWh) is the REAL-affinity numeric column. expenseAmount is now an INTEGER cents column
-    // (money-cents-migration), so a decimal string there ROUNDS (covered separately below) — volume is the
-    // column that still exercises the float-preserving REAL coerce branch.
+    // expenseAmount is integer cents, so volume is the column that exercises the REAL branch.
     const row = buildMinimalStringRow(expenses, { volume: '123.45' });
     const result = coerceRow(row, expenses);
     expect(result.volume).toBe(123.45);
   });
 
-  test('money INTEGER column rounds a decimal string (cents are whole — money-cents-migration)', () => {
-    // expenseAmount is integer CENTS post-0009; a 2.0.0 backup stores whole-cent integers. A stray decimal
-    // (e.g. a hand-edited CSV) rounds to the nearest whole cent, never truncates.
+  test('money integer column rounds a decimal string to whole cents', () => {
+    // A stray decimal, e.g. from a hand-edited CSV, rounds rather than truncates.
     const row = buildMinimalStringRow(expenses, { expenseAmount: '1234.56' });
     const result = coerceRow(row, expenses);
     expect(result.expenseAmount).toBe(1235);
@@ -245,14 +214,11 @@ describe('coerceRow: Numeric columns', () => {
     expect(result.mileage).toBeNull();
   });
 
-  // The Google Sheets restore reads cells as FORMATTED_VALUE (default
-  // valueRenderOption), so a thousands-separated odometer/mileage comes back as a string like
-  // "12,345". The old Number.parseInt(strVal, 10) stopped at the comma → 12 (a 1000x silent
-  // corruption). These pin the comma-aware strict parse.
-  test('INTEGER: a thousands-separated mileage keeps its full value (not parseInt-truncated)', () => {
+  // Sheets returns FORMATTED_VALUE, so "12,345" arrives as a string that parseInt would cut to 12.
+  test('INTEGER: a thousands-separated mileage keeps its full value', () => {
     const row = buildMinimalStringRow(expenses, { mileage: '12,345' });
     const result = coerceRow(row, expenses);
-    expect(result.mileage).toBe(12345); // was 12 under parseInt — the bug
+    expect(result.mileage).toBe(12345);
   });
 
   test('INTEGER: a "12345.0"-style Sheets numeric string rounds to the whole number', () => {
@@ -261,32 +227,24 @@ describe('coerceRow: Numeric columns', () => {
     expect(result.mileage).toBe(45000);
   });
 
-  test('INTEGER: a genuine garbage tail still rejects to null (strict, not truncated)', () => {
-    // Number('12abc') is NaN (unlike parseInt('12abc')=12) → null, matching the garbage→null contract.
+  test('INTEGER: a genuine garbage tail still rejects to null', () => {
     const row = buildMinimalStringRow(expenses, { mileage: '12abc' });
     const result = coerceRow(row, expenses);
     expect(result.mileage).toBeNull();
   });
 
-  test('REAL: a thousands-separated amount keeps its full value (not parseFloat-truncated)', () => {
-    // volume is the REAL-affinity column (expenseAmount is now integer cents); the comma-aware strict
-    // parse it guards still applies to every REAL column the Sheets restore reads as FORMATTED_VALUE.
+  test('REAL: a thousands-separated amount keeps its full value', () => {
     const row = buildMinimalStringRow(expenses, { volume: '1,234.56' });
     const result = coerceRow(row, expenses);
-    expect(result.volume).toBe(1234.56); // was 1 under parseFloat — the bug
+    expect(result.volume).toBe(1234.56);
   });
 
   test('REAL: a plain integer-valued amount (CSV round-trip) is unchanged', () => {
-    // The CSV path writes a raw number with no separators — confirm the fix didn't regress it.
     const row = buildMinimalStringRow(expenses, { volume: '50' });
     const result = coerceRow(row, expenses);
     expect(result.volume).toBe(50);
   });
 });
-
-// ---------------------------------------------------------------------------
-// Validation: coerced rows pass Zod insert schemas
-// ---------------------------------------------------------------------------
 
 describe('Validation: coerced rows pass insert schemas', () => {
   for (const [key, table] of Object.entries(TABLE_SCHEMA_MAP)) {
@@ -303,10 +261,6 @@ describe('Validation: coerced rows pass insert schemas', () => {
     });
   }
 });
-
-// ---------------------------------------------------------------------------
-// Validation: empty boolean fields still pass validation
-// ---------------------------------------------------------------------------
 
 describe('Validation: empty NOT NULL booleans pass after coercion', () => {
   test('expense with empty missedFillup passes validation', () => {
@@ -334,19 +288,8 @@ describe('Validation: empty NOT NULL booleans pass after coercion', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// coerceRow: NOT NULL columns with a STATIC default.
-//
-// An empty/null backup cell for a NOT NULL column carrying a static default must coerce to that DEFAULT,
-// never to null — else the insert throws `NOT NULL constraint failed` and the WHOLE restore aborts (the
-// user can't recover ANY data from their own valid backup). Verified firsthand that the
-// pre-fix coerceRow nulled these (the theming-engine `themePreference` add re-surfaced the
-// DatabaseMigrations.md footgun; `currencyUnit`/`backupFrequency`/`unitPreferences`/`syncInactivityMinutes`
-// shared the latent gap). This is the non-boolean sibling of the block above.
-// ---------------------------------------------------------------------------
-
 describe('coerceRow: empty NOT NULL columns with a static default fall back to the default', () => {
-  // Drive the REAL schema column metadata so this can't drift from the table definition.
+  // Read from the schema so this cannot drift from the table definition.
   const cols = getTableColumns(userPreferences) as Record<string, { default?: unknown }>;
 
   test.each([
@@ -357,7 +300,6 @@ describe('coerceRow: empty NOT NULL columns with a static default fall back to t
     'empty %s coerces to its column default (not null) — restore cannot abort',
     (colName) => {
       const expected = cols[colName].default;
-      // Sanity: the column genuinely declares a static default (guards against a schema change that drops it).
       expect(expected, `${colName} must declare a static default`).toBeDefined();
       for (const empty of ['', 'null', 'NULL', 'undefined']) {
         const coerced = coerceRow({ userId: 'u1', [colName]: empty }, userPreferences);
@@ -365,16 +307,14 @@ describe('coerceRow: empty NOT NULL columns with a static default fall back to t
           expected
         );
       }
-      // An entirely ABSENT key (an old backup predating the column) is also safe — left absent so the DB
-      // default applies (it must NOT be forced to null).
+      // An absent key is left for the DB default to apply.
       const absent = coerceRow({ userId: 'u1' }, userPreferences);
       expect(absent[colName] === undefined || absent[colName] === expected).toBe(true);
     }
   );
 
   test('a full userPreferences row of empties coerces to a schema-valid row (whole-row restore survives)', () => {
-    // Every NOT NULL column blank — the worst-case partial/legacy backup. Pre-fix this produced multiple
-    // nulls → NOT NULL violations on insert. Now the insert schema accepts the coerced row.
+    // Worst case: every NOT NULL column blank.
     const row = buildMinimalStringRow(userPreferences, {
       themePreference: '',
       currencyUnit: '',
@@ -393,10 +333,6 @@ describe('coerceRow: empty NOT NULL columns with a static default fall back to t
     expect(coerced.themePreference).toBe('instrument');
   });
 });
-
-// ---------------------------------------------------------------------------
-// validateBackupData: well-formed backup passes
-// ---------------------------------------------------------------------------
 
 describe('validateBackupData: acceptance', () => {
   test('valid parsed backup passes validation', () => {
@@ -427,7 +363,6 @@ describe('validateBackupData: acceptance', () => {
       odometer: [],
       photoRefs: [],
     };
-    // Fix vehicleId reference
     (backup.expenses[0] as Record<string, unknown>).vehicleId = backup.vehicles[0].id;
 
     const result = backupService.validateBackupData(backup);
@@ -470,14 +405,6 @@ describe('validateBackupData: acceptance', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// validateBackupData: cross-row UNIQUE constraints
-// A corrupt/truncated backup whose rows violate a DB unique index (duplicate non-null clientId /
-// licensePlate) passes per-row schema + referential checks but throws on the 2nd colliding INSERT.
-// Because bun-sqlite's async-tx callback does NOT roll back the wipe, a replace-mode
-// restore would leave the account EMPTY. Catching the duplicate at validation = the insert can't fail on
-// it = the destructive wipe never runs. (The general transient-failure atomicity fix is escalated.)
-// ---------------------------------------------------------------------------
 describe('validateBackupData: cross-row unique constraints', () => {
   function backupWith(over: Partial<ParsedBackupData>): ParsedBackupData {
     return {
@@ -538,10 +465,7 @@ describe('validateBackupData: cross-row unique constraints', () => {
   });
 
   test('NULL licensePlate does NOT collide (the index is partial — many nulls allowed)', () => {
-    // Explicitly NULL the plate on both: the partial unique index is `WHERE license_plate IS NOT NULL`,
-    // so two null-plate vehicles are NOT a duplicate — dupCheck must skip nulls. (buildMinimalStringRow
-    // fills every column with a `test-<name>` default, so without this override BOTH would share
-    // 'test-licensePlate' and legitimately collide — confirming the dupCheck fires; this pins the null skip.)
+    // Explicit nulls: buildMinimalStringRow would otherwise give both the same test default.
     const v1 = {
       ...coerceRow(buildMinimalStringRow(vehicles, { userId: 'u1' }), vehicles),
       id: 'v1',
@@ -556,14 +480,8 @@ describe('validateBackupData: cross-row unique constraints', () => {
     expect(result.valid).toBe(true);
   });
 
-  // The three COMPOSITE unique indexes the original check missed. Each is a real
-  // CREATE UNIQUE INDEX in the migrations on a backed-up + restored table, so a duplicate survives
-  // per-row + referential validation, then throws on the colliding INSERT AFTER the replace-mode
-  // wipe → empty account (the same-footgun data-loss trigger as clientId/licensePlate).
-  // Each asserts on the SPECIFIC unique-constraint message substring, so a parallel referential error
-  // (the synthetic parent rows aren't all present) cannot make the assertion pass spuriously — the
-  // assertion fires only if THIS unique check produced its error.
-  test('two photoRefs sharing (photoId, providerId) are rejected — pr_photo_provider_idx', () => {
+  // Each assertion matches its own constraint message, so an unrelated referential error cannot pass it.
+  test('two photoRefs sharing (photoId, providerId) are rejected', () => {
     const mk = (id: string) =>
       ({
         ...coerceRow(buildMinimalStringRow(photoRefs), photoRefs),
@@ -578,7 +496,7 @@ describe('validateBackupData: cross-row unique constraints', () => {
     expect(result.errors.some((e) => e.includes('photoRef photo+provider'))).toBe(true);
   });
 
-  test('two reminderNotifications sharing (reminderId, dueDate) are rejected — rn_reminder_due_idx', () => {
+  test('two reminderNotifications sharing (reminderId, dueDate) are rejected', () => {
     const due = new Date('2024-03-01T00:00:00Z');
     const mk = (id: string) =>
       ({
@@ -598,9 +516,8 @@ describe('validateBackupData: cross-row unique constraints', () => {
     expect(result.errors.some((e) => e.includes('reminder+dueDate'))).toBe(true);
   });
 
-  test('two MILEAGE reminderNotifications sharing (reminderId, dueOdometer) are rejected — rn_reminder_odo_idx', () => {
-    // Mileage rows carry a NULL dueDate (the time index treats them as distinct) but collide on the
-    // partial odometer index. The composite check on (reminderId, dueOdometer) must catch them.
+  test('two mileage reminderNotifications sharing (reminderId, dueOdometer) are rejected', () => {
+    // Mileage rows have a null dueDate, so only the odometer key can match them.
     const mk = (id: string) =>
       ({
         ...coerceRow(
@@ -619,13 +536,9 @@ describe('validateBackupData: cross-row unique constraints', () => {
     expect(result.errors.some((e) => e.includes('reminder+dueOdometer'))).toBe(true);
   });
 
-  test('mileage reminderNotifications at DIFFERENT odometers do NOT trip the unique check (NULL dueDate + distinct dueOdometer)', () => {
-    // Two mileage rows for the same reminder but DIFFERENT odometer milestones: NULL dueDate makes the
-    // time index distinct, and distinct dueOdometer makes the mileage index distinct too → neither
-    // composite check should flag them. Pins that the null-skip + distinct-key path mirrors SQLite
-    // semantics (a regression that keyed nulls as '' would falsely flag the time index here). Asserts
-    // specifically that NO unique-constraint error was produced (a parallel referential error from the
-    // synthetic parent-less reminder is irrelevant to what this test pins).
+  test('mileage reminderNotifications at different odometers do not trip the unique check', () => {
+    // Null dueDate and distinct dueOdometer values: a regression that keyed nulls as '' would flag
+    // these. Only the absence of a unique-constraint error is asserted.
     const mk = (id: string, odo: number) =>
       ({
         ...coerceRow(
@@ -643,12 +556,7 @@ describe('validateBackupData: cross-row unique constraints', () => {
     expect(result.errors.some((e) => e.includes('violates a unique constraint'))).toBe(false);
   });
 
-  /**
-   * `vf_active_vehicle_idx` is unique on `vehicle_id` WHERE `is_active = 1`. Financing is exported
-   * in full, history included, so the predicate has to be honoured here: a vehicle legitimately
-   * accumulates settled agreements, and only a second ACTIVE one collides. Validating without the
-   * predicate would reject every backup from anyone who has ever refinanced.
-   */
+  // Only active financing rows are unique per vehicle; settled history is valid.
   const financingRow = (id: string, isActive: boolean, vehicleId = 'veh-1') =>
     ({
       ...coerceRow(buildMinimalStringRow(vehicleFinancing, { vehicleId }), vehicleFinancing),
@@ -657,9 +565,7 @@ describe('validateBackupData: cross-row unique constraints', () => {
       isActive,
     }) as Record<string, unknown>;
 
-  test('two ACTIVE financing rows for one vehicle are rejected — vf_active_vehicle_idx', () => {
-    // Without this check the duplicate survives validation and throws on the colliding INSERT
-    // *after* the replace-mode wipe, which leaves the account empty.
+  test('two ACTIVE financing rows for one vehicle are rejected', () => {
     const result = backupService.validateBackupData(
       backupWith({ financing: [financingRow('f1', true), financingRow('f2', true)] })
     );
@@ -667,7 +573,7 @@ describe('validateBackupData: cross-row unique constraints', () => {
     expect(result.errors.some((e) => e.includes('active financing vehicleId'))).toBe(true);
   });
 
-  test('several SETTLED financing rows for one vehicle are accepted (outside the partial index)', () => {
+  test('several SETTLED financing rows for one vehicle are accepted', () => {
     const result = backupService.validateBackupData(
       backupWith({
         financing: [financingRow('f1', false), financingRow('f2', false), financingRow('f3', true)],
@@ -685,10 +591,6 @@ describe('validateBackupData: cross-row unique constraints', () => {
     expect(result.errors.some((e) => e.includes('active financing vehicleId'))).toBe(false);
   });
 });
-
-// ---------------------------------------------------------------------------
-// validateBackupData: referential integrity
-// ---------------------------------------------------------------------------
 
 describe('validateBackupData: referential integrity', () => {
   test('expense referencing non-existent vehicle fails', () => {
@@ -787,8 +689,7 @@ describe('validateBackupData: referential integrity', () => {
             policyId: ins.id as string,
             claimType: 'collision',
             status: 'filed',
-            // No optional links — buildMinimalStringRow would otherwise fill
-            // term_id/vehicle_id with dummy ids that fail the ref-check.
+            // Optional links left empty; the generated dummy ids would fail the ref check.
             termId: '',
             vehicleId: '',
           }),
@@ -988,14 +889,7 @@ describe('validateBackupData: referential integrity', () => {
     expect(result.errors.some((e) => e.includes('non-existent vehicle'))).toBe(true);
   });
 
-  // (arch dedup convergence guard) Financing / odometer / trips each own purely via a vehicleId FK,
-  // and their three byte-identical ref-checks were converged onto one shared `validateVehicleFkRefs(rows,
-  // vehicleIds, label)` helper (the trips addition tipped the rule-of-three). The convergence is
-  // behavior-preserving ONLY if each caller still emits its EXACT prior message — a future "simplify the
-  // label" edit to the shared helper could silently change one entity's validation text (which a restore
-  // UI / a log consumer may match on). This drives all THREE through the public validateBackupData with a
-  // bogus vehicleId and asserts the precise per-entity string survives. Non-vacuous: change any label in
-  // the helper's callers and the matching assertion goes RED.
+  // Each caller of the shared vehicle-FK check must keep its exact message, since consumers may match on it.
   const VEHICLE_FK_CASES: {
     label: string;
     table: Parameters<typeof getTableColumns>[0];
@@ -1007,7 +901,7 @@ describe('validateBackupData: referential integrity', () => {
   ];
 
   for (const { label, table, key } of VEHICLE_FK_CASES) {
-    test(`${label} row referencing a non-existent vehicle fails with its exact label (convergence)`, () => {
+    test(`${label} row referencing a non-existent vehicle fails with its exact label`, () => {
       const row = coerceRow(buildMinimalStringRow(table, { vehicleId: 'ghost' }), table);
       const base: ParsedBackupData = {
         metadata: {
@@ -1030,8 +924,6 @@ describe('validateBackupData: referential integrity', () => {
       const backup: ParsedBackupData = { ...base, [key]: [row] };
       const result = backupService.validateBackupData(backup);
       expect(result.valid).toBe(false);
-      // The EXACT message contract each converged caller must still produce: "<Label> <id> references
-      // non-existent vehicle". A regression renaming a caller's label fails only its own case here.
       expect(
         result.errors.some((e) => e === `${label} ${row.id} references non-existent vehicle`),
         `expected the exact "${label} <id> references non-existent vehicle" message; got: ${JSON.stringify(result.errors)}`
@@ -1064,10 +956,6 @@ describe('coerceRow: Odometer entry columns', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// TABLE_SCHEMA_MAP coverage: every table has a schema entry
-// ---------------------------------------------------------------------------
-
 describe('TABLE_SCHEMA_MAP coverage', () => {
   test('all expected backup tables are registered', () => {
     const expected = [
@@ -1089,13 +977,8 @@ describe('TABLE_SCHEMA_MAP coverage', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Property 9: Backup round-trip for tracking flags
-// **Validates: Requirements 6.1, 6.2**
-// ---------------------------------------------------------------------------
-
-describe('Property 9: Backup round-trip for tracking flags', () => {
-  /** Map boolean to CSV string representations that a backup might produce. */
+describe('tracking flags round-trip', () => {
+  /** CSV string forms a backup may use for booleans. */
   const boolStringArb = fc.constantFrom('true', 'false', '1', '0', 'TRUE', 'FALSE');
 
   test('coerceRow preserves arbitrary trackFuel/trackCharging boolean values from CSV strings', () => {
@@ -1179,28 +1062,20 @@ describe('Property 9: Backup round-trip for tracking flags', () => {
   });
 
   test('older backups missing trackFuel/trackCharging get correct defaults', () => {
-    // Simulate an older backup row that lacks the tracking flag columns entirely
     const row = buildMinimalStringRow(vehicles, { userId: 'u1' });
     delete (row as Record<string, unknown>).trackFuel;
     delete (row as Record<string, unknown>).trackCharging;
 
     const coerced = coerceRow(row, vehicles);
 
-    // Schema defaults: trackFuel=true, trackCharging=false
     expect(coerced.trackFuel).toBe(true);
     expect(coerced.trackCharging).toBe(false);
 
-    // Must still pass validation
     const schema = createInsertSchema(vehicles);
     const result = schema.safeParse(coerced);
     expect(result.success).toBe(true);
   });
 });
-
-// ---------------------------------------------------------------------------
-// coerceRow: unitPreferences JSON round-trip on vehicles
-// **Validates: Requirements 9.5, 10.1**
-// ---------------------------------------------------------------------------
 
 describe('coerceRow: unitPreferences JSON column on vehicles', () => {
   test('valid unitPreferences JSON string is parsed correctly', () => {
@@ -1252,8 +1127,7 @@ describe('coerceRow: unitPreferences JSON column on vehicles', () => {
 
     const coerced = coerceRow(row, vehicles);
 
-    // unitPreferences is undefined — Drizzle will use the schema default on insert
-    // The Zod schema from createInsertSchema should accept undefined for columns with defaults
+    // Zod accepts undefined for columns with defaults.
     const schema = createInsertSchema(vehicles);
     const result = schema.safeParse(coerced);
     expect(result.success).toBe(true);
@@ -1294,8 +1168,7 @@ describe('coerceRow: unitPreferences JSON column on vehicles', () => {
   });
 
   test('unparseable unitPreferences JSON resolves to the column default, not null', () => {
-    // null would violate NOT NULL on this column, and the restore inserts inside one transaction —
-    // so the old null assignment threw away the user's entire restore over one corrupt cell.
+    // A null here would violate NOT NULL and abort the whole restore.
     const row = buildMinimalStringRow(vehicles, { unitPreferences: '{broken-json' });
     const result = coerceRow(row, vehicles);
     expect(result.unitPreferences).toEqual(DEFAULT_UNIT_PREFERENCES);

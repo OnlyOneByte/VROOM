@@ -1,13 +1,5 @@
 <script lang="ts">
-	// Component gallery (dev-only) — the LIVE source of truth for the VROOM kit.
-	// Renders the reusable components in their key states + both viewports so an
-	// agent (or human) can see "what good looks like" and COMPOSE from the kit
-	// instead of reinventing. Pairs with .kiro/steering/DesignSystem.md.
-	//
-	// Route-smoke covers /dev/gallery (a11y + mobile + screenshot), so this page
-	// doubles as a single capture target that exercises every component state —
-	// e.g. it would surface a blank-chart / missing-empty-state regression at the
-	// component level, before any feature route hits it.
+	// Dev-only component gallery: every kit component in its key states.
 	import { dev } from '$app/environment';
 	import PageHeader from '$lib/components/common/page-header.svelte';
 	import EmptyState from '$lib/components/common/empty-state.svelte';
@@ -36,7 +28,6 @@
 	const badgeVariants = ['default', 'secondary', 'destructive', 'outline'] as const;
 	const alertVariants = ['default', 'destructive', 'warning', 'success'] as const;
 
-	// Sample chart data for the "populated" state.
 	const trend = [
 		{ date: new Date(2026, 0, 1), amount: 120 },
 		{ date: new Date(2026, 1, 1), amount: 240 },
@@ -77,7 +68,6 @@
 			description="The live VROOM kit — compose from these, don't reinvent. See DesignSystem.md."
 		/>
 
-		<!-- Buttons -->
 		<section class="space-y-3">
 			<h2 class="text-lg font-semibold">Buttons</h2>
 			<div class="flex flex-wrap gap-2">
@@ -93,7 +83,6 @@
 			</div>
 		</section>
 
-		<!-- Badges -->
 		<section class="space-y-3">
 			<h2 class="text-lg font-semibold">Badges</h2>
 			<div class="flex flex-wrap gap-2">
@@ -103,7 +92,6 @@
 			</div>
 		</section>
 
-		<!-- Alerts (status surfaces) -->
 		<section class="space-y-3">
 			<h2 class="text-lg font-semibold">Alerts</h2>
 			{#each alertVariants as v (v)}
@@ -116,7 +104,6 @@
 			{/each}
 		</section>
 
-		<!-- Form field (label + input + error wired) -->
 		<section class="space-y-3">
 			<h2 class="text-lg font-semibold">Form field</h2>
 			<div class="max-w-sm space-y-2">
@@ -132,7 +119,6 @@
 			</div>
 		</section>
 
-		<!-- The Four-States contract, side by side -->
 		<section class="space-y-3">
 			<h2 class="text-lg font-semibold">The Four States (every data view must handle all four)</h2>
 			<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -189,13 +175,11 @@
 			</div>
 		</section>
 
-		<!-- StatCards -->
 		<section class="space-y-3">
 			<h2 class="text-lg font-semibold">StatCard grid</h2>
 			<StatCardGrid items={statItems} columns={3} />
 		</section>
 
-		<!-- Charts: the wrapper handles loading/empty/error/populated for you -->
 		<section class="space-y-3">
 			<h2 class="text-lg font-semibold">Charts (ChartCard 4-state wrapper)</h2>
 			<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">

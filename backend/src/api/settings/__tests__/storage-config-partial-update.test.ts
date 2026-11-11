@@ -1,16 +1,7 @@
 /**
- * PUT /settings merges storageConfig, so its request schema must ACCEPT a partial one.
- *
- * Zod 4 changed `z.record(enum, value)` to be EXHAUSTIVE: it demands every enum key. The
- * storageConfig schema keyed `defaults` by the photo-category enum, so the provider form's payload —
- * which edits ONE provider's folder paths and names no category defaults — was rejected 400 with
- * four `invalid_type … received undefined` issues, on every single submit. The form swallowed that
- * rejection and still said "added successfully", so the per-category folder paths and enable toggles
- * the user had just typed were discarded 100% of the time.
- *
- * The contract below is the merge granularity, from both sides: anything merged per-key may be
- * omitted, and anything replaced wholesale may not (an omitted key there would be silent data loss
- * rather than "leave it alone").
+ * storageConfig and backupConfig request schemas must accept partial updates at the granularity the
+ * route merges them: `defaults` per category, and provider entries replaced whole, so an omitted
+ * key there would be data loss rather than "leave it alone".
  */
 
 import { describe, expect, test } from 'bun:test';
@@ -24,8 +15,8 @@ const FULL_ENTRY = {
   odometer_readings: { enabled: true, folderPath: 'Odometer' },
 };
 
-describe('storageConfigSchema — `defaults` is merged per category, so a subset is valid', () => {
-  test('the provider form payload (one provider, no category defaults) parses', () => {
+describe('storageConfigSchema — defaults merge per category, so a subset is valid', () => {
+  test('a provider form payload with no category defaults parses', () => {
     const result = storageConfigSchema.safeParse({
       defaults: {},
       providerCategories: { 'drive-1': FULL_ENTRY },
@@ -52,8 +43,7 @@ describe('storageConfigSchema — `defaults` is merged per category, so a subset
     expect(result.data?.defaults).toEqual({});
   });
 
-  test('a category that is sent still has to carry a provider id or an explicit null', () => {
-    // Partial means "omit what you are not changing", not "anything goes".
+  test('a category that is sent must carry a provider id or an explicit null', () => {
     expect(storageConfigSchema.safeParse({ defaults: { expense_receipts: 7 } }).success).toBe(
       false
     );
@@ -69,7 +59,7 @@ describe('storageConfigSchema — `defaults` is merged per category, so a subset
   });
 });
 
-describe('storageConfigSchema — a providerCategories ENTRY is replaced, so it must be complete', () => {
+describe('storageConfigSchema — a providerCategories entry is replaced, so it must be complete', () => {
   test('an entry missing a category is rejected rather than half-merged', () => {
     const { expense_receipts, ...missingOne } = FULL_ENTRY;
     expect(expense_receipts).toBeDefined();
@@ -79,12 +69,10 @@ describe('storageConfigSchema — a providerCategories ENTRY is replaced, so it 
       providerCategories: { 'drive-1': missingOne },
     });
 
-    // mergeStorageConfig swaps the whole entry in, so accepting a partial one would quietly drop
-    // the folder path + enabled flag of every category the caller left out.
     expect(result.success).toBe(false);
   });
 
-  test('more than 20 provider entries is still refused', () => {
+  test('more than 20 provider entries is refused', () => {
     const providerCategories = Object.fromEntries(
       Array.from({ length: 21 }, (_, i) => [`drive-${i}`, FULL_ENTRY])
     );
@@ -93,16 +81,14 @@ describe('storageConfigSchema — a providerCategories ENTRY is replaced, so it 
   });
 });
 
-describe('a parsed update still satisfies what the route does with it', () => {
+describe('a parsed update satisfies what the route does with it', () => {
   test('it merges into a full StorageConfig, and its defaults are always readable', () => {
     const incoming = storageConfigSchema.parse({
       defaults: { expense_receipts: 'drive-1' },
       providerCategories: { 'drive-1': FULL_ENTRY },
     });
 
-    // The route's merge, mirrored: the compiler is the assertion here — a schema whose `defaults`
-    // could be undefined (no `.default({})`) would stop satisfying this spread and the
-    // `Object.values` ownership scan below, which run on every PUT.
+    // A schema whose `defaults` could be undefined would break this spread at compile time.
     const merged: StorageConfig = {
       defaults: { ...DEFAULT_STORAGE_CONFIG.defaults, ...incoming.defaults },
       providerCategories: {
@@ -112,7 +98,6 @@ describe('a parsed update still satisfies what the route does with it', () => {
     };
 
     expect(merged.defaults.expense_receipts).toBe('drive-1');
-    // A category the caller did not name keeps the stored value instead of being cleared.
     expect(merged.defaults.vehicle_photos).toBeNull();
     expect(merged.providerCategories['drive-1']?.expense_receipts.folderPath).toBe('Receipts');
 

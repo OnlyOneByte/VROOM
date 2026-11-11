@@ -1,11 +1,3 @@
-/**
- * Unit tests for restore provider list endpoint logic.
- * Validates: Requirement 5.6 — sourceTypes derived from enabled flags + metadata.
- *
- * Tests the pure logic that derives sourceTypes from provider config and
- * filters providers that have at least one available source type.
- */
-
 import { describe, expect, test } from 'bun:test';
 import type { BackupConfig, ProviderBackupSettings } from '../../../types';
 
@@ -24,10 +16,7 @@ interface RestoreProviderInfo {
   sourceTypes: ('zip' | 'sheets')[];
 }
 
-/**
- * Pure function replicating the restore provider list logic from sync/routes.ts
- * GET /restore/providers handler.
- */
+// Copy of the GET /restore/providers logic in routes.ts.
 function deriveRestoreProviders(
   providers: ProviderRow[],
   config: BackupConfig

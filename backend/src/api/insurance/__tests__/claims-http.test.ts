@@ -1,11 +1,6 @@
 /**
- * In-process HTTP tests for the insurance claims routes — through the REAL stack
- * (middleware → auth → zValidator → handler → repository → DB).
- *
- * Covers the claim lifecycle (file → list → update → delete), ownership scoping
- * (a claim under another user's policy is 404, never readable/mutable), and zod
- * enum rejection (bad claimType/status). createTestApp() rewrites process.env +
- * dynamic-imports DB-bound modules, so this file imports only the harness.
+ * HTTP tests for insurance claims: the file, list, update, and delete lifecycle, ownership scoping, and enum
+ * validation. Imports only the harness: createTestApp sets env before config loads.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -68,7 +63,7 @@ describe('insurance claims HTTP routes', () => {
     });
     const createdBody = await json<DataEnvelope<ClaimRow>>(created);
     expect(created.status, JSON.stringify(createdBody)).toBe(201);
-    expect(createdBody.data.status).toBe('filed'); // default
+    expect(createdBody.data.status).toBe('filed');
     expect(createdBody.data.claimType).toBe('collision');
     const claimId = createdBody.data.id;
 
@@ -124,11 +119,10 @@ describe('insurance claims HTTP routes', () => {
     const partialBody = await json<DataEnvelope<ClaimRow>>(partial);
     expect(partial.status, JSON.stringify(partialBody)).toBe(200);
     expect(partialBody.data.status).toBe('settled');
-    expect(partialBody.data.payoutAmount).toBe(1200.5); // preserved
-    expect(partialBody.data.description).toBe('Rear-ended at a light'); // preserved
-    expect(partialBody.data.faultDesignation).toBe('not_at_fault'); // preserved
+    expect(partialBody.data.payoutAmount).toBe(1200.5);
+    expect(partialBody.data.description).toBe('Rear-ended at a light');
+    expect(partialBody.data.faultDesignation).toBe('not_at_fault');
 
-    // Explicit null clears the optional fields (the user emptied them in the form).
     const cleared = await ctx.authed('PUT', `/api/v1/insurance/${policyId}/claims/${claimId}`, {
       description: null,
       payoutAmount: null,
@@ -156,13 +150,12 @@ describe('insurance claims HTTP routes', () => {
     const badStatus = await ctx.authed('POST', `/api/v1/insurance/${policyId}/claims`, {
       claimDate: '2024-06-15T00:00:00.000Z',
       claimType: 'other',
-      status: 'pending', // not in CLAIM_STATUSES
+      status: 'pending',
     });
     expect(badStatus.status).toBe(400);
   });
 
   test('claims under an unowned policy are not accessible (404)', async () => {
-    // A random policy id the user does not own.
     const list = await ctx.authed('GET', '/api/v1/insurance/someone-elses-policy/claims');
     expect(list.status).toBeGreaterThanOrEqual(400);
     expect(list.status).toBeLessThan(500);
@@ -181,10 +174,7 @@ describe('insurance claims HTTP routes', () => {
   });
 });
 
-// A claim's optional vehicleId/termId links were written verbatim — the route only proved
-// POLICY ownership, so a claim could reference a vehicle the user doesn't own (cross-tenant FK) or a
-// term from a DIFFERENT policy. validateClaimRefs now gates both on create + update.
-describe('insurance claim vehicleId/termId link validation', () => {
+describe('insurance claim vehicleId and termId links', () => {
   test('filing a claim with a vehicle the user does NOT own → 404 (ownership gate)', async () => {
     const ownVehicle = await seedVehicle(ctx);
     const policyId = await seedPolicy(ownVehicle);
@@ -192,7 +182,7 @@ describe('insurance claim vehicleId/termId link validation', () => {
     const res = await ctx.authed('POST', `/api/v1/insurance/${policyId}/claims`, {
       claimDate: '2024-06-15T00:00:00.000Z',
       claimType: 'collision',
-      vehicleId: 'not-my-vehicle', // never owned by this user
+      vehicleId: 'not-my-vehicle',
     });
     expect(res.status).toBe(404);
   });
@@ -213,7 +203,7 @@ describe('insurance claim vehicleId/termId link validation', () => {
     expect(body.error.message.toLowerCase()).toContain('term');
   });
 
-  test('a claim referencing the policy’s OWN vehicle + term is accepted (control, no over-block)', async () => {
+  test('a claim referencing the policy’s own vehicle and term is accepted', async () => {
     const ownVehicle = await seedVehicle(ctx);
     const policyId = await seedPolicy(ownVehicle);
 
@@ -249,11 +239,6 @@ describe('insurance claim vehicleId/termId link validation', () => {
     expect(put.status).toBe(404);
   });
 
-  // validateClaimRefs gates termId on BOTH create + update, but only the UPDATE vehicleId leg
-  // (above) and the CREATE termId leg (filing-with-termId test) were pinned — the UPDATE termId leg
-  // was unguarded. A claim must not be re-pointed at a term on ANOTHER policy (a cross-policy link is
-  // a referential-integrity violation: a claim belongs to its own policy's coverage). This pins that
-  // the PUT path re-validates termId-on-this-policy, not just vehicle ownership.
   test('a PUT re-pointing a claim at a termId NOT on this policy → 400', async () => {
     const ownVehicle = await seedVehicle(ctx);
     const policyId = await seedPolicy(ownVehicle);
@@ -270,7 +255,6 @@ describe('insurance claim vehicleId/termId link validation', () => {
     });
     const claimId = (await json<DataEnvelope<ClaimRow>>(filed)).data.id;
 
-    // Re-point THIS policy's claim at the OTHER policy's term → cross-policy link, must be rejected.
     const put = await ctx.authed('PUT', `/api/v1/insurance/${policyId}/claims/${claimId}`, {
       termId: otherTermId,
     });

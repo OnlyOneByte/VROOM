@@ -1,17 +1,13 @@
 /**
- * Unit net for the recurring-cost normalizer (recurring-expenses T7 backend core).
- *
- * Pure functions over a Reminder row — no DB. Pins the monthly run-rate derivation: the four
- * frequencies stay mutually consistent on an occurrences-per-year ÷ 12 basis, custom intervals convert
- * per unit, and only active positive-amount expense reminders contribute (notification / inactive /
- * null-amount / un-fireable-interval all contribute 0).
+ * Monthly run-rate normalizer. Pure functions over a Reminder row: the four frequencies share an
+ * occurrences-per-year ÷ 12 basis, and only active positive-amount expense reminders contribute.
  */
 
 import { describe, expect, test } from 'bun:test';
 import type { Reminder } from '../../../db/schema';
 import { monthlyRunRate, occurrencesPerYear, recurringCostSummary } from '../reminder-cost';
 
-/** Minimal valid expense Reminder; override per case. Dates are fixed (no Date.now in assertions). */
+/** Minimal valid expense Reminder; override per case. */
 function reminder(overrides: Partial<Reminder> = {}): Reminder {
   const base: Reminder = {
     id: 'rem-1',
@@ -47,22 +43,22 @@ describe('occurrencesPerYear — mirrors the engine frequency interpretation', (
   test('the named frequencies are mutually consistent', () => {
     expect(occurrencesPerYear('yearly')).toBeCloseTo(1, 6);
     expect(occurrencesPerYear('monthly')).toBeCloseTo(12, 6);
-    expect(occurrencesPerYear('weekly')).toBeCloseTo(365.25 / 7, 6); // ~52.18, not a rounded 52
+    expect(occurrencesPerYear('weekly')).toBeCloseTo(365.25 / 7, 6);
   });
 
   test('custom intervals convert per unit (and scale inversely with the interval)', () => {
     expect(occurrencesPerYear('custom', 1, 'month')).toBeCloseTo(12, 6);
-    expect(occurrencesPerYear('custom', 3, 'month')).toBeCloseTo(4, 6); // every 3 months → 4×/yr
+    expect(occurrencesPerYear('custom', 3, 'month')).toBeCloseTo(4, 6);
     expect(occurrencesPerYear('custom', 2, 'week')).toBeCloseTo(365.25 / 7 / 2, 6);
     expect(occurrencesPerYear('custom', 1, 'year')).toBeCloseTo(1, 6);
     expect(occurrencesPerYear('custom', 90, 'day')).toBeCloseTo(365.25 / 90, 6);
   });
 
-  test('un-fireable / unknown shapes contribute nothing (0, never a divide-by-zero)', () => {
+  test('un-fireable and unknown shapes contribute nothing', () => {
     expect(occurrencesPerYear('custom', 0, 'month')).toBe(0);
     expect(occurrencesPerYear('custom', -3, 'month')).toBe(0);
-    expect(occurrencesPerYear('custom', 3, 'fortnight')).toBe(0); // unknown unit
-    expect(occurrencesPerYear('whenever')).toBe(0); // unknown frequency
+    expect(occurrencesPerYear('custom', 3, 'fortnight')).toBe(0);
+    expect(occurrencesPerYear('whenever')).toBe(0);
   });
 });
 
@@ -98,7 +94,7 @@ describe('monthlyRunRate — per-reminder normalized cost', () => {
     expect(monthlyRunRate(r)).toBeCloseTo(100, 6);
   });
 
-  test('non-contributing reminders are $0: notification, inactive, null/zero amount', () => {
+  test('notification, inactive, and zero or null amount reminders contribute nothing', () => {
     expect(monthlyRunRate(reminder({ type: 'notification', expenseAmount: null }))).toBe(0);
     expect(monthlyRunRate(reminder({ isActive: false, expenseAmount: 100 }))).toBe(0);
     expect(monthlyRunRate(reminder({ expenseAmount: null }))).toBe(0);
@@ -109,10 +105,10 @@ describe('monthlyRunRate — per-reminder normalized cost', () => {
 describe('recurringCostSummary — aggregate over a user set', () => {
   test('sums only the contributing reminders and counts them', () => {
     const set = [
-      reminder({ id: 'a', frequency: 'monthly', expenseAmount: 100 }), // $100/mo
-      reminder({ id: 'b', frequency: 'yearly', expenseAmount: 1200 }), // $100/mo
-      reminder({ id: 'c', type: 'notification', expenseAmount: null }), // $0 — excluded
-      reminder({ id: 'd', isActive: false, expenseAmount: 999 }), // $0 — excluded
+      reminder({ id: 'a', frequency: 'monthly', expenseAmount: 100 }),
+      reminder({ id: 'b', frequency: 'yearly', expenseAmount: 1200 }),
+      reminder({ id: 'c', type: 'notification', expenseAmount: null }),
+      reminder({ id: 'd', isActive: false, expenseAmount: 999 }),
     ];
     const summary = recurringCostSummary(set);
     expect(summary.count).toBe(2);

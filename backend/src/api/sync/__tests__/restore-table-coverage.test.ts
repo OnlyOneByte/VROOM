@@ -1,25 +1,6 @@
-/**
- * Restore-side drift guard — the symmetric partner to backup-table-coverage.test.ts (c208).
- *
- * c208 proved the BACKUP half can't silently drop a table (createBackup keys === registry).
- * This guards the RESTORE half: if a table is backed up but restore never inserts it, the
- * data round-trips into the archive and back out to NOTHING — silent data loss on restore.
- * The restore path has THREE hand-maintained lists that must agree with the registry:
- *  1. TABLE_SCHEMA_MAP (config) — the source of truth.
- *  2. RestoreService.insertBackupData() — hand-written FK-ordered `insertRows(tx, <table>, …)` calls
- *  (the batching helper that keeps each statement under SQLite's bind-parameter ceiling).
- *  3. The ImportSummary interface — one count field per table, populated by hand in BOTH
- *  restoreFromBackup and restoreFromSheets (a missing field = silent undercount in the
- *  user's "imported N rows" confirmation).
- *
- * Verdict at review time (c209): restore coverage is SOUND — all 15 backed-up tables are
- * inserted and summarized. These guards keep it that way under autonomous development.
- *
- * Pure source/shape introspection — no DB, no createTestApp (so no DB-singleton import trap).
- * insertBackupData is private, so its table coverage is asserted by scanning the source for an insert
- * of each registry table — the same drizzle table object the registry maps, resolved to its exported
- * variable name.
- */
+// Restore-side drift guards. Each backed-up table must be inserted by insertBackupData, have a
+// conflict probe (or a probed parent), and have an ImportSummary count. A miss is silent data loss.
+// Pure source introspection, since insertBackupData is private.
 
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
@@ -32,7 +13,7 @@ import * as schema from '../../../db/schema';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const RESTORE_SRC = readFileSync(join(HERE, '..', 'restore.ts'), 'utf-8');
 
-/** Map a Drizzle table object back to the schema export NAME it's exported under (e.g. `vehicleFinancing`). */
+/** Maps a Drizzle table object to its schema export name, e.g. `vehicleFinancing`. */
 function exportNameFor(target: unknown): string | undefined {
   for (const [name, value] of Object.entries(schema)) {
     if (value === target) return name;
@@ -49,9 +30,7 @@ describe('restore table coverage', () => {
         missing.push(`${key} (table not found among schema exports)`);
         continue;
       }
-      // restore.ts inserts a table through the batched helper, `insertRows(tx, <exportName>, …)`, or
-      // directly via `.insert(<exportName>)`. A registry table with neither means the backup writes it
-      // but restore drops it — silent data loss.
+      // A table must appear as insertRows(tx, <exportName>, …) or .insert(<exportName>).
       const insertPattern = new RegExp(
         `\\.insert\\(\\s*${exportName}\\s*\\)|insertRows\\(\\s*tx,\\s*${exportName}\\s*,`
       );
@@ -67,33 +46,19 @@ describe('restore table coverage', () => {
   });
 
   test('every inserted table is conflict-probed OR a child of a probed parent (the symmetry)', () => {
-    // Merge-mode insert(userPreferences) against the importer's always-present prefs row
-    // threw a raw UNIQUE-PK error because detectConflicts didn't PROBE userPreferences — it only
-    // probed 6 tables while insertBackupData inserts 15. The fix added userPreferences + syncState to
-    // the probes. This guard makes that symmetry DRIFT-PROOF: every table insertBackupData inserts must
-    // be either (a) conflict-probed in detectConflicts, or (b) a CHILD whose insert can't be reached on
-    // a colliding merge because the merge ABORTS on the parent's conflict first (detectConflicts returns
-    // before the transaction runs). A new PARENT-LESS table added to inserts without a probe would
-    // silently reintroduce the raw-throw class — this fails loudly instead.
-    //
-    // detectConflicts probes are written as `name: '<db_table_name>'`; collect them.
+    // Every inserted table must be conflict-probed, or a child of a probed parent. A parentless table
+    // without a probe would reintroduce raw UNIQUE errors during merge.
+    // detectConflicts probes are written as `name: '<db_table_name>'`.
     const probedTableNames = new Set(
       [...RESTORE_SRC.matchAll(/name:\s*'([a-z_]+)'/g)].map((m) => m[1])
     );
 
-    // Tables whose insert is UNREACHABLE on a colliding merge because a probed ANCESTOR collides first
-    // (so detectConflicts reports a conflict and the restore returns before insertBackupData runs).
-    // Each child here FK-references a probed parent; a same-backup re-import that collides on the child
-    // necessarily also collides on that parent (the child can't exist without it). Documented, not blanket.
+    // Children whose insert is unreachable on a colliding merge, because a probed parent collides first.
     const CHILD_OF_PROBED_PARENT: Record<string, string> = {
       insuranceTerms: 'insurance_policies (FK policyId → a probed parent)',
       insuranceTermVehicles: 'insurance_terms → insurance_policies (probed ancestor)',
       insuranceClaims: 'insurance_policies (FK policyId → probed parent)',
       odometerEntries: 'vehicles (FK vehicleId → probed parent)',
-      // reminders is now DIRECTLY probed — it's userId-owned with its own id PK and is NOT FK'd to
-      // vehicles (it survives vehicle deletion, the state), so the old "child of vehicles" exemption
-      // was FALSE and let the raw-UNIQUE-throw class reach insert(reminders). It's no longer listed
-      // here; these two are genuine children of the now-probed reminders parent.
       reminderVehicles: 'reminders (FK reminderId → a now-probed parent)',
       reminderNotifications: 'reminders (FK reminderId → a now-probed parent)',
     };
@@ -123,9 +88,8 @@ describe('restore table coverage', () => {
   });
 
   test('ImportSummary has a count field for every registry key', async () => {
-    // The summary is the user-facing "imported N rows" confirmation. A registry key with no
-    // ImportSummary field can't be counted → silent undercount even when the data restores.
-    // Parse the interface body from source (the type is erased at runtime).
+    // A registry key with no ImportSummary field would undercount the import confirmation.
+    // The interface is parsed from source, since types are erased at runtime.
     const ifaceMatch = RESTORE_SRC.match(/export interface ImportSummary\s*\{([^}]*)\}/);
     expect(ifaceMatch, 'ImportSummary interface should be parseable from restore.ts').toBeTruthy();
     const body = ifaceMatch?.[1] ?? '';

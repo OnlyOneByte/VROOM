@@ -1,13 +1,5 @@
-/**
- * buildTripSummary unit + property tests (trips-location T5, design §5, R4).
- *
- * The spec's required properties:
- *  - sum of milesByPurpose == totalMiles (no miles lost / double-counted);
- *  - businessMileageValue == businessMiles × rate (the reimbursement contract);
- *  - empty trips → all zeros, never NaN (the div-guard on averageTripMiles).
- * Plus: distance is the clamped tripDistance (R2/ — an inverted pair contributes 0), every purpose key
- * is always present, and an unexpected purpose buckets to 'other' (no crash, no dropped miles).
- */
+// Trip mileage summaries. Per-purpose miles sum to the total, business value is business miles
+// times rate, and empty input yields zeros, not NaN.
 
 import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
@@ -35,12 +27,12 @@ function trip(over: Partial<Trip> = {}): Trip {
   } as Trip;
 }
 
-describe('buildTripSummary (T5)', () => {
+describe('buildTripSummary', () => {
   test('empty trips → all zeros, never NaN', () => {
     const s = buildTripSummary([], 0.67);
     expect(s.tripCount).toBe(0);
     expect(s.totalMiles).toBe(0);
-    expect(s.averageTripMiles).toBe(0); // div-guard (not 0/0 = NaN)
+    expect(s.averageTripMiles).toBe(0);
     expect(s.businessMiles).toBe(0);
     expect(s.businessMileageValue).toBe(0);
     for (const p of TRIP_PURPOSES) expect(s.milesByPurpose[p]).toBe(0);
@@ -72,7 +64,7 @@ describe('buildTripSummary (T5)', () => {
     expect(s.rate).toBe(0.67);
   });
 
-  test('an inverted odometer pair contributes 0 miles (tripDistance clamp, R2/)', () => {
+  test('an inverted odometer pair contributes 0 miles', () => {
     const s = buildTripSummary([
       trip({ startOdometer: 5000, endOdometer: 4000, purpose: 'business' }),
     ]);
@@ -88,18 +80,16 @@ describe('buildTripSummary (T5)', () => {
     expect(s.milesByPurpose.other).toBe(42);
   });
 
-  test('rate defaults to 0 → businessMileageValue is 0 (no rate persisted yet)', () => {
+  test('rate defaults to 0, so businessMileageValue is 0', () => {
     const s = buildTripSummary([trip({ startOdometer: 0, endOdometer: 100, purpose: 'business' })]);
     expect(s.businessMiles).toBe(100);
     expect(s.businessMileageValue).toBe(0);
   });
 
-  // PROPERTY: the per-purpose split always re-sums to the total, and business-$ = businessMiles × rate,
-  // for any set of trips and any non-negative rate.
   test('property: Σ milesByPurpose == totalMiles AND businessMileageValue == businessMiles × rate', () => {
     const tripArb = fc.record({
       start: fc.integer({ min: 0, max: 1_000_000 }),
-      delta: fc.integer({ min: -5000, max: 5000 }), // may be negative → clamp to 0
+      delta: fc.integer({ min: -5000, max: 5000 }),
       purpose: fc.constantFrom(...TRIP_PURPOSES, 'unknown'),
     });
     fc.assert(
@@ -121,7 +111,7 @@ describe('buildTripSummary (T5)', () => {
   });
 });
 
-describe('buildTripSummaryByMonth (R5 local-month bucketing)', () => {
+describe('buildTripSummaryByMonth', () => {
   test('buckets trips by their local YYYY-MM and summarizes each', () => {
     const trips = [
       trip({

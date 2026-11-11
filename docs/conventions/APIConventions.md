@@ -1,8 +1,3 @@
----
-inclusion: fileMatch
-fileMatchPattern: "backend/src/api/**"
----
-
 # Backend API Conventions
 
 ## Domain Structure

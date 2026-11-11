@@ -1,10 +1,3 @@
-/**
- * Odometer Repository
- *
- * Manual odometer entry CRUD and unified history via UNION query
- * combining expenses.mileage and odometer_entries.odometer.
- */
-
 import { and, count, desc, eq, gte, lt, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
@@ -28,12 +21,8 @@ export interface OdometerHistoryResult {
 }
 
 /**
- * The half-open `[dayStart, nextDay)` window on the LOCAL calendar day of `recordedAt` (R5 local-day
- * semantics). The single source of truth for the trip↔odometer dedup key's DATE component: createFromTrip
- * (write) and deleteLinkedTripEntry (remove) MUST compute the IDENTICAL window or a delete would miss the
- * entry the create wrote (orphan) — and the TripRepository same-key reference count (#-N1) must use the
- * SAME window so "is another trip on this day?" agrees with "what day did createFromTrip dedup on?". Exported
- * (not a private static) so the trips repo shares it too — one window definition across all three call sites.
+ * Half-open `[dayStart, nextDay)` window on the local calendar day of `recordedAt`. The trip↔odometer
+ * dedup key depends on it: create, delete, and the trips repo must all compute the same window.
  */
 export function localDayWindow(recordedAt: Date): { dayStart: Date; nextDay: Date } {
   const dayStart = new Date(recordedAt.getFullYear(), recordedAt.getMonth(), recordedAt.getDate());
@@ -47,18 +36,13 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
     super(db, odometerEntries);
   }
 
-  /** IDs of all manual odometer entries for a vehicle (for cascade cleanup). */
   async findIdsByVehicleId(vehicleId: string): Promise<string[]> {
     return this.findIdsByColumn(odometerEntries.vehicleId, vehicleId);
   }
 
   /**
-   * Create an odometer entry derived from another signal (a trip's end reading — trips-location D2,
-   * "reuse the odometer linkage"), DEDUPED by (vehicleId, calendar-day of recordedAt, odometer value):
-   * if an entry already exists for the same vehicle + same local day + same reading, skip the insert and
-   * return null (the user may have logged the reading manually too — D2 avoids the divergent double-count).
-   * Returns the created entry on insert. userId-scoped on the dedup probe (the tenant discipline).
-   * `note` defaults to a provenance marker so the unified history shows where the reading came from.
+   * Records a trip's end reading unless a same-day, same-value entry already exists, so a manual reading
+   * and a trip reading for the same observation are not double-counted. Returns null when deduped.
    */
   async createFromTrip(entry: {
     vehicleId: string;
@@ -67,8 +51,6 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
     recordedAt: Date;
     note?: string;
   }): Promise<OdometerEntry | null> {
-    // Same-day window [startOfDay, nextDay) on the LOCAL calendar day of recordedAt (R5 local-day
-    // semantics) — a trip and a manual reading on the same day at the same value are the same observation.
     const { dayStart, nextDay } = localDayWindow(entry.recordedAt);
 
     const existing = await this.db
@@ -84,7 +66,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
         )
       )
       .limit(1);
-    if (existing.length > 0) return null; // dedup: same (vehicle, day, reading) already recorded
+    if (existing.length > 0) return null;
 
     return this.create({
       vehicleId: entry.vehicleId,
@@ -95,23 +77,12 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
     });
   }
 
-  /**
-   * The provenance marker createFromTrip stamps on a trip-derived entry. The trips↔odometer lifecycle
-   *  keys on this so it ONLY ever touches an entry a trip created — never a manual reading the user
-   * logged at the same (vehicle, day, value). Single source of truth, shared by createFromTrip's default
-   * note and deleteLinkedTripEntry's match predicate.
-   */
+  /** Marks trip-created entries so lifecycle deletes never touch manual readings. */
   static readonly TRIP_PROVENANCE_NOTE = 'From trip';
 
   /**
-   * Delete the odometer entry a trip created (the trips↔odometer lifecycle: trip-delete with
-   * keepOdometer=false, and the re-sync leg's "remove the stale entry" step). Matches the EXACT key
-   * createFromTrip wrote: same vehicle + owner + reading + LOCAL calendar day of `recordedAt`, AND the
-   * `note = 'From trip'` provenance marker — so a user's MANUAL reading at the same (vehicle, day, value)
-   * is never collateral-deleted (it lacks the marker). Returns the count removed (0 when the user had
-   * deduped the trip onto a pre-existing manual entry — createFromTrip returned null then, so there is no
-   * trip-owned row to remove, which is correct: the manual reading stays). Tenant-scoped (userId in the
-   * predicate, the discipline).
+   * Deletes only the trip-created entry matching the createFromTrip key. Manual readings at the same key
+   * lack the provenance note and are kept. Returns the number of rows removed.
    */
   async deleteLinkedTripEntry(entry: {
     vehicleId: string;
@@ -137,15 +108,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
     return removed.length;
   }
 
-  /**
-   * The tenant + vehicle scope shared by EVERY raw-SQL odometer-source leg: `vehicle_id = ?
-   * AND user_id = ?`. The UNION-ALL history/current-odometer queries repeat this predicate once
-   * per source leg (expenses + odometer_entries) AND once per query (data + count + max) — 6 sites.
-   * Routing them all through ONE fragment keeps the belt-and-braces tenant scope in
-   * lockstep: a divergent copy that dropped `user_id` on a single leg would surface another user's
-   * mileage into this user's history, or poison the maintenance mileage trigger (design D2) with a
-   * cross-tenant reading. One source of truth means that can't drift in during a future edit.
-   */
+  /** Tenant and vehicle predicate applied to every raw-SQL source leg. Each leg must keep user_id. */
   private vehicleScope(vehicleId: string, userId: string): ReturnType<typeof sql> {
     return sql`vehicle_id = ${vehicleId} AND user_id = ${userId}`;
   }
@@ -156,10 +119,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
     limit: number,
     offset: number
   ): Promise<{ data: OdometerEntry[]; totalCount: number }> {
-    // userId-scope BOTH legs (— completes the sweep, which scoped getHistory +
-    // getCurrentOdometer but missed THIS method): the route validates vehicle ownership
-    // first, but scoping here means an unvalidated vehicleId can never surface another
-    // user's manual entries (the tenant class). vehicle_id AND user_id together.
+    // Scoped by user_id so an unvalidated vehicleId cannot leak another user's rows.
     const where = and(eq(odometerEntries.vehicleId, vehicleId), eq(odometerEntries.userId, userId));
 
     const data = await this.db
@@ -175,14 +135,6 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
     return { data, totalCount: result?.count ?? 0 };
   }
 
-  /**
-   * Get unified odometer history combining expense mileage and manual entries.
-   *
-   * Executes a UNION ALL query:
-   * - expenses WHERE mileage IS NOT NULL → source='expense'
-   * - odometer_entries → source='manual'
-   * Ordered by date DESC with LIMIT/OFFSET pagination.
-   */
   async getHistory(
     vehicleId: string,
     userId: string,
@@ -192,9 +144,6 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
     const offset = options?.offset ?? 0;
 
     try {
-      // Data query: UNION ALL combining expenses.mileage and odometer_entries. Both legs AND the userId
-      // scope (belt-and-braces): callers validate vehicle ownership first, but scoping here too means
-      // an unvalidated vehicleId can never surface another user's readings (the tenant class).
       const rows = await this.db.all<{
         odometer: number;
         recorded_at: number;
@@ -211,7 +160,6 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
         LIMIT ${limit} OFFSET ${offset}
       `);
 
-      // Count query for pagination
       const [countResult] = await this.db.all<{ total: number }>(sql`
         SELECT (
           (SELECT COUNT(*) FROM expenses WHERE ${this.vehicleScope(vehicleId, userId)} AND mileage IS NOT NULL) +
@@ -240,21 +188,11 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
   }
 
   /**
-   * Current odometer reading for a vehicle = MAX across both sources
-   * (`expenses.mileage` + `odometer_entries.odometer`), by value — not by date.
-   *
-   * This is the canonical "current odometer" for the maintenance-schedule
-   * mileage trigger (design D2). It reconciles the fuel-only
-   * `vehicle-stats.currentMileage` (which ignores manual entries and non-fuel
-   * mileage) by considering every reading the vehicle has.
-   *
-   * Returns null when the vehicle has no readings on either source.
-   * Distance is stored as-entered in the vehicle's distanceUnit (convert-on-read).
+   * Highest reading by value across expense mileage and manual entries, or null when there are none.
+   * Feeds the maintenance mileage trigger. Readings are stored in the vehicle's distanceUnit as entered.
    */
   async getCurrentOdometer(vehicleId: string, userId: string): Promise<number | null> {
     try {
-      // Both legs AND the userId scope (belt-and-braces — see getHistory): scoping here means an
-      // unvalidated vehicleId can never poison the mileage trigger with another user's reading.
       const [row] = await this.db.all<{ current: number | null }>(sql`
         SELECT MAX(odometer) AS current FROM (
           SELECT mileage AS odometer FROM expenses

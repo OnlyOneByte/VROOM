@@ -13,9 +13,7 @@
 
 	interface Props {
 		vehicleId: string;
-		// T12b-3c: a shared viewer/editor sees insurance READ-ONLY (every mutate affordance hidden).
-		// Defaults false so the owner [id]-page call site is byte-unchanged. Insurance writes are
-		// owner-only server-side (validateInsuranceOwnership denies viewer AND editor).
+		// Defaults to false; insurance writes are owner-only server-side, so the read-only view hides every mutate affordance.
 		readOnly?: boolean;
 	}
 

@@ -17,7 +17,6 @@ import {
 } from '../offline-storage';
 import { offlineExpenseQueue } from '$lib/stores/offline.svelte';
 
-// Get localStorage mock from global setup
 const localStorageMock = window.localStorage as any;
 
 describe('Offline Storage', () => {
@@ -50,7 +49,6 @@ describe('Offline Storage', () => {
 			localStorageMock.getItem.mockReturnValue(JSON.stringify(mockExpenses));
 
 			const expenses = loadOfflineExpenses();
-			// Expenses should have version bumped and a clientId backfilled on migration
 			expect(expenses).toHaveLength(1);
 			const migrated = expenses[0];
 			if (!migrated) throw new Error('expected one migrated expense');
@@ -66,13 +64,7 @@ describe('Offline Storage', () => {
 			expect(expenses).toEqual([]);
 		});
 
-		it('backfills a legacy clientId DETERMINISTICALLY — stable across repeated reads (idempotency-key bug)', () => {
-			// A pre-v3 entry has no clientId. The migration must mint a STABLE key, because
-			// loadOfflineExpenses runs on every read of a not-yet-persisted legacy entry — a random
-			// UUID fallback would produce a DIFFERENT clientId each read, so a retried sync POST
-			// (after a lost response) carries a fresh key the server can't dedup → a duplicate
-			// expense row (offline data safety). The clientId is the offline POST's
-			// idempotency key (offline-storage.ts:160 / sync-manager.ts:222).
+		it('backfills a legacy clientId deterministically, stable across repeated reads', () => {
 			const legacy: OfflineExpense[] = [
 				{
 					id: 'legacy-entry-1',
@@ -83,7 +75,6 @@ describe('Offline Storage', () => {
 					date: '2024-01-01',
 					timestamp: Date.now(),
 					synced: false
-					// no version, no clientId → pre-v3
 				}
 			];
 			localStorageMock.getItem.mockReturnValue(JSON.stringify(legacy));
@@ -92,7 +83,6 @@ describe('Offline Storage', () => {
 			const second = loadOfflineExpenses()[0];
 
 			expect(first?.clientId).toBeTruthy();
-			// The load-bearing invariant: the SAME stored entry yields the SAME clientId every read.
 			expect(second?.clientId).toBe(first?.clientId);
 			expect(second?.version).toBe('3.0');
 		});
@@ -109,7 +99,6 @@ describe('Offline Storage', () => {
 					date: '2024-02-01',
 					timestamp: Date.now(),
 					synced: false
-					// version absent → still triggers the migration branch
 				}
 			];
 			localStorageMock.getItem.mockReturnValue(JSON.stringify(withKey));
@@ -145,10 +134,6 @@ describe('Offline Storage', () => {
 		});
 	});
 
-	// An offline write that does not land MUST be visible to its caller: localStorage.setItem throws
-	// when site data is blocked (SecurityError) or the quota is exhausted (QuotaExceededError), and the
-	// caller is about to tell the user "saved offline" and navigate away from the only other copy.
-	// A swallowed failure here is a silently dropped expense.
 	describe('a storage write that fails is reported, never swallowed', () => {
 		const row: OfflineExpense = {
 			id: 'test-1',
@@ -161,7 +146,6 @@ describe('Offline Storage', () => {
 			synced: false
 		};
 
-		/** Fail ONLY the next write, so the stateful mock keeps working for every later test. */
 		function blockNextWrite(error: Error): void {
 			localStorageMock.setItem.mockImplementationOnce(() => {
 				throw error;
@@ -210,14 +194,10 @@ describe('Offline Storage', () => {
 
 			saveOfflineExpenses([row]);
 
-			// A badge counting a row that no reload can bring back would promise a delivery that
-			// cannot happen.
 			expect(offlineExpenseQueue.current).toEqual([]);
 		});
 	});
 
-	// A blob that cannot be parsed is about to be overwritten by the next write, and it is the only
-	// trace of whatever was queued — copy it aside first (best effort) rather than erasing it.
 	describe('corrupted outbox blob', () => {
 		it('is stashed under a sibling key before the next write can overwrite it', () => {
 			localStorageMock.getItem.mockReturnValue('{not json');
@@ -256,9 +236,6 @@ describe('Offline Storage', () => {
 		});
 
 		it('persists fuelType into the outbox so an electric charge survives sync', () => {
-			// The sync transform (toBackendExpense) routes charge→volume ONLY when fuelType is
-			// electric; if the outbox drops fuelType, an offline electric charging expense syncs
-			// with no energy value. addOfflineExpense MUST carry it.
 			addOfflineExpense({
 				vehicleId: 'vehicle-1',
 				tags: ['fuel'],
@@ -304,7 +281,6 @@ describe('Offline Storage', () => {
 
 			const savedData = JSON.parse(localStorageMock.setItem.mock.calls[0][1]);
 			expect(savedData).toHaveLength(2);
-			// Existing entry is migrated: version bumped + clientId backfilled.
 			expect(savedData[0]).toMatchObject({ ...existingExpenses[0], version: '3.0' });
 			expect(typeof savedData[0].clientId).toBe('string');
 			expect(savedData[1]).toMatchObject(newExpenseData);
@@ -347,8 +323,6 @@ describe('Offline Storage', () => {
 		});
 	});
 
-	// A malformed/unsyncable row is PARKED as needsAttention — it must drop out of the pending
-	// set (so syncAll stops silently re-attempting it forever) and surface via getNeedsAttentionExpenses.
 	describe('needs-attention parking', () => {
 		const rows: OfflineExpense[] = [
 			{
@@ -377,7 +351,7 @@ describe('Offline Storage', () => {
 		it('getPendingExpenses EXCLUDES a needs-attention row (no infinite silent re-attempt)', () => {
 			localStorageMock.getItem.mockReturnValue(JSON.stringify(rows));
 			const pending = getPendingExpenses();
-			expect(pending.map(e => e.id)).toEqual(['ok-1']); // the parked malformed row is NOT pending
+			expect(pending.map(e => e.id)).toEqual(['ok-1']);
 		});
 
 		it('getNeedsAttentionExpenses surfaces ONLY the parked (unsynced + flagged) rows', () => {
@@ -402,16 +376,12 @@ describe('Offline Storage', () => {
 			expect(saved.find((e: OfflineExpense) => e.id === 'malformed-1').needsAttention).toBe(true);
 			expect(saved.find((e: OfflineExpense) => e.id === 'ok-1').needsAttention).toBeFalsy();
 
-			// After the user fixes it, clearing re-admits the row to the pending set.
 			localStorageMock.getItem.mockReturnValue(JSON.stringify(saved));
 			clearNeedsAttention('malformed-1');
 			saved = JSON.parse(localStorageMock.setItem.mock.calls.at(-1)[1]);
 			expect(saved.find((e: OfflineExpense) => e.id === 'malformed-1').needsAttention).toBe(false);
 		});
 
-		// A parked row has two unrelated causes — a local completeness gate and a server verdict — so
-		// the reason has to travel WITH the row. Otherwise whatever surfaces it can only guess, and the
-		// single hardcoded guess ("add the volume and mileage") is wrong for every rejected row.
 		it('stores the reason with the parked row, and drops it when the row is re-admitted', () => {
 			localStorageMock.getItem.mockReturnValue(
 				JSON.stringify([{ ...rows[1], needsAttention: false }])
@@ -427,29 +397,17 @@ describe('Offline Storage', () => {
 			expect(saved[0].attentionReason).toBeUndefined();
 		});
 
-		// (bug) The "Needs attention" card description must name the fields the parking GATE actually
-		// checks. The gate is isIncompleteFuelExpense — `(!volume && !charge) || !mileage` — which never looks
-		// at `amount`. The original copy said "a fuel entry needs its AMOUNT and mileage", misdirecting the
-		// user to a field that is always present on a parked row (formatCurrency(amount) renders right below
-		// it) while omitting the real culprit (fuel volume/charge).'s whole point is a FIXABLE
-		// surfacing (no-silent-loss) — a message pointing at the wrong field defeats it. This is
-		// a source-scan (no .svelte render harness in this project): pins the card copy to the gate's actual
-		// fields so the two can't drift back out of sync. Mirrors the sync-manager's own permanent-error text.
 		it('the Needs-attention card names the fields the parking gate checks (volume/charge + mileage, not bare amount)', () => {
 			const src = readFileSync(
 				`${process.cwd()}/src/lib/components/expenses/OfflineExpenseCards.svelte`,
 				'utf8'
 			);
-			// Isolate the needs-attention <CardNs.Description> copy (between the section's title and its close).
 			const start = src.indexOf('Needs attention ({needsAttentionExpenses.length})');
 			expect(start, 'the Needs-attention section exists').toBeGreaterThan(-1);
 			const descSlice = src.slice(start, start + 400);
-			// The gate's real fields, by their user-facing names.
 			expect(descSlice).toMatch(/volume/i);
 			expect(descSlice).toMatch(/charge/i);
 			expect(descSlice).toMatch(/mileage/i);
-			// NON-VACUITY / regression-catch: it must NOT misdirect with the original "its amount and mileage"
-			// phrasing (amount is never part of isIncompleteFuelExpense). A revert to that copy trips this.
 			expect(descSlice).not.toMatch(/needs its amount and mileage/i);
 		});
 	});
@@ -527,11 +485,6 @@ describe('Offline Storage', () => {
 			expect(savedData[0].id).toBe('pending-1');
 		});
 
-		// composition: a PARKED (needsAttention) row is UNSYNCED, so
-		// clearSyncedExpenses MUST keep it — it survives for the user to fix/discard, never dropped as if
-		// it were synced. The legacy syncOfflineExpenses calls clearSyncedExpenses() after its loop, so a
-		// regression that dropped parked rows here would silently DELETE the malformed entry (data loss,
-		// ) right after parking it. Pins parked survives + synced dropped + pending kept.
 		it('KEEPS a parked (needsAttention) row — only synced rows are cleared (data-safety)', () => {
 			const mockExpenses: OfflineExpense[] = [
 				{
@@ -571,7 +524,7 @@ describe('Offline Storage', () => {
 			clearSyncedExpenses();
 
 			const saved = JSON.parse(localStorageMock.setItem.mock.calls.at(-1)[1]) as OfflineExpense[];
-			expect(saved.map(e => e.id).sort()).toEqual(['parked-1', 'pending-1']); // synced gone, parked SURVIVES
+			expect(saved.map(e => e.id).sort()).toEqual(['parked-1', 'pending-1']);
 		});
 	});
 
@@ -613,12 +566,6 @@ describe('Offline Storage', () => {
 	});
 });
 
-/**
- * offlineExpenseToBackend — the SINGLE SOURCE for the OfflineExpense →
- * toBackendExpense mapping that the 3 sync sites (syncOfflineExpenses + sync-manager's
- * syncSingleExpense / resolveConflict) now all call. Pins the full field mapping at the dedup
- * boundary so the class (a field carried in one copy, forgotten in another) can't reopen.
- */
 describe('offlineExpenseToBackend — shared offline→backend mapping', () => {
 	const base: OfflineExpense = {
 		id: 'off-1',
@@ -642,9 +589,8 @@ describe('offlineExpenseToBackend — shared offline→backend mapping', () => {
 		expect(out.tags).toEqual(['fuel']);
 	});
 
-	it('carries an ELECTRIC charge through (the invariant, now at the dedup boundary)', () => {
+	it('carries an electric charge through', () => {
 		const out = offlineExpenseToBackend({ ...base, charge: 55, fuelType: 'Electric' });
-		// charge routes to the backend `volume` field BECAUSE fuelType is carried + electric
 		expect(out.volume).toBe(55);
 		expect(out.fuelType).toBe('Electric');
 	});
@@ -656,10 +602,6 @@ describe('offlineExpenseToBackend — shared offline→backend mapping', () => {
 	});
 
 	it('carries missedFillup through (the invariant — same dropout class as)', () => {
-		// calculateAverageMpg pairs CONSECUTIVE fill-ups and EXCLUDES a missedFillup row from pairing;
-		// if the outbox drops the flag, an offline missed fill-up syncs as a normal one → the next
-		// pair spans the unlogged gap → inflated/garbage MPG. Pin true AND false so
-		// a regression that drops the field (undefined→backend default false) turns the true case RED.
 		const trueOut = offlineExpenseToBackend({
 			...base,
 			volume: 40,
@@ -676,14 +618,6 @@ describe('offlineExpenseToBackend — shared offline→backend mapping', () => {
 		expect(falseOut.missedFillup).toBe(false);
 	});
 
-	// A CLASS-level completeness pin for the recurring offline-field-dropout family. The
-	// per-field tests above each pin ONE field, but the bug class (fuelType-drop, missedFillup-drop)
-	// is "the outbox carries a field in one place but the MAPPER forgot it" — so the load-bearing guard is
-	// that EVERY user-settable OfflineExpense field survives the mapping TOGETHER, in one populated round-trip.
-	// A future field added to OfflineExpense + the form but forgotten in offlineExpenseToBackend (the exact
-	// shape) leaves its assertion here unmet → RED. NOTE description: an offline expense is create-only
-	// (isEdit defaults false), so an OMITTED description is dropped from the payload — but a PRESENT one must
-	// survive; we pin a present description.
 	it('carries EVERY user-settable field together (the dropout-class completeness pin)', () => {
 		const full: OfflineExpense = {
 			id: 'off-full',
@@ -708,20 +642,14 @@ describe('offlineExpenseToBackend — shared offline→backend mapping', () => {
 		expect(out.expenseAmount).toBe(73.21);
 		expect(out.date).toBe('2024-07-04');
 		expect(out.mileage).toBe(54321);
-		expect(out.volume).toBe(12.5); // liquid fuel → volume kept on volume
+		expect(out.volume).toBe(12.5);
 		expect(out.fuelType).toBe('Diesel');
 		expect(out.missedFillup).toBe(true);
 		expect(out.description).toBe('Costco top-up');
 	});
 });
 
-// ---------------------------------------------------------------------------
-// isIncompleteFuelExpense: the byte-identical fuel-completeness sync guard hand-inlined
-// at syncOfflineExpenses + sync-manager.syncSingleExpense (the offline↔sync fan-out behind) is now
-// ONE exported predicate. The two sync suites drive it green→green via the real sync paths; these pin the
-// predicate's own cells directly so a future tweak to the rule is anchored at the source.
-// ---------------------------------------------------------------------------
-describe('isIncompleteFuelExpense (shared fuel-completeness sync guard)', () => {
+describe('isIncompleteFuelExpense', () => {
 	function fuel(over: Partial<OfflineExpense>): OfflineExpense {
 		return {
 			id: 'e1',

@@ -1,8 +1,3 @@
----
-inclusion: fileMatch
-fileMatchPattern: "**/*.svelte,**/*.svelte.ts"
----
-
 # Svelte Component Patterns
 
 Svelte 5 component mechanics for this project. Not repeated here — defer to:

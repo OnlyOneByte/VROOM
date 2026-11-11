@@ -11,10 +11,9 @@
 
 	interface Props {
 		open: boolean;
-		/** The reminder whose materialized expenses to show (null when closed). */
 		reminderId: string | null;
 		reminderName: string;
-		/** reminderId → display name resolution is the parent's job; this maps vehicleId → name. */
+		/** Maps vehicleId to display name; the parent resolves reminder names. */
 		vehicleNames: Map<string, string>;
 	}
 
@@ -24,10 +23,7 @@
 	let loadError = $state<string | null>(null);
 	let expenses = $state<Expense[]>([]);
 
-	// Fetch (recurring-expenses T6 "materialized N expenses" view) whenever the dialog opens for a
-	// reminder. Keyed on `open:reminderId` so re-opening a different reminder re-fetches, and closing
-	// then re-opening the same one refreshes. The seam (GET /reminders/:id/expenses → findBySource) is
-	// ownership-checked + user-scoped server-side.
+	// Keyed on open:reminderId, so switching reminders or reopening refetches the expenses.
 	let lastKey = $state('');
 	$effect(() => {
 		const key = `${open}:${reminderId ?? ''}`;

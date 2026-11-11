@@ -2,8 +2,7 @@
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 
-	// Legacy OAuth completion page — redirects to settings.
-	// The provider form flow now uses returnTo=/settings/providers/new directly.
+	// Redirects to settings; provider flows pass returnTo=/settings/providers/new directly.
 	onMount(() => {
 		if (browser) {
 			window.location.href = '/settings';

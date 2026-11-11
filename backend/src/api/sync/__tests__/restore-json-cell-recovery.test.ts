@@ -1,26 +1,6 @@
-/**
- * Data-recovery guards for the JSON cells of a backup CSV.
- *
- * Two distinct hazards, two distinct answers:
- *
- *  1. A cell that does NOT parse as JSON carries no recoverable information. coerceRow used to assign
- *     `null`, which violates NOT NULL on the two defaulted JSON columns (vehicles.unit_preferences,
- *     user_preferences.unit_preferences) — and because restore wipes and re-inserts inside ONE
- *     transaction, that single bad cell rolled back the WHOLE restore: the user recovered nothing from
- *     an otherwise-valid backup, with a bare 500. The column default is the only answer that keeps the
- *     rest of the backup, so coerceRow now resolves it like every other type does.
- *
- *  2. A cell that DOES parse but is not a valid value for the column carries user intent we must not
- *     silently overwrite — `{"distanceUnit":"mi"}` means miles, and defaulting it would leave the
- *     vehicle's raw volume/mileage numbers interpreted under the wrong units. It also used to be
- *     inserted verbatim by a restore that reported success, after which every unit-reading analytics
- *     surface failed (getAllVehicleUnits throws on unparseable prefs by design). Validation now
- *     refuses the backup up front, naming the table, the column and the row, so nothing is touched and
- *     the user can fix the one cell.
- *
- * createTestApp() rewrites env then dynamic-imports DB-bound modules, so import backup/restore
- * dynamically AFTER createTestApp.
- */
+// Two JSON-cell hazards. An unparseable unit_preferences cell resolves to the column default, so the
+// rest of the restore survives. A parseable but invalid one refuses the restore, because defaulting it
+// would reinterpret the vehicle's raw distances and volumes under the wrong units.
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import AdmZip from 'adm-zip';
@@ -36,12 +16,7 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-/**
- * Rewrite one column of every row of one CSV inside a REAL exported backup ZIP, leaving the archive
- * otherwise byte-identical in structure. The raw text is written through the same csv-stringify
- * settings the exporter uses, so the restore path sees exactly the cell a hand-edit or a Sheets
- * round-trip would have produced.
- */
+/** Rewrites one column of every row in a real backup ZIP, using the exporter's CSV settings. */
 function patchColumn(zipBuffer: Buffer, filename: string, column: string, rawCell: string): Buffer {
   const zip = new AdmZip(zipBuffer);
   const entry = zip.getEntry(filename);
@@ -122,8 +97,7 @@ describe('a backup whose unit_preferences cell parses but is not valid unit pref
     const { parseUnitPreferences } = await import('../../../types');
     const goodPrefsBefore = vehiclePrefsCell(vehicleId);
 
-    // Short unit spellings: valid JSON, wrong vocabulary — what a hand-written or third-party export
-    // produces.
+    // Valid JSON with unrecognized unit spellings.
     const badShape = patchColumn(
       zip,
       'vehicles.csv',
@@ -147,7 +121,7 @@ describe('a backup whose unit_preferences cell parses but is not valid unit pref
     expect(message).toContain('unitPreferences');
     expect(message, 'the offending row is named').toContain(vehicleId);
 
-    // Refused BEFORE the replace-mode wipe: the account is exactly as it was.
+    // Refused before the wipe, so the account is unchanged.
     expect(vehiclePrefsCell(vehicleId), 'the stored prefs are untouched').toBe(goodPrefsBefore);
     expect(expenseCount(), 'the existing expense is untouched').toBe(1);
     expect(
@@ -155,16 +129,13 @@ describe('a backup whose unit_preferences cell parses but is not valid unit pref
       'every stored vehicle still has prefs the analytics layer can read'
     ).not.toBeNull();
 
-    // The user-visible consequence of the old behaviour: a "successful" restore left every
-    // unit-reading analytics surface broken. It still works.
     const stats = await ctx.authed(
       'GET',
       '/api/v1/analytics/fuel-stats?startDate=1600000000000&endDate=1800000000000'
     );
     expect(stats.status, await stats.text()).toBe(200);
 
-    // Parity with the write path, which is the whole point: the API already refuses this value, so the
-    // recovery path was the one way such a row could get in.
+    // The write route refuses this value, so the restore must refuse it too.
     const write = await ctx.authed('PUT', `/api/v1/vehicles/${vehicleId}`, {
       unitPreferences: { distanceUnit: 'mi', volumeUnit: 'gal', chargeUnit: 'kWh' },
     });

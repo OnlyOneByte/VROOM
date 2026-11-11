@@ -38,7 +38,6 @@
 	let calendarValue = $state<DateValue>();
 	let open = $state(false);
 
-	// Sync string value to DateValue
 	$effect(() => {
 		if (!value) {
 			calendarValue = undefined;
@@ -51,13 +50,12 @@
 		}
 	});
 
-	// Sync DateValue back to string
 	$effect(() => {
 		if (calendarValue) {
 			const newValue = calendarValue.toString();
 			if (newValue !== value) {
 				value = newValue;
-				open = false; // Close popover when date is selected
+				open = false;
 			}
 		} else if (value) {
 			value = undefined;

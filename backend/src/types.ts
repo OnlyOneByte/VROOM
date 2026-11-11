@@ -1,7 +1,3 @@
-/**
- * Shared Types - Re-exports from db/schema and db/types, plus application-specific types
- */
-
 export type {
   Expense,
   InsurancePolicy,
@@ -72,10 +68,6 @@ export const DEFAULT_UNIT_PREFERENCES: UnitPreferences = {
   chargeUnit: ChargeUnit.KWH,
 };
 
-/**
- * Validates that a value is a valid UnitPreferences object with all required keys
- * containing valid enum members. Returns the validated object or null if invalid.
- */
 export function parseUnitPreferences(value: unknown): UnitPreferences | null {
   if (typeof value !== 'object' || value === null) {
     return null;
@@ -99,8 +91,6 @@ export function parseUnitPreferences(value: unknown): UnitPreferences | null {
     chargeUnit: obj.chargeUnit,
   };
 }
-
-// Photo provider storage types
 
 export type PhotoCategory =
   | 'vehicle_photos'
@@ -151,13 +141,9 @@ export interface BackupData {
   reminders?: import('./db/schema').Reminder[];
   reminderVehicles?: import('./db/schema').ReminderVehicle[];
   reminderNotifications?: import('./db/schema').ReminderNotification[];
-  // Optional: absent in backups predating the trips-location feature (trips-location T4); the restore
-  // path treats trips.csv as OPTIONAL_BACKUP_FILES so an older backup without it still restores.
+  // Optional: absent from older backups, which restore still accepts (see OPTIONAL_BACKUP_FILES).
   trips?: import('./db/schema').Trip[];
-  // Optional: absent in backups predating vehicle-sharing (T9). The OWNER's backup carries the ACCEPTED
-  // grants they made (D7 — pending/declined/revoked are NOT exported); the invitee's backup never
-  // contains the owner's shares (createBackup scopes by ownerId). Restore re-stamps ownerId to the
-  // importer and skips a grant whose invitee user is absent (cross-instance restore — no FK abort).
+  // Only accepted grants are exported. Restore re-stamps ownerId and skips grants whose invitee is absent.
   vehicleShares?: import('./db/schema').VehicleShare[];
 }
 
@@ -182,19 +168,17 @@ export interface ParsedBackupData {
   vehicleShares?: Record<string, unknown>[];
 }
 
-// Backup provider types
-
 export interface ProviderBackupSettings {
   enabled: boolean;
-  folderPath: string; // e.g., "/Backups" — appended to provider's rootPath
-  retentionCount: number; // Max backups to keep (default 10)
-  lastBackupAt?: string; // ISO 8601 — updated per-provider on successful backup
-  sheetsSyncEnabled?: boolean; // Google Sheets sync toggle (only for google-drive providers)
-  sheetsSpreadsheetId?: string; // The synced spreadsheet ID (only for google-drive providers)
+  folderPath: string; // Appended to the provider's root path.
+  retentionCount: number;
+  lastBackupAt?: string;
+  sheetsSyncEnabled?: boolean; // google-drive providers only
+  sheetsSpreadsheetId?: string; // google-drive providers only
 }
 
 export interface BackupConfig {
-  providers: Record<string, ProviderBackupSettings>; // keyed by providerId
+  providers: Record<string, ProviderBackupSettings>;
 }
 
 export const DEFAULT_BACKUP_CONFIG: BackupConfig = {
@@ -217,5 +201,5 @@ export interface ProviderBackupList {
   providerName: string;
   providerType: string;
   backups: BackupFileInfo[];
-  error?: string; // If listing failed for this provider
+  error?: string;
 }

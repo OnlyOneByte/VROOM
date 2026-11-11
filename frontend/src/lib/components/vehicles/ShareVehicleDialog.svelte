@@ -22,19 +22,15 @@
 
 	let { open = $bindable(), vehicleId, vehicleName }: Props = $props();
 
-	// Invite form
 	let email = $state('');
 	let level = $state<ShareLevel>('viewer');
 	let inviting = $state(false);
 
-	// Current-shares list (owner-side, scoped to THIS vehicle).
 	let isLoading = $state(false);
 	let loadError = $state<string | null>(null);
 	let shares = $state<VehicleShare[]>([]);
 
-	// Load the owner's granted shares whenever the dialog opens for a vehicle, filtered to this one
-	// (the API returns shares across ALL my vehicles — scope client-side to the vehicle in view). Keyed
-	// on open:vehicleId so re-opening a different vehicle re-fetches.
+	// Fetches the owner's shares and scopes them to this vehicle client-side; keyed on open:vehicleId.
 	let lastKey = $state('');
 	$effect(() => {
 		const key = `${open}:${vehicleId ?? ''}`;
@@ -113,7 +109,6 @@
 			</Dialog.Description>
 		</Dialog.Header>
 
-		<!-- Invite form -->
 		<form class="space-y-3" onsubmit={invite}>
 			<div class="space-y-1.5">
 				<Label for="share-email">Invitee email</Label>
@@ -144,7 +139,6 @@
 			</Button>
 		</form>
 
-		<!-- Current shares -->
 		<div class="mt-2">
 			<h3 class="mb-2 text-sm font-medium text-muted-foreground">People with access</h3>
 			{#if isLoading}

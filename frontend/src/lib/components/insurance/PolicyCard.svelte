@@ -24,8 +24,6 @@
 		onEdit: (_policy: InsurancePolicy) => void;
 		onDelete?: (_policyId: string) => void;
 		onRefresh: () => Promise<void>;
-		// T12b-3c: read-only shared view — hide the policy-settings, term edit/delete/renew, claim
-		// file/edit/delete, and document upload/delete affordances.
 		readOnly?: boolean;
 	}
 
@@ -64,7 +62,6 @@
 
 <Card class={!policy.isActive ? 'opacity-70' : ''}>
 	<CardContent class="p-4">
-		<!-- Policy header: company + settings/delete -->
 		<div class="flex items-center justify-between gap-2">
 			<div class="flex items-center gap-2.5 min-w-0">
 				<div class="flex-shrink-0 rounded-full bg-primary/10 p-2">
@@ -100,7 +97,6 @@
 			</div>
 		</div>
 
-		<!-- Current term card -->
 		{#if latestTerm}
 			<div class="mt-3">
 				<InsuranceTermCard
@@ -114,7 +110,6 @@
 			</div>
 		{/if}
 
-		<!-- Past terms toggle (only if there are past terms) -->
 		{#if pastTerms.length > 0}
 			<div class="mt-2">
 				<Button
@@ -134,7 +129,6 @@
 			</div>
 		{/if}
 
-		<!-- Expanded past terms + notes -->
 		{#if expanded}
 			<div class="mt-2 space-y-4">
 				{#if policy.notes}
@@ -156,17 +150,13 @@
 			</div>
 		{/if}
 
-		<!-- Documents. Hidden in the read-only shared view: the insurance DOCUMENT reads
-		     (GET /photos/insurance_policy/:id) are NOT widened for a shared viewer — only the policies
-		     list and claims are — so rendering DocumentViewer would 404 → "policy not found"
-		     error toast. Documents are secondary; a viewer sees policy terms + claims, not attachments. -->
+		<!-- Hidden in the read-only shared view; documents are secondary to terms and claims. -->
 		{#if !readOnly}
 			<div class="mt-3 border-t border-border pt-3">
 				<DocumentViewer entityType="insurance_policy" entityId={policy.id} />
 			</div>
 		{/if}
 
-		<!-- Claims (always visible) -->
 		<div class="mt-3 border-t border-border pt-3">
 			<ClaimsSection policyId={policy.id} {vehicles} {readOnly} />
 		</div>

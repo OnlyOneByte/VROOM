@@ -82,10 +82,8 @@
 		preselectedTags = null
 	}: Props = $props();
 
-	// Determine if we're in edit mode
 	let isEditMode = $derived(!!expenseId);
 
-	// Form data
 	let formData = $state({
 		vehicleId: '',
 		tags: [] as string[],
@@ -101,21 +99,14 @@
 		missedFillup: false
 	});
 
-	// Form state
-	// `expenseId` is a route param, fixed for this component's life, so capturing it once is the
-	// intent — and `isLoading` is reassigned when the load settles, so it can't become a $derived.
-	// Svelte's state_referenced_locally warning here is the false positive MainSteering tells us to
-	// tolerate; leave it visible rather than suppressed, because it is also the only live signal that
-	// the load runs in onMount only (a same-route expenseId change would reload nothing).
+	// expenseId is fixed for this component's life and the load runs only in onMount; the state_referenced_locally warning here is intentional.
 	let isLoading = $state(!!expenseId);
 	let isSubmitting = $state(false);
 	let isDeleting = $state(false);
 	let showDeleteConfirm = $state(false);
 	let vehicles = $state<Vehicle[]>([]);
 	let errors = $state<ExpenseFormErrors>({});
-	// Form-level failure of the LAST submit (a server rejection, or a device that cannot store the
-	// entry). Field errors live in `errors`; this is for the failures no single field owns, and it is
-	// rendered next to Save because the user stays on the form when it is set.
+	// Failures no single field owns (server rejection or storage failure); shown next to Save.
 	let submitError = $state<string | null>(null);
 	let touched = $state<Record<string, boolean>>({});
 	let originalExpense = $state<Expense | null>(null);
@@ -126,7 +117,6 @@
 	let calculatedMpg = $state<number | null>(null);
 	let calculatedEfficiency = $state<number | null>(null);
 
-	// Split expense state (create mode only)
 	let isSplit = $state(false);
 	let splitMethod = $state<'even' | 'absolute' | 'percentage'>('even');
 	let splitAllocations = $state<Array<{ vehicleId: string; amount?: number; percentage?: number }>>(
@@ -134,46 +124,35 @@
 	);
 	let selectedVehicleIds = $state<string[]>([]);
 
-	// Group edit mode — when editing a child expense, we load the parent group
 	let isGroupEditMode = $state(false);
 	let groupId = $state<string | null>(null);
 
-	// Per-vehicle mileage for split mode
 	let showPerVehicleMileage = $state(false);
 	let splitMileages = $state<Record<string, string>>({});
 
-	// Insurance-managed mode — read-only, links to policy page
 	let isInsuranceManaged = $state(false);
 	let insurancePolicyId = $state<string | null>(null);
 
-	// Source tracking for financing payments
 	let sourceType = $state<string | null>(null);
 	let sourceId = $state<string | null>(null);
 
-	// Pending photo files for create mode (uploaded after expense is saved)
 	let pendingFiles = $state<File[]>([]);
 
 	let parsedTotalAmount = $derived(parseFloat(formData.amount) || 0);
 
-	// Tag suggestions: the static common tags PLUS the user's own previously-used
-	// tags (derived from the already-loaded vehicle expenses — no extra fetch).
-	// Common tags stay first (preserving the existing dropdown order); historical
-	// tags not already in the common list are appended. Closes the long-standing
-	// "populate from the user's previous tags" TODO.
+	// Common tags first, then the user's previously-used tags not already in the common list.
 	let tagSuggestions = $derived.by(() => {
 		const historical = extractUniqueTags(allVehicleExpenses);
 		const commonSet = new Set<string>(COMMON_EXPENSE_TAGS);
 		return [...COMMON_EXPENSE_TAGS, ...historical.filter(t => !commonSet.has(t))];
 	});
 
-	// Get user settings for units
 	let settings = $derived(settingsStore.settings);
 	let volumeUnit = $derived(settings?.unitPreferences?.volumeUnit || 'gallons_us');
 	let chargeUnit = $derived(settings?.unitPreferences?.chargeUnit || 'kwh');
 	let distanceUnit = $derived(settings?.unitPreferences?.distanceUnit || 'miles');
 	let currencyUnit = $derived(settings?.currencyUnit || 'USD');
 
-	// Resolve distance label from vehicle unitPreferences, falling back to global settings
 	let effectiveDistanceUnit = $derived(vehicle?.unitPreferences?.distanceUnit ?? distanceUnit);
 	let distLabel = $derived(getDistanceUnitLabel(effectiveDistanceUnit, false));
 
@@ -197,16 +176,14 @@
 				formData.description = preselectedDescription;
 			}
 			if (preselectedTags) {
-				// Comma-separated list from "Duplicate expense"; trim + drop blanks,
-				// honor the same 10-tag cap the TagInput enforces.
+				// Duplicate tags arrive comma-separated; trim, drop blanks, and apply the 10-tag cap.
 				formData.tags = preselectedTags
 					.split(',')
 					.map(t => t.trim())
 					.filter(Boolean)
 					.slice(0, 10);
 			}
-			// Note: date deliberately stays today's date — a duplicate is a NEW
-			// occurrence of a recurring expense, not a copy of the original's date.
+			// Date stays today: a duplicate is a new occurrence of a recurring expense, not a copy.
 		}
 
 		if (formData.vehicleId) {
@@ -215,8 +192,7 @@
 			await loadAllVehicleExpenses();
 		}
 
-		// Set financing source fields AFTER vehicle is loaded so the $effect
-		// for vehicle changes has already fired and won't reset it
+		// Set after the vehicle load so the vehicle-change $effect does not reset them.
 		if (!isEditMode && preselectedFinancingId) {
 			sourceType = 'financing';
 			sourceId = preselectedFinancingId;
@@ -246,7 +222,6 @@
 
 			originalExpense = expense;
 
-			// Switch to group edit mode if this is a child of a split group
 			if (expense.groupId) {
 				groupId = expense.groupId;
 				try {
@@ -254,12 +229,9 @@
 					const first = splitGroup.siblings[0];
 					if (!first) throw new Error('Empty split group');
 
-					// Check if this is insurance-managed (siblings have description with insurance prefix)
-					// Insurance-created expenses have tags including 'insurance'
 					const isInsurance = first.tags?.includes('insurance') ?? false;
 					if (isInsurance) {
 						isInsuranceManaged = true;
-						// Still populate form data for read-only display
 						formData.category = first.category;
 						formData.amount = splitGroup.groupTotal.toString();
 						formData.tags = first.tags || [];
@@ -269,7 +241,6 @@
 						return;
 					}
 
-					// User-created split — enter group edit mode
 					isGroupEditMode = true;
 					formData.category = first.category;
 					formData.amount = splitGroup.groupTotal.toString();
@@ -277,7 +248,6 @@
 					formData.date = toDateInputValue(new Date(first.date));
 					formData.description = first.description || '';
 
-					// Set up split state from siblings
 					isSplit = true;
 					const method = (splitGroup.splitMethod as 'even' | 'absolute' | 'percentage') || 'even';
 					splitMethod = method;
@@ -342,7 +312,6 @@
 
 	async function loadLastFuelExpense() {
 		try {
-			// Fetch the most recent fuel expenses server-side; grab 2 in case one is the current expense
 			const result = await expenseApi.getExpensesByVehicle(formData.vehicleId, {
 				limit: 2,
 				category: 'fuel'
@@ -363,14 +332,7 @@
 		}
 	}
 
-	/**
-	 * Apply a VLM receipt-parse draft to the form. Each field is optional + already validated
-	 * server-side (fail-closed), so we set ONLY the fields the draft carries and leave the rest for the
-	 * user. The draft amount is in DOLLARS (formData.amount is a dollar string); date is 'YYYY-MM-DD'
-	 * (the DatePicker's bind format); category routes through selectCategory so its side-effects fire;
-	 * odometer → mileage; vendor → description. The image rides pendingFiles → the existing
-	 * expense_receipts photo flow on save. The user reviews + submits via the UNCHANGED path.
-	 */
+	/** Applies a VLM receipt draft: only fields the draft carries are set; category goes through selectCategory so its side effects fire. */
 	function handleReceiptDraft(draft: ReceiptDraft, image: File) {
 		if (typeof draft.amount === 'number') formData.amount = String(draft.amount);
 		if (draft.date) formData.date = draft.date;
@@ -387,18 +349,12 @@
 		touched['category'] = true;
 		handleBlur('category');
 
-		// Reset financing source when switching away from financial category
 		if (categoryValue !== 'financial') {
 			sourceType = null;
 			sourceId = null;
 		}
 
-		// Clear fuel-only fields when switching AWAY from fuel (mirroring the financing-source
-		// reset above). The fuel inputs hide via `showFuelFields`, but their formData values otherwise
-		// PERSIST and ride along on submit — stamping a stale volume/charge/fuelType onto a non-fuel
-		// row (inert in analytics, which filter category='fuel', but a real data-hygiene leak), and a
-		// stray mileage would feed getCurrentOdometer cross-category. A fuel expense keeps its fields;
-		// only the switch-away clears them.
+		// Clear fuel-only fields when leaving fuel; hidden inputs would otherwise persist and submit stale values.
 		if (categoryValue !== 'fuel') {
 			formData.volume = '';
 			formData.charge = '';
@@ -408,15 +364,12 @@
 		}
 	}
 
-	// Reload vehicle data when vehicle selection changes (not on initial mount — onMount handles that)
 	let previousVehicleId = $state('');
 	$effect(() => {
 		if (formData.vehicleId && formData.vehicleId !== previousVehicleId) {
 			previousVehicleId = formData.vehicleId;
-			// Skip if this is the initial load (onMount handles it)
 			if (vehicle !== null || !isLoading) {
-				// Reset financing flag when switching vehicles (new vehicle may not have financing)
-				// But don't reset during edit mode initial load — loadExpense sets the correct value
+				// Skipped during the edit-mode load, where loadExpense sets the correct value.
 				if (!isEditMode || vehicle !== null) {
 					sourceType = null;
 					sourceId = null;
@@ -428,13 +381,10 @@
 		}
 	});
 
-	// Show fuel-specific fields when Fuel category is selected
 	let showFuelFields = $derived(formData.category === 'fuel');
 
-	// Whether the current expense is a financing payment
 	let isFinancingPayment = $derived(sourceType === 'financing' && !!sourceId);
 
-	// Determine which energy field to require based on the selected fuelType
 	let showVolumeField = $derived(showFuelFields && !isElectricFuelType(formData.fuelType));
 	let showChargeField = $derived(showFuelFields && isElectricFuelType(formData.fuelType));
 
@@ -443,7 +393,6 @@
 			const milesDriven = parseInt(formData.mileage) - lastFuelExpense.mileage;
 
 			if (milesDriven > 0) {
-				// Calculate efficiency based on fuelType
 				if (isElectricFuelType(formData.fuelType) && formData.charge) {
 					calculatedEfficiency =
 						Math.round((milesDriven / parseFloat(formData.charge)) * 100) / 100;
@@ -518,22 +467,15 @@
 		return Object.keys(errors).length === 0;
 	}
 
-	/**
-	 * What to tell the user about a submit that could NOT be queued for later delivery, so they stay
-	 * on the form with their data instead of being sent away believing it was saved.
-	 */
+	/** Message for a submit that could not be queued offline; the user stays on the form with their data. */
 	function submitFailureMessage(kind: SyncFailureKind, error: unknown): string {
 		if (kind === 'auth') return 'Your session has expired. Please sign in again.';
 		if (kind === 'transient') return 'Network error. Please try again.';
-		// A terminal rejection carries the server's own reason — the only message that tells the user
-		// what to change.
+		// The server's reason is the only message that tells the user what to change.
 		return extractErrorMessage(error, 'Could not save this expense. Please try again.');
 	}
 
-	/**
-	 * The offline outbox write itself failed (site data blocked, or the device is out of storage), so
-	 * nothing about this expense survives a navigation. Say so and keep the user on the filled-in form.
-	 */
+	/** Message for when the offline outbox write itself fails; the user stays on the form so nothing is lost. */
 	function reportUnqueuedSave(): void {
 		submitError =
 			'This device could not store the expense — storage is full or site data is blocked. ' +
@@ -552,10 +494,7 @@
 		isSubmitting = true;
 		submitError = null;
 
-		// Convert the date-input value to an ISO timestamp at noon local time to avoid a timezone
-		// day-shift (see dateOnlyToISO). Shared with VehicleForm/odometer so all forms agree, and
-		// computed OUTSIDE the try so the error-fallback offline save below persists the same
-		// instant instead of re-deriving (or leaking) the raw 'YYYY-MM-DD' picker value.
+		// Noon local avoids a timezone day-shift; computed outside try so the offline fallback saves the same instant.
 		const dateISO = dateOnlyToISO(formData.date);
 
 		try {
@@ -578,7 +517,6 @@
 			};
 
 			if (isGroupEditMode && groupId) {
-				// Update split expense group
 				const splitConfig = buildSplitConfig(splitMethod, selectedVehicleIds, splitAllocations);
 				await expenseApi.updateSplitExpense(groupId, {
 					splitConfig,
@@ -591,7 +529,6 @@
 				});
 				gotoDynamic(returnTo);
 			} else if (isEditMode) {
-				// Update existing expense using API service
 				await expenseApi.updateExpense(expenseId!, expenseData);
 
 				appStore.addNotification({
@@ -600,7 +537,6 @@
 				});
 				gotoDynamic(returnTo);
 			} else if (isSplit && selectedVehicleIds.length >= 2) {
-				// Create split expense group
 				const splitConfig = buildSplitConfig(splitMethod, selectedVehicleIds, splitAllocations);
 				const result = await expenseApi.createSplitExpense({
 					splitConfig,
@@ -611,7 +547,6 @@
 					totalAmount: parseFloat(formData.amount)
 				});
 
-				// Upload photos to the first sibling expense
 				const firstSibling = result.siblings[0];
 				if (firstSibling) {
 					await uploadPendingPhotos(firstSibling.id);
@@ -623,7 +558,6 @@
 				});
 				gotoDynamic(returnTo);
 			} else {
-				// Create new expense
 				if (onlineStatus.current) {
 					const created = await expenseApi.createExpense(expenseData);
 
@@ -635,7 +569,6 @@
 					});
 					gotoDynamic(returnTo);
 				} else {
-					// Save offline
 					const queued = addOfflineExpense({
 						vehicleId: expenseData.vehicleId,
 						tags: expenseData.tags,
@@ -659,7 +592,6 @@
 						return;
 					}
 
-					// syncManager's `online` listener delivers this; see the note in $lib/utils/pwa.
 					appStore.addNotification({
 						type: 'info',
 						message: 'Expense saved offline. Will sync when online.'
@@ -671,14 +603,10 @@
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to save expense:', error);
 
-			// A failure the SERVER decided (a validation rejection, a deleted vehicle, a revoked share)
-			// is not a connection problem: the outbox would re-POST it forever and never succeed, so it
-			// belongs on screen, next to the data that caused it. Only a failure that can still succeed
-			// later — no response, a timeout, a 5xx, or an expired session — may be queued.
+			// Server-decided failures stay on screen; only failures that can succeed later may be queued.
 			const failureKind = classifySyncFailure(error);
 
 			if (!isEditMode && failureKind !== 'terminal') {
-				// Save offline as fallback for new expenses
 				const expenseData = {
 					vehicleId: formData.vehicleId,
 					tags: formData.tags,
@@ -704,12 +632,8 @@
 					...(expenseData.mileage !== undefined && { mileage: expenseData.mileage }),
 					...(expenseData.volume !== undefined && { volume: expenseData.volume }),
 					...(expenseData.charge !== undefined && { charge: expenseData.charge }),
-					// Carry fuelType: the sync transform needs it to keep an electric charge.
 					...(expenseData.fuelType !== undefined && { fuelType: expenseData.fuelType }),
-					// Carry missedFillup: dropping it on sync corrupts consecutive-fillup MPG pairing.
-					// This error-fallback save must stay field-for-field identical to the offline-first save
-					// above — an online create that fails (timeout/5xx → this catch) lands here, and any
-					// field only one of the two paths carries is silently lost for those users.
+					// Must stay field-for-field identical to the offline-first save above, or fields are silently lost.
 					...(expenseData.missedFillup !== undefined && { missedFillup: expenseData.missedFillup })
 				});
 
@@ -718,7 +642,6 @@
 					return;
 				}
 
-				// syncManager's `online` listener delivers this; see the note in $lib/utils/pwa.
 				appStore.addNotification({
 					type: 'warning',
 					message:
@@ -747,10 +670,7 @@
 		isDeleting = true;
 
 		try {
-			// Any expense with a groupId is part of a split (insurance-managed or a
-			// user split): delete the parent group so every sibling goes. Deleting just
-			// expenseId would orphan the other vehicles' portions into a broken split —
-			// and the dialog above promises the whole split is removed.
+			// Split members share a groupId; deleting only expenseId would orphan the other vehicles' portions.
 			if (groupId) {
 				await expenseApi.deleteSplitExpense(groupId);
 			} else {
@@ -778,16 +698,10 @@
 		gotoDynamic(returnTo);
 	}
 
-	// Whether this expense can be duplicated. Split groups and insurance-managed
-	// expenses are owned by other flows (the split editor / the policy term), so
-	// duplicating them as a plain single expense would be misleading — gate them out.
+	// Split and insurance-managed expenses belong to other flows, so they cannot be duplicated as a single expense.
 	let canDuplicate = $derived(isEditMode && !isGroupEditMode && !isInsuranceManaged);
 
-	// Deep-link to a fresh expense form with the recurring fields pre-filled
-	// (vehicle / category / amount / description / tags). Date is intentionally
-	// omitted so the new entry defaults to today — a duplicate is the NEXT
-	// occurrence of a recurring expense (parking, tolls, registration), not a
-	// byte copy. Fuel/mileage fields are omitted too: those are reading-specific.
+	// Date is omitted on purpose: a duplicate is the next occurrence of a recurring expense.
 	function handleDuplicate() {
 		const query: Record<string, string> = { returnTo };
 		if (formData.vehicleId) query['vehicleId'] = formData.vehicleId;
@@ -820,14 +734,12 @@
 	function handleSplitToggle(checked: boolean) {
 		isSplit = checked;
 		if (checked) {
-			// Populate with currently selected vehicle
 			if (formData.vehicleId) {
 				selectedVehicleIds = [formData.vehicleId];
 			}
 			splitMethod = 'even';
 			splitAllocations = [];
 		} else {
-			// Reset to single vehicle mode
 			if (selectedVehicleIds.length > 0) {
 				const firstId = selectedVehicleIds[0];
 				if (firstId) formData.vehicleId = firstId;
@@ -844,8 +756,7 @@
 	}
 
 	function resetAllocationsForMethod(method: 'even' | 'absolute' | 'percentage') {
-		// resetSplitAllocations is the shared source of truth — the insurance-term form runs the
-		// identical reset, so the 100/N rounded-to-1-decimal percentage seed can't drift between them.
+		// Shared with the insurance-term form so the 100/N percentage seed cannot drift between them.
 		splitAllocations = resetSplitAllocations(method, selectedVehicleIds);
 	}
 
@@ -863,7 +774,6 @@
 		</div>
 	{:else if isInsuranceManaged}
 		<div class="space-y-6">
-			<!-- Header -->
 			<div class="flex items-center gap-4">
 				<button
 					aria-label="Go back"
@@ -878,7 +788,6 @@
 				</div>
 			</div>
 
-			<!-- Insurance managed banner -->
 			<div class="flex items-start gap-3 rounded-lg border border-border bg-muted/50 p-4">
 				<Shield class="mt-0.5 h-5 w-5 shrink-0 text-chart-3" />
 				<div class="min-w-0 flex-1">
@@ -906,7 +815,6 @@
 				</div>
 			</div>
 
-			<!-- Read-only expense details -->
 			<div class="rounded-lg border bg-card p-6 space-y-4">
 				<div class="grid grid-cols-2 gap-4 text-sm">
 					<div>
@@ -924,9 +832,7 @@
 					</div>
 					<div>
 						<p class="text-muted-foreground">Date</p>
-						<!-- formData.date is the raw date-input value ('YYYY-MM-DD', and empty until the user
-						picks one), so it goes through dateOnlyToISO (noon local) — the same parse the save path
-						uses, which also turns an empty picker into a valid instant instead of a throw. -->
+						<!-- Date-only values go through dateOnlyToISO, which also avoids throwing on an empty picker. -->
 						<p class="font-medium text-foreground">
 							{formatDate(dateOnlyToISO(formData.date))}
 						</p>
@@ -950,14 +856,12 @@
 				{/if}
 			</div>
 
-			<!-- Photos (read-only but can still view) -->
 			{#if groupId && originalExpense}
 				<div class="rounded-lg border bg-card p-6">
 					<ExpensePhotoSection entityType="expense" entityId={originalExpense.id} />
 				</div>
 			{/if}
 
-			<!-- Back button -->
 			<div class="flex justify-center gap-3">
 				<Button variant="outline" onclick={() => gotoDynamic(returnTo)}>
 					<ArrowLeft class="mr-2 h-4 w-4" />
@@ -975,7 +879,6 @@
 		</div>
 	{:else}
 		<div class="space-y-6 pb-32 sm:pb-24">
-			<!-- Header -->
 			<div class="flex items-center gap-4">
 				<button
 					aria-label="Go back"
@@ -1009,7 +912,6 @@
 				</div>
 			</div>
 
-			<!-- Form -->
 			<form
 				onsubmit={e => {
 					e.preventDefault();
@@ -1017,14 +919,11 @@
 				}}
 				class="rounded-lg border bg-card p-6 space-y-6"
 			>
-				<!-- Scan receipt (create mode only) — pre-fills the fields below from a photo. -->
 				{#if !isEditMode && !isSplit && !isInsuranceManaged}
 					<ReceiptScanButton onDraft={handleReceiptDraft} />
 				{/if}
 
-				<!-- Vehicle Selection -->
 				{#if isSplit}
-					<!-- Split mode: multi-select checkboxes -->
 					<div class="space-y-2">
 						<Label>Vehicles *</Label>
 						<div class="rounded-md border border-input p-3 space-y-2">
@@ -1056,7 +955,6 @@
 						{/if}
 					</div>
 				{:else}
-					<!-- Normal single vehicle selector + split button inline -->
 					<div class="space-y-2">
 						<Label for="vehicle">Vehicle *</Label>
 						<div class="flex gap-2">
@@ -1125,7 +1023,6 @@
 					</div>
 				{/if}
 
-				<!-- Category Selection (Required) -->
 				<CategorySelector
 					value={formData.category}
 					error={errors['category']}
@@ -1133,7 +1030,6 @@
 					onSelect={selectCategory}
 				/>
 
-				<!-- Financing Payment Indicator (read-only, set via URL param) -->
 				{#if isFinancingPayment}
 					<div class="flex items-center gap-3 rounded-lg border bg-muted/50 p-4">
 						<CreditCard class="h-4 w-4 text-chart-3" />
@@ -1143,7 +1039,6 @@
 					</div>
 				{/if}
 
-				<!-- Date -->
 				<div class="space-y-2">
 					<Label for="date">Date *</Label>
 					<DatePicker
@@ -1158,7 +1053,6 @@
 					{/if}
 				</div>
 
-				<!-- Amount -->
 				<div class="space-y-2">
 					<Label for="amount">Amount *</Label>
 					<div class="relative">
@@ -1183,7 +1077,6 @@
 					{/if}
 				</div>
 
-				<!-- Inline Split Breakdown (shown when split is active and amount > 0) -->
 				{#if isSplit && selectedVehicleIds.length >= 2 && parsedTotalAmount > 0}
 					<div class="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
 						<div class="flex items-center gap-2">
@@ -1201,9 +1094,7 @@
 					</div>
 				{/if}
 
-				<!-- Mileage: single field or per-vehicle collapsible -->
 				{#if isSplit && selectedVehicleIds.length >= 2}
-					<!-- Per-vehicle mileage (collapsible) -->
 					<div class="space-y-2">
 						<button
 							type="button"
@@ -1248,7 +1139,6 @@
 						{/if}
 					</div>
 				{:else}
-					<!-- Single vehicle mileage -->
 					<div class="space-y-2">
 						<Label for="mileage">
 							Current Mileage {showFuelFields ? '*' : '(Optional)'}
@@ -1284,7 +1174,6 @@
 					</div>
 				{/if}
 
-				<!-- Fuel-specific fields -->
 				{#if showFuelFields && vehicle}
 					<FuelFieldsSection
 						trackFuel={vehicle.trackFuel}
@@ -1307,7 +1196,6 @@
 					/>
 				{/if}
 
-				<!-- Description -->
 				<div class="space-y-2">
 					<Label for="description">Description (Optional)</Label>
 					<Textarea
@@ -1330,7 +1218,6 @@
 					/>
 				</div>
 
-				<!-- Tags -->
 				<TagInput
 					bind:tags={formData.tags}
 					error={errors['tags']}
@@ -1338,7 +1225,6 @@
 					suggestions={tagSuggestions}
 				/>
 
-				<!-- Photos & Receipts -->
 				{#if isGroupEditMode && groupId && originalExpense}
 					<ExpensePhotoSection entityType="expense" entityId={originalExpense.id} />
 				{:else if isEditMode && expenseId}
@@ -1358,7 +1244,6 @@
 				{/if}
 			</form>
 
-			<!-- Floating Action Bar -->
 			<div
 				class="fixed sm:bottom-8 sm:right-8 bottom-4 left-4 right-4 sm:left-auto sm:w-auto w-auto z-50"
 			>
@@ -1374,10 +1259,7 @@
 							class="sm:rounded-full rounded-full shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 sm:h-14 px-5 border-0 flex-shrink-0"
 						>
 							<Trash2 class="h-5 w-5 sm:mr-2" />
-							<!-- Clipped, not `hidden`, below `sm`: the icon is all that is left there and every Lucide
-							     icon is aria-hidden, so display:none on the text leaves the button with no accessible
-							     name at all. `max-sm:sr-only` (not `sr-only sm:not-sr-only`) because a later vendor
-							     `.sr-only` rule outranks `sm:not-sr-only` and would hide the label at every width. -->
+							<!-- Clip rather than hide below sm: a sr-only rule would otherwise outrank sm:not-sr-only. -->
 							<span class="max-sm:sr-only font-semibold">Delete</span>
 						</Button>
 					{/if}
@@ -1425,7 +1307,6 @@
 		</div>
 	{/if}
 
-	<!-- Delete Confirmation AlertDialog (outside if/else so it works in all modes) -->
 	<AlertDialog.Root bind:open={showDeleteConfirm}>
 		<AlertDialog.Content>
 			<AlertDialog.Header>

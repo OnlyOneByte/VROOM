@@ -1,29 +1,3 @@
-/**
- * Guard for the bug class "the same expense category renders a different color, label or icon
- * depending on the widget".
- *
- * There used to be two independently hand-written category → color maps — one returning Tailwind
- * badge classes (expense-helpers.ts), one returning CSS color values (chart-colors.ts) — and they
- * disagreed on maintenance, financial, and enhancement. Both are rendered on the dashboard at
- * once (the activity-feed badges sit beside the category pie), so one expense showed two
- * different colors on one screen. The two label maps likewise disagreed on `fuel`
- * ("Fuel & Charging" vs "Fuel"), so the analytics pies and the dashboard pie named the same
- * slice differently. The icon axis had drifted the same way: the shared helper collapsed
- * regulatory, enhancement, and misc onto one `DollarSign` while the form's category picker drew
- * three distinct icons for them.
- *
- * Each axis is now ONE assignment — `CATEGORY_COLOR_TOKENS`, `CATEGORY_LABELS` (chart-colors.ts)
- * and `CATEGORY_ICONS` (expense-helpers.ts) — and every surface derives from it. These tests fail
- * if a second map is reintroduced ANYWHERE under `src` — a duplicate is at least as likely to turn
- * up in a component as in a util, and the earlier version of this scan read a single util file — if
- * a renderer stops deriving from the shared one, or if a surface renders the raw enum value instead
- * of the canonical label. They drive the REAL exports, plus a source scan for the shapes a
- * divergence would take.
- *
- * Also pins StatCard's icon-token coverage: its class map silently stopped at chart-5 while the
- * theme had grown to eight --chart-N tokens, so `iconColor="chart-6"` rendered the primary tint.
- */
-
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -45,7 +19,6 @@ import {
 import { collectSvelteFiles } from './_helpers/collect-svelte-files';
 import type { StatCardIconColor } from '$lib/components/charts/StatCard.svelte';
 
-// A literal mirror of the ExpenseCategory union (src/lib/types/expense.ts).
 const ALL_CATEGORIES: ExpenseCategory[] = [
 	'fuel',
 	'maintenance',
@@ -67,12 +40,6 @@ const CATEGORY_SELECTOR_SOURCE = readFileSync(
 	'utf8'
 );
 
-/**
- * The `.ts` half of the source scan. The shared walker every other source-scan guard uses
- * (`collectSvelteFiles`) yields only `.svelte`, and a second category map can just as easily live
- * in a plain module — the colors one did. Deliberately NOT named `collectSvelteFiles`: the
- * meta-guard in _helpers/no-duplicate-file-walker.test.ts forbids re-declaring that symbol.
- */
 function collectTsFiles(dir: string, acc: string[] = []): string[] {
 	for (const entry of readdirSync(dir, { withFileTypes: true })) {
 		const full = join(dir, entry.name);
@@ -88,30 +55,19 @@ function collectTsFiles(dir: string, acc: string[] = []): string[] {
 
 const CATEGORY_ALTERNATION = ALL_CATEGORIES.join('|');
 
-/** The one file sanctioned to assign a category a color/label, and the one to assign an icon. */
 const COLOR_AND_LABEL_HOME = 'lib/utils/chart-colors.ts';
 const ICON_HOME = 'lib/utils/expense-helpers.ts';
 
-/**
- * The value shapes a per-category COLOR entry takes — one per rendering a duplicate could target.
- * Kept as named patterns so the recogniser test below can prove each one still matches.
- */
 const COLOR_VALUE_PATTERNS = {
-	// Tailwind classes, as a badge/pill renders them.
 	badgeClasses: `'(?:text|bg|border)-`,
-	// A CSS color value, as a chart renders it.
 	chartColor: `'var\\(--`,
-	// The design-system token itself — a second copy of the assignment.
 	token: `'(?:chart-\\d+|neutral)'`
 };
 
-/** A per-category LABEL entry: a quoted, capitalised display string. */
 const LABEL_VALUE_PATTERN = `'[A-Z]`;
 
-/** A per-category ICON entry: a bare component identifier, ending the line. */
 const ICON_VALUE_PATTERN = `[A-Z][A-Za-z0-9]*\\s*[,}]?\\s*$`;
 
-/** A source file under scan, with the repo-relative path the failure message names. */
 interface ScannedFile {
 	rel: string;
 	source: string;
@@ -121,11 +77,6 @@ function relativeToSrc(file: string): string {
 	return relative(SRC_ROOT, file).split('\\').join('/');
 }
 
-/**
- * Test sources are excluded: a guard (this one included) has to spell the forbidden shapes out in
- * order to look for them, and fixtures legitimately build throwaway category maps. Only the files
- * that actually render to a user can diverge.
- */
 function isTestSource(rel: string): boolean {
 	return rel.includes('__tests__/') || rel.endsWith('.test.ts');
 }
@@ -143,11 +94,6 @@ const RENDERING_SOURCES: ScannedFile[] = [
 	}))
 ].filter(file => !isTestSource(file.rel));
 
-/**
- * Per-category entries (`fuel: <value>`) whose value matches `valuePattern` — the shape every one
- * of the historical duplicate maps took. Returns `path:line` offenders, skipping the one file
- * sanctioned to hold that axis's assignment.
- */
 function findPerCategoryEntries(
 	valuePattern: string,
 	sanctionedHome: string,
@@ -164,14 +110,6 @@ function findPerCategoryEntries(
 	return offenders;
 }
 
-/**
- * Recover the color token a badge class pair renders. Returns a describing string (never a token)
- * for anything unrecognised OR self-contradictory, so a drifted rendering fails loudly instead of
- * matching by accident.
- *
- * Both halves are read on purpose: reading only `text-chart-N` left `'text-chart-4 bg-chart-1/10'`
- * — a mismatch a user sees as a badge whose tint is a different category's color — passing.
- */
 function tokenFromBadgeClasses(classes: string): string {
 	const text = /\btext-(chart-\d+)\b/.exec(classes);
 	const tint = /\bbg-(chart-\d+)\/\d+\b/.exec(classes);
@@ -184,7 +122,6 @@ function tokenFromBadgeClasses(classes: string): string {
 	return `unrecognised badge classes: ${classes}`;
 }
 
-/** Recover the color token a chart CSS color value renders. Same loud-failure contract. */
 function tokenFromChartColor(color: string): string {
 	const chart = /^var\(--(chart-\d+)\)$/.exec(color);
 	if (chart) return chart[1] as string;
@@ -230,8 +167,6 @@ describe('one category → color assignment', () => {
 	});
 
 	test('the extractors really parse the renderings (not vacuously equal)', () => {
-		// If either extractor stopped recognising the real shapes, the test above would compare
-		// two "unrecognised…" strings and could still pass. Pin both shapes explicitly.
 		expect(getCategoryBadgeClasses('maintenance')).toBe('text-chart-2 bg-chart-2/10');
 		expect(getCategoryChartColor('maintenance')).toBe('var(--chart-2)');
 		expect(tokenFromBadgeClasses('text-chart-2 bg-chart-2/10')).toBe('chart-2');
@@ -239,9 +174,6 @@ describe('one category → color assignment', () => {
 	});
 
 	test('a badge whose text and tint halves name different tokens is not a token', () => {
-		// The hole this closes: the extractor used to read only the `text-` half, so a badge whose
-		// 10% tint came from another category resolved to a clean token and the comparison above
-		// stayed green.
 		expect(tokenFromBadgeClasses('text-chart-4 bg-chart-1/10')).toBe(
 			'badge halves disagree: text-chart-4 vs bg-chart-1'
 		);
@@ -249,9 +181,6 @@ describe('one category → color assignment', () => {
 	});
 
 	test('no second category → color map exists anywhere under src', () => {
-		// The divergence's original shape: a per-category literal mapping straight to a rendering.
-		// Scanned over every .svelte/.ts source, not just the utils — the duplicate this guard was
-		// written for lived in a COMPONENT.
 		const offenders = Object.values(COLOR_VALUE_PATTERNS).flatMap(pattern =>
 			findPerCategoryEntries(pattern, COLOR_AND_LABEL_HOME)
 		);
@@ -266,8 +195,6 @@ describe('one category → color assignment', () => {
 	});
 
 	test('every per-category value pattern still matches the shape it hunts', () => {
-		// Only the badge-class pattern is exercised by a real duplicate today, so the other
-		// renderings would otherwise be scanned for by a pattern nothing proves still works.
 		const synthetic: ScannedFile[] = [
 			{
 				rel: 'lib/components/fake/Divergent.svelte',
@@ -300,7 +227,6 @@ describe('one category → color assignment', () => {
 			'lib/components/fake/Divergent.svelte:5'
 		]);
 		expect(hits(ICON_VALUE_PATTERN, ICON_HOME)).toEqual(['lib/components/fake/Divergent.svelte:6']);
-		// The sanctioned home of each axis is skipped, not matched-and-forgiven.
 		expect(hits(COLOR_VALUE_PATTERNS.token, 'lib/components/fake/Divergent.svelte')).toEqual([
 			`${COLOR_AND_LABEL_HOME}:1`
 		]);
@@ -316,7 +242,6 @@ describe('one category → label map', () => {
 	});
 
 	test('the fuel label names charging on every surface', () => {
-		// The bucket holds EV charge sessions too; the chart legends used to say just "Fuel".
 		expect(categoryLabels.fuel).toBe('Fuel & Charging');
 		expect(CATEGORY_LABELS.fuel).toBe('Fuel & Charging');
 	});
@@ -333,10 +258,6 @@ describe('one category → label map', () => {
 	});
 
 	test('no component renders a category as the bare enum value', () => {
-		// `{expense.category}` prints "fuel", not "Fuel & Charging" — the activity cards and the
-		// sync-conflict dialog both did, so two surfaces named the category differently from every
-		// other screen. Only the canonical helpers may render it: `getCategoryLabel(…)` or
-		// `categoryLabels[…]`, neither of which ends an interpolation with `.category}`.
 		const bareInterpolation = /(?<![=$])\{\s*[A-Za-z_$][\w$.]*\.category\s*\}/;
 		const capitalizedEnum = /\bcapitalize\(\s*[A-Za-z_$][\w$.[\]']*\.category/;
 
@@ -360,13 +281,11 @@ describe('one category → label map', () => {
 	});
 
 	test('the bare-enum scan recognises the shape it hunts (and spares the canonical helpers)', () => {
-		// Pins the regex itself: a scan that matched nothing would pass the test above vacuously.
 		const bareInterpolation = /(?<![=$])\{\s*[A-Za-z_$][\w$.]*\.category\s*\}/;
 		expect(bareInterpolation.test('<Badge>{expense.category}</Badge>')).toBe(true);
 		expect(bareInterpolation.test('{ currentConflict.localExpense.category }')).toBe(true);
 		expect(bareInterpolation.test('{getCategoryLabel(expense.category)}')).toBe(false);
 		expect(bareInterpolation.test('{categoryLabels[expense.category]}')).toBe(false);
-		// An attribute binding passes the value on; it is not a rendered label.
 		expect(bareInterpolation.test('<Select value={row.category} />')).toBe(false);
 	});
 });
@@ -374,9 +293,6 @@ describe('one category → label map', () => {
 describe('one category → icon assignment', () => {
 	test('the assignment is the picker\u2019s six distinct icons', () => {
 		expect(Object.keys(CATEGORY_ICONS).sort()).toEqual([...ALL_CATEGORIES].sort());
-		// The drift this replaced: regulatory/enhancement/misc all shared one icon in the helper
-		// while the picker gave each its own, so the icon a user picked was not the icon the table
-		// showed. Distinctness IS the design — the icon is how a category column is scanned.
 		expect(new Set(ALL_CATEGORIES.map(category => CATEGORY_ICONS[category])).size).toBe(6);
 	});
 
@@ -387,18 +303,12 @@ describe('one category → icon assignment', () => {
 	});
 
 	test('the form\u2019s category picker derives its icons from the same assignment', () => {
-		// The picker is where the second icon map lived. It must call the shared getter, not carry
-		// its own icon per entry.
 		expect(CATEGORY_SELECTOR_SOURCE).toContain('getCategoryIcon(category.value)');
 	});
 
 	test('no second category → icon map exists anywhere under src', () => {
-		// Shape 1: a per-category key pointing straight at a component (`fuel: Fuel`).
 		const keyedMap = findPerCategoryEntries(ICON_VALUE_PATTERN, ICON_HOME);
 
-		// Shape 2: the picker's shape — an entry object that pairs a category value with its own
-		// icon. `icon:` alone is far too common to flag (every stat-card grid uses it), so this
-		// looks only at object literals keyed by a category string.
 		const categoryEntryObject = new RegExp(
 			`\\{[^{}]*\\bvalue:\\s*'(?:${CATEGORY_ALTERNATION})'[^{}]*\\}`,
 			'g'
@@ -420,8 +330,6 @@ describe('one category → icon assignment', () => {
 	});
 
 	test('the icon scans recognise the shapes they hunt', () => {
-		// Both scans are regex-shaped, so pin that they match the real duplicates. Without this a
-		// typo'd pattern would make the test above pass over anything.
 		const keyedMap = new RegExp(`^\\s*'?(?:${CATEGORY_ALTERNATION})'?:\\s*${ICON_VALUE_PATTERN}`);
 		expect(keyedMap.test('\tregulatory: DollarSign,')).toBe(true);
 		expect(keyedMap.test("\t'misc': Coffee")).toBe(true);
@@ -435,15 +343,11 @@ describe('one category → icon assignment', () => {
 
 describe('the two category-color helpers cannot be confused', () => {
 	test('each name has exactly one meaning', () => {
-		// Badge classes vs a CSS color value — the two contracts that used to share the name
-		// `getCategoryColor` one import apart.
 		expect(getCategoryBadgeClasses('fuel')).toBe('text-chart-1 bg-chart-1/10');
 		expect(getCategoryChartColor('fuel')).toBe('var(--chart-1)');
 	});
 
 	test('the deprecated getCategoryColor aliases still point at their replacements', () => {
-		// They exist only until the remaining call sites are renamed; re-pointing either one at
-		// the other module's helper would silently swap classes for a CSS color.
 		expect(deprecatedBadgeClassesAlias).toBe(getCategoryBadgeClasses);
 		expect(deprecatedChartColorAlias).toBe(getCategoryChartColor);
 	});
@@ -454,11 +358,8 @@ describe('StatCard icon tokens cover the theme', () => {
 		const themeTokens = new Set(
 			[...APP_CSS.matchAll(/--chart-(\d+)\s*:/g)].map(match => `chart-${match[1]}`)
 		);
-		// The scan is live, not a no-op over a renamed/moved stylesheet.
 		expect(themeTokens.size).toBeGreaterThan(4);
 
-		// StatCard spells every token out as a single-quoted literal, in both the type union and
-		// the class map (Tailwind only resolves complete class strings).
 		const statCardTokens = new Set(
 			[...STAT_CARD_SOURCE.matchAll(/'(chart-\d+)'/g)].map(match => match[1] as string)
 		);
@@ -471,8 +372,7 @@ describe('StatCard icon tokens cover the theme', () => {
 	});
 
 	test('an out-of-range icon token is a compile error', () => {
-		// @ts-expect-error 'chart-9' is not a --chart-N token the theme defines. If this stops
-		// erroring, StatCardIconColor has been widened back to `string` and typos go silent again.
+		// @ts-expect-error
 		const outOfRange: StatCardIconColor = 'chart-9';
 		expect(outOfRange).toBe('chart-9');
 

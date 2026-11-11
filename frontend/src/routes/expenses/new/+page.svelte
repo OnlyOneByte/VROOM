@@ -8,7 +8,7 @@
 	let preselectedFinancingId = $derived(page.url.searchParams.get('financingId'));
 	let preselectedAmount = $derived(page.url.searchParams.get('amount'));
 	let preselectedDescription = $derived(page.url.searchParams.get('description'));
-	// Tags arrive as a comma-separated list (from "Duplicate expense").
+	// Tags arrive as a comma-separated string.
 	let preselectedTags = $derived(page.url.searchParams.get('tags'));
 </script>
 

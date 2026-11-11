@@ -1,14 +1,7 @@
 /**
- * Regression guard: concurrent unlinks must never strip a user of every sign-in method.
- *
- * "You cannot unlink your last sign-in method" is the only thing standing between a user and a
- * permanently unreachable account: VROOM has no password auth, so with zero `domain='auth'` rows the
- * next OAuth sign-in finds the email already taken, refuses to merge, and the account can only be
- * recovered with manual SQL on the server.
- *
- * That makes the guard's atomicity load-bearing. Counting the rows and deleting one must happen with
- * no yield point in between, or two unlinks issued at once (two tabs, two devices, a retried
- * request) each see a count of 2, each pass the guard, and both delete.
+ * Concurrent unlinks must never remove every sign-in method. VROOM has no password auth, so a user
+ * with zero auth rows cannot recover the account. The count and the delete must therefore run
+ * without a yield point between them.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -74,7 +67,7 @@ describe('DELETE /auth/accounts/:id — last-sign-in-method guard under concurre
     expect(remainingAuthIds().length).toBe(1);
   });
 
-  test('the sequential path is unchanged: second unlink is refused, first survives', async () => {
+  test('a sequential second unlink is refused and the first provider survives', async () => {
     seedAuthProvider('ap-google', 'google');
     seedAuthProvider('ap-github', 'github');
 

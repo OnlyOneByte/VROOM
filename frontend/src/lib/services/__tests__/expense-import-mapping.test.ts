@@ -1,13 +1,3 @@
-/**
- * Coverage for expenseApi.importExpensesCsv — the client surface the "Migrate from another tracker"
- * settings card consumes. The backend route accepts an optional `mapping` (POST /import). These pin:
- *  - the native path request is UNCHANGED (no `mapping` key) — backward-compat,
- *  - a foreign import threads the mapping through verbatim (the migration card's Fuelio path).
- *
- * apiClient is mocked (the analytics-api.test.ts pattern) so we assert the exact URL + body the
- * client builds — apiClient.post already unwraps the {success,data} envelope.
- */
-
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { ImportColumnMapping } from '$lib/types';
 import type { ExpenseImportResult } from '../expense-api';
@@ -15,7 +5,6 @@ import type { ExpenseImportResult } from '../expense-api';
 const post = vi.fn();
 vi.mock('../api-client', () => ({
 	apiClient: { post },
-	// expense-api.ts also imports these from api-client at module load — stub them harmlessly.
 	getApiBaseUrl: () => '',
 	withPagination: (path: string) => path
 }));
@@ -47,7 +36,6 @@ describe('expenseApi.importExpensesCsv', () => {
 		const [url, body] = post.mock.calls[0] ?? [];
 		expect(url).toBe('/api/v1/expenses/import');
 		expect(body).toEqual({ csv: 'date,vehicle\n2024-01-01,Civic', dryRun: true });
-		// The exact-equality above already proves it, but pin the load-bearing absence explicitly:
 		expect('mapping' in (body as object)).toBe(false);
 	});
 
@@ -75,7 +63,6 @@ describe('expenseApi.importExpensesCsv', () => {
 		const [url, body] = post.mock.calls[0] ?? [];
 		expect(url).toBe('/api/v1/expenses/import');
 		expect(body).toEqual({ csv: 'Date,Cost,Car\n…', dryRun: true, mapping });
-		// The dialog reads unmappedCategories to prompt the user to remap (D2).
 		expect(result.unmappedCategories).toEqual(['carwash']);
 	});
 });

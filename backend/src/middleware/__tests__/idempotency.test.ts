@@ -1,21 +1,5 @@
-/**
- * Characterization net for the idempotency middleware.
- *
- * This is the double-charge / duplicate-record guard (money-relevant) and sat at 43% coverage —
- * the caching/replay/TTL core was never directly tested (only the required-key 400 path, via
- * sync-route-errors.test.ts at the route level). These tests pin the full contract through a minimal
- * Hono app (the error-handler.test.ts convention), using a per-app counter to observe whether the
- * handler ACTUALLY ran — a replayed cache hit must NOT increment it:
- *  1. method gating — only POST/PUT/DELETE/PATCH are guarded; GET passes through untouched,
- *  2. key gating — missing key throws when required, passes through when optional,
- *  3. cache-hit replay — a duplicate request returns the cached body without re-running the handler,
- *  4. user-scoping — two users sharing one key do NOT collide (the `${userId}:${key}` store key),
- *  5. only-cache-2xx — a 5xx is NOT cached (a transient failure must not be replayed forever),
- *  6. TTL expiry — an entry older than the TTL is dropped, so the handler runs again.
- *
- * The store is a module-level singleton shared across the process, so every test uses a UNIQUE
- * Idempotency-Key to stay isolated.
- */
+// Idempotency contract: method and key gating, cached replay, user scoping, only 2xx cached, and TTL expiry.
+// The store is process-wide, so each test uses its own Idempotency-Key.
 
 import { describe, expect, setSystemTime, test } from 'bun:test';
 import { type Context, Hono } from 'hono';
@@ -32,11 +16,7 @@ interface ErrorBody {
   error: { code: string; message: string };
 }
 
-/**
- * Build a minimal app: an optional user-setter → the idempotency middleware → a counting handler.
- * `getCount()` reveals how many times the handler body executed; a cache replay leaves it unchanged.
- * `failStatus`, when set, makes the handler return that status (to exercise the only-cache-2xx branch).
- */
+// getCount() reports handler executions, so a cache replay leaves it unchanged.
 function makeApp(
   opts: { required?: boolean; userId?: string; failStatus?: number; nonJsonBody?: boolean } = {}
 ) {
@@ -62,7 +42,7 @@ function makeApp(
       );
     }
     if (opts.nonJsonBody) {
-      // A 2xx NON-JSON body (e.g. a CSV export) — response.json() would throw on this.
+      // response.json() would throw on this body.
       return c.body('id,amount\nx,1', 200, { 'content-type': 'text/csv' });
     }
     return c.json({ count });
@@ -81,7 +61,6 @@ describe('idempotency middleware — method & key gating', () => {
     const headers = { ...JSON_HEADERS, 'Idempotency-Key': 'k-get' };
     await app.request('/op', { method: 'GET', headers });
     await app.request('/op', { method: 'GET', headers });
-    // Both GETs run the handler; a key on a safe method is ignored.
     expect(getCount()).toBe(2);
   });
 
@@ -99,7 +78,6 @@ describe('idempotency middleware — method & key gating', () => {
     const body = (await res.json()) as ErrorBody;
     expect(body.success).toBe(false);
     expect(body.error.code).toBe(SyncErrorCode.VALIDATION_ERROR);
-    // The handler must never run when the required key is absent.
     expect(getCount()).toBe(0);
   });
 });
@@ -116,7 +94,6 @@ describe('idempotency middleware — caching contract', () => {
 
     const second = await app.request('/op', { method: 'POST', headers });
     expect(second.status).toBe(200);
-    // Replayed body is byte-for-byte the first response (count:1), and the handler did NOT run again.
     expect(((await second.json()) as CountBody).count).toBe(1);
     expect(getCount()).toBe(1);
   });
@@ -127,7 +104,6 @@ describe('idempotency middleware — caching contract', () => {
     const userB = makeApp({ userId: 'user-b' });
 
     await userA.app.request('/op', { method: 'POST', headers: sharedKey });
-    // User B's identical key must NOT hit user A's cache entry — B's handler runs fresh.
     await userB.app.request('/op', { method: 'POST', headers: sharedKey });
 
     expect(userA.getCount()).toBe(1);
@@ -142,19 +118,12 @@ describe('idempotency middleware — caching contract', () => {
     expect(first.status).toBe(500);
     expect(getCount()).toBe(1);
 
-    // Second request must re-run (the 500 was not cached), giving the operation another chance.
     const second = await app.request('/op', { method: 'POST', headers });
     expect(second.status).toBe(500);
     expect(getCount()).toBe(2);
   });
 
   test('a non-JSON 2xx body does NOT 500 and is NOT cached — the dup safely re-runs', async () => {
-    // The middleware clones + JSON-parses the body to cache it. A 2xx NON-JSON response (CSV/binary/
-    // 204) would make response.json() THROW, turning a SUCCESSFUL response into a 500 — and a cached
-    // non-JSON body couldn't round-trip through the replay c.json() anyway. The guard parses
-    // defensively: a non-JSON 2xx is left UNCACHED (so the dup just re-runs — safe degradation), and
-    // the original response passes through untouched. No idempotency route returns non-JSON today;
-    // this pins the contract so adding one can't regress into a 500.
     const { app, getCount } = makeApp({ nonJsonBody: true });
     const headers = { 'Idempotency-Key': 'k-nonjson' };
 
@@ -163,7 +132,6 @@ describe('idempotency middleware — caching contract', () => {
     expect(await first.text()).toContain('id,amount');
     expect(getCount()).toBe(1);
 
-    // Not cached (couldn't be JSON-parsed) → the duplicate re-runs the handler rather than replaying.
     const second = await app.request('/op', { method: 'POST', headers });
     expect(second.status).toBe(200);
     expect(getCount()).toBe(2);
@@ -177,7 +145,7 @@ describe('idempotency middleware — caching contract', () => {
       await app.request('/op', { method: 'POST', headers });
       expect(getCount()).toBe(1);
 
-      // Advance 25h — past the 24h TTL. The cached entry is stale and must be evicted on read.
+      // 25h is past the 24h TTL.
       setSystemTime(new Date('2024-01-02T01:00:00.000Z'));
       await app.request('/op', { method: 'POST', headers });
       expect(getCount()).toBe(2);

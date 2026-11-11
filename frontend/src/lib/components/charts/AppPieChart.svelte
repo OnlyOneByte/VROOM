@@ -46,10 +46,7 @@
 		return config;
 	});
 
-	// Gate PieChart rendering until the container is visible in the viewport.
-	// The SVG motion tween (endAngle sweep from 0→2π) fires at mount time,
-	// so we must delay mounting until the user can see it. Uses synchronous
-	// MutationObserver + offsetParent check instead of async IntersectionObserver.
+	// Delay mounting until visible: the motion tween starts at mount time; the MutationObserver check fires synchronously.
 	let pieGate = createVisibilityWatch();
 </script>
 

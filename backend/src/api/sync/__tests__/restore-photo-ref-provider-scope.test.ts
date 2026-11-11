@@ -1,16 +1,5 @@
-/**
- * A restored photo_ref may only name a storage provider the IMPORTER owns.
- *
- * Providers hold encrypted credentials and are deliberately not backed up, so restore already skips a
- * ref whose provider is absent from this instance. That existence probe was not tenant-scoped, so a ref
- * naming ANOTHER user's provider id passed it and was inserted — and the photo sync worker resolves a
- * ref's provider by id alone, with no ownership check, so it would then upload the importer's photo
- * bytes into a stranger's storage account (and the stranger's /sync-status would start counting the
- * importer's refs). Every other identifier on this path is tenant-scoped; this one now is too.
- *
- * createTestApp() rewrites env then dynamic-imports DB-bound modules, so keep static imports to the
- * harness + bun:test.
- */
+// A restored photo_ref may only name a storage provider the importer owns. The sync worker resolves
+// providers by id alone, so a foreign provider would receive the importer's photos.
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
@@ -64,8 +53,7 @@ describe('restore scopes the photo_ref provider probe to the importer', () => {
     const ownProvider = seedProvider('own-provider', ctx.user.id);
     const foreignProvider = seedProvider('foreign-provider', 'other-user');
 
-    // Two refs on the importer's own photos, one of them pointing at a provider they do not own —
-    // the shape a crafted backup produces. Both are exported, because export scopes refs by PHOTO.
+    // Two refs on the importer's own photos; one names a provider the importer does not own.
     seedPhotoWithRef('photo-own', vehicleId, 'ref-own', ownProvider);
     seedPhotoWithRef('photo-foreign', vehicleId, 'ref-foreign', foreignProvider);
     expect(refRows()).toHaveLength(2);
@@ -77,8 +65,7 @@ describe('restore scopes the photo_ref provider probe to the importer', () => {
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 
-    // Both directions: dropping the ownership predicate re-admits ref-foreign, and over-narrowing the
-    // probe (e.g. scoping to a provider list the importer has none of) would lose ref-own.
+    // Both directions: without the ownership check the foreign ref survives; an over-narrow probe drops the own ref.
     expect(refRows().map((r) => r.id)).toEqual(['ref-own']);
     expect(refRows()[0].provider_id).toBe(ownProvider);
   });

@@ -33,7 +33,6 @@
 		isStandalone = pwaInstallState.isStandalone;
 		canInstall = pwaInstallState.canInstall;
 
-		// Poll briefly for the beforeinstallprompt event
 		const checkInterval = setInterval(() => {
 			canInstall = pwaInstallState.canInstall;
 			isStandalone = pwaInstallState.isStandalone;
@@ -70,7 +69,6 @@
 	</CardHeader>
 	<CardContent>
 		{#if isStandalone}
-			<!-- Already installed / running as PWA -->
 			<div class="flex items-center gap-3 rounded-lg bg-chart-2/10 p-4">
 				<CircleCheck class="h-5 w-5 text-chart-2 shrink-0" />
 				<p class="text-sm text-foreground">
@@ -78,7 +76,6 @@
 				</p>
 			</div>
 		{:else if canInstall}
-			<!-- Android / Desktop Chrome/Edge — native install prompt available -->
 			<div class="space-y-4">
 				<p class="text-sm text-muted-foreground">
 					Install VROOM on your device for a native app experience with offline support and faster
@@ -95,7 +92,6 @@
 				</Button>
 			</div>
 		{:else if isIOS}
-			<!-- iOS — manual Add to Home Screen instructions -->
 			<div class="space-y-4">
 				<p class="text-sm text-muted-foreground">
 					To install VROOM on your iPhone or iPad, use Safari's Add to Home Screen feature:
@@ -136,7 +132,6 @@
 				</p>
 			</div>
 		{:else if isChromium}
-			<!-- Chrome/Edge but beforeinstallprompt hasn't fired -->
 			<div class="space-y-4">
 				<p class="text-sm text-muted-foreground">
 					Install VROOM on your device for a native app experience with offline support and faster
@@ -150,7 +145,6 @@
 				</p>
 			</div>
 		{:else}
-			<!-- Non-Chromium desktop browser (Firefox, Safari macOS, etc.) -->
 			<div class="space-y-3">
 				<div class="flex items-start gap-3 rounded-lg bg-muted p-4">
 					<Monitor class="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />

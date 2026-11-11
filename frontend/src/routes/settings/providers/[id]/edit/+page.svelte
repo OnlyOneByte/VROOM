@@ -56,7 +56,6 @@
 			folderSettings = stored
 				? { ...DEFAULT_CATEGORY_SETTINGS, ...stored }
 				: DEFAULT_CATEGORY_SETTINGS;
-			// Compute which categories have this provider as the default
 			defaultCategories.clear();
 			for (const [cat, pid] of Object.entries(storageConfig.defaults)) {
 				if (pid === id) defaultCategories.add(cat as PhotoCategory);

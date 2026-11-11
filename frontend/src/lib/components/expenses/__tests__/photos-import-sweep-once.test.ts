@@ -1,16 +1,4 @@
-/**
- * "Import from Photos" must sweep the album ONCE per time the dialog is opened.
- *
- * The sweep is expensive on the server (one Google Photos album search plus a
- * per-photo already-imported lookup) and the steady state — everything already imported, or an
- * empty album — returns ZERO drafts. An open-gate that infers "we have not swept yet" from the
- * RESULT (no rows, not loading, no error) can never recognise that state as swept, so an empty
- * album re-arms the gate on every sweep and the dialog hammers the endpoint for as long as it
- * stays open. The gate must therefore key on the OPEN TRANSITION, not on the result.
- *
- * The mocked endpoint below fails the test by its own call budget, so a regression shows up as a
- * bounded failure instead of a hung test run.
- */
+// The Photos sweep runs once per dialog open; gating on the sweep result would re-sweep an empty album forever.
 
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { render } from '@testing-library/svelte';

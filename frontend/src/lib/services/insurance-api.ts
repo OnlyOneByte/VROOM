@@ -12,10 +12,6 @@ import type {
 } from '$lib/types';
 import { apiClient, getApiBaseUrl, withPagination } from './api-client';
 
-/**
- * Insurance API service
- * Centralized API calls for insurance policy operations
- */
 export const insuranceApi = {
 	async getAllPolicies(): Promise<InsurancePolicy[]> {
 		return apiClient.get<InsurancePolicy[]>('/api/v1/insurance');
@@ -57,10 +53,7 @@ export const insuranceApi = {
 		return apiClient.delete<InsurancePolicy>(`/api/v1/insurance/${policyId}/terms/${termId}`);
 	},
 
-	// --- Document methods (delegate to the entityType-generic photo endpoints) ---
-	// entityType is 'insurance_policy' or 'insurance_claim'; both route to the
-	// insurance_docs storage category on the backend.
-
+	// entityType is 'insurance_policy' or 'insurance_claim'; both are stored in the insurance_docs category.
 	async getEntityDocuments(
 		entityType: string,
 		entityId: string,
@@ -84,8 +77,6 @@ export const insuranceApi = {
 	getEntityDocumentThumbnailUrl(entityType: string, entityId: string, photoId: string): string {
 		return `${getApiBaseUrl()}/api/v1/photos/${entityType}/${entityId}/${photoId}/thumbnail`;
 	},
-
-	// --- Claims methods ---
 
 	async getClaims(policyId: string): Promise<InsuranceClaim[]> {
 		return apiClient.get<InsuranceClaim[]>(`/api/v1/insurance/${policyId}/claims`);

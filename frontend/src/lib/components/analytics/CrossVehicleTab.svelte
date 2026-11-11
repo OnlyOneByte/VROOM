@@ -31,7 +31,6 @@
 	// Visibility-gated rendering for inline charts that bypass ChartCard.
 	let costBarGate = createVisibilityWatch();
 
-	// Dynamic unit labels — cross-vehicle view uses global unit preferences
 	let units = $derived(crossVehicle?.units ?? settingsStore.unitPreferences);
 	let efficiencyLabel = $derived(getFuelEfficiencyLabel(units.distanceUnit, units.volumeUnit));
 	let distShortLabel = $derived(getDistanceUnitLabel(units.distanceUnit, true));
@@ -59,7 +58,6 @@
 		loadData();
 	});
 
-	// --- Section 1: Monthly Expense Trends ---
 	let trendData = $derived(
 		(crossVehicle?.monthlyExpenseTrends ?? []).map(d => ({
 			...d,
@@ -67,10 +65,8 @@
 		}))
 	);
 
-	// --- Section 2: Expense Breakdown Pie ---
 	let appPieData = $derived(buildCategoryPieData(crossVehicle?.expenseByCategory ?? []));
 
-	// --- Section 3: Vehicle Cost Comparison Bar ---
 	let costBarData = $derived(crossVehicle?.vehicleCostComparison ?? []);
 
 	const costBarConfig: Chart.ChartConfig = {
@@ -79,7 +75,6 @@
 
 	const costBarSeries = [{ key: 'totalCost', label: 'Total Cost', color: 'var(--chart-1)' }];
 
-	// --- Section 3b: Fuel Efficiency Comparison ---
 	let fuelEffVehicleNames = $derived.by(() => {
 		const names = new SvelteSet<string>();
 		for (const month of crossVehicle?.fuelEfficiencyComparison ?? []) {
@@ -129,7 +124,6 @@
 	</div>
 {:else if crossVehicle && financing && insurance}
 	<div class="space-y-4 md:space-y-6">
-		<!-- Section 1: Monthly Expense Trends -->
 		{#if trendData.length > 0}
 			<ExpenseTrendChart data={trendData} title="Monthly Expense Trends">
 				{#snippet icon()}
@@ -138,9 +132,7 @@
 			</ExpenseTrendChart>
 		{/if}
 
-		<!-- Section 2: Expense by Category + Vehicle Cost Comparison (2-col grid) -->
 		<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-			<!-- Expense by Category -->
 			{#if appPieData.length > 0}
 				<AppPieChart
 					title="Expense by Category"
@@ -149,7 +141,6 @@
 				/>
 			{/if}
 
-			<!-- Vehicle Cost Comparison (kept manual — has cost-per-mile list) -->
 			{#if costBarData.length > 0}
 				<Card.Root class="p-4 sm:p-6">
 					<div class="space-y-4">
@@ -204,7 +195,6 @@
 			{/if}
 		</div>
 
-		<!-- Section 3: Fuel Efficiency Comparison -->
 		{#if fuelEffData.length > 0}
 			<AppLineChart
 				title="Fuel Efficiency Comparison"
@@ -218,10 +208,8 @@
 			/>
 		{/if}
 
-		<!-- Section 4: Financing Overview (extracted) -->
 		<FinancingAnalytics {financing} />
 
-		<!-- Section 5: Insurance Overview (extracted) -->
 		<InsuranceAnalytics {insurance} />
 	</div>
 {/if}

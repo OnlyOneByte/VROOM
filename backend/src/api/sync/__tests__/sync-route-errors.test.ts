@@ -1,18 +1,6 @@
-/**
- * The error contract of the sync routes, over the REAL HTTP stack.
- *
- * The sync handlers hand-roll no try/catch: every error they raise propagates to the global
- * errorHandler middleware, which is the single error path for this router. Three classes are pinned
- * here because each maps to a different status through a different branch of that handler:
- *  - a SyncError raised inside a handler → its code's status (VALIDATION_ERROR → 400);
- *  - a SyncError raised by MIDDLEWARE, before the handler runs → the same envelope, proving the
- *  handler serves the whole stack and not just route bodies;
- *  - an AppError (requireAuth's AuthenticationError) → its own statusCode, not a flattened 500.
- *
- * A route that reintroduced a local catch block could silently change any of these, so the shapes are
- * asserted rather than assumed. createTestApp() rewrites env then dynamic-imports DB-bound modules;
- * keep imports to the harness + bun:test.
- */
+// Error responses of the sync routes over the real HTTP stack. The routes have no local catch
+// blocks, so SyncErrors from handlers or middleware and AppErrors from auth all reach the global
+// error handler and must keep their own statuses.
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, json, type TestApp } from '../../../test-helpers/http-client';
@@ -61,9 +49,7 @@ describe('sync route error behavior', () => {
     expect(body.error.code).toBe('VALIDATION_ERROR');
   });
 
-  // An AppError must keep its own statusCode rather than being flattened to a blanket 500: requireAuth
-  // throws AuthenticationError, which is an AppError and NOT a SyncError, so it exercises a different
-  // branch of the handler from the two cases above.
+  // AppErrors keep their own status rather than becoming a generic 500.
   test('an unauthenticated sync request → 401 via the central handler (AppError keeps its status)', async () => {
     const res = await ctx.anon('POST', '/api/v1/sync', { syncTypes: ['backup'] });
     expect(res.status).toBe(401);
@@ -73,7 +59,6 @@ describe('sync route error behavior', () => {
   });
 
   test('GET /sync/health is unauthenticated-safe and returns healthy (no error path)', async () => {
-    // A positive control so the suite also pins a non-error route shape next to the error ones.
     const res = await ctx.authed('GET', '/api/v1/sync/health');
     expect(res.status).toBe(200);
     const body = (await json<{ status: string; service: string }>(res)) as {

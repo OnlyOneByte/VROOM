@@ -1,4 +1,3 @@
-/* Line chart entrance animation: stroke draws in left-to-right, then dots appear */
 @keyframes stroke-draw {
 	to {
 		stroke-dashoffset: 0;
@@ -14,7 +13,6 @@
 	}
 }
 
-/* Pre-animation: hide lines and dots until the animation class is added */
 .chart-line-animate-ready .lc-path {
 	stroke-dasharray: 5000;
 	stroke-dashoffset: 5000;
@@ -24,7 +22,6 @@
 	opacity: 0;
 }
 
-/* When animated class is added, trigger the draw-in */
 .chart-line-animate-ready.chart-line-animated .lc-path {
 	animation: stroke-draw 2s ease-out forwards;
 }

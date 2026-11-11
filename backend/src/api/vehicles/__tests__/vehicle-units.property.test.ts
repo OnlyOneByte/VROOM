@@ -1,14 +1,4 @@
-/**
- * Property-Based Tests for vehicle unit CRUD
- *
- * Property 1: Unit preferences contain required keys
- * Property 2: Default unit inheritance on vehicle creation
- * Property 3: Explicit unit preferences override defaults
- * Property 4: Unit preferences are updatable
- * Property 17: Global settings change does not affect vehicles
- *
- * Validates: Requirements 1.1, 1.2, 1.4, 1.5, 1.6, 11.3
- */
+/** Property-based tests for vehicle unit preferences. */
 
 import type { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -27,8 +17,6 @@ import {
   type TestDb,
 } from '../../analytics/__tests__/analytics-test-generators';
 
-// ── Generators ─────────────────────────────────────────────────────────────────
-
 const distanceUnitArb = fc.constantFrom(DistanceUnit.MILES, DistanceUnit.KILOMETERS);
 const volumeUnitArb = fc.constantFrom(
   VolumeUnit.GALLONS_US,
@@ -37,14 +25,12 @@ const volumeUnitArb = fc.constantFrom(
 );
 const chargeUnitArb = fc.constantFrom(ChargeUnit.KWH);
 
-/** Generates a valid UnitPreferences object with all required keys. */
 const validUnitPreferencesArb: fc.Arbitrary<UnitPreferences> = fc.record({
   distanceUnit: distanceUnitArb,
   volumeUnit: volumeUnitArb,
   chargeUnit: chargeUnitArb,
 });
 
-/** Generates a second valid UnitPreferences distinct from the first. */
 const distinctUnitPreferencesPairArb = fc
   .tuple(validUnitPreferencesArb, validUnitPreferencesArb)
   .filter(
@@ -54,24 +40,17 @@ const distinctUnitPreferencesPairArb = fc
       a.chargeUnit !== b.chargeUnit
   );
 
-/** Generates an invalid distanceUnit string. */
 const invalidDistanceUnitArb = fc
   .string({ minLength: 1, maxLength: 20 })
   .filter((s) => s !== 'miles' && s !== 'kilometers');
 
-/** Generates an invalid volumeUnit string. */
 const invalidVolumeUnitArb = fc
   .string({ minLength: 1, maxLength: 20 })
   .filter((s) => s !== 'gallons_us' && s !== 'gallons_uk' && s !== 'liters');
 
-/** Generates an invalid chargeUnit string. */
 const invalidChargeUnitArb = fc.string({ minLength: 1, maxLength: 20 }).filter((s) => s !== 'kwh');
 
-// ── Property 1: Unit preferences contain required keys ─────────────────────────
-// Feature: unit-aware-display, Property 1: Unit preferences contain required keys
-// **Validates: Requirements 1.1, 1.2**
-
-describe('Property 1: Unit preferences contain required keys', () => {
+describe('unit preferences contain required keys', () => {
   test('parseUnitPreferences accepts all valid enum combinations', () => {
     fc.assert(
       fc.property(validUnitPreferencesArb, (prefs) => {
@@ -149,20 +128,13 @@ describe('Property 1: Unit preferences contain required keys', () => {
   });
 });
 
-// ── Property 2: Default unit inheritance on vehicle creation ───────────────────
-// Feature: unit-aware-display, Property 2: Default unit inheritance on vehicle creation
-// **Validates: Requirements 1.4**
-
-describe('Property 2: Default unit inheritance on vehicle creation', () => {
-  test('when unitPreferences is undefined, defaults match DEFAULT_UNIT_PREFERENCES', () => {
+describe('default unit inheritance on vehicle creation', () => {
+  test('when unitPreferences is undefined, the user settings are inherited', () => {
     fc.assert(
       fc.property(validUnitPreferencesArb, (userPrefs) => {
-        // Simulate the vehicle creation logic: if unitPreferences is absent,
-        // use the user's settings (or DEFAULT_UNIT_PREFERENCES if no settings)
         const vehicleUnitPrefs: UnitPreferences | undefined = undefined;
         const resolvedPrefs = vehicleUnitPrefs ?? userPrefs;
 
-        // The resolved prefs should match the user's settings exactly
         expect(resolvedPrefs.distanceUnit).toBe(userPrefs.distanceUnit);
         expect(resolvedPrefs.volumeUnit).toBe(userPrefs.volumeUnit);
         expect(resolvedPrefs.chargeUnit).toBe(userPrefs.chargeUnit);
@@ -184,7 +156,6 @@ describe('Property 2: Default unit inheritance on vehicle creation', () => {
   test('default inheritance produces valid preferences for any user settings', () => {
     fc.assert(
       fc.property(validUnitPreferencesArb, (userPrefs) => {
-        // Simulate: vehicle created without explicit prefs → inherits from user
         const inherited = { ...userPrefs };
         const validated = parseUnitPreferences(inherited);
         expect(validated).not.toBeNull();
@@ -199,15 +170,10 @@ describe('Property 2: Default unit inheritance on vehicle creation', () => {
   });
 });
 
-// ── Property 3: Explicit unit preferences override defaults ────────────────────
-// Feature: unit-aware-display, Property 3: Explicit unit preferences override defaults
-// **Validates: Requirements 1.5**
-
-describe('Property 3: Explicit unit preferences override defaults', () => {
+describe('explicit unit preferences override defaults', () => {
   test('explicit prefs are preserved exactly, regardless of user defaults', () => {
     fc.assert(
       fc.property(distinctUnitPreferencesPairArb, ([userDefaults, explicitPrefs]) => {
-        // Simulate: vehicle created with explicit prefs → should use explicit, not defaults
         const vehicleUnitPrefs: UnitPreferences | undefined = explicitPrefs;
         const resolvedPrefs = vehicleUnitPrefs ?? userDefaults;
 
@@ -222,7 +188,6 @@ describe('Property 3: Explicit unit preferences override defaults', () => {
   test('explicit prefs pass validation after assignment', () => {
     fc.assert(
       fc.property(validUnitPreferencesArb, (explicitPrefs) => {
-        // The explicit prefs should always be valid
         const validated = parseUnitPreferences(explicitPrefs);
         expect(validated).not.toBeNull();
         expect(validated).toEqual({
@@ -236,15 +201,10 @@ describe('Property 3: Explicit unit preferences override defaults', () => {
   });
 });
 
-// ── Property 4: Unit preferences are updatable ─────────────────────────────────
-// Feature: unit-aware-display, Property 4: Unit preferences are updatable
-// **Validates: Requirements 1.6**
-
-describe('Property 4: Unit preferences are updatable', () => {
+describe('unit preferences are updatable', () => {
   test('full update replaces all unit preferences', () => {
     fc.assert(
       fc.property(validUnitPreferencesArb, validUnitPreferencesArb, (existing, updated) => {
-        // Simulate: full update merges new prefs over existing
         const merged: UnitPreferences = { ...existing, ...updated };
         const validated = parseUnitPreferences(merged);
 
@@ -260,15 +220,12 @@ describe('Property 4: Unit preferences are updatable', () => {
   test('partial update merges correctly — only specified keys change', () => {
     fc.assert(
       fc.property(validUnitPreferencesArb, distanceUnitArb, (existing, newDistanceUnit) => {
-        // Simulate: partial update with only distanceUnit
         const partialUpdate = { distanceUnit: newDistanceUnit };
         const merged: UnitPreferences = { ...existing, ...partialUpdate };
         const validated = parseUnitPreferences(merged);
 
         expect(validated).not.toBeNull();
-        // Updated key reflects new value
         expect(validated?.distanceUnit).toBe(newDistanceUnit);
-        // Non-updated keys remain unchanged
         expect(validated?.volumeUnit).toBe(existing.volumeUnit);
         expect(validated?.chargeUnit).toBe(existing.chargeUnit);
       }),
@@ -304,11 +261,7 @@ describe('Property 4: Unit preferences are updatable', () => {
   });
 });
 
-// ── Property 17: Global settings change does not affect vehicles ───────────────
-// Feature: unit-aware-display, Property 17: Global settings change does not affect vehicles
-// **Validates: Requirements 11.3**
-
-describe('Property 17: Global settings change does not affect vehicles', () => {
+describe('global settings change does not affect vehicles', () => {
   let testDb: TestDb;
 
   beforeEach(() => {
@@ -319,7 +272,6 @@ describe('Property 17: Global settings change does not affect vehicles', () => {
     testDb.sqlite.close();
   });
 
-  /** Seed user_preferences with specific unit preferences. */
   function seedUserPreferences(db: Database, userId: string, units: UnitPreferences): void {
     db.run('INSERT INTO user_preferences (user_id, unit_preferences) VALUES (?, ?)', [
       userId,
@@ -327,7 +279,6 @@ describe('Property 17: Global settings change does not affect vehicles', () => {
     ]);
   }
 
-  /** Seed a vehicle with specific unit preferences. */
   function seedVehicleWithUnits(
     db: Database,
     vehicleId: string,
@@ -340,7 +291,6 @@ describe('Property 17: Global settings change does not affect vehicles', () => {
     );
   }
 
-  /** Read a vehicle's unit_preferences from the DB. */
   function getVehicleUnits(db: Database, vehicleId: string): UnitPreferences | null {
     const row = db.query('SELECT unit_preferences FROM vehicles WHERE id = ?').get(vehicleId) as {
       unit_preferences: string;
@@ -356,7 +306,6 @@ describe('Property 17: Global settings change does not affect vehicles', () => {
         validUnitPreferencesArb,
         fc.integer({ min: 1, max: 5 }),
         (initialUnits, updatedUnits, vehicleCount) => {
-          // Reset DB for each iteration
           testDb.sqlite.close();
           testDb = createTestDb();
 
@@ -368,7 +317,6 @@ describe('Property 17: Global settings change does not affect vehicles', () => {
           });
           seedUserPreferences(testDb.sqlite, userId, initialUnits);
 
-          // Create vehicles that inherit the initial unit preferences
           const vehicleIds: string[] = [];
           for (let i = 0; i < vehicleCount; i++) {
             const vid = `vehicle-prop17-${i}`;
@@ -376,7 +324,6 @@ describe('Property 17: Global settings change does not affect vehicles', () => {
             seedVehicleWithUnits(testDb.sqlite, vid, userId, initialUnits);
           }
 
-          // Verify vehicles have the initial units before the settings change
           for (const vid of vehicleIds) {
             const units = getVehicleUnits(testDb.sqlite, vid);
             expect(units).not.toBeNull();
@@ -385,13 +332,11 @@ describe('Property 17: Global settings change does not affect vehicles', () => {
             expect(units?.chargeUnit).toBe(initialUnits.chargeUnit);
           }
 
-          // Update the user's global unit preferences
           testDb.sqlite.run('UPDATE user_preferences SET unit_preferences = ? WHERE user_id = ?', [
             JSON.stringify(updatedUnits),
             userId,
           ]);
 
-          // Verify the settings actually changed
           const settingsRow = testDb.sqlite
             .query('SELECT unit_preferences FROM user_preferences WHERE user_id = ?')
             .get(userId) as { unit_preferences: string } | null;
@@ -401,7 +346,6 @@ describe('Property 17: Global settings change does not affect vehicles', () => {
           expect(newSettings.volumeUnit).toBe(updatedUnits.volumeUnit);
           expect(newSettings.chargeUnit).toBe(updatedUnits.chargeUnit);
 
-          // Verify ALL vehicles still have their original unit preferences
           for (const vid of vehicleIds) {
             const units = getVehicleUnits(testDb.sqlite, vid);
             expect(units).not.toBeNull();

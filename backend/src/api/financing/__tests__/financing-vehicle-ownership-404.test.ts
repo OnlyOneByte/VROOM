@@ -1,22 +1,6 @@
 /**
- * Vehicle-ownership 404 guard on the financing GET + POST routes (arch characterization).
- *
- * `GET` and `POST /api/v1/financing/vehicles/:vehicleId/financing` both gate on the vehicle existing
- * AND belonging to the caller before doing any financing work. Financing was the LONE route module
- * hand-rolling that guard inline (`vehicleRepository.findByUserIdAndId` + a manual
- * `throw new HTTPException(404, { message: 'Vehicle not found' })`) while every sibling module
- * (expenses/insurance/odometer/analytics/vehicles) uses the shared `validateVehicleOwnership`.
- *
- * This pins the OBSERVABLE 404 (status + message) on both routes so the refactor — swapping the
- * inline blocks for `validateVehicleOwnership`, which throws `NotFoundError('Vehicle')` → the same
- * 404 + "Vehicle not found" message via the global error handler — is provably behavior-preserving
- * for every consumer. (The raw error envelope's `code` field shifts from 'HTTPException' to
- * 'NotFoundError', CONVERGING financing onto the code every other route already emits for this case;
- * the FE never branches on either value — both are absent from ERROR_CODE_MESSAGES, so it falls back
- * to `error.message`, which is unchanged.)
- *
- * createTestApp() rewrites env + dynamic-imports the DB-bound modules, so this imports only the
- * harness + bun:test.
+ * GET and POST on the financing vehicle route return 404 "Vehicle not found" when the vehicle is
+ * missing or not owned by the caller, and the POST does so before any financing write.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';

@@ -1,8 +1,3 @@
-/**
- * Unit tests for BackupStrategyRegistry.
- * Validates: Requirement 3.3 — register, retrieve, undefined for unregistered, overwrite.
- */
-
 import { beforeEach, describe, expect, test } from 'bun:test';
 import type {
   BackupStrategy,
@@ -10,7 +5,6 @@ import type {
   BackupStrategyResult,
 } from '../backup-strategy';
 
-/** Minimal mock strategy for testing registry behavior. */
 function createMockStrategy(label: string): BackupStrategy {
   return {
     async execute(_ctx: BackupStrategyContext): Promise<BackupStrategyResult> {
@@ -20,16 +14,11 @@ function createMockStrategy(label: string): BackupStrategy {
 }
 
 describe('BackupStrategyRegistry', () => {
-  // Import fresh module per test to avoid shared state between tests
   let registry: typeof import('../backup-strategy-registry')['backupStrategyRegistry'];
 
   beforeEach(async () => {
-    // Re-import to get a fresh singleton — but since it's a module-level singleton,
-    // we test the class directly by creating a new instance via the exported class pattern.
-    // The registry uses a Map internally, so we can test register/get behavior.
     const mod = await import('../backup-strategy-registry');
     registry = mod.backupStrategyRegistry;
-    // Clear any previously registered strategies by re-registering known types
   });
 
   test('register and retrieve a strategy', () => {

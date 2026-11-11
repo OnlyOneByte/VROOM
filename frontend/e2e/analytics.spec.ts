@@ -1,16 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { ANALYTICS_SUMMARY, addSessionCookie, mockApi } from './support/mock-api';
 
-/**
- * The analytics dashboard.
- *
- * The page makes ONE call on load — `GET /api/v1/analytics/summary` — which returns
- * quickStats + fuelStats + fuelAdvanced together. (The previous version of this file
- * mocked `/analytics/quick-stats`, an endpoint the page only reaches through
- * `getSummary`'s 404/network fallback, so the page's real request was unmocked.) It is
- * also a protected route, so `/auth/me` has to answer or the layout redirects to `/auth`
- * before anything renders.
- */
+// The page loads everything from GET /api/v1/analytics/summary; /auth/me must answer too.
 
 test.describe('Analytics', () => {
 	test.beforeEach(async ({ context }) => {
@@ -56,8 +47,7 @@ test.describe('Analytics', () => {
 
 		await page.getByRole('tab', { name: 'Cross-Vehicle', exact: true }).click();
 
-		// Only the selection + panel swap is asserted: each non-fuel tab lazy-loads its own
-		// chart bundle and its own endpoint, which this spec deliberately does not fixture.
+		// Other tabs lazy-load their own endpoints, which this spec does not fixture.
 		await expect(page.getByRole('tab', { name: 'Cross-Vehicle', exact: true })).toHaveAttribute(
 			'aria-selected',
 			'true'
@@ -97,10 +87,8 @@ test.describe('Analytics', () => {
 		await page.goto('/analytics');
 
 		await expect(page.getByText('$0.00')).toBeVisible();
-		// avgEfficiency null renders as N/A rather than a misleading 0.
 		await expect(page.getByText('N/A')).toBeVisible();
-		// With no fill-ups and no distance the fuel tab collapses to one empty state
-		// instead of ten "no data" cards.
+		// No fill-ups or distance collapses the fuel tab to a single empty state.
 		await expect(page.getByRole('heading', { name: 'Fill-ups' })).toBeHidden();
 	});
 

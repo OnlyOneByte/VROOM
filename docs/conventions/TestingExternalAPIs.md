@@ -1,8 +1,3 @@
----
-inclusion: fileMatch
-fileMatchPattern: "backend/src/api/providers/**,backend/src/test-helpers/fake-google-clients.ts,backend/src/api/sync/backup-strategy*.ts,backend/src/api/sync/restore.ts"
----
-
 # Testing External APIs — inject a client, don't `mock.module`
 
 VROOM talks to third-party APIs: Google Drive, Google Sheets, Google Photos, S3,

@@ -15,26 +15,18 @@ import {
 } from '../../utils/unit-preferences-schema';
 import { preferencesRepository, syncStateRepository } from './repository';
 
-/**
- * Validate storageConfig provider references and consistency.
- * - All provider IDs in defaults (non-null) must exist in user_providers and belong to the user.
- * - All provider IDs in providerCategories keys must exist and belong to the user.
- * - A provider set as default for a category must have that category enabled in providerCategories.
- */
 async function validateStorageConfig(
   storageConfig: z.infer<typeof storageConfigSchema>,
   userId: string
 ): Promise<void> {
   const db = getDb();
 
-  // Collect all provider IDs that need ownership validation
   const defaultProviderIds = Object.values(storageConfig.defaults).filter(
     (id): id is string => id !== null
   );
   const categoryProviderIds = Object.keys(storageConfig.providerCategories);
   const allProviderIds = [...new Set([...defaultProviderIds, ...categoryProviderIds])];
 
-  // Validate all referenced providers exist and belong to the user
   if (allProviderIds.length > 0) {
     const ownedProviders = await db
       .select({ id: userProviders.id })
@@ -51,7 +43,6 @@ async function validateStorageConfig(
     }
   }
 
-  // Validate that a provider set as default for a category has that category enabled
   for (const [category, providerId] of Object.entries(storageConfig.defaults)) {
     if (providerId === null) continue;
     const providerCategories = storageConfig.providerCategories[providerId];
@@ -69,10 +60,6 @@ async function validateStorageConfig(
   }
 }
 
-/**
- * Validate backupConfig provider references.
- * All provider IDs in backupConfig.providers must exist in user_providers and belong to the user.
- */
 async function validateBackupConfig(
   backupConfig: z.infer<typeof backupConfigSchema>,
   userId: string
@@ -96,9 +83,6 @@ async function validateBackupConfig(
   }
 }
 
-/**
- * Merge incoming storageConfig with existing, producing a full StorageConfig.
- */
 function mergeStorageConfig(
   existing: StorageConfig | null | undefined,
   incoming: z.infer<typeof storageConfigSchema>
@@ -122,19 +106,7 @@ function mergeStorageConfig(
   };
 }
 
-/**
- * Merge incoming backupConfig with existing, producing a full BackupConfig.
- *
- * MIRRORS mergeStorageConfig — the PUT used to write backupConfig WHOLESALE while storageConfig was
- * merged, an asymmetry that was a silent data-loss trap: a client PUT-ing
- * `backupConfig` with only the provider it's editing would WIPE every other provider's backup
- * settings (retentionCount / sheetsSyncEnabled / folderPath). The frontend mitigated by always
- * reconstructing the full providers map (ProviderForm.svelte spreads ...backupConfig.providers), but
- * that made the backend contract fragile — a partial sender (a future client, a direct API caller, or
- * a stale-load race) lost data. Merge per-provider here so the backend is correct regardless of caller.
- * A provider entry IS replaced wholesale (its settings are a small fixed shape always sent complete by
- * the editor), but providers NOT in the incoming map are preserved.
- */
+// Providers absent from a partial PUT must survive; a named provider's entry is replaced whole.
 function mergeBackupConfig(
   existing: BackupConfig | null | undefined,
   incoming: z.infer<typeof backupConfigSchema>
@@ -147,14 +119,9 @@ function mergeBackupConfig(
 
 const routes = new Hono();
 
-// Apply auth and change tracking middleware to all routes
 routes.use('*', requireAuth);
 routes.use('*', changeTracker);
 
-// unitPreferencesSchema + partialUnitPreferencesSchema now live in utils/unit-preferences-schema.ts
-// (shared with vehicles/routes.ts — the dedup).
-
-// Zod schema for storageConfig validation
 const categorySettingSchema = z.object({
   enabled: z.boolean(),
   folderPath: z.string(),
@@ -176,7 +143,6 @@ const storageConfigSchema = z.object({
     }),
 });
 
-// Zod schema for per-provider backup settings
 const providerBackupSettingsSchema = z.object({
   enabled: z.boolean(),
   folderPath: z
@@ -190,7 +156,6 @@ const providerBackupSettingsSchema = z.object({
   sheetsSpreadsheetId: z.string().optional(),
 });
 
-// Zod schema for backup config validation
 const backupConfigSchema = z.object({
   providers: z
     .record(z.string().max(64), providerBackupSettingsSchema)
@@ -199,7 +164,6 @@ const backupConfigSchema = z.object({
     }),
 });
 
-// Validation schema derived from userPreferences Drizzle table
 const baseSettingsSchema = createInsertSchema(userPreferences, {
   syncInactivityMinutes: z
     .number()
@@ -221,26 +185,13 @@ const updateSettingsSchema = baseSettingsSchema
     unitPreferences: partialUnitPreferencesSchema.optional(),
     storageConfig: storageConfigSchema.optional(),
     backupConfig: backupConfigSchema.optional(),
-    // Theming engine (spec T2, D2): the selected theme id. createInsertSchema would accept it as an
-    // UNBOUNDED string (the column is plain text); pin an explicit bounded, non-empty constraint so a
-    // partial PUT can persist it (routed through the existing row-level merge in repository.update — a
-    // field not sent is left untouched, the discipline) while a 5000-char or empty id can't land.
-    // The resolver (T6) treats an unknown id as `default`, so an arbitrary <=64-char value is safe to
-    // store; the cap is a storage/abuse bound, not an allow-list (custom themes are a future seam, D6).
+    // Bounded because the column is plain text; the cap is an abuse bound, not an allow-list.
     themePreference: z.string().min(1).max(64).optional(),
-    // trips-location D3 (T8): the DEFAULT business-mileage rate ($/mile). createInsertSchema would accept
-    // the real column unbounded; pin an explicit non-negative, sanely-capped constraint (a reimbursement
-    // rate is well under $100/mile — the cap is an abuse bound). Routed through the same row-level merge
-    // (...restUpdates → repository.update), so a partial PUT persists it without touching sibling fields
-    // 0 = the additive default (no business value until a rate is set).
+    // Non-negative and capped; the cap is an abuse bound, not a product limit.
     businessMileageRate: z.number().min(0).max(100).optional(),
   })
   .partial();
 
-/**
- * GET /api/settings
- * Get user settings (creates default if not exists)
- */
 routes.get('/', async (c) => {
   const user = c.get('user');
 
@@ -252,22 +203,14 @@ routes.get('/', async (c) => {
   });
 });
 
-/**
- * PUT /api/settings
- * Update user settings
- */
 routes.put('/', async (c) => {
   const user = c.get('user');
   const body = await readJsonBody(c);
-  // A ZodError here propagates to the central errorHandler → 400 ValidationError
-  // ('Invalid request data'); the storage/backup validators throw ValidationError
-  // (an AppError subclass) which the handler shapes by its 400 statusCode.
+  // ZodError is mapped to a 400 by the central error handler.
   const updates = updateSettingsSchema.parse(body);
 
-  // Ensure settings exist first
   const existingSettings = await preferencesRepository.getOrCreate(user.id);
 
-  // Merge partial unitPreferences with existing values
   const {
     unitPreferences: partialUnitPrefs,
     storageConfig,
@@ -279,24 +222,19 @@ routes.put('/', async (c) => {
     partialUnitPrefs
   );
 
-  // Validate storageConfig if provided
   let mergedStorageConfig: StorageConfig | undefined;
   if (storageConfig) {
     mergedStorageConfig = mergeStorageConfig(existingSettings.storageConfig, storageConfig);
-    // Validate the merged result to catch cases where disabling a category
-    // conflicts with it being set as a default
+    // Validate the merged result so a category cannot be disabled while it is still a default.
     await validateStorageConfig(mergedStorageConfig, user.id);
   }
 
-  // Validate + merge backupConfig if provided. Merge (not wholesale-replace) so a partial PUT that
-  // names only one provider can't silently wipe the others' backup settings — mirrors storageConfig.
   let mergedBackupConfig: BackupConfig | undefined;
   if (backupConfig) {
     await validateBackupConfig(backupConfig, user.id);
     mergedBackupConfig = mergeBackupConfig(existingSettings.backupConfig, backupConfig);
   }
 
-  // Update settings
   const updatedSettings = await preferencesRepository.update(user.id, {
     ...restUpdates,
     ...(mergedUnitPreferences && { unitPreferences: mergedUnitPreferences }),
@@ -311,10 +249,6 @@ routes.put('/', async (c) => {
   });
 });
 
-/**
- * POST /api/settings/backup
- * Trigger manual backup — updates lastBackupDate in sync_state
- */
 routes.post('/backup', async (c) => {
   const user = c.get('user');
   await syncStateRepository.updateBackupDate(user.id);
@@ -326,10 +260,6 @@ routes.post('/backup', async (c) => {
   });
 });
 
-/**
- * POST /api/settings/restore
- * Restore from backup
- */
 routes.post('/restore', async (c) => {
   return c.json({
     success: true,

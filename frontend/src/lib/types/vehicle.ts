@@ -20,22 +20,13 @@ export interface Vehicle {
 	purchaseDate?: string;
 	financing?: VehicleFinancing;
 	unitPreferences?: UnitPreferences;
-	/**
-	 * Present ONLY on a vehicle owned by someone else and shared with the current user, when fetched
-	 * via `getVehicles({ includeShared: true })` (T5a `?include=shared`). Carries the access level +
-	 * who shared it; an owned vehicle has no `sharedAccess`. Lets the fleet card badge "shared by X"
-	 * and gate edit affordances by level (T12b).
-	 */
+	/** Only on vehicles shared with the current user; owned vehicles have none. */
 	sharedAccess?: SharedAccess;
 	createdAt: string;
 	updatedAt: string;
 }
 
-/**
- * Update payload for a vehicle. Unlike the read-model `Vehicle`, the nullable
- * optional fields accept `null` to CLEAR them on edit (vs `undefined`/absent =
- * leave unchanged). The backend `updateVehicleSchema` accepts nullish for these.
- */
+/** Nullable optional fields accept null to clear them; undefined leaves them unchanged. */
 export interface UpdateVehicleRequest {
 	make?: string;
 	model?: string;
@@ -79,9 +70,9 @@ export interface VehicleFinancing {
 export interface VehicleStats {
 	period: '7d' | '30d' | '90d' | '1y' | 'all';
 	totalMileage: number;
-	/** Period-filtered + fuel-only MAX (can drop under a short window; ignores manual odometer entries). */
+	/** Fuel-only max within the period; can drop in a short window and ignores manual odometer entries. */
 	currentMileage: number | null;
-	/** Canonical all-time, all-sources odometer (expenses + manual entries); period-independent. */
+	/** All-time odometer across expenses and manual entries; not affected by the period. */
 	currentOdometer: number | null;
 	totalFuelConsumed: number;
 	totalChargeConsumed: number;

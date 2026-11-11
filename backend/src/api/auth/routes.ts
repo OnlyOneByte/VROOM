@@ -21,14 +21,7 @@ import { consumeOAuthState, validateAndRefreshSession } from './utils';
 
 const routes = new Hono();
 
-/**
- * The session-user shape returned by GET /me and POST /refresh — id/email/displayName plus
- * ISO-or-null timestamps. Extracted so the two handlers share ONE serializer instead of
- * the byte-identical 5-field block they each inlined; structurally typed so it accepts both the
- * `c.get('user')` row and validateAndRefreshSession's `result.user`. NOTE: deliberately NOT used
- * by PATCH /me (emits only id/email/displayName — no timestamps) or GET /accounts (a different
- * created-at fallback) — those are different shapes, folding them in would change a response.
- */
+/** Payload for GET /me and POST /refresh. PATCH /me and GET /accounts differ on purpose. */
 function serializeSessionUser(u: {
   id: string;
   email: string;
@@ -45,28 +38,13 @@ function serializeSessionUser(u: {
   };
 }
 
-/**
- * OAuth State Storage
- *
- * IMPORTANT: This is an in-memory store and will be lost on server restart.
- *
- * For production deployments:
- * - Use Redis for distributed systems
- * - Use database with TTL for single-instance deployments
- * - Consider encrypted cookies for stateless approach
- *
- * Current implementation is suitable for:
- * - Development environments
- * - Single-instance deployments with infrequent restarts
- * - Low-traffic applications where occasional OAuth retry is acceptable
- */
+// In-memory: pending OAuth states are lost on restart and not shared across instances.
 const oauthStateStore = new Map<
   string,
   {
     codeVerifier?: string;
     createdAt: number;
     returnTo?: string;
-    // Provider flow fields (absent for login flow)
     userId?: string;
     flowType?: 'provider' | 'auth-link';
     providerId?: string;
@@ -74,7 +52,6 @@ const oauthStateStore = new Map<
   }
 >();
 
-// Clean up expired states (older than 10 minutes)
 const MAX_STATE_STORE_SIZE = 1000;
 const cleanupExpiredStates = () => {
   const now = Date.now();
@@ -83,7 +60,6 @@ const cleanupExpiredStates = () => {
       oauthStateStore.delete(state);
     }
   }
-  // Hard cap: if still over limit after expiry cleanup, evict oldest entries
   if (oauthStateStore.size > MAX_STATE_STORE_SIZE) {
     const entries = [...oauthStateStore.entries()].sort((a, b) => a[1].createdAt - b[1].createdAt);
     const toRemove = entries.slice(0, oauthStateStore.size - MAX_STATE_STORE_SIZE);
@@ -93,20 +69,13 @@ const cleanupExpiredStates = () => {
   }
 };
 
-// --- Auth rate limiter (IP-based, for unauthenticated login/callback/link routes) ---
 const authRateLimiter = rateLimiter({
   ...CONFIG.rateLimit.auth,
-  // Key on the trusted client IP (real socket IP, or X-Forwarded-For only behind a
-  // configured trusted proxy) — NOT the raw spoofable header, which would let an
-  // attacker get a fresh bucket per request and bypass the brute-force limit.
+  // Keyed on the trusted client IP. A raw X-Forwarded-For header is spoofable and would give
+  // every request a fresh bucket.
   keyGenerator: (c) => `auth:${getClientIp(c)}`,
 });
 
-// ============================================================================
-// PUBLIC AUTH ROUTES (no requireAuth)
-// ============================================================================
-
-// List enabled auth providers (public)
 routes.get('/providers', async (c) => {
   const providers = getEnabledProviders();
   return c.json({
@@ -115,7 +84,6 @@ routes.get('/providers', async (c) => {
   });
 });
 
-// Auth login initiation — provider-agnostic
 routes.get('/login/:authProvider', authRateLimiter, async (c) => {
   const authProviderId = c.req.param('authProvider') ?? '';
   const providerConfig = getEnabledProvider(authProviderId);
@@ -137,7 +105,6 @@ routes.get('/login/:authProvider', authRateLimiter, async (c) => {
   return c.redirect(url.toString());
 });
 
-// Auth link initiation — requires authentication
 routes.get('/link/:authProvider', authRateLimiter, requireAuth, async (c) => {
   const user = c.get('user');
   const authProviderId = c.req.param('authProvider') ?? '';
@@ -162,7 +129,6 @@ routes.get('/link/:authProvider', authRateLimiter, requireAuth, async (c) => {
   return c.redirect(url.toString());
 });
 
-// --- Auth callback helper: exchange tokens and fetch user info ---
 async function exchangeAuthTokens(
   providerConfig: ReturnType<typeof getProvider> & object,
   code: string,
@@ -174,7 +140,6 @@ async function exchangeAuthTokens(
   return userInfo;
 }
 
-// --- Auth callback helper: update existing user's profile ---
 async function updateExistingUserProfile(
   userId: string,
   authRowId: string,
@@ -186,14 +151,8 @@ async function updateExistingUserProfile(
     displayName: userInfo.displayName,
     avatarUrl: userInfo.avatarUrl,
   });
-  // DO NOT overwrite the VROOM login identity (users.email) on every login. The old code
-  // set email := the provider's CURRENTLY-reported email each time, so a user who changed their
-  // Google/GitHub primary email had their VROOM login email silently swapped on the next login (a
-  // within-account identity drift, no notice). Sync email ONLY as a first-link BACKFILL — when the
-  // stored email is empty/unset — otherwise preserve it. displayName/avatarUrl stay synced (not
-  // identity-sensitive); the provider's own email is still recorded by updateProfile above (the
-  // per-provider record, not the login identity). The cross-account UNIQUE-collision branch is kept:
-  // it's still reachable on the backfill write. (users.email is NOT NULL, so "unset" = empty string.)
+  // users.email is the login identity: it is only backfilled when empty, never re-synced from the
+  // provider on each login.
   const [current] = await db
     .select({ email: users.email })
     .from(users)
@@ -201,15 +160,13 @@ async function updateExistingUserProfile(
     .limit(1);
   const shouldBackfillEmail = !current?.email;
   if (!shouldBackfillEmail) {
-    // Common path: preserve the existing login email; only refresh the display fields.
     await db
       .update(users)
       .set({ displayName: userInfo.displayName, updatedAt: new Date() })
       .where(eq(users.id, userId));
     return;
   }
-  // First-link backfill: the stored email is empty → adopt the provider's. Wrap in try/catch for the
-  // UNIQUE constraint (another account may already hold this email — fall back to display-only).
+  // Another account may already hold the provider's email; fall back to a display-only update.
   try {
     await db
       .update(users)
@@ -234,7 +191,6 @@ async function updateExistingUserProfile(
   }
 }
 
-// --- Auth callback helper: resolve new user (no existing auth row) ---
 async function resolveNewUser(
   authProviderId: string,
   userInfo: { providerAccountId: string; email: string; displayName: string; avatarUrl?: string }
@@ -247,19 +203,12 @@ async function resolveNewUser(
     .limit(1);
 
   if (existingByEmail.length > 0) {
-    // Email already taken — no implicit account merging
     return { redirect: `${CONFIG.frontend.url}/auth?auth_error=email_exists` };
   }
 
-  // New user transaction with race condition catch
   try {
-    // SYNCHRONOUS transaction: bun-sqlite is a sync dialect — an `async` tx callback
-    // returns a pending promise so BEGIN/COMMIT wrap nothing and each `await tx.insert` autocommits alone
-    //  New-user signup inserts the users row THEN the auth-provider link; if the second
-    // insert threw under the old async form, the users row stayed committed with NO auth link → an orphan
-    // account that can never log in AND blocks re-signup on the email-unique index. Running synchronously
-    // (.returning().get() / .run() inline, no await) keeps both inserts in ONE real transaction that rolls
-    // back atomically. The UNIQUE-collision catch below is unchanged.
+    // The callback must stay synchronous: bun-sqlite would otherwise autocommit each awaited insert,
+    // leaving a user row with no auth link if the second insert fails.
     const result = db.transaction((tx) => {
       const newUser = tx
         .insert(users)
@@ -297,28 +246,18 @@ async function resolveNewUser(
   }
 }
 
-// --- Auth callback helper: validate OAuth state for link flow ---
-// Single-use + flow-isolated consume via the shared consumeOAuthState; the 'auth-link' flowType
-// must match, else reject+delete (anti-fixation).
 function validateLinkState(stateParam: string | null) {
   const storedData = consumeOAuthState(oauthStateStore, stateParam, 'auth-link');
   return storedData ? { data: storedData } : { error: 'invalid_state' as const };
 }
 
-// --- Auth callback helper: validate OAuth state for login flow ---
-// Login flow requires an entry with NO flowType (a link/provider state must NOT log a user in).
+// A link or provider state must never be accepted as a login state.
 function validateLoginState(stateParam: string | null) {
   const storedData = consumeOAuthState(oauthStateStore, stateParam, undefined);
   return storedData ? { data: storedData } : { error: 'invalid_state' as const };
 }
 
-// --- Auth callback helper: handle link conflict check ---
-// The account-takeover boundary: an OAuth identity already bound to ANOTHER user must be rejected
-// (account_conflict), the SAME user is an idempotent no-op (already_linked), and an unbound identity
-// is free to link (null). EXPORTED + repo-injectable (default = the singleton, so the route call-site
-// is unchanged) so the 3-way decision is unit-testable against a real seeded repo without the
-// getDb-singleton bind (the DI-seam pattern) — a regression here would silently enable linking
-// someone else's provider identity to your account.
+// Account-takeover boundary: an identity bound to another user must never be re-linked.
 export async function checkLinkConflicts(
   authProviderId: string,
   providerAccountId: string,
@@ -331,7 +270,7 @@ export async function checkLinkConflicts(
   return 'account_conflict';
 }
 
-// Link callback — MUST be registered BEFORE the generic callback to avoid route collision
+// Must be registered before the generic /callback/:authProvider route, which would shadow it.
 routes.get('/callback/link/:authProvider', authRateLimiter, async (c) => {
   const authProviderId = c.req.param('authProvider') ?? '';
   const url = new URL(c.req.url);
@@ -339,7 +278,6 @@ routes.get('/callback/link/:authProvider', authRateLimiter, async (c) => {
   const stateParam = url.searchParams.get('state');
   const profileRedirect = (params: string) => `${CONFIG.frontend.url}/profile?${params}`;
 
-  // Handle cancellation
   if (!code) {
     if (stateParam) oauthStateStore.delete(stateParam);
     return c.redirect(profileRedirect('link_error=cancelled'));
@@ -349,13 +287,11 @@ routes.get('/callback/link/:authProvider', authRateLimiter, async (c) => {
   if ('error' in stateResult) return c.redirect(profileRedirect('link_error=invalid_state'));
   const storedData = stateResult.data;
 
-  // Validate session manually
   const lucia = getLucia();
   const sessionId = getCookie(c, lucia.sessionCookieName);
   const authResult = await validateProviderSession(sessionId);
   if (!authResult) return c.redirect(`${CONFIG.frontend.url}/auth?auth_error=invalid_state`);
 
-  // CSRF check
   if (storedData.userId !== authResult.user.id) {
     logger.warn('Auth link CSRF mismatch', {
       sessionUserId: authResult.user.id,
@@ -397,7 +333,6 @@ routes.get('/callback/link/:authProvider', authRateLimiter, async (c) => {
   return c.redirect(profileRedirect('success=linked'));
 });
 
-// --- Auth callback helper: create Lucia session and set cookie ---
 async function createAuthSession(c: Context, userId: string) {
   const lucia = getLucia();
   const session = await lucia.createSession(userId, {});
@@ -411,7 +346,6 @@ async function createAuthSession(c: Context, userId: string) {
   });
 }
 
-// --- Auth callback helper: exchange tokens with error redirect ---
 async function exchangeAuthTokensOrRedirect(
   providerConfig: ReturnType<typeof getProvider> & object,
   code: string,
@@ -434,7 +368,6 @@ async function exchangeAuthTokensOrRedirect(
   }
 }
 
-// Generic auth callback — REGISTERED AFTER link callback
 routes.get('/callback/:authProvider', authRateLimiter, async (c) => {
   const authProviderId = c.req.param('authProvider') ?? '';
   const url = new URL(c.req.url);
@@ -483,11 +416,6 @@ routes.get('/callback/:authProvider', authRateLimiter, async (c) => {
   return c.redirect(`${CONFIG.frontend.url}/dashboard`);
 });
 
-// ============================================================================
-// SESSION ROUTES (no rate limiter — these are not auth initiation)
-// ============================================================================
-
-// Get current user
 routes.get('/me', async (c) => {
   const lucia = getLucia();
   const sessionId = getCookie(c, lucia.sessionCookieName);
@@ -499,10 +427,7 @@ routes.get('/me', async (c) => {
   const { session, user } = await lucia.validateSession(sessionId);
 
   if (!session) {
-    // Clear the now-invalid session cookie so the dead token doesn't linger in the browser
-    // (— align with requireAuth + the logout handler; OWASP session-mgmt hygiene per ARCC
-    // secure-cookie-handling). The session is already invalid server-side, so this is hygiene, not a
-    // replay fix — but it stops the client from re-sending a known-dead cookie on every request.
+    // Clear the dead cookie so the browser stops resending it.
     deleteCookie(c, lucia.sessionCookieName, {
       path: '/',
       secure: CONFIG.env === 'production',
@@ -525,7 +450,6 @@ routes.get('/me', async (c) => {
   });
 });
 
-// Update current user's profile (display name).
 routes.patch('/me', requireAuth, async (c) => {
   const user = c.get('user');
 
@@ -558,7 +482,6 @@ routes.patch('/me', requireAuth, async (c) => {
   });
 });
 
-// Logout
 routes.post('/logout', async (c) => {
   const lucia = getLucia();
   const sessionId = getCookie(c, lucia.sessionCookieName);
@@ -578,7 +501,6 @@ routes.post('/logout', async (c) => {
   return c.json({ success: true, message: 'Logged out successfully' });
 });
 
-// Refresh session (extend session if valid)
 routes.post('/refresh', async (c) => {
   const lucia = getLucia();
   const sessionId = getCookie(c, lucia.sessionCookieName);
@@ -590,7 +512,6 @@ routes.post('/refresh', async (c) => {
   const result = await validateAndRefreshSession(sessionId, lucia, c);
 
   if (!result) {
-    // Clear the now-invalid session cookie (— mirror /me + requireAuth + logout).
     deleteCookie(c, lucia.sessionCookieName, {
       path: '/',
       secure: CONFIG.env === 'production',
@@ -613,11 +534,6 @@ routes.post('/refresh', async (c) => {
   });
 });
 
-// ============================================================================
-// LINKED ACCOUNTS ROUTES (requireAuth, no rate limiter)
-// ============================================================================
-
-// List linked auth accounts
 routes.get('/accounts', requireAuth, async (c) => {
   const user = c.get('user');
   const rows = await authProviderRepository.findByUserId(user.id);
@@ -637,21 +553,13 @@ routes.get('/accounts', requireAuth, async (c) => {
   return c.json({ success: true, data });
 });
 
-// Unlink auth account — transaction-safe
 routes.delete('/accounts/:id', requireAuth, async (c) => {
   const user = c.get('user');
   const accountId = c.req.param('id');
   const db = getDb();
 
-  // SYNCHRONOUS transaction callback: bun-sqlite is a sync dialect, so an `async` callback hands
-  // BEGIN/COMMIT a pending promise and each `await tx.…` inside it autocommits on its own. That made
-  // "you cannot unlink your last sign-in method" a read-then-write race rather than a guard: two
-  // concurrent unlinks of two different providers each counted 2, each passed, and the user was left
-  // with ZERO sign-in methods — unrecoverable from the UI, since there is no password auth and a
-  // fresh OAuth login refuses to merge into an account whose email already exists. Running with no
-  // yield point between the count and the delete (.all()/.run() inline, never awaited) is what puts
-  // them in one real transaction. The delete re-states the ownership + domain predicate so this
-  // route can never reach a row of another domain (e.g. a storage provider) by id.
+  // Keep the count and the delete free of yield points (no awaits): the last-sign-in-method guard
+  // is a read-then-write and must not race with a concurrent unlink.
   const result = db.transaction((tx) => {
     const authRows = tx
       .select({ id: userProviders.id })
@@ -693,31 +601,15 @@ routes.delete('/accounts/:id', requireAuth, async (c) => {
   return c.body(null, 204);
 });
 
-// ============================================================================
-// STORAGE PROVIDER OAUTH ROUTES (existing — kept below auth routes)
-// ============================================================================
-
 /**
- * Is `value` a path this server may bounce a browser back to after the provider round-trip?
- *
- * The callback reports its outcome by redirecting to the frontend origin + returnTo + its own query
- * string (see `frontendRedirect` in the provider callback below), so an unvalidated `returnTo` is an
- * open redirect wearing the app's own origin. EXPORTED for its unit guard — the rejected shapes are
- * the point of the function, and each one is a live hazard:
- *  - not starting with a single `/`: `@evil.example.com/x` turns the app's origin into the URL's
- *  *userinfo*, so the browser resolves the host to the attacker's while the link still reads as
- *  the real app.
- *  - `//host` or `/\host`: scheme-relative authorities.
- *  - `?` or `#`: the callback appends its OWN query, so a returnTo carrying one would swallow
- *  `provider_error`/`provider_connected`/`nonce` into a parameter value and the frontend would
- *  never see the result of the flow.
- *  - whitespace, which is how CR/LF would otherwise reach the Location header.
+ * Same-origin path check for the provider flow's returnTo. Rejects `@host` (becomes userinfo),
+ * `//host` and `/\host` (scheme-relative), `?`/`#` (would swallow the callback's own query), and
+ * whitespace (CR/LF header injection).
  */
 export function isSafeReturnPath(value: string | undefined): value is string {
   return value !== undefined && /^\/(?![/\\])[^?#\\\s]*$/.test(value);
 }
 
-// Provider OAuth initiation — isolated from login flow
 routes.get('/providers/connect/google', requireAuth, async (c) => {
   const user = c.get('user');
   const returnTo = c.req.query('returnTo');
@@ -743,10 +635,7 @@ routes.get('/providers/connect/google', requireAuth, async (c) => {
     'profile',
     'email',
     'https://www.googleapis.com/auth/drive.file',
-    // photos-auto-expense T5/D2 (ARCC-cleared, design §7): the NARROWEST Google Photos read scope —
-    // read-only + app-created-data only, so VROOM can enumerate ONLY the receipts it uploaded to its own
-    // album (mediaItems:search, T1), never the user's camera roll. Additive: existing Drive/Photos users
-    // re-consent on next connect (the flow already sets prompt=consent + access_type=offline below).
+    // Narrowest Photos scope: read-only, and only items this app created, never the camera roll.
     'https://www.googleapis.com/auth/photoslibrary.readonly.appcreateddata',
   ]);
 
@@ -769,8 +658,6 @@ routes.get('/providers/connect/google', requireAuth, async (c) => {
   cleanupExpiredStates();
   return c.redirect(url.toString());
 });
-
-// --- Provider OAuth callback helpers ---
 
 async function validateProviderSession(
   sessionId: string | undefined
@@ -839,18 +726,13 @@ function resolveProviderState(
   code: string | null
 ): { state: ProviderCallbackState; returnTo: string } | { error: string; returnTo: string } {
   const storedData = stateParam ? oauthStateStore.get(stateParam) : undefined;
-  // Fallback for an expired/unknown state, where the caller's own returnTo is gone. It must be
-  // a frontend page that EXISTS and reads `provider_error`, or the error is reported into a 404:
-  // the provider-connect form (new/edit) is the only place that renders it, and this flow always
-  // starts there.
+  // Fallback must be a page that renders provider_error, or the error lands on a 404.
   const requestedReturnTo = storedData?.returnTo ?? '/settings/providers/new';
-  // Re-validate on the way OUT as well as at intake, so a state written by any other code path —
-  // or one minted before the intake gate existed — still cannot steer this redirect off-origin.
+  // Validated again on output so no state, whatever wrote it, can steer the redirect off-origin.
   const returnTo = isSafeReturnPath(requestedReturnTo)
     ? requestedReturnTo
     : '/settings/providers/new';
 
-  // Handle OAuth cancellation (user denied consent)
   if (!code) {
     if (stateParam) oauthStateStore.delete(stateParam);
     return { error: 'cancelled', returnTo };
@@ -861,7 +743,6 @@ function resolveProviderState(
     return { error: 'invalid_state', returnTo };
   }
 
-  // Runtime assertion: provider flow always requires codeVerifier (Google supports PKCE)
   if (!storedData.codeVerifier) {
     oauthStateStore.delete(stateParam);
     return { error: 'invalid_state', returnTo };
@@ -890,7 +771,7 @@ async function validateProviderCsrf(
   return { userId: authResult.user.id };
 }
 
-// Provider OAuth callback — never touches the session
+// Must never create or modify the login session.
 routes.get('/callback/provider/google', async (c) => {
   const url = new URL(c.req.url);
   const code = url.searchParams.get('code');
@@ -903,18 +784,15 @@ routes.get('/callback/provider/google', async (c) => {
   }
 
   const { state } = resolved;
-  // code is guaranteed non-null here — resolveProviderState returns error if !code
+  // resolveProviderState returns an error whenever code is missing.
   const authCode = code as string;
 
-  // Validate session + CSRF: user must be authenticated and match state userId
   const lucia = getLucia();
   const sessionId = getCookie(c, lucia.sessionCookieName);
   const validated = await validateProviderCsrf(sessionId, state.userId);
   if (!validated) {
     const authResult = await validateProviderSession(sessionId);
     if (!authResult) {
-      // The login page is /auth (there is no /auth/login); auth_error=invalid_state is the
-      // key its copy maps to "your sign-in session expired", which is exactly this case.
       return c.redirect(`${CONFIG.frontend.url}/auth?auth_error=invalid_state`);
     }
     logger.warn('Provider OAuth CSRF mismatch', {
@@ -924,7 +802,6 @@ routes.get('/callback/provider/google', async (c) => {
     return c.redirect(frontendRedirect(`${state.returnTo}?provider_error=session_mismatch`));
   }
 
-  // Exchange code for tokens and fetch email
   let result: Awaited<ReturnType<typeof exchangeProviderTokens>>;
   try {
     result = await exchangeProviderTokens(authCode, state.codeVerifier);

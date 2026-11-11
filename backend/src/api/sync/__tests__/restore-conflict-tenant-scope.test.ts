@@ -1,22 +1,5 @@
-/**
- * Security regression: merge-mode conflict detection must be TENANT-SCOPED.
- *
- * `detectConflicts` probed `SELECT * FROM <table> WHERE id IN (backup ids)` with NO ownership
- * filter, then returned the full existing DB row as `localData` in the `conflicts` response. So a
- * merge-mode restore whose row ids COLLIDE with another user's rows leaked that user's full row
- * contents (VIN, amounts, …) back to the importer — a cross-tenant READ leak, the same class as the
- * restore write-stamp. The fix scopes every probe to the importer's own rows (userId column for
- * vehicles/expenses/insurance/photos; owned-parent FK for financing/photoRefs).
- *
- * This proves it: seed a VICTIM vehicle, then restore (merge) a backup whose vehicle id is tampered
- * to COLLIDE with the victim's id, as the importer. Pre-fix: conflicts contained the victim's row.
- * Post-fix: no conflict is reported (the colliding id isn't the importer's), so the restore proceeds
- * and the victim's row is never echoed. A positive control proves a genuine SELF-collision still
- * reports a conflict (the feature isn't broken, only the leak is closed).
- *
- * createTestApp() rewrites env then dynamic-imports DB-bound modules; keep static imports to the
- * harness + bun:test and import backup/restore + adm-zip dynamically AFTER createTestApp.
- */
+// Merge-mode conflict detection must be tenant-scoped. An id collision with another user's row must
+// not return that user's data in the conflicts response.
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
@@ -42,15 +25,13 @@ async function createVehicle(make: string): Promise<string> {
 
 describe('restore merge conflict detection is tenant-scoped (cross-tenant read guard)', () => {
   test("a backup vehicle id colliding with ANOTHER user's row reports NO conflict (no leak)", async () => {
-    // The importer (harness user) owns one vehicle; export it as a real ZIP.
     const myVehicleId = await createVehicle('Honda');
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');
     const AdmZip = (await import('adm-zip')).default;
     const zip = await backupService.exportAsZip(ctx.user.id);
 
-    // Seed a VICTIM user with a vehicle whose id we will collide against. Its make ('Ferrari') is the
-    // secret that must NOT leak back.
+    // The victim's make ('Ferrari') is the secret that must not leak back.
     const { db } = await import('../../../db/connection');
     const schema = await import('../../../db/schema');
     const victimId = 'victim-user-1';
@@ -66,8 +47,7 @@ describe('restore merge conflict detection is tenant-scoped (cross-tenant read g
       year: 2023,
     });
 
-    // Tamper the export: rewrite our vehicle's id to the victim's id, so the merge probe's id set
-    // contains the victim's id. (metadata.userId stays ours → the envelope check still passes.)
+    // Rewrites the id so the merge probe sees the victim's id. metadata.userId stays the importer's.
     const archive = new AdmZip(zip);
     const csv = archive.getEntry('vehicles.csv')?.getData().toString('utf-8') as string;
     expect(csv, 'export contains vehicles.csv').toBeTruthy();
@@ -75,11 +55,8 @@ describe('restore merge conflict detection is tenant-scoped (cross-tenant read g
     expect(tampered.includes(victimVehicleId), 'tamper replaced the id').toBe(true);
     archive.updateFile('vehicles.csv', Buffer.from(tampered, 'utf-8'));
 
-    // Pre-fix: detectConflicts matched the victim's row and returned it in `conflicts[].localData`
-    // — the leak. Post-fix: the probe is scoped to the importer, so the victim's id is NOT seen as a
-    // conflict; merge then proceeds to insert and the DB's PK constraint rejects the colliding id
-    // (the-audited "PK collision throws + rolls back, no overwrite"). EITHER outcome is secure —
-    // the one thing that must never happen is the victim's row appearing in the response.
+    // The probe must not match the victim's row. A PK-collision error or a proceeding merge are both
+    // acceptable. The victim's row appearing in the response is not.
     let conflicts: NonNullable<
       Awaited<ReturnType<typeof restoreService.restoreFromBackup>>['conflicts']
     > = [];
@@ -91,7 +68,7 @@ describe('restore merge conflict detection is tenant-scoped (cross-tenant read g
       );
       conflicts = result.conflicts ?? [];
     } catch (err) {
-      // A PK-collision throw is the secure path (no overwrite); the error must not carry the secret.
+      // The error must not carry the secret.
       expect(JSON.stringify(err instanceof Error ? err.message : err)).not.toContain('Ferrari');
     }
 
@@ -112,14 +89,12 @@ describe('restore merge conflict detection is tenant-scoped (cross-tenant read g
   });
 
   test('a genuine SELF-collision still reports a conflict (feature intact)', async () => {
-    // The importer already owns the vehicle the backup carries → a real merge conflict.
     const myVehicleId = await createVehicle('Toyota');
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');
     const zip = await backupService.exportAsZip(ctx.user.id);
 
-    // The row still exists (no wipe in merge mode), so restoring the same export in merge mode
-    // collides with the importer's OWN row → conflict reported.
+    // Merge mode does not wipe, so the same export collides with the importer's own row.
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'merge');
 
     expect(result.success).toBe(false);

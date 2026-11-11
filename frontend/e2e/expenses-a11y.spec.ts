@@ -9,19 +9,8 @@ import {
 	VEHICLE_CIVIC
 } from './support/mock-api';
 
-/**
- * Accessibility of the expense list, in the states the shipped ratchet cannot reach.
- *
- * `pwa.spec.ts` scans `/`, `/auth` and `/dashboard` as they first render. Two things put the
- * expenses table outside that net: its row controls exist only AFTER an interaction (tap a
- * compact row, expand a split group), and the default fixtures contain no split expense at all.
- * Both halves of the gap are closed here — a split group and an insurance-owned split group in
- * the fixtures, and a scan after each interaction that creates a control.
- *
- * The violations this pins are not allowlisted anywhere: the assertions below demand an empty
- * set, so a row that nests Edit/Delete inside a row-level button, or an icon-only control with
- * no name, fails this spec rather than being recorded as debt.
- */
+// Scans the expense table in states pwa.spec.ts cannot reach: after tapping rows or expanding
+// split groups. No allowlist here; any violation fails.
 
 const SPLIT_GROUP = [
 	{
@@ -56,7 +45,7 @@ const SPLIT_GROUP = [
 	}
 ];
 
-/** A premium materialized from an insurance policy: its Delete is blocked, and must say why. */
+// Materialized from an insurance policy, so its Delete is blocked and must explain why.
 const INSURANCE_GROUP = [
 	{
 		id: 'expense-premium-camry',
@@ -100,11 +89,10 @@ const INSURANCE_REASON = 'Delete the insurance policy to remove this expense';
 
 async function openExpenses(page: Page) {
 	await page.goto('/expenses');
-	// The populated table, not the loading shell — scanning the shell would measure nothing.
+	// Wait for the populated table; the loading shell would scan nothing.
 	await expect(page.getByText('$45.50').filter({ visible: true }).first()).toBeVisible();
 }
 
-/** The rule ids axe reports in the current state, attached to the report either way. */
 async function axeViolationIds(page: Page, testInfo: TestInfo, label: string) {
 	return (await scanA11y(page, testInfo, `expenses-${label}`)).ids;
 }
@@ -122,15 +110,14 @@ test.describe('Expense list accessibility — wide layout', () => {
 
 		expect(await axeViolationIds(page, testInfo, 'wide-collapsed')).toEqual([]);
 
-		// Expand BY KEYBOARD: focus the disclosure and press Enter. The row used to be a bare
-		// `<tr onclick>`, which no keyboard can reach, so the portions were mouse-only.
+		// Expand by keyboard: the portions must be reachable without a mouse.
 		const disclosure = page.getByRole('button', { name: 'Split expense portions' }).first();
 		await disclosure.focus();
 		await expect(disclosure).toHaveAttribute('aria-expanded', 'false');
 		await page.keyboard.press('Enter');
 
 		await expect(disclosure).toHaveAttribute('aria-expanded', 'true');
-		// The Civic's $100.00 portion only exists in the DOM while the group is expanded.
+		// The Civic portion only exists in the DOM while the group is expanded.
 		await expect(page.getByRole('cell', { name: '$100.00' })).toBeVisible();
 
 		expect(await axeViolationIds(page, testInfo, 'wide-expanded')).toEqual([]);
@@ -143,8 +130,7 @@ test.describe('Expense list accessibility — wide layout', () => {
 	test('the disclosure does not make a split row taller than a plain one', async ({ page }) => {
 		await openExpenses(page);
 
-		// Both row kinds already carry 32px icon buttons in their action cell, so the disclosure
-		// has to fit that height: a taller split row would make the table ragged.
+		// Split rows must match plain rows' 32px action height or the table looks ragged.
 		const plain = await page.getByRole('row', { name: /Costco fill-up/ }).boundingBox();
 		const split = await page.getByRole('row', { name: /Shared detailing/ }).boundingBox();
 
@@ -156,7 +142,7 @@ test.describe('Expense list accessibility — wide layout', () => {
 	}) => {
 		await openExpenses(page);
 
-		// Hovering the row is what reveals its action cluster to a mouse user.
+		// Hovering the row reveals its action cluster.
 		const premiumRow = page.getByRole('row', { name: /Policy premium/ });
 		await premiumRow.hover();
 		const blockedDelete = premiumRow.getByRole('button', { name: 'Delete expense' });
@@ -164,20 +150,16 @@ test.describe('Expense list accessibility — wide layout', () => {
 		await expect(blockedDelete).toHaveAttribute('aria-disabled', 'true');
 		await expect(blockedDelete).toHaveAccessibleDescription(INSURANCE_REASON);
 
-		// Hover is a real pointer-events check: Playwright refuses to hover an element the page
-		// has set `pointer-events: none` on, which is how the kit styles a disabled control and
-		// why its `title` tooltip never appeared.
+		// Hover is a real pointer-events check: disabled kit controls set pointer-events: none.
 		await blockedDelete.hover();
 		await expect(blockedDelete).toHaveAttribute('title', INSURANCE_REASON);
 
-		// `disabled` would leave this unfocusable, which is what made the reason unreachable.
+		// `disabled` would make this unfocusable and hide the reason.
 		await blockedDelete.focus();
 		await expect(blockedDelete).toBeFocused();
 		await page.keyboard.press('Enter');
 
-		// Scoped to the toast: the same sentence is also present (and visually clipped) as the
-		// button's `aria-describedby` target, which is the point — the reason reaches a mouse
-		// user, a keyboard user and assistive tech by three different routes.
+		// Scoped to the toast; the same sentence also backs the button's aria-describedby.
 		await expect(page.locator('[data-sonner-toast]').getByText(INSURANCE_REASON)).toBeVisible();
 		await expect(page.getByRole('alertdialog')).toHaveCount(0);
 	});
@@ -196,8 +178,7 @@ test.describe('Expense list accessibility — compact layout', () => {
 
 		expect(await axeViolationIds(page, testInfo, 'compact-collapsed')).toEqual([]);
 
-		// A standalone row: tapping it reveals Edit + Delete. While they lived INSIDE the row
-		// button this scan reported `nested-interactive`.
+		// Edit and Delete must stay outside the row button, or axe reports nested-interactive.
 		await page
 			.getByRole('button', { name: /Costco fill-up|Fuel & Charging/ })
 			.first()
@@ -205,7 +186,6 @@ test.describe('Expense list accessibility — compact layout', () => {
 		await expect(page.getByRole('link', { name: 'Edit' }).first()).toBeVisible();
 		expect(await axeViolationIds(page, testInfo, 'compact-standalone-selected')).toEqual([]);
 
-		// A split group row: the second instance of the same class, plus its portions.
 		await page.getByRole('button', { name: /Split/ }).first().click();
 		await expect(page.getByText('$100.00').filter({ visible: true }).first()).toBeVisible();
 		expect(await axeViolationIds(page, testInfo, 'compact-split-selected')).toEqual([]);
@@ -219,8 +199,7 @@ test.describe('Expense list accessibility — compact layout', () => {
 		await page.keyboard.press('Enter');
 		await expect(splitRow).toHaveAttribute('aria-expanded', 'true');
 
-		// Tab from the row to its Delete and press it. The row's own keydown handler used to
-		// deselect the row first, unmounting this button before its activation click landed.
+		// The row's keydown handler must not unmount this button before its click fires.
 		const del = page.getByRole('button', { name: 'Delete', exact: true });
 		await del.focus();
 		await page.keyboard.press('Enter');

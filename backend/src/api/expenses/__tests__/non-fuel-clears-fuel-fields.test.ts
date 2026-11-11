@@ -1,15 +1,3 @@
-/**
- * A NON-fuel expense write must not persist fuel-only fields. The frontend form already
- * clears volume/charge/fuelType/mileage on a category switch client-side, but the backend used to write
- * updateData/expenseData verbatim — so a direct API caller (or a future client) could store a
- * maintenance/misc row carrying volume/fuelType/missedFillup and, crucially, a stray `mileage` that
- * getCurrentOdometer reads CROSS-CATEGORY (no category filter in its UNION) → poisons the
- * reminder/lease odometer axis. clearFuelFieldsIfNotFuel nulls the four fuel columns on a non-fuel
- * write. These drive the REAL POST/PUT stack + read the row back via ctx.sqlite.
- *
- * createTestApp() rewrites env + dynamic-imports DB-bound modules — imports limited to harness + bun:test.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -48,10 +36,9 @@ describe('non-fuel expense writes null the fuel-only fields', () => {
       category: 'misc',
       expenseAmount: 40,
       date: '2024-06-01',
-      // Stray fuel fields a non-fuel expense should never carry (a direct API caller / stale client).
       volume: 12,
       fuelType: 'Regular',
-      mileage: 99_999, // the dangerous one — would poison getCurrentOdometer cross-category
+      mileage: 99_999,
       missedFillup: true,
     });
     const body = await json<DataEnvelope<{ id: string }>>(res);
@@ -61,13 +48,12 @@ describe('non-fuel expense writes null the fuel-only fields', () => {
     expect(row.category).toBe('misc');
     expect(row.volume).toBeNull();
     expect(row.fuel_type).toBeNull();
-    expect(row.mileage).toBeNull(); // not stored → can't poison the odometer axis
+    expect(row.mileage).toBeNull();
     expect(row.missed_fillup).toBe(0);
   });
 
   test('PUT switching a fuel expense to maintenance nulls its fuel fields', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
-    // A valid fuel expense first (volume + mileage required by the create refinement).
     const created = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId,
       category: 'fuel',
@@ -80,9 +66,8 @@ describe('non-fuel expense writes null the fuel-only fields', () => {
     const cbody = await json<DataEnvelope<{ id: string }>>(created);
     expect(created.status, JSON.stringify(cbody)).toBe(201);
     const id = cbody.data.id;
-    expect(expenseRow(id).volume).toBe(10); // sanity: fuel fields present pre-switch
+    expect(expenseRow(id).volume).toBe(10);
 
-    // Switch to maintenance, sending ONLY the category (the omit-the-fuel-fields case).
     const put = await ctx.authed('PUT', `/api/v1/expenses/${id}`, { category: 'maintenance' });
     expect(put.status).toBe(200);
 
@@ -96,7 +81,6 @@ describe('non-fuel expense writes null the fuel-only fields', () => {
 
   test('PUT writing a stray mileage onto an ALREADY-non-fuel row (no category sent) nulls it', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
-    // A maintenance expense — no fuel fields. (Created non-fuel, so it has no mileage to start.)
     const created = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId,
       category: 'maintenance',
@@ -106,12 +90,8 @@ describe('non-fuel expense writes null the fuel-only fields', () => {
     const cbody = await json<DataEnvelope<{ id: string }>>(created);
     expect(created.status, JSON.stringify(cbody)).toBe(201);
     const id = cbody.data.id;
-    expect(expenseRow(id).mileage).toBeNull(); // sanity: no mileage pre-edit
+    expect(expenseRow(id).mileage).toBeNull();
 
-    // Edit it WITHOUT resending category, sneaking in a stray mileage (a direct API caller / stale
-    // client). updateData.category is undefined here, so a clear keyed off the REQUEST category would be
-    // a no-op and 99_999 would persist on a maintenance row, becoming the vehicle's MAX(odometer)
-    // cross-category. The clear must key off the EFFECTIVE (stored) category instead.
     const put = await ctx.authed('PUT', `/api/v1/expenses/${id}`, {
       expenseAmount: 85,
       mileage: 99_999,

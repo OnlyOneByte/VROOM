@@ -1,7 +1,3 @@
-/**
- * Configuration Module - Environment variables, validation, and constants
- */
-
 import type { Table } from 'drizzle-orm';
 import { z } from 'zod';
 import packageJson from '../package.json';
@@ -37,43 +33,25 @@ const envSchema = z.object({
         throw new Error('PORT must be valid (1-65535)');
       return port;
     }),
-  // Address to bind. Handed to Bun as `hostname`, so it is honored exactly, and index.ts refuses
-  // to start if this machine cannot bind it.
-  //
-  // The default is the IPv4 loopback LITERAL, not `localhost` and not "every interface":
-  //  - a name binds whichever loopback family it resolves to — measurably ::1 only on hosts whose
-  //    resolver answers that first, which then REFUSES every client that dials 127.0.0.1 (curl,
-  //    an nginx/Caddy upstream, a port-forwarded probe). A literal is deterministic.
-  //  - omitting the hostname binds every interface, so a bare-metal install would be publicly
-  //    reachable by default — a silent exposure.
-  // Clients that resolve `localhost` get both loopback addresses and retry across them, so a
-  // documented `localhost:3001` upstream still reaches an IPv4-only bind. Containers must set
-  // `0.0.0.0` (loopback is unreachable from outside the container) — both Dockerfiles and both
-  // example stacks do.
+  // Default is the IPv4 loopback literal. A hostname like localhost can resolve to ::1 only, and an
+  // omitted hostname binds every interface. Containers must set 0.0.0.0.
   HOST: z.string().default('127.0.0.1'),
   DATABASE_URL: z.string().default('./data/vroom.db'),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
-  // Must match a route the backend actually serves: auth routes mount under /api/v1/auth, and
-  // the /api/* -> /api/v1/* compatibility redirect never sees a bare /auth/... path (it 404s).
-  // GOOGLE_PROVIDER_REDIRECT_URI is derived from this value below, so a wrong path breaks both
-  // the login and the storage-connect callback.
+  // Must match a real route under /api/v1. The provider redirect URI below is derived from this value.
   GOOGLE_REDIRECT_URI: z.string().default('http://localhost:3001/api/v1/auth/callback/google'),
   GOOGLE_PROVIDER_REDIRECT_URI: z.string().optional(),
   GITHUB_CLIENT_ID: z.string().optional(),
   GITHUB_CLIENT_SECRET: z.string().optional(),
   GITHUB_REDIRECT_URI: z.string().default('http://localhost:3001/api/v1/auth/callback/github'),
-  // There is deliberately no session secret: sessions are opaque ids stored in the `sessions`
-  // table (Lucia + Drizzle adapter), so nothing is signed or encrypted with a configurable key.
+  // No session secret: sessions are opaque ids in the sessions table, so nothing is signed with a configured key.
   FRONTEND_URL: z.string().optional(),
   CORS_ORIGINS: z
     .string()
     .optional()
     .transform((val) => val?.split(',').map((origin) => origin.trim()) || []),
-  // Comma-separated IPs of trusted reverse proxies (e.g. your load balancer).
-  // `X-Forwarded-For` is ONLY honored when the request's actual socket IP is in
-  // this list — otherwise the spoofable header is ignored and the real socket IP
-  // is used. Empty by default (direct-exposure safe; no header is trusted).
+  // X-Forwarded-For is trusted only when the socket IP is in this list. Empty means no proxy header is trusted.
   TRUSTED_PROXY_IPS: z
     .string()
     .optional()
@@ -84,30 +62,20 @@ const envSchema = z.object({
         .filter(Boolean)
     ),
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
-  // Allow the in-memory FakeStorageProvider (tests / local E2E only). Never set
-  // in production — the factory also hard-gates on env !== 'production'.
+  // Tests and local E2E only. The storage factory also refuses it in production.
   ALLOW_FAKE_STORAGE: z
     .string()
     .optional()
     .transform((val) => val === '1' || val === 'true'),
-  // Disable in-memory rate limiting for the local E2E harness, whose own request
-  // volume (route-smoke hits every route + many API calls, repeated across runs)
-  // exhausts the 1000/15min global window and flakes late specs with 429s. Never
-  // set in production — double-gated on env !== 'production' below.
   DISABLE_RATE_LIMIT: z
     .string()
     .optional()
     .transform((val) => val === '1' || val === 'true'),
-  // Web Push. The VAPID keypair is the push application-server identity for the whole instance
-  // (NOT per-user), so it is a deploy secret set in the environment, not a user_providers
-  // credential. The PRIVATE key is server-only (never shipped to the browser, never logged); the
-  // PUBLIC key is public-by-design (the applicationServerKey the browser requires).
-  // When any of the three is unset the feature is OFF (CONFIG.push.enabled=false) and the subscribe
-  // UI reports "push not configured on this server" — the in-app reminder feed is unchanged.
-  // Generate a keypair with `bun run vapid:gen`.
+  // Instance-wide push identity, set in the environment rather than per user. The private key never leaves
+  // the server. Leaving any of the three unset disables push. Generate a pair with `bun run vapid:gen`.
   VAPID_PUBLIC_KEY: z.string().optional(),
   VAPID_PRIVATE_KEY: z.string().optional(),
-  // The VAPID `sub` claim — a mailto: or https: contact the push service can reach (spec-required).
+  // mailto: or https: contact that the push service can reach.
   VAPID_SUBJECT: z.string().optional(),
 });
 
@@ -147,17 +115,10 @@ const getDefaultCorsOrigins = (environment: Environment): string[] => {
 
 export const CONFIG = {
   env: env.NODE_ENV as Environment,
-  // The deployed build's own version, read from package.json so `GET /health` and `GET /api`
-  // report what is actually running instead of a literal that nobody remembers to bump — a
-  // bug report that names a version has to mean something.
   version: packageJson.version,
-  // Fake storage provider is allowed only outside production AND only when
-  // explicitly opted in via ALLOW_FAKE_STORAGE — double-gated.
   allowFakeStorageProvider:
     env.ALLOW_FAKE_STORAGE && (env.NODE_ENV as Environment) !== 'production',
-  // Rate limiting is bypassed only outside production AND only when explicitly opted
-  // in via DISABLE_RATE_LIMIT (the local E2E harness) — double-gated, can never
-  // weaken production's abuse protection.
+  // Double-gated: opt-in via env and never in production.
   disableRateLimit: env.DISABLE_RATE_LIMIT && (env.NODE_ENV as Environment) !== 'production',
   server: { port: env.PORT, host: env.HOST },
   database: {
@@ -191,9 +152,7 @@ export const CONFIG = {
         : getDefaultCorsOrigins(env.NODE_ENV as Environment),
   },
   logging: { level: env.LOG_LEVEL },
-  // Web Push (push-notifications). `enabled` gates the whole feature: only when all three VAPID
-  // values are present is push wired up. The private key stays here server-side — it is NEVER
-  // exposed by any route (only vapidPublicKey + vapidSubject cross to a response/the wire).
+  // Only vapidPublicKey and vapidSubject may reach a response. The private key must never be exposed.
   push: {
     vapidPublicKey: env.VAPID_PUBLIC_KEY,
     vapidPrivateKey: env.VAPID_PRIVATE_KEY,
@@ -208,7 +167,6 @@ export const CONFIG = {
   },
   rateLimit: {
     cleanupInterval: 60_000,
-    // Reverse proxies whose `X-Forwarded-For` we trust (see env TRUSTED_PROXY_IPS).
     trustedProxyIps: env.TRUSTED_PROXY_IPS,
     global: { windowMs: 15 * 60 * 1000, limit: 1000, message: 'Too many requests' },
     auth: { windowMs: 15 * 60 * 1000, limit: 30 },
@@ -219,26 +177,13 @@ export const CONFIG = {
   },
   backup: {
     maxFileSize: 50 * 1024 * 1024,
-    // Cap on TOTAL uncompressed bytes across all entries in an uploaded backup
-    // ZIP. bodyLimit caps the compressed upload (maxFileSize); this guards the
-    // decompressed size so a zip bomb can't inflate to many GB and OOM the
-    // process. Generous vs any real backup (CSV text), tiny vs a bomb.
+    // Caps total decompressed bytes across all entries, so a zip bomb cannot exhaust memory.
     maxUncompressedSize: 200 * 1024 * 1024,
-    // Per-entry compression-ratio cap: the maxUncompressedSize check sums the
-    // ZIP-central-directory `size` field, which is ATTACKER-DECLARED — a bomb can lie
-    // (declare a small size to pass the sum, then inflate to GB on getData()). The
-    // DEFLATE ratio is also bounded (~1032:1 theoretical max per pass), so any entry
-    // whose declared size is an absurd multiple of its (real, in-file) compressedSize
-    // is a bomb signature regardless of what the size field claims. Real CSV text
-    // compresses ~3-20x, repetitive headers up to a few hundred x; 1000x is generous
-    // headroom for legit data, far below a nested/crafted bomb. compressedSize 0
-    // (an empty/stored entry) is skipped — nothing to inflate.
+    // Checked against the real compressed size, because the declared size in the ZIP directory is
+    // attacker-controlled. Real CSV compresses far below this ratio.
     maxCompressionRatio: 1000,
-    // 2.0.0 = the integer-CENTS money schema (migration 0009, money-cents-migration). Bumped from 1.0.0
-    // so a naive restore of a pre-cents (dollar-float) backup FAILS the version check (fail-closed) rather
-    // than silently 100×-corrupting money via coerceRow's integer branch (design §4). The
-    // version-gated ×100 shim (restore.ts → coerceRow shimMoneyToCents) is the recovery path that lets an
-    // old backup restore CORRECTLY despite the bump.
+    // Bumped for integer-cents money. A pre-cents backup fails the version check instead of being
+    // silently corrupted 100x. Restore's version-gated shim converts old backups.
     currentVersion: '2.0.0',
     supportedModes: ['preview', 'replace', 'merge'] as const,
     defaultRetentionCount: 10,
@@ -257,13 +202,12 @@ export const CONFIG = {
     },
     expense: {
       descriptionMaxLength: 500,
-      locationMaxLength: 200, // expense-location: optional free-text location label cap
+      locationMaxLength: 200,
       maxAmount: 1_000_000,
       maxTags: 10,
       tagMaxLength: 50,
       fuelTypeMaxLength: 50,
-      // CSV import: hard cap on rows accepted in a single import request so a huge
-      // (or malicious) file can't exhaust memory/CPU parsing+validating row-by-row.
+      // Caps rows per CSV import so a large file cannot exhaust memory.
       maxImportRows: 5000,
     },
     insurance: {
@@ -294,23 +238,16 @@ export const CONFIG = {
       maxCatchUpOccurrences: 12,
       maxTags: 10,
       tagMaxLength: 50,
-      // Service-interval mileage (maintenance-schedule). Unitless integer in the vehicle's
-      // distanceUnit; cap generously (covers any realistic miles/km service interval) while
-      // blocking absurd values that would push nextDueOdometer past INTEGER range.
+      // Covers any realistic service interval while keeping nextDueOdometer within INTEGER range.
       maxIntervalMileage: 1_000_000,
-      // Cap the notification-history feed so a long-lapsed reminder that fired
-      // many times can't return an unbounded list to the UI (newest-first).
+      // Newest-first, so a reminder that fired often cannot return an unbounded list.
       notificationsHistoryLimit: 100,
     },
     settings: { maxBackupRetention: 100, maxSyncInactivityMinutes: 30 },
     push: {
-      // A subscription that fails this many CONSECUTIVE transient sends is reaped (the
-      // reaping-hygiene class): a dead-but-not-410 endpoint should not linger + be retried forever.
+      // Reaped after this many consecutive transient send failures, so a dead endpoint is not retried forever.
       maxConsecutiveFailures: 5,
-      // Cap the push subscriptions ONE user may hold (device rotation is normal — a user replaces
-      // phones/browsers — so a NEW device past the cap EVICTS the oldest rather than being rejected,
-      // keeping the newest N; this also bounds a crafted-endpoint flood to N rows). Generous for a
-      // real multi-device household.
+      // A new device past this cap evicts the oldest subscription instead of being rejected.
       maxSubscriptionsPerUser: 20,
     },
   },
@@ -360,10 +297,8 @@ export function getBackupTableKeys(): string[] {
   return Object.keys(TABLE_SCHEMA_MAP);
 }
 
-// Files that may be absent in older backups (pre-migration). EXPORTED so a drift guard can assert this
-// set is a SUBSET of TABLE_FILENAME_MAP's values — an entry here that drifts from the map (typo, or a map
-// rename) silently makes a genuinely-optional file REQUIRED, so a valid older backup missing it fails
-// restore with "Missing required files" (: the user can't recover their own backup).
+// Exported so a test can check this is a subset of TABLE_FILENAME_MAP's values. A typo here would make
+// an optional file required.
 export const OPTIONAL_BACKUP_FILES = new Set([
   'insurance_terms.csv',
   'insurance_term_vehicles.csv',
@@ -410,7 +345,6 @@ export const validateProductionConfig = () => {
       process.exit(1);
     }
 
-    // Validate encryption key format (must be 64-char hex = 32 bytes)
     if (encryptionKey && !/^[0-9a-fA-F]{64}$/.test(encryptionKey)) {
       console.error('❌ PROVIDER_ENCRYPTION_KEY must be a 64-character hex string (32 bytes)');
       process.exit(1);

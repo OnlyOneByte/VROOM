@@ -1,7 +1,6 @@
 import { vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 
-// Create a proper localStorage mock that behaves like the real thing
 const createLocalStorageMock = () => {
 	let store: Record<string, string> = {};
 
@@ -22,7 +21,6 @@ const createLocalStorageMock = () => {
 			return Object.keys(store).length;
 		},
 		key: vi.fn((index: number) => Object.keys(store)[index] || null),
-		// Add a method to reset the store for tests
 		__reset: () => {
 			store = {};
 			mock.getItem.mockClear();
@@ -42,15 +40,12 @@ Object.defineProperty(window, 'localStorage', {
 	writable: true
 });
 
-// Make localStorage mock available globally for tests
 (global as unknown as { localStorageMock: typeof localStorageMock }).localStorageMock =
 	localStorageMock;
 
-// Mock addEventListener and removeEventListener on window
 window.addEventListener = vi.fn();
 window.removeEventListener = vi.fn();
 
-// Mock matchMedia
 Object.defineProperty(window, 'matchMedia', {
 	value: vi.fn(() => ({
 		matches: false,
@@ -59,7 +54,6 @@ Object.defineProperty(window, 'matchMedia', {
 	}))
 });
 
-// Mock service worker
 const createServiceWorkerMock = () => {
 	const mock = {
 		register: vi.fn(() =>
@@ -73,11 +67,9 @@ const createServiceWorkerMock = () => {
 			}
 		}),
 		addEventListener: vi.fn(),
-		// Add a method to reset the mock
 		__reset: () => {
 			mock.register.mockClear();
 			mock.addEventListener.mockClear();
-			// Reset ready to default
 			mock.ready = Promise.resolve({
 				sync: {
 					register: vi.fn()
@@ -95,20 +87,16 @@ Object.defineProperty(navigator, 'serviceWorker', {
 	writable: true
 });
 
-// Make service worker mock available globally for tests
 (global as unknown as { mockServiceWorker: typeof mockServiceWorker }).mockServiceWorker =
 	mockServiceWorker;
 
-// Mock online status
 Object.defineProperty(navigator, 'onLine', {
 	value: true,
 	writable: true
 });
 
-// Mock fetch
 global.fetch = vi.fn();
 
-// Mock browser environment
 vi.mock('$app/environment', () => ({
 	browser: true,
 	dev: false,
@@ -116,5 +104,4 @@ vi.mock('$app/environment', () => ({
 	version: '1.0.0'
 }));
 
-// Ensure browser is available globally for tests
 (global as unknown as { browser: boolean }).browser = true;

@@ -14,14 +14,7 @@
 		'odometer_readings'
 	];
 
-	/**
-	 * `photoRootPath` is the parent form's state, bound here exactly like `providerRootPath` is bound
-	 * in the Connection Settings card: the form seeds it from the stored provider, this section edits
-	 * it, and the form's Save writes it with the rest of the config. A private copy kept here instead
-	 * could only be synced back through an `$effect` on a parent-owned prop — which rewrites the field
-	 * whenever anything else on the form changes — or through a save request of its own, which the
-	 * create form (with no provider id yet) cannot make.
-	 */
+	/** Bound to the parent form, which owns the value and writes it on save; a local copy would need a prop $effect. */
 	let {
 		photoRootPath = $bindable('Photos'),
 		categorySettings,
@@ -79,7 +72,6 @@
 		<span class="text-sm font-medium">Photo Storage Paths</span>
 	</div>
 
-	<!-- Root path -->
 	<div class="space-y-2">
 		<Label for="root-path" class="text-sm text-muted-foreground">Root Path</Label>
 		<div
@@ -102,7 +94,6 @@
 		</p>
 	</div>
 
-	<!-- Advanced: per-category paths -->
 	<Collapsible.Root bind:open={advancedOpen}>
 		<Collapsible.Trigger
 			class="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full"

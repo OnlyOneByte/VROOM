@@ -1,28 +1,10 @@
-/**
- * Storage-provider config is the app's photo + backup destination, so a save that quietly drops
- * part of it is data loss with a success toast on top. Five contracts, all driven through the
- * MOUNTED form because every one of them only exists in the wiring:
- *
- *  - a save never un-sets config the form does not manage (`accountEmail` is written server-side at
- *    connect time and is the only record of WHICH Google account a provider belongs to);
- *  - the photo root path the user can see and type is the one that is stored and saved — it is a real
- *    path segment server-side, so resetting it makes new uploads land away from the existing ones;
- *  - typing in one field never rewrites another;
- *  - the settings payload names only what this form edits, and invents nothing;
- *  - a follow-up settings save that FAILS is said out loud, because the folder/backup toggles the
- *    user just set are what decides whether photos and backups go anywhere at all.
- */
+// Saving the provider form must never drop or rewrite config it does not show, and a failed follow-up save must be reported.
 
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import type { UserProviderInfo } from '$lib/types';
 
-/**
- * Mounting needs svelte's CLIENT entry, and this suite resolves the package's `default` (server)
- * one because vite.config.ts sets no `browser` resolve condition for tests — `mount()` from a bare
- * `svelte` import throws "not available on the server". Written `as string` so TypeScript does not
- * try to type svelte's internals (which ship no declarations) while Vite still resolves the path.
- */
+// Mounting needs svelte's client entry, which the default test resolution does not provide.
 vi.mock(
 	'svelte',
 	() => import('../../../../../../../node_modules/svelte/src/index-client.js' as string)
@@ -35,7 +17,6 @@ vi.mock('$app/state', () => ({
 	page: { url: new URL('http://localhost/settings/providers/drive-1/edit') }
 }));
 
-/** The provider payloads the form sends — the subject of most assertions below. */
 interface ProviderPayload {
 	displayName?: string;
 	config?: Record<string, unknown>;
@@ -70,7 +51,6 @@ vi.mock('$lib/services/settings-api', () => ({
 const { appStore } = await import('$lib/stores/app.svelte');
 const ProviderForm = (await import('../ProviderForm.svelte')).default;
 
-/** A connected Google Drive provider as GET /providers returns it. */
 const STORED_PROVIDER: UserProviderInfo = {
 	id: 'drive-1',
 	domain: 'storage',
@@ -119,12 +99,10 @@ const rootPathInput = () => screen.getByLabelText('Root Path') as HTMLInputEleme
 const displayNameInput = () => screen.getByLabelText('Name') as HTMLInputElement;
 const saveButton = () => screen.getByRole('button', { name: /update provider|save provider/i });
 
-/** Wait for the form's own state to be seeded from the provider props. */
 async function awaitLoaded() {
 	await vi.waitFor(() => expect(displayNameInput().value).toBe('My Drive'));
 }
 
-/** The config body of the nth updateProvider call. */
 function sentConfig(call = 0): Record<string, unknown> {
 	return updateProvider.mock.calls[call]?.[1]?.config ?? {};
 }

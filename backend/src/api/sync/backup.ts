@@ -1,7 +1,3 @@
-/**
- * Backup Service - Creates, parses, and validates VROOM data backups
- */
-
 import AdmZip from 'adm-zip';
 import { parse } from 'csv-parse/sync';
 import { stringify } from 'csv-stringify/sync';
@@ -57,35 +53,25 @@ export interface ValidationResult {
   errors: string[];
 }
 
-/**
- * The money columns that became integer-CENTS in migration 0009 (money-cents-migration §1), keyed by
- * their CAMELCASE drizzle field name (coerceRow + the CSV headers use the field name, not the snake_case
- * db column). A pre-cents backup (metadata.version < 2.0.0) stored these as DOLLAR floats; restoring it
- * into the cents schema must ×100 them, or coerceRow's INTEGER branch would `Math.round('12.34')` = 12
- * cents = $0.12, a silent 100× corruption (design §4). A flat field-name set is safe:
- * coerceRow processes ONE table at a time, and no NON-money column shares any of these names (apr/volume/
- * businessMileageRate — the excluded reals — are all distinctly named).
- */
+/** Money fields stored as integer cents in the 2.0.0 schema, keyed by camelCase field name. */
 export const MONEY_CENTS_FIELDS = new Set<string>([
-  'purchasePrice', // vehicles
-  'originalAmount', // vehicleFinancing
-  'paymentAmount', // vehicleFinancing + insuranceTerms (both money)
-  'residualValue', // vehicleFinancing
-  'excessMileageFee', // vehicleFinancing
-  'deductibleAmount', // insuranceTerms
-  'coverageLimit', // insuranceTerms
-  'totalCost', // insuranceTerms
-  'monthlyCost', // insuranceTerms
-  'payoutAmount', // insuranceClaims
-  'expenseAmount', // expenses + reminders (both money)
-  'groupTotal', // expenses
+  'purchasePrice',
+  'originalAmount',
+  'paymentAmount',
+  'residualValue',
+  'excessMileageFee',
+  'deductibleAmount',
+  'coverageLimit',
+  'totalCost',
+  'monthlyCost',
+  'payoutAmount',
+  'expenseAmount',
+  'groupTotal',
 ]);
 
 /**
- * A backup written under a schema where money was DOLLAR floats (everything before the 2.0.0 cents
- * schema). Such a backup must have its money columns ×100-shimmed on restore. Compares the MAJOR
- * version: anything < 2 is pre-cents. A version >= the current major we cannot shim (a future format) is
- * NOT pre-cents — it falls through to validateBackupData's fail-closed version check.
+ * Pre-2.0.0 backups stored money as dollar floats and must be shimmed to cents on restore. Future
+ * majors are not pre-cents; validateBackupData rejects them.
  */
 export function isPreCentsBackup(version: string | undefined): boolean {
   const major = Number.parseInt(String(version ?? '').split('.')[0], 10);
@@ -98,13 +84,6 @@ for (const [key, table] of Object.entries(TABLE_SCHEMA_MAP)) {
   TABLE_SCHEMAS[key] = createInsertSchema(table);
 }
 
-/**
- * Schema-aware row coercion using Drizzle column metadata.
- * Converts string values from CSV/Sheets into proper JS types (Date, boolean, number, JSON).
- *
- * Column type sets are dialect-agnostic — supports both SQLite and PostgreSQL column types
- * so the backup pipeline works regardless of the underlying database.
- */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Column type coercion requires checking multiple column types
 export function coerceRow(
   row: Record<string, unknown>,
@@ -113,13 +92,8 @@ export function coerceRow(
 ): Record<string, unknown> {
   const columns = getTableColumns(table);
   const coerced: Record<string, unknown> = { ...row };
-  // Pre-cents (version < 2.0.0) backup: its money columns are DOLLAR floats but the post-0009 schema
-  // declares them integer, so they route through the INTEGER branch below and would `Math.round('12.34')`
-  // = 12 cents = $0.12 (a silent 100× loss). When this flag is set, the INTEGER branch ×100s a money
-  // field instead (design §4 shim). A 2.0.0+ backup already stores cents → no shim (flag false).
   const shimMoneyToCents = options?.shimMoneyToCents ?? false;
 
-  // Dialect-agnostic column type sets — add PG types here when adding PostgreSQL support
   const BOOLEAN_TYPES = new Set(['SQLiteBoolean', 'PgBoolean']);
   const TIMESTAMP_TYPES = new Set(['SQLiteTimestamp', 'PgTimestamp', 'PgTimestampString']);
   const JSON_TYPES = new Set(['SQLiteTextJson', 'PgJsonb', 'PgJson']);
@@ -132,21 +106,14 @@ export function coerceRow(
     const col = column as any;
     const val = coerced[columnName];
 
-    // A NOT NULL column that carries a STATIC default: an absent/empty/null backup value must resolve to
-    // that default, never to null — else the insert throws `NOT NULL constraint failed` and the WHOLE
-    // restore aborts (the user can't recover ANY data from their own valid backup). This is
-    // the steering-doc `coerceRow` footgun (DatabaseMigrations.md): the boolean special-case below already
-    // did exactly this (`col.default ?? false`); this generalizes it to every type (text `themePreference`/
-    // `currencyUnit`/`backupFrequency`, JSON `unitPreferences`, integer `syncInactivityMinutes`, …). Gated
-    // on a STATIC `default` (not a `$defaultFn` — those columns here are nullable, so they keep the null path).
+    // A NOT NULL column with a static default must resolve blank cells to that default, never null:
+    // a null insert fails and aborts the whole restore.
     const hasStaticDefault = col.notNull && col.hasDefault && col.default !== undefined;
 
     if (val === undefined || val === null) {
       if (BOOLEAN_TYPES.has(col.columnType)) {
         coerced[columnName] = val === undefined ? (col.default ?? false) : false;
       } else if (hasStaticDefault) {
-        // null (explicit) would violate NOT NULL; undefined (absent key) would also let the DB default
-        // apply, but we set it explicitly so every restore path is uniform.
         coerced[columnName] = col.default;
       }
       continue;
@@ -170,12 +137,7 @@ export function coerceRow(
       try {
         coerced[columnName] = JSON.parse(strVal);
       } catch {
-        // A cell that does not parse carries NOTHING recoverable, so it resolves exactly like an
-        // absent one: the column's static default when it has one, else null. Assigning null
-        // unconditionally violated NOT NULL on a defaulted JSON column, and since restore wipes and
-        // re-inserts in ONE transaction, that threw away the user's WHOLE restore over a single
-        // corrupt cell. Warn rather than substitute silently — the default is a guess, and for unit
-        // preferences it reinterprets the row's raw distances and volumes.
+        // Resolves like an absent cell. Warn because the default may reinterpret the row's values.
         logger.warn('Backup cell is not valid JSON; substituted the column default', {
           table: getTableName(table),
           column: columnName,
@@ -184,32 +146,22 @@ export function coerceRow(
         coerced[columnName] = hasStaticDefault ? col.default : null;
       }
     } else if (INTEGER_TYPES.has(col.columnType)) {
-      // STRICT numeric parse, not Number.parseInt: parseInt stops at the first non-digit, so a
-      // thousands-separated value the Google Sheets restore returns (default valueRenderOption is
-      // FORMATTED_VALUE → a 12,345-mile odometer comes back as the string "12,345") would truncate
-      // to 12 — silently, since 12 is not NaN — corrupting the reading 1000x.
-      // Strip grouping commas, then require the WHOLE string to be numeric (Number(), unlike parseInt,
-      // rejects a "12abc" tail to NaN → null, matching the existing garbage→null contract). Round so a
-      // Sheets "12345.0" / a stray decimal lands on a whole number rather than truncating.
+      // Whole-string numeric parse: parseInt would turn Sheets' "12,345" into 12. Strip grouping
+      // commas, and round so "12345.0" stays whole.
       const num = Number(strVal.replace(/,/g, ''));
       if (Number.isNaN(num)) {
         coerced[columnName] = null;
       } else if (shimMoneyToCents && MONEY_CENTS_FIELDS.has(columnName)) {
-        // Pre-cents backup: this money value is DOLLARS (e.g. 12.34). Scale to integer cents (1234),
-        // ROUND-before-int exactly like the 0009 migration (12.34*100 = 1233.9999… would truncate to
-        // 1233 without the round). This is the design §4 recovery path: an old backup round-trips
-        // CORRECTLY instead of becoming $0.12.
+        // Round before truncating: 12.34 * 100 is 1233.99… in floating point.
         coerced[columnName] = Math.round(num * 100);
       } else {
         coerced[columnName] = Math.round(num);
       }
     } else if (REAL_TYPES.has(col.columnType)) {
-      // Same thousands-separator hazard: parseFloat("1,234.56") stops at the comma → 1. Strip grouping
-      // commas + a strict whole-string parse (Number() → NaN on a garbage tail → null).
       const num = Number(strVal.replace(/,/g, ''));
       coerced[columnName] = Number.isNaN(num) ? null : num;
     } else if (TEXT_TYPES.has(col.columnType)) {
-      // Google Sheets may return numeric-looking text values (e.g., license plates) as numbers
+      // Sheets may return numeric-looking text (license plates) as numbers.
       coerced[columnName] = strVal;
     }
   }
@@ -217,9 +169,6 @@ export function coerceRow(
   return coerced;
 }
 
-/**
- * Combines a provider's rootPath with the backup folder path from settings.
- */
 export function resolveBackupFolderPath(
   providerRow: UserProvider,
   settings: ProviderBackupSettings
@@ -230,9 +179,6 @@ export function resolveBackupFolderPath(
 }
 
 export class BackupService {
-  /**
-   * Load BackupConfig from user settings and filter to enabled providers.
-   */
   async loadBackupConfig(
     userId: string
   ): Promise<{ config: BackupConfig; enabledProviders: [string, ProviderBackupSettings][] }> {
@@ -243,11 +189,7 @@ export class BackupService {
     return { config, enabledProviders };
   }
 
-  /**
-   * Enforce retention policy for a specific provider.
-   * Lists backup files, sorts newest-first, deletes files beyond retentionCount.
-   * Returns the count of actually deleted files (not attempted).
-   */
+  /** Returns the number of files actually deleted. */
   async enforceRetention(userId: string, providerId: string): Promise<number> {
     const { config } = await this.loadBackupConfig(userId);
     const settings = config.providers[providerId];
@@ -293,10 +235,6 @@ export class BackupService {
     return deletedCount;
   }
 
-  /**
-   * List backup files from a specific provider.
-   * Filters to vroom-backup-*.zip, sorts newest-first, marks isLatest.
-   */
   async listBackups(userId: string, providerId: string): Promise<BackupFileInfo[]> {
     const { storageProviderRegistry } = await import('../providers/domains/storage/registry');
     const provider = await storageProviderRegistry.getProvider(providerId, userId);
@@ -334,10 +272,6 @@ export class BackupService {
     return backups;
   }
 
-  /**
-   * List backup files from ALL backup-enabled providers.
-   * Returns one ProviderBackupList per enabled provider with per-provider error handling.
-   */
   async listAllBackups(userId: string): Promise<ProviderBackupList[]> {
     const { enabledProviders } = await this.loadBackupConfig(userId);
     const results: ProviderBackupList[] = [];
@@ -374,10 +308,7 @@ export class BackupService {
     return results;
   }
 
-  /**
-   * Download a backup file from a specific provider.
-   * Verifies ownership via storageProviderRegistry.getProvider().
-   */
+  /** Ownership of providerId is enforced by storageProviderRegistry.getProvider. */
   async downloadBackup(userId: string, providerId: string, fileRef: string): Promise<Buffer> {
     const { storageProviderRegistry } = await import('../providers/domains/storage/registry');
     const provider = await storageProviderRegistry.getProvider(providerId, userId);
@@ -407,19 +338,16 @@ export class BackupService {
           .innerJoin(vehicles, eq(odometerEntries.vehicleId, vehicles.id))
           .where(eq(vehicles.userId, userId))
           .then((r) => r.map((x) => x.odometer_entries)),
-        // Trips are userId-stamped directly (like photos), so a plain userId scope is enough — but a
-        // trip also carries vehicleId, exported verbatim for the restore referential-integrity check.
+        // vehicleId is exported verbatim for the restore referential check.
         db.select().from(trips).where(eq(trips.userId, userId)),
       ]);
 
-    // Query insurance terms for user's policies
     const policyIds = userInsurance.map((p) => p.id);
     const userInsuranceTerms =
       policyIds.length > 0
         ? await db.select().from(insuranceTerms).where(inArray(insuranceTerms.policyId, policyIds))
         : [];
 
-    // Query junction rows for user's insurance terms
     const termIds = userInsuranceTerms.map((t) => t.id);
     const userInsuranceTermVehicles =
       termIds.length > 0
@@ -429,7 +357,6 @@ export class BackupService {
             .where(inArray(insuranceTermVehicles.termId, termIds))
         : [];
 
-    // Query insurance claims for user's policies
     const userInsuranceClaims =
       policyIds.length > 0
         ? await db
@@ -438,12 +365,9 @@ export class BackupService {
             .where(inArray(insuranceClaims.policyId, policyIds))
         : [];
 
-    // Query photos directly by userId
     const userPhotos = await db.select().from(photos).where(eq(photos.userId, userId));
 
-    // Query photo_refs for all user photos, chunked per the IN-clause contract in utils/chunk: the id
-    // list is as long as the user's photo library, so an unchunked IN would blow SQLite's bind-parameter
-    // ceiling on exactly the accounts whose backup matters most.
+    // Chunked to stay under SQLite's bind-parameter limit.
     const photoIds = userPhotos.map((p) => p.id);
     const userPhotoRefs: (typeof photoRefs.$inferSelect)[] = [];
     for (const batch of chunk(photoIds)) {
@@ -451,14 +375,12 @@ export class BackupService {
       userPhotoRefs.push(...rows);
     }
 
-    // Query user preferences and sync state
     const userPreferencesRows = await db
       .select()
       .from(userPreferences)
       .where(eq(userPreferences.userId, userId));
     const syncStateRows = await db.select().from(syncState).where(eq(syncState.userId, userId));
 
-    // Query reminders, reminder_vehicles, and reminder_notifications
     const userReminders = await db.select().from(reminders).where(eq(reminders.userId, userId));
 
     const reminderIds = userReminders.map((r) => r.id);
@@ -475,10 +397,8 @@ export class BackupService {
       .from(reminderNotifications)
       .where(eq(reminderNotifications.userId, userId));
 
-    // vehicle-sharing T9 (R7/D7/D8 §6.4): export the ACCEPTED shares this user GRANTED (ownerId === me).
-    // Scoping by ownerId is the blast-radius guarantee — an invitee (who is sharedWithId, never ownerId)
-    // gets NONE of the owner's shares in their own backup. D7: only accepted grants are exported (pending/
-    // declined/revoked are not re-created on restore), so the backup carries exactly what restore re-creates.
+    // Only accepted grants this user made. Scoping by ownerId keeps invitees' grants out of their own
+    // backup, and pending, declined or revoked grants are not restored.
     const userVehicleShares = await db
       .select()
       .from(vehicleShares)
@@ -542,8 +462,7 @@ export class BackupService {
         } else if (value instanceof Date) {
           row[col] = value.toISOString();
         } else if (typeof value === 'object') {
-          // JSON columns (unitPreferences, terms, tags, splitConfig, etc.)
-          // must be serialized as JSON strings, not [object Object]
+          // Without serialization these would render as [object Object].
           row[col] = JSON.stringify(value);
         } else {
           row[col] = value;
@@ -559,17 +478,8 @@ export class BackupService {
     const zip = new AdmZip(file);
     const zipEntries = zip.getEntries();
 
-    // Zip-bomb guard: bodyLimit caps the COMPRESSED upload, but getData() below
-    // inflates each entry. Sum the uncompressed sizes (read from the ZIP central
-    // directory — no inflation) and reject before decompressing anything if the
-    // total exceeds the cap. A real backup is CSV text well under this; a bomb is
-    // far over. (header.size is the uncompressed byte count for each entry.)
-    //
-    // Header.size is ATTACKER-DECLARED, so a bomb can lie (declare a small size to
-    // pass the sum below, then inflate to GB on getData()). Guard the COMPRESSION RATIO
-    // per entry FIRST — compressedSize is the real in-file byte count, and the declared
-    // size being an absurd multiple of it is a bomb signature the sum can't catch. This
-    // runs before any getData(), so a crafted entry is rejected without inflating.
+    // Zip-bomb guard. Header sizes are attacker-declared, so check the per-entry compression ratio
+    // first, before any getData() inflates anything. Then cap the declared total.
     for (const e of zipEntries) {
       const compressed = e.header?.compressedSize ?? 0;
       const uncompressed = e.header?.size ?? 0;
@@ -602,12 +512,8 @@ export class BackupService {
 
     const metadata = JSON.parse(metadataEntry.getData().toString('utf-8')) as BackupMetadata;
 
-    // A pre-cents (version < 2.0.0) backup stored money as DOLLAR floats; the post-0009 schema declares
-    // those columns integer, so they must be ×100-shimmed to CENTS during coercion or coerceRow's integer
-    // branch silently 100×-undercounts them (design §4). After a successful shim the in-memory data IS in
-    // the cents (2.0.0) format, so its version is upgraded to match — that is what lets validateBackupData
-    // (which fail-closes on a version mismatch) accept this recovered backup. A version we can NOT shim
-    // (a future major) leaves the version untouched → validateBackupData rejects it (fail-closed default).
+    // Pre-2.0.0 money is shimmed to cents during coercion, so the recovered data is upgraded to the
+    // current version. An unshimmable future version is left unchanged, so validation rejects it.
     const shimMoneyToCents = isPreCentsBackup(metadata.version);
 
     const getCSVData = (fileName: string): Record<string, unknown>[] => {
@@ -680,21 +586,9 @@ export class BackupService {
   }
 
   /**
-   * Refuse a backup whose JSON cell PARSES but is not a valid value for its column, naming the table,
-   * the column and the row so the user can fix that one cell.
-   *
-   * drizzle-zod maps a `mode: 'json'` column to an unconstrained value, so the per-row schema check
-   * above sees nothing wrong with `{"distanceUnit":"mi","volumeUnit":"gal"}` — the short spellings a
-   * hand-written or third-party export produces. Such a row used to be inserted by a restore that
-   * reported SUCCESS, after which every unit-reading analytics surface failed, because reading a
-   * vehicle's units treats unreadable preferences as a hard error by design. Defaulting the value
-   * instead would be worse than refusing: the raw distances and volumes stay as they are, so a vehicle
-   * recorded in kilometres and litres would come back labelled miles and gallons and every figure the
-   * user reads would be wrong. Validating here means the restore either goes through whole or never
-   * starts — the same contract as the referential checks.
-   *
-   * The unit columns are the ones with a parser to validate against and an unforgiving reader; another
-   * JSON column earns a line here as soon as it has a schema of its own.
+   * Refuses a backup whose JSON cell parses but is invalid for its column, naming the table, column
+   * and row. Defaulting instead would relabel raw distances and volumes in the wrong units, so the
+   * restore must fail as a whole.
    */
   private validateJsonColumnShapes(backup: ParsedBackupData): string[] {
     const errors: string[] = [];
@@ -704,11 +598,8 @@ export class BackupService {
       idField: string
     ): void => {
       for (const row of rows ?? []) {
-        // Only a PRESENT value is checked: an absent cell resolves to the column's static default
-        // during coercion, which runs before validation on both restore paths.
+        // Absent cells were already resolved to defaults during coercion.
         if (row.unitPreferences == null) continue;
-        // The same schema the vehicle / settings write routes validate against, so the recovery path
-        // accepts exactly what the API accepts.
         const result = unitPreferencesSchema.safeParse(row.unitPreferences);
         if (!result.success) {
           const issues = result.error.issues.map((e) => e.message).join(', ');
@@ -789,41 +680,26 @@ export class BackupService {
   }
 
   /**
-   * Reject a backup whose rows would violate a DB-level UNIQUE index, BEFORE restore's destructive
-   * replace-mode wipe runs. Per-row schema + referential checks don't catch CROSS-ROW
-   * duplicates, so a corrupt/truncated download with two expenses sharing a non-null clientId
-   * (expenses_user_client_idx) or two vehicles sharing a licensePlate (vehicles_user_license_plate_idx)
-   * passes validateBackupData, the wipe commits, then the 2nd colliding INSERT throws — and bun-sqlite's
-   * async-transaction callback does NOT roll back the wipe, leaving the account EMPTY.
-   * Catching the duplicate here means the insert can't fail on it, so the wipe never runs. (The general
-   * transient-insert-failure window is a transaction-atomicity fix, escalated — this closes the one
-   * reachable within-tenant data-loss trigger.)
+   * Rejects a backup whose rows would violate a DB UNIQUE index. This runs before the replace-mode
+   * wipe: a duplicate caught after the wipe leaves the account empty.
    */
   private validateUniqueConstraints(backup: ParsedBackupData): string[] {
     const errors: string[] = [];
-    // One composite-key dup detector for ALL the DB-level UNIQUE indexes. A row is SKIPPED if ANY
-    // keyed column is null, because SQLite treats a NULL in an indexed column as DISTINCT (and the
-    // partial indexes are `WHERE <col> IS NOT NULL`) — so such a row can never collide. A single-column
-    // index is just the one-element case: `[String(v)].join(sep) === String(v)` with the identical
-    // null-skip, so this subsumes the former scalar dupCheck byte-for-byte (dedup of the
-    // self-introduced sibling — the scalar variant was a strict special case of this one).
+    // Composite-key check shared by every UNIQUE index. Rows with a null key column are skipped,
+    // because SQLite treats NULLs as distinct.
     const dupCheck = (
       rows: Record<string, unknown>[] | undefined,
       fields: string[],
       label: string,
-      /**
-       * Mirrors a partial index's WHERE clause: rows outside it cannot collide, so counting them
-       * would reject a legitimate backup. Only needed where the predicate tests a column rather
-       * than `IS NOT NULL`, which the null-skip above already covers.
-       */
+      /** Mirrors a partial index predicate; rows outside it cannot collide. */
       inIndex?: (row: Record<string, unknown>) => boolean
     ): void => {
       const seen = new Set<string>();
       for (const row of rows ?? []) {
         if (inIndex && !inIndex(row)) continue;
         const values = fields.map((f) => row[f]);
-        if (values.some((v) => v == null)) continue; // NULL in any column → distinct (never collides)
-        const key = values.map((v) => String(v)).join('\u0000'); // NUL join — unambiguous composite key
+        if (values.some((v) => v == null)) continue;
+        const key = values.map((v) => String(v)).join('\u0000');
         if (seen.has(key)) {
           errors.push(`Duplicate ${label} "${key}" — backup violates a unique constraint`);
         }
@@ -835,27 +711,20 @@ export class BackupService {
       value === true || value === 1 || value === '1' || value === 'true';
     dupCheck(backup.expenses, ['clientId'], 'expense clientId'); // expenses_user_client_idx
     dupCheck(backup.vehicles, ['licensePlate'], 'vehicle licensePlate'); // vehicles_user_license_plate_idx
-    // The remaining DB-level UNIQUE indexes on backed-up + restored tables (— the leg
-    // those two checks missed): a duplicate on any of these survives per-row + referential validation,
-    // then throws on the colliding INSERT after the replace-mode wipe → empty account.
     dupCheck(backup.photoRefs, ['photoId', 'providerId'], 'photoRef photo+provider'); // pr_photo_provider_idx
     dupCheck(
       backup.reminderNotifications,
       ['reminderId', 'dueDate'],
       'reminderNotification reminder+dueDate'
-    ); // rn_reminder_due_idx (time axis; null dueDate → distinct)
+    ); // rn_reminder_due_idx
     dupCheck(
       backup.reminderNotifications,
       ['reminderId', 'dueOdometer'],
       'reminderNotification reminder+dueOdometer'
-    ); // rn_reminder_odo_idx (mileage axis; partial WHERE due_odometer IS NOT NULL)
-    // vehicle_shares_active_idx (partial WHERE status in pending/accepted). Export is accepted-only, so
-    // every exported row is "active" → a dup on (vehicleId, sharedWithId) would collide on restore.
+    ); // rn_reminder_odo_idx
+    // vehicle_shares_active_idx. Export is accepted-only, so every exported row is active.
     dupCheck(backup.vehicleShares, ['vehicleId', 'sharedWithId'], 'vehicleShare vehicle+invitee');
-    // vf_active_vehicle_idx (partial WHERE is_active = 1). Financing history is exported in full, so
-    // the predicate has to be applied here: several SETTLED agreements per vehicle are valid, two
-    // ACTIVE ones are not. This index spent its life as hand-written SQL absent from `schema.ts`,
-    // which is why the coverage guard could not see it and this check was missing.
+    // Partial index (is_active = 1): several settled agreements per vehicle are valid, one active.
     dupCheck(backup.financing, ['vehicleId'], 'active financing vehicleId', (row) =>
       isTruthyFlag(row.isActive)
     );
@@ -879,13 +748,7 @@ export class BackupService {
     return errors;
   }
 
-  /**
-   * Shared referential check for a row that owns purely via a `vehicleId` FK (financing/odometer/trips —
-   * each cascade-deletes with its vehicle). Rejects a backup whose row names a vehicle absent from the SAME
-   * backup, so the post-wipe restore INSERT can't FK-violate. The three callers were byte-identical save the
-   * entity label (a rule-of-three the trips addition tipped — dedup'd); the message is preserved
-   * verbatim (`<Label> <id> references non-existent vehicle`) so any consumer of the text is unaffected.
-   */
+  /** Checks rows that cascade-delete with their vehicle via vehicleId. */
   private validateVehicleFkRefs(
     rows: Record<string, unknown>[],
     vehicleIds: Set<string>,
@@ -908,12 +771,8 @@ export class BackupService {
   }
 
   /**
-   * Referential check for vehicle_shares (vehicle-sharing T9). A share row owns via vehicleId (must be a
-   * vehicle in this same backup) AND its ownerId must be the backup creator (the only userId in a single-
-   * user backup) — a share naming another owner would be cross-tenant garbage. The sharedWithId (invitee)
-   * is deliberately NOT validated here: that user is NOT part of the owner's backup (users aren't backed
-   * up), so its absence is expected; the RESTORE path skips a grant whose invitee is missing rather than
-   * failing validation (a cross-instance restore legitimately may not have the invitee).
+   * The vehicle must be in this backup and the owner must be the backup creator. The invitee is not
+   * checked: users are not backed up, and restore skips grants whose invitee is absent.
    */
   private validateShareRefs(
     shareList: Record<string, unknown>[],
@@ -1007,8 +866,6 @@ export class BackupService {
     return this.validateVehicleFkRefs(odometerList, vehicleIds, 'Odometer entry');
   }
 
-  // A trip references a vehicle (trips.vehicle_id, ON DELETE cascade) — the trips-location T4 referential
-  // check (spec §4), via the shared vehicleId-FK helper.
   private validateTripRefs(tripList: Record<string, unknown>[], vehicleIds: Set<string>): string[] {
     return this.validateVehicleFkRefs(tripList, vehicleIds, 'Trip');
   }
@@ -1024,11 +881,8 @@ export class BackupService {
     }
   ): string[] {
     const errors: string[] = [];
-    // entityType keys MUST match the photo upload allowlist (photos/helpers.ts validateEntityOwnership):
-    // vehicle / insurance_policy / insurance_claim / expense / odometer_entry. A type accepted on upload
-    // but missing here makes restore reject an otherwise-valid backup outright (valid:false aborts the
-    // WHOLE restore, not just the photo) — the crown-jewel round-trip failure insurance_claim
-    // hit (: claim photos are a real, app-creatable target the original 15-table cert/ predated).
+    // Keys must match the photo upload allowlist (photos/helpers.ts validateEntityOwnership). A type
+    // accepted on upload but missing here rejects the whole restore.
     const entityTypeToIds: Record<string, Set<string>> = {
       vehicle: entityIds.vehicleIds,
       expense: entityIds.expenseIds,
@@ -1060,8 +914,7 @@ export class BackupService {
       if (!photoIds.has(String(ref.photoId))) {
         errors.push(`PhotoRef ${ref.id} references non-existent photo ${ref.photoId}`);
       }
-      // Note: providerId validation is skipped here because user_providers
-      // are not included in the backup data (they contain encrypted credentials)
+      // providerId is filtered at insert time: user_providers are not backed up.
     }
     return errors;
   }

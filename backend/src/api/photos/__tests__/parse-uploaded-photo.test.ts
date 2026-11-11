@@ -1,23 +1,15 @@
 /**
- * Unit net for `parseUploadedPhoto` (photos/helpers.ts) — the multipart upload-body parse + File
- * validation extracted from the two byte-identical upload routes (photos/routes.ts +
- * vehicles/photo-routes.ts). Pure of any storage provider: it only parses the request body and asserts
- * a `photo` File, throwing AppError(400) otherwise. Driven through a minimal Hono app + real FormData
- * requests (the same path Hono's parseBody runs in production), so this exercises the genuine helper.
- *
- * Pins the upload-input contract one place now that both routes share it — the natural seam for future
- * size/type/magic-byte validation (the follow-on).
+ * parseUploadedPhoto returns the multipart `photo` File and throws a 400 when it is missing or is a
+ * plain string. Driven through a minimal Hono app with real FormData requests.
  */
 
 import { describe, expect, test } from 'bun:test';
 import { Hono } from 'hono';
 import { parseUploadedPhoto } from '../helpers';
 
-/** A tiny app whose one route returns the parsed file's name (200) or lets the helper throw. */
 function makeApp() {
   const app = new Hono();
   app.onError((err, c) => {
-    // AppError carries a statusCode; surface it so the test can assert the 400.
     const status = (err as { statusCode?: number }).statusCode ?? 500;
     return c.json({ error: err.message }, status as 400 | 500);
   });
@@ -44,7 +36,7 @@ describe('parseUploadedPhoto', () => {
   test('throws 400 when the `photo` part is missing entirely', async () => {
     const app = makeApp();
     const fd = new FormData();
-    fd.append('notphoto', 'x'); // some other field, no `photo`
+    fd.append('notphoto', 'x');
 
     const res = await app.request('/u', { method: 'POST', body: fd });
     expect(res.status).toBe(400);

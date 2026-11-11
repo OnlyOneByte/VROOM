@@ -1,23 +1,10 @@
-/**
- * /expenses opens with three independent reads — settings, the vehicle list, and the first page of
- * expenses plus its summary.
- *
- * They used to be three sequential `await`s, so the table waited for two round trips it did not
- * depend on; the only reason the order mattered was that the vehicle shown on each row was joined
- * inside the fetch, from whatever `vehicles` happened to hold at that moment. Moving that join to a
- * derived is what makes the three safe to issue together — and is the part that could silently
- * regress, by leaving every row's vehicle column blank with nothing going red.
- *
- * So this pins both halves: the reads go out in ONE round, and the rows handed to the table still
- * carry their vehicle. It also pins the search box's accessible name, which used to come from its
- * placeholder alone and therefore vanished the moment the user typed.
- */
+// The three opening reads go out together, rows keep their vehicle, and the search box keeps a name.
 
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, waitFor } from '@testing-library/svelte';
 import type { Expense, UserSettings, Vehicle } from '$lib/types';
 
-/** Mounting needs svelte's CLIENT entries (vite.config.ts sets no `browser` condition for tests). */
+// Mounting needs svelte's client entries; vite.config.ts sets no browser condition for tests.
 vi.mock('svelte', () => import('../../../../node_modules/svelte/src/index-client.js' as string));
 vi.mock(
 	'svelte/reactivity',
@@ -27,11 +14,7 @@ vi.mock(
 vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
-/**
- * Stand in for the table and record its props: a Svelte 5 component is a `(anchor, props)`
- * function, and the props object carries live getters, so reading it later reads the page's
- * CURRENT state. What the page passes down is exactly what is under test here.
- */
+// Records the props: they carry live getters, so reads see the page's current state.
 let tableProps: Record<string, unknown> = {};
 vi.mock('$lib/components/expenses/ExpensesTable.svelte', () => ({
 	default: (_anchor: unknown, props: Record<string, unknown>) => {
@@ -62,8 +45,7 @@ vi.mock('$lib/services/settings-api', () => ({
 	}
 }));
 
-// Statically imported so the route's module graph is transformed at file load, outside any test's
-// timeout (the same reason the other component suites import their subject at the top).
+// Imported eagerly so module transforms happen outside test timeouts.
 import Page from '../+page.svelte';
 
 const VEHICLE: Vehicle = {
@@ -121,15 +103,13 @@ beforeEach(() => {
 	);
 });
 
-/** The expense rows currently handed to the table. */
 function rowsGivenToTable(): Array<Expense & { vehicle?: Vehicle }> {
 	return (tableProps['expenses'] ?? []) as Array<Expense & { vehicle?: Vehicle }>;
 }
 
 describe('/expenses initial load', () => {
 	test('the expense page is requested WITHOUT waiting for settings or the vehicle list', async () => {
-		// Both of the legs the fetch used to queue behind never resolve here, so a serial load
-		// could not possibly get as far as requesting a page of expenses.
+		// The other two reads never resolve here, so a serial load could never reach the expense request.
 		getSettings.mockImplementation(() => new Promise<never>(() => {}));
 		getVehicles.mockImplementation(() => new Promise<never>(() => {}));
 
@@ -139,7 +119,7 @@ describe('/expenses initial load', () => {
 			expect(getAllExpenses).toHaveBeenCalled();
 			expect(getExpenseSummary).toHaveBeenCalled();
 		});
-		// ...and the two slow legs really were in flight at the same time, not skipped.
+		// The two slow reads were genuinely in flight together.
 		expect(getSettings).toHaveBeenCalled();
 		expect(getVehicles).toHaveBeenCalled();
 	});
@@ -152,7 +132,7 @@ describe('/expenses initial load', () => {
 	});
 
 	test('a row whose vehicle is not in the fleet is still rendered, without a vehicle', async () => {
-		// Shared/deleted vehicle: the join must degrade to `undefined`, never drop the row.
+		// A shared or deleted vehicle degrades to undefined rather than dropping the row.
 		getAllExpenses.mockImplementation(() =>
 			Promise.resolve({
 				data: [{ ...SERVER_PAGE[0], id: 'orphan', vehicleId: 'gone' }],
@@ -175,8 +155,7 @@ describe('/expenses initial load', () => {
 		);
 		await fireEvent.input(input, { target: { value: 'cost' } });
 
-		// A placeholder is not a name: it is gone as soon as there is a value, so the name has to
-		// come from the label instead.
+		// A placeholder disappears once typed into, so the name must come from the label.
 		expect(input).toHaveAccessibleName('Search expenses and vehicles');
 		expect(input.getAttribute('aria-label')).not.toBe(input.getAttribute('placeholder'));
 	});

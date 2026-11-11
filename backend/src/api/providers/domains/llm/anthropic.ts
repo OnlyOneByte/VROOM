@@ -1,20 +1,6 @@
 /**
- * Anthropic (Claude) LLM (assistant) adapter (llm-assistant T3b). Implements `LlmProvider.chat` against
- * the Anthropic Messages API (`POST {baseUrl}/v1/messages`) with tool use. Mirrors the VLM Anthropic
- * adapter's transport (x-api-key + anthropic-version headers, NOT Bearer) and the OpenAI-compatible LLM
- * adapter's dumb-transport contract.
- *
- * DUMB TRANSPORT (design §3/§4): maps VROOM's ChatMessage[] + ToolDefinition[] into Anthropic's wire
- * format and normalizes the response into `{ text?, toolCalls? }`; it NEVER executes a tool or trusts the
- * args — the orchestrator (T4) validates. A non-2xx / network / timeout failure THROWS (the chat route
- * maps it to 502; never a faked success — the anti-fail-open lesson).
- *
- * Wire mapping notes:
- *  - Anthropic takes a top-level `system` string (not a system message), so a `system`-role ChatMessage is
- *  lifted out. `tools[]` are `{ name, description, input_schema }`.
- *  - A `tool` RESULT goes back as a user message with a `tool_result` content block keyed by tool_use_id.
- *  - The response `content[]` may contain `text` blocks AND `tool_use` blocks; a `tool_use` block →
- *  ChatResult.toolCalls (id + name + JSON.stringify(input)); otherwise the joined text → ChatResult.text.
+ * Anthropic Messages API adapter. Dumb transport: it never executes tools or trusts tool args.
+ * Failures throw so the chat route can answer 502 instead of a fake success.
  */
 
 import { logger } from '../../../../utils/logger';
@@ -33,7 +19,6 @@ const MAX_TOKENS = 1024;
 const ANTHROPIC_VERSION = '2023-06-01';
 const DEFAULT_BASE_URL = 'https://api.anthropic.com';
 
-/** The Anthropic response content blocks we read (only the fields we use). */
 interface AnthropicBlock {
   type?: string;
   text?: unknown;
@@ -60,7 +45,7 @@ export class AnthropicLlmProvider implements LlmProvider {
   }
 
   async chat(request: ChatRequest): Promise<ChatResult> {
-    // Anthropic takes the system prompt as a top-level field, not a message. Lift system-role messages.
+    // Anthropic takes the system prompt as a top-level field, not a message.
     const system = request.messages
       .filter((m) => m.role === 'system')
       .map((m) => m.content)
@@ -109,7 +94,6 @@ export class AnthropicLlmProvider implements LlmProvider {
   }
 }
 
-/** Map a VROOM ChatMessage to an Anthropic message. A `tool` result → a user `tool_result` block. */
 function toAnthropicMessage(m: ChatMessage): Record<string, unknown> {
   if (m.role === 'tool') {
     return {
@@ -117,20 +101,14 @@ function toAnthropicMessage(m: ChatMessage): Record<string, unknown> {
       content: [{ type: 'tool_result', tool_use_id: m.toolCallId ?? '', content: m.content }],
     };
   }
-  // assistant | user → a plain text message.
   return { role: m.role, content: m.content };
 }
 
-/** Map a VROOM ToolDefinition to Anthropic's `{ name, description, input_schema }` shape. */
 function toAnthropicTool(t: ToolDefinition): Record<string, unknown> {
   return { name: t.name, description: t.description, input_schema: t.parameters };
 }
 
-/**
- * Normalize the Anthropic response into ChatResult. `tool_use` blocks → toolCalls (id + name + RAW args
- * JSON — the orchestrator validates); otherwise the joined `text` blocks → text. A response with neither
- * → { text: '' } (no throw — a malformed 2xx is not a transport failure).
- */
+/** A malformed 2xx body yields empty text rather than throwing. */
 function normalizeResponse(json: AnthropicResponse | null): ChatResult {
   const blocks = json?.content ?? [];
   const toolUses = blocks.filter((b) => b.type === 'tool_use');

@@ -1,22 +1,9 @@
 /**
- * Deleting one vehicle of a materialized split group must leave the survivors' legs summing to the
- * group total.
- *
- * A split expense is stored as one row per vehicle: each row carries its own `expense_amount` (its
- * leg) plus `group_total`, the pre-split total repeated on every sibling. "The legs sum to
- * group_total" is the invariant the split create/update paths enforce.
- *
- * The vehicle-delete route prunes the reminder split-config blobs (not FK-managed) but the FK cascade
- * only removes the deleted vehicle's own sibling row, so the survivors used to keep a `group_total`
- * from a split that no longer exists. That stale header is then amplified into money: an even or
- * percentage edit with no explicit total re-divides `group_total` across the surviving legs, so the
- * survivor's recorded cost silently grows to the whole original amount.
- *
- * The invariant pinned here: after a vehicle delete, every surviving split group's `group_total`
- * equals the sum of its surviving legs, and a later edit re-divides only that honest total.
- *
- * createTestApp() rewrites env + dynamic-imports DB-bound modules — keep static imports to the
- * harness + bun:test.
+ * After a vehicle delete, each surviving split group's group_total must equal the sum of its surviving
+ * legs. A split expense is one row per vehicle, each carrying its leg in expense_amount and the
+ * pre-split total in group_total. A stale total would make a later even or percentage edit re-divide
+ * the old amount. createTestApp() must run before any DB-bound import, so this file imports only the
+ * harness and bun:test.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -64,7 +51,7 @@ async function createEvenSplit(vehicleIds: string[], totalAmount: number): Promi
   return (await json<DataEnvelope<SplitCreateResponse>>(res)).data.groupId;
 }
 
-/** The surviving sibling rows of a group, in CENTS, straight from the table. */
+/** Reads the group's rows directly from the table, in cents. */
 function legs(
   groupId: string
 ): Array<{ vehicle_id: string; expense_amount: number; group_total: number }> {
@@ -93,7 +80,6 @@ describe('vehicle delete and materialized split groups', () => {
 
     const surviving = legs(groupId);
     expect(surviving).toHaveLength(1);
-    // The honest result: the survivor incurred $50 and the group is now a $50 group.
     expect(surviving[0]).toEqual({ vehicle_id: v1, expense_amount: 5000, group_total: 5000 });
   });
 
@@ -103,8 +89,7 @@ describe('vehicle delete and materialized split groups', () => {
 
     expect((await ctx.authed('DELETE', `/api/v1/vehicles/${v2}`)).status).toBe(200);
 
-    // No `totalAmount`: the update path falls back to the stored group total, which is exactly where a
-    // stale header turns into a wrong amount.
+    // Omitting totalAmount makes the update re-divide the stored group total.
     const edit = await ctx.authed('PUT', `/api/v1/expenses/split/${groupId}`, {
       splitConfig: { method: 'even', vehicleIds: [v1] },
     });

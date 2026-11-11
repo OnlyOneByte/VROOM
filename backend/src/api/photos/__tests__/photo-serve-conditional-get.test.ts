@@ -1,14 +1,6 @@
 /**
- * The photo serve path is the ONLY route that returns a photo's bytes, and what it returns is the
- * full-resolution original — there is no server-side resize (no image codec exists in the Bun
- * runtime and none is vendored). A 3 MB receipt is therefore 3 MB on the wire for a 48px avatar.
- *
- * Until a real resize lands, the one thing that bounds the cost is a conditional GET: a strong
- * validator on the 200 plus an `If-None-Match` short-circuit that answers 304 from SQLite alone.
- * That matters twice over on a self-hosted box — the client skips the download AND the server skips
- * re-fetching the original from the storage provider over the same home uplink.
- *
- * These tests measure the bytes actually served: full payload on a cold GET, ZERO on a revalidation.
+ * Conditional GET on the photo serve route. Responses are the full original (nothing resizes), so a
+ * revalidation must answer 304 with zero bytes and without a provider download.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -20,7 +12,6 @@ import type {
   UploadParams,
 } from '../../providers/domains/storage/storage-provider';
 
-/** A representative phone photo: 2.5 MB of JPEG-sized bytes. */
 const PHOTO_BYTES = Buffer.alloc(2_621_440, 7);
 const STORAGE_KEY = 'receipts/receipt.jpg';
 const PHOTO_PATH = '/api/v1/photos/expense/exp-1/photo-1/thumbnail';
@@ -31,9 +22,8 @@ let downloads = 0;
 let restoreRegistry: () => void;
 
 /**
- * The real FakeStorageProvider holding real bytes, wrapped to count downloads. Only the registry's
- * row → instance factory is stubbed (restored in afterEach); every other registry rule — provider
- * ownership scoping, status check, ref resolution — stays live.
+ * Wraps the fake storage provider to count downloads. Only the registry's instance factory is
+ * stubbed; ownership, status, and ref resolution stay live.
  */
 async function installCountingProvider(): Promise<void> {
   const { FakeStorageProvider } = await import('../../providers/domains/storage/fake-provider');
@@ -97,14 +87,12 @@ function seedServablePhoto(): void {
   );
 }
 
-/** GET the serve route with an optional `If-None-Match`, authenticated as the session user. */
 async function getPhoto(ifNoneMatch?: string): Promise<Response> {
   const headers: Record<string, string> = { Cookie: ctx.cookie };
   if (ifNoneMatch !== undefined) headers['If-None-Match'] = ifNoneMatch;
   return ctx.app.request(PHOTO_PATH, { headers });
 }
 
-/** The bytes a client actually had to download for this response. */
 async function servedBytes(res: Response): Promise<number> {
   return (await res.arrayBuffer()).byteLength;
 }
@@ -130,7 +118,6 @@ describe('photo serve: conditional GET', () => {
 
     const etag = res.headers.get('ETag');
     expect(etag).toBeTruthy();
-    // Strong validator: the stored bytes are write-once, so a byte-for-byte match is guaranteed.
     expect(etag?.startsWith('W/')).toBe(false);
     expect(etag).toMatch(/^"[^"]+"$/);
   });
@@ -192,7 +179,7 @@ describe('photo serve: conditional GET', () => {
   });
 
   test("another photo's validator never short-circuits this one", async () => {
-    // A second photo of the same expense, pointing at the same stored object so it is servable too.
+    // Shares the stored object so the second photo is servable.
     ctx.sqlite.run(
       `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
        VALUES ('photo-2', ?, 'expense', 'exp-1', 'receipt-2.jpg', 'image/jpeg', ?)`,

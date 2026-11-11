@@ -9,9 +9,7 @@
 	import { formatCurrency } from '$lib/utils/formatters';
 
 	interface Props {
-		/** Count of active expense reminders contributing a positive monthly run-rate. */
 		count: number;
-		/** Total normalized monthly run-rate across those reminders (currency/month). */
 		monthlyTotal: number;
 		isLoading?: boolean;
 	}

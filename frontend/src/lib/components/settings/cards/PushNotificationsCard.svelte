@@ -1,17 +1,5 @@
 <script lang="ts">
-	/**
-	 * Push notifications settings card — push-notifications T5 (honors D5 opt-in + D6 timing honesty).
-	 *
-	 * Opt-in surface for browser Web Push: a toggle + a status line that names the exact state
-	 * (unsupported / not-configured-503 / blocked / on / off). Enabling is gated behind a first-use
-	 * AlertDialog disclosure (D5, remembered in localStorage) that states what push does and — honestly —
-	 * that delivery is request-driven (a notification fires when VROOM next runs a reminder check, not on
-	 * a guaranteed schedule; D6). No auto-fired permission prompt: the browser prompt only appears after
-	 * the user turns the toggle on and acknowledges the disclosure.
-	 *
-	 * All browser Push API + transport logic lives in `$lib/utils/push`; this card is a thin view over
-	 * the pure `derivePushStatus` state machine.
-	 */
+	/** Browser push opt-in: a toggle plus a status line; enabling is gated behind a one-time disclosure. */
 	import { onMount } from 'svelte';
 	import { Bell, LoaderCircle } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
@@ -43,7 +31,6 @@
 	let toggleable = $derived(status === 'off' || status === 'subscribed');
 	let isOn = $derived(status === 'subscribed');
 
-	/** Determine the current push state on this browser (supported? configured? blocked? subscribed?). */
 	async function loadStatus() {
 		isLoading = true;
 		loadError = null;
@@ -114,7 +101,6 @@
 				appStore.showSuccess('Push notifications turned on');
 				return;
 			}
-			// Map the exact reason to a status line and/or a toast.
 			if (outcome.reason === 'denied') {
 				status = 'denied';
 			} else if (outcome.reason === 'unsupported') {

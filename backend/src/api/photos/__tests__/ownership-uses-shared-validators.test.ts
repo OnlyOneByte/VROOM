@@ -1,24 +1,8 @@
 /**
- * Regression GUARD: `photos/helpers.ts validateEntityOwnership` must express each entity's
- * authorization rule by calling a SHARED seam — never a private copy or an inlined repository
- * check. Two implementations of one authorization rule drift independently: one gets a security
- * fix, the other does not.
- *
- * This file once carried a private `validateExpenseOwnership` plus inlined
- * `vehicleRepository.findByUserIdAndId` / `insurancePolicyRepository.findById` checks that
- * duplicated the shared validators. Which seam each entity belongs to is itself load-bearing:
- *  - `vehicle` / `insurance_policy` own via their own userId column → the STRICT validators in
- *  utils/validation.ts.
- *  - `expense` / `odometer_entry` are OWNER-STAMPED on a shared vehicle (the row carries the
- *  vehicle owner's userId, not the editor's), so a strict acting-user match denies an accepted
- *  editor the photo on a row they authored → the vehicle-sharing seam, `requireVehicleWrite`.
- *  Reverting either to a userId-match check brings back a 404 on the editor's own receipt.
- *
- * It deliberately does NOT touch `insurance_claim` (transitive claim→policy ownership via
- * insuranceClaimRepository, no shared validator exists) nor `validatePhotoOwnership` (a different
- * check, on an existing photo row).
- *
- * Pure source scan — no DB, no network. Runs in the fast suite.
+ * Source guard: validateEntityOwnership must delegate to shared seams, not a local copy or an inlined
+ * repository check. Vehicle and insurance policy use the strict validators. Expenses and odometer
+ * entries are owner-stamped on shared vehicles, so they must use requireVehicleWrite instead of a
+ * userId match.
  */
 
 import { describe, expect, test } from 'bun:test';
@@ -62,24 +46,18 @@ describe('photo entity-ownership uses the shared validators', () => {
 
   test('does NOT locally re-declare a shared ownership validator (no shadowing duplicate)', () => {
     const src = readHelpers();
-    // The shared validators are IMPORTED; a local `function`/`const` of the same name
-    // would be a re-introduced private copy that can drift from its source of truth.
     const localDecl =
       /(?:function|const|let)\s+(validateVehicleOwnership|validateInsuranceOwnership|requireVehicleWrite)\b/;
     const m = localDecl.exec(src);
     expect(
       m,
       `photos/helpers.ts re-declares a shared ownership validator locally ` +
-        `(${m?.[1]}) — that's the cycle-18 duplication coming back. Import it from ` +
-        `utils/validation.ts instead.`
+        `(${m?.[1]}). Import it from utils/validation.ts instead.`
     ).toBeNull();
   });
 
   test('does NOT re-import vehicle/policy repositories to inline ownership checks', () => {
     const src = readHelpers();
-    // These imports were dropped in — their return marks a re-inlined vehicle/policy
-    // ownership check (the old `vehicleRepository.findByUserIdAndId` / `insurancePolicyRepository
-    // .findById` pattern) instead of delegating to the shared validator.
     for (const repo of ['vehicleRepository', 'insurancePolicyRepository']) {
       expect(
         src.includes(repo),

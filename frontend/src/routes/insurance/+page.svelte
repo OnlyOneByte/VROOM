@@ -21,7 +21,7 @@
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
 
-	// Build a map of vehicleId → display name for showing on policy cards
+	// vehicleId -> display name for policy cards.
 	let vehicleNameMap = $derived(new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)])));
 
 	onMount(async () => {
@@ -86,7 +86,6 @@
 	</div>
 {:else}
 	<div class="space-y-6 pb-24">
-		<!-- Header -->
 		<PageHeader title="Insurance" description="Manage your insurance policies across all vehicles">
 			{#snippet actions()}
 				<Button class="hidden sm:flex" onclick={handleAddPolicy}>
@@ -126,7 +125,6 @@
 		{/if}
 	</div>
 
-	<!-- Floating Action Button (mobile) -->
 	<FloatingActionButton
 		onclick={handleAddPolicy}
 		label="New Policy"

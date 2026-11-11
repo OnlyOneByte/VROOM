@@ -11,7 +11,6 @@
 	onMount(() => {
 		initializePWA();
 
-		// Check periodically if install prompt is available
 		const checkInterval = setInterval(() => {
 			if (pwaInstallState.canInstall && !pwaInstallState.isInstalled) {
 				showPrompt = true;
@@ -19,7 +18,6 @@
 			}
 		}, 1000);
 
-		// Clean up interval after 10 seconds
 		setTimeout(() => clearInterval(checkInterval), 10000);
 
 		return () => clearInterval(checkInterval);

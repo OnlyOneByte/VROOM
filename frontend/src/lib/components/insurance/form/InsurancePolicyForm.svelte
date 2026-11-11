@@ -39,8 +39,7 @@
 	import type { InsurancePolicy, Vehicle, CreateTermRequest } from '$lib/types';
 	import FormLayout from '$lib/components/common/form-layout.svelte';
 
-	// Money-field labels show the user's currency symbol, not a hardcoded "$"
-	// (EUR/GBP users would otherwise see the wrong unit). Same class as.
+	// Money labels use the user's currency symbol; a hardcoded $ would show the wrong unit for EUR/GBP users.
 	const currencySymbol = $derived(getCurrencySymbol());
 
 	interface Props {
@@ -53,7 +52,6 @@
 
 	const isEditMode = $derived(!!policyId);
 
-	// Component state
 	let isLoading = $state(true);
 	let isSubmitting = $state(false);
 	let isDeleting = $state(false);
@@ -61,13 +59,11 @@
 	let vehicles = $state<Vehicle[]>([]);
 	let policy = $state<InsurancePolicy | null>(null);
 
-	// Policy fields
 	let company = $state('');
 	let selectedVehicleIds = $state<string[]>([]);
 	let notes = $state('');
 	let isActive = $state(true);
 
-	// Initial term fields (create only)
 	let startDate = $state('');
 	let endDate = $state('');
 	let policyNumber = $state('');
@@ -82,7 +78,6 @@
 	let monthlyCost = $state('');
 	let paymentAmount = $state('');
 
-	// Validation
 	interface FormErrors {
 		company?: string;
 		vehicles?: string;
@@ -175,8 +170,7 @@
 			if (isEditMode && policy) {
 				await insuranceApi.updatePolicy(policy.id, {
 					company: company.trim(),
-					// null (not undefined) so an emptied notes field is actually cleared
-					// server-side — JSON drops undefined, leaving the old notes intact.
+					// Send null, not undefined: JSON drops undefined and the old notes would survive.
 					notes: notes.trim() || null,
 					isActive
 				});
@@ -201,9 +195,7 @@
 					company: company.trim(),
 					terms: [
 						{
-							// Date-only picker values; the API coerces them, so send noon-local or the
-							// term boundary (and the premium rows it materializes) lands a day early
-							// west of UTC.
+							// Send noon-local: date-only values parsed as UTC midnight land a day early west of UTC.
 							startDate: dateOnlyToISO(startDate),
 							endDate: dateOnlyToISO(endDate),
 							...termData,
@@ -258,7 +250,6 @@
 		</div>
 	{:else}
 		<div class="space-y-6">
-			<!-- Header -->
 			<div class="flex items-center gap-4">
 				<Button variant="outline" size="icon" aria-label="Go back" onclick={handleBack}>
 					<ArrowLeft class="h-4 w-4" />
@@ -278,7 +269,6 @@
 			</div>
 
 			<form onsubmit={handleSubmit} class="space-y-6 pb-32 sm:pb-24">
-				<!-- Policy Information -->
 				<Card>
 					<CardHeader>
 						<div class="flex items-center gap-2">
@@ -326,7 +316,6 @@
 					</CardContent>
 				</Card>
 
-				<!-- Initial Term (create only) — all term-specific fields in one card -->
 				{#if !isEditMode}
 					<Card>
 						<CardHeader>
@@ -336,7 +325,6 @@
 							>
 						</CardHeader>
 						<CardContent class="space-y-6">
-							<!-- Dates -->
 							<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 								<div class="space-y-2">
 									<Label for="start-date">Start Date *</Label>
@@ -364,7 +352,6 @@
 								</div>
 							</div>
 
-							<!-- Vehicle selection (per-term) -->
 							<div class="space-y-2">
 								<Label>Covered Vehicles *</Label>
 								<div class="rounded-md border border-input p-3 space-y-2">
@@ -388,7 +375,6 @@
 								{/if}
 							</div>
 
-							<!-- Policy Details -->
 							<div class="border-t border-border pt-6">
 								<h4 class="text-sm font-medium text-foreground mb-4">Policy Details</h4>
 								<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -465,7 +451,6 @@
 								</div>
 							</div>
 
-							<!-- Finance Details -->
 							<div class="border-t border-border pt-6">
 								<h4 class="text-sm font-medium text-foreground mb-4">Finance Details</h4>
 								<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -537,7 +522,6 @@
 				{/if}
 			</form>
 
-			<!-- Floating Action Bar -->
 			<div class="fixed bottom-4 left-4 right-4 z-50 sm:bottom-8 sm:right-8 sm:left-auto sm:w-auto">
 				<div
 					class="flex flex-row gap-3 sm:gap-4 justify-center sm:justify-end items-center bg-background sm:bg-transparent p-3 sm:p-0 rounded-full sm:rounded-none shadow-2xl sm:shadow-none border sm:border-0"
@@ -587,7 +571,6 @@
 			</div>
 		</div>
 
-		<!-- Delete Confirmation -->
 		<AlertDialog bind:open={showDeleteConfirm}>
 			<AlertDialogContent>
 				<AlertDialogHeader>

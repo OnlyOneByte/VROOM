@@ -1,14 +1,7 @@
 /**
- * SSRF guard for the push endpoint (push-notifications, hardening).
- *
- * The subscribe endpoint is a URL the server later POSTs to (via web-push). An authenticated user can
- * hand-craft the JSON body, so without an allowlist they could register an internal/metadata/localhost
- * URL and turn the send hook into a request proxy (blind SSRF, ARCC SSRF-mitigation). This pins:
- *  (A) isAllowedPushEndpoint accepts ONLY https URLs on a known browser-vendor push host, and rejects
- *  every SSRF vector (metadata IP, loopback, private IP, alternate IP encodings, http, other
- *  schemes, userinfo-bypass, look-alike domains, malformed).
- *  (B) POST /api/v1/push/subscribe REJECTS a rogue endpoint (400) + stores nothing, while accepting a
- *  real vendor endpoint (201) — validation at the earliest point (SAX-04).
+ * SSRF guard for push endpoints. isAllowedPushEndpoint accepts only https URLs on browser-vendor push
+ * hosts and rejects SSRF vectors. POST /api/v1/push/subscribe rejects a rogue endpoint and stores
+ * nothing.
  */
 
 import { describe, expect, test } from 'bun:test';
@@ -16,7 +9,7 @@ import { createTestApp } from '../../../test-helpers/http-client';
 import { isAllowedPushEndpoint } from '../push-endpoint';
 import { pushSubscriptionRepository } from '../repository';
 
-describe('isAllowedPushEndpoint — allowlist (A)', () => {
+describe('isAllowedPushEndpoint allowlist', () => {
   test('accepts real browser-vendor push endpoints (https, known host + subdomains)', () => {
     for (const ep of [
       'https://fcm.googleapis.com/fcm/send/abc123',
@@ -53,7 +46,7 @@ describe('isAllowedPushEndpoint — allowlist (A)', () => {
   });
 });
 
-describe('POST /api/v1/push/subscribe — SSRF rejection (B)', () => {
+describe('POST /api/v1/push/subscribe SSRF rejection', () => {
   test('a metadata/internal endpoint is rejected (400) + nothing is stored', async () => {
     const ctx = await createTestApp();
     const res = await ctx.authed('POST', '/api/v1/push/subscribe', {
@@ -61,7 +54,6 @@ describe('POST /api/v1/push/subscribe — SSRF rejection (B)', () => {
       keys: { p256dh: 'k', auth: 'a' },
     });
     expect(res.status).toBe(400);
-    // The rogue endpoint never entered the store.
     expect(await pushSubscriptionRepository.findByUser(ctx.user.id)).toHaveLength(0);
     ctx.close();
   });

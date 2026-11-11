@@ -1,21 +1,3 @@
-/**
- * Property-Based Tests for Quick Stats Computation
- *
- * Property 1: Expense sum computation
- * For any user and year, the reported YTD spending should equal the sum of all
- * expense amounts for that user's vehicles in the given year.
- *
- * Property 2: Vehicle count computation
- * For any user, the reported vehicle count should equal the number of vehicles
- * owned by that user in the database.
- *
- * Property 3: Fleet health score is bounded weighted average
- * For any user with one or more vehicles, the fleet health score should be
- * between 0 and 100 inclusive.
- *
- * **Validates: Requirements 2.4, 2.5, 2.6, 12.2**
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { AnalyticsRepository } from '../repository';
@@ -34,9 +16,6 @@ import {
   yearToRange,
 } from './analytics-test-generators';
 
-// ---------------------------------------------------------------------------
-// Shared setup
-// ---------------------------------------------------------------------------
 let testDb: TestDb;
 let repo: AnalyticsRepository;
 
@@ -49,11 +28,7 @@ afterEach(() => {
   testDb.sqlite.close();
 });
 
-// ---------------------------------------------------------------------------
-// Property 1: Expense sum computation
-// **Validates: Requirements 2.4, 12.2**
-// ---------------------------------------------------------------------------
-describe('Property 1: Expense sum computation', () => {
+describe('Expense sum computation', () => {
   test('YTD spending equals sum of all expense amounts for user vehicles in the given year', async () => {
     await fc.assert(
       fc.asyncProperty(
@@ -66,7 +41,6 @@ describe('Property 1: Expense sum computation', () => {
           return fc.tuple(...vehicleArbs);
         }),
         async (targetYear, vehiclesArr) => {
-          // Fresh DB for each run
           testDb.sqlite.close();
           testDb = createTestDb();
           repo = new AnalyticsRepository(testDb.drizzle);
@@ -79,7 +53,6 @@ describe('Property 1: Expense sum computation', () => {
             seedVehicle(testDb.sqlite, v);
           }
 
-          // Generate expenses for each vehicle — some in target year, some not
           const allExpenses: TestExpense[] = [];
           for (const v of vehicles) {
             const yearExpenses =
@@ -87,7 +60,6 @@ describe('Property 1: Expense sum computation', () => {
                 expenseListArb(v.id, { minLength: 0, maxLength: 5, yearConstraint: targetYear }),
                 1
               )[0] ?? [];
-            // Also generate some expenses in a different year
             const otherExpenses =
               fc.sample(
                 expenseListArb(v.id, {
@@ -97,7 +69,6 @@ describe('Property 1: Expense sum computation', () => {
                 }),
                 1
               )[0] ?? [];
-            // Ensure unique IDs for other-year expenses
             const renamedOther = otherExpenses.map((e, i) => ({
               ...e,
               id: `${e.id}-other-${i}`,
@@ -112,12 +83,10 @@ describe('Property 1: Expense sum computation', () => {
           const range = yearToRange(targetYear);
           const result = await repo.getQuickStats(user.id, range);
 
-          // Expected: sum of expense amounts where the expense date falls in targetYear
           const expectedSum = allExpenses
             .filter((e) => e.date.getFullYear() === targetYear)
             .reduce((sum, e) => sum + e.expenseAmount, 0);
 
-          // Compare with floating-point tolerance (cents precision)
           expect(Math.abs(result.ytdSpending - expectedSum)).toBeLessThan(0.01);
         }
       ),
@@ -126,15 +95,10 @@ describe('Property 1: Expense sum computation', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Property 2: Vehicle count computation
-// **Validates: Requirement 2.5**
-// ---------------------------------------------------------------------------
-describe('Property 2: Vehicle count computation', () => {
+describe('Vehicle count computation', () => {
   test('reported vehicle count equals the number of vehicles owned by the user', async () => {
     await fc.assert(
       fc.asyncProperty(fc.integer({ min: 0, max: 5 }), async (vehicleCount) => {
-        // Fresh DB for each run
         testDb.sqlite.close();
         testDb = createTestDb();
         repo = new AnalyticsRepository(testDb.drizzle);
@@ -142,17 +106,14 @@ describe('Property 2: Vehicle count computation', () => {
         const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
         seedUser(testDb.sqlite, user);
 
-        // Also seed a second user to verify isolation
         const otherUser = { id: 'user-2', email: 'other@test.com', displayName: 'Other' };
         seedUser(testDb.sqlite, otherUser);
 
-        // Seed vehicles for the target user
         for (let i = 0; i < vehicleCount; i++) {
           const v = fc.sample(vehicleArb('user-1', i), 1)[0];
           if (v) seedVehicle(testDb.sqlite, v);
         }
 
-        // Seed some vehicles for the other user (should not be counted)
         for (let i = 0; i < 2; i++) {
           const v = fc.sample(vehicleArb('user-2', i), 1)[0];
           if (v) seedVehicle(testDb.sqlite, v);
@@ -167,7 +128,6 @@ describe('Property 2: Vehicle count computation', () => {
   });
 });
 
-/** Helper to seed vehicles with optional insurance and maintenance expenses. */
 function seedVehiclesWithExpenses(db: TestDb, vehicleCount: number, withInsurance: boolean): void {
   let policyId: string | null = null;
   if (withInsurance) {
@@ -200,18 +160,13 @@ function seedVehiclesWithExpenses(db: TestDb, vehicleCount: number, withInsuranc
   }
 }
 
-// ---------------------------------------------------------------------------
-// Property 3: Fleet health score is bounded weighted average
-// **Validates: Requirement 2.6**
-// ---------------------------------------------------------------------------
-describe('Property 3: Fleet health score is bounded weighted average', () => {
+describe('Fleet health score is bounded weighted average', () => {
   test('fleet health score is between 0 and 100 inclusive for users with vehicles', async () => {
     await fc.assert(
       fc.asyncProperty(
         fc.integer({ min: 1, max: 4 }),
         fc.boolean(),
         async (vehicleCount, withInsurance) => {
-          // Fresh DB for each run
           testDb.sqlite.close();
           testDb = createTestDb();
           repo = new AnalyticsRepository(testDb.drizzle);
@@ -225,7 +180,6 @@ describe('Property 3: Fleet health score is bounded weighted average', () => {
 
           expect(result.fleetHealthScore).toBeGreaterThanOrEqual(0);
           expect(result.fleetHealthScore).toBeLessThanOrEqual(100);
-          // Score should be an integer (Math.round is applied)
           expect(Number.isInteger(result.fleetHealthScore)).toBe(true);
         }
       ),
@@ -245,13 +199,6 @@ describe('Property 3: Fleet health score is bounded weighted average', () => {
     expect(result.fleetHealthScore).toBe(0);
   });
 
-  // Pin the FLEET-AGGREGATION semantic computeFleetHealthScore relies on —
-  // a vehicle with NO scorable data is INCLUDED in the mean at its default sub-scores, NOT excluded and
-  // NOT zeroed. computeRegularityScore([])=50 + computeMileageScore([])=50 + insurance 0 →
-  // round(50*0.4 + 50*0.35 + 0*0.25) = round(37.5) = 38. The existing tests pin bounds/integer/no-vehicles
-  // but NOT this: a refactor that dropped empty vehicles from the denominator (or scored them 0) would
-  // silently shift EVERY multi-vehicle fleet score with no test catching it. Deterministic (no insurance,
-  // no expenses), so the exact 38 is stable.
   test('a vehicle with NO data scores 38 (default 50/50 + 0 insurance) and is INCLUDED in the fleet mean', async () => {
     testDb.sqlite.close();
     testDb = createTestDb();
@@ -259,7 +206,6 @@ describe('Property 3: Fleet health score is bounded weighted average', () => {
 
     const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
     seedUser(testDb.sqlite, user);
-    // One vehicle, zero expenses, zero insurance.
     seedVehicle(testDb.sqlite, {
       id: 'veh-empty',
       userId: user.id,
@@ -269,12 +215,8 @@ describe('Property 3: Fleet health score is bounded weighted average', () => {
     });
 
     const single = await repo.getQuickStats(user.id, yearToRange(2024));
-    // round(50*0.4 + 50*0.35 + 0*0.25) = round(37.5) = 38 — NOT 0 (not excluded), NOT 50.
     expect(single.fleetHealthScore).toBe(38);
 
-    // Add a SECOND no-data vehicle: the mean of two identical 38s stays 38 — proving both are counted
-    // in the denominator (an exclusion bug would still read 38 here, but the single-vehicle case above
-    // already rules out "empty → excluded → 0/NaN"; together they pin inclusion + the per-vehicle value).
     seedVehicle(testDb.sqlite, {
       id: 'veh-empty-2',
       userId: user.id,

@@ -1,15 +1,3 @@
-// Feature: unit-aware-display, Property 11: Cross-vehicle analytics conversion
-/**
- * Property 11: Cross-vehicle analytics conversion
- *
- * For any set of vehicles with potentially different unit preferences and any
- * user Global_Unit_Preference, the Analytics_API cross-vehicle aggregation SHALL
- * convert each vehicle's distance, volume, and efficiency values to the global
- * unit system before summing or averaging.
- *
- * **Validates: Requirements 6.1**
- */
-
 import type { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
@@ -27,10 +15,6 @@ import {
   yearToRange,
 } from './analytics-test-generators';
 
-// ---------------------------------------------------------------------------
-// Unit preference arbitraries
-// ---------------------------------------------------------------------------
-
 const distanceUnitArb = fc.constantFrom(DistanceUnit.MILES, DistanceUnit.KILOMETERS);
 const volumeUnitArb = fc.constantFrom(
   VolumeUnit.GALLONS_US,
@@ -44,17 +28,9 @@ const unitPreferencesArb: fc.Arbitrary<UnitPreferences> = fc.record({
   chargeUnit: fc.constant(ChargeUnit.KWH),
 });
 
-/**
- * Generate two unit preference objects that are guaranteed to differ
- * in at least one of distanceUnit or volumeUnit.
- */
 const mixedUnitPairArb: fc.Arbitrary<[UnitPreferences, UnitPreferences]> = fc
   .tuple(unitPreferencesArb, unitPreferencesArb)
   .filter(([a, b]) => a.distanceUnit !== b.distanceUnit || a.volumeUnit !== b.volumeUnit);
-
-// ---------------------------------------------------------------------------
-// DB seeding helpers
-// ---------------------------------------------------------------------------
 
 function seedUserSettings(db: Database, userId: string, units: UnitPreferences): void {
   db.run('INSERT INTO user_preferences (user_id, unit_preferences) VALUES (?, ?)', [
@@ -94,7 +70,6 @@ function makeTestVehicle(id: string, userId: string, make: string, model: string
   return { id, userId, make, model, year: 2022 };
 }
 
-/** Seed 3 fuel expenses with increasing mileage for a vehicle. */
 function seedFuelExpensesForVehicle(
   db: Database,
   vehicleId: string,
@@ -113,7 +88,6 @@ function seedFuelExpensesForVehicle(
   }
 }
 
-/** Set up user, settings, and two vehicles with different unit preferences. */
 function setupMixedUnitScenario(
   db: Database,
   userUnits: UnitPreferences,
@@ -132,7 +106,6 @@ function setupMixedUnitScenario(
   return { userId, vehicleA, vehicleB };
 }
 
-/** Assert units metadata matches user's global preferences. */
 function assertUnitsMatch(
   units: { distanceUnit: string; volumeUnit: string; chargeUnit: string },
   expected: UnitPreferences
@@ -142,7 +115,6 @@ function assertUnitsMatch(
   expect(units.chargeUnit).toBe(expected.chargeUnit);
 }
 
-/** Assert costPerDistance is correctly computed with unit conversion. */
 function assertCostPerDistance(
   comparison: CrossVehicleData['vehicleCostComparison'],
   vehicleId: string,
@@ -163,7 +135,6 @@ function assertCostPerDistance(
   }
 }
 
-/** Assert efficiency values are converted to user's global units. */
 function assertEfficiencyConverted(
   fuelEfficiencyComparison: CrossVehicleData['fuelEfficiencyComparison'],
   vehicleId: string,
@@ -188,9 +159,6 @@ function assertEfficiencyConverted(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Test state
-// ---------------------------------------------------------------------------
 let testDb: TestDb;
 let repo: AnalyticsRepository;
 const TEST_YEAR = 2024;
@@ -210,11 +178,7 @@ function resetDb(): void {
   repo = new AnalyticsRepository(testDb.drizzle);
 }
 
-// ---------------------------------------------------------------------------
-// Property 11: Cross-vehicle analytics conversion
-// **Validates: Requirements 6.1**
-// ---------------------------------------------------------------------------
-describe('Property 11: Cross-vehicle analytics conversion', () => {
+describe('Cross-vehicle analytics conversion', () => {
   test('cross-vehicle aggregation converts values to user global units', async () => {
     await fc.assert(
       fc.asyncProperty(

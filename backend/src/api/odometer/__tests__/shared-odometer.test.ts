@@ -1,17 +1,3 @@
-/**
- * vehicle-sharing T6 — odometer READ+WRITE widening through the REAL stack (the odometer analogue of
- * the T5b-2/T5b-3 expense owner-stamp model, design §2.1).
- *
- * Odometer entries are userId-keyed exactly like expenses (reads filter eq(userId); getCurrentOdometer
- * + the mileage-reminder axis scope by userId), so the same owner-stamp model applies: when a shared
- * EDITOR creates a reading on the owner's vehicle, the row is stamped userId = OWNER (so it rides the
- * owner's mileage / getCurrentOdometer / backup), and the per-vehicle reads gate via requireVehicleRead
- * then query the OWNER's books. Odometer rows carry NO createdBy column (they are not money rows — only
- * the expenses provenance migration 0011 added one), so the owner-stamp is via userId alone.
- *
- * Fixture: A is the OWNER (the harness-seeded session); B is a SECOND user invited as viewer/editor.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -22,8 +8,8 @@ import {
 } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
 
-let ctx: TestApp; // owner (user A)
-let bCookie: string; // invitee B (the shared viewer/editor)
+let ctx: TestApp;
+let bCookie: string;
 let bId: string;
 let bEmail: string;
 let bCounter = 0;
@@ -57,7 +43,6 @@ async function asB(method: string, path: string, body?: unknown): Promise<Respon
   return ctx.app.request(path, init);
 }
 
-/** A owns a vehicle, invites B at `level`, B accepts → an ACCEPTED share. Returns vehicleId. */
 async function shareAccepted(level: 'viewer' | 'editor'): Promise<string> {
   const vehicleId = await seedVehicle(ctx, { make: 'Shared', model: 'Car', year: 2021 });
   const invite = await ctx.authed('POST', '/api/v1/shares', { vehicleId, email: bEmail, level });
@@ -66,7 +51,6 @@ async function shareAccepted(level: 'viewer' | 'editor'): Promise<string> {
   return vehicleId;
 }
 
-/** The raw stored userId on an odometer entry (owner-stamp assertion, not the API echo). */
 function storedUserId(entryId: string): string {
   return (
     ctx.sqlite.query('SELECT user_id FROM odometer_entries WHERE id = ?').get(entryId) as {
@@ -75,7 +59,7 @@ function storedUserId(entryId: string): string {
   ).user_id;
 }
 
-describe('odometer READ+WRITE widening — owner-stamp (T6)', () => {
+describe('odometer reads and writes on shared vehicles stamp the owner', () => {
   test('an EDITOR create stamps userId=OWNER (rides the owner books + getCurrentOdometer)', async () => {
     const vehicleId = await shareAccepted('editor');
 
@@ -85,9 +69,8 @@ describe('odometer READ+WRITE widening — owner-stamp (T6)', () => {
     });
     const body = await json<DataEnvelope<{ id: string }>>(res);
     expect(res.status, JSON.stringify(body)).toBe(201);
-    expect(storedUserId(body.data.id)).toBe(ctx.user.id); // owner A, not the acting editor B
+    expect(storedUserId(body.data.id)).toBe(ctx.user.id);
 
-    // It rides the OWNER's books: A's per-vehicle list shows the editor-entered reading.
     const ownerList = await json<PaginatedEnvelope<OdoRow>>(
       await ctx.authed('GET', `/api/v1/odometer/${vehicleId}`)
     );
@@ -96,7 +79,6 @@ describe('odometer READ+WRITE widening — owner-stamp (T6)', () => {
 
   test('an accepted VIEWER reads the shared vehicle list/history/entry (owner-stamped rows)', async () => {
     const vehicleId = await shareAccepted('viewer');
-    // Owner seeds a reading.
     const created = await ctx.authed('POST', `/api/v1/odometer/${vehicleId}`, {
       odometer: 22000,
       recordedAt: '2024-06-02T00:00:00.000Z',
@@ -118,7 +100,7 @@ describe('odometer READ+WRITE widening — owner-stamp (T6)', () => {
     expect((await json<DataEnvelope<OdoRow>>(single)).data.id).toBe(entryId);
   });
 
-  test('an EDITOR can PUT and DELETE a shared-vehicle reading (D3); userId stays the OWNER', async () => {
+  test('an editor can PUT and DELETE a shared-vehicle reading; userId stays the owner', async () => {
     const vehicleId = await shareAccepted('editor');
     const created = await ctx.authed('POST', `/api/v1/odometer/${vehicleId}`, {
       odometer: 10000,
@@ -130,7 +112,7 @@ describe('odometer READ+WRITE widening — owner-stamp (T6)', () => {
     const putBody = await json<DataEnvelope<{ odometer: number }>>(put);
     expect(put.status, JSON.stringify(putBody)).toBe(200);
     expect(putBody.data.odometer).toBe(10500);
-    expect(storedUserId(entryId)).toBe(ctx.user.id); // owner-stamp invariant survives an editor edit
+    expect(storedUserId(entryId)).toBe(ctx.user.id);
 
     const del = await asB('DELETE', `/api/v1/odometer/${entryId}`);
     expect(del.status, 'editor can delete a shared-vehicle reading').toBe(200);
@@ -159,7 +141,6 @@ describe('odometer READ+WRITE widening — owner-stamp (T6)', () => {
     expect((await asB('PUT', `/api/v1/odometer/${entryId}`, { odometer: 1 })).status).toBe(404);
     expect((await asB('DELETE', `/api/v1/odometer/${entryId}`)).status).toBe(404);
 
-    // The owner's reading is untouched.
     const stillThere = ctx.sqlite
       .query('SELECT odometer FROM odometer_entries WHERE id = ?')
       .get(entryId) as { odometer: number };

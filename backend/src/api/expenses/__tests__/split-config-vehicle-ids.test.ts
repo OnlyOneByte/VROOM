@@ -1,12 +1,3 @@
-/**
- * Direct unit net for splitConfigVehicleIds (arch-extract → guard-pin). This was a local un-exported
- * helper in expenses/routes.ts, hand-copied inline at 3 sites (the route's ownership loop, the expense
- * repo's validateVehicleOwnership, the reminder validator's split-vs-vehicleIds check). lifted it into
- * expenses/validation.ts as ONE source of truth + routed all three through it. The arch-extract→guard-pin
- * standing pattern (→ averageConsecutiveMpg, buildSplitConfig): pin the newly-shared helper
- * directly so a future regression is caught at the helper, not only via a caller.
- */
-
 import { describe, expect, test } from 'bun:test';
 import { type SplitConfig, splitConfigVehicleIds } from '../validation';
 

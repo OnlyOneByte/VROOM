@@ -1,37 +1,18 @@
-/**
- * Property tests for BackupService.
- *
- * Property 2: Retention enforcement correctness
- * Property 4: Backup listing filter, sort, and badge
- *
- * Provider isolation (Property 1), skip logic (Property 16), and lastBackupAt
- * updates (Property 17) are covered in backup-orchestrator.test.ts.
- *
- * Validates: Requirements 2.2, 2.3, 2.4, 4.1, 4.2
- */
-
 import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import type { StorageFileInfo } from '../../providers/domains/storage/storage-provider';
-
-// ---------------------------------------------------------------------------
-// Arbitraries
-// ---------------------------------------------------------------------------
 
 /** Arbitrary for a valid ISO 8601 timestamp. */
 const isoTimestampArb = fc
   .integer({ min: 1_000_000_000_000, max: 2_000_000_000_000 })
   .map((ms) => new Date(ms).toISOString());
 
-/** Arbitrary for a retention count (1–100). */
 const retentionCountArb = fc.integer({ min: 1, max: 100 });
 
-/** Arbitrary for a backup file name matching the vroom-backup-*.zip pattern. */
 const backupFileNameArb = fc
   .stringMatching(/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}-[0-9]{2}$/)
   .map((ts) => `vroom-backup-${ts}.zip`);
 
-/** Arbitrary for a non-backup file name (does NOT match vroom-backup-*.zip). */
 const nonBackupFileNameArb = fc.oneof(
   fc.stringMatching(/^photo-[a-z0-9]{4,8}\.(jpg|png)$/),
   fc.stringMatching(/^document-[a-z0-9]{4,8}\.pdf$/),
@@ -40,7 +21,6 @@ const nonBackupFileNameArb = fc.oneof(
   fc.constant('vroom-backup-.txt')
 );
 
-/** Arbitrary for a StorageFileInfo representing a backup file. */
 const backupFileArb: fc.Arbitrary<StorageFileInfo> = fc.record({
   key: fc.stringMatching(/^key-[a-zA-Z0-9]{5,20}$/),
   name: backupFileNameArb,
@@ -49,7 +29,6 @@ const backupFileArb: fc.Arbitrary<StorageFileInfo> = fc.record({
   lastModified: isoTimestampArb,
 });
 
-/** Arbitrary for a StorageFileInfo representing a non-backup file. */
 const nonBackupFileArb: fc.Arbitrary<StorageFileInfo> = fc.record({
   key: fc.stringMatching(/^nbk-[a-zA-Z0-9]{5,20}$/),
   name: nonBackupFileNameArb,
@@ -58,13 +37,8 @@ const nonBackupFileArb: fc.Arbitrary<StorageFileInfo> = fc.record({
   lastModified: isoTimestampArb,
 });
 
-// ---------------------------------------------------------------------------
-// Property 4: Backup listing filter, sort, and badge
-// Validates: Requirements 4.1, 4.2
-// ---------------------------------------------------------------------------
-
-describe('Property 4: Backup listing filter, sort, and badge', () => {
-  /** Pure function replicating the listBackups filter/sort/badge logic. */
+describe('backup listing filter, sort, and badge', () => {
+  // Copy of the listBackups filter, sort and badge logic.
   function applyListBackupsLogic(files: StorageFileInfo[]) {
     return files
       .filter((f) => f.name.startsWith('vroom-backup-') && f.name.endsWith('.zip'))
@@ -148,12 +122,7 @@ describe('Property 4: Backup listing filter, sort, and badge', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Property 2: Retention enforcement correctness
-// Validates: Requirements 2.2, 2.3, 2.4
-// ---------------------------------------------------------------------------
-
-describe('Property 2: Retention enforcement correctness', () => {
+describe('retention enforcement correctness', () => {
   function computeRetention(
     files: StorageFileInfo[],
     retentionCount: number

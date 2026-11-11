@@ -1,20 +1,6 @@
-/**
- * Security regression: restore must STAMP the importing user's id onto every
- * owned row, never trust the userId carried in the (untrusted) backup file.
- *
- * The only envelope check is validateUserId(metadata.userId, importer), and the
- * referential-integrity pass never covered the root tables (vehicles, insurance,
- * photos, preferences, syncState). So a crafted backup with metadata.userId = me
- * but a row whose userId = someone-else would, without stamping, insert a row
- * owned by another user. This proves the stamp: we tamper a real export's
- * vehicles.csv to carry a FOREIGN user_id, restore it as our user, and assert the
- * restored row is owned by US.
- *
- * createTestApp() rewrites env then dynamic-imports DB-bound modules; keep this
- * file's static imports to the harness + bun:test and import backup/restore +
- * adm-zip dynamically AFTER createTestApp so DB-bound singletons bind to the
- * throwaway DB.
- */
+// Restore must stamp the importer's userId onto every owned row and never trust the userId in the
+// backup file. Validation only checks the envelope, so a tampered row would otherwise land under
+// another user.
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
@@ -81,8 +67,7 @@ describe('restore stamps the importer userId (cross-tenant write guard)', () => 
 
     const zip = await backupService.exportAsZip(ctx.user.id);
 
-    // Insert a second user so the foreign user_id satisfies the FK (the attacker
-    // would target a real, known victim id). Then tamper vehicles.csv to claim it.
+    // The foreign user must exist to satisfy the FK.
     const { db } = await import('../../../db/connection');
     const schema = await import('../../../db/schema');
     const foreignId = 'victim-user-1';
@@ -93,39 +78,27 @@ describe('restore stamps the importer userId (cross-tenant write guard)', () => 
     const archive = new AdmZip(zip);
     const vehiclesCsv = archive.getEntry('vehicles.csv')?.getData().toString('utf-8');
     expect(vehiclesCsv, 'export contains vehicles.csv').toBeTruthy();
-    // Flip the owner column on the data row from our id to the victim's id.
     const tampered = (vehiclesCsv as string).split(ctx.user.id).join(foreignId);
     expect(tampered.includes(foreignId), 'tamper actually replaced the owner id').toBe(true);
     archive.updateFile('vehicles.csv', Buffer.from(tampered, 'utf-8'));
     const tamperedZip = archive.toBuffer();
 
-    // Restore the tampered backup AS our user (metadata.userId is still ours, so
-    // the envelope check passes — the attack is the per-row userId in the file).
+    // metadata.userId stays the importer's, so the envelope check passes.
     const result = await restoreService.restoreFromBackup(ctx.user.id, tamperedZip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 
-    // The restored vehicle must be owned by US, not the victim. Pre-fix this
-    // failed: the row kept the foreign user_id from the file.
+    // The restored row must be owned by the importer.
     const rows = vehicleRows();
     expect(rows, 'exactly the one restored vehicle').toHaveLength(1);
     expect(rows[0].id).toBe(vehicleId);
     expect(rows[0].user_id, 'row must be stamped to the importer, not the file value').toBe(
       ctx.user.id
     );
-    // And nothing landed under the victim.
     expect(rows.filter((r) => r.user_id === foreignId)).toHaveLength(0);
   });
 
-  // C8 (deep-review): the stamp is applied to NINE directly-owned tables (vehicles, insurance,
-  // reminders, reminderNotifications, expenses, odometer, userPreferences, syncState, photos), but only
-  // `vehicles` was guarded above. A dropped `stampUserId(...)` wrapper on any OTHER insert (the exact
-  // C3-class structural-invariant drift) would let a crafted backup plant a cross-tenant row with NO
-  // test red. Picking the SECOND table to pin: verified firsthand which root tables the stamp SOLELY
-  // protects — validateBackupData rejects a foreign userId on the LEAF tables (expenses/reminders user-
-  // check against the metadata set, so they're belt-and-suspenders), but `validateInsuranceRefs` only
-  // checks `id` presence, NOT userId. So `insurance_policies` is a genuine STAMP-ONLY defense root table
-  // (exactly as the stampUserId docstring flags). Same tamper recipe on insurance_policies.csv.
-  test('a backup whose INSURANCE row carries a FOREIGN userId still restores as the importer (stamp-only root table)', async () => {
+  // Validation does not check userId on insurance policies, so the stamp is their only defense.
+  test('a backup whose insurance row carries a foreign userId still restores as the importer', async () => {
     const vehRes = await ctx.authed('POST', '/api/v1/vehicles', {
       make: 'Honda',
       model: 'Accord',
@@ -173,8 +146,7 @@ describe('restore stamps the importer userId (cross-tenant write guard)', () => 
     const result = await restoreService.restoreFromBackup(ctx.user.id, tamperedZip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 
-    // The restored policy must be owned by US — a dropped stamp on the insurance insert would land it
-    // under the victim (cross-tenant write that validation does NOT catch for this table). Both directions.
+    // The restored policy must be owned by the importer.
     const rows = policyRows();
     expect(rows, 'exactly the one restored policy').toHaveLength(1);
     expect(rows[0].id).toBe(polBody.data.id);
@@ -184,15 +156,8 @@ describe('restore stamps the importer userId (cross-tenant write guard)', () => 
     expect(rows.filter((r) => r.user_id === foreignId)).toHaveLength(0);
   });
 
-  // (deep-review follow-on flagged C8) Extend the stamp guard to `photos` — the THIRD stamp-only
-  // root table. Verified firsthand: validatePhotoRefs (backup.ts) checks only entityType + entityId
-  // membership, NOT the photo's userId against the metadata set — so (like insurance, unlike the leaf
-  // expenses/reminders which validation user-checks) a tampered foreign userId on a photo row passes
-  // validation and reaches the insert, where stampUserId is the SOLE defense. A photo is a real upload
-  // target (receipts, vehicle/claim docs) → a cross-tenant write here is. Seed a photo row
-  // directly (no storage provider needed for the restore path — mirrors claims-roundtrip.test.ts), export,
-  // tamper photos.csv to a victim id, restore AS us, assert the photo is owned by US.
-  test('a backup whose PHOTO row carries a FOREIGN userId still restores as the importer (stamp-only root table)', async () => {
+  // Photo validation does not check userId, so the stamp is the only defense here.
+  test('a backup whose photo row carries a foreign userId still restores as the importer', async () => {
     const vehRes = await ctx.authed('POST', '/api/v1/vehicles', {
       make: 'Honda',
       model: 'CR-V',
@@ -202,7 +167,6 @@ describe('restore stamps the importer userId (cross-tenant write guard)', () => 
     expect(vehRes.status, JSON.stringify(vehBody)).toBeLessThan(300);
     const vehicleId = vehBody.data.id;
 
-    // A photo attached to that vehicle (entity_type='vehicle'), as an upload would create.
     ctx.sqlite.run(
       `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
        VALUES ('photo-stamp-1', ?, 'vehicle', ?, 'car.jpg', 'image/jpeg', 4096)`,
@@ -232,8 +196,7 @@ describe('restore stamps the importer userId (cross-tenant write guard)', () => 
     const result = await restoreService.restoreFromBackup(ctx.user.id, tamperedZip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 
-    // The restored photo must be owned by US — a dropped stamp on the photos insert would land it under
-    // the victim (cross-tenant write that validatePhotoRefs does NOT catch for this table). Both directions.
+    // The restored photo must be owned by the importer.
     const rows = photoRows();
     expect(rows, 'exactly the one restored photo').toHaveLength(1);
     expect(rows[0].id).toBe('photo-stamp-1');

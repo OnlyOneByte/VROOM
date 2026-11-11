@@ -1,18 +1,4 @@
-/**
- * Theming engine T5 guard — THEME_REGISTRY integrity + the `default` ≡ app.css identity contract.
- *
- * Two invariants:
- *  1. DEFAULT IS app.css: the `default` theme's light/dark token maps equal the live `src/app.css`
- *  `:root` / `.dark` declarations VALUE-FOR-VALUE. This is what makes `default` a zero-visual-change
- *  identity theme (R1) — and catches baseline drift: an app.css color edit not mirrored in the
- *  registry (or vice-versa) trips this. Source-of-truth: app.css is parsed at test time, not hardcoded.
- *  2. NO MISSING-KEY LEAK: every ThemeDefinition declares EVERY THEME_TOKEN_KEY in BOTH variants. A
- *  partial variant would leave a token at the previously-applied theme's value when switched (a visual
- *  leak) — the resolver/emitter assume a complete map. Applies to `default` today and to every future
- *  theme automatically.
- *
- * Pure source-scan + registry reflection — no DOM, no runtime apply.
- */
+// Checks THEME_REGISTRY integrity, and that the default theme matches app.css.
 
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
@@ -26,7 +12,6 @@ import {
 
 const APP_CSS = readFileSync(`${process.cwd()}/src/app.css`, 'utf8');
 
-/** Parse a `<selector> { ... }` block's `--token: value;` declarations into a key→value map (no `--`). */
 function parseTokens(selector: string): Record<string, string> {
 	const re = new RegExp(`${selector.replace('.', '\\.')}\\s*\\{([^}]*)\\}`);
 	const body = APP_CSS.match(re)?.[1] ?? '';
@@ -39,7 +24,7 @@ function parseTokens(selector: string): Record<string, string> {
 	return out;
 }
 
-describe('THEME_REGISTRY integrity + default ≡ app.css (T5)', () => {
+describe('THEME_REGISTRY integrity and default matches app.css', () => {
 	const cssLight = parseTokens(':root');
 	const cssDark = parseTokens('.dark');
 
@@ -85,13 +70,6 @@ describe('THEME_REGISTRY integrity + default ≡ app.css (T5)', () => {
 		}
 	});
 
-	// A NON-default theme must actually DIFFER from `default` in BOTH variants — else it is a silent no-op
-	// theme. This is a real footgun: each new ThemeDefinition is authored by copy-pasting the DEFAULT_LIGHT/
-	// DEFAULT_DARK blocks and editing values (theme-registry.ts), so a registration that forgets to change
-	// the values ships a theme the picker offers but that paints identically to default — and EVERY other
-	// guard stays green (contrast passes: it IS default's known-AA palette; registry-integrity passes: all
-	// keys present; css-freshness passes: a block is emitted). Nothing else catches "registered but inert".
-	// Distinct = at least one token value differs (not necessarily all). Skips `default` itself.
 	const nonDefaultThemes = Object.values(THEME_REGISTRY).filter(t => t.id !== DEFAULT_THEME_ID);
 	if (nonDefaultThemes.length > 0) {
 		const defLight = THEME_REGISTRY[DEFAULT_THEME_ID]?.light as ThemeTokens;
@@ -120,13 +98,6 @@ describe('THEME_REGISTRY integrity + default ≡ app.css (T5)', () => {
 		);
 	}
 
-	// PICKER METADATA CONTRACT: the ThemePickerCard renders each theme's `label`, `description`, and
-	// `swatch` strip. TypeScript types these as `string` / `ThemeTokenKey[]`, but `string` admits '' and an
-	// array admits [] — a theme shipped with an empty label/description or an empty swatch renders a BLANK or
-	// broken picker card (no name, no preview), and every other guard (contrast/distinctness/wiring/byte-
-	// freshness) stays GREEN because they only inspect token VALUES, never the presentation metadata. This
-	// pins the non-empty + valid-key contract for EVERY registered theme so a future palette (bento/…) with a
-	// typo'd or omitted field trips here, not in the user's settings page.
 	describe.each(Object.values(THEME_REGISTRY))('theme "$id" picker metadata', theme => {
 		test('has a non-empty label', () => {
 			expect(theme.label.trim().length, `${theme.id} has an empty label`).toBeGreaterThan(0);
@@ -148,13 +119,6 @@ describe('THEME_REGISTRY integrity + default ≡ app.css (T5)', () => {
 		});
 	});
 
-	// CROSS-THEME DISTINCTNESS (all pairs): the per-theme guard above only checks each theme vs `default`. It
-	// would NOT catch two NON-default themes being byte-identical — e.g. a future palette registered by
-	// copy-pasting an existing one and forgetting to edit the token maps (the steepest risk now: each new
-	// theme IS authored by cloning a prior X_LIGHT/X_DARK block). Such a clone would ship two picker cards that
-	// paint identically — green under contrast/metadata/byte-freshness (the values are individually valid) and
-	// green under the vs-default guard (it differs from default, just not from its twin). This pins that EVERY
-	// PAIR of registered themes differs in at least one token in at least one variant. Surfaced firsthand.
 	test('no two registered themes are byte-identical (all-pairs distinctness)', () => {
 		const all = Object.values(THEME_REGISTRY);
 		for (let i = 0; i < all.length; i++) {
@@ -175,13 +139,6 @@ describe('THEME_REGISTRY integrity + default ≡ app.css (T5)', () => {
 		}
 	});
 
-	// DARK-IS-DARKER orientation: every theme's DARK variant must actually be darker than its LIGHT variant.
-	// Each theme is authored as defineBuiltinTheme({light: X_LIGHT, dark: X_DARK}); swapping those two args (or
-	// pasting a light palette into the dark slot) is a plausible copy-paste mistake that ships a "dark mode"
-	// which is actually light. EVERY other guard stays green: contrast passes (each variant is independently
-	// AA-clean), all-pairs distinctness passes (still distinct), metadata passes — only a human toggling dark
-	// mode would notice. This pins the orientation on two inverting anchors: background L (dark < light) AND
-	// foreground L (dark > light — the text inverts too). Parses the leading oklch lightness from each token.
 	const oklchL = (v: string): number => {
 		const m = v.match(/oklch\(\s*([\d.]+)/);
 		return m ? Number(m[1]) : Number.NaN;

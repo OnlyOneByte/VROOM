@@ -1,20 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// Mock SvelteKit modules
 vi.mock('$app/navigation', () => ({
 	goto: vi.fn()
 }));
 
-// Mock offline storage utilities
 vi.mock('$lib/utils/offline-storage', () => ({
 	syncOfflineExpenses: vi.fn()
 }));
 
-// Mock fetch
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
-// Mock expense data
 const mockPendingExpenses = [
 	{
 		id: 'offline-1',
@@ -215,7 +211,7 @@ describe('Expense List Logic', () => {
 
 		it('formats expense dates', () => {
 			const formatDate = (dateString: string) => {
-				return dateString; // In real app, might format differently
+				return dateString;
 			};
 
 			expect(formatDate('2024-01-15')).toBe('2024-01-15');
@@ -463,7 +459,7 @@ describe('Expense List Logic', () => {
 			const result = processLargeList(largeList);
 			expect(result.pending).toBe(500);
 			expect(result.synced).toBe(5);
-			expect(result.processingTime).toBeLessThan(100); // Should be fast
+			expect(result.processingTime).toBeLessThan(100);
 		});
 	});
 });

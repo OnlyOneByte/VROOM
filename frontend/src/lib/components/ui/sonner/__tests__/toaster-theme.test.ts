@@ -1,29 +1,16 @@
-/**
- * The app-wide Toaster must render in the user's active light/dark mode.
- *
- * sonner styles its own card from the `data-sonner-theme` attribute it derives from the `theme`
- * prop — it does not read the app's `.dark` class. A literal `theme="light"` therefore leaves every
- * toast on a light surface for every dark-mode user, which is the whole app's error channel.
- */
-
 import { render, waitFor } from '@testing-library/svelte';
 import { toast } from 'svelte-sonner';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { themeStore } from '$lib/stores/theme.svelte';
 import { Toaster } from '../index';
 
-/**
- * Mounting needs svelte's CLIENT entries; this suite otherwise resolves the package's `default`
- * (server) ones because vite.config.ts sets no `browser` resolve condition for tests. Written
- * `'…' as string` so TypeScript does not try to type svelte's internals (which ship no
- * declarations) while Vite still sees a literal it can resolve.
- */
+// Tests resolve svelte's server entry by default, so mount with the client build. The cast keeps TypeScript from typing svelte internals.
 vi.mock(
 	'svelte',
 	() => import('../../../../../../node_modules/svelte/src/index-client.js' as string)
 );
 
-/** sonner only mounts its themed list once a toast exists, so each case has to raise one. */
+// sonner mounts its themed list only once a toast exists.
 async function themeOfMountedToaster(): Promise<string | null> {
 	toast('a message');
 	const list = await waitFor(() => {
@@ -36,7 +23,7 @@ async function themeOfMountedToaster(): Promise<string | null> {
 
 beforeEach(() => {
 	localStorage.clear();
-	// test-setup's matchMedia mock reports matches:false; pin it so a 'system' resolution is light.
+	// Pin matchMedia to light so a 'system' preference resolves to light.
 	vi.mocked(window.matchMedia).mockReturnValue({
 		matches: false,
 		addEventListener: vi.fn(),

@@ -40,7 +40,6 @@
 	let fuelStats = $derived(summary?.fuelStats ?? null);
 	let fuelAdvanced = $derived(summary?.fuelAdvanced ?? null);
 
-	// Dynamic unit labels — quick stats uses global unit preferences
 	let units = $derived(quickStats?.units ?? settingsStore.unitPreferences);
 	let efficiencyLabel = $derived(
 		`Avg ${getFuelEfficiencyLabel(units.distanceUnit, units.volumeUnit)}`
@@ -88,7 +87,6 @@
 </svelte:head>
 
 <div class="min-h-screen space-y-4 md:space-y-6">
-	<!-- Header -->
 	<div class="space-y-2">
 		<h1 class="flex items-center gap-2 text-2xl font-bold sm:gap-3 sm:text-3xl">
 			<ChartBar class="h-6 w-6 sm:h-8 sm:w-8" />
@@ -99,7 +97,6 @@
 		</p>
 	</div>
 
-	<!-- Quick Stats -->
 	{#if isLoading}
 		<div class="flex justify-center p-8">
 			<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
@@ -117,7 +114,6 @@
 		<StatCardGrid items={quickStatsItems} columns={4} />
 	{/if}
 
-	<!-- Tabs -->
 	<Tabs.Root bind:value={activeTab} class="space-y-4 md:space-y-6">
 		<Tabs.List class="grid w-full grid-cols-2 lg:grid-cols-4">
 			<Tabs.Trigger value="fuel-stats">Fuel & Stats</Tabs.Trigger>

@@ -29,14 +29,8 @@ import { SyncError, SyncErrorCode } from '../../../errors';
 import { GoogleDriveService } from './google-drive-service';
 
 /**
- * Per-table column order for every VROOM sheet, keyed by the SAME keys as
- * `TABLE_SCHEMA_MAP` in config.ts. These arrays are the single source of truth for the
- * Sheets backup/restore round-trip: the export writes row 0 = headers and each data row
- * = `headers.map((h) => row[h])`, and the import re-keys each cell off the sheet's own
- * header row. Because the order is hand-maintained (Sheets, unlike the CSV path, is not
- * schema-derived), a schema column that isn't mirrored here is SILENTLY DROPPED on backup
- * and restored as null — a data-loss bug. `sheets-header-coverage.test.ts` pins every
- * array to its schema as a regression guard; keep these in sync with db/schema.ts.
+ * Column order per table, keyed like TABLE_SCHEMA_MAP in config.ts. Hand-maintained, so a schema
+ * column missing here is silently dropped on backup. sheets-header-coverage.test.ts guards it.
  */
 export const SHEET_HEADERS = {
   vehicles: [
@@ -252,15 +246,7 @@ export const SHEET_HEADERS = {
   ],
 } as const satisfies Record<string, readonly string[]>;
 
-/**
- * The canonical ordered roster of VROOM sheet TAB titles — ONE source of truth for the tab set
- * that `createSpreadsheet` (initial tabs) and `ensureRequiredSheets` (backfill missing tabs on an
- * existing spreadsheet) both need. Before this, the 15-tab list was hand-copied in BOTH places (plus the
- * read-range + write fan-out, which pair each title with table-specific logic and stay inline), so adding
- * a 16th table meant editing parallel lists in lockstep — a-class drift vector. These are display
- * tab TITLES (with spaces), distinct from the `SHEET_HEADERS` keys (camelCase) — kept ordered to match
- * the historical create order so existing spreadsheets are unaffected.
- */
+/** Display titles of the backup tabs, in creation order. Distinct from the camelCase SHEET_HEADERS keys. */
 export const SHEET_NAMES = [
   'Vehicles',
   'Expenses',
@@ -281,12 +267,7 @@ export const SHEET_NAMES = [
   'Vehicle Shares',
 ] as const;
 
-/**
- * Suffix for the transient per-table tabs used by the atomic backup swap. A backup STAGES every
- * table's data into `${name}${SHEET_STAGING_SUFFIX}` (leaving the live canonical sheets untouched), and
- * only once ALL staging writes succeed does it commit a single atomic `batchUpdate` that deletes the old
- * canonical sheets and renames the staging tabs into their place. Space-free so it needs no A1 quoting.
- */
+// Space-free so the range needs no A1 quoting.
 const SHEET_STAGING_SUFFIX = '__vroom_staging';
 
 export interface SpreadsheetInfo {
@@ -296,12 +277,7 @@ export interface SpreadsheetInfo {
   sheets: { id: number; title: string }[];
 }
 
-/**
- * Pre-built googleapis clients for {@link GoogleSheetsService}. Inject in-memory fakes in
- * tests to drive the real service logic (folder path walk, sheet clear+write, read
- * round-trip) with ZERO network. All three should share one backing store so folder
- * creation, file moves, and listing stay coherent across the Sheets + Drive surfaces.
- */
+/** Injected in tests. All three clients must share one backing store so Sheets and Drive stay consistent. */
 export interface GoogleSheetsClients {
   sheets: sheets_v4.Sheets;
   drive: drive_v3.Drive;
@@ -314,11 +290,6 @@ export class GoogleSheetsService {
   private drive: drive_v3.Drive;
   private driveService: GoogleDriveService;
 
-  /**
-   * @param refreshToken Google OAuth refresh token (ignored when `clients` is injected).
-   * @param clients Optional pre-built Sheets + Drive clients (see {@link GoogleSheetsClients}).
-   *  Production callers omit it and OAuth2-authed clients are built.
-   */
   constructor(refreshToken: string, clients?: GoogleSheetsClients) {
     if (clients) {
       this.sheets = clients.sheets;
@@ -347,7 +318,6 @@ export class GoogleSheetsService {
     folderPath: string,
     displayName: string
   ): Promise<SpreadsheetInfo> {
-    // Walk the folder path segments (e.g. "VROOM/Backups") to find-or-create each folder
     const targetFolderId = await this.resolveOrCreateFolderPath(folderPath);
 
     const spreadsheetName = `VROOM Data - ${displayName}`;
@@ -377,10 +347,6 @@ export class GoogleSheetsService {
     return this.getSpreadsheetInfo(spreadsheetId);
   }
 
-  /**
-   * Walk a slash-separated folder path (e.g. "VROOM/Backups"), finding or creating
-   * each segment in the Drive hierarchy. Returns the leaf folder's ID.
-   */
   private async resolveOrCreateFolderPath(folderPath: string): Promise<string> {
     const segments = folderPath
       .split('/')
@@ -471,12 +437,7 @@ export class GoogleSheetsService {
     }
   }
 
-  /**
-   * Run a child query only when there are parent ids to query by, else return []. Collapses the
-   * repeated `ids.length > 0 ? await db.select()…where(inArray(col, ids)) : []` guard (avoids a
-   * pointless `inArray(col, [])` round-trip) into one named place. Behavior-identical to the
-   * inline ternary it replaces.
-   */
+  /** Skips the query when there are no parent ids, avoiding an empty inArray. */
   private async queryIfNonEmpty<T>(
     ids: readonly unknown[],
     query: () => Promise<T[]>
@@ -508,27 +469,23 @@ export class GoogleSheetsService {
           .where(eq(vehicles.userId, userId)),
       ]);
 
-    // Query insurance terms for user's policies
     const policyIds = userInsurance.map((p) => p.id);
     const userInsuranceTerms = await this.queryIfNonEmpty(policyIds, () =>
       db.select().from(insuranceTerms).where(inArray(insuranceTerms.policyId, policyIds))
     );
 
-    // Query junction rows for user's insurance terms
     const termIds = userInsuranceTerms.map((t) => t.id);
     const userInsuranceTermVehicles = await this.queryIfNonEmpty(termIds, () =>
       db.select().from(insuranceTermVehicles).where(inArray(insuranceTermVehicles.termId, termIds))
     );
 
-    // Query insurance claims for user's policies
     const userInsuranceClaims = await this.queryIfNonEmpty(policyIds, () =>
       db.select().from(insuranceClaims).where(inArray(insuranceClaims.policyId, policyIds))
     );
 
-    // Query photos directly by userId
     const userPhotos = await db.select().from(photos).where(eq(photos.userId, userId));
 
-    // Query photo_refs for all user photos (batched to stay under SQLite variable limit)
+    // Batched to stay under the SQLite bound-variable limit.
     const photoIds = userPhotos.map((p) => p.id);
     const userPhotoRefs: (typeof photoRefs.$inferSelect)[] = [];
     const BATCH_SIZE = 500;
@@ -538,14 +495,12 @@ export class GoogleSheetsService {
       userPhotoRefs.push(...rows);
     }
 
-    // Query user preferences and sync state
     const userPreferencesRows = await db
       .select()
       .from(userPreferences)
       .where(eq(userPreferences.userId, userId));
     const syncStateRows = await db.select().from(syncState).where(eq(syncState.userId, userId));
 
-    // Query reminders, reminder_vehicles, and reminder_notifications
     const userReminders = await db.select().from(reminders).where(eq(reminders.userId, userId));
 
     const reminderIds = userReminders.map((r) => r.id);
@@ -557,19 +512,15 @@ export class GoogleSheetsService {
       .from(reminderNotifications)
       .where(eq(reminderNotifications.userId, userId));
 
-    // Query trips directly by userId (userId-stamped, like photos)
     const userTrips = await db.select().from(trips).where(eq(trips.userId, userId));
 
-    // Query the ACCEPTED shares this user GRANTED. The ownerId scope means an invitee never exports the
-    // owner's shares; accepted-only so restore re-creates exactly what is exported.
+    // Shares this user granted; accepted-only so restore recreates exactly what was exported.
     const userVehicleShares = await db
       .select()
       .from(vehicleShares)
       .where(and(eq(vehicleShares.ownerId, userId), eq(vehicleShares.status, 'accepted')));
 
-    // Pair each canonical sheet title with the rows + headers it backs up. Order MUST match SHEET_NAMES:
-    // the atomic swap sets each tab's `index` from this array's position, so it has to mirror the
-    // spreadsheet's original create order or the backup's tabs would reshuffle every run.
+    // Must follow SHEET_NAMES order: the atomic swap assigns each tab's index from this position.
     const tables: { title: string; rows: Record<string, unknown>[]; headers: readonly string[] }[] =
       [
         { title: 'Vehicles', rows: userVehicles, headers: SHEET_HEADERS.vehicles },
@@ -627,29 +578,18 @@ export class GoogleSheetsService {
   }
 
   /**
-   * Write every table's data to the backup spreadsheet ATOMICALLY. The previous design cleared
-   * then re-wrote each LIVE sheet in place, so a failure mid-run (network blip, 429, the process dying)
-   * left a TORN backup — some sheets rewritten, the one that was mid-write emptied by its preceding clear,
-   * the rest stale — on what may be the user's ONLY copy (data-loss). This instead:
-   *  1. STAGE — write each table into a fresh `${title}${SHEET_STAGING_SUFFIX}` tab. The live canonical
-   *  sheets are never touched in this phase, so any failure here is harmless: the prior backup is
-   *  fully intact. We clean up the partial staging tabs and rethrow.
-   *  2. COMMIT — once ALL staging writes succeed, ONE `batchUpdate` deletes the old canonical sheets and
-   *  renames each staging tab to its canonical title. Sheets applies a batchUpdate all-or-nothing, so
-   *  a concurrent reader sees either the entire old backup or the entire new one, never a mix.
-   * Net effect: the backup is replaced as a single transaction, and the old copy is destroyed only at the
-   * instant the new one takes its place.
+   * Stages every table in a staging tab, then swaps them in with one batchUpdate. A failure while
+   * staging leaves the previous backup intact, and readers never see a mix of old and new tabs.
    */
   private async writeAllSheetsAtomically(
     spreadsheetId: string,
     tables: { title: string; rows: Record<string, unknown>[]; headers: readonly string[] }[]
   ): Promise<void> {
     const stagingTitles = tables.map((t) => `${t.title}${SHEET_STAGING_SUFFIX}`);
-    // Drop any staging tabs orphaned by a previously-interrupted backup, so the create below is clean.
+    // Staging tabs left by an interrupted run would collide with the create below.
     await this.deleteSheetsByTitle(spreadsheetId, stagingTitles);
 
     try {
-      // Phase 1 — create the staging tabs, then fill them. All writes target staging only.
       await this.sheets.spreadsheets.batchUpdate({
         spreadsheetId,
         requestBody: {
@@ -667,15 +607,11 @@ export class GoogleSheetsService {
         )
       );
     } catch (err) {
-      // Staging failed → the live backup is untouched. Best-effort cleanup of partial staging tabs.
       await this.deleteSheetsByTitle(spreadsheetId, stagingTitles).catch(() => {});
       throw err;
     }
 
-    // Phase 2 — atomic swap: delete the old canonical sheets, rename staging → canonical, in ONE batch.
-    // Each rename also sets `index` to the table's canonical position so tab ORDER is preserved across
-    // backups (a staging tab is born at the end; without this the order would drift every run, which is
-    // user-visible in the spreadsheet — and pinned by the create-tab-order test).
+    // Each rename sets index explicitly: a staging tab is created at the end, so without it tab order drifts.
     const info = await this.getSpreadsheetInfo(spreadsheetId);
     const idByTitle = new Map(info.sheets.map((s) => [s.title, s.id]));
     const requests: sheets_v4.Schema$Request[] = [];
@@ -699,7 +635,6 @@ export class GoogleSheetsService {
     await this.sheets.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests } });
   }
 
-  /** Delete every sheet whose title is in `titles` (best-effort by current title→id lookup). */
   private async deleteSheetsByTitle(spreadsheetId: string, titles: string[]): Promise<void> {
     const info = await this.getSpreadsheetInfo(spreadsheetId);
     const wanted = new Set(titles);
@@ -711,7 +646,7 @@ export class GoogleSheetsService {
     }
   }
 
-  /** Write a header row + the data rows into one sheet (RAW). Assumes the sheet exists and is empty. */
+  /** Assumes the sheet exists and is empty. */
   private async writeSheetValues<T extends Record<string, unknown>>(
     spreadsheetId: string,
     sheetName: string,
@@ -726,14 +661,8 @@ export class GoogleSheetsService {
     await this.sheets.spreadsheets.values.update({
       spreadsheetId,
       range: `${sheetName}!A1:${String.fromCharCode(64 + headers.length)}${data.length + 1}`,
-      // RAW (not USER_ENTERED) so every cell is stored VERBATIM as text. USER_ENTERED makes
-      // Sheets PARSE each cell as if typed: a value beginning with `=`/`+`/`-`/`@` becomes a live
-      // formula (formula injection + the cell silently round-trips back as the formula RESULT, not the
-      // user's data — backup corruption of the user's OWN records), and it reformats
-      // numbers/dates. RAW stores the literal string, so the backup→restore round-trip is byte-exact and
-      // injection-inert with NO escaping needed — do NOT add a `'`-prefix escape here (that scheme is for
-      // one-way CSV export; on this round-trip path it reintroduces the apostrophe corruption,
-      // see csv-safety.ts header). parseValue still does the type coercion symmetrically on read.
+      // RAW keeps values byte-exact. USER_ENTERED would turn "=..." into formulas and reformat numbers
+      // and dates. Do not add apostrophe escaping here; that is for one-way CSV export only.
       valueInputOption: 'RAW',
       requestBody: { values },
     });
@@ -809,9 +738,8 @@ export class GoogleSheetsService {
       this.readSheetData(spreadsheetId, 'Reminders!A:Z').catch(() => []),
       this.readSheetData(spreadsheetId, 'Reminder Vehicles!A:Z').catch(() => []),
       this.readSheetData(spreadsheetId, 'Reminder Notifications!A:Z').catch(() => []),
-      // Trips tab absent in pre-trips-location backups → tolerate a missing tab (OPTIONAL_BACKUP_FILES).
+      // Older backups lack these tabs.
       this.readSheetData(spreadsheetId, 'Trips!A:Z').catch(() => []),
-      // Vehicle Shares tab absent in pre-sharing backups → tolerate a missing tab (OPTIONAL_BACKUP_FILES).
       this.readSheetData(spreadsheetId, 'Vehicle Shares!A:Z').catch(() => []),
     ]);
 
@@ -884,11 +812,7 @@ export class GoogleSheetsService {
   }
 }
 
-/**
- * Create a GoogleSheetsService for a specific provider.
- * Queries DB by providerId + userId (ownership check), decrypts credentials.
- * Used by the restore path only — backup strategy instantiates directly.
- */
+/** Ownership-checked lookup of a storage provider's Google credentials. Used by restore only. */
 export async function createSheetsServiceForProvider(
   providerId: string,
   userId: string

@@ -10,7 +10,6 @@ import { goto } from '$app/navigation';
 import { authStore } from '$lib/stores/auth.svelte';
 import type { User } from '$lib/types';
 
-// Mock SvelteKit navigation; resolve() is identity so we assert on raw paths.
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
@@ -22,11 +21,6 @@ const mockUser: User = {
 	updatedAt: '2024-01-01T00:00:00Z'
 };
 
-// Every top-level route that has a +page.svelte and requires auth. If a new authed
-// route is added, deny-by-default protects it automatically — but listing them here
-// makes the contract explicit and catches a future regression that re-introduces an
-// allowlist gap (the bug this suite was written to close: /insurance, /reminders,
-// /profile, /trips were silently unprotected).
 const AUTHED_ROUTES = [
 	'/dashboard',
 	'/vehicles',
@@ -68,16 +62,13 @@ describe('route classification (deny-by-default)', () => {
 	});
 
 	it("does NOT let the root '/' make every path public", () => {
-		// '/' is public, but it must match EXACTLY — not as a prefix of everything.
 		expect(isPublicRoute('/dashboard')).toBe(false);
 		expect(publicRoutes).toContain('/');
 	});
 
 	it('does not treat a route that merely shares a name prefix as public', () => {
-		// '/trips' is protected even though no public route is a prefix; guard against
-		// a future '/term...' vs '/termsofservice' style prefix-collision bug.
 		expect(isProtectedRoute('/trips')).toBe(true);
-		expect(isProtectedRoute('/terms-of-use')).toBe(true); // not the legal page
+		expect(isProtectedRoute('/terms-of-use')).toBe(true);
 	});
 });
 
@@ -129,10 +120,6 @@ describe('handleRouteProtection redirects', () => {
 	});
 });
 
-// requireAuth() — the per-page guard a protected page-load awaits. Previously untested (the ~56% gap);
-// it reads the REAL authStore (driven via its public methods, the ProtectedRoute.test.ts convention)
-// rather than a mock, so these exercise the genuine state machine. A regression here either bounces an
-// authenticated user (broken page) or fails to bounce a logged-out one (the security-load-bearing path).
 describe('requireAuth', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -160,10 +147,9 @@ describe('requireAuth', () => {
 		vi.useFakeTimers();
 		authStore.setLoading(true);
 
-		const pending = requireAuth(); // enters the poll branch (setTimeout(check, 50))
+		const pending = requireAuth();
 
-		// Auth resolves to authenticated mid-poll; advancing the timer runs the next `check`.
-		authStore.setUser(mockUser); // setUser flips isLoading=false
+		authStore.setUser(mockUser);
 		await vi.advanceTimersByTimeAsync(60);
 
 		await expect(pending).resolves.toBe(true);
@@ -176,7 +162,7 @@ describe('requireAuth', () => {
 
 		const pending = requireAuth();
 
-		authStore.setLoading(false); // resolved, still no user → unauthenticated
+		authStore.setLoading(false);
 		await vi.advanceTimersByTimeAsync(60);
 
 		await expect(pending).resolves.toBe(false);

@@ -144,8 +144,7 @@ export interface FinancingResponse {
 	summary: {
 		totalMonthlyPayments: number;
 		remainingBalance: number;
-		// This month's interest on the current loan balances (renamed from `interestPaidYtd`, bug:
-		// it's a forward estimate, not year-to-date and not actually paid).
+		// Forward estimate of this month's interest on current balances; not year-to-date and not paid.
 		monthlyInterestEstimate: number;
 		activeCount: number;
 		loanCount: number;

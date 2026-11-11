@@ -1,23 +1,7 @@
-/**
- * Direct certification of buildTCOMonthlyTrend. This is the per-month total-cost-of-
- * ownership SERIES the TCO chart renders, and it was driven ONLY transitively through getTCO — no test
- * asserted its bucketing (the C6/ "helper output never pinned" gap, on a money-facing series).
- *
- * The contract (certified firsthand against source, analytics-charts.ts):
- *  - Buckets each row by (category, sourceType): financial+financing → financing; financial+insurance_term
- *  → insurance; fuel → fuel; maintenance → maintenance. This MIRRORS categorizeTCOExpenses (the TCO
- *  TOTAL bucketing, certified), but in the TIME dimension.
- *  - An UNCATEGORIZED row contributes to NO bucket — a financial+reminder (recurring) or financial+null
- *  (manual) row, or a regulatory/enhancement/misc row, is silently EXCLUDED from the trend (the deliberate
- *  "the trend shows only the 4 named categories" contract; categorizeTCOExpenses routes those to
- *  otherCosts, which the trend simply doesn't surface). A mis-bucket here would inflate a displayed money
- *  series.
- *  - Same-month rows of different categories co-accumulate into one month entry; the series is sorted
- *  ascending by YYYY-MM month key; a dateless row is dropped (no crash, no phantom key).
- *
- * toMonthKey uses LOCAL getFullYear/getMonth, so these construct dates via new Date(y, mIdx, d) (local) for
- * timezone-stable keys.
- */
+// buildTCOMonthlyTrend buckets rows by (category, sourceType) per month. Only the four named
+// buckets appear in the trend. Reminder and manual financial rows, regulatory, enhancement and misc
+// are excluded, dateless rows are dropped, and months sort ascending. Dates are built in local time
+// so month keys do not depend on the timezone.
 
 import { describe, expect, test } from 'bun:test';
 import { buildTCOMonthlyTrend } from '../analytics-charts';
@@ -42,33 +26,28 @@ describe('buildTCOMonthlyTrend — (category, sourceType) bucketing', () => {
     });
   });
 
-  test('an uncategorized row contributes to NO bucket (the 4-named-categories contract)', () => {
+  test('uncategorized rows contribute to no bucket', () => {
     const jan = new Date(2024, 0, 10);
     const trend = buildTCOMonthlyTrend([
-      // A recurring-expense materialized financial row (sourceType 'reminder') — NOT financing/insurance.
       { category: 'financial', sourceType: 'reminder', expenseAmount: 999, date: jan },
-      // A manual financial row (null sourceType).
       { category: 'financial', sourceType: null, expenseAmount: 50, date: jan },
-      // Categories with no TCO-trend bucket at all.
       { category: 'regulatory', sourceType: null, expenseAmount: 40, date: jan },
       { category: 'enhancement', sourceType: null, expenseAmount: 200, date: jan },
       { category: 'misc', sourceType: null, expenseAmount: 30, date: jan },
     ]);
 
-    // The month exists only if at least one row was seen; all four buckets stay 0 (nothing inflated).
     expect(trend).toEqual([
       { month: '2024-01', financing: 0, insurance: 0, fuel: 0, maintenance: 0 },
     ]);
   });
 
-  test('a financial row is bucketed by sourceType, NOT lumped — financing vs insurance vs other', () => {
+  test('financial rows are bucketed by sourceType', () => {
     const jan = new Date(2024, 0, 1);
     const trend = buildTCOMonthlyTrend([
       { category: 'financial', sourceType: 'financing', expenseAmount: 100, date: jan },
       { category: 'financial', sourceType: 'insurance_term', expenseAmount: 60, date: jan },
       { category: 'financial', sourceType: 'reminder', expenseAmount: 500, date: jan },
     ]);
-    // financing 100 + insurance 60; the reminder financial row is excluded (not folded into either).
     const jan2024 = trend.find((t) => t.month === '2024-01');
     expect(jan2024?.financing).toBe(100);
     expect(jan2024?.insurance).toBe(60);

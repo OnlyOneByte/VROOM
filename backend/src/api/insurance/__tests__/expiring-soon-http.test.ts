@@ -1,15 +1,7 @@
 /**
- * In-process HTTP tests for GET /api/v1/insurance/expiring-soon — through the REAL stack.
- *
- * The `days` query param was Number.parseInt'd with NO finite-guard
- * (unlike its sibling `limit`, guarded right beside it). A non-numeric `?days=` → NaN →
- * `endDate = new Date(now + NaN)` = Invalid Date → the BETWEEN range query silently matched NOTHING,
- * so "expiring soon" falsely reported ZERO expiring policies and the user missed a renewal nag. The
- * fix guards + clamps `days` like `limit`. These pin: a malformed days still finds an expiring term
- * (the regression), the valid path works, and the clamp holds.
- *
- * createTestApp() rewrites process.env + dynamic-imports the DB-bound modules, so this file imports
- * only the harness.
+ * HTTP tests for GET /insurance/expiring-soon. A non-numeric or out-of-range `days` must fall back or clamp,
+ * never produce an Invalid Date that silently hides expiring terms.
+ * Imports only the harness: createTestApp sets env before config loads.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -36,15 +28,12 @@ interface ExpiringResponse {
   limit: number;
 }
 
-/**
- * Seed a policy whose single term ends ~20 days from now — so it falls inside the default 30-day
- * "expiring soon" window. Returns the term id.
- */
+/** Seeds a policy whose term ends in about 20 days, inside the default 30-day window. */
 async function seedSoonExpiringTerm(vehicleId: string): Promise<string> {
   const start = new Date();
-  start.setDate(start.getDate() - 345); // ~a year ago
+  start.setDate(start.getDate() - 345);
   const end = new Date();
-  end.setDate(end.getDate() + 20); // expires in ~20 days → within 30-day window
+  end.setDate(end.getDate() + 20);
   const res = await ctx.authed('POST', '/api/v1/insurance', {
     company: 'Acme Mutual',
     terms: [
@@ -62,8 +51,8 @@ async function seedSoonExpiringTerm(vehicleId: string): Promise<string> {
   return body.data.terms[0].id;
 }
 
-describe('GET /insurance/expiring-soon — malformed `days` must not silently hide expiring terms', () => {
-  test('the default window finds a ~20-days-out term (baseline)', async () => {
+describe('GET /insurance/expiring-soon', () => {
+  test('the default window finds a term expiring in about 20 days', async () => {
     const vid = await seedVehicle(ctx);
     const termId = await seedSoonExpiringTerm(vid);
 
@@ -74,14 +63,13 @@ describe('GET /insurance/expiring-soon — malformed `days` must not silently hi
     expect(body.daysAhead).toBe(30);
   });
 
-  test('REGRESSION: a non-numeric `?days=abc` falls back to the 30-day default (was: Invalid Date → empty)', async () => {
+  test('a non-numeric days value falls back to the 30-day default', async () => {
     const vid = await seedVehicle(ctx);
     const termId = await seedSoonExpiringTerm(vid);
 
     const res = await ctx.authed('GET', '/api/v1/insurance/expiring-soon?days=abc');
     const body = await json<ExpiringResponse>(res);
     expect(res.status, JSON.stringify(body)).toBe(200);
-    // Pre-fix: NaN → Invalid Date → BETWEEN matched nothing → the term vanished from the nag.
     expect(body.daysAhead).toBe(30);
     expect(body.data.some((t) => t.id === termId)).toBe(true);
   });
@@ -97,7 +85,7 @@ describe('GET /insurance/expiring-soon — malformed `days` must not silently hi
     expect(body.data.some((t) => t.id === termId)).toBe(true);
   });
 
-  test('an absurd `?days=99999` clamps to the 366-day ceiling (no unbounded window)', async () => {
+  test('an out-of-range days value clamps to the 366-day ceiling', async () => {
     await seedVehicle(ctx);
     const res = await ctx.authed('GET', '/api/v1/insurance/expiring-soon?days=99999');
     const body = await json<ExpiringResponse>(res);

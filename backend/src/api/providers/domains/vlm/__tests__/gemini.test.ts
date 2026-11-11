@@ -1,14 +1,3 @@
-/**
- * GeminiVlmProvider adapter (vlm-receipt-parsing T3b). Drives the REAL adapter against a stubbed global
- * fetch (no live key/endpoint) and pins the request SHAPE + failure-honesty rules:
- *  - POSTs to {baseUrl}/v1beta/models/{model}:generateContent?key=... with the FIXED prompt + an
- *  inline_data base64 image part;
- *  - the api key rides the ?key= QUERY param (not a header);
- *  - the model's first text part is returned verbatim (parseExtraction validates it);
- *  - a non-2xx / network failure THROWS (route → 502, never a faked success);
- *  - missing/non-string content → '' (empty draft downstream, no throw).
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { GeminiVlmProvider } from '../gemini';
 import { RECEIPT_EXTRACTION_PROMPT } from '../prompt';
@@ -35,7 +24,6 @@ function stubFetch(responder: () => Response | Promise<Response>): void {
   }) as any;
 }
 
-/** A Gemini generateContent success body: candidates[].content.parts[].text. */
 function okResponse(text: unknown): Response {
   return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text }] } }] }), {
     status: 200,
@@ -60,7 +48,6 @@ describe('GeminiVlmProvider — request shaping', () => {
     const raw = await provider.extractReceipt(IMAGE);
     expect(raw).toBe('{"amount": 12.5}');
 
-    // URL targets the model's generateContent method and carries the key as a query param.
     expect(captured?.url).toContain(
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent'
     );
@@ -100,7 +87,7 @@ describe('GeminiVlmProvider — request shaping', () => {
   });
 });
 
-describe('GeminiVlmProvider — failure honesty (anti-fail-open)', () => {
+describe('GeminiVlmProvider failures', () => {
   test('THROWS on a non-2xx response', async () => {
     stubFetch(() => new Response('quota', { status: 429 }));
     const provider = new GeminiVlmProvider({ apiKey: 'k', model: 'm' });

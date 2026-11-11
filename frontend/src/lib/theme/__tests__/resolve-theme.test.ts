@@ -1,8 +1,4 @@
-/**
- * Theming engine T6 — resolveTheme unit tests. The resolver is pure + TOTAL: it must return a valid token
- * map for EVERY input and never throw, falling back to `default` on any unknown/garbage id (R8) so a
- * corrupted persisted theme can't blank the UI.
- */
+// resolveTheme is total: it returns a valid token map for any input and never throws.
 
 import { describe, expect, test } from 'vitest';
 import { resolveTheme, resolveThemeDefinition, resolveVariant } from '../resolve-theme';
@@ -11,7 +7,7 @@ import { THEME_TOKEN_KEYS } from '../theme-types';
 
 const DEFAULT = THEME_REGISTRY[DEFAULT_THEME_ID];
 
-describe('resolveTheme (T6 total resolver)', () => {
+describe('resolveTheme', () => {
 	test('every built-in theme resolves to its own light/dark variant', () => {
 		for (const [id, def] of Object.entries(THEME_REGISTRY)) {
 			expect(resolveTheme(id, 'light', 'light')).toEqual(def.light);
@@ -25,12 +21,11 @@ describe('resolveTheme (T6 total resolver)', () => {
 	});
 
 	test('explicit light/dark mode ignores the OS preference', () => {
-		// mode wins over systemPref when it's concrete.
 		expect(resolveTheme('default', 'light', 'dark')).toEqual(DEFAULT?.light);
 		expect(resolveTheme('default', 'dark', 'light')).toEqual(DEFAULT?.dark);
 	});
 
-	test('an unknown theme id falls back to default (R8)', () => {
+	test('an unknown theme id falls back to default', () => {
 		expect(resolveTheme('no-such-theme', 'light', 'light')).toEqual(DEFAULT?.light);
 		expect(resolveTheme('no-such-theme', 'dark', 'dark')).toEqual(DEFAULT?.dark);
 	});
@@ -46,7 +41,6 @@ describe('resolveTheme (T6 total resolver)', () => {
 		for (const [id, mode, sys] of inputs) {
 			// biome-ignore lint/suspicious/noExplicitAny: deliberately feeding malformed inputs to prove totality
 			const tokens = resolveTheme(id as any, mode as any, sys as any);
-			// A complete token map (every key present) — never a partial/empty object that would leak.
 			for (const key of THEME_TOKEN_KEYS) {
 				expect(tokens[key], `${String(id)}/${String(mode)} missing ${key}`).toBeTruthy();
 			}
@@ -73,7 +67,6 @@ describe('resolveThemeDefinition', () => {
 	});
 
 	test('does not resolve inherited Object.prototype keys as theme ids (no prototype-pollution false hit)', () => {
-		// 'constructor'/'toString' are on Object.prototype but NOT own registry keys → must fall back.
 		expect(resolveThemeDefinition('constructor').id).toBe('default');
 		expect(resolveThemeDefinition('toString').id).toBe('default');
 	});

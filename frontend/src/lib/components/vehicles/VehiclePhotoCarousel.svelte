@@ -12,8 +12,7 @@
 	interface Props {
 		vehicleId: string;
 		photos: Photo[];
-		/** vehicle-sharing T12b-3b: photo upload/delete/set-cover are owner-only (the photo routes keep
-		 *  strict ownership server-side). Default true so existing owner call sites are unchanged. */
+		/** Photo upload, delete and set-cover are owner-only on the server. Defaults to true for owner call sites. */
 		isOwner?: boolean;
 		onUpload: () => void;
 		onDelete: (_photoId: string) => void | Promise<void>;
@@ -25,8 +24,6 @@
 	let hasPhotos = $derived(photos.length > 0);
 	let deletingPhotoId = $state<string | null>(null);
 
-	// Styled confirm dialog (replaces native confirm()) — deletion is permanent
-	// (removes the file from storage too).
 	let confirmOpen = $state(false);
 	let pendingDeleteId = $state<string | null>(null);
 
@@ -52,7 +49,6 @@
 		carouselApi = api;
 		if (!api) return;
 		api.on('select', () => {
-			// Trigger reactivity by reassigning
 			carouselApi = api;
 		});
 	}

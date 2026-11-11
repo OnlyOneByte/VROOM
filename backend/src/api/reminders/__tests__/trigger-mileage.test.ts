@@ -1,19 +1,7 @@
 /**
- * Characterizes the MILEAGE axis of the reminder trigger.
- * — the whichever-comes-first runtime that fires a service reminder when a vehicle's odometer
- * reaches a milestone, independent of any time/date axis.
- *
- * Mileage reminders aren't API-creatable yet (validation is T4), so these seed the reminder row
- * directly via sqlite, then drive the REAL trigger endpoint (route → service → odometer repo → DB)
- * and read notifications straight off sqlite. Pinned:
- *  - current odometer >= nextDueOdometer → exactly ONE mileage notification (null dueDate,
- *  dueOdometer set); below the milestone → none
- *  - re-triggering does NOT duplicate the milestone notification (idempotent; no auto-re-arm)
- *  - a mileage reminder with !=1 linked vehicle is skipped (D4), not errored
- *  - the current odometer is the MAX across expenses.mileage + odometer_entries (getCurrentOdometer)
- *
- * createTestApp() rewrites env + dynamic-imports DB-bound modules, so keep static imports to the
- * harness + bun:test.
+ * The mileage axis of the reminder trigger: a milestone notification fires once the vehicle's odometer
+ * reaches nextDueOdometer. Reminder rows are seeded via sqlite, then the real trigger endpoint is driven.
+ * Keep static imports to the harness and bun:test: createTestApp sets env before config loads.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -98,22 +86,17 @@ describe('mileage-reminder trigger (whichever-comes-first, odometer axis)', () =
     expect(notifs[0]?.due_odometer).toBe(35000);
   });
 
-  // guard: the due-gate (trigger-service.ts:418) is `currentOdometer < nextDueOdometer →
-  // not yet due`, i.e. EXACT-equality must FIRE (>=-due semantics). Every other firing case here
-  // seeds STRICTLY past the milestone (35200/36000/40500), so a `<`→`<=` slip (re-deriving "not
-  // yet due" as `<=`) would ship GREEN while silently dropping the notification for a vehicle that
-  // lands EXACTLY on its milestone — getCurrentOdometer returns a raw integer MAX, so an exact
-  // 35000 reading is genuinely reachable (a round-number odometer log / a fillup on the milestone).
-  // This pins the boundary the docstring claims (`>=`) but no case drove.
-  test('current odometer EXACTLY on the milestone fires (the >= boundary, not just strictly over)', async () => {
+  // Other firing cases sit strictly past the milestone, so this guards the >= boundary: a `<` to `<=` slip would
+  // otherwise go unnoticed.
+  test('current odometer exactly on the milestone fires', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2020 });
-    await addOdometerReading(vehicleId, 35000); // exactly the 35000 milestone
+    await addOdometerReading(vehicleId, 35000);
     seedMileageReminder('rmEq', vehicleId, 35000);
 
     await trigger();
 
     const notifs = mileageNotifs('rmEq');
-    expect(notifs).toHaveLength(1); // `<=` regression → 0 here, current tests stay green
+    expect(notifs).toHaveLength(1);
     expect(notifs[0]?.due_odometer).toBe(35000);
   });
 
@@ -178,12 +161,8 @@ describe('mileage-reminder trigger (whichever-comes-first, odometer axis)', () =
     expect(mileageNotifs('rm5')).toHaveLength(1);
   });
 
-  // The mileage dedup is per-MILESTONE (the rn_reminder_odo_idx partial unique is on
-  // (reminderId, dueOdometer)), NOT per-reminder. After mark-serviced re-arms to a NEW milestone,
-  // crossing THAT must fire a fresh notification — a regression making the index reminderId-only
-  // would silently block every future milestone. This pins the distinct-milestone invariant the
-  // existing idempotent-re-trigger test (same milestone → still 1) doesn't cover.
-  test('a DISTINCT milestone after mark-serviced fires a NEW notification (per-milestone dedup)', async () => {
+  // Dedup is per milestone, not per reminder: a re-armed milestone must fire again.
+  test('a new milestone after mark-serviced fires a new notification', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2020 });
     await addOdometerReading(vehicleId, 35200); // past the first 35000 milestone
     seedMileageReminder('rm6', vehicleId, 35000);
@@ -212,14 +191,7 @@ describe('mileage-reminder trigger (whichever-comes-first, odometer axis)', () =
     expect(after.map((n) => n.due_odometer)).toEqual([35000, 40200]);
   });
 
-  // deep-review: a `both` (whichever-comes-first) reminder that is SIMULTANEOUSLY time-overdue
-  // AND mileage-past-milestone must fire TWO distinct notifications in one trigger — one on the time
-  // axis (dueDate set, dueOdometer null) and one on the mileage axis (dueOdometer set, dueDate null).
-  // This is exactly what the TWO partial unique indexes enable (rn_reminder_due_idx on dueDate +
-  // rn_reminder_odo_idx partial-on-dueOdometer): the two notifications live in disjoint index domains
-  // so neither collides. A regression collapsing them into one (reminderId, dueDate) unique — or a
-  // single (reminderId) unique — would silently drop the mileage notification with no other failing
-  // test (the existing tests cover each axis in ISOLATION, never the coexistence). Pin it.
+  // The time and mileage notifications sit in disjoint unique-index domains, so both must survive a single trigger.
   test('a `both` reminder overdue on BOTH axes fires two distinct notifications (time + mileage, no collision)', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2020 });
     await addOdometerReading(vehicleId, 36000); // past the 35000 milestone

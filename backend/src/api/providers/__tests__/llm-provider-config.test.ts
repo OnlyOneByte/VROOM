@@ -1,20 +1,3 @@
-/**
- * LLM (assistant) provider domain — config validation + encrypted-credential guard (llm-assistant T1).
- * An LLM provider is a NEW DOMAIN ('llm') in the EXISTING domain-agnostic user_providers system, REUSING
- * the vlm-receipt-parsing provider-domain plumbing: the api key rides the encrypted `credentials` blob
- * exactly like a storage refreshToken/S3 secret, and `config` carries the non-secret model name + optional
- * baseUrl. NO schema change. The SAME 4 model provider types serve both the `vlm` and `llm` domains; the
- * per-type required-field gate + the domain↔type guard were generalized from vlm-specific to model-domain
- * (vlm OR llm) in T1 — these pin that the `llm` domain is now first-class:
- *  - the api key is ENCRYPTED AT REST + NEVER echoed (SAX-03 — same control as vlm/storage);
- *  - the required-field gate fails FAST at CREATE *and* PUT (the both-paths discipline);
- *  - a config-only PUT (changing the model) does NOT falsely demand the apiKey be re-sent;
- *  - domain↔type consistency now accepts a model type in the 'llm' domain (the key new behavior) while
- *  still rejecting a model type in a non-model domain and a storage type in 'llm';
- *  - ollama may be keyless (the self-hosted, no-data-leaves-host assistant path);
- *  - an `llm` and a `vlm` provider with the SAME provider type coexist (the domains are independent).
- */
-
 import { beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -40,7 +23,6 @@ interface ProviderResponse {
   createdAt: string | null;
 }
 
-/** A well-formed openai-compatible LLM (assistant) provider create body. */
 function llmBody(over: Record<string, unknown> = {}) {
   return {
     domain: 'llm',
@@ -59,7 +41,7 @@ function rawCredentials(id: string): string | null {
   return row?.credentials ?? null;
 }
 
-describe('POST /api/v1/providers — LLM domain (T1)', () => {
+describe('POST /api/v1/providers — LLM domain', () => {
   test('creates an llm provider (201), api key ENCRYPTED at rest + STRIPPED from the response', async () => {
     const res = await ctx.authed('POST', '/api/v1/providers', llmBody());
     expect(res.status).toBe(201);
@@ -147,7 +129,6 @@ describe('POST /api/v1/providers — LLM domain (T1)', () => {
       config: { model: 'claude-3-5-sonnet-latest' },
     });
     expect(vlm.status).toBe(201);
-    // Each domain lists exactly its own provider.
     const llmList = await json<DataEnvelope<ProviderResponse[]>>(
       await ctx.authed('GET', '/api/v1/providers?domain=llm')
     );
@@ -161,7 +142,7 @@ describe('POST /api/v1/providers — LLM domain (T1)', () => {
   });
 });
 
-describe('PUT /api/v1/providers/:id — LLM domain (T1, the both-paths gate)', () => {
+describe('PUT /api/v1/providers/:id — LLM domain', () => {
   async function createLlm(): Promise<string> {
     const res = await ctx.authed('POST', '/api/v1/providers', llmBody());
     expect(res.status).toBe(201);

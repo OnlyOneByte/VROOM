@@ -13,14 +13,7 @@
 
 	let { value, error, touched = false, onSelect }: Props = $props();
 
-	/**
-	 * The picker's own short labels, NOT the canonical `categoryLabels`: these cards share a 2-col
-	 * mobile grid, where a multi-word label wraps to a second line and floats the icon mid-card,
-	 * breaking the row rhythm against its single-line siblings. Each description carries the detail
-	 * the one-word label drops — including, for `fuel`, that the bucket also holds EV charging
-	 * (the canonical label is "Fuel & Charging"). Icons come from the shared `CATEGORY_ICONS`
-	 * assignment so the icon on the card a user picks is the icon the table then shows the row with.
-	 */
+	/** Short labels for the 2-column grid; icons come from CATEGORY_ICONS so they match the table rows. */
 	const categories = [
 		{ value: 'fuel', label: 'Fuel', description: 'Gas, diesel, and EV charging' },
 		{

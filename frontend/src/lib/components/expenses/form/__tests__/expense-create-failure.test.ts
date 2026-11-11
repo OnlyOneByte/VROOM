@@ -1,33 +1,11 @@
-/**
- * What the expense form does when a CREATE fails decides whether the user's data survives — and
- * whether what they are told is true.
- *
- * The form's catch used to be unconditional: every failure, including one the server had just
- * decided (a validation rejection, a deleted vehicle, a revoked share), was written to the offline
- * outbox and announced as "Saved offline due to connection issue". That is two defects in one — the
- * message is false, and the queued row is re-POSTed on every sync forever because the same request
- * is rejected identically every time. Nothing ever delivers it and nothing ever tells the user.
- *
- * So the three outcomes below are the contract, driven through the MOUNTED form (clicking the real
- * Save button, with the real offline-storage writing to the real localStorage mock) because the
- * decision only matters where it is wired:
- *   - a 4xx verdict  → shown on the form, nothing queued, no navigation away;
- *   - a 5xx/transport failure → queued for later delivery, user moved on;
- *   - a queue write that FAILS → said out loud, and the user keeps the filled-in form (the project's
- *     offline writes never drop rule — the inverse, a silent drop with a success toast, is the bug).
- */
+// Create failures: server rejections stay on the form, connection failures are queued, and a failed queue write is surfaced.
 
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { ApiError } from '$lib/utils/error-handling';
 import { loadOfflineExpenses } from '$lib/utils/offline-storage';
 
-/**
- * Mounting needs svelte's CLIENT entry, and this suite resolves the package's `default` (server)
- * one because vite.config.ts sets no `browser` resolve condition for tests — `mount()` from a bare
- * `svelte` import throws "not available on the server". Written `as string` so TypeScript does not
- * try to type svelte's internals (which ship no declarations) while Vite still resolves the path.
- */
+// Mounting needs svelte's client entry, which the default test resolution does not provide.
 vi.mock(
 	'svelte',
 	() => import('../../../../../../node_modules/svelte/src/index-client.js' as string)
@@ -64,7 +42,6 @@ const localStorageMock = window.localStorage as unknown as {
 	setItem: { mockImplementationOnce: (fn: () => void) => void };
 };
 
-/** Mount the create form pre-filled with a valid expense, then press Save. */
 async function fillAndSave(): Promise<void> {
 	render(ExpenseForm, {
 		props: {
@@ -95,11 +72,8 @@ describe('ExpenseForm — a failed create is classified before anything is queue
 
 		await fillAndSave();
 
-		// The server's own reason reaches the user, instead of a connection story.
 		await vi.waitFor(() => expect(submitError()).toBe('Amount must be greater than 0'));
-		// Nothing was queued: a row the server rejects deterministically can never sync.
 		expect(loadOfflineExpenses()).toEqual([]);
-		// And the user keeps the form they filled in.
 		expect(goto).not.toHaveBeenCalled();
 	});
 

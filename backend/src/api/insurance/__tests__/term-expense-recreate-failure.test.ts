@@ -1,17 +1,8 @@
 /**
- * Guard: a term update whose premium expense cannot be RECREATED must not report success.
- *
- * Updating a term re-materializes its premium: delete the old split expense, write a new one. The
- * two cannot share a transaction (createSplitExpense opens its own), so between them the term's
- * premium is gone from the expense ledger and from TCO. Swallowing a recreate failure there turned
- * a permanent money-row loss into a 200 "Term updated successfully" with nothing but a log line —
- * the silent-loss class the quality bar forbids.
- *
- * The recreate failure is forced rather than waited for: the realistic triggers (a concurrently
- * deleted covered vehicle FK-violating a sibling insert, a DB-level fault) are not reachable from
- * the route, which recomputes vehicleIds from the junction on every call.
- *
- * createTestApp() must run before static config/connection imports — keep imports to the harness.
+ * A term update whose premium expense cannot be recreated must report failure, not success. The old
+ * premium is deleted first, so a silent swallow would lose it. The failure is forced by a spy, since the
+ * route cannot reach the realistic triggers.
+ * Keep imports to the harness: createTestApp sets env before config loads.
  */
 
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
@@ -69,8 +60,8 @@ async function seedCostedTerm(): Promise<{ policyId: string; termId: string }> {
   return { policyId: body.data.id, termId: termId as string };
 }
 
-describe('insurance term update — premium recreate failure', () => {
-  test('reports the loss instead of answering 200 with the premium deleted', async () => {
+describe('insurance term update premium recreate failure', () => {
+  test('reports the failure instead of answering 200', async () => {
     const { policyId, termId } = await seedCostedTerm();
     const { expenseRepository } = await import('../../expenses/repository');
     const spy = spyOn(expenseRepository, 'createSplitExpense').mockImplementation(() => {
@@ -83,8 +74,6 @@ describe('insurance term update — premium recreate failure', () => {
       });
       const body = await json<{ success: boolean; error?: { message: string } }>(res);
 
-      // The delete has already committed, so the premium really is gone — the response must say so
-      // rather than claiming the update completed.
       expect(premiumRows(termId).length, 'the old premium row was deleted').toBe(0);
       expect(res.status, JSON.stringify(body)).toBe(500);
       expect(body.success).toBe(false);
@@ -100,10 +89,9 @@ describe('insurance term update — premium recreate failure', () => {
     const res = await ctx.authed('PUT', `/api/v1/insurance/${policyId}/terms/${termId}`, {
       totalCost: 1500,
     });
-    expect(res.status, 'the happy path must be untouched by the guard above').toBe(200);
+    expect(res.status).toBe(200);
     const rows = premiumRows(termId);
     expect(rows.length).toBe(1);
-    // Money is stored in integer cents.
     expect(rows[0]?.expense_amount).toBe(150_000);
   });
 });

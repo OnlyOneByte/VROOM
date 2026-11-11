@@ -44,34 +44,25 @@
 			.slice(0, 2);
 	});
 
-	// Derive state from store
 	let settings = $derived(settingsStore.settings);
 	let isLoading = $derived(settingsStore.isLoading);
-	// Only a treat-as-fatal error is one that left us with NO settings to show.
-	// A failed *save* keeps `settings` populated, so the form stays up and just
-	// toasts — we must not blow that away. Showing the form seeded with hardcoded
-	// defaults on a failed initial load would let a Save silently overwrite the
-	// user's real preferences (miles/USD/etc.), so gate the form on having data.
+	// Gate the form on loaded settings: seeded defaults would let Save overwrite real preferences.
 	let loadError = $derived(settingsStore.error && !settings ? settingsStore.error : null);
 
 	let isSaving = $state(false);
 	let isBackingUp = $state(false);
 
-	// Unit preferences
 	let distanceUnit = $state<'miles' | 'kilometers'>('miles');
 	let volumeUnit = $state<'gallons_us' | 'gallons_uk' | 'liters'>('gallons_us');
 	let chargeUnit = $state<'kwh'>('kwh');
 	let currencyUnit = $state('USD');
 
-	// Backup settings — derived from backupConfig
 	let autoBackupEnabled = $state(false);
 	let backupFrequency = $state<'daily' | 'weekly' | 'monthly'>('weekly');
 	let syncInactivityMinutes = $state(5);
 
-	// Provider state for backup card and restore dialog
 	let storageProviders = $state<UserProviderInfo[]>([]);
 
-	// Derived backup state from backupConfig
 	let backupConfig = $derived<BackupConfig>(settings?.backupConfig ?? { providers: {} });
 
 	let backupProvidersEnabled = $derived(Object.values(backupConfig.providers).some(p => p.enabled));
@@ -89,7 +80,6 @@
 			.map(p => ({ id: p.id, displayName: p.displayName, providerType: p.providerType }));
 	});
 
-	// Dialog state
 	let showBackupDialog = $state(false);
 	let showRestoreDialog = $state(false);
 
@@ -109,7 +99,7 @@
 		try {
 			storageProviders = await providerApi.getProviders('storage');
 		} catch {
-			// Non-critical
+			// Leave the list empty; the page already renders its empty state.
 		}
 	}
 
@@ -292,10 +282,6 @@
 		</div>
 	{/if}
 
-	<!-- Save is a fixed FAB rendered outside the load/error/form branches, so it
-	     must be gated too: on a failed load the form shows seeded defaults, and a
-	     Save here would overwrite the user's real (unfetched) preferences. Hide it
-	     until settings actually loaded. (isSaving still disables it during a save.) -->
 	{#if !isLoading && !loadError}
 		<Button
 			onclick={handleSave}

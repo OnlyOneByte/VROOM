@@ -18,7 +18,6 @@ import { apiClient, getApiBaseUrl, withPagination } from './api-client';
 import { toDateInputValue } from '$lib/utils/formatters';
 import { triggerBlobDownload } from '$lib/utils/download';
 
-/** Convenience alias for a paginated response of transformed frontend Expenses. */
 type PaginatedExpenseResponse = PaginatedResponse<Expense>;
 
 /** One row's outcome from a CSV import (mirrors the backend summarizeImportPlan). */
@@ -37,13 +36,12 @@ export interface ExpenseImportResult {
 	errorCount: number;
 	totalRows: number;
 	rows: ExpenseImportRow[];
-	/** Foreign-tracker import only: rows skipped as already-present on a commit (idempotent re-import). */
+	/** Commit only: rows skipped because they were already imported. */
 	duplicates?: number;
-	/** Foreign-tracker import only: distinct foreign category words that fell through to `misc` (D2). */
+	/** Foreign-tracker import: unrecognized category words, imported as `misc`. */
 	unmappedCategories?: string[];
 }
 
-/** Parameters accepted by paginated expense list methods. */
 /** Columns the expense list can be sorted by (must match the backend allowlist). */
 export type ExpenseSortBy = 'date' | 'amount' | 'category';
 export type ExpenseSortDir = 'asc' | 'desc';
@@ -61,17 +59,12 @@ interface ExpenseListParams {
 	sortDir?: ExpenseSortDir;
 }
 
-/** Parameters accepted by the expense summary endpoint. */
 interface ExpenseSummaryParams {
 	vehicleId?: string;
 	period?: string;
 }
 
-/**
- * Build a URLSearchParams from expense list params + optional vehicleId.
- * Exported for unit testing (the expense list/search/pagination correctness
- * depends on this building the query string exactly right).
- */
+/** Builds the expense list query string, without the leading '?'. */
 export function buildExpenseQuery(params?: ExpenseListParams, vehicleId?: string): string {
 	const query = new URLSearchParams();
 	if (vehicleId) query.set('vehicleId', vehicleId);
@@ -82,8 +75,6 @@ export function buildExpenseQuery(params?: ExpenseListParams, vehicleId?: string
 	if (params?.endDate) query.set('endDate', params.endDate);
 	if (params?.period) query.set('period', params.period);
 	if (params?.search?.trim()) query.set('search', params.search.trim());
-	// Only emit sort params when set to a non-default — keeps URLs/queries identical
-	// to before for the default (date desc) path, so nothing else changes behavior.
 	if (params?.sortBy) query.set('sortBy', params.sortBy);
 	if (params?.sortDir) query.set('sortDir', params.sortDir);
 	if (params?.tags?.length) {
@@ -94,11 +85,7 @@ export function buildExpenseQuery(params?: ExpenseListParams, vehicleId?: string
 	return query.toString();
 }
 
-/**
- * Fetch a paginated expense response using apiClient.getPaginated() so we keep
- * the pagination metadata that apiClient.get() would strip during envelope unwrapping.
- * Transforms backend expense fields to frontend format.
- */
+// Uses getPaginated so pagination metadata is kept; get() would unwrap it away.
 async function fetchPaginatedExpenses(url: string): Promise<PaginatedExpenseResponse> {
 	const result = await apiClient.getPaginated<BackendExpenseResponse>(url);
 
@@ -108,11 +95,7 @@ async function fetchPaginatedExpenses(url: string): Promise<PaginatedExpenseResp
 	};
 }
 
-/**
- * Expense API service
- * All expense API calls go through here to ensure field name transformations
- * (backend `expenseAmount`/`fuelAmount` ↔ frontend `amount`/`volume`/`charge`)
- */
+/** Expense endpoints. Responses are mapped from backend to frontend field names. */
 export const expenseApi = {
 	async getExpense(expenseId: string): Promise<Expense> {
 		const data = await apiClient.get<BackendExpenseResponse>(`/api/v1/expenses/${expenseId}`);
@@ -132,12 +115,7 @@ export const expenseApi = {
 		return fetchPaginatedExpenses(`/api/v1/expenses${qs ? `?${qs}` : ''}`);
 	},
 
-	/**
-	 * Download all matching expenses as a CSV file (server-generated). Honours the
-	 * SAME filters as the list table — vehicle / category / date-range / free-text
-	 * search / tags — so the export matches exactly what the user is viewing.
-	 * Triggers a browser download.
-	 */
+	// Accepts the same filters as the list view so the export matches what the user sees.
 	async downloadExpensesCsv(params?: {
 		vehicleId?: string;
 		category?: string;
@@ -163,17 +141,7 @@ export const expenseApi = {
 		triggerBlobDownload(blob, `vroom-expenses-${toDateInputValue(new Date())}.csv`);
 	},
 
-	/**
-	 * Import expenses from a CSV. Sends the CSV TEXT; the server validates every row and resolves
-	 * each vehicle by NAME within the user's own fleet. With `dryRun: true` the server validates +
-	 * reports only (preview) and writes nothing; `dryRun: false` commits the valid rows.
-	 *
-	 * For a foreign-tracker file (import-trackers T4/T5), pass `mapping` — the server translates the
-	 * file to native shape (rename + unit-convert + category-map + date-parse) FIRST, then runs the
-	 * exact same validate/commit flow, so the result adds `unmappedCategories` (and `duplicates` on a
-	 * commit). Omit `mapping` for a native "VROOM CSV" (the round-trip target of the export) — the
-	 * request is then byte-identical to before (backward-compatible).
-	 */
+	// dryRun previews without writing. A foreign-tracker file needs `mapping`; omit it for native VROOM CSV.
 	async importExpensesCsv(
 		csv: string,
 		dryRun = false,
@@ -182,16 +150,11 @@ export const expenseApi = {
 		return apiClient.post<ExpenseImportResult>('/api/v1/expenses/import', {
 			csv,
 			dryRun,
-			// Only include mapping when provided so the native path's request is unchanged.
 			...(mapping ? { mapping } : {})
 		});
 	},
 
-	/**
-	 * Identify a known tracker (Fuelly/Fuelio/Drivvo) from the uploaded file's HEADER names, so the
-	 * mapping dialog can pre-fill. Sends only the header strings (never the data).
-	 * Returns the matched preset (its label + default mapping) or null → the user maps manually.
-	 */
+	// Matches a known tracker by header names only; null means the user maps columns manually.
 	async detectImportSource(headers: string[]): Promise<ImportMappingPreset | null> {
 		return apiClient.post<ImportMappingPreset | null>('/api/v1/expenses/import/detect', {
 			headers
@@ -232,9 +195,7 @@ export const expenseApi = {
 		expenseId: string,
 		expense: Partial<Expense> & { vehicleId: string; category: ExpenseCategory; amount: number }
 	): Promise<Expense> {
-		// isEdit: an emptied description is sent as null so the user can CLEAR it
-		// (the clear-optional-field class). Create + offline/sync paths don't pass
-		// this, so their payloads are unchanged.
+		// Edit only: an emptied description is sent as null so it can be cleared.
 		const backendExpense = toBackendExpense(expense, { isEdit: true });
 		const data = await apiClient.put<BackendExpenseResponse>(
 			`/api/v1/expenses/${expenseId}`,
@@ -246,8 +207,6 @@ export const expenseApi = {
 	async deleteExpense(expenseId: string): Promise<void> {
 		await apiClient.delete(`/api/v1/expenses/${expenseId}`);
 	},
-
-	// --- Photo methods (delegate to generic photo endpoints) ---
 
 	async getPhotos(
 		entityType: 'expense',
@@ -272,8 +231,6 @@ export const expenseApi = {
 	getPhotoThumbnailUrl(entityType: 'expense', entityId: string, photoId: string): string {
 		return `${getApiBaseUrl()}/api/v1/photos/${entityType}/${entityId}/${photoId}/thumbnail`;
 	},
-
-	// --- Split expense (expense group) methods ---
 
 	async createSplitExpense(data: {
 		splitConfig: SplitConfig;

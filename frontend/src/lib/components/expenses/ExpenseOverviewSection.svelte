@@ -48,10 +48,8 @@
 		</CardNs.Header>
 		<CollapsibleContent>
 			<CardNs.Content class="space-y-6">
-				<!-- Stats Grid -->
 				<StatCardGrid items={statCards} columns={4} />
 
-				<!-- Category Breakdown -->
 				{#if summary && summary.categoryBreakdown.length > 0}
 					<div class="space-y-3">
 						<div class="flex items-center gap-2">

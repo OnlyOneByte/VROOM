@@ -1,22 +1,8 @@
 /**
- * # DEEP-REVIEW (certify + guard): `resolveNewUser`'s email-collision + race-retry invariant.
- *
- * `resolveNewUser` (auth/routes.ts) creates a user on an OAuth login that has no existing auth row. Its
- * collision handling is a load-bearing data-safety + concurrency contract (— VROOM NEVER
- * implicitly merges two accounts):
- *  1. PRE-CHECK: if a user with the incoming email already exists → redirect `email_exists` (no merge).
- *  2. TRANSACTIONAL CATCH (concurrency-only): the new-user tx inserts BOTH `users(email)` (UNIQUE on email)
- *  and `user_providers(provider_type, provider_account_id)` (partial UNIQUE `up_auth_identity_idx` WHERE
- *  domain='auth'). So a concurrent request landing between our pre-check SELECT and our tx commit can
- *  UNIQUE-violate on EITHER index. The catch re-queries findByProviderIdentity(authProvider, accountId):
- *  - row FOUND → the race winner was the SAME provider identity → return its userId (idempotent login);
- *  the provider-identity UNIQUE guarantees that row is unambiguous
- *  - row ABSENT → a DIFFERENT account grabbed that email → redirect `email_exists`
- *
- * Certified CLEAN firsthand — no defect. resolveNewUser is a private handler helper, so this guard
- * models the EXACT decision logic against the REAL migrated schema (the SQL contract it runs): the pre-check
- * no-merge, and the catch-branch race-winner-vs-collision discrimination. A regression that (a) implicitly
- * merged on email, or (b) returned a userId for a different-account collision (cross-account login!), breaks it.
+ * resolveNewUser must never merge accounts by email. The pre-check refuses an email already in use.
+ * If the insert loses a race, the catch returns the user only when it is the same provider identity;
+ * a different account that took the email yields email_exists. The handler is private, so this
+ * models its SQL against the migrated schema.
  */
 
 import { Database } from 'bun:sqlite';
@@ -45,15 +31,15 @@ function seedAuthUser(
   );
 }
 
-/** The PRE-CHECK: an existing email blocks new-user creation (no implicit account merge). */
+/** Pre-check: an existing email blocks new-user creation. */
 function preCheckBlocksExistingEmail(email: string): boolean {
   const existing = db.query('SELECT id FROM users WHERE email = ? LIMIT 1').get(email) as {
     id: string;
   } | null;
-  return existing !== null; // true → resolveNewUser returns { redirect: 'email_exists' }
+  return existing !== null;
 }
 
-/** The CATCH branch (runs after a UNIQUE(users.email) violation in the new-user tx). */
+/** Catch branch, reached after a UNIQUE violation in the new-user transaction. */
 function catchBranchResolution(
   authProvider: string,
   accountId: string
@@ -68,9 +54,8 @@ function catchBranchResolution(
 }
 
 describe('resolveNewUser — pre-check (no implicit account merge)', () => {
-  test('an email already owned by another account blocks new-user creation (→ email_exists)', () => {
+  test('an email already owned by another account blocks new-user creation', () => {
     seedAuthUser('u_first', 'shared@example.com', 'google', 'acc-1');
-    // A different provider account presenting the SAME email must NOT merge into u_first.
     expect(preCheckBlocksExistingEmail('shared@example.com')).toBe(true);
   });
 
@@ -80,29 +65,21 @@ describe('resolveNewUser — pre-check (no implicit account merge)', () => {
   });
 });
 
-describe('resolveNewUser — transactional race-retry catch (concurrency-only)', () => {
-  test('SAME provider account won the race → idempotent: return the winner userId (NOT a redirect)', () => {
-    // A concurrent request for the SAME provider identity (google/acc-1) inserted the user first.
+describe('resolveNewUser — transactional race-retry catch', () => {
+  test('the same provider identity won the race → return the winner userId', () => {
     seedAuthUser('u_winner', 'race@example.com', 'google', 'acc-1');
-    // Our tx UNIQUE-violated on users.email; the catch re-queries our own provider identity → finds the winner.
     expect(catchBranchResolution('google', 'acc-1')).toEqual({ userId: 'u_winner' });
   });
 
-  test('a DIFFERENT account grabbed the email → email_exists (never a cross-account login)', () => {
-    // The winner was a DIFFERENT provider account that happens to share the email.
+  test('a different account grabbed the email → email_exists, never a cross-account login', () => {
     seedAuthUser('u_other', 'dup@example.com', 'github', 'acc-other');
-    // Our catch re-queries OUR identity (google/acc-new) → no row → must redirect, never return u_other.
     expect(catchBranchResolution('google', 'acc-new')).toEqual({ redirect: 'email_exists' });
   });
 });
 
-describe('resolveNewUser — the schema fact the catch relies on', () => {
-  test('a partial-UNIQUE auth-identity index exists on (provider_type, provider_account_id) — makes the race-winner retry unambiguous', () => {
-    // The catch returns the race winner by re-querying findByProviderIdentity(authProvider, accountId). That
-    // is only sound because the provider identity is UNIQUE for auth rows (up_auth_identity_idx, partial WHERE
-    // domain='auth') — so at most ONE row matches and a concurrent same-identity insert is the winner we
-    // adopt. Pin that this unique index exists (a migration dropping it would make the retry ambiguous +
-    // allow duplicate auth identities). users.email is ALSO unique (the other index the tx can violate).
+describe('resolveNewUser — the schema the catch relies on', () => {
+  test('a unique auth-identity index exists on (provider_type, provider_account_id)', () => {
+    // The race-winner lookup is only unambiguous if at most one auth row matches the identity.
     const idxRows = db
       .query(
         "SELECT name, sql FROM sqlite_master WHERE type = 'index' AND tbl_name = 'user_providers'"

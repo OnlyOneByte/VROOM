@@ -1,37 +1,18 @@
 /**
- * Property-Based Tests for PhotoRepository
- *
- * Property 1: Single Cover Invariant
- * After any sequence of create/setCover/delete operations on an entity,
- * at most one photo has `isCover = true`. If the entity has at least one
- * photo, exactly one should be cover. If zero photos remain, none should
- * be cover.
- *
- * **Validates: Requirements 3.1, 3.4, 14.2**
- *
- * Approach: Generate a random sequence of operations (create, setCover,
- * delete) and apply them to an in-memory reference model. After all
- * operations, verify the single-cover invariant holds.
+ * Property tests over an in-memory model of PhotoRepository's cover rules. After any sequence of
+ * create, setCover, and delete on an entity, at most one photo is the cover, and an entity's photo
+ * set never overlaps another entity's.
  */
 
 import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 
-// ---------------------------------------------------------------------------
-// Reference Model
-// ---------------------------------------------------------------------------
-
-/** Minimal in-memory photo for the reference model. */
 interface RefPhoto {
   id: string;
   isCover: boolean;
   createdAt: number;
 }
 
-/**
- * Reference implementation that simulates PhotoRepository behaviour
- * purely in memory, matching the contract from the design doc.
- */
 class ReferencePhotoModel {
   photos: RefPhoto[] = [];
 
@@ -62,18 +43,10 @@ class ReferencePhotoModel {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Operation types
-// ---------------------------------------------------------------------------
-
 type Op =
   | { type: 'create'; createdAt: number }
   | { type: 'setCover'; photoIndex: number }
   | { type: 'delete'; photoIndex: number };
-
-// ---------------------------------------------------------------------------
-// Generators
-// ---------------------------------------------------------------------------
 
 const timestampArb = fc.integer({ min: 1672531200000, max: 1767139200000 });
 
@@ -86,11 +59,7 @@ const opsArb = fc.array(
   { minLength: 1, maxLength: 40 }
 );
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Apply a single operation to the model, resolving indices against live photos. */
+/** Applies one operation; indices resolve against the photos that currently exist. */
 function applyOp(model: ReferencePhotoModel, op: Op, nextId: number): number {
   if (op.type === 'create') {
     model.create(`photo-${nextId}`, op.createdAt);
@@ -107,7 +76,6 @@ function applyOp(model: ReferencePhotoModel, op: Op, nextId: number): number {
   return nextId;
 }
 
-/** Assert the single-cover invariant on the current model state. */
 function assertCoverInvariant(model: ReferencePhotoModel): void {
   const coverCount = model.photos.filter((p) => p.isCover).length;
   if (model.photos.length === 0) {
@@ -117,11 +85,7 @@ function assertCoverInvariant(model: ReferencePhotoModel): void {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Property 1: Single Cover Invariant
-// ---------------------------------------------------------------------------
-
-describe('Property 1: Single Cover Invariant', () => {
+describe('single cover invariant', () => {
   test('after any sequence of create/setCover/delete, at most one photo has isCover = true', () => {
     fc.assert(
       fc.property(opsArb, (ops) => {
@@ -188,26 +152,6 @@ describe('Property 1: Single Cover Invariant', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Property 4: Entity Isolation
-// ---------------------------------------------------------------------------
-
-/**
- * Property 4: Entity Isolation
- *
- * For any two distinct (entityType, entityId) pairs — including pairs where
- * the entityId matches but the entityType differs — the set of photos
- * returned by findByEntity for one pair has zero overlap with the set
- * returned for the other pair. Operations on one entity never affect photos
- * of another entity.
- *
- * **Validates: Requirements 6.1, 6.2**
- */
-
-// ---------------------------------------------------------------------------
-// Multi-entity reference model
-// ---------------------------------------------------------------------------
-
 interface EntityKey {
   entityType: string;
   entityId: string;
@@ -271,10 +215,6 @@ class MultiEntityRefModel {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Generators for entity isolation
-// ---------------------------------------------------------------------------
-
 const entityTypeArb = fc.constantFrom('vehicle', 'expense', 'trip');
 const entityIdArb = fc
   .string({ minLength: 1, maxLength: 8 })
@@ -285,7 +225,7 @@ const entityKeyArb: fc.Arbitrary<EntityKey> = fc.record({
   entityId: entityIdArb,
 });
 
-/** Generate two distinct entity keys (differ in at least one component). */
+/** Two entity keys that differ in entityType or entityId. */
 const distinctEntityPairArb: fc.Arbitrary<[EntityKey, EntityKey]> = fc
   .tuple(entityKeyArb, entityKeyArb)
   .filter(([a, b]) => a.entityType !== b.entityType || a.entityId !== b.entityId);
@@ -303,10 +243,6 @@ const entityOpsArb = fc.array(
   ),
   { minLength: 1, maxLength: 20 }
 );
-
-// ---------------------------------------------------------------------------
-// Helpers for entity isolation
-// ---------------------------------------------------------------------------
 
 function applyEntityOp(
   model: MultiEntityRefModel,
@@ -331,11 +267,7 @@ function applyEntityOp(
   return nextId;
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
-describe('Property 4: Entity Isolation', () => {
+describe('entity isolation', () => {
   test('findByEntity results for two distinct entities never overlap', () => {
     fc.assert(
       fc.property(distinctEntityPairArb, entityOpsArb, entityOpsArb, ([keyA, keyB], opsA, opsB) => {
@@ -343,16 +275,13 @@ describe('Property 4: Entity Isolation', () => {
         let nextIdA = 0;
         let nextIdB = 0;
 
-        // Apply all operations for entity A
         for (const op of opsA) {
           nextIdA = applyEntityOp(model, keyA, op, nextIdA, 'a');
         }
-        // Apply all operations for entity B
         for (const op of opsB) {
           nextIdB = applyEntityOp(model, keyB, op, nextIdB, 'b');
         }
 
-        // Verify: photo sets are disjoint
         const idsA = model.photoIds(keyA);
         const idsB = model.photoIds(keyB);
         for (const id of idsA) {
@@ -395,7 +324,6 @@ describe('Property 4: Entity Isolation', () => {
         ([keyA, keyB], tsA, tsB, coverIdx) => {
           const model = new MultiEntityRefModel();
 
-          // Create photos for both entities
           for (let i = 0; i < tsA.length; i++) {
             model.create(keyA, `a-${i}`, tsA[i]);
           }
@@ -403,15 +331,12 @@ describe('Property 4: Entity Isolation', () => {
             model.create(keyB, `b-${i}`, tsB[i]);
           }
 
-          // Snapshot entity B's cover before mutating A
           const coverBBefore = model.coverPhoto(keyB);
 
-          // Set cover on entity A
           const photosA = model.findByEntity(keyA);
           const targetIdx = coverIdx % photosA.length;
           model.setCover(keyA, photosA[targetIdx].id);
 
-          // Entity B's cover must be unchanged
           const coverBAfter = model.coverPhoto(keyB);
           expect(coverBAfter?.id).toBe(coverBBefore?.id);
           expect(coverBAfter?.isCover).toBe(coverBBefore?.isCover);
@@ -438,16 +363,13 @@ describe('Property 4: Entity Isolation', () => {
             model.create(keyB, `b-${i}`, tsB[i]);
           }
 
-          // Snapshot entity B state
           const photosBBefore = model.findByEntity(keyB);
           const coverBBefore = model.coverPhoto(keyB);
 
-          // Delete a photo from entity A
           const photosA = model.findByEntity(keyA);
           const targetIdx = deleteIdx % photosA.length;
           model.delete(keyA, photosA[targetIdx].id);
 
-          // Entity B must be unchanged
           const photosBAfter = model.findByEntity(keyB);
           expect(photosBAfter.length).toBe(photosBBefore.length);
           expect(model.coverPhoto(keyB)?.id).toBe(coverBBefore?.id);
@@ -469,7 +391,6 @@ describe('Property 4: Entity Isolation', () => {
           const keyExpense: EntityKey = { entityType: 'expense', entityId: sharedId };
           const model = new MultiEntityRefModel();
 
-          // Create photos for both entities sharing the same entityId
           for (let i = 0; i < tsVehicle.length; i++) {
             model.create(keyVehicle, `v-${i}`, tsVehicle[i]);
           }
@@ -477,13 +398,11 @@ describe('Property 4: Entity Isolation', () => {
             model.create(keyExpense, `e-${i}`, tsExpense[i]);
           }
 
-          // Apply random operations to vehicle entity
           let nextId = 100;
           for (const op of extraOps) {
             nextId = applyEntityOp(model, keyVehicle, op, nextId, 'v-extra');
           }
 
-          // Expense entity must still have exactly its original photos
           const expensePhotos = model.findByEntity(keyExpense);
           const expenseIds = new Set(expensePhotos.map((p) => p.id));
           for (let i = 0; i < tsExpense.length; i++) {
@@ -491,7 +410,6 @@ describe('Property 4: Entity Isolation', () => {
           }
           expect(expensePhotos.length).toBe(tsExpense.length);
 
-          // No overlap between the two entities
           const vehicleIds = model.photoIds(keyVehicle);
           for (const id of vehicleIds) {
             expect(expenseIds.has(id)).toBe(false);

@@ -13,7 +13,6 @@ import type { BackupConfig, StorageConfig, UnitPreferences } from '../types';
 import { DEFAULT_BACKUP_CONFIG, DEFAULT_STORAGE_CONFIG, DEFAULT_UNIT_PREFERENCES } from '../types';
 import type { ReminderSplitConfig } from './types';
 
-// User table
 export const users = sqliteTable('users', {
   id: text('id')
     .primaryKey()
@@ -24,7 +23,6 @@ export const users = sqliteTable('users', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });
 
-// Vehicle table (v2: removed currentInsurancePolicyId)
 export const vehicles = sqliteTable(
   'vehicles',
   {
@@ -44,7 +42,7 @@ export const vehicles = sqliteTable(
     nickname: text('nickname'),
     vin: text('vin'),
     initialMileage: integer('initial_mileage'),
-    purchasePrice: integer('purchase_price'), // money: integer CENTS (migration 0009)
+    purchasePrice: integer('purchase_price'), // cents
     purchaseDate: integer('purchase_date', { mode: 'timestamp' }),
     unitPreferences: text('unit_preferences', { mode: 'json' })
       .$type<UnitPreferences>()
@@ -55,17 +53,14 @@ export const vehicles = sqliteTable(
   },
   (table) => ({
     userIdIdx: index('vehicles_user_id_idx').on(table.userId),
-    // License-plate uniqueness is PER-USER, not global (migration 0005): two users may
-    // legitimately register the same plate string (reissued plates, sold-then-rebought cars), and a
-    // global unique index both wrongly blocked the second user AND leaked plate existence across
-    // tenants. Partial (WHERE license_plate IS NOT NULL) so plate-less vehicles don't collide.
+    // Per-user, not global: two users may register the same plate, and a global index would also
+    // reveal plate existence across tenants. Partial so plate-less vehicles never collide.
     userLicensePlateIdx: uniqueIndex('vehicles_user_license_plate_idx')
       .on(table.userId, table.licensePlate)
       .where(sql`${table.licensePlate} IS NOT NULL`),
   })
 );
 
-// Vehicle Financing table (v2: removed currentBalance — computed on read)
 export const vehicleFinancing = sqliteTable(
   'vehicle_financing',
   {
@@ -76,38 +71,33 @@ export const vehicleFinancing = sqliteTable(
       .notNull()
       .references(() => vehicles.id, { onDelete: 'cascade' }),
     financingType: text('financing_type').notNull().default('loan'), // 'loan' | 'lease' | 'own'
-    provider: text('provider').notNull(), // Lender name, leasing company, or dealer
-    originalAmount: integer('original_amount').notNull(), // money: integer CENTS (migration 0009)
-    apr: real('apr'), // For loans, null for leases/own — a PERCENT, stays real (NOT money)
+    provider: text('provider').notNull(),
+    originalAmount: integer('original_amount').notNull(), // cents
+    apr: real('apr'), // percent, not money; null for leases/own
     termMonths: integer('term_months').notNull(),
     startDate: integer('start_date', { mode: 'timestamp' }).notNull(),
-    // Payment Configuration
-    paymentAmount: integer('payment_amount').notNull(), // money: integer CENTS (migration 0009)
+    paymentAmount: integer('payment_amount').notNull(), // cents
     paymentFrequency: text('payment_frequency').notNull().default('monthly'), // 'monthly' | 'bi-weekly' | 'weekly' | 'custom'
-    paymentDayOfMonth: integer('payment_day_of_month'), // For monthly (1-31)
-    paymentDayOfWeek: integer('payment_day_of_week'), // For weekly (0-6, Sunday=0)
-    // Lease-specific fields
-    residualValue: integer('residual_value'), // money: integer CENTS (migration 0009) — End-of-lease buyout price
-    mileageLimit: integer('mileage_limit'), // Annual mileage limit for leases (a MILEAGE count, NOT money)
-    excessMileageFee: integer('excess_mileage_fee'), // money: integer CENTS (migration 0009) — Per-mile fee over limit
-    // Status
+    paymentDayOfMonth: integer('payment_day_of_month'), // 1-31, for monthly
+    paymentDayOfWeek: integer('payment_day_of_week'), // 0-6, Sunday=0, for weekly
+    residualValue: integer('residual_value'), // cents; end-of-lease buyout price
+    mileageLimit: integer('mileage_limit'), // annual miles for leases, not money
+    excessMileageFee: integer('excess_mileage_fee'), // cents per mile over the limit
     isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
-    endDate: integer('end_date', { mode: 'timestamp' }), // Payoff date or lease end date
+    endDate: integer('end_date', { mode: 'timestamp' }), // payoff date or lease end date
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   },
   (table) => ({
     vehicleIdIdx: index('vf_vehicle_id_idx').on(table.vehicleId),
-    // At most one ACTIVE financing agreement per vehicle, enforced in the database rather than by
-    // the repository: a vehicle with two active loans double-counts every payment in cost-per-mile.
-    // History is unbounded, hence partial rather than a plain unique on vehicle_id.
+    // Enforced in the database, not the repository: two active loans would double-count every payment
+    // in cost-per-mile. History is unbounded, hence partial.
     activeVehicleIdx: uniqueIndex('vf_active_vehicle_idx')
       .on(table.vehicleId)
       .where(sql`${table.isActive} = 1`),
   })
 );
 
-// Insurance Policy table (v2: removed terms JSON, currentTermStart, currentTermEnd)
 export const insurancePolicies = sqliteTable(
   'insurance_policies',
   {
@@ -128,7 +118,6 @@ export const insurancePolicies = sqliteTable(
   })
 );
 
-// Insurance Terms table (v2: extracted from JSON column on insurance_policies)
 export const insuranceTerms = sqliteTable(
   'insurance_terms',
   {
@@ -142,15 +131,15 @@ export const insuranceTerms = sqliteTable(
     endDate: integer('end_date', { mode: 'timestamp' }).notNull(),
     policyNumber: text('policy_number'),
     coverageDescription: text('coverage_description'),
-    deductibleAmount: integer('deductible_amount'), // money: integer CENTS (migration 0009)
-    coverageLimit: integer('coverage_limit'), // money: integer CENTS (migration 0009) — a dollar cap, not a %
+    deductibleAmount: integer('deductible_amount'), // cents
+    coverageLimit: integer('coverage_limit'), // cents; a dollar cap, not a percent
     agentName: text('agent_name'),
     agentPhone: text('agent_phone'),
     agentEmail: text('agent_email'),
-    totalCost: integer('total_cost'), // money: integer CENTS (migration 0009)
-    monthlyCost: integer('monthly_cost'), // money: integer CENTS (migration 0009)
+    totalCost: integer('total_cost'), // cents
+    monthlyCost: integer('monthly_cost'), // cents
     premiumFrequency: text('premium_frequency'),
-    paymentAmount: integer('payment_amount'), // money: integer CENTS (migration 0009)
+    paymentAmount: integer('payment_amount'), // cents
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   },
@@ -160,7 +149,6 @@ export const insuranceTerms = sqliteTable(
   })
 );
 
-// Insurance Term ↔ Vehicles junction table (v2: replaces insurancePolicyVehicles)
 export const insuranceTermVehicles = sqliteTable(
   'insurance_term_vehicles',
   {
@@ -177,10 +165,7 @@ export const insuranceTermVehicles = sqliteTable(
   })
 );
 
-// Insurance Claims table — a claim filed against a policy (optionally a specific
-// term and vehicle). claimType / status / faultDesignation are free-text columns
-// whose allowed values are enforced by the zod validation layer, mirroring how
-// insurance_terms.premiumFrequency is handled (text column + app-level enum).
+// claimType, status and faultDesignation are free text; allowed values are enforced by the zod layer.
 export const insuranceClaims = sqliteTable(
   'insurance_claims',
   {
@@ -196,7 +181,7 @@ export const insuranceClaims = sqliteTable(
     claimType: text('claim_type').notNull(), // collision | theft | weather | vandalism | other
     description: text('description'),
     status: text('status').notNull().default('filed'), // filed | in_progress | settled | denied
-    payoutAmount: integer('payout_amount'), // money: integer CENTS (migration 0009)
+    payoutAmount: integer('payout_amount'), // cents
     faultDesignation: text('fault_designation'), // at_fault | not_at_fault | shared | null
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
@@ -208,10 +193,8 @@ export const insuranceClaims = sqliteTable(
   })
 );
 
-// Split method type for split expenses
 export type SplitMethod = 'even' | 'absolute' | 'percentage';
 
-// Expense table (v2: fuelAmount → volume, removed insurancePolicyId; v3: removed isFinancingPayment + insuranceTermId, uses sourceType/sourceId)
 export const expenses = sqliteTable(
   'expenses',
   {
@@ -221,44 +204,32 @@ export const expenses = sqliteTable(
     vehicleId: text('vehicle_id')
       .notNull()
       .references(() => vehicles.id, { onDelete: 'cascade' }),
-    category: text('category').notNull(), // ExpenseCategory enum values
-    tags: text('tags', { mode: 'json' }).$type<string[]>(), // JSON array of tags (replaces type)
+    category: text('category').notNull(),
+    tags: text('tags', { mode: 'json' }).$type<string[]>(),
     date: integer('date', { mode: 'timestamp' }).notNull(),
     mileage: integer('mileage'),
     description: text('description'),
-    // expense-location T1 (migration 0012): an OPTIONAL free-text location label (e.g. "Shell, Main St").
-    // D1/D5 — free-text only, NO GPS in v1 (mirrors trips.startLocation). Length-capped at the Zod edge.
-    location: text('location'),
+    location: text('location'), // free-text label; no GPS
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-    expenseAmount: integer('expense_amount').notNull(), // money: integer CENTS (migration 0009)
-    volume: real('volume'), // gallons / kWh — a QUANTITY, stays real (NOT money)
+    expenseAmount: integer('expense_amount').notNull(), // cents
+    volume: real('volume'), // gallons or kWh; a quantity, not money
     fuelType: text('fuel_type'),
     missedFillup: integer('missed_fillup', { mode: 'boolean' }).notNull().default(false),
-    // Direct user ownership — eliminates vehicles JOIN for user-scoped queries.
-    // For a SHARED-created row (an editor logged a cost on someone else's vehicle, vehicle-sharing
-    // T5b owner-stamp model) this is the vehicle OWNER's id — so the row rides the owner's backup/TCO
-    // and counts once. The actual author is recorded in `createdBy`.
+    // Owner id even when an editor created the row on a shared vehicle, so the row counts once in the
+    // owner's totals. The author is recorded in createdBy.
     userId: text('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    // PROVENANCE — who physically entered the row (vehicle-sharing T5b, migration 0011). Differs from
-    // `userId` only for an editor-created shared row (createdBy = editor, userId = owner). NULL =
-    // legacy/self-created (treat as createdBy === userId). onDelete SET NULL: this is provenance, not
-    // ownership — deleting the author must NOT delete the owner's cost-history row.
+    // NULL means self-created. Set null on author deletion: provenance must not delete the owner's history.
     createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
-    // NULL for standalone expenses, shared UUID for split siblings
-    groupId: text('group_id'),
-    // Pre-split total amount, same on all siblings in a group — money: integer CENTS (migration 0009)
-    groupTotal: integer('group_total'),
-    // Split method: 'even' | 'absolute' | 'percentage'
-    splitMethod: text('split_method'),
-    // Source tracking — nullable, server-set only (e.g., 'reminder', 'import', 'api')
-    sourceType: text('source_type'),
+    groupId: text('group_id'), // NULL for standalone expenses, shared UUID for split siblings
+    groupTotal: integer('group_total'), // cents; pre-split total, identical on all siblings
+    splitMethod: text('split_method'), // 'even' | 'absolute' | 'percentage'
+    sourceType: text('source_type'), // server-set only: 'reminder' | 'import' | 'api'
     sourceId: text('source_id'),
-    // Offline idempotency key — client-generated UUID for expenses created via the
-    // offline outbox. NULL for server- or legacy-created rows. Scoped unique per user
-    // so a retried offline POST returns the original row instead of duplicating it.
+    // Client-generated UUID for offline-outbox creates; NULL for server-created rows. Unique per user,
+    // so a retried POST returns the original row.
     clientId: text('client_id'),
   },
   (table) => ({
@@ -269,27 +240,21 @@ export const expenses = sqliteTable(
       table.date
     ),
     categoryDateIdx: index('expenses_category_date_idx').on(table.category, table.date),
-    // userId-based indexes for analytics hot paths
     userDateIdx: index('expenses_user_date_idx').on(table.userId, table.date),
     userCategoryDateIdx: index('expenses_user_category_date_idx').on(
       table.userId,
       table.category,
       table.date
     ),
-    // Group lookup for split operations
     groupIdx: index('expenses_group_idx').on(table.groupId),
-    // Source tracking lookup (e.g., all expenses from a specific reminder or financing)
     sourceIdx: index('expenses_source_idx').on(table.sourceType, table.sourceId),
-    // Offline idempotency: partial unique index so a retried create with the same
-    // client_id returns the original row. Partial (WHERE client_id IS NOT NULL) so
-    // the many NULL rows from server/legacy creates are unaffected.
+    // Partial so the many NULL clientId rows from server-created expenses are not constrained.
     userClientIdx: uniqueIndex('expenses_user_client_idx')
       .on(table.userId, table.clientId)
       .where(sql`${table.clientId} IS NOT NULL`),
   })
 );
 
-// User Providers table (domain-agnostic provider connections) — UNCHANGED in v2
 export const userProviders = sqliteTable(
   'user_providers',
   {
@@ -312,16 +277,14 @@ export const userProviders = sqliteTable(
   },
   (table) => ({
     userDomainIdx: index('up_user_domain_idx').on(table.userId, table.domain),
-    // One auth identity per external account: the uniqueness that stops a second local user from
-    // claiming an OAuth account already linked elsewhere. Scoped to `auth` because the other
-    // domains (storage, llm) legitimately hold several rows per provider account.
+    // One auth identity per external account, so a second local user cannot claim an OAuth account
+    // already linked elsewhere. Scoped to 'auth' because storage and llm domains hold several rows per account.
     authIdentityIdx: uniqueIndex('up_auth_identity_idx')
       .on(table.providerType, table.providerAccountId)
       .where(sql`${table.domain} = 'auth'`),
   })
 );
 
-// User Preferences table (v2: split from userSettings — write-rare, user-facing settings)
 export const userPreferences = sqliteTable('user_preferences', {
   userId: text('user_id')
     .primaryKey()
@@ -331,17 +294,9 @@ export const userPreferences = sqliteTable('user_preferences', {
     .notNull()
     .default(DEFAULT_UNIT_PREFERENCES),
   currencyUnit: text('currency_unit').notNull().default('USD'),
-  // Theming engine (theming-engine spec T1, D2). The user's selected theme id; 'default' reproduces
-  // today's look byte-for-byte, so this is fully additive — existing rows backfill 'default' and
-  // nothing changes until a user picks another theme. The light/dark *mode* stays device-local
-  // (localStorage) by current convention (D2); only the theme *id* is persisted/synced here.
+  // Only the theme id is stored. The light/dark mode is device-local (localStorage).
   themePreference: text('theme_preference').notNull().default('default'),
-  // trips-location D3 (T8): the DEFAULT business-mileage reimbursement rate in $/mile (e.g. 0.67). The trip
-  // mileage-summary uses it when no explicit ?rate= override is passed (a per-trip override is a thin
-  // additive follow-on). Fully additive — existing rows backfill 0 (= today's behavior: businessValue 0
-  // until a rate is set). A RATE, not a stored money AMOUNT, so it stays `real` (naturally fractional) and
-  // is out of scope for the money-cents integer migration (which covers the 14 money-amount columns); the
-  // business $ it produces is computed at display time (design.md §7) and inherits money handling there.
+  // Dollars per mile, used when a trip mileage summary gets no explicit rate. A rate, not a money amount.
   businessMileageRate: real('business_mileage_rate').notNull().default(0),
   autoBackupEnabled: integer('auto_backup_enabled', { mode: 'boolean' }).notNull().default(false),
   backupFrequency: text('backup_frequency').notNull().default('weekly'), // 'daily' | 'weekly' | 'monthly'
@@ -357,8 +312,7 @@ export const userPreferences = sqliteTable('user_preferences', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });
 
-// Sync State table (v2: split from userSettings — write-heavy, system timestamps only)
-// NOTE: No createdAt/updatedAt columns by design
+// No createdAt/updatedAt by design.
 export const syncState = sqliteTable('sync_state', {
   userId: text('user_id')
     .primaryKey()
@@ -368,7 +322,6 @@ export const syncState = sqliteTable('sync_state', {
   lastBackupDate: integer('last_backup_date', { mode: 'timestamp' }),
 });
 
-// Lucia Auth session table
 export const sessions = sqliteTable('sessions', {
   id: text('id').notNull().primaryKey(),
   userId: text('user_id')
@@ -377,7 +330,6 @@ export const sessions = sqliteTable('sessions', {
   expiresAt: integer('expires_at').notNull(),
 });
 
-// Odometer Entries table (v2: removed linkedEntityType, linkedEntityId, odometer_linked_entity_idx)
 export const odometerEntries = sqliteTable(
   'odometer_entries',
   {
@@ -401,12 +353,8 @@ export const odometerEntries = sqliteTable(
   })
 );
 
-// Trips table (trips-location T1, spec §1) — manual trip log per vehicle. Mirrors odometerEntries (the
-// closest existing shape). `distance` is NOT stored; it's derived `max(0, endOdometer − startOdometer)` at
-// read time (R2, the clamp) so a later odometer correction can't desync a stored distance. No GPS in v1
-// (D5): startLocation/endLocation are optional free-text labels. The business-mileage rate lives in
-// preferences (display-time), so this table introduces NO float-money column (design §7 — inherits the
-// money-cents migration cleanly).
+// Distance is not stored. It is derived as max(0, endOdometer - startOdometer) at read time, so a later
+// odometer correction cannot desync a stored value. Locations are free-text labels; there is no GPS.
 export const trips = sqliteTable(
   'trips',
   {
@@ -420,10 +368,10 @@ export const trips = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     startOdometer: integer('start_odometer').notNull(),
-    endOdometer: integer('end_odometer').notNull(), // R2: end >= start enforced at Zod; distance derived
-    purpose: text('purpose').notNull(), // 'business' | 'personal' | 'commute' | 'other' (D4)
+    endOdometer: integer('end_odometer').notNull(), // end >= start is enforced in Zod
+    purpose: text('purpose').notNull(), // 'business' | 'personal' | 'commute' | 'other'
     tripDate: integer('trip_date', { mode: 'timestamp' }).notNull(),
-    startLocation: text('start_location'), // D5: free-text label, optional (no GPS in v1)
+    startLocation: text('start_location'),
     endLocation: text('end_location'),
     note: text('note'),
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
@@ -434,7 +382,6 @@ export const trips = sqliteTable(
   })
 );
 
-// Photos table (v2: added userId FK, added photos_user_entity_type_idx)
 export const photos = sqliteTable(
   'photos',
   {
@@ -459,7 +406,6 @@ export const photos = sqliteTable(
   })
 );
 
-// Photo Refs table (v2: removed pendingIdx — will be manually appended as partial index)
 export const photoRefs = sqliteTable(
   'photo_refs',
   {
@@ -484,15 +430,13 @@ export const photoRefs = sqliteTable(
   },
   (table) => ({
     photoProviderIdx: uniqueIndex('pr_photo_provider_idx').on(table.photoId, table.providerId),
-    // Drives the upload-retry sweep, which only ever looks at rows still worth retrying. Partial so
-    // the index stays small as `active` rows accumulate — they are the overwhelming majority.
+    // Partial: only rows the upload-retry sweep can act on. Active rows are the bulk of the table.
     pendingIdx: index('pr_pending_idx')
       .on(table.status, table.createdAt)
       .where(sql`${table.status} IN ('pending', 'failed') AND ${table.retryCount} < 3`),
   })
 );
 
-// Reminders table
 export const reminders = sqliteTable(
   'reminders',
   {
@@ -509,25 +453,18 @@ export const reminders = sqliteTable(
     frequency: text('frequency').notNull(), // 'weekly' | 'monthly' | 'yearly' | 'custom'
     intervalValue: integer('interval_value'), // for custom: e.g. 3
     intervalUnit: text('interval_unit'), // 'day' | 'week' | 'month' | 'year'
-    // Maintenance-schedule (spec .kiro/specs/maintenance-schedule): a reminder may be
-    // due by time, by mileage, or by whichever-comes-first. These are additive + nullable/
-    // defaulted so existing reminders behave identically (triggerMode defaults to 'time').
     triggerMode: text('trigger_mode').notNull().default('time'), // 'time' | 'mileage' | 'both'
-    intervalMileage: integer('interval_mileage'), // distance interval, in the vehicle's distanceUnit
-    lastServiceOdometer: integer('last_service_odometer'), // anchor for the mileage axis
-    nextDueOdometer: integer('next_due_odometer'), // cache = lastServiceOdometer + intervalMileage
+    intervalMileage: integer('interval_mileage'), // in the vehicle's distance unit
+    lastServiceOdometer: integer('last_service_odometer'),
+    nextDueOdometer: integer('next_due_odometer'), // cache: lastServiceOdometer + intervalMileage
     startDate: integer('start_date', { mode: 'timestamp' }).notNull(),
     endDate: integer('end_date', { mode: 'timestamp' }), // null = runs forever
-    // Nullable as of T3: a mileage-ONLY reminder has no time axis, so it carries no
-    // next_due_date. The time-due query null-guards (`IS NOT NULL AND next_due_date <= now`) and
-    // the trigger loop skips a null date. Relaxing this from NOT NULL forced a SQLite table rebuild
-    // (migration 0004), hand-authored child-first so the reminder_vehicles / reminder_notifications
-    // ON DELETE CASCADE does not wipe child rows (the lesson: PRAGMA foreign_keys=OFF is a
-    // no-op inside the migrator's transaction).
+    // Nullable for mileage-only reminders, which have no time axis. Time-due queries must null-guard.
+    // PRAGMA foreign_keys is a no-op inside the migrator's transaction, so table rebuilds must go child-first.
     nextDueDate: integer('next_due_date', { mode: 'timestamp' }),
     expenseCategory: text('expense_category'),
     expenseTags: text('expense_tags', { mode: 'json' }).$type<string[]>(),
-    expenseAmount: integer('expense_amount'), // money: integer CENTS (migration 0009) — total amount, required when type='expense' + actionMode='automatic'
+    expenseAmount: integer('expense_amount'), // cents; required when type='expense' and actionMode='automatic'
     expenseDescription: text('expense_description'),
     expenseSplitConfig: text('expense_split_config', { mode: 'json' }).$type<ReminderSplitConfig>(),
     isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
@@ -536,7 +473,7 @@ export const reminders = sqliteTable(
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   },
   (table) => ({
-    // Optimal for the overdue query: WHERE user_id = ? AND is_active = true AND next_due_date <= now
+    // Serves the overdue query: user_id = ? AND is_active AND next_due_date <= now.
     userActiveDueIdx: index('reminders_user_active_due_idx').on(
       table.userId,
       table.isActive,
@@ -545,7 +482,6 @@ export const reminders = sqliteTable(
   })
 );
 
-// Reminder ↔ Vehicles junction table
 export const reminderVehicles = sqliteTable(
   'reminder_vehicles',
   {
@@ -562,7 +498,6 @@ export const reminderVehicles = sqliteTable(
   })
 );
 
-// Reminder Notifications table (persistent notification state)
 export const reminderNotifications = sqliteTable(
   'reminder_notifications',
   {
@@ -575,11 +510,9 @@ export const reminderNotifications = sqliteTable(
     userId: text('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    // Nullable as of T3: a mileage-fired notification has no time period, so it carries
-    // no due_date (its milestone lives in due_odometer instead). Exactly one of dueDate/dueOdometer
-    // is set per notification (time axis vs mileage axis).
-    dueDate: integer('due_date', { mode: 'timestamp' }), // the period this notification is for (time axis)
-    // Odometer milestone for a mileage-fired notification.
+    // Exactly one of dueDate / dueOdometer is set per notification: dueDate for the time axis,
+    // dueOdometer for the mileage axis.
+    dueDate: integer('due_date', { mode: 'timestamp' }),
     dueOdometer: integer('due_odometer'),
     isRead: integer('is_read', { mode: 'boolean' }).notNull().default(false),
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
@@ -587,26 +520,17 @@ export const reminderNotifications = sqliteTable(
   },
   (table) => ({
     userUnreadIdx: index('rn_user_unread_idx').on(table.userId, table.isRead),
-    // Time axis: dedups one notification per reminder + period. dueDate is now nullable; SQLite
-    // treats NULLs as distinct in a UNIQUE index, so mileage rows (null dueDate) are not
-    // constrained here — they get their own index below.
+    // SQLite treats NULLs as distinct in a UNIQUE index, so mileage rows (null dueDate) are not constrained here.
     reminderDueIdx: uniqueIndex('rn_reminder_due_idx').on(table.reminderId, table.dueDate),
-    // Mileage axis: dedups one notification per reminder + odometer milestone. PARTIAL index
-    // (WHERE due_odometer IS NOT NULL) so it only constrains mileage rows — folding dueOdometer
-    // into the time index instead would break time-axis dedup (its NULL dueOdometer is distinct).
+    // Partial so it constrains only mileage rows. Folding dueOdometer into the time index would break time-axis dedup.
     reminderOdoIdx: uniqueIndex('rn_reminder_odo_idx')
       .on(table.reminderId, table.dueOdometer)
       .where(sql`${table.dueOdometer} IS NOT NULL`),
   })
 );
 
-// Vehicle sharing (migration 0010, vehicle-sharing T1).
-// An OWNER grants another existing VROOM user scoped access to ONE of their vehicles. This is the
-// ONLY widening of cross-userId access in VROOM — every read/write route that opts a
-// shared vehicle in routes through utils/sharing.ts (T2), never raw. IDs are text/cuid2 to match
-// users.id + vehicles.id (the design draft said integer — corrected to the live schema). All three
-// FKs cascade so a deleted vehicle/owner/invitee drops the share row (D8); shared-CREATED expense
-// rows are owner-userId-stamped and are NOT touched by this cascade (real cost history stays).
+// Owners grant other users scoped access to one of their vehicles. This is the only cross-user widening
+// of access: every route that reads a shared vehicle must go through utils/sharing.ts.
 export const vehicleShares = sqliteTable(
   'vehicle_shares',
   {
@@ -615,38 +539,30 @@ export const vehicleShares = sqliteTable(
       .$defaultFn(() => createId()),
     vehicleId: text('vehicle_id')
       .notNull()
-      .references(() => vehicles.id, { onDelete: 'cascade' }), // revoke-on-vehicle-delete (D8)
+      .references(() => vehicles.id, { onDelete: 'cascade' }),
     ownerId: text('owner_id')
       .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }), // denormalized for the owner-side list query
+      .references(() => users.id, { onDelete: 'cascade' }),
     sharedWithId: text('shared_with_id')
       .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }), // the invitee
-    level: text('level').notNull(), // 'viewer' | 'editor' (Zod enum at the route)
-    status: text('status').notNull().default('pending'), // 'pending'|'accepted'|'declined'|'revoked'
+      .references(() => users.id, { onDelete: 'cascade' }),
+    level: text('level').notNull(), // 'viewer' | 'editor'
+    status: text('status').notNull().default('pending'), // 'pending' | 'accepted' | 'declined' | 'revoked'
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   },
   (table) => ({
-    // One ACTIVE share per (vehicle, invitee). Partial (WHERE status IN pending/accepted) so a
-    // declined/revoked row does NOT block re-inviting the same user to the same vehicle later.
+    // Partial so a declined or revoked share does not block re-inviting the same user.
     activeShareIdx: uniqueIndex('vehicle_shares_active_idx')
       .on(table.vehicleId, table.sharedWithId)
       .where(sql`status in ('pending','accepted')`),
-    // Invitee-side "shared with me" lookup (by invitee + status).
     sharedWithIdx: index('vehicle_shares_shared_with_idx').on(table.sharedWithId, table.status),
-    // Owner-side "shares I granted" lookup.
     ownerIdx: index('vehicle_shares_owner_idx').on(table.ownerId),
   })
 );
 
-// Push subscriptions (migration 0013, push-notifications T1). A per-user, per-DEVICE Web Push
-// subscription — the endpoint + the two client crypto keys (p256dh + auth) the W3C Push API returns
-// from pushManager.subscribe(). UserId-scoped (the reminder_notifications shape): a user may have many
-// devices, each one row; FK-cascade so a deleted user drops their subscriptions. NOT a backed-up table
-// (it sits on EXCLUDED_BY_DESIGN beside sessions/user_providers): the keys are device-ephemeral secrets
-// re-derivable client-side, and a restored stale subscription would push to a dead endpoint in a new
-// environment — the same "ephemeral, meaningless/unsafe to restore" rationale as sessions.
+// Per-device Web Push subscription. Not backed up: the keys are device-ephemeral, and a restored
+// endpoint would point at a dead subscription in a new environment.
 export const pushSubscriptions = sqliteTable(
   'push_subscriptions',
   {
@@ -656,37 +572,27 @@ export const pushSubscriptions = sqliteTable(
     userId: text('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    // The push-service delivery URL (vendor-specific: fcm.googleapis / web.push.apple / updates.push.services.mozilla …).
     endpoint: text('endpoint').notNull(),
-    // The client public key (base64url) — half of the message-encryption keypair the SW holds.
     p256dh: text('p256dh').notNull(),
-    // The client auth secret (base64url) — the other half; together they encrypt the push payload.
     auth: text('auth').notNull(),
-    // Optional label so the user can recognize a device in a "your devices" list.
     userAgent: text('user_agent'),
-    // Consecutive transient send failures; a row past a cap is reaped (the reaping-hygiene class).
-    failureCount: integer('failure_count').notNull().default(0),
+    failureCount: integer('failure_count').notNull().default(0), // consecutive transient send failures
     lastSuccessAt: integer('last_success_at', { mode: 'timestamp' }),
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   },
   (table) => ({
     userIdx: index('ps_user_idx').on(table.userId),
-    // Idempotent re-subscribe: the same browser re-subscribing returns the SAME endpoint, so upsert
-    // by (userId, endpoint) — never duplicate a device. Scoped by userId so two users could never
-    // collide on a shared endpoint (they cannot — endpoints are per-subscription — but the scope keeps
-    // the unique key tenant-local, mirroring the rest of VROOM).
+    // Upsert key: re-subscribing from the same browser returns the same endpoint.
     userEndpointIdx: uniqueIndex('ps_user_endpoint_idx').on(table.userId, table.endpoint),
   })
 );
 
-// Export types for use in application
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 
 export type Vehicle = typeof vehicles.$inferSelect;
 export type NewVehicle = typeof vehicles.$inferInsert;
 
-// Extended Vehicle type with optional financing relationship
 export type VehicleWithFinancing = Vehicle & {
   financing?: VehicleFinancing;
 };

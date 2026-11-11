@@ -1,8 +1,3 @@
----
-inclusion: fileMatch
-fileMatchPattern: "frontend/src/routes/**/*.svelte,frontend/src/lib/components/**/*.svelte,frontend/src/app.css"
----
-
 # Design System — compose from the kit, don't invent
 
 VROOM has a real component kit (shadcn-svelte primitives + app-level patterns). The single

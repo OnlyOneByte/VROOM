@@ -1,18 +1,7 @@
 /**
- * Assistant chat route (llm-assistant T4) — `POST /api/v1/assistant/chat`. Drives the REAL stack
- * (middleware → requireAuth → zValidator → handler → orchestrator → registry → adapter) via the
- * in-process harness, with the adapter's outbound fetch STUBBED to SCRIPT the model turns (no live key).
- * Pins the orchestrator + route contract (design §4):
- *  - a clean tool-call → final-answer round-trip returns { reply, toolsUsed } and the tool actually ran;
- *  - an UNKNOWN tool name is rejected (fed back as an error, the tool never runs) — the allowlist guard;
- *  - BAD tool args are Zod-rejected (the tool never runs) — the typed-validation guard;
- *  - the K/T caps terminate a runaway tool-loop with an HONEST bounded reply (never a fabricated answer);
- *  - NO configured llm provider → 400; a provider transport failure → 502 (anti-fail-open);
- *  - the IDOR guard holds at the route layer (a model-requested foreign vehicleId cannot leak data);
- *  - unauth → 401.
- *
- * The fetch stub is STATEFUL: a per-test script array yields one scripted OpenAI-style response per
- * model turn, so the test can drive "turn 1 asks for a tool, turn 2 answers".
+ * POST /api/v1/assistant/chat through the real stack, with the provider's fetch stubbed to script each
+ * model turn. Covers the tool loop, the tool allowlist, argument validation, the turn cap, provider
+ * errors, and user scoping.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -86,8 +75,8 @@ afterEach(() => {
   ctx.close();
 });
 
-describe('POST /api/v1/assistant/chat (T4)', () => {
-  test('a clean tool-call then answer round-trip returns the reply + the tool that ran', async () => {
+describe('POST /api/v1/assistant/chat', () => {
+  test('a tool call followed by an answer returns the reply and the tool that ran', async () => {
     await seedLlmProvider();
     // Turn 1: the model asks for getExpenseSummary; Turn 2: it answers with the grounded text.
     stubScript([
@@ -104,24 +93,23 @@ describe('POST /api/v1/assistant/chat (T4)', () => {
     expect(data.toolsUsed).toEqual(['getExpenseSummary']);
   });
 
-  test('an UNKNOWN tool name is rejected — the model recovers and answers (allowlist guard)', async () => {
+  test('an unknown tool name is rejected and the model recovers', async () => {
     await seedLlmProvider();
     stubScript([
-      callTurn('dropAllTables', '{}'), // not in the allowlist
+      callTurn('dropAllTables', '{}'),
       answerTurn('I could not do that, but here is a summary.'),
     ]);
     const res = await ctx.authed('POST', '/api/v1/assistant/chat', { message: 'hi' });
     expect(res.status).toBe(200);
     const data = (await json<DataEnvelope<ChatReply>>(res)).data;
-    // The unknown tool never ran → toolsUsed stays empty.
     expect(data.toolsUsed).toEqual([]);
     expect(data.reply).toContain('summary');
   });
 
-  test('BAD tool args are Zod-rejected — the tool never runs (typed-validation guard)', async () => {
+  test('invalid tool arguments are rejected before the tool runs', async () => {
     await seedLlmProvider();
     stubScript([
-      callTurn('getFuelStats', '{"range":"last-tuesday"}'), // not an allow-listed range enum
+      callTurn('getFuelStats', '{"range":"last-tuesday"}'),
       answerTurn('Here is what I found.'),
     ]);
     const res = await ctx.authed('POST', '/api/v1/assistant/chat', { message: 'mpg?' });
@@ -129,14 +117,13 @@ describe('POST /api/v1/assistant/chat (T4)', () => {
     expect((await json<DataEnvelope<ChatReply>>(res)).data.toolsUsed).toEqual([]);
   });
 
-  test('a runaway tool-loop terminates with an honest bounded reply (the K/T caps)', async () => {
+  test('a runaway tool loop stops with an honest bounded reply', async () => {
     await seedLlmProvider();
-    // The model NEVER answers — it keeps requesting a tool. The loop must terminate via MAX_TURNS.
-    stubScript([callTurn('listVehicles', '{}')]); // the stub repeats the last entry forever
+    // The model never answers, so the loop must stop at its turn cap. The stub repeats its last entry.
+    stubScript([callTurn('listVehicles', '{}')]);
     const res = await ctx.authed('POST', '/api/v1/assistant/chat', { message: 'loop forever' });
     expect(res.status).toBe(200);
     const data = (await json<DataEnvelope<ChatReply>>(res)).data;
-    // Honest bounded reply — NOT a fabricated answer.
     expect(data.reply).toMatch(/not able to finish|try rephrasing/i);
   });
 
@@ -147,7 +134,7 @@ describe('POST /api/v1/assistant/chat (T4)', () => {
     expect(await res.text()).toMatch(/assistant|provider|Settings/i);
   });
 
-  test('a provider transport failure → 502 (anti-fail-open, never a faked reply)', async () => {
+  test('a provider failure returns 502, never a faked reply', async () => {
     await seedLlmProvider();
     stubFailure(429);
     const res = await ctx.authed('POST', '/api/v1/assistant/chat', { message: 'hi' });
@@ -173,7 +160,7 @@ describe('POST /api/v1/assistant/chat (T4)', () => {
     expect(res.status).toBe(401);
   });
 
-  test('IDOR: a tool scoped to the session user never returns another user data', async () => {
+  test('tools only return the session user’s data', async () => {
     await seedLlmProvider();
     // Seed the session user's vehicle + a foreign user's vehicle.
     const mine = await seedVehicle(ctx, { make: 'Mine', model: 'Car', year: 2022 });
@@ -183,14 +170,12 @@ describe('POST /api/v1/assistant/chat (T4)', () => {
     ctx.sqlite.run(
       `INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('veh-foreign', 'other-llm-route', 'Foreign', 'Car', 2022)`
     );
-    // The model calls listVehicles; the tool runs scoped to the SESSION user, so only `mine` comes back.
     stubScript([callTurn('listVehicles', '{}'), answerTurn('You have 1 vehicle.')]);
     const res = await ctx.authed('POST', '/api/v1/assistant/chat', { message: 'my vehicles?' });
     expect(res.status).toBe(200);
     const raw = await res.text();
     const data = JSON.parse(raw) as DataEnvelope<ChatReply>;
     expect(data.data.toolsUsed).toEqual(['listVehicles']);
-    // The foreign vehicle id is never in the response (the tool result fed to the model was scoped).
     expect(raw).not.toContain('veh-foreign');
     expect(mine).toBeTruthy();
   });

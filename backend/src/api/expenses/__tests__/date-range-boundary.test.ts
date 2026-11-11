@@ -1,18 +1,3 @@
-/**
- * Regression guard for the expense-list date-range END boundary.
- *
- * The UI DatePicker sends `endDate` as a date-only `YYYY-MM-DD`, which `z.coerce.date()` turns into
- * LOCAL midnight (00:00:00 — the START of that day). A bare `lte(expenses.date, midnight)` then drops
- * every same-day expense NOT stamped at exactly midnight, so a "through Mar 31" filter silently hides
- * all of Mar 31 (the C6/ local-vs-UTC boundary class). The fix treats a midnight `endDate` as
- * INCLUSIVE of the whole local day (extends to 23:59:59.999 local); a non-midnight `endDate` is
- * honored verbatim. This builder backs BOTH the list (findPaginated) and the CSV export (findAll), so
- * the guard pins the most-used surface + keeps list==export.
- *
- * Dates are built with `new Date(Y, M, D, …)` (LOCAL) so the test is host-independent — the picked
- * day and the seeded timestamps share whatever the host TZ is (sidesteps the UTC-host vacuity trap).
- */
-
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
@@ -62,21 +47,18 @@ function input(overrides: Partial<NewExpense>): NewExpense {
   } as NewExpense;
 }
 
-describe('findPaginated endDate boundary (bug same-day inclusive)', () => {
-  test('an afternoon expense on the endDate day is INCLUDED (the regression)', async () => {
-    // Picked range: Mar 1 → Mar 31. Expense stamped Mar 31, 2:00pm LOCAL.
+describe('findPaginated endDate boundary includes the whole end day', () => {
+  test('an afternoon expense on the endDate day is included', async () => {
     await repo.create(
       input({ description: 'mar 31 afternoon', date: new Date(2026, 2, 31, 14, 0) })
     );
 
     const result = await repo.findPaginated({
       userId: USER_A,
-      // date-only picker values → local midnight, exactly what z.coerce.date() yields server-side.
       startDate: new Date(2026, 2, 1),
       endDate: new Date(2026, 2, 31),
     });
 
-    // Pre-fix this was 0 — the 2pm timestamp exceeded the midnight upper bound and was dropped.
     expect(result.totalCount).toBe(1);
     expect(result.data[0]?.description).toBe('mar 31 afternoon');
   });
@@ -113,13 +95,12 @@ describe('findPaginated endDate boundary (bug same-day inclusive)', () => {
   });
 
   test('a non-midnight endDate (deliberate full timestamp) is honored verbatim, not extended', async () => {
-    // If a caller passes an explicit mid-day upper bound, an expense later that same day must NOT match.
     await repo.create(input({ description: 'before noon', date: new Date(2026, 2, 31, 9, 0) }));
     await repo.create(input({ description: 'after noon', date: new Date(2026, 2, 31, 15, 0) }));
 
     const result = await repo.findPaginated({
       userId: USER_A,
-      endDate: new Date(2026, 2, 31, 12, 0), // noon — not midnight, so NOT day-extended
+      endDate: new Date(2026, 2, 31, 12, 0),
     });
 
     expect(result.totalCount).toBe(1);
@@ -127,7 +108,6 @@ describe('findPaginated endDate boundary (bug same-day inclusive)', () => {
   });
 
   test('findAll (CSV export path) shares the same inclusive boundary', async () => {
-    // The export must surface exactly what the filtered table shows (list==export invariant).
     await repo.create(
       input({ description: 'export mar 31 pm', date: new Date(2026, 2, 31, 16, 30) })
     );

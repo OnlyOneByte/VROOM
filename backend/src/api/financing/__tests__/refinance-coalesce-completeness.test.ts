@@ -1,18 +1,6 @@
 /**
- * The create-or-replace financing path must RESET every nullable cross-type/schedule
- * column to a clean value on reuse, so switching a vehicle's financing TYPE can't leave a prior type's
- * field stale (a `loan` row carrying a lease `mileageLimit`, etc). fixed this by
- * coalescing each `.optional()` field to null on the reused row (routes.ts replace branch); the
- * behavioral test (refinance-cross-type-field-reset) pins the CURRENTLY-known fields in both directions.
- *
- * GAP this closes: that behavioral test enumerates today's fields by hand, so a FUTURE schema migration
- * adding a new NULLABLE financing column would leave the replace path silently merging it stale (the
- * class reopens) while every existing test stays green. This is the source-scan completeness guard (the
- * idiom): it censuses the live `vehicleFinancing` nullable columns via getTableColumns and
- * asserts EACH one is explicitly handled in the replace-path SET object — so adding a nullable column
- * forces the author to either reset it there or consciously exempt it here.
- *
- * Pure source-scan + schema reflection — no DB, no HTTP. Fast.
+ * Source-scan guard: every nullable vehicleFinancing column must be reset in the create-or-replace
+ * SET object, so a new nullable column cannot silently carry a stale value across a type switch.
  */
 
 import { describe, expect, test } from 'bun:test';
@@ -21,24 +9,16 @@ import { vehicleFinancing } from '../../../db/schema';
 
 const ROUTES_SRC = await Bun.file(`${import.meta.dir}/../routes.ts`).text();
 
-/**
- * Isolate the create-OR-REPLACE branch's `financingRepository.update(existingFinancing.id, { ... })` SET
- * object — the block that must reset every nullable cross-type field. Scoped to that call so a field name
- * appearing elsewhere (the schema derivation, the create() call) can't satisfy the assertion spuriously.
- */
+/** The replace-branch update() call, isolated so field names elsewhere in the file cannot satisfy the check. */
 function replaceSetObject(): string {
   const anchor = 'financingRepository.update(existingFinancing.id, {';
   const start = ROUTES_SRC.indexOf(anchor);
   if (start === -1) return '';
-  // The SET object literal ends at the first `});` after the anchor.
   const end = ROUTES_SRC.indexOf('});', start);
   return end === -1 ? ROUTES_SRC.slice(start) : ROUTES_SRC.slice(start, end);
 }
 
-/**
- * System-managed nullable columns the replace path does NOT (and must not) set from the request body:
- * the create/update timestamps are driven by `$defaultFn` / the explicit `updatedAt: new Date()`.
- */
+/** Timestamps are set by defaults or explicitly, never from the request body. */
 const SYSTEM_MANAGED = new Set(['createdAt', 'updatedAt']);
 
 describe('create-or-replace coalesce-list completeness', () => {
@@ -48,7 +28,7 @@ describe('create-or-replace coalesce-list completeness', () => {
     .map(([name]) => name);
 
   test('the census found the expected nullable financing columns (non-vacuous)', () => {
-    // Guards the guard: if the schema reflection returns nothing, the completeness check below is vacuous.
+    // An empty census would make the completeness check below pass trivially.
     expect(nullableCols).toContain('apr');
     expect(nullableCols).toContain('mileageLimit');
     expect(nullableCols.length).toBeGreaterThanOrEqual(7);
@@ -63,8 +43,6 @@ describe('create-or-replace coalesce-list completeness', () => {
     const unmanaged: string[] = [];
     for (const col of nullableCols) {
       if (SYSTEM_MANAGED.has(col)) continue;
-      // Each must appear in the SET object — either coalesced (`col: financingData.col ?? null`) or set
-      // explicitly (`endDate: null`). A new nullable column not handled here trips this.
       if (!new RegExp(`\\b${col}\\b`).test(setObj)) {
         unmanaged.push(col);
       }

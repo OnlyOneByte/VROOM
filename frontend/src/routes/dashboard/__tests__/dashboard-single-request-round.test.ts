@@ -1,20 +1,10 @@
-/**
- * The dashboard's eight opening reads are all independent, so they belong in ONE latency round.
- *
- * Six went out together and then, once ALL six had resolved, two more followed: the batched cover
- * photos and the per-vehicle expense stats. Neither takes an argument and neither reads anything
- * the first six produced — the lookup maps are built after everything resolves — so the carousel's
- * cover art and per-vehicle totals simply arrived a full round trip later than they needed to.
- *
- * This pins it where it is observable: with one first-round read left hanging, the two reads that
- * used to be stuck behind it still go out.
- */
+// Pins that the independent opening reads are issued in one round, not chained.
 
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { render, waitFor } from '@testing-library/svelte';
 import type { Vehicle } from '$lib/types';
 
-/** Mounting needs svelte's CLIENT entries (vite.config.ts sets no `browser` condition for tests). */
+// Mounting needs svelte's client entries; vite.config.ts sets no browser condition for tests.
 vi.mock('svelte', () => import('../../../../node_modules/svelte/src/index-client.js' as string));
 vi.mock(
 	'svelte/reactivity',
@@ -24,7 +14,7 @@ vi.mock(
 vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
-// Charts and the carousel are irrelevant here and account for most of the route's module graph.
+// Charts and the carousel are stubbed: they dominate the module graph.
 vi.mock('$lib/components/charts', () => ({ AppPieChart: () => {} }));
 vi.mock('$lib/components/charts/ExpenseTrendChart.svelte', () => ({ default: () => {} }));
 vi.mock('$lib/components/dashboard/VehicleCarousel.svelte', () => ({ default: () => {} }));
@@ -59,8 +49,7 @@ vi.mock('$lib/services/reminder-api', () => ({
 	}
 }));
 
-// Statically imported so the route's module graph is transformed at file load, outside any test's
-// timeout (the same reason the other component suites import their subject at the top).
+// Imported eagerly so module transforms happen outside test timeouts.
 import Page from '../+page.svelte';
 
 const VEHICLE: Vehicle = {
@@ -123,9 +112,7 @@ describe('dashboard initial load', () => {
 		] as const) {
 			expect(spy.mock.calls.length, `${name} requested exactly once`).toBe(1);
 		}
-		// The summary is the one read requested twice on purpose: all-time for the stat cards, and
-		// the selected period for the trend — except at the default period, where they are the same
-		// request and the page reuses the all-time result instead of asking twice.
+		// The summary is requested once per distinct period: all-time, and the selected one if different.
 		expect(getExpenseSummary.mock.calls.length).toBe(1);
 	});
 });

@@ -1,30 +1,10 @@
-/**
- * The vehicle detail page's Expenses tab is PAGINATED, so every filter it offers has to be applied
- * by the server.
- *
- * It used to request `{ limit, offset, sortBy, sortDir }` and then narrow the 20 rows that came
- * back with a local array filter, while the card title ("All Expenses (N)") and the paginator kept
- * describing the whole set. A vehicle with 60 expenses answered a search for a row on page 3 with
- * the table's empty state next to a header that said 60 — indistinguishable from "you never logged
- * that". The table's category dropdown had the same defect, and the CSV export ignored the filters
- * altogether while its own contract promises the export matches what the user is viewing.
- *
- * These pin the REQUEST and what the table is handed, which is where the bug lived:
- *   - a search term and a category reach the API, and each restarts the page at offset 0 (a
- *     filtered set is a different set, so the offset you were on is meaningless in it);
- *   - the rows handed to the table are exactly the rows the server sent, un-narrowed — the thing
- *     that makes going server-side load-bearing rather than decorative;
- *   - the export carries the active filters.
- */
+// Filters must reach the API and restart at offset 0; the table gets server rows untouched.
 
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, waitFor } from '@testing-library/svelte';
 import type { Expense, Vehicle } from '$lib/types';
 
-/**
- * Mounting needs svelte's CLIENT entries; this suite otherwise resolves the package's `default`
- * (server) ones because vite.config.ts sets no `browser` resolve condition for tests.
- */
+// Mounting needs svelte's client entries; vite.config.ts sets no browser condition for tests.
 vi.mock('svelte', () => import('../../../../../node_modules/svelte/src/index-client.js' as string));
 vi.mock(
 	'svelte/reactivity',
@@ -34,15 +14,8 @@ vi.mock(
 vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
-/**
- * The props the page hands ExpensesTable, captured by standing in for it. A Svelte 5 component is
- * just a `(anchor, props)` function, so a recorder is a legal one — and the props object it
- * receives carries live getters, so reading it later reads the page's CURRENT state.
- *
- * Standing in for the table rather than rendering it is deliberate: the fix under test is entirely
- * the page's (what it requests, and what it passes down), and the real table drags in the whole
- * bits-ui table/select/dialog tree for no added coverage.
- */
+// Records the props handed to ExpensesTable; live getters expose the page's current state.
+// Standing in for the table keeps the test on the page: the table adds no coverage here.
 let tableProps: Record<string, unknown> = {};
 vi.mock('$lib/components/expenses/ExpensesTable.svelte', () => ({
 	default: (_anchor: unknown, props: Record<string, unknown>) => {
@@ -50,8 +23,7 @@ vi.mock('$lib/components/expenses/ExpensesTable.svelte', () => ({
 	}
 }));
 
-// Charts, carousels and dialogs are irrelevant here and account for most of the route's module
-// graph (layerchart/d3/embla), so they are stood in for too.
+// Charts, carousels and dialogs are stubbed; they dominate the module graph.
 vi.mock('$lib/components/charts', () => ({ AppPieChart: () => {} }));
 vi.mock('$lib/components/charts/ExpenseTrendChart.svelte', () => ({ default: () => {} }));
 vi.mock('$lib/components/charts/FuelEfficiencyTrendChart.svelte', () => ({ default: () => {} }));
@@ -107,11 +79,10 @@ vi.mock('$lib/services/analytics-api', () => ({
 	analyticsApi: { getFuelEfficiency: (...args: unknown[]) => getFuelEfficiency(...args) }
 }));
 
-// Statically imported so the route's module graph is transformed at file load, outside any test's
-// timeout (the same reason the other component suites import their subject at the top).
+// Imported eagerly so module transforms happen outside test timeouts.
 import Page from '../+page.svelte';
 
-/** One page of rows the SERVER chose. The page must hand these to the table untouched. */
+// Rows the server chose; the page must pass them through untouched.
 const SERVER_PAGE: Expense[] = [
 	{
 		id: 'e1',
@@ -139,7 +110,7 @@ const SERVER_PAGE: Expense[] = [
 	}
 ] as unknown as Expense[];
 
-/** A multi-page set, so "restart at offset 0" and the header count are both meaningful. */
+// A multi-page set, so the offset reset and the header count are meaningful.
 const TOTAL_COUNT = 60;
 
 beforeEach(() => {
@@ -167,7 +138,6 @@ beforeEach(() => {
 	);
 });
 
-/** Render the route and open its Expenses tab. */
 async function renderExpensesTab() {
 	const screen = render(Page, { props: { data: { vehicleId: 'v1' } } });
 	const tab = await waitFor(() => screen.getByRole('tab', { name: 'Expenses' }));
@@ -176,24 +146,17 @@ async function renderExpensesTab() {
 	return screen;
 }
 
-/** The params object of the most recent list request. */
 function lastListParams(): Record<string, unknown> {
 	const call = getExpensesByVehicle.mock.calls.at(-1);
 	expect(call, 'the expense list was requested at least once').toBeTruthy();
 	return (call as unknown[])[1] as Record<string, unknown>;
 }
 
-/** The expense rows currently handed to the table. */
 function rowsGivenToTable(): Expense[] {
 	return (tableProps['expenses'] ?? []) as Expense[];
 }
 
-/**
- * The mount sequence. Photos are the one read that genuinely depends on the vehicle — it is
- * owner-only server-side, so firing it for a shared viewer buys nothing but a "vehicle not found"
- * toast. Summary, fuel efficiency and per-vehicle stats need only the route param, so making them
- * wait for the vehicle to come back costs a whole round trip on the app's heaviest route.
- */
+// Photos are the only read that needs the vehicle; the rest must not wait for it.
 describe('vehicle detail mount — only the photos read waits for the vehicle', () => {
 	test('summary, fuel efficiency and stats go out WHILE the vehicle request is still pending', async () => {
 		let releaseVehicle: (vehicle: Vehicle) => void = () => {};
@@ -283,9 +246,8 @@ describe('vehicle Expenses tab — filters are applied by the server, across all
 			const screen = await renderExpensesTab();
 			await waitFor(() => expect(rowsGivenToTable()).toHaveLength(SERVER_PAGE.length));
 
-			// A term that matches NEITHER row's description, category or tags. A page that filtered
-			// what it had been sent would hand the table nothing; a page that trusts the server
-			// keeps passing on exactly what came back.
+			// A term matching neither row: a client-side filter would leave the table empty.
+			// Nothing is filtered locally.
 			const input = screen.getByRole('textbox', { name: 'Search expenses' });
 			await fireEvent.input(input, { target: { value: 'zzz-matches-nothing-locally' } });
 			await vi.advanceTimersByTimeAsync(400);
@@ -294,7 +256,7 @@ describe('vehicle Expenses tab — filters are applied by the server, across all
 				expect(lastListParams()).toMatchObject({ search: 'zzz-matches-nothing-locally' })
 			);
 			expect(rowsGivenToTable().map(e => e.id)).toEqual(['e1', 'e2']);
-			// And the count beside them still describes the whole filtered set, not the page.
+			// The count still describes the whole filtered set, not the page.
 			expect(tableProps['totalCount']).toBe(TOTAL_COUNT);
 		} finally {
 			vi.useRealTimers();
@@ -304,8 +266,7 @@ describe('vehicle Expenses tab — filters are applied by the server, across all
 	test('the category axis is CONTROLLED by the page and sent to the API from offset 0', async () => {
 		await renderExpensesTab();
 
-		// Handing the table `onCategoryChange` is what switches its dropdown out of the local mode
-		// that could only ever narrow the page it was given.
+		// Passing onCategoryChange switches the table to server-controlled filtering.
 		const onCategoryChange = tableProps['onCategoryChange'] as ((_c: string) => void) | undefined;
 		expect(onCategoryChange, 'the table is given a category handler').toBeTypeOf('function');
 

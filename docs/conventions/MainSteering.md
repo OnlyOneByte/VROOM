@@ -1,7 +1,3 @@
----
-inclusion: always
----
-
 # Project Conventions
 
 ## Tech Stack

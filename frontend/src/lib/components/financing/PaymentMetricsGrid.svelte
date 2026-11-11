@@ -30,7 +30,6 @@
 		unitPreferences
 	}: Props = $props();
 
-	// Resolve distance label from vehicle unitPreferences, falling back to global settings
 	let units = $derived(unitPreferences ?? settingsStore.unitPreferences);
 	let distLabel = $derived(getDistanceUnitLabel(units.distanceUnit, true));
 
@@ -38,10 +37,8 @@
 		financing.financingType === 'loan' && financing.apr != null && financing.apr > 0
 	);
 
-	// Remaining term in months
 	let remainingMonths = $derived(Math.max(0, financing.termMonths - paymentsCount));
 
-	// Total cost of loan = original amount + total projected interest from amortization schedule
 	let totalCostOfLoan = $derived.by(() => {
 		if (!isLoanWithApr || amortizationSchedule.length === 0) return financing.originalAmount;
 		const totalProjectedInterest = amortizationSchedule.reduce(
@@ -57,10 +54,7 @@
 		return Math.round((totalInterest / financing.originalAmount) * 100);
 	});
 
-	// Lease mileage overage. `financing.mileageLimit` is the ANNUAL allowance; calculateLeaseOverage
-	// scales it by the term (annual × termMonths/12) before comparing against the lifetime `mileageUsed`,
-	// matching the sibling LeaseMetricsCard. Comparing driven miles against the bare ANNUAL number
-	// over-reported the overage + $ fee ~Nx on an N-year lease (the annual-vs-total class).
+	// Compare driven miles against the whole-lease allowance (annual × termMonths/12), or multi-year leases over-report the overage.
 	let leaseOverage = $derived(calculateLeaseOverage(financing, mileageUsed));
 	let excessMiles = $derived(leaseOverage.excessMiles);
 	let overageCost = $derived(leaseOverage.overageCost);

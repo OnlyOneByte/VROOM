@@ -1,22 +1,5 @@
-/**
- * Characterization net for the rate-limit middleware.
- *
- * The abuse-prevention middleware sat at 60% line — the limit-exceeded 429 path (with its Retry-After
- * + X-RateLimit-* headers, a contract the client may read) and the window-reset path were uncovered.
- * These pin the full contract through a minimal Hono app (the error-handler/idempotency convention),
- * driving requests against a tiny window + limit passed directly to `rateLimiter(config)`:
- *  1. first request opens the window (count=1) and passes,
- *  2. requests UP TO the limit pass; the one OVER returns 429 with the documented headers,
- *  3. a 429's body carries RATE_LIMIT_EXCEEDED + retryAfter,
- *  4. the per-key generator isolates callers (one key's exhaustion doesn't 429 another),
- *  5. once the window elapses (resetTime < now) a fresh window opens and requests pass again.
- *
- * `windowMs`/`limit`/`keyGenerator` come from the config ARG (not a frozen CONFIG singleton), so the
- * harness controls them directly. The one CONFIG dependency is `disableRateLimit` (the E2E opt-out):
- * it defaults false in the test process (DISABLE_RATE_LIMIT is set by nothing in the repo), but we
- * GUARD on it so this net can never silently go vacuous. Each test uses a unique
- * key prefix since the store is a module-level singleton shared across the process.
- */
+// Rate limiter window and limit behavior, including the 429 headers and window reset.
+// The store is process-wide, so each test uses its own key.
 
 import { describe, expect, setSystemTime, test } from 'bun:test';
 import { type Context, Hono } from 'hono';
@@ -28,7 +11,6 @@ interface RateLimitErrorBody {
   error: { code: string; message: string; details?: { retryAfter?: number } };
 }
 
-/** Minimal app: a fixed-key rate limiter (tiny window+limit) in front of a trivial 200 handler. */
 function makeApp(opts: { windowMs: number; limit: number; key: string }) {
   const app = new Hono();
   app.use(
@@ -43,8 +25,7 @@ function makeApp(opts: { windowMs: number; limit: number; key: string }) {
   return app;
 }
 
-// Guard: if the E2E opt-out is ever active in the test process, every assertion below would vacuously
-// pass (the limiter just calls next()). Fail loudly instead of lying green.
+// If the E2E opt-out were active, every assertion below would pass vacuously.
 test('precondition: rate limiting is ACTIVE in the test process (not the E2E opt-out)', () => {
   expect(CONFIG.disableRateLimit).toBe(false);
 });
@@ -56,7 +37,6 @@ describe('rate-limit middleware — window + limit', () => {
       const res = await app.request('/ping');
       expect(res.status).toBe(200);
     }
-    // The 4th request in the same window is over the limit.
     const blocked = await app.request('/ping');
     expect(blocked.status).toBe(429);
     expect(blocked.headers.get('X-RateLimit-Limit')).toBe('3');
@@ -80,8 +60,7 @@ describe('rate-limit middleware — window + limit', () => {
     const a = makeApp({ windowMs: 60_000, limit: 1, key: 'k-userA' });
     const b = makeApp({ windowMs: 60_000, limit: 1, key: 'k-userB' });
     expect((await a.request('/ping')).status).toBe(200);
-    expect((await a.request('/ping')).status).toBe(429); // A is now exhausted
-    // B has its own bucket → still allowed.
+    expect((await a.request('/ping')).status).toBe(429);
     expect((await b.request('/ping')).status).toBe(200);
   });
 
@@ -90,9 +69,8 @@ describe('rate-limit middleware — window + limit', () => {
     try {
       setSystemTime(new Date('2024-01-01T00:00:00.000Z'));
       expect((await app.request('/ping')).status).toBe(200);
-      expect((await app.request('/ping')).status).toBe(429); // still inside the window
+      expect((await app.request('/ping')).status).toBe(429);
 
-      // Advance past the 1s window → resetTime < now → a fresh window opens.
       setSystemTime(new Date('2024-01-01T00:00:02.000Z'));
       expect((await app.request('/ping')).status).toBe(200);
     } finally {

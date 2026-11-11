@@ -1,4 +1,4 @@
-// v2: Flat insurance term type matching insurance_terms table columns
+// Flat term row, mirroring the insurance_terms table columns.
 export interface InsuranceTerm {
 	id: string;
 	policyId: string;
@@ -92,8 +92,7 @@ export interface UpdateTermRequest {
 	vehicleCoverage?: TermVehicleCoverage;
 }
 
-// --- Insurance claims (mirror backend claims-validation enums) ---
-
+// Mirrors the backend claims-validation enums.
 export const CLAIM_TYPES = ['collision', 'theft', 'weather', 'vandalism', 'other'] as const;
 export type ClaimType = (typeof CLAIM_TYPES)[number];
 
@@ -132,8 +131,7 @@ export interface CreateClaimRequest {
 export interface UpdateClaimRequest {
 	claimDate?: string;
 	claimType?: ClaimType;
-	// `null` clears the field, `undefined`/absent leaves it unchanged. (JSON
-	// drops `undefined`, so an emptied optional must be sent as explicit null.)
+	// null clears the field; undefined is dropped by JSON, so send null explicitly to clear.
 	description?: string | null;
 	status?: ClaimStatus;
 	payoutAmount?: number | null;

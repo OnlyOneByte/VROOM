@@ -1,28 +1,5 @@
-/**
- * Regression GUARD (committed, travels with the merge) for the CORS↔CSRF origin-allowlist coupling
- * (deep-review-adjacent, flagged this surface unaudited).
- *
- * app.ts wires TWO origin-sensitive middlewares from ONE source of truth:
- *  1. `cors({ origin: CONFIG.cors.origins, ... })` — which cross-origin requests get CORS headers
- *  (so the browser lets the response through).
- *  2. `csrf({ origin: CONFIG.cors.origins })` — which Origin headers are accepted on
- *  state-changing requests (POST/PUT/DELETE/PATCH); a mismatch is rejected as forgery.
- *
- * These MUST read the SAME allowlist. They are coupled only by both literally referencing
- * `CONFIG.cors.origins` — nothing enforced it. If a future edit drifts them (hands `csrf` a hardcoded
- * list, a narrower/wider const, or an env var `cors` doesn't use), the two trust boundaries split:
- *  - CSRF trusting an origin CORS doesn't (or vice versa) → either a CSRF-protection gap on an origin
- *  the app didn't intend to trust, or legitimate cross-origin state-changing requests silently
- *  rejected as forgery. Both are security/availability regressions (isolation), and a
- *  behavioral test that only exercises the happy-path same-origin request stays GREEN, blind to the
- *  drift (the spoof/odd-origin case is the one that isn't routinely exercised).
- *
- * This guard pins the coupling via a source-scan: both middleware calls in app.ts must pass
- * `origin: CONFIG.cors.origins`. Edit either out of lockstep → RED here. The one-edit→source-scan
- * pattern (RAW, atomic, convert, retry-ceiling, export-import columns).
- *
- * Pure source scan — no DB, no network. Runs in the fast suite.
- */
+// Source-scan guard: cors() and csrf() in app.ts must both read the origin allowlist from CONFIG.cors.origins.
+// If either drifts to a hardcoded or different list, the two trust boundaries split.
 
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
@@ -32,13 +9,10 @@ import { fileURLToPath } from 'node:url';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const APP = join(HERE, '..', 'app.ts');
 
-// Match a middleware call `cors({ ... })` / `csrf({ ... })` and capture its single argument-object body
-// (the calls contain no nested parens/braces, so `[^)]*` to the closing `)` is safe). Whitespace is
-// collapsed first so multi-line config bodies match.
+// Captures each call's options object. Whitespace is collapsed first so multi-line objects match.
 const CORS_CALL = /\bcors\(\{([^}]*)\}/;
 const CSRF_CALL = /\bcsrf\(\{([^}]*)\}/;
 
-// The origin must be sourced from the shared config getter, not a hardcoded/divergent list.
 const ORIGIN_FROM_CONFIG = /origin\s*:\s*CONFIG\.cors\.origins\b/;
 
 function appSrcCollapsed(): string {

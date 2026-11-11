@@ -36,7 +36,6 @@
 	let rangeValue = $state<{ start: DateValue; end: DateValue } | undefined>(undefined);
 	let open = $state(false);
 
-	// Sync string values to range DateValue
 	$effect(() => {
 		if (startValue && endValue) {
 			try {
@@ -49,7 +48,6 @@
 		}
 	});
 
-	// Sync range DateValue back to strings
 	$effect(() => {
 		if (rangeValue?.start && rangeValue?.end) {
 			const newStart = rangeValue.start.toString();

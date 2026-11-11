@@ -1,26 +1,4 @@
 <script lang="ts">
-	/**
-	 * Assistant chat surface — llm-assistant T6.
-	 *
-	 * A blocking (D5) chat over the user's own car data: the user types a question, we POST it to the
-	 * shipped `POST /api/v1/assistant/chat` (backend T4) via assistantApi, and render the grounded reply
-	 * plus the read-only tools that ran (transparency, not trust). The assistant is READ-ONLY — it can
-	 * never change data — so there is no confirm/commit step here.
-	 *
-	 * Four-states (R9), at the PAGE level keyed on the provider check:
-	 *  loading — checking whether an `llm` provider is configured
-	 *  error — that check failed (retry)
-	 *  empty — no `llm` provider configured (link to Settings → Assistant)
-	 *  data — the chat surface (its own send lifecycle: idle / sending-spinner / send-error+retry)
-	 *
-	 * SAFE RENDER (R8): the reply is shown as PLAIN TEXT with preserved whitespace (`whitespace-pre-wrap`)
-	 * — a text node, never `{@html}` — so untrusted model output cannot inject markup/script. No markdown
-	 * library is pulled in for v1 (plain text is the safe floor; rich markdown is a later enhancement).
-	 *
-	 * R7 first-use privacy disclosure: before the FIRST message ever, an AlertDialog explains the question
-	 * + the data needed to answer it is sent to the configured provider (and self-hosting keeps it local).
-	 * Dismissal is remembered in localStorage so it shows once (the VLM ReceiptScanButton pattern).
-	 */
 	import { onMount, tick } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { Bot, Send, LoaderCircle, CircleAlert, User } from '@lucide/svelte';
@@ -37,30 +15,26 @@
 	import { ApiError } from '$lib/utils/error-handling';
 
 	const DISCLOSURE_KEY = 'vroom.llm.assistant-disclosed';
-	/** The backend caps history at 12 turns — send the most recent window so a long chat never 400s. */
+	// The backend rejects longer histories, so only the most recent turns are sent.
 	const MAX_HISTORY_TURNS = 12;
 
-	/** A rendered chat message. `toolsUsed` is display-only (the server produces it); it is NOT part of
-	 *  the AssistantTurn we send back as history (the backend accepts user/assistant turns only). */
+	// toolsUsed is display-only; the backend history accepts user/assistant turns without it.
 	interface ChatMessage {
 		role: 'user' | 'assistant';
 		content: string;
 		toolsUsed?: string[];
 	}
 
-	// --- Provider-check (page-level four-states) ---
 	let isLoading = $state(true);
 	let loadError = $state<string | null>(null);
 	let hasProvider = $state(false);
 
-	// --- Chat state ---
 	let messages = $state<ChatMessage[]>([]);
 	let input = $state('');
 	let isSending = $state(false);
 	let sendError = $state<string | null>(null);
 	let scrollEl = $state<HTMLDivElement | null>(null);
 
-	// --- Disclosure ---
 	let showDisclosure = $state(false);
 
 	async function loadProviders() {
@@ -86,19 +60,17 @@
 		try {
 			localStorage.setItem(DISCLOSURE_KEY, '1');
 		} catch {
-			// localStorage may be unavailable (private mode) — proceed anyway; we just re-ask next time.
+			// localStorage can be unavailable (private mode); the disclosure is simply shown again.
 		}
 		showDisclosure = false;
 		void send();
 	}
 
-	/** Scroll the transcript to the newest message after the DOM settles. */
 	async function scrollToBottom() {
 		await tick();
 		if (scrollEl) scrollEl.scrollTop = scrollEl.scrollHeight;
 	}
 
-	/** Build the bounded prior transcript to send as `history` (excludes the in-flight message). */
 	function buildHistory(): AssistantTurn[] {
 		return messages.slice(-MAX_HISTORY_TURNS).map(m => ({ role: m.role, content: m.content }));
 	}
@@ -106,7 +78,7 @@
 	async function send() {
 		const text = input.trim();
 		if (!text || isSending) return;
-		// Gate the very first message behind the privacy disclosure.
+		// The first message is gated behind the privacy disclosure.
 		if (!isDisclosed()) {
 			showDisclosure = true;
 			return;
@@ -133,7 +105,6 @@
 		}
 	}
 
-	/** Retry the last user message (kept in the transcript) without re-appending it. */
 	async function retry() {
 		const last = messages[messages.length - 1];
 		if (!last || last.role !== 'user' || isSending) return;
@@ -170,7 +141,6 @@
 		return err instanceof Error ? err.message : 'Something went wrong. Please try again.';
 	}
 
-	/** Enter sends; Shift+Enter inserts a newline (the standard chat-input idiom). */
 	function onKeydown(e: KeyboardEvent) {
 		if (e.key === 'Enter' && !e.shiftKey) {
 			e.preventDefault();
@@ -214,7 +184,6 @@
 		</EmptyState>
 	{:else}
 		<div class="flex flex-col gap-4" data-testid="assistant-chat">
-			<!-- Transcript -->
 			<div
 				bind:this={scrollEl}
 				class="min-h-[40vh] max-h-[60vh] overflow-y-auto rounded-lg border bg-card p-4 space-y-4"
@@ -301,7 +270,6 @@
 				</div>
 			{/if}
 
-			<!-- Input -->
 			<div class="flex items-end gap-2">
 				<Textarea
 					bind:value={input}

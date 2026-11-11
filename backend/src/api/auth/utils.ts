@@ -1,10 +1,3 @@
-/**
- * Authentication Utilities
- *
- * Shared authentication helper functions to reduce duplication
- * between middleware and route handlers.
- */
-
 import type { Context } from 'hono';
 import { setCookie } from 'hono/cookie';
 import type { Lucia, Session, User } from 'lucia';
@@ -17,7 +10,6 @@ export interface SessionRefreshResult {
   refreshed: boolean;
 }
 
-/** The OAuth-state entries stored while a login/link/provider flow is in flight. */
 export interface OAuthStateEntry {
   codeVerifier?: string;
   createdAt: number;
@@ -28,21 +20,9 @@ export interface OAuthStateEntry {
 }
 
 /**
- * SINGLE-USE consumption of an OAuth `state` from the in-flight store, with flow isolation.
- *
- * The OAuth `state` parameter is the CSRF token of the login/link/provider round-trip: it must be
- * (1) single-use — a replayed callback can't re-consume it; (2) flow-isolated — a state minted for the
- * login flow (no `flowType`) must NOT be accepted by the link/provider callback and vice-versa, else a
- * fixation/confusion attack could cross flows; (3) anti-fixation — a mismatched/unknown state is DELETED
- * on the failed lookup, so a planted value can't linger. This was previously inlined byte-near-identically
- * in `validateLoginState`/`validateLinkState` and pinned only by brittle SOURCE-STRING scans
- * (auth-routes.property.test.ts); extracting it makes the behavior unit-testable (the pattern). The
- * provider flow keeps its own inline consume (it adds a PKCE codeVerifier assertion) — same contract.
- *
- * @param expectedFlow the `flowType` this caller requires: `undefined` for the LOGIN flow (entry must
- *  have NO flowType), or `'auth-link'`/`'provider'` for those flows.
- * @returns the entry on a valid single-use match, else null. EITHER WAY the state is deleted from the
- *  store (consumed on success; evicted on any failure) — never replayable.
+ * Single-use, flow-isolated consume of an OAuth state. The entry is deleted whether or not it
+ * matches, so a failed or replayed state cannot be retried. `expectedFlow` is `undefined` for the
+ * login flow, which requires an entry with no flowType.
  */
 export function consumeOAuthState(
   store: Map<string, OAuthStateEntry>,
@@ -50,7 +30,6 @@ export function consumeOAuthState(
   expectedFlow: OAuthStateEntry['flowType']
 ): OAuthStateEntry | null {
   const entry = stateParam ? store.get(stateParam) : undefined;
-  // Login flow: entry must have NO flowType. Link/provider: flowType must match exactly.
   const flowOk = expectedFlow ? entry?.flowType === expectedFlow : !entry?.flowType;
   if (!stateParam || !entry || !flowOk) {
     if (stateParam) store.delete(stateParam);
@@ -61,21 +40,9 @@ export function consumeOAuthState(
 }
 
 /**
- * Validate a session and, when Lucia has just slid its server-side expiry forward, re-issue the
- * browser cookie so the two deadlines stay together.
- *
- * `lucia.validateSession` is not a pure read: once a session passes its half-life it writes a new
- * `expiresAt` and reports `fresh: true`. The browser cookie, by contrast, is written ONLY at login
- * with a fixed `maxAge`. Nothing else re-writes it, so without this re-issue an actively-used login
- * expires on its original deadline while the server-side session is still perfectly valid — the user
- * is signed out mid-use and `POST /auth/refresh` cannot prevent it, because it runs this same code.
- *
- * `fresh` is the only signal that does not lie about when the DB expiry moved, and it is
- * self-limiting: Lucia flips it in the same call that writes the row, so it is true at most once per
- * half-life window — one `Set-Cookie` per window, not one per request. The session id is REUSED
- * (Lucia extended that row; it did not mint a new one), so there is no rotation to mirror here.
- *
- * Used by both the requireAuth middleware and the POST /auth/refresh route.
+ * Validates a session and re-issues the browser cookie when Lucia extends the session. Lucia moves
+ * the DB expiry during validateSession (signalled by `fresh`), but the cookie is only written at
+ * login, so without this the browser drops a still-valid session on the original deadline.
  */
 export async function validateAndRefreshSession(
   sessionId: string,
@@ -96,8 +63,7 @@ export async function validateAndRefreshSession(
     };
   }
 
-  // Keep this attribute block literal and identical to the login cookie — a session cookie written
-  // with weaker attributes on one auth path is invisible to every happy-path test.
+  // Attributes must match the login cookie exactly (see routes.ts createAuthSession).
   if (c) {
     setCookie(c, lucia.sessionCookieName, session.id, {
       path: '/',

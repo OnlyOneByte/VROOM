@@ -1,11 +1,3 @@
-/**
- * Unit guard (C38) for the import-trackers manual-mapping pure helpers, extracted C38 from
- * ImportExpensesDialog.svelte (vitest can't reach functions defined inside a `.svelte` <script>, so the
- * C37 manual-mapping logic was unpinned). These pin: header parsing (quotes/whitespace), the
- * native-export detection that gates the manual editor, and the auto-guess needle sets (incl. the C37
- * eyes-on additions spent/paid/total→amount, kind→category that a bespoke export needed to preview).
- */
-
 import { describe, expect, test } from 'vitest';
 import {
 	guessManualColumns,
@@ -41,9 +33,7 @@ describe('isNativeImportHeaders', () => {
 	});
 
 	test('a file MISSING any native column is not native (→ manual mapping)', () => {
-		// No 'category' column.
 		expect(isNativeImportHeaders(['date', 'vehicle', 'amount'])).toBe(false);
-		// A bespoke foreign file.
 		expect(isNativeImportHeaders(['Transaction Date', 'Spent', 'Kind'])).toBe(false);
 		expect(isNativeImportHeaders([])).toBe(false);
 	});
@@ -71,7 +61,7 @@ describe('guessManualColumns', () => {
 		});
 	});
 
-	test('the C37 generous needles: spent/paid/total→amount, kind→type→category', () => {
+	test('generous header needles map spent/paid/total to amount and kind to category', () => {
 		expect(guessManualColumns(['Transaction Date', 'Spent', 'Kind', 'Notes'])).toEqual({
 			date: 'Transaction Date',
 			amount: 'Spent',
@@ -84,7 +74,6 @@ describe('guessManualColumns', () => {
 	test('metric volume needles (litre/liter/gallon/fill) + odo map onto fuel-log headers', () => {
 		const guess = guessManualColumns(['Odo (km)', 'Fuel (litres)', 'Fill Amount']);
 		expect(guess.mileage).toBe('Odo (km)');
-		// First volume match wins (litres before "Fill Amount").
 		expect(guess.volume).toBe('Fuel (litres)');
 	});
 

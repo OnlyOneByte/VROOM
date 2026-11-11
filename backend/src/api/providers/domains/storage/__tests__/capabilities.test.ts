@@ -1,8 +1,3 @@
-/**
- * StorageCapabilities helpers (D4a). The capability flags let callers branch BEFORE
- * invoking an operation a limited backend (Google Photos) can't perform.
- */
-
 import { describe, expect, test } from 'bun:test';
 import {
   capabilitiesOf,
@@ -11,9 +6,7 @@ import {
   type StorageProvider,
 } from '../storage-provider';
 
-/** A minimal provider that omits `capabilities` (like Drive/S3). */
 const undeclared = { type: 'google-drive' } as unknown as StorageProvider;
-/** A limited provider that declares reduced capabilities (like Google Photos). */
 const limited = {
   type: 'google-photos',
   capabilities: { delete: false, list: false, arbitraryFiles: false },
@@ -43,8 +36,6 @@ describe('isImageMimeType', () => {
 });
 
 describe('PDF-routing decision (the photo-service gate logic)', () => {
-  // The gate in photo-service is: skip/refuse when
-  //  !capabilitiesOf(provider).arbitraryFiles && !isImageMimeType(file.type)
   const shouldRefuse = (p: StorageProvider, mime: string) =>
     !capabilitiesOf(p).arbitraryFiles && !isImageMimeType(mime);
 

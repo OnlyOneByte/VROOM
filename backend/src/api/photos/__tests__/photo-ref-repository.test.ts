@@ -2,8 +2,6 @@ import { afterEach, describe, expect, mock, test } from 'bun:test';
 import type { NewPhotoRef, PhotoRef } from '../../../db/schema';
 import { PhotoRefRepository } from '../photo-ref-repository';
 
-// --- Test fixtures ---
-
 const now = new Date();
 
 const activeRef: PhotoRef = {
@@ -222,8 +220,7 @@ describe('PhotoRefRepository', () => {
 
   describe('countByProviderAndCategory', () => {
     test('returns count of active refs for provider and entity types', async () => {
-      // countByProviderAndCategory uses select().from().innerJoin().where()
-      // The where() call returns the result array directly (no .limit())
+      // This query resolves at where(), with no limit().
       const countResult = [{ count: 42 }];
       const countDb = {
         select: mock(() => countDb),

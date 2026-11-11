@@ -74,7 +74,6 @@
 </script>
 
 <div class="space-y-3">
-	<!-- Segmented method selector -->
 	<div class="flex rounded-lg border border-input p-0.5">
 		{#each methods as m (m.value)}
 			<Button
@@ -89,7 +88,6 @@
 		{/each}
 	</div>
 
-	<!-- Vehicle allocations -->
 	<div class="space-y-2">
 		{#each vehicles as vehicle (vehicle.id)}
 			<div class="flex items-center gap-2 text-sm">
@@ -141,7 +139,6 @@
 		{/each}
 	</div>
 
-	<!-- Total row -->
 	<div class="flex items-center justify-between border-t border-border pt-2 text-sm">
 		<span class="font-medium text-foreground">Total</span>
 		{#if splitMethod === 'even'}

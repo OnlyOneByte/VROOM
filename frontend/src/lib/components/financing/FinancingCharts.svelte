@@ -15,11 +15,9 @@
 
 	let { financing, amortizationSchedule = [] }: Props = $props();
 
-	// Visibility gate: this chart bypasses ChartCard and uses ChartContainer
-	// directly. Without a gate, it renders into 0×0 containers in hidden tabs.
+	// Gated like ChartCard: this chart renders directly, so it needs its own visibility guard in hidden tabs.
 	let chartGate = createVisibilityWatch();
 
-	// Show amortization chart only for loans with APR > 0
 	let showAmortizationChart = $derived(
 		financing.financingType === 'loan' &&
 			financing.apr &&
@@ -27,7 +25,6 @@
 			amortizationSchedule.length > 0
 	);
 
-	// Prepare data for stacked bar chart with optimization for large datasets
 	let amortizationChartData = $derived.by(() => {
 		if (!showAmortizationChart) return [];
 
@@ -116,7 +113,6 @@
 			</p>
 		</CardHeader>
 		<CardContent class="p-4 sm:p-6">
-			<!-- Legend -->
 			<div
 				class="mb-3 flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-xs sm:text-sm"
 				role="list"

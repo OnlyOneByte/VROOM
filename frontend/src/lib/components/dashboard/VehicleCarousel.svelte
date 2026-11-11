@@ -20,7 +20,7 @@
 		lastActivity: Date | null;
 		hasActiveFinancing: boolean;
 		coverPhotoUrl?: string | null;
-		/** Owner's display name when this vehicle was shared with the user (T12b); null when owned. */
+		/** Owner's display name when the vehicle is shared with the user; null when owned. */
 		sharedBy?: string | null;
 	}
 
@@ -65,12 +65,8 @@
 							class="pl-2 md:pl-4 basis-[85%] sm:basis-[70%] md:basis-1/2 lg:basis-1/3"
 						>
 							<div class="p-1">
-								<!-- Card is NOT interactive itself (that would nest the Add-Expense
-								     button inside an interactive ancestor — an a11y violation). The
-								     vehicle-name link below is the navigation target; the card just
-								     provides the hover affordance. -->
+								<!-- Not interactive itself: a link here would nest the Add-Expense control inside it. -->
 								<Card.Root class="overflow-hidden hover:shadow-lg transition-shadow group">
-									<!-- Image area -->
 									<div
 										class="relative h-40 bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center overflow-hidden"
 									>
@@ -107,11 +103,7 @@
 									</div>
 
 									<Card.Content class="relative p-4 flex flex-col h-[200px]">
-										<!-- Vehicle Name — the card's navigation target. The stretched-link
-										     pattern (`after:absolute after:inset-0`) makes the whole card
-										     clickable for mouse users while keeping a single real <a> for
-										     keyboard/AT. The Add-Expense button sits above it (z-10) so it
-										     stays independently clickable without nesting interactives. -->
+										<!-- The name is the card's navigation target via the stretched link; the action button stays clickable above it. -->
 										<div class="mb-3">
 											<h3 class="font-semibold text-lg leading-tight">
 												<a
@@ -126,7 +118,6 @@
 											{/if}
 										</div>
 
-										<!-- Stats - Fixed height container -->
 										<div class="space-y-2 flex-1">
 											<div class="flex items-center justify-between text-sm">
 												<span class="text-muted-foreground flex items-center gap-1.5">
@@ -155,8 +146,7 @@
 											</div>
 										</div>
 
-										<!-- Action Button — relative z-10 keeps it above the stretched-link
-										     overlay so it's independently clickable. -->
+										<!-- relative z-10 keeps the action button above the stretched-link overlay. -->
 										<Button
 											variant="outline"
 											size="sm"

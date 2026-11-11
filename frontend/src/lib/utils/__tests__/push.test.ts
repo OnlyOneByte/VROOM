@@ -1,10 +1,3 @@
-/**
- * push.ts state-machine guard (push-notifications T5) — the card's status is derived by the PURE
- * `derivePushStatus`, so we pin its precedence exhaustively here (no DOM needed): capability beats
- * configuration beats a hard block beats on/off. Also asserts every status maps to a non-empty,
- * honest label (the D6 request-driven wording lives in the label, not the component).
- */
-
 import { describe, expect, test } from 'vitest';
 import { derivePushStatus, pushStatusLabel, type PushStatus, type PushStatusInput } from '../push';
 
@@ -61,7 +54,7 @@ describe('pushStatusLabel', () => {
 		}
 	});
 
-	test('the subscribed label is honest about request-driven timing (D6 — no guaranteed-schedule claim)', () => {
+	test('the subscribed label does not promise scheduled delivery', () => {
 		const label = pushStatusLabel('subscribed').toLowerCase();
 		expect(label).toContain('reminder check');
 		expect(label).not.toContain('every day');

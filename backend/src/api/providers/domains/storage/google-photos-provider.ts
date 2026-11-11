@@ -1,13 +1,6 @@
 /**
- * Google Photos storage provider — wraps GooglePhotosService behind the
- * StorageProvider interface, declaring REDUCED capabilities (see
- * .kiro/specs/google-photos-provider/):
- *  - delete: false — the Library API is append-only; delete() is a no-op (D1a).
- *  - list: false — no folder/album listing for backup; list() returns [] (D3b).
- *  - arbitraryFiles: false — photos/videos only; callers must not route PDFs here (D2a).
- *
- * Callers consult `capabilitiesOf(provider)` BEFORE invoking delete/list/upload of a
- * non-image, so these reduced operations degrade predictably rather than throwing.
+ * Google Photos provider. The Library API is append-only and photos-only, so the declared
+ * capabilities are reduced; callers check capabilitiesOf() before delete, list or non-image upload.
  */
 
 import { logger } from '../../../../utils/logger';
@@ -30,12 +23,6 @@ export class GooglePhotosProvider implements StorageProvider {
 
   private service: GooglePhotosService;
 
-  /**
-   * @param refreshToken Google OAuth refresh token (ignored when `service` injected).
-   * @param service Optional pre-built service (inject one wired to the in-memory
-   *  fake Photos client in tests — zero network).
-   * @param albumId Optional cached VROOM album id (from provider `config`).
-   */
   constructor(refreshToken: string, service?: GooglePhotosService, albumId?: string) {
     this.service = service ?? new GooglePhotosService(refreshToken, undefined, albumId);
   }
@@ -53,17 +40,12 @@ export class GooglePhotosProvider implements StorageProvider {
     return this.service.download(ref.externalId);
   }
 
-  /**
-   * No-op (D1a). Google Photos has no library-delete; the caller (photo-service)
-   * still removes the VROOM photo/photo_ref rows, so it disappears from VROOM while
-   * remaining in the user's Google Photos library. capabilities.delete=false lets
-   * the caller surface that to the user rather than expecting backend removal.
-   */
+  /** No-op: the Library API cannot delete, so the photo stays in the user's Google Photos library. */
   async delete(_ref: StorageRef): Promise<void> {
     logger.debug('GooglePhotosProvider.delete is a no-op (Library API is append-only)');
   }
 
-  /** Fetch a FRESH baseUrl — the stored one expires (~60 min). */
+  /** Stored base URLs expire after about 60 minutes, so this always fetches a fresh one. */
   async getExternalUrl(ref: StorageRef): Promise<string | null> {
     try {
       return await this.service.getFreshUrl(ref.externalId);
@@ -80,7 +62,7 @@ export class GooglePhotosProvider implements StorageProvider {
     return this.service.healthCheck();
   }
 
-  /** Returns [] (D3b) — Google Photos isn't a backup-ZIP target, only a photo destination. */
+  /** Always empty: Google Photos is only a photo destination, not a backup target. */
   async list(_folderPath: string): Promise<StorageFileInfo[]> {
     return [];
   }

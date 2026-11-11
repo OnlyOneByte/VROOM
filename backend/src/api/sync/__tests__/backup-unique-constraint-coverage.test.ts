@@ -1,27 +1,6 @@
-/**
- * UNIQUE-constraint coverage drift guard — the symmetric sibling of backup-ref-validation-coverage
- *  closing the OTHER half of the pre-wipe-validation net.
- *
- * +: replace-mode restore WIPES the account, then inserts. A backup row that
- * violates a DB-level UNIQUE index slips past per-row + referential validation, the wipe commits,
- * then the colliding INSERT throws — and bun-sqlite's async-tx callback does NOT roll back the wipe
- *  leaving the account EMPTY. validateUniqueConstraints is the
- * gate that rejects such a backup BEFORE the wipe. extended it from 2 to all 5 unique indexes
- * currently on backed-up tables. What NOTHING pins is that it STAYS complete: a future migration can
- * add a 6th unique index to a backed-up table and pass every existing test while validateUniqueConstraints
- * silently fails to cover it — re-opening the exact empty-account gap closed.
- *
- * This guard makes that coverage drift-proof: it RUNTIME-enumerates each backed-up table's unique
- * indexes from the real Drizzle schema (getTableConfig().indexes, filtered to unique) and asserts
- * validateUniqueConstraints checks each one. The single-column `userId` prefix on the partial indexes
- * is dropped: every backup is single-user (metadata.userId is constant across its rows), so a
- * `(user_id, X)` unique index reduces to validating X — which is exactly what the check does
- * (dupCheck(backup.expenses, ['clientId'], …), NOT ['userId','clientId']). So the guard asserts the
- * NON-userId constrained columns (camelCased) each appear in a dupCheck field-array dispatched on the
- * matching backup.<key>.
- *
- * Pure source/schema introspection — no DB, no createTestApp (so no DB-singleton import trap).
- */
+// Every UNIQUE index on a backed-up table must be checked by validateUniqueConstraints, or a
+// duplicate would empty the account during restore. Indexes are enumerated from the schema. The
+// userId prefix is dropped because each backup is single-user. Pure introspection, no DB.
 
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
@@ -34,17 +13,14 @@ import { TABLE_SCHEMA_MAP } from '../../../config';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BACKUP_SRC = readFileSync(join(HERE, '..', 'backup.ts'), 'utf-8');
 
-/** snake_case DB column → camelCase backup-row field (the parsed rows use the schema's JS key). */
+/** snake_case DB column → camelCase backup-row field. */
 function toCamel(col: string): string {
   return col.replace(/_([a-z])/g, (_m, c: string) => c.toUpperCase());
 }
 
-/** The validateUniqueConstraints method body, where dupCheck(backup.<key>, [fields], label) is dispatched. */
 function uniqueCheckBody(): string {
   const start = BACKUP_SRC.indexOf('private validateUniqueConstraints(');
   expect(start, 'validateUniqueConstraints should exist in backup.ts').toBeGreaterThan(-1);
-  // It is the last private method before validateFileSize / the next member; slice generously to
-  // the method that follows it in source (validateFileSize) or, failing that, to end of file.
   const after = BACKUP_SRC.indexOf('validateFileSize(', start);
   return BACKUP_SRC.slice(start, after > start ? after : undefined);
 }
@@ -90,7 +66,7 @@ describe('backup unique-constraint coverage', () => {
 
     for (const [key, table] of Object.entries(TABLE_SCHEMA_MAP)) {
       for (const idx of uniqueIndexesFor(table)) {
-        // A pure userId-only unique index can't cross-collide in a single-user backup → skip.
+        // A userId-only unique index cannot collide within a single-user backup.
         if (idx.nonUserCols.length === 0) continue;
         if (!indexIsChecked(body, key, idx.nonUserCols)) {
           missing.push(
@@ -109,13 +85,11 @@ describe('backup unique-constraint coverage', () => {
     ).toEqual([]);
   });
 
-  test('the introspection actually finds the known unique indexes (anti-vacuity)', () => {
-    // If getTableConfig().indexes ever stops reporting unique indexes (a drizzle API change), the
-    // coverage test above would pass vacuously (nothing to check). Pin the known set so it cannot.
+  test('the introspection finds the known unique indexes', () => {
+    // Pins the known set so a drizzle API change cannot make the coverage test pass vacuously.
     const all = Object.entries(TABLE_SCHEMA_MAP).flatMap(([, table]) =>
       uniqueIndexesFor(table).map((ix) => `${getTableName(table)}:${ix.name}`)
     );
-    // The 5 unique indexes enumerated on backed-up tables.
     expect(all).toContain('expenses:expenses_user_client_idx');
     expect(all).toContain('vehicles:vehicles_user_license_plate_idx');
     expect(all).toContain('photo_refs:pr_photo_provider_idx');

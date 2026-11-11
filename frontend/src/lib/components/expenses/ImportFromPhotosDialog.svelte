@@ -1,21 +1,5 @@
 <script lang="ts">
-	/**
-	 * "Import from Photos" review surface — photos-auto-expense T4.
-	 *
-	 * Opened from the expenses page header (mirrors ImportExpensesDialog). On open it sweeps the user's
-	 * VROOM Photos album via the shipped stage endpoint (photosImportApi.getReceiptDrafts → the backend
-	 * walked the app-created album, parsed each through the user's VLM, filtered already-imported photos,
-	 * PERSISTED NOTHING), then shows a review CHECKLIST: each row = the photo thumbnail + editable draft
-	 * fields (amount / category / date / vehicle) + a "include" checkbox. A batch "Add N expenses" fires N
-	 * idempotent confirmDraft calls (clientId = photos:<photoId>), so a re-import never doubles a row (D3).
-	 *
-	 * Four-states (R9): loading (sweeping) / error (retry — never blocked) / empty ("no new receipts in
-	 * your VROOM Photos album") / data (the checklist). The live Photos + VLM legs stay eyes-on-pending.
-	 *
-	 * R7/D1 disclosure: a one-time AlertDialog before the FIRST sweep states plainly that VROOM reads ONLY
-	 * the receipts IT uploaded to Photos, never the camera roll (the app-created-only platform limit).
-	 * Dismissal is remembered in localStorage (the VLM ReceiptScanButton pattern).
-	 */
+	/** Reads only receipts VROOM uploaded to its Photos album, never the camera roll. */
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Select from '$lib/components/ui/select';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
@@ -35,9 +19,7 @@
 
 	interface Props {
 		open: boolean;
-		/** The user's vehicles — needed for the per-row target-vehicle picker. */
 		vehicles: Vehicle[];
-		/** Called after a successful batch so the parent can refetch the list. */
 		onImported: () => void;
 	}
 
@@ -46,7 +28,6 @@
 	const DISCLOSURE_KEY = 'vroom.photos.import-disclosed';
 	const CATEGORY_VALUES = Object.keys(categoryLabels) as ExpenseCategory[];
 
-	/** A reviewable row: the staged draft + the user's edits + whether to include it in the batch. */
 	interface ReviewRow {
 		photoId: string;
 		thumbnailUrl: string | null;
@@ -68,7 +49,6 @@
 		rows.filter(r => r.include && r.vehicleId && Number(r.amount) > 0).length
 	);
 
-	/** Map a staged draft to an editable row, pre-filling from the draft + sensible defaults. */
 	function toRow(item: ReceiptDraftItem): ReviewRow {
 		return {
 			photoId: item.photoId,
@@ -81,16 +61,7 @@
 		};
 	}
 
-	/**
-	 * Open-gate: sweep ONCE per open transition, gating the FIRST-ever sweep behind the R7/D1
-	 * disclosure. The key is the open state itself — NOT the sweep's result. Inferring "not swept
-	 * yet" from `rows.length === 0 && !isLoading && !loadError` re-armed this effect after every
-	 * sweep that found nothing (the steady state once everything is imported), and since the effect
-	 * also writes those three signals it re-entered immediately: one album search + VLM-filter pass
-	 * per round trip, forever, for as long as the dialog stayed open. Keying on the transition
-	 * sweeps exactly once however the sweep ends, and re-arms when the dialog is closed and
-	 * reopened. (The sibling dialogs use this same lastKey idiom.)
-	 */
+	/** Keyed on the open transition, not the sweep result: deriving "not yet swept" from the rows re-armed the sweep after every empty result. */
 	let lastOpenKey = '';
 	$effect(() => {
 		const key = String(open);
@@ -119,8 +90,6 @@
 	async function sweep() {
 		isLoading = true;
 		loadError = null;
-		// Drop any previous open's review rows up front, so a re-open never shows stale drafts
-		// behind the new sweep.
 		rows = [];
 		try {
 			const drafts = await photosImportApi.getReceiptDrafts();
@@ -157,8 +126,7 @@
 			rows = [];
 			onImported();
 		} catch (e) {
-			// Idempotent creates: the ones that already succeeded are committed; surface the failure +
-			// keep the dialog open so the user can retry (a re-run skips the already-created via clientId).
+			// Committed creates stay committed; the dialog stays open so a retry skips them via clientId.
 			appStore.showError(e instanceof Error ? e.message : 'Failed to add some expenses');
 		} finally {
 			isImporting = false;
@@ -225,12 +193,10 @@
 							class="flex gap-3 rounded-lg border p-3 {row.include ? '' : 'opacity-50'}"
 							data-testid="photos-import-row"
 						>
-							<!-- include checkbox -->
 							<div class="flex items-start pt-1">
 								<Checkbox bind:checked={row.include} aria-label="Include this receipt" />
 							</div>
 
-							<!-- thumbnail -->
 							<div class="h-20 w-20 shrink-0 overflow-hidden rounded-md border bg-muted">
 								{#if row.thumbnailUrl}
 									<img
@@ -246,7 +212,6 @@
 								{/if}
 							</div>
 
-							<!-- editable draft fields -->
 							<div class="grid flex-1 grid-cols-2 gap-2">
 								<div class="space-y-1">
 									<Label class="text-[11px] text-muted-foreground">Amount</Label>

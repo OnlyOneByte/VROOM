@@ -8,15 +8,7 @@ import {
   minOf,
 } from './calculations';
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
 const MAX_REASONABLE_MILES_BETWEEN_FILLUPS = 1000;
-// The realistic-efficiency band (MIN/MAX_VALID_MPG, MIN/MAX_VALID_MI_KWH) now lives in calculations.ts
-// (the lower-level module analytics-charts already imports for maxOf/minOf) — ONE source of truth so the
-// per-vehicle stats averages and the analytics charts can't diverge. Imported at the top of
-// this file.
 
 export const DAY_NAMES = [
   'Sunday',
@@ -52,10 +44,6 @@ const VALID_CATEGORIES = [
   'misc',
 ] as const;
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 export interface FuelEfficiencyPoint {
   date: string;
   efficiency: number;
@@ -80,16 +68,8 @@ export interface FuelExpenseRow {
   vehicleId: string;
 }
 
-/**
- * A row counts as a real FILLUP only if it carries a positive volume. queryFuelExpenses returns ALL
- * category='fuel' rows with no volume filter, and a SPLIT fuel expense creates one sibling PER VEHICLE
- * with volume=null (createSiblings never sets it) — so any fillup-COUNT or per-fillup-average that
- * counts raw rows overcounts a single split fillup as N (the split-sibling overcount
- * class). This is the ONE source of truth for that predicate (was hand-inlined at computeAverageCosts,
- * buildSeasonalEfficiency, buildDayOfWeekPatterns, buildFillupCostByVehicle, and re-defined locally
- * in analytics/repository's buildFuelStatsFromData); a divergent copy silently reintroduces the
- * overcount on one surface.
- */
+// A split fuel expense creates one sibling per vehicle with volume=null, so only volume-bearing
+// rows are fillups.
 export const isFillup = (r: Pick<FuelExpenseRow, 'volume'>): boolean =>
   r.volume != null && r.volume > 0;
 
@@ -102,7 +82,6 @@ export interface GeneralExpenseRow {
   date: Date | number | null;
   mileage: number | null;
   volume: number | null;
-  // Needed so the monthly MPG accumulator can skip multi-tank windows (matches FuelRow).
   missedFillup: boolean;
 }
 
@@ -114,11 +93,6 @@ interface VehicleMetrics {
   totalMileage: number;
 }
 
-// ---------------------------------------------------------------------------
-// Pure functions
-// ---------------------------------------------------------------------------
-
-/** Check if an efficiency value is within realistic bounds for the fuel type. */
 function isRealisticEfficiency(efficiency: number, electric: boolean): boolean {
   if (electric) {
     return efficiency >= MIN_VALID_MI_KWH && efficiency <= MAX_VALID_MI_KWH;
@@ -126,7 +100,6 @@ function isRealisticEfficiency(efficiency: number, electric: boolean): boolean {
   return efficiency >= MIN_VALID_MPG && efficiency <= MAX_VALID_MPG;
 }
 
-/** Try to compute an efficiency point from a consecutive pair. Returns null if invalid. */
 export function computeEfficiencyPoint(
   current: FuelRow,
   previous: FuelRow
@@ -149,18 +122,7 @@ export function computeEfficiencyPoint(
   };
 }
 
-/**
- * A GAS-MPG efficiency point: like computeEfficiencyPoint but null for an electric `current` row. ONE
- * source of truth for the gas/charge partition every MPG-aggregating builder needs — a
- * charge session stores kWh in `volume`, so computeEfficiencyPoint emits a ~mi/kWh value that, summed
- * into a gas-MPG average labeled mi/gal (getFuelEfficiencyLabel is always distance/volume), drags the
- * average down and mislabels the charge's mi/kWh. Every pairing builder routes through here —
- * buildMonthlyConsumption, addSeasonalEfficiencyData, computePerVehicleFuelEfficiency, the per-vehicle
- * monthly comparison — mirroring the gas/charge isolation vehicle-stats.ts applies on its side.
- * EV-only efficiency belongs on the mi/kWh surface, not a mi/gal chart, so a gas-less car correctly
- * contributes no point here. Cost-per-mile is deliberately NOT gated — it spans all energy — so
- * computeMpgAndCostPerMile still calls computeEfficiencyPoint directly for cost.
- */
+// Charge sessions store kWh in volume, so their mi/kWh must not feed a mi/gal average.
 export function gasEfficiencyPoint(
   current: FuelRow,
   previous: FuelRow
@@ -169,19 +131,11 @@ export function gasEfficiencyPoint(
   return computeEfficiencyPoint(current, previous);
 }
 
-/** Convert a date to a YYYY-MM month key. */
 export function toMonthKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-/**
- * Every YYYY-MM month key from `start`'s month through `end`'s month, inclusive.
- *
- * The cursor is anchored to day-1 of each month: stepping a raw day-29..31 date with
- * setMonth overshoots short months (Jan 31 -> "Feb 31" rolls to Mar 2/3), silently SKIPPING
- * February. Anchoring to day-1 is rollover-safe and matches what toMonthKey reads (year+month
- * only). Returns [] if either bound is null or start is after end.
- */
+// The cursor is pinned to day 1: stepping a day 29-31 date with setMonth skips short months.
 export function monthKeysInRange(start: Date | null, end: Date | null): string[] {
   if (!start || !end) return [];
   const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
@@ -194,19 +148,7 @@ export function monthKeysInRange(start: Date | null, end: Date | null): string[]
   return keys;
 }
 
-/**
- * Effective monthly premium for an insurance term.
- *
- * A term may record its cost either as a recurring `monthlyCost` OR as a lump-sum `totalCost`
- * (e.g. a "6-month policy = $1,200" entered as totalCost=1200, monthlyCost=null). The premium
- * math must honour both: using `monthlyCost ?? 0` silently contributes $0 for every totalCost-only
- * term, zeroing its premium total and trend.
- *
- * Precedence: an explicit `monthlyCost` wins. Otherwise amortize `totalCost` across the term's
- * span — `monthsInTerm = monthKeysInRange(start, end).length` (day-1 anchored, inclusive of both
- * endpoint months, matching how the premium trend buckets). Returns 0 when neither cost is set or
- * the term has no resolvable span to amortize across.
- */
+// Ignoring totalCost when monthlyCost is null would zero out every lump-sum term.
 export function effectiveMonthlyPremium(term: {
   startDate: Date | null;
   endDate: Date | null;
@@ -221,31 +163,17 @@ export function effectiveMonthlyPremium(term: {
   return term.totalCost / monthsInTerm;
 }
 
-/** One loan's amortization inputs: current balance, annual rate %, fixed monthly payment. */
 export interface AmortizationLoan {
   balance: number;
   apr: number;
   paymentAmount: number;
 }
 
-/**
- * Amortization schedule: per-month total interest + principal across a set of loans.
- *
- * Each month, a loan's interest = balance * (apr/100/12) and its principal = payment − interest;
- * the balance is then REDUCED by that principal for the next month. The old buildLoanBreakdown
- * computed interest off a balance it never decremented, so every one of the 12 months reported the
- * SAME interest/principal (interest never declined, principal never rose, and a loan that pays off
- * mid-window was over-projected). This walks the balance down month over month, clamping at 0 so a
- * paid-off loan contributes nothing further (no negative interest, no phantom principal).
- *
- * Pure + caller-resolved (no DB): the caller supplies current balances and the month-key labels, so
- * this is unit-testable. `monthKeys.length` months are emitted in order.
- */
+// Interest accrues on the running balance, so it declines as principal is repaid.
 export function buildAmortizationSchedule(
   loans: AmortizationLoan[],
   monthKeys: string[]
 ): Array<{ month: string; interest: number; principal: number }> {
-  // Local running balances so we don't mutate the caller's inputs.
   const balances = loans.map((l) => l.balance);
 
   return monthKeys.map((month) => {
@@ -253,9 +181,9 @@ export function buildAmortizationSchedule(
     let totalPrincipal = 0;
     for (let i = 0; i < loans.length; i++) {
       const balance = balances[i];
-      if (balance <= 0) continue; // paid off — contributes nothing
+      if (balance <= 0) continue;
       const interest = balance * (loans[i].apr / 100 / 12);
-      // Principal can't exceed the remaining balance (the final payment is smaller).
+      // The final payment is smaller than paymentAmount, so principal is capped at the balance.
       const principal = Math.min(Math.max(0, loans[i].paymentAmount - interest), balance);
       totalInterest += Math.max(0, interest);
       totalPrincipal += principal;
@@ -265,18 +193,16 @@ export function buildAmortizationSchedule(
   });
 }
 
-/** Normalize a date field that may be a Date or timestamp (Unix seconds). */
 export function normalizeDate(d: Date | number | null): Date | null {
   if (d == null) return null;
   if (d instanceof Date) return d;
   if (typeof d === 'number') {
-    // Unix timestamps in seconds (< 1e12) vs milliseconds (>= 1e12)
+    // Seconds below 1e12, milliseconds above.
     return new Date(d < 1e12 ? d * 1000 : d);
   }
   return new Date(d);
 }
 
-/** Group fuel expense rows by vehicleId. */
 export function groupByVehicle<T extends { vehicleId: string }>(rows: T[]): Map<string, T[]> {
   const byVehicle = new Map<string, T[]>();
   for (const row of rows) {
@@ -287,13 +213,7 @@ export function groupByVehicle<T extends { vehicleId: string }>(rows: T[]): Map<
   return byVehicle;
 }
 
-/**
- * Iterate consecutive fuel pairs WITHIN each vehicle group. Generic over any row carrying `vehicleId`
- * (it only reads that for grouping; the pairing is type-agnostic). Grouping by vehicle first is what
- * stops a date-ordered multi-vehicle list from pairing two DIFFERENT cars' consecutive rows — the
- * cross-vehicle pooling hazard: `current.mileage − previous.mileage` across cars is meaningless.
- * Exported so getFuelEfficiencyTrend can reuse the exact same per-vehicle pairing as the MPG/cost charts.
- */
+// Pairing is per vehicle so two cars' odometer readings are never subtracted from each other.
 export function forEachVehiclePair<T extends { vehicleId: string }>(
   rows: T[],
   callback: (current: T, previous: T) => void
@@ -308,14 +228,6 @@ export function forEachVehiclePair<T extends { vehicleId: string }>(
   }
 }
 
-/**
- * Return a COPY of `rows` sorted by (vehicleId, then date ascending) — the canonical pre-sort the
- * per-vehicle MPG / cost-per-distance / odometer-progression builders need before pairing consecutive
- * rows (so forEachVehiclePair never straddles two cars or goes out of date order). The whole comparator
- * was hand-duplicated byte-for-byte at 3 sites in analytics/repository.ts. The date-key
- * preserves the original `instanceof Date ? getTime() : Number(date)` exactly: `date` is `Date | number
- * | null` (never a string), so a number is already epoch-ms and `Number(null)` → 0, both unchanged.
- */
 export function sortByVehicleThenDate<T extends { vehicleId: string; date: Date | number | null }>(
   rows: T[]
 ): T[] {
@@ -327,7 +239,6 @@ export function sortByVehicleThenDate<T extends { vehicleId: string; date: Date 
   });
 }
 
-/** Compute MPG and cost-per-mile values from consecutive fuel expense pairs. */
 export function computeMpgAndCostPerMile(rows: FuelExpenseRow[]): {
   mpgValues: number[];
   costPerMileValues: number[];
@@ -339,11 +250,7 @@ export function computeMpgAndCostPerMile(rows: FuelExpenseRow[]): {
     const point = computeEfficiencyPoint(current, previous);
     if (!point) return;
 
-    // mpgValues feeds the FuelStats "Fuel Consumption" card, labeled mi/gal — so a charge session's
-    // ~mi/kWh must NOT count toward it. gasEfficiencyPoint is the ONE source of truth for
-    // that gas/charge partition. costPerMileValues is INTENTIONALLY unfiltered: cost per mile is
-    // total energy spend over total miles (fuel + charge), a consistent $/mi — so the cost block
-    // below uses `point` (any fuel type), while only a gas point counts toward mpg.
+    // Only gas pairs count toward MPG; cost per mile spans all energy, so it is not filtered.
     if (gasEfficiencyPoint(current, previous)) {
       mpgValues.push(point.efficiency);
     }
@@ -356,7 +263,6 @@ export function computeMpgAndCostPerMile(rows: FuelExpenseRow[]): {
   return { mpgValues, costPerMileValues };
 }
 
-/** Build monthly consumption chart data from fuel rows. */
 export function buildMonthlyConsumption(
   rows: FuelExpenseRow[]
 ): Array<{ month: string; efficiency: number; volume: number }> {
@@ -371,8 +277,6 @@ export function buildMonthlyConsumption(
     map.set(key, entry);
   }
 
-  // Add efficiency data from consecutive pairs within each vehicle group. gasEfficiencyPoint (not
-  // computeEfficiencyPoint) so a PHEV's charge mi/kWh doesn't pollute this gas-MPG average.
   forEachVehiclePair(rows, (current, previous) => {
     const point = gasEfficiencyPoint(current, previous);
     if (!point) return;
@@ -384,21 +288,16 @@ export function buildMonthlyConsumption(
     }
   });
 
-  return (
-    Array.from(map.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      // Keep the most RECENT 12 months (slice from the end of the ascending sort). slice(0, 12)
-      // would keep the OLDEST 12 and hide the current period once a user has >12 months of data.
-      .slice(-12)
-      .map(([month, data]) => ({
-        month,
-        efficiency: data.effCount > 0 ? data.effSum / data.effCount : 0,
-        volume: data.volume,
-      }))
-  );
+  return Array.from(map.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .slice(-12)
+    .map(([month, data]) => ({
+      month,
+      efficiency: data.effCount > 0 ? data.effSum / data.effCount : 0,
+      volume: data.volume,
+    }));
 }
 
-/** Build gas price history from fuel rows. */
 export function buildGasPriceHistory(
   rows: FuelExpenseRow[]
 ): Array<{ date: string; fuelType: string; pricePerVolume: number }> {
@@ -409,19 +308,15 @@ export function buildGasPriceHistory(
       fuelType: r.fuelType ?? 'Regular',
       pricePerVolume: r.expenseAmount / (r.volume as number),
     }))
-    .slice(-100); // Cap to last 100 entries
+    .slice(-100);
 }
 
-/** Build fillup cost by vehicle chart data. */
 export function buildFillupCostByVehicle(
   rows: FuelExpenseRow[],
   vehicleNameMap: Map<string, string>
 ): Array<{ month: string; vehicleId: string; vehicleName: string; avgCost: number }> {
   const map = new Map<string, { totalCost: number; count: number }>();
   for (const row of rows) {
-    // Count only volume-bearing rows: a SPLIT fuel expense creates one sibling per vehicle with
-    // volume=null, so an unguarded count/sum treats each partial-cost allocation as a standalone
-    // fillup and dilutes the per-vehicle average fillup cost. See isFillup.
     if (!isFillup(row)) continue;
     const d = normalizeDate(row.date);
     if (!d) continue;
@@ -442,10 +337,9 @@ export function buildFillupCostByVehicle(
       };
     })
     .sort((a, b) => a.month.localeCompare(b.month))
-    .slice(-120); // Cap to last 12 months of data (up to 10 vehicles)
+    .slice(-120);
 }
 
-/** Compute fuel consumption metrics (avg/best/worst efficiency) from efficiency values. */
 export function computeFuelConsumptionMetrics(efficiencyValues: number[]): {
   avgEfficiency: number | null;
   bestEfficiency: number | null;
@@ -460,7 +354,6 @@ export function computeFuelConsumptionMetrics(efficiencyValues: number[]): {
   };
 }
 
-/** Compute average cost metrics from fuel rows. */
 export function computeAverageCosts(
   fuelRows: FuelExpenseRow[],
   costPerMileValues: number[],
@@ -474,14 +367,8 @@ export function computeAverageCosts(
   avgCostPerDay: number | null;
 } {
   const withCost = fuelRows.filter((r) => r.expenseAmount > 0);
-  // avg cost/fillup must be cost-of-fillups ÷ fillup-count, both over the SAME basis. A split fuel
-  // expense creates one sibling PER VEHICLE — each carrying its cost share but volume=null
-  // (createSiblings never sets volume) — so a row-based count overcounts a split fillup as N,
-  // understating avg cost/fillup ~Nx. Restrict BOTH the numerator
-  // and denominator to volume-bearing rows (a real fillup has a volume), matching the isFillup predicate
-  // the fuel-stats COUNT already uses: a null-volume split sibling counts as 0 fillups there, so
-  // its share must drop out of perFillup too (else cost-in-numerator / count-not-in-denominator inflates
-  // it). For an unsplit fillup volume>0 && cost>0 both hold, so this equals the old value on the common path.
+  // Numerator and denominator must share the same row basis, or split-fuel siblings skew the
+  // average.
   const fillups = fuelRows.filter(isFillup);
   const perFillup =
     fillups.length > 0 ? fillups.reduce((s, r) => s + r.expenseAmount, 0) / fillups.length : null;
@@ -498,13 +385,8 @@ export function computeAverageCosts(
   };
 }
 
-/**
- * Miles driven between a consecutive fill-up pair, or null if the window isn't a valid
- * distance measurement — mirroring computeEfficiencyPoint: a missed/partial fill-up (either
- * row) spans multiple tanks, a non-positive delta is out-of-order/duplicate data, and an
- * implausibly large gap (> cap) is bad data. Used so month aggregators can't fold a bogus
- * window into MPG / cost-per-distance.
- */
+// Returns null for a window spanning a missed fill-up, a non-positive delta, or an implausibly
+// large gap.
 function validMilesBetween(
   current: { mileage: number | null; missedFillup: boolean },
   previous: { mileage: number | null; missedFillup: boolean }
@@ -516,7 +398,6 @@ function validMilesBetween(
   return miles;
 }
 
-/** Accumulate cost-per-mile data from consecutive fuel expense pairs for a single vehicle. */
 function accumulateCostPerMile(
   vehicleRows: FuelExpenseRow[],
   map: Map<string, { totalCost: number; totalMiles: number }>
@@ -537,7 +418,6 @@ function accumulateCostPerMile(
   }
 }
 
-/** Build cost per distance chart data from consecutive fuel expense pairs. */
 export function buildCostPerDistanceChart(
   rows: FuelExpenseRow[],
   vehicleNameMap: Map<string, string>
@@ -560,17 +440,15 @@ export function buildCostPerDistanceChart(
       };
     })
     .sort((a, b) => a.month.localeCompare(b.month))
-    .slice(-120); // Cap to last 120 entries
+    .slice(-120);
 }
 
-/** Assign maintenance timeline status based on days remaining. */
 function assignTimelineStatus(daysRemaining: number): 'good' | 'warning' | 'overdue' {
   if (daysRemaining < 0) return 'overdue';
   if (daysRemaining < 30) return 'warning';
   return 'good';
 }
 
-/** Estimate the average interval in days between sorted service dates. */
 function estimateServiceInterval(sorted: GeneralExpenseRow[]): number {
   if (sorted.length < 2) return 180;
   const intervals: number[] = [];
@@ -585,7 +463,6 @@ function estimateServiceInterval(sorted: GeneralExpenseRow[]): number {
   return Math.round(intervals.reduce((a, b) => a + b, 0) / intervals.length);
 }
 
-/** Build a single maintenance timeline entry from a service group. */
 function buildTimelineEntry(
   service: string,
   rows: GeneralExpenseRow[],
@@ -620,7 +497,6 @@ function buildTimelineEntry(
   };
 }
 
-/** Build maintenance timeline from maintenance expenses. */
 export function buildMaintenanceTimeline(
   maintenanceRows: GeneralExpenseRow[],
   now: Date
@@ -655,7 +531,6 @@ export function buildMaintenanceTimeline(
   return timeline.sort((a, b) => a.daysRemaining - b.daysRemaining).slice(0, 50);
 }
 
-/** Add efficiency data from consecutive fuel pairs to season data map. */
 function addSeasonalEfficiencyData(
   fuelRows: FuelExpenseRow[],
   seasonData: Map<string, { effSum: number; effCount: number; fillupCount: number }>
@@ -665,7 +540,6 @@ function addSeasonalEfficiencyData(
       const current = vehicleRows[i];
       const previous = vehicleRows[i - 1];
       if (!current || !previous) continue;
-      // gasEfficiencyPoint: gas-MPG only, no PHEV charge mi/kWh in this seasonal average.
       const point = gasEfficiencyPoint(current, previous);
       if (!point) continue;
       const d = new Date(point.date);
@@ -679,7 +553,6 @@ function addSeasonalEfficiencyData(
   }
 }
 
-/** Build seasonal efficiency from fuel expense rows. */
 export function buildSeasonalEfficiency(
   fuelRows: FuelExpenseRow[]
 ): Array<{ season: string; avgEfficiency: number; fillupCount: number }> {
@@ -688,11 +561,6 @@ export function buildSeasonalEfficiency(
   for (const row of fuelRows) {
     const d = normalizeDate(row.date);
     if (!d) continue;
-    // Count only volume-bearing rows as fillups. A split fuel
-    // expense creates one sibling PER VEHICLE, each carrying its cost share but volume=null
-    // (createSiblings never sets volume), so an unconditional row count would overcount a single
-    // split fillup as N in the season's fillupCount. A real fillup has a volume — mirror the
-    // isFillup predicate computeAverageCosts and the fuel-stats COUNT already use.
     if (!isFillup(row)) continue;
     const season = SEASON_MAP[d.getMonth()] ?? 'Winter';
     const entry = seasonData.get(season) ?? { effSum: 0, effCount: 0, fillupCount: 0 };
@@ -712,7 +580,6 @@ export function buildSeasonalEfficiency(
   });
 }
 
-/** Normalize a score to 0-100 range. */
 function normalizeScore(value: number, min: number, max: number, invert: boolean): number {
   if (max === min) return 50;
   const ratio = (value - min) / (max - min);
@@ -720,7 +587,6 @@ function normalizeScore(value: number, min: number, max: number, invert: boolean
   return Math.max(0, Math.min(100, Math.round(score * 100)));
 }
 
-/** Accumulate expense-based metrics per vehicle. */
 function accumulateExpenseMetrics(
   allExpenses: GeneralExpenseRow[],
   metrics: Map<string, VehicleMetrics>
@@ -739,7 +605,6 @@ function accumulateExpenseMetrics(
   }
 }
 
-/** Compute average fuel efficiency per vehicle from consecutive fuel pairs. */
 function computePerVehicleFuelEfficiency(
   fuelRows: FuelExpenseRow[],
   metrics: Map<string, VehicleMetrics>
@@ -753,7 +618,6 @@ function computePerVehicleFuelEfficiency(
   for (const [vId, rows] of vFuelRows) {
     const mpgValues: number[] = [];
     for (let i = 1; i < rows.length; i++) {
-      // gasEfficiencyPoint: this feeds the radar's fuelEfficiency (gas MPG), no charge mi/kWh.
       const point = gasEfficiencyPoint(rows[i] as FuelRow, rows[i - 1] as FuelRow);
       if (point) mpgValues.push(point.efficiency);
     }
@@ -764,22 +628,12 @@ function computePerVehicleFuelEfficiency(
   }
 }
 
-/**
- * Per-vehicle unit converters the radar applies to its UNIT-BEARING metrics before the cross-fleet
- * normalize. `fuelEfficiency` (each vehicle's avg gas MPG in ITS units — mi/gal or km/L) and `mileage`
- * (each vehicle's max odometer in ITS distance unit) are normalized via min/max ACROSS the whole fleet,
- * so a mixed mi+km / gal+L fleet would rank a 15 km/L car (~35 mpg) BELOW a 30 mpg car though it's more
- * efficient — the ranking can fully invert. The repository binds these closures from
- * vehicleUnitsMap + userUnits (it owns the unit-conversion deps); analytics-charts stays unit-naive. Omit
- * for a same-unit fleet (or any non-fleet caller) → byte-identical raw behavior. maintenanceCost / annualCost
- * ($) and reliability (a count) are unit-free — NOT converted.
- */
+// Only fuelEfficiency and mileage carry units; costs and the reliability count do not.
 export interface RadarUnitConverters {
   efficiency: (value: number, vehicleId: string) => number;
   distance: (value: number, vehicleId: string) => number;
 }
 
-/** Build vehicle radar scores from expense data. */
 export function buildVehicleRadar(
   allExpenses: GeneralExpenseRow[],
   fuelRows: FuelExpenseRow[],
@@ -811,10 +665,7 @@ export function buildVehicleRadar(
   accumulateExpenseMetrics(allExpenses, metrics);
   computePerVehicleFuelEfficiency(fuelRows, metrics);
 
-  // Convert each vehicle's UNIT-BEARING metrics (gas MPG + odometer) to the user's global
-  // units BEFORE the cross-fleet min/max normalize, so a mixed mi+km/gal+L fleet ranks like-with-like.
-  // No-op when `convert` is omitted (same-unit fleet); a converter is identity for a vehicle already in
-  // the user's units (convertEfficiency/convertDistance short-circuit on equal from/to).
+  // Convert before the cross-fleet min/max normalization, or mixed-unit fleets rank unlike values.
   if (convert) {
     for (const [vId, m] of metrics) {
       if (m.fuelEfficiency > 0) m.fuelEfficiency = convert.efficiency(m.fuelEfficiency, vId);
@@ -869,7 +720,6 @@ export function buildVehicleRadar(
   });
 }
 
-/** Build day-of-week patterns from fuel expenses. */
 export function buildDayOfWeekPatterns(
   fuelRows: FuelExpenseRow[]
 ): Array<{ day: string; fillupCount: number; avgCost: number; avgVolume: number }> {
@@ -878,12 +728,6 @@ export function buildDayOfWeekPatterns(
   for (const row of fuelRows) {
     const d = normalizeDate(row.date);
     if (!d) continue;
-    // Count only volume-bearing rows as fillups (the split-sibling class — the
-    // sibling buildSeasonalEfficiency already guards this at :644). A split fuel expense creates one
-    // sibling PER VEHICLE, each with its cost share but volume=null (createSiblings never sets volume),
-    // and queryFuelExpenses has no volume filter — so an unconditional count would overcount one split
-    // fillup as N AND skew avgVolume (totalGallons/N) + avgCost (per-row not per-fillup). A real fillup
-    // has a volume; mirror computeAverageCosts.
     if (!isFillup(row)) continue;
     const dayName = DAY_NAMES[d.getDay()] ?? 'Sunday';
     const entry = dayData.get(dayName) ?? { count: 0, totalCost: 0, totalGallons: 0 };
@@ -904,7 +748,6 @@ export function buildDayOfWeekPatterns(
   });
 }
 
-/** Build monthly cost heatmap from all expenses. */
 export function buildMonthlyCostHeatmap(allExpenses: GeneralExpenseRow[]): Array<{
   month: string;
   fuel: number;
@@ -947,19 +790,15 @@ export function buildMonthlyCostHeatmap(allExpenses: GeneralExpenseRow[]): Array
 
   return Array.from(monthMap.entries())
     .sort(([a], [b]) => a.localeCompare(b))
-    .slice(-24) // Cap to last 24 months
+    .slice(-24)
     .map(([month, data]) => ({ month, ...data }));
 }
 
-/** Sort rows by date and accumulate day-gaps into buckets. */
 function accumulateIntervalBuckets(
   vehicleRows: FuelExpenseRow[],
   buckets: Array<{ label: string; min: number; max: number; count: number }>
 ): void {
-  // Copy before sorting: today the caller passes a freshly-grouped local array so an
-  // in-place sort is harmless, but a defensive copy keeps this helper pure (no input
-  // mutation) so a future caller that passes a shared/order-significant array can't be
-  // bitten by a hidden reorder. Behavior-identical for the current call site.
+  // Sort a copy so the caller's array keeps its order.
   const sorted = [...vehicleRows].sort((a, b) => {
     const da = normalizeDate(a.date);
     const db = normalizeDate(b.date);
@@ -976,7 +815,6 @@ function accumulateIntervalBuckets(
   }
 }
 
-/** Build fillup interval distribution from sorted fuel expenses. */
 export function buildFillupIntervals(
   fuelRows: FuelExpenseRow[]
 ): Array<{ intervalLabel: string; count: number }> {
@@ -1005,7 +843,6 @@ export function buildFillupIntervals(
     .map((b) => ({ intervalLabel: b.label, count: b.count }));
 }
 
-/** Compute maintenance regularity score from sorted maintenance expense dates. */
 export function computeRegularityScore(
   maintenanceDates: Array<{ date: Date | number | null }>
 ): number {
@@ -1027,7 +864,6 @@ export function computeRegularityScore(
   return maintenanceDates.length === 1 ? 75 : 50;
 }
 
-/** Compute mileage interval adherence score from maintenance expenses with mileage. */
 export function computeMileageScore(mileageExpenses: Array<{ mileage: number | null }>): number {
   if (mileageExpenses.length < 2) return 50;
   const mileageGaps: number[] = [];
@@ -1042,7 +878,6 @@ export function computeMileageScore(mileageExpenses: Array<{ mileage: number | n
   return Math.round((goodIntervals.length / mileageGaps.length) * 100);
 }
 
-/** Build TCO monthly trend grouped by category. */
 export function buildTCOMonthlyTrend(
   rows: Array<{
     category: string;
@@ -1082,7 +917,6 @@ export function buildTCOMonthlyTrend(
     .map(([month, data]) => ({ month, ...data }));
 }
 
-/** Build monthly maintenance costs for a vehicle. */
 export function buildVehicleMaintenanceCosts(
   allExpenses: GeneralExpenseRow[]
 ): Array<{ month: string; cost: number }> {
@@ -1099,7 +933,6 @@ export function buildVehicleMaintenanceCosts(
     .map(([month, cost]) => ({ month, cost }));
 }
 
-/** Accumulate fuel data for a single row into the month map. */
 function accumulateFuelRow(
   monthData: Map<
     string,
@@ -1114,9 +947,8 @@ function accumulateFuelRow(
   const entry = monthData.get(key) ?? { totalCost: 0, totalGallons: 0, totalMiles: 0, count: 0 };
   entry.totalCost += row.expenseAmount;
 
-  // Only fold a pair into the month's MPG when it's a valid distance window (skips missed
-  // fill-ups + over-cap gaps, mirroring computeEfficiencyPoint) AND this row has volume —
-  // else one tank's volume gets counted against two tanks' miles, inflating MPG.
+  // A volume is only paired with miles from a valid window, or one tank's fuel gets divided by two
+  // tanks' miles.
   const miles = prevRow ? validMilesBetween(row, prevRow) : null;
   if (miles !== null && row.volume != null && row.volume > 0) {
     entry.totalMiles += miles;
@@ -1126,7 +958,6 @@ function accumulateFuelRow(
   monthData.set(key, entry);
 }
 
-/** Build fuel efficiency and cost by month for a vehicle. */
 export function buildFuelEfficiencyAndCost(
   fuelRows: GeneralExpenseRow[]
 ): Array<{ month: string; efficiency: number | null; cost: number }> {
@@ -1157,7 +988,6 @@ export function buildFuelEfficiencyAndCost(
     }));
 }
 
-/** Build expense breakdown by category for a vehicle. */
 export function buildVehicleExpenseBreakdown(
   allExpenses: GeneralExpenseRow[]
 ): Array<{ category: string; amount: number }> {
@@ -1171,7 +1001,6 @@ export function buildVehicleExpenseBreakdown(
   return Array.from(map.entries()).map(([category, amount]) => ({ category, amount }));
 }
 
-/** Build monthly expense trends from all expenses. */
 export function buildMonthlyExpenseTrends(
   allExpenses: GeneralExpenseRow[]
 ): Array<{ month: string; amount: number }> {
@@ -1184,11 +1013,10 @@ export function buildMonthlyExpenseTrends(
   }
   return Array.from(map.entries())
     .sort(([a], [b]) => a.localeCompare(b))
-    .slice(-24) // Cap to last 24 months
+    .slice(-24)
     .map(([month, amount]) => ({ month, amount }));
 }
 
-/** Build expense by category with percentages. */
 export function buildExpenseByCategory(
   allExpenses: GeneralExpenseRow[]
 ): Array<{ category: string; amount: number; percentage: number }> {
@@ -1209,7 +1037,6 @@ export function buildExpenseByCategory(
   }));
 }
 
-/** Build fuel efficiency comparison across vehicles by month. */
 export function buildFuelEfficiencyComparison(
   fuelRows: FuelExpenseRow[],
   vehicleNameMap: Map<string, string>
@@ -1217,7 +1044,6 @@ export function buildFuelEfficiencyComparison(
   month: string;
   vehicles: Array<{ vehicleId: string; vehicleName: string; efficiency: number }>;
 }> {
-  // Group fuel rows by vehicle
   const byVehicle = new Map<string, FuelExpenseRow[]>();
   for (const row of fuelRows) {
     const arr = byVehicle.get(row.vehicleId) ?? [];
@@ -1225,11 +1051,9 @@ export function buildFuelEfficiencyComparison(
     byVehicle.set(row.vehicleId, arr);
   }
 
-  // Compute monthly efficiency per vehicle
   const monthVehicleEff = new Map<string, Map<string, { sum: number; count: number }>>();
   for (const [vId, rows] of byVehicle) {
     for (let i = 1; i < rows.length; i++) {
-      // gasEfficiencyPoint: per-vehicle gas-MPG comparison, no PHEV charge mi/kWh.
       const point = gasEfficiencyPoint(rows[i] as FuelRow, rows[i - 1] as FuelRow);
       if (!point) continue;
       const month = toMonthKey(new Date(point.date));
@@ -1244,7 +1068,7 @@ export function buildFuelEfficiencyComparison(
 
   return Array.from(monthVehicleEff.entries())
     .sort(([a], [b]) => a.localeCompare(b))
-    .slice(-24) // Cap to last 24 months
+    .slice(-24)
     .map(([month, vehicleMap]) => ({
       month,
       vehicles: Array.from(vehicleMap.entries()).map(([vId, data]) => ({
@@ -1255,7 +1079,6 @@ export function buildFuelEfficiencyComparison(
     }));
 }
 
-/** Find the biggest expense from a list of general expense rows. */
 export function findBiggestExpense(
   rows: GeneralExpenseRow[]
 ): { description: string; amount: number; date: string } | null {
@@ -1277,7 +1100,6 @@ export function findBiggestExpense(
   };
 }
 
-/** Compute previous year comparison given current and previous totals. */
 export function computePreviousYearComparison(
   currentTotal: number,
   previousTotal: number

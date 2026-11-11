@@ -70,7 +70,6 @@
 	let unlinkError = $state<string | null>(null);
 	let linkingProvider = $state<string | null>(null);
 
-	// --- Display name editing ---
 	let isEditingName = $state(false);
 	let nameDraft = $state('');
 	let isSavingName = $state(false);
@@ -142,7 +141,7 @@
 			accounts = fetchedAccounts;
 			providers = fetchedProviders;
 		} catch {
-			// Silently handle — accounts will show empty
+			// Accounts section falls back to empty.
 		} finally {
 			isLoadingAccounts = false;
 		}
@@ -173,7 +172,6 @@
 		}
 	}
 
-	// --- Export all data ---
 	let isExporting = $state(false);
 
 	async function handleExportData() {
@@ -202,7 +200,6 @@
 			<p class="text-muted-foreground">Manage your account and personal preferences</p>
 		</div>
 
-		<!-- Identity -->
 		<Card>
 			<CardHeader>
 				<div class="flex items-center gap-2">
@@ -296,7 +293,6 @@
 			</CardContent>
 		</Card>
 
-		<!-- Link Error / Success Messages -->
 		{#if linkErrorMessage}
 			<div
 				class="flex items-start gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4"
@@ -306,16 +302,12 @@
 			</div>
 		{/if}
 		{#if successMessage}
-			<!-- Icon keeps the chart-2 "success" hue (graphical, exempt) + the tint bg;
-			     the TEXT is text-foreground because chart-2 on its own 10% tint is ~3.26:1,
-			     below WCAG AA 4.5:1 for this small text. -->
 			<div class="flex items-start gap-3 rounded-lg border border-chart-2/50 bg-chart-2/10 p-4">
 				<CircleCheck class="h-5 w-5 text-chart-2 shrink-0 mt-0.5" />
 				<p class="text-sm text-foreground">{successMessage}</p>
 			</div>
 		{/if}
 
-		<!-- Connected Accounts -->
 		<Card>
 			<CardHeader>
 				<div class="flex items-center gap-2">
@@ -404,7 +396,6 @@
 			</CardContent>
 		</Card>
 
-		<!-- Sessions -->
 		<ComingSoonCard
 			icon={Monitor}
 			title="Sessions"
@@ -416,7 +407,6 @@
 			]}
 		/>
 
-		<!-- Data & Privacy -->
 		<Card>
 			<CardHeader>
 				<div class="flex items-center gap-2">
@@ -426,7 +416,6 @@
 				<CardDescription>Control your data and privacy preferences</CardDescription>
 			</CardHeader>
 			<CardContent class="space-y-4">
-				<!-- Export all data (live) -->
 				<div class="flex items-center justify-between gap-3">
 					<div class="flex items-center gap-2 text-sm">
 						<Download class="h-4 w-4 text-muted-foreground" />
@@ -448,10 +437,6 @@
 					</Button>
 				</div>
 				<Separator />
-				<!-- Delete account (not yet available — destructive, needs confirm flow).
-				     No opacity-50: dimming muted text drops it below WCAG AA contrast.
-				     Full-opacity muted-foreground (~5:1) reads as secondary while staying
-				     accessible; the "Coming soon" pill carries the disabled state. -->
 				<div class="flex items-center justify-between gap-3">
 					<div class="flex items-center gap-2 text-sm text-muted-foreground">
 						<Trash2 class="h-4 w-4" />
@@ -462,7 +447,6 @@
 			</CardContent>
 		</Card>
 
-		<!-- Sharing -->
 		<ComingSoonCard
 			icon={Users}
 			title="Sharing"
@@ -473,7 +457,6 @@
 			]}
 		/>
 
-		<!-- Notifications -->
 		<ComingSoonCard
 			icon={Bell}
 			title="Notifications"

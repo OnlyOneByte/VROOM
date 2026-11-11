@@ -1,13 +1,5 @@
-/**
- * In-memory fake of the Google Photos {@link PhotosClient} surface. Inject into
- * GooglePhotosService (constructor seam) to drive the real service logic — album
- * resolve-or-create, 2-step upload, fresh-URL fetch, download — with ZERO network
- * and no `mock.module`, per .kiro/steering/TestingExternalAPIs.md.
- *
- * Determinism: ids are a monotonic counter, baseUrls embed the id. Resilience:
- * {@link FakePhotosStore.injectFault} makes the Nth call to a method throw a
- * Gaxios-shaped error so tests can assert how the service handles 401/403/429.
- */
+// In-memory fake of the Google Photos client surface. Inject it into GooglePhotosService to run real service
+// logic with no network and no mock.module.
 
 import type {
   PhotosAlbum,
@@ -40,11 +32,11 @@ export function photosApiError(
   return err;
 }
 
-/** Shared backing store for the fake Photos client. One per test for isolation. */
+// Shared backing store for the fake Photos client. Create one per test.
 export class FakePhotosStore {
   albums = new Map<string, PhotosAlbum>();
   media = new Map<string, StoredMedia>();
-  /** Pending upload tokens → bytes, consumed by batchCreate. */
+  // Consumed by batchCreate.
   uploadTokens = new Map<string, { bytes: Buffer; mimeType: string; fileName: string }>();
   private idCounter = 0;
   private faults: FaultRule[] = [];
@@ -54,7 +46,6 @@ export class FakePhotosStore {
     return `${prefix}-${this.idCounter}`;
   }
 
-  /** Arm the next `times` call(s) to `method` (e.g. 'batchCreate') to throw `error`. */
   injectFault(method: string, error: Error, times = 1): void {
     this.faults.push({ method, error, remaining: times });
   }
@@ -67,19 +58,13 @@ export class FakePhotosStore {
     }
   }
 
-  /** Seed an album directly (bypasses the API) — e.g. a pre-existing VROOM album. */
   seedAlbum(title: string): string {
     const id = this.nextId('album');
     this.albums.set(id, { id, title });
     return id;
   }
 
-  /**
-   * Script the media items `searchMediaItems` returns, in pages of `pageSize` (default: one page).
-   * Each entry becomes a stored media item (id + bytes) so a later download() resolves it. Returns
-   * the created media-item ids in order. Lets a stage-endpoint test drive a multi-photo sweep + the
-   * D4 cap + pagination without any network.
-   */
+  // Scripts the items searchMediaItems returns, paged by pageSize. Each item is also stored, so download() resolves it.
   seedSearchablePhotos(
     specs: Array<{ filename?: string; mimeType?: string; bytes?: Buffer }>,
     pageSize = specs.length || 1
@@ -102,12 +87,10 @@ export class FakePhotosStore {
     return ids;
   }
 
-  /** The ordered ids `searchMediaItems` paginates over (set by {@link seedSearchablePhotos}). */
   searchableIds: string[] = [];
   searchPageSize = 1;
 }
 
-/** Build a fake {@link PhotosClient} backed by `store`. */
 export function makeFakePhotosClient(store: FakePhotosStore): PhotosClient {
   const baseUrlFor = (id: string) => `https://photos.fake/${id}`;
 
@@ -191,7 +174,6 @@ export function makeFakePhotosClient(store: FakePhotosStore): PhotosClient {
         } satisfies PhotosMediaItem;
       });
       const page: PhotosSearchPage = { items };
-      // Emit a nextPageToken only while more seeded ids remain.
       if (end < store.searchableIds.length) page.nextPageToken = String(end);
       return Promise.resolve(page);
     },

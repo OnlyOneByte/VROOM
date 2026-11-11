@@ -59,7 +59,6 @@
 	let inputAmount = $derived(parseFloat(inputValue) || 0);
 	let minimumPayment = $derived(calculateMinimumPayment(financing));
 
-	// Debounced input for impact calculations
 	let debouncedInput = $state(0);
 	const updateDebounced = debounce((val: number) => {
 		debouncedInput = val;
@@ -70,7 +69,6 @@
 		updateDebounced(current);
 	});
 
-	// Reset state when dialog opens
 	$effect(() => {
 		if (open) {
 			inputValue = financing.paymentAmount.toFixed(2);
@@ -100,7 +98,6 @@
 		</Dialog.Header>
 
 		<div class="space-y-4 py-2">
-			<!-- Payment Input -->
 			<div class="space-y-2">
 				<Label for="payment-input">Monthly Payment</Label>
 				<div class="relative">
@@ -119,7 +116,6 @@
 				</p>
 			</div>
 
-			<!-- Validation / State Messages -->
 			{#if plannerState.state === 'below-minimum'}
 				<div
 					class="rounded-lg border border-destructive bg-destructive/10 p-3 text-sm text-destructive"
@@ -132,12 +128,10 @@
 				</div>
 			{/if}
 
-			<!-- Impact cards -->
 			{#if plannerState.state === 'normal' || plannerState.state === 'with-delta'}
 				{@const impact = plannerState.primaryImpact}
 				{@const delta = plannerState.state === 'with-delta' ? plannerState.secondaryDelta : null}
 				<div class="grid grid-cols-3 gap-3">
-					<!-- Payoff Date -->
 					<div class="rounded-lg border bg-card p-3 text-center">
 						<Calendar class="mx-auto mb-1 h-4 w-4 text-chart-1" />
 						<p class="text-sm font-semibold text-foreground">
@@ -146,7 +140,6 @@
 						<p class="text-xs text-muted-foreground">Payoff Date</p>
 					</div>
 
-					<!-- Time Saved -->
 					<div class="rounded-lg border bg-card p-3 text-center">
 						<TrendingDown class="mx-auto mb-1 h-4 w-4 text-chart-2" />
 						<p class="text-sm font-semibold text-foreground">
@@ -172,7 +165,6 @@
 						{/if}
 					</div>
 
-					<!-- Interest Saved -->
 					<div class="rounded-lg border bg-card p-3 text-center">
 						<DollarSign class="mx-auto mb-1 h-4 w-4 text-chart-3" />
 						<p class="text-sm font-semibold text-foreground">
@@ -199,7 +191,6 @@
 				</div>
 			{/if}
 
-			<!-- Summary sentence -->
 			{#if plannerState.state === 'normal' || plannerState.state === 'with-delta'}
 				{@const impact = plannerState.primaryImpact}
 				{@const delta = plannerState.state === 'with-delta' ? plannerState.secondaryDelta : null}
@@ -208,7 +199,6 @@
 				</div>
 			{/if}
 
-			<!-- Save button and error display -->
 			<div class="space-y-2">
 				<Button class="w-full" disabled={!saveEnabled} onclick={handleSave}>
 					{#if isSaving}

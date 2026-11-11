@@ -19,7 +19,6 @@
 
 	let { financing, currentMileage, initialMileage = null, unitPreferences }: Props = $props();
 
-	// Resolve distance label from vehicle unitPreferences, falling back to global settings
 	let units = $derived(unitPreferences ?? settingsStore.unitPreferences);
 	let distLabel = $derived(getDistanceUnitLabel(units.distanceUnit, true));
 
@@ -32,13 +31,7 @@
 		}
 	});
 
-	// The WHOLE-LEASE allowance (annual mileageLimit × termMonths/12), NOT the bare annual number. The
-	// burn bar / displayed limit / limitOdometer below all compare against LIFETIME driven miles
-	// (leaseMetrics.mileageUsed = current−initial), so using the annual limit over-reported usage ~Nx on
-	// an N-year lease — e.g. 24k driven on an on-pace 36-mo/12k-yr lease showed "24k/12k, 100% RED" while
-	// this card's own "left" figure (leaseMetrics.mileageRemaining, which already routes through
-	// leaseTotalMileageAllowance) said "12k left" (the annual-vs-total class — the
-	// one card the PaymentMetricsGrid fix missed). ONE source of truth for the whole-lease budget.
+	// Whole-lease allowance (annual limit × termMonths/12): burn and limit compare against lifetime miles, so the annual figure would over-report usage.
 	let totalMileageAllowance = $derived(leaseTotalMileageAllowance(financing));
 
 	let mileageUsagePercentage = $derived.by(() => {
@@ -54,7 +47,6 @@
 				: '[&_[data-slot=progress-indicator]]:bg-chart-2'
 	);
 
-	// Odometer values: start-of-year odometer and the limit odometer
 	let startOdometer = $derived(initialMileage ?? 0);
 	let currentOdometer = $derived(currentMileage ?? startOdometer);
 	let limitOdometer = $derived(startOdometer + totalMileageAllowance);
@@ -69,7 +61,6 @@
 			</CardTitle>
 		</CardHeader>
 		<CardContent class="space-y-4 p-4 sm:p-6">
-			<!-- Burn bar -->
 			<div class="space-y-2">
 				<div class="flex justify-between text-xs sm:text-sm">
 					<span class="text-muted-foreground">
@@ -91,7 +82,6 @@
 				</div>
 			</div>
 
-			<!-- Odometer row -->
 			<div class="flex items-center justify-between text-xs sm:text-sm text-muted-foreground">
 				<span>
 					Odometer: <span class="font-medium text-foreground"

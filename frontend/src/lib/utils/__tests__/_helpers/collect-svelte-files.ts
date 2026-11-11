@@ -1,15 +1,3 @@
-/**
- * Shared test helper: recursively collect every `.svelte` file under a root, skipping
- * node_modules + .svelte-kit. ONE source of truth for the source-scan GUARD suite —
- * no-hardcoded-currency, no-interpolated-arbitrary-class, no-theme-clashing-colors, and
- * fab-bottom-clearance each re-declared this byte-identical walker (rule-of-four dedup;
- * the dark-clash guard tipped it past the rule-of-three bar). The caller keeps its own
- * SRC_ROOT (it depends on each test file's own import.meta.url depth) and passes it in.
- *
- * Pure + dependency-free (node:fs/node:path only) so it loads in the fast unit suite with no
- * browser/server. Not a `.test.ts` — it exports a helper, it doesn't declare tests.
- */
-
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 

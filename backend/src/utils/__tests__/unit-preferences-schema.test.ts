@@ -1,9 +1,5 @@
-/**
- * Unit tests for the shared unit-preferences schema + merge helper. The schema +
- * partial-merge were byte-identical in vehicles/routes.ts and settings/routes.ts; this pins the
- * extracted single source of truth — especially mergeUnitPreferences's contracts (undefined when
- * nothing to merge; null/undefined existing spread safely; partial overrides existing field-by-field).
- */
+// Unit preferences schema, and mergeUnitPreferences: undefined when there is nothing to merge, and
+// a null existing value is spread safely.
 
 import { describe, expect, test } from 'bun:test';
 import { ChargeUnit, DistanceUnit, type UnitPreferences, VolumeUnit } from '../../types';
@@ -45,16 +41,13 @@ describe('mergeUnitPreferences', () => {
     const merged = mergeUnitPreferences(FULL, { volumeUnit: VolumeUnit.LITERS });
     expect(merged).toEqual({
       distanceUnit: DistanceUnit.MILES,
-      volumeUnit: VolumeUnit.LITERS, // overridden
+      volumeUnit: VolumeUnit.LITERS,
       chargeUnit: ChargeUnit.KWH,
     });
   });
 
-  test('a null/undefined existing is spread safely (the vehicle-path edge — existing may be null)', () => {
-    // The settings path always has a full existing; the vehicle path could pass null. Both old inline
-    // sites spread `...existing` so a null would have spread to {} — this preserves that exactly. The
-    // return is typed UnitPreferences (the helper's `as` cast, matching the prior inline behavior), so
-    // the expected partials are cast to compare structurally.
+  test('a null or undefined existing value is spread safely', () => {
+    // The return is typed UnitPreferences, so the partial expectations are cast.
     expect(mergeUnitPreferences(null, { distanceUnit: DistanceUnit.KILOMETERS })).toEqual({
       distanceUnit: DistanceUnit.KILOMETERS,
     } as UnitPreferences);

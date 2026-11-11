@@ -1,23 +1,6 @@
 /**
- * Account-takeover boundary guard for checkLinkConflicts.
- *
- * The OAuth link callback (routes.ts /callback/link/:authProvider) lets a logged-in user attach a
- * second provider identity (e.g. add GitHub to a Google-created account). checkLinkConflicts is the
- * gate that decides whether the bind is allowed, and it is the ACCOUNT-TAKEOVER boundary:
- *  - unbound identity → null (free to link)
- *  - already bound to THIS user → 'already_linked' (idempotent no-op, not a duplicate row)
- *  - bound to a DIFFERENT user → 'account_conflict' (REJECT — never silently re-bind)
- *
- * The third branch is the security-critical one: a regression that returned null or 'already_linked'
- * for an identity owned by another user would let attacker B link victim A's GitHub/Google identity
- * to B's account (or, depending on the downstream write, hijack the identity row). The repo-level
- * scoping of findByProviderIdentity is tested (auth-provider-repository.property.test.ts), but the
- * 3-way DECISION itself was un-pinned until now.
- *
- * Drives the REAL checkLinkConflicts (exported + repo-injectable) against a REAL seeded
- * AuthProviderRepository over an in-memory migrated DB — NOT a re-implementation of the decision
- *  and not the getDb-singleton (the bind). The default
- * route call-site keeps using the singleton; only this test injects the test repo.
+ * Account-takeover boundary for checkLinkConflicts: an identity bound to another user must be
+ * rejected, never silently re-bound. Runs against a seeded in-memory repository.
  */
 
 import { Database } from 'bun:sqlite';
@@ -55,12 +38,12 @@ afterEach(() => {
 });
 
 describe('checkLinkConflicts — account-takeover boundary', () => {
-  test('an UNBOUND provider identity → null (free to link)', async () => {
+  test('an unbound provider identity → null (free to link)', async () => {
     const result = await checkLinkConflicts('github', 'gh-account-123', USER_A, repo);
     expect(result).toBeNull();
   });
 
-  test('an identity already bound to THIS user → already_linked (idempotent, no second row)', async () => {
+  test('an identity already bound to this user → already_linked', async () => {
     await repo.create({
       userId: USER_A,
       authProvider: 'github',
@@ -71,8 +54,7 @@ describe('checkLinkConflicts — account-takeover boundary', () => {
     expect(result).toBe('already_linked');
   });
 
-  test('an identity bound to a DIFFERENT user → account_conflict (THE takeover boundary: never re-bind)', async () => {
-    // USER_A owns the github identity; USER_B attempts to link the SAME identity.
+  test('an identity bound to a different user → account_conflict', async () => {
     await repo.create({
       userId: USER_A,
       authProvider: 'github',
@@ -83,8 +65,7 @@ describe('checkLinkConflicts — account-takeover boundary', () => {
     expect(result).toBe('account_conflict');
   });
 
-  test('the conflict is keyed on (provider, providerAccountId) — a DIFFERENT provider with the same account id does NOT collide', async () => {
-    // Same providerAccountId string under a different provider is a distinct identity → free to link.
+  test('the conflict is keyed on provider and account id together', async () => {
     await repo.create({
       userId: USER_A,
       authProvider: 'github',
@@ -95,7 +76,7 @@ describe('checkLinkConflicts — account-takeover boundary', () => {
     expect(result).toBeNull();
   });
 
-  test('after USER_A links github, USER_A re-linking google (a NEW identity) is still free → null', async () => {
+  test('after linking github, linking a new google identity is still free', async () => {
     await repo.create({
       userId: USER_A,
       authProvider: 'github',

@@ -1,11 +1,5 @@
 /**
- * Insurance Claims Repository
- *
- * CRUD for claims filed against an insurance policy. Every query is scoped by
- * policyId — the route validates that the policy belongs to the user first
- * (validateInsuranceOwnership), so scoping claims to that policy transitively
- * enforces ownership. Methods that take a claimId also re-check the claim
- * belongs to the given policyId (defense in depth against cross-policy IDs).
+ * Every query is scoped by policyId, so the route's policy-ownership check also covers claims.
  */
 
 import { and, desc, eq } from 'drizzle-orm';
@@ -30,8 +24,7 @@ export interface CreateClaimInput {
 export interface UpdateClaimInput {
   claimDate?: Date;
   claimType?: string;
-  // Nullable value fields: `null` clears the column, `undefined` leaves it
-  // unchanged (the update() patch only sets keys that are `!== undefined`).
+  // null clears a column; undefined leaves it unchanged.
   description?: string | null;
   status?: string;
   payoutAmount?: number | null;
@@ -47,7 +40,6 @@ export class InsuranceClaimRepository {
     this.db = db;
   }
 
-  /** All claims for a policy, newest claim_date first. */
   async findByPolicyId(policyId: string): Promise<InsuranceClaim[]> {
     try {
       return await this.db
@@ -62,9 +54,7 @@ export class InsuranceClaimRepository {
   }
 
   /**
-   * Resolve the owning userId for a claim via its policy (claim → policy.userId).
-   * Returns null if the claim doesn't exist. Used for photo-upload ownership
-   * checks where only the claimId is known.
+   * Resolves the owning user through the claim's policy. Used for photo ownership checks when only claimId is known.
    */
   async findOwnerUserId(claimId: string): Promise<string | null> {
     const [row] = await this.db
@@ -76,7 +66,6 @@ export class InsuranceClaimRepository {
     return row?.userId ?? null;
   }
 
-  /** A single claim, scoped to its policy. Throws NotFoundError if absent. */
   async findById(policyId: string, claimId: string): Promise<InsuranceClaim> {
     const [claim] = await this.db
       .select()
@@ -120,7 +109,6 @@ export class InsuranceClaimRepository {
     claimId: string,
     updates: UpdateClaimInput
   ): Promise<InsuranceClaim> {
-    // Ensure the claim exists under this policy before mutating.
     await this.findById(policyId, claimId);
 
     const patch: Record<string, unknown> = { updatedAt: new Date() };
@@ -151,7 +139,6 @@ export class InsuranceClaimRepository {
   }
 
   async delete(policyId: string, claimId: string): Promise<void> {
-    // Ensure it exists under this policy (404 rather than silent no-op).
     await this.findById(policyId, claimId);
     try {
       await this.db
@@ -164,5 +151,4 @@ export class InsuranceClaimRepository {
   }
 }
 
-// Export singleton instance
 export const insuranceClaimRepository = new InsuranceClaimRepository(getDb());

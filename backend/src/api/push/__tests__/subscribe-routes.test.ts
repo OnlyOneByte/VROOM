@@ -1,22 +1,8 @@
 /**
- * push-notifications T3 — POST/DELETE /api/v1/push/subscribe (HTTP harness).
- *
- * Drives the REAL app over an in-memory DB. Pins the store contract the FE (T5) + the send hook (T4)
- * depend on:
- *  - POST persists a subscription for the SESSION user + reads back via the repo (201, id only —
- *  the crypto keys are never echoed).
- *  - POST is idempotent on (userId, endpoint): a re-subscribe from the same browser updates, never
- *  duplicates.
- *  - DELETE removes the session user's subscription (idempotent — deleting an unknown endpoint is a
- *  clean no-op, not an error).
- *  - IDOR: user B cannot delete user A's subscription via the endpoint alone (the endpoint is not a
- *  capability — the write is scoped to ctx.userId). B's delete is a no-op; A's row survives.
- *  - auth + validation: anon → 401; a malformed body (missing keys) → 400.
- *
- * createTestApp() seeds user A; user B is minted on the same DB (the shares-routes.test.ts pattern).
- * These routes do NOT gate on CONFIG.push.enabled — a user may register a subscription regardless of
- * whether THIS server can currently send (the send hook checks enablement at T4); so the harness (no
- * VAPID env) exercises them fully.
+ * POST and DELETE /api/v1/push/subscribe over the in-memory app. Covers persisting for the session
+ * user (id only, keys not echoed), idempotent re-subscribe, DELETE as a no-op for unknown endpoints,
+ * IDOR protection between users, and auth and validation errors. These routes do not check whether
+ * push is configured.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -28,8 +14,8 @@ import {
 } from '../../../test-helpers/http-client';
 import { pushSubscriptionRepository } from '../repository';
 
-let ctx: TestApp; // user A
-let bId: string; // user B
+let ctx: TestApp;
+let bId: string;
 let bCounter = 0;
 
 beforeEach(async () => {
@@ -49,7 +35,7 @@ const SUB = {
   userAgent: 'Chrome on Pixel',
 };
 
-/** Act AS user B against the same app (a real minted session, the shares-routes pattern). */
+/** Sends a request as user B with a real session cookie. */
 async function asB(method: string, path: string, body?: unknown): Promise<Response> {
   const { lucia } = await import('../../auth/lucia');
   const session = await lucia.createSession(bId, {});
@@ -66,19 +52,17 @@ async function asB(method: string, path: string, body?: unknown): Promise<Respon
   return ctx.app.request(path, init);
 }
 
-describe('POST /api/v1/push/subscribe (T3)', () => {
-  test('persists a subscription for the session user + returns 201 with the id only', async () => {
+describe('POST /api/v1/push/subscribe', () => {
+  test('persists a subscription for the session user and returns 201 with the id only', async () => {
     const res = await ctx.authed('POST', '/api/v1/push/subscribe', SUB);
     expect(res.status).toBe(201);
     const body = await json<DataEnvelope<{ id: string }>>(res);
     expect(body.data.id).toBeTruthy();
 
-    // The crypto keys are NOT echoed in the response.
     const raw = JSON.stringify(body);
     expect(raw.includes(SUB.keys.p256dh)).toBe(false);
     expect(raw.includes(SUB.keys.auth)).toBe(false);
 
-    // Round-trips through the repo, scoped to user A.
     const stored = await pushSubscriptionRepository.findByUser(ctx.user.id);
     expect(stored).toHaveLength(1);
     expect(stored[0].endpoint).toBe(SUB.endpoint);
@@ -107,7 +91,7 @@ describe('POST /api/v1/push/subscribe (T3)', () => {
   });
 });
 
-describe('DELETE /api/v1/push/subscribe (T3)', () => {
+describe('DELETE /api/v1/push/subscribe', () => {
   test('removes the session user subscription (idempotent)', async () => {
     await ctx.authed('POST', '/api/v1/push/subscribe', SUB);
 
@@ -117,7 +101,6 @@ describe('DELETE /api/v1/push/subscribe (T3)', () => {
     expect(body.data.removed).toBe(true);
     expect(await pushSubscriptionRepository.findByUser(ctx.user.id)).toHaveLength(0);
 
-    // Deleting again (unknown endpoint) is a clean no-op, not an error.
     const again = await ctx.authed('DELETE', '/api/v1/push/subscribe', { endpoint: SUB.endpoint });
     expect(again.status).toBe(200);
     expect((await json<DataEnvelope<{ removed: boolean }>>(again)).data.removed).toBe(false);
@@ -126,7 +109,6 @@ describe('DELETE /api/v1/push/subscribe (T3)', () => {
   test('IDOR: user B cannot delete user A subscription via the endpoint', async () => {
     await ctx.authed('POST', '/api/v1/push/subscribe', SUB);
 
-    // B tries to delete A's endpoint — no row of B's matches → no-op, and A's row survives.
     const res = await asB('DELETE', '/api/v1/push/subscribe', { endpoint: SUB.endpoint });
     expect(res.status).toBe(200);
     expect((await json<DataEnvelope<{ removed: boolean }>>(res)).data.removed).toBe(false);
@@ -141,7 +123,6 @@ describe('DELETE /api/v1/push/subscribe (T3)', () => {
     expect(await pushSubscriptionRepository.findByUser(ctx.user.id)).toHaveLength(1);
     expect(await pushSubscriptionRepository.findByUser(bId)).toHaveLength(1);
 
-    // A deletes theirs; B's survives (per-user scoping).
     await ctx.authed('DELETE', '/api/v1/push/subscribe', { endpoint: SUB.endpoint });
     expect(await pushSubscriptionRepository.findByUser(ctx.user.id)).toHaveLength(0);
     expect(await pushSubscriptionRepository.findByUser(bId)).toHaveLength(1);

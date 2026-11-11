@@ -1,7 +1,4 @@
-/**
- * Settings API service
- * Centralized API calls for settings and sync operations using apiClient
- */
+/** Settings and backup/restore sync endpoints. */
 
 import type {
 	BackupFileInfo,

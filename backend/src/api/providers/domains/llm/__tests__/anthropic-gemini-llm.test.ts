@@ -1,19 +1,3 @@
-/**
- * Anthropic + Gemini LLM (assistant) chat+tools adapters (llm-assistant T3b). Drives the REAL adapters
- * against a stubbed global fetch (no live key/endpoint) and pins the request SHAPE + the dumb-transport
- * normalization + the failure-honesty rules, mirroring the T3a openai-compatible adapter test:
- *  - Anthropic: POST {baseUrl}/v1/messages with x-api-key + anthropic-version (NOT Bearer); a system-role
- *  message lifts to the top-level `system`; tools[] are {name, description, input_schema}; a tool_use
- *  response block → ChatResult.toolCalls; a text block → ChatResult.text.
- *  - Gemini: POST {baseUrl}/v1beta/models/{model}:generateContent?key=... (key in the QUERY, not a header);
- *  a system-role message → systemInstruction; tools → [{ functionDeclarations }]; a functionCall part →
- *  ChatResult.toolCalls; a text part → ChatResult.text.
- *  - both: a non-2xx / network failure THROWS (the chat route maps it to 502 — never a faked answer).
- *
- * Adapters = dumb transport: they map the wire format both ways but NEVER execute a tool or trust args —
- * the orchestrator (T4) validates. These assert transport + headers + the wire mapping + error-honesty.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { AnthropicLlmProvider } from '../anthropic';
 import { GeminiLlmProvider } from '../gemini';
@@ -64,7 +48,7 @@ afterEach(() => {
   globalThis.fetch = realFetch;
 });
 
-describe('AnthropicLlmProvider.chat (T3b)', () => {
+describe('AnthropicLlmProvider.chat', () => {
   function anthropicText(text: string): Response {
     return new Response(JSON.stringify({ content: [{ type: 'text', text }] }), {
       status: 200,
@@ -86,12 +70,10 @@ describe('AnthropicLlmProvider.chat (T3b)', () => {
     expect(captured?.headers['x-api-key']).toBe('sk-assistant-key');
     expect(captured?.headers['anthropic-version']).toBe('2023-06-01');
     expect(captured?.headers.Authorization).toBeUndefined();
-    // The system message is the top-level `system` field, not a message.
     expect(captured?.body.system).toBe('You are a car-data assistant.');
     const msgs = captured?.body.messages as Array<{ role: string }>;
-    expect(msgs).toHaveLength(1); // only the user message remains
+    expect(msgs).toHaveLength(1);
     expect(msgs[0].role).toBe('user');
-    // tools[] use input_schema.
     const tools = captured?.body.tools as Array<{ name: string; input_schema: unknown }>;
     expect(tools[0].name).toBe('getExpenseSummary');
     expect(tools[0].input_schema).toEqual(TOOLS[0].parameters);
@@ -135,7 +117,7 @@ describe('AnthropicLlmProvider.chat (T3b)', () => {
     expect(block.tool_use_id).toBe('tu_1');
   });
 
-  test('a non-2xx response THROWS (anti-fail-open)', async () => {
+  test('a non-2xx response throws', async () => {
     stubFetch(() => new Response('overloaded', { status: 529 }));
     await expect(
       new AnthropicLlmProvider(SETTINGS).chat({ messages: MESSAGES, tools: TOOLS })
@@ -147,7 +129,7 @@ describe('AnthropicLlmProvider.chat (T3b)', () => {
   });
 });
 
-describe('GeminiLlmProvider.chat (T3b)', () => {
+describe('GeminiLlmProvider.chat', () => {
   function geminiText(text: string): Response {
     return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text }] } }] }), {
       status: 200,
@@ -166,13 +148,11 @@ describe('GeminiLlmProvider.chat (T3b)', () => {
     await new GeminiLlmProvider(GEMINI_SETTINGS).chat({ messages: MESSAGES, tools: TOOLS });
 
     expect(captured?.url).toContain('/v1beta/models/gemini-1.5-pro:generateContent?key=gm-key-123');
-    // The key is NOT a header (it is the query param) — never logged via headers.
     expect(JSON.stringify(captured?.headers)).not.toContain('gm-key-123');
     const sys = captured?.body.systemInstruction as { parts: Array<{ text: string }> };
     expect(sys.parts[0].text).toBe('You are a car-data assistant.');
     const tools = captured?.body.tools as Array<{ functionDeclarations: Array<{ name: string }> }>;
     expect(tools[0].functionDeclarations[0].name).toBe('getExpenseSummary');
-    // assistant/user contents only (system was lifted).
     const contents = captured?.body.contents as Array<{ role: string }>;
     expect(contents).toHaveLength(1);
     expect(contents[0].role).toBe('user');
@@ -212,7 +192,7 @@ describe('GeminiLlmProvider.chat (T3b)', () => {
     expect(part.functionResponse?.name).toBe('getFuelStats');
   });
 
-  test('a non-2xx response THROWS (anti-fail-open)', async () => {
+  test('a non-2xx response throws', async () => {
     stubFetch(() => new Response('quota', { status: 429 }));
     await expect(
       new GeminiLlmProvider(GEMINI_SETTINGS).chat({ messages: MESSAGES, tools: TOOLS })

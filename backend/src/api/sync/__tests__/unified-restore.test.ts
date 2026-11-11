@@ -1,21 +1,11 @@
-/**
- * Unit tests for unified restore flow.
- * Validates: Requirement 5 — ZIP download+restore, Sheets via provider credentials,
- * missing sheetsSpreadsheetId error, invalid provider error.
- *
- * Tests the pure logic of the restore paths: the route handler delegates to
- * backupService.downloadBackup + restoreService.restoreFromBackup for ZIP,
- * and restoreService.restoreFromSheets for Sheets.
- */
+// Copies of the restore route's provider and Sheets checks, tested in isolation. The copies can
+// drift from routes.ts.
 
 import { describe, expect, test } from 'bun:test';
 import { SyncError, SyncErrorCode } from '../../../errors';
 import type { BackupConfig } from '../../../types';
 
-/**
- * Simulates the route handler's provider validation logic.
- * Returns the provider row if found and active, or throws SyncError.
- */
+/** Copy of the route's provider lookup. */
 function validateProvider(
   providers: Array<{ id: string; userId: string; status: string }>,
   providerId: string,
@@ -30,10 +20,7 @@ function validateProvider(
   return row;
 }
 
-/**
- * Simulates the Sheets restore path's sheetsSpreadsheetId lookup.
- * Returns the spreadsheet ID or throws if not found.
- */
+/** Copy of the Sheets spreadsheetId lookup. */
 function getSheetsSpreadsheetId(backupConfig: BackupConfig | null, providerId: string): string {
   const providerConfig = backupConfig?.providers?.[providerId];
   const sheetsSpreadsheetId = providerConfig?.sheetsSpreadsheetId;
@@ -46,9 +33,7 @@ function getSheetsSpreadsheetId(backupConfig: BackupConfig | null, providerId: s
   return sheetsSpreadsheetId;
 }
 
-/**
- * Simulates the ZIP restore flow: download + restore.
- */
+/** Copy of the ZIP download-and-restore flow. */
 async function simulateZipRestore(
   downloadFn: (userId: string, providerId: string, fileRef: string) => Promise<Buffer>,
   restoreFn: (

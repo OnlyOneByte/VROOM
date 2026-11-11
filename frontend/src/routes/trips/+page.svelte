@@ -25,21 +25,12 @@
 	let trips = $state<Trip[]>([]);
 	let vehicles = $state<Vehicle[]>([]);
 	let summary = $state<TripSummary | null>(null);
-	// Total trips across all pages (the summary counts ALL trips, so the list must not silently show only
-	// page 1 while the summary says more — the dashboard/expenses "page-1-masquerades-as-all" class).
 	let totalCount = $state(0);
 
-	// The GLOBAL distance label — used ONLY on the cross-fleet Mileage Summary card (which pools all
-	// vehicles' miles via getSummary(); a single label on a mixed mi+km fleet is the pooling class,
-	// product-gated/escalated — out of scope here).
+	// Global distance label, used only by the cross-fleet summary card; mixed mi/km fleets need per-vehicle labels.
 	let distLabel = $derived(getDistanceUnitLabel(settingsStore.unitPreferences.distanceUnit, true));
-	// vehicleId -> display name, so each trip card can name its vehicle (graceful fallback if deleted).
 	let vehicleNames = $derived(new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)])));
-	// vehicleId -> THAT vehicle's distance label. Trip odometers are stored same-unit-as-the-vehicle (R2),
-	// so a per-trip card must label distance by its OWN vehicle's distanceUnit, NOT the global setting —
-	// else a km vehicle's trips read "mi" for a mixed-fleet user (the per-vehicle-units
-	// pattern OdometerTab/LeaseMetricsCard already follow). Falls back to the global pref when the vehicle
-	// (or its prefs) is absent — the `unitPreferences ?? settingsStore` graceful-default idiom.
+	// Trip odometers use the vehicle's own unit, so label each trip by its vehicle, not the global setting.
 	let vehicleDistLabels = $derived(
 		new Map(
 			vehicles.map(v => [
@@ -54,8 +45,6 @@
 	const tripDistLabel = (vehicleId: string): string =>
 		vehicleDistLabels.get(vehicleId) ?? distLabel;
 
-	// Create/edit form (dialog) state. The trips↔odometer EDIT/DELETE lifecycle is now RATIFIED +
-	// shipped (T7 backend): editing re-syncs the linked odometer entry; deleting prompts keep-or-delete.
 	let formOpen = $state(false);
 	let editingTrip = $state<Trip | null>(null);
 
@@ -69,8 +58,7 @@
 		formOpen = true;
 	}
 
-	// Delete-confirm dialog state + the keep-or-delete-linked-odometer choice. Default KEEP (matches
-	// the backend non-destructive default — the linked reading may be part of the user's odometer history).
+	// Defaults to keeping the linked odometer reading, which may be part of the history.
 	let deleteTarget = $state<Trip | null>(null);
 	let keepOdometer = $state(true);
 	let isDeleting = $state(false);
@@ -101,9 +89,7 @@
 		isLoading = true;
 		loadError = null;
 		try {
-			// Request the max page (100) so the read-only list shows as much as one fetch allows; the
-			// "Showing N of M" footer below surfaces any remainder rather than silently truncating (a full
-			// paginator lands with the T6b-2 form cycle). The summary counts ALL trips regardless.
+			// Requests the max page; the "Showing N of M" footer surfaces any remainder.
 			const [tripPage, vehicleList, tripSummary] = await Promise.all([
 				tripApi.list({ limit: 100 }),
 				vehicleApi.getVehicles(),
@@ -115,8 +101,7 @@
 			summary = tripSummary;
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to load trips:', error);
-			// Persist the failure so we don't fall through to the "No trips yet" empty state — that
-			// masquerades a fetch failure as "you have none" (the dashboard/reminders load-error discipline).
+			// Persist the failure so it is not rendered as an empty list.
 			loadError = error instanceof Error ? error.message : 'Failed to load trips';
 			appStore.addNotification({ type: 'error', message: 'Failed to load trips' });
 		} finally {
@@ -181,7 +166,6 @@
 			{/snippet}
 		</EmptyState>
 	{:else}
-		<!-- Mileage-summary card (R4): the reimbursement rollup across the listed trips. -->
 		{#if summary}
 			<CardNs.Card data-testid="trip-summary-card">
 				<CardNs.CardHeader class="p-4 sm:p-6">
@@ -279,8 +263,6 @@
 			{/each}
 		</div>
 
-		<!-- Surface any trips beyond this page (the list requests up to 100; the summary counts ALL). Without
-		     this, a >100-trip user would see the summary count exceed the visible cards with no explanation. -->
 		{#if trips.length < totalCount}
 			<p class="text-center text-sm text-muted-foreground" data-testid="trip-list-truncation">
 				Showing {trips.length.toLocaleString()} of {totalCount.toLocaleString()} trips
@@ -290,8 +272,6 @@
 
 	<TripForm bind:open={formOpen} {vehicles} trip={editingTrip} onSaved={load} />
 
-	<!-- Delete-confirm with the keep-or-delete-linked-odometer choice. Controlled open (bound to
-	     deleteTarget) so the per-card Delete button drives it without a per-row trigger element. -->
 	<AlertDialog.Root
 		open={deleteTarget !== null}
 		onOpenChange={o => {

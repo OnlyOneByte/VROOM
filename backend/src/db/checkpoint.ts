@@ -3,7 +3,6 @@
 import { logger } from '../utils/logger';
 import { checkpointWAL, forceCheckpointWAL } from './connection.js';
 
-// Manual checkpoint script
 async function manualCheckpoint() {
   try {
     logger.checkpoint('Running manual WAL checkpoint...');
@@ -25,7 +24,6 @@ async function manualCheckpoint() {
   }
 }
 
-// Run if called directly
 if (import.meta.main) {
   await manualCheckpoint();
 }

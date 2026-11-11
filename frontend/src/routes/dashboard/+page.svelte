@@ -35,14 +35,12 @@
 	} from '$lib/types';
 	import type { TimePeriod } from '$lib/constants/time-periods';
 
-	// Reminders due now or within the next 2 weeks surface on the dashboard.
 	const UPCOMING_WINDOW_DAYS = 14;
 
 	let isLoading = $state(true);
 	let loadError = $state<string | null>(null);
 	let selectedPeriod = $state<TimePeriod>('all');
 
-	// Raw data
 	let vehicles = $state<Vehicle[]>([]);
 	let allTimeSummary = $state<ExpenseSummary | null>(null);
 	let periodSummary = $state<ExpenseSummary | null>(null);
@@ -54,7 +52,6 @@
 		Map<string, { totalAmount: number; recentAmount: number; lastActivity: Date | null }>
 	>(new Map());
 
-	// Derived: vehicle overview cards with per-vehicle expense stats
 	let vehicleOverviews = $derived.by(() => {
 		return vehicles.map(v => {
 			const photos = vehiclePhotosMap.get(v.id) || [];
@@ -73,19 +70,15 @@
 				lastActivity: vStats?.lastActivity ?? null,
 				hasActiveFinancing: v.financing?.isActive || false,
 				coverPhotoUrl,
-				// "shared by X" badge on a vehicle owned by someone else (T12b); undefined for owned.
+				// Set only for vehicles shared with this user.
 				sharedBy: v.sharedAccess?.sharedBy ?? null
 			};
 		});
 	});
 
-	// Vehicles the user OWNS (no sharedAccess annotation). The stats cards + expense totals are
-	// owner-scoped on the backend (getExpenseSummary filters by userId), so counting shared vehicles
-	// in "Total Vehicles"/"Active Financing" would contradict the dollar figures — keep those
-	// owned-only. Only the fleet carousel below widens to include shared vehicles (T12b).
+	// Owned vehicles only: totals are owner-scoped on the backend. The fleet carousel also shows shared vehicles.
 	let ownedVehicles = $derived(vehicles.filter(v => !v.sharedAccess));
 
-	// Derived: stats for cards — always uses all-time data, unaffected by period selector
 	let stats = $derived.by(() => ({
 		totalVehicles: ownedVehicles.length,
 		totalExpenses: allTimeSummary?.totalAmount ?? 0,
@@ -93,18 +86,15 @@
 		activeFinancing: ownedVehicles.filter(v => v.financing?.isActive).length
 	}));
 
-	// Derived: monthly trend chart data from period-filtered summary
 	let trendChartData = $derived.by(() => {
 		if (!periodSummary?.monthlyTrend) return [];
 		return periodSummary.monthlyTrend.map(t => ({
-			// Local-time parse: `new Date('YYYY-MM-01')` is midnight UTC and shifts the
-			// month label back one for negative-offset users.
+			// Parse as local time: new Date('YYYY-MM-01') is UTC midnight and shifts the label.
 			date: parseMonthToDate(t.period),
 			amount: t.amount
 		}));
 	});
 
-	// Derived: category breakdown chart data from period-filtered summary
 	let categoryChartData = $derived.by(() => {
 		if (!periodSummary?.categoryBreakdown) return [];
 		const total = periodSummary.categoryBreakdown.reduce((sum, c) => sum + c.amount, 0);
@@ -117,7 +107,6 @@
 		}));
 	});
 
-	// Derived: recent activity with vehicle names
 	let recentExpenses = $derived.by(() => {
 		const vehicleMap = new Map(
 			vehicles.map(v => [v.id, v.nickname || `${v.year} ${v.make} ${v.model}`])
@@ -132,9 +121,7 @@
 		}));
 	});
 
-	// Derived: active reminders due now or within the next UPCOMING_WINDOW_DAYS,
-	// soonest first. "Due now" (overdue) matches the /reminders isDue rule exactly
-	// (nextDueDate <= now) so the two views never disagree.
+	// Soonest first; the due rule matches /reminders so the two views agree.
 	let dueReminders = $derived.by(() => {
 		const now = Date.now();
 		const horizon = now + UPCOMING_WINDOW_DAYS * 24 * 60 * 60 * 1000;
@@ -142,9 +129,7 @@
 		return (
 			remindersList
 				.filter(r => r.reminder.isActive)
-				// This is the TIME-axis "due soon" widget. A pure-mileage reminder has a null nextDueDate
-				// (its due-ness is odometer-based, surfaced on the /reminders page) — exclude it here, and
-				// the narrowing lets the date math below treat nextDueDate as a string.
+				// Pure-mileage reminders have no nextDueDate and are excluded here.
 				.filter(
 					(r): r is typeof r & { reminder: { nextDueDate: string } } =>
 						r.reminder.nextDueDate !== null
@@ -174,9 +159,7 @@
 		isLoading = true;
 		loadError = null;
 		try {
-			// ONE latency round for the whole dashboard. Nothing here reads another leg's
-			// result — the lookup maps below are built after everything resolves — so a
-			// second round would only add a round trip's delay to the carousel.
+			// One round for all requests; the lookup maps are built after they resolve.
 			const [
 				loadedVehicles,
 				allTimeData,
@@ -187,22 +170,18 @@
 				photosByVehicle,
 				vehicleStats
 			] = await Promise.all([
-				// include=shared: the fleet also shows vehicles others have shared with this user (T12b),
-				// each annotated with sharedAccess so the card can badge "shared by X".
+				// include=shared also returns vehicles shared with this user, annotated with sharedAccess.
 				vehicleApi.getVehicles({ includeShared: true }),
 				expenseApi.getExpenseSummary({ period: 'all' }),
 				selectedPeriod !== 'all'
 					? expenseApi.getExpenseSummary({ period: selectedPeriod })
 					: Promise.resolve(null),
 				expenseApi.getAllExpenses({ limit: 5 }),
-				// Reminders are a secondary widget — a failure here must not blank the
-				// whole dashboard, so degrade to an empty list rather than rejecting.
+				// Secondary widgets degrade instead of failing the whole dashboard.
 				reminderApi.list().catch(() => [] as ReminderWithVehicles[]),
-				// Recurring-cost run-rate is likewise secondary — degrade to zero so a
-				// reminders-service hiccup never blanks the dashboard (T7).
+				// Recurring run-rate degrades to zero on failure.
 				reminderApi.getRecurringCost().catch(() => ({ count: 0, monthlyTotal: 0 })),
-				// Photos come back in ONE request grouped by vehicleId (batch endpoint), not
-				// one call per vehicle. Cover art is decoration — degrade to none.
+				// Photos are one batch request; cover art degrades to none.
 				vehicleApi.getAllVehiclePhotos().catch(() => ({}) as Record<string, Photo[]>),
 				expenseApi.getVehicleStats()
 			]);
@@ -236,9 +215,7 @@
 			vehiclePhotosMap = photosMap;
 			vehicleStatsMap = statsMap;
 		} catch (error) {
-			// Persist the error so the page can show a retry affordance instead of
-			// silently rendering the empty "add your first vehicle" state — which a
-			// returning user would misread as their data having vanished.
+			// Persist the error: an empty state would look like lost data.
 			loadError = error instanceof Error ? error.message : 'Failed to load dashboard data';
 			handleErrorWithNotification(error, 'Failed to load dashboard data');
 		} finally {
@@ -246,14 +223,10 @@
 		}
 	}
 
-	// Quick-add a fill-up: deep-link to the expense form pre-set to the fuel
-	// category, returning to the dashboard on save. When the user owns exactly one
-	// vehicle, preselect it so the flow is genuinely two taps; with several, the
-	// form's own vehicle picker (defaults to the first) handles the choice.
+	// Deep-links to the fuel expense form; the vehicle is preselected only when the user owns one.
 	function handleLogFillup() {
 		const query: Record<string, string> = { category: 'fuel', returnTo: routes.dashboard };
-		// Preselect only when the user OWNS exactly one vehicle — a fill-up is logged to a vehicle you
-		// can write to, and shared-vehicle writes are still gated (T5b); the form picker handles the rest.
+		// Shared vehicles are not preselected; their writes are gated server-side.
 		if (ownedVehicles.length === 1) {
 			query['vehicleId'] = ownedVehicles[0]!.id;
 		}
@@ -280,7 +253,6 @@
 </svelte:head>
 
 <div class="space-y-6 pb-24">
-	<!-- Header -->
 	<PageHeader
 		title="Dashboard"
 		description={loadError
@@ -290,9 +262,6 @@
 				: 'Welcome! Get started by adding your first vehicle'}
 	>
 		{#snippet actions()}
-			<!-- Quick-add the most common action. Only meaningful once a vehicle
-			     exists; hidden in the error/empty states. Visible on mobile too —
-			     the FAB is "Add Vehicle", so this is the only fast path to a fill-up. -->
 			{#if !loadError && stats.totalVehicles > 0}
 				<Button onclick={handleLogFillup}>
 					<Fuel class="mr-2 h-4 w-4" />
@@ -303,9 +272,6 @@
 	</PageHeader>
 
 	{#if loadError && !isLoading}
-		<!-- Error state: a load failure must NOT silently fall through to the empty
-		     "add your first vehicle" view (a returning user would think their data
-		     vanished). Mirror the analytics route's error+retry idiom. -->
 		<div class="rounded-lg border bg-card p-6">
 			<div class="mb-4 flex items-center gap-3 text-destructive">
 				<CircleAlert class="h-5 w-5" />
@@ -315,7 +281,6 @@
 			<Button onclick={loadDashboardData}>Retry</Button>
 		</div>
 	{:else}
-		<!-- Stats Cards -->
 		<DashboardStatsCards
 			totalVehicles={stats.totalVehicles}
 			totalExpenses={stats.totalExpenses}
@@ -324,25 +289,16 @@
 			{isLoading}
 		/>
 
-		<!-- Pending vehicle-share invitations (T12b). Self-fetching + self-hiding: renders nothing
-		     unless an invite is pending or its load failed. Outside the totalVehicles>0 gate on purpose
-		     — a brand-new user with no vehicles can still be invited (a shared vehicle may be their
-		     first). Accepting refreshes the dashboard so the new vehicle appears (fleet widening, T12b-2). -->
 		<SharedWithMeCard onAccepted={loadDashboardData} />
 
-		<!-- Vehicle Carousel — gated on the WIDENED fleet (owned ∪ shared), so a user who owns nothing
-		     yet but has an accepted shared vehicle still sees it (the expense-driven sections below stay
-		     gated on owned vehicles, since their figures are owner-scoped). -->
 		{#if vehicleOverviews.length > 0}
 			<VehicleCarousel vehicles={vehicleOverviews} {isLoading} />
 		{/if}
 
-		<!-- Period Selector -->
 		{#if stats.totalVehicles > 0}
 			<PeriodSelector {selectedPeriod} {isLoading} onPeriodChange={handlePeriodChange} />
 		{/if}
 
-		<!-- Charts Row -->
 		{#if stats.totalVehicles > 0}
 			<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 				<ExpenseTrendChart data={trendChartData} title="Monthly Expense Trends" {isLoading}>
@@ -362,13 +318,11 @@
 				</AppPieChart>
 			</div>
 
-			<!-- Recent Activity + Upcoming Reminders -->
 			<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 				<RecentActivityCard expenses={recentExpenses} {isLoading} />
 				<DueRemindersCard reminders={dueReminders} {isLoading} />
 			</div>
 
-			<!-- Recurring-cost run-rate (T7): the monthly cost across active expense reminders -->
 			<RecurringCostCard
 				count={recurringCost.count}
 				monthlyTotal={recurringCost.monthlyTotal}

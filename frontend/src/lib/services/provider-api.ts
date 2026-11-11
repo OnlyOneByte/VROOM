@@ -1,8 +1,3 @@
-/**
- * Provider API service
- * Centralized API calls for storage provider management
- */
-
 import type { UserProviderInfo } from '$lib/types';
 import { apiClient } from './api-client';
 

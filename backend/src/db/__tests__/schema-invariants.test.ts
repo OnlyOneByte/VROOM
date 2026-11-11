@@ -1,19 +1,5 @@
-/**
- * Behavioural invariants of the schema — the rules the DATABASE enforces, as opposed to the
- * structure `migration-0000` pins.
- *
- * These were previously spread across thirteen per-migration test files, each asserting the
- * invariant its own migration introduced. Collapsing the migrations would have deleted them along
- * with the migrations, which would have been the wrong trade: a partial index's PREDICATE is the
- * interesting part, and nothing else in the suite covers it. `migration-0000` checks that
- * `vehicle_shares_active_idx` exists and has a WHERE clause; only the tests here check that the
- * clause admits a re-invite after a decline.
- *
- * What was dropped on purpose: assertions about migration MECHANICS — that a given migration was
- * additive, that seed rows survived it, that double-applying it throws, what the schema looked like
- * before it. Those describe a sequence that no longer exists. Every assertion about the resulting
- * schema's behaviour was kept.
- */
+// Behavioral invariants the database enforces: partial-index predicates, uniqueness, and cascade rules.
+// Table structure is pinned separately in migration-0000.test.ts.
 
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -21,7 +7,6 @@ import { applyMigration, countRows, loadMigrations } from './migration-helpers';
 
 const migrations = loadMigrations();
 
-/** A migrated database with one user and one vehicle owned by them. */
 function seeded(): Database {
   const db = new Database(':memory:');
   db.run('PRAGMA foreign_keys = ON');
@@ -48,8 +33,7 @@ describe('offline-sync idempotency: expenses_user_client_idx', () => {
   }
 
   test('a client_id cannot be replayed by the same user', () => {
-    // This is what makes a retried offline queue flush safe: the second delivery of the same
-    // locally-minted id is rejected by the database, not deduplicated by hopeful app code.
+    // Makes a retried offline flush safe: the database rejects the replayed client_id.
     insertExpense('e1', 'u1', 'client-abc');
     expect(() => insertExpense('e2', 'u1', 'client-abc')).toThrow(/UNIQUE constraint failed/);
   });
@@ -62,8 +46,7 @@ describe('offline-sync idempotency: expenses_user_client_idx', () => {
   });
 
   test('server-created expenses carry NULL client_id and never collide', () => {
-    // The index is partial precisely so the NULL majority is exempt; a plain unique would allow
-    // exactly one server-created expense per user, ever.
+    // Partial so NULL client_ids are exempt. A plain unique would allow one server-created expense per user.
     for (const id of ['e1', 'e2', 'e3']) insertExpense(id, 'u1', null);
     expect(countRows(db, 'expenses')).toBe(3);
   });
@@ -120,8 +103,7 @@ describe('mileage-triggered reminders', () => {
   afterEach(() => db.close());
 
   test('a mileage-only reminder persists with a NULL next_due_date', () => {
-    // Mileage reminders have no date axis at all. `next_due_date` being nullable is what lets them
-    // exist; a NOT NULL column forced a meaningless sentinel date into every one of them.
+    // next_due_date must be nullable: a NOT NULL column would force a sentinel date onto mileage-only reminders.
     db.run(
       `INSERT INTO reminders (id, user_id, name, type, action_mode, frequency, trigger_mode,
          interval_mileage, last_service_odometer, next_due_odometer, start_date, next_due_date, is_active)
@@ -186,8 +168,7 @@ describe('user preference defaults', () => {
   });
 
   test('business_mileage_rate keeps fractional precision (a real, not cents)', () => {
-    // The one money-shaped field that is NOT integer cents: it is a rate per distance unit, and
-    // the IRS publishes it to three decimals.
+    // A rate, not an amount, so it stays real rather than integer cents.
     db.run("INSERT INTO user_preferences (user_id, business_mileage_rate) VALUES ('u1', 0.655)");
     const row = db
       .query<{ business_mileage_rate: number }, []>(
@@ -264,8 +245,7 @@ describe('vehicle sharing: vehicle_shares_active_idx', () => {
   });
 
   test('a declined or revoked share does NOT block re-inviting the same user', () => {
-    // The index covers only `pending`/`accepted`. Without the predicate, one decline would
-    // permanently bar that person from the vehicle.
+    // The index predicate covers only pending/accepted. Without it, one decline would bar the invitee for good.
     share('s1', 'declined');
     share('s2', 'revoked');
     share('s3', 'pending');
@@ -301,7 +281,7 @@ describe('expense provenance: created_by', () => {
     );
   }
 
-  test('created_by is nullable — the legacy/self-created sentinel', () => {
+  test('created_by is nullable for self-created rows', () => {
     insertExpense('e1', null);
     expect(countRows(db, 'expenses')).toBe(1);
   });
@@ -318,9 +298,7 @@ describe('expense provenance: created_by', () => {
   });
 
   test('deleting the AUTHOR nulls the provenance and keeps the owner cost row', () => {
-    // The FK is ON DELETE SET NULL, not CASCADE and not the default NO ACTION. CASCADE would
-    // delete another user's cost history when an editor leaves; NO ACTION would make that editor
-    // undeletable. The migration chain this baseline replaced had NO ACTION by omission.
+    // SET NULL, not CASCADE (would delete the owner's cost history) and not NO ACTION (would block deleting the editor).
     insertExpense('e1', 'u2');
     db.run("DELETE FROM users WHERE id = 'u2'");
     const row = db

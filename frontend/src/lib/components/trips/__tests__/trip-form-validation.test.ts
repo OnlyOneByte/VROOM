@@ -1,13 +1,4 @@
-/**
- * Characterization net for the trip-form validator (trips-location T6b-2) — the PURE core of TripForm,
- * mirroring the backend createTripSchema so a submit that would 400 is caught client-side. Host-independent
- * (no store/DOM), the form-validator pattern.
- *
- * Pins: required-field presence (vehicle / odometer / date), the R2 end>=start rule (incl. the equal-allowed
- * boundary), the R5 future-guard on the LOCAL calendar day (today PASSES — the lesson — tomorrow fails),
- * the max-length bounds on locations/note, and a fully-valid form → {}. The future cases are computed
- * relative to `now` so they hold on any host date/TZ.
- */
+// Pins the trip-form validator: required fields, the end >= start rule, and the local-day future guard, computed relative to now.
 
 import { describe, expect, test } from 'vitest';
 import { parseOdometer, validateTripFields, type TripFormData } from '../trip-form-validation';
@@ -28,7 +19,7 @@ function form(overrides: Partial<TripFormData> = {}): TripFormData {
 		startOdometer: '1000',
 		endOdometer: '1080',
 		purpose: 'business',
-		tripDate: localDateOffset(0), // today
+		tripDate: localDateOffset(0),
 		startLocation: '',
 		endLocation: '',
 		note: '',
@@ -56,10 +47,7 @@ describe('validateTripFields', () => {
 		expect(validateTripFields(form({ startOdometer: '12.5' })).startOdometer).toBeTruthy();
 	});
 
-	// regression: Svelte coerces an <input type="number"> bind:value to a NUMBER (or null when
-	// cleared), so the form actually passes numbers — NOT the strings the seed implies. A bare `.trim()`
-	// threw "raw.trim is not a function" and killed submit silently. These pin that the validator accepts
-	// the coerced shapes the live form really produces (the bug was invisible to string-only tests).
+	// Svelte passes numbers or null for number inputs at runtime, so the validator must accept those shapes, not only strings.
 	test('accepts NUMBER-typed odometers (the Svelte type=number coercion the live form sends)', () => {
 		expect(validateTripFields(form({ startOdometer: 1000, endOdometer: 1080 }))).toEqual({});
 	});
@@ -70,7 +58,7 @@ describe('validateTripFields', () => {
 		expect(errors.endOdometer).toBeTruthy();
 	});
 
-	test('R2 holds across mixed string/number odometers (end < start)', () => {
+	test('end-before-start rule holds for mixed string and number odometers', () => {
 		expect(
 			validateTripFields(form({ startOdometer: 1080, endOdometer: '1000' })).endOdometer
 		).toBeTruthy();
@@ -82,8 +70,8 @@ describe('validateTripFields', () => {
 		expect(parseOdometer(0)).toBe(0);
 		expect(parseOdometer(null)).toBeNull();
 		expect(parseOdometer('')).toBeNull();
-		expect(parseOdometer(12.5)).toBeNull(); // non-integer
-		expect(parseOdometer(-5)).toBeNull(); // negative
+		expect(parseOdometer(12.5)).toBeNull();
+		expect(parseOdometer(-5)).toBeNull();
 	});
 
 	test('requires a valid end odometer', () => {
@@ -91,22 +79,22 @@ describe('validateTripFields', () => {
 		expect(validateTripFields(form({ endOdometer: 'abc' })).endOdometer).toBeTruthy();
 	});
 
-	test('R2: rejects end < start with an endOdometer error', () => {
+	test('rejects end before start with an endOdometer error', () => {
 		const errors = validateTripFields(form({ startOdometer: '1080', endOdometer: '1000' }));
 		expect(errors.endOdometer).toBeTruthy();
 	});
 
-	test('R2: end === start is allowed (a 0-distance trip is valid, e.g. round trip not logged)', () => {
+	test('allows end equal to start (a zero-distance trip)', () => {
 		const errors = validateTripFields(form({ startOdometer: '1000', endOdometer: '1000' }));
 		expect(errors.endOdometer).toBeUndefined();
 	});
 
-	test('R5: rejects a future local calendar day (tomorrow)', () => {
+	test('rejects a future local calendar day (tomorrow)', () => {
 		const errors = validateTripFields(form({ tripDate: localDateOffset(1) }));
 		expect(errors.tripDate).toBe('Trip date cannot be in the future');
 	});
 
-	test('R5: accepts a past day (yesterday)', () => {
+	test('accepts a past day (yesterday)', () => {
 		expect(validateTripFields(form({ tripDate: localDateOffset(-1) })).tripDate).toBeUndefined();
 	});
 

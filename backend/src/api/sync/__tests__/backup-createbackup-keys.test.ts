@@ -1,18 +1,6 @@
-/**
- * Drift guard (part B): createBackup()'s emitted data-keys must EXACTLY equal the backup
- * registry keys (TABLE_SCHEMA_MAP). See backup-table-coverage.test.ts for parts A (schema
- * coverage) and the rationale.
- *
- * Why this matters: createBackup() is hand-written per-table queries that populate the export
- * object; exportAsZip then serializes each key it finds via TABLE_SCHEMA_MAP[key]. These are
- * two independent lists. A createBackup query with no registry entry is silently dropped on
- * export; a registry entry with no createBackup query is never in the object to serialize.
- * Both are silent backup data loss. This pins them equal.
- *
- * createTestApp() rewrites process.env then dynamic-imports DB-bound modules, so this file
- * keeps static imports to the harness + bun:test (+ the pure config) and imports backup
- * dynamically AFTER createTestApp, exactly like claims-roundtrip.test.ts.
- */
+// createBackup() output keys must exactly match the TABLE_SCHEMA_MAP registry keys. Both lists are
+// independent, and a mismatch silently drops data on export.
+// Imports backup dynamically after createTestApp(), which rewrites env before DB-bound modules load.
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
@@ -26,13 +14,10 @@ afterEach(() => ctx.close());
 
 describe('createBackup output stays in sync with the registry', () => {
   test('createBackup() emits exactly the registry keys (plus metadata)', async () => {
-    // Import BOTH the service and the registry dynamically — a static `config` import would
-    // pull the DB-bound singleton before createTestApp() rewrites DATABASE_URL to :memory:,
-    // binding to the persistent dev DB (which fails seeding on a duplicate user email).
+    // A static config import would bind the persistent dev DB before DATABASE_URL is rewritten.
     const { backupService } = await import('../backup');
     const { TABLE_SCHEMA_MAP } = await import('../../../config');
-    // An empty user is sufficient — each table query returns [], but the KEY is still present,
-    // which is exactly what this guard checks (the object's shape, not its contents).
+    // An empty user suffices: the guard checks the object's keys, not its contents.
     const backup = await backupService.createBackup(ctx.user.id);
 
     const emittedKeys = Object.keys(backup)

@@ -1,16 +1,3 @@
-/**
- * GoogleDriveService against an in-memory fake Drive client (injected via the
- * constructor seam — NO `mock.module`, so nothing leaks across files).
- *
- * This exercises the REAL service logic — query building, folder find-or-create,
- * upload stream handling, list pagination, download, delete, permissions, and
- * error surfacing — proving the wiring the photo + backup paths depend on, with
- * zero network. The fake's fault-injection covers the regression paths: how the
- * service behaves when the Drive API returns 401/403/429/network errors.
- *
- * Pattern doc: .kiro/steering/TestingExternalAPIs.md
- */
-
 import { beforeEach, describe, expect, test } from 'bun:test';
 import {
   FakeGoogleStore,
@@ -34,12 +21,11 @@ describe('GoogleDriveService — folders', () => {
 
   test('findFolder matches by name + mimeType, scoped to parent', async () => {
     const rootVroom = store.seedFolder('VROOM');
-    store.seedFolder('VROOM'); // a second top-level VROOM (distractor)
+    store.seedFolder('VROOM');
     const backups = store.seedFolder('Backups', rootVroom);
 
     const found = await svc.findFolder('Backups', rootVroom);
     expect(found?.id).toBe(backups);
-    // A file named "Backups" must NOT match a folder query.
     store.seedFile({ name: 'Backups', mimeType: 'text/plain', parentId: rootVroom });
     expect((await svc.findFolder('Backups', rootVroom))?.id).toBe(backups);
   });
@@ -107,7 +93,6 @@ describe('GoogleDriveService — files', () => {
     }
     const files = await svc.listFilesInFolder(folder);
     expect(files).toHaveLength(230);
-    // only direct children — a file in another folder must not leak in
     store.seedFile({ name: 'other.zip', mimeType: 'application/zip', parentId: 'elsewhere' });
     expect(await svc.listFilesInFolder(folder)).toHaveLength(230);
   });

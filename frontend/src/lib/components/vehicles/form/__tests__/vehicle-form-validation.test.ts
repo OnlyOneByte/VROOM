@@ -1,15 +1,4 @@
-/**
- * Characterization net for the vehicle + financing form validators (guard, — FE coverage ratchet).
- *
- * vehicle-form-validation.ts sat at ~15% line / 8% branch — two PURE validators that gate what vehicle/
- * financing data enters the DB, with almost every branch untested. High-risk pure logic,
- * host-independent (no mocks). Pins: each required-field + range branch returns the right error key, a
- * fully-valid form returns {}, the year boundary (1900 .. now+2, computed relative to `now` so it holds
- * on any host), the VIN regex + 11–17 length band, the financing `own`-skip short-circuit, and the
- * loan-only APR band.
- *
- * The validators take typed form objects; tests build a minimal valid base + override per case.
- */
+// Pins the vehicle and financing form validators: required fields, ranges, VIN format, the year window and the loan-only APR band.
 
 import { describe, expect, test } from 'vitest';
 import type { VehicleFormData } from '$lib/types';
@@ -59,13 +48,12 @@ describe('validateVehicleFields', () => {
 		expect(validateVehicleFields(vehicle({ model: '' })).model).toBe('Model is required');
 	});
 
-	test('year must be within 1900 .. currentYear + 2 (boundary, computed vs now)', () => {
+	test('year must be between 1900 and currentYear + 2', () => {
 		const maxYear = new Date().getFullYear() + 2;
 		expect(validateVehicleFields(vehicle({ year: 1899 })).year).toBe('Please enter a valid year');
 		expect(validateVehicleFields(vehicle({ year: maxYear + 1 })).year).toBe(
 			'Please enter a valid year'
 		);
-		// The inclusive boundaries are valid.
 		expect(validateVehicleFields(vehicle({ year: 1900 })).year).toBeUndefined();
 		expect(validateVehicleFields(vehicle({ year: maxYear })).year).toBeUndefined();
 	});
@@ -76,9 +64,9 @@ describe('validateVehicleFields', () => {
 		);
 		expect(validateVehicleFields(vehicle({ vin: 'ABC123' })).vin).toBe(
 			'VIN must be between 11 and 17 characters'
-		); // 6 chars — too short
-		expect(validateVehicleFields(vehicle({ vin: '1HGBH41JXMN109186' })).vin).toBeUndefined(); // 17, valid
-		expect(validateVehicleFields(vehicle({ vin: '' })).vin).toBeUndefined(); // absent → not validated
+		);
+		expect(validateVehicleFields(vehicle({ vin: '1HGBH41JXMN109186' })).vin).toBeUndefined();
+		expect(validateVehicleFields(vehicle({ vin: '' })).vin).toBeUndefined();
 	});
 
 	test('initialMileage and purchasePrice cannot be negative (but undefined is fine)', () => {

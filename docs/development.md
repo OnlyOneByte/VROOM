@@ -56,30 +56,9 @@ cd frontend && npm run test:e2e
 
 ## Conventions
 
-`.kiro/steering/` holds the project's coding rules — one file per area: tech stack, code
+`docs/conventions/` holds the project's coding rules — one file per area: tech stack, code
 quality, Svelte 5 runes patterns, API and repository patterns, migrations, testing (including
-external APIs), the design system, UI quality, PWA behavior, backup/restore, and workspace
-MCPs. Read the ones relevant to what you're touching before writing code; they are the
-authority on style, and they are more specific than this guide.
+external APIs), the design system, UI quality, PWA behavior, and backup/restore. Read the ones
+relevant to what you're touching before writing code; they are the authority on style, and they
+are more specific than this guide.
 
-`.kiro/skills/` holds step-by-step workflows for repetitive multi-file tasks (adding an API
-endpoint, adding a database table, adding an expense category, debugging a component,
-reviewing frontend changes).
-
-`.kiro/specs/` holds feature specs as requirements → design → tasks. A spec is deleted once
-its work has shipped; git history keeps it.
-
-## Editor integration
-
-`.kiro/settings/mcp.json` configures MCP servers for Svelte and shadcn-svelte docs, Chrome
-DevTools, and SQLite against the dev database `backend/data/vroom.db` — writes included, so
-don't point it at anything you care about. A Playwright server is configured but ships
-disabled. `.kiro/hooks/` adds pre-task, on-save, and post-task automation (steering preload,
-Svelte autofix, validation, migration reminders, review passes). Both are picked up
-automatically by [Kiro](https://kiro.dev/) and ignored by other editors.
-
-The Chrome DevTools server expects Chrome on the default debugging port:
-
-```bash
-/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222
-```

@@ -1,4 +1,3 @@
-// The six expense categories used throughout the app.
 export type ExpenseCategory =
 	'fuel' | 'maintenance' | 'financial' | 'regulatory' | 'enhancement' | 'misc';
 
@@ -26,8 +25,6 @@ export const COMMON_EXPENSE_TAGS = [
 	'emergency',
 	'routine'
 ] as const;
-
-// --- Expense splitting types ---
 
 export type SplitConfig =
 	| { method: 'even'; vehicleIds: string[] }

@@ -1,15 +1,5 @@
 import { appStore } from '$lib/stores/app.svelte';
 
-/**
- * Extract a human message from an unknown thrown value, falling back to `fallback`
- * when it isn't an `Error`. This is the `error instanceof Error ? error.message : <fallback>`
- * idiom that was hand-repeated across the catch blocks in load-state, the auth store, and
- * the sync manager — one source of truth so the shape can't drift.
- *
- * NOTE: this is the "error message WINS, literal is the fallback" ordering. It is deliberately
- * NOT used by `handleApiError`, whose `fallbackMessage || (...)` gives the caller's message
- * PRECEDENCE over the error's own — a different contract that must stay as-is.
- */
 export function extractErrorMessage(error: unknown, fallback: string): string {
 	return error instanceof Error ? error.message : fallback;
 }
@@ -40,9 +30,6 @@ class VroomError extends Error {
 	}
 }
 
-/**
- * API-specific error class for HTTP errors
- */
 export class ApiError extends VroomError {
 	constructor(
 		message: string,
@@ -55,7 +42,6 @@ export class ApiError extends VroomError {
 	}
 }
 
-// Error type guards
 function isVroomError(error: unknown): error is VroomError {
 	return error instanceof VroomError;
 }
@@ -64,9 +50,6 @@ function isNetworkError(error: unknown): boolean {
 	return error instanceof TypeError && error.message.includes('fetch');
 }
 
-/**
- * Error code to user-friendly message mapping
- */
 const ERROR_CODE_MESSAGES: Record<string, string> = {
 	VALIDATION_ERROR: 'Please check your input and try again',
 	NOT_FOUND: 'The requested resource was not found',
@@ -82,23 +65,13 @@ const ERROR_CODE_MESSAGES: Record<string, string> = {
 	PERMISSION_DENIED: 'Permission denied'
 };
 
-/**
- * Get user-friendly message for error code
- */
 function getUserFriendlyMessage(code: string | undefined): string | undefined {
 	if (!code) return undefined;
 	return ERROR_CODE_MESSAGES[code];
 }
 
-/**
- * Enhanced error handling with fallback message support
- * @param error - The error to handle
- * @param fallbackMessage - Optional fallback message if error is not descriptive
- * @returns Standardized AppError object
- */
 function handleApiError(error: unknown, fallbackMessage?: string): AppError {
 	if (isVroomError(error)) {
-		// Use user-friendly message if available
 		const friendlyMessage = getUserFriendlyMessage(error.code);
 		return {
 			message: friendlyMessage || error.message,
@@ -125,7 +98,6 @@ function handleApiError(error: unknown, fallbackMessage?: string): AppError {
 	};
 }
 
-// Global error handler with user notification
 export function handleErrorWithNotification(error: unknown, context?: string): void {
 	const appError = handleApiError(error);
 	const message = context ? `${context}: ${appError.message}` : appError.message;

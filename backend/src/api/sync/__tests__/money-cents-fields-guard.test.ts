@@ -1,20 +1,6 @@
-/**
- * Drift guard for MONEY_CENTS_FIELDS (money-cents-migration data-safety, deep-review).
- *
- * MONEY_CENTS_FIELDS is the allowlist the pre-cents restore shim (coerceRow shimMoneyToCents) ×100s when
- * importing an old (< 2.0.0) dollar backup. It is matched against coerceRow's `columnName`, which is the
- * drizzle FIELD name (camelCase) from getTableColumns — NOT the snake_case DB column. Two silent-corruption
- * risks this guard pins:
- *  1. A money field MISSING from the set → an old backup's dollars are NOT ×100'd → stored 100× low ($0.12
- *  for $12.34). So the set must list EVERY money field name.
- *  2. A name in the set that is NOT actually an integer column on some table → the shim never matches it
- *  (dead entry) OR (worse) it matches a wrong column. So every entry must be a real integer field.
- * It also confirms the known NON-money reals (apr %, volume gal/kWh, businessMileageRate $/mile rate) are
- * NOT in the set (they must never be ×100'd).
- *
- * If a future migration adds a 15th money column, this guard FAILS until MONEY_CENTS_FIELDS is updated —
- * exactly the forget-to-add-it regression that would otherwise corrupt that column on every old-backup restore.
- */
+// MONEY_CENTS_FIELDS lists the money fields the pre-cents restore shim scales. It is matched against
+// camelCase field names. A missing entry leaves old dollar amounts 100x low, and a wrong entry
+// scales a non-money column. Fails when a money column is added without updating the set.
 
 import { describe, expect, test } from 'bun:test';
 import { getTableColumns } from 'drizzle-orm';
@@ -28,8 +14,7 @@ import {
 } from '../../../db/schema';
 import { coerceRow, MONEY_CENTS_FIELDS } from '../backup';
 
-/** The 14 money columns (design §1) by drizzle field name — 12 DISTINCT names (paymentAmount + expenseAmount
- *  each appear on two tables). This is the human-maintained source of truth the migration was built against. */
+/** Expected money field names. paymentAmount and expenseAmount each appear on two tables. */
 const EXPECTED_MONEY_FIELDS = new Set<string>([
   'purchasePrice', // vehicles
   'originalAmount', // vehicleFinancing
@@ -46,13 +31,12 @@ const EXPECTED_MONEY_FIELDS = new Set<string>([
 ]);
 
 describe('MONEY_CENTS_FIELDS drift guard (restore-shim allowlist)', () => {
-  test('matches the expected 12-name money-field set exactly (add a new money column → update both)', () => {
+  test('matches the expected money-field set exactly', () => {
     expect(new Set(MONEY_CENTS_FIELDS)).toEqual(EXPECTED_MONEY_FIELDS);
   });
 
   test('every allowlisted name is a REAL integer (cents) column on at least one table', () => {
-    // coerceRow keys MONEY_CENTS_FIELDS.has(columnName) where columnName is the drizzle field name and the
-    // money columns are now `integer`. A typo'd entry would be a SQLiteInteger nowhere → silently never shim.
+    // A typo'd entry would match no integer column and never shim.
     const tables = [
       vehicles,
       vehicleFinancing,
@@ -74,24 +58,18 @@ describe('MONEY_CENTS_FIELDS drift guard (restore-shim allowlist)', () => {
   });
 
   test('the known NON-money reals are NOT in the allowlist (never ×100 a percent/quantity/rate)', () => {
-    // apr (percent), volume (gal/kWh), businessMileageRate ($/mile rate, design-excluded) stay `real`.
+    // apr is a percent, volume a quantity, and businessMileageRate a rate. None are cents.
     for (const nonMoney of ['apr', 'volume', 'businessMileageRate', 'mileage', 'termMonths']) {
       expect(MONEY_CENTS_FIELDS.has(nonMoney), `${nonMoney} must NOT be shimmed`).toBe(false);
     }
   });
 });
 
-// ---------------------------------------------------------------------------
-// coerceRow shim contract (regression: the Google-Sheets restore corruption).
-// The Sheets restore path reads a LIVE sheet that is always CURRENT (cents) format and must coerce WITHOUT
-// the shim. The pre-cents ZIP path reads a versioned 1.0.0 dollar backup and must coerce WITH the shim.
-// The bug was restoreFromSheets always-shimming a cents sheet → 100× OVER-value. These pin BOTH directions
-// of the shim so a cents value is preserved no-shim, and a dollar value is ×100'd with-shim.
-// ---------------------------------------------------------------------------
+// Sheets restores hold cents and skip the shim. Pre-2.0.0 ZIP restores hold dollars and apply it.
+// Applying the shim to cents would overstate them 100x.
 describe('coerceRow money shim contract (Sheets no-shim vs ZIP pre-cents shim)', () => {
   test('NO shim: a cents money string is preserved EXACTLY (the live-Sheets / 2.0.0-ZIP path)', () => {
-    // A current sheet/backup stores integer cents (4550 = $45.50). Without the shim it must round-trip 4550,
-    // NOT 455000 — the exact over-value bug if the shim wrongly fired.
+    // 4550 is $45.50 in cents. Without the shim it must stay 4550, not become 455000.
     const row = {
       id: 'e1',
       vehicleId: 'v1',

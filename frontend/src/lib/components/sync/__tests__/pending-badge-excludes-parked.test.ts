@@ -1,16 +1,4 @@
-/**
- * A parked row must not be advertised as syncable.
- *
- * `markExpenseNeedsAttention` leaves `synced:false`, so a badge that counts `!synced` keeps showing
- * "Sync 1" for a row the sync loop deliberately skips. Tapping it is a no-op: OfflineIndicator's
- * handler calls `syncOfflineExpenses`, which early-returns on an empty pending set without touching
- * `syncState`, so nothing at all happens; the sidebar's variant flashes "Synced" and reverts. That is
- * now reachable for ordinary server rejections, not just malformed fuel rows, so a stuck badge would
- * be common.
- *
- * Each case pairs the parked assertion with a pending one, so a test that can no longer see the
- * control it is asserting the absence of fails instead of passing vacuously.
- */
+// A parked row must not count as pending: the sync loop skips it, so a badge counting it would never clear.
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/svelte';

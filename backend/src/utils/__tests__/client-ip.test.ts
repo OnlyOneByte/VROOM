@@ -1,18 +1,5 @@
-/**
- * getClientIp — the trusted client-IP resolver behind rate-limit keys.
- *
- * SECURITY regression guard: an attacker must NOT be able to get a fresh rate-limit
- * bucket by spoofing X-Forwarded-For. These tests pin the trust rules:
- *  - no trusted proxies (default) → ignore XFF, use socket IP
- *  - socket IS a trusted proxy → honor leftmost XFF (the real client)
- *  - socket is NOT a trusted proxy → ignore XFF even if present
- *  - no socket IP (in-process app.request) → fall back to XFF, else 'unknown'
- *
- * The trusted-proxy list is injected (getClientIp's 2nd arg) so the trust logic is
- * tested deterministically without env/module-cache gymnastics. `getConnInfo`
- * (hono/bun) is the only external dep; it's mock.module'd here (nothing else imports
- * client-ip, so the process-global stub can't leak usefully).
- */
+// Rate-limit keys must not let a spoofed X-Forwarded-For buy a fresh bucket. getConnInfo is mocked,
+// and the trusted-proxy list is passed in.
 
 import { beforeEach, describe, expect, mock, test } from 'bun:test';
 import type { Context } from 'hono';
@@ -29,7 +16,7 @@ mock.module('hono/bun', () => ({
 
 import { getClientIp } from '../client-ip';
 
-/** Minimal Context stub exposing only what getClientIp reads: req.header(). */
+/** Minimal Context stub: only req.header() is read. */
 function ctx(headers: Record<string, string> = {}): Context {
   const lower: Record<string, string> = {};
   for (const [k, v] of Object.entries(headers)) lower[k.toLowerCase()] = v;
@@ -53,7 +40,7 @@ describe('getClientIp — no trusted proxies (default, direct exposure)', () => 
     socketAddress = '203.0.113.7';
     const a = getClientIp(ctx({ 'X-Forwarded-For': '1.1.1.1' }), []);
     const b = getClientIp(ctx({ 'X-Forwarded-For': '2.2.2.2' }), []);
-    expect(a).toBe(b); // bypass closed: same bucket regardless of header
+    expect(a).toBe(b);
   });
 });
 
@@ -72,18 +59,14 @@ describe('getClientIp — behind a trusted proxy', () => {
     );
   });
 
-  // A request can arrive AT the trusted proxy's socket IP with NO X-Forwarded-For (e.g. a
-  // direct hit to the LB, or a probe). The trusted branch is entered but `xff` is undefined, so it
-  // must fall through to the socket IP — never crash, never key on 'unknown' (which would pool all
-  // such requests into one shared bucket).
+  // Without a forwarded header, a trusted socket must key on its own IP, not pool everything into
+  // 'unknown'.
   test('falls back to the socket IP when trusted but no X-Forwarded-For is sent', () => {
     socketAddress = '10.0.0.1';
     expect(getClientIp(ctx({}), ['10.0.0.1'])).toBe('10.0.0.1');
   });
 
-  // An empty / whitespace-only X-Forwarded-For from a trusted proxy parses to undefined
-  // (clientFromForwardedFor's `first || undefined`), so it must fall through to the socket IP — not
-  // return '' as the rate-limit key (an empty key would pool every empty-XFF request together).
+  // An empty forwarded value must not become an empty rate-limit key shared by every such request.
   test('falls back to the socket IP when trusted but X-Forwarded-For is empty/whitespace', () => {
     socketAddress = '10.0.0.1';
     expect(getClientIp(ctx({ 'X-Forwarded-For': '   ' }), ['10.0.0.1'])).toBe('10.0.0.1');
@@ -101,9 +84,7 @@ describe('getClientIp — no socket IP (in-process app.request)', () => {
     expect(getClientIp(ctx({}), [])).toBe('unknown');
   });
 
-  // The no-socket fallback (:62) takes the LEFTMOST XFF entry + trims, mirroring the
-  // trusted-proxy parse — pin that a multi-entry header keys on the original client, not the raw
-  // string (so two in-process requests behind the same first-hop client share a bucket).
+  // Matches the trusted-proxy parse: the first entry, trimmed.
   test('takes the leftmost entry of a multi-hop X-Forwarded-For in the fallback', () => {
     connInfoThrows = true;
     expect(getClientIp(ctx({ 'X-Forwarded-For': ' 5.6.7.8 , 9.9.9.9 ' }), [])).toBe('5.6.7.8');

@@ -1,15 +1,4 @@
-/**
- * Background sync worker — polls photo_refs with pending/failed status
- * and syncs them to their target providers by downloading from any active ref.
- *
- * Runs in-process via setInterval. No external job queue needed.
- *
- * Features:
- * - Exponential backoff: failed refs wait 30 * 2^retryCount seconds before retry
- * - Retry count increment on failure (max 3 attempts via findPendingOrFailed query)
- * - Proper photo metadata lookup for uploads (fileName, mimeType, entityType, entityId)
- * - Folder path resolution from storage_config via the registry
- */
+/** Background worker that syncs pending/failed photo refs to their target providers, in-process via setInterval. */
 
 import { CONFIG } from '../../config';
 import type { PhotoRef } from '../../db/schema';
@@ -22,15 +11,7 @@ import { storageProviderRegistry } from './domains/storage/registry';
 import type { PhotoCategory, StorageProvider } from './domains/storage/storage-provider';
 import { ENTITY_TO_CATEGORY } from './domains/storage/storage-provider';
 
-/**
- * Collaborators the sync worker reaches for. Injected in tests (via the optional
- * `deps` arg on `processBatch`) so fakes are substituted WITHOUT `mock.module` —
- * whose process-global stubs leak across files. The old test mock.module'd these
- * three modules and never restored them (mock.restore() doesn't undo module
- * mocks), so every later suite saw a stubbed `photoRepository` missing
- * `findByUser` and real photos-route tests 500'd. Production omits the arg and
- * the real module singletons are used. See .kiro/steering/TestingExternalAPIs.md.
- */
+/** Tests pass fakes through `processBatch`'s deps arg; module mocks would leak across test files. */
 export interface SyncWorkerDeps {
   photoRefRepository: Pick<
     typeof photoRefRepository,
@@ -52,34 +33,21 @@ const defaultDeps: SyncWorkerDeps = {
 let intervalId: ReturnType<typeof setInterval> | null = null;
 let isProcessing = false;
 
-/** Track ref IDs currently being processed to prevent duplicate work across overlapping batches. */
 const inFlightRefs = new Map<string, number>();
 
-/** Max time (ms) a ref can stay in-flight before being considered stale and evicted. */
-const IN_FLIGHT_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const IN_FLIGHT_TTL_MS = 5 * 60 * 1000;
 
-/** Safety cap — if the map somehow grows beyond this, clear it entirely. */
 const MAX_IN_FLIGHT_ENTRIES = 500;
 
-/** Base backoff interval in seconds. Actual delay = BASE_BACKOFF_SECONDS * 2^retryCount */
 const BASE_BACKOFF_SECONDS = 30;
 
-/**
- * Retry ceiling — must mirror the `retryCount < 3` bound in
- * photoRefRepository.findPendingOrFailed. Setting a ref's retryCount to this value takes it
- * out of the pending/failed work set (used to terminally park a non-retryable auth failure).
- */
+/** Must match the retryCount bound in photoRefRepository.findPendingOrFailed. */
 export const MAX_RETRY_COUNT = 3;
 
-/**
- * Check whether a failed ref should be skipped due to exponential backoff.
- * Returns true if not enough time has passed since the last attempt.
- */
 export function shouldSkipDueToBackoff(ref: PhotoRef, now: Date): boolean {
   if (ref.status !== 'failed') return false;
 
-  // Use syncedAt as last attempt time (updated on every attempt).
-  // Fall back to createdAt for refs that have never been attempted.
+  // syncedAt is bumped on every attempt; createdAt covers refs never attempted.
   const lastAttempt = ref.syncedAt ?? ref.createdAt;
   if (!lastAttempt) return false;
 
@@ -89,10 +57,6 @@ export function shouldSkipDueToBackoff(ref: PhotoRef, now: Date): boolean {
   return elapsed < backoffMs;
 }
 
-/**
- * Evict all stale entries from the in-flight tracking map.
- * Called at the start of each batch to prevent unbounded growth.
- */
 function evictStaleInFlightRefs(nowMs: number): void {
   if (inFlightRefs.size > MAX_IN_FLIGHT_ENTRIES) {
     inFlightRefs.clear();
@@ -105,10 +69,6 @@ function evictStaleInFlightRefs(nowMs: number): void {
   }
 }
 
-/**
- * Determine whether a ref should be processed in this batch.
- * Returns false if the ref is already in-flight or still in backoff.
- */
 function shouldProcessRef(ref: PhotoRef, now: Date): boolean {
   if (inFlightRefs.has(ref.id)) {
     return false;
@@ -125,11 +85,6 @@ function shouldProcessRef(ref: PhotoRef, now: Date): boolean {
   return true;
 }
 
-/**
- * Process a single batch of pending/failed photo refs.
- * Downloads from any active ref for the same photo, uploads to the target provider.
- * Caches provider instances within the batch to avoid repeated DB lookups + decryption.
- */
 export async function processBatch(deps: SyncWorkerDeps = defaultDeps): Promise<void> {
   if (isProcessing) return;
   isProcessing = true;
@@ -172,9 +127,6 @@ export async function processBatch(deps: SyncWorkerDeps = defaultDeps): Promise<
   }
 }
 
-/**
- * Resolve a provider from cache or fetch via getProviderInternal (no auth check).
- */
 async function getCachedProvider(
   providerId: string,
   cache: Map<string, StorageProvider>,
@@ -189,15 +141,9 @@ async function getCachedProvider(
 }
 
 /**
- * Record a failure for a ref the worker has nothing to sync FROM, so the batch moves past it.
- *
- * Leaving the row untouched (a bare `return`) is a liveness bug, not a harmless skip:
- * findPendingOrFailed is `ORDER BY created_at ASC LIMIT batchSize`, and a ref nothing advances is
- * by construction among the oldest — so once batchSize of them accumulate they own every slot in
- * the batch and no newer photo is ever fanned out, silently and forever. Writing the failure
- * advances the row: backoff spaces the retries, and the `retryCount < MAX_RETRY_COUNT` bound in the
- * query eventually drops it from the work set, which is what frees the slot. The errorMessage is
- * also the only place this surfaces to the user (provider stats).
+ * Must record a failure rather than return silently: findPendingOrFailed is ordered by created_at,
+ * so untouched unsyncable rows would fill every batch slot and starve newer photos. Bumping
+ * retryCount lets the retry ceiling eventually drop the row from the work set.
  */
 async function recordUnsyncableRef(
   ref: PhotoRef,
@@ -221,23 +167,17 @@ async function recordUnsyncableRef(
   });
 }
 
-/**
- * Process a single pending/failed photo ref.
- * Looks up photo metadata, downloads from an active source, and uploads to the target.
- */
 async function processSingleRef(
   ref: PhotoRef,
   providerCache: Map<string, StorageProvider>,
   deps: SyncWorkerDeps
 ): Promise<void> {
-  // Find an active ref for the same photo to download from
   const sourceRef = await deps.photoRefRepository.findActiveByPhoto(ref.photoId);
   if (!sourceRef) {
     await recordUnsyncableRef(ref, 'No active source copy available for this photo', deps);
     return;
   }
 
-  // Look up photo metadata for proper upload params
   const photo = await deps.photoRepository.findById(ref.photoId);
   if (!photo) {
     await recordUnsyncableRef(ref, 'Photo record no longer exists', deps);
@@ -245,7 +185,6 @@ async function processSingleRef(
   }
 
   try {
-    // Download from source provider
     const sourceProvider = await getCachedProvider(
       sourceRef.providerId,
       providerCache,
@@ -256,19 +195,15 @@ async function processSingleRef(
       externalId: sourceRef.storageRef,
     });
 
-    // Resolve target provider and folder path from storage_config
     const category = ENTITY_TO_CATEGORY[photo.entityType] as PhotoCategory | undefined;
     let pathHint = '';
 
     if (category) {
       try {
         pathHint = await deps.registry.resolveProviderFolderPath(ref.providerId, category);
-      } catch {
-        // If path resolution fails, continue with empty pathHint
-      }
+      } catch {}
     }
 
-    // Upload to target provider with proper metadata
     const targetProvider = await getCachedProvider(ref.providerId, providerCache, deps.registry);
     const uploadResult = await targetProvider.upload({
       fileName: photo.fileName,
@@ -279,7 +214,6 @@ async function processSingleRef(
       pathHint,
     });
 
-    // Update ref to active with the new storage ref and sync timestamp
     await deps.photoRefRepository.updateStatus(ref.id, {
       status: 'active',
       storageRef: uploadResult.externalId,
@@ -293,20 +227,11 @@ async function processSingleRef(
       targetProviderId: ref.providerId,
     });
   } catch (error) {
-    // On failure: set errorMessage, update syncedAt for backoff tracking.
     const errorMessage = extractErrorMessage(error);
 
-    // A revoked/expired token (AUTH_INVALID) or a denied scope (PERMISSION_DENIED) is TERMINAL —
-    // retrying it burns backoff cycles and never succeeds. Honor that by jumping retryCount straight
-    // to the cap so findPendingOrFailed (`retryCount < 3`) stops re-picking it, and prefix the stored
-    // message so a parked ref reads as "reconnect required" rather than as a transient network flake.
-    //
-    // REACH: only the Google Photos client maps a 401/403 onto these codes today. The googleapis-backed
-    // Drive service and the AWS-SDK-backed S3 provider throw their vendor errors unmapped, so a revoked
-    // grant there still spends all three retries before parking at the same cap. Mapping them needs a
-    // code DISTINCT from AUTH_INVALID: that one means "the VROOM session expired" on the interactive
-    // routes (it is the 401 the frontend turns into "Please log in again"), and a provider's token
-    // expiring must not tell the user to re-authenticate to VROOM.
+    // Retrying a revoked token or denied scope never succeeds, so park the ref at the retry ceiling.
+    // AUTH_INVALID is reserved for VROOM session expiry (the frontend prompts a re-login on it), so
+    // provider auth errors must not reuse that code.
     const isTerminalAuth =
       isSyncError(error) &&
       (error.code === SyncErrorCode.AUTH_INVALID || error.code === SyncErrorCode.PERMISSION_DENIED);
@@ -333,10 +258,6 @@ async function processSingleRef(
   }
 }
 
-/**
- * Start the background sync worker. Polls at the configured interval.
- * Guarded by CONFIG.syncWorker.enabled — no-op in test environment.
- */
 export function startSyncWorker(): void {
   if (!CONFIG.syncWorker.enabled) {
     logger.info('Sync worker disabled (test environment)');
@@ -359,9 +280,6 @@ export function startSyncWorker(): void {
   logger.info(`Sync worker started (poll every ${CONFIG.syncWorker.pollIntervalMs}ms)`);
 }
 
-/**
- * Stop the background sync worker. Safe to call multiple times.
- */
 export function stopSyncWorker(): void {
   if (intervalId) {
     clearInterval(intervalId);

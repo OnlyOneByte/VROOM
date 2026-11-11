@@ -23,9 +23,7 @@
 	let { isExpanded = true } = $props();
 
 	let pendingCount = $derived(countPendingSync(offlineExpenseQueue.current));
-	// Parked rows are counted separately from `pendingCount` because they are not waiting on the
-	// network, they are waiting on the user — this panel is the only place in the chrome that can
-	// point them at the expenses page, where the parked rows are listed with their reasons.
+	// Parked rows wait on the user rather than the network, so they are counted separately from pendingCount.
 	let parkedCount = $derived(countParked(offlineExpenseQueue.current));
 	let parkedLinkLabel = $derived(
 		parkedCount === 1
@@ -68,7 +66,6 @@
 <div class="border-t border-border pt-3 space-y-2">
 	{#if isExpanded}
 		<div class="px-3 space-y-2">
-			<!-- Status header -->
 			<div class="flex items-center justify-between">
 				{#snippet statusHeader()}
 					{@const StatusIcon = statusInfo.icon}
@@ -80,7 +77,6 @@
 				{@render statusHeader()}
 			</div>
 
-			<!-- Connection status -->
 			<div class="flex items-center justify-between text-xs">
 				<span class="text-muted-foreground">Connection</span>
 				{#snippet connectionStatusSnippet()}
@@ -96,7 +92,6 @@
 				{@render connectionStatusSnippet()}
 			</div>
 
-			<!-- Pending expenses -->
 			{#if pendingCount > 0}
 				<div class="flex items-center justify-between text-xs">
 					<span class="text-muted-foreground">Pending</span>
@@ -107,7 +102,6 @@
 				</div>
 			{/if}
 
-			<!-- Parked rows: unsyncable until the user edits or discards them -->
 			{#if parkedCount > 0}
 				<div class="flex items-center justify-between text-xs">
 					<span class="text-muted-foreground">Needs attention</span>
@@ -124,7 +118,6 @@
 				</div>
 			{/if}
 
-			<!-- Conflicts -->
 			{#if syncConflicts.current.length > 0}
 				<div class="flex items-center justify-between text-xs">
 					<span class="text-muted-foreground">Conflicts</span>
@@ -135,7 +128,6 @@
 				</div>
 			{/if}
 
-			<!-- Last backup -->
 			{#if backupEnabled.current || sheetsSyncEnabled.current}
 				<div class="flex items-center justify-between text-xs">
 					<span class="text-muted-foreground">Last backup</span>
@@ -145,7 +137,6 @@
 				</div>
 			{/if}
 
-			<!-- Last change -->
 			{#if lastDataChangeTime.current}
 				<div class="flex items-center justify-between text-xs">
 					<span class="text-muted-foreground">Last change</span>
@@ -155,7 +146,6 @@
 				</div>
 			{/if}
 
-			<!-- Sync button -->
 			{#if onlineStatus.current && pendingCount > 0}
 				<Button
 					size="sm"
@@ -171,7 +161,6 @@
 			{/if}
 		</div>
 	{:else}
-		<!-- Collapsed view - just icon -->
 		{#snippet collapsedIcon()}
 			{@const StatusIcon = statusInfo.icon}
 			<div class="flex justify-center px-3">

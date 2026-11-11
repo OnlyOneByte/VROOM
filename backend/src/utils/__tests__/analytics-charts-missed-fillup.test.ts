@@ -1,15 +1,5 @@
-/**
- * Regression tests for the missed-fill-up guard in the monthly fuel charts.
- *
- * The canonical efficiency math (computeEfficiencyPoint) skips a consecutive pair when
- * EITHER row is a missed/partial fill-up, or the mileage gap is non-positive / implausibly
- * large (> MAX_REASONABLE_MILES_BETWEEN_FILLUPS). Two MONTH-AGGREGATING builders had drifted
- * from that contract:
- *  - buildFuelEfficiencyAndCost (accumulateFuelRow) — folded a missed-fill-up pair into the
- *  month's miles/gallons, counting one tank's volume against two tanks' miles → inflated MPG.
- *  - buildCostPerDistanceChart (accumulateCostPerMile) — same gap → spiked cost-per-distance.
- * These pin that both now skip missed fill-ups and over-cap gaps. Pure functions, no DB.
- */
+// Missed fill-ups and implausibly large gaps must not feed monthly MPG or cost-per-distance.
+// A missed fill-up spans more than one tank, so folding it in inflates both figures.
 
 import { describe, expect, test } from 'bun:test';
 import {
@@ -37,9 +27,6 @@ function general(over: Partial<GeneralExpenseRow> & { id: string }): GeneralExpe
 
 describe('buildFuelEfficiencyAndCost — missed-fill-up does not inflate monthly MPG', () => {
   test('a missed-fill-up pair is excluded from the month efficiency', () => {
-    // Three same-month fill-ups; the middle one is a missed fill-up. A correct MPG uses only
-    // the clean 1→3? No: pairs are consecutive. Pair (2 after missed-1) must be skipped, and
-    // pair (missed-2) must be skipped, leaving no valid window → efficiency null, not inflated.
     const rows: GeneralExpenseRow[] = [
       general({ id: 'a', mileage: 10000, volume: 10, date: new Date(2024, 5, 1) }),
       general({
@@ -54,15 +41,14 @@ describe('buildFuelEfficiencyAndCost — missed-fill-up does not inflate monthly
     const out = buildFuelEfficiencyAndCost(rows);
     const june = out.find((m) => m.month === '2024-06');
     expect(june).toBeTruthy();
-    // Every consecutive pair touches the missed-fill-up row, so no valid distance window →
-    // efficiency is null (no miles/gallons accumulated), NOT an inflated number.
+    // Every consecutive pair touches the missed row, so no valid window remains.
     expect(june?.efficiency).toBeNull();
   });
 
   test('an implausibly large gap (> cap) is excluded', () => {
     const rows: GeneralExpenseRow[] = [
       general({ id: 'a', mileage: 10000, volume: 10, date: new Date(2024, 6, 1) }),
-      // 5000 mi between fill-ups is over MAX_REASONABLE_MILES_BETWEEN_FILLUPS (1000) → bad data.
+      // 5000 mi exceeds the 1000 mi cap.
       general({ id: 'b', mileage: 15000, volume: 10, date: new Date(2024, 6, 15) }),
     ];
     const out = buildFuelEfficiencyAndCost(rows);
@@ -106,7 +92,7 @@ describe('buildCostPerDistanceChart — missed-fill-up does not spike cost/dista
         date: new Date(2024, 2, 15),
       }),
     ];
-    // The only pair touches a missed fill-up → no month entry emitted (totalMiles filtered out).
+    // The only pair touches a missed fill-up, so no month is emitted.
     const out = buildCostPerDistanceChart(rows, new Map([['veh-1', 'My Car']]));
     expect(out.length).toBe(0);
   });

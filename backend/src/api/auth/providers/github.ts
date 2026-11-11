@@ -49,8 +49,7 @@ export const githubAuthProvider: OAuthProviderConfig = {
     if (!userRes.ok) throw new Error('Failed to fetch GitHub user info');
     const userData = (await userRes.json()) as GitHubUser;
 
-    // Always fetch from /user/emails to ensure we get a verified email.
-    // The /user endpoint can return an unverified email in the email field.
+    // /user can return an unverified email, so the verified primary comes from /user/emails.
     const emailRes = await fetch('https://api.github.com/user/emails', { headers });
     if (!emailRes.ok) throw new Error('Failed to fetch GitHub user emails');
     const emails = (await emailRes.json()) as GitHubEmail[];

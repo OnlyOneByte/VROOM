@@ -1,42 +1,23 @@
-/**
- * Centralized API client
- *
- * All API calls should go through this client to ensure:
- * - Consistent credentials handling
- * - Consistent error handling
- * - Response envelope unwrapping (extracts `data` from `{ success, data }`)
- */
+/** Single entry point for HTTP calls: credentials, error mapping, envelope unwrapping. */
 
 import { browser } from '$app/environment';
 import { env } from '$env/dynamic/public';
 import { ApiError } from '$lib/utils/error-handling';
 
-/** Returns the API base URL (e.g. "https://api.vroom.ryang.dev") or empty string for same-origin. */
+/** Empty string means same-origin. */
 export function getApiBaseUrl(): string {
 	return env['PUBLIC_API_URL'] ?? '';
 }
 
-/**
- * Auth endpoints for which a 401 is an ordinary answer rather than an expiry: the startup probe
- * (`authStore.initialize`) and the refresh call both read it as "not signed in" and handle it
- * themselves. Running the global handler for them would toast and redirect on every page load
- * made by a visitor who is simply not logged in.
- */
+// A 401 here means "not signed in", which the callers handle; the global expiry handler must skip it.
 const SELF_REPORTED_401_PATHS = ['/api/v1/auth/me', '/api/v1/auth/refresh'];
 
 /** One toast and one navigation per expiry, however many in-flight requests see the same 401. */
 let sessionExpiryHandled = false;
 
 /**
- * A 401 on an app request means the server-side session is gone, so the auth store still claiming
- * an authenticated user is a lie: clear it, say why, and send the user to sign in. This is the only
- * place the app reaches the network, which is why it is the only place that can see every 401.
- *
- * Clearing the store also makes the layout's route-protection effect navigate — to the same
- * destination, so the duplicate is harmless; the latch above is about repeated 401s, not that.
- *
- * Total by construction: the caller is about to throw an `ApiError` describing the real failure,
- * and a secondary fault in notifying or navigating must not replace it with an unrelated one.
+ * Clears the auth store and redirects to sign-in. Never throws: the caller is about to throw the
+ * real ApiError and a secondary failure here must not replace it.
  */
 async function handleSessionExpiry(url: string): Promise<void> {
 	if (!browser || sessionExpiryHandled) return;
@@ -48,7 +29,7 @@ async function handleSessionExpiry(url: string): Promise<void> {
 	}, 1000);
 
 	try {
-		// Imported lazily: the stores import this module, so a static import would be circular.
+		// Lazy: the stores import this module, so static imports would be circular.
 		const [{ authStore }, { appStore }] = await Promise.all([
 			import('$lib/stores/auth.svelte'),
 			import('$lib/stores/app.svelte')
@@ -65,8 +46,7 @@ async function handleSessionExpiry(url: string): Promise<void> {
 			import('$app/paths'),
 			import('$lib/routes')
 		]);
-		// Started, not awaited: the caller is blocked on this before it can throw its own ApiError,
-		// and a navigation that stalls (a `beforeNavigate` hold, say) must not strand that error.
+		// Not awaited: a navigation that stalls (e.g. a beforeNavigate hold) must not block the ApiError.
 		void goto(resolve(routes.auth)).catch((error: unknown) => {
 			if (import.meta.env.DEV) console.error('Session-expiry redirect failed:', error);
 		});
@@ -89,12 +69,8 @@ function toFetchBody(body: unknown): globalThis.BodyInit | undefined {
 }
 
 /**
- * Shared fetch core for `request`/`requestFull`: resolves the URL, sets the JSON Content-Type
- * (skipped for FormData), sends with `credentials: 'include'`, and on a non-ok response parses the
- * backend `{ error: { message, code, details } }` envelope into a thrown `ApiError`. Returns the
- * ok Response so each caller does its OWN success-body handling (unwrap-data vs raw-JSON). The
- * fetch-setup + error-parsing block was byte-identical across both wrappers — one
- * source of truth so an error-shape fix can't land in one path and be forgotten in the other.
+ * Shared fetch core for `request` and `requestFull`. Throws an ApiError built from the backend
+ * `{ error: { message, code, details } }` envelope on non-ok responses; callers handle success bodies.
  */
 async function fetchOrThrow(url: string, options: ApiOptions): Promise<Response> {
 	const { body, headers: customHeaders, method, signal } = options;
@@ -132,7 +108,7 @@ async function fetchOrThrow(url: string, options: ApiOptions): Promise<Response>
 					: (errorBody.error.details as Record<string, unknown>);
 			}
 		} catch {
-			// ignore parse errors
+			// Error body is not JSON; keep the status-based message.
 		}
 		throw new ApiError(message, response.status, details, code);
 	}
@@ -143,7 +119,7 @@ async function fetchOrThrow(url: string, options: ApiOptions): Promise<Response>
 async function request<T>(url: string, options: ApiOptions = {}): Promise<T> {
 	const response = await fetchOrThrow(url, options);
 
-	// Handle empty responses (204, etc.)
+	// Non-JSON bodies (e.g. 204) are returned as the raw Response.
 	const contentType = response.headers.get('content-type');
 	if (!contentType?.includes('application/json')) {
 		return response as unknown as T;
@@ -151,20 +127,14 @@ async function request<T>(url: string, options: ApiOptions = {}): Promise<T> {
 
 	const result = await response.json();
 
-	// Unwrap the { success, data } envelope
 	return result.data !== undefined ? result.data : result;
 }
 
-/**
- * Like `request`, but returns the full JSON body without unwrapping the
- * `data` field. Used for paginated endpoints where we need `{ data, pagination }`.
- */
 async function requestFull<T>(url: string, options: ApiOptions = {}): Promise<T> {
 	const response = await fetchOrThrow(url, options);
 	return response.json();
 }
 
-/** Append limit/offset query params to a URL path. */
 export function withPagination(url: string, params?: { limit?: number; offset?: number }): string {
 	const query = new URLSearchParams();
 	if (params?.limit !== undefined) query.set('limit', String(params.limit));
@@ -188,17 +158,12 @@ export const apiClient = {
 	delete: <T>(url: string, options?: ApiOptions) =>
 		request<T>(url, { ...options, method: 'DELETE' }),
 
-	/** Returns the raw Response (for file downloads, etc.) */
 	raw: (url: string, options: { method?: string; headers?: Record<string, string> } = {}) => {
 		const fullUrl = url.startsWith('http') ? url : `${getApiBaseUrl()}${url}`;
 		return fetch(fullUrl, { credentials: 'include', ...options });
 	},
 
-	/**
-	 * GET a paginated endpoint and return the full envelope (data + pagination).
-	 * Unlike `get()`, this does NOT unwrap the `data` field — it returns the
-	 * complete `{ data, pagination }` response so callers keep metadata.
-	 */
+	// Unlike get(), keeps the { data, pagination } envelope.
 	getPaginated: <T>(url: string, options?: ApiOptions) =>
 		requestFull<{
 			data: T[];

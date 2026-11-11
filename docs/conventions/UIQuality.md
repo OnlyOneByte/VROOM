@@ -1,8 +1,3 @@
----
-inclusion: fileMatch
-fileMatchPattern: "frontend/src/routes/**/*.svelte,frontend/src/lib/components/**/*.svelte"
----
-
 # UI Quality — "human-ready, not junk"
 
 CI runs type-check, lint, the unit suite, and a build. All of that proves a page

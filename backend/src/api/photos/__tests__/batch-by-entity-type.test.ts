@@ -1,12 +1,6 @@
 /**
- * Tests for the batch photo-fetch primitive behind GET /api/v1/photos?entityType=.
- *
- * The dashboard used to fetch photos one request per vehicle (N+1). The batch
- * endpoint calls photoRepository.findByUser(userId, entityType) once and groups
- * the rows by entityId. These tests pin the two properties that make that safe:
- *  - the query is user-scoped (never returns another user's photos)
- *  - the query is entity-type-scoped (vehicle photos only, not expense photos)
- * plus the grouping shape the service produces.
+ * Batch photo fetch for GET /api/v1/photos?entityType=. Results must be scoped to the user and the
+ * entity type, and grouped by entityId.
  */
 
 import { Database } from 'bun:sqlite';
@@ -67,7 +61,7 @@ function addPhoto(userId: string, entityType: string, entityId: string) {
   });
 }
 
-/** Mirror of the service's grouping (service binds the singleton repo). */
+/** Mirrors listPhotosByEntityType's grouping, which binds the singleton repo. */
 function groupByEntityId(photos: Photo[]): Record<string, Photo[]> {
   const grouped: Record<string, Photo[]> = {};
   for (const p of photos) {

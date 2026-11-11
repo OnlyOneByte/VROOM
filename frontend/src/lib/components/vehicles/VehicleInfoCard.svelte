@@ -11,9 +11,7 @@
 
 	interface Props {
 		vehicle: Vehicle;
-		/** vehicle-sharing T12b-3b: editing vehicle info is owner-only (server keeps strict
-		 *  validateVehicleOwnership on PUT /vehicles/:id). Default true so every existing owner
-		 *  call site is unchanged; the [id] page passes the resolved capability. */
+		/** Editing vehicle info is owner-only on the server. Defaults to true so owner call sites are unchanged. */
 		isOwner?: boolean;
 	}
 

@@ -1,31 +1,13 @@
 /**
- * Property-Based Tests for PhotoService Upload Validation
- *
- * Property 6: MIME Type Validation
- * Any file with a MIME type not in {image/jpeg, image/png, image/webp}
- * is rejected, and any file with a MIME type in the allowed set is accepted.
- *
- * **Validates: Requirements 1.4, 9.1**
- *
- * Property 7: File Size Validation
- * Any file exceeding 10,485,760 bytes is rejected, and any file with
- * size > 0 and <= 10,485,760 bytes is accepted.
- *
- * **Validates: Requirements 1.5, 9.2**
- *
- * Approach: Test the validation predicates directly against the exported
- * constants from photo-service.ts. No database calls, no mocking.
+ * Property tests for photo upload validation: the MIME allowlist and the size limit, plus the
+ * cover-on-upload and cover-promotion rules. Pure, with no database.
  */
 
 import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE } from '../photo-service';
 
-// ---------------------------------------------------------------------------
-// Property 6: MIME Type Validation
-// ---------------------------------------------------------------------------
-
-describe('Property 6: MIME Type Validation', () => {
+describe('MIME type validation', () => {
   test('any MIME type in ALLOWED_MIME_TYPES is accepted', () => {
     fc.assert(
       fc.property(fc.constantFrom(...ALLOWED_MIME_TYPES), (mimeType) => {
@@ -38,9 +20,7 @@ describe('Property 6: MIME Type Validation', () => {
   test('any MIME type not in ALLOWED_MIME_TYPES is rejected', () => {
     const invalidMimeArb = fc
       .oneof(
-        // Completely random strings
         fc.string({ minLength: 0, maxLength: 50 }),
-        // Plausible but invalid MIME types
         fc.constantFrom(
           '',
           'image/gif',
@@ -79,11 +59,7 @@ describe('Property 6: MIME Type Validation', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Property 7: File Size Validation
-// ---------------------------------------------------------------------------
-
-describe('Property 7: File Size Validation', () => {
+describe('file size validation', () => {
   test('any file size > MAX_FILE_SIZE is rejected', () => {
     const oversizedArb = fc.integer({ min: MAX_FILE_SIZE + 1, max: MAX_FILE_SIZE * 10 });
 
@@ -118,10 +94,6 @@ describe('Property 7: File Size Validation', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Reference Model (inline — mirrors the repository tests' ReferencePhotoModel)
-// ---------------------------------------------------------------------------
-
 interface RefPhoto {
   id: string;
   isCover: boolean;
@@ -131,7 +103,7 @@ interface RefPhoto {
 class ReferencePhotoModel {
   photos: RefPhoto[] = [];
 
-  /** Simulates uploadPhotoForEntity auto-cover logic. */
+  /** Mirrors uploadPhotoForEntity's auto-cover rule. */
   upload(id: string, createdAt: number): RefPhoto {
     const isFirst = this.photos.length === 0;
     const photo: RefPhoto = { id, isCover: isFirst, createdAt };
@@ -139,7 +111,7 @@ class ReferencePhotoModel {
     return photo;
   }
 
-  /** Simulates deletePhotoForEntity cover-promotion logic. */
+  /** Mirrors deletePhotoForEntity's cover promotion. */
   delete(photoId: string): void {
     const idx = this.photos.findIndex((p) => p.id === photoId);
     if (idx === -1) return;
@@ -157,10 +129,6 @@ class ReferencePhotoModel {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Generators
-// ---------------------------------------------------------------------------
-
 const tsArb = fc.integer({ min: 1672531200000, max: 1767139200000 });
 
 /**
@@ -170,21 +138,7 @@ const tsArb = fc.integer({ min: 1672531200000, max: 1767139200000 });
 const distinctTimestampsArb = (min: number, max: number) =>
   fc.uniqueArray(tsArb, { minLength: min, maxLength: max }).filter((arr) => arr.length >= min);
 
-// ---------------------------------------------------------------------------
-// Property 2: Auto-Cover on First Upload
-// ---------------------------------------------------------------------------
-
-/**
- * Property 2: Auto-Cover on First Upload
- *
- * For any entity with zero existing photos, uploading a valid photo results
- * in that photo having isCover = true. For any entity with one or more
- * existing photos, uploading a valid photo results in the new photo having
- * isCover = false and the existing cover photo remaining unchanged.
- *
- * **Validates: Requirements 1.2, 1.3**
- */
-describe('Property 2: Auto-Cover on First Upload', () => {
+describe('auto-cover on first upload', () => {
   test('first photo uploaded always becomes cover', () => {
     fc.assert(
       fc.property(tsArb, (createdAt) => {
@@ -237,20 +191,7 @@ describe('Property 2: Auto-Cover on First Upload', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Property 3: Cover Promotion on Delete
-// ---------------------------------------------------------------------------
-
-/**
- * Property 3: Cover Promotion on Delete
- *
- * When the cover photo is deleted and at least one other photo remains,
- * the oldest remaining photo (by createdAt) becomes the new cover photo
- * with isCover = true.
- *
- * **Validates: Requirements 4.2, 3.4**
- */
-describe('Property 3: Cover Promotion on Delete', () => {
+describe('cover promotion on delete', () => {
   test('deleting cover promotes oldest remaining photo to cover', () => {
     fc.assert(
       fc.property(distinctTimestampsArb(2, 15), (timestamps) => {

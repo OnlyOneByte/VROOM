@@ -75,7 +75,6 @@
 		</CardDescription>
 	</CardHeader>
 	<CardContent>
-		<!-- Ownership Type Selector -->
 		<div class="mb-6">
 			<Label class="mb-3 block">How do you own this vehicle? *</Label>
 			<div class="grid grid-cols-3 gap-3">
@@ -224,7 +223,6 @@
 						</Select.Root>
 					</div>
 
-					<!-- Monthly Payment (for leases — loans auto-calculate this) -->
 					{#if ownershipType === 'lease'}
 						<div class="space-y-2">
 							<Label for="paymentAmount">Monthly Payment *</Label>
@@ -281,7 +279,6 @@
 					{/if}
 				</div>
 
-				<!-- Current Balance (Edit Mode) -->
 				{#if isEditMode && vehicle?.financing?.computedBalance !== undefined}
 					<Card class="bg-muted/50">
 						<CardHeader>
@@ -314,7 +311,6 @@
 					</Card>
 				{/if}
 
-				<!-- Amortization Preview -->
 				{#if amortizationPreview && ownershipType === 'finance'}
 					<Card class="border-primary/20 bg-primary/5">
 						<CardHeader>

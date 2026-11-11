@@ -1,15 +1,8 @@
-/**
- * Coverage ratchet for api-client.ts — the low spot + the most load-bearing FE
- * module: EVERY API call routes through `request`/`requestFull` here (envelope unwrap, error parsing,
- * header gating, pagination). The sibling service tests all MOCK this module, so its real internals
- * were never exercised. Here we stub global.fetch (the auth.test.ts pattern) and drive the REAL
- * apiClient methods, asserting the behavior every caller depends on.
- */
+// Drives the real apiClient methods with a stubbed fetch; sibling service tests mock this module.
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-// api-client reads PUBLIC_API_URL from $env/dynamic/public; pin it empty so getApiBaseUrl() === ''
-// (same-origin) and the asserted URLs are the bare paths.
+// Pins PUBLIC_API_URL to empty so the asserted URLs are bare paths.
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
 const { apiClient, getApiBaseUrl, withPagination } = await import('../api-client');
@@ -18,7 +11,6 @@ const { ApiError } = await import('$lib/utils/error-handling');
 const mockFetch = vi.fn();
 global.fetch = mockFetch as unknown as typeof fetch;
 
-/** A JSON Response double (api-client checks .ok, content-type, then .json()). */
 function jsonResponse(body: unknown, { ok = true, status = 200 } = {}): Response {
 	return {
 		ok,
@@ -28,7 +20,6 @@ function jsonResponse(body: unknown, { ok = true, status = 200 } = {}): Response
 	} as unknown as Response;
 }
 
-/** Await a promise expected to reject, returning the thrown ApiError (typed, for assertions). */
 async function captureError(p: Promise<unknown>): Promise<InstanceType<typeof ApiError>> {
 	try {
 		await p;
@@ -59,7 +50,6 @@ describe('request envelope unwrapping', () => {
 	});
 
 	test('a response WITHOUT a data field is returned as-is (no over-unwrap)', async () => {
-		// result.data === undefined → return result verbatim (e.g. a bare object).
 		mockFetch.mockResolvedValueOnce(jsonResponse({ count: 3, monthlyTotal: 10 }));
 		const result = await apiClient.get('/api/v1/reminders/recurring-cost');
 		expect(result).toEqual({ count: 3, monthlyTotal: 10 });
@@ -80,7 +70,6 @@ describe('request envelope unwrapping', () => {
 		};
 		mockFetch.mockResolvedValueOnce(raw as unknown as Response);
 		const result = await apiClient.delete('/api/v1/expenses/e1');
-		// The Response object itself is returned (cast) — not a thrown parse error.
 		expect(result).toBe(raw);
 	});
 });
@@ -111,7 +100,6 @@ describe('request method + header behavior', () => {
 		fd.append('photo', 'x');
 		await apiClient.post('/api/v1/photos', fd, {});
 		const [, init] = mockFetch.mock.calls[0] ?? [];
-		// Browser sets the multipart Content-Type+boundary itself; we must NOT set it.
 		expect((init?.headers as Record<string, string>)['Content-Type']).toBeUndefined();
 		expect(init?.body).toBe(fd);
 	});
@@ -201,11 +189,7 @@ describe('withPagination', () => {
 	});
 });
 
-// apiClient.raw (api-client.ts:131-132) was UNCOVERED — it's the raw-Response fetch used for file
-// downloads (e.g. the backup-ZIP export, data portability). Unlike request(), it does NOT
-// unwrap the envelope; it returns the Response directly. The load-bearing bits: a relative url is
-// base-prefixed (absolute http(s) passes through), and `credentials: 'include'` is ALWAYS sent so the
-// auth cookie rides along (a dropped credentials = a 401 on every download).
+// raw() must always send credentials, or every download is a 401.
 describe('apiClient.raw', () => {
 	test('prefixes a relative url with the base and always sends credentials: include', async () => {
 		const resp = jsonResponse({ ok: true });
@@ -213,11 +197,10 @@ describe('apiClient.raw', () => {
 
 		const out = await apiClient.raw('/api/v1/backup/export');
 
-		// returns the Response verbatim (no envelope unwrap)
 		expect(out).toBe(resp);
 		expect(mockFetch).toHaveBeenCalledTimes(1);
 		const [url, init] = mockFetch.mock.calls[0] ?? [];
-		expect(url).toBe('/api/v1/backup/export'); // base is '' (PUBLIC_API_URL unset) → bare path
+		expect(url).toBe('/api/v1/backup/export');
 		expect(init?.credentials).toBe('include');
 	});
 
@@ -237,6 +220,6 @@ describe('apiClient.raw', () => {
 		const [, init] = mockFetch.mock.calls[0] ?? [];
 		expect(init?.method).toBe('POST');
 		expect(init?.headers).toEqual({ 'X-Test': '1' });
-		expect(init?.credentials).toBe('include'); // credentials still forced even with options
+		expect(init?.credentials).toBe('include');
 	});
 });

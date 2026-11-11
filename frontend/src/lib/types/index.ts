@@ -1,9 +1,3 @@
-/**
- * Barrel export for all types.
- * Import from '$lib/types' — resolves here.
- * Each domain has its own file for maintainability.
- */
-
 export * from './user.js';
 export * from './vehicle.js';
 export * from './expense.js';

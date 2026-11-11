@@ -1,11 +1,3 @@
-/**
- * Unit tests for the split-expense validation schemas (guard, steered by the coverage
- * baseline — expenses/validation.ts was at 50% func / 73% line, the uncovered branches being the
- * financial-correctness REFINEMENTS). These guard real money-math: a percentage split must sum to
- * 100, absolute allocations must sum to the declared total, and source fields are both-or-neither.
- * Pure Zod schemas → no DB, no server; exercised via safeParse.
- */
-
 import { describe, expect, test } from 'bun:test';
 import { createSplitExpenseSchema, splitConfigSchema, updateSplitSchema } from '../validation';
 
@@ -42,7 +34,6 @@ describe('splitConfigSchema — discriminated union shape', () => {
     expect(splitConfigSchema.safeParse({ method: 'bogus', vehicleIds: ['v1'] }).success).toBe(
       false
     );
-    // A percentage allocation over 100 is rejected by the field schema.
     expect(
       splitConfigSchema.safeParse({
         method: 'percentage',
@@ -74,7 +65,7 @@ describe('createSplitExpenseSchema — percentage-sum refinement (must total 100
         method: 'percentage',
         allocations: [
           { vehicleId: 'v1', percentage: 60 },
-          { vehicleId: 'v2', percentage: 30 }, // sums to 90
+          { vehicleId: 'v2', percentage: 30 },
         ],
       },
     });
@@ -109,7 +100,7 @@ describe('createSplitExpenseSchema — absolute-sum refinement (must equal total
         method: 'absolute',
         allocations: [
           { vehicleId: 'v1', amount: 70 },
-          { vehicleId: 'v2', amount: 20 }, // sums to 90, not 100
+          { vehicleId: 'v2', amount: 20 },
         ],
       },
     });
@@ -139,12 +130,6 @@ describe('createSplitExpenseSchema — source fields are both-or-neither', () =>
     expect(neither.success).toBe(true);
   });
 
-  // The manual split route accepts ONLY a 'financing' source link (mirrors the regular
-  // create) — 'insurance_term'/'reminder' splits come EXCLUSIVELY from system paths that bypass this
-  // route. Pre-fix the schema was z.string().optional() → a hand-crafted POST could forge an
-  // UNVALIDATED reminder/insurance_term link on the caller's own siblings (skews source-bucketed
-  // analytics; a real matching insurance_term sourceId cascade-deletes the manual split when the
-  // policy is removed). NON-VACUOUS: pre-fix every line here parsed success:true.
   test('rejects a non-financing sourceType (reminder / insurance_term / arbitrary string)', () => {
     for (const sourceType of ['reminder', 'insurance_term', 'manual', 'anything']) {
       const r = createSplitExpenseSchema.safeParse({
@@ -174,11 +159,6 @@ describe('createSplitExpenseSchema — source fields are both-or-neither', () =>
   });
 });
 
-// The split-create schema's tags were a bare z.array(z.string()) that bypassed
-// the tagElementSchema separator-rejection the regular create/update boundaries enforce. A tag containing
-// ';' or ',' persisted onto every sibling, then the CSV export ('; '-join) → re-import (/[;,]/-split)
-// round-tripped it into MULTIPLE tags (silent data loss). Now routed through the shared tagElementSchema.
-// Pre-fix these REJECT-assertions were RED (the bare array accepted the separator tag).
 describe('createSplitExpenseSchema — tags reject the CSV separator', () => {
   const splitBase = {
     ...baseCreate,
@@ -215,14 +195,12 @@ describe('createSplitExpenseSchema — tags reject the CSV separator', () => {
 
 describe('updateSplitSchema — shares the same refinement', () => {
   test('absolute-sum refinement applies; totalAmount optional means the absolute check is skipped when omitted', () => {
-    // With totalAmount present, the sum must match.
     const mismatch = updateSplitSchema.safeParse({
       totalAmount: 100,
       splitConfig: { method: 'absolute', allocations: [{ vehicleId: 'v1', amount: 50 }] },
     });
     expect(mismatch.success).toBe(false);
 
-    // With totalAmount OMITTED, the absolute-sum check is skipped (data.totalAmount === undefined).
     const skipped = updateSplitSchema.safeParse({
       splitConfig: { method: 'absolute', allocations: [{ vehicleId: 'v1', amount: 50 }] },
     });
@@ -237,12 +215,7 @@ describe('updateSplitSchema — shares the same refinement', () => {
   });
 });
 
-// + money-cents-migration: totalAmount is the dollars→integer-CENTS input edge at the
-// validation boundary (centsAmount = z.number().positive().transform(dollarsToCents)). The split's
-// groupTotal + legs are then all computed in native cents from this SAME value (Σlegs == groupTotal
-// EXACTLY). A sub-cent dollar input rounds to the nearest whole cent (ROUND-before-int), never truncates.
-// The UI only sends 2-decimal dollar amounts; this verifies the dollars→cents conversion.
-describe('split totalAmount is converted to integer cents (/ money-cents-migration)', () => {
+describe('split totalAmount is converted to integer cents', () => {
   test('a dollar totalAmount with a sub-cent tail rounds to whole cents on create', () => {
     const r = createSplitExpenseSchema.safeParse({
       ...baseCreate,
@@ -250,7 +223,6 @@ describe('split totalAmount is converted to integer cents (/ money-cents-migrati
       totalAmount: 100.005,
     });
     expect(r.success).toBe(true);
-    // $100.005 → round(100.005 * 100) = 10001 cents.
     if (r.success) expect(r.data.totalAmount).toBe(10001);
   });
 
@@ -260,7 +232,7 @@ describe('split totalAmount is converted to integer cents (/ money-cents-migrati
       totalAmount: 49.999,
     });
     expect(r.success).toBe(true);
-    if (r.success) expect(r.data.totalAmount).toBe(5000); // $49.999 → 5000 cents
+    if (r.success) expect(r.data.totalAmount).toBe(5000);
   });
 
   test('a clean 2-decimal dollar totalAmount converts to its exact cent value', () => {
@@ -270,6 +242,6 @@ describe('split totalAmount is converted to integer cents (/ money-cents-migrati
       totalAmount: 100.0,
     });
     expect(r.success).toBe(true);
-    if (r.success) expect(r.data.totalAmount).toBe(10000); // $100.00 → 10000 cents
+    if (r.success) expect(r.data.totalAmount).toBe(10000);
   });
 });

@@ -5,15 +5,10 @@ import { apiClient, getApiBaseUrl } from '$lib/services/api-client';
 import { appStore } from '$lib/stores/app.svelte';
 
 interface GoogleOAuthOptions {
-	/** Whether we're editing an existing provider */
 	isEditMode: boolean;
-	/** The provider ID (edit mode only) */
 	providerId?: string;
-	/** The existing account email (edit mode only, used as login_hint) */
 	existingEmail?: string;
-	/** Current display name to persist across redirect */
 	displayName: string;
-	/** Current selected type to persist across redirect */
 	selectedType: string | null;
 }
 
@@ -31,23 +26,12 @@ interface GoogleOAuthReturn extends GoogleOAuthState {
 	restoreFormState: () => { selectedType?: string; displayName?: string } | null;
 }
 
-/**
- * Manages the Google OAuth flow for connecting a Google Drive provider.
- *
- * Handles:
- * - Saving form state to sessionStorage before redirect
- * - Restoring form state after OAuth redirect
- * - Fetching pending credentials from the backend
- * - Cleaning up URL params after redirect
- */
+/** Google Drive OAuth flow; form state survives the redirect via sessionStorage. */
 export function useGoogleOAuth(getOptions: () => GoogleOAuthOptions): GoogleOAuthReturn {
 	let pendingEmail = $state('');
 	let oauthNonce = $state('');
 
-	/**
-	 * Restore form state saved before an OAuth redirect.
-	 * Call this synchronously during component init (outside onMount).
-	 */
+	/** Call synchronously during component init, outside onMount. */
 	function restoreFormState(): { selectedType?: string; displayName?: string } | null {
 		if (!browser) return null;
 		const saved = sessionStorage.getItem('provider-form-state');
@@ -60,10 +44,6 @@ export function useGoogleOAuth(getOptions: () => GoogleOAuthOptions): GoogleOAut
 		}
 	}
 
-	/**
-	 * Start the Google OAuth flow.
-	 * Saves form state to sessionStorage, then redirects to the backend OAuth endpoint.
-	 */
 	function startGoogleOAuth() {
 		const opts = getOptions();
 		const nonce = crypto.randomUUID();
@@ -87,13 +67,7 @@ export function useGoogleOAuth(getOptions: () => GoogleOAuthOptions): GoogleOAut
 		window.location.href = `${getApiBaseUrl()}/api/v1/auth/providers/connect/google?${params.toString()}`;
 	}
 
-	/**
-	 * Handle the OAuth return. Call this in onMount.
-	 * Checks URL params for provider_connected / provider_error,
-	 * fetches pending credentials, and cleans the URL.
-	 *
-	 * Returns restored form state if the OAuth flow completed successfully.
-	 */
+	/** Call from onMount. Returns restored form state only when the OAuth flow completed. */
 	async function handleOAuthReturn(): Promise<{
 		restoredSelectedType?: string;
 		restoredDisplayName?: string;
@@ -106,7 +80,6 @@ export function useGoogleOAuth(getOptions: () => GoogleOAuthOptions): GoogleOAut
 		if (providerConnected === 'true' && nonceParam) {
 			oauthNonce = nonceParam;
 
-			// Restore form state from sessionStorage
 			let restoredSelectedType: string | undefined;
 			let restoredDisplayName: string | undefined;
 			const saved = sessionStorage.getItem('provider-form-state');
@@ -125,7 +98,6 @@ export function useGoogleOAuth(getOptions: () => GoogleOAuthOptions): GoogleOAut
 				}
 			}
 
-			// Fetch the connected email from the pending credentials API
 			try {
 				const result = await apiClient.get<{ email: string }>(
 					`/api/v1/providers/pending/${nonceParam}`
@@ -135,7 +107,6 @@ export function useGoogleOAuth(getOptions: () => GoogleOAuthOptions): GoogleOAut
 				appStore.showError('Failed to retrieve connected Google account. Please try again.');
 			}
 
-			// Clean URL
 			// eslint-disable-next-line svelte/no-navigation-without-resolve -- dynamic runtime path from current URL
 			goto(page.url.pathname, { replaceState: true });
 

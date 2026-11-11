@@ -1,20 +1,9 @@
 import { test, expect, type Page } from '@playwright/test';
 import { E2E_USER, addSessionCookie, mockApi } from './support/mock-api';
 
-/**
- * Sign-in, route protection and sign-out.
- *
- * Route facts this spec is written against (there is no `/login` route — the previous
- * version of this file navigated to one):
- *   `/`     — marketing landing page, public, has the "Sign In" affordance
- *   `/auth` — sign-in page; the provider buttons come from `GET /api/v1/auth/providers`,
- *             so the label is "Continue with <provider>", not "Sign in with Google"
- *   anything not in `publicRoutes` ($lib/utils/auth.ts) redirects a logged-out visitor
- *             to `/auth`
- */
+// There is no /login route: sign-in is /auth, and provider buttons come from GET /api/v1/auth/providers.
 
-/** Sign out lives in the desktop sidebar, and on narrow viewports inside the mobile
- *  navigation sheet — which is not in the DOM until the hamburger is clicked. */
+// On narrow viewports sign-out lives in the navigation sheet, which only exists after the hamburger opens.
 async function openNavigationForNarrowViewports(page: Page) {
 	const hamburger = page.getByRole('button', { name: 'Open navigation menu' });
 	if (await hamburger.isVisible()) {
@@ -59,8 +48,7 @@ test.describe('Signed out', () => {
 	});
 
 	test('choosing a provider hands off to the backend OAuth start endpoint', async ({ page }) => {
-		// The real endpoint 302s to Google. Stub it so the test asserts the handoff without
-		// leaving localhost.
+		// The real endpoint redirects to Google; stub it to stay on localhost.
 		await page.route('**/api/v1/auth/login/google', route =>
 			route.fulfill({ status: 200, contentType: 'text/html', body: '<html>provider</html>' })
 		);

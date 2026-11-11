@@ -13,11 +13,7 @@ const frequencySchema = z.enum(['weekly', 'monthly', 'yearly', 'custom']);
 const intervalUnitSchema = z.enum(['day', 'week', 'month', 'year']);
 const triggerModeSchema = z.enum(['time', 'mileage', 'both']);
 
-// Nullable DB-backed fields use .nullish() (accept undefined OR null), NOT
-// .optional() (undefined only). The update flow merges the existing DB row —
-// whose unset optional columns come back as `null` — and re-validates the
-// merged object with createReminderSchema; with .optional() those nulls fail
-// validation and EVERY update (incl. the pause/resume toggle) 400s.
+// Use .nullish() for nullable DB columns: the update flow re-validates a merged DB row whose unset columns are null.
 const reminderBaseSchema = z.object({
   name: z.string().min(1).max(CONFIG.validation.reminder.nameMaxLength),
   description: z.string().max(CONFIG.validation.reminder.descriptionMaxLength).nullish(),
@@ -26,12 +22,8 @@ const reminderBaseSchema = z.object({
   frequency: frequencySchema,
   intervalValue: z.number().int().positive().nullish(),
   intervalUnit: intervalUnitSchema.nullish(),
-  // Maintenance-schedule (T4). triggerMode is OPTIONAL, not `.default('time')`: a default would
-  // survive `.partial()` on the update schema and silently flip an existing mileage reminder back to
-  // 'time' on any update that omits the field. Absent on create → the DB column default ('time')
-  // applies; absent on update → the merge keeps the existing value. intervalMileage/
-  // lastServiceOdometer are the mileage axis inputs; nextDueOdometer is SERVER-DERIVED (=
-  // lastServiceOdometer + intervalMileage) in the route, never client input. Refined per D4 below.
+  // Not defaulted: a default would survive .partial() and flip an existing mileage reminder back to 'time'.
+  // nextDueOdometer is derived in the route, never client input.
   triggerMode: triggerModeSchema.optional(),
   intervalMileage: z
     .number()
@@ -42,19 +34,15 @@ const reminderBaseSchema = z.object({
   lastServiceOdometer: z.number().int().min(0).nullish(),
   startDate: z.coerce.date(),
   endDate: z.coerce.date().nullish(),
-  // Active/paused flag. Optional on create (defaults active in the DB); on
-  // update this is what the pause/resume toggle flips — it must be accepted
-  // here or Zod strips it and the toggle silently no-ops.
+  // Must be listed here, or Zod strips it and the pause/resume toggle silently no-ops.
   isActive: z.boolean().optional(),
   vehicleIds: z.array(z.string().min(1)).min(1),
-  // Expense template fields (required when type = 'expense')
   expenseCategory: z.enum(EXPENSE_CATEGORIES).nullish(),
   expenseTags: z
     .array(z.string().min(1).max(CONFIG.validation.reminder.tagMaxLength))
     .max(CONFIG.validation.reminder.maxTags)
     .nullish(),
-  // money (T5): client sends DOLLARS, store integer CENTS. .max() bound checks the DOLLAR value
-  // pre-transform; .nullish() passes null (clear) / undefined (unchanged) through untransformed.
+  // Client sends dollars; the max bound applies before the cents transform.
   expenseAmount: moneyDollarsToCents((n) =>
     n.positive().max(CONFIG.validation.reminder.maxExpenseAmount)
   ).nullish(),
@@ -63,8 +51,7 @@ const reminderBaseSchema = z.object({
 });
 
 type ReminderInput = z.infer<typeof reminderBaseSchema>;
-// Refinements run against both the full create schema and the partial update
-// schema, so accept a partial shape — each helper guards on the fields it needs.
+// Refinements run on both the create and partial update schemas, so each one guards on the fields it reads.
 type ReminderRefineInput = Partial<ReminderInput>;
 
 function refineCustomFrequency(data: ReminderRefineInput, ctx: z.RefinementCtx) {
@@ -104,8 +91,6 @@ function refineExpenseType(data: ReminderRefineInput, ctx: z.RefinementCtx) {
 }
 
 function refineMileageTrigger(data: ReminderRefineInput, ctx: z.RefinementCtx) {
-  // Only the mileage axis ('mileage' | 'both') has extra requirements (D4). 'time' (the default)
-  // is unconstrained here.
   if (data.triggerMode !== 'mileage' && data.triggerMode !== 'both') return;
 
   if (!data.intervalMileage) {
@@ -115,11 +100,8 @@ function refineMileageTrigger(data: ReminderRefineInput, ctx: z.RefinementCtx) {
       path: ['intervalMileage'],
     });
   }
-  // NOTE: lastServiceOdometer is NOT required from the client — the route defaults it to the
-  // vehicle's current odometer when omitted (D4). The field-level schema already constrains it to a
-  // non-negative int IF provided, so there's nothing to add here. (Earlier this required presence,
-  // which wrongly rejected the documented default-on-create behavior.)
-  // D4: a mileage axis tracks ONE vehicle (the odometer is per-vehicle).
+  // lastServiceOdometer is not required here: the route defaults it to the vehicle's current odometer.
+  // A mileage axis tracks one vehicle, since odometers are per-vehicle.
   if (data.vehicleIds && data.vehicleIds.length !== 1) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -142,16 +124,8 @@ function refineDateRange(data: ReminderRefineInput, ctx: z.RefinementCtx) {
 function refineSplitConfig(data: ReminderRefineInput, ctx: z.RefinementCtx) {
   if (!data.expenseSplitConfig) return;
 
-  // The split-vs-vehicleIds MATCH check is a cross-field invariant — meaningful only when BOTH are in
-  // the payload. On a PARTIAL update (updateReminderSchema is .partial()) that changes only the split
-  // config and OMITS vehicleIds, `data.vehicleIds` is undefined → new Set(undefined) = ∅, so the old
-  // unconditional check 400'd every split-config-only edit with a false "must match vehicleIds".
-  // Guard it on vehicleIds presence — the route's merged re-parse (createReminderSchema.parse(merged))
-  // still catches a genuine mismatch against the merged full object. The sum checks below are
-  // vehicleIds-independent and always run.
+  // Partial updates may omit vehicleIds; the route's merged re-validation covers the match check then.
   if (data.vehicleIds) {
-    // splitConfigVehicleIds owns the `even ? vehicleIds : allocations.map(...)` extraction (one source
-    // of truth); it returns a de-duped array, so new Set(...) here is the same set as before.
     const provided = new Set(data.vehicleIds);
     const split = new Set(splitConfigVehicleIds(data.expenseSplitConfig));
 
@@ -164,7 +138,6 @@ function refineSplitConfig(data: ReminderRefineInput, ctx: z.RefinementCtx) {
     }
   }
 
-  // Percentage allocations must sum to 100
   if (data.expenseSplitConfig.method === 'percentage') {
     const sum = data.expenseSplitConfig.allocations.reduce((acc, a) => acc + a.percentage, 0);
     if (Math.abs(sum - 100) >= 0.001) {
@@ -176,7 +149,6 @@ function refineSplitConfig(data: ReminderRefineInput, ctx: z.RefinementCtx) {
     }
   }
 
-  // Absolute allocations must sum to expenseAmount
   if (data.expenseSplitConfig.method === 'absolute' && data.expenseAmount != null) {
     const sum = data.expenseSplitConfig.allocations.reduce((acc, a) => acc + a.amount, 0);
     if (Math.abs(sum - data.expenseAmount) >= 0.001) {
@@ -197,10 +169,7 @@ export const createReminderSchema = reminderBaseSchema.superRefine((data, ctx) =
   refineMileageTrigger(data, ctx);
 });
 
-// Note: `.partial()` cannot be called on a schema that already has refinements
-// (Zod v4 throws). Partial-ize the base object first, then re-apply the same
-// cross-field refinements. The refine helpers guard on each field, so missing
-// (undefined) fields in a partial update are handled correctly.
+// Zod v4 throws on .partial() after refinements, so partialize the base object first.
 export const updateReminderSchema = reminderBaseSchema.partial().superRefine((data, ctx) => {
   refineCustomFrequency(data, ctx);
   refineExpenseType(data, ctx);
@@ -209,17 +178,8 @@ export const updateReminderSchema = reminderBaseSchema.partial().superRefine((da
   refineMileageTrigger(data, ctx);
 });
 
-/**
- * A TRANSFORM-FREE structural twin of createReminderSchema for the PUT merge gate (money-cents-migration
- * T5). The reminder PUT route re-parses a merged {...existing(stored CENTS), ...partialUpdate(parsed
- * CENTS)} object purely to reject structurally-invalid intermediate states. createReminderSchema carries
- * the dollars→cents transform on expenseAmount (+ the nested split allocation amounts), so re-parsing
- * ALREADY-cents data through it would DOUBLE-convert AND re-check the `.max($10k)` DOLLAR bound against a
- * cents value (a latent 400 for any reminder ≥ $10k on every update). This twin overrides expenseAmount to
- * a plain non-negative number (no transform, no dollar-domain max — the value is already validated cents)
- * and uses the transform-free splitConfigStructuralSchema. Same cross-field refinements. Validation-only —
- * its parsed output is discarded; the route persists the field-merged cents values directly.
- */
+// Transform-free twin of createReminderSchema for the PUT merge gate. The merged object already holds cents,
+// so re-running the dollar transform or its max bound would double-convert or reject large amounts.
 const reminderMergeGateSchema = reminderBaseSchema
   .extend({
     expenseAmount: z.number().nonnegative().nullish(),
@@ -233,7 +193,6 @@ const reminderMergeGateSchema = reminderBaseSchema
     refineMileageTrigger(data, ctx);
   });
 
-/** Structural re-validation for the PUT merge gate — see reminderMergeGateSchema. Throws on invalid. */
 export function assertMergedReminderValid(merged: unknown): void {
   reminderMergeGateSchema.parse(merged);
 }

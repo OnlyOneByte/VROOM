@@ -1,15 +1,4 @@
-/**
- * The compact row's Edit and Delete are the smallest controls in the app — 28px tall, 4px apart,
- * and one of them destructive. `UIQuality.md` puts the tap-target floor at 40px.
- *
- * Growing them to 40px would make the most incidental controls on the page taller than the primary
- * CTAs above them, so the pair keeps its drawn size and carries an invisible vertical hit area
- * instead. That trick is only correct as an arithmetic whole: the overhang has to be positioned
- * against the control itself (`relative`), has to be vertical only (so the destructive control's
- * hit area never overlaps its neighbour's), and has to be big enough that drawn height plus
- * overhang clears the floor. This derives all three from the class strings the component ships, so
- * shrinking the control or the overhang fails here rather than silently dropping back under 40px.
- */
+// Compact row Edit/Delete keep their drawn size and reach the 40px tap-target floor through a vertical hit-area overhang.
 
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render } from '@testing-library/svelte';
@@ -22,7 +11,6 @@ vi.mock(
 	() => import('../../../../../node_modules/svelte/src/reactivity/index-client.js' as string)
 );
 
-/** Tailwind's spacing unit: `h-7` is 7 of these. */
 const SPACING_PX = 4;
 const TAP_TARGET_FLOOR_PX = 40;
 
@@ -40,7 +28,6 @@ const EXPENSES: Expense[] = [
 	}
 ] as unknown as Expense[];
 
-/** `IsMobile` reads `window.matchMedia`, which test-setup installs as a mock. */
 function useCompactLayout() {
 	vi.mocked(window.matchMedia).mockReturnValue({
 		matches: true,

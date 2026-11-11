@@ -1,15 +1,6 @@
 /**
- * PUT /settings storageConfig consistency validation. validateStorageConfig
- * (settings/routes.ts) was only ~56% covered — its 4 branches gate a user from saving a broken or
- * cross-tenant storage-routing config, so a regression would let photos route to a non-owned/disabled
- * provider. These drive the REAL validator through the HTTP stack with raw-seeded owned providers (the
- * backup-config-merge pattern); the validator runs on the MERGED storageConfig, so this also
- * exercises mergeStorageConfig.
- *
- * Branches pinned: (1) a referenced provider not owned → 400; (2) a category default whose provider has
- * NO providerCategories entry → 400; (3) a default whose category is present but NOT enabled → 400;
- * (4) a fully-consistent config → 200 (positive control). createTestApp() rewrites env + dynamic-imports
- * DB-bound modules, so imports stay limited to the harness + bun:test.
+ * PUT /settings storageConfig consistency rules, through the HTTP stack. A default must reference an
+ * owned provider that has its category enabled, so photos cannot route to a foreign or disabled one.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -51,10 +42,7 @@ function defaults(over: Record<string, string | null> = {}) {
   };
 }
 
-/**
- * A complete per-provider category map. The inner `z.record(photoCategoryEnum, …)` is EXHAUSTIVE in
- * Zod v4 — every category key must be present — so build all 4, then override.
- */
+// The per-provider category map is exhaustive in Zod 4, so every category key must be present.
 function categoryMap(over: Record<string, { enabled: boolean; folderPath: string }> = {}) {
   const base = { enabled: true, folderPath: '/Backups' };
   return {
@@ -76,8 +64,7 @@ describe('PUT /settings storageConfig consistency validation', () => {
     expect(res.status).toBe(200);
   });
 
-  test('a default referencing a NON-OWNED provider → 400 (ownership + no cross-tenant routing)', async () => {
-    // 'ghost' is never seeded — not in this user's providers.
+  test('a default referencing a non-owned provider → 400', async () => {
     const res = await putStorageConfig({
       defaults: defaults({ vehicle_photos: 'ghost' }),
       providerCategories: { ghost: categoryMap() },
@@ -91,19 +78,18 @@ describe('PUT /settings storageConfig consistency validation', () => {
     seedProvider('drive-2');
     const res = await putStorageConfig({
       defaults: defaults({ vehicle_photos: 'drive-2' }),
-      providerCategories: {}, // drive-2 is owned but has no category settings at all
+      providerCategories: {},
     });
     expect(res.status).toBe(400);
     const body = (await json<ErrorBody>(res)) as ErrorBody;
     expect(body.error.message).toContain('no category settings');
   });
 
-  test('a default whose category is present but NOT enabled → 400', async () => {
+  test('a default whose category is present but disabled → 400', async () => {
     seedProvider('drive-3');
     const res = await putStorageConfig({
       defaults: defaults({ vehicle_photos: 'drive-3' }),
       providerCategories: {
-        // vehicle_photos present but disabled — can't be the default while disabled.
         'drive-3': categoryMap({ vehicle_photos: { enabled: false, folderPath: '/Vehicles' } }),
       },
     });

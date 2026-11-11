@@ -1,11 +1,3 @@
-/**
- * Unit tests for `createLoadState<T>()` (arch scaffold). Pins the behaviour-preserving
- * contract the per-page triad has today, so a later cycle can migrate pages onto it with a
- * proven net: success stores data + clears error, failure runs onError + records the message
- * + leaves prior data intact, the message falls back for non-Error throws, isLoading toggles
- * around the run, and isError is the (error && !loading) four-states gate.
- */
-
 import { describe, expect, test, vi } from 'vitest';
 import { createLoadState } from './load-state.svelte';
 
@@ -43,7 +35,7 @@ describe('createLoadState', () => {
 		expect(result).toBeNull();
 		expect(onError).toHaveBeenCalledTimes(1);
 		expect(s.error).toBe('boom');
-		expect(s.isError).toBe(true); // error && !loading → show error+retry
+		expect(s.isError).toBe(true);
 		expect(s.isLoading).toBe(false);
 	});
 
@@ -54,7 +46,7 @@ describe('createLoadState', () => {
 		await s.run(async () => {
 			throw new Error('refresh failed');
 		});
-		expect(s.data).toBe(7); // not wiped to null on failure
+		expect(s.data).toBe(7);
 		expect(s.error).toBe('refresh failed');
 	});
 
@@ -106,6 +98,6 @@ describe('createLoadState', () => {
 		s.clearError();
 		expect(s.error).toBeNull();
 		expect(s.isError).toBe(false);
-		expect(s.data).toBe(3); // data preserved
+		expect(s.data).toBe(3);
 	});
 });

@@ -1,40 +1,17 @@
 /**
- * Theming engine — theme registry (spec T5, Phase 2). The runtime source of truth for every built-in
- * theme's token VALUES. The resolver (T6) looks themes up here; the themes.css emitter (T7) generates one
- * `:root[data-theme=...]` block per registry entry from these maps.
- *
- * `default` is the EXISTING look, its light+dark token maps transcribed VERBATIM from `src/app.css`
- * (`:root` + `.dark`). A guard (theme-registry.test.ts) parses the live app.css and asserts the `default`
- * definition equals it value-for-value — so `default` is provably a zero-visual-change identity theme (R1)
- * and any future app.css edit that isn't mirrored here trips the guard (baseline-drift detection).
- *
- * The first NON-default theme (`instrument`, per D1/D5) is DESIGN-GATED: its palette must be distilled
- * from the design-language mock + AA-tuned (A3/R10), which is a product/design decision, not a loop
- * self-authorization. It lands in a follow-up once the palette is provided. The registry + the integrity
- * guard are built to accept it with zero structural change (add one ThemeDefinition).
+ * Runtime source of truth for built-in theme token values. `default` must mirror app.css exactly;
+ * theme-registry.test.ts fails on drift. Add a theme by adding one defineBuiltinTheme call.
  */
 
 import type { ThemeDefinition, ThemeTokenKey, ThemeTokens } from './theme-types';
 
-/**
- * The default swatch strip the picker card previews when a theme does not specify its own. These four
- * tokens read well as a representative 4-color preview for any palette (brand, accent, surface, ink). A
- * theme MAY override `swatch` for a more characterful preview; most reuse this. Order is presentation-only.
- */
+// Representative preview used when a theme does not set its own swatch.
 const DEFAULT_SWATCH: ThemeTokenKey[] = ['primary', 'accent', 'background', 'foreground'];
 
 /**
- * Factory for a built-in {@link ThemeDefinition} — converges the per-theme boilerplate every palette repeats
- * (`source: 'builtin'` + the default swatch + the fixed field shape). Each new built-in theme is one call
- * with its id/label/description + light/dark maps; `swatch` is OPTIONAL (defaults to {@link DEFAULT_SWATCH},
- * a theme may still pass its own for a characterful preview). This makes "builtin + default swatch" the
- * un-forgettable default so a future palette registration can not omit `source` or mis-shape the object.
- *
- * One palette rule is easy to miss when authoring a new theme: `destructive` is read BOTH as ink
- * (`text-destructive` error copy, over `card`/`background`/`popover`/`muted`) and as a fill whose label is
- * `destructive-foreground`. So a dark variant needs a LIGHT red with a DARK foreground, and a light variant
- * the reverse — every variant here sets `destructive-foreground` to its own `background` for that reason.
- * theme-contrast.test.ts holds both roles to AA, so a palette that gets this wrong fails before merge.
+ * Builds a built-in theme with the default swatch unless one is given.
+ * `destructive` is used as text on card/background and as a fill labelled `destructive-foreground`, so
+ * each variant sets `destructive-foreground` to its own `background`. theme-contrast.test.ts enforces both roles.
  */
 function defineBuiltinTheme(
 	def: Pick<ThemeDefinition, 'id' | 'label' | 'description' | 'light' | 'dark'> & {
@@ -52,7 +29,7 @@ function defineBuiltinTheme(
 	};
 }
 
-/** `default` light palette — VERBATIM from app.css `:root`. Do not edit by hand; mirror app.css. */
+/** `default` light palette. Mirrors app.css `:root`; theme-registry.test.ts fails on drift. */
 const DEFAULT_LIGHT: ThemeTokens = {
 	background: 'oklch(1 0 0)',
 	foreground: 'oklch(0.141 0.005 285.823)',
@@ -92,7 +69,7 @@ const DEFAULT_LIGHT: ThemeTokens = {
 	'sidebar-ring': 'oklch(0.705 0.015 286.067)'
 };
 
-/** `default` dark palette — VERBATIM from app.css `.dark`. Do not edit by hand; mirror app.css. */
+/** `default` dark palette. Mirrors app.css `.dark`; theme-registry.test.ts fails on drift. */
 const DEFAULT_DARK: ThemeTokens = {
 	background: 'oklch(0.141 0.005 285.823)',
 	foreground: 'oklch(0.985 0 0)',
@@ -140,11 +117,6 @@ const DEFAULT_THEME: ThemeDefinition = defineBuiltinTheme({
 	dark: DEFAULT_DARK
 });
 
-/**
- * `blueprint` light palette — an engineering "whiteprint": navy ink on pale drafting-paper blue. Distilled
- * from the ryang.dev blueprint mock (cyan-on-navy schematic) into VROOM's token set, then AA-tuned: every
- * foreground/background pair clears WCAG AA 4.5 (verified by theme-contrast.test.ts, the D4 hard gate).
- */
 const BLUEPRINT_LIGHT: ThemeTokens = {
 	background: 'oklch(0.98 0.01 230)',
 	foreground: 'oklch(0.25 0.05 245)',
@@ -184,10 +156,6 @@ const BLUEPRINT_LIGHT: ThemeTokens = {
 	'sidebar-ring': 'oklch(0.5 0.13 245)'
 };
 
-/**
- * `blueprint` dark palette — the mock's native look: cyan on deep navy, a backlit drafting table. AA-tuned
- * exactly like the light variant (theme-contrast.test.ts).
- */
 const BLUEPRINT_DARK: ThemeTokens = {
 	background: 'oklch(0.22 0.04 245)',
 	foreground: 'oklch(0.93 0.03 230)',
@@ -235,11 +203,6 @@ const BLUEPRINT_THEME: ThemeDefinition = defineBuiltinTheme({
 	dark: BLUEPRINT_DARK
 });
 
-/**
- * `bento` light palette — a clean bento-light: soft-grey canvas, white card panels, the mock's violet/blue
- * accent family. Distilled from the ryang.dev bento mock (a modular dark dashboard) into VROOM's token set,
- * AA-tuned (every fg/bg pair clears WCAG AA 4.5 — theme-contrast.test.ts).
- */
 const BENTO_LIGHT: ThemeTokens = {
 	background: 'oklch(0.97 0.005 265)',
 	foreground: 'oklch(0.22 0.02 265)',
@@ -279,10 +242,6 @@ const BENTO_LIGHT: ThemeTokens = {
 	'sidebar-ring': 'oklch(0.52 0.2 266)'
 };
 
-/**
- * `bento` dark palette — the mock's native modular-dashboard look: charcoal canvas, lifted card panels, an
- * indigo-blue brand + violet accent. AA-tuned exactly like the light variant (theme-contrast.test.ts).
- */
 const BENTO_DARK: ThemeTokens = {
 	background: 'oklch(0.17 0.012 265)',
 	foreground: 'oklch(0.95 0.01 265)',
@@ -330,11 +289,6 @@ const BENTO_THEME: ThemeDefinition = defineBuiltinTheme({
 	dark: BENTO_DARK
 });
 
-/**
- * `vaporwave` light palette — a soft-lavender vaporwave-light: pale magenta canvas, the neon-magenta brand,
- * a cyan accent. Distilled from the ryang.dev CRT/vaporwave mock into VROOM's token set, AA-tuned (every
- * fg/bg pair clears WCAG AA 4.5 — theme-contrast.test.ts). D7 token-only: the palette, not scanline/glow effects.
- */
 const VAPORWAVE_LIGHT: ThemeTokens = {
 	background: 'oklch(0.97 0.02 320)',
 	foreground: 'oklch(0.28 0.12 320)',
@@ -374,10 +328,6 @@ const VAPORWAVE_LIGHT: ThemeTokens = {
 	'sidebar-ring': 'oklch(0.55 0.25 350)'
 };
 
-/**
- * `vaporwave` dark palette — the mock's native look: a deep purple-magenta canvas, neon-magenta brand, cyan
- * accent, gold/pink charts. AA-tuned exactly like the light variant (theme-contrast.test.ts).
- */
 const VAPORWAVE_DARK: ThemeTokens = {
 	background: 'oklch(0.22 0.11 310)',
 	foreground: 'oklch(0.95 0.04 320)',
@@ -425,11 +375,6 @@ const VAPORWAVE_THEME: ThemeDefinition = defineBuiltinTheme({
 	dark: VAPORWAVE_DARK
 });
 
-/**
- * `cyberpunk` light palette — a clean cyberpunk-light: pale blue-grey canvas, the cyan brand, a magenta
- * accent. Distilled from the ryang.dev cyberpunk mock into VROOM's token set, AA-tuned (theme-contrast.test.ts).
- * D7 token-only: the palette, not the scanline/chromatic-aberration effects.
- */
 const CYBERPUNK_LIGHT: ThemeTokens = {
 	background: 'oklch(0.97 0.01 220)',
 	foreground: 'oklch(0.2 0.03 240)',
@@ -469,10 +414,6 @@ const CYBERPUNK_LIGHT: ThemeTokens = {
 	'sidebar-ring': 'oklch(0.5 0.13 205)'
 };
 
-/**
- * `cyberpunk` dark palette — the mock's native look: near-black slate canvas, neon-cyan brand, magenta
- * accent, amber warning. AA-tuned exactly like the light variant (theme-contrast.test.ts).
- */
 const CYBERPUNK_DARK: ThemeTokens = {
 	background: 'oklch(0.16 0.02 240)',
 	foreground: 'oklch(0.9 0.03 220)',
@@ -520,11 +461,6 @@ const CYBERPUNK_THEME: ThemeDefinition = defineBuiltinTheme({
 	dark: CYBERPUNK_DARK
 });
 
-/**
- * `aurora` light palette — a clean aurora-light: near-white canvas, the aurora-blue brand, a teal accent.
- * Distilled from the ryang.dev Glass/Aurora mock into VROOM's token set, AA-tuned (theme-contrast.test.ts).
- * D7 token-only: the palette, not the gradient-mesh / backdrop-blur effects.
- */
 const AURORA_LIGHT: ThemeTokens = {
 	background: 'oklch(0.98 0.01 265)',
 	foreground: 'oklch(0.24 0.05 265)',
@@ -564,10 +500,6 @@ const AURORA_LIGHT: ThemeTokens = {
 	'sidebar-ring': 'oklch(0.52 0.18 265)'
 };
 
-/**
- * `aurora` dark palette — the mock's native look: a deep-navy canvas with an aurora-blue brand + teal
- * accent (the gradient-mesh hues as solid tokens). AA-tuned exactly like the light variant (theme-contrast.test.ts).
- */
 const AURORA_DARK: ThemeTokens = {
 	background: 'oklch(0.18 0.04 265)',
 	foreground: 'oklch(0.92 0.02 265)',
@@ -615,11 +547,6 @@ const AURORA_THEME: ThemeDefinition = defineBuiltinTheme({
 	dark: AURORA_DARK
 });
 
-/**
- * `solarpunk` light palette — the mock's native warm look: cream/sand canvas, moss-green brand, clay accent,
- * warm-brown text. The first WARM/organic theme (the v1 set is all cool/neon). Distilled from the ryang.dev
- * solarpunk mock into VROOM's token set, AA-tuned (theme-contrast.test.ts). D7 token-only.
- */
 const SOLARPUNK_LIGHT: ThemeTokens = {
 	background: 'oklch(0.95 0.02 95)',
 	foreground: 'oklch(0.3 0.03 75)',
@@ -659,10 +586,6 @@ const SOLARPUNK_LIGHT: ThemeTokens = {
 	'sidebar-ring': 'oklch(0.52 0.12 135)'
 };
 
-/**
- * `solarpunk` dark palette — a night-garden: deep warm-brown/olive canvas, moss-green brand, muted clay
- * accent. AA-tuned exactly like the light variant (theme-contrast.test.ts).
- */
 const SOLARPUNK_DARK: ThemeTokens = {
 	background: 'oklch(0.22 0.02 75)',
 	foreground: 'oklch(0.92 0.03 90)',
@@ -710,11 +633,6 @@ const SOLARPUNK_THEME: ThemeDefinition = defineBuiltinTheme({
 	dark: SOLARPUNK_DARK
 });
 
-/**
- * `editorial` light palette — the mock's native magazine look: cream paper, near-black ink, a crimson
- * accent, warm-grey muted. A warm-NEUTRAL palette whose signature is the crimson. Distilled from the
- * ryang.dev editorial mock into VROOM's token set, AA-tuned (theme-contrast.test.ts). D7 token-only.
- */
 const EDITORIAL_LIGHT: ThemeTokens = {
 	background: 'oklch(0.97 0.012 85)',
 	foreground: 'oklch(0.22 0.005 60)',
@@ -754,10 +672,6 @@ const EDITORIAL_LIGHT: ThemeTokens = {
 	'sidebar-ring': 'oklch(0.5 0.17 27)'
 };
 
-/**
- * `editorial` dark palette — a warm-charcoal newsprint: dark warm-grey canvas, cream ink, the crimson brand.
- * AA-tuned exactly like the light variant (theme-contrast.test.ts).
- */
 const EDITORIAL_DARK: ThemeTokens = {
 	background: 'oklch(0.21 0.008 60)',
 	foreground: 'oklch(0.93 0.012 85)',
@@ -805,11 +719,6 @@ const EDITORIAL_THEME: ThemeDefinition = defineBuiltinTheme({
 	dark: EDITORIAL_DARK
 });
 
-/**
- * `tui` light palette — a paper-terminal: cream canvas, dark-amber brand, teal-green accent. Distilled from
- * the ryang.dev terminal/TUI mock into VROOM's token set, AA-tuned (theme-contrast.test.ts). D7 token-only
- * (no box-drawing/monospace layout — the palette only).
- */
 const TUI_LIGHT: ThemeTokens = {
 	background: 'oklch(0.96 0.01 95)',
 	foreground: 'oklch(0.24 0.02 90)',
@@ -849,10 +758,6 @@ const TUI_LIGHT: ThemeTokens = {
 	'sidebar-ring': 'oklch(0.52 0.1 85)'
 };
 
-/**
- * `tui` dark palette — the mock's native terminal look: near-black canvas, amber brand, teal-green accent,
- * blue/pink/green charts (the heatmap hues). AA-tuned exactly like the light variant (theme-contrast.test.ts).
- */
 const TUI_DARK: ThemeTokens = {
 	background: 'oklch(0.16 0.004 90)',
 	foreground: 'oklch(0.9 0.02 95)',
@@ -900,12 +805,6 @@ const TUI_THEME: ThemeDefinition = defineBuiltinTheme({
 	dark: TUI_DARK
 });
 
-/**
- * `y2k` light palette — a Frutiger-Aero / Y2K chrome look: cool blue-white canvas, bubblegum-magenta brand,
- * electric-cyan accent, an indigo ink. Distilled from the ryang.dev Y2K mock into VROOM's token set, AA-tuned
- * (every fg/bg pair clears WCAG AA 4.5 — theme-contrast.test.ts, the D4 hard gate). D7 token-only (the
- * palette, not the glossy-bevel / lens-flare effects).
- */
 const Y2K_LIGHT: ThemeTokens = {
 	background: 'oklch(0.98 0.015 220)',
 	foreground: 'oklch(0.25 0.06 285)',
@@ -945,10 +844,6 @@ const Y2K_LIGHT: ThemeTokens = {
 	'sidebar-ring': 'oklch(0.55 0.23 350)'
 };
 
-/**
- * `y2k` dark palette — a translucent-tech-noir: deep indigo canvas, electric-cyan brand, magenta accent, the
- * candy chart hues. AA-tuned exactly like the light variant (theme-contrast.test.ts).
- */
 const Y2K_DARK: ThemeTokens = {
 	background: 'oklch(0.17 0.03 275)',
 	foreground: 'oklch(0.94 0.025 220)',
@@ -996,13 +891,6 @@ const Y2K_THEME: ThemeDefinition = defineBuiltinTheme({
 	dark: Y2K_DARK
 });
 
-/**
- * `neobrutalist` light palette — the mock's stark hard-edged look: off-white paper, near-black INK borders
- * (border/input = the ink token, the thick-outline signature as a TOKEN), an electric-blue brand, a loud
- * yellow accent. Distilled from the ryang.dev neobrutalist mock into VROOM's token set, AA-tuned (every
- * fg/bg pair clears WCAG AA 4.5 — theme-contrast.test.ts). D7 token-only (no hard drop-shadow / offset
- * effects — the palette + the ink-colored borders only).
- */
 const NEOBRUTALIST_LIGHT: ThemeTokens = {
 	background: 'oklch(0.97 0.01 95)',
 	foreground: 'oklch(0.18 0.02 270)',
@@ -1042,11 +930,6 @@ const NEOBRUTALIST_LIGHT: ThemeTokens = {
 	'sidebar-ring': 'oklch(0.5 0.22 264)'
 };
 
-/**
- * `neobrutalist` dark palette — hard near-black canvas with WHITE ink borders (the inverted thick-outline)
- * + the same loud electric-blue brand and yellow accent. AA-tuned exactly like the light variant
- * (theme-contrast.test.ts).
- */
 const NEOBRUTALIST_DARK: ThemeTokens = {
 	background: 'oklch(0.16 0.01 270)',
 	foreground: 'oklch(0.97 0.01 95)',
@@ -1094,12 +977,7 @@ const NEOBRUTALIST_THEME: ThemeDefinition = defineBuiltinTheme({
 	dark: NEOBRUTALIST_DARK
 });
 
-/**
- * Every built-in theme by id. `default` is the always-present identity theme (R8 fallback target). The
- * The v1 set (default + 5: blueprint/bento/vaporwave/cyberpunk/aurora) is COMPLETE; solarpunk/
- * editorial/tui/y2k/neobrutalist are fill-ins from the ryang.dev mocks. Each theme is a single
- * defineBuiltinTheme call — zero structural change; further fill-ins (claymorphism/brutalist/zine) drop in the same way.
- */
+/** Every built-in theme by id. `default` is the always-present fallback. */
 export const THEME_REGISTRY: Record<string, ThemeDefinition> = {
 	default: DEFAULT_THEME,
 	blueprint: BLUEPRINT_THEME,
@@ -1114,5 +992,4 @@ export const THEME_REGISTRY: Record<string, ThemeDefinition> = {
 	neobrutalist: NEOBRUTALIST_THEME
 };
 
-/** The id every unknown/absent selection resolves to (R8). */
 export const DEFAULT_THEME_ID = 'default';
