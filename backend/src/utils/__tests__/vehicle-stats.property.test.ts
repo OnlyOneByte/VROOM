@@ -592,7 +592,7 @@ describe('averageMpg excludes out-of-band outlier pairs ([5,100] band)', () => {
     expect(stats.averageMpg).toBeCloseTo((30 + 100) / 2, 5);
   });
 
-  test('a below-band pair (<5 MPG) is dropped (the MIN_VALID_MPG=5 floor, new in)', () => {
+  test('a below-band pair (<5 MPG) is dropped (the MIN_VALID_MPG=5 floor)', () => {
     // idx1→idx2: 40 mi / 10 gal = 4 MPG — below the 5-MPG floor (a city-traffic mis-log / wrong units).
     const tooLow = makeFuelExpense({ mileage: 10340, volume: 10, missedFillup: false, index: 2 });
     const stats = calculateVehicleStats([anchor0, anchor1, tooLow], 10000, true, false);

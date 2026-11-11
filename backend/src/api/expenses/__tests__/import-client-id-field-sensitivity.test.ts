@@ -12,7 +12,7 @@
  * test — so a dropped-field regression would stay GREEN everywhere. This pins each field's contribution.
  *
  * CERTIFIED FIRSTHAND: every field in the content array (vehicleId, category, expenseAmount,
- * date, mileage, volume, fuelType, description, tags, missedFillup, occurrence) flips the key. Determinism
+ * date, mileage, volume, fuelType, description, location, tags, missedFillup, occurrence) flips the key. Determinism
  * holds (same content + same occurrence → same key). DOCUMENTED NUANCE (not a fix — it's mitigated): the
  * content joins tags with '' so `['a','b']` and `['ab']` share a tags-segment, BUT buildImportPlan's
  * occurrence counter gives within-file collisions distinct occurrence indices → distinct final keys, so the
@@ -81,7 +81,7 @@ describe('deriveImportClientId — field sensitivity (the import idempotency-key
         deriveImportClientId(variant, 0),
         `Two rows differing only in ${field} produced the SAME idempotency key — the second would be ` +
           `silently dropped on import (createIdempotent no-ops the (userId, clientId) collision), losing ` +
-          `the user's data (#NS1). ${field} must be part of deriveImportClientId's content hash.`
+          `the user's data. ${field} must be part of deriveImportClientId's content hash.`
       ).not.toBe(original);
     });
   }

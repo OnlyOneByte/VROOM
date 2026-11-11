@@ -433,12 +433,12 @@ describe('StorageProviderRegistry', () => {
     test('the fake gate SHORT-CIRCUITS before decrypt (a fake row with garbage creds still throws the GATE error, not a decrypt/parse error)', () => {
       const db = createMockDb([]);
       const registry = new StorageProviderRegistry(db as never);
-      // Credentials that would throw on JSON.parse if decrypt ran — proving the gate check runs FIRST,
+      // Credentials that would throw in decrypt if it ran (not valid ciphertext) — proving the gate check runs FIRST,
       // so a fake row never even reaches the credential decrypt path (the ordering in registry.ts:217-224).
       const fakeRowBadCreds = {
         ...baseProvider,
         providerType: 'fake',
-        credentials: enc('not-valid-json{{{'),
+        credentials: 'not-valid-json{{{',
       };
 
       expect(() => registry.createProviderInstance(fakeRowBadCreds)).toThrow(

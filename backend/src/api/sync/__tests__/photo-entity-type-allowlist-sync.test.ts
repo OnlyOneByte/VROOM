@@ -82,7 +82,7 @@ function emptyBackup(userId: string): ParsedBackupData {
   } as ParsedBackupData;
 }
 
-describe('photo entity-type allowlist sync (# drift guard)', () => {
+describe('photo entity-type allowlist sync (drift guard)', () => {
   // --- 1. The RESTORE validator must accept every canonical photo entity type --------------------
   // A photo of any ENTITY_TO_CATEGORY type, pointed at a row that EXISTS in the backup, must NOT trip
   // validatePhotoRefs' "unknown entity type" branch — that branch aborts the whole restore. We

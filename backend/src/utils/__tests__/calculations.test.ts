@@ -167,10 +167,10 @@ describe('calculateAverageMilesPerKwh', () => {
 // (calculations.ts) and calculateAverageMpg (vehicle-stats.ts) both delegate to. Before the loop was
 // hand-copied at both sites (proved a copy once lost its guard); now it's ONE helper. It was only
 // tested INDIRECTLY through its two callers (the "helper tested only in isolation" gap, same as
-// monthsBetween/C6) — these pin its OWN cells directly so a future edit to the band / skip / guard can't
+// monthsBetween) — these pin its OWN cells directly so a future edit to the band / skip / guard can't
 // drift undetected. The helper takes PRE-SORTED rows (callers own the sort) + the minimal {mileage,
 // volume, missedFillup} shape. The outlier band is the CANONICAL inclusive [MIN_VALID_MPG, MAX_VALID_MPG]
-// = [5,100] shared with the analytics charts ( — was (0,150) here).
+// = [5,100] shared with the analytics charts.
 // ---------------------------------------------------------------------------
 describe('averageConsecutiveMpg (shared consecutive-pair MPG loop)', () => {
   test('averages consecutive pairs: miles-driven / current.volume', () => {

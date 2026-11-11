@@ -1,6 +1,5 @@
 /**
- * Regression GUARD (committed, travels with the merge) for the cycle-6/11 date class on the CSV-IMPORT
- * paths (the import-trackers T6 net the GUIDE flags: "extend the no-utc guard to cover import-mapping.ts").
+ * Regression guard for the midnight-UTC date-rollback class on the CSV-import paths.
  *
  * A date-only foreign value ("YYYY-MM-DD", "MM/DD/YYYY", …) MUST be built in LOCAL time from numeric parts
  * via `buildLocalDate(year, month, day, …)`. Handing a date-only STRING to `new Date('YYYY-MM-DD')` parses
@@ -78,7 +77,7 @@ describe('no UTC-midnight date construction on the CSV-import paths', () => {
     }
     expect(
       offenders,
-      `A CSV-import date is built from a date-only string → midnight-UTC rollback for users west of UTC ` +
+      `A CSV-import date is built from a date-only string → midnight-UTC rollback for users west of UTC. ` +
         `Build it from numeric parts via buildLocalDate(year, month, day, …) instead:\n${offenders.join('\n')}`
     ).toEqual([]);
   });

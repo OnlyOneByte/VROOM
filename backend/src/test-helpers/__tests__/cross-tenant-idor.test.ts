@@ -144,13 +144,13 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     expectDenied(await ctx.authed('DELETE', `/api/v1/expenses/split/${gid}`), 'DELETE split');
   });
 
-  // vehicle-sharing T5b-2b (split WRITE widening — the- IDOR discipline). The split routes
+  // Split WRITE widening. The split routes
   // moved from the strict assertVehiclesOwned (own EVERY vehicle) → requireSplitWriteAccess (owner |
   // accepted editor on every config vehicle, single-owner set). This pins the widening did not
   // over-open: an accepted VIEWER who legitimately READS the shared split still cannot CREATE/PUT/DELETE
   // one (the requireVehicleRead vs requireVehicleWrite split), and a cross-owner set is rejected. Here B
   // owns the vehicle; A is the viewer.
-  test('split (T5b-2b): a viewer reads but cannot create/update/delete a split; cross-owner rejected', async () => {
+  test('split: a viewer reads but cannot create/update/delete a split; cross-owner rejected', async () => {
     const vid = await idOf(
       await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
     );
@@ -437,14 +437,14 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     expect(stillUnread.is_read).toBe(0);
   });
 
-  // vehicle-sharing T7 + T7b (reminder per-vehicle READ + WRITE widening — the- IDOR
-  // discipline). T7 widened the GET ?vehicleId list (requireVehicleRead + owner-scope); T7b widened the
-  // WRITE paths (POST/PUT/DELETE/mark-serviced) to requireReminderVehiclesWrite (owner | accepted editor
-  // on every vehicle, single-owner set, owner-stamp). This pins the widening did not over-open: a
+  // Reminder per-vehicle READ + WRITE widening. The GET ?vehicleId list moved to
+  // requireVehicleRead + owner-scope, and the WRITE paths (POST/PUT/DELETE/mark-serviced) moved to
+  // requireReminderVehiclesWrite (owner | accepted editor on every vehicle, single-owner set,
+  // owner-stamp). This pins the widening did not over-open: a
   // NON-shared third party is denied the per-vehicle list AND every write; an accepted EDITOR may write
   // (owner-stamped); a VIEWER may read but NOT write (the requireVehicleRead vs requireVehicleWrite
   // split); and a cross-owner reminder is rejected. Here B owns the vehicle.
-  test('reminder per-vehicle (T7/T7b): third party denied; editor writes (owner-stamped); viewer reads not writes; cross-owner rejected', async () => {
+  test('reminder per-vehicle: third party denied; editor writes (owner-stamped); viewer reads not writes; cross-owner rejected', async () => {
     const vid = await idOf(
       await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
     );
@@ -530,7 +530,7 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
       startDate: '2024-06-02T00:00:00.000Z',
       vehicleIds: [vid],
     });
-    expect(editorCreate.status, 'editor create now allowed (T7b)').toBe(201);
+    expect(editorCreate.status, 'editor create now allowed').toBe(201);
     const editorRid = (await json<DataEnvelope<{ reminder: { id: string } }>>(editorCreate)).data
       .reminder.id;
     const stamped = ctx.sqlite
@@ -556,12 +556,12 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     expect(cross.status).toBeLessThan(500);
   });
 
-  // vehicle-sharing T8a (per-vehicle analytics READ widening — the- IDOR discipline). The six
+  // Per-vehicle analytics READ widening. The six
   // vehicle-scoped analytics routes moved from validateVehicleOwnership → requireVehicleRead + owner-scope.
   // This pins the widening did not over-open: a NON-shared third party is denied every per-vehicle
   // analytics route (existence-hiding 404). An accepted viewer reading them is covered in
   // shared-analytics-read.test.ts; here B owns the vehicle and A has no share.
-  test('analytics per-vehicle read (T8a): a third party is denied every vehicle-scoped analytics route', async () => {
+  test('analytics per-vehicle read: a third party is denied every vehicle-scoped analytics route', async () => {
     const vid = await idOf(
       await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
     );
@@ -589,13 +589,13 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     }
   });
 
-  // vehicle-sharing T8b (per-vehicle insurance READ widening — the- IDOR discipline). The
+  // Per-vehicle insurance READ widening. The
   // GET /insurance/vehicles/:vehicleId/policies route moved from validateVehicleOwnership →
   // requireVehicleRead + a blast-radius narrow. This pins the widening did not over-open: a NON-shared
   // third party is denied the per-vehicle policies list (existence-hiding 404). The blast-radius
   // narrowing for an accepted invitee (no leak of the owner's other vehicles) is covered positively in
   // shared-insurance-read.test.ts. Here B owns the vehicle + policy; A has no share.
-  test('insurance per-vehicle read (T8b): a third party is denied the vehicle-scoped policies list', async () => {
+  test('insurance per-vehicle read: a third party is denied the vehicle-scoped policies list', async () => {
     const vid = await idOf(
       await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
     );
@@ -616,13 +616,13 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     );
   });
 
-  // vehicle-sharing T12b-3c (insurance CLAIMS READ widening). GET /insurance/:id/claims moved from
+  // Insurance CLAIMS READ widening. GET /insurance/:id/claims moved from
   // validateInsuranceOwnership → a policy-read gate (owner | accepted share on a covered vehicle) + a
-  // §6.4 blast-radius claim narrow. This pins the widening did not over-open: a third party with NO
+  // blast-radius claim narrow. This pins the widening did not over-open: a third party with NO
   // share to ANY of the policy's covered vehicles is denied the claims list (existence-hiding 404).
   // The positive narrowing (a viewer sees only the shared vehicle's claims) lives in
   // shared-insurance-read.test.ts. B owns the vehicle + policy + claim; A has no share.
-  test('insurance claims read (T12b-3c): a third party is denied a policy claims list', async () => {
+  test('insurance claims read: a third party is denied a policy claims list', async () => {
     const vid = await idOf(
       await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
     );

@@ -2,7 +2,19 @@
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { routes } from '$lib/routes';
-	import { Calendar, DollarSign, Search, FileText, TrendingUp, X, Car, CircleAlert, Download, Upload, Images } from '@lucide/svelte';
+	import {
+		Calendar,
+		DollarSign,
+		Search,
+		FileText,
+		TrendingUp,
+		X,
+		Car,
+		CircleAlert,
+		Download,
+		Upload,
+		Images
+	} from '@lucide/svelte';
 	import { offlineExpenseQueue } from '$lib/stores/offline.svelte';
 	import { removeOfflineExpense } from '$lib/utils/offline-storage';
 	import { settingsStore } from '$lib/stores/settings.svelte';
@@ -375,15 +387,15 @@
 			description="Track and categorize expenses across all vehicles"
 		>
 			{#snippet actions()}
-				<!-- Import from Photos is always available — a user with no expenses yet is exactly
+				<!-- Import is always available — a user with no expenses yet is exactly
 				     who wants to import. Export only makes sense once there's something to export. -->
 				<Button variant="outline" onclick={() => (photosImportOpen = true)}>
 					<Images class="mr-2 h-4 w-4" />
 					Import from Photos
 				</Button>
-				<Button variant="outline" onclick={() => (photosImportOpen = true)}>
-					<Images class="mr-2 h-4 w-4" />
-					Import from Photos
+				<Button variant="outline" onclick={() => (importOpen = true)}>
+					<Upload class="mr-2 h-4 w-4" />
+					Import CSV
 				</Button>
 				{#if totalCount > 0}
 					<Button variant="outline" onclick={handleExportCsv} disabled={isExporting}>

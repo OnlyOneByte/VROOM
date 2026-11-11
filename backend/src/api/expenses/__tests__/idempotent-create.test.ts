@@ -119,7 +119,7 @@ describe('createIdempotent', () => {
 });
 
 // A conflict-resolution keep-local must APPLY the local edit on a (userId, clientId) collision,
-// not silently no-op-return the stored row (: a resolved offline edit is never lost). The
+// not silently no-op-return the stored row (a resolved offline edit is never lost). The
 // pre-fix sync-manager sent forceOverwrite but the backend (a) Zod-stripped it and (b) createIdempotent
 // returned the existing row unchanged. These pin the overwrite path: same row id (in-place update, no
 // duplicate), the local fields applied, and the identity + idempotency keys (id/userId/clientId) immutable.

@@ -55,7 +55,7 @@ function htmlIsDark(): boolean {
 	return document.documentElement.classList.contains('dark');
 }
 
-describe('themeStore.initialize — bootstrap + live OS-preference listener (the-skipped one-shot)', () => {
+describe('themeStore.initialize — bootstrap + live OS-preference listener (the skipped one-shot)', () => {
 	test('mounts the stored preference, registers ONE live listener (idempotent), and the listener honors the system-only guard', () => {
 		// 1. MOUNT: seed a stored 'dark' preference, then the (singleton's only) real initialize().
 		localStorage.setItem(STORAGE_KEY, 'dark');

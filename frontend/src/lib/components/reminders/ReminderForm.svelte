@@ -55,7 +55,7 @@
 
 	// Form fields. type 'notification' just notifies; type 'expense' auto-creates
 	// an expense (category + amount, applied to the vehicle[s]) when due. When an
-	// expense reminder spans >1 vehicle, the optional expenseSplitConfig (T4) controls
+	// expense reminder spans >1 vehicle, the optional expenseSplitConfig controls
 	// how the materialized amount is divided per vehicle (even / fixed-$ / %), reusing
 	// the same SplitConfigEditor as the expense + insurance-term forms.
 	let kind = $state<ReminderKind>('notification');
@@ -90,7 +90,7 @@
 	let expenseAmount = $state('');
 	let expenseTags = $state<string[]>([]);
 
-	// Multi-vehicle split (T4): how an expense reminder divides its amount across vehicles.
+	// Multi-vehicle split: how an expense reminder divides its amount across vehicles.
 	// 'even' carries no per-vehicle rows (backend splits via largest-remainder cents); 'absolute'/
 	// 'percentage' carry per-vehicle allocations. resetSplitAllocations is the shared source of truth
 	//  so the seed can't drift from the expense/insurance forms.
@@ -278,7 +278,7 @@
 				expenseCategory: isExpense ? expenseCategory : null,
 				expenseAmount: isExpense ? parseFloat(expenseAmount) : null,
 				expenseTags: isExpense && expenseTags.length > 0 ? expenseTags : null,
-				// Multi-vehicle split (T4): the per-vehicle division for an expense reminder spanning ≥2
+				// Multi-vehicle split: the per-vehicle division for an expense reminder spanning ≥2
 				// vehicles; null for a notification, single-vehicle, or unsplit expense reminder (so the
 				// trigger materializes one row on vehicleIds[0], unchanged). Explicit null on edit clears
 				// a stale config when the reminder drops back to one vehicle / notification.

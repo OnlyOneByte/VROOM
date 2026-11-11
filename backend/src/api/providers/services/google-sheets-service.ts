@@ -560,9 +560,8 @@ export class GoogleSheetsService {
     // Query trips directly by userId (userId-stamped, like photos)
     const userTrips = await db.select().from(trips).where(eq(trips.userId, userId));
 
-    // Query the ACCEPTED shares this user GRANTED (vehicle-sharing T9, D7 + §6.4 blast-radius: ownerId
-    // scope means an invitee never exports the owner's shares; accepted-only so restore re-creates exactly
-    // what is exported).
+    // Query the ACCEPTED shares this user GRANTED. The ownerId scope means an invitee never exports the
+    // owner's shares; accepted-only so restore re-creates exactly what is exported.
     const userVehicleShares = await db
       .select()
       .from(vehicleShares)

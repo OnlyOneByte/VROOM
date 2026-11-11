@@ -165,7 +165,7 @@ describe('vehicle deletion cascades photo cleanup to dependent entities', () => 
 // never-firing orphan still shown active). The vehicle-delete route now calls
 // reminderRepository.deactivateVehicleless(userId) after the delete, flipping any now-vehicleless active
 // reminder to inactive. A MULTI-vehicle reminder is unaffected — it keeps its remaining vehicles + stays
-// active. (This was a characterization test of the buggy state; flipped to the fixed behavior at.)
+// active. (This was a characterization test of the buggy state; flipped to the fixed behavior.)
 describe('a single-vehicle reminder is auto-deactivated when its only vehicle is deleted', () => {
   function reminderRow(id: string): { is_active: number } | null {
     return (

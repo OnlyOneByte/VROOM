@@ -268,7 +268,7 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
   // fillups.currentYear is in-memory `fuelRows.filter(isFillup)` (volume != null && volume > 0), while
   // fillups.previousYear is the SQL `COUNT(CASE WHEN volume > 0 THEN 1 END)` in queryFuelAggregates (coupled
   // only by the "matches the isFillup predicate" comment). A split fuel expense creates volume-null siblings
-  // (ExpenseSplitService.createSiblings) that must NOT inflate either count.'s guard pins ONLY
+  // (ExpenseSplitService.createSiblings) that must NOT inflate either count. The currentYear guard pins ONLY
   // the currentYear/in-memory half; nothing exercises the prev-period SQL count's null-exclusion — drop the
   // `CASE WHEN volume > 0` (e.g. plain COUNT(*)) and the prev-period count silently inflates by the split
   // legs while every test stays green, so "Last Period" over-reports fillups. This pins the

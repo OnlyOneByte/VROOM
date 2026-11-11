@@ -112,7 +112,7 @@ const schemaShapes = new Map(
  * backup/restore rather than an in-place upgrade.
  */
 const SHIPPED_JOURNAL: readonly { idx: number; tag: string; when: number }[] = [
-  { idx: 0, tag: '0000_baseline', when: 1792617530275 },
+  { idx: 0, tag: '0000_baseline', when: 1794413530056 },
 ];
 
 describe('Migrations: General', () => {

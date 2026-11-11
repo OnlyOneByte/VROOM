@@ -1,6 +1,6 @@
 /**
  * Regression GUARD (committed, travels with the merge) for the CSV export↔import column-name contract
- * — the crown-jewel round-trip invariant (: "export → re-import round-trips losslessly").
+ * — the crown-jewel round-trip invariant ("export → re-import round-trips losslessly").
  *
  * The export writes its header row from `EXPORT_COLUMNS` (expenses/routes.ts). The native importer reads
  * each cell BY NAME via `makeCellGetter`'s `get('<col>')` (import-csv.ts) — `get('vehicle')`,
