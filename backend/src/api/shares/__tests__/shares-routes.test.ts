@@ -178,7 +178,7 @@ describe('invitee side — /received, accept, decline (T4, R2/R5)', () => {
       await asInvitee('GET', '/api/v1/shares/received')
     );
     expect(recv.data.length).toBe(1);
-    const row = recv.data[0]!;
+    const row = recv.data[0];
     expect(row.status).toBe('pending');
     // "year make model" (no nickname seeded) + the OWNER A's displayName, not the invitee B's.
     expect(row.vehicleName).toBe('2021 Honda Civic');
@@ -197,7 +197,7 @@ describe('invitee side — /received, accept, decline (T4, R2/R5)', () => {
     const recv = await json<DataEnvelope<Share[]>>(
       await asInvitee('GET', '/api/v1/shares/received')
     );
-    expect(recv.data[0]!.vehicleName).toBe('Daily Driver');
+    expect(recv.data[0].vehicleName).toBe('Daily Driver');
   });
 
   test('invitee declines a pending invite → declined, and slot frees for re-invite', async () => {

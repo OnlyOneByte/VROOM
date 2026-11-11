@@ -2,7 +2,7 @@
  * GeminiVlmProvider adapter (vlm-receipt-parsing T3b). Drives the REAL adapter against a stubbed global
  * fetch (no live key/endpoint) and pins the request SHAPE + failure-honesty rules:
  *  - POSTs to {baseUrl}/v1beta/models/{model}:generateContent?key=... with the FIXED prompt + an
- *    inline_data base64 image part;
+ *  inline_data base64 image part;
  *  - the api key rides the ?key= QUERY param (not a header);
  *  - the model's first text part is returned verbatim (parseExtraction validates it);
  *  - a non-2xx / network failure THROWS (route → 502, never a faked success);

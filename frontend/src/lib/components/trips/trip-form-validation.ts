@@ -3,15 +3,15 @@ import type { TripPurpose } from '$lib/types';
 /**
  * Pure trip-form validation (trips-location T6b-2) — the testable core of TripForm, mirroring the backend
  * createTripSchema (backend/src/api/trips/validation.ts) so the form blocks BEFORE a 400 round-trip. Host-
- * independent (no store/DOM), the C125/C201 form-validator pattern.
+ * independent (no store/DOM), the form-validator pattern.
  *
  * The form binds raw strings (an <input type="number"> yields a string; the DatePicker binds 'YYYY-MM-DD');
  * the validator parses + range-checks them and returns an errors map (empty = valid). It enforces the two
  * rules the user can get wrong:
- *   - R2: endOdometer >= startOdometer (a backwards trip is a data-entry error, not a 0-distance trip).
- *   - R5 future-guard: tripDate is not a future LOCAL CALENDAR DAY (the C226 fix — the form sends a date-only
- *     value the backend reads as noon-local, so "today" must always pass; only a calendar day AFTER today is
- *     rejected). Compared on local Y/M/D, matching backend notFutureLocalDay.
+ *  - R2: endOdometer >= startOdometer (a backwards trip is a data-entry error, not a 0-distance trip).
+ *  - R5 future-guard: tripDate is not a future LOCAL CALENDAR DAY (the fix — the form sends a date-only
+ *  value the backend reads as noon-local, so "today" must always pass; only a calendar day AFTER today is
+ *  rejected). Compared on local Y/M/D, matching backend notFutureLocalDay.
  */
 
 export interface TripFormData {
@@ -20,7 +20,7 @@ export interface TripFormData {
 	 * Odometer field values. Typed `string | number` because Svelte COERCES an `<input type="number">`
 	 * `bind:value` to a NUMBER at runtime (and to `null` when the box is cleared) — so although the form
 	 * seeds these as '', they hold numbers once the user types. parseOdometer must tolerate both (the
-	 * C230 fix: a bare `.trim()` threw `raw.trim is not a function` on the coerced number, killing submit).
+	 * fix: a bare `.trim()` threw `raw.trim is not a function` on the coerced number, killing submit).
 	 */
 	startOdometer: string | number | null;
 	endOdometer: string | number | null;
@@ -37,7 +37,7 @@ export type TripFormErrors = Partial<Record<keyof TripFormData, string>>;
 /**
  * Parse a raw odometer field value to a non-negative integer, or null when it isn't one. Tolerates the
  * `string | number | null` the form actually holds (Svelte coerces a number-input to a number / null —
- * see TripFormData), so it never calls a string method on a number (the C230 `raw.trim` crash).
+ * see TripFormData), so it never calls a string method on a number (the `raw.trim` crash).
  */
 export function parseOdometer(raw: string | number | null | undefined): number | null {
 	if (raw === null || raw === undefined) return null;
@@ -50,7 +50,7 @@ export function parseOdometer(raw: string | number | null | undefined): number |
 
 /**
  * Is `dateOnly` ('YYYY-MM-DD') a calendar day AFTER today's LOCAL day? Mirrors the backend's
- * notFutureLocalDay (compare local Y/M/D, not an absolute instant — the C226 lesson). Malformed input
+ * notFutureLocalDay (compare local Y/M/D, not an absolute instant — the lesson). Malformed input
  * is treated as "not future" (the required-presence check handles emptiness; format errors surface as a
  * backend 400 rather than a confusing client message).
  */

@@ -3,7 +3,7 @@
  *
  * `notifyUser(userId, payload)` fans a Web Push notification out to all of a user's subscriptions and
  * runs the reaping lifecycle: a `gone` (404/410) result PRUNES that dead subscription; a
- * `transientError` increments the failure streak and reaps past the configured cap (the #135
+ * `transientError` increments the failure streak and reaps past the configured cap (the
  * reaping-hygiene class); an `ok` clears the streak. It is BEST-EFFORT — wrapped so it NEVER throws
  * into its caller and NEVER blocks (R3): the reminder feed is the source of truth, push is an
  * additive nudge, and a push failure must not fail a reminder write.
@@ -127,7 +127,7 @@ async function sendToSubscription(
     return;
   }
   // transientError: count it; reap a persistently-failing (but not explicitly-gone) endpoint past the
-  // cap (#135) so a dead-but-not-410 endpoint does not linger + retry forever.
+  // cap so a dead-but-not-410 endpoint does not linger + retry forever.
   const failures = await pushSubscriptionRepository.incrementFailure(sub.id);
   summary.failed += 1;
   if (failures >= CONFIG.validation.push.maxConsecutiveFailures) {

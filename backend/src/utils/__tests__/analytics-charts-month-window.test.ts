@@ -1,5 +1,5 @@
 /**
- * Regression test (cycle 11) for the monthly-consumption window.
+ * Regression test for the monthly-consumption window.
  *
  * buildMonthlyConsumption sorts months ascending then takes 12. It used slice(0, 12),
  * which keeps the OLDEST 12 months — so once a user has >12 months of fill-ups the chart
@@ -55,7 +55,7 @@ describe('buildMonthlyConsumption — keeps the most recent 12 months', () => {
   });
 });
 
-// C341 (deep-review→guard): the efficiency loop attaches MPG to months the VOLUME loop already
+// The efficiency loop attaches MPG to months the VOLUME loop already
 // created — `map.get(key)` then `if (entry)` (analytics-charts.ts:333-334). That guard is load-bearing:
 // the volume loop skips a null/invalid date (`if (!d) continue`), but a degenerate efficiency point
 // returns date='' → toMonthKey(new Date('')) = 'NaN-NaN', and `if (entry)` is what stops that phantom

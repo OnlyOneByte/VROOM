@@ -2,10 +2,10 @@
  * money-cents-migration T6 — analytics display-edge converters (api-transform.ts).
  *
  * These guard the cents→dollars projection applied at the analytics response boundary. The load-bearing
- * case (C17.5): `fuelAdvancedToApi` must convert the REAL money fields (dayOfWeekPatterns.avgCost,
+ * `fuelAdvancedToApi` must convert the REAL money fields (dayOfWeekPatterns.avgCost,
  * monthlyCostHeatmap.*) but must NOT touch `vehicleRadar.maintenanceCost`/`annualCost` — despite their
  * cost-y names, those are normalizeScore() 0-100 RADAR SCORES (buildVehicleRadar), and a /100 would
- * corrupt the chart (80 → 0.8). A C17 bug converted them; this pins the correct behavior so it can't return.
+ * corrupt the chart (80 → 0.8). A bug converted them; this pins the correct behavior so it can't return.
  */
 
 import { describe, expect, test } from 'bun:test';
@@ -72,7 +72,7 @@ describe('analytics api-transform: money cents→dollars, non-money untouched', 
       fillupIntervals: [{ intervalLabel: '0-7d', count: 3 }],
     } as FuelAdvancedData;
     const r = fuelAdvancedToApi(d);
-    // RADAR SCORES: byte-for-byte unchanged (the C17.5 bug divided these by 100).
+    // RADAR SCORES: byte-for-byte unchanged (a transform bug divided these by 100).
     expect(r.vehicleRadar[0].maintenanceCost).toBe(80);
     expect(r.vehicleRadar[0].annualCost).toBe(60);
     expect(r.vehicleRadar[0].fuelEfficiency).toBe(75);

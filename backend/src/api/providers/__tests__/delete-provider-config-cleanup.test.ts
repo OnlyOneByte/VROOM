@@ -1,11 +1,11 @@
 /**
- * DELETE /providers/:id storage-config cleanup side effects (C245 guard). Deleting a STORAGE provider
+ * DELETE /providers/:id storage-config cleanup side effects. Deleting a STORAGE provider
  * must scrub every reference to it from the user's settings — else a dangling storageConfig default
  * leaves photo uploads routing to a provider that no longer exists, and a stale backupConfig entry
- * lingers (the C237 area). The DELETE handler's cleanupStorageConfig + cleanupBackupConfig (routes.ts:
+ * lingers. The DELETE handler's cleanupStorageConfig + cleanupBackupConfig (routes.ts:
  * 418-454) had no end-to-end coverage — the existing providers-routes-http DELETE tests only assert
  * the 204 + tenant-scoping, not the settings scrub. This drives the REAL POST→PUT-settings→DELETE→GET
- * stack via the s3 seam (no OAuth, no env gate — the C91 rationale).
+ * stack via the s3 seam (no OAuth, no env gate — the rationale).
  *
  * createTestApp() rewrites env + dynamic-imports DB-bound modules — imports limited to harness + bun:test.
  */
@@ -32,7 +32,7 @@ async function createS3Provider(displayName: string): Promise<string> {
     providerType: 's3',
     displayName,
     credentials: { accessKeyId: 'k', secretAccessKey: 'secret' },
-    // S3 config must carry endpoint/bucket/region (C349 create-time validation).
+    // S3 config must carry endpoint/bucket/region (create-time validation).
     config: { endpoint: 'https://s3.example.com', bucket: 'b', region: 'us-east-1' },
   });
   const body = await json<DataEnvelope<{ id: string }>>(res);
@@ -51,7 +51,7 @@ function defaults(over: Record<string, string | null> = {}) {
   };
 }
 
-/** Complete per-provider category map (the inner z.record is EXHAUSTIVE in Zod v4 — the C70 trap). */
+/** Complete per-provider category map (the inner z.record is EXHAUSTIVE in Zod v4 — the trap). */
 function categoryMap() {
   const base = { enabled: true, folderPath: '/Backups' };
   return {
@@ -78,7 +78,7 @@ async function getSettings(): Promise<SettingsBody['data']> {
   return (await json<SettingsBody>(res)).data;
 }
 
-describe('DELETE /providers/:id scrubs the provider from storage + backup config (C245)', () => {
+describe('DELETE /providers/:id scrubs the provider from storage + backup config', () => {
   test('deleting a storage provider nulls its storageConfig default + removes its categories & backup entry', async () => {
     const id = await createS3Provider('Drive To Delete');
 

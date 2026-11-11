@@ -181,10 +181,10 @@ describe('insurance claims HTTP routes', () => {
   });
 });
 
-// C247 (#84): a claim's optional vehicleId/termId links were written verbatim — the route only proved
+// A claim's optional vehicleId/termId links were written verbatim — the route only proved
 // POLICY ownership, so a claim could reference a vehicle the user doesn't own (cross-tenant FK) or a
 // term from a DIFFERENT policy. validateClaimRefs now gates both on create + update.
-describe('insurance claim vehicleId/termId link validation (#84)', () => {
+describe('insurance claim vehicleId/termId link validation', () => {
   test('filing a claim with a vehicle the user does NOT own → 404 (ownership gate)', async () => {
     const ownVehicle = await seedVehicle(ctx);
     const policyId = await seedPolicy(ownVehicle);
@@ -249,7 +249,7 @@ describe('insurance claim vehicleId/termId link validation (#84)', () => {
     expect(put.status).toBe(404);
   });
 
-  // C369: validateClaimRefs gates termId on BOTH create + update, but only the UPDATE vehicleId leg
+  // validateClaimRefs gates termId on BOTH create + update, but only the UPDATE vehicleId leg
   // (above) and the CREATE termId leg (filing-with-termId test) were pinned — the UPDATE termId leg
   // was unguarded. A claim must not be re-pointed at a term on ANOTHER policy (a cross-policy link is
   // a referential-integrity violation: a claim belongs to its own policy's coverage). This pins that

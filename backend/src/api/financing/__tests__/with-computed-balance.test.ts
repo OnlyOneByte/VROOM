@@ -1,5 +1,5 @@
 /**
- * Unit tests for withComputedBalance (C243 arch dedup). The `{ ...financing, computedBalance,
+ * Unit tests for withComputedBalance. The `{ ...financing, computedBalance,
  * eligibleForPayoff: isEligibleForPayoff(...) }` enrichment shape was hand-rolled at 3 route sites
  * (vehicles list + single GET, financing GET); this pure helper is now the single source of truth, so
  * pin its contract here: it spreads the financing object, attaches computedBalance verbatim, and

@@ -1,4 +1,3 @@
-import { zValidator } from '@hono/zod-validator';
 import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
@@ -7,7 +6,7 @@ import { users, type VehicleShare } from '../../db/schema';
 import type { ApiResponse } from '../../errors';
 import { ConflictError, NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
-import { commonSchemas, validateVehicleOwnership } from '../../utils/validation';
+import { commonSchemas, validateVehicleOwnership, zValidator } from '../../utils/validation';
 import { type ReceivedShare, vehicleShareRepository } from './repository';
 
 /**
@@ -47,7 +46,7 @@ routes.post('/', zValidator('json', inviteSchema), async (c) => {
   const { vehicleId, email, level } = c.req.valid('json');
 
   // Owner-only: the vehicle must be the acting user's own (404 if not — never leaks existence). This is
-  // the C151 validate-before-insert order: every rejection throws BEFORE any row write.
+  // the validate-before-insert order: every rejection throws BEFORE any row write.
   await validateVehicleOwnership(vehicleId, user.id);
 
   // Invitee must be an existing VROOM user (D4 — no email-signup invites in v1).

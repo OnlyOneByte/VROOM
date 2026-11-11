@@ -5,35 +5,25 @@ description: Interactive debugging workflow using Chrome DevTools MCP. Given a c
 
 # Debug Component
 
-Use this skill when the user asks to visually check, test, or debug a component or route in the running app. This skill uses the Chrome DevTools MCP to interact with the live application.
+Use this skill when the user asks to visually check, test, or debug a component or route in the
+running app. It drives the live app through the `chrome-devtools` MCP server configured in
+`.kiro/settings/mcp.json`, which attaches to an existing Chrome at `http://127.0.0.1:9222`.
+
+Tools below are named bare (`take_snapshot`, `navigate_page`, …) — the client adds its own prefix.
+**Every one takes a `pageId`**; get it from `list_pages` first.
 
 ## Prerequisites
 
-Before starting, verify:
-1. Chrome is running with remote debugging enabled (`--remote-debugging-port=9222`)
-2. Backend is running on port 3001
-3. Frontend dev server is running on port 5173
+1. Chrome running with `--remote-debugging-port=9222`
+2. Backend on port 3001
+3. Frontend dev server on port 5173
 
-### Launching Chrome with Remote Debugging
+### Launching Chrome with remote debugging
 
-If Chrome isn't running with debugging enabled, launch it. There are two options:
-
-**Option A: Relaunch Chrome (simplest, requires quitting Chrome first)**
-
-The user must quit Chrome first (Cmd+Q), then launch:
-
-```bash
-/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
-  --remote-debugging-port=9222 \
-  --user-data-dir="$HOME/Library/Application Support/Google/Chrome" \
-  --no-first-run --no-default-browser-check --profile-directory=Default
-```
-
-Use `controlBashProcess` with action `start` since this is a long-running process.
-
-**Option B: Copy profile and run a second instance (keeps existing Chrome open)**
-
-This copies the user's Chrome profile so their Google login and cookies are available without closing their main browser:
+Chrome refuses to open the debugging port when `--user-data-dir` is the default profile directory,
+reporting *"remote debugging requires a non-default data directory. Specify this using
+--user-data-dir."* So run a second instance against a copy of the profile — that keeps the user's
+Google login and cookies and leaves their main browser open:
 
 ```bash
 # 1. Copy the profile
@@ -41,186 +31,111 @@ mkdir -p /tmp/chrome-debug-profile
 rsync -a --quiet ~/Library/Application\ Support/Google/Chrome/Default/ /tmp/chrome-debug-profile/Default/
 cp ~/Library/Application\ Support/Google/Chrome/Local\ State /tmp/chrome-debug-profile/Local\ State
 
-# 2. Launch Chrome with the copied profile (use controlBashProcess start)
+# 2. Launch it (long-running — run it in the background, don't block on it)
 /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
   --remote-debugging-port=9222 \
   --user-data-dir=/tmp/chrome-debug-profile \
   --no-first-run --no-default-browser-check --profile-directory=Default
 ```
 
-**Verify the connection:**
-
-```bash
-curl -s http://127.0.0.1:9222/json/version | head -5
-```
-
-Or use `mcp_chrome_devtools_list_pages` — if it returns without error, the connection is live.
+Verify with `curl -s http://127.0.0.1:9222/json/version`, or just call `list_pages` — if it returns
+without error the connection is live.
 
 ## Workflow
 
-### Step 1: Verify Services Are Running
-
-Check that both servers are accessible:
+### Step 1: Verify services
 
 ```bash
-# Check backend health
-curl -s http://localhost:3001/health | head -c 200
-```
-
-```bash
-# Check frontend is serving
+curl -s http://localhost:3001/health            # {"status":"ok",...}
 curl -s -o /dev/null -w "%{http_code}" http://localhost:5173
 ```
 
-If either is down, tell the user which service needs to be started:
-- Backend: `bun run dev` from `backend/`
-- Frontend: `npm run dev` from `frontend/`
+If either is down, tell the user which to start — `bun run dev` from `backend/`, `npm run dev` from
+`frontend/`. Do NOT start them yourself; they are long-running.
 
-Do NOT start these yourself — they are long-running processes.
-
-### Step 2: Identify the Target Route
-
-Map the user's description to a frontend route:
+### Step 2: Identify the target route
 
 | Description | Route |
 |---|---|
-| dashboard, home | `/dashboard` |
-| vehicles, car list | `/vehicles` |
-| vehicle detail, car detail | `/vehicles/[id]` |
+| dashboard, home, vehicle list | `/dashboard` |
+| vehicle detail | `/vehicles/[id]` |
+| add vehicle | `/vehicles/new` |
 | expenses, expense list | `/expenses` |
-| add expense, new expense | `/expenses/new` or `/expenses` (with dialog) |
+| add expense | `/expenses/new` |
+| edit expense | `/expenses/[id]/edit` |
 | analytics, charts, stats | `/analytics` |
+| reminders | `/reminders` |
+| trips | `/trips` |
+| insurance | `/insurance` |
+| assistant, chat | `/assistant` |
 | settings, preferences | `/settings` |
 | profile, account | `/profile` |
-| insurance | `/insurance` |
 | login, auth | `/auth` |
-| trips | `/trips` |
+| component gallery (dev only) | `/dev/gallery` |
 
-If the user mentions a specific vehicle or expense, you may need to query the SQLite database first to get the ID:
-```
-mcp_sqlite_read_query: SELECT id, make, model, year FROM vehicles LIMIT 10
-```
+There is no `/vehicles` index — the vehicle list lives on `/dashboard`. The full route map is
+`frontend/src/lib/routes.ts`.
 
-### Step 3: Navigate and Take Initial Snapshot
+For a specific vehicle or expense id, query the DB through the `sqlite` MCP server's `read_query`
+(pointed at `backend/data/vroom.db`):
 
-1. List open pages to find or create the right tab:
-   ```
-   mcp_chrome_devtools_list_pages
-   ```
-
-2. Navigate to the target route:
-   ```
-   mcp_chrome_devtools_navigate_page: { url: "http://localhost:5173/<route>" }
-   ```
-
-3. Wait for the page to load (wait for a key element):
-   ```
-   mcp_chrome_devtools_wait_for: { text: ["<expected text on page>"] }
-   ```
-
-4. Take an accessibility snapshot (preferred over screenshot):
-   ```
-   mcp_chrome_devtools_take_snapshot
-   ```
-
-### Step 4: Check for Errors
-
-1. Check console for errors:
-   ```
-   mcp_chrome_devtools_list_console_messages: { types: ["error", "warn"] }
-   ```
-
-2. Check network requests for failed API calls:
-   ```
-   mcp_chrome_devtools_list_network_requests: { resourceTypes: ["fetch", "xhr"] }
-   ```
-
-3. If there are failed requests, inspect them:
-   ```
-   mcp_chrome_devtools_get_network_request: { reqid: <id> }
-   ```
-
-### Step 5: Interactive Testing (if requested)
-
-If the user wants to test a specific interaction:
-
-1. Take a snapshot to find element UIDs:
-   ```
-   mcp_chrome_devtools_take_snapshot
-   ```
-
-2. Interact with elements using their UIDs:
-   ```
-   mcp_chrome_devtools_click: { uid: "<element-uid>" }
-   mcp_chrome_devtools_fill: { uid: "<input-uid>", value: "test value" }
-   ```
-
-3. After interaction, check for new errors:
-   ```
-   mcp_chrome_devtools_list_console_messages: { types: ["error"] }
-   mcp_chrome_devtools_list_network_requests: { resourceTypes: ["fetch", "xhr"] }
-   ```
-
-4. Take a screenshot if visual verification is needed:
-   ```
-   mcp_chrome_devtools_take_screenshot
-   ```
-
-### Step 6: Report Findings
-
-Summarize what was found:
-- Page loaded successfully or not
-- Console errors/warnings (with details)
-- Failed API calls (status codes, error messages)
-- Visual issues observed
-- Any interaction failures
-
-If errors were found, suggest fixes based on the error type:
-- **Console errors**: Check the referenced source file and line
-- **Network 401**: Auth session may be expired — check cookies/session
-- **Network 404**: Endpoint may not exist — check backend routes
-- **Network 500**: Backend error — check backend logs or the error response body
-- **Hydration errors**: SSR/client mismatch — check for browser-only API usage at module level
-- **Svelte warnings**: Component may use deprecated patterns — run the Svelte autofixer
-
-## Advanced: Performance Profiling
-
-If the user reports performance issues:
-
-1. Start a trace:
-   ```
-   mcp_chrome_devtools_performance_start_trace: { reload: true, autoStop: true }
-   ```
-
-2. Analyze insights:
-   ```
-   mcp_chrome_devtools_performance_analyze_insight: { insightSetId: "...", insightName: "LCPBreakdown" }
-   ```
-
-## Advanced: Dark Mode Testing
-
-To verify dark mode styling:
-```
-mcp_chrome_devtools_emulate: { colorScheme: "dark" }
-mcp_chrome_devtools_take_screenshot
+```sql
+SELECT id, make, model, year FROM vehicles LIMIT 10
 ```
 
-Then switch back:
+### Step 3: Navigate and snapshot
+
+1. `list_pages` — find or create the right tab
+2. `navigate_page: { pageId, url: "http://localhost:5173/<route>" }`
+3. `wait_for: { pageId, text: ["<expected text>"] }` — resolves when any listed string appears
+4. `take_snapshot: { pageId }` — the a11y tree, with a `uid` per element. Prefer this over a
+   screenshot; it is what `click`/`fill` need.
+
+### Step 4: Check for errors
+
 ```
-mcp_chrome_devtools_emulate: { colorScheme: "light" }
+list_console_messages: { pageId, types: ["error", "warn"] }
+list_network_requests: { pageId, resourceTypes: ["fetch", "xhr"] }
+get_network_request: { pageId, reqid: <number> }    # for a failed one
 ```
 
-## Advanced: Mobile Viewport Testing
+### Step 5: Interactive testing (if requested)
 
-To test responsive layout:
+`take_snapshot` for fresh uids (always use the latest), then:
+
 ```
-mcp_chrome_devtools_emulate: {
-  viewport: { width: 375, height: 812, deviceScaleFactor: 3, isMobile: true, hasTouch: true }
-}
-mcp_chrome_devtools_take_screenshot
+click: { pageId, uid: "<element-uid>" }
+fill:  { pageId, uid: "<input-uid>", value: "test value" }
 ```
 
-Reset to desktop:
+Re-check console and network afterwards. `take_screenshot: { pageId }` if visual confirmation is
+needed (`fullPage: true` for the whole page).
+
+### Step 6: Report findings
+
+Page loaded or not, console errors/warnings, failed API calls with status and body, visual issues,
+interaction failures. Suggest fixes by error type:
+
+- **Console error** — check the referenced source file and line
+- **401** — session expired; check cookies/session
+- **404** — endpoint may not exist; check the mount in `backend/src/app.ts`
+- **500** — check the backend log or the error response body
+- **Hydration mismatch** — look for browser-only API usage at module level
+- **Svelte warning** — may be a deprecated pattern; run the Svelte MCP autofixer
+
+## Advanced
+
+**Performance:** `performance_start_trace: { pageId, reload: true, autoStop: true }`, then
+`performance_analyze_insight: { pageId, insightSetId, insightName: "LCPBreakdown" }` using an id
+from the trace's "Available insight sets" list.
+
+**Dark mode:** `emulate: { pageId, colorScheme: "dark" }`; reset with `colorScheme: "auto"`.
+
+**Mobile viewport:** `viewport` is a *string*, `'<width>x<height>x<dpr>[,mobile][,touch][,landscape]'`:
+
 ```
-mcp_chrome_devtools_emulate: { viewport: null }
+emulate: { pageId, viewport: "375x812x3,mobile,touch" }
 ```
+
+Omit `viewport` to clear the override. `resize_page: { pageId, width, height }` resizes the real
+window instead of emulating.

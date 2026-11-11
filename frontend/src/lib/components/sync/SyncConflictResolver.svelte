@@ -11,15 +11,33 @@
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
 	import { Button } from '$lib/components/ui/button';
 	import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert';
-	import { formatCurrency } from '$lib/utils/formatters';
+	import { formatCurrency, formatDate } from '$lib/utils/formatters';
+	// A conflicting row's `category` is whatever the local draft or the server holds, so these
+	// go through the key-tolerant label helper rather than indexing `categoryLabels` directly.
+	import { getCategoryLabel } from '$lib/utils/chart-colors';
 
 	let showModal = $state(false);
 	let currentConflict = $state<SyncConflict | null>(null);
 	let resolving = $state(false);
 
+	/**
+	 * The conflict batch the user has deferred, held by identity.
+	 *
+	 * Dismissal MUST be remembered: the effect below opens the dialog whenever a conflict is queued,
+	 * so without this every exit — Skip, the X, Escape, an overlay click — was undone in the same
+	 * flush, and the only way out of the dialog was to resolve every conflict.
+	 *
+	 * Identity is the right granularity because `syncConflicts.current` is REPLACED wholesale by each
+	 * sync run and appended to by a retry: deferring the batch on screen leaves it queued (the sidebar
+	 * keeps counting it) and the next sync attempt, or any newly discovered conflict, produces a
+	 * different array and brings the dialog back.
+	 */
+	let dismissedBatch = $state<SyncConflict[] | null>(null);
+
 	$effect(() => {
-		if (syncConflicts.current.length > 0 && !showModal) {
-			currentConflict = syncConflicts.current[0] ?? null;
+		const conflicts = syncConflicts.current;
+		if (conflicts.length > 0 && !showModal && conflicts !== dismissedBatch) {
+			currentConflict = conflicts[0] ?? null;
 			showModal = true;
 		}
 	});
@@ -50,12 +68,9 @@
 	}
 
 	function closeModal() {
+		dismissedBatch = syncConflicts.current;
 		showModal = false;
 		currentConflict = null;
-	}
-
-	function formatDate(dateString: string): string {
-		return new Date(dateString).toLocaleDateString();
 	}
 
 	function formatAmount(amount: number): string {
@@ -63,7 +78,16 @@
 	}
 </script>
 
-<Dialog bind:open={showModal}>
+<Dialog
+	bind:open={showModal}
+	onOpenChange={open => {
+		// Escape, an overlay click and the X close through the primitive rather than closeModal(), so
+		// the deferral has to be recorded here as well — otherwise the effect re-opens the dialog in
+		// the same flush and those three controls do nothing. Only the primitive's own close paths
+		// reach this; a programmatic `showModal = false` does not.
+		if (!open) dismissedBatch = syncConflicts.current;
+	}}
+>
 	<DialogContent class="max-w-2xl">
 		{#if currentConflict}
 			<DialogHeader>
@@ -109,8 +133,9 @@
 							<div class="space-y-2 text-sm">
 								<div class="flex justify-between">
 									<span class="text-muted-foreground">Category:</span>
-									<span class="font-medium capitalize">{currentConflict.localExpense.category}</span
-									>
+									<span class="font-medium">
+										{getCategoryLabel(currentConflict.localExpense.category)}
+									</span>
 								</div>
 								{#if currentConflict.localExpense.tags && currentConflict.localExpense.tags.length > 0}
 									<div class="flex justify-between">
@@ -160,9 +185,9 @@
 								<div class="space-y-2 text-sm">
 									<div class="flex justify-between">
 										<span class="text-muted-foreground">Category:</span>
-										<span class="font-medium capitalize"
-											>{currentConflict.serverExpense.category}</span
-										>
+										<span class="font-medium">
+											{getCategoryLabel(currentConflict.serverExpense.category ?? '')}
+										</span>
 									</div>
 									<div class="flex justify-between">
 										<span class="text-muted-foreground">Tags:</span>

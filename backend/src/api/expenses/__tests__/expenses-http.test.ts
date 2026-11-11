@@ -123,13 +123,13 @@ describe('expenses HTTP search/pagination', () => {
 });
 
 /**
- * PUT /:id vehicle-reassignment ownership (#61, C189): the CREATE path validates the target vehicle
+ * PUT /:id vehicle-reassignment ownership: the CREATE path validates the target vehicle
  * is the user's (validateVehicleOwnership), but the UPDATE path did NOT — so a PUT could point the
  * (owned) expense at a vehicleId the user doesn't own, corrupting their analytics attribution. The
  * create path's own guard is the model; this pins the symmetric update guard. Raw-seed a FOREIGN
  * user+vehicle that coexists in the shared DB (a second createTestApp would reset it).
  */
-describe('PUT /api/v1/expenses/:id — vehicle reassignment ownership (#61)', () => {
+describe('PUT /api/v1/expenses/:id — vehicle reassignment ownership', () => {
   test('reassigning the expense to a FOREIGN vehicle is rejected 404 (ownership guard)', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const expenseId = await createExpense(
@@ -188,10 +188,10 @@ describe('PUT /api/v1/expenses/:id — vehicle reassignment ownership (#61)', ()
   });
 });
 
-// #98 (C51): POST /expenses must thread `forceOverwrite` through to createIdempotent so a keep-local
+// POST /expenses must thread `forceOverwrite` through to createIdempotent so a keep-local
 // conflict resolution APPLIES the local edit on a (userId, clientId) collision. Pre-fix the schema
 // Zod-STRIPPED the flag (an unknown key) → the offline edit was silently lost. This drives the REAL route.
-describe('POST /api/v1/expenses — forceOverwrite keep-local resolution (#98)', () => {
+describe('POST /api/v1/expenses — forceOverwrite keep-local resolution', () => {
   async function postExpense(body: Record<string, unknown>) {
     const res = await ctx.authed('POST', '/api/v1/expenses', body);
     return { res, body: await json<DataEnvelope<{ id: string; expenseAmount: number }>>(res) };
@@ -254,13 +254,13 @@ describe('POST /api/v1/expenses — forceOverwrite keep-local resolution (#98)',
   });
 });
 
-// C52 guard — the #98 keep-local overwrite path INTERSECTS the #76 fuel-field-hygiene class: an overwrite
+// guard — the keep-local overwrite path INTERSECTS the fuel-field-hygiene class: an overwrite
 // re-runs the create route's clearFuelFieldsIfNotFuel(body) BEFORE the idempotent update, so a resolved
 // edit that CHANGES a fuel row to a non-fuel category must NULL the existing row's stale fuel fields
 // (volume/mileage/fuelType) — not leave them. This is a REAL correctness invariant on the new overwrite
-// branch (a stray mileage poisons getCurrentOdometer cross-category, #76); the C51 tests only changed the
+// branch (a stray mileage poisons getCurrentOdometer cross-category); the tests only changed the
 // amount, so this exercises the category-switch leg of the overwrite. Drives real VROOM logic end-to-end.
-describe('C52 — a keep-local overwrite that switches fuel→non-fuel clears the stale fuel fields (#98 ∩ #76)', () => {
+describe('a keep-local overwrite that switches fuel→non-fuel clears the stale fuel fields', () => {
   test('overwriting a fuel row with a maintenance edit nulls volume/mileage/fuelType', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const clientId = 'c52-fuel-switch';
@@ -301,7 +301,7 @@ describe('C52 — a keep-local overwrite that switches fuel→non-fuel clears th
       >(resolved);
     expect(resolved.status, JSON.stringify(resolvedBody)).toBeLessThan(300);
 
-    // Same row, re-categorized, and the stale fuel fields are NULLED (not carried over) — #76 on the
+    // Same row, re-categorized, and the stale fuel fields are NULLED (not carried over) — on the
     // overwrite path. A lingering mileage here would poison getCurrentOdometer cross-category.
     expect(resolvedBody.data.id).toBe(firstBody.data.id);
     expect(resolvedBody.data.category).toBe('maintenance');

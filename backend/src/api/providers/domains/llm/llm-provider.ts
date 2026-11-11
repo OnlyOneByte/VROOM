@@ -59,7 +59,7 @@ export interface LlmProvider {
    * Send the transcript + the tool definitions to the model and return its RAW response, normalized to
    * `{ text?, toolCalls? }`. MUST NOT execute tools or trust tool-call args — the orchestrator (T4) does
    * that. Throws on a transport/auth failure (the chat route maps that to a 502, never a fake success —
-   * the #43/#44/#144 anti-fail-open lesson).
+   * the anti-fail-open lesson).
    */
   chat(request: ChatRequest): Promise<ChatResult>;
 }

@@ -1,5 +1,5 @@
 /**
- * Unit tests for the pending-OAuth-credentials store (C83 guard, steered by the C81 coverage
+ * Unit tests for the pending-OAuth-credentials store (guard, steered by the coverage
  * baseline — this security-relevant module was ~76% covered, the gaps being the TTL-expiry and
  * max-size-eviction edge cases). It stages a provider refresh token between the OAuth callback
  * and provider creation, so its TTL + consume-once + capacity-eviction semantics are a real

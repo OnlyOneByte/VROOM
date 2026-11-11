@@ -1,5 +1,5 @@
 /**
- * push-api.ts client guard (push-notifications T5) — the C149/C163 service-test pattern: apiClient is
+ * push-api.ts client guard (push-notifications T5) — the service-test pattern: apiClient is
  * mocked so we assert the exact endpoints + payloads the FE opt-in surface sends to the shipped backend
  * push router (GET vapid-public-key / POST subscribe / DELETE subscribe), including that the unsubscribe
  * carries the endpoint in the request BODY (the backend DELETE reads `{ endpoint }` from the body).

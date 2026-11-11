@@ -10,7 +10,7 @@
  * assistant text OR a list of requested tool calls. It NEVER executes a tool and NEVER trusts the
  * tool-call args — the orchestrator (T4) allowlist-checks the name + Zod-validates the args + runs the
  * tool userId-scoped. A non-2xx / network / timeout failure THROWS (the chat route maps it to a 502;
- * never a faked success — the #43/#44/#144 anti-fail-open lesson). The api key (when present) goes in the
+ * never a faked success — the anti-fail-open lesson). The api key (when present) goes in the
  * Authorization header; a keyless config (self-hosted Ollama) omits it.
  */
 

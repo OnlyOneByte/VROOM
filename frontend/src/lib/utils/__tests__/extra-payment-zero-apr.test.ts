@@ -1,12 +1,12 @@
 /**
- * Regression: calculateExtraPaymentImpact on a 0%-APR loan (#92, C297 bug cycle).
+ * Regression: calculateExtraPaymentImpact on a 0%-APR loan.
  *
  * The early guard was `financing.financingType !== 'loan' || !financing.apr || financing.apr <= 0`,
  * which lumped every interest-free loan (apr 0, or no APR entered) in with leases/own and returned a
  * FLAT { monthsSaved: 0, interestSaved: 0 }. But a 0%-APR loan is interest-free, NOT inert — extra
  * payments retire the principal faster and genuinely shorten the term. The PaymentPlannerDialog renders
  * `impact.monthsSaved` ("{n} mos"), so an interest-free loan wrongly showed "0 mos" for an extra payment
- * that obviously shortens the payoff. NORTH_STAR #2 (correct-for-everyone — a 0% dealer-financing loan is
+ * that obviously shortens the payoff. (correct-for-everyone — a 0% dealer-financing loan is
  * common). The amortization loop already handles 0% correctly (rate 0 → full payment to principal), so the
  * fix only bails early for NON-loans and lets 0%-APR loans run the loop with rate 0. These lock that.
  */
@@ -35,7 +35,7 @@ function makeLoan(overrides: Partial<VehicleFinancing> = {}): VehicleFinancing {
 	};
 }
 
-describe('calculateExtraPaymentImpact — 0%-APR loan is interest-free but NOT inert (#92)', () => {
+describe('calculateExtraPaymentImpact — 0%-APR loan is interest-free but NOT inert', () => {
 	test('a 0%-APR loan + extra payment shortens the term (monthsSaved > 0), interestSaved stays $0', () => {
 		// $12,000 @ 0% / $500 a month = 24 months. Doubling the payment to $1,000 → 12 months → saves 12.
 		const impact = calculateExtraPaymentImpact(makeLoan(), 500);

@@ -19,11 +19,19 @@
 	import { Label } from '$lib/components/ui/label';
 	import { FormFieldError } from '$lib/components/ui/form-field';
 	import * as Card from '$lib/components/ui/card';
-	import { StatCardGrid, AppLineChart } from '$lib/components/charts';
+	import { AppLineChart } from '$lib/components/charts';
+	import StatCardGrid from '$lib/components/charts/StatCardGrid.svelte';
 	import ChartCard from '$lib/components/charts/ChartCard.svelte';
 	import { Inbox, DollarSign, TrendingUp, Car, Plus } from '@lucide/svelte';
 
-	const buttonVariants = ['default', 'destructive', 'outline', 'secondary', 'ghost', 'link'] as const;
+	const buttonVariants = [
+		'default',
+		'destructive',
+		'outline',
+		'secondary',
+		'ghost',
+		'link'
+	] as const;
 	const buttonSizes = ['default', 'sm', 'lg'] as const;
 	const badgeVariants = ['default', 'secondary', 'destructive', 'outline'] as const;
 	const alertVariants = ['default', 'destructive', 'warning', 'success'] as const;
@@ -101,7 +109,9 @@
 			{#each alertVariants as v (v)}
 				<Alert variant={v}>
 					<AlertTitle>{v} alert</AlertTitle>
-					<AlertDescription>Use Alert variants for status — never hand-tinted divs.</AlertDescription>
+					<AlertDescription
+						>Use Alert variants for status — never hand-tinted divs.</AlertDescription
+					>
 				</Alert>
 			{/each}
 		</section>
@@ -111,7 +121,13 @@
 			<h2 class="text-lg font-semibold">Form field</h2>
 			<div class="max-w-sm space-y-2">
 				<Label for="gallery-amount">Amount</Label>
-				<Input id="gallery-amount" type="number" placeholder="0.00" aria-invalid={true} aria-describedby="gallery-amount-error" />
+				<Input
+					id="gallery-amount"
+					type="number"
+					placeholder="0.00"
+					aria-invalid={true}
+					aria-describedby="gallery-amount-error"
+				/>
 				<FormFieldError id="gallery-amount-error">Amount must be positive</FormFieldError>
 			</div>
 		</section>
@@ -154,7 +170,9 @@
 					<Card.Content>
 						<Alert variant="destructive">
 							<AlertTitle>Couldn't load</AlertTitle>
-							<AlertDescription>Show a visible, recoverable message — never a silent catch.</AlertDescription>
+							<AlertDescription
+								>Show a visible, recoverable message — never a silent catch.</AlertDescription
+							>
 						</Alert>
 					</Card.Content>
 				</Card.Root>
@@ -163,7 +181,9 @@
 					<Card.Header><Card.Title>Populated</Card.Title></Card.Header>
 					<Card.Content>
 						<p class="text-sm">The happy path with real content.</p>
-						<p class="text-sm text-muted-foreground">Secondary text uses muted-foreground (AA contrast).</p>
+						<p class="text-sm text-muted-foreground">
+							Secondary text uses muted-foreground (AA contrast).
+						</p>
 					</Card.Content>
 				</Card.Root>
 			</div>
@@ -179,8 +199,20 @@
 		<section class="space-y-3">
 			<h2 class="text-lg font-semibold">Charts (ChartCard 4-state wrapper)</h2>
 			<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-				<AppLineChart title="Populated" data={trend} x="date" y="amount" config={trendConfig} series={[{ key: 'amount', label: 'Amount', color: 'var(--primary)' }]} />
-				<ChartCard title="Empty" isEmpty emptyTitle="No data yet" emptyDescription="Charts show an empty state, never a blank box.">
+				<AppLineChart
+					title="Populated"
+					data={trend}
+					x="date"
+					y="amount"
+					config={trendConfig}
+					series={[{ key: 'amount', label: 'Amount', color: 'var(--primary)' }]}
+				/>
+				<ChartCard
+					title="Empty"
+					isEmpty
+					emptyTitle="No data yet"
+					emptyDescription="Charts show an empty state, never a blank box."
+				>
 					<div></div>
 				</ChartCard>
 				<ChartCard title="Loading" isLoading>

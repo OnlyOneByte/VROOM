@@ -2,13 +2,13 @@
  * In-process HTTP tests for the trip routes (trips-location T3) — through the REAL stack via createTestApp.
  *
  * Covers the 6 endpoints + their validation/ownership contracts:
- *   - POST create: happy path, R2 reject (end < start), future-date reject, bad-purpose reject, unowned
- *     vehicle → 404 (the #80 enumeration discipline, never 403).
- *   - GET list: paginated, vehicleId/purpose filters, tenant scope (a foreign user's trips never appear).
- *   - GET /:id: own → 200, foreign → 404.
- *   - GET /vehicle/:vehicleId: a vehicle's trips, unowned vehicle → 404.
- *   - PUT /:id: happy, R2 reject on a both-odometer update, foreign → 404.
- *   - DELETE /:id: happy, foreign → 404 (the #52 tenant-safe deleteByIdAndUserId).
+ *  - POST create: happy path, R2 reject (end < start), future-date reject, bad-purpose reject, unowned
+ *  vehicle → 404 (the enumeration discipline, never 403).
+ *  - GET list: paginated, vehicleId/purpose filters, tenant scope (a foreign user's trips never appear).
+ *  - GET /:id: own → 200, foreign → 404.
+ *  - GET /vehicle/:vehicleId: a vehicle's trips, unowned vehicle → 404.
+ *  - PUT /:id: happy, R2 reject on a both-odometer update, foreign → 404.
+ *  - DELETE /:id: happy, foreign → 404 (the tenant-safe deleteByIdAndUserId).
  *
  * The createTestApp harness seeds ONE user; cross-tenant cases seed a 2nd user + their vehicle/trip directly
  * via ctx.sqlite, then assert the authed (1st) user can't reach them.
@@ -91,7 +91,7 @@ describe('POST /api/v1/trips (create)', () => {
   // The R5 future-guard compares the LOCAL CALENDAR DAY, not the absolute instant. The FE sends a date-only
   // value anchored at NOON LOCAL (dateOnlyToISO); a bare `d <= new Date()` instant guard 400'd a trip dated
   // TODAY whenever the server clock was before local noon (noon-local-today is then hours "in the future"),
-  // breaking the form's own default for the entire local morning. These two pin the fix (the #87/#106 family).
+  // breaking the form's own default for the entire local morning. These two pin the fix.
   test('ACCEPTS a trip dated TODAY sent as noon-local (the FE dateOnlyToISO contract — not a future reject)', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const now = new Date();
@@ -137,20 +137,20 @@ describe('POST /api/v1/trips (create)', () => {
     expect(res.status).toBe(400);
   });
 
-  test('a trip on an UNOWNED vehicle is 404, not 403 (no enumeration oracle, #80)', async () => {
+  test('a trip on an UNOWNED vehicle is 404, not 403 (no enumeration oracle)', async () => {
     const { vehicleId } = seedForeignTrip();
     const res = await ctx.authed('POST', '/api/v1/trips', VALID(vehicleId));
     expect(res.status).toBe(404);
   });
 
-  // C228 deep-review cert (NORTH_STAR #1, backup-safety): a create that OMITS the optional locations/note
-  // must persist them as SQL NULL — not '' and not the string 'undefined'. The C227 TripForm sends
+  // deep-review cert (backup-safety): a create that OMITS the optional locations/note
+  // must persist them as SQL NULL — not '' and not the string 'undefined'. The TripForm sends
   // `value.trim() || undefined`, JSON drops undefined keys, Zod .optional() leaves them absent, and the
   // route coalesces `data.x ?? null`. This pins that whole FE→BE→DB chain end-to-end (the omitted path was
   // implicit in every other test via the VALID() helper but never ASSERTED to land as null), so a future
   // refactor that dropped the `?? null` or made the schema default to '' would flip a RED assertion. Reads
   // the row straight from SQLite (the stored value, not the API echo) to catch a coercion the JSON wouldn't.
-  test('a create omitting optional locations/note persists them as NULL (FE undefined→absent→null, #1)', async () => {
+  test('a create omitting optional locations/note persists them as NULL (FE undefined→absent→null)', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const res = await ctx.authed('POST', '/api/v1/trips', {
       vehicleId,
@@ -236,13 +236,13 @@ describe('POST /api/v1/trips (create)', () => {
     expect(n).toBe(1); // same (vehicle, day, reading) → one odometer entry, not two
   });
 
-  // C233 deep-review: the route comments "Both [D2 side-effects] are best-effort — the trip is already
-  // persisted, so a … hiccup never fails the create." recheckMileageReminders is internally guarded (C42)
+  // deep-review: the route comments "Both [D2 side-effects] are best-effort — the trip is already
+  // persisted, so a … hiccup never fails the create." recheckMileageReminders is internally guarded
   // but createFromTrip is a plain repo write that CAN throw a DatabaseError; left unguarded it 500'd a create
   // whose trip row ALREADY committed → the FE showed "failed" + a retry made a DUPLICATE. Fault-inject a
   // createFromTrip throw and pin the contract: the create still returns 201 AND the trip is persisted (the
   // best-effort linkage swallows + logs, never propagates). Non-vacuous: drop the route try/catch → 500 here.
-  test('a createFromTrip (D2 linkage) throw does NOT fail the create — trip persists, 201 returned (C233)', async () => {
+  test('a createFromTrip (D2 linkage) throw does NOT fail the create — trip persists, 201 returned', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const { odometerRepository } = await import('../../odometer/repository');
     const original = odometerRepository.createFromTrip;
@@ -270,13 +270,13 @@ describe('POST /api/v1/trips (create)', () => {
   });
 });
 
-// C216 (guard): the SECOND half of D2's promise — "a trip's end reading drives the mileage-reminder axis".
-// C213 wired recheckMileageReminders into the trip POST + pinned that getCurrentOdometer reflects the
-// reading, but never asserted a mileage reminder actually FIRES when a trip crosses its milestone. A C216
+// The SECOND half of D2's promise — "a trip's end reading drives the mileage-reminder axis".
+// wired recheckMileageReminders into the trip POST + pinned that getCurrentOdometer reflects the
+// reading, but never asserted a mileage reminder actually FIRES when a trip crosses its milestone. A
 // bug-scout verified the full chain end-to-end firsthand (POST trip → createFromTrip → getCurrentOdometer →
 // recheck → notification); this pins it so a regression in the trip→odometer→recheck wiring goes red — and
 // a control that a BELOW-milestone trip fires nothing (no false notification).
-describe('a trip crossing a mileage-reminder milestone fires the notification (D2 end-to-end, C216)', () => {
+describe('a trip crossing a mileage-reminder milestone fires the notification (D2 end-to-end)', () => {
   /** Seed a mileage-axis reminder due at `dueOdometer` for one vehicle (raw — the mileage API is partial). */
   function seedMileageReminder(id: string, vehicleId: string, dueOdometer: number): void {
     ctx.sqlite.run(
@@ -326,12 +326,12 @@ describe('a trip crossing a mileage-reminder milestone fires the notification (D
   });
 });
 
-// C214 (T7 — the RATIFIED trips↔odometer lifecycle, was the pending characterization). Angelo ruled
+// (T7 — the RATIFIED trips↔odometer lifecycle, was the pending characterization). the ruling was
 // (2026-06-25): editing a trip's endOdometer/tripDate RE-SYNCS the linked odometer entry; deleting a trip
 // PROMPTS keep-or-delete (non-destructive default = KEEP). These tests previously pinned the pre-ruling
 // "independent-observation" behavior as an escalation anchor; they now assert the ratified semantics (the
-// #148/C102 anchor-flips-on-ruling pattern, discharged). The keepOdometer=false path + the manual-reading
-// safety + the re-sync no-orphan invariant are pinned in the "C214 trips↔odometer lifecycle (T7)" block above.
+// anchor-flips-on-ruling pattern, discharged). The keepOdometer=false path + the manual-reading
+// safety + the re-sync no-orphan invariant are pinned in the " trips↔odometer lifecycle (T7)" block above.
 const odoCount = (ctx: TestApp, vehicleId: string): number =>
   (
     ctx.sqlite
@@ -341,7 +341,7 @@ const odoCount = (ctx: TestApp, vehicleId: string): number =>
     }
   ).n;
 
-describe('trips↔odometer lifecycle on EDIT/DELETE (C214 ratified, T7)', () => {
+describe('trips↔odometer lifecycle on EDIT/DELETE (ratified, T7)', () => {
   test('editing a trip’s endOdometer RE-SYNCS the linked odometer entry (currentOdometer tracks the correction)', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const created = await ctx.authed(
@@ -360,13 +360,13 @@ describe('trips↔odometer lifecycle on EDIT/DELETE (C214 ratified, T7)', () => 
     expect(put.status).toBe(200);
 
     const { odometerRepository } = await import('../../odometer/repository');
-    // RATIFIED (C214 case 3): the stale 5000 entry is removed + a fresh linked entry written at 500, so
-    // getCurrentOdometer reflects the correction (no #76/#244 stray-reading poison on the reminder axis).
+    // RATIFIED (case 3): the stale 5000 entry is removed + a fresh linked entry written at 500, so
+    // getCurrentOdometer reflects the correction (no stray-reading poison on the reminder axis).
     expect(odoCount(ctx, vehicleId)).toBe(1);
     expect(await odometerRepository.getCurrentOdometer(vehicleId, ctx.user.id)).toBe(500);
   });
 
-  test('deleting a trip (default) KEEPS the linked odometer entry (non-destructive default, C214 case 1)', async () => {
+  test('deleting a trip (default) KEEPS the linked odometer entry (non-destructive default, case 1)', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const created = await ctx.authed(
       'POST',
@@ -496,15 +496,15 @@ describe('GET /api/v1/trips/summary (T5 mileage rollup)', () => {
     expect(body.data.milesByPurpose.personal).toBe(30);
   });
 
-  // C236 escalation-anchor (the #148/C102 pattern) for the #94 unit-pooling class on the trips cross-fleet
+  // escalation-anchor (the pattern) for the unit-pooling class on the trips cross-fleet
   // rollup. The cross-fleet summary sums tripDistance across ALL vehicles, but trip odometers are stored in
   // EACH vehicle's own distanceUnit (R2) — so a mixed mi+km fleet pools mi + km into ONE unlabeled scalar
-  // (the #94 class the C223 deep-review already filed + escalated as product-gated). This PINS today's
+  // (the class the deep-review already filed + escalated as product-gated). This PINS today's
   // raw-pool behavior (a km vehicle's 200-unit trip + a mi vehicle's 100-unit trip → totalMiles 300, NOT
-  // unit-converted) so the eventual #94 fix (convert-to-user-global / per-vehicle-only / require-vehicleId)
+  // unit-converted) so the eventual fix (convert-to-user-global / per-vehicle-only / require-vehicleId)
   // FLIPS a RED assertion rather than silently changing a displayed figure unnoticed. NOT a fix — the call
-  // is Angelo's (escalated); this is the characterization net that makes the change visible when it lands.
-  test('cross-fleet summary POOLS raw odometer deltas across mixed-unit vehicles (#94 anchor — characterization, not endorsement)', async () => {
+  // is a product decision; this is the characterization net that makes the change visible when it lands.
+  test('cross-fleet summary POOLS raw odometer deltas across mixed-unit vehicles (anchor — characterization, not endorsement)', async () => {
     // Full unitPreferences shape (the create schema requires all three) — only distanceUnit differs.
     const miVehicle = await seedVehicle(ctx, {
       make: 'Toyota',
@@ -536,8 +536,8 @@ describe('GET /api/v1/trips/summary (T5 mileage rollup)', () => {
     const res = await ctx.authed('GET', '/api/v1/trips/summary');
     const body = await json<DataEnvelope<{ totalMiles: number; businessMiles: number }>>(res);
     expect(res.status, JSON.stringify(body)).toBe(200);
-    // TODAY: 100 (mi) + 200 (km) summed RAW = 300, with no per-vehicle conversion (the #94 imperfection).
-    // When #94 is ruled + fixed, this number changes → this assertion goes RED → update it deliberately.
+    // TODAY: 100 (mi) + 200 (km) summed RAW = 300, with no per-vehicle conversion (the imperfection).
+    // When is ruled + fixed, this number changes → this assertion goes RED → update it deliberately.
     expect(body.data.totalMiles).toBe(300);
     expect(body.data.businessMiles).toBe(300);
   });
@@ -577,8 +577,8 @@ describe('GET /api/v1/trips/summary (T5 mileage rollup)', () => {
     expect(body.data.averageTripMiles).toBe(0);
   });
 
-  // C253 money-rate boundary guard (NORTH_STAR #1/#2 — businessMileageValue = businessMiles × rate is a
-  // DISPLAYED $ figure). A C253 bug-scout certified the summary money path clean firsthand: the
+  // money-rate boundary guard (— businessMileageValue = businessMiles × rate is a
+  // DISPLAYED $ figure). A bug-scout certified the summary money path clean firsthand: the
   // `summaryQuerySchema.rate = z.coerce.number().min(0).optional()` (routes.ts:46) REJECTS a negative rate
   // (would flip the reimbursement $ negative) and a non-finite rate ('Infinity'/'NaN' → businessMiles × ∞ =
   // Infinity/NaN money), so no defect — but NO HTTP test pinned that boundary. These are the merge-surviving
@@ -653,12 +653,12 @@ describe('PUT /api/v1/trips/:id', () => {
     expect(res.status).toBe(400);
   });
 
-  // C211 (bug): a PARTIAL PUT must be validated against the EFFECTIVE merged pair, not just the body. The
+  // (bug) A PARTIAL PUT must be validated against the EFFECTIVE merged pair, not just the body. The
   // updateTripSchema refine fires only when BOTH odometers are present, so sending ONLY endOdometer below
   // the STORED startOdometer (or ONLY startOdometer above the stored end) bypassed R2 and persisted an
-  // inverted pair → tripDistance clamps to 0, a phantom 0-mile trip (#109/#130 class). The route now
+  // inverted pair → tripDistance clamps to 0, a phantom 0-mile trip. The route now
   // re-checks the merged pair against the existing row.
-  test('rejects a partial PUT of ONLY endOdometer below the STORED startOdometer (#109/#130, 400)', async () => {
+  test('rejects a partial PUT of ONLY endOdometer below the STORED startOdometer (400)', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const created = await ctx.authed(
       'POST',
@@ -677,7 +677,7 @@ describe('PUT /api/v1/trips/:id', () => {
     expect(row.end_odometer).toBe(1080);
   });
 
-  test('rejects a partial PUT of ONLY startOdometer above the STORED endOdometer (#109/#130, 400)', async () => {
+  test('rejects a partial PUT of ONLY startOdometer above the STORED endOdometer (400)', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const created = await ctx.authed(
       'POST',
@@ -730,7 +730,7 @@ describe('DELETE /api/v1/trips/:id', () => {
     expect(after.status).toBe(404);
   });
 
-  test('a foreign trip delete is 404 and removes NOTHING (#52 tenant-safe delete)', async () => {
+  test('a foreign trip delete is 404 and removes NOTHING (tenant-safe delete)', async () => {
     const { tripId } = seedForeignTrip();
     const res = await ctx.authed('DELETE', `/api/v1/trips/${tripId}`);
     expect(res.status).toBe(404);
@@ -747,16 +747,16 @@ describe('DELETE /api/v1/trips/:id', () => {
 });
 
 /**
- * C214 trips↔odometer lifecycle (T7) — the ratified delete/edit semantics for the D2 linked odometer entry.
+ * trips↔odometer lifecycle (T7) — the ratified delete/edit semantics for the D2 linked odometer entry.
  * A trip create writes a deduped `odometer_entries` row at (vehicle, tripDate-day, endOdometer) stamped
  * note='From trip' (createFromTrip). These pin what delete + edit do to THAT row:
- *   1. delete trip, default → KEEP the linked entry (non-destructive default).
- *   2. delete trip ?keepOdometer=false → ALSO remove the linked entry.
- *   3. ?keepOdometer=false must NEVER remove a MANUAL reading at the same (vehicle, day, value) — only the
- *      'From trip' provenance row.
- *   4. edit endOdometer → RE-SYNC: the linked entry moves to the new reading, no stale orphan left.
+ *  1. delete trip, default → KEEP the linked entry (non-destructive default).
+ *  2. delete trip ?keepOdometer=false → ALSO remove the linked entry.
+ *  3. ?keepOdometer=false must NEVER remove a MANUAL reading at the same (vehicle, day, value) — only the
+ *  'From trip' provenance row.
+ *  4. edit endOdometer → RE-SYNC: the linked entry moves to the new reading, no stale orphan left.
  */
-describe('C214 trips↔odometer lifecycle (T7)', () => {
+describe('trips↔odometer lifecycle (T7)', () => {
   /** Count the trip-provenance odometer entries for a vehicle at a given reading. */
   function linkedEntryCount(vehicleId: string, odometer: number): number {
     const row = ctx.sqlite
@@ -889,11 +889,11 @@ describe('C214 trips↔odometer lifecycle (T7)', () => {
     expect(linkedEntryCount(vehicleId, 1080)).toBe(1); // still exactly one such reading, just re-dated
   });
 
-  // #C214-N1 (bug, found + fixed C10): createFromTrip DEDUPS, so two trips at the same (vehicle, day,
+  // #-N1: createFromTrip DEDUPS, so two trips at the same (vehicle, day,
   // reading) SHARE one linked odometer entry. Deleting ONE with keepOdometer=false must NOT remove the
   // shared entry while the OTHER trip still references it — else the survivor's odometer reading is silently
   // orphaned (getCurrentOdometer → null). The route now removes the entry only when no other trip maps to it.
-  test('keepOdometer=false on one of TWO trips sharing a key KEEPS the shared entry (no orphan, #C214-N1)', async () => {
+  test('keepOdometer=false on one of TWO trips sharing a key KEEPS the shared entry (no orphan, #-N1)', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     // Two trips, same vehicle + same day + same endOdometer → ONE shared linked entry (dedup).
     const a = await ctx.authed('POST', '/api/v1/trips', VALID(vehicleId, { endOdometer: 1080 }));

@@ -70,7 +70,11 @@ describe('shareApi — owner side (T3)', () => {
 
 describe('shareApi — invitee side (T4)', () => {
 	it('listReceived GETs /shares/received and carries the enriched fields (T12)', async () => {
-		const received: ReceivedShare = { ...share, vehicleName: '2021 Honda Civic', sharedBy: 'Alice' };
+		const received: ReceivedShare = {
+			...share,
+			vehicleName: '2021 Honda Civic',
+			sharedBy: 'Alice'
+		};
 		mockGet.mockResolvedValue([received]);
 		const res = await shareApi.listReceived();
 		expect(mockGet).toHaveBeenCalledWith('/api/v1/shares/received');

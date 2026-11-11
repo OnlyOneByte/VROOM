@@ -6,12 +6,7 @@
  */
 
 import { describe, expect, test } from 'vitest';
-import {
-	derivePushStatus,
-	pushStatusLabel,
-	type PushStatus,
-	type PushStatusInput
-} from '../push';
+import { derivePushStatus, pushStatusLabel, type PushStatus, type PushStatusInput } from '../push';
 
 const base: PushStatusInput = {
 	supported: true,

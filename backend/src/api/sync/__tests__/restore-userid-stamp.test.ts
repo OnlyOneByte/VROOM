@@ -184,12 +184,12 @@ describe('restore stamps the importer userId (cross-tenant write guard)', () => 
     expect(rows.filter((r) => r.user_id === foreignId)).toHaveLength(0);
   });
 
-  // C11 (deep-review follow-on flagged C8): extend the stamp guard to `photos` — the THIRD stamp-only
+  // (deep-review follow-on flagged C8) Extend the stamp guard to `photos` — the THIRD stamp-only
   // root table. Verified firsthand: validatePhotoRefs (backup.ts) checks only entityType + entityId
   // membership, NOT the photo's userId against the metadata set — so (like insurance, unlike the leaf
   // expenses/reminders which validation user-checks) a tampered foreign userId on a photo row passes
   // validation and reaches the insert, where stampUserId is the SOLE defense. A photo is a real upload
-  // target (receipts, vehicle/claim docs) → a cross-tenant write here is NORTH_STAR #2. Seed a photo row
+  // target (receipts, vehicle/claim docs) → a cross-tenant write here is. Seed a photo row
   // directly (no storage provider needed for the restore path — mirrors claims-roundtrip.test.ts), export,
   // tamper photos.csv to a victim id, restore AS us, assert the photo is owned by US.
   test('a backup whose PHOTO row carries a FOREIGN userId still restores as the importer (stamp-only root table)', async () => {

@@ -4,8 +4,8 @@
  * The dashboard used to fetch photos one request per vehicle (N+1). The batch
  * endpoint calls photoRepository.findByUser(userId, entityType) once and groups
  * the rows by entityId. These tests pin the two properties that make that safe:
- *   - the query is user-scoped (never returns another user's photos)
- *   - the query is entity-type-scoped (vehicle photos only, not expense photos)
+ *  - the query is user-scoped (never returns another user's photos)
+ *  - the query is entity-type-scoped (vehicle photos only, not expense photos)
  * plus the grouping shape the service produces.
  */
 

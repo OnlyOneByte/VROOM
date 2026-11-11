@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, type Component } from 'svelte';
 	import { page } from '$app/state';
 	import { authStore } from '$lib/stores/auth.svelte';
 	import { appStore } from '$lib/stores/app.svelte';
@@ -10,19 +10,18 @@
 	import OfflineIndicator from '$lib/components/sync/OfflineIndicator.svelte';
 	import { NOTIFICATION_LIMITS } from '$lib/constants/limits';
 	import PWAInstallPrompt from '$lib/components/layout/PWAInstallPrompt.svelte';
-	import SyncConflictResolver from '$lib/components/sync/SyncConflictResolver.svelte';
+	import { syncConflicts } from '$lib/utils/sync/sync-state.svelte';
 	import { pwaInfo } from 'virtual:pwa-info';
 	import { loadOfflineExpenses } from '$lib/utils/offline-storage';
 	import { offlineExpenseQueue } from '$lib/stores/offline.svelte';
 	import '../app.css';
-	// Theming engine (T7): the generated `:root[data-theme="<id>"]` blocks for non-default themes. Imported
-	// right after app.css so a non-default theme paints with zero FOUC + zero token duplication in JS. The
-	// store (T8) sets `data-theme` on <html>; with no data-theme (or "default") app.css's bare :root wins.
+	// The generated `:root[data-theme="<id>"]` blocks for non-default themes. Imported right after
+	// app.css so a non-default theme paints with zero FOUC and zero token duplication in JS. themeStore
+	// sets `data-theme` on <html>; with no data-theme (or "default") app.css's bare :root wins.
 	import '$lib/theme/themes.css';
 
 	import { LoaderCircle } from '@lucide/svelte';
 
-	import { vehicleApi } from '$lib/services/vehicle-api';
 	import { reminderApi } from '$lib/services/reminder-api';
 	import { maybeTriggerRecurringExpenses } from '$lib/utils/reminder-helpers';
 	import { onlineStatus } from '$lib/stores/offline.svelte';
@@ -31,27 +30,15 @@
 
 	let { children } = $props();
 
-	let vehiclesLoaded = $state(false);
 	let settingsLoaded = $state(false);
 	let recurringTriggered = $state(false);
-
-	async function loadUserVehicles() {
-		if (vehiclesLoaded) return;
-		try {
-			const vehicles = await vehicleApi.getVehicles();
-			appStore.setVehicles(vehicles);
-			vehiclesLoaded = true;
-		} catch (error) {
-			if (import.meta.env.DEV) console.error('Failed to load vehicles:', error);
-		}
-	}
 
 	// Hydrate the settings store app-wide once authenticated. currencyUnit and unit
 	// preferences are GLOBAL display state — getCurrencySymbol()/formatCurrency() and
 	// unit formatters read settingsStore.settings, falling back to USD/imperial when
 	// it's null. Without this, a page that doesn't itself call settingsStore.load()
 	// (e.g. the insurance forms) showed "$" for a EUR/GBP user on a direct/refreshed
-	// load. Loading it here makes the symbol correct everywhere. (cycle 203)
+	// load. Loading it here makes the symbol correct everywhere.
 	async function loadUserSettings() {
 		if (settingsLoaded) return;
 		try {
@@ -62,11 +49,11 @@
 		}
 	}
 
-	// recurring-expenses T5/D1: opportunistically materialize due recurring expenses on app init —
-	// authed + online + at most once per local calendar day (the gate + localStorage debounce live in
-	// maybeTriggerRecurringExpenses). Fail-soft (a trigger error is swallowed there; the manual "Run due
-	// reminders" button remains). Once per session here (recurringTriggered) so re-running the auth
-	// effect doesn't re-call it within the same load.
+	// Opportunistically materialize due recurring expenses on app init — authed + online + at most once
+	// per local calendar day (the gate + localStorage debounce live in maybeTriggerRecurringExpenses).
+	// Fail-soft: a trigger error is swallowed there and the manual "Run due reminders" button remains.
+	// Once per session here (recurringTriggered) so re-running the auth effect doesn't re-call it within
+	// the same load.
 	async function maybeTriggerRecurring() {
 		if (recurringTriggered) return;
 		recurringTriggered = true;
@@ -78,10 +65,17 @@
 		});
 	}
 
+	// The SOLE toast dedup for the notification queue: a notification is toasted once, ever, even if
+	// it is re-added or the effect re-runs. Do not add a second "ids I saw last run" snapshot — the
+	// effect removes each notification as it toasts it, so any snapshot taken afterwards is empty.
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- intentionally non-reactive tracking Set, not used in $state or $derived
 	const shownNotifications = new Set<string>();
 
-	let previousNotificationIds = new Set<string>();
+	// The offline-sync conflict dialog: loaded on demand because its dialog/scroll-area/alert chrome
+	// is dead weight on every route for a modal that appears only when a queued write collides with
+	// the server. Set-once on purpose — resolving the last conflict empties the list, and unmounting
+	// the dialog in that same flush would tear it down mid-close.
+	let SyncConflictResolver = $state<Component | null>(null);
 
 	let webManifestLink = $derived(pwaInfo ? pwaInfo.webManifest.linkTag : '');
 
@@ -116,15 +110,21 @@
 
 	$effect(() => {
 		if (authState.isAuthenticated && !authState.isLoading) {
-			loadUserVehicles();
 			loadUserSettings();
 			maybeTriggerRecurring();
 		}
 	});
 
 	$effect(() => {
+		if (SyncConflictResolver || syncConflicts.current.length === 0) return;
+		void import('$lib/components/sync/SyncConflictResolver.svelte').then(module => {
+			SyncConflictResolver = module.default;
+		});
+	});
+
+	$effect(() => {
 		appState.notifications.forEach(notification => {
-			if (previousNotificationIds.has(notification.id) || shownNotifications.has(notification.id)) {
+			if (shownNotifications.has(notification.id)) {
 				return;
 			}
 
@@ -153,8 +153,6 @@
 			toastFn(notification.message, options);
 			appStore.removeNotification(notification.id);
 		});
-
-		previousNotificationIds = new Set(appState.notifications.map(n => n.id));
 	});
 
 	$effect(() => {
@@ -163,8 +161,16 @@
 </script>
 
 <svelte:head>
-	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-	<meta name="theme-color" content="#2563eb" />
+	<!--
+		Do NOT re-declare `viewport` or `theme-color` here. app.html owns both, and a duplicate in
+		<svelte:head> lands AFTER it in the document:
+		  - viewport: a later <meta name="viewport"> REPLACES the earlier description wholesale rather
+		    than merging, so one that omits `viewport-fit=cover` resets it to `auto`. The safe-area
+		    insets app.css's .safe-top/.safe-bottom read then collapse to 0 on notched devices.
+		  - theme-color: the browser uses the FIRST declaration, which is also the one themeStore
+		    rewrites (document.querySelector returns the first match), so a second one is dead weight
+		    that silently disagrees with the installed-app manifest colour in vite.config.ts.
+	-->
 	<!-- eslint-disable-next-line svelte/no-at-html-tags -- PWA manifest link from @vite-pwa/sveltekit -->
 	{@html webManifestLink}
 </svelte:head>
@@ -207,8 +213,10 @@
 <!-- PWA install prompt -->
 <PWAInstallPrompt />
 
-<!-- Sync conflict resolver -->
-<SyncConflictResolver />
+<!-- Sync conflict resolver (loaded on first conflict) -->
+{#if SyncConflictResolver}
+	<SyncConflictResolver />
+{/if}
 
 <!-- Sonner toast container -->
 <Toaster position="bottom-right" richColors closeButton />

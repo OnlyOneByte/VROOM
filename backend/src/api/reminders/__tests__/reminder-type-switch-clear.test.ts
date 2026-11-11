@@ -1,5 +1,5 @@
 /**
- * Regression guard for the clear-optional-field data-loss class (cycles 82-85),
+ * Regression guard for the clear-optional-field data-loss class,
  * newly reachable on the reminder EXPENSE-TEMPLATE fields via the cycle-158
  * expense-type form. When the user switches an expense reminder to notification,
  * the form sends expenseCategory/expenseAmount/expenseTags as null. This proves

@@ -16,7 +16,11 @@
 	import { capitalize, dateOnlyToISO, toDateInputValue } from '$lib/utils/formatters';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
 	import { getDistanceUnitLabel } from '$lib/utils/units';
-	import { buildSplitConfig, categoryLabels, resetSplitAllocations } from '$lib/utils/expense-helpers';
+	import {
+		buildSplitConfig,
+		categoryLabels,
+		resetSplitAllocations
+	} from '$lib/utils/expense-helpers';
 	import type { SplitAllocationDraft } from '$lib/utils/expense-helpers';
 	import type { ExpenseCategory, ReminderWithVehicles, Vehicle } from '$lib/types';
 	import type { ReminderSplitConfig, TriggerMode } from '$lib/types/reminder';
@@ -51,7 +55,7 @@
 
 	// Form fields. type 'notification' just notifies; type 'expense' auto-creates
 	// an expense (category + amount, applied to the vehicle[s]) when due. When an
-	// expense reminder spans >1 vehicle, the optional expenseSplitConfig (T4) controls
+	// expense reminder spans >1 vehicle, the optional expenseSplitConfig controls
 	// how the materialized amount is divided per vehicle (even / fixed-$ / %), reusing
 	// the same SplitConfigEditor as the expense + insurance-term forms.
 	let kind = $state<ReminderKind>('notification');
@@ -86,10 +90,10 @@
 	let expenseAmount = $state('');
 	let expenseTags = $state<string[]>([]);
 
-	// Multi-vehicle split (T4): how an expense reminder divides its amount across vehicles.
+	// Multi-vehicle split: how an expense reminder divides its amount across vehicles.
 	// 'even' carries no per-vehicle rows (backend splits via largest-remainder cents); 'absolute'/
 	// 'percentage' carry per-vehicle allocations. resetSplitAllocations is the shared source of truth
-	// (C415) so the seed can't drift from the expense/insurance forms.
+	//  so the seed can't drift from the expense/insurance forms.
 	let splitMethod = $state<'even' | 'absolute' | 'percentage'>('even');
 	let splitAllocations = $state<SplitAllocationDraft[]>([]);
 	// The split editor is only relevant for an expense reminder spanning ≥2 vehicles with a positive
@@ -133,8 +137,8 @@
 			// Read the stored ISO back as the LOCAL calendar date (not a bare UTC .slice(0,10)). The save
 			// path persists via dateOnlyToISO → NOON LOCAL (:205-206), so for a UTC+13/+14 user noon-local
 			// lands on the prior UTC day and `.slice(0,10)` would show the day before — shifting the date
-			// back every edit-open (#131, the #87/#106 family). toDateInputValue reads local Y/M/D, matching
-			// the create path (:66/:134) and the C267/C268/C271 sibling-form fixes.
+			// back every edit-open. toDateInputValue reads local Y/M/D, matching
+			// the create path (:66/:134) and the sibling-form fixes.
 			startDate = toDateInputValue(new Date(r.startDate));
 			endDate = r.endDate ? toDateInputValue(new Date(r.endDate)) : '';
 			selectedVehicleIds = [...reminder.vehicleIds];
@@ -194,7 +198,7 @@
 	}
 
 	// Build the ReminderSplitConfig payload — null unless this is a multi-vehicle expense reminder with
-	// an editor showing. The union itself is built by the shared buildSplitConfig helper (C23, the ONE
+	// an editor showing. The union itself is built by the shared buildSplitConfig helper (the ONE
 	// source of truth ExpenseForm also uses); ReminderSplitConfig is structurally identical to SplitConfig.
 	function reminderSplitConfig(): ReminderSplitConfig | null {
 		if (!showSplitEditor) return null;
@@ -274,7 +278,7 @@
 				expenseCategory: isExpense ? expenseCategory : null,
 				expenseAmount: isExpense ? parseFloat(expenseAmount) : null,
 				expenseTags: isExpense && expenseTags.length > 0 ? expenseTags : null,
-				// Multi-vehicle split (T4): the per-vehicle division for an expense reminder spanning ≥2
+				// Multi-vehicle split: the per-vehicle division for an expense reminder spanning ≥2
 				// vehicles; null for a notification, single-vehicle, or unsplit expense reminder (so the
 				// trigger materializes one row on vehicleIds[0], unchanged). Explicit null on edit clears
 				// a stale config when the reminder drops back to one vehicle / notification.

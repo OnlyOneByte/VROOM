@@ -280,7 +280,11 @@
 
 			<div class="space-y-1.5">
 				<Label for="llm-model">Model</Label>
-				<Input id="llm-model" bind:value={formModel} placeholder={selectedTypeOption.defaultModel} />
+				<Input
+					id="llm-model"
+					bind:value={formModel}
+					placeholder={selectedTypeOption.defaultModel}
+				/>
 			</div>
 
 			{#if selectedTypeOption.needsBaseUrl}

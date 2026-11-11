@@ -1,19 +1,19 @@
 /**
  * `createLoadState<T>()` — the shared primitive behind VROOM's repeated page
- * load triad (arch #2, step 1: extract the scaffold; pages migrate onto it one per
+ * load triad (arch, step 1: extract the scaffold; pages migrate onto it one per
  * later cycle). ~14 `+page.svelte` files hand-repeat the same shape:
  *
- *     let isLoading = $state(true);
- *     let loadError = $state<string | null>(null);
- *     async function load() {
- *       isLoading = true; loadError = null;
- *       try { data = await fetch(); }
- *       catch (e) { toast(e); loadError = e instanceof Error ? e.message : 'fallback'; }
- *       finally { isLoading = false; }
- *     }
+ *  let isLoading = $state(true);
+ *  let loadError = $state<string | null>(null);
+ *  async function load() {
+ *  isLoading = true; loadError = null;
+ *  try { data = await fetch(); }
+ *  catch (e) { toast(e); loadError = e instanceof Error ? e.message : 'fallback'; }
+ *  finally { isLoading = false; }
+ *  }
  *
  * That triad is exactly where the recurring "load failure masquerades as an empty
- * state" bug class hides (dashboard, /reminders, /settings, vehicle-detail C57) — a
+ * state" bug class hides (dashboard, /reminders, /settings, vehicle-detail) — a
  * page that forgets the `loadError` leg silently renders empty on failure. Centralizing
  * it makes the error leg structural, not per-page boilerplate.
  *

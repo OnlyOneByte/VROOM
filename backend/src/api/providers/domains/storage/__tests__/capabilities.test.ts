@@ -44,7 +44,7 @@ describe('isImageMimeType', () => {
 
 describe('PDF-routing decision (the photo-service gate logic)', () => {
   // The gate in photo-service is: skip/refuse when
-  //   !capabilitiesOf(provider).arbitraryFiles && !isImageMimeType(file.type)
+  //  !capabilitiesOf(provider).arbitraryFiles && !isImageMimeType(file.type)
   const shouldRefuse = (p: StorageProvider, mime: string) =>
     !capabilitiesOf(p).arbitraryFiles && !isImageMimeType(mime);
 

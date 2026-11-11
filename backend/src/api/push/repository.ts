@@ -14,7 +14,7 @@ import { BaseRepository } from '../../utils/repository';
 
 /**
  * The subscription store. Every method is userId-SCOPED — the endpoint alone NEVER authorizes a
- * read/write (the IDOR discipline NORTH_STAR #2). A user owns many devices, each one row; an
+ * read/write (the IDOR discipline). A user owns many devices, each one row; an
  * idempotent upsert keys on (userId, endpoint) so a browser re-subscribing updates its row rather
  * than duplicating it. Mirrors the reminder_notifications userId-owned-row shape.
  */

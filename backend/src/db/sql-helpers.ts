@@ -3,9 +3,9 @@
  *
  * Currently implements SQLite syntax. When adding PostgreSQL support,
  * swap implementations based on DB_DIALECT env var:
- *   - extractMonth:    EXTRACT(MONTH FROM col)::integer
- *   - formatYearMonth: to_char(col, 'YYYY-MM')
- *   - toDateTimeString: col::text (PG timestamps are already ISO)
+ *  - extractMonth: EXTRACT(MONTH FROM col)::integer
+ *  - formatYearMonth: to_char(col, 'YYYY-MM')
+ *  - toDateTimeString: col::text (PG timestamps are already ISO)
  *
  * These helpers abstract the only SQLite-specific raw SQL in the codebase,
  * keeping all other queries portable via Drizzle's query builder.

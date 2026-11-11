@@ -28,7 +28,7 @@ export interface BackupStrategy {
 }
 
 /**
- * The honest run-level verdict (#44): `success` = every attempted provider backed up cleanly;
+ * The honest run-level verdict: `success` = every attempted provider backed up cleanly;
  * `partial` = at least one provider succeeded AND at least one failed; `failed` = every attempted
  * provider failed; `noop` = nothing was attempted (no enabled providers / skipped / in-progress).
  * The route maps this to an HTTP status (success/noop → 200, partial → 207, failed → 502) so a

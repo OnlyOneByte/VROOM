@@ -16,6 +16,7 @@
   --chart-7: oklch(0.52 0.18 120);
   --chart-8: oklch(0.55 0.13 0);
   --destructive: oklch(0.52 0.22 25);
+  --destructive-foreground: oklch(0.98 0.01 265);
   --foreground: oklch(0.24 0.05 265);
   --input: oklch(0.88 0.02 265);
   --muted: oklch(0.94 0.02 265);
@@ -53,7 +54,8 @@
   --chart-6: oklch(0.7 0.15 85);
   --chart-7: oklch(0.72 0.16 120);
   --chart-8: oklch(0.78 0.13 0);
-  --destructive: oklch(0.62 0.22 20);
+  --destructive: oklch(0.72 0.22 20);
+  --destructive-foreground: oklch(0.18 0.04 265);
   --foreground: oklch(0.92 0.02 265);
   --input: oklch(0.32 0.04 265);
   --muted: oklch(0.28 0.035 265);
@@ -92,6 +94,7 @@
   --chart-7: oklch(0.55 0.18 120);
   --chart-8: oklch(0.52 0.15 330);
   --destructive: oklch(0.52 0.22 27);
+  --destructive-foreground: oklch(0.97 0.005 265);
   --foreground: oklch(0.22 0.02 265);
   --input: oklch(0.88 0.01 265);
   --muted: oklch(0.94 0.01 265);
@@ -129,7 +132,8 @@
   --chart-6: oklch(0.7 0.15 86);
   --chart-7: oklch(0.75 0.13 120);
   --chart-8: oklch(0.78 0.16 330);
-  --destructive: oklch(0.62 0.21 25);
+  --destructive: oklch(0.72 0.21 25);
+  --destructive-foreground: oklch(0.17 0.012 265);
   --foreground: oklch(0.95 0.01 265);
   --input: oklch(0.3 0.016 265);
   --muted: oklch(0.27 0.015 265);
@@ -168,6 +172,7 @@
   --chart-7: oklch(0.55 0.12 20);
   --chart-8: oklch(0.52 0.15 340);
   --destructive: oklch(0.52 0.22 27);
+  --destructive-foreground: oklch(0.98 0.01 230);
   --foreground: oklch(0.25 0.05 245);
   --input: oklch(0.85 0.03 235);
   --muted: oklch(0.94 0.02 235);
@@ -205,7 +210,8 @@
   --chart-6: oklch(0.7 0.13 50);
   --chart-7: oklch(0.7 0.12 10);
   --chart-8: oklch(0.78 0.16 330);
-  --destructive: oklch(0.62 0.21 25);
+  --destructive: oklch(0.72 0.21 25);
+  --destructive-foreground: oklch(0.22 0.04 245);
   --foreground: oklch(0.93 0.03 230);
   --input: oklch(0.4 0.05 240);
   --muted: oklch(0.3 0.035 245);
@@ -244,6 +250,7 @@
   --chart-7: oklch(0.55 0.22 170);
   --chart-8: oklch(0.6 0.15 260);
   --destructive: oklch(0.52 0.22 25);
+  --destructive-foreground: oklch(0.97 0.01 220);
   --foreground: oklch(0.2 0.03 240);
   --input: oklch(0.87 0.02 225);
   --muted: oklch(0.93 0.02 220);
@@ -281,7 +288,8 @@
   --chart-6: oklch(0.8 0.16 25);
   --chart-7: oklch(0.65 0.24 170);
   --chart-8: oklch(0.82 0.16 260);
-  --destructive: oklch(0.62 0.23 18);
+  --destructive: oklch(0.72 0.23 18);
+  --destructive-foreground: oklch(0.16 0.02 240);
   --foreground: oklch(0.9 0.03 220);
   --input: oklch(0.3 0.035 238);
   --muted: oklch(0.26 0.025 240);
@@ -320,6 +328,7 @@
   --chart-7: oklch(0.5 0.08 240);
   --chart-8: oklch(0.5 0.1 320);
   --destructive: oklch(0.5 0.2 27);
+  --destructive-foreground: oklch(0.97 0.012 85);
   --foreground: oklch(0.22 0.005 60);
   --input: oklch(0.87 0.014 80);
   --muted: oklch(0.92 0.014 85);
@@ -357,7 +366,8 @@
   --chart-6: oklch(0.68 0.18 207);
   --chart-7: oklch(0.72 0.08 240);
   --chart-8: oklch(0.7 0.12 320);
-  --destructive: oklch(0.62 0.21 27);
+  --destructive: oklch(0.72 0.21 27);
+  --destructive-foreground: oklch(0.21 0.008 60);
   --foreground: oklch(0.93 0.012 85);
   --input: oklch(0.33 0.01 60);
   --muted: oklch(0.29 0.009 60);
@@ -396,6 +406,7 @@
   --chart-7: oklch(0.55 0.2 205);
   --chart-8: oklch(0.55 0.16 325);
   --destructive: oklch(0.52 0.22 27);
+  --destructive-foreground: oklch(0.97 0.01 95);
   --foreground: oklch(0.18 0.02 270);
   --input: oklch(0.18 0.02 270);
   --muted: oklch(0.93 0.02 95);
@@ -433,7 +444,8 @@
   --chart-6: oklch(0.7 0.18 84);
   --chart-7: oklch(0.7 0.2 205);
   --chart-8: oklch(0.78 0.16 325);
-  --destructive: oklch(0.62 0.23 18);
+  --destructive: oklch(0.72 0.23 18);
+  --destructive-foreground: oklch(0.16 0.01 270);
   --foreground: oklch(0.97 0.01 95);
   --input: oklch(0.4 0.02 270);
   --muted: oklch(0.26 0.015 270);
@@ -472,6 +484,7 @@
   --chart-7: oklch(0.55 0.11 250);
   --chart-8: oklch(0.5 0.1 350);
   --destructive: oklch(0.52 0.2 28);
+  --destructive-foreground: oklch(0.95 0.02 95);
   --foreground: oklch(0.3 0.03 75);
   --input: oklch(0.86 0.03 90);
   --muted: oklch(0.9 0.03 95);
@@ -509,7 +522,8 @@
   --chart-6: oklch(0.7 0.14 315);
   --chart-7: oklch(0.72 0.13 250);
   --chart-8: oklch(0.7 0.11 350);
-  --destructive: oklch(0.62 0.21 28);
+  --destructive: oklch(0.72 0.21 28);
+  --destructive-foreground: oklch(0.22 0.02 75);
   --foreground: oklch(0.92 0.03 90);
   --input: oklch(0.34 0.03 75);
   --muted: oklch(0.3 0.025 75);
@@ -548,6 +562,7 @@
   --chart-7: oklch(0.5 0.12 345);
   --chart-8: oklch(0.5 0.13 60);
   --destructive: oklch(0.52 0.22 25);
+  --destructive-foreground: oklch(0.96 0.01 95);
   --foreground: oklch(0.24 0.02 90);
   --input: oklch(0.86 0.015 95);
   --muted: oklch(0.92 0.02 95);
@@ -585,7 +600,8 @@
   --chart-6: oklch(0.8 0.12 265);
   --chart-7: oklch(0.72 0.13 345);
   --chart-8: oklch(0.68 0.13 60);
-  --destructive: oklch(0.62 0.21 25);
+  --destructive: oklch(0.72 0.21 25);
+  --destructive-foreground: oklch(0.16 0.004 90);
   --foreground: oklch(0.9 0.02 95);
   --input: oklch(0.3 0.006 90);
   --muted: oklch(0.25 0.005 90);
@@ -624,6 +640,7 @@
   --chart-7: oklch(0.55 0.15 40);
   --chart-8: oklch(0.6 0.15 270);
   --destructive: oklch(0.52 0.22 25);
+  --destructive-foreground: oklch(0.97 0.02 320);
   --foreground: oklch(0.28 0.12 320);
   --input: oklch(0.88 0.04 320);
   --muted: oklch(0.93 0.04 320);
@@ -661,7 +678,8 @@
   --chart-6: oklch(0.68 0.24 170);
   --chart-7: oklch(0.78 0.16 20);
   --chart-8: oklch(0.85 0.15 270);
-  --destructive: oklch(0.62 0.23 18);
+  --destructive: oklch(0.72 0.23 18);
+  --destructive-foreground: oklch(0.22 0.11 310);
   --foreground: oklch(0.95 0.04 320);
   --input: oklch(0.4 0.13 320);
   --muted: oklch(0.3 0.1 305);
@@ -700,6 +718,7 @@
   --chart-7: oklch(0.55 0.16 25);
   --chart-8: oklch(0.55 0.16 315);
   --destructive: oklch(0.52 0.22 25);
+  --destructive-foreground: oklch(0.98 0.015 220);
   --foreground: oklch(0.25 0.06 285);
   --input: oklch(0.86 0.035 240);
   --muted: oklch(0.93 0.03 250);
@@ -737,7 +756,8 @@
   --chart-6: oklch(0.72 0.2 170);
   --chart-7: oklch(0.8 0.15 20);
   --chart-8: oklch(0.8 0.18 315);
-  --destructive: oklch(0.62 0.23 18);
+  --destructive: oklch(0.72 0.23 18);
+  --destructive-foreground: oklch(0.17 0.03 275);
   --foreground: oklch(0.94 0.025 220);
   --input: oklch(0.31 0.04 270);
   --muted: oklch(0.26 0.035 275);

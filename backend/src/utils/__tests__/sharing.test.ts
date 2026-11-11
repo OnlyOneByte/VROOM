@@ -4,9 +4,9 @@
  * Drives the REAL resolveVehicleAccess / requireVehicleRead / requireVehicleWrite against a migrated
  * throwaway DB seeded with an owner, an invitee, a third party, and shares at every status/level.
  * This is the ONE seam every shared route routes through, so its matrix is the load-bearing
- * cross-tenant proof (NORTH_STAR #2): owner→full, accepted-viewer→read-only, accepted-editor→
+ * cross-tenant proof: owner→full, accepted-viewer→read-only, accepted-editor→
  * read+write, pending/declined/revoked→NONE, non-share third party→404, nonexistent vehicle→404.
- * 404 (NotFoundError) — never 403 — is asserted on every denial (the #80 enumeration-oracle rule).
+ * 404 (NotFoundError) — never 403 — is asserted on every denial (the enumeration-oracle rule).
  */
 
 import { Database } from 'bun:sqlite';

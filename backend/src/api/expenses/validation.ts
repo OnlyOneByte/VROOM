@@ -3,12 +3,12 @@ import { CONFIG } from '../../config';
 import { dollarsToCents } from '../../utils/money';
 
 // ---------------------------------------------------------------------------
-// Tag element — ONE source of truth (C408). A tag may not contain ';' or ',' because the CSV export
+// Tag element — ONE source of truth. A tag may not contain ';' or ',' because the CSV export
 // joins tags with '; ' and the importer splits on /[;,]/, so a separator-bearing tag round-trips into
-// MULTIPLE tags (silent data loss, #104/C352). Enforced at EVERY tag write boundary: the regular
+// MULTIPLE tags (silent data loss). Enforced at EVERY tag write boundary: the regular
 // create/update schemas (routes.ts imports this) AND the split-create schema below — the split boundary
-// was a bare z.array(z.string()) that bypassed the #104 refine, persisting a `road; trip` tag that
-// split on export→re-import (the C352 fix landed on the regular boundaries but missed this one).
+// was a bare z.array(z.string()) that bypassed the refine, persisting a `road; trip` tag that
+// split on export→re-import (the fix landed on the regular boundaries but missed this one).
 // ---------------------------------------------------------------------------
 export const tagElementSchema = z
   .string()
@@ -22,7 +22,7 @@ export const tagElementSchema = z
   });
 
 // A positive DOLLAR money amount → integer CENTS (money-cents-migration T5). Was a quantize-to-whole-cents
-// transform (Math.round(n*100)/100, #141/C458) ensuring groupTotal == Σsiblings; under the cents schema the
+// transform (Math.round(n*100)/100) ensuring groupTotal == Σsiblings; under the cents schema the
 // storage unit IS the integer cent, so the transform is now `dollarsToCents` (Math.round(n*100)). The "legs
 // sum to groupTotal" invariant still holds — split-service now computes legs in native cents from this SAME
 // cent value (largest-remainder / exact-remainder), so Σlegs == groupTotal EXACTLY. The UI sends 2-decimal
@@ -152,14 +152,14 @@ export const createSplitExpenseSchema = z
     tags: z.array(tagElementSchema).max(CONFIG.validation.expense.maxTags).optional(),
     date: z.coerce.date(),
     description: z.string().optional(),
-    totalAmount: centsAmount, // quantized to whole cents so groupTotal == Σsiblings (#141)
+    totalAmount: centsAmount, // quantized to whole cents so groupTotal == Σsiblings
     // Manual split create accepts ONLY 'financing' as a source link (mirrors the regular create at
     // routes.ts:84) — and the /split POST handler fully validates it (assertFinancingSourceValid per
     // vehicle). 'insurance_term' + 'reminder' splits are created EXCLUSIVELY by system paths that
     // bypass this route (insurance hooks via createSplitExpense; the reminder trigger via a direct
     // tx.insert), so a bare z.string() here was pure over-permissiveness: a hand-crafted POST could
-    // forge an UNVALIDATED insurance_term/reminder link on the caller's own siblings (#145 — the #62
-    // within-tenant integrity class on the split path #125/C422 missed: skews source-bucketed
+    // forge an UNVALIDATED insurance_term/reminder link on the caller's own siblings (— the
+    // within-tenant integrity class on the split path missed: skews source-bucketed
     // analytics, and a real matching sourceId would cascade-delete the manual split when its parent
     // insurance term is removed). Restricting to 'financing' closes that with zero system-path impact.
     sourceType: z.literal('financing').optional(),
@@ -180,6 +180,6 @@ export const createSplitExpenseSchema = z
 export const updateSplitSchema = z
   .object({
     splitConfig: splitConfigSchema,
-    totalAmount: centsAmount.optional(), // quantized to whole cents (#141)
+    totalAmount: centsAmount.optional(), // quantized to whole cents
   })
   .superRefine(refineSplitConfig);

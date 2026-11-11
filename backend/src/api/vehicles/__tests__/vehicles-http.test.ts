@@ -78,10 +78,10 @@ describe('vehicle update HTTP route — clear-optional-field semantics', () => {
   });
 });
 
-describe('vehicle license-plate uniqueness is per-user, not global (C233 tenant-scope)', () => {
+describe('vehicle license-plate uniqueness is per-user, not global (tenant-scope)', () => {
   // Raw-seed a DIFFERENT user who already owns a vehicle with plate SHARED-9. The plate-uniqueness
   // check that backs create/update must be scoped to the requesting user — a global lookup wrongly
-  // 409'd this user AND leaked plate existence across tenants (the C168/#52 class). Two users may
+  // 409'd this user AND leaked plate existence across tenants. Two users may
   // legitimately share a plate string (reissued plates, sold-then-rebought cars).
   function seedForeignVehicleWithPlate(plate: string): void {
     ctx.sqlite.run(
@@ -130,7 +130,7 @@ describe('vehicle license-plate uniqueness is per-user, not global (C233 tenant-
     expect(body.data.licensePlate).toBe('SHARED-9');
   });
 
-  // C289: the assertLicensePlateAvailable dedup centralized the excludeId self-exclusion — pin both
+  // The assertLicensePlateAvailable dedup centralized the excludeId self-exclusion — pin both
   // of its branches so the helper can't over- or under-exclude.
   test('UPDATE re-saving a vehicle WITHOUT changing its plate does not 409 against itself', async () => {
     const id = await seedFullVehicle(); // owns 'ABC-123'

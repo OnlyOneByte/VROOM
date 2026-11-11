@@ -1,14 +1,14 @@
 /**
- * Drift guard for MONEY_CENTS_FIELDS (money-cents-migration data-safety, C20 deep-review).
+ * Drift guard for MONEY_CENTS_FIELDS (money-cents-migration data-safety, deep-review).
  *
  * MONEY_CENTS_FIELDS is the allowlist the pre-cents restore shim (coerceRow shimMoneyToCents) ×100s when
  * importing an old (< 2.0.0) dollar backup. It is matched against coerceRow's `columnName`, which is the
  * drizzle FIELD name (camelCase) from getTableColumns — NOT the snake_case DB column. Two silent-corruption
- * risks this guard pins (both NORTH_STAR #1):
- *   1. A money field MISSING from the set → an old backup's dollars are NOT ×100'd → stored 100× low ($0.12
- *      for $12.34). So the set must list EVERY money field name.
- *   2. A name in the set that is NOT actually an integer column on some table → the shim never matches it
- *      (dead entry) OR (worse) it matches a wrong column. So every entry must be a real integer field.
+ * risks this guard pins:
+ *  1. A money field MISSING from the set → an old backup's dollars are NOT ×100'd → stored 100× low ($0.12
+ *  for $12.34). So the set must list EVERY money field name.
+ *  2. A name in the set that is NOT actually an integer column on some table → the shim never matches it
+ *  (dead entry) OR (worse) it matches a wrong column. So every entry must be a real integer field.
  * It also confirms the known NON-money reals (apr %, volume gal/kWh, businessMileageRate $/mile rate) are
  * NOT in the set (they must never be ×100'd).
  *
@@ -82,7 +82,7 @@ describe('MONEY_CENTS_FIELDS drift guard (restore-shim allowlist)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// coerceRow shim contract (C20 regression: the Google-Sheets restore corruption).
+// coerceRow shim contract (regression: the Google-Sheets restore corruption).
 // The Sheets restore path reads a LIVE sheet that is always CURRENT (cents) format and must coerce WITHOUT
 // the shim. The pre-cents ZIP path reads a versioned 1.0.0 dollar backup and must coerce WITH the shim.
 // The bug was restoreFromSheets always-shimming a cents sheet → 100× OVER-value. These pin BOTH directions
@@ -91,7 +91,7 @@ describe('MONEY_CENTS_FIELDS drift guard (restore-shim allowlist)', () => {
 describe('coerceRow money shim contract (Sheets no-shim vs ZIP pre-cents shim)', () => {
   test('NO shim: a cents money string is preserved EXACTLY (the live-Sheets / 2.0.0-ZIP path)', () => {
     // A current sheet/backup stores integer cents (4550 = $45.50). Without the shim it must round-trip 4550,
-    // NOT 455000 — the exact C20 over-value bug if the shim wrongly fired.
+    // NOT 455000 — the exact over-value bug if the shim wrongly fired.
     const row = {
       id: 'e1',
       vehicleId: 'v1',

@@ -7,7 +7,7 @@
  * and the user confirms through the UNCHANGED POST /expenses path (design §4, R2/R4). The image is
  * persisted only on confirm, via the existing expense_receipts photo flow (R5) — not here.
  *
- * Error honesty (the #43/#44/#144 anti-fail-open lesson): no configured provider → 400 with an
+ * Error honesty (the anti-fail-open lesson): no configured provider → 400 with an
  * actionable message; a provider transport/HTTP failure → 502 (never a faked success); an oversized
  * or wrong-type image → 400/413. A partial/empty draft is a 200 — the user fills the rest by hand.
  *

@@ -14,12 +14,12 @@ import { ApiError } from '$lib/utils/error-handling';
 
 /**
  * The user-facing state of push on THIS browser. Drives the settings card's status line + toggle:
- *   unsupported  — the browser lacks the Push API / service worker / Notification API
- *   unconfigured — this server has no VAPID keypair (the 503 degrade); nothing to subscribe to
- *   denied       — the user blocked notifications at the OS/browser level (must un-block manually)
- *   subscribed   — an active subscription exists and is persisted server-side (push is ON)
- *   off          — supported + configured + not blocked, but not subscribed (push is OFF, can enable)
- *   error        — a status check or toggle failed (retry)
+ *  unsupported — the browser lacks the Push API / service worker / Notification API
+ *  unconfigured — this server has no VAPID keypair (the 503 degrade); nothing to subscribe to
+ *  denied — the user blocked notifications at the OS/browser level (must un-block manually)
+ *  subscribed — an active subscription exists and is persisted server-side (push is ON)
+ *  off — supported + configured + not blocked, but not subscribed (push is OFF, can enable)
+ *  error — a status check or toggle failed (retry)
  */
 export type PushStatus = 'unsupported' | 'unconfigured' | 'denied' | 'subscribed' | 'off' | 'error';
 

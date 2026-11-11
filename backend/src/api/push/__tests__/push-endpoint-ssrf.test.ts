@@ -1,14 +1,14 @@
 /**
- * SSRF guard for the push endpoint (push-notifications, C560 hardening).
+ * SSRF guard for the push endpoint (push-notifications, hardening).
  *
  * The subscribe endpoint is a URL the server later POSTs to (via web-push). An authenticated user can
  * hand-craft the JSON body, so without an allowlist they could register an internal/metadata/localhost
  * URL and turn the send hook into a request proxy (blind SSRF, ARCC SSRF-mitigation). This pins:
- *   (A) isAllowedPushEndpoint accepts ONLY https URLs on a known browser-vendor push host, and rejects
- *       every SSRF vector (metadata IP, loopback, private IP, alternate IP encodings, http, other
- *       schemes, userinfo-bypass, look-alike domains, malformed).
- *   (B) POST /api/v1/push/subscribe REJECTS a rogue endpoint (400) + stores nothing, while accepting a
- *       real vendor endpoint (201) — validation at the earliest point (SAX-04).
+ *  (A) isAllowedPushEndpoint accepts ONLY https URLs on a known browser-vendor push host, and rejects
+ *  every SSRF vector (metadata IP, loopback, private IP, alternate IP encodings, http, other
+ *  schemes, userinfo-bypass, look-alike domains, malformed).
+ *  (B) POST /api/v1/push/subscribe REJECTS a rogue endpoint (400) + stores nothing, while accepting a
+ *  real vendor endpoint (201) — validation at the earliest point (SAX-04).
  */
 
 import { describe, expect, test } from 'bun:test';

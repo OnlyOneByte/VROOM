@@ -1,9 +1,9 @@
 /**
- * Characterization tests for getInsurance / buildInsuranceDetails (C73 deep-review). This
- * insurance-analytics path had ZERO test coverage, yet it carries the cost-shape logic (bug #8,
- * effectiveMonthlyPremium) AND the open #14 question (an expired latest term still counts as the
- * current premium). The C73 audit read it against source; this pins the CURRENT behavior so a
- * future #14 decision (filter to endDate >= now, or keep) is a safe, deliberate change against a
+ * Characterization tests for getInsurance / buildInsuranceDetails. This
+ * insurance-analytics path had ZERO test coverage, yet it carries the cost-shape logic (bug,
+ * effectiveMonthlyPremium) AND the open question (an expired latest term still counts as the
+ * current premium). The audit read it against source; this pins the CURRENT behavior so a
+ * future decision (filter to endDate >= now, or keep) is a safe, deliberate change against a
  * net — and documents exactly what that behavior is.
  *
  * Goes through the public getInsurance(userId) over a real in-memory DB (buildInsuranceDetails is
@@ -70,7 +70,7 @@ function term(opts: {
 
 const now = Date.UTC(2024, 5, 15); // fixed reference for the relative term windows below
 
-describe('getInsurance — cost-shape handling (bug #8 path)', () => {
+describe('getInsurance — cost-shape handling (bug path)', () => {
   test('an explicit monthlyCost flows straight into the monthly + annual totals', async () => {
     policy('p1', 'GEICO');
     term({
@@ -89,7 +89,7 @@ describe('getInsurance — cost-shape handling (bug #8 path)', () => {
   });
 
   test('a lump-sum totalCost (no monthlyCost) is amortized across the term span, not zeroed', async () => {
-    // The bug #8 class: `monthlyCost ?? 0` once zeroed every totalCost-only term.
+    // The bug class: `monthlyCost ?? 0` once zeroed every totalCost-only term.
     policy('p1', 'GEICO');
     // A ~12-month term with totalCost 1200 → ~100/mo.
     term({
@@ -129,7 +129,7 @@ describe('getInsurance — latest-term selection', () => {
     expect(result.summary.totalMonthlyPremiums).toBeCloseTo(120, 2); // the newer term's premium
   });
 
-  test('equal-endDate terms break the tie by the later startDate (deterministic, #50)', async () => {
+  test('equal-endDate terms break the tie by the later startDate (deterministic)', async () => {
     // Two terms share an endDate (e.g. a mid-term correction); the later-STARTING one is the current
     // coverage and must win regardless of DB row order.
     policy('p1', 'GEICO');
@@ -171,7 +171,7 @@ describe('getInsurance — latest-term selection', () => {
   });
 });
 
-describe('getInsurance — #25: per-vehicle attribution scopes to the LATEST term, not all terms', () => {
+describe('getInsurance — per-vehicle attribution scopes to the LATEST term, not all terms', () => {
   // The premium is the LATEST term's (line ~924); coveredVehicleIds MUST be that same term's
   // junctions. Pre-fix it spanned EVERY term's junctions, so a policy whose coverage shrank across
   // terms mis-distributed: the latest premium got divided by the (larger) all-terms vehicle count,
@@ -253,10 +253,10 @@ describe('getInsurance — #25: per-vehicle attribution scopes to the LATEST ter
   });
 });
 
-describe('getInsurance — #14 OPEN QUESTION: an expired latest term still counts (pending Angelo)', () => {
+describe('getInsurance — OPEN QUESTION: an expired latest term still counts (pending a product decision)', () => {
   // This pins the CURRENT behavior, NOT an endorsement of it. buildInsuranceDetails picks the
   // latest term by endDate but does NOT check endDate >= now, so an ACTIVE policy whose latest
-  // term lapsed months ago still contributes its stale premium. If/when #14 is decided to filter
+  // term lapsed months ago still contributes its stale premium. If/when is decided to filter
   // expired terms, this test is the one to flip (and it documents exactly what changes).
   test('an active policy whose only term already EXPIRED still adds its premium to the total', async () => {
     policy('p1', 'GEICO');
@@ -271,13 +271,13 @@ describe('getInsurance — #14 OPEN QUESTION: an expired latest term still count
     seedInsuranceTermVehicle(testDb.sqlite, { termId: 'lapsed', vehicleId: 'veh-1' });
 
     const result = await repo.getInsurance(USER);
-    // CURRENT behavior (the #14 question): the expired term's premium is still counted.
+    // CURRENT behavior (the question): the expired term's premium is still counted.
     expect(result.summary.totalMonthlyPremiums).toBeCloseTo(90, 2);
     expect(result.summary.activePoliciesCount).toBe(1);
   });
 });
 
-describe('getInsurance — #51: term-less active policies excluded from activePoliciesCount', () => {
+describe('getInsurance — term-less active policies excluded from activePoliciesCount', () => {
   // A term-less active policy contributes $0 to the premium totals (buildInsuranceDetails skips it via
   // `if (!latestTerm) continue`). Pre-fix activePoliciesCount counted it anyway → "2 active policies"
   // beside premiums summed over only 1, an internal inconsistency. The count now uses the SAME
@@ -335,13 +335,13 @@ describe('getInsurance — empty / no-data', () => {
   });
 });
 
-// C46 deep-review: the `monthlyPremiumTrend` series (the per-month premium chart the analytics tab
+// deep-review: the `monthlyPremiumTrend` series (the per-month premium chart the analytics tab
 // renders) was driven ONLY transitively through getInsurance — every prior test asserts the totals /
-// per-vehicle split / count / contract, but NONE pins the month-by-month bucketing. That's the C6/C18
+// per-vehicle split / count / contract, but NONE pins the month-by-month bucketing. That's the C6/
 // "helper output never asserted" gap on a money-facing series: a regression in accumulateMonthlyPremiums
 // (e.g. adding the premium ONCE instead of per-month, or an off-by-one on the span) would distort the
 // trend chart and pass every existing test. These certify the bucketing firsthand. Day-1-anchored,
-// inclusive of both endpoint months (monthKeysInRange, the #14/cycle-14 contract effectiveMonthlyPremium
+// inclusive of both endpoint months (monthKeysInRange, the contract effectiveMonthlyPremium
 // amortizes over) — uses UTC month boundaries so the keys are timezone-stable.
 //
 // HARNESS NOTE (firsthand audit finding): insurance_terms.start_date/end_date are Drizzle `mode:
@@ -373,7 +373,7 @@ function termSeconds(opts: {
   );
 }
 
-describe('getInsurance — monthlyPremiumTrend bucketing (C46 deep-review)', () => {
+describe('getInsurance — monthlyPremiumTrend bucketing', () => {
   test('a term contributes its monthly premium to EACH month it spans (inclusive both ends)', async () => {
     policy('p1', 'GEICO');
     // Jan 1 → Mar 31 2024 inclusive = exactly 3 month-keys, each carrying the full $100 monthly premium.
@@ -450,8 +450,8 @@ describe('getInsurance — monthlyPremiumTrend bucketing (C46 deep-review)', () 
   });
 });
 
-// FE↔BE contract-drift guard for the GET /analytics/insurance response (loop-improvement #2;
-// C55 /stats, C62 /vehicles list, C68 single-financing — this locks the hand-assembled
+// FE↔BE contract-drift guard for the GET /analytics/insurance response (loop-improvement;
+// /stats, /vehicles list, single-financing — this locks the hand-assembled
 // InsuranceData). getInsurance hand-builds a nested summary + 3 derived arrays with NO type
 // binding to the frontend InsuranceResponse (types/analytics.ts:180); a dropped/renamed key
 // silently breaks the analytics tab. Exact-key equality, shape-stable across empty + populated.

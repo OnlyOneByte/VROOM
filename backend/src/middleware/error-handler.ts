@@ -46,9 +46,8 @@ export const errorHandler: ErrorHandler = (err, c) => {
 
   // Handle sync/provider errors. SyncError extends Error (not AppError), so without this branch it
   // would fall through to the generic 500 path below, losing its code→status mapping (a
-  // VALIDATION_ERROR would 500 instead of 400). syncErrorResponse is the SAME shaping the local
-  // handleSyncError uses, so a SyncError yields an identical envelope whether caught in a route
-  // catch block or here — letting route handlers safely drop their hand-rolled try/catch.
+  // VALIDATION_ERROR would 500 instead of 400). This is the only path that shapes a SyncError:
+  // routes throw them and hand-roll no catch block of their own.
   if (isSyncError(err)) {
     const { body, status } = syncErrorResponse(err);
     return c.json(body, status as 400 | 401 | 403 | 409 | 429 | 500 | 503);

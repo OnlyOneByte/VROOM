@@ -1,5 +1,5 @@
 /**
- * Push endpoint validation — an SSRF guard (push-notifications, C560 hardening).
+ * Push endpoint validation — an SSRF guard (push-notifications, hardening).
  *
  * A Web Push subscription carries an `endpoint` URL that the server later POSTs to (via web-push). That
  * URL is user-supplied JSON — a hand-crafted `POST /push/subscribe` is not something only a real browser
@@ -21,10 +21,10 @@
  * The registrable push-service domains. A host passes if it EQUALS one of these or is a dot-suffixed
  * subdomain of one (`endsWith('.' + domain)`) — the `$`-anchored-suffix discipline from the ARCC guide,
  * so `fcm.googleapis.com.evil.com` does NOT match `fcm.googleapis.com`.
- *   - fcm.googleapis.com            — Chrome / Chromium / Edge (FCM)
- *   - push.services.mozilla.com     — Firefox (updates.push.services.mozilla.com + autopush subdomains)
- *   - push.apple.com                — Safari / iOS 16.4+ (web.push.apple.com)
- *   - notify.windows.com            — Edge / WNS (*.notify.windows.com)
+ *  - fcm.googleapis.com — Chrome / Chromium / Edge (FCM)
+ *  - push.services.mozilla.com — Firefox (updates.push.services.mozilla.com + autopush subdomains)
+ *  - push.apple.com — Safari / iOS 16.4+ (web.push.apple.com)
+ *  - notify.windows.com — Edge / WNS (*.notify.windows.com)
  * Extend this list (not the validation logic) if a new browser-vendor push host appears.
  */
 export const ALLOWED_PUSH_HOSTS = [

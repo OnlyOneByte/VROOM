@@ -41,7 +41,7 @@ function stripComments(source: string): string {
 	const withoutBlocks = source.replace(/\/\*[\s\S]*?\*\//g, ' ');
 	return withoutBlocks
 		.split('\n')
-		.map((line) => {
+		.map(line => {
 			const trimmed = line.trimStart();
 			// JSDoc continuation line ("* …") left over from a partial strip — drop it.
 			if (trimmed.startsWith('*')) return '';
@@ -66,7 +66,7 @@ function collectSourceFiles(dir: string, acc: string[] = []): string[] {
 	return acc;
 }
 
-describe('no native confirm()/alert() dialogs (use ConfirmDialog — cycle 89/195 class guard)', () => {
+describe('no native confirm()/alert() dialogs (use ConfirmDialog — class guard)', () => {
 	const files = collectSourceFiles(SRC_ROOT);
 
 	test('the scan actually found sources (guard is live, not a no-op)', () => {
@@ -94,7 +94,7 @@ describe('no native confirm()/alert() dialogs (use ConfirmDialog — cycle 89/19
 
 		expect(
 			offenders,
-			`Native confirm()/alert() call(s) found — use the disclosing ConfirmDialog primitive (src/lib/components/common/ConfirmDialog.svelte) instead, so destructive cascades are surfaced (cycle 89/195):\n${offenders.join('\n')}`
+			`Native confirm()/alert() call(s) found — use the disclosing ConfirmDialog primitive (src/lib/components/common/ConfirmDialog.svelte) instead, so destructive cascades are surfaced:\n${offenders.join('\n')}`
 		).toEqual([]);
 	});
 });

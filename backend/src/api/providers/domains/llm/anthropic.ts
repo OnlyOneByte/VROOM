@@ -7,14 +7,14 @@
  * DUMB TRANSPORT (design §3/§4): maps VROOM's ChatMessage[] + ToolDefinition[] into Anthropic's wire
  * format and normalizes the response into `{ text?, toolCalls? }`; it NEVER executes a tool or trusts the
  * args — the orchestrator (T4) validates. A non-2xx / network / timeout failure THROWS (the chat route
- * maps it to 502; never a faked success — the #43/#44/#144 anti-fail-open lesson).
+ * maps it to 502; never a faked success — the anti-fail-open lesson).
  *
  * Wire mapping notes:
  *  - Anthropic takes a top-level `system` string (not a system message), so a `system`-role ChatMessage is
- *    lifted out. `tools[]` are `{ name, description, input_schema }`.
+ *  lifted out. `tools[]` are `{ name, description, input_schema }`.
  *  - A `tool` RESULT goes back as a user message with a `tool_result` content block keyed by tool_use_id.
  *  - The response `content[]` may contain `text` blocks AND `tool_use` blocks; a `tool_use` block →
- *    ChatResult.toolCalls (id + name + JSON.stringify(input)); otherwise the joined text → ChatResult.text.
+ *  ChatResult.toolCalls (id + name + JSON.stringify(input)); otherwise the joined text → ChatResult.text.
  */
 
 import { logger } from '../../../../utils/logger';

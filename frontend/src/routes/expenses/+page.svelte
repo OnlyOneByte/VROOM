@@ -2,7 +2,19 @@
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { routes } from '$lib/routes';
-	import { Calendar, DollarSign, Search, FileText, TrendingUp, X, Car, CircleAlert, Download, Images } from '@lucide/svelte';
+	import {
+		Calendar,
+		DollarSign,
+		Search,
+		FileText,
+		TrendingUp,
+		X,
+		Car,
+		CircleAlert,
+		Download,
+		Upload,
+		Images
+	} from '@lucide/svelte';
 	import { offlineExpenseQueue } from '$lib/stores/offline.svelte';
 	import { removeOfflineExpense } from '$lib/utils/offline-storage';
 	import { settingsStore } from '$lib/stores/settings.svelte';
@@ -28,13 +40,14 @@
 	import ExpenseTagFilter from '$lib/components/expenses/ExpenseTagFilter.svelte';
 	import OfflineExpenseCards from '$lib/components/expenses/OfflineExpenseCards.svelte';
 	import ExpenseOverviewSection from '$lib/components/expenses/ExpenseOverviewSection.svelte';
+	import ImportExpensesDialog from '$lib/components/expenses/ImportExpensesDialog.svelte';
 	import ImportFromPhotosDialog from '$lib/components/expenses/ImportFromPhotosDialog.svelte';
 	import * as Select from '$lib/components/ui/select';
 
 	// Component state
 	let isLoading = $state(true);
 	let loadError = $state<string | null>(null);
-	let expenses = $state<ExpenseWithVehicle[]>([]);
+	let expenses = $state<Expense[]>([]);
 	let vehicles = $state<Vehicle[]>([]);
 	let summary = $state<ExpenseSummary | null>(null);
 
@@ -66,10 +79,10 @@
 	// just the current 20-row slice (the table's local filter only narrowed the page).
 	let categoryFilter = $state<string>('');
 
-	// Partition the offline queue three ways. A PARKED row (needsAttention, #79) is unsynced but must NOT
+	// Partition the offline queue three ways. A PARKED row (needsAttention) is unsynced but must NOT
 	// appear in "Pending Sync" — it's not waiting to sync, it's permanently unsyncable until the user fixes
 	// it. Surface it in its own "Needs attention" section so a malformed entry is visible, not silently
-	// stuck (NORTH_STAR #1 — no silent loss). Mirrors getPendingExpenses/getNeedsAttentionExpenses, but over
+	// stuck (— no silent loss). Mirrors getPendingExpenses/getNeedsAttentionExpenses, but over
 	// the reactive in-memory queue so the lists update live as sync parks/clears rows.
 	let pendingExpenses = $derived(
 		offlineExpenseQueue.current.filter(expense => !expense.synced && !expense.needsAttention)
@@ -144,18 +157,23 @@
 	onMount(loadInitial);
 
 	/**
-	 * Initial page load. Previously these awaits were unguarded, so a failure in
-	 * settings/vehicles/expenses left `isLoading` stuck `true` forever (permanent
-	 * skeleton). Now a failure surfaces a persistent error + Retry, matching the
-	 * insurance/dashboard/analytics routes.
+	 * Initial page load, in ONE latency round. Settings, the vehicle list and the first expense
+	 * page are independent: the vehicle name shown on each row is joined reactively
+	 * (`displayExpenses`), so the rows no longer have to wait for the fleet to arrive.
+	 *
+	 * A failure in any leg must surface a persistent error + Retry rather than leave `isLoading`
+	 * stuck true forever on a permanent skeleton, matching the insurance/dashboard/analytics routes.
 	 */
 	async function loadInitial() {
 		isLoading = true;
 		loadError = null;
 		try {
-			await settingsStore.load();
-			vehicles = await vehicleApi.getVehicles();
-			await fetchPageAndSummary();
+			const [, loadedVehicles] = await Promise.all([
+				settingsStore.load(),
+				vehicleApi.getVehicles(),
+				fetchPageAndSummary()
+			]);
+			vehicles = loadedVehicles;
 		} catch (error) {
 			loadError = error instanceof Error ? error.message : 'Failed to load expenses';
 			handleErrorWithNotification(error, 'Failed to load expenses');
@@ -196,10 +214,7 @@
 				expenseApi.getExpenseSummary(buildSummaryParams())
 			]);
 
-			expenses = pageResult.data.map(expense => ({
-				...expense,
-				vehicle: vehicles.find(v => v.id === expense.vehicleId)
-			}));
+			expenses = pageResult.data;
 			totalCount = pageResult.pagination.totalCount;
 			currentOffset = offset;
 			summary = summaryResult;
@@ -219,10 +234,7 @@
 		isLoadingPage = true;
 		try {
 			const pageResult = await expenseApi.getAllExpenses(buildListParams(offset));
-			expenses = pageResult.data.map(expense => ({
-				...expense,
-				vehicle: vehicles.find(v => v.id === expense.vehicleId)
-			}));
+			expenses = pageResult.data;
 			totalCount = pageResult.pagination.totalCount;
 			currentOffset = offset;
 		} catch (error) {
@@ -300,8 +312,9 @@
 		}
 	}
 
-	// On import success, reload from page 0 so the freshly-imported rows are visible
-	// and counts/summary refresh.
+	// CSV import (dialog previews then commits). On success, reload from page 0 so
+	// the freshly-imported rows are visible and counts/summary refresh.
+	let importOpen = $state(false);
 	let photosImportOpen = $state(false);
 	function handleImported() {
 		currentOffset = 0;
@@ -322,10 +335,17 @@
 		await fetchPageAndSummary(currentOffset);
 	}
 
-	// Search is now applied server-side (description + category) across ALL pages,
-	// so the rows we receive are already filtered — no client-side narrowing needed.
-	// (The previous client-only filter silently missed matches on other pages.)
-	let displayExpenses = $derived(expenses);
+	// Search, category, date range and tags are all applied server-side across ALL pages, so the
+	// rows we receive are already the right ones — no client-side narrowing, which would only ever
+	// see the current 20-row page and silently hide matches on the others.
+	//
+	// The vehicle each row belongs to is joined HERE rather than at fetch time, so the page request
+	// and the vehicle-list request can go out together: a row rendered before the fleet arrives
+	// simply gains its vehicle name when it does, instead of keeping it blank for good.
+	let vehicleById = $derived(new Map(vehicles.map(v => [v.id, v])));
+	let displayExpenses = $derived<ExpenseWithVehicle[]>(
+		expenses.map(expense => ({ ...expense, vehicle: vehicleById.get(expense.vehicleId) }))
+	);
 </script>
 
 <svelte:head>
@@ -367,11 +387,15 @@
 			description="Track and categorize expenses across all vehicles"
 		>
 			{#snippet actions()}
-				<!-- Import from Photos is always available — a user with no expenses yet is exactly
+				<!-- Import is always available — a user with no expenses yet is exactly
 				     who wants to import. Export only makes sense once there's something to export. -->
 				<Button variant="outline" onclick={() => (photosImportOpen = true)}>
 					<Images class="mr-2 h-4 w-4" />
 					Import from Photos
+				</Button>
+				<Button variant="outline" onclick={() => (importOpen = true)}>
+					<Upload class="mr-2 h-4 w-4" />
+					Import CSV
 				</Button>
 				{#if totalCount > 0}
 					<Button variant="outline" onclick={handleExportCsv} disabled={isExporting}>
@@ -407,11 +431,14 @@
 						<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
 							<Search class="h-5 w-5 text-muted-foreground" />
 						</div>
+						<!-- The placeholder is not an accessible name: it disappears as soon as the user
+						     types, leaving a screen reader or voice-control user with an unnamed field. -->
 						<Input
 							type="text"
 							bind:value={searchTerm}
 							placeholder="Search expenses, vehicles..."
 							class="pl-10 w-full"
+							aria-label="Search expenses and vehicles"
 						/>
 					</div>
 					<div class="sm:w-56">
@@ -540,5 +567,7 @@
 		ariaLabel="Add expense"
 	/>
 
+	<!-- CSV import dialog (previews via dryRun, then commits) -->
+	<ImportExpensesDialog bind:open={importOpen} {vehicles} onImported={handleImported} />
 	<ImportFromPhotosDialog bind:open={photosImportOpen} {vehicles} onImported={handleImported} />
 {/if}

@@ -131,7 +131,7 @@ describe('GoogleDriveStrategy', () => {
     expect(mockCreateOrUpdate).toHaveBeenCalledTimes(1);
   });
 
-  test('partial failure — ZIP fails but Sheets succeeds → strategy reports FAILURE (#43)', async () => {
+  test('partial failure — ZIP fails but Sheets succeeds → strategy reports FAILURE', async () => {
     mockUpload.mockImplementation(() => Promise.reject(new Error('Upload network error')));
     const result = await strategy.execute(
       createContext({
@@ -144,7 +144,7 @@ describe('GoogleDriveStrategy', () => {
       })
     );
 
-    // HONEST reporting (#43): one failed capability ⇒ the provider's backup is NOT a success, so the
+    // HONEST reporting: one failed capability ⇒ the provider's backup is NOT a success, so the
     // failed ZIP is retried next run instead of being silently abandoned. (Old behavior: success=true.)
     expect(result.success).toBe(false);
     expect(result.message).toContain('Upload network error');
@@ -153,7 +153,7 @@ describe('GoogleDriveStrategy', () => {
     expect(result.capabilities.sheets?.success).toBe(true); // the OK capability still records success
   });
 
-  test('partial failure — Sheets fails but ZIP succeeds → strategy reports FAILURE (#43)', async () => {
+  test('partial failure — Sheets fails but ZIP succeeds → strategy reports FAILURE', async () => {
     mockCreateOrUpdate.mockImplementation(() => Promise.reject(new Error('Sheets API error')));
     const result = await strategy.execute(
       createContext({

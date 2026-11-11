@@ -319,7 +319,7 @@ describe('updateProfile', () => {
     expect(config.avatarUrl).toBe('https://example.com/avatar');
   });
 
-  // C282: the cross-tenant WRITE defense — updateProfile is scoped on (id, userId) just like delete
+  // The cross-tenant WRITE defense — updateProfile is scoped on (id, userId) just like delete
   // (which has its own "does not delete other users' rows" guard), so updating another user's auth
   // profile with the wrong userId must be a no-op (account-profile tampering defense). Was unpinned —
   // delete had the parallel guard but updateProfile only had the happy path.
@@ -395,7 +395,7 @@ describe('Domain isolation', () => {
 });
 
 // ---------------------------------------------------------------------------
-// buildAuthProviderConfig (C283 dedup — one source for the auth `config` shape)
+// buildAuthProviderConfig (dedup — one source for the auth `config` shape)
 // ---------------------------------------------------------------------------
 
 describe('buildAuthProviderConfig', () => {

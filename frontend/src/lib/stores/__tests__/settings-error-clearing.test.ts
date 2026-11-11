@@ -1,5 +1,5 @@
 /**
- * Regression (C308): the settings store must CLEAR a stale `error` at the start of every async
+ * Regression: the settings store must CLEAR a stale `error` at the start of every async
  * operation, not just load()/update().
  *
  * load() and update() reset `error = null` on entry, but downloadBackup / uploadBackup / executeSync /
@@ -38,7 +38,7 @@ function errJson(status: number, message = 'boom') {
 	};
 }
 
-describe('settings store — error is cleared on the entry of every async op (C308)', () => {
+describe('settings store — error is cleared on the entry of every async op', () => {
 	beforeEach(() => {
 		mockFetch.mockReset();
 		settingsStore.reset();
@@ -50,8 +50,8 @@ describe('settings store — error is cleared on the entry of every async op (C3
 		await settingsStore.load();
 		expect(settingsStore.error, 'a failed load must set the error').toBeTruthy();
 
-		// 2) loadRestoreProviders() SUCCEEDS → it must clear the stale error on entry (the C308 fix;
-		//    pre-fix this method never touched `error`, so the stale "load failed" persisted).
+		// 2) loadRestoreProviders() SUCCEEDS → it must clear the stale error on entry (the fix;
+		//  pre-fix this method never touched `error`, so the stale "load failed" persisted).
 		mockFetch.mockResolvedValueOnce(okJson([{ id: 'p1', displayName: 'Drive', sourceTypes: [] }]));
 		await settingsStore.loadRestoreProviders();
 		expect(settingsStore.error, 'a succeeding op must clear the stale error').toBe(null);

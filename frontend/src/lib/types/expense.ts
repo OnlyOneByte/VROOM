@@ -1,11 +1,6 @@
 // The six expense categories used throughout the app.
 export type ExpenseCategory =
-	| 'fuel'
-	| 'maintenance'
-	| 'financial'
-	| 'regulatory'
-	| 'enhancement'
-	| 'misc';
+	'fuel' | 'maintenance' | 'financial' | 'regulatory' | 'enhancement' | 'misc';
 
 // Common tag suggestions (not enforced)
 export const COMMON_EXPENSE_TAGS = [

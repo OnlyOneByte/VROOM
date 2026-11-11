@@ -1,12 +1,13 @@
-import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { NotFoundError } from '../../errors';
 import { buildPaginatedResponse } from '../../utils/pagination';
-import { commonSchemas } from '../../utils/validation';
+import { commonSchemas, zValidator } from '../../utils/validation';
 import { parseUploadedPhoto, photoThumbnailResponse } from '../photos/helpers';
 import {
   deletePhotoForEntity,
+  getPhotoServeMetadataForEntity,
   getPhotoThumbnailForEntity,
+  ifNoneMatchSatisfies,
   listPhotosForEntity,
   setCoverPhotoForEntity,
   uploadPhotoForEntity,
@@ -42,13 +43,34 @@ photoRoutes.get('/', zValidator('query', commonSchemas.pagination), async (c) =>
   return c.json(buildPaginatedResponse(result.data, result.totalCount, limit, offset));
 });
 
-// GET /:photoId/thumbnail — Proxy thumbnail
+// GET /:photoId/thumbnail — Serve a vehicle photo's bytes.
+//
+// "thumbnail" is historical: this serves the FULL-RESOLUTION original, because nothing in the stack
+// resizes. This is the route the vehicle header avatar, the dashboard carousel and the photo
+// carousel all use, so a conditional GET is what bounds the repeat cost: answer one BEFORE the
+// provider round-trip, since the validator comes from the photo row. Mirrors the generic
+// /photos/:entityType/... handler — keep the two in step.
 photoRoutes.get('/:photoId/thumbnail', async (c) => {
   const vehicleId = c.req.param('vehicleId');
   const photoId = c.req.param('photoId');
   if (!vehicleId || !photoId) throw new NotFoundError('Photo');
 
   const user = c.get('user');
+  const { etag, mimeType: storedMimeType } = await getPhotoServeMetadataForEntity(
+    'vehicle',
+    vehicleId,
+    photoId,
+    user.id
+  );
+
+  if (ifNoneMatchSatisfies(c.req.header('if-none-match'), etag)) {
+    // Reuse the 200's headers so the 304 carries the same validator + caching policy (RFC 9110
+    // §15.4.5 requires both, or the next request can no longer revalidate).
+    const headers = photoThumbnailResponse(Buffer.alloc(0), storedMimeType).headers;
+    headers.set('ETag', etag);
+    return new Response(null, { status: 304, headers });
+  }
+
   const { buffer, mimeType } = await getPhotoThumbnailForEntity(
     'vehicle',
     vehicleId,
@@ -56,7 +78,9 @@ photoRoutes.get('/:photoId/thumbnail', async (c) => {
     user.id
   );
 
-  return photoThumbnailResponse(buffer, mimeType);
+  const response = photoThumbnailResponse(buffer, mimeType);
+  response.headers.set('ETag', etag);
+  return response;
 });
 
 // PUT /:photoId/cover — Set cover photo

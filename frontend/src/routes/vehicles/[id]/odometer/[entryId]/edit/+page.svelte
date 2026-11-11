@@ -240,7 +240,7 @@
 					class="flex-shrink-0"
 				>
 					<Trash2 class="h-4 w-4 sm:mr-2" />
-					<span class="hidden sm:inline">Delete</span>
+					<span class="max-sm:sr-only">Delete</span>
 				</Button>
 				<div class="flex flex-1 gap-3">
 					<Button

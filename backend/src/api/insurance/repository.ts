@@ -95,7 +95,7 @@ export class InsurancePolicyRepository {
 
   /**
    * Validate that all vehicleIds belong to the given userId. Delegates to the shared
-   * assertVehiclesOwned (C376) — ONE source of truth for the cross-tenant ownership query shared with
+   * assertVehiclesOwned — ONE source of truth for the cross-tenant ownership query shared with
    * the expense split path; the insurance term writes run inside a tx, hence the dbOrTx handle.
    */
   private async validateVehicleOwnership(
@@ -107,11 +107,11 @@ export class InsurancePolicyRepository {
   }
 
   /**
-   * Insert junction rows for a term's vehicle coverage — SYNCHRONOUS (#127 class, C504). bun-sqlite is a
+   * Insert junction rows for a term's vehicle coverage — SYNCHRONOUS. bun-sqlite is a
    * sync dialect, so the create/addTerm/updateTerm transactions run their callbacks synchronously for real
-   * atomic rollback — an async callback autocommits each write alone (the C151 footgun), which could leave
+   * atomic rollback — an async callback autocommits each write alone, which could leave
    * a term with partial or zero vehicle coverage (updateTerm wipes coverage then re-inserts). `.run()`
-   * executes inline in tx. (The async sibling was orphaned by the C504 sync conversion + removed C509.)
+   * executes inline in tx. (The async sibling was orphaned by the sync conversion + removed.)
    */
   private insertJunctionRowsSync(
     tx: DrizzleTransaction,
@@ -127,7 +127,7 @@ export class InsurancePolicyRepository {
    * Fetch a policy's terms (newest endDate first) + the term→vehicle junction coverage, and derive the
    * unique vehicleIds. The byte-identical "select terms by policyId ordered by endDate desc → select the
    * junction rows for those termIds → dedupe vehicleIds" block was hand-repeated at FOUR sites
-   * (attachTermsAndCoverage + the create/update-policy, add-term, and update-term transactions, C304
+   * (attachTermsAndCoverage + the create/update-policy, add-term, and update-term transactions,
    * dedup). Takes the active handle (`this.db` OR a transaction `tx`) so the in-tx callers read their own
    * uncommitted writes; pure assembly otherwise. One source of truth for the response's coverage shape so
    * a junction-schema change can't drift across the four. NOTE: callers spread the result alongside their
@@ -184,7 +184,7 @@ export class InsurancePolicyRepository {
       const allVehicleIds = [...new Set(data.terms.flatMap((t) => t.vehicleCoverage.vehicleIds))];
       await this.validateVehicleOwnership(this.db, allVehicleIds, userId);
 
-      // SYNCHRONOUS transaction (#127 class, C504): policy insert THEN per-term inserts + junction rows.
+      // SYNCHRONOUS transaction: policy insert THEN per-term inserts + junction rows.
       // Under the old async callback a throw mid-loop left an orphan policy with partial/zero terms (the
       // junction insert could fail after the policy committed). Running synchronously (.returning().get() /
       // insertJunctionRowsSync inline) keeps every insert in ONE real transaction that rolls back atomically.
@@ -336,7 +336,7 @@ export class InsurancePolicyRepository {
           .where(eq(insurancePolicies.id, id))
           .returning();
 
-        // Fetch terms and coverage for the response (shared assembly, C304)
+        // Fetch terms and coverage for the response (shared assembly)
         const coverage = await this.fetchTermsAndCoverage(tx, id);
 
         return { ...updatedResult[0], ...coverage };
@@ -390,7 +390,7 @@ export class InsurancePolicyRepository {
       // Validate vehicle ownership BEFORE the tx — a pure read precondition (see create()).
       await this.validateVehicleOwnership(this.db, term.vehicleCoverage.vehicleIds, userId);
 
-      // SYNCHRONOUS transaction (#127 class, C504): term insert + junction rows + policy bump must be
+      // SYNCHRONOUS transaction: term insert + junction rows + policy bump must be
       // atomic — under the old async callback a throw on the junction insert left a term persisted with
       // partial/zero coverage. Running synchronously keeps them in ONE real transaction.
       const termId = createId();
@@ -473,9 +473,9 @@ export class InsurancePolicyRepository {
         await this.validateVehicleOwnership(this.db, vehicleCoverage.vehicleIds, userId);
       }
 
-      // SYNCHRONOUS transaction (#127 class, C504): the coverage change DELETEs all junction rows then
+      // SYNCHRONOUS transaction: the coverage change DELETEs all junction rows then
       // re-inserts — under the old async callback a throw on the re-insert left the term with ZERO
-      // coverage (the #114/#110 money-facing class). Running synchronously keeps the term update +
+      // coverage (the money-facing class). Running synchronously keeps the term update +
       // junction replace + policy bump in ONE real transaction that rolls back atomically.
       // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Term update requires field-by-field mapping and junction management
       this.db.transaction((tx) => {
@@ -589,7 +589,10 @@ export class InsurancePolicyRepository {
           throw new NotFoundError('Term');
         }
 
-        // Delete term — junction rows cascade, expenses get SET NULL via FK
+        // Delete term — the junction rows cascade via FK. The materialized premium EXPENSES do
+        // NOT: they link to the term by the plain text (sourceType, sourceId) pair, with no FK, so
+        // nothing here touches them and they would stay summed into TCO insurance cost forever.
+        // The caller MUST deleteBySource('insurance_term', termId) first.
         await tx.delete(insuranceTerms).where(eq(insuranceTerms.id, termId));
 
         // Update policy updatedAt
@@ -646,7 +649,7 @@ export class InsurancePolicyRepository {
   /**
    * Find terms expiring within a date range, for ACTIVE policies only.
    *
-   * The `insurancePolicies.isActive` filter (#26c) excludes terms of CANCELLED policies: this
+   * The `insurancePolicies.isActive` filter excludes terms of CANCELLED policies: this
    * backs GET /expiring-soon (upcoming-renewal nags), and a policy the user has cancelled must
    * not resurface there as "expiring" — they're not renewing it. Mirrors the active-only filter
    * the per-vehicle coverage query already uses below.

@@ -85,7 +85,7 @@ describe('insurance per-vehicle READ widening + blast-radius (T8b)', () => {
     const body = await json<DataEnvelope<PolicyRow[]>>(res);
     expect(res.status).toBe(200);
     expect(body.data.length).toBe(1);
-    const policy = body.data[0]!;
+    const policy = body.data[0];
     // Blast-radius: the invitee sees ONLY vehicleA — never vehicleB (the owner's other vehicle).
     expect(policy.vehicleIds).toEqual([vehicleA]);
     expect(policy.termVehicleCoverage.every((c) => c.vehicleId === vehicleA)).toBe(true);
@@ -112,7 +112,7 @@ describe('insurance per-vehicle READ widening + blast-radius (T8b)', () => {
     );
     expect(body.data.length).toBe(1);
     // Owner is not narrowed — both vehicles present.
-    expect(body.data[0]!.vehicleIds.sort()).toEqual([vehicleA, vehicleB].sort());
+    expect(body.data[0].vehicleIds.sort()).toEqual([vehicleA, vehicleB].sort());
   });
 
   test('a term that covers ONLY the owner other vehicle is dropped from the invitee view', async () => {
@@ -140,7 +140,7 @@ describe('insurance per-vehicle READ widening + blast-radius (T8b)', () => {
       await asB('GET', `/api/v1/insurance/vehicles/${vehicleA}/policies`)
     );
     expect(body.data.length).toBe(1);
-    const policy = body.data[0]!;
+    const policy = body.data[0];
     // Only the vehicleA-covering term survives; the vehicleB-only term is dropped (no leak).
     expect(policy.terms.length).toBe(1);
     expect(policy.vehicleIds).toEqual([vehicleA]);
@@ -228,8 +228,8 @@ describe('insurance claims READ widening + blast-radius (T12b-3c)', () => {
     expect(res.status).toBe(200);
     // Only the shared-vehicle claim is visible — never the vehicleB claim, never the unattributed one.
     expect(body.data.length).toBe(1);
-    expect(body.data[0]!.id).toBe(claimA);
-    expect(body.data[0]!.vehicleId).toBe(vehicleA);
+    expect(body.data[0].id).toBe(claimA);
+    expect(body.data[0].vehicleId).toBe(vehicleA);
   });
 
   test('the OWNER reading the same policy sees ALL claims (no narrowing)', async () => {
@@ -258,7 +258,7 @@ describe('insurance claims READ widening + blast-radius (T12b-3c)', () => {
       await asB('GET', `/api/v1/insurance/${policyId}/claims`)
     );
     expect(body.data.length).toBe(1);
-    expect(body.data[0]!.id).toBe(claimA);
+    expect(body.data[0].id).toBe(claimA);
   });
 
   test('a STRANGER (no share to any covered vehicle) is denied the claims list (existence-hiding 404)', async () => {

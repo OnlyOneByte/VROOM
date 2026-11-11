@@ -79,7 +79,7 @@ export const reminderApi = {
 	 * The route returns RAW repository rows (backend shape: `expenseAmount`, un-split `volume`), so
 	 * map each through `fromBackendExpense` exactly like every other expense read (expense-api.ts) —
 	 * otherwise a consumer reading `expense.amount` gets undefined and an electric charge stays in
-	 * `volume` instead of `charge`. (The FE→BE-seam type-lie NORTH_STAR #3 warns about.)
+	 * `volume` instead of `charge`. (The FE→BE-seam type-lie warns about.)
 	 */
 	async getMaterializedExpenses(id: string): Promise<Expense[]> {
 		const data = await apiClient.get<BackendExpenseResponse[]>(`/api/v1/reminders/${id}/expenses`);

@@ -1,5 +1,5 @@
 /**
- * buildAmortizationSchedule (bug #10, cycle 38).
+ * buildAmortizationSchedule.
  *
  * The old buildLoanBreakdown read each loan's balance into a Map then NEVER decremented it across
  * the 12-month loop — so every month reported identical interest/principal (interest never declined,
@@ -16,7 +16,7 @@ const KEYS = (n: number) =>
   Array.from({ length: n }, (_, i) => `2024-${String(i + 1).padStart(2, '0')}`);
 
 describe('buildAmortizationSchedule', () => {
-  test('interest DECLINES and principal RISES month over month (the bug #10 fix)', () => {
+  test('interest DECLINES and principal RISES month over month (the bug fix)', () => {
     // $20,000 @ 6% APR, $400/mo. Month 1 interest = 20000 * 0.005 = 100; principal = 300.
     const sched = buildAmortizationSchedule(
       [{ balance: 20000, apr: 6, paymentAmount: 400 }],
@@ -86,7 +86,7 @@ describe('buildAmortizationSchedule', () => {
     ]);
   });
 
-  // C281 deep-review: the negative-amortization edge — a payment that doesn't even cover the monthly
+  // deep-review: the negative-amortization edge — a payment that doesn't even cover the monthly
   // interest. principal = Math.max(0, payment − interest) clamps to 0, so the balance NEVER decreases
   // and the loan never pays off in the projection (a genuinely under-water loan — correct behavior,
   // but the prior tests all used payment > interest, leaving this branch unpinned).

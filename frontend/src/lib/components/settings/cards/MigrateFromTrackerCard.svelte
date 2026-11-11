@@ -47,8 +47,8 @@
 	// an earlier request is still in flight would otherwise paint counts for the wrong vehicle.
 	let previewSeq = 0;
 
-	let targetVehicle = $derived(vehicles.find((v) => v.id === targetVehicleId));
-	let errorRows = $derived(preview?.rows.filter((r) => r.status === 'error') ?? []);
+	let targetVehicle = $derived(vehicles.find(v => v.id === targetVehicleId));
+	let errorRows = $derived(preview?.rows.filter(r => r.status === 'error') ?? []);
 	let unmappedCategories = $derived(preview?.unmappedCategories ?? []);
 
 	async function loadVehicles() {
@@ -187,9 +187,9 @@
 		<Dialog.Header>
 			<Dialog.Title>Migrate from another tracker</Dialog.Title>
 			<Dialog.Description>
-				Pick the vehicle to import into, then upload your {TRACKER_LABEL} export file. You'll see a
-				preview before anything is saved. Units are converted to your vehicle's units automatically,
-				and amounts import in your configured currency.
+				Pick the vehicle to import into, then upload your {TRACKER_LABEL} export file. You'll see a preview
+				before anything is saved. Units are converted to your vehicle's units automatically, and amounts
+				import in your configured currency.
 			</Dialog.Description>
 		</Dialog.Header>
 

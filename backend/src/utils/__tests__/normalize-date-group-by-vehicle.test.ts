@@ -1,19 +1,19 @@
 /**
  * Characterization tests for the two FOUNDATIONAL analytics primitives in analytics-charts.ts
- * (C122 deep-review/guard) — `normalizeDate` and `groupByVehicle`, both ZERO-coverage despite every
- * date-bucketing + per-vehicle builder routing through them. The C67 (fuel/date builders), C119
- * (expense-summary) and C120 (maintenance/gas-price) audits certified the LEAVES; these are the ROOTS
+ *  — `normalizeDate` and `groupByVehicle`, both ZERO-coverage despite every
+ * date-bucketing + per-vehicle builder routing through them. The (fuel/date builders),
+ * (expense-summary) and (maintenance/gas-price) audits certified the LEAVES; these are the ROOTS
  * those leaves call. Read against source firsthand and found CORRECT; this locks the conclusion so a
- * future edit can't silently regress it (NORTH_STAR #5).
+ * future edit can't silently regress it.
  *
- *   - normalizeDate  — the SECONDS-vs-MILLISECONDS epoch heuristic (`< 1e12` → ×1000). This is the exact
- *                      boundary where date corruption hides: the DB stores timestamps in SECONDS (the
- *                      recurring mode:'timestamp' footgun the loop re-finds at C46/C34/C209), so a
- *                      drifted threshold would shift every chart's dates by a factor of 1000. NOTHING
- *                      asserted this boundary before. null→null; Date→identity; number routed by 1e12.
- *   - groupByVehicle — the #54 cross-vehicle-pooling guard: groups rows by vehicleId so a date-ordered
- *                      multi-vehicle list never pairs two DIFFERENT cars' consecutive rows. Preserves
- *                      per-vehicle input order; empty→empty map.
+ *  - normalizeDate — the SECONDS-vs-MILLISECONDS epoch heuristic (`< 1e12` → ×1000). This is the exact
+ *  boundary where date corruption hides: the DB stores timestamps in SECONDS (the
+ *  recurring mode:'timestamp' footgun the loop re-finds at), so a
+ *  drifted threshold would shift every chart's dates by a factor of 1000. NOTHING
+ *  asserted this boundary before. null→null; Date→identity; number routed by 1e12.
+ *  - groupByVehicle — the cross-vehicle-pooling guard: groups rows by vehicleId so a date-ordered
+ *  multi-vehicle list never pairs two DIFFERENT cars' consecutive rows. Preserves
+ *  per-vehicle input order; empty→empty map.
  *
  * Pure module → no DB, no server.
  */

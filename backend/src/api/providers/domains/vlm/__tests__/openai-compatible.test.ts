@@ -1,5 +1,5 @@
 /**
- * OpenAiCompatibleVlmProvider adapter (vlm-receipt-parsing T3a, C511). Drives the REAL adapter against
+ * OpenAiCompatibleVlmProvider adapter (vlm-receipt-parsing T3a). Drives the REAL adapter against
  * a stubbed global fetch (no live key/endpoint) and pins the request SHAPE + the failure-honesty rules:
  *  - the request POSTs to {baseUrl}/chat/completions with the FIXED prompt + an image_url data-URL part;
  *  - a Bearer Authorization header is present with a key, ABSENT for keyless self-hosted (Ollama);

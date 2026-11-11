@@ -3,11 +3,11 @@
  * against a stubbed global fetch (no live key/endpoint) and pins the request SHAPE + the dumb-transport
  * normalization + the failure-honesty rules, mirroring the T3a openai-compatible adapter test:
  *  - Anthropic: POST {baseUrl}/v1/messages with x-api-key + anthropic-version (NOT Bearer); a system-role
- *    message lifts to the top-level `system`; tools[] are {name, description, input_schema}; a tool_use
- *    response block → ChatResult.toolCalls; a text block → ChatResult.text.
+ *  message lifts to the top-level `system`; tools[] are {name, description, input_schema}; a tool_use
+ *  response block → ChatResult.toolCalls; a text block → ChatResult.text.
  *  - Gemini: POST {baseUrl}/v1beta/models/{model}:generateContent?key=... (key in the QUERY, not a header);
- *    a system-role message → systemInstruction; tools → [{ functionDeclarations }]; a functionCall part →
- *    ChatResult.toolCalls; a text part → ChatResult.text.
+ *  a system-role message → systemInstruction; tools → [{ functionDeclarations }]; a functionCall part →
+ *  ChatResult.toolCalls; a text part → ChatResult.text.
  *  - both: a non-2xx / network failure THROWS (the chat route maps it to 502 — never a faked answer).
  *
  * Adapters = dumb transport: they map the wire format both ways but NEVER execute a tool or trust args —

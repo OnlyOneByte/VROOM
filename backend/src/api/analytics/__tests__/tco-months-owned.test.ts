@@ -1,8 +1,8 @@
 /**
- * Unit net for monthsOwnedInYear (analytics/repository.ts), the C121/#28 fix: a YEAR-scoped TCO must
+ * Unit net for monthsOwnedInYear (analytics/repository.ts), the fix: a YEAR-scoped TCO must
  * divide its windowed total by the months of THAT year the vehicle was owned (≤12), not by
  * full-ownership months purchaseDate→now. Pure function with an INJECTED `now` (no Date.now()), so the
- * assertions are host-independent — sidesteps the C77 UTC-host vacuity trap.
+ * assertions are host-independent — sidesteps the UTC-host vacuity trap.
  *
  * (The companion behavior — purchasePrice is excluded from a year-scoped total — is asserted at the
  * source level by the includePurchase = !year gate; this unit pins the divisor math that pairs with it.)
@@ -11,7 +11,7 @@
 import { describe, expect, test } from 'bun:test';
 import { calendarYearRange, monthsBetween, monthsOwnedInYear, toDate } from '../repository';
 
-describe('monthsOwnedInYear — year-scoped ownership span (C121 #28)', () => {
+describe('monthsOwnedInYear — year-scoped ownership span', () => {
   test('a vehicle owned for the WHOLE year counts 12 months', () => {
     // Bought before the year, still owned after it → all 12 months.
     expect(monthsOwnedInYear(new Date(2022, 5, 1), new Date(2025, 0, 1), 2024)).toBe(12);
@@ -41,10 +41,10 @@ describe('monthsOwnedInYear — year-scoped ownership span (C121 #28)', () => {
   });
 });
 
-// monthsBetween (C194-era helper): the signed `(year×12 + month-delta)` whole-calendar-months count
+// monthsBetween (-era helper): the signed `(year×12 + month-delta)` whole-calendar-months count
 // behind TWO money-facing denominators — financing months-elapsed (Math.max(0,…)) and the all-time TCO
 // cost-per-month divisor (Math.max(1,…)). Until now it was only IMPORTED + name-checked in a comment
-// (per-vehicle.property.test.ts:574), never directly asserted — the C181/C229 "helper tested only in
+// (per-vehicle.property.test.ts:574), never directly asserted — the "helper tested only in
 // isolation" gap: a divergent reimplementation (a dropped `* 12`, a flipped subtraction) would turn NO
 // test red. These pin the raw contract (the docstring's signed result; callers apply their own clamp),
 // so a regression in the shared divisor can't slip through. Local getMonth/getFullYear, like the helper.
@@ -78,7 +78,7 @@ describe('monthsBetween — signed whole-calendar-months count (money divisor)',
   });
 });
 
-// toDate (C194 dedup): the `x instanceof Date ? x : new Date(x)` normalization the analytics builders
+// toDate: the `x instanceof Date ? x : new Date(x)` normalization the analytics builders
 // hand-repeated at 4 sites (fuel monthly, financing startDate, term start+end), now one helper.
 describe('toDate — normalize a Date-or-raw-timestamp into a Date', () => {
   test('passes an existing Date through by IDENTITY (no reconstruction)', () => {
@@ -97,7 +97,7 @@ describe('toDate — normalize a Date-or-raw-timestamp into a Date', () => {
   });
 });
 
-// calendarYearRange (C216 dedup): the half-open [Jan1, nextJan1) Date pair the year filters
+// calendarYearRange: the half-open [Jan1, nextJan1) Date pair the year filters
 // (queryTotalSpending, year-scoped vehicle-expenses, getYearEnd) hand-repeated at 3 sites.
 describe('calendarYearRange — half-open [Jan 1, next Jan 1) local boundaries', () => {
   test('start is Jan 1 of the year (local midnight), end is Jan 1 of the next year', () => {

@@ -1,13 +1,13 @@
 /**
- * #62/#109/#125/#145 (C172 guard) — the within-tenant financing-source-link integrity class is closed
+ * The within-tenant financing-source-link integrity class is closed
  * across ALL FOUR expense-write paths (POST /, PUT /:id, POST /split, PUT /split/:id) by
  * `assertFinancingSourceValid` / `assertSplitFinancingSourceValid`. A forged/mismatched
  * `{sourceType:'financing', sourceId}` link is the exact predicate FinancingRepository.computeBalance
  * sums, so an unvalidated one mis-attributes a row as a loan payment → understates the displayed balance
- * (NORTH_STAR #1 money figure) + mis-wires the financing cascade-cleanup.
+ * (money figure) + mis-wires the financing cascade-cleanup.
  *
  * Each path is pinned BEHAVIORALLY in expense-source-traceability.test.ts — but a behavioral test for
- * path N can't protect a FUTURE path N+1. This is the merge-survival gap (the C25/C271/C170 source-scan
+ * path N can't protect a FUTURE path N+1. This is the merge-survival gap (the source-scan
  * idiom): if someone adds a FIFTH expense-persist site (or refactors a handler) WITHOUT a preceding
  * source-link validator, the class silently reopens and NO existing test goes red. This guard is that
  * net — it asserts, structurally, that every expense-persist call in routes.ts is preceded WITHIN ITS
@@ -15,7 +15,7 @@
  *
  * NOTE: the import path (`expenseRepository.importExpenses`) is INTENTIONALLY not a guarded site — it
  * builds rows from CSV, which has no `sourceType` column, so it can never set a financing source link
- * (verified firsthand C172). It is excluded by construction, asserted below so a future import change
+ * (verified firsthand). It is excluded by construction, asserted below so a future import change
  * that DID accept a source link can't quietly land here unnoticed.
  */
 
@@ -49,7 +49,7 @@ function handlerStartBefore(offset: number): number {
   return start;
 }
 
-describe('#62/#109/#125/#145 expense source-link validation coverage (C172 structural guard)', () => {
+describe('expense source-link validation coverage', () => {
   test('exactly FOUR expense-persist write paths exist in routes.ts (a 5th forces a guard update)', () => {
     // Pins the write surface: createIdempotent + update + createSplitExpense + updateSplitExpense, one
     // each. A NEW persist site (or a second call to one) changes a count below → the author must come

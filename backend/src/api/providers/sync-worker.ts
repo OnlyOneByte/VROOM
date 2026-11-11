@@ -189,6 +189,39 @@ async function getCachedProvider(
 }
 
 /**
+ * Record a failure for a ref the worker has nothing to sync FROM, so the batch moves past it.
+ *
+ * Leaving the row untouched (a bare `return`) is a liveness bug, not a harmless skip:
+ * findPendingOrFailed is `ORDER BY created_at ASC LIMIT batchSize`, and a ref nothing advances is
+ * by construction among the oldest — so once batchSize of them accumulate they own every slot in
+ * the batch and no newer photo is ever fanned out, silently and forever. Writing the failure
+ * advances the row: backoff spaces the retries, and the `retryCount < MAX_RETRY_COUNT` bound in the
+ * query eventually drops it from the work set, which is what frees the slot. The errorMessage is
+ * also the only place this surfaces to the user (provider stats).
+ */
+async function recordUnsyncableRef(
+  ref: PhotoRef,
+  reason: string,
+  deps: SyncWorkerDeps
+): Promise<void> {
+  const retryCount = ref.retryCount + 1;
+
+  await deps.photoRefRepository.updateStatus(ref.id, {
+    status: 'failed',
+    errorMessage: reason,
+    retryCount,
+    syncedAt: new Date(),
+  });
+
+  logger.warn('Sync worker: nothing to sync this ref from, recorded a failure', {
+    refId: ref.id,
+    photoId: ref.photoId,
+    retryCount,
+    reason,
+  });
+}
+
+/**
  * Process a single pending/failed photo ref.
  * Looks up photo metadata, downloads from an active source, and uploads to the target.
  */
@@ -200,20 +233,14 @@ async function processSingleRef(
   // Find an active ref for the same photo to download from
   const sourceRef = await deps.photoRefRepository.findActiveByPhoto(ref.photoId);
   if (!sourceRef) {
-    logger.debug('Sync worker: no active source ref for photo, skipping', {
-      refId: ref.id,
-      photoId: ref.photoId,
-    });
+    await recordUnsyncableRef(ref, 'No active source copy available for this photo', deps);
     return;
   }
 
   // Look up photo metadata for proper upload params
   const photo = await deps.photoRepository.findById(ref.photoId);
   if (!photo) {
-    logger.debug('Sync worker: photo record not found, skipping', {
-      refId: ref.id,
-      photoId: ref.photoId,
-    });
+    await recordUnsyncableRef(ref, 'Photo record no longer exists', deps);
     return;
   }
 
@@ -270,12 +297,16 @@ async function processSingleRef(
     const errorMessage = extractErrorMessage(error);
 
     // A revoked/expired token (AUTH_INVALID) or a denied scope (PERMISSION_DENIED) is TERMINAL —
-    // retrying it burns backoff cycles and never succeeds. The provider adapters deliberately map
-    // a 401/403 to these codes (#105) "so the user re-connects"; honor that here by jumping
-    // retryCount straight to the cap so findPendingOrFailed (`retryCount < 3`) stops re-picking it,
-    // and prefix the message so the provider-stats `failed` count surfaces "reconnect required"
-    // rather than masquerading as a transient network flake (#144, the #105/#43/#44 family at the
-    // sync-worker consumer leg).
+    // retrying it burns backoff cycles and never succeeds. Honor that by jumping retryCount straight
+    // to the cap so findPendingOrFailed (`retryCount < 3`) stops re-picking it, and prefix the stored
+    // message so a parked ref reads as "reconnect required" rather than as a transient network flake.
+    //
+    // REACH: only the Google Photos client maps a 401/403 onto these codes today. The googleapis-backed
+    // Drive service and the AWS-SDK-backed S3 provider throw their vendor errors unmapped, so a revoked
+    // grant there still spends all three retries before parking at the same cap. Mapping them needs a
+    // code DISTINCT from AUTH_INVALID: that one means "the VROOM session expired" on the interactive
+    // routes (it is the 401 the frontend turns into "Please log in again"), and a provider's token
+    // expiring must not tell the user to re-authenticate to VROOM.
     const isTerminalAuth =
       isSyncError(error) &&
       (error.code === SyncErrorCode.AUTH_INVALID || error.code === SyncErrorCode.PERMISSION_DENIED);

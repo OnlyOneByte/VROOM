@@ -1,13 +1,13 @@
 /**
  * Regression GUARD (committed, travels with the merge) for the dead-interpolated-Tailwind-class
- * bug class (cycle 14 found it via DOM probe; cycle 65 fixed the load-bearing instance).
+ * bug class (found it via DOM probe; fixed the load-bearing instance).
  *
  * Tailwind generates arbitrary-value utilities (e.g. `h-[600px]`) by SCANNING SOURCE TEXT for
  * the literal class at build time. A class built with a runtime `{...}` interpolation —
  * `class="h-[{scrollHeight}] w-full"` or `h-[{CHART_HEIGHT}px]` — is never seen as a literal,
  * so NO CSS rule is generated and the utility is silently dead: the height/width never applies.
  * In ExpensesTable this meant the 600px scroll cap never engaged and a many-row vehicle grew
- * unbounded (the bug fixed in C65 by switching to an inline `style="height: …"`). The e2e harness
+ * unbounded (the bug fixed in by switching to an inline `style="height: …"`). The e2e harness
  * wouldn't catch it (a too-tall list still "renders"), so this static scan is the net.
  *
  * Scans every .svelte for an interpolated arbitrary value `<util>-[ … { … ]` (the `{` before the
@@ -35,7 +35,7 @@ const INTERPOLATED_ARBITRARY = /[\w-]+-\[[^\]]*\{[^\]]*\]/;
  * Two chart components carry a `h-[{CHART_HEIGHT}px]` on the inner Chart.Container that is the
  * SAME dead class, but is HARMLESS there: each passes `height={CHART_HEIGHT}` to its ChartCard
  * wrapper, which sets the real height in an inline style, so the container just fills a
- * correctly-sized parent (verified C14/C65). They are excluded so the guard stays zero-tolerance
+ * correctly-sized parent (verified). They are excluded so the guard stays zero-tolerance
  * for the LOAD-BEARING case without forcing an eyes-on chart edit. If a chart ever loses its
  * wrapper height, that's a separate (visible) regression — revisit this exclusion then.
  */
@@ -62,7 +62,7 @@ function stripComments(source: string): string {
 		.join('\n');
 }
 
-describe('no interpolated arbitrary Tailwind classes (dead-class guard — C14/C65)', () => {
+describe('no interpolated arbitrary Tailwind classes (dead-class guard)', () => {
 	const files = collectSvelteFiles(SRC_ROOT);
 
 	test('the scan actually found .svelte sources (guard is live, not a no-op)', () => {
@@ -87,7 +87,7 @@ describe('no interpolated arbitrary Tailwind classes (dead-class guard — C14/C
 
 		expect(
 			offenders,
-			`Interpolated arbitrary Tailwind class(es) found — Tailwind can't generate a rule for a runtime-interpolated arbitrary value, so the utility is silently dead. Use an inline style="..." for dynamic sizing instead (C14/C65):\n${offenders.join('\n')}`
+			`Interpolated arbitrary Tailwind class(es) found — Tailwind can't generate a rule for a runtime-interpolated arbitrary value, so the utility is silently dead. Use an inline style="..." for dynamic sizing instead:\n${offenders.join('\n')}`
 		).toEqual([]);
 	});
 });

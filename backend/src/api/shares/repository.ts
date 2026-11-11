@@ -1,14 +1,14 @@
 /**
  * Vehicle-shares repository (vehicle-sharing T3/T4). Thin BaseRepository subclass + the scoped finders
  * the share-management routes need. Two ownership truths are deliberately distinct:
- *   - the OWNER of a vehicle is `vehicles.userId` (validated at the route via validateVehicleOwnership),
- *   - `vehicle_shares.ownerId` is a DENORMALIZED copy, written at invite time, used ONLY to make the
- *     owner-side "shares I granted across all my vehicles" list index-friendly. Never the gate.
+ *  - the OWNER of a vehicle is `vehicles.userId` (validated at the route via validateVehicleOwnership),
+ *  - `vehicle_shares.ownerId` is a DENORMALIZED copy, written at invite time, used ONLY to make the
+ *  owner-side "shares I granted across all my vehicles" list index-friendly. Never the gate.
  *
  * EVERY destructive/mutating finder keys on the acting user's relationship to the row (ownerId for
- * owner-side, sharedWithId for invitee-side) — the #52 id-only-delete lesson: never act on a share by
- * id alone. The route layer additionally re-validates vehicle ownership before an invite insert (C151
- * validate-before-insert: throw BEFORE the row write, never inside an async tx after it).
+ * owner-side, sharedWithId for invitee-side) — the id-only-delete lesson: never act on a share by
+ * id alone. The route layer additionally re-validates vehicle ownership before an invite insert:
+ * throw BEFORE the row write, never inside an async transaction after it.
  */
 
 import { and, eq } from 'drizzle-orm';
@@ -41,8 +41,24 @@ export interface ReceivedShare extends VehicleShare {
   sharedBy: string;
 }
 
-/** A share is "active" (occupies the partial-unique slot) while pending or accepted. */
+/**
+ * A share is "active" — it occupies the one-per-(vehicle, invitee) slot — while pending or accepted;
+ * declined and revoked are inert history, so they neither grant access nor block a re-invite.
+ *
+ * PAIRED DEFINITION: the partial unique index `vehicle_shares_active_idx` (db/schema.ts) spells the
+ * same list out in raw SQL, because its `WHERE status in (...)` clause is baked into generated DDL and
+ * can only change through a migration. Everything in TypeScript must go through this constant so
+ * adding a status is a two-place change (here + a migration) rather than a hunt for hand-written
+ * comparisons — `shares-active-status-pairing.test.ts` fails if the two sides drift.
+ */
 export const ACTIVE_SHARE_STATUSES = ['pending', 'accepted'] as const;
+
+export type ActiveShareStatus = (typeof ACTIVE_SHARE_STATUSES)[number];
+
+/** Narrowing membership test for {@link ACTIVE_SHARE_STATUSES} — `status` comes from a free text column. */
+export function isActiveShareStatus(status: string): status is ActiveShareStatus {
+  return ACTIVE_SHARE_STATUSES.includes(status as ActiveShareStatus);
+}
 
 export class VehicleShareRepository extends BaseRepository<VehicleShare, NewVehicleShare> {
   constructor(db: AppDatabase = getDb()) {
@@ -60,8 +76,7 @@ export class VehicleShareRepository extends BaseRepository<VehicleShare, NewVehi
       .where(
         and(eq(vehicleShares.vehicleId, vehicleId), eq(vehicleShares.sharedWithId, sharedWithId))
       );
-    // Only pending/accepted occupy the active slot; declined/revoked are inert (re-invitable).
-    return rows.find((r) => r.status === 'pending' || r.status === 'accepted') ?? null;
+    return rows.find((r) => isActiveShareStatus(r.status)) ?? null;
   }
 
   /** All shares the owner granted, across ALL their vehicles (owner-side "manage" list). */
@@ -106,7 +121,7 @@ export class VehicleShareRepository extends BaseRepository<VehicleShare, NewVehi
       .where(eq(vehicleShares.sharedWithId, sharedWithId))
       .orderBy(vehicleShares.createdAt);
     return rows
-      .filter((r) => r.share.status === 'pending' || r.share.status === 'accepted')
+      .filter((r) => isActiveShareStatus(r.share.status))
       .map((r) => ({
         ...r.share,
         vehicleName: r.nickname ?? `${r.year} ${r.make} ${r.model}`,

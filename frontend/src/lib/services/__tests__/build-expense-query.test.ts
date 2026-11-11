@@ -3,11 +3,11 @@
  * every expense list / search / pagination / export request. No IO; straight
  * input→output. Pins the behavior the expense-list correctness depends on
  * (cycle-10 was a whole bug class about this query being built wrong):
- *   - each optional param maps to its query key
- *   - search is trimmed; whitespace-only search is dropped
- *   - tags become REPEATED `tags=` params (not comma-joined)
- *   - falsy guards: offset/limit of 0 are omitted; empty strings omitted
- *   - vehicleId is a separate leading arg
+ *  - each optional param maps to its query key
+ *  - search is trimmed; whitespace-only search is dropped
+ *  - tags become REPEATED `tags=` params (not comma-joined)
+ *  - falsy guards: offset/limit of 0 are omitted; empty strings omitted
+ *  - vehicleId is a separate leading arg
  */
 
 import { describe, expect, test } from 'vitest';

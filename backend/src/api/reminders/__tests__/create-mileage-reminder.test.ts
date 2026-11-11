@@ -1,15 +1,15 @@
 /**
- * T4 (cycle 31): mileage reminders are now API-creatable — the validation refinements (D4) + the
+ * T4: mileage reminders are now API-creatable — the validation refinements (D4) + the
  * server-derived nextDueOdometer / nullable nextDueDate wiring, end-to-end through the real stack.
  *
- * Before this, the mileage trigger engine (C25) was dormant: no route accepted triggerMode/
+ * Before this, the mileage trigger engine was dormant: no route accepted triggerMode/
  * intervalMileage, so a mileage reminder could only be seeded via sqlite. This pins the create +
  * update contract:
- *   - a mileage reminder requires intervalMileage + exactly one vehicle (D4); lastServiceOdometer
- *     defaults to the vehicle's current odometer when omitted
- *   - nextDueOdometer is SERVER-DERIVED (= lastServiceOdometer + intervalMileage), not client input
- *   - a pure-mileage reminder persists with a NULL next_due_date; a 'both' reminder keeps startDate
- *   - the refinements reject the bad shapes (no intervalMileage, multi-vehicle)
+ *  - a mileage reminder requires intervalMileage + exactly one vehicle (D4); lastServiceOdometer
+ *  defaults to the vehicle's current odometer when omitted
+ *  - nextDueOdometer is SERVER-DERIVED (= lastServiceOdometer + intervalMileage), not client input
+ *  - a pure-mileage reminder persists with a NULL next_due_date; a 'both' reminder keeps startDate
+ *  - the refinements reject the bad shapes (no intervalMileage, multi-vehicle)
  *
  * createTestApp() rewrites env + dynamic-imports DB-bound modules; keep imports to harness + bun:test.
  */

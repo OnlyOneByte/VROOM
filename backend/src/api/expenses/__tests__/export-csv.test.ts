@@ -20,7 +20,7 @@ beforeEach(async () => {
 afterEach(() => ctx.close());
 
 // This file's fixture vehicle is a Honda Civic 2021 with an optional nickname; converge onto the shared
-// seedVehicle (arch convergence, Angelo-approved) via a thin wrapper preserving the exact prior make/model/
+// seedVehicle  via a thin wrapper preserving the exact prior make/model/
 // year (the shared default is a Camry). nickname stays optional — an omitted call seeds the unnamed Civic.
 const seedCivic = (nickname?: string): Promise<string> =>
   seedVehicle(ctx, {
@@ -95,7 +95,7 @@ describe('GET /api/v1/expenses/export (CSV)', () => {
   });
 
   test('search filter narrows the export to matching rows (matches the table)', async () => {
-    // Before cycle 186 the export ignored search, so a searched table + Export CSV
+    // Before the export ignored search, so a searched table + Export CSV
     // gave a BROADER file than the user was viewing. Now it matches.
     const vehicleId = await seedCivic();
     await createExpense(
@@ -175,7 +175,7 @@ describe('GET /api/v1/expenses/export (CSV)', () => {
   });
 
   test('labels amounts in the user’s currency, not a hardcoded USD', async () => {
-    // A EUR user's export must say EUR, not USD (the cycle 74-75 hardcoded-USD
+    // A EUR user's export must say EUR, not USD (the hardcoded-USD
     // class). Set the preference through the real settings route, then export.
     const setRes = await ctx.authed('PUT', '/api/v1/settings', { currencyUnit: 'EUR' });
     expect(setRes.status, await setRes.text()).toBe(200);

@@ -1,5 +1,5 @@
 /**
- * Shared test seeders for the createTestApp() HTTP harness (arch convergence, Angelo-approved
+ * Shared test seeders for the createTestApp() HTTP harness
  * 2026-06-23). `seedVehicle` was hand-redeclared in 50+ HTTP-harness test files with 7 slightly
  * different signatures (no-arg, nickname-only, make-only, make/model/year, an extra-fields bag, …);
  * this is the ONE shared seeder they converge onto, ONE domain migrated per arch cycle (never a

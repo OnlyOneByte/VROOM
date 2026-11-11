@@ -237,7 +237,7 @@ function assertFinancedAreNotOwn(
 }
 
 // ---------------------------------------------------------------------------
-// #54 (C158): getFuelEfficiencyTrend must NOT pair fuel rows ACROSS vehicles in the fleet view.
+// getFuelEfficiencyTrend must NOT pair fuel rows ACROSS vehicles in the fleet view.
 // Pre-fix the query ordered by date only and paired consecutive rows globally, so two different cars'
 // odometers got subtracted → a phantom efficiency point. The fix orders by (vehicleId, date) and pairs
 // only WITHIN each vehicle (forEachVehiclePair). These pin the boundary.
@@ -263,7 +263,7 @@ function seedFuel(
   } as TestExpense);
 }
 
-/** Seed a CHARGE session (electric fuelType; kWh in volume) — for the #126 gas/charge partition guard. */
+/** Seed a CHARGE session (electric fuelType; kWh in volume) — for the gas/charge partition guard. */
 function seedCharge(
   vehicleId: string,
   id: string,
@@ -284,7 +284,7 @@ function seedCharge(
   } as TestExpense);
 }
 
-describe('#54: fleet fuel-efficiency trend never pairs across vehicles', () => {
+describe('fleet fuel-efficiency trend never pairs across vehicles', () => {
   test('two cars with CLOSE odometers + interleaved dates produce NO cross-vehicle phantom point', async () => {
     const { userId } = setupUserAndVehicles(2);
     const [v0, v1] = ['vehicle-user-1-0', 'vehicle-user-1-1'];
@@ -328,18 +328,18 @@ describe('#54: fleet fuel-efficiency trend never pairs across vehicles', () => {
     expect(trend[0]?.efficiency).toBeCloseTo(30, 5);
   });
 
-  // #126 (C427): getFuelEfficiencyTrend (+ the converted cross-vehicle efficiency builders) computed the
+  // getFuelEfficiencyTrend (+ the converted cross-vehicle efficiency builders) computed the
   // gas-MPG efficiency via computeEfficiencyPoint, which ACCEPTS electric rows — so a PHEV's charge
   // session (kWh in volume → ~mi/kWh) leaked a point into the gas-MPG trend (mislabeled mi/gal), the
-  // #119/#122 contamination on the repository converted/trend paths the C413 sweep missed. Now all 4
+  // contamination on the repository converted/trend paths the sweep missed. Now all 4
   // sites use gasEfficiencyPoint. This pins the trend excludes charge for a plug-in hybrid.
-  test('a plug-in hybrid efficiency trend excludes its CHARGE sessions (gas MPG only) — #126', async () => {
+  test('a plug-in hybrid efficiency trend excludes its CHARGE sessions (gas MPG only)', async () => {
     const { userId } = setupUserAndVehicles(1);
     const v0 = 'vehicle-user-1-0';
     // Two CONSECUTIVE gas fillups (10000 → 10300 on 10 gal = 30 MPG), then two CONSECUTIVE charge sessions
     // (20000 → 20060 on 15 kWh = 4 mi/kWh) on the SAME vehicle. Grouping each energy type keeps gas pairs
     // adjacent (so a 30 MPG point forms) AND charge pairs adjacent (so PRE-fix a ~4 mi/kWh point also
-    // formed) — isolating the gas/charge-EXCLUSION concern from the separate #C398 pairing-adjacency one.
+    // formed) — isolating the gas/charge-EXCLUSION concern from the separate # pairing-adjacency one.
     seedFuel(v0, 'g-1', new Date(2024, 0, 1), 10_000, 10);
     seedFuel(v0, 'g-2', new Date(2024, 0, 5), 10_300, 10);
     seedCharge(v0, 'c-1', new Date(2024, 0, 10), 20_000, 15);
@@ -352,20 +352,20 @@ describe('#54: fleet fuel-efficiency trend never pairs across vehicles', () => {
     expect(trend.some((p) => p.efficiency < 10)).toBe(false); // no mi/kWh-magnitude leak
   });
 
-  // #126 guard on the CONVERTED path (C66, arch-extract→guard-pin for the C64 *convertedGasEfficiencyPoints
-  // generator). getFuelEfficiencyTrend above uses its OWN forEachVehiclePair loop, NOT the C64 generator — so
+  // guard on the CONVERTED path (arch-extract→guard-pin for the *convertedGasEfficiencyPoints
+  // generator). getFuelEfficiencyTrend above uses its OWN forEachVehiclePair loop, NOT the generator — so
   // it does NOT pin the generator's gas-gate. The mixed-unit summary readers (getQuickStats / getYearEnd /
   // getSummary) feed avgEfficiency through computeConvertedEfficiencyValues → the generator, and ONLY there is
   // a PHEV charge session both (a) excluded from the gas average AND (b) NOT mis-fed to convertEfficiency
-  // (which would convert mi/kWh as if it were mi/gal → garbage, the worse half of #126/C427). Property 11
+  // (which would convert mi/kWh as if it were mi/gal → garbage, the worse half of). Property 11
   // drives this path but seeds gas-only rows, so a gate regression (revert gasEfficiencyPoint →
   // computeEfficiencyPoint in the generator) would stay green there. This is the direct net: a mixed-unit
   // (km/L vehicle, mi/gal user) PHEV fleet — the converted avgEfficiency must reflect the gas pair ALONE.
-  test('the CONVERTED summary gas-MPG average excludes a PHEV charge session on a mixed-unit fleet — #126 (C64 generator)', async () => {
+  test('the CONVERTED summary gas-MPG average excludes a PHEV charge session on a mixed-unit fleet (generator)', async () => {
     const { userId } = setupUserAndVehicles(1);
     const v0 = 'vehicle-user-1-0';
     // User keeps the default miles/gallons; the vehicle reports km/litres → allVehiclesMatchUnits is false →
-    // skipConversion=false → computeConvertedEfficiencyValues runs the C64 generator's CONVERT branch.
+    // skipConversion=false → computeConvertedEfficiencyValues runs the generator's CONVERT branch.
     testDb.sqlite.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
       JSON.stringify({ distanceUnit: 'kilometers', volumeUnit: 'liters', chargeUnit: 'kwh' }),
       v0,

@@ -156,9 +156,9 @@
 			</div>
 		{/if}
 
-		<!-- Documents. Hidden in the read-only shared view (T12b-3c): the insurance DOCUMENT reads
+		<!-- Documents. Hidden in the read-only shared view: the insurance DOCUMENT reads
 		     (GET /photos/insurance_policy/:id) are NOT widened for a shared viewer — only the policies
-		     LIST (T8b) + claims (C475) are — so rendering DocumentViewer would 404 → "policy not found"
+		     list and claims are — so rendering DocumentViewer would 404 → "policy not found"
 		     error toast. Documents are secondary; a viewer sees policy terms + claims, not attachments. -->
 		{#if !readOnly}
 			<div class="mt-3 border-t border-border pt-3">

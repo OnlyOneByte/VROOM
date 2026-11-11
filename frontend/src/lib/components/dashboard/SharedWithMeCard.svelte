@@ -34,7 +34,7 @@
 		try {
 			const received = await shareApi.listReceived();
 			// Only PENDING invites are actionable here; an accepted share surfaces as a fleet card (T12b-2).
-			pending = received.filter((s) => s.status === 'pending');
+			pending = received.filter(s => s.status === 'pending');
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to load invitations:', error);
 			loadError = error instanceof Error ? error.message : 'Failed to load invitations';
@@ -48,7 +48,7 @@
 		try {
 			await shareApi.accept(share.id);
 			toast.success(`Accepted access to ${share.vehicleName}`);
-			pending = pending.filter((s) => s.id !== share.id);
+			pending = pending.filter(s => s.id !== share.id);
 			onAccepted?.();
 		} catch (error) {
 			const msg =
@@ -64,7 +64,7 @@
 		try {
 			await shareApi.decline(share.id);
 			toast.success(`Declined the invitation to ${share.vehicleName}`);
-			pending = pending.filter((s) => s.id !== share.id);
+			pending = pending.filter(s => s.id !== share.id);
 		} catch (error) {
 			const msg =
 				error instanceof ApiError ? error.message : 'Could not decline the invitation. Try again.';

@@ -19,8 +19,8 @@ export function gotoDynamic(path: string): ReturnType<typeof goto> {
  * Accepts a resolved path (from resolve()) and a query params object.
  *
  * Example:
- *   gotoWithQuery(resolve(routes.expenseNew), { vehicleId: id, returnTo: '/dashboard' })
- *   gotoWithQuery(resolve(paramRoutes.insurancePolicyEdit, { id }), { returnTo: '/vehicles/123' })
+ *  gotoWithQuery(resolve(routes.expenseNew), { vehicleId: id, returnTo: '/dashboard' })
+ *  gotoWithQuery(resolve(paramRoutes.insurancePolicyEdit, { id }), { returnTo: '/vehicles/123' })
  */
 export function gotoWithQuery(
 	resolvedPath: string,

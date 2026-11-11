@@ -1,12 +1,12 @@
 /**
- * Account-takeover boundary guard for checkLinkConflicts (cycle 296).
+ * Account-takeover boundary guard for checkLinkConflicts.
  *
  * The OAuth link callback (routes.ts /callback/link/:authProvider) lets a logged-in user attach a
  * second provider identity (e.g. add GitHub to a Google-created account). checkLinkConflicts is the
  * gate that decides whether the bind is allowed, and it is the ACCOUNT-TAKEOVER boundary:
- *   - unbound identity            → null            (free to link)
- *   - already bound to THIS user  → 'already_linked' (idempotent no-op, not a duplicate row)
- *   - bound to a DIFFERENT user   → 'account_conflict' (REJECT — never silently re-bind)
+ *  - unbound identity → null (free to link)
+ *  - already bound to THIS user → 'already_linked' (idempotent no-op, not a duplicate row)
+ *  - bound to a DIFFERENT user → 'account_conflict' (REJECT — never silently re-bind)
  *
  * The third branch is the security-critical one: a regression that returned null or 'already_linked'
  * for an identity owned by another user would let attacker B link victim A's GitHub/Google identity
@@ -14,9 +14,9 @@
  * scoping of findByProviderIdentity is tested (auth-provider-repository.property.test.ts), but the
  * 3-way DECISION itself was un-pinned until now.
  *
- * Drives the REAL checkLinkConflicts (exported + repo-injectable, C296) against a REAL seeded
+ * Drives the REAL checkLinkConflicts (exported + repo-injectable) against a REAL seeded
  * AuthProviderRepository over an in-memory migrated DB — NOT a re-implementation of the decision
- * (the C181/C229 coverage-theater trap), and not the getDb-singleton (the C77 bind). The default
+ *  and not the getDb-singleton (the bind). The default
  * route call-site keeps using the singleton; only this test injects the test repo.
  */
 
@@ -54,7 +54,7 @@ afterEach(() => {
   sqliteDb.close();
 });
 
-describe('checkLinkConflicts — account-takeover boundary (C296)', () => {
+describe('checkLinkConflicts — account-takeover boundary', () => {
   test('an UNBOUND provider identity → null (free to link)', async () => {
     const result = await checkLinkConflicts('github', 'gh-account-123', USER_A, repo);
     expect(result).toBeNull();

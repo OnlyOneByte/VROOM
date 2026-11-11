@@ -3,15 +3,15 @@
  *
  * TWO halves:
  *  (A) HTTP behaviour via createTestApp. The harness sets NO VAPID env vars, so CONFIG.push.enabled is
- *      false — which is exactly the DEFAULT deployment state and the R6 honesty guarantee we most need
- *      pinned: an unconfigured server answers 503 PUSH_NOT_CONFIGURED (not a 500, not a blank 200), and
- *      the route requires auth. (CONFIG is a process-cached env snapshot read at first import — it can't
- *      be flipped per-file in the full suite [the ALLOW_FAKE_STORAGE lesson, CLAUDE.md], so the
- *      configured-200 path is asserted by driving the handler with a stubbed CONFIG in half (C) instead
- *      of fighting the module cache.)
+ *  false — which is exactly the DEFAULT deployment state and the R6 honesty guarantee we most need
+ *  pinned: an unconfigured server answers 503 PUSH_NOT_CONFIGURED (not a 500, not a blank 200), and
+ *  the route requires auth. (CONFIG is a process-cached env snapshot read at first import — it can't
+ *  be flipped per-file in the full suite [the ALLOW_FAKE_STORAGE lesson, CLAUDE.md], so the
+ *  configured-200 path is asserted by driving the handler with a stubbed CONFIG in half (C) instead
+ *  of fighting the module cache.)
  *  (B) A source-scan invariant: the route source NEVER references vapidPrivateKey. The private key is
- *      server-only (it signs payloads in T4); a route that read it could leak the app-server secret to a
- *      response. This fails loudly if a future edit wires the private key into the read surface.
+ *  server-only (it signs payloads in T4); a route that read it could leak the app-server secret to a
+ *  response. This fails loudly if a future edit wires the private key into the read surface.
  *  (C) A pure handler check of the configured path (stubbed CONFIG) — 200 returns ONLY the public key.
  */
 

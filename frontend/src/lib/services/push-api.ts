@@ -2,14 +2,14 @@
  * Web Push API client (push-notifications T5 — the FE opt-in surface).
  *
  * A thin typed wrapper over the shipped backend push router (`/api/v1/push`, backend T2/T3):
- *   - `getVapidPublicKey()` → GET /vapid-public-key → `{ publicKey }`. When the server has no VAPID
- *     keypair the backend answers 503 `PUSH_NOT_CONFIGURED`, which the shared client turns into an
- *     `ApiError` with `code === 'PUSH_NOT_CONFIGURED'` — the caller degrades to "not configured" (R6).
- *   - `subscribe(input)` → POST /subscribe → `{ id }`. Persists THIS browser's Web Push subscription
- *     for the session user (idempotent on (userId, endpoint) server-side; the crypto keys are never
- *     echoed back — only the row id).
- *   - `unsubscribe(endpoint)` → DELETE /subscribe → `{ removed }`. Idempotent no-op on an unknown
- *     endpoint; scoped to the session user (a subscription is not a cross-user capability).
+ *  - `getVapidPublicKey()` → GET /vapid-public-key → `{ publicKey }`. When the server has no VAPID
+ *  keypair the backend answers 503 `PUSH_NOT_CONFIGURED`, which the shared client turns into an
+ *  `ApiError` with `code === 'PUSH_NOT_CONFIGURED'` — the caller degrades to "not configured" (R6).
+ *  - `subscribe(input)` → POST /subscribe → `{ id }`. Persists THIS browser's Web Push subscription
+ *  for the session user (idempotent on (userId, endpoint) server-side; the crypto keys are never
+ *  echoed back — only the row id).
+ *  - `unsubscribe(endpoint)` → DELETE /subscribe → `{ removed }`. Idempotent no-op on an unknown
+ *  endpoint; scoped to the session user (a subscription is not a cross-user capability).
  *
  * All calls carry the session cookie via the shared `apiClient` (credentials: 'include'). This client
  * does NOT touch the browser Push API — that lives in `$lib/utils/push` (feature-detect + subscribe

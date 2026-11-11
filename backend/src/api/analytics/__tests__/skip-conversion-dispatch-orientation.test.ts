@@ -1,23 +1,23 @@
 /**
- * Regression GUARD (committed, travels with the merge) for the #94 convert-before-pool DISPATCH orientation
- * (the C65/C69/C72 advanced-builder twins).
+ * Regression GUARD (committed, travels with the merge) for the convert-before-pool DISPATCH orientation
+ * (the advanced-builder twins).
  *
  * getSummary / getFuelStats / getFuelAdvanced / getCrossVehicle each pick between a PURE builder and its
  * `buildConverted*` twin on the `skipConversion` flag (skipConversion = allVehiclesMatchUnits(...)). The
  * orientation is load-bearing and easy to silently invert:
  *
- *     skipConversion ? <pure builder>          : this.buildConverted<X>(...)   // ternary form
- *     if (skipConversion) { x = <pure> } else  { x = this.buildConverted<X>(...) }   // if/else form
+ *  skipConversion ? <pure builder> : this.buildConverted<X>(...) // ternary form
+ *  if (skipConversion) { x = <pure> } else { x = this.buildConverted<X>(...) } // if/else form
  *
  * skipConversion=TRUE means "all vehicles already share the user's units → NO conversion needed → take the
  * PURE builder". So the TRUTHY branch must be the pure builder and the FALSY/else branch the converted twin.
  * Flip it (`skipConversion ? converted : pure`, or `if (!skipConversion)`) and a MIXED-unit fleet takes the
- * raw-pooling pure builder → #94 regression (mi/gal pooled with km/L, gal with L) — INVISIBLE to a same-unit
+ * raw-pooling pure builder → regression (mi/gal pooled with km/L, gal with L) — INVISIBLE to a same-unit
  * test fixture (the only kind most builder tests use), which is exactly why a behavioral test can't catch it.
  *
- * The C59 source-scan pins that the converted call never gets a unit PLACEHOLDER; this pins the complementary
+ * The source-scan pins that the converted call never gets a unit PLACEHOLDER; this pins the complementary
  * invariant — that the converted twin is on the CONVERSION-NEEDED branch, not the skip branch. Together they
- * fence the whole dispatch. The one-edit→source-scan pattern (C25/C45/C59) on the C65/C69/C72 dispatch sites.
+ * fence the whole dispatch. The one-edit→source-scan pattern on the dispatch sites.
  *
  * Pure source scan — no DB, no network. Runs in the fast suite.
  */
@@ -45,7 +45,7 @@ function hasConverted(s: string): boolean {
   return /buildConverted/.test(s);
 }
 
-describe('#94 skipConversion dispatch orientation — truthy branch is the PURE builder, falsy is the converted twin', () => {
+describe('skipConversion dispatch orientation — truthy branch is the PURE builder, falsy is the converted twin', () => {
   test('the scan resolves the real analytics repository (guard is live, not a no-op)', () => {
     expect(readFileSync(REPO, 'utf8').length, `unreadable/empty: ${REPO}`).toBeGreaterThan(100);
   });
@@ -61,7 +61,7 @@ describe('#94 skipConversion dispatch orientation — truthy branch is the PURE 
     );
     expect(
       matches.length,
-      'expected ≥3 skipConversion builder-dispatch ternary sites (C65/C69/C72)'
+      'expected ≥3 skipConversion builder-dispatch ternary sites'
     ).toBeGreaterThanOrEqual(3);
 
     const inverted: string[] = [];
@@ -77,7 +77,7 @@ describe('#94 skipConversion dispatch orientation — truthy branch is the PURE 
       inverted,
       `A skipConversion ternary is INVERTED — the converted twin must be on the FALSY (conversion-needed) ` +
         `branch and the pure builder on the TRUTHY (skip) branch. Flipping it routes a mixed-unit fleet to ` +
-        `the raw-pooling pure builder (#94, NORTH_STAR #2), invisible to same-unit tests:\n${inverted.join('\n')}`
+        `the raw-pooling pure builder, invisible to same-unit tests:\n${inverted.join('\n')}`
     ).toEqual([]);
   });
 
@@ -105,7 +105,7 @@ describe('#94 skipConversion dispatch orientation — truthy branch is the PURE 
       inverted,
       `An if (skipConversion) convert-dispatch is INVERTED — the converted twin must be in the ELSE ` +
         `(conversion-needed) block, the pure builder in the THEN (skip) block. Flipping it pools a mixed ` +
-        `fleet raw (#94):\n${inverted.join('\n')}`
+        `fleet raw:\n${inverted.join('\n')}`
     ).toEqual([]);
   });
 });

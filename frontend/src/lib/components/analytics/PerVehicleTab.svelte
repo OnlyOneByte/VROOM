@@ -9,7 +9,8 @@
 	import { Progress } from '$lib/components/ui/progress';
 	import { analyticsApi, getDefaultDateRange } from '$lib/services/analytics-api';
 	import { vehicleApi } from '$lib/services/vehicle-api';
-	import { AppPieChart, StatCardGrid } from '$lib/components/charts';
+	import { AppPieChart } from '$lib/components/charts';
+	import StatCardGrid from '$lib/components/charts/StatCardGrid.svelte';
 	import { buildCategoryPieData } from '$lib/utils/chart-colors';
 	import type {
 		Vehicle,
@@ -90,7 +91,7 @@
 	// --- Health Score ---
 	// The score TEXT is intentionally NOT tinted with the tier color: chart-5 amber
 	// (#fe9a00) on its own bg-chart-5/10 tint is only 1.97:1 — illegible, failing WCAG
-	// AA even at the large-text 3:1 bar (cycle 189). The tier is instead conveyed by the
+	// AA even at the large-text 3:1 bar. The tier is instead conveyed by the
 	// tint-colored ring (graphical) PLUS an explicit text label below, so it's legible
 	// AND not signalled by color alone.
 	function getScoreBgColor(score: number): string {

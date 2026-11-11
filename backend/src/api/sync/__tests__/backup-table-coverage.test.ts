@@ -2,18 +2,18 @@
  * Drift guards for the backup table set — a data-loss-class regression prevention.
  *
  * The backup pipeline has TWO independent lists that must stay in sync:
- *   1. TABLE_SCHEMA_MAP / TABLE_FILENAME_MAP (config) — drive CSV serialize, parse, validate.
- *   2. BackupService.createBackup() — hand-written per-table queries that POPULATE the export.
+ *  1. TABLE_SCHEMA_MAP / TABLE_FILENAME_MAP (config) — drive CSV serialize, parse, validate.
+ *  2. BackupService.createBackup() — hand-written per-table queries that POPULATE the export.
  * Nothing mechanically ties them together, and neither is derived from the schema. So under
  * autonomous development a new table can be added to the schema (and to one list but not the
  * other), and the export silently omits it — a user's backup quietly loses that data, and
  * because new files are treated as OPTIONAL on restore, the round-trip won't complain either.
  *
  * Two guards close that:
- *   A. Every schema table is either backed up (in the registry) OR on an explicit
- *      EXCLUDED_BY_DESIGN allowlist. Adding a new table forces a deliberate decision here.
- *   B. createBackup()'s output data-keys EXACTLY equal the registry keys — the populate step
- *      can't drift from the serialize step.
+ *  A. Every schema table is either backed up (in the registry) OR on an explicit
+ *  EXCLUDED_BY_DESIGN allowlist. Adding a new table forces a deliberate decision here.
+ *  B. createBackup()'s output data-keys EXACTLY equal the registry keys — the populate step
+ *  can't drift from the serialize step.
  *
  * createTestApp() rewrites env + dynamic-imports DB-bound modules, so keep static imports to
  * the harness + bun:test + the pure config; import backup dynamically AFTER createTestApp.
@@ -23,26 +23,24 @@ import { describe, expect, test } from 'bun:test';
 import { getTableName, is, Table } from 'drizzle-orm';
 import { OPTIONAL_BACKUP_FILES, TABLE_FILENAME_MAP, TABLE_SCHEMA_MAP } from '../../../config';
 import * as schema from '../../../db/schema';
+import { ratchet } from '../../../test-helpers/debt-ratchet';
 
-// Tables intentionally NOT in a backup. Each must have a real reason — if you add a table
-// here you are asserting "a user's backup should not contain this", so document why.
-//   users          — the account identity itself; restore stamps rows onto the requesting user.
-//   userProviders  — encrypted storage credentials; never exported (see backup.ts validatePhotoRefEntries note).
-//   sessions       — ephemeral auth sessions; restoring them would be meaningless/unsafe.
-//   push_subscriptions — per-DEVICE Web Push subscriptions (push-notifications T1). The endpoint + the
-//     p256dh/auth client crypto keys are device-ephemeral secrets re-derivable by the browser on
-//     re-subscribe; a restored stale subscription would push to a dead endpoint in a new environment —
-//     the same "ephemeral, meaningless/unsafe to restore" rationale as sessions. The user re-enables push
-//     per-device after a restore; nothing of value is lost by excluding it.
-// (vehicle_shares WAS temporarily parked here at T1; T9 [C54] wired its owner-side backup round-trip —
-//  createBackup exports the owner's ACCEPTED grants [D7], restore re-stamps ownerId + skips absent
-//  invitees [#127-safe] — so it is now a backed-up table in the registry, no longer excluded.)
-const EXCLUDED_BY_DESIGN = new Set<string>([
-  'users',
-  'user_providers',
-  'sessions',
-  'push_subscriptions',
-]);
+/**
+ * Tables intentionally absent from a backup. Adding one here asserts "a user's backup should not
+ * contain this", so each needs a reason that survives the next reader:
+ *
+ *  - `users` — the account identity itself. Restore stamps rows onto the REQUESTING user, so
+ *    carrying foreign user rows would at best be dead weight and at worst let a crafted backup
+ *    mint an account.
+ *  - `user_providers` — encrypted storage/LLM credentials. Exporting them would put a user's
+ *    third-party secrets in a file they email around.
+ *  - `sessions` — ephemeral auth sessions; a restored one is either expired or a live credential
+ *    in the wrong place.
+ *  - `push_subscriptions` — per-DEVICE Web Push endpoints plus the p256dh/auth client keys. The
+ *    browser re-derives these on re-subscribe, and a restored stale subscription pushes at a dead
+ *    endpoint. Same rationale as sessions: ephemeral, and meaningless in a new environment.
+ */
+const EXCLUDED_BY_DESIGN = ['users', 'user_providers', 'sessions', 'push_subscriptions'] as const;
 
 /** Every physical table NAME defined in the Drizzle schema. */
 function allSchemaTableNames(): string[] {
@@ -62,20 +60,44 @@ function registryTableNames(): Set<string> {
   return names;
 }
 
-describe('backup table coverage (drift guards — cycle 208)', () => {
-  test('every schema table is either backed up or explicitly excluded by design', () => {
+/**
+ * The sites are the schema tables the backup registry does NOT serialize — each one needs an
+ * explicit decision. `kind: 'exclusion'` checks both directions, and the second direction is the
+ * one a hand-written subset check misses: an entry naming a table that IS now backed up, or that no
+ * longer exists, is stale, and a stale entry would silently exempt a future table that happens to
+ * take that name.
+ */
+ratchet({
+  name: 'every schema table is either backed up or excluded by design',
+  kind: 'exclusion',
+  tolerated: EXCLUDED_BY_DESIGN,
+  guidance:
+    'Schema table(s) neither backed up nor excluded by design. Either add them to ' +
+    'TABLE_SCHEMA_MAP + TABLE_FILENAME_MAP + createBackup() so user data survives a backup, or ' +
+    'add them to EXCLUDED_BY_DESIGN with a documented reason:',
+  scan: () => {
     const registry = registryTableNames();
-    const uncovered = allSchemaTableNames().filter(
-      (name) => !registry.has(name) && !EXCLUDED_BY_DESIGN.has(name)
-    );
+    return allSchemaTableNames().filter((name) => !registry.has(name));
+  },
+  probe: () => {
+    // Fixtures, not live sites: anchoring on a real excluded table would break the day one of them
+    // becomes backed up. What has to hold is that both derivations are non-empty and disjointly
+    // meaningful — a scan over nothing, or a registry of nothing, passes a subset check forever.
     expect(
-      uncovered,
-      `Schema table(s) neither backed up nor excluded-by-design. Either add them to ` +
-        `TABLE_SCHEMA_MAP + TABLE_FILENAME_MAP + createBackup() (so user data survives a backup), ` +
-        `or add them to EXCLUDED_BY_DESIGN with a documented reason:\n${uncovered.join('\n')}`
-    ).toEqual([]);
-  });
+      allSchemaTableNames().length,
+      'no schema tables found — the schema import broke'
+    ).toBeGreaterThan(20);
+    expect(registryTableNames().size, 'the backup registry resolved to nothing').toBeGreaterThan(
+      10
+    );
+    // And that the registry really is a subset of the schema: a name in the registry that no table
+    // defines would make the scan under-report.
+    const schemaNames = new Set(allSchemaTableNames());
+    expect([...registryTableNames()].filter((name) => !schemaNames.has(name))).toEqual([]);
+  },
+});
 
+describe('backup table coverage', () => {
   test('the registry and filename map cover exactly the same keys', () => {
     // A table mapped to a schema but missing a filename (or vice-versa) would be skipped by
     // exportAsZip's `if (table && filename)` guard — a silent omission.
@@ -88,14 +110,14 @@ describe('backup table coverage (drift guards — cycle 208)', () => {
     // (a typo, or a map rename like reminder_vehicles.csv → reminders_vehicles.csv without updating the
     // OPTIONAL set), the stale OPTIONAL string filters out NOTHING → that genuinely-optional file becomes
     // REQUIRED → parseZipBackup rejects a valid older backup missing it ("Missing required files"), so the
-    // user can't recover their own data (NORTH_STAR #1). Pin OPTIONAL ⊆ map-values so the two can't drift.
+    // user can't recover their own data. Pin OPTIONAL ⊆ map-values so the two can't drift.
     const mapValues = new Set(Object.values(TABLE_FILENAME_MAP));
     const orphans = [...OPTIONAL_BACKUP_FILES].filter((f) => !mapValues.has(f));
     expect(
       orphans,
       `OPTIONAL_BACKUP_FILES entr(ies) not present in TABLE_FILENAME_MAP — a stale/typo'd optional ` +
         `filename makes a real backup file REQUIRED, failing restore of a valid older backup that omits ` +
-        `it (NORTH_STAR #1). Keep OPTIONAL_BACKUP_FILES a subset of the map's values:\n${orphans.join('\n')}`
+        `it. Keep OPTIONAL_BACKUP_FILES a subset of the map's values:\n${orphans.join('\n')}`
     ).toEqual([]);
   });
 

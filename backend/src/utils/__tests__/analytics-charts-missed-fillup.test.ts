@@ -1,13 +1,13 @@
 /**
- * Regression tests (cycle 10) for the missed-fill-up guard in the monthly fuel charts.
+ * Regression tests for the missed-fill-up guard in the monthly fuel charts.
  *
  * The canonical efficiency math (computeEfficiencyPoint) skips a consecutive pair when
  * EITHER row is a missed/partial fill-up, or the mileage gap is non-positive / implausibly
  * large (> MAX_REASONABLE_MILES_BETWEEN_FILLUPS). Two MONTH-AGGREGATING builders had drifted
  * from that contract:
- *   - buildFuelEfficiencyAndCost (accumulateFuelRow) — folded a missed-fill-up pair into the
- *     month's miles/gallons, counting one tank's volume against two tanks' miles → inflated MPG.
- *   - buildCostPerDistanceChart (accumulateCostPerMile) — same gap → spiked cost-per-distance.
+ *  - buildFuelEfficiencyAndCost (accumulateFuelRow) — folded a missed-fill-up pair into the
+ *  month's miles/gallons, counting one tank's volume against two tanks' miles → inflated MPG.
+ *  - buildCostPerDistanceChart (accumulateCostPerMile) — same gap → spiked cost-per-distance.
  * These pin that both now skip missed fill-ups and over-cap gaps. Pure functions, no DB.
  */
 

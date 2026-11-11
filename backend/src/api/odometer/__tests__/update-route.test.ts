@@ -4,10 +4,10 @@
  * own copy of the schema rather than exercising the real route, so it wouldn't
  * catch a regression in routes.ts. This drives the REAL stack (route → partial
  * schema → ownership check → repo) and pins the update contract:
- *   - a future recordedAt is still rejected on edit (updateSchema = createSchema
- *     .partial() must keep the no-future-date refinement on the present field)
- *   - a negative odometer is rejected
- *   - a valid update persists
+ *  - a future recordedAt is still rejected on edit (updateSchema = createSchema
+ *  .partial() must keep the no-future-date refinement on the present field)
+ *  - a negative odometer is rejected
+ *  - a valid update persists
  * (Cross-tenant PUT/GET/DELETE denial is already covered by the cycle-138
  * cross-tenant-idor suite, so it's not duplicated here.)
  *
@@ -32,7 +32,7 @@ beforeEach(async () => {
 afterEach(() => ctx.close());
 
 // This file's fixture is a make-param Honda (default) Civic 2021; converge onto the shared test-helpers/seed
-// seedVehicle (arch convergence, Angelo-approved) via a thin make wrapper preserving the exact prior payload
+// seedVehicle  via a thin make wrapper preserving the exact prior payload
 // (model 'Civic', year 2021) so behavior is unchanged (the shared default is a Camry).
 const seedVehicle = (make = 'Honda'): Promise<string> =>
   seedVehicleShared(ctx, { make, model: 'Civic', year: 2021 });
@@ -112,11 +112,11 @@ describe('odometer PUT /:id (update contract)', () => {
   });
 
   // The 3 odometer routes (GET /entry/:id, PUT, DELETE) return 404 for a non-existent id. Originally the
-  // inline `findById + entry.userId !== user.id` guard converged onto validateOdometerOwnership (C172);
-  // the vehicle-sharing T6 widening (C95) then replaced that with the resolver seam (load the row UNSCOPED
+  // inline `findById + entry.userId !== user.id` guard converged onto validateOdometerOwnership;
+  // the vehicle-sharing T6 widening then replaced that with the resolver seam (load the row UNSCOPED
   // then requireVehicleRead/Write) + a `!row` NotFoundError, removing validateOdometerOwnership (dead
-  // export pruned C102). These pin the not-found 404 at all 3 sites regardless of the gating mechanism
-  // (the anchoring test the C160 audit flagged as missing; the cross-tenant IDOR suite covers cross-user).
+  // export pruned). These pin the not-found 404 at all 3 sites regardless of the gating mechanism
+  // (the anchoring test the audit flagged as missing; the cross-tenant IDOR suite covers cross-user).
   test('GET /entry/:id returns 404 for a non-existent id', async () => {
     const res = await ctx.authed('GET', '/api/v1/odometer/entry/does-not-exist');
     expect(res.status).toBe(404);

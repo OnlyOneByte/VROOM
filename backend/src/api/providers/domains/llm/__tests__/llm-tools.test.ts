@@ -3,16 +3,16 @@
  * guarantees the whole feature rests on (design §4 / §7.4-5, ARCC confused-deputy + GenAI-tool-use):
  *
  *  1. userId-SCOPED execution — a tool invoked with user A's id NEVER returns user B's rows. The userId
- *     comes from the SESSION, never a model arg; there is no parameter by which the model could widen it.
+ *  comes from the SESSION, never a model arg; there is no parameter by which the model could widen it.
  *  2. confused-deputy guard on a model-supplied vehicleId — calling getExpenseSummary/getFuelStats with
- *     ANOTHER user's vehicleId throws (NotFoundError, existence-hiding) — the model cannot reach a vehicle
- *     the session user cannot read.
+ *  ANOTHER user's vehicleId throws (NotFoundError, existence-hiding) — the model cannot reach a vehicle
+ *  the session user cannot read.
  *  3. the `range` arg is an allow-listed ENUM — a bad/free value fails the Zod schema (no injection).
  *  4. the allowlist is a fixed frozen set — every tool is read-only; the model cannot name a tool we did
- *     not pre-specify (the orchestrator looks names up here).
+ *  not pre-specify (the orchestrator looks names up here).
  *
  * createTestApp() rewrites env then the test DYNAMIC-imports the DB-bound tools module AFTER it, so the
- * repos the tools wrap bind the in-memory test DB (the C291/C300 harness pattern).
+ * repos the tools wrap bind the in-memory test DB (the harness pattern).
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -77,8 +77,9 @@ describe('assistant tool layer — userId scoping (the confused-deputy core, T2)
       NOW_MS
     )) as { totalAmount: number; expenseCount: number };
     // Only the session user's single expense is counted — the other user's huge expense is invisible.
+    // Totals arrive in DOLLARS (the stored 5000 cents), as the HTTP summary route reports them.
     expect(summary.expenseCount).toBe(1);
-    expect(summary.totalAmount).toBe(5000);
+    expect(summary.totalAmount).toBe(50);
   });
 
   test("a model-supplied vehicleId for ANOTHER user's vehicle is rejected (confused-deputy guard)", async () => {
@@ -112,7 +113,7 @@ describe('assistant tool layer — userId scoping (the confused-deputy core, T2)
       ctx.user.id,
       NOW_MS
     )) as { totalAmount: number };
-    expect(summary.totalAmount).toBe(7500);
+    expect(summary.totalAmount).toBe(75); // dollars, from the stored 7500 cents
   });
 });
 

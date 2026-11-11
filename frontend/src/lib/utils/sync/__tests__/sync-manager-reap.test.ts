@@ -1,5 +1,5 @@
 /**
- * #135 — SyncManager.syncAll reaps SYNCED rows from localStorage after a run.
+ * SyncManager.syncAll reaps SYNCED rows from localStorage after a run.
  *
  * The legacy `syncOfflineExpenses` clears synced rows (`clearSyncedExpenses`) once they POST, but the
  * modern `SyncManager.syncAll` previously only marked each row `synced:true` and NEVER cleared them — so
@@ -50,7 +50,7 @@ function pending(id: string, over: Partial<OfflineExpense> = {}): OfflineExpense
 	};
 }
 
-describe('SyncManager.syncAll — reaps synced rows (#135)', () => {
+describe('SyncManager.syncAll — reaps synced rows', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		ls.clear();
@@ -72,7 +72,7 @@ describe('SyncManager.syncAll — reaps synced rows (#135)', () => {
 
 		expect(result.synced).toBe(2);
 		expect(result.failed).toBe(0);
-		// THE #135 ASSERTION: both synced rows were reaped — localStorage is empty, not retaining synced rows.
+		// THE ASSERTION: both synced rows were reaped — localStorage is empty, not retaining synced rows.
 		expect(loadOfflineExpenses()).toHaveLength(0);
 	});
 

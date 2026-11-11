@@ -3,8 +3,8 @@
  * uploads). The photo routes are entityType-generic; the only gate for a new
  * type is validateEntityOwnership's switch in photos/helpers.ts. This proves the
  * new 'insurance_claim' case end-to-end through the real route stack:
- *   GET /photos/insurance_claim/:claimId  — own claim passes the gate (200),
- *   a non-existent / unowned claim is rejected (404).
+ *  GET /photos/insurance_claim/:claimId — own claim passes the gate (200),
+ *  a non-existent / unowned claim is rejected (404).
  * listPhotosForEntity calls validateEntityOwnership, so a GET exercises the same
  * ownership check an upload would — without needing a storage provider.
  */

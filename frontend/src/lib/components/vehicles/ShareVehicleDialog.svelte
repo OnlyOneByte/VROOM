@@ -50,7 +50,7 @@
 		loadError = null;
 		try {
 			const all = await shareApi.listGranted();
-			shares = all.filter((s) => s.vehicleId === vehicleId);
+			shares = all.filter(s => s.vehicleId === vehicleId);
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to load shares:', error);
 			loadError = error instanceof Error ? error.message : 'Failed to load shares';
@@ -134,8 +134,7 @@
 					</Select.Trigger>
 					<Select.Content>
 						<Select.Item value="viewer" label="Viewer">Viewer — can view only</Select.Item>
-						<Select.Item value="editor" label="Editor"
-							>Editor — can view + add expenses</Select.Item
+						<Select.Item value="editor" label="Editor">Editor — can view + add expenses</Select.Item
 						>
 					</Select.Content>
 				</Select.Root>
@@ -175,7 +174,7 @@
 								<Select.Root
 									type="single"
 									value={share.level}
-									onValueChange={(v) => changeLevel(share, v as ShareLevel)}
+									onValueChange={v => changeLevel(share, v as ShareLevel)}
 								>
 									<Select.Trigger
 										class="h-8 w-[110px]"

@@ -1,7 +1,7 @@
 /**
  * Photos → auto-expense T6 — the full STAGE → CONFIRM → RE-RUN round-trip guard (the merge-surviving half
  * of the feature DoD). The route test (receipt-drafts-route.test.ts) pins the stage endpoint's contract;
- * this pins the OTHER half NORTH_STAR #3 cares about: that a staged draft, confirmed via the UNCHANGED
+ * this pins the OTHER half cares about: that a staged draft, confirmed via the UNCHANGED
  * POST /expenses with `clientId = photos:<mediaId>`, PERSISTS — and that a RE-RUN is idempotent: the
  * re-swept photo is now filtered out (the already-imported cross-ref), AND a re-confirm of the same
  * clientId is a no-op (createIdempotent returns the existing row, never a duplicate). The whole

@@ -1,9 +1,12 @@
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { dirname, join, relative, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, it, expect, beforeEach, vi } from 'vitest';
+import { ratchet } from './_helpers/debt-ratchet';
 import {
 	getPlatformInfo,
 	initializePWA,
 	promptInstall,
-	requestBackgroundSync,
 	pwaInstallState,
 	type BeforeInstallPromptEvent
 } from '../pwa';
@@ -97,6 +100,66 @@ describe('PWA Utils', () => {
 		});
 	});
 
+	describe('initializePWA — idempotent registration', () => {
+		/**
+		 * The `beforeinstallprompt`/`appinstalled` listeners live on `window`, so they outlive the
+		 * components that ask for them, and nothing ever removes them. initializePWA is called from
+		 * TWO components, one of which (the settings install card) re-mounts on every visit to
+		 * /settings — so registering unconditionally accumulated a fresh pair per visit for the life
+		 * of the page. Calling it repeatedly must leave exactly one listener per event.
+		 */
+		type WindowListener = (event: Event) => void;
+
+		const setupRemoveEventListener = window.removeEventListener;
+
+		/** Replay add/remove against a set, so "how many are LIVE" is observable, not just call counts. */
+		function trackWindowListeners(): Map<string, Set<WindowListener>> {
+			const live = new Map<string, Set<WindowListener>>();
+			const listenersFor = (type: string): Set<WindowListener> => {
+				const existing = live.get(type);
+				if (existing) return existing;
+				const created = new Set<WindowListener>();
+				live.set(type, created);
+				return created;
+			};
+			window.addEventListener = vi.fn((type: string, handler: WindowListener) =>
+				listenersFor(type).add(handler)
+			) as unknown as typeof window.addEventListener;
+			window.removeEventListener = vi.fn((type: string, handler: WindowListener) =>
+				listenersFor(type).delete(handler)
+			) as unknown as typeof window.removeEventListener;
+			return live;
+		}
+
+		afterEach(() => {
+			window.removeEventListener = setupRemoveEventListener;
+		});
+
+		it('leaves exactly one listener per event after repeated calls', () => {
+			const live = trackWindowListeners();
+
+			initializePWA();
+			initializePWA();
+			initializePWA();
+
+			expect(live.get('beforeinstallprompt')?.size).toBe(1);
+			expect(live.get('appinstalled')?.size).toBe(1);
+		});
+
+		it('keeps the surviving registration live, so install detection still works', () => {
+			const live = trackWindowListeners();
+
+			initializePWA();
+			initializePWA();
+
+			const [handler] = [...(live.get('beforeinstallprompt') ?? [])];
+			expect(handler).toBeDefined();
+			handler!({ preventDefault: vi.fn() } as unknown as Event);
+
+			expect(pwaInstallState.canInstall).toBe(true);
+		});
+	});
+
 	describe('promptInstall', () => {
 		it('should return false when no deferred prompt available', async () => {
 			const result = await promptInstall();
@@ -120,85 +183,12 @@ describe('PWA Utils', () => {
 		});
 	});
 
-	describe('requestBackgroundSync', () => {
-		it('should register background sync when supported', async () => {
-			const mockSync = {
-				register: vi.fn().mockResolvedValue(undefined)
-			};
-
-			// Set up the mock for this test
-			mockServiceWorker.ready = Promise.resolve({
-				sync: mockSync
-			} as any);
-
-			// Also update the navigator mock directly
-			Object.defineProperty(navigator, 'serviceWorker', {
-				value: {
-					...mockServiceWorker,
-					ready: Promise.resolve({
-						sync: mockSync
-					})
-				},
-				writable: true
-			});
-
-			await requestBackgroundSync('test-sync', true); // Force browser mode
-
-			expect(mockSync.register).toHaveBeenCalledWith('test-sync');
-		});
-
-		it('should handle background sync registration failure', async () => {
-			const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-			// Set up the mock for this test
-			const rejectedPromise = Promise.reject(new Error('Service worker not ready'));
-			mockServiceWorker.ready = rejectedPromise;
-
-			// Also update the navigator mock directly
-			Object.defineProperty(navigator, 'serviceWorker', {
-				value: {
-					...mockServiceWorker,
-					ready: rejectedPromise
-				},
-				writable: true
-			});
-
-			await requestBackgroundSync('test-sync', true); // Force browser mode
-
-			// Wait a bit for the promise to reject and console.error to be called
-			await new Promise(resolve => setTimeout(resolve, 10));
-
-			expect(consoleError).toHaveBeenCalledWith(
-				'Background sync registration failed:',
-				expect.any(Error)
-			);
-
-			consoleError.mockRestore();
-		});
-
-		it('should not register when service worker not supported', async () => {
-			// Remove service worker support
-			Object.defineProperty(window, 'navigator', {
-				value: {},
-				writable: true
-			});
-
-			await requestBackgroundSync('test-sync');
-
-			// Should not throw or call any methods
-			expect(mockServiceWorker.ready).toBeDefined();
-		});
-
-		it('should handle missing sync API', async () => {
-			mockServiceWorker.ready = Promise.resolve({
-				// No sync property
-			} as any);
-
-			await requestBackgroundSync('test-sync');
-
-			// Should not throw
-		});
-	});
+	// There is no requestBackgroundSync here any more: it registered a Background Sync tag that the
+	// service worker never consumed, so offline expenses were never synced in the background despite
+	// the call reading that way. The outbox lives in localStorage, which worker scope cannot read, so
+	// the handler side was not implementable without moving the outbox to IndexedDB. Delivery is the
+	// foreground sync manager's `online` listener plus the manual sync control.
+	// sw-push-handlers.test.ts fails if a sync registration reappears without a consuming listener.
 
 	describe('getPlatformInfo', () => {
 		// getPlatformInfo classifies the UA to decide which install instructions to show
@@ -363,5 +353,109 @@ describe('PWA Utils', () => {
 			expect(result).toBe(true);
 			expect(pwaInstallState.canInstall).toBe(false);
 		});
+	});
+});
+
+/**
+ * Source-scan guard for the PWA document head.
+ *
+ * `viewport` and `theme-color` are single-declaration metas, and a duplicate does real damage rather
+ * than being merely redundant:
+ *  - A second `<meta name="viewport">` REPLACES the first description instead of merging with it, so
+ *    one that omits `viewport-fit=cover` resets it to `auto`. `env(safe-area-inset-*)` then reports 0,
+ *    and app.css's .safe-top/.safe-bottom plus the mobile nav's safe-area padding silently collapse on
+ *    notched devices. `<svelte:head>` content lands AFTER app.html's head, so a layout or page copy
+ *    always wins.
+ *  - The browser picks the FIRST `theme-color`, which is also the one themeStore rewrites per active
+ *    theme (document.querySelector returns the first match). A second one is dead weight that
+ *    disagrees with the installed-app manifest colour and would hijack theming if it ever sorted first.
+ *
+ * `user-scalable=no` is called out separately because it fails WCAG 1.4.4 (Resize Text) and the axe
+ * `meta-viewport` rule, independent of the duplication problem.
+ */
+describe('PWA document head — viewport and theme-color are declared exactly once', () => {
+	const UTILS_TESTS_DIR = dirname(fileURLToPath(import.meta.url));
+	const SRC_ROOT = join(UTILS_TESTS_DIR, '..', '..', '..');
+	const FRONTEND_ROOT = join(SRC_ROOT, '..');
+
+	/** Drop HTML comments so prose ABOUT a meta tag is not scanned as a declaration of one. */
+	function stripHtmlComments(source: string): string {
+		return source.replace(/<!--[\s\S]*?-->/g, ' ');
+	}
+
+	function metaDeclarations(source: string, name: string): string[] {
+		const pattern = new RegExp(`<meta[^>]*name=["']${name}["'][^>]*>`, 'gi');
+		return stripHtmlComments(source).match(pattern) ?? [];
+	}
+
+	const appHtml = readFileSync(join(SRC_ROOT, 'app.html'), 'utf8');
+	const layout = readFileSync(join(SRC_ROOT, 'routes', '+layout.svelte'), 'utf8');
+	const viteConfig = readFileSync(join(FRONTEND_ROOT, 'vite.config.ts'), 'utf8');
+
+	it('app.html declares one viewport, and it carries viewport-fit=cover', () => {
+		const declarations = metaDeclarations(appHtml, 'viewport');
+		expect(declarations).toHaveLength(1);
+		expect(declarations[0]).toContain('viewport-fit=cover');
+		expect(declarations[0]).not.toContain('user-scalable=no');
+	});
+
+	it('the root layout re-declares neither viewport nor theme-color', () => {
+		expect(metaDeclarations(layout, 'viewport')).toEqual([]);
+		expect(metaDeclarations(layout, 'theme-color')).toEqual([]);
+	});
+
+	it('app.html declares one theme-color and it matches the installed-app manifest', () => {
+		const declarations = metaDeclarations(appHtml, 'theme-color');
+		expect(declarations).toHaveLength(1);
+
+		const metaColor = /content=["']([^"']+)["']/.exec(declarations[0] ?? '')?.[1];
+		const manifestColor = /theme_color:\s*['"]([^'"]+)['"]/.exec(viteConfig)?.[1];
+		expect(manifestColor).toBeTruthy();
+		expect(metaColor).toBe(manifestColor);
+	});
+
+	/**
+	 * Routes that still override the viewport. Every entry is a live defect: it drops
+	 * `viewport-fit=cover` for that route, so the safe-area insets collapse there.
+	 */
+	const PENDING_VIEWPORT_OVERRIDES: string[] = [];
+
+	const viewportOverrides = (): string[] => {
+		const offenders: string[] = [];
+		const walk = (dir: string): void => {
+			for (const entry of readdirSync(dir)) {
+				const full = join(dir, entry);
+				if (statSync(full).isDirectory()) {
+					walk(full);
+				} else if (entry.endsWith('.svelte')) {
+					if (metaDeclarations(readFileSync(full, 'utf8'), 'viewport').length > 0) {
+						offenders.push(relative(SRC_ROOT, full).split(sep).join('/'));
+					}
+				}
+			}
+		};
+		walk(join(SRC_ROOT, 'routes'));
+		walk(join(SRC_ROOT, 'lib'));
+		return offenders;
+	};
+
+	ratchet({
+		name: 'no route re-declares the viewport',
+		tolerated: PENDING_VIEWPORT_OVERRIDES,
+		guidance:
+			'A <meta name="viewport"> outside app.html overrides it and drops viewport-fit=cover, ' +
+			'collapsing env(safe-area-inset-*) on that route. Remove the override from these:',
+		scan: viewportOverrides,
+		probe: () => {
+			// Fixtures, not a live override: anchoring on one would break once the list hit zero.
+			expect(
+				metaDeclarations('<meta name="viewport" content="width=device-width" />', 'viewport')
+			).toHaveLength(1);
+			expect(
+				metaDeclarations('<meta name="theme-color" content="#000" />', 'viewport')
+			).toHaveLength(0);
+			// app.html itself must still declare one, else the walk/matcher pair proves nothing.
+			expect(metaDeclarations(appHtml, 'viewport').length).toBe(1);
+		}
 	});
 });

@@ -1,5 +1,5 @@
 /**
- * trip-api.ts coverage (trips-location T6 FE seam) — the C149/C163 service-test pattern: apiClient is
+ * trip-api.ts coverage (trips-location T6 FE seam) — the service-test pattern: apiClient is
  * mocked, so each method's exact URL + payload is asserted (guards against a wrong-segment typo) plus the
  * query-string construction (filter-drop on empty vehicleId/purpose, the summary rate param). The wrappers
  * are thin passthroughs (apiClient already unwraps the { success, data } envelope), so they return data
@@ -95,10 +95,10 @@ describe('tripApi.getSummary (R4 rollup)', () => {
 		expect(url).toContain('rate=0.67');
 	});
 
-	// C219 (guard): rate=0 is a MEANINGFUL business value (explicit free reimbursement / "no rate"), NOT an
+	// Rate=0 is a MEANINGFUL business value (explicit free reimbursement / "no rate"), NOT an
 	// absent param — it must SURVIVE serialization, unlike an empty-string vehicleId which is dropped. The
 	// trip-api passes `rate: params.rate` raw (no `|| undefined` coercion that would nuke a 0), relying on
-	// buildQueryString's `value != null` check (drops only null/undefined, keeps a numeric 0). A C219
+	// buildQueryString's `value != null` check (drops only null/undefined, keeps a numeric 0). A
 	// bug-scout verified this firsthand; this pins it so a future `rate || undefined` refactor (the
 	// reminder-api isActive:false truthy-drop class) can't silently swallow an explicit-zero rate.
 	test('rate=0 SURVIVES (a meaningful explicit-zero, not a dropped falsy)', async () => {
@@ -149,7 +149,7 @@ describe('tripApi CRUD wiring', () => {
 	});
 });
 
-// C238 deep-review cert: trip-api wrappers are thin passthroughs with NO try/catch — an apiClient ApiError
+// deep-review cert: trip-api wrappers are thin passthroughs with NO try/catch — an apiClient ApiError
 // (non-2xx) must PROPAGATE to the caller, NOT be swallowed into a resolved empty value. The whole FE error
 // discipline downstream depends on this: the /trips list page's `loadError` four-state (it shows the error
 // pane, NOT the "No trips yet" empty state, on a fetch failure — the masquerade-as-data-loss guard) and the
@@ -193,7 +193,7 @@ describe('tripDistance (FE derived, mirrors the backend clamp)', () => {
 		expect(tripDistance({ startOdometer: 1000, endOdometer: 1080 })).toBe(80);
 	});
 
-	test('clamps a non-increasing pair to 0 (R2/#46)', () => {
+	test('clamps a non-increasing pair to 0 (R2/)', () => {
 		expect(tripDistance({ startOdometer: 1080, endOdometer: 1000 })).toBe(0);
 		expect(tripDistance({ startOdometer: 500, endOdometer: 500 })).toBe(0);
 	});

@@ -1,5 +1,5 @@
 /**
- * Regression guard for the clear-optional-field data-loss class (cycles 82-85),
+ * Regression guard for the clear-optional-field data-loss class,
  * the LAST open instance: an expense `description` emptied on edit must actually
  * CLEAR (column → NULL), not silently keep its old value. The frontend fix sends
  * description:null on edit (toBackendExpense isEdit); this proves the backend half

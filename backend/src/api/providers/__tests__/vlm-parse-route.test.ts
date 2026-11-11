@@ -1,11 +1,11 @@
 /**
- * Receipt-parse route (vlm-receipt-parsing T4, C512) — POST /api/v1/receipts/parse. Drives the REAL
+ * Receipt-parse route (vlm-receipt-parsing T4) — POST /api/v1/receipts/parse. Drives the REAL
  * stack (middleware → requireAuth → handler → registry → adapter) via the in-process harness, with the
  * adapter's outbound fetch STUBBED (no live key/endpoint). Pins the route contract:
  *  - PERSISTS NOTHING (no expense row created);
  *  - a good model response → a clean DRAFT (validated through the fail-closed schema);
  *  - NO configured vlm provider → 400 with an actionable message (not a 500);
- *  - a provider transport/HTTP failure → 502 (the #43/#44 anti-fail-open lesson, never a faked 200);
+ *  - a provider transport/HTTP failure → 502 (the anti-fail-open lesson, never a faked 200);
  *  - a wrong-type / oversized image → 400 / 413;
  *  - the api key is never echoed in the response.
  *

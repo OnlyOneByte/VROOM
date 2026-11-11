@@ -1,17 +1,17 @@
 /**
- * In-process HTTP tests for the REAL analytics routes (C185 deep-review → guard).
+ * In-process HTTP tests for the REAL analytics routes (deep-review → guard).
  *
  * The analytics route handlers (analytics/routes.ts) were the named coverage low spot (15% func) —
  * the existing summary-route.test.ts reconstructs a MINIMAL app inline (mocked repo + fake auth),
- * so it never drives the real module (the C181/C182 coverage-theater shape). This drives the ACTUAL
- * app via createTestApp() over an in-memory DB (the C91 providers-routes precedent), so it covers:
- *   - auth gating (anon → 401) on a representative endpoint,
- *   - the OWNERSHIP-GUARD branch the audit cares about: a vehicle-scoped endpoint must NOT serve a
- *     foreign / nonexistent vehicleId (validateVehicleOwnership → NotFoundError → 404; the C109/#52
- *     cross-tenant class — a user can never read another tenant's analytics by guessing an id),
- *   - the optional-vehicleId branch (omitted → all-the-user's-vehicles path, no validation),
- *   - the {success,data} success envelope on an owned vehicle,
- *   - query validation (required vehicleId missing → 400).
+ * so it never drives the real module (the coverage-theater shape). This drives the ACTUAL
+ * app via createTestApp() over an in-memory DB (the providers-routes precedent), so it covers:
+ *  - auth gating (anon → 401) on a representative endpoint,
+ *  - the OWNERSHIP-GUARD branch the audit cares about: a vehicle-scoped endpoint must NOT serve a
+ *  foreign / nonexistent vehicleId (validateVehicleOwnership → NotFoundError → 404; the
+ *  cross-tenant class — a user can never read another tenant's analytics by guessing an id),
+ *  - the optional-vehicleId branch (omitted → all-the-user's-vehicles path, no validation),
+ *  - the {success,data} success envelope on an owned vehicle,
+ *  - query validation (required vehicleId missing → 400).
  *
  * createTestApp() must run before static config/connection imports — keep imports to the harness.
  */
@@ -33,7 +33,7 @@ beforeEach(async () => {
 afterEach(() => ctx.close());
 
 // This file's fixture is a nickname-required Honda Civic 2021; converge onto the shared test-helpers/seed
-// seedVehicle (arch convergence, Angelo-approved) via a thin wrapper that keeps make/model/year explicit
+// seedVehicle  via a thin wrapper that keeps make/model/year explicit
 // (the shared default is a Toyota Camry) so behavior is preserved.
 const seedVehicle = (nickname: string): Promise<string> =>
   seedVehicleShared(ctx, { make: 'Honda', model: 'Civic', year: 2021, nickname });
@@ -107,8 +107,8 @@ describe('analytics routes (real HTTP stack)', () => {
     expect(res.status).toBe(404);
   });
 
-  // C290: /fuel-stats + /fuel-advanced carry the IDENTICAL `if (vehicleId) validateVehicleOwnership`
-  // optional-guard as fuel-efficiency, but their cross-tenant branch was uncovered (the C185 net pinned
+  // /fuel-stats + /fuel-advanced carry the IDENTICAL `if (vehicleId) validateVehicleOwnership`
+  // optional-guard as fuel-efficiency, but their cross-tenant branch was uncovered (the net pinned
   // fuel-efficiency + the required-vehicleId endpoints, not these two). Pin both branches on each:
   // omitted vehicleId → 200 all-fleet (no validation), foreign vehicleId → 404 (no cross-tenant leak).
   // NOTE: unlike fuel-efficiency, these two REQUIRE startDate+endDate (unix seconds) — omit them and
@@ -146,11 +146,11 @@ describe('analytics routes (real HTTP stack)', () => {
     expect(res.status).toBe(404);
   });
 
-  // C109 (guard): /vehicle-expenses carries the SAME `validateVehicleOwnership(vehicleId)` cross-tenant
+  // /vehicle-expenses carries the SAME `validateVehicleOwnership(vehicleId)` cross-tenant
   // gate as vehicle-tco/vehicle-health (routes.ts:147) — a REQUIRED-vehicleId endpoint — but its ownership
-  // branch was the one vehicle-scoped analytics route this net never pinned (the C185/C290 additions covered
+  // branch was the one vehicle-scoped analytics route this net never pinned (the additions covered
   // tco/health/fuel-*). The repo method getVehicleExpenses is unit-tested, but a route-layer guard-drop would
-  // serve another tenant's per-vehicle expense analytics by guessing an id (the C109/#52 class). Unlike
+  // serve another tenant's per-vehicle expense analytics by guessing an id. Unlike
   // tco/health it also REQUIRES startDate+endDate (dateRangeRequiredVehicleQuerySchema), so omit them and
   // zValidator 400s before the guard — supply the range to reach the ownership branch. RANGE defined above.
   test('vehicle-expenses serves an OWNED vehicle (200 + envelope)', async () => {
@@ -179,11 +179,11 @@ describe('analytics routes (real HTTP stack)', () => {
     expect(res.status).toBe(400);
   });
 
-  // C110 (the C108/C109 route-coverage audit, completing the analytics domain): /quick-stats,
+  // /quick-stats,
   // /cross-vehicle, /year-end were the 3 analytics routes with ZERO HTTP-harness coverage. Unlike the
   // vehicle-scoped routes above they're USER-scoped in the repo (no per-vehicle ownership gate), so the
   // route-layer invariants to pin are: (a) auth-gating — every analytics route is behind requireAuth, but
-  // the C185 net asserted 401 on only ONE representative route (/financing); these pin it per-route so a
+  // the net asserted 401 on only ONE representative route (/financing); these pin it per-route so a
   // mis-mount that skipped the middleware on one wouldn't go unnoticed; (b) the REQUIRED startDate+endDate
   // validation on the two dateRange routes (omit → 400 via zValidator, BEFORE any repo work); (c) year-end's
   // year is OPTIONAL (omitted → defaults to the current year → 200, not 400). Drives the REAL routes.
@@ -218,12 +218,12 @@ describe('analytics routes (real HTTP stack)', () => {
     expect(withYear.status).toBe(200);
   });
 
-  // #139 (C453): a 0%-APR dealer-promo loan (apr===0, schema .min(0)-valid) must STILL appear in
+  // A 0%-APR dealer-promo loan (apr===0, schema .min(0)-valid) must STILL appear in
   // /analytics/financing's loanBreakdown. buildLoanBreakdown previously filtered `&& f.apr` (truthy),
-  // dropping apr===0 → a real active loan's principal paydown vanished from the chart (the #92/#117
+  // dropping apr===0 → a real active loan's principal paydown vanished from the chart (the
   // 0%-APR class, 3rd site). The amortization helper handles 0% correctly: interest=balance*0=0, the
   // whole payment retires principal. Drive the REAL GET /analytics/financing over a raw-seeded 0% loan.
-  test('a 0%-APR active loan still appears in loanBreakdown with a principal series (#139)', async () => {
+  test('a 0%-APR active loan still appears in loanBreakdown with a principal series', async () => {
     const vehicleId = await seedVehicle('Promo Lease');
     // Raw-seed a 0%-APR active loan (the form/route allows apr:0; seed directly to pin the analytics path).
     ctx.sqlite.run(

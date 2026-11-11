@@ -1,5 +1,5 @@
 /**
- * Unit tests for the shared unit-preferences schema + merge helper (C238 dedup). The schema +
+ * Unit tests for the shared unit-preferences schema + merge helper. The schema +
  * partial-merge were byte-identical in vehicles/routes.ts and settings/routes.ts; this pins the
  * extracted single source of truth — especially mergeUnitPreferences's contracts (undefined when
  * nothing to merge; null/undefined existing spread safely; partial overrides existing field-by-field).

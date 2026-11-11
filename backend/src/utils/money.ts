@@ -3,9 +3,9 @@
  *
  * Money is stored + computed as integer CENTS everywhere internally (the 14 columns in design §1, flipped
  * by migration 0009). Dollars exist only at the two edges:
- *   - INPUT edge (client → DB): `dollarsToCents` — a Zod transform on every money input validator (T3).
- *   - DISPLAY edge (DB → client): `centsToDollars` — applied at the API response boundary (T6) so the
- *     frontend's existing dollar contract (`Expense.amount`, …) is UNCHANGED and no eyes-on FE work is needed.
+ *  - INPUT edge (client → DB): `dollarsToCents` — a Zod transform on every money input validator (T3).
+ *  - DISPLAY edge (DB → client): `centsToDollars` — applied at the API response boundary (T6) so the
+ *  frontend's existing dollar contract (`Expense.amount`, …) is UNCHANGED and no eyes-on FE work is needed.
  *
  * ROUND-before-int is mandatory on the way in: `12.34 * 100` is the binary float `1233.9999…`, so a bare
  * `| 0` / `Math.trunc` would store 1233 (a cent low). `Math.round` fixes it (same rule the 0009 migration
@@ -13,6 +13,7 @@
  */
 
 import { z } from 'zod';
+import type { ExpenseSummary } from '../api/expenses/repository';
 
 /** Dollars (possibly fractional) → integer cents. `12.34 → 1234`. ROUND-before-int (binary-float safe). */
 export function dollarsToCents(dollars: number): number {
@@ -102,8 +103,8 @@ export const reminderToApi = <T extends Record<string, unknown>>(row: T) =>
  * (`withComputedBalance` adds it = originalAmount − Σ payments, all cents). `eligibleForPayoff` is
  * computed on the cents balance upstream, so it is copied through unchanged. ONE source of truth for the
  * financing display edge: the financing route returns this directly AND the vehicles route embeds it under
- * `vehicle.financing`, so the same field-set + computedBalance conversion was hand-rolled at both (C14) —
- * a divergence would show a different loan balance on the financing page vs the vehicle card (NORTH_STAR #2).
+ * `vehicle.financing`, so the same field-set + computedBalance conversion was hand-rolled at both —
+ * a divergence would show a different loan balance on the financing page vs the vehicle card.
  * `computedBalance` is converted only when present + numeric (a raw create/replace row has no balance yet).
  */
 export function financingWithBalanceToApi<T extends Record<string, unknown>>(row: T): T {
@@ -111,6 +112,56 @@ export function financingWithBalanceToApi<T extends Record<string, unknown>>(row
   return typeof withMoney.computedBalance === 'number'
     ? { ...withMoney, computedBalance: centsToDollars(withMoney.computedBalance) }
     : withMoney;
+}
+
+/**
+ * A VEHICLE API object's money cents→dollars: the vehicle's own `purchasePrice` AND its embedded
+ * `financing` (money columns + the derived `computedBalance`, via the shared financing mapper so a
+ * vehicle card and the financing page can never show different balances). `eligibleForPayoff` is
+ * computed on the cents balance upstream, so it is copied through unchanged. Pure, shallow.
+ *
+ * Shared rather than route-local because the vehicles routes are not the only consumer: the LLM
+ * assistant's read tools return vehicle rows too, and a second hand-rolled copy is exactly how one
+ * consumer ends up reporting cents as dollars.
+ */
+export function vehicleRowToApi<T extends Record<string, unknown>>(row: T): T {
+  const v = vehicleToApi(row);
+  const fin = v.financing as Record<string, unknown> | null | undefined;
+  if (fin && typeof fin === 'object') {
+    return { ...v, financing: financingWithBalanceToApi(fin) };
+  }
+  return v;
+}
+
+/**
+ * A ReminderWithVehicles API object ({ reminder, vehicleIds }) cents→dollars: the money (expenseAmount)
+ * lives on the nested reminder; vehicleIds and everything else pass through. Shared with the assistant
+ * tools for the same reason as `vehicleRowToApi`.
+ */
+export function reminderWithVehiclesToApi<T extends { reminder: Record<string, unknown> }>(
+  row: T
+): T {
+  return { ...row, reminder: reminderToApi(row.reminder) };
+}
+
+/**
+ * An expense SUMMARY (`expenseRepository.getSummary`) cents→dollars: the two totals, the monthly
+ * average (a cents-per-month quotient) and the amount in both breakdown series. Counts, category keys
+ * and period labels are not money. ONE source of truth for the five fields, since the summary route and
+ * the assistant's getExpenseSummary tool both return this shape.
+ */
+export function expenseSummaryToApi(summary: ExpenseSummary): ExpenseSummary {
+  return {
+    ...summary,
+    totalAmount: centsToDollars(summary.totalAmount),
+    monthlyAverage: centsToDollars(summary.monthlyAverage),
+    recentAmount: centsToDollars(summary.recentAmount),
+    categoryBreakdown: summary.categoryBreakdown.map((r) => ({
+      ...r,
+      amount: centsToDollars(r.amount),
+    })),
+    monthlyTrend: summary.monthlyTrend.map((r) => ({ ...r, amount: centsToDollars(r.amount) })),
+  };
 }
 
 /**
@@ -123,8 +174,8 @@ export function financingWithBalanceToApi<T extends Record<string, unknown>>(row
  * that schema with the `.transform(dollarsToCents)` appended. Keeps every money validator a one-liner
  * with its own message/bounds while the cents conversion lives in ONE place.
  *
- *   moneyDollarsToCents((n) => n.positive('Amount must be positive'))           // required positive money
- *   moneyDollarsToCents((n) => n.min(0, 'Cannot be negative')).optional()       // optional, ≥ 0
+ *  moneyDollarsToCents((n) => n.positive('Amount must be positive')) // required positive money
+ *  moneyDollarsToCents((n) => n.min(0, 'Cannot be negative')).optional() // optional, ≥ 0
  */
 export function moneyDollarsToCents(build: (base: z.ZodNumber) => z.ZodNumber = (n) => n) {
   return build(z.number()).transform(dollarsToCents);

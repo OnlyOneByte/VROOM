@@ -59,7 +59,7 @@ export function fuelAdvancedToApi(d: FuelAdvancedData): FuelAdvancedData {
     // vehicleRadar is NOT money: its `maintenanceCost` + `annualCost` fields are normalizeScore() 0-100
     // RADAR SCORES (analytics-charts.ts buildVehicleRadar — every field is normalized to [0,100] for the
     // radar chart), despite the cost-y names. Converting them /100 would corrupt the chart (a score of 80
-    // → 0.8). Leave the whole object untouched. (Verified firsthand C17.5 against buildVehicleRadar.)
+    // → 0.8). Leave the whole object untouched. (Verified firsthand against buildVehicleRadar.)
     dayOfWeekPatterns: d.dayOfWeekPatterns.map((p) => ({ ...p, avgCost: c(p.avgCost) })),
     monthlyCostHeatmap: d.monthlyCostHeatmap.map((m) => ({
       ...m,

@@ -137,8 +137,8 @@ function calculateMileageStats(
   stats.currentMileage = latestMileage;
   // Distance driven can never be negative. A backdated/mistyped reading BELOW initialMileage (or the
   // only in-window reading being lower than the purchase odometer) would otherwise surface a negative
-  // totalMileage verbatim (#46). Clamp at 0 — correct under ANY stats-period windowing (the separate
-  // #45 decision), since a driven distance is non-negative regardless of the window's numerator scope.
+  // totalMileage verbatim. Clamp at 0 — correct under ANY stats-period windowing (the separate
+  // decision), since a driven distance is non-negative regardless of the window's numerator scope.
   stats.totalMileage = Math.max(0, latestMileage - initialMileage);
 
   if (stats.totalMileage > 0) {
@@ -152,14 +152,14 @@ function calculateMileageStats(
  * Pairs CONSECUTIVE fillups (current − previous) for the per-segment distance, so the input MUST be
  * in chronological order. The sole production caller (vehicles/routes.ts) already sorts by date, but a
  * pairwise odometer-delta is silently WRONG on unordered rows (negative deltas dropped by the mpg>0
- * filter, but valid out-of-order segments mis-paired) — so sort defensively here too (#75). The sort
+ * filter, but valid out-of-order segments mis-paired) — so sort defensively here too. The sort
  * is on a copy + idempotent for already-sorted input, so it's behavior-preserving for today's caller
  * while making the helper correct for any future consumer that forgets to pre-sort.
  */
 function calculateAverageMpg(unorderedExpenses: FuelExpense[]): number | null {
-  // Defensive inline date sort (#75: the helper requires chronological order for correct pairwise
-  // odometer deltas), then run the SHARED consecutive-pair MPG average (C17 dedup — the same loop +
-  // missedFillup skip + (0,150) band that calculateAverageMPG uses; C161 proved hand-copies drift).
+  // Defensive inline date sort (: the helper requires chronological order for correct pairwise
+  // odometer deltas), then run the SHARED consecutive-pair MPG average (dedup — the same loop +
+  // missedFillup skip + (0,150) band that calculateAverageMPG uses; proved hand-copies drift).
   const sorted = [...unorderedExpenses].sort((a, b) => a.date.getTime() - b.date.getTime());
   return averageConsecutiveMpg(sorted);
 }

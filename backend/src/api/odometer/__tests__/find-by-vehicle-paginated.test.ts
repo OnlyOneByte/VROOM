@@ -1,9 +1,9 @@
 /**
  * Unit tests for OdometerRepository.findByVehicleIdPaginated (the backing query for
- * GET /api/v1/odometer/:vehicleId). C180 (#48 completion): C168 userId-scoped getHistory +
+ * GET /api/v1/odometer/:vehicleId). (completion): userId-scoped getHistory +
  * getCurrentOdometer but MISSED this third method, which filtered on vehicle_id ALONE. The
  * route validates vehicle ownership first so it's not live-exploitable, but the unscoped leg
- * is the identical latent cross-tenant boundary (C109/#52) the #48 sweep set out to close —
+ * is the identical latent cross-tenant boundary the sweep set out to close —
  * so it's now scoped on (vehicle_id AND user_id) on both the data + count legs, pinned here.
  */
 
@@ -66,9 +66,9 @@ describe('OdometerRepository.findByVehicleIdPaginated', () => {
     expect(page.data).toHaveLength(2);
   });
 
-  // #48 (C180): the data AND count legs are userId-scoped. A row owned by ANOTHER user that
+  // The data AND count legs are userId-scoped. A row owned by ANOTHER user that
   // (pathologically) shares this vehicleId must neither appear in the page NOR inflate totalCount.
-  test('is userId-scoped — another user’s same-vehicleId rows never leak into data or count (#48)', async () => {
+  test('is userId-scoped — another user’s same-vehicleId rows never leak into data or count', async () => {
     const OTHER_USER = 'u-page-other';
     sqliteDb.run(
       `INSERT INTO users (id, email, display_name) VALUES ('${OTHER_USER}', 'po@test.com', 'Other')`

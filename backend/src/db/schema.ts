@@ -1,5 +1,5 @@
 import { createId } from '@paralleldrive/cuid2';
-import { relations, sql } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import {
   index,
   integer,
@@ -55,7 +55,7 @@ export const vehicles = sqliteTable(
   },
   (table) => ({
     userIdIdx: index('vehicles_user_id_idx').on(table.userId),
-    // License-plate uniqueness is PER-USER, not global (migration 0005, C233): two users may
+    // License-plate uniqueness is PER-USER, not global (migration 0005): two users may
     // legitimately register the same plate string (reissued plates, sold-then-rebought cars), and a
     // global unique index both wrongly blocked the second user AND leaked plate existence across
     // tenants. Partial (WHERE license_plate IS NOT NULL) so plate-less vehicles don't collide.
@@ -98,6 +98,12 @@ export const vehicleFinancing = sqliteTable(
   },
   (table) => ({
     vehicleIdIdx: index('vf_vehicle_id_idx').on(table.vehicleId),
+    // At most one ACTIVE financing agreement per vehicle, enforced in the database rather than by
+    // the repository: a vehicle with two active loans double-counts every payment in cost-per-mile.
+    // History is unbounded, hence partial rather than a plain unique on vehicle_id.
+    activeVehicleIdx: uniqueIndex('vf_active_vehicle_idx')
+      .on(table.vehicleId)
+      .where(sql`${table.isActive} = 1`),
   })
 );
 
@@ -306,6 +312,12 @@ export const userProviders = sqliteTable(
   },
   (table) => ({
     userDomainIdx: index('up_user_domain_idx').on(table.userId, table.domain),
+    // One auth identity per external account: the uniqueness that stops a second local user from
+    // claiming an OAuth account already linked elsewhere. Scoped to `auth` because the other
+    // domains (storage, llm) legitimately hold several rows per provider account.
+    authIdentityIdx: uniqueIndex('up_auth_identity_idx')
+      .on(table.providerType, table.providerAccountId)
+      .where(sql`${table.domain} = 'auth'`),
   })
 );
 
@@ -365,11 +377,6 @@ export const sessions = sqliteTable('sessions', {
   expiresAt: integer('expires_at').notNull(),
 });
 
-// Relations
-export const expensesRelations = relations(expenses, ({ one }) => ({
-  vehicle: one(vehicles, { fields: [expenses.vehicleId], references: [vehicles.id] }),
-}));
-
 // Odometer Entries table (v2: removed linkedEntityType, linkedEntityId, odometer_linked_entity_idx)
 export const odometerEntries = sqliteTable(
   'odometer_entries',
@@ -396,7 +403,7 @@ export const odometerEntries = sqliteTable(
 
 // Trips table (trips-location T1, spec §1) — manual trip log per vehicle. Mirrors odometerEntries (the
 // closest existing shape). `distance` is NOT stored; it's derived `max(0, endOdometer − startOdometer)` at
-// read time (R2, the #46 clamp) so a later odometer correction can't desync a stored distance. No GPS in v1
+// read time (R2, the clamp) so a later odometer correction can't desync a stored distance. No GPS in v1
 // (D5): startLocation/endLocation are optional free-text labels. The business-mileage rate lives in
 // preferences (display-time), so this table introduces NO float-money column (design §7 — inherits the
 // money-cents migration cleanly).
@@ -477,6 +484,11 @@ export const photoRefs = sqliteTable(
   },
   (table) => ({
     photoProviderIdx: uniqueIndex('pr_photo_provider_idx').on(table.photoId, table.providerId),
+    // Drives the upload-retry sweep, which only ever looks at rows still worth retrying. Partial so
+    // the index stays small as `active` rows accumulate — they are the overwhelming majority.
+    pendingIdx: index('pr_pending_idx')
+      .on(table.status, table.createdAt)
+      .where(sql`${table.status} IN ('pending', 'failed') AND ${table.retryCount} < 3`),
   })
 );
 
@@ -497,7 +509,7 @@ export const reminders = sqliteTable(
     frequency: text('frequency').notNull(), // 'weekly' | 'monthly' | 'yearly' | 'custom'
     intervalValue: integer('interval_value'), // for custom: e.g. 3
     intervalUnit: text('interval_unit'), // 'day' | 'week' | 'month' | 'year'
-    // Maintenance-schedule (cycle 15, spec .kiro/specs/maintenance-schedule): a reminder may be
+    // Maintenance-schedule (spec .kiro/specs/maintenance-schedule): a reminder may be
     // due by time, by mileage, or by whichever-comes-first. These are additive + nullable/
     // defaulted so existing reminders behave identically (triggerMode defaults to 'time').
     triggerMode: text('trigger_mode').notNull().default('time'), // 'time' | 'mileage' | 'both'
@@ -506,11 +518,11 @@ export const reminders = sqliteTable(
     nextDueOdometer: integer('next_due_odometer'), // cache = lastServiceOdometer + intervalMileage
     startDate: integer('start_date', { mode: 'timestamp' }).notNull(),
     endDate: integer('end_date', { mode: 'timestamp' }), // null = runs forever
-    // Nullable as of T3 (cycle 22): a mileage-ONLY reminder has no time axis, so it carries no
+    // Nullable as of T3: a mileage-ONLY reminder has no time axis, so it carries no
     // next_due_date. The time-due query null-guards (`IS NOT NULL AND next_due_date <= now`) and
     // the trigger loop skips a null date. Relaxing this from NOT NULL forced a SQLite table rebuild
     // (migration 0004), hand-authored child-first so the reminder_vehicles / reminder_notifications
-    // ON DELETE CASCADE does not wipe child rows (the C15 lesson: PRAGMA foreign_keys=OFF is a
+    // ON DELETE CASCADE does not wipe child rows (the lesson: PRAGMA foreign_keys=OFF is a
     // no-op inside the migrator's transaction).
     nextDueDate: integer('next_due_date', { mode: 'timestamp' }),
     expenseCategory: text('expense_category'),
@@ -563,11 +575,11 @@ export const reminderNotifications = sqliteTable(
     userId: text('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    // Nullable as of T3 (cycle 22): a mileage-fired notification has no time period, so it carries
+    // Nullable as of T3: a mileage-fired notification has no time period, so it carries
     // no due_date (its milestone lives in due_odometer instead). Exactly one of dueDate/dueOdometer
     // is set per notification (time axis vs mileage axis).
     dueDate: integer('due_date', { mode: 'timestamp' }), // the period this notification is for (time axis)
-    // Odometer milestone for a mileage-fired notification (cycle 15 column; activated T3, cycle 22).
+    // Odometer milestone for a mileage-fired notification.
     dueOdometer: integer('due_odometer'),
     isRead: integer('is_read', { mode: 'boolean' }).notNull().default(false),
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
@@ -588,9 +600,9 @@ export const reminderNotifications = sqliteTable(
   })
 );
 
-// Vehicle sharing (migration 0010, vehicle-sharing T1; Angelo ratified D1-D8 2026-06-27).
+// Vehicle sharing (migration 0010, vehicle-sharing T1).
 // An OWNER grants another existing VROOM user scoped access to ONE of their vehicles. This is the
-// ONLY widening of cross-userId access in VROOM (NORTH_STAR #2) — every read/write route that opts a
+// ONLY widening of cross-userId access in VROOM — every read/write route that opts a
 // shared vehicle in routes through utils/sharing.ts (T2), never raw. IDs are text/cuid2 to match
 // users.id + vehicles.id (the design draft said integer — corrected to the live schema). All three
 // FKs cascade so a deleted vehicle/owner/invitee drops the share row (D8); shared-CREATED expense
@@ -652,7 +664,7 @@ export const pushSubscriptions = sqliteTable(
     auth: text('auth').notNull(),
     // Optional label so the user can recognize a device in a "your devices" list.
     userAgent: text('user_agent'),
-    // Consecutive transient send failures; a row past a cap is reaped (the #135 reaping-hygiene class).
+    // Consecutive transient send failures; a row past a cap is reaped (the reaping-hygiene class).
     failureCount: integer('failure_count').notNull().default(0),
     lastSuccessAt: integer('last_success_at', { mode: 'timestamp' }),
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),

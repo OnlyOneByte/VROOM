@@ -1,7 +1,7 @@
 /**
  * Unit tests for the backend `extractErrorMessage` — the single source of truth for the VALUE form of
  * the `error instanceof Error ? error.message : String(error)` idiom hand-rolled ~60× across the
- * backend (arch dedup seam, C147). Mirrors the frontend C90 `extract-error-message.test.ts`.
+ * backend (arch dedup seam). Mirrors the frontend `extract-error-message.test.ts`.
  *
  * The load-bearing contract is the type branch: a real Error yields its `.message`; ANYTHING else is
  * stringified via `String(...)` (NOT a fixed fallback literal — that's a DIFFERENT idiom, e.g.

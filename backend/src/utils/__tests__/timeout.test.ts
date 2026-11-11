@@ -1,6 +1,6 @@
 /**
- * Characterization tests for `withTimeout` + `OPERATION_TIMEOUTS` (C82 deep-review). This
- * utility was at 0% coverage (surfaced by the C81 coverage baseline) yet is live in the sync
+ * Characterization tests for `withTimeout` + `OPERATION_TIMEOUTS`. This
+ * utility was at 0% coverage (surfaced by the coverage baseline) yet is live in the sync
  * backup path (backup-orchestrator.ts, sync/routes.ts), where a hung Drive/Sheets call must
  * fail as a typed SyncError rather than hang forever. Pins the three race outcomes + the error
  * shape so a future edit can't silently change them. Pure → no DB, no server; uses small REAL

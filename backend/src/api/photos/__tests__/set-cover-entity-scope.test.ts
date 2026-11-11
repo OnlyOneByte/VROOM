@@ -1,8 +1,8 @@
 /**
- * Direct PhotoRepository.setCoverPhoto tests (C229 bug → entity-scoped second UPDATE).
+ * Direct PhotoRepository.setCoverPhoto tests (bug → entity-scoped second UPDATE).
  *
  * The two photo "property" tests (photo-repository.property.test.ts + photo-service.property.test.ts)
- * only exercise an in-memory REFERENCE model — neither drives the REAL setCoverPhoto (the C181
+ * only exercise an in-memory REFERENCE model — neither drives the REAL setCoverPhoto (the
  * coverage-theater anti-pattern), so the method's WHERE predicate was unpinned. These tests run the
  * real repo over a migrated in-memory SQLite DB (the batch-by-entity-type.test.ts pattern).
  *
@@ -10,7 +10,7 @@
  * (entityType, entityId), but the second (set-cover) UPDATE keyed on `id` ALONE — so a photoId
  * belonging to a DIFFERENT entity would clear the named entity's cover AND wrongly flag the foreign
  * photo (leaving the named entity cover-less). The fix VALIDATES the target's (id, entityType,
- * entityId) match BEFORE any write — because the bun:sqlite async-transaction footgun (the C151
+ * entityId) match BEFORE any write — because the bun:sqlite async-transaction footgun (the
  * lesson) means a throw AFTER the unset would NOT roll the unset back, so an unset-then-throw would
  * still leave the entity cover-less. Validate-first guarantees no mutation on a bad/foreign id.
  */

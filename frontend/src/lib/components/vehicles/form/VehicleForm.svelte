@@ -71,6 +71,10 @@
 	const isEditMode = $derived(!!vehicleId);
 
 	// Component state
+	// `vehicleId` is a route param, so this only supplies the first-paint value (the spinner
+	// branch, instead of a flash of the empty form); the load $effect below re-arms `isLoading`
+	// on any later change. It is reassigned, so it can't become a $derived. Svelte's
+	// state_referenced_locally warning here is the false positive MainSteering tells us to tolerate.
 	let isLoading = $state(!!vehicleId);
 	let isSubmitting = $state(false);
 	let isDeleting = $state(false);
@@ -95,7 +99,7 @@
 	// /vehicles/new the initializers capture the USD/imperial DEFAULT, and a metric
 	// user would get "Miles · Gallons" pre-selected (and silently saved). Re-seed from
 	// the store once it resolves, but only while the user hasn't touched the units and
-	// only in create mode (edit mode populates from the vehicle, not global prefs). (cycle 204)
+	// only in create mode (edit mode populates from the vehicle, not global prefs).
 	$effect(() => {
 		if (isEditMode || unitsTouched) return;
 		const prefs = settingsStore.unitPreferences;
@@ -379,9 +383,7 @@
 			const vinVal = vehicleForm.vin ? vehicleForm.vin.toUpperCase() : undefined;
 			const mileage = vehicleForm.initialMileage ?? undefined;
 			const price = vehicleForm.purchasePrice ?? undefined;
-			const pDate = vehicleForm.purchaseDate
-				? dateOnlyToISO(vehicleForm.purchaseDate)
-				: undefined;
+			const pDate = vehicleForm.purchaseDate ? dateOnlyToISO(vehicleForm.purchaseDate) : undefined;
 
 			// Update/create vehicle.
 			let savedVehicle: Vehicle;
@@ -878,7 +880,11 @@
 							class="rounded-full shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 px-5 flex-shrink-0"
 						>
 							<Trash2 class="h-5 w-5 sm:mr-2" />
-							<span class="hidden sm:inline font-semibold">Delete</span>
+							<!-- Clipped, not `hidden`, below `sm`: the icon is all that is left there and every Lucide
+							     icon is aria-hidden, so display:none on the text leaves the button with no accessible
+							     name at all. `max-sm:sr-only` (not `sr-only sm:not-sr-only`) because a later vendor
+							     `.sr-only` rule outranks `sm:not-sr-only` and would hide the label at every width. -->
+							<span class="max-sm:sr-only font-semibold">Delete</span>
 						</Button>
 					{/if}
 
@@ -891,7 +897,7 @@
 						class="rounded-full shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 px-5 flex-shrink-0"
 					>
 						<X class="h-5 w-5 sm:mr-2" />
-						<span class="hidden sm:inline font-semibold">Cancel</span>
+						<span class="max-sm:sr-only font-semibold">Cancel</span>
 					</Button>
 
 					<Button
@@ -952,7 +958,7 @@
 					<AlertDialogAction
 						onclick={handleDelete}
 						disabled={isDeleting}
-						class="bg-destructive hover:bg-destructive/90"
+						class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
 					>
 						{#if isDeleting}
 							<LoaderCircle class="h-4 w-4 animate-spin mr-2" />

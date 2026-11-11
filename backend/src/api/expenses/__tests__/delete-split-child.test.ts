@@ -26,7 +26,7 @@ beforeEach(async () => {
 afterEach(() => ctx.close());
 
 // This file's fixtures are make-only ("Honda"/"Toyota" with a constant model/year); converge onto the
-// shared seedVehicle (arch convergence, Angelo-approved) via a thin make-param wrapper that preserves the
+// shared seedVehicle  via a thin make-param wrapper that preserves the
 // exact prior payload (model 'Test', year 2021) so behavior is unchanged (the shared default is a Camry).
 const seedVehicle = (make: string): Promise<string> =>
   seedVehicleShared(ctx, { make, model: 'Test', year: 2021 });
@@ -68,7 +68,7 @@ describe('deleting a split sibling via DELETE /:id', () => {
 
     // What the ExpensesTable row delete (and the non-insurance ExpenseForm delete)
     // actually call: a single-row delete on children[0].
-    const del = await ctx.authed('DELETE', `/api/v1/expenses/${group.siblings[0]!.id}`);
+    const del = await ctx.authed('DELETE', `/api/v1/expenses/${group.siblings[0].id}`);
     expect(del.status).toBe(200);
 
     // The OTHER sibling survives — the group is now a broken partial split whose

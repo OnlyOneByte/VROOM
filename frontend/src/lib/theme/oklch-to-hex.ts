@@ -1,5 +1,5 @@
 /**
- * oklch() → `#rrggbb` hex conversion (#333 — the PWA `<meta name="theme-color">` tint).
+ * oklch() → `#rrggbb` hex conversion (— the PWA `<meta name="theme-color">` tint).
  *
  * The theme tokens are authored in `oklch()` (app.css + the registry), but the PWA status-bar meta tag
  * needs a plain hex string: `theme-color` predates wide `oklch()` support in the browser-chrome parser, so
@@ -7,7 +7,7 @@
  * This converts the ACTIVE theme's surface token to a hex the chrome reliably honors.
  *
  * Pipeline (Björn Ottosson's OKLab, the same matrices the WCAG-contrast guard uses — kept in lockstep):
- *   oklch → OKLab → linear sRGB → gamma-encoded sRGB → clamp [0,1] → 8-bit hex.
+ *  oklch → OKLab → linear sRGB → gamma-encoded sRGB → clamp [0,1] → 8-bit hex.
  * The gamma step (absent in the contrast guard, which works in linear light for luminance) is what makes
  * this a DISPLAY color rather than a luminance input. Out-of-gamut channels are clamped, not errored — a
  * vivid token still yields its nearest in-gamut hex rather than breaking the tint.

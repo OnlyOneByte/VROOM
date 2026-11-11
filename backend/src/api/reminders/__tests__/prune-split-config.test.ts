@@ -1,10 +1,10 @@
 /**
- * Unit tests for pruneVehicleFromSplitConfig (#88, C48) — the pure renormalizer that drops a deleted
+ * Unit tests for pruneVehicleFromSplitConfig — the pure renormalizer that drops a deleted
  * vehicle's leg from a reminder's expenseSplitConfig blob.
  *
  * The blob is NOT FK-managed (unlike the reminder_vehicles junction), so a deleted vehicle lingers in it
  * and the next trigger builds a split sibling for the dead vehicleId → FK violation + half-committed
- * surviving legs (C151 async-tx footgun). These pin the renormalize contract per split method.
+ * surviving legs (async-tx footgun). These pin the renormalize contract per split method.
  */
 
 import { describe, expect, test } from 'bun:test';

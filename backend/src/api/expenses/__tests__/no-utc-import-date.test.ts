@@ -1,10 +1,9 @@
 /**
- * Regression GUARD (committed, travels with the merge) for the cycle-6/11 date class on the CSV-IMPORT
- * paths (the import-trackers T6 net the GUIDE flags: "extend the no-utc guard to cover import-mapping.ts").
+ * Regression guard for the midnight-UTC date-rollback class on the CSV-import paths.
  *
  * A date-only foreign value ("YYYY-MM-DD", "MM/DD/YYYY", …) MUST be built in LOCAL time from numeric parts
  * via `buildLocalDate(year, month, day, …)`. Handing a date-only STRING to `new Date('YYYY-MM-DD')` parses
- * it as midnight UTC, which rolls the calendar day BACK for every user west of UTC (#23/#59/#87 family) —
+ * it as midnight UTC, which rolls the calendar day BACK for every user west of UTC —
  * the exact bug normalizeForeignDate + the native parseDate were written to avoid.
  *
  * `import-mapping.test.ts` already pins the BEHAVIOR (normalize → parse-back → local Y/M/D in any CI zone),
@@ -14,8 +13,8 @@
  * RED here even if no test happens to drive the new line (source-scan > untracked e2e for merge survival).
  *
  * It deliberately does NOT flag the two KNOWN-CORRECT `new Date()` sites in import-mapping.ts:
- *   - `new Date(ms)` (epoch path) — a numeric absolute instant, not a date string.
- *   - `new Date(s)` inside the branch gated on an explicit Z/±offset — an absolute instant, honored as-is.
+ *  - `new Date(ms)` (epoch path) — a numeric absolute instant, not a date string.
+ *  - `new Date(s)` inside the branch gated on an explicit Z/±offset — an absolute instant, honored as-is.
  * The scan only matches a Date constructed from a STRING/template whose content looks like a bare
  * Y-M-D / M/D/Y date (digit-separator-digit), which is precisely the antipattern.
  *
@@ -37,9 +36,9 @@ const FILES = [
 
 // A `new Date(...)` whose argument is a STRING or TEMPLATE built from a bare date — matched in two forms,
 // both reintroducing the midnight-UTC rollback:
-//   (a) a quoted/backtick literal with digit-sep-digit-sep-digit content: 'YYYY-MM-DD' / "MM/DD/YYYY".
-//   (b) a template whose interpolations are joined by date separators: `${y}-${m}-${d}` (a `}` immediately
-//       before a `-`/`/`/`.` separator — the frontend no-utc guard's idiom).
+//  (a) a quoted/backtick literal with digit-sep-digit-sep-digit content: 'YYYY-MM-DD' / "MM/DD/YYYY".
+//  (b) a template whose interpolations are joined by date separators: `${y}-${m}-${d}` (a `}` immediately
+//  before a `-`/`/`/`.` separator — the frontend no-utc guard's idiom).
 // Neither matches the CORRECT numeric form `new Date(year, month - 1, day)` (no opening quote/backtick),
 // nor `new Date(ms)` / `new Date(s)` (no date separators in the arg).
 const UTC_DATE_LITERAL = /new\s+Date\s*\(\s*['"][^'")]*\d{1,4}\s*[-/.]\s*\d{1,2}\s*[-/.]/;
@@ -60,7 +59,7 @@ function stripComments(src: string): string {
     .join('\n');
 }
 
-describe('no UTC-midnight date construction on the CSV-import paths (cycle 6/11 class guard)', () => {
+describe('no UTC-midnight date construction on the CSV-import paths', () => {
   test('the scan resolves the real import date modules (guard is live, not a no-op)', () => {
     for (const f of FILES) {
       expect(readFileSync(f, 'utf8').length, `unreadable/empty: ${f}`).toBeGreaterThan(100);
@@ -78,8 +77,8 @@ describe('no UTC-midnight date construction on the CSV-import paths (cycle 6/11 
     }
     expect(
       offenders,
-      `A CSV-import date is built from a date-only string → midnight-UTC rollback for users west of UTC ` +
-        `(#23/#59/#87). Build it from numeric parts via buildLocalDate(year, month, day, …) instead:\n${offenders.join('\n')}`
+      `A CSV-import date is built from a date-only string → midnight-UTC rollback for users west of UTC. ` +
+        `Build it from numeric parts via buildLocalDate(year, month, day, …) instead:\n${offenders.join('\n')}`
     ).toEqual([]);
   });
 

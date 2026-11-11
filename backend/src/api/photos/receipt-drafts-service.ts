@@ -11,7 +11,7 @@
  * (T1-live + T5); here `listReceiptPhotos` either works against the fake or throws an honest
  * "not enabled" the route maps to an actionable message. No live-read code is added by this slice.
  *
- * Error honesty (#43/#44/#144): a Photos transport failure THROWS (the route maps it to 502); a VLM
+ * Error honesty: a Photos transport failure THROWS (the route maps it to 502); a VLM
  * failure on ONE item yields that item an EMPTY draft (the user fills it) rather than failing the whole
  * batch — never a fabricated parse.
  */

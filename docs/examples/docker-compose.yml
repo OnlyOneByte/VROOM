@@ -12,8 +12,10 @@ services:
     volumes:
       # Persistent database storage
       - vroom-data:/app/data
-      # Optional: Mount custom config
-      - ./config/backend.env:/app/.env:ro
+    # Every variable the backend reads has to be listed here: the container sees only
+    # what this block passes through, so a value in `.env` that is missing below never
+    # reaches it. The three the backend refuses to start without in production are
+    # GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and PROVIDER_ENCRYPTION_KEY.
     environment:
       - NODE_ENV=production
       - PORT=3001
@@ -22,8 +24,8 @@ services:
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}
+      - PROVIDER_ENCRYPTION_KEY=${PROVIDER_ENCRYPTION_KEY}
       - FRONTEND_URL=${FRONTEND_URL}
-      - SESSION_SECRET=${SESSION_SECRET}
       - CORS_ORIGINS=${CORS_ORIGINS}
       - LOG_LEVEL=${LOG_LEVEL:-warn}
     restart: unless-stopped
@@ -64,7 +66,9 @@ services:
     labels:
       - "io.portainer.accesscontrol.teams=vroom"
 
-  # Cloudflare Tunnel for secure public access (free HTTPS, no port forwarding)
+  # Cloudflare Tunnel for secure public access (free HTTPS, no port forwarding).
+  # Delete this service if you are not using a tunnel — with an empty TUNNEL_TOKEN the
+  # container exits on start and is restarted forever.
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: vroom-tunnel

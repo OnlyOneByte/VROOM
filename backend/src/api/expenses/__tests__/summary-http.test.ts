@@ -97,13 +97,13 @@ describe('GET /expenses/summary — monthly bucketing (unixepoch regression)', (
   });
 });
 
-// C250 coverage: every existing summary test calls /summary with NO vehicleId (cross-fleet), so the
+// coverage: every existing summary test calls /summary with NO vehicleId (cross-fleet), so the
 // `if (filters.vehicleId)` scoping branches in expenseRepository.getSummary (repository.ts:466 + 488 — both
 // the period window AND the recent-30d window) + the route's validateVehicleOwnership branch were UNTESTED
 // (the repo sat at 78.82% line). These drive the vehicle-scoped summary through the REAL stack: a 2-vehicle
 // fleet, then ?vehicleId=<v1> must return ONLY v1's totals (v2 excluded), and an UNOWNED vehicleId → 404
-// (the #80 ownership discipline). NOT theater — exercises the real getSummary scoping, not a reimplementation.
-describe('GET /expenses/summary — vehicleId scoping (C250 coverage of the scoped path)', () => {
+// (the ownership discipline). NOT theater — exercises the real getSummary scoping, not a reimplementation.
+describe('GET /expenses/summary — vehicleId scoping (coverage of the scoped path)', () => {
   test('?vehicleId scopes totals + category breakdown to that vehicle only', async () => {
     const v1 = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2021 });
     const v2 = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2022 });
@@ -122,7 +122,7 @@ describe('GET /expenses/summary — vehicleId scoping (C250 coverage of the scop
     expect(byCat.misc).toBe(40);
   });
 
-  test('a summary scoped to an UNOWNED vehicle is 404 (ownership-checked, #80)', async () => {
+  test('a summary scoped to an UNOWNED vehicle is 404 (ownership-checked)', async () => {
     // Seed a 2nd user + their vehicle via raw SQL; the authed (1st) user must not summarize it.
     ctx.sqlite.run(
       `INSERT INTO users (id, email, display_name) VALUES ('u2sum', 'sum@x.com', 'Other')`

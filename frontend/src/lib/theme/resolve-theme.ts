@@ -21,13 +21,13 @@ export type ResolvedVariant = 'light' | 'dark';
  * resolve a definition's metadata (label/swatch) with the same fallback semantics.
  */
 export function resolveThemeDefinition(themeId: ThemeId | null | undefined): ThemeDefinition {
-  if (themeId && Object.hasOwn(THEME_REGISTRY, themeId)) {
-    const def = THEME_REGISTRY[themeId];
-    if (def) return def;
-  }
-  // The registry is constructed with `default` always present; this non-null is a belt-and-braces
-  // fallback so the function stays total even if the registry were ever mis-shaped.
-  return THEME_REGISTRY[DEFAULT_THEME_ID] as ThemeDefinition;
+	if (themeId && Object.hasOwn(THEME_REGISTRY, themeId)) {
+		const def = THEME_REGISTRY[themeId];
+		if (def) return def;
+	}
+	// The registry is constructed with `default` always present; this non-null is a belt-and-braces
+	// fallback so the function stays total even if the registry were ever mis-shaped.
+	return THEME_REGISTRY[DEFAULT_THEME_ID] as ThemeDefinition;
 }
 
 /**
@@ -35,12 +35,12 @@ export function resolveThemeDefinition(themeId: ThemeId | null | undefined): The
  * an absent/garbage systemPref defaults to `light` (the safe, lightest-surface default).
  */
 export function resolveVariant(
-  mode: ThemeMode | null | undefined,
-  systemPref: ResolvedVariant | null | undefined
+	mode: ThemeMode | null | undefined,
+	systemPref: ResolvedVariant | null | undefined
 ): ResolvedVariant {
-  if (mode === 'light' || mode === 'dark') return mode;
-  // mode === 'system' (or anything unrecognized) → follow the OS preference.
-  return systemPref === 'dark' ? 'dark' : 'light';
+	if (mode === 'light' || mode === 'dark') return mode;
+	// mode === 'system' (or anything unrecognized) → follow the OS preference.
+	return systemPref === 'dark' ? 'dark' : 'light';
 }
 
 /**
@@ -48,11 +48,11 @@ export function resolveVariant(
  * Unknown id → default; `system` mode → the systemPref variant; anything malformed → default's light.
  */
 export function resolveTheme(
-  themeId: ThemeId | null | undefined,
-  mode: ThemeMode | null | undefined,
-  systemPref: ResolvedVariant | null | undefined
+	themeId: ThemeId | null | undefined,
+	mode: ThemeMode | null | undefined,
+	systemPref: ResolvedVariant | null | undefined
 ): ThemeTokens {
-  const definition = resolveThemeDefinition(themeId);
-  const variant = resolveVariant(mode, systemPref);
-  return definition[variant];
+	const definition = resolveThemeDefinition(themeId);
+	const variant = resolveVariant(mode, systemPref);
+	return definition[variant];
 }

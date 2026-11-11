@@ -25,7 +25,7 @@ afterEach(() => ctx.close());
 
 // This file's fixture is a Honda Civic 2021 seeded with initialMileage 10000 (the baseline the
 // currentOdometer cross-source MAX assertions build on); converge onto the shared test-helpers/seed
-// seedVehicle (arch convergence, Angelo-approved), passing make/model/year explicitly + initialMileage
+// seedVehicle, passing make/model/year explicitly + initialMileage
 // through `extra` so the exact prior fixture is preserved (the shared default is a Camry with no mileage).
 const seedVehicle = (): Promise<string> =>
   seedVehicleShared(ctx, {
@@ -128,7 +128,7 @@ describe('GET /vehicles/:id/stats — currentOdometer (T3 part 3 reconcile)', ()
  * The response is hand-assembled in routes.ts (`c.json({ period, ...stats, currentOdometer })`)
  * with NO type binding to the frontend `VehicleStats` interface it must satisfy. The backend
  * `calculateVehicleStats()` returns only 11 fields — the route adds `period` + `currentOdometer`
- * separately (C52 added the latter to both sides independently). So a refactor that returns the
+ * separately (added the latter to both sides independently). So a refactor that returns the
  * calculator output directly, or drops/renames a field, would silently diverge from the frontend
  * contract and the UI would read `undefined`.
  *

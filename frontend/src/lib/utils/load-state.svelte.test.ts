@@ -1,5 +1,5 @@
 /**
- * Unit tests for `createLoadState<T>()` (arch #2 scaffold). Pins the behaviour-preserving
+ * Unit tests for `createLoadState<T>()` (arch scaffold). Pins the behaviour-preserving
  * contract the per-page triad has today, so a later cycle can migrate pages onto it with a
  * proven net: success stores data + clears error, failure runs onError + records the message
  * + leaves prior data intact, the message falls back for non-Error throws, isLoading toggles

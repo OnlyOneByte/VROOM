@@ -76,10 +76,10 @@ export class GooglePhotosService {
 
   /**
    * @param refreshToken Google OAuth refresh token (ignored when `client` injected).
-   * @param client       Optional pre-built PhotosClient — inject an in-memory fake
-   *                      in tests. Production builds an OAuth2-authed real client.
-   * @param albumId       Optional cached VROOM album id (from provider `config`) so
-   *                      we skip the resolve-or-create round-trip when known.
+   * @param client Optional pre-built PhotosClient — inject an in-memory fake
+   *  in tests. Production builds an OAuth2-authed real client.
+   * @param albumId Optional cached VROOM album id (from provider `config`) so
+   *  we skip the resolve-or-create round-trip when known.
    */
   constructor(refreshToken: string, client?: PhotosClient, albumId?: string) {
     this.client = client ?? createRealPhotosClient(refreshToken);
@@ -128,7 +128,7 @@ export class GooglePhotosService {
    *
    * Throws SyncError(AUTH_INVALID) when the client cannot search yet (the read scope is ARCC-gated +
    * lands in T1-live/T5) — an HONEST failure the route maps to an actionable message, never a fake
-   * empty result (#43/#44/#144 anti-fail-open).
+   * empty result (anti-fail-open).
    */
   async listReceiptPhotos(maxItems: number): Promise<PhotosMediaItem[]> {
     if (!this.client.searchMediaItems) {
@@ -223,7 +223,7 @@ export function createRealPhotosClient(refreshToken: string): PhotosClient {
         // mirror authedFetch's status→code mapping: a 401/403 here is an EXPIRED/REVOKED token, not a
         // transient network flake. Classifying it as NETWORK_ERROR makes the backoff retry it as a
         // retryable glitch (a 401 storm) instead of surfacing AUTH_INVALID so the user re-connects
-        // (#105). The sibling batchCreate/download/list paths already map 401→AUTH_INVALID via authedFetch.
+        //  The sibling batchCreate/download/list paths already map 401→AUTH_INVALID via authedFetch.
         throw new SyncError(
           res.status === 401 || res.status === 403
             ? SyncErrorCode.AUTH_INVALID

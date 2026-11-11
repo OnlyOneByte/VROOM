@@ -5,7 +5,7 @@
  *  - an already-imported photo is FILTERED OUT (the idempotency cross-ref, D3/R5);
  *  - a per-item VLM/download failure degrades to an EMPTY draft for THAT item (never a batch fail);
  *  - a thumbnail-URL failure degrades that item's thumbnailUrl to null (not fatal);
- *  - a Photos LIST/transport failure PROPAGATES (the route maps it to 502 — anti-fail-open #43/#44/#144);
+ *  - a Photos LIST/transport failure PROPAGATES (the route maps it to 502 — anti-fail-open);
  *  - the D4 cap is honored (listReceiptPhotos is called with the cap).
  *
  * The HTTP wiring (provider resolution, the 400/502 mapping) is pinned separately by the route test.

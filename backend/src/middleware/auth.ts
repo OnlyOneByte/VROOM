@@ -52,6 +52,13 @@ export const requireAuth: MiddlewareHandler = async (c, next) => {
 /**
  * Optional authentication middleware
  * Sets user context if authenticated, but doesn't throw if not
+ *
+ * Goes through validateAndRefreshSession rather than calling lucia directly, because
+ * `lucia.validateSession` is the write that slides a past-half-life session's expiry forward and
+ * reports it ONCE via `session.fresh`. This middleware runs on every `/api/*` request ahead of
+ * requireAuth, so calling lucia here would consume that one signal and leave the browser cookie
+ * stranded on its original login deadline — the session lifetime must be handled by whoever
+ * observes the extension first.
  */
 export const optionalAuth: MiddlewareHandler = async (c, next) => {
   try {
@@ -59,10 +66,10 @@ export const optionalAuth: MiddlewareHandler = async (c, next) => {
     const sessionId = getCookie(c, lucia.sessionCookieName);
 
     if (sessionId) {
-      const { session, user } = await lucia.validateSession(sessionId);
-      if (session && user) {
-        c.set('user', user);
-        c.set('session', { id: session.id, expiresAt: session.expiresAt });
+      const result = await validateAndRefreshSession(sessionId, lucia, c);
+      if (result) {
+        c.set('user', result.user);
+        c.set('session', { id: result.session.id, expiresAt: result.session.expiresAt });
       }
     }
   } catch (error) {

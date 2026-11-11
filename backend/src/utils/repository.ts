@@ -24,15 +24,15 @@ import { NotFoundError } from '../errors';
  * Usage:
  * ```typescript
  * export class UserRepository extends BaseRepository<User, NewUser> {
- *   constructor(db: AppDatabase) {
- *     super(db, users);
- *   }
+ *  constructor(db: AppDatabase) {
+ *  super(db, users);
+ *  }
  *
- *   // Add custom methods with direct Drizzle queries
- *   async findByEmail(email: string): Promise<User | null> {
- *     const result = await this.db.select().from(users).where(eq(users.email, email)).limit(1);
- *     return result[0] || null;
- *   }
+ *  // Add custom methods with direct Drizzle queries
+ *  async findByEmail(email: string): Promise<User | null> {
+ *  const result = await this.db.select().from(users).where(eq(users.email, email)).limit(1);
+ *  return result[0] || null;
+ *  }
  * }
  * ```
  */

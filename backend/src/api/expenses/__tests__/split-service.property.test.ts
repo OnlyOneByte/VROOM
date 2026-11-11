@@ -219,14 +219,14 @@ describe('Property 4: Absolute split passthrough', () => {
 });
 
 // ---------------------------------------------------------------------------
-// C287: deterministic percentage-split edge cases the property gens don't reach.
+// Deterministic percentage-split edge cases the property gens don't reach.
 // The percentage path floors the first N-1 vehicles and assigns the EXACT remainder
 // to the last (so the sum is precise), with a Math.max(0, ...) clamp guarding a
 // negative remainder. The property tests pin the SUM; these pin the penny placement
 // + the clamp branch (a >100% config reaching the pure fn — computeAllocations does
 // NOT re-validate; only the route's Zod refinement gates the sum-to-100 invariant).
 // ---------------------------------------------------------------------------
-describe('C287: percentage split penny-residue + over-100% clamp', () => {
+describe('percentage split penny-residue + over-100% clamp', () => {
   // money-cents-migration: totalAmount is integer CENTS, so $100 = 10000 cents. The penny-residue
   // semantics are unchanged — they now play out in whole cents (floor(33% of 10000) = 3333, last = 3334).
   test('the LAST vehicle absorbs the rounding residue (33/33/34 of $100, exact sum)', () => {
@@ -511,7 +511,7 @@ describe('Property 2 (Design): Split sibling consistency', () => {
 // The original `< 0.02` tolerance was looser than that guarantee — it would let a
 // real ±0.01 drift (one sibling off by a penny) pass silently. Assert cent-equality
 // (round both to integer cents and compare) so a genuine penny-drift regression
-// fails. (cycle 198)
+// fails.
 // **Validates: Requirements 5.3, 14.3**
 // ---------------------------------------------------------------------------
 describe('Property 3 (Design): Split amounts sum to groupTotal', () => {
@@ -556,7 +556,7 @@ describe('Property 3 (Design): Split amounts sum to groupTotal', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Property 4 (Design): a split sibling is COST-ONLY — never carries fuel metrics (C311 deep-review).
+// Property 4 (Design): a split sibling is COST-ONLY — never carries fuel metrics.
 // createSiblings hardcodes missedFillup:false and never sets volume/mileage/fuelType (the create-split
 // schema has NO input path for them — splitting a SHARED cost across vehicles can't attribute a physical
 // volume/odometer to each leg). So even a category:'fuel' split is a pure cost row: volume/mileage/fuelType

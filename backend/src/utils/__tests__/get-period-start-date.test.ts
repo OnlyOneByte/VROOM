@@ -1,10 +1,10 @@
 /**
- * Unit tests for getPeriodStartDate (C69 arch dedup). This switch was duplicated in
+ * Unit tests for getPeriodStartDate. This switch was duplicated in
  * vehicles/routes.ts and expenses/repository.ts; extracting it to one source of truth is
  * behavior-preserving, and this pins the contract both call sites now depend on:
- *   - 'all' → null (the caller applies NO lower bound),
- *   - each bounded period → now − N days (7/30/90/365), deterministic given an injected `now`,
- *   - the expenses-repo `?? new Date(0)` fallback is exercised at that call site, not here.
+ *  - 'all' → null (the caller applies NO lower bound),
+ *  - each bounded period → now − N days (7/30/90/365), deterministic given an injected `now`,
+ *  - the expenses-repo `?? new Date(0)` fallback is exercised at that call site, not here.
  * Pure → no DB, no server.
  */
 

@@ -123,10 +123,10 @@ describe('OdometerRepository.getCurrentOdometer', () => {
     expect(await repo.getCurrentOdometer(VEHICLE_ID, USER_ID)).toBe(0);
   });
 
-  // #48 (C168): the query is now userId-scoped (belt-and-braces). A row that belongs to ANOTHER user must
+  // The query is now userId-scoped (belt-and-braces). A row that belongs to ANOTHER user must
   // never surface, even if the caller passes a vehicleId that (pathologically) resolves to it. Pre-fix the
   // query filtered on vehicle_id alone, so an unvalidated vehicleId could leak a cross-tenant reading.
-  test('is userId-scoped — a reading owned by another user never leaks (#48)', async () => {
+  test('is userId-scoped — a reading owned by another user never leaks', async () => {
     const OTHER_USER = 'u-other-tenant';
     sqliteDb.run(
       `INSERT INTO users (id, email, display_name) VALUES ('${OTHER_USER}', 'other@test.com', 'Other')`

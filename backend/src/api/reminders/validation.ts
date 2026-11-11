@@ -145,13 +145,13 @@ function refineSplitConfig(data: ReminderRefineInput, ctx: z.RefinementCtx) {
   // The split-vs-vehicleIds MATCH check is a cross-field invariant — meaningful only when BOTH are in
   // the payload. On a PARTIAL update (updateReminderSchema is .partial()) that changes only the split
   // config and OMITS vehicleIds, `data.vehicleIds` is undefined → new Set(undefined) = ∅, so the old
-  // unconditional check 400'd every split-config-only edit with a false "must match vehicleIds" (#73).
+  // unconditional check 400'd every split-config-only edit with a false "must match vehicleIds".
   // Guard it on vehicleIds presence — the route's merged re-parse (createReminderSchema.parse(merged))
   // still catches a genuine mismatch against the merged full object. The sum checks below are
   // vehicleIds-independent and always run.
   if (data.vehicleIds) {
     // splitConfigVehicleIds owns the `even ? vehicleIds : allocations.map(...)` extraction (one source
-    // of truth, C50); it returns a de-duped array, so new Set(...) here is the same set as before.
+    // of truth); it returns a de-duped array, so new Set(...) here is the same set as before.
     const provided = new Set(data.vehicleIds);
     const split = new Set(splitConfigVehicleIds(data.expenseSplitConfig));
 

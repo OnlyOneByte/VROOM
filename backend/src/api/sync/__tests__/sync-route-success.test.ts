@@ -1,14 +1,14 @@
 /**
- * HTTP success-path coverage for sync/routes.ts (C188 guard ratchet — the 31%-line low spot).
+ * HTTP success-path coverage for sync/routes.ts (guard ratchet — the 31%-line low spot).
  *
- * sync-route-errors.test.ts (C30/C36) pins the ERROR paths (validation 400s, auth 401, health). This
+ * sync-route-errors.test.ts pins the ERROR paths (validation 400s, auth 401, health). This
  * complements it with the uncovered SUCCESS/derivation handlers — all pure DB-read + in-handler
  * derivation, so they drive the REAL routes via createTestApp() over in-memory SQLite with NO provider
- * network and NO mock.module (avoiding the C38/C91 cross-suite trap + the C163 restoreFromSheets gap):
- *   - GET /status — the backupEnabled / sheetsSyncEnabled derivation from backupConfig (lines 105-110),
- *   - GET /restore/providers — the sourceTypes (zip needs enabled+lastBackupAt; sheets needs
- *     sheetsSyncEnabled+sheetsSpreadsheetId) derivation + the skip-when-neither branch (280-298),
- *   - POST / — the no-enabled-providers success envelope (the 95 happy path).
+ * network and NO mock.module (avoiding the cross-suite trap + the restoreFromSheets gap):
+ *  - GET /status — the backupEnabled / sheetsSyncEnabled derivation from backupConfig (lines 105-110),
+ *  - GET /restore/providers — the sourceTypes (zip needs enabled+lastBackupAt; sheets needs
+ *  sheetsSyncEnabled+sheetsSpreadsheetId) derivation + the skip-when-neither branch (280-298),
+ *  - POST / — the no-enabled-providers success envelope (the 95 happy path).
  *
  * createTestApp() rewrites env then dynamic-imports DB-bound modules; keep imports to the harness.
  */
@@ -157,10 +157,10 @@ describe('POST /api/v1/sync — success envelope', () => {
   });
 });
 
-// #44 — the route must NOT report 200 when every backup provider failed. Drive the REAL route with a
+// The route must NOT report 200 when every backup provider failed. Drive the REAL route with a
 // fake failing strategy registered in the registry + a seeded enabled provider (leak-free: overwrite
 // the custom type with a no-op afterwards; real google-drive untouched).
-describe('POST /api/v1/sync — honest HTTP status on backup failure (#44)', () => {
+describe('POST /api/v1/sync — honest HTTP status on backup failure', () => {
   test('all providers fail → 502 error envelope (not a 200 false success)', async () => {
     const { backupStrategyRegistry } = await import('../backup-strategy-registry');
     const { encrypt } = await import('../../../utils/encryption');
@@ -200,10 +200,10 @@ describe('POST /api/v1/sync — honest HTTP status on backup failure (#44)', () 
   });
 });
 
-// C250: the backups download + list-providers route slices were uncovered (sync/routes.ts 139-154,
+// The backups download + list-providers route slices were uncovered (sync/routes.ts 139-154,
 // 126-137). Both are PROVIDER-FREE: download reads the user's OWN db data via exportAsZip; the
 // no-providerId list path returns [] when no backup providers are enabled. (The byte/provider-bound
-// restore-from-provider paths stay the C163 mock-trap territory, deliberately left.)
+// restore-from-provider paths stay the mock-trap territory, deliberately left.)
 describe('GET /api/v1/sync/backups/download — the manual backup-export route', () => {
   test('returns a real ZIP with the attachment headers (no provider needed — own-data export)', async () => {
     // Seed a row so the export has content (the user already exists via the harness).

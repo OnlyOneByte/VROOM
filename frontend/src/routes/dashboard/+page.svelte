@@ -18,7 +18,7 @@
 	import PeriodSelector from '$lib/components/common/period-selector.svelte';
 	import { handleErrorWithNotification } from '$lib/utils/error-handling';
 	import { categoryLabels } from '$lib/utils/expense-helpers';
-	import { getCategoryColor as getCategoryChartColor } from '$lib/utils/chart-colors';
+	import { getCategoryChartColor } from '$lib/utils/chart-colors';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
 	import { parseMonthToDate } from '$lib/utils/chart-formatters';
 	import { vehicleApi } from '$lib/services/vehicle-api';
@@ -98,7 +98,7 @@
 		if (!periodSummary?.monthlyTrend) return [];
 		return periodSummary.monthlyTrend.map(t => ({
 			// Local-time parse: `new Date('YYYY-MM-01')` is midnight UTC and shifts the
-			// month label back one for negative-offset users (cycle 211).
+			// month label back one for negative-offset users.
 			date: parseMonthToDate(t.period),
 			amount: t.amount
 		}));
@@ -139,31 +139,33 @@
 		const now = Date.now();
 		const horizon = now + UPCOMING_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 		const vehicleMap = new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)]));
-		return remindersList
-			.filter(r => r.reminder.isActive)
-			// This is the TIME-axis "due soon" widget. A pure-mileage reminder has a null nextDueDate
-			// (its due-ness is odometer-based, surfaced on the /reminders page) — exclude it here, and
-			// the narrowing lets the date math below treat nextDueDate as a string.
-			.filter(
-				(r): r is typeof r & { reminder: { nextDueDate: string } } =>
-					r.reminder.nextDueDate !== null
-			)
-			.filter(r => new Date(r.reminder.nextDueDate).getTime() <= horizon)
-			.sort(
-				(a, b) =>
-					new Date(a.reminder.nextDueDate).getTime() - new Date(b.reminder.nextDueDate).getTime()
-			)
-			.map(r => ({
-				id: r.reminder.id,
-				name: r.reminder.name,
-				nextDueDate: r.reminder.nextDueDate,
-				isOverdue: new Date(r.reminder.nextDueDate).getTime() <= now,
-				expenseAmount: r.reminder.expenseAmount,
-				vehicleNames: r.vehicleIds
-					.map(id => vehicleMap.get(id))
-					.filter(Boolean)
-					.join(', ')
-			}));
+		return (
+			remindersList
+				.filter(r => r.reminder.isActive)
+				// This is the TIME-axis "due soon" widget. A pure-mileage reminder has a null nextDueDate
+				// (its due-ness is odometer-based, surfaced on the /reminders page) — exclude it here, and
+				// the narrowing lets the date math below treat nextDueDate as a string.
+				.filter(
+					(r): r is typeof r & { reminder: { nextDueDate: string } } =>
+						r.reminder.nextDueDate !== null
+				)
+				.filter(r => new Date(r.reminder.nextDueDate).getTime() <= horizon)
+				.sort(
+					(a, b) =>
+						new Date(a.reminder.nextDueDate).getTime() - new Date(b.reminder.nextDueDate).getTime()
+				)
+				.map(r => ({
+					id: r.reminder.id,
+					name: r.reminder.name,
+					nextDueDate: r.reminder.nextDueDate,
+					isOverdue: new Date(r.reminder.nextDueDate).getTime() <= now,
+					expenseAmount: r.reminder.expenseAmount,
+					vehicleNames: r.vehicleIds
+						.map(id => vehicleMap.get(id))
+						.filter(Boolean)
+						.join(', ')
+				}))
+		);
 	});
 
 	onMount(loadDashboardData);
@@ -172,13 +174,18 @@
 		isLoading = true;
 		loadError = null;
 		try {
+			// ONE latency round for the whole dashboard. Nothing here reads another leg's
+			// result — the lookup maps below are built after everything resolves — so a
+			// second round would only add a round trip's delay to the carousel.
 			const [
 				loadedVehicles,
 				allTimeData,
 				periodData,
 				recentResponse,
 				loadedReminders,
-				loadedRecurringCost
+				loadedRecurringCost,
+				photosByVehicle,
+				vehicleStats
 			] = await Promise.all([
 				// include=shared: the fleet also shows vehicles others have shared with this user (T12b),
 				// each annotated with sharedAccess so the card can badge "shared by X".
@@ -193,7 +200,11 @@
 				reminderApi.list().catch(() => [] as ReminderWithVehicles[]),
 				// Recurring-cost run-rate is likewise secondary — degrade to zero so a
 				// reminders-service hiccup never blanks the dashboard (T7).
-				reminderApi.getRecurringCost().catch(() => ({ count: 0, monthlyTotal: 0 }))
+				reminderApi.getRecurringCost().catch(() => ({ count: 0, monthlyTotal: 0 })),
+				// Photos come back in ONE request grouped by vehicleId (batch endpoint), not
+				// one call per vehicle. Cover art is decoration — degrade to none.
+				vehicleApi.getAllVehiclePhotos().catch(() => ({}) as Record<string, Photo[]>),
+				expenseApi.getVehicleStats()
 			]);
 			vehicles = loadedVehicles;
 			allTimeSummary = allTimeData;
@@ -201,13 +212,6 @@
 			recentExpensesList = recentResponse.data;
 			remindersList = loadedReminders;
 			recurringCost = loadedRecurringCost;
-
-			// Load photos and per-vehicle stats in parallel. Photos come back in ONE
-			// request grouped by vehicleId (batch endpoint), not one call per vehicle.
-			const [photosByVehicle, vehicleStats] = await Promise.all([
-				vehicleApi.getAllVehiclePhotos().catch(() => ({}) as Record<string, Photo[]>),
-				expenseApi.getVehicleStats()
-			]);
 
 			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- Map created and consumed within async function, not reactive state
 			const photosMap = new Map<string, Photo[]>();

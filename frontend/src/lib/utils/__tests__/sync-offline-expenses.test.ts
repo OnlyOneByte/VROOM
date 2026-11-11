@@ -2,19 +2,24 @@
  * Tests for syncOfflineExpenses — the offline-queue → server orchestration that
  * the offline-storage CRUD tests don't touch. This is the branch's namesake and
  * the highest data-loss-stakes path, so it pins the data-safety contract:
- *   - happy path: every pending expense is POSTed (each carrying its idempotency
- *     clientId) and the queue is cleared; syncState ends idle
- *   - PARTIAL failure: when one POST rejects, the already-sent ones are marked
- *     synced (so a retry won't duplicate them), the failed + remaining stay
- *     pending (retried next sync), and syncState goes to 'error' — nothing lost
- *   - a malformed fuel expense (no volume/charge or no mileage) is skipped
+ *  - happy path: every pending expense is POSTed (each carrying its idempotency
+ *  clientId) and the queue is cleared; syncState ends idle
+ *  - PARTIAL failure: when one POST rejects, the already-sent ones are marked
+ *  synced (so a retry won't duplicate them), the failed + remaining stay
+ *  pending (retried next sync), and syncState goes to 'error' — nothing lost
+ *  - a malformed fuel expense (no volume/charge or no mileage) is skipped
  *
  * Uses the REAL offline-storage (round-tripping through the setup's stateful
  * localStorage mock) and mocks only fetch, the way sync-manager.test does.
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { syncOfflineExpenses, saveOfflineExpenses, loadOfflineExpenses, type OfflineExpense } from '../offline-storage';
+import {
+	syncOfflineExpenses,
+	saveOfflineExpenses,
+	loadOfflineExpenses,
+	type OfflineExpense
+} from '../offline-storage';
 import { syncState } from '../../stores/offline.svelte';
 
 const mockFetch = vi.fn();
@@ -73,28 +78,58 @@ describe('syncOfflineExpenses', () => {
 		expect(syncState.current).toBe('success');
 	});
 
-	it('on a mid-batch failure: keeps the failed + remaining pending, no data lost', async () => {
+	it('on a mid-batch TRANSIENT failure: keeps the failed pending and still attempts the rest', async () => {
 		saveOfflineExpenses([pending('a'), pending('b'), pending('c')]);
-		// a succeeds, b fails — c must never be sent this round.
+		// a succeeds, b fails transiently, c succeeds. A failed row must NOT block the rows behind
+		// it: the queue is drained per row, so one bad entry cannot strand everything after it.
 		mockFetch
 			.mockResolvedValueOnce(apiOk())
-			.mockRejectedValueOnce(new Error('network down'));
+			.mockRejectedValueOnce(new Error('network down'))
+			.mockResolvedValueOnce(apiOk());
 
 		await syncOfflineExpenses();
 
-		// Only a and b were attempted (loop stops at the throw); c untouched.
-		expect(mockFetch).toHaveBeenCalledTimes(2);
+		expect(mockFetch).toHaveBeenCalledTimes(3);
 		expect(syncState.current).toBe('error');
 
-		// 'a' is marked synced (so a retry won't duplicate it); 'b' and 'c' remain
-		// pending to retry next sync. Nothing is dropped from the queue.
+		// 'a' and 'c' were delivered, so they drain out of the queue; only the transiently-failed
+		// 'b' is still held, unparked, for the next run. The delivered rows draining is the point:
+		// before per-row handling, the throw escaped the loop and clearSyncedExpenses() never ran,
+		// so a single bad entry kept the whole queue — and everything behind it unsent — forever.
 		const remaining = loadOfflineExpenses();
-		const byId = new Map(remaining.map((e) => [e.id, e]));
-		expect(byId.get('a')?.synced).toBe(true);
-		expect(byId.get('b')?.synced).toBe(false);
-		expect(byId.get('c')?.synced).toBe(false);
-		// All three still present — the failed batch lost no entries.
-		expect(remaining).toHaveLength(3);
+		expect(remaining).toHaveLength(1);
+		expect(remaining[0]?.id).toBe('b');
+		expect(remaining[0]?.synced).toBe(false);
+		// A transient failure parks nothing — 'b' must stay deliverable.
+		expect(remaining[0]?.needsAttention).toBeFalsy();
+	});
+
+	it('on a TERMINAL rejection: parks the row instead of re-POSTing it forever', async () => {
+		saveOfflineExpenses([pending('a')]);
+		// A 400 means the server examined the row and rejected it; the identical POST will be
+		// rejected identically forever, so it must leave the pending queue and be surfaced rather
+		// than retried on every sync. Reported as "a connection issue" before this was classified.
+		mockFetch.mockResolvedValue(
+			new Response(
+				JSON.stringify({ success: false, error: { message: 'vehicleId is required' } }),
+				{
+					status: 400,
+					headers: { 'content-type': 'application/json' }
+				}
+			)
+		);
+
+		await syncOfflineExpenses();
+		await syncOfflineExpenses();
+
+		// Attempted once, not once per sync run — the row is parked after the first verdict.
+		expect(mockFetch).toHaveBeenCalledTimes(1);
+
+		const parked = loadOfflineExpenses().find(e => e.id === 'a');
+		expect(parked?.needsAttention).toBe(true);
+		expect(parked?.synced).toBe(false);
+		// The row survives: parking surfaces it for the user, it does not discard their entry.
+		expect(parked).toBeDefined();
 	});
 
 	it('skips a malformed fuel expense (missing volume/charge or mileage)', async () => {
@@ -114,13 +149,13 @@ describe('syncOfflineExpenses', () => {
 		expect(body.clientId).toBe('cid-ok');
 	});
 
-	// CHARACTERIZATION of the CURRENT behavior of a skipped malformed fuel entry (the #79 finding,
-	// C231 deep-review): a `continue`-skipped entry is never markExpenseAsSynced'd, so the trailing
+	// CHARACTERIZATION of the CURRENT behavior of a skipped malformed fuel entry (the finding,
+	// deep-review): a `continue`-skipped entry is never markExpenseAsSynced'd, so the trailing
 	// clearSyncedExpenses() (which only drops synced===true) leaves it PENDING in the queue — forever,
 	// silently re-skipped on every future sync with no user signal. This pins that stuck-forever
 	// behavior so a fix can't change it unnoticed. The RESOLUTION (drop it / surface an error / move to
-	// a "failed" bucket) is a product call ESCALATED to Angelo (#79) — NOT decided here.
-	it('CHARACTERIZATION (#79): a skipped malformed fuel entry stays stuck in the queue, unsynced', async () => {
+	// a "failed" bucket) is a product call, NOT decided here.
+	it('CHARACTERIZATION: a skipped malformed fuel entry stays stuck in the queue, unsynced', async () => {
 		saveOfflineExpenses([pending('fuel-bad', { category: 'fuel' }), pending('ok')]);
 		mockFetch.mockImplementation(() => Promise.resolve(apiOk()));
 

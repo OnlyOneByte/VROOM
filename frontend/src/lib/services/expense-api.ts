@@ -8,6 +8,7 @@ import type {
 	SplitConfig,
 	SplitExpenseGroup
 } from '$lib/types';
+import type { ImportMappingPreset } from '$lib/types/import-mapping';
 import {
 	fromBackendExpense,
 	toBackendExpense,
@@ -183,6 +184,17 @@ export const expenseApi = {
 			dryRun,
 			// Only include mapping when provided so the native path's request is unchanged.
 			...(mapping ? { mapping } : {})
+		});
+	},
+
+	/**
+	 * Identify a known tracker (Fuelly/Fuelio/Drivvo) from the uploaded file's HEADER names, so the
+	 * mapping dialog can pre-fill. Sends only the header strings (never the data).
+	 * Returns the matched preset (its label + default mapping) or null → the user maps manually.
+	 */
+	async detectImportSource(headers: string[]): Promise<ImportMappingPreset | null> {
+		return apiClient.post<ImportMappingPreset | null>('/api/v1/expenses/import/detect', {
+			headers
 		});
 	},
 

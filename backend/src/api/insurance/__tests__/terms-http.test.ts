@@ -129,7 +129,7 @@ describe('insurance term update HTTP route — clear-optional-field semantics', 
 });
 
 /**
- * C272 (bug-cycle scout → guard): the #84-class cross-tenant FK defense on the TERM write paths. A
+ * The-class cross-tenant FK defense on the TERM write paths. A
  * term's vehicleCoverage.vehicleIds is the attacker-controllable FK; the repository's private
  * validateVehicleOwnership gates create()/addTerm()/updateTerm() before inserting junction rows
  * (repository.ts:175/407/541) — so a user can't attach a vehicle they don't own to an insurance term
@@ -139,7 +139,7 @@ describe('insurance term update HTTP route — clear-optional-field semantics', 
  * A failure here = NotFoundError('Vehicle') → 404. The foreign row is raw-seeded so it coexists in the
  * shared DB (a second createTestApp would reset it).
  */
-describe('#84-class — insurance term writes reject a foreign (non-owned) vehicleId', () => {
+describe('class — insurance term writes reject a foreign (non-owned) vehicleId', () => {
   /** Seed a vehicle owned by ANOTHER user directly; returns its id. */
   function seedForeignVehicle(id: string): void {
     ctx.sqlite.run(
@@ -219,15 +219,15 @@ describe('#84-class — insurance term writes reject a foreign (non-owned) vehic
 });
 
 // ---------------------------------------------------------------------------
-// Term-UPDATE → premium-expense REPLACEMENT (C312 deep-review guard). A costed term
+// Term-UPDATE → premium-expense REPLACEMENT. A costed term
 // auto-materializes a split premium expense (hooks.createTermExpenses, sourceType:'insurance_term',
 // one even-split sibling per covered vehicle). On a term UPDATE, updateTermExpenses must DELETE the
 // stale auto-expenses (deleteBySource) and RE-CREATE them to match the NEW totalCost — else the
-// premium expense drifts from the term it derives from (NORTH_STAR #2 money correctness). The
-// clear-field + #84 tests above don't touch this; policy-delete-cascade pins create+delete but not
+// premium expense drifts from the term it derives from (money correctness). The
+// clear-field + tests above don't touch this; policy-delete-cascade pins create+delete but not
 // the update-replaces path. Drives the REAL PUT route + reads the persisted expenses.
 // ---------------------------------------------------------------------------
-describe('#57-class — a term-cost UPDATE replaces its auto-created premium expense (C312)', () => {
+describe('class — a term-cost UPDATE replaces its auto-created premium expense', () => {
   /** Sum + count of the auto-created premium expenses linked to a term. */
   function premiumExpenses(termId: string): { count: number; total: number } {
     const rows = ctx.sqlite

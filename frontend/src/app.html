@@ -2,6 +2,16 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
+		<!--
+			The single source of truth for `viewport` and `theme-color`. Nothing else may re-declare them
+			(a <svelte:head> copy lands later in the document and overrides this one):
+			  - `viewport-fit=cover` is required for env(safe-area-inset-*) to report non-zero values, which
+			    app.css's .safe-top/.safe-bottom and the mobile nav's safe-area padding depend on. It also
+			    pairs with apple-mobile-web-app-status-bar-style=black-translucent below, which lets content
+			    run under the status bar.
+			  - `theme-color` must match the installed-app manifest colour in vite.config.ts. themeStore
+			    rewrites this element's content per active theme, so it must stay the FIRST (and only) one.
+		-->
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 		<meta name="theme-color" content="#1f2937" />
 		<meta name="apple-mobile-web-app-capable" content="yes" />
@@ -27,7 +37,7 @@
 					theme === 'dark' ||
 					(theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
 				if (isDark) el.classList.add('dark');
-				// Theme-id axis (T8): mirror the store's applyTheme — a non-default theme id sets
+				// Theme-id axis: mirror themeStore's applyTheme — a non-default theme id sets
 				// data-theme PRE-PAINT so a custom theme doesn't flash the default look on load
 				// (the same no-FOUC contract the dark class above honors). default/absent → no attribute.
 				var themeId = localStorage.getItem('vroom-theme-id') || 'default';

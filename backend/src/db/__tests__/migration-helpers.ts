@@ -18,6 +18,86 @@ export interface MigrationFile {
   sql: string;
 }
 
+export interface JournalEntry {
+  idx: number;
+  version: string;
+  when: number;
+  tag: string;
+  breakpoints: boolean;
+}
+
+export interface SnapshotFile {
+  /** Numeric prefix of the snapshot file name (`0012_snapshot.json` -> 12). */
+  idx: number;
+  file: string;
+  id: string;
+  prevId: string;
+}
+
+/** A table as drizzle-kit records it in a snapshot: tables and columns are keyed by SQL name. */
+export interface SnapshotTable {
+  name: string;
+  columns: Record<string, { name: string; type: string; notNull?: boolean; primaryKey?: boolean }>;
+  indexes?: Record<string, unknown>;
+}
+
+/** A snapshot with its schema payload, not just its chain links. */
+export interface SnapshotContent extends SnapshotFile {
+  tables: Record<string, SnapshotTable>;
+}
+
+const META_DIR = join(MIGRATIONS_DIR, 'meta');
+
+/**
+ * Snapshot file names in the lexicographic order drizzle-kit itself uses: it sorts the directory
+ * listing and treats the LAST entry as the baseline for the next diff.
+ */
+function snapshotFileNames(): string[] {
+  return readdirSync(META_DIR)
+    .filter((f) => !f.startsWith('_') && f.endsWith('.json'))
+    .sort();
+}
+
+function snapshotIdx(file: string): number {
+  const match = file.match(/^(\d+)_/);
+  return match ? Number.parseInt(match[1], 10) : -1;
+}
+
+/** Read `drizzle/meta/_journal.json` — the ordered list the runtime migrator walks. */
+export function loadJournal(): { version: string; dialect: string; entries: JournalEntry[] } {
+  return JSON.parse(readFileSync(join(META_DIR, '_journal.json'), 'utf-8'));
+}
+
+/** Read every snapshot's chain links (`id`/`prevId`), in drizzle-kit's own order. */
+export function loadSnapshots(): SnapshotFile[] {
+  return snapshotFileNames().map((file) => {
+    const raw = JSON.parse(readFileSync(join(META_DIR, file), 'utf-8')) as {
+      id: string;
+      prevId: string;
+    };
+    return { idx: snapshotIdx(file), file, id: raw.id, prevId: raw.prevId };
+  });
+}
+
+/**
+ * Read the snapshot drizzle-kit will diff `schema.ts` against on the next `db:generate`, schema
+ * payload included — a stale head snapshot has the right NAME and the wrong CONTENT, so only the
+ * content can catch it.
+ */
+export function loadHeadSnapshot(): SnapshotContent {
+  const names = snapshotFileNames();
+  const file = names[names.length - 1];
+  if (!file) {
+    throw new Error(`No snapshot files in ${META_DIR}`);
+  }
+  const raw = JSON.parse(readFileSync(join(META_DIR, file), 'utf-8')) as {
+    id: string;
+    prevId: string;
+    tables: Record<string, SnapshotTable>;
+  };
+  return { idx: snapshotIdx(file), file, id: raw.id, prevId: raw.prevId, tables: raw.tables };
+}
+
 /** Read and sort all migration SQL files from the drizzle folder. */
 export function loadMigrations(): MigrationFile[] {
   const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql'));
@@ -34,15 +114,37 @@ export function loadMigrations(): MigrationFile[] {
     .sort((a, b) => a.idx - b.idx);
 }
 
+/** Split a migration into statements on Drizzle's `--> statement-breakpoint` markers. */
+export function splitStatements(migration: MigrationFile): string[] {
+  return migration.sql
+    .split('--> statement-breakpoint')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/** Statements that move the schema drizzle-kit snapshots, as opposed to the rows inside it. */
+const DDL_STATEMENT =
+  /^(CREATE|ALTER|DROP)\s+(UNIQUE\s+|VIRTUAL\s+|TEMP(ORARY)?\s+)*(TABLE|INDEX|VIEW|TRIGGER)\b/i;
+
+/**
+ * Does this migration change the schema, or only the rows?
+ *
+ * Only a schema change needs a snapshot of its own: a data-only migration (all `UPDATE`s, no DDL —
+ * the money-to-cents backfill was one) leaves the previous snapshot an accurate description of the
+ * database, so drizzle-kit neither writes nor needs a new one.
+ */
+export function migrationChangesSchema(migration: MigrationFile): boolean {
+  return splitStatements(migration).some((statement) =>
+    DDL_STATEMENT.test(statement.replace(/^(--[^\n]*\n|\s)+/, ''))
+  );
+}
+
 /**
  * Apply a single migration file to the database.
  * Splits on Drizzle's `--> statement-breakpoint` markers.
  */
 export function applyMigration(db: Database, migration: MigrationFile): void {
-  const statements = migration.sql
-    .split('--> statement-breakpoint')
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const statements = splitStatements(migration);
 
   db.run('BEGIN');
   try {
@@ -95,7 +197,13 @@ export function countRows(db: Database, table: string): number {
   return result.count;
 }
 
-/** Seed a minimal user + vehicle + expense for data survival tests. */
+/**
+ * Seed a minimal user + vehicle + expense.
+ *
+ * `expense_amount` is integer CENTS (4550 = $45.50), matching the column. A float here would be
+ * stored verbatim — SQLite leaves a value it cannot losslessly convert in its original type, so an
+ * INTEGER column quietly accepts 45.5 and every later read is off by 100x.
+ */
 export function seedCoreData(db: Database): void {
   db.run(
     "INSERT INTO users (id, email, display_name) VALUES ('u1', 'test@example.com', 'Test User')"
@@ -104,6 +212,6 @@ export function seedCoreData(db: Database): void {
     "INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('v1', 'u1', 'Toyota', 'Camry', 2022)"
   );
   db.run(
-    "INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount) VALUES ('e1', 'v1', 'u1', 'fuel', 1700000000, 45.50)"
+    "INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount) VALUES ('e1', 'v1', 'u1', 'fuel', 1700000000, 4550)"
   );
 }

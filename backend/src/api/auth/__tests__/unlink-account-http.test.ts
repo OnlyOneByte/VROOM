@@ -1,13 +1,13 @@
 /**
- * #C158 GUARD — DELETE /api/v1/auth/accounts/:id (unlink an auth provider).
+ * # GUARD — DELETE /api/v1/auth/accounts/:id (unlink an auth provider).
  *
  * This route had ZERO coverage despite enforcing two load-bearing account-security invariants through the
- * REAL HTTP stack (verified firsthand C158, no defect — this pins them):
- *   1. LAST-ACCOUNT LOCKOUT GUARD: a user must keep at least one sign-in method. Unlinking the ONLY auth
- *      provider is refused (400 LAST_ACCOUNT) so the user can't lock themselves out. The count runs INSIDE
- *      the same transaction as the delete (concurrency-safe).
- *   2. CROSS-TENANT OWNERSHIP: the row must belong to the requesting user AND be domain='auth' — another
- *      user's account id (or a non-auth provider row) → 404, no deletion (NORTH_STAR #2 isolation).
+ * REAL HTTP stack (verified firsthand, no defect — this pins them):
+ *  1. LAST-ACCOUNT LOCKOUT GUARD: a user must keep at least one sign-in method. Unlinking the ONLY auth
+ *  provider is refused (400 LAST_ACCOUNT) so the user can't lock themselves out. The count runs INSIDE
+ *  the same transaction as the delete (concurrency-safe).
+ *  2. CROSS-TENANT OWNERSHIP: the row must belong to the requesting user AND be domain='auth' — another
+ *  user's account id (or a non-auth provider row) → 404, no deletion (isolation).
  * Plus the happy path: with ≥2 auth providers, unlinking one returns 204 and leaves the others intact.
  *
  * Drives createTestApp() (real app + real Lucia session) and seeds auth provider rows via ctx.sqlite, since

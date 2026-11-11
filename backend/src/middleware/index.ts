@@ -5,7 +5,7 @@
  * making imports cleaner throughout the application.
  *
  * Usage:
- *   import { requireAuth, rateLimiter, bodyLimit } from './middleware';
+ *  import { requireAuth, rateLimiter, bodyLimit } from './middleware';
  *
  * Available Middleware:
  * - requireAuth: Requires authentication, throws 401 if not authenticated

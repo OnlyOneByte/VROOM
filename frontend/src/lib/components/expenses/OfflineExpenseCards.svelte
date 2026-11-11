@@ -6,10 +6,13 @@
 	import { DISPLAY_LIMITS } from '$lib/constants/limits';
 	import { EXPENSE_MESSAGES } from '$lib/constants/messages';
 	import { formatCurrency, formatDate } from '$lib/utils/formatters';
+	// `OfflineExpense.category` is unvalidated user input typed `string`, so these rows go through
+	// the key-tolerant label helper rather than indexing `categoryLabels` directly.
+	import { getCategoryLabel } from '$lib/utils/chart-colors';
 
 	interface Props {
 		pendingExpenses: OfflineExpense[];
-		/** Rows parked as permanently-unsyncable (#79) — surfaced so the user can fix or discard them. */
+		/** Rows parked as permanently-unsyncable — surfaced so the user can fix or discard them. */
 		needsAttentionExpenses?: OfflineExpense[];
 		syncedExpenses: OfflineExpense[];
 		onRemovePending: (_id: string) => void;
@@ -52,14 +55,15 @@
 						<button
 							onclick={() => onRemovePending(expense.id)}
 							class="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0"
+							aria-label="Delete pending expense"
 							title="Delete pending expense"
 						>
 							<X class="h-4 w-4" />
 						</button>
 						<div class="flex-1">
 							<div class="flex items-center gap-2 mb-1">
-								<Badge variant="secondary" class="capitalize">
-									{expense.category}
+								<Badge variant="secondary">
+									{getCategoryLabel(expense.category)}
 								</Badge>
 								{#if expense.tags && expense.tags.length > 0}
 									<span class="text-sm text-muted-foreground">
@@ -104,17 +108,20 @@
 		<CardNs.Content>
 			<div class="space-y-3">
 				{#each needsAttentionExpenses as expense (expense.id)}
-					<div class="flex items-center gap-3 p-3 bg-warning/10 border border-warning/20 rounded-lg">
+					<div
+						class="flex items-center gap-3 p-3 bg-warning/10 border border-warning/20 rounded-lg"
+					>
 						<button
 							onclick={() => removeNeedsAttention(expense.id)}
 							class="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0"
+							aria-label="Discard this entry"
 							title="Discard this entry"
 						>
 							<X class="h-4 w-4" />
 						</button>
 						<div class="flex-1">
 							<div class="flex items-center gap-2 mb-1">
-								<Badge variant="secondary" class="capitalize">{expense.category}</Badge>
+								<Badge variant="secondary">{getCategoryLabel(expense.category)}</Badge>
 								{#if expense.tags && expense.tags.length > 0}
 									<span class="text-sm text-muted-foreground">{expense.tags.join(', ')}</span>
 								{/if}
@@ -158,8 +165,8 @@
 					>
 						<div class="flex-1">
 							<div class="flex items-center gap-2 mb-1">
-								<Badge variant="secondary" class="capitalize">
-									{expense.category}
+								<Badge variant="secondary">
+									{getCategoryLabel(expense.category)}
 								</Badge>
 								{#if expense.tags && expense.tags.length > 0}
 									<span class="text-sm text-muted-foreground">

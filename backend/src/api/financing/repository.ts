@@ -21,7 +21,7 @@ import { BaseRepository } from '../../utils/repository';
  * is EXACT — originalAmount(cents) − Σ payments(cents), clamped ≥ 0 — so there is no sub-cent drift to
  * absorb; 1 cent is the natural "fully paid" threshold (a balance of exactly 0 or a stray 1-cent rounding
  * residue both read as paid off). One source of truth for the payoff rule across the three enrichment
- * sites (vehicles list + single GET, financing GET — C182).
+ * sites (vehicles list + single GET, financing GET).
  */
 export const PAYOFF_BALANCE_THRESHOLD = 1;
 
@@ -34,7 +34,7 @@ export function isEligibleForPayoff(computedBalance: number): boolean {
  * Enrich a financing record with the two derived API fields — `computedBalance` (passed in, since the
  * caller decides whether to use the per-record computeBalance or the batch computeBalances) and
  * `eligibleForPayoff`. The `{ ...financing, computedBalance, eligibleForPayoff: isEligibleForPayoff(...) }`
- * shape was hand-rolled at 3 sites (vehicles list + single GET, financing GET — the same trio C182
+ * shape was hand-rolled at 3 sites (vehicles list + single GET, financing GET — the same trio
  * collapsed the threshold across); one source of truth so the derived-field set can't drift between
  * them. Generic over the financing shape so it serves both the full VehicleFinancing and the
  * vehicle-joined financing object. Pure — no DB.
@@ -66,7 +66,7 @@ export class FinancingRepository extends BaseRepository<VehicleFinancing, NewVeh
 
   /**
    * Compute the current balance for a financing record:
-   *   originalAmount - COALESCE(SUM(expenses.expenseAmount), 0)
+   *  originalAmount - COALESCE(SUM(expenses.expenseAmount), 0)
    * WHERE source_type = 'financing' AND source_id = financingId, clamped to min 0.
    *
    * Returns 0 if the financing record does not exist.

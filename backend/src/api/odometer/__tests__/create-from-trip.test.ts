@@ -113,8 +113,8 @@ describe('OdometerRepository.createFromTrip (D2)', () => {
     expect(created, 'our insert is not blocked by a foreign user row').not.toBeNull();
   });
 
-  // C215 (guard): D2's WHOLE POINT is "avoid the divergent double-count when the user ALSO logs odometer
-  // manually". The C213 tests only covered trip→trip dedup; this pins the actual scenario — a trip dedups
+  // D2's WHOLE POINT is "avoid the divergent double-count when the user ALSO logs odometer
+  // manually". The tests only covered trip→trip dedup; this pins the actual scenario — a trip dedups
   // against a MANUALLY-created entry (the normal odometer create path, note=null) for the same (vehicle,
   // day, reading). A regression that only deduped trip-origin entries would silently double-count here.
   test('dedups against a MANUALLY-logged same-day-same-reading entry (the D2 double-count scenario)', async () => {
@@ -134,9 +134,9 @@ describe('OdometerRepository.createFromTrip (D2)', () => {
     expect(countEntries()).toBe(1);
   });
 
-  // C215 (guard): the dedup window is the LOCAL calendar day (getFullYear/Month/Date), matching R5's
+  // The dedup window is the LOCAL calendar day (getFullYear/Month/Date), matching R5's
   // local-day semantics — NOT a UTC day. Two readings straddling UTC-midnight on the same local day dedup;
-  // and the cross-day case inserts. Pins that the window can't silently regress to a UTC slice (the #87/#106
+  // and the cross-day case inserts. Pins that the window can't silently regress to a UTC slice (the
   // date-seam class). (Asserted relative to the host TZ so it holds regardless of the runner's zone.)
   test('the dedup window is the LOCAL calendar day, not a UTC slice (R5)', async () => {
     const first = new Date('2024-06-20T12:00:00.000Z');

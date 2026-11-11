@@ -1,168 +1,131 @@
 import { expect, test } from '@playwright/test';
+import { ANALYTICS_SUMMARY, addSessionCookie, mockApi } from './support/mock-api';
 
-test.describe('Analytics Page', () => {
+/**
+ * The analytics dashboard.
+ *
+ * The page makes ONE call on load — `GET /api/v1/analytics/summary` — which returns
+ * quickStats + fuelStats + fuelAdvanced together. (The previous version of this file
+ * mocked `/analytics/quick-stats`, an endpoint the page only reaches through
+ * `getSummary`'s 404/network fallback, so the page's real request was unmocked.) It is
+ * also a protected route, so `/auth/me` has to answer or the layout redirects to `/auth`
+ * before anything renders.
+ */
+
+test.describe('Analytics', () => {
 	test.beforeEach(async ({ context }) => {
-		// Set up authenticated session
-		await context.addCookies([
-			{
-				name: 'auth_session',
-				value: 'mock-session-token',
-				domain: 'localhost',
-				path: '/',
-				httpOnly: true,
-				sameSite: 'Lax'
-			}
-		]);
+		await addSessionCookie(context);
 	});
 
-	test('should load analytics page without errors', async ({ page }) => {
-		// Mock quick stats API
-		await page.route('**/api/v1/analytics/quick-stats*', async route => {
-			await route.fulfill({
-				status: 200,
-				contentType: 'application/json',
-				body: JSON.stringify({
-					success: true,
-					data: {
-						vehicleCount: 2,
-						ytdSpending: 5000,
-						avgMpg: 28.5,
-						fleetHealthScore: 85
-					}
-				})
-			});
-		});
+	test('loads the quick stats and the tab bar', async ({ page }) => {
+		await mockApi(page);
 
 		await page.goto('/analytics');
 
-		// Verify page title
 		await expect(page).toHaveTitle(/Analytics/);
+		await expect(page.getByRole('heading', { name: 'Analytics Dashboard' })).toBeVisible();
 
-		// Verify quick stats cards are visible
-		await expect(page.getByText('Vehicles')).toBeVisible();
+		await expect(page.getByText('Total Vehicles')).toBeVisible();
 		await expect(page.getByText('YTD Spending')).toBeVisible();
-		await expect(page.getByText('Avg MPG')).toBeVisible();
+		// The efficiency card's label is unit-derived, not the literal "Avg MPG".
+		await expect(page.getByText('Avg mi/gal')).toBeVisible();
 		await expect(page.getByText('Fleet Health')).toBeVisible();
+		await expect(page.getByText('$5,000.00')).toBeVisible();
 
-		// Verify tab navigation is present
-		await expect(page.getByRole('tab', { name: /Fuel & Stats/i })).toBeVisible();
-		await expect(page.getByRole('tab', { name: /Cross-Vehicle/i })).toBeVisible();
-		await expect(page.getByRole('tab', { name: /Per-Vehicle/i })).toBeVisible();
-		await expect(page.getByRole('tab', { name: /Year-End Summary/i })).toBeVisible();
+		for (const tab of ['Fuel & Stats', 'Cross-Vehicle', 'Per-Vehicle', 'Year-End']) {
+			await expect(page.getByRole('tab', { name: tab, exact: true })).toBeVisible();
+		}
 	});
 
-	test('should switch between tabs', async ({ page }) => {
-		// Mock APIs
-		await page.route('**/api/v1/analytics/**', async route => {
-			const url = route.request().url();
-			if (url.includes('quick-stats')) {
-				await route.fulfill({
-					status: 200,
-					contentType: 'application/json',
-					body: JSON.stringify({
-						success: true,
-						data: { vehicleCount: 1, ytdSpending: 1000, avgMpg: 30, fleetHealthScore: 90 }
-					})
-				});
-			} else if (url.includes('fuel-stats')) {
-				await route.fulfill({
+	test('the fuel tab renders the figures from the summary payload', async ({ page }) => {
+		await mockApi(page);
+
+		await page.goto('/analytics');
+
+		await expect(page.getByRole('heading', { name: 'Fill-ups' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Fuel Consumption' })).toBeVisible();
+		const fillups = ANALYTICS_SUMMARY.fuelStats.fillups.currentYear;
+		await expect(page.getByText(String(fillups), { exact: true }).first()).toBeVisible();
+	});
+
+	test('switching tabs moves the selection off the fuel tab', async ({ page }) => {
+		await mockApi(page);
+
+		await page.goto('/analytics');
+		await expect(page.getByRole('heading', { name: 'Fill-ups' })).toBeVisible();
+
+		await page.getByRole('tab', { name: 'Cross-Vehicle', exact: true }).click();
+
+		// Only the selection + panel swap is asserted: each non-fuel tab lazy-loads its own
+		// chart bundle and its own endpoint, which this spec deliberately does not fixture.
+		await expect(page.getByRole('tab', { name: 'Cross-Vehicle', exact: true })).toHaveAttribute(
+			'aria-selected',
+			'true'
+		);
+		await expect(page.getByRole('heading', { name: 'Fill-ups' })).toBeHidden();
+	});
+
+	test('a fleet with no data still renders, with zeroed stats', async ({ page }) => {
+		await mockApi(page, { vehicles: [], expenses: [] });
+		await page.route(
+			url => url.pathname === '/api/v1/analytics/summary',
+			route =>
+				route.fulfill({
 					status: 200,
 					contentType: 'application/json',
 					body: JSON.stringify({
 						success: true,
 						data: {
-							fillups: { currentYear: 10, previousYear: 8, currentMonth: 2, previousMonth: 1 },
-							gallons: { currentYear: 100, previousYear: 80, currentMonth: 20, previousMonth: 10 },
-							fuelConsumption: { avgMpg: 30, bestMpg: 35, worstMpg: 25 },
-							fillupDetails: { avgVolume: 10, minVolume: 8, maxVolume: 12 },
-							averageCost: {
-								perFillup: 50,
-								bestCostPerMile: 0.15,
-								worstCostPerMile: 0.25,
-								avgCostPerDay: 5
+							...ANALYTICS_SUMMARY,
+							quickStats: {
+								...ANALYTICS_SUMMARY.quickStats,
+								vehicleCount: 0,
+								ytdSpending: 0,
+								avgEfficiency: null,
+								fleetHealthScore: 0
 							},
-							distance: { totalMiles: 3000, avgPerDay: 10, avgPerMonth: 300 },
-							monthlyConsumption: [],
-							gasPriceHistory: [],
-							fillupCostByVehicle: [],
-							odometerProgression: [],
-							costPerMile: []
+							fuelStats: {
+								...ANALYTICS_SUMMARY.fuelStats,
+								fillups: { currentYear: 0, previousYear: 0, currentMonth: 0, previousMonth: 0 },
+								distance: { totalDistance: 0, avgPerDay: null, avgPerMonth: null }
+							}
 						}
 					})
-				});
-			} else {
-				await route.fulfill({
-					status: 200,
+				})
+		);
+
+		await page.goto('/analytics');
+
+		await expect(page.getByText('$0.00')).toBeVisible();
+		// avgEfficiency null renders as N/A rather than a misleading 0.
+		await expect(page.getByText('N/A')).toBeVisible();
+		// With no fill-ups and no distance the fuel tab collapses to one empty state
+		// instead of ten "no data" cards.
+		await expect(page.getByRole('heading', { name: 'Fill-ups' })).toBeHidden();
+	});
+
+	test('a failed load shows an error with a retry that re-requests', async ({ page }) => {
+		await mockApi(page);
+		let attempts = 0;
+		await page.route(
+			url => url.pathname === '/api/v1/analytics/summary',
+			route => {
+				attempts += 1;
+				return route.fulfill({
+					status: 500,
 					contentType: 'application/json',
-					body: JSON.stringify({ success: true, data: {} })
+					body: JSON.stringify({ success: false, error: { message: 'Server error' } })
 				});
 			}
-		});
+		);
 
 		await page.goto('/analytics');
 
-		// Click Fuel & Stats tab
-		await page.getByRole('tab', { name: /Fuel & Stats/i }).click();
-		await expect(page.getByText('Fillups')).toBeVisible();
+		await expect(page.getByText('Failed to load analytics')).toBeVisible();
+		const retry = page.getByRole('button', { name: 'Retry' });
+		await expect(retry).toBeVisible();
 
-		// Click Cross-Vehicle tab
-		await page.getByRole('tab', { name: /Cross-Vehicle/i }).click();
-		// Wait for tab content to load
-		await page.waitForTimeout(500);
-
-		// Click Year-End Summary tab
-		await page.getByRole('tab', { name: /Year-End Summary/i }).click();
-		await expect(page.getByText('Select Year')).toBeVisible();
-	});
-
-	test('should handle empty state when no vehicles exist', async ({ page }) => {
-		await page.route('**/api/v1/analytics/quick-stats*', async route => {
-			await route.fulfill({
-				status: 200,
-				contentType: 'application/json',
-				body: JSON.stringify({
-					success: true,
-					data: {
-						vehicleCount: 0,
-						ytdSpending: 0,
-						avgMpg: null,
-						fleetHealthScore: 0
-					}
-				})
-			});
-		});
-
-		await page.route('**/api/v1/vehicles', async route => {
-			await route.fulfill({
-				status: 200,
-				contentType: 'application/json',
-				body: JSON.stringify({ success: true, data: [] })
-			});
-		});
-
-		await page.goto('/analytics');
-
-		// Quick stats should show zeros
-		await expect(page.getByText('0', { exact: true })).toBeVisible();
-
-		// Per-Vehicle tab should show empty state
-		await page.getByRole('tab', { name: /Per-Vehicle/i }).click();
-		await expect(page.getByText(/No vehicles found/i)).toBeVisible();
-	});
-
-	test('should handle API errors gracefully', async ({ page }) => {
-		await page.route('**/api/v1/analytics/quick-stats*', async route => {
-			await route.fulfill({
-				status: 500,
-				contentType: 'application/json',
-				body: JSON.stringify({ success: false, error: { message: 'Server error' } })
-			});
-		});
-
-		await page.goto('/analytics');
-
-		// Should show error message with retry button
-		await expect(page.getByText(/Failed to load/i)).toBeVisible();
-		await expect(page.getByRole('button', { name: /Retry/i })).toBeVisible();
+		await retry.click();
+		await expect.poll(() => attempts).toBeGreaterThan(1);
 	});
 });

@@ -15,7 +15,7 @@ import { financingRepository } from './repository';
  * effect. The ONE source of truth for "this financing is now done" — the payoff (PUT /:id/payoff)
  * and delete (DELETE /:id) routes ran this byte-identical `update({isActive:false, endDate}) +
  * onFinancingDeactivated` pair separately, so a future change to what deactivation entails (extra
- * cleanup, the #67/C206 re-finance reset) would otherwise have to land in both. The caller is
+ * cleanup, the re-finance reset) would otherwise have to land in both. The caller is
  * expected to have already validated ownership. Returns the updated row (the payoff route echoes it;
  * delete ignores it).
  */

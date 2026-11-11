@@ -104,7 +104,7 @@ export const createPolicySchema = z.object({
   company: z.string().min(1, 'Company is required').max(ins.companyMaxLength),
   // A policy's embedded terms validate by the SAME schema an add-term request uses (createTermSchema) —
   // the two were byte-identical copies (shape + endDate>startDate refine + message), a divergence-bug
-  // vector (a future term-validation tightening would have to land in both). ONE source of truth (C451).
+  // vector (a future term-validation tightening would have to land in both). ONE source of truth.
   terms: z.array(createTermSchema).min(1, 'At least one term is required'),
   notes: z.string().max(ins.notesMaxLength).optional(),
   isActive: z.boolean().optional().default(true),

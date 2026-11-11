@@ -2,15 +2,15 @@ import type { CreateShareRequest, ReceivedShare, ShareLevel, VehicleShare } from
 import { apiClient } from './api-client';
 
 /**
- * Vehicle-share API service (vehicle-sharing T10 FE seam) — the C149/C163 service pattern over the
+ * Vehicle-share API service (vehicle-sharing T10 FE seam) — the service pattern over the
  * T3 (owner-side) + T4 (invitee-side) `/api/v1/shares` routes:
- *   POST   /api/v1/shares              — owner invites an existing user by email (-> pending)
- *   GET    /api/v1/shares/granted      — shares I granted (owner side)
- *   PUT    /api/v1/shares/:id          — owner changes a share's level
- *   DELETE /api/v1/shares/:id          — owner revokes a share
- *   GET    /api/v1/shares/received     — invites/grants TO me (invitee side)
- *   POST   /api/v1/shares/:id/accept   — invitee accepts a pending invite
- *   POST   /api/v1/shares/:id/decline  — invitee declines / self-removes
+ *  POST /api/v1/shares — owner invites an existing user by email (-> pending)
+ *  GET /api/v1/shares/granted — shares I granted (owner side)
+ *  PUT /api/v1/shares/:id — owner changes a share's level
+ *  DELETE /api/v1/shares/:id — owner revokes a share
+ *  GET /api/v1/shares/received — invites/grants TO me (invitee side)
+ *  POST /api/v1/shares/:id/accept — invitee accepts a pending invite
+ *  POST /api/v1/shares/:id/decline — invitee declines / self-removes
  *
  * apiClient.get/post/put already unwrap the { success, data } envelope, so these are thin pass-throughs.
  * No money fields on a share row, so no cents↔dollars transform is needed (unlike expense/reminder reads).

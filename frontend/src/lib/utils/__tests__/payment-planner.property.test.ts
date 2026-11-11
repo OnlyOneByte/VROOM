@@ -265,8 +265,8 @@ describe('Property 2: Impact Monotonicity', () => {
 
 	/**
 	 * Gap above minimum in cents. Both amounts are above minimum:
-	 *   b = minimum + gapB
-	 *   a = b + extraA  (so a > b > minimum)
+	 *  b = minimum + gapB
+	 *  a = b + extraA (so a > b > minimum)
 	 *
 	 * Keep gaps modest to stay within realistic payment ranges.
 	 */
@@ -660,9 +660,9 @@ describe('Property 5: Save Idempotency', () => {
 // Property 6: Summary Sentence Consistency
 //
 // Summary sentence matches the current planner state:
-//   at-minimum → minimum message
-//   normal → savings vs minimum
-//   with-delta → savings + delta
+//  at-minimum → minimum message
+//  normal → savings vs minimum
+//  with-delta → savings + delta
 //
 // **Validates: Requirements 7.1, 7.2, 7.3**
 // ---------------------------------------------------------------------------
@@ -697,7 +697,7 @@ describe('Property 6: Summary Sentence Consistency', () => {
 		);
 	});
 
-	// C380: buildSummary renders monthsSaved via the (private) formatMonths, which pluralizes on the
+	// buildSummary renders monthsSaved via the (private) formatMonths, which pluralizes on the
 	// `=== 1` boundary — "1 month" vs "N months". The structure tests above never assert the singular/
 	// plural rendering, so a regression dropping the `=== 1` branch would silently emit "saves 1 months"
 	// (a visible grammar bug on the planner card). Pin both sides through the PUBLIC buildSummary (the
@@ -809,16 +809,16 @@ describe('Property 7: Non-Loan Financing Guard', () => {
 });
 
 // ---------------------------------------------------------------------------
-// #117 (C405): a 0%-APR loan in the Payment Planner showed "0 mos / $0 saved" no matter the extra
+// A 0%-APR loan in the Payment Planner showed "0 mos / $0 saved" no matter the extra
 // payment. calculateMinimumPayment returns null for a 0%-APR loan, so the dialog passes minimumPayment=0
 // into computePlannerState; the OLD code used that 0 as the baseline paymentAmount, so the baseline
 // amortization (simulateAmortization at payment 0) tripped the negative-amortization guard → 0 months →
-// monthsSaved = max(0, 0 − accelerated) = 0. The #92 symptom re-manifested at the planner layer (the
-// C297 0%-APR fix lives one layer down in calculateExtraPaymentImpact; feeding a $0 baseline defeats it).
+// monthsSaved = max(0, 0 − accelerated) = 0. The symptom re-manifested at the planner layer (the
+// 0%-APR fix lives one layer down in calculateExtraPaymentImpact; feeding a $0 baseline defeats it).
 // FIX: baseline = minimumPayment>0 ? minimumPayment : financing.paymentAmount. These pin that a 0%-APR
 // loan now reports real months saved, and that apr>0 behavior is unchanged.
 // ---------------------------------------------------------------------------
-describe('#117: 0%-APR loan planner reports real months saved (not "0 mos")', () => {
+describe('0%-APR loan planner reports real months saved (not "0 mos")', () => {
 	// A 0%-APR loan: minimumPayment is null → the dialog passes 0. $12,000 balance, $400/mo contractual.
 	const zeroApr = makeFinancing({
 		apr: 0,
@@ -838,7 +838,7 @@ describe('#117: 0%-APR loan planner reports real months saved (not "0 mos")', ()
 		expect(state.state === 'normal' || state.state === 'with-delta').toBe(true);
 		const impact = (state as { primaryImpact: { monthsSaved: number; interestSaved: number } })
 			.primaryImpact;
-		expect(impact.monthsSaved).toBe(6); // was 0 pre-fix (the bug)
+		expect(impact.monthsSaved).toBe(6); // was 0 pre-fix
 		expect(impact.interestSaved).toBe(0); // interest-free loan — $0 interest saved is correct
 	});
 

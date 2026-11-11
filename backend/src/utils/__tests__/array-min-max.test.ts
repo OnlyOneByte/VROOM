@@ -1,5 +1,5 @@
 /**
- * Unit tests for maxOf / minOf (calculations.ts) — the spread-safe array min/max (C235 deep-review).
+ * Unit tests for maxOf / minOf (calculations.ts) — the spread-safe array min/max.
  *
  * These replace 18 `Math.max(...arr)` / `Math.min(...arr)` sites across analytics-charts.ts,
  * analytics/repository.ts, and vehicle-stats.ts. The argument-spread form throws

@@ -33,68 +33,71 @@ const HTML_TAG = /\{\s*@html\b/;
  * Handles JS block/line comments, JSDoc continuation lines, and HTML/Svelte `<!-- ... -->` spans.
  */
 function stripComments(source: string): string {
-  const withoutBlocks = source
-    .replace(/\/\*[\s\S]*?\*\//g, ' ') // JS block comments (incl. JSDoc)
-    .replace(/<!--[\s\S]*?-->/g, ' '); // HTML / Svelte comments
-  return withoutBlocks
-    .split('\n')
-    .map((line) => {
-      const trimmed = line.trimStart();
-      if (trimmed.startsWith('*')) return ''; // leftover JSDoc continuation line
-      const idx = line.indexOf('//');
-      if (idx === -1) return line;
-      if (idx > 0 && line[idx - 1] === ':') return line; // keep URLs (https://)
-      return line.slice(0, idx);
-    })
-    .join('\n');
+	const withoutBlocks = source
+		.replace(/\/\*[\s\S]*?\*\//g, ' ') // JS block comments (incl. JSDoc)
+		.replace(/<!--[\s\S]*?-->/g, ' '); // HTML / Svelte comments
+	return withoutBlocks
+		.split('\n')
+		.map(line => {
+			const trimmed = line.trimStart();
+			if (trimmed.startsWith('*')) return ''; // leftover JSDoc continuation line
+			const idx = line.indexOf('//');
+			if (idx === -1) return line;
+			if (idx > 0 && line[idx - 1] === ':') return line; // keep URLs (https://)
+			return line.slice(0, idx);
+		})
+		.join('\n');
 }
 
 /** Collect .svelte/.ts files whose path identifies them as part of the assistant surface. */
 function collectAssistantFiles(dir: string, acc: string[] = []): string[] {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (entry.name === 'node_modules' || entry.name === '.svelte-kit') continue;
-      collectAssistantFiles(full, acc);
-    } else if (entry.name.endsWith('.svelte') || entry.name.endsWith('.ts')) {
-      const rel = relative(SRC_ROOT, full).split('\\').join('/');
-      // The assistant route page + any lib file/dir named for the assistant. Exclude this guard itself
-      // and the service client (no rendering there).
-      if (
-        (rel.includes('assistant') || rel.includes('routes/assistant')) &&
-        !rel.endsWith('__tests__/assistant-safe-render.test.ts')
-      ) {
-        acc.push(full);
-      }
-    }
-  }
-  return acc;
+	for (const entry of readdirSync(dir, { withFileTypes: true })) {
+		const full = join(dir, entry.name);
+		if (entry.isDirectory()) {
+			if (entry.name === 'node_modules' || entry.name === '.svelte-kit') continue;
+			collectAssistantFiles(full, acc);
+		} else if (entry.name.endsWith('.svelte') || entry.name.endsWith('.ts')) {
+			const rel = relative(SRC_ROOT, full).split('\\').join('/');
+			// The assistant route page + any lib file/dir named for the assistant. Exclude this guard itself
+			// and the service client (no rendering there).
+			if (
+				(rel.includes('assistant') || rel.includes('routes/assistant')) &&
+				!rel.endsWith('__tests__/assistant-safe-render.test.ts')
+			) {
+				acc.push(full);
+			}
+		}
+	}
+	return acc;
 }
 
 describe('assistant reply renders SAFE (no {@html} on untrusted model output — R8 class guard)', () => {
-  const files = collectAssistantFiles(SRC_ROOT);
+	const files = collectAssistantFiles(SRC_ROOT);
 
-  test('the scan actually found the assistant surface (guard is live, not a no-op)', () => {
-    // The /assistant route page must exist for this guard to mean anything.
-    const hasPage = files.some((f) => f.split('\\').join('/').endsWith('routes/assistant/+page.svelte'));
-    expect(hasPage, `assistant files scanned:\n${files.join('\n')}`).toBe(true);
-  });
+	test('the scan actually found the assistant surface (guard is live, not a no-op)', () => {
+		// The /assistant route page must exist for this guard to mean anything.
+		const hasPage = files.some(f =>
+			f.split('\\').join('/').endsWith('routes/assistant/+page.svelte')
+		);
+		expect(hasPage, `assistant files scanned:\n${files.join('\n')}`).toBe(true);
+	});
 
-  test('no assistant source uses {@html} (untrusted reply must render as a text node)', () => {
-    const offenders: string[] = [];
-    for (const file of files) {
-      const rel = relative(SRC_ROOT, file).split('\\').join('/');
-      // Strip comments first (block comments span lines), then scan the cleaned lines while still
-      // reporting the original line text/number.
-      const rawLines = readFileSync(file, 'utf8').split('\n');
-      const cleanLines = stripComments(rawLines.join('\n')).split('\n');
-      cleanLines.forEach((line, idx) => {
-        if (HTML_TAG.test(line)) offenders.push(`${rel}:${idx + 1}  ${(rawLines[idx] ?? line).trim()}`);
-      });
-    }
-    expect(
-      offenders,
-      `{@html} found on the assistant surface — the reply is UNTRUSTED model output and must render as a plain-text node (whitespace-pre-wrap), never raw HTML (design §8.8, R8):\n${offenders.join('\n')}`
-    ).toEqual([]);
-  });
+	test('no assistant source uses {@html} (untrusted reply must render as a text node)', () => {
+		const offenders: string[] = [];
+		for (const file of files) {
+			const rel = relative(SRC_ROOT, file).split('\\').join('/');
+			// Strip comments first (block comments span lines), then scan the cleaned lines while still
+			// reporting the original line text/number.
+			const rawLines = readFileSync(file, 'utf8').split('\n');
+			const cleanLines = stripComments(rawLines.join('\n')).split('\n');
+			cleanLines.forEach((line, idx) => {
+				if (HTML_TAG.test(line))
+					offenders.push(`${rel}:${idx + 1}  ${(rawLines[idx] ?? line).trim()}`);
+			});
+		}
+		expect(
+			offenders,
+			`{@html} found on the assistant surface — the reply is UNTRUSTED model output and must render as a plain-text node (whitespace-pre-wrap), never raw HTML (design §8.8, R8):\n${offenders.join('\n')}`
+		).toEqual([]);
+	});
 });

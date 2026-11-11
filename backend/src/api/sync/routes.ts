@@ -11,6 +11,7 @@ import { userProviders } from '../../db/schema';
 import { createErrorResponse, createSuccessResponse, SyncError, SyncErrorCode } from '../../errors';
 import { bodyLimit, idempotency, rateLimiter, requireAuth } from '../../middleware';
 import type { BackupConfig, ProviderBackupSettings } from '../../types';
+import { readJsonBody } from '../../utils/request-body';
 import { OPERATION_TIMEOUTS, withTimeout } from '../../utils/timeout';
 import { preferencesRepository, syncStateRepository } from '../settings/repository';
 import { activityTracker } from './activity-tracker';
@@ -79,9 +80,11 @@ routes.post('/', syncRateLimiter, idempotency({ required: false }), async (c) =>
   const user = c.get('user');
   const userId = user.id;
 
-  const body = await c.req.json();
-  validateSyncTypes(body.syncTypes);
-  const force = body.force === true;
+  // `null` is valid JSON, so the body is optional-chained: dereferencing it would be a TypeError
+  // reported as a 500 for what is the client's own malformed request.
+  const body = await readJsonBody<{ syncTypes?: unknown; force?: unknown } | null>(c);
+  validateSyncTypes(body?.syncTypes);
+  const force = body?.force === true;
 
   const result = await backupOrchestrator.execute(userId, user.displayName, force);
 
@@ -92,7 +95,7 @@ routes.post('/', syncRateLimiter, idempotency({ required: false }), async (c) =>
     );
   }
 
-  // Honest HTTP status (#44): a backup where every attempted provider failed must NOT report 200.
+  // Honest HTTP status: a backup where every attempted provider failed must NOT report 200.
   // failed → 502 (upstream provider failure), partial → 207 Multi-Status (some succeeded, some did
   // not — the failed ones will retry since the sync anchor was not advanced). success/noop → 200.
   if (result.outcome === 'failed') {
@@ -176,7 +179,7 @@ routes.post(
   idempotency({ required: true }),
   async (c) => {
     const user = c.get('user');
-    const body = restoreFromProviderSchema.parse(await c.req.json());
+    const body = restoreFromProviderSchema.parse(await readJsonBody(c));
 
     // Verify provider exists and is active
     const db = getDb();
@@ -223,6 +226,9 @@ routes.post(
 routes.post(
   '/restore/from-backup',
   restoreRateLimiter,
+  // A whole backup ZIP, so larger than the app-wide body cap. That cap runs FIRST and rejects on
+  // Content-Length, so this allowance only takes effect because app.ts maps this path to it —
+  // keep the two in step or a large backup becomes unrestorable again.
   bodyLimit({ maxSize: CONFIG.backup.maxFileSize }),
   idempotency({ required: true }),
   async (c) => {

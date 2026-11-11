@@ -1,12 +1,12 @@
 /**
  * Trip mileage-summary rollup (trips-location T5, design §5, R4) — a PURE function over already-fetched
- * trip rows. Kept DB-free (no analytics-repository singleton bind, the C77 trap): the route fetches the
+ * trip rows. Kept DB-free (no analytics-repository singleton bind, the trap): the route fetches the
  * user's/vehicle's trips via tripRepository, then calls this. Split-safe BY CONSTRUCTION — trips never
- * split, so there's no volume=null sibling / denominator class (#18/#56) to guard.
+ * split, so there's no volume=null sibling / denominator class to guard.
  *
  * The reimbursement report (R4): total miles by purpose, business-$ = businessMiles × rate, trip count,
  * and average trip distance (div-guarded count>0). Distance per trip is the shared derived
- * `tripDistance` (max(0, end−start), R2/#46) — never a stored column, so a later odometer correction can't
+ * `tripDistance` (max(0, end−start), R2/) — never a stored column, so a later odometer correction can't
  * desync it. The business-mileage rate is a PARAMETER (not read from a stored field): D3 ratified a
  * configurable rate in userPreferences + an optional per-trip override, but that persistence is a separate
  * schema/migration slice (see the §7 note — trips deliberately introduced no rate column yet), so T5

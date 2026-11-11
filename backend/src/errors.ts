@@ -2,9 +2,6 @@
  * Error Module - Error classes, handlers, and response formatters
  */
 
-import type { Context } from 'hono';
-import { logger } from './utils/logger';
-
 export class AppError extends Error {
   public readonly statusCode: number;
   public readonly isOperational: boolean;
@@ -162,50 +159,12 @@ export const handleDatabaseError = (error: unknown): AppError => {
 };
 
 /**
- * Canonical SyncError → HTTP response shaping. Single source of truth used by BOTH the local
- * `handleSyncError` (route catch blocks) and the global `errorHandler` middleware, so a SyncError
- * produces a byte-identical envelope + status regardless of which path catches it. The body is the
- * standard error envelope keyed on the SyncErrorCode; the status comes from ERROR_STATUS_MAP
- * (defaulting to 500 for an unmapped code).
+ * Canonical SyncError → HTTP response shaping, used by the global `errorHandler` middleware — the
+ * one path that answers a thrown SyncError, since no route hand-rolls a catch block for one. The
+ * body is the standard error envelope keyed on the SyncErrorCode; the status comes from
+ * ERROR_STATUS_MAP (defaulting to 500 for an unmapped code).
  */
 export function syncErrorResponse(error: SyncError): { body: ErrorResponse; status: number } {
   const status = ERROR_STATUS_MAP[error.code] || 500;
   return { body: createErrorResponse(error.code, error.message, error.details), status };
-}
-
-export function handleSyncError(
-  c: Context,
-  error: unknown,
-  operation: string,
-  defaultErrorCode = 'OPERATION_FAILED'
-): Response {
-  const userId = c.get('user')?.id || 'unknown';
-
-  if (isSyncError(error)) {
-    logger.error(`${operation} failed`, {
-      userId,
-      error: error.message,
-      code: error.code,
-      details: error.details,
-    });
-    const { body, status } = syncErrorResponse(error);
-    return c.json(body, status as never);
-  }
-
-  logger.error(`${operation} failed`, {
-    userId,
-    error: error instanceof Error ? error.message : 'Unknown error',
-  });
-
-  if (error && typeof error === 'object' && 'code' in error) {
-    const syncError = error as { code: string; message: string; details?: unknown };
-    const status = ERROR_STATUS_MAP[syncError.code as SyncErrorCode] || 500;
-    return c.json(
-      createErrorResponse(syncError.code, syncError.message, syncError.details),
-      status as never
-    );
-  }
-
-  const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-  return c.json(createErrorResponse(defaultErrorCode, `Failed to ${operation}`, errorMessage), 500);
 }

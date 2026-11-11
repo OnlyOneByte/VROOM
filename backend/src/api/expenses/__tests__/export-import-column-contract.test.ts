@@ -1,13 +1,13 @@
 /**
  * Regression GUARD (committed, travels with the merge) for the CSV export↔import column-name contract
- * — the crown-jewel round-trip invariant (NORTH_STAR #1: "export → re-import round-trips losslessly").
+ * — the crown-jewel round-trip invariant ("export → re-import round-trips losslessly").
  *
  * The export writes its header row from `EXPORT_COLUMNS` (expenses/routes.ts). The native importer reads
  * each cell BY NAME via `makeCellGetter`'s `get('<col>')` (import-csv.ts) — `get('vehicle')`,
  * `get('amount')`, `get('fuelType')`, etc. The two are coupled ONLY by the string column names matching.
  * Rename or drop an EXPORT_COLUMN (e.g. `fuelType` → `fuel_type`) without updating the importer's
  * `get('fuelType')` and a VROOM-exported file silently STOPS round-tripping that field — the column reads
- * as blank, the value is lost on re-import (NORTH_STAR #1). NEITHER existing suite catches this: export-csv
+ * as blank, the value is lost on re-import. NEITHER existing suite catches this: export-csv
  * .test.ts asserts the export only, and import-csv.test.ts hand-writes its OWN literal header row (it never
  * imports the real EXPORT_COLUMNS const), so a drift between the two leaves both green.
  *
@@ -15,7 +15,7 @@
  * emits it). The reverse is NOT required — EXPORT_COLUMNS carries 2 export-only metadata columns
  * (`currency`, `createdAt`) the importer deliberately ignores (currency is display context; createdAt is
  * regenerated). Source-scans the importer for its `get('<key>')` reads + imports the real EXPORT_COLUMNS.
- * The one-edit→source-scan pattern (C25/C45/C59/C73) on the export/import round-trip contract.
+ * The one-edit→source-scan pattern on the export/import round-trip contract.
  *
  * Pure source scan + a const import — no DB, no network. Runs in the fast suite.
  */
@@ -33,7 +33,7 @@ const IMPORTER = join(HERE, '..', 'import-csv.ts');
 // these are exactly the column names the importer expects in the header row.
 const GET_CALL = /\bget\(\s*['"]([a-zA-Z]+)['"]\s*\)/g;
 
-describe('CSV export↔import column-name contract (round-trip, NORTH_STAR #1)', () => {
+describe('CSV export↔import column-name contract (round-trip)', () => {
   test('EXPORT_COLUMNS is the real exported const (guard is live, not a no-op)', () => {
     expect(Array.isArray(EXPORT_COLUMNS)).toBe(true);
     expect(EXPORT_COLUMNS.length).toBeGreaterThanOrEqual(10);
@@ -63,7 +63,7 @@ describe('CSV export↔import column-name contract (round-trip, NORTH_STAR #1)',
     expect(
       missing,
       `The importer reads column(s) the export no longer writes: [${missing.join(', ')}]. A VROOM ` +
-        `export → re-import would silently LOSE these fields (NORTH_STAR #1). Keep EXPORT_COLUMNS in ` +
+        `export → re-import would silently LOSE these fields. Keep EXPORT_COLUMNS in ` +
         `sync with the importer's get('<col>') reads — rename/drop on BOTH sides together.`
     ).toEqual([]);
   });

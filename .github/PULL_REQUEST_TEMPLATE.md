@@ -13,7 +13,7 @@
 
 ## Checklist
 
-- [ ] I've run validation (`bun run validate` / `npm run validate`) in affected subfolders
-- [ ] I've tested this locally
-- [ ] I've updated documentation if needed
-- [ ] No `console.log` debug statements left behind
+- [ ] Validation passes in every folder I changed: `cd backend && bun run validate`, `cd frontend && npm run validate`
+- [ ] Tested locally
+- [ ] Docs updated if behavior changed
+- [ ] No stray `console.log`

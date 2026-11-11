@@ -1,5 +1,5 @@
 /**
- * Unit tests for vehicleIdsForTerm — the pure junction→vehicleIds derivation extracted (C273) from the
+ * Unit tests for vehicleIdsForTerm — the pure junction→vehicleIds derivation extracted from the
  * three byte-identical sites in insurance/routes.ts (create-policy loop, addTerm, updateTerm). Pins the
  * behavior the dedup must preserve: filter the policy's termVehicleCoverage to one termId, project the
  * vehicleId, preserving order and NOT de-duplicating (each call site fed the result straight to

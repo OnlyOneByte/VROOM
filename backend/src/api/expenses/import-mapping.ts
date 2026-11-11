@@ -10,7 +10,7 @@
  * is unit-testable without a server.
  *
  * The native target columns are exactly the subset `parseRow` reads:
- *   date,vehicle,category,amount,mileage,volume,fuelType,description,tags,missedFillup
+ *  date,vehicle,category,amount,mileage,volume,fuelType,description,tags,missedFillup
  */
 
 import { parse } from 'csv-parse/sync';
@@ -61,7 +61,7 @@ export interface ColumnMapping {
    * cell). Fuel-tracker exports (Fuelly/Fuelio/Drivvo) have no category column — they're definitionally
    * all fuel — so their presets set this to `fuel`, turning an otherwise-0-ready detected log into ready
    * fuel rows. Only the EMPTY cell is filled; a NAMED-but-unrecognized word still falls back to `misc`
-   * with a note (the D2/C47 remap path is unchanged).
+   * with a note (the D2/ remap path is unchanged).
    */
   defaultCategory?: ExpenseCategory;
 }
@@ -145,10 +145,10 @@ export const NATIVE_HEADER: NativeField[] = [
  * Normalize a numeric string with thousands/decimal separators to a dot-decimal. When BOTH `.` and `,`
  * appear, the LAST-occurring one is the decimal separator and the other is thousands — this is
  * unambiguous and handles BOTH conventions: `1.234,56` (EU: comma last → decimal) → `1234.56` AND
- * `1,234.56` (US: dot last → decimal) → `1234.56` (#124, C417 — the old code hard-assumed comma-decimal,
+ * `1,234.56` (US: dot last → decimal) → `1234.56` (— the old code hard-assumed comma-decimal,
  * so a US-format value with both separators stripped its dots → `1.23456`, a ~1000x money under-count
  * reachable via the US Fuelly preset). A lone `,` is treated as the decimal separator (the decimal-comma
- * decision; lone-comma-as-THOUSANDS is the ambiguous #24 locale/product call, NOT decided here). A value
+ * decision; lone-comma-as-THOUSANDS is the ambiguous locale/product call, NOT decided here). A value
  * with neither, or only dots, is returned unchanged.
  */
 export function normalizeDecimal(raw: string): string {

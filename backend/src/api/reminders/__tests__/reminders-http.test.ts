@@ -70,7 +70,7 @@ describe('reminders HTTP routes', () => {
     expect(body.data[0].reminder.isActive).toBe(true);
   });
 
-  // C251 coverage: the reminders LIST route exposes ?type / ?isActive / ?vehicleId (routes.ts:203-205) →
+  // coverage: the reminders LIST route exposes ?type / ?isActive / ?vehicleId (routes.ts:203-205) →
   // findByUserId's filter branches (repository.ts:117 type, 120 isActive, 125 vehicleId-JOIN), but every
   // existing test fetched the UNFILTERED list, so those branches sat untested (the repo at 80.77% line).
   // These drive each filter through the REAL route + assert it discriminates: type=notification excludes an
@@ -152,7 +152,7 @@ describe('reminders HTTP routes', () => {
 
   test('PUT updating vehicleIds to a vehicle the user does not own is rejected', async () => {
     // Pins the UPDATE-path ownership gate — the second site converged onto the shared
-    // validateVehicleIdsOwned helper (C141). A valid reminder, then a PUT that swaps in a
+    // validateVehicleIdsOwned helper. A valid reminder, then a PUT that swaps in a
     // foreign vehicleId must be rejected by the same validator, not silently accepted.
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const created = await createNotificationReminder(vehicleId);
@@ -165,17 +165,17 @@ describe('reminders HTTP routes', () => {
     expect(res.status).toBeLessThan(500);
   });
 
-  // C178 (guard): a PUT must not be able to smuggle a foreign vehicleId in ONLY through the
+  // A PUT must not be able to smuggle a foreign vehicleId in ONLY through the
   // `expenseSplitConfig` JSON blob while OMITTING top-level `vehicleIds`. The blob carries its own
-  // vehicleIds (the #88 footgun family: an FK in a JSON column that bypasses the junction ownership
+  // vehicleIds (the footgun family: an FK in a JSON column that bypasses the junction ownership
   // check). It's defended in DEPTH by TWO layers that this pins compose end-to-end at the HTTP boundary:
-  //   (a) the merge+re-parse runs `createReminderSchema` on {existing.vehicleIds, ...partial}, so the
-  //       split-config-vs-vehicleIds MATCH invariant rejects a config that names anything but the
-  //       (owned) existing vehicleIds when vehicleIds is omitted; and
-  //   (b) when vehicleIds IS sent, validateVehicleIdsOwned rejects the foreign id outright.
+  //  (a) the merge+re-parse runs `createReminderSchema` on {existing.vehicleIds, ...partial}, so the
+  //  split-config-vs-vehicleIds MATCH invariant rejects a config that names anything but the
+  //  (owned) existing vehicleIds when vehicleIds is omitted; and
+  //  (b) when vehicleIds IS sent, validateVehicleIdsOwned rejects the foreign id outright.
   // Existing tests cover (b) standalone + the match invariant at the schema-UNIT level; neither drives
   // this HTTP composition (a foreign id reachable ONLY via the split blob). A regression that moved the
-  // split match-check behind an `if (vehicleIds)` that the merge doesn't satisfy would reopen #88-class.
+  // split match-check behind an `if (vehicleIds)` that the merge doesn't satisfy would reopen-class.
   test('PUT cannot attach a foreign vehicle via expenseSplitConfig alone (omitting vehicleIds)', async () => {
     const owned = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     // A second user's vehicle, seeded directly (cross-tenant).
@@ -199,7 +199,7 @@ describe('reminders HTTP routes', () => {
     const id = (await json<DataEnvelope<ReminderWithJoins>>(created)).data.reminder.id;
 
     // (a) Foreign vehicle ONLY in the split blob, vehicleIds omitted → the merged-parse match invariant
-    //     (split IDs must equal the existing OWNED vehicleIds) rejects it.
+    //  (split IDs must equal the existing OWNED vehicleIds) rejects it.
     const viaBlob = await ctx.authed('PUT', `/api/v1/reminders/${id}`, {
       expenseSplitConfig: { method: 'even', vehicleIds: ['foreign-veh'] },
     });
@@ -230,7 +230,7 @@ describe('reminders HTTP routes', () => {
     // The seeded reminder is monthly from 2024-01-01 — overdue vs. now, so the
     // trigger service fires it and emits a notification. Exercises the full POST
     // /trigger route (rate limiter → handler → trigger service → DB) — the one
-    // reminders endpoint the HTTP layer didn't cover (TODO.md AI-testing gap #278).
+    // reminders endpoint the HTTP layer didn't cover (TODO.md AI-testing gap).
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     await createNotificationReminder(vehicleId);
 

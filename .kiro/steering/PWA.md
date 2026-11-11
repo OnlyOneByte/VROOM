@@ -1,73 +1,91 @@
 ---
 inclusion: fileMatch
-fileMatchPattern: "frontend/static/sw.js,frontend/static/manifest.json,frontend/src/lib/utils/pwa.ts,frontend/src/lib/components/layout/PWAInstallPrompt.svelte,frontend/src/app.html"
+fileMatchPattern: "frontend/src/service-worker.ts,frontend/vite.config.ts,frontend/src/lib/utils/pwa.ts,frontend/src/lib/utils/push.ts,frontend/src/lib/utils/offline-storage.ts,frontend/src/lib/components/layout/PWAInstallPrompt.svelte,frontend/src/lib/components/settings/cards/PwaInstallCard.svelte,frontend/src/app.html"
 ---
 
 # PWA (Progressive Web App)
 
 ## Architecture
 
-The PWA setup spans these files:
+`@vite-pwa/sveltekit` owns the PWA build. There is no `static/sw.js` and no
+`static/manifest.json` — both are generated.
 
 | File | Purpose |
 |---|---|
-| `frontend/static/manifest.json` | Web app manifest — name, icons, display mode, theme color |
-| `frontend/static/sw.js` | Service worker — fetch handler, background sync for offline expenses |
-| `frontend/src/lib/utils/pwa.ts` | PWA utilities — install prompt capture, service worker registration, background sync API |
-| `frontend/src/lib/components/layout/PWAInstallPrompt.svelte` | Install banner UI — shown when `beforeinstallprompt` fires |
-| `frontend/src/app.html` | `<link rel="manifest">`, apple-mobile-web-app meta tags |
+| `frontend/vite.config.ts` | `SvelteKitPWA({...})` — the `injectManifest` strategy, `registerType: 'autoUpdate'`, and the web app manifest (name, icons, `display: standalone`, theme color) as inline config |
+| `frontend/src/service-worker.ts` | Service worker source — precaches the injected manifest, handles Web Push |
+| `frontend/src/lib/utils/pwa.ts` | `getPlatformInfo()`, `pwaInstallState`, `initializePWA()`, `promptInstall()`, `requestBackgroundSync()` |
+| `frontend/src/lib/utils/push.ts` | Web Push browser lifecycle (permission, subscribe, persist server-side) plus the pure `derivePushStatus()` state machine |
+| `frontend/src/lib/utils/offline-storage.ts` | The offline expense outbox in localStorage |
+| `frontend/src/lib/components/layout/PWAInstallPrompt.svelte` | Install banner |
+| `frontend/src/lib/components/settings/cards/PwaInstallCard.svelte` | Settings install card, including the iOS Share → Add to Home Screen branch |
+| `frontend/src/app.html` | Theme color, apple-mobile-web-app meta tags, favicon and apple-touch-icon links |
 
-## Install Prompt Requirements
+## Registration
 
-Chrome fires `beforeinstallprompt` only when ALL of these are true:
+`svelte.config.js` sets `serviceWorker.register: false` — SvelteKit must not register the
+worker, because the plugin does. `+layout.svelte`'s `onMount` dynamically imports
+`virtual:pwa-register` and calls `registerSW({ immediate: true })`, gated on `pwaInfo`.
 
-1. Valid `manifest.json` linked via `<link rel="manifest">` in `app.html`
-2. Manifest has `name`, `start_url`, `display` (standalone/fullscreen/minimal-ui), and `icons` with at least a 192px and 512px PNG
-3. Service worker registered with a `fetch` event handler (even a passthrough counts)
-4. Site served over HTTPS (or localhost for dev)
-5. User has interacted with the page
+The manifest `<link>` is injected from the same file's `<svelte:head>` via
+`{@html webManifestLink}` (from `virtual:pwa-info`). Do NOT add a `<link rel="manifest">`
+to `app.html`.
 
-iOS Safari does not support `beforeinstallprompt`. Users must use Share → "Add to Home Screen". The manifest and apple meta tags ensure the app launches in standalone mode.
+## Service worker
 
-## Service Worker (`sw.js`)
+`src/service-worker.ts` is SvelteKit's reserved SW entry; the plugin's `injectManifest`
+step substitutes `self.__WB_MANIFEST` in the built output. Two jobs:
 
-- Located in `frontend/static/` so it's served at the root scope (`/sw.js`)
-- Uses a network-first strategy for navigation requests with an offline fallback
-- Non-navigation requests pass through to the network (no caching layer yet)
-- Handles `sync` events for offline expense syncing via the Background Sync API
-- Registered in `+layout.svelte` via `registerServiceWorker()` from `pwa.ts`
+1. **Precache** — `precacheAndRoute(self.__WB_MANIFEST)`, plus `skipWaiting()` and
+   `clientsClaim()`. That is the entire caching layer: precached build assets, no runtime
+   route handlers, no navigation fallback, no offline page.
+2. **Web Push** — a `push` listener renders the backend's `{ title, body, tag, url }`
+   payload (a bodyless or non-JSON push still surfaces a generic notification rather than
+   being dropped); `notificationclick` focuses an existing tab and navigates it, else opens
+   a window. Default URL `/reminders`.
 
-### Adding Caching
+When editing it:
 
-If adding a cache strategy later, update the `fetch` handler in `sw.js`. Use cache-first for static assets and network-first for API calls. Bump `CACHE_NAME` version when changing cache behavior so old caches get cleaned up in the `activate` handler.
+- `self.__WB_MANIFEST` must appear **verbatim**. Workbox string-matches the built output,
+  so routing it through an alias breaks the precache silently.
+- There is **no `sync` listener.** `requestBackgroundSync()` registers Background Sync tags
+  that nothing in the worker consumes; offline expenses sync from the page via
+  `sync/sync-manager.ts`, not from the worker.
+- `src/lib/utils/__tests__/sw-push-handlers.test.ts` scans this source and `vite.config.ts`
+  to pin the two handlers, the precache call, the `injectManifest` wiring, and that
+  `static/sw.js` stays deleted (two registered workers would collide). It runs in the unit
+  suite.
 
-## PWA Install State (`pwa.ts`)
+## Offline writes
 
-`pwaInstallState` is a plain object (not a Svelte store) with three flags:
+Offline expense creates are deduped by a `clientId` UUID in the request body — not by the
+`Idempotency-Key` middleware, which backs restore. `addOfflineExpense()` mints the
+`clientId`, `loadOfflineExpenses()` backfills one for pre-v3 localStorage entries, and the
+backend's `expenseRepository.createIdempotent` resolves a collision against the partial
+unique index on `(user_id, client_id)`.
 
-- `canInstall` — `true` after `beforeinstallprompt` fires and before the user installs
-- `isInstalled` — `true` after `appinstalled` fires or if already in standalone mode
-- `isStandalone` — `true` if running in standalone display mode
+Any new field on `OfflineExpense` must be carried through `offlineExpenseToBackend()` AND
+every `addOfflineExpense()` call site (`ExpenseForm.svelte` has two — the offline-first save
+and the error-fallback save). A field added to one path only vanishes on sync;
+`offline-save-carries-fuel-fields.test.ts` source-scans for exactly that.
 
-`initializePWA()` sets up the event listeners. `promptInstall()` triggers the deferred prompt. Both are called from `PWAInstallPrompt.svelte`.
+## Install prompt
+
+`initializePWA()` attaches the `beforeinstallprompt` and `appinstalled` listeners and
+populates `pwaInstallState` — a plain object, NOT a rune store, with `canInstall`,
+`isInstalled`, `isStandalone`. `promptInstall()` replays the deferred event. Because the
+object is not reactive, each component calls `initializePWA()` itself and then **polls**
+`pwaInstallState` on an interval.
+
+Chrome fires `beforeinstallprompt` only over HTTPS (or localhost), after a user
+interaction, with a valid manifest and a registered worker that has a `fetch` handler
+(`precacheAndRoute` provides one). iOS Safari never fires it — hence the `isIOS` branch in
+`PwaInstallCard.svelte`.
 
 ## Icons
 
-| File | Size | Purpose |
-|---|---|---|
-| `frontend/static/icon-192.png` | 192×192 | Manifest icon, apple-touch-icon |
-| `frontend/static/icon-512.png` | 512×512 | Manifest icon, splash screen |
-| `frontend/static/icon-512-maskable.png` | 512×512 | Maskable icon for adaptive icon shapes on Android |
-| `frontend/static/favicon.svg` | SVG | Browser tab favicon |
-
-When updating the app icon, regenerate all three PNG sizes. The maskable icon should have safe-zone padding (inner 80% circle contains the logo).
-
-## Manifest Changes
-
-After editing `manifest.json`, users need to:
-
-1. Unregister the old service worker (DevTools → Application → Service Workers → Unregister)
-2. Clear site data or hard refresh
-3. Revisit the page — the new manifest will be picked up
-
-In development, Chrome DevTools → Application → Manifest shows validation errors if the manifest is misconfigured.
+`npm run generate-pwa-assets` regenerates the whole set from `static/favicon.svg` per
+`pwa-assets.config.ts` (`minimal2023Preset`): `pwa-64x64.png`, `pwa-192x192.png`,
+`pwa-512x512.png`, `maskable-icon-512x512.png`, `apple-touch-icon-180x180.png`,
+`favicon.ico`. Edit the SVG and rerun rather than hand-replacing PNGs — the manifest icon
+list in `vite.config.ts` and the links in `app.html` reference these exact names.

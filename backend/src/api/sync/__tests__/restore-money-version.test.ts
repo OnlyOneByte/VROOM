@@ -1,13 +1,13 @@
 /**
- * money-cents-migration T2 — the NORTH_STAR #1 data-safety gate.
+ * money-cents-migration T2 — the data-safety gate.
  *
  * After migration 0009 the 14 money columns are integer CENTS. A backup taken under the OLD float-dollars
  * schema (metadata.version 1.0.0, money written as `12.34`) must NEVER silently corrupt when restored into
  * the cents schema. Two mechanisms ship together (design §4):
- *   1. CONFIG.backup.currentVersion bumped 1.0.0 → 2.0.0 — a naive restore of an UNSHIMMABLE old/foreign
- *      version fails the validateBackupData version check (fail-closed default), never corrupting.
- *   2. A version-gated ×100 shim (coerceRow shimMoneyToCents, driven by isPreCentsBackup) — a pre-cents
- *      backup's dollar money is scaled to cents on restore, so the user's old backup round-trips CORRECTLY.
+ *  1. CONFIG.backup.currentVersion bumped 1.0.0 → 2.0.0 — a naive restore of an UNSHIMMABLE old/foreign
+ *  version fails the validateBackupData version check (fail-closed default), never corrupting.
+ *  2. A version-gated ×100 shim (coerceRow shimMoneyToCents, driven by isPreCentsBackup) — a pre-cents
+ *  backup's dollar money is scaled to cents on restore, so the user's old backup round-trips CORRECTLY.
  *
  * These tests drive the REAL export→restore stack (createTestApp → exportAsZip → restoreFromBackup) plus a
  * hand-built 1.0.0 dollar-float ZIP to prove the shim, and assert against the RAW cents DB rows.
@@ -69,7 +69,7 @@ function buildBackupZip(version: string, expenseAmountCell: string): Buffer {
   return zip.toBuffer();
 }
 
-describe('money-cents-migration T2: backup version bump + restore shim (NORTH_STAR #1)', () => {
+describe('money-cents-migration T2: backup version bump + restore shim', () => {
   test('a NEW 2.0.0 cents backup round-trips with EXACT integer-cents equality', async () => {
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');

@@ -66,7 +66,7 @@ export class VehicleRepository extends BaseRepository<Vehicle, NewVehicle> {
   }
 
   /**
-   * Find a vehicle by license plate WITHIN ONE USER'S fleet. Scoped by userId (the C168/#48/#52
+   * Find a vehicle by license plate WITHIN ONE USER'S fleet. Scoped by userId (the
    * tenant-scope-at-the-read class): the plate-uniqueness check that backs vehicle create/update is
    * a per-user constraint, not a global one — two different users may legitimately register the same
    * plate (e.g. a reissued plate across states, or a sold-then-rebought car), and a GLOBAL lookup

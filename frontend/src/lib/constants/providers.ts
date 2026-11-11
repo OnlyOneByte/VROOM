@@ -24,7 +24,7 @@ export const DEFAULT_FOLDER_SETTINGS: Record<PhotoCategory, CategorySetting> = {
 };
 
 /**
- * VLM (vision-LLM) provider types for receipt parsing — the D1-ruled set (Angelo 2026-06-30):
+ * VLM (vision-LLM) provider types for receipt parsing — the D1-ruled set:
  * OpenAI-compatible + Anthropic + Gemini + Ollama. Mirrors the backend SUPPORTED_PROVIDER_TYPES
  * vlm subset. `keyless` types (ollama) do not require an API key; `needsBaseUrl` types require one.
  * `defaultModel`/`defaultBaseUrl` pre-fill the form so the user only edits to change them.
@@ -78,7 +78,7 @@ export const VLM_PROVIDER_TYPES: VlmProviderTypeOption[] = [
 export type ModelProviderTypeOption = VlmProviderTypeOption;
 
 /**
- * LLM (assistant) provider types — the D1-ruled set (Angelo 2026-06-30): the SAME four model
+ * LLM (assistant) provider types — the D1-ruled set: the SAME four model
  * provider types as VLM (the backend `MODEL_PROVIDER_TYPES` serves both domains). The default
  * MODELS differ: a chat assistant needs a TOOL-CALLING text model, not a vision model — so
  * Ollama defaults to `llama3.1` (tool-call capable) rather than the VLM card's vision `llava`.

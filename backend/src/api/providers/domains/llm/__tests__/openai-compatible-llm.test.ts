@@ -5,7 +5,7 @@
  *  - POSTs to {baseUrl}/chat/completions with the transcript messages + a `tools` array (function shape);
  *  - a Bearer Authorization header is present with a key, ABSENT for keyless self-hosted (Ollama);
  *  - a model response with `tool_calls` normalizes to ChatResult.toolCalls (name + RAW args string), and
- *    a plain content response normalizes to ChatResult.text — the orchestrator (T4) validates either;
+ *  a plain content response normalizes to ChatResult.text — the orchestrator (T4) validates either;
  *  - a non-2xx / network failure THROWS (the chat route maps it to 502 — never a faked success);
  *  - a missing/non-string content with no tool calls returns { text: '' } (no throw).
  *

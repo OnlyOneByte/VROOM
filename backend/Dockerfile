@@ -30,16 +30,23 @@ RUN apk add --no-cache dumb-init
 COPY --chown=bun:bun package.json bun.lock* ./
 RUN bun install --production --frozen-lockfile
 
-# Copy built application from builder stage
+# Copy built application from builder stage.
+# `dist/index.js` is a single self-contained bundle (every local module and npm dependency is
+# inlined; only bun:sqlite and node builtins stay external), and startup migrations read the
+# plain .sql files in ./drizzle relative to WORKDIR — so these two are the whole runtime.
+# Nothing here copies src/: a partial copy (src/db alone) only looks runnable — `bun
+# src/db/init.ts` would fail on its ../config import — and drizzle-kit is a devDependency that
+# `bun install --production` does not install, so drizzle.config.ts has nothing to run it.
 COPY --chown=bun:bun --from=builder /app/dist ./dist
 COPY --chown=bun:bun --from=builder /app/drizzle ./drizzle
-COPY --chown=bun:bun --from=builder /app/src/db ./src/db
-COPY --chown=bun:bun drizzle.config.ts ./
 
 # Create data directory for SQLite database
 RUN mkdir -p /app/data && chown -R bun:bun /app/data
 
-# Set environment variables
+# Set environment variables.
+# HOST is honored by the server, so 0.0.0.0 is required here: a loopback bind is unreachable from
+# outside the container, and the HEALTHCHECK below dials localhost. Override HOST only with
+# another address that still covers loopback.
 ENV NODE_ENV=production \
     PORT=3001 \
     HOST=0.0.0.0 \

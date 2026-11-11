@@ -1,15 +1,15 @@
 /**
- * #100 (C168) — `PreferencesRepository.mergeJsonField` atomic JSON merge guard.
+ * `PreferencesRepository.mergeJsonField` atomic JSON merge guard.
  *
  * The legacy userPreferences write pattern (`getOrCreate` → JS-merge → `update`) has a lost-update race:
  * two concurrent requests both read the same row, each merges its own delta onto that stale snapshot, and
- * the second write clobbers the first (last-writer-wins). Angelo decided (2026-06-23) to make the merge a
+ * the second write clobbers the first (last-writer-wins). The decision was to make the merge a
  * single atomic `json_patch(...)` UPDATE so the merge happens inside the DB engine with no read-then-write
  * gap. This guard pins that primitive:
- *   1. deep-merges a nested partial (sibling keys survive, nested objects recurse),
- *   2. deletes a key when the patch value is `null` (RFC-7386 — the cleanupBackupConfig shape),
- *   3. THE RACE PROPERTY: two SEQUENTIAL delta-patches (each modelling a concurrent request that only
- *      knows its own change) BOTH survive — which the old read-modify-write could not guarantee.
+ *  1. deep-merges a nested partial (sibling keys survive, nested objects recurse),
+ *  2. deletes a key when the patch value is `null` (RFC-7386 — the cleanupBackupConfig shape),
+ *  3. THE RACE PROPERTY: two SEQUENTIAL delta-patches (each modelling a concurrent request that only
+ *  knows its own change) BOTH survive — which the old read-modify-write could not guarantee.
  * Non-vacuous: a read-modify-write reimplementation of case 3 (merge both deltas onto the SAME initial
  * snapshot, write both) loses the first writer — asserted here so the test fails if the route ever
  * regresses to that pattern.
@@ -50,7 +50,7 @@ function backupConfig(): Record<string, unknown> {
   return row.c ? JSON.parse(row.c) : {};
 }
 
-describe('#100 mergeJsonField — atomic deep-merge', () => {
+describe('mergeJsonField — atomic deep-merge', () => {
   test('deep-merges a nested partial; sibling keys + nested fields survive', async () => {
     await repo.mergeJsonField(USER, 'backupConfig', {
       providers: { p1: { enabled: true, folderPath: '/A' } },
@@ -89,7 +89,7 @@ describe('#100 mergeJsonField — atomic deep-merge', () => {
     expect(Object.keys(cfg.providers).sort()).toEqual(['base', 'reqA', 'reqB']);
 
     // Non-vacuity: model the OLD read-modify-write (both deltas merged onto one stale read, both written).
-    // The second write wins → reqA is LOST. This is exactly the #100 bug the atomic merge fixes.
+    // The second write wins → reqA is LOST. This is exactly the bug the atomic merge fixes.
     const stale = { providers: { base: { enabled: true } } };
     const rmwA = { providers: { ...stale.providers, reqA: { enabled: true } } };
     const rmwB = { providers: { ...stale.providers, reqB: { enabled: false } } };

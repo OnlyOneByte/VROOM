@@ -1,29 +1,63 @@
+<script lang="ts" module>
+	/**
+	 * The design-system color tokens a StatCard icon can render in: the full `--chart-1` …
+	 * `--chart-8` categorical palette defined in app.css, plus `primary`, `destructive`, and the
+	 * neutral `muted`.
+	 *
+	 * `iconColor` is still declared as `string` below, so an out-of-range token is caught at
+	 * runtime (dev warning + primary fallback) rather than at compile time. Narrowing the prop to
+	 * this type is the goal, and it forces the same narrowing through `StatCardGrid`'s
+	 * `StatCardItem` and the five item-builders whose arrays currently infer `iconColor: string`
+	 * (DashboardStatsCards, ExpenseOverviewCard, ExpenseOverviewSection, PaymentMetricsGrid,
+	 * routes/analytics). Import this type when declaring an `iconColor` field so that migration is
+	 * a type annotation and not a rewrite.
+	 */
+	export type StatCardIconColor =
+		| 'primary'
+		| 'chart-1'
+		| 'chart-2'
+		| 'chart-3'
+		| 'chart-4'
+		| 'chart-5'
+		| 'chart-6'
+		| 'chart-7'
+		| 'chart-8'
+		| 'destructive'
+		| 'muted';
+</script>
+
 <script lang="ts">
 	import { Card, CardContent } from '$lib/components/ui/card';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import type { AnyIcon } from './types';
 
-	// Tailwind purges classes at build time by scanning for complete strings.
-	// Dynamic interpolation like `bg-${token}/10` won't be detected, so we
-	// map each token to its full class pair up-front.
-	const ICON_COLOR_MAP: Record<string, { bg: string; text: string }> = {
+	// Tailwind resolves utilities by scanning source text for complete class strings. Dynamic
+	// interpolation like `bg-${token}/10` is never seen, so each token maps to its full pair
+	// up-front. `Record<StatCardIconColor, …>` keeps the two in lockstep: adding a token to the
+	// type without a pair here fails the build.
+	const ICON_COLOR_MAP: Record<StatCardIconColor, { bg: string; text: string }> = {
 		primary: { bg: 'bg-primary/10', text: 'text-primary' },
 		'chart-1': { bg: 'bg-chart-1/10', text: 'text-chart-1' },
 		'chart-2': { bg: 'bg-chart-2/10', text: 'text-chart-2' },
 		'chart-3': { bg: 'bg-chart-3/10', text: 'text-chart-3' },
 		'chart-4': { bg: 'bg-chart-4/10', text: 'text-chart-4' },
 		'chart-5': { bg: 'bg-chart-5/10', text: 'text-chart-5' },
+		'chart-6': { bg: 'bg-chart-6/10', text: 'text-chart-6' },
+		'chart-7': { bg: 'bg-chart-7/10', text: 'text-chart-7' },
+		'chart-8': { bg: 'bg-chart-8/10', text: 'text-chart-8' },
 		destructive: { bg: 'bg-destructive/10', text: 'text-destructive' },
 		muted: { bg: 'bg-muted', text: 'text-muted-foreground' }
 	};
 
-	const DEFAULT_ICON_CLASSES: { bg: string; text: string } = ICON_COLOR_MAP['primary']!;
+	const DEFAULT_ICON_CLASSES: { bg: string; text: string } = ICON_COLOR_MAP.primary;
 
 	interface Props {
 		label: string;
 		value: string | number;
 		unit?: string;
 		icon?: AnyIcon;
+		/** A StatCardIconColor token. Still typed `string` because the item-builders that feed
+		 *  StatCardGrid infer `iconColor: string`; see the StatCardIconColor docs above. */
 		iconColor?: string;
 		secondaryLabel?: string;
 		secondaryValue?: string | number;
@@ -48,11 +82,21 @@
 	}: Props = $props();
 
 	let hasDual = $derived(secondaryLabel !== undefined && secondaryValue !== undefined);
-	let iconClasses = $derived(
-		iconColor in ICON_COLOR_MAP
-			? (ICON_COLOR_MAP[iconColor] as { bg: string; text: string })
-			: DEFAULT_ICON_CLASSES
-	);
+	let iconClasses = $derived.by(() => {
+		if (Object.hasOwn(ICON_COLOR_MAP, iconColor)) {
+			return ICON_COLOR_MAP[iconColor as StatCardIconColor];
+		}
+		// An unrecognised token used to fall back to the primary tint in total silence, so a typo
+		// ("chart-6" while the map stopped at chart-5, "chart1", "accent") shipped as a
+		// wrong-colored card. Still falls back — a stat card must render — but says so in dev.
+		if (import.meta.env.DEV) {
+			console.warn(
+				`StatCard: unknown iconColor "${iconColor}" — rendering the primary tint. ` +
+					`Valid tokens: ${Object.keys(ICON_COLOR_MAP).join(', ')}.`
+			);
+		}
+		return DEFAULT_ICON_CLASSES;
+	});
 </script>
 
 <Card class={className}>

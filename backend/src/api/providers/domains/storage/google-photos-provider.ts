@@ -2,9 +2,9 @@
  * Google Photos storage provider — wraps GooglePhotosService behind the
  * StorageProvider interface, declaring REDUCED capabilities (see
  * .kiro/specs/google-photos-provider/):
- *   - delete: false      — the Library API is append-only; delete() is a no-op (D1a).
- *   - list: false        — no folder/album listing for backup; list() returns [] (D3b).
- *   - arbitraryFiles: false — photos/videos only; callers must not route PDFs here (D2a).
+ *  - delete: false — the Library API is append-only; delete() is a no-op (D1a).
+ *  - list: false — no folder/album listing for backup; list() returns [] (D3b).
+ *  - arbitraryFiles: false — photos/videos only; callers must not route PDFs here (D2a).
  *
  * Callers consult `capabilitiesOf(provider)` BEFORE invoking delete/list/upload of a
  * non-image, so these reduced operations degrade predictably rather than throwing.
@@ -32,9 +32,9 @@ export class GooglePhotosProvider implements StorageProvider {
 
   /**
    * @param refreshToken Google OAuth refresh token (ignored when `service` injected).
-   * @param service      Optional pre-built service (inject one wired to the in-memory
-   *                     fake Photos client in tests — zero network).
-   * @param albumId      Optional cached VROOM album id (from provider `config`).
+   * @param service Optional pre-built service (inject one wired to the in-memory
+   *  fake Photos client in tests — zero network).
+   * @param albumId Optional cached VROOM album id (from provider `config`).
    */
   constructor(refreshToken: string, service?: GooglePhotosService, albumId?: string) {
     this.service = service ?? new GooglePhotosService(refreshToken, undefined, albumId);

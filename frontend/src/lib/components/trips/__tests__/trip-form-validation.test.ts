@@ -1,10 +1,10 @@
 /**
  * Characterization net for the trip-form validator (trips-location T6b-2) — the PURE core of TripForm,
  * mirroring the backend createTripSchema so a submit that would 400 is caught client-side. Host-independent
- * (no store/DOM), the C125/C201 form-validator pattern.
+ * (no store/DOM), the form-validator pattern.
  *
  * Pins: required-field presence (vehicle / odometer / date), the R2 end>=start rule (incl. the equal-allowed
- * boundary), the R5 future-guard on the LOCAL calendar day (today PASSES — the C226 lesson — tomorrow fails),
+ * boundary), the R5 future-guard on the LOCAL calendar day (today PASSES — the lesson — tomorrow fails),
  * the max-length bounds on locations/note, and a fully-valid form → {}. The future cases are computed
  * relative to `now` so they hold on any host date/TZ.
  */
@@ -41,7 +41,7 @@ describe('validateTripFields', () => {
 		expect(validateTripFields(form())).toEqual({});
 	});
 
-	test('a trip dated TODAY is accepted (the C226 noon-local fix — not a future reject)', () => {
+	test('a trip dated TODAY is accepted (the noon-local fix — not a future reject)', () => {
 		const errors = validateTripFields(form({ tripDate: localDateOffset(0) }));
 		expect(errors.tripDate).toBeUndefined();
 	});
@@ -56,7 +56,7 @@ describe('validateTripFields', () => {
 		expect(validateTripFields(form({ startOdometer: '12.5' })).startOdometer).toBeTruthy();
 	});
 
-	// C230 regression: Svelte coerces an <input type="number"> bind:value to a NUMBER (or null when
+	// regression: Svelte coerces an <input type="number"> bind:value to a NUMBER (or null when
 	// cleared), so the form actually passes numbers — NOT the strings the seed implies. A bare `.trim()`
 	// threw "raw.trim is not a function" and killed submit silently. These pin that the validator accepts
 	// the coerced shapes the live form really produces (the bug was invisible to string-only tests).
@@ -71,7 +71,9 @@ describe('validateTripFields', () => {
 	});
 
 	test('R2 holds across mixed string/number odometers (end < start)', () => {
-		expect(validateTripFields(form({ startOdometer: 1080, endOdometer: '1000' })).endOdometer).toBeTruthy();
+		expect(
+			validateTripFields(form({ startOdometer: 1080, endOdometer: '1000' })).endOdometer
+		).toBeTruthy();
 	});
 
 	test('parseOdometer tolerates string | number | null (the exported submit-path parser)', () => {

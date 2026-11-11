@@ -1,11 +1,11 @@
 /**
- * Regression for #86 (C262): fuel-stats "This Month" / "Last Month" must be CALENDAR months —
+ * Regression for: fuel-stats "This Month" / "Last Month" must be CALENDAR months —
  * matching BOTH month AND year — not a year-agnostic getMonth() match.
  *
  * buildFuelStatsFromData filtered currentMonth/prevMonth fillups + gallons on getMonth() alone.
  * fuelRows spans the entire requested range (the default 'all' view is multi-year), so a fillup
  * from the SAME calendar month in a PRIOR year was folded into "This Month" — e.g. with three
- * years of January data the "This Month" figure triple-counted (NORTH_STAR #2, correct-for-everyone:
+ * years of January data the "This Month" figure triple-counted (correct-for-everyone:
  * the FE labels these "This Month"/"Last Month", true calendar months, alongside the also-now-derived
  * currentMonth). This pins the year-scoping (incl. the January → previous-year rollover for "Last Month").
  *
@@ -65,7 +65,7 @@ function rangeFrom(startYear: number) {
   };
 }
 
-describe('#86 — fuel-stats This/Last Month are calendar months (year-scoped)', () => {
+describe('fuel-stats This/Last Month are calendar months (year-scoped)', () => {
   test('a prior-year same-month fillup does NOT contaminate "This Month"', async () => {
     const now = new Date();
     const curMonth = now.getMonth();
@@ -85,7 +85,7 @@ describe('#86 — fuel-stats This/Last Month are calendar months (year-scoped)',
     // Only the current-calendar-month fillup counts toward "This Month".
     expect(stats.fillups.currentMonth).toBe(1);
     expect(stats.volume.currentMonth).toBeCloseTo(10, 5);
-    // currentYear (range-relative, the #85-gated figure) still sees ALL three fillups.
+    // currentYear (range-relative, the-gated figure) still sees ALL three fillups.
     expect(stats.fillups.currentYear).toBe(3);
   });
 

@@ -7,10 +7,10 @@
  * per-type required-field gate + the domain↔type guard were generalized from vlm-specific to model-domain
  * (vlm OR llm) in T1 — these pin that the `llm` domain is now first-class:
  *  - the api key is ENCRYPTED AT REST + NEVER echoed (SAX-03 — same control as vlm/storage);
- *  - the required-field gate fails FAST at CREATE *and* PUT (the #103/#123 both-paths discipline);
+ *  - the required-field gate fails FAST at CREATE *and* PUT (the both-paths discipline);
  *  - a config-only PUT (changing the model) does NOT falsely demand the apiKey be re-sent;
  *  - domain↔type consistency now accepts a model type in the 'llm' domain (the key new behavior) while
- *    still rejecting a model type in a non-model domain and a storage type in 'llm';
+ *  still rejecting a model type in a non-model domain and a storage type in 'llm';
  *  - ollama may be keyless (the self-hosted, no-data-leaves-host assistant path);
  *  - an `llm` and a `vlm` provider with the SAME provider type coexist (the domains are independent).
  */
@@ -161,7 +161,7 @@ describe('POST /api/v1/providers — LLM domain (T1)', () => {
   });
 });
 
-describe('PUT /api/v1/providers/:id — LLM domain (T1, the #123 both-paths gate)', () => {
+describe('PUT /api/v1/providers/:id — LLM domain (T1, the both-paths gate)', () => {
   async function createLlm(): Promise<string> {
     const res = await ctx.authed('POST', '/api/v1/providers', llmBody());
     expect(res.status).toBe(201);

@@ -21,7 +21,9 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          # Same single source of truth as ci-cd.yml, so the two jobs cannot resolve different
+          # 22.x releases and disagree about whether the lockfile installs.
+          node-version-file: .nvmrc
 
       - name: Install frontend dependencies
         working-directory: ./frontend
@@ -29,7 +31,10 @@ jobs:
 
       - name: Prepare SvelteKit
         working-directory: ./frontend
-        run: npm run prepare
+        # NOT `npm run prepare`: that script is `svelte-kit sync || echo ''` so npm's install
+        # lifecycle tolerates a missing svelte-kit, and the `|| echo ''` swallows a failed sync.
+        # `npm run sync` is the same command without the tolerance.
+        run: npm run sync
 
       - name: Run frontend tests with coverage
         working-directory: ./frontend
@@ -51,6 +56,10 @@ jobs:
 
       - name: Run backend tests with coverage
         working-directory: ./backend
+        # `shell: bash` for its `pipefail`, which the default `bash -e` does not set: the step's
+        # status would otherwise be `tee`'s, so a red suite would publish a badge measured from
+        # a run nobody was told had failed.
+        shell: bash
         run: |
           bun test --coverage 2>&1 | tee coverage-output.txt
 
@@ -75,6 +84,13 @@ jobs:
           if [ -f backend/coverage-output.txt ]; then
             BE_PCT=$(grep "^All files" backend/coverage-output.txt | awk -F'|' '{gsub(/ /,"",$2); print $2}')
           else
+            BE_PCT="0"
+          fi
+
+          # A table bun no longer prints in this shape yields an empty match, which would render
+          # as a bare "%" badge. Say so and fall back to the same 0 the missing-file branch uses.
+          if ! printf '%s' "$BE_PCT" | grep -qE '^[0-9]+(\.[0-9]+)?$'; then
+            echo "::warning::could not parse backend coverage from backend/coverage-output.txt"
             BE_PCT="0"
           fi
 
@@ -108,12 +124,13 @@ jobs:
           # Copy badges to temp location
           cp -r .badges /tmp/badges
 
-          # Switch to orphan branch
-          git fetch origin coverage-badges || true
+          # Switch to orphan branch. Nothing here reads the remote branch — the badge files are
+          # rebuilt from scratch and force-pushed — so there is no fetch whose failure to excuse.
           git checkout --orphan coverage-badges-tmp
 
-          # Clean and add only badge files
-          git rm -rf . || true
+          # Clean and add only badge files. `--ignore-unmatch` tolerates exactly the expected
+          # miss (an already-empty tree) instead of `|| true` swallowing every other git error.
+          git rm -r -f --ignore-unmatch .
           cp -r /tmp/badges/* .
           git add frontend-coverage.json backend-coverage.json
 

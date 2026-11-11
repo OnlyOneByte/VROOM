@@ -1,15 +1,14 @@
 /**
- * Characterization net for the dialect-aware SQL date/time helpers (C98 guard,
- * C81-coverage-steered: sql-helpers.ts was 33% func, never directly tested — only
- * exercised incidentally through analytics queries).
+ * Characterization net for the dialect-aware SQL date/time helpers, which were only ever
+ * exercised incidentally through analytics queries rather than directly.
  *
  * These three helpers are the ONLY SQLite-specific raw SQL in the codebase, and their
  * doc comments record two REAL past bugs, both from the same root cause — the column is
  * a Unix-epoch integer in SECONDS (Drizzle `mode: 'timestamp'`), so every strftime/
  * datetime call MUST pass 'unixepoch' or SQLite reads the integer as a Julian day number:
- *   - omitting it on formatYearMonth collapsed distinct months into bogus GROUP BY
- *     buckets → blank dashboard charts + a $0 monthly average;
- *   - omitting it on extractMonth returned garbage month numbers.
+ *  - omitting it on formatYearMonth collapsed distinct months into bogus GROUP BY
+ *  buckets → blank dashboard charts + a $0 monthly average;
+ *  - omitting it on extractMonth returned garbage month numbers.
  * This pins the 'unixepoch' invariant directly against real SQLite (a regression that
  * dropped it would change these outputs), executing each fragment via a Drizzle select
  * over a seeded expense — the same shape the analytics queries use.

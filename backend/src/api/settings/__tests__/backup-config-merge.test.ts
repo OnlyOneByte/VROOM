@@ -1,8 +1,8 @@
 /**
- * PUT /settings backupConfig MERGE semantics (C237 bug → #82). The handler used to write backupConfig
+ * PUT /settings backupConfig MERGE semantics (bug →). The handler used to write backupConfig
  * WHOLESALE while storageConfig was merged — so a partial PUT naming only one provider silently WIPED
  * every other provider's backup settings (retentionCount / sheetsSyncEnabled / folderPath), a
- * data-loss trap (NORTH_STAR #1). The fix merges per-provider server-side (mergeBackupConfig, mirroring
+ * data-loss trap. The fix merges per-provider server-side (mergeBackupConfig, mirroring
  * mergeStorageConfig). These tests pin the merge through the REAL HTTP stack.
  *
  * Two OWNED storage providers are raw-seeded (validateBackupConfig requires ownership), then driven via
@@ -50,7 +50,7 @@ function providerSettings(id: string, over: Record<string, unknown> = {}) {
   return { enabled: true, folderPath: `/Backups/${id}`, retentionCount: 7, ...over };
 }
 
-describe('PUT /settings backupConfig is merged per-provider, not wholesale-replaced (#82)', () => {
+describe('PUT /settings backupConfig is merged per-provider, not wholesale-replaced', () => {
   test('a partial backupConfig PUT preserves providers it does not name', async () => {
     seedProvider('drive-a', 'Drive A');
     seedProvider('drive-b', 'Drive B');
@@ -72,7 +72,7 @@ describe('PUT /settings backupConfig is merged per-provider, not wholesale-repla
     ]);
 
     // 2) PUT a PARTIAL backupConfig naming ONLY drive-b (e.g. a client editing just that provider,
-    //    or a stale-load race). Pre-fix this wiped drive-a entirely.
+    //  or a stale-load race). Pre-fix this wiped drive-a entirely.
     const partial = await ctx.authed('PUT', '/api/v1/settings', {
       backupConfig: {
         providers: {

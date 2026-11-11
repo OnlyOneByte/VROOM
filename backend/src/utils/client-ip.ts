@@ -40,10 +40,10 @@ function clientFromForwardedFor(xff: string): string | undefined {
  * Resolve the effective client IP for rate-limit keying.
  *
  * - Trusted-proxy deployments: set TRUSTED_PROXY_IPS to your LB/proxy IP(s); when a
- *   request's socket IP matches, the leftmost `X-Forwarded-For` entry is used.
+ *  request's socket IP matches, the leftmost `X-Forwarded-For` entry is used.
  * - Direct-exposure (default): forwarded headers are ignored; the socket IP is used.
  * - In-process tests (no socket IP): falls back to a forwarded header if present
- *   (tests opt in explicitly), else 'unknown'.
+ *  (tests opt in explicitly), else 'unknown'.
  */
 export function getClientIp(c: Context, trustedProxyIps?: readonly string[]): string {
   const socketIp = getSocketIp(c);

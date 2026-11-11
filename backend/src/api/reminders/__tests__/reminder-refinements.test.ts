@@ -1,6 +1,6 @@
 /**
- * Unit tests for the createReminderSchema cross-field REFINEMENTS (C87 deep-review, steered by
- * the C81 coverage baseline — reminders/validation.ts was at 64% func, the gaps being the
+ * Unit tests for the createReminderSchema cross-field REFINEMENTS (deep-review, steered by
+ * the coverage baseline — reminders/validation.ts was at 64% func, the gaps being the
  * refinement FAILURE branches: the correctness guards that reject a malformed reminder). The
  * existing update-validation test covers only the isActive toggle; this pins the six refinements
  * (custom-frequency, expense-type, mileage-trigger D4, date-range, split-config sums/match).
@@ -111,7 +111,7 @@ describe('refineDateRange', () => {
     ).toBe(true);
   });
 
-  // C375: the refinement uses `endDate <= startDate` (not `<`), so endDate EQUAL to startDate — a
+  // The refinement uses `endDate <= startDate` (not `<`), so endDate EQUAL to startDate — a
   // zero-duration reminder that would fire its start period then immediately deactivate — is rejected
   // too. Tests above pin strictly-after (ok) + strictly-before (fail) but NOT the equality boundary,
   // which is exactly what the `<=` (vs `<`) is load-bearing for: a regression to `<` would silently

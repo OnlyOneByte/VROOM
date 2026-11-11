@@ -189,7 +189,7 @@ describe('Property 6: Financing payoff eligibility flag', () => {
           }
 
           const computedBalance = await repo.computeBalance(financingId);
-          // C182: call the REAL exported rule (was a local `<= 0.01` copy — the C181 theater
+          // Call the REAL exported rule (was a local `<= 0.01` copy — the theater
           // pattern). isEligibleForPayoff is now the one source of truth the 3 route sites use.
           const eligibleForPayoff = isEligibleForPayoff(computedBalance);
 
@@ -228,7 +228,7 @@ describe('Property 6: Financing payoff eligibility flag', () => {
     expect(isEligibleForPayoff(balance)).toBe(false);
   });
 
-  // C182: pin the extracted predicate's BOUNDARY directly (the 3 route sites + the property
+  // Pin the extracted predicate's BOUNDARY directly (the 3 route sites + the property
   // test above all route through it now). Exactly-at-threshold is eligible; a cent above is not.
   test('isEligibleForPayoff boundary: exactly the threshold is eligible, just above is not', () => {
     expect(isEligibleForPayoff(PAYOFF_BALANCE_THRESHOLD)).toBe(true); // 0.01 → paid off

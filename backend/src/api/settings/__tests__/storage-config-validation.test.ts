@@ -1,9 +1,9 @@
 /**
- * PUT /settings storageConfig consistency validation (C239 guard). validateStorageConfig
+ * PUT /settings storageConfig consistency validation. validateStorageConfig
  * (settings/routes.ts) was only ~56% covered — its 4 branches gate a user from saving a broken or
  * cross-tenant storage-routing config, so a regression would let photos route to a non-owned/disabled
  * provider. These drive the REAL validator through the HTTP stack with raw-seeded owned providers (the
- * C237 backup-config-merge pattern); the validator runs on the MERGED storageConfig, so this also
+ * backup-config-merge pattern); the validator runs on the MERGED storageConfig, so this also
  * exercises mergeStorageConfig.
  *
  * Branches pinned: (1) a referenced provider not owned → 400; (2) a category default whose provider has
@@ -53,7 +53,7 @@ function defaults(over: Record<string, string | null> = {}) {
 
 /**
  * A complete per-provider category map. The inner `z.record(photoCategoryEnum, …)` is EXHAUSTIVE in
- * Zod v4 (the C70 trap) — every category key must be present — so build all 4, then override.
+ * Zod v4 — every category key must be present — so build all 4, then override.
  */
 function categoryMap(over: Record<string, { enabled: boolean; folderPath: string }> = {}) {
   const base = { enabled: true, folderPath: '/Backups' };
@@ -66,7 +66,7 @@ function categoryMap(over: Record<string, { enabled: boolean; folderPath: string
   };
 }
 
-describe('PUT /settings storageConfig consistency validation (C239)', () => {
+describe('PUT /settings storageConfig consistency validation', () => {
   test('a fully-consistent storageConfig is accepted (positive control)', async () => {
     seedProvider('drive-1');
     const res = await putStorageConfig({

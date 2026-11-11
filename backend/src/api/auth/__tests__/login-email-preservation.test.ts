@@ -1,20 +1,20 @@
 /**
- * #129 (C155) — login email-preservation guard.
+ * Login email-preservation guard.
  *
  * `updateExistingUserProfile` (auth/routes.ts) runs on EVERY OAuth login. It used to OVERWRITE
  * `users.email` (the VROOM login identity) with the provider's currently-reported email each time, so a
  * user who changed their Google/GitHub primary email had their VROOM login email silently swapped on the
- * next login — a within-account identity drift with no notice. Angelo's decision (2026-06-23): sync email
+ * next login — a within-account identity drift with no notice. sync email
  * ONLY as a first-link BACKFILL (when the stored email is empty/unset); otherwise PRESERVE it. displayName
  * stays synced unconditionally; the cross-account UNIQUE-collision fallback is kept for the backfill write.
  *
  * `updateExistingUserProfile` is a private (un-exported) handler helper, so this guard pins the behavior
  * two ways that BOTH break if the fix regresses to the old unconditional overwrite:
- *   (A) a behavioral model of the EXACT decision logic against a real in-memory users table (the SQL
- *       contract the handler runs): existing non-empty email preserved across a re-login with a different
- *       provider email; an empty email backfilled.
- *   (B) a source-scan asserting routes.ts gates the email write on the stored email being empty (so a
- *       future edit can't silently restore `set({ email: userInfo.email, ... })` unconditionally).
+ *  (A) a behavioral model of the EXACT decision logic against a real in-memory users table (the SQL
+ *  contract the handler runs): existing non-empty email preserved across a re-login with a different
+ *  provider email; an empty email backfilled.
+ *  (B) a source-scan asserting routes.ts gates the email write on the stored email being empty (so a
+ *  future edit can't silently restore `set({ email: userInfo.email, ... })` unconditionally).
  */
 
 import { Database } from 'bun:sqlite';
@@ -45,7 +45,7 @@ function applyLoginProfileSync(
   }
 }
 
-describe('#129 login email-preservation — behavioral model (A)', () => {
+describe('login email-preservation — behavioral model (A)', () => {
   let db: Database;
   beforeEach(() => {
     db = new Database(':memory:');
@@ -84,7 +84,7 @@ describe('#129 login email-preservation — behavioral model (A)', () => {
   });
 });
 
-describe('#129 login email-preservation — source-scan (B)', () => {
+describe('login email-preservation — source-scan (B)', () => {
   test('updateExistingUserProfile gates the email write on the stored email being empty', async () => {
     const src = await Bun.file(`${import.meta.dir}/../routes.ts`).text();
     const start = src.indexOf('async function updateExistingUserProfile');

@@ -2,20 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { authStore } from '../../stores/auth.svelte';
 import type { User } from '../../types/index.js';
 
-// Mock $app/stores
-vi.mock('$app/stores', () => {
-	const mockPageStore = {
-		subscribe: vi.fn(callback => {
-			callback({ url: { pathname: '/dashboard' } });
-			return () => {};
-		})
-	};
-
-	return {
-		page: mockPageStore
-	};
-});
-
 // Mock $app/state
 vi.mock('$app/state', () => ({
 	page: { url: { pathname: '/dashboard' } }
@@ -110,7 +96,7 @@ describe('Navigation Component Logic', () => {
 		// Navigation.svelte (they're local consts, not exported, so they can't be
 		// imported directly). It's a documentation/regression fixture, not proof the
 		// component renders them — keep it in sync if the nav changes. (Corrected
-		// cycle 155: the old fixture still listed a "Vehicles" item the live nav
+		// : the old fixture still listed a "Vehicles" item the live nav
 		// dropped and omitted Insurance/Reminders/Trips — a stale self-assert.)
 		const navigation = [
 			{ name: 'Dashboard', href: '/dashboard' },

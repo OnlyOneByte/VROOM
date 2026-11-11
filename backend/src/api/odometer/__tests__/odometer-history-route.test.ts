@@ -5,12 +5,12 @@
  * property test drives the repository directly, so a regression in the ROUTE wiring (the ownership
  * gate, the pagination clamp, the buildPaginatedResponse envelope) wouldn't be caught. This drives
  * the REAL stack (route → validateVehicleOwnership → getHistory → buildPaginatedResponse) and pins:
- *   - the unified history merges BOTH sources (a manual odometer entry + an expense-mileage row),
- *     newest-first, with the per-row {odometer, source, sourceId, recordedAt} shape the FE reads;
- *   - the paginated envelope (totalCount / limit / offset / hasMore) is correct + hasMore flips
- *     when limit truncates the set;
- *   - an unowned vehicleId is a clean 404 (the ownership gate runs before any read), never a
- *     cross-tenant leak (the C109/#52 tenant discipline this route inherits).
+ *  - the unified history merges BOTH sources (a manual odometer entry + an expense-mileage row),
+ *  newest-first, with the per-row {odometer, source, sourceId, recordedAt} shape the FE reads;
+ *  - the paginated envelope (totalCount / limit / offset / hasMore) is correct + hasMore flips
+ *  when limit truncates the set;
+ *  - an unowned vehicleId is a clean 404 (the ownership gate runs before any read), never a
+ *  cross-tenant leak (the tenant discipline this route inherits).
  * (The repo's value-level correctness — MAX-by-value, userId-scope on both legs — is the property
  * test's job; this is the route contract.)
  *

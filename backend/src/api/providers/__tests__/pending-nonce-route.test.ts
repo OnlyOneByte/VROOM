@@ -1,5 +1,5 @@
 /**
- * GET /api/v1/providers/pending/:nonce route coverage (C257 guard). The route reads the in-memory
+ * GET /api/v1/providers/pending/:nonce route coverage. The route reads the in-memory
  * pending-OAuth-credentials store (utils/pending-credentials) via getPendingEmail(user.id, nonce) —
  * the seam the OAuth callback uses to hand the resolved email to the provider-create UI. The store's
  * unit logic is covered (pending-credentials.test), but the ROUTE slice (auth + the found/not-found
@@ -8,7 +8,7 @@
  *
  * pending-credentials is a plain process-global Map (no DB), but createTestApp() dynamic-imports the
  * DB-bound app AFTER rewriting env — so we dynamic-import storePending INSIDE the test (post-harness)
- * to guarantee we seed the SAME module instance the route reads (the C163 same-instance discipline).
+ * to guarantee we seed the SAME module instance the route reads (the same-instance discipline).
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';

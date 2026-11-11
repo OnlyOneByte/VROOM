@@ -1,5 +1,5 @@
 /**
- * Shared unitPreferences Zod schema + partial-merge helper (C238 dedup).
+ * Shared unitPreferences Zod schema + partial-merge helper.
  *
  * `unitPreferencesSchema` / `partialUnitPreferencesSchema` were declared BYTE-IDENTICALLY in both
  * vehicles/routes.ts and settings/routes.ts (same enums, same error-message strings), and the PUT

@@ -5,8 +5,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import * as Collapsible from '$lib/components/ui/collapsible';
 	import { PHOTO_CATEGORY_LABELS } from '$lib/constants/ui';
-	import type { PhotoCategory, CategorySetting, UserProviderInfo } from '$lib/types';
-	import { providerApi } from '$lib/services/provider-api';
+	import type { PhotoCategory, CategorySetting } from '$lib/types';
 
 	const CATEGORIES: PhotoCategory[] = [
 		'vehicle_photos',
@@ -15,14 +14,22 @@
 		'odometer_readings'
 	];
 
+	/**
+	 * `photoRootPath` is the parent form's state, bound here exactly like `providerRootPath` is bound
+	 * in the Connection Settings card: the form seeds it from the stored provider, this section edits
+	 * it, and the form's Save writes it with the rest of the config. A private copy kept here instead
+	 * could only be synced back through an `$effect` on a parent-owned prop — which rewrites the field
+	 * whenever anything else on the form changes — or through a save request of its own, which the
+	 * create form (with no provider id yet) cannot make.
+	 */
 	let {
-		provider,
+		photoRootPath = $bindable('Photos'),
 		categorySettings,
 		defaultCategories = new Set<PhotoCategory>(),
 		providerRootPath = '',
 		onUpdate
 	}: {
-		provider: UserProviderInfo;
+		photoRootPath: string;
 		categorySettings: Record<PhotoCategory, CategorySetting>;
 		defaultCategories?: Set<PhotoCategory>;
 		providerRootPath?: string;
@@ -31,33 +38,7 @@
 
 	let rootPrefix = $derived(providerRootPath ? `${providerRootPath.replace(/\/+$/, '')}/` : '');
 
-	// eslint-disable-next-line svelte/prefer-writable-derived -- rootPath is locally editable, reset on provider change
-	let photoRootPath = $state('Photos');
 	let advancedOpen = $state(false);
-
-	// Set/reset rootPath when provider changes
-	$effect(() => {
-		photoRootPath = (provider.config?.['photoRootPath'] as string) ?? 'Photos';
-	});
-
-	let saveTimeout: ReturnType<typeof setTimeout> | null = null;
-
-	function handleRootPathBlur() {
-		if (provider.id === 'new') return;
-		const originalPath = (provider.config?.['photoRootPath'] as string) ?? 'Photos';
-		if (photoRootPath === originalPath) return;
-
-		if (saveTimeout) clearTimeout(saveTimeout);
-		saveTimeout = setTimeout(async () => {
-			try {
-				await providerApi.updateProvider(provider.id, {
-					config: { ...provider.config, photoRootPath: photoRootPath }
-				});
-			} catch {
-				photoRootPath = originalPath;
-			}
-		}, 300);
-	}
 
 	function handleCategoryToggle(category: PhotoCategory, checked: boolean) {
 		const updated = { ...categorySettings };
@@ -109,11 +90,7 @@
 			{/if}
 			<input
 				id="root-path"
-				value={photoRootPath}
-				oninput={e => {
-					photoRootPath = e.currentTarget.value;
-				}}
-				onblur={handleRootPathBlur}
+				bind:value={photoRootPath}
 				placeholder="Photos"
 				class="flex-1 bg-transparent px-3 py-1 outline-none placeholder:text-muted-foreground {rootPrefix
 					? 'pl-0'

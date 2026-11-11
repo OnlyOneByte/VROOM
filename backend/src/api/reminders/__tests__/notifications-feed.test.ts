@@ -2,7 +2,7 @@
  * In-process HTTP tests for the reminder NOTIFICATION feed — the rows the trigger
  * writes when a notification-type reminder fires (GET /reminders/notifications +
  * PUT /reminders/notifications/:id/read). The endpoints existed but nothing in the
- * frontend called them (cycle 165 surfaced the feed on /reminders); these pin the
+ * frontend called them (surfaced the feed on /reminders); these pin the
  * contract that UI now depends on: notifications are returned newest-first, and
  * marking one read flips isRead (and is ownership-scoped).
  *
@@ -61,10 +61,10 @@ describe('reminder notification feed (GET + mark-read)', () => {
     expect(body.data.length).toBeGreaterThanOrEqual(2);
 
     // Newest-first by createdAt (the recency axis — NOT dueDate, which is NULL for mileage
-    // notifications and would sink them; #142/C459). Each createdAt >= the next one.
+    // notifications and would sink them). Each createdAt >= the next one.
     for (let i = 1; i < body.data.length; i++) {
-      const prev = new Date(body.data[i - 1]!.createdAt).getTime();
-      const cur = new Date(body.data[i]!.createdAt).getTime();
+      const prev = new Date(body.data[i - 1].createdAt).getTime();
+      const cur = new Date(body.data[i].createdAt).getTime();
       expect(prev).toBeGreaterThanOrEqual(cur);
     }
     // All start unread.
@@ -78,7 +78,7 @@ describe('reminder notification feed (GET + mark-read)', () => {
     const listed = await json<DataEnvelope<NotificationRow[]>>(
       await ctx.authed('GET', '/api/v1/reminders/notifications')
     );
-    const target = listed.data[0]!;
+    const target = listed.data[0];
     const unreadBefore = listed.data.length;
 
     const marked = await ctx.authed('PUT', `/api/v1/reminders/notifications/${target.id}/read`);
@@ -104,12 +104,12 @@ describe('reminder notification feed (GET + mark-read)', () => {
     expect(res.status).toBeLessThan(500);
   });
 
-  // #142 (C459): the feed orders by createdAt (recency), NOT dueDate. A MILEAGE notification carries
+  // The feed orders by createdAt (recency), NOT dueDate. A MILEAGE notification carries
   // dueDate=NULL (its milestone is dueOdometer), and NULLs sort LAST under `DESC` — so ordering by dueDate
   // sank every mileage notification beneath every time notification regardless of when it fired (and the
   // limit truncated the mileage axis entirely past 100 time notifications). This pins that a mileage
   // notification created AFTER a time notification appears FIRST in the feed.
-  test('a mileage notification (dueDate NULL) created later sorts FIRST, not last (#142)', async () => {
+  test('a mileage notification (dueDate NULL) created later sorts FIRST, not last', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     // Seed a reminder to satisfy the FK, then two notifications directly: a time one created earlier,
     // a mileage one (dueDate NULL, dueOdometer set) created LATER.

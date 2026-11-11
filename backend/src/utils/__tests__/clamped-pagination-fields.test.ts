@@ -1,16 +1,16 @@
 /**
- * Guard (C232) for `commonSchemas.clampedPaginationFields` — the shared list-query `limit`/`offset` field-set
- * the C229 dedup extracted, now spread by the odometer + trips list routes.
+ * Guard for `commonSchemas.clampedPaginationFields` — the shared list-query `limit`/`offset` field-set
+ * the dedup extracted, now spread by the odometer + trips list routes.
  *
  * WHY THIS EXISTS: there are TWO pagination shapes in commonSchemas and they are DELIBERATELY different —
- * conflating them is a real, money-adjacent footgun the C212 scout + C229 dedup both called out:
- *   - `clampedPaginationFields` (THIS): NO defaults; `limit` capped at the RUNTIME `CONFIG.pagination.maxPageSize`.
- *     Pairs with `clampPagination` (utils/pagination.ts), which re-clamps — so an omitted value falls through
- *     to clampPagination's `defaultPageSize`, and an out-of-range value is REJECTED at the Zod boundary.
- *   - `commonSchemas.pagination`: bakes in `.default(50)` / `.default(0)` + a hardcoded `.max(100)`.
+ * conflating them is a real, money-adjacent footgun the scout + dedup both called out:
+ *  - `clampedPaginationFields` (THIS): NO defaults; `limit` capped at the RUNTIME `CONFIG.pagination.maxPageSize`.
+ *  Pairs with `clampPagination` (utils/pagination.ts), which re-clamps — so an omitted value falls through
+ *  to clampPagination's `defaultPageSize`, and an out-of-range value is REJECTED at the Zod boundary.
+ *  - `commonSchemas.pagination`: bakes in `.default(50)` / `.default(0)` + a hardcoded `.max(100)`.
  * If a future "tidy-up" repointed a clampPagination route at `commonSchemas.pagination` (or inlined defaults
  * into this field-set), the clamp/default behavior would silently change AND the cap would stop tracking
- * CONFIG — exactly the divergence C212 refused to adopt. Nothing pinned that contract behaviorally; this does.
+ * CONFIG — exactly the divergence refused to adopt. Nothing pinned that contract behaviorally; this does.
  *
  * Pure schema test (no DB / no HTTP harness) — parses the field-set directly, so it survives a merge as a
  * committed source-scan-grade guard.
@@ -26,7 +26,7 @@ const listQuery = z.object({ ...commonSchemas.clampedPaginationFields });
 
 const MAX = CONFIG.pagination.maxPageSize;
 
-describe('commonSchemas.clampedPaginationFields (C232 contract guard)', () => {
+describe('commonSchemas.clampedPaginationFields', () => {
   test('coerces a numeric-string limit/offset (query params arrive as strings)', () => {
     const parsed = listQuery.parse({ limit: '25', offset: '50' });
     expect(parsed.limit).toBe(25);
@@ -52,7 +52,7 @@ describe('commonSchemas.clampedPaginationFields (C232 contract guard)', () => {
     expect(parsed.offset).toBeUndefined();
   });
 
-  test('the cap TRACKS CONFIG.pagination.maxPageSize — it is NOT a hardcoded 100 (the C212/C229 divergence guard)', () => {
+  test('the cap TRACKS CONFIG.pagination.maxPageSize — it is NOT a hardcoded 100', () => {
     // This is the load-bearing distinction from commonSchemas.pagination (hardcoded .max(100) + defaults).
     // If someone repointed the field-set at a literal cap, maxPageSize and the boundary would drift apart.
     const atMax = listQuery.safeParse({ limit: String(MAX) });

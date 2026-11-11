@@ -61,14 +61,14 @@ export interface VisibilityWatchResult {
  * Usage:
  * ```svelte
  * <script>
- *   import { createVisibilityWatch } from '$lib/utils/visibility-watch';
- *   let gate = createVisibilityWatch();
+ *  import { createVisibilityWatch } from '$lib/utils/visibility-watch';
+ *  let gate = createVisibilityWatch();
  * </script>
  *
  * <div bind:this={gate.el} style="min-height: 300px">
- *   {#if gate.visible}
- *     <Chart ... />
- *   {/if}
+ *  {#if gate.visible}
+ *  <Chart ... />
+ *  {/if}
  * </div>
  * ```
  */

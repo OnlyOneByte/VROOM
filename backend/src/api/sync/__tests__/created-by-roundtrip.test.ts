@@ -1,6 +1,6 @@
 /**
  * TRUE backup → restore round-trip for `expenses.created_by` (the vehicle-sharing T5b owner-stamp
- * PROVENANCE column, migration 0011). Data-safety quality bar #1: no silent loss — NORTH_STAR #1
+ * PROVENANCE column, migration 0011). Data-safety quality bar: no silent loss —
  * names backup/restore round-tripping every column as sacred, and this column is load-bearing for the
  * whole shared-write model: `user_id` = the vehicle OWNER (whose books the row rides), `created_by` =
  * who physically entered it (an editor, on a shared row; NULL = legacy/self).

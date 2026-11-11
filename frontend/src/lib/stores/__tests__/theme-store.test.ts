@@ -1,5 +1,5 @@
 /**
- * C336 (guard) — pin themeStore, the user-facing light/dark/system theme controller.
+ * Pin themeStore, the user-facing light/dark/system theme controller.
  *
  * stores/theme.svelte.ts had ZERO direct test coverage. It's the single source of truth for dark mode:
  * setPreference persists the choice to localStorage, resolves 'system' against the OS
@@ -7,9 +7,9 @@
  * status bar. A regression here silently breaks dark mode for every user (wrong class, unpersisted
  * choice, or a 'system' pick that ignores the OS). These pin the load-bearing observable effects of
  * setPreference (the re-runnable public surface; initialize() is a one-shot guarded by an internal flag):
- *   - explicit 'dark'/'light' → the <html> `dark` class + the theme-color meta track the choice
- *   - 'system' resolves against window.matchMedia('(prefers-color-scheme: dark)')
- *   - the choice is written to localStorage under the stable key, and `current` reflects it
+ *  - explicit 'dark'/'light' → the <html> `dark` class + the theme-color meta track the choice
+ *  - 'system' resolves against window.matchMedia('(prefers-color-scheme: dark)')
+ *  - the choice is written to localStorage under the stable key, and `current` reflects it
  * NON-VACUOUS: dropping the classList toggle, the meta swap, the persistence, or inverting the system
  * resolution each turns a case RED.
  *
@@ -57,7 +57,7 @@ function themeColor(): string | null {
 }
 
 describe('themeStore.setPreference — explicit light/dark', () => {
-	// #333: the theme-color meta now tracks the ACTIVE theme's `background` token (oklch→hex), not a fixed
+	// The theme-color meta now tracks the ACTIVE theme's `background` token (oklch→hex), not a fixed
 	// brand hex. With no theme id set (beforeEach clears localStorage → default theme), the default
 	// background tokens are oklch(1 0 0) → #ffffff (light) and oklch(0.141 0.005 285.823) → #09090b (dark).
 	test("'dark' adds the html dark class + sets the dark theme-color + persists + updates current", () => {
@@ -109,11 +109,11 @@ describe('themeStore.setPreference — system resolves against the OS preference
 });
 
 /**
- * #333 — the PWA theme-color meta tracks the ACTIVE THEME's surface, not a fixed brand hex. Switching the
+ * The PWA theme-color meta tracks the ACTIVE THEME's surface, not a fixed brand hex. Switching the
  * theme-id axis re-tints the address bar to that theme's `background` token (oklch→hex), per resolved mode.
  * These pin the new wiring: aurora's surface differs from default's, in both light and dark.
  */
-describe('themeStore.setTheme — the theme-color meta follows the active theme surface (#333)', () => {
+describe('themeStore.setTheme — the theme-color meta follows the active theme surface', () => {
 	afterEach(() => {
 		// Reset the id axis so other suites see the default theme.
 		themeStore.setTheme('default');
@@ -141,14 +141,14 @@ describe('themeStore.setTheme — the theme-color meta follows the active theme 
 });
 
 /**
- * C349 (arch) — getSystemTheme is the SINGLE OS-color-scheme resolver, now SHARED by the store's applyTheme
+ * getSystemTheme is the SINGLE OS-color-scheme resolver, now SHARED by the store's applyTheme
  * AND ThemePickerCard's swatch preview (was duplicated as a private `systemPref()` copy in the picker). It
  * was only ever driven transitively through setPreference('system'); these pin its OWN contract directly so
  * the now-shared helper is anchored (arch rule 3 — characterize before consolidating). The picker imports
- * THIS function, so a regression to its media query or SSR default trips here, protecting the C348
+ * THIS function, so a regression to its media query or SSR default trips here, protecting the
  * preview-vs-applied coupling (both resolve `system` through the same code → they cannot disagree).
  */
-describe('getSystemTheme — the shared OS color-scheme resolver (C349 dedup anchor)', () => {
+describe('getSystemTheme — the shared OS color-scheme resolver (dedup anchor)', () => {
 	test('returns "dark" when the OS prefers dark', () => {
 		mockSystemDark(true);
 		expect(getSystemTheme()).toBe('dark');

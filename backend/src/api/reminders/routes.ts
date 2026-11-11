@@ -1,16 +1,20 @@
-import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { CONFIG } from '../../config';
 import type { NewReminder, Reminder } from '../../db/schema';
 import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, rateLimiter, requireAuth } from '../../middleware';
-import { centsToDollars, expenseToApi, reminderToApi } from '../../utils/money';
+import {
+  centsToDollars,
+  expenseToApi,
+  reminderToApi,
+  reminderWithVehiclesToApi,
+} from '../../utils/money';
 import {
   requireVehicleRead,
   requireVehicleWrite,
   resolveVehicleOwnerId,
 } from '../../utils/sharing';
-import { commonSchemas, validateReminderOwnership } from '../../utils/validation';
+import { commonSchemas, validateReminderOwnership, zValidator } from '../../utils/validation';
 import { expenseRepository } from '../expenses/repository';
 import { odometerRepository } from '../odometer/repository';
 import { recurringCostSummary } from './reminder-cost';
@@ -23,15 +27,6 @@ import {
 } from './validation';
 
 const routes = new Hono();
-
-/**
- * T6 display edge for a ReminderWithVehicles response ({ reminder, vehicleIds }): convert the nested
- * reminder's expenseAmount from integer CENTS → dollars. vehicleIds + the rest pass through. Used at
- * every reminder list/get/create/update return (the money lives under `.reminder`).
- */
-function reminderWithVehiclesToApi<T extends { reminder: Record<string, unknown> }>(row: T): T {
-  return { ...row, reminder: reminderToApi(row.reminder) };
-}
 
 /**
  * Resolve the server-derived mileage fields for a create/update (T4, D4). For a mileage/both
@@ -112,8 +107,8 @@ async function requireReminderVehiclesWrite(
  * A single one-period advance is wrong when the reminder is MULTIPLE periods overdue: advancing once
  * from a stale nextDueDate lands it still <= now, so the just-serviced reminder stays overdue + re-fires.
  * The loop is bounded by the date advancing past now; the strict-advance backstop bails on a
- * non-progressing cadence (the bug #13 guard — advanceReminderDueDate also throws on a bad interval).
- * Extracted from the mark-serviced handler (C394) to keep it under the cognitive-complexity cap.
+ * non-progressing cadence (the bug guard — advanceReminderDueDate also throws on a bad interval).
+ * Extracted from the mark-serviced handler to keep it under the cognitive-complexity cap.
  */
 function advanceToFirstFutureDue(reminder: Reminder, from: Date): Date {
   const now = new Date();
@@ -206,8 +201,8 @@ routes.post(
       reminder.nextDueDate
     ) {
       const nextDue = advanceToFirstFutureDue(reminder, reminder.nextDueDate);
-      // #114 (C394): honor endDate on the re-arm, mirroring the trigger-service fastForwardPastNow guard
-      // (C362/#107). A BOUNDED reminder serviced AFTER its endDate would otherwise be re-armed to a future
+      // Honor endDate on the re-arm, mirroring the trigger-service fastForwardPastNow guard
+      //  A BOUNDED reminder serviced AFTER its endDate would otherwise be re-armed to a future
       // nextDueDate and left is_active=1 — living on past its end + firing again. If the advanced date
       // crosses endDate the reminder is done: deactivate it (the whole reminder, incl. a both-axes one —
       // endDate bounds the reminder, not just the time axis) and return it inactive, not a forward date.
@@ -425,8 +420,8 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
 
   // T3/D2 (recurring-expenses): a 'expense'-type reminder auto-materializes real expense rows
   // (sourceType:'reminder', sourceId:reminder.id). Those are HISTORY — deleting the reminder must
-  // NOT delete them (NORTH_STAR #1, no silent loss). Sever the link (keep the rows) via clearSource,
-  // mirroring the C85 onFinancingDeactivated idiom. Best-effort: a clearSource hiccup must not block
+  // NOT delete them (no silent loss). Sever the link (keep the rows) via clearSource,
+  // mirroring the onFinancingDeactivated idiom. Best-effort: a clearSource hiccup must not block
   // the delete the user asked for (the rows simply keep a now-dangling sourceId, harmless). Scoped to
   // the OWNER (the materialized rows are owner-stamped). No-op for non-expense reminders (0 rows match).
   try {

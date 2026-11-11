@@ -1,5 +1,5 @@
 /**
- * VLM extraction schema + registry dispatch (vlm-receipt-parsing T2, C510). The load-bearing
+ * VLM extraction schema + registry dispatch (vlm-receipt-parsing T2). The load-bearing
  * untrusted-output discipline (design §7.3): a receipt image is untrusted input, so the model's
  * response is bounded by a STRICT schema and anything failing is DROPPED (fail-closed), never coerced.
  * The draft is never auto-written — these tests prove the bounding, not a DB write.

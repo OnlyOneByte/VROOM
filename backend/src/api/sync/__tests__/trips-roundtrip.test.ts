@@ -1,5 +1,5 @@
 /**
- * TRUE backup → restore round-trip for trips (trips-location T4, design §4, NORTH_STAR #1).
+ * TRUE backup → restore round-trip for trips (trips-location T4, design §4).
  *
  * The `trips` table was threaded through the backup/restore pipeline by hand across many files (config
  * maps + OPTIONAL_BACKUP_FILES, backup query + referential-integrity, restore FK-ordered insert +
@@ -82,8 +82,8 @@ describe('backup → restore round-trip preserves trips (T4)', () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     // A NON-midnight UTC instant (13:30:00Z) — exercises the tripDate timestamp-mode column through the
     // CSV Date→toISOString→coerceRow `new Date()` round-trip. A date-only truncation or a tz-shift on
-    // either serializer leg would move this off the exact epoch (the #87/#106/#131 date-seam class; the
-    // C203 bug-scout verified this path clean firsthand, this pins it so a future regression goes red).
+    // either serializer leg would move this off the exact epoch (the date-seam class; the
+    // bug-scout verified this path clean firsthand, this pins it so a future regression goes red).
     const tripDateSec = Math.floor(Date.UTC(2024, 5, 20, 13, 30, 0) / 1000);
     seedTrip(ctx, 'trip-1', vehicleId, {
       start_odometer: 24000,
@@ -114,7 +114,7 @@ describe('backup → restore round-trip preserves trips (T4)', () => {
     expect(row.start_odometer).toBe(24000);
     expect(row.end_odometer).toBe(24135);
     expect(row.purpose).toBe('business');
-    // The timestamp survives to the exact second — no date-only truncation, no tz drift (C203 scout).
+    // The timestamp survives to the exact second — no date-only truncation, no tz drift.
     expect(row.trip_date).toBe(tripDateSec);
     expect(row.start_location).toBe('Office');
     expect(row.end_location).toBe('Client site');
@@ -135,7 +135,7 @@ describe('backup → restore round-trip preserves trips (T4)', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].purpose).toBe('personal');
     // CSV coerceRow must restore an empty optional cell as NULL (not the string "") — the data-safety
-    // contract the C175 NOT-NULL-default fix protects for required columns; these are plain nullable.
+    // contract the NOT-NULL-default fix protects for required columns; these are plain nullable.
     expect(rows[0].start_location).toBeNull();
     expect(rows[0].end_location).toBeNull();
     expect(rows[0].note).toBeNull();

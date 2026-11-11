@@ -42,13 +42,13 @@ function isApostropheRunThenTrigger(s: string): boolean {
  *
  * Two cases the single rule covers:
  *  - `=HYPERLINK(...)` (no leading `'`) → `'=HYPERLINK(...)`: the OWASP text-prefix that stops a
- *    spreadsheet from EVALUATING the cell. (Only the first char can start a formula, so this is
- *    sufficient and minimally intrusive.)
+ *  spreadsheet from EVALUATING the cell. (Only the first char can start a formula, so this is
+ *  sufficient and minimally intrusive.)
  *  - `'=Daily` (a value the user genuinely typed with a leading `'` before a trigger) → `''=Daily`:
- *    the INVERTIBLE escape (vlm/csv-apostrophe ruling, 2026-06-30) so the symmetric importer can
- *    restore the user's literal leading `'` instead of over-stripping it. Excel still displays
- *    `''=Daily` as the user's `'=Daily` (a leading `'` forces text and is hidden), so it stays
- *    both safe and faithful.
+ *  the INVERTIBLE escape (vlm/csv-apostrophe ruling, 2026-06-30) so the symmetric importer can
+ *  restore the user's literal leading `'` instead of over-stripping it. Excel still displays
+ *  `''=Daily` as the user's `'=Daily` (a leading `'` forces text and is hidden), so it stays
+ *  both safe and faithful.
  */
 export function neutralizeCsvCell<T>(value: T): T | string {
   if (typeof value !== 'string' || value.length === 0) return value;
@@ -76,8 +76,8 @@ export function neutralizeCsvRow<T extends Record<string, unknown>>(
  *
  * Strips a single leading `'` IFF the value is an apostrophe-run-then-trigger (`'=`, `''=`, `'+`,
  * `'@`, … — the EXACT shape neutralize prefixes), undoing one neutralization layer:
- *   `'=SUM(...)`  → `=SUM(...)`   (an exported formula → the user's original)
- *   `''=Daily`    → `'=Daily`     (an exported user-typed-`'`-before-trigger → the literal `'=Daily`)
+ *  `'=SUM(...)` → `=SUM(...)` (an exported formula → the user's original)
+ *  `''=Daily` → `'=Daily` (an exported user-typed-`'`-before-trigger → the literal `'=Daily`)
  *
  * RULED 2026-06-30 (vlm/csv-apostrophe): optimize VROOM-own-export round-trip fidelity. The matched
  * escape makes neutralize↔denormalize a true inverse for EVERY value, INCLUDING one the user genuinely

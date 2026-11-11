@@ -140,13 +140,13 @@
 			description="Normalized 0–100 scores by metric (higher is better)"
 			data={radarData}
 			x="metric"
-			y={radarVehicleSeries.map((s) => s.key)}
+			y={radarVehicleSeries.map(s => s.key)}
 			series={radarVehicleSeries}
 			config={radarConfig}
 			seriesLayout="group"
 			yDomain={[0, 100]}
 			yAxisFormat={(v: number) => String(v)}
-			xAxisProps={{ ticks: radarMetrics.map((m) => m.label) }}
+			xAxisProps={{ ticks: radarMetrics.map(m => m.label) }}
 		/>
 	</div>
 

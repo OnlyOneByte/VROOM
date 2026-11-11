@@ -196,7 +196,7 @@
 						<!-- text-foreground, NOT the chart color: text-chart-1 (#f54900) on white is
 						     only 3.59:1 and chart-2 3.66:1 — both fail WCAG AA for this text. The
 						     colored Progress bar below carries the progress signal; the number just
-						     needs to be legible. (Same text-on-chart-color class as cycle 187/188.) -->
+						     needs to be legible. (Same text-on-chart-color class.) -->
 						<span class="text-lg font-bold text-foreground">
 							{Math.round(progressPercentage)}%
 						</span>
@@ -222,7 +222,7 @@
 					<div>
 						<p class="text-xs text-muted-foreground">Paid</p>
 						<!-- text-foreground, NOT text-chart-2: #009689 on white is 3.66:1 (fails WCAG
-						     AA). The "Paid" label above already identifies it; same class as cycle 187/188. -->
+						     AA). The "Paid" label above already identifies it; same class. -->
 						<p class="text-sm sm:text-base font-semibold text-foreground">
 							{formatCurrency(amountPaid)}
 						</p>

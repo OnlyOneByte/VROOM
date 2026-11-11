@@ -1,18 +1,18 @@
 /**
- * T4 part 3 (cycle 37): mileage re-check on write (D5).
+ * T4 part 3: mileage re-check on write (D5).
  *
  * A mileage reminder fires the moment a new odometer reading crosses its milestone — not only on the
  * next POST /trigger. The odometer-create and mileaged-expense-create routes call
  * reminderTriggerService.recheckMileageReminders(userId, vehicleId) after persisting. Pinned
  * end-to-end through the real route → trigger → repo → DB stack:
- *   - a manual odometer reading at/over the milestone fires the notification immediately (no /trigger)
- *   - a reading BELOW the milestone fires nothing
- *   - a mileaged EXPENSE crossing the milestone fires it too (expenses.mileage feeds getCurrentOdometer)
- *   - it's idempotent: a later /trigger does NOT double-fire what recheck already wrote
- *   - a NON-mileage write path is unaffected (no spurious notifications)
+ *  - a manual odometer reading at/over the milestone fires the notification immediately (no /trigger)
+ *  - a reading BELOW the milestone fires nothing
+ *  - a mileaged EXPENSE crossing the milestone fires it too (expenses.mileage feeds getCurrentOdometer)
+ *  - it's idempotent: a later /trigger does NOT double-fire what recheck already wrote
+ *  - a NON-mileage write path is unaffected (no spurious notifications)
  *
  * Mileage reminders aren't seeded via the API for the below-milestone setup ordering, so seed the
- * reminder row directly via sqlite (matching the C25 pattern), then drive the REAL write routes.
+ * reminder row directly via sqlite (matching the pattern), then drive the REAL write routes.
  * createTestApp() rewrites env + dynamic-imports DB-bound modules; keep imports to harness + bun:test.
  */
 
@@ -132,12 +132,12 @@ describe('mileage re-check on write (D5)', () => {
 });
 
 /**
- * #71 (C214): the recheck hook was wired on CREATE but NOT on the PUT/update paths, so EDITING a
+ * The recheck hook was wired on CREATE but NOT on the PUT/update paths, so EDITING a
  * reading upward across a milestone (a common correction) silently did NOT fire until the next
  * /trigger — breaking the D5 "fires the moment crossed" guarantee for edits. These pin the recheck on
  * both update routes (odometer PUT + mileaged-expense PUT).
  */
-describe('mileage re-check on UPDATE (D5, #71)', () => {
+describe('mileage re-check on UPDATE (D5)', () => {
   test('editing an odometer reading UP across the milestone fires immediately (no /trigger)', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'RAV4', year: 2022 });
     seedMileageReminder('ru1', vehicleId, 35000);
@@ -182,7 +182,7 @@ describe('mileage re-check on UPDATE (D5, #71)', () => {
 });
 
 /**
- * C284: the DELETE path deliberately does NOT recheck — and that's correct. A mileage reminder only
+ * The DELETE path deliberately does NOT recheck — and that's correct. A mileage reminder only
  * crosses FORWARD (processMileageReminder fires when currentOdometer >= nextDueOdometer and dedups),
  * it never UN-fires. Deleting the highest reading lowers the current odometer, which can only remove a
  * future forward-crossing, never retroactively cancel one already written. This pins that
@@ -191,7 +191,7 @@ describe('mileage re-check on UPDATE (D5, #71)', () => {
  * below the milestone) — so a future "recheck on delete" change can't silently break the no-un-fire
  * contract.
  */
-describe('mileage re-check is NOT run on DELETE (downward change is safe — C284)', () => {
+describe('mileage re-check is NOT run on DELETE (downward change is safe)', () => {
   test('deleting the milestone-crossing reading keeps the already-fired notification (no un-fire, no re-fire)', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'RAV4', year: 2022 });
     seedMileageReminder('rd1', vehicleId, 35000);

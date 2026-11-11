@@ -3,7 +3,7 @@
 	import { routes, paramRoutes } from '$lib/routes';
 	import { Gauge, Plus } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
-	import { StatCardGrid } from '$lib/components/charts';
+	import StatCardGrid from '$lib/components/charts/StatCardGrid.svelte';
 	import EmptyState from '$lib/components/common/empty-state.svelte';
 	import { settingsStore } from '$lib/stores/settings.svelte';
 	import {

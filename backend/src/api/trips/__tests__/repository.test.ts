@@ -1,9 +1,9 @@
 /**
  * TripRepository unit tests (trips-location T2) over an in-memory migrated DB (the OdometerRepository
  * test harness). Covers the CRUD + finder surface and — the spec's required regression — the
- * cross-tenant DELETE scope (#52): deleteByIdAndUserId must NEVER remove another user's trip. Every
- * finder is asserted userId-scoped (the C155/C109 tenant discipline). Also pins the derived
- * `tripDistance` clamp (R2, the #46 negative-guard).
+ * cross-tenant DELETE scope: deleteByIdAndUserId must NEVER remove another user's trip. Every
+ * finder is asserted userId-scoped (the tenant discipline). Also pins the derived
+ * `tripDistance` clamp (R2, the negative-guard).
  */
 
 import { Database } from 'bun:sqlite';
@@ -74,7 +74,7 @@ describe('TripRepository (T2)', () => {
     expect(trip.note).toBe('Client visit');
   });
 
-  test('findByIdAndUserId returns the owner’s trip and NULL for a foreign user (#52 read scope)', async () => {
+  test('findByIdAndUserId returns the owner’s trip and NULL for a foreign user (read scope)', async () => {
     const trip = await repo.create(tripData());
     expect(await repo.findByIdAndUserId(trip.id, USER_ID)).not.toBeNull();
     // Another user must not be able to read it by id.
@@ -133,9 +133,9 @@ describe('TripRepository (T2)', () => {
     expect(ids.sort()).toEqual([a.id, b.id].sort());
   });
 
-  // The spec's required #52 regression: a destructive delete keyed on id ALONE would let one user
+  // The spec's required regression: a destructive delete keyed on id ALONE would let one user
   // delete another's trip. deleteByIdAndUserId keys on BOTH — a foreign delete is a no-op (returns false).
-  test('deleteByIdAndUserId removes the owner’s trip but REFUSES a foreign user’s delete (#52)', async () => {
+  test('deleteByIdAndUserId removes the owner’s trip but REFUSES a foreign user’s delete', async () => {
     const trip = await repo.create(tripData());
 
     // A foreign user's delete attempt removes nothing and reports false (caller → 404).
@@ -163,7 +163,7 @@ describe('tripDistance (derived, R2 clamp)', () => {
     expect(tripDistance({ startOdometer: 1000, endOdometer: 1080 })).toBe(80);
   });
 
-  test('clamps a non-increasing odometer pair to 0 (the #46 negative-guard)', () => {
+  test('clamps a non-increasing odometer pair to 0 (the negative-guard)', () => {
     expect(tripDistance({ startOdometer: 1080, endOdometer: 1000 })).toBe(0);
     expect(tripDistance({ startOdometer: 5000, endOdometer: 5000 })).toBe(0);
   });

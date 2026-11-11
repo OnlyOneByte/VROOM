@@ -36,7 +36,7 @@ export const activityTracker: MiddlewareHandler = async (c, next) => {
     // provider (enabled:false, sheetsSyncEnabled:true). Reuse the orchestrator's OWN predicate
     // (filterEnabledProviders: s.enabled || s.sheetsSyncEnabled) rather than a local `.some(p.enabled)`
     // copy: the copy was NARROWER, so a Sheets-only-sync user never armed the timer → auto-backup-on-
-    // inactivity silently never fired even though the orchestrator it gates would have backed up (#136).
+    // inactivity silently never fired even though the orchestrator it gates would have backed up.
     const hasSyncEnabled = backupConfig?.providers
       ? filterEnabledProviders(backupConfig).length > 0
       : false;

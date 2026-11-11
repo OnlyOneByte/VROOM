@@ -9,19 +9,19 @@
  * that rejected the row's NULLs) is the canonical example this harness catches.
  *
  * HOW IT WORKS — import ordering is load-bearing:
- *   The DB singleton in `db/connection.ts` reads `CONFIG.database.url` at IMPORT
- *   time, and `CONFIG` reads `process.env` at ITS import time. So this helper
- *   sets `DATABASE_URL`/`NODE_ENV` on `process.env` and then uses DYNAMIC
- *   `import()` for everything DB-bound. A test MUST call `createTestApp()`
- *   before statically importing anything that pulls in `config`/`connection`.
- *   (Keep this file's own imports type-only for the same reason.)
+ *  The DB singleton in `db/connection.ts` reads `CONFIG.database.url` at IMPORT
+ *  time, and `CONFIG` reads `process.env` at ITS import time. So this helper
+ *  sets `DATABASE_URL`/`NODE_ENV` on `process.env` and then uses DYNAMIC
+ *  `import()` for everything DB-bound. A test MUST call `createTestApp()`
+ *  before statically importing anything that pulls in `config`/`connection`.
+ *  (Keep this file's own imports type-only for the same reason.)
  *
  * Usage:
- *   import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
- *   let ctx: TestApp;
- *   beforeEach(async () => { ctx = await createTestApp(); });
- *   afterEach(() => ctx.close());
- *   const res = await ctx.authed('GET', '/api/v1/reminders');
+ *  import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+ *  let ctx: TestApp;
+ *  beforeEach(async () => { ctx = await createTestApp(); });
+ *  afterEach(() => ctx.close());
+ *  const res = await ctx.authed('GET', '/api/v1/reminders');
  */
 
 import type { Hono } from 'hono';
@@ -32,7 +32,7 @@ import type { Hono } from 'hono';
  * `Response.json()` is correctly typed `Promise<unknown>` (the wire gives untyped
  * bytes), which would otherwise force an `as`-cast at every call site. This
  * centralizes that one cast so route tests read cleanly:
- *   `const body = await json<DataEnvelope<{ id: string }>>(res)`.
+ *  `const body = await json<DataEnvelope<{ id: string }>>(res)`.
  * The caller declares the shape it asserts against — no `any`, no per-file casts.
  */
 export async function json<T>(res: Response): Promise<T> {
@@ -86,7 +86,7 @@ let migrated = false;
  */
 export async function createTestApp(seedUser: Partial<TestUser> = {}): Promise<TestApp> {
   // 1) Point the (not-yet-imported) DB singleton at the in-memory DB and force a
-  //    non-production env BEFORE any DB-bound module is imported.
+  //  non-production env BEFORE any DB-bound module is imported.
   process.env.NODE_ENV = 'test';
   process.env.DATABASE_URL = ':memory:';
   process.env.SESSION_SECRET ||= 'test-session-secret-at-least-32-chars-long';

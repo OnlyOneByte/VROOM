@@ -4,7 +4,7 @@
  * The T4 route test (assistant-chat-route.test.ts) pins the route/orchestrator CONTRACT — the guards
  * (allowlist, Zod, IDOR), the K/T caps, the 400/502 honesty — but every one of its tool-call cases runs
  * against an EMPTY DB, so it never inspects WHAT the tool returned or that the model actually SAW it.
- * This pins the OTHER half NORTH_STAR #3 cares about: that a read tool, run over REAL seeded data, feeds
+ * This pins the OTHER half cares about: that a read tool, run over REAL seeded data, feeds
  * its real aggregate BACK to the model (design §4 step d) so the grounded answer reflects the user's own
  * numbers — the full FE→BE→tool-loop→reply seam, end to end, without a live LLM or a browser.
  *
@@ -160,12 +160,14 @@ describe('LLM assistant tool-result round-trip: real data fed back to the model 
     const data = (await json<DataEnvelope<ChatReply>>(res)).data;
     expect(data.toolsUsed).toEqual(['getExpenseSummary']);
 
-    // The tool result fed back to the model must carry the real summed total (cents — 12000 — or a
-    // dollar-bearing field). Assert the seeded amount appears in what the model saw.
+    // The tool result fed back to the model must carry the real summed total, in the DOLLARS the system
+    // prompt promises ("all amounts are in the user currency"). The summary sums integer cents on the
+    // repo seam, so the tool layer converts at its display edge: the seeded $120 reaches the model as
+    // 120, never as the stored 12000 cents (which the model would read out as $12,000).
     const combined = toolMessagesSent().join('\n');
     expect(combined.length).toBeGreaterThan(0);
-    // The summary aggregates money in cents on the repo seam; the seeded $120 → 12000 cents.
-    expect(combined).toContain('12000');
+    expect(combined).toContain('"totalAmount":120');
+    expect(combined).not.toContain('12000');
   });
 
   test('a two-tool conversation threads BOTH results back before the final answer', async () => {

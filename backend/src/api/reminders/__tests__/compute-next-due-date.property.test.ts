@@ -269,7 +269,7 @@ describe('Property 20: Anchor day prevents month-end drift', () => {
 });
 
 // ---------------------------------------------------------------------------
-// advanceReminderDueDate — the C153 wrapper that binds the four reminder.* fields + the stable
+// advanceReminderDueDate — the wrapper that binds the four reminder.* fields + the stable
 // anchor day, so the catch-up / notification / fast-forward / mark-serviced re-arm paths all advance
 // a reminder identically (it replaced four byte-identical computeNextDueDate(...) call blocks).
 // ---------------------------------------------------------------------------
@@ -307,7 +307,7 @@ describe('advanceReminderDueDate delegates to computeNextDueDate with the remind
     expect(mar.getDate()).toBe(31);
   });
 
-  test('propagates the bug-#13 throws (corrupt frequency / non-positive interval)', () => {
+  test('propagates the bug- throws (corrupt frequency / non-positive interval)', () => {
     const start = new Date(2025, 0, 10);
     expect(() =>
       advanceReminderDueDate(stubReminder({ frequency: 'monthy', startDate: start }), start)

@@ -1,14 +1,14 @@
 /**
- * HTTP characterization of GET /api/v1/reminders/:id/expenses (recurring-expenses T6 backend, C122).
+ * HTTP characterization of GET /api/v1/reminders/:id/expenses (recurring-expenses T6 backend).
  *
  * The route lists the expense rows a reminder has MATERIALIZED (via findBySource('reminder', id,
  * userId)) — the read seam the T6 "this reminder created N expenses" UI will fetch. Goes through the
  * REAL stack (route → ownership check → expenseRepository.findBySource). Pins:
- *   - an expense reminder → trigger → GET /:id/expenses returns the materialized rows, all
- *     source-linked to the reminder ($125.50 template),
- *   - a notification reminder (materializes nothing) → [],
- *   - ownership-scoped: a random/foreign reminder id → 404, and one user's reminder is invisible to
- *     another user.
+ *  - an expense reminder → trigger → GET /:id/expenses returns the materialized rows, all
+ *  source-linked to the reminder ($125.50 template),
+ *  - a notification reminder (materializes nothing) → [],
+ *  - ownership-scoped: a random/foreign reminder id → 404, and one user's reminder is invisible to
+ *  another user.
  *
  * createTestApp() rewrites env + dynamic-imports DB-bound modules, so keep static imports to the
  * harness + bun:test.

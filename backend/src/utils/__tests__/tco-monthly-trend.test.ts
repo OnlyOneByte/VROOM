@@ -1,19 +1,19 @@
 /**
- * Direct certification of buildTCOMonthlyTrend (C53 deep-review). This is the per-month total-cost-of-
+ * Direct certification of buildTCOMonthlyTrend. This is the per-month total-cost-of-
  * ownership SERIES the TCO chart renders, and it was driven ONLY transitively through getTCO — no test
- * asserted its bucketing (the C6/C18/C46 "helper output never pinned" gap, on a money-facing series).
+ * asserted its bucketing (the C6/ "helper output never pinned" gap, on a money-facing series).
  *
  * The contract (certified firsthand against source, analytics-charts.ts):
- *   - Buckets each row by (category, sourceType): financial+financing → financing; financial+insurance_term
- *     → insurance; fuel → fuel; maintenance → maintenance. This MIRRORS categorizeTCOExpenses (the TCO
- *     TOTAL bucketing, certified C33), but in the TIME dimension.
- *   - An UNCATEGORIZED row contributes to NO bucket — a financial+reminder (recurring, C27) or financial+null
- *     (manual) row, or a regulatory/enhancement/misc row, is silently EXCLUDED from the trend (the deliberate
- *     "the trend shows only the 4 named categories" contract; categorizeTCOExpenses routes those to
- *     otherCosts, which the trend simply doesn't surface). A mis-bucket here would inflate a displayed money
- *     series (NORTH_STAR #1).
- *   - Same-month rows of different categories co-accumulate into one month entry; the series is sorted
- *     ascending by YYYY-MM month key; a dateless row is dropped (no crash, no phantom key).
+ *  - Buckets each row by (category, sourceType): financial+financing → financing; financial+insurance_term
+ *  → insurance; fuel → fuel; maintenance → maintenance. This MIRRORS categorizeTCOExpenses (the TCO
+ *  TOTAL bucketing, certified), but in the TIME dimension.
+ *  - An UNCATEGORIZED row contributes to NO bucket — a financial+reminder (recurring) or financial+null
+ *  (manual) row, or a regulatory/enhancement/misc row, is silently EXCLUDED from the trend (the deliberate
+ *  "the trend shows only the 4 named categories" contract; categorizeTCOExpenses routes those to
+ *  otherCosts, which the trend simply doesn't surface). A mis-bucket here would inflate a displayed money
+ *  series.
+ *  - Same-month rows of different categories co-accumulate into one month entry; the series is sorted
+ *  ascending by YYYY-MM month key; a dateless row is dropped (no crash, no phantom key).
  *
  * toMonthKey uses LOCAL getFullYear/getMonth, so these construct dates via new Date(y, mIdx, d) (local) for
  * timezone-stable keys.
@@ -45,7 +45,7 @@ describe('buildTCOMonthlyTrend — (category, sourceType) bucketing', () => {
   test('an uncategorized row contributes to NO bucket (the 4-named-categories contract)', () => {
     const jan = new Date(2024, 0, 10);
     const trend = buildTCOMonthlyTrend([
-      // A recurring-expense materialized financial row (sourceType 'reminder', C27) — NOT financing/insurance.
+      // A recurring-expense materialized financial row (sourceType 'reminder') — NOT financing/insurance.
       { category: 'financial', sourceType: 'reminder', expenseAmount: 999, date: jan },
       // A manual financial row (null sourceType).
       { category: 'financial', sourceType: null, expenseAmount: 50, date: jan },

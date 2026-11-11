@@ -1,14 +1,14 @@
 /**
  * TRUE backup → restore round-trip for vehicle_shares (vehicle-sharing T9, design §4/§6.4, R7/D7/D8,
- * NORTH_STAR #1). vehicle_shares is threaded through the pipeline by hand (config maps +
+ * ). vehicle_shares is threaded through the pipeline by hand (config maps +
  * OPTIONAL_BACKUP_FILES, createBackup query + validateShareRefs, restore FK-ordered insert +
  * ImportSummary + conflict-probe); the drift guards prove the wiring EXISTS — this proves the round-trip
  * preserves an owner's accepted grant AND honors the cross-tenant guarantees:
- *   - the OWNER's export carries their ACCEPTED grants (D7 — pending/declined/revoked are NOT exported),
- *   - the INVITEE's export does NOT pull the owner's shares (blast-radius, §6.4 — createBackup scopes by
- *     ownerId, and the invitee is never an ownerId),
- *   - restore re-stamps ownerId to the importer and (cross-instance) SKIPS a grant whose invitee user is
- *     absent rather than FK-aborting the whole restore (#127/C151 data-loss class).
+ *  - the OWNER's export carries their ACCEPTED grants (D7 — pending/declined/revoked are NOT exported),
+ *  - the INVITEE's export does NOT pull the owner's shares (blast-radius, §6.4 — createBackup scopes by
+ *  ownerId, and the invitee is never an ownerId),
+ *  - restore re-stamps ownerId to the importer and (cross-instance) SKIPS a grant whose invitee user is
+ *  absent rather than FK-aborting the whole restore (data-loss class).
  *
  * Shares are seeded directly via ctx.sqlite (the round-trip path — CSV serialize → parse → FK-ordered
  * insert — is independent of the share routes, same approach trips-roundtrip uses). createTestApp()
