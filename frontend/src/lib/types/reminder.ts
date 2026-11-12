@@ -1,16 +1,11 @@
-// Reminder frequency options
 export type ReminderFrequency = 'weekly' | 'monthly' | 'yearly' | 'custom';
 
-// Custom interval units
 export type IntervalUnit = 'day' | 'week' | 'month' | 'year';
 
-// Reminder action types
 export type ReminderType = 'expense' | 'notification';
 
-// Trigger axis (maintenance-schedule): by time, by odometer mileage, or whichever comes first.
 export type TriggerMode = 'time' | 'mileage' | 'both';
 
-// Split config for reminder expenses (mirrors backend ReminderSplitConfig)
 export type ReminderSplitConfig =
 	| { method: 'even'; vehicleIds: string[] }
 	| { method: 'absolute'; allocations: { vehicleId: string; amount: number }[] }
@@ -21,16 +16,12 @@ export interface Reminder {
 	userId: string;
 	name: string;
 	description: string | null;
-	type: string; // ReminderType
+	type: ReminderType;
 	actionMode: string;
-	frequency: string; // ReminderFrequency
+	frequency: ReminderFrequency;
 	intervalValue: number | null;
-	intervalUnit: string | null; // IntervalUnit
-	// Maintenance-schedule (T4 backend). triggerMode defaults to 'time'; the mileage fields are set
-	// only for 'mileage'/'both'. nextDueOdometer is the server-derived milestone cache
-	// (= lastServiceOdometer + intervalMileage). Distances are unitless ints in the vehicle's
-	// distanceUnit (convert-on-read). nextDueDate is null for a pure-mileage reminder.
-	triggerMode: string; // TriggerMode
+	intervalUnit: IntervalUnit | null;
+	triggerMode: TriggerMode;
 	intervalMileage: number | null;
 	lastServiceOdometer: number | null;
 	nextDueOdometer: number | null;
@@ -57,8 +48,6 @@ export interface ReminderNotification {
 	id: string;
 	reminderId: string;
 	userId: string;
-	// A time-axis notification carries a dueDate; a mileage-axis one carries a dueOdometer instead
-	// (exactly one is set). Both nullable as of the maintenance-schedule work.
 	dueDate: string | null;
 	dueOdometer: number | null;
 	isRead: boolean;
@@ -72,14 +61,7 @@ export interface TriggerResult {
 	skipped: Array<{ reminderId: string; reason: string; message?: string }>;
 }
 
-/**
- * The monthly recurring run-rate across a user's active expense reminders (recurring-expenses T7).
- * Mirrors the backend `recurringCostSummary` shape (reminders/reminder-cost.ts) — the dashboard
- * "recurring costs" widget renders this; fetched via `reminderApi.getRecurringCost()`.
- */
 export interface RecurringCostSummary {
-	/** Count of active expense reminders contributing a positive monthly run-rate. */
 	count: number;
-	/** Total normalized monthly run-rate across those reminders (currency/month). */
 	monthlyTotal: number;
 }

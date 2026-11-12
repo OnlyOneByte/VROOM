@@ -1,22 +1,6 @@
-/**
- * Pin appStore, the global vehicle-list + notification (toast) store.
- *
- * stores/app.svelte.ts had ZERO direct test coverage. It backs the app-wide vehicle list (every
- * vehicle CRUD surface reads/writes it) and the toast notification system (showSuccess/Error/Warning/
- * Info → addNotification). The load-bearing logic a refactor could silently break:
- *  - updateVehicle does an ID-MATCH map (only the matching vehicle changes; a non-match is a no-op);
- *  removeVehicle is an ID filter — get either predicate wrong and the wrong vehicle mutates/vanishes.
- *  - addNotification assigns a fresh id + stamps a timestamp + defaults duration to 5000.
- *  - the four show* helpers carry DISTINCT default toast lifetimes (success 5000 / error 8000 /
- *  warning 6000 / info 5000) — these are the user-facing dismiss timings; a regression that
- *  flattened them would make errors vanish too fast (or infos linger).
- * reset() clears state; the store is a singleton so each test resets first.
- * NON-VACUOUS: flip an updateVehicle/removeVehicle predicate, or change a default duration, → RED.
- */
-
 import { beforeEach, describe, expect, test } from 'vitest';
 import { appStore } from '../app.svelte';
-import type { Vehicle } from '$lib/types';
+import type { Vehicle } from '#lib/types/index.ts';
 
 function vehicle(id: string, over: Partial<Vehicle> = {}): Vehicle {
 	return { id, userId: 'u1', make: 'Toyota', model: 'Camry', year: 2022, ...over } as Vehicle;
@@ -39,10 +23,10 @@ describe('appStore — vehicle CRUD', () => {
 	test('updateVehicle changes ONLY the id-matched vehicle, merging the partial', () => {
 		appStore.setVehicles([vehicle('a', { make: 'Honda' }), vehicle('b', { make: 'Mazda' })]);
 		appStore.updateVehicle('b', { model: 'CX-5' });
-		expect(appStore.vehicles.find(v => v.id === 'a')?.make).toBe('Honda'); // untouched
+		expect(appStore.vehicles.find(v => v.id === 'a')?.make).toBe('Honda');
 		const b = appStore.vehicles.find(v => v.id === 'b');
-		expect(b?.make).toBe('Mazda'); // preserved
-		expect(b?.model).toBe('CX-5'); // merged
+		expect(b?.make).toBe('Mazda');
+		expect(b?.model).toBe('CX-5');
 	});
 
 	test('updateVehicle for an unknown id is a no-op (no row added, none mutated)', () => {
@@ -94,7 +78,7 @@ describe('appStore — notifications', () => {
 			appStore.notifications.map(n => [n.type, n.duration])
 		);
 		expect(byType['success']).toBe(5000);
-		expect(byType['error']).toBe(8000); // errors linger longest
+		expect(byType['error']).toBe(8000);
 		expect(byType['warning']).toBe(6000);
 		expect(byType['info']).toBe(5000);
 	});

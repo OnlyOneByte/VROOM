@@ -1,7 +1,3 @@
-/**
- * Error Module - Error classes, handlers, and response formatters
- */
-
 export class AppError extends Error {
   public readonly statusCode: number;
   public readonly isOperational: boolean;
@@ -116,7 +112,7 @@ export function formatErrorResponse(error: unknown, includeStack: boolean = fals
   }
 
   if (error instanceof Error) {
-    // In production, don't expose raw error messages — they may contain internal details
+    // Raw messages can contain internal details, so they are shown only in development.
     const message = includeStack ? error.message : 'An internal error occurred';
     return createErrorResponse(
       'InternalServerError',
@@ -144,26 +140,32 @@ const ERROR_STATUS_MAP: Record<string, number> = {
   [SyncErrorCode.SYNC_IN_PROGRESS]: 409,
 };
 
+// bun:sqlite sets `code`; drizzle may wrap the driver error, so the cause chain is walked too.
+const UNIQUE_VIOLATION_CODES = new Set([
+  'SQLITE_CONSTRAINT_UNIQUE',
+  'SQLITE_CONSTRAINT_PRIMARYKEY',
+]);
+
+export function isUniqueConstraintError(err: unknown): boolean {
+  for (let e: unknown = err; e instanceof Error; e = e.cause) {
+    const code = (e as Error & { code?: unknown }).code;
+    if (typeof code === 'string' && UNIQUE_VIOLATION_CODES.has(code)) return true;
+  }
+  return false;
+}
+
 export const handleDatabaseError = (error: unknown): AppError => {
+  if (isUniqueConstraintError(error)) return new ConflictError('Resource already exists');
   if (error instanceof Error) {
-    if (error.message.includes('UNIQUE constraint failed'))
-      return new ConflictError('Resource already exists');
     if (error.message.includes('FOREIGN KEY constraint failed'))
       return new ValidationError('Invalid reference to related resource');
     if (error.message.includes('NOT NULL constraint failed'))
       return new ValidationError('Required field is missing');
-    // Don't leak raw SQLite error messages to clients
     return new DatabaseError('A database error occurred');
   }
   return new DatabaseError('A database error occurred');
 };
 
-/**
- * Canonical SyncError → HTTP response shaping, used by the global `errorHandler` middleware — the
- * one path that answers a thrown SyncError, since no route hand-rolls a catch block for one. The
- * body is the standard error envelope keyed on the SyncErrorCode; the status comes from
- * ERROR_STATUS_MAP (defaulting to 500 for an unmapped code).
- */
 export function syncErrorResponse(error: SyncError): { body: ErrorResponse; status: number } {
   const status = ERROR_STATUS_MAP[error.code] || 500;
   return { body: createErrorResponse(error.code, error.message, error.details), status };

@@ -1,11 +1,5 @@
-/**
- * Time period constants for date calculations
- */
-
-// Period type definition
 export type TimePeriod = '7d' | '30d' | '90d' | '1y' | 'all';
 
-// Period options for selectors
 export const PERIOD_OPTIONS = [
 	{ value: '7d' as const, label: 'Last 7 Days' },
 	{ value: '30d' as const, label: 'Last 30 Days' },
@@ -14,7 +8,6 @@ export const PERIOD_OPTIONS = [
 	{ value: 'all' as const, label: 'All Time' }
 ] as const;
 
-// Type guard for period validation
 export function isValidPeriod(value: string): value is TimePeriod {
 	return ['7d', '30d', '90d', '1y', 'all'].includes(value);
 }

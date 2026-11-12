@@ -1,20 +1,20 @@
 <script lang="ts">
 	import { DollarSign, Calculator } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import Input from '$lib/components/ui/input/input.svelte';
-	import Label from '$lib/components/ui/label/label.svelte';
-	import * as Select from '$lib/components/ui/select';
-	import DatePicker from '$lib/components/common/date-picker.svelte';
-	import { FormFieldError } from '$lib/components/ui/form-field';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import Input from '#lib/components/ui/input/input.svelte';
+	import Label from '#lib/components/ui/label/label.svelte';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import DatePicker from '#lib/components/common/date-picker.svelte';
+	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
 	import {
 		Card,
 		CardContent,
 		CardDescription,
 		CardHeader,
 		CardTitle
-	} from '$lib/components/ui/card';
-	import { formatCurrency } from '$lib/utils/formatters';
-	import type { Vehicle, FinancingFormErrors, FinancingPaymentConfig } from '$lib/types';
+	} from '#lib/components/ui/card/index.ts';
+	import { formatCurrency } from '#lib/utils/formatters.ts';
+	import type { Vehicle, FinancingFormErrors, FinancingPaymentConfig } from '#lib/types/index.ts';
 
 	interface Props {
 		ownershipType: 'own' | 'lease' | 'finance';
@@ -75,7 +75,6 @@
 		</CardDescription>
 	</CardHeader>
 	<CardContent>
-		<!-- Ownership Type Selector -->
 		<div class="mb-6">
 			<Label class="mb-3 block">How do you own this vehicle? *</Label>
 			<div class="grid grid-cols-3 gap-3">
@@ -224,7 +223,6 @@
 						</Select.Root>
 					</div>
 
-					<!-- Monthly Payment (for leases — loans auto-calculate this) -->
 					{#if ownershipType === 'lease'}
 						<div class="space-y-2">
 							<Label for="paymentAmount">Monthly Payment *</Label>
@@ -281,7 +279,6 @@
 					{/if}
 				</div>
 
-				<!-- Current Balance (Edit Mode) -->
 				{#if isEditMode && vehicle?.financing?.computedBalance !== undefined}
 					<Card class="bg-muted/50">
 						<CardHeader>
@@ -314,7 +311,6 @@
 					</Card>
 				{/if}
 
-				<!-- Amortization Preview -->
 				{#if amortizationPreview && ownershipType === 'finance'}
 					<Card class="border-primary/20 bg-primary/5">
 						<CardHeader>

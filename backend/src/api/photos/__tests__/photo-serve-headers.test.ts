@@ -1,51 +1,51 @@
-/**
- * Source-scan GUARD (extended) for the photo-serve security headers.
- *
- * The thumbnail/serve endpoints return user-uploaded bytes with a Content-Type taken from the stored,
- * CLIENT-asserted `mimeType` (never sniffed). Without `X-Content-Type-Options: nosniff` the browser may
- * MIME-sniff a file whose bytes are HTML/script but declared image/png and execute it — a stored-content
- * vector. ARCC Secure-HTTP-Headers makes nosniff a MANDATORY response header.
- *
- * The nosniff literal + the byte-serving Response were extracted to ONE builder,
- * `photoThumbnailResponse` in helpers.ts, because the vehicle-photo sub-router's serve was MISSING
- * nosniff while the generic route had it (a real divergence on the primary photo surface). So this
- * guard now pins (a) the nosniff literal lives in the shared builder, and (b) BOTH serve routes route
- * through it — a refactor that drops the header, or re-inlines a header-incomplete Response at either
- * site, fails here and travels with the merge.
- *
- * SOURCE SCAN (not behavioral): the 200-byte serve calls the real storage provider's download(), which
- * needs network/provider bytes and isn't exercisable in the in-memory harness (the property tests model
- * it). So we pin the load-bearing literals in source. Mirrors the frontend source-scan guards.
- */
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { uploadPhotoForEntity } from '../photo-service';
+import { type FakePhotoStorage, installFakePhotoStorage } from './fake-photo-storage';
 
-import { describe, expect, test } from 'bun:test';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+let ctx: TestApp;
+let storage: FakePhotoStorage;
+let photoId: string;
 
-const HELPERS_SRC = readFileSync(join(import.meta.dir, '..', 'helpers.ts'), 'utf-8');
-const PHOTOS_ROUTES_SRC = readFileSync(join(import.meta.dir, '..', 'routes.ts'), 'utf-8');
-const VEHICLE_PHOTO_ROUTES_SRC = readFileSync(
-  join(import.meta.dir, '..', '..', 'vehicles', 'photo-routes.ts'),
-  'utf-8'
-);
+beforeEach(async () => {
+  ctx = await createTestApp();
+  ctx.sqlite.run(
+    `INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('veh-1', ?, 'Toyota', 'Camry', 2022)`,
+    [ctx.user.id]
+  );
+  storage = installFakePhotoStorage(ctx);
+  const photo = await uploadPhotoForEntity(
+    'vehicle',
+    'veh-1',
+    ctx.user.id,
+    new File([new Uint8Array([137, 80, 78, 71])], 'shot.png', { type: 'image/png' })
+  );
+  photoId = photo.id;
+});
 
-describe('photo-serve security headers (source guard)', () => {
-  test('the shared photoThumbnailResponse builder sets nosniff + the client mimeType Content-Type', () => {
-    const start = HELPERS_SRC.indexOf('export function photoThumbnailResponse');
-    expect(start).toBeGreaterThan(-1);
-    const block = HELPERS_SRC.slice(
-      start,
-      HELPERS_SRC.indexOf('}', HELPERS_SRC.indexOf('});', start))
-    );
-    expect(block).toContain("'Content-Type': mimeType");
-    expect(block).toContain("'X-Content-Type-Options': 'nosniff'");
+afterEach(() => {
+  storage.restore();
+  ctx.close();
+});
+
+async function serve(path: string): Promise<Response> {
+  return ctx.app.request(path, { headers: { Cookie: ctx.cookie } });
+}
+
+describe('photo serve security headers', () => {
+  test('the generic thumbnail route sends nosniff and the stored MIME type', async () => {
+    const res = await serve(`/api/v1/photos/vehicle/veh-1/${photoId}/thumbnail`);
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    expect(res.headers.get('Content-Type')).toBe('image/png');
   });
 
-  test('the generic photos route serves thumbnails via the shared builder', () => {
-    expect(PHOTOS_ROUTES_SRC).toContain('photoThumbnailResponse(buffer, mimeType)');
-  });
+  test('the vehicle-scoped thumbnail route sends nosniff and the stored MIME type', async () => {
+    const res = await serve(`/api/v1/vehicles/veh-1/photos/${photoId}/thumbnail`);
 
-  test('the vehicle-photo route serves thumbnails via the shared builder (— was missing nosniff)', () => {
-    expect(VEHICLE_PHOTO_ROUTES_SRC).toContain('photoThumbnailResponse(buffer, mimeType)');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    expect(res.headers.get('Content-Type')).toBe('image/png');
   });
 });

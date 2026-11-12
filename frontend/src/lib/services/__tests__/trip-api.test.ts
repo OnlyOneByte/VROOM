@@ -1,15 +1,7 @@
-/**
- * trip-api.ts coverage (trips-location T6 FE seam) — the service-test pattern: apiClient is
- * mocked, so each method's exact URL + payload is asserted (guards against a wrong-segment typo) plus the
- * query-string construction (filter-drop on empty vehicleId/purpose, the summary rate param). The wrappers
- * are thin passthroughs (apiClient already unwraps the { success, data } envelope), so they return data
- * verbatim — no transform layer here (trips carry no split/electric fields, unlike expenses).
- */
-
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import type { Trip, TripSummary } from '$lib/types';
-import { tripDistance } from '$lib/types';
-import { ApiError } from '$lib/utils/error-handling';
+import type { Trip, TripSummary } from '#lib/types/index.ts';
+import { tripDistance } from '#lib/types/index.ts';
+import { ApiError } from '#lib/utils/error-handling.ts';
 
 const get = vi.fn();
 const post = vi.fn();
@@ -68,7 +60,7 @@ describe('tripApi.list (paginated + filter-drop)', () => {
 	});
 });
 
-describe('tripApi.getSummary (R4 rollup)', () => {
+describe('tripApi.getSummary', () => {
 	const SUMMARY: TripSummary = {
 		tripCount: 2,
 		totalMiles: 150,
@@ -95,12 +87,6 @@ describe('tripApi.getSummary (R4 rollup)', () => {
 		expect(url).toContain('rate=0.67');
 	});
 
-	// Rate=0 is a MEANINGFUL business value (explicit free reimbursement / "no rate"), NOT an
-	// absent param — it must SURVIVE serialization, unlike an empty-string vehicleId which is dropped. The
-	// trip-api passes `rate: params.rate` raw (no `|| undefined` coercion that would nuke a 0), relying on
-	// buildQueryString's `value != null` check (drops only null/undefined, keeps a numeric 0). A
-	// bug-scout verified this firsthand; this pins it so a future `rate || undefined` refactor (the
-	// reminder-api isActive:false truthy-drop class) can't silently swallow an explicit-zero rate.
 	test('rate=0 SURVIVES (a meaningful explicit-zero, not a dropped falsy)', async () => {
 		get.mockResolvedValueOnce(SUMMARY);
 		await tripApi.getSummary({ rate: 0 });
@@ -149,15 +135,6 @@ describe('tripApi CRUD wiring', () => {
 	});
 });
 
-// deep-review cert: trip-api wrappers are thin passthroughs with NO try/catch — an apiClient ApiError
-// (non-2xx) must PROPAGATE to the caller, NOT be swallowed into a resolved empty value. The whole FE error
-// discipline downstream depends on this: the /trips list page's `loadError` four-state (it shows the error
-// pane, NOT the "No trips yet" empty state, on a fetch failure — the masquerade-as-data-loss guard) and the
-// TripForm's catch→"Failed to log trip" toast both assume a rejected promise. The wiring tests above only
-// cover the resolved path; nothing pinned that a server error reaches the caller. If a future refactor added
-// a swallow-and-return-[] to trip-api, the list page would silently render "No trips yet" on a 500 with NO
-// failing test. These pin the propagation across the read + both mutate verbs (the reminder-api/expense-api
-// rejects.toThrow pattern). Vacuity floor: each asserts the SAME ApiError instance/message escapes.
 describe('tripApi propagates apiClient errors (does not swallow — the loadError/toast contract)', () => {
 	test('list rejects when getPaginated throws (→ the list page error pane, not empty state)', async () => {
 		getPaginated.mockRejectedValueOnce(new ApiError('Server unavailable', 503));
@@ -193,7 +170,7 @@ describe('tripDistance (FE derived, mirrors the backend clamp)', () => {
 		expect(tripDistance({ startOdometer: 1000, endOdometer: 1080 })).toBe(80);
 	});
 
-	test('clamps a non-increasing pair to 0 (R2/)', () => {
+	test('clamps a non-increasing pair to 0', () => {
 		expect(tripDistance({ startOdometer: 1080, endOdometer: 1000 })).toBe(0);
 		expect(tripDistance({ startOdometer: 500, endOdometer: 500 })).toBe(0);
 	});

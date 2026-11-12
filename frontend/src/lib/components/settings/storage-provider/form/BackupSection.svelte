@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { FileSpreadsheet } from '@lucide/svelte';
-	import { Label } from '$lib/components/ui/label';
-	import { Checkbox } from '$lib/components/ui/checkbox';
-	import * as Select from '$lib/components/ui/select';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { Checkbox } from '#lib/components/ui/checkbox/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
 
 	let {
 		providerRootPrefix = '',
@@ -31,7 +31,6 @@
 </script>
 
 <div class="space-y-5">
-	<!-- Backup folder path — always visible, shared by ZIP and Sheets -->
 	<div class="space-y-2">
 		<Label for="backup-folder-path" class="text-sm">Backup folder path</Label>
 		<div
@@ -58,7 +57,6 @@
 		{/if}
 	</div>
 
-	<!-- ZIP backup checkbox -->
 	<div class="space-y-3">
 		<div class="flex items-start gap-3">
 			<Checkbox
@@ -105,7 +103,6 @@
 		{/if}
 	</div>
 
-	<!-- Google Sheets sync checkbox (Google Drive only) -->
 	{#if selectedType === 'google-drive'}
 		<div class="space-y-3">
 			<div class="flex items-start gap-3">

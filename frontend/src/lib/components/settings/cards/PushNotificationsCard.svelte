@@ -1,33 +1,20 @@
 <script lang="ts">
-	/**
-	 * Push notifications settings card — push-notifications T5 (honors D5 opt-in + D6 timing honesty).
-	 *
-	 * Opt-in surface for browser Web Push: a toggle + a status line that names the exact state
-	 * (unsupported / not-configured-503 / blocked / on / off). Enabling is gated behind a first-use
-	 * AlertDialog disclosure (D5, remembered in localStorage) that states what push does and — honestly —
-	 * that delivery is request-driven (a notification fires when VROOM next runs a reminder check, not on
-	 * a guaranteed schedule; D6). No auto-fired permission prompt: the browser prompt only appears after
-	 * the user turns the toggle on and acknowledges the disclosure.
-	 *
-	 * All browser Push API + transport logic lives in `$lib/utils/push`; this card is a thin view over
-	 * the pure `derivePushStatus` state machine.
-	 */
 	import { onMount } from 'svelte';
 	import { Bell, LoaderCircle } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Switch } from '$lib/components/ui/switch';
-	import * as AlertDialog from '$lib/components/ui/alert-dialog';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Switch } from '#lib/components/ui/switch/index.ts';
+	import * as AlertDialog from '#lib/components/ui/alert-dialog/index.ts';
 	import {
 		Card,
 		CardContent,
 		CardDescription,
 		CardHeader,
 		CardTitle
-	} from '$lib/components/ui/card';
-	import * as pushUtil from '$lib/utils/push';
-	import { pushApi } from '$lib/services/push-api';
-	import { appStore } from '$lib/stores/app.svelte';
-	import { ApiError } from '$lib/utils/error-handling';
+	} from '#lib/components/ui/card/index.ts';
+	import * as pushUtil from '#lib/utils/push.ts';
+	import { pushApi } from '#lib/services/push-api.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { ApiError } from '#lib/utils/error-handling.ts';
 
 	const DISCLOSURE_KEY = 'vroom.push.disclosed';
 
@@ -38,12 +25,9 @@
 	let showDisclosure = $state(false);
 
 	let statusLine = $derived(pushUtil.pushStatusLabel(status));
-	// The toggle is only meaningful when the browser can actually enable/disable — the other states are
-	// terminal messages (nothing to toggle), so we hide the switch and just explain.
 	let toggleable = $derived(status === 'off' || status === 'subscribed');
 	let isOn = $derived(status === 'subscribed');
 
-	/** Determine the current push state on this browser (supported? configured? blocked? subscribed?). */
 	async function loadStatus() {
 		isLoading = true;
 		loadError = null;
@@ -53,7 +37,6 @@
 				status = 'unsupported';
 				return;
 			}
-			// Is push configured on the server? A 503 PUSH_NOT_CONFIGURED means the feature is off.
 			let configured = true;
 			try {
 				await pushApi.getVapidPublicKey();
@@ -85,13 +68,12 @@
 		try {
 			localStorage.setItem(DISCLOSURE_KEY, '1');
 		} catch {
-			// localStorage may be unavailable (private mode) — proceed anyway; we just re-ask next time.
+			// Storage may be unavailable (private mode); the disclosure is re-asked next time.
 		}
 		showDisclosure = false;
 		void doEnable();
 	}
 
-	/** The Switch intent handler: turning on gates behind the disclosure; turning off is immediate. */
 	function onToggle(checked: boolean) {
 		if (isToggling) return;
 		if (checked) {
@@ -114,7 +96,6 @@
 				appStore.showSuccess('Push notifications turned on');
 				return;
 			}
-			// Map the exact reason to a status line and/or a toast.
 			if (outcome.reason === 'denied') {
 				status = 'denied';
 			} else if (outcome.reason === 'unsupported') {

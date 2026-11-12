@@ -1,25 +1,3 @@
-/**
- * Every error response wears the same envelope.
- *
- * The contract is `{ success: false, error: { code, message, details? } }`, produced by
- * `createErrorResponse` / `formatErrorResponse` in `src/errors.ts`. The frontend switches on
- * `error.code` and shows `error.message`, so a response that omits `code` or puts something other
- * than a sentence in `message` degrades the UI to "something went wrong" — or worse, renders
- * machine detail at the user.
- *
- * Two ways that kept happening:
- *
- *  1. Hand-rolling the object literal at the `c.json(...)` call. Shape-correct today, drifts
- *     tomorrow, and there is no one place to change when the envelope gains a field.
- *  2. Letting a library shape it. `@hono/zod-validator`'s built-in failure response answers
- *     `error: { name: 'ZodError', message: <the issue array, JSON-stringified> }` — no `code`, and
- *     a `message` that is a dump of Zod internals. That is why route files import `zValidator`
- *     from `utils/validation` (which supplies a hook) rather than from the package.
- *
- * Both halves are checked: a source scan for hand-rolled envelopes and for the raw package import,
- * plus live assertions on an actual validation failure so the hook cannot silently stop running.
- */
-
 import { describe, expect, test } from 'bun:test';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -46,16 +24,8 @@ function sourceFiles(dir: string, acc: string[] = []): string[] {
 const files = sourceFiles(SRC);
 const rel = (file: string) => relative(SRC, file).split('\\').join('/');
 
-/**
- * A `c.json({ success: false, ... })` literal — the hand-rolled envelope. Matched on the collapsed
- * source so a multi-line literal is caught too; route files split these across six lines.
- */
 const HAND_ROLLED = /c\.json\(\s*\{\s*success:\s*false/;
 
-/**
- * `src/errors.ts` is where the envelope is DEFINED, and `src/middleware/error-handler.ts` is the
- * one place allowed to pass a pre-built body through (it receives one from `syncErrorResponse`).
- */
 const ENVELOPE_OWNERS = ['errors.ts', 'middleware/error-handler.ts', 'api/sync/sync-errors.ts'];
 
 ratchet({
@@ -71,8 +41,6 @@ ratchet({
       .filter((file) => HAND_ROLLED.test(readFileSync(file, 'utf-8').replace(/\s+/g, ' ')))
       .map(rel),
   probe: () => {
-    // Fixtures, not live offenders: anchoring on a real one would make this unsatisfiable once the
-    // last is fixed, which is the state it is in now.
     expect(HAND_ROLLED.test('return c.json({ success: false, error: { code: "X" } }, 400);')).toBe(
       true
     );
@@ -103,7 +71,6 @@ ratchet({
 });
 
 describe('a live validation failure wears the envelope', () => {
-  /** Exercises the hook end to end — the source scans cannot tell whether it still fires. */
   const app = new Hono().post(
     '/t',
     zValidator('json', z.object({ n: z.number(), label: z.string() })),
@@ -126,10 +93,7 @@ describe('a live validation failure wears the envelope', () => {
     expect(status).toBe(400);
     expect(body.success).toBe(false);
     expect(error.code).toBe('ValidationError');
-    // The field has to be named — a message that does not say WHICH field is unactionable on a
-    // multi-field form.
     expect(error.message).toContain('n');
-    // And the message must not be the serialized ZodError the package would have produced.
     expect(error.message).not.toContain('"code"');
     expect(error.message.trimStart().startsWith('[')).toBe(false);
     expect(error.details.issues).toHaveLength(1);

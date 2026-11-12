@@ -1,24 +1,3 @@
-/**
- * Characterization tests for the MAINTENANCE + GAS-PRICE chart builder family in analytics-charts.ts
- *  Three more zero-coverage builders the (fuel/date) +
- * (expense-summary) audits did not reach — `buildGasPriceHistory`, `buildVehicleMaintenanceCosts`,
- * `buildMaintenanceTimeline` (the last drives the private buildTimelineEntry / estimateServiceInterval
- * / assignTimelineStatus trio). Read each against source firsthand and found CORRECT; this locks the
- * conclusion so a future edit can't silently regress it. Each test pins an invariant
- * the audit verified:
- *
- *  - buildGasPriceHistory — keeps only priced fillups (volume>0 ∧ amount>0 ∧ date present),
- *  pricePerVolume = amount/volume, fuelType ?? 'Regular', slice(-100).
- *  - buildVehicleMaintenanceCosts— category==='maintenance' ONLY (fuel/financial excluded), month-bucket
- *  sum, ascending month sort, dateless dropped.
- *  - buildMaintenanceTimeline — groups by description (case-insensitive; null→'general maintenance');
- *  assignTimelineStatus thresholds (<0 overdue / <30 warning / else good);
- *  a single-occurrence group defaults the interval to 180 days; output
- *  sorted by daysRemaining ascending (most-overdue first).
- *
- * Pure module → no DB, no server.
- */
-
 import { describe, expect, test } from 'bun:test';
 import {
   buildGasPriceHistory,
@@ -30,7 +9,6 @@ import {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// Local-time date so bucketing assertions are timezone-independent (the C6/ discipline).
 function d(year: number, month1to12: number, day: number): Date {
   return new Date(year, month1to12 - 1, day);
 }
@@ -84,11 +62,11 @@ describe('buildGasPriceHistory', () => {
 
   test('drops rows with no volume, no amount, zero volume, or no date (no NaN/Infinity price)', () => {
     const out = buildGasPriceHistory([
-      fuelRow({ volume: null }), // split sibling — no volume
-      fuelRow({ volume: 0 }), // zero volume → would divide-by-zero
-      fuelRow({ expenseAmount: 0 }), // free fill → not a price point
-      fuelRow({ date: null }), // dateless
-      fuelRow({ volume: 10, expenseAmount: 50, date: d(2024, 2, 1) }), // the only kept row
+      fuelRow({ volume: null }),
+      fuelRow({ volume: 0 }),
+      fuelRow({ expenseAmount: 0 }),
+      fuelRow({ date: null }),
+      fuelRow({ volume: 10, expenseAmount: 50, date: d(2024, 2, 1) }),
     ]);
     expect(out).toHaveLength(1);
     expect(out[0]?.pricePerVolume).toBeCloseTo(5, 10);
@@ -155,32 +133,30 @@ describe('buildMaintenanceTimeline', () => {
     expect(out[0]?.service).toBe('general maintenance');
   });
 
-  // A single-occurrence group defaults the interval to 180 days, so daysRemaining ≈
-  // (lastDate - now)/day + 180. We anchor lastDate relative to `now` to drive each status.
   test('status is "warning" when the next service is ~10 days out (single-row interval=180)', () => {
-    const lastDate = new Date(now.getTime() - 170 * DAY_MS); // nextDue ≈ now + 10d
+    const lastDate = new Date(now.getTime() - 170 * DAY_MS);
     const out = buildMaintenanceTimeline([genRow({ description: 'tires', date: lastDate })], now);
     expect(out[0]?.daysRemaining).toBe(10);
     expect(out[0]?.status).toBe('warning');
   });
 
   test('status is "overdue" when the next service date is in the past (daysRemaining < 0)', () => {
-    const lastDate = new Date(now.getTime() - 185 * DAY_MS); // nextDue ≈ now - 5d
+    const lastDate = new Date(now.getTime() - 185 * DAY_MS);
     const out = buildMaintenanceTimeline([genRow({ description: 'brakes', date: lastDate })], now);
     expect(out[0]?.daysRemaining).toBe(-5);
     expect(out[0]?.status).toBe('overdue');
   });
 
   test('status is "good" when the next service is well in the future (>=30 days)', () => {
-    const lastDate = new Date(now.getTime() - 120 * DAY_MS); // nextDue ≈ now + 60d
+    const lastDate = new Date(now.getTime() - 120 * DAY_MS);
     const out = buildMaintenanceTimeline([genRow({ description: 'coolant', date: lastDate })], now);
     expect(out[0]?.daysRemaining).toBe(60);
     expect(out[0]?.status).toBe('good');
   });
 
   test('output is sorted by daysRemaining ascending (most-overdue service first)', () => {
-    const overdue = new Date(now.getTime() - 200 * DAY_MS); // ≈ -20d
-    const soon = new Date(now.getTime() - 165 * DAY_MS); // ≈ +15d
+    const overdue = new Date(now.getTime() - 200 * DAY_MS);
+    const soon = new Date(now.getTime() - 165 * DAY_MS);
     const out = buildMaintenanceTimeline(
       [
         genRow({ description: 'soon-service', date: soon }),

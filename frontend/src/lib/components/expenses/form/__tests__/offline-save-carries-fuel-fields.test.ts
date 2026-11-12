@@ -1,86 +1,56 @@
-/**
- * Regression GUARD (committed, merge-surviving) for the offline-field-dropout class at the ExpenseForm
- * CALL SITES — (fuelType), (missedFillup), (missedFillup again, on the error-fallback save).
- *
- * ExpenseForm saves an offline expense from TWO places: the offline-first path (no network) and the
- * error-fallback path (an online create that throws → catch → save offline). The dropout bug recurs
- * because each `addOfflineExpense({...})` object is hand-built: a fuel field carried in one call but
- * forgotten in the other is silently dropped on that path, and on sync calculateAverageMpg pairs the
- * fill-up across the unlogged gap → corrupted MPG. was fixed on the offline-first
- * path but the SAME field was missing from the error-fallback save until.
- *
- * The mapper side (offlineExpenseToBackend) is fully pinned by offline-storage.test.ts (incl. the
- * completeness pin) — but the mapper can't carry a field the CALL SITE never put in the object. This
- * static scan pins the call sites: EVERY addOfflineExpense(...) in ExpenseForm must carry both
- * missedFillup and fuelType. A component runtime test would need Playwright (the catch path is
- * network-failure-gated) + would re-implement the form, so a source scan is the
- * merge-surviving guard. Fast unit suite — no browser, no server.
- */
-
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
+import { offlineExpenseToBackend, type OfflineExpense } from '#lib/utils/offline-storage.ts';
+import { toOfflineExpense, type ParsedExpenseForm } from '../offline-expense';
 
-// This file lives at .../expenses/form/__tests__/; the component is one level up.
-const COMPONENT = join(dirname(fileURLToPath(import.meta.url)), '..', 'ExpenseForm.svelte');
+const BASE: ParsedExpenseForm = {
+	vehicleId: 'v1',
+	tags: ['commute'],
+	category: 'fuel',
+	amount: 42.5,
+	date: '2026-03-04T12:00:00.000Z'
+};
 
-/**
- * Extract the argument body of every `addOfflineExpense({ ... })` call. The object literal is
- * brace-balanced from the first `{` after the call to its matching `}`, so a simple depth counter
- * isolates each call's body even with nested `{ ... }` spreads inside.
- */
-function extractAddOfflineExpenseBodies(source: string): string[] {
-	const bodies: string[] = [];
-	const CALL = 'addOfflineExpense(';
-	let idx = source.indexOf(CALL);
-	while (idx !== -1) {
-		const braceStart = source.indexOf('{', idx);
-		if (braceStart === -1) break;
-		let depth = 0;
-		let end = braceStart;
-		for (let i = braceStart; i < source.length; i++) {
-			if (source[i] === '{') depth++;
-			else if (source[i] === '}') {
-				depth--;
-				if (depth === 0) {
-					end = i;
-					break;
-				}
-			}
-		}
-		bodies.push(source.slice(braceStart, end + 1));
-		idx = source.indexOf(CALL, end);
-	}
-	return bodies;
-}
-
-describe('ExpenseForm offline-save sites carry the fuel fields (dropout guard)', () => {
-	const source = readFileSync(COMPONENT, 'utf8');
-	const bodies = extractAddOfflineExpenseBodies(source);
-
-	test('the scan found BOTH offline-save call sites (guard is live, not a no-op)', () => {
-		// The offline-first path + the error-fallback path. If a refactor changes the count, revisit
-		// this guard rather than letting it silently pass on a single (or zero) site.
-		expect(bodies.length).toBe(2);
+describe('toOfflineExpense', () => {
+	test('carries fuelType so an electric charge survives sync', () => {
+		const queued = toOfflineExpense({ ...BASE, fuelType: 'electric', charge: 30 });
+		expect(queued.fuelType).toBe('electric');
+		expect(queued.charge).toBe(30);
+		expect(queued).not.toHaveProperty('volume');
 	});
 
-	test('every addOfflineExpense call carries missedFillup (— MPG-pairing correctness)', () => {
-		const missing = bodies.filter(b => !b.includes('missedFillup'));
-		expect(
-			missing,
-			`An addOfflineExpense(...) call omits missedFillup. Dropping it on sync makes ` +
-				`calculateAverageMpg pair a missed fill-up across the unlogged gap → corrupted MPG ` +
-				`. Carry it: ...(expenseData.missedFillup !== undefined && { missedFillup: ... }).`
-		).toEqual([]);
+	test('carries missedFillup, including false, so MPG pairing stays correct', () => {
+		expect(toOfflineExpense({ ...BASE, missedFillup: true }).missedFillup).toBe(true);
+		expect(toOfflineExpense({ ...BASE, missedFillup: false }).missedFillup).toBe(false);
 	});
 
-	test('every addOfflineExpense call carries fuelType (— electric charge survives sync)', () => {
-		const missing = bodies.filter(b => !b.includes('fuelType'));
+	test('carries every entered numeric field and the identity fields', () => {
 		expect(
-			missing,
-			`An addOfflineExpense(...) call omits fuelType. The sync transform needs it to keep an ` +
-				`electric charge. Carry it on every offline-save path.`
-		).toEqual([]);
+			toOfflineExpense({
+				...BASE,
+				mileage: 12000,
+				volume: 11.2,
+				fuelType: 'regular',
+				description: 'Costco',
+				missedFillup: false
+			})
+		).toEqual({
+			...BASE,
+			mileage: 12000,
+			volume: 11.2,
+			fuelType: 'regular',
+			description: 'Costco',
+			missedFillup: false
+		});
+	});
+
+	test('carries the location through the queue to the synced request', () => {
+		const queued = toOfflineExpense({ ...BASE, location: 'Shell on Main St' });
+		expect(queued.location).toBe('Shell on Main St');
+		const stored: OfflineExpense = { ...queued, id: 'o1', timestamp: 0, synced: false };
+		expect(offlineExpenseToBackend(stored).location).toBe('Shell on Main St');
+	});
+
+	test('omits unentered optional fields and defaults description to empty', () => {
+		expect(toOfflineExpense(BASE)).toEqual({ ...BASE, description: '' });
 	});
 });

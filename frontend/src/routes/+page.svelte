@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { authStore } from '$lib/stores/auth.svelte';
-	import { routes } from '$lib/routes';
+	import { authStore } from '#lib/stores/auth.svelte.ts';
+	import { routes } from '#lib/routes.ts';
 	import { onMount } from 'svelte';
-	import { Button } from '$lib/components/ui/button';
+	import { Button } from '#lib/components/ui/button/index.ts';
 	import {
 		Car,
 		ChartBar,
@@ -24,7 +24,6 @@
 		visible = true;
 	});
 
-	// Redirect authenticated users straight to dashboard
 	$effect(() => {
 		if (!authState.isLoading && authState.isAuthenticated) {
 			goto(resolve(routes.dashboard));
@@ -41,15 +40,12 @@
 </svelte:head>
 
 <div class="min-h-screen bg-background">
-	<!-- Hero Section -->
 	<div class="relative overflow-hidden">
-		<!-- Subtle background pattern -->
 		<div
 			class="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-chart-1/5"
 		></div>
 
 		<div class="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-			<!-- Nav bar -->
 			<nav class="flex items-center justify-between py-6">
 				<div class="flex items-center gap-3">
 					<div class="inline-flex items-center justify-center w-10 h-10 bg-primary rounded-xl">
@@ -63,7 +59,6 @@
 				</Button>
 			</nav>
 
-			<!-- Hero content -->
 			<div
 				class="py-20 sm:py-32 text-center transition-all duration-700 {visible
 					? 'opacity-100 translate-y-0'
@@ -112,7 +107,6 @@
 		</div>
 	</div>
 
-	<!-- Features Section -->
 	<div id="features" class="border-t border-border bg-muted/50 py-20 sm:py-28">
 		<div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
 			<div class="text-center mb-16">
@@ -205,7 +199,6 @@
 		</div>
 	</div>
 
-	<!-- CTA Section -->
 	<div class="border-t border-border py-20 sm:py-28">
 		<div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 text-center space-y-6">
 			<h2 class="text-3xl sm:text-4xl font-bold text-foreground">Ready to take control?</h2>
@@ -219,7 +212,6 @@
 		</div>
 	</div>
 
-	<!-- Footer -->
 	<div class="border-t border-border py-8">
 		<div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
 			<div class="flex flex-col sm:flex-row items-center justify-between gap-4">

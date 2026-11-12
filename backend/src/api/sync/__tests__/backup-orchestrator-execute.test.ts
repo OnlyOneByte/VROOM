@@ -1,24 +1,4 @@
-/**
- * Real-`execute()` skip-path coverage for BackupOrchestrator (deep-review → guard).
- *
- * backup-orchestrator.test.ts pins the pure exports (filterEnabledProviders/needsZipGeneration)
- * but its mutex / change-detection-skip / no-providers cases are LOCAL SIMS (mirrors of logic embedded
- * in execute()), flagged in that file's header as "not reachable from an in-memory harness." That note
- * was over-cautious: createTestApp() rewrites DATABASE_URL to in-memory BEFORE the orchestrator's
- * (dynamically-imported-here) module + its getDb() resolve, so the REAL execute() runs against the
- * harness DB. The EARLY-RETURN skip paths return before any storage-provider/ZIP work, so they ARE
- * drivable for real — converting those sims to genuine coverage of the namesake method.
- *
- * Pinned on the real execute():
- *  - force=false + a brand-new user (no data changes) → { skipped: true } (the no-op-backup guard).
- *  - force=false + an empty backupConfig (no enabled providers) → { results: {} }, NOT skipped
- *  (this user HAS changes — seeding a vehicle bumps lastDataChangeDate — so it passes the change
- *  gate, then short-circuits on zero providers).
- *
- * createTestApp() must run before static config/connection imports — keep imports to the harness.
- */
-
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import {
   createTestApp,
   type DataEnvelope,
@@ -40,12 +20,11 @@ interface OrchestratorResult {
   status?: string;
   outcome: 'success' | 'partial' | 'failed' | 'noop';
   failedProviders: string[];
-  results: Record<string, { success: boolean }>;
+  results: Record<string, { success: boolean; message?: string }>;
 }
 
 describe('BackupOrchestrator.execute() real skip paths', () => {
   test('force=false with no data changes since last sync → skipped (the no-op-backup guard)', async () => {
-    // A brand-new seeded user has no tracked data change yet, so hasChangesSinceLastSync is false.
     const { backupOrchestrator } = await import('../backup-orchestrator');
     const result = (await backupOrchestrator.execute(
       ctx.user.id,
@@ -57,9 +36,6 @@ describe('BackupOrchestrator.execute() real skip paths', () => {
   });
 
   test('a user WITH changes but NO enabled providers → not skipped, empty results', async () => {
-    // Seed a vehicle through the real route — the changeTracker middleware bumps lastDataChangeDate,
-    // so this user passes the change gate. With an empty backupConfig (the getOrCreate default), the
-    // orchestrator then short-circuits on zero enabled providers: a non-skipped, empty-results run.
     const veh = await ctx.authed('POST', '/api/v1/vehicles', {
       make: 'Toyota',
       model: 'Camry',
@@ -73,13 +49,12 @@ describe('BackupOrchestrator.execute() real skip paths', () => {
       'Test User'
     )) as OrchestratorResult;
 
-    expect(result.skipped).toBeUndefined(); // it had changes → did NOT skip on the change gate
-    expect(result.results).toEqual({}); // ...but no enabled providers → empty results
-    expect(result.outcome).toBe('noop'); // nothing attempted → noop (not a false success)
+    expect(result.skipped).toBeUndefined();
+    expect(result.results).toEqual({});
+    expect(result.outcome).toBe('noop');
   });
 
   test('force=true bypasses the change gate; with no providers still yields empty results', async () => {
-    // force=true skips hasChangesSinceLastSync entirely; the no-providers short-circuit still applies.
     const { backupOrchestrator } = await import('../backup-orchestrator');
     const result = (await backupOrchestrator.execute(
       ctx.user.id,
@@ -87,21 +62,47 @@ describe('BackupOrchestrator.execute() real skip paths', () => {
       true
     )) as OrchestratorResult;
 
-    expect(result.skipped).toBeUndefined(); // forced → did not take the change-skip path
+    expect(result.skipped).toBeUndefined();
     expect(result.results).toEqual({});
     expect(result.outcome).toBe('noop');
   });
+
+  test('a second run for the same user while one is in flight returns in_progress', async () => {
+    const { backupOrchestrator } = await import('../backup-orchestrator');
+    const first = backupOrchestrator.execute(ctx.user.id, 'Test User', true);
+    const second = (await backupOrchestrator.execute(
+      ctx.user.id,
+      'Test User',
+      true
+    )) as OrchestratorResult;
+
+    expect(second.status).toBe('in_progress');
+    expect((await first).status).toBeUndefined();
+  });
+
+  test('a mutex held past the 5-minute TTL does not block a new run', async () => {
+    const { backupOrchestrator } = await import('../backup-orchestrator');
+    const TTL_MS = 5 * 60 * 1000;
+    const clock = spyOn(Date, 'now').mockReturnValue(1_000_000);
+    try {
+      const stuck = backupOrchestrator.execute(ctx.user.id, 'Test User', true);
+      clock.mockReturnValue(1_000_000 + TTL_MS + 1);
+
+      const fresh = (await backupOrchestrator.execute(
+        ctx.user.id,
+        'Test User',
+        true
+      )) as OrchestratorResult;
+      expect(fresh.status).toBeUndefined();
+      expect(fresh.outcome).toBe('noop');
+      await stuck;
+    } finally {
+      clock.mockRestore();
+    }
+  });
 });
 
-// HONEST partial/total-failure reporting. A fake strategy registered for a custom provider
-// type lets us drive the REAL execute() fan-out + outcome aggregation over the harness DB with NO
-// provider network (the leak-free pattern — register/unregister around each test).
-describe('BackupOrchestrator.execute() honest outcome', () => {
-  /**
-   * Seed an enabled storage provider of the given type owned by the test user. MERGES into the
-   * existing backup_config (so multiple providers can coexist in one run — needed for the orchestrator
-   * `partial` case, where one provider succeeds and another fails).
-   */
+describe('BackupOrchestrator.execute() outcome', () => {
   function seedEnabledProvider(ctxApp: TestApp, id: string, providerType: string): void {
     ctxApp.sqlite.run(
       `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
@@ -119,17 +120,13 @@ describe('BackupOrchestrator.execute() honest outcome', () => {
       'INSERT OR REPLACE INTO user_preferences (user_id, backup_config) VALUES (?, ?)',
       [ctxApp.user.id, JSON.stringify(config)]
     );
-    // A data change so the run passes the change gate (force=true also bypasses it, but be explicit).
     ctxApp.sqlite.run(
       'INSERT INTO vehicles (id, user_id, make, model, year) VALUES (?, ?, ?, ?, ?)',
       [`v-${id}`, ctxApp.user.id, 'T', 'C', 2022]
     );
   }
 
-  /** A credentials blob the orchestrator can decrypt (it JSON.parses decrypt(row.credentials)). */
   function encryptedCreds(): string {
-    // The orchestrator decrypts then JSON.parses; encrypt a minimal valid JSON refresh-token blob.
-    // Use the real encryption util so decrypt() round-trips (the harness shares the test env key).
     return enc(JSON.stringify({ refreshToken: 'fake' }));
   }
 
@@ -163,8 +160,6 @@ describe('BackupOrchestrator.execute() honest outcome', () => {
         },
       });
     };
-    // The registry is a process-global singleton; the registry Map has no delete, so overwrite with a
-    // throwaway no-op to "unregister" the custom type after each test (real google-drive untouched).
     unregister = (type) =>
       backupStrategyRegistry.register(type, {
         async execute() {
@@ -188,7 +183,6 @@ describe('BackupOrchestrator.execute() honest outcome', () => {
       expect(result.failedProviders).toContain('pf');
       expect(result.results.pf?.success).toBe(false);
 
-      // DATA-SAFETY CORE: a failed backup must leave the user with un-synced changes so it RETRIES.
       const sync = ctx.sqlite
         .query('SELECT last_sync_date FROM sync_state WHERE user_id = ?')
         .get(ctx.user.id) as { last_sync_date: string | null } | null;
@@ -198,11 +192,7 @@ describe('BackupOrchestrator.execute() honest outcome', () => {
     }
   });
 
-  test('a single provider that did not fully back up → outcome failed (capability partial = no clean snapshot)', async () => {
-    // A lone provider whose strategy returns success:false (e.g. ZIP ok but Sheets failed) means that
-    // provider has NO complete backup this run → the honest run-level verdict is `failed` (→ 502), and
-    // the sync anchor stays un-advanced so it retries. (Orchestrator `partial` is reserved for a MIX
-    // ACROSS providers — see the next test.)
+  test('a single provider that did not fully back up → outcome failed', async () => {
     registerFake('fake-cap-partial', 'partial');
     try {
       seedEnabledProvider(ctx, 'pcp', 'fake-cap-partial');
@@ -237,8 +227,6 @@ describe('BackupOrchestrator.execute() honest outcome', () => {
       expect(result.failedProviders).toEqual(['pbad']);
       expect(result.results.pok?.success).toBe(true);
 
-      // A partial run must NOT advance the global sync anchor either — the failed provider still
-      // owes a backup, so leaving the user "unsynced" is what makes it retry next run.
       const sync = ctx.sqlite
         .query('SELECT last_sync_date FROM sync_state WHERE user_id = ?')
         .get(ctx.user.id) as { last_sync_date: string | null } | null;
@@ -264,6 +252,144 @@ describe('BackupOrchestrator.execute() honest outcome', () => {
       expect(result.failedProviders).toEqual([]);
     } finally {
       unregister('fake-ok');
+    }
+  });
+
+  test('a rejected per-provider attempt counts as a failed provider, not a skip', async () => {
+    registerFake('fake-reject', true);
+    const { backupStrategyRegistry } = await import('../backup-strategy-registry');
+    const lookup = spyOn(backupStrategyRegistry, 'get').mockImplementation(() => {
+      throw new Error('lookup exploded');
+    });
+    try {
+      seedEnabledProvider(ctx, 'prej', 'fake-reject');
+      const { backupOrchestrator } = await import('../backup-orchestrator');
+      const result = (await backupOrchestrator.execute(
+        ctx.user.id,
+        'U',
+        true
+      )) as OrchestratorResult;
+
+      expect(result.failedProviders).toEqual(['prej']);
+      expect(result.outcome).toBe('failed');
+      expect(result.results.prej?.success).toBe(false);
+      expect(result.results.prej?.message).toBe('lookup exploded');
+    } finally {
+      lookup.mockRestore();
+      unregister('fake-reject');
+    }
+  });
+
+  test('a backup-config entry with no provider row is skipped while the live provider still runs', async () => {
+    registerFake('fake-live', true);
+    try {
+      seedEnabledProvider(ctx, 'plive', 'fake-live');
+      seedEnabledProvider(ctx, 'pghost', 'fake-live');
+      ctx.sqlite.run('DELETE FROM user_providers WHERE id = ?', ['pghost']);
+      const { backupOrchestrator } = await import('../backup-orchestrator');
+      const result = (await backupOrchestrator.execute(
+        ctx.user.id,
+        'U',
+        true
+      )) as OrchestratorResult;
+
+      expect(Object.keys(result.results)).toEqual(['plive']);
+      expect(result.failedProviders).toEqual([]);
+      expect(result.outcome).toBe('success');
+    } finally {
+      unregister('fake-live');
+    }
+  });
+
+  test('a provider whose type has no registered strategy is skipped, not failed', async () => {
+    seedEnabledProvider(ctx, 'punreg', 'no-such-provider-type');
+    const { backupOrchestrator } = await import('../backup-orchestrator');
+    const result = (await backupOrchestrator.execute(ctx.user.id, 'U', true)) as OrchestratorResult;
+
+    expect(result.results).toEqual({});
+    expect(result.failedProviders).toEqual([]);
+    expect(result.outcome).toBe('noop');
+  });
+
+  test('a Sheets-only provider is attempted by the run, and no ZIP is built for it', async () => {
+    let zipSeen: Buffer | null | undefined;
+    const { backupStrategyRegistry } = await import('../backup-strategy-registry');
+    backupStrategyRegistry.register('fake-sheets-only', {
+      async execute(context) {
+        zipSeen = context.zipBuffer;
+        return { success: true, capabilities: { sheets: { success: true } } };
+      },
+    });
+    const { backupService } = await import('../backup');
+    const zipSpy = spyOn(backupService, 'exportAsZip');
+    try {
+      seedEnabledProvider(ctx, 'psheets', 'fake-sheets-only');
+      ctx.sqlite.run(
+        'INSERT OR REPLACE INTO user_preferences (user_id, backup_config) VALUES (?, ?)',
+        [
+          ctx.user.id,
+          JSON.stringify({
+            providers: {
+              psheets: {
+                enabled: false,
+                folderPath: 'B',
+                retentionCount: 5,
+                sheetsSyncEnabled: true,
+              },
+            },
+          }),
+        ]
+      );
+      const { backupOrchestrator } = await import('../backup-orchestrator');
+      const result = (await backupOrchestrator.execute(
+        ctx.user.id,
+        'U',
+        true
+      )) as OrchestratorResult;
+
+      expect(result.results.psheets?.success).toBe(true);
+      expect(zipSpy).not.toHaveBeenCalled();
+      expect(zipSeen).toBeNull();
+    } finally {
+      zipSpy.mockRestore();
+      backupStrategyRegistry.register('fake-sheets-only', {
+        async execute() {
+          return { success: true, capabilities: {} };
+        },
+      });
+    }
+  });
+
+  test('a failed ZIP build does not abort the run; the strategy gets a null ZIP', async () => {
+    let zipSeen: Buffer | null | undefined;
+    const { backupStrategyRegistry } = await import('../backup-strategy-registry');
+    backupStrategyRegistry.register('fake-zip-probe', {
+      async execute(context) {
+        zipSeen = context.zipBuffer;
+        return { success: true, capabilities: { zip: { success: true } } };
+      },
+    });
+    const { backupService } = await import('../backup');
+    const zipSpy = spyOn(backupService, 'exportAsZip').mockRejectedValue(new Error('zip exploded'));
+    try {
+      seedEnabledProvider(ctx, 'pzip', 'fake-zip-probe');
+      const { backupOrchestrator } = await import('../backup-orchestrator');
+      const result = (await backupOrchestrator.execute(
+        ctx.user.id,
+        'U',
+        true
+      )) as OrchestratorResult;
+
+      expect(zipSpy).toHaveBeenCalledTimes(1);
+      expect(zipSeen).toBeNull();
+      expect(result.outcome).toBe('success');
+    } finally {
+      zipSpy.mockRestore();
+      backupStrategyRegistry.register('fake-zip-probe', {
+        async execute() {
+          return { success: true, capabilities: {} };
+        },
+      });
     }
   });
 });

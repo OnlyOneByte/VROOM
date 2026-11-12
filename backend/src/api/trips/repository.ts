@@ -1,15 +1,3 @@
-/**
- * Trip Repository (trips-location T2, design §2).
- *
- * Manual trip-log CRUD over the `trips` table. Mirrors OdometerRepository: a thin BaseRepository
- * subclass (inheriting findById/create/update/delete) plus userId-scoped finders. EVERY query ANDs
- * `eq(trips.userId, userId)` — the tenant-scope discipline; the destructive delete keys on BOTH
- * id AND userId (the lesson: an id-only delete lets one user delete another's row). `distance` is
- * NOT a column — it's derived `max(0, endOdometer − startOdometer)` at read time (R2, the clamp),
- * so a later odometer correction can't desync a stored value; the helper is exported for the route/
- * analytics layers (T3/T5) to share one source of truth.
- */
-
 import { and, count, desc, eq, gte, lt, ne } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
@@ -18,7 +6,6 @@ import { trips } from '../../db/schema';
 import { BaseRepository } from '../../utils/repository';
 import { localDayWindow } from '../odometer/repository';
 
-/** Derived trip distance: driven miles, clamped at 0 (R2, the negative-guard). Never stored. */
 export function tripDistance(trip: Pick<Trip, 'startOdometer' | 'endOdometer'>): number {
   return Math.max(0, trip.endOdometer - trip.startOdometer);
 }
@@ -33,7 +20,6 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
     super(db, trips);
   }
 
-  /** A single trip scoped to its owner (the validateTripOwnership backing read). */
   async findByIdAndUserId(id: string, userId: string): Promise<Trip | null> {
     const [row] = await this.db
       .select()
@@ -43,15 +29,7 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
     return row ?? null;
   }
 
-  /**
-   * Count OTHER trips (excluding `excludeTripId`) that map to the SAME trip↔odometer dedup key — same
-   * vehicle + owner + endOdometer + LOCAL calendar day of tripDate. The lifecycle removes the linked
-   * odometer entry on a keepOdometer=false delete (and the edit re-sync), but createFromTrip DEDUPS, so two
-   * trips at the same (vehicle, day, reading) SHARE one entry (N:1). Removing it while another trip still
-   * references it orphans that survivor's odometer reading (#-N1, found). The route uses this to
-   * remove the shared entry ONLY when no other trip still maps to it. Uses the SAME localDayWindow as
-   * createFromTrip/deleteLinkedTripEntry so "another trip on this day" agrees with the dedup's day. Tenant-scoped.
-   */
+  // Odometer dedup key: do not remove the linked odometer entry while this returns > 0.
   async countOthersAtOdometerKey(args: {
     excludeTripId: string;
     vehicleId: string;
@@ -76,10 +54,6 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
     return result?.count ?? 0;
   }
 
-  /**
-   * All of a user's trips, newest first, optionally narrowed by vehicle and/or purpose. userId is
-   * ALWAYS in the predicate (tenant scope) — a vehicleId filter NEVER widens past the owner.
-   */
   async findByUserId(userId: string, filters?: TripFilters): Promise<Trip[]> {
     const conditions = [eq(trips.userId, userId)];
     if (filters?.vehicleId) conditions.push(eq(trips.vehicleId, filters.vehicleId));
@@ -91,7 +65,6 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
       .orderBy(desc(trips.tripDate));
   }
 
-  /** A vehicle's trips (newest first), tenant-scoped — vehicle_id AND user_id together. */
   async findByVehicle(vehicleId: string, userId: string): Promise<Trip[]> {
     return this.db
       .select()
@@ -100,7 +73,6 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
       .orderBy(desc(trips.tripDate));
   }
 
-  /** Paginated trips for a user (the list route's read), with a total count for the paginator. */
   async findByUserIdPaginated(
     userId: string,
     limit: number,
@@ -124,17 +96,6 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
     return { data, totalCount: result?.count ?? 0 };
   }
 
-  /** IDs of all trips for a vehicle (for the vehicle-delete cascade / photo cleanup parity). */
-  async findIdsByVehicleId(vehicleId: string): Promise<string[]> {
-    return this.findIdsByColumn(trips.vehicleId, vehicleId);
-  }
-
-  /**
-   * Delete a trip scoped to its owner: the WHERE keys on BOTH id AND userId (the lesson — an
-   * id-only delete would let a crafted request remove another user's trip). Returns true when a row
-   * was actually deleted, false when nothing matched (caller maps false → 404). Distinct from the
-   * BaseRepository `delete(id)` which keys on id alone (correct only after an ownership pre-check).
-   */
   async deleteByIdAndUserId(id: string, userId: string): Promise<boolean> {
     const deleted = await this.db
       .delete(trips)

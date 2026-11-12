@@ -1,15 +1,3 @@
-/**
- * DELETE /providers/:id storage-config cleanup side effects. Deleting a STORAGE provider
- * must scrub every reference to it from the user's settings — else a dangling storageConfig default
- * leaves photo uploads routing to a provider that no longer exists, and a stale backupConfig entry
- * lingers. The DELETE handler's cleanupStorageConfig + cleanupBackupConfig (routes.ts:
- * 418-454) had no end-to-end coverage — the existing providers-routes-http DELETE tests only assert
- * the 204 + tenant-scoping, not the settings scrub. This drives the REAL POST→PUT-settings→DELETE→GET
- * stack via the s3 seam (no OAuth, no env gate — the rationale).
- *
- * createTestApp() rewrites env + dynamic-imports DB-bound modules — imports limited to harness + bun:test.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -25,14 +13,12 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-/** Create an s3 storage provider via the real POST route; returns its id. */
 async function createS3Provider(displayName: string): Promise<string> {
   const res = await ctx.authed('POST', '/api/v1/providers', {
     domain: 'storage',
     providerType: 's3',
     displayName,
     credentials: { accessKeyId: 'k', secretAccessKey: 'secret' },
-    // S3 config must carry endpoint/bucket/region (create-time validation).
     config: { endpoint: 'https://s3.example.com', bucket: 'b', region: 'us-east-1' },
   });
   const body = await json<DataEnvelope<{ id: string }>>(res);
@@ -40,7 +26,6 @@ async function createS3Provider(displayName: string): Promise<string> {
   return body.data.id;
 }
 
-/** All-null storageConfig defaults; override per test. */
 function defaults(over: Record<string, string | null> = {}) {
   return {
     vehicle_photos: null,
@@ -51,7 +36,6 @@ function defaults(over: Record<string, string | null> = {}) {
   };
 }
 
-/** Complete per-provider category map (the inner z.record is EXHAUSTIVE in Zod v4 — the trap). */
 function categoryMap() {
   const base = { enabled: true, folderPath: '/Backups' };
   return {
@@ -82,7 +66,6 @@ describe('DELETE /providers/:id scrubs the provider from storage + backup config
   test('deleting a storage provider nulls its storageConfig default + removes its categories & backup entry', async () => {
     const id = await createS3Provider('Drive To Delete');
 
-    // Point a category default at it + give it a providerCategories entry + a backupConfig entry.
     const put = await ctx.authed('PUT', '/api/v1/settings', {
       storageConfig: {
         defaults: defaults({ vehicle_photos: id }),
@@ -94,17 +77,14 @@ describe('DELETE /providers/:id scrubs the provider from storage + backup config
     });
     expect(put.status, await put.text()).toBe(200);
 
-    // Sanity: the references are present before delete.
     const before = await getSettings();
     expect(before.storageConfig.defaults.vehicle_photos).toBe(id);
     expect(before.storageConfig.providerCategories[id]).toBeDefined();
     expect(before.backupConfig.providers[id]).toBeDefined();
 
-    // Delete the provider.
     const del = await ctx.authed('DELETE', `/api/v1/providers/${id}`);
     expect(del.status).toBe(204);
 
-    // Every reference is scrubbed: the default is nulled, the category + backup entries are gone.
     const after = await getSettings();
     expect(after.storageConfig.defaults.vehicle_photos, 'default nulled').toBeNull();
     expect(after.storageConfig.providerCategories[id], 'category entry removed').toBeUndefined();
@@ -126,7 +106,6 @@ describe('DELETE /providers/:id scrubs the provider from storage + backup config
     expect(del.status).toBe(204);
 
     const after = await getSettings();
-    // 'keep' is untouched; only 'drop' is scrubbed.
     expect(after.storageConfig.defaults.vehicle_photos).toBe(keep);
     expect(after.storageConfig.defaults.expense_receipts).toBeNull();
     expect(after.storageConfig.providerCategories[keep]).toBeDefined();

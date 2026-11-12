@@ -18,7 +18,6 @@ import { financingRepository, withComputedBalance } from './repository';
 
 const routes = new Hono();
 
-// Validation schemas derived from db schema
 const baseFinancingSchema = createInsertSchema(vehicleFinancing, {
   provider: z
     .string()
@@ -27,8 +26,6 @@ const baseFinancingSchema = createInsertSchema(vehicleFinancing, {
       CONFIG.validation.financing.providerMaxLength,
       `Provider must be ${CONFIG.validation.financing.providerMaxLength} characters or less`
     ),
-  // money: client sends DOLLARS, store integer CENTS (T3). The .min(0.01) bound checks the DOLLAR value
-  // (0.01 = 1 cent) before the transform scales it. apr is a PERCENT — NOT money, stays a plain number.
   originalAmount: moneyDollarsToCents((n) => n.min(0.01, 'Original amount must be greater than 0')),
   apr: z
     .number()
@@ -60,7 +57,6 @@ const baseFinancingSchema = createInsertSchema(vehicleFinancing, {
     .min(CONFIG.validation.financing.minDayOfWeek)
     .max(CONFIG.validation.financing.maxDayOfWeek)
     .optional(),
-  // money (T3): residualValue + excessMileageFee → cents. mileageLimit is a MILEAGE count, NOT money.
   residualValue: moneyDollarsToCents((n) => n.min(0)).optional(),
   mileageLimit: z.number().int().min(0).optional(),
   excessMileageFee: moneyDollarsToCents((n) => n.min(0)).optional(),
@@ -76,13 +72,9 @@ const financingParamsSchema = z.object({
   financingId: z.string().min(1, 'Financing ID is required'),
 });
 
-// Apply authentication and change tracking to all routes
 routes.use('*', requireAuth);
 routes.use('*', changeTracker);
 
-/**
- * Helper: enrich a financing record with computed balance and payoff eligibility.
- */
 async function enrichWithBalance(
   financing: NonNullable<Awaited<ReturnType<typeof financingRepository.findByVehicleId>>>
 ) {
@@ -90,12 +82,8 @@ async function enrichWithBalance(
   return withComputedBalance(financing, computedBalance);
 }
 
-// T6 display edge for a financing API object (money cols + the derived computedBalance, cents→dollars) is
-// the shared financingWithBalanceToApi (utils/money.ts) — one source of truth with the vehicles route's
-// embedded-financing conversion (dedup of the self-dup). Aliased locally to keep the call sites terse.
 const financingRowToApi = financingWithBalanceToApi;
 
-// GET /api/vehicles/:vehicleId/financing - Get financing details for a vehicle
 routes.get(
   '/vehicles/:vehicleId/financing',
   zValidator('param', commonSchemas.vehicleIdParam),
@@ -118,7 +106,6 @@ routes.get(
   }
 );
 
-// POST /api/vehicles/:vehicleId/financing - Create or update financing for a vehicle
 routes.post(
   '/vehicles/:vehicleId/financing',
   zValidator('param', commonSchemas.vehicleIdParam),
@@ -148,22 +135,7 @@ routes.post(
     const existingFinancing = await financingRepository.findByVehicleId(vehicleId);
 
     if (existingFinancing) {
-      // This endpoint is "the vehicle's financing is now THIS" — a create-or-replace. If the prior
-      // financing was paid off / completed (isActive=false, via PUT /payoff or DELETE), re-financing
-      // the same vehicle reuses that row, and `isActive` is .optional() in the create schema (it's a
-      // .notNull().default(true) column, so drizzle-zod omits it) → the client never sends it → the
-      // update would LEAVE isActive=false, silently dropping the new active financing from
-      // the isActive-filtered queries (loanBreakdown/analytics) + the FE's isActive gate. Re-activate
-      // explicitly, mirroring how create() defaults isActive=true. A still-active record stays active
-      // (idempotent). endDate is likewise cleared so a stale payoff/lease-end date can't linger.
-      //
-      // The cross-type optional fields must ALSO be reset, not merged (the sibling defect to the
-      // reset). `update()` skips `undefined` keys, but these are all `.optional()` in the create
-      // schema — so switching a vehicle's financing TYPE (lease↔loan) without re-sending the prior
-      // type's fields would LEAVE them stale (a `loan` row carrying a lease `mileageLimit`, consumed by
-      // FE lease-metrics + the Sheets export). A fresh create() defaults each absent
-      // nullable column to NULL; the create-or-REPLACE path must produce the same clean row. Coalesce
-      // every optional cross-type/schedule field to null so the reused row mirrors a fresh insert.
+      // update() skips undefined keys, so every reset field must be set to null explicitly.
       const updatedFinancing = await financingRepository.update(existingFinancing.id, {
         ...financingData,
         apr: financingData.apr ?? null,
@@ -197,14 +169,12 @@ routes.post(
   }
 );
 
-// PATCH /api/financing/:financingId/payment-amount - Update scheduled payment amount
 routes.patch(
   '/:financingId/payment-amount',
   zValidator('param', financingParamsSchema),
   zValidator(
     'json',
     z.object({
-      // money (T3): the PATCH payment-amount endpoint mirrors the create schema's cents transform.
       paymentAmount: moneyDollarsToCents((n) =>
         n.min(0.01, 'Payment amount must be greater than 0')
       ),
@@ -228,7 +198,6 @@ routes.patch(
   }
 );
 
-// PUT /api/financing/:financingId/payoff - Explicitly mark financing as paid off
 routes.put('/:financingId/payoff', zValidator('param', financingParamsSchema), async (c) => {
   const user = c.get('user');
   const { financingId } = c.req.valid('param');
@@ -243,7 +212,6 @@ routes.put('/:financingId/payoff', zValidator('param', financingParamsSchema), a
   });
 });
 
-// DELETE /api/financing/:financingId - Deactivate financing
 routes.delete('/:financingId', zValidator('param', financingParamsSchema), async (c) => {
   const user = c.get('user');
   const { financingId } = c.req.valid('param');

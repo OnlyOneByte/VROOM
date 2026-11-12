@@ -1,39 +1,8 @@
-/**
- * The expenses table has two layouts and three row kinds (standalone, split-group parent, split
- * child), and every row carries controls that appear only after an interaction. That combination is
- * where its accessibility broke, in four ways that all have the same root: a row that is ITSELF a
- * control cannot legally carry Edit/Delete inside it, and a row that is NOT a control cannot be
- * operated at all.
- *
- * What this suite pins:
- *   - a split group can be expanded and collapsed BY KEYBOARD, and reports its state;
- *   - Delete inside a revealed split row opens the confirmation BY KEYBOARD (the parent used to
- *     unmount the button on keydown, so the activation click never landed);
- *   - no row ever nests one interactive control inside another (axe `nested-interactive`);
- *   - every row control has an accessible name, and none hides itself from a focused user;
- *   - a Delete blocked by an insurance policy can still be focused, announces that it is disabled,
- *     and explains WHY to mouse, keyboard and assistive-tech users alike.
- */
-
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render } from '@testing-library/svelte';
 import ExpensesTable from '../ExpensesTable.svelte';
-import { appStore } from '$lib/stores/app.svelte';
-import type { Expense, Vehicle } from '$lib/types';
-
-/**
- * Mounting needs svelte's CLIENT entries, and this suite resolves the package's `default` (server)
- * ones because vite.config.ts sets no `browser` resolve condition for tests. `svelte/reactivity`
- * matters as much as `svelte` here: its server `MediaQuery` reports a static fallback, so the
- * `IsMobile` hook would always pick the wide layout and the compact one would never be tested.
- * Both paths are written `'…' as string` so TypeScript does not try to type svelte's internals
- * (which ship no declarations) while Vite still sees a literal it can resolve.
- */
-vi.mock('svelte', () => import('../../../../../node_modules/svelte/src/index-client.js' as string));
-vi.mock(
-	'svelte/reactivity',
-	() => import('../../../../../node_modules/svelte/src/reactivity/index-client.js' as string)
-);
+import { appStore } from '#lib/stores/app.svelte.ts';
+import type { Expense, Vehicle } from '#lib/types/index.ts';
 
 const VEHICLE: Vehicle = {
 	id: 'v1',
@@ -56,7 +25,6 @@ const rowBase = {
 	updatedAt: '2024-03-12T12:00:00.000Z'
 };
 
-/** One standalone row, one plain split group, one split group owned by an insurance policy. */
 const EXPENSES: Expense[] = [
 	{
 		...rowBase,
@@ -106,10 +74,8 @@ const EXPENSES: Expense[] = [
 
 const INSURANCE_REASON = 'Delete the insurance policy to remove this expense';
 
-/** Everything a user can tab to or activate — the set axe's `nested-interactive` is about. */
 const INTERACTIVE = 'a[href], button, [role="button"], input, select, textarea, [tabindex]';
 
-/** `INTERACTIVE` narrowed to one ancestor. Prefixing the string would scope only its first member. */
 function scopeTo(ancestor: string) {
 	return INTERACTIVE.split(', ')
 		.map(selector => `${ancestor} ${selector}`)
@@ -125,7 +91,6 @@ function mountTable(props: Record<string, unknown> = {}) {
 	});
 }
 
-/** `IsMobile` reads `window.matchMedia`, which test-setup installs as a mock. */
 function useLayout(layout: 'compact' | 'wide') {
 	vi.mocked(window.matchMedia).mockReturnValue({
 		matches: layout === 'compact',
@@ -134,7 +99,6 @@ function useLayout(layout: 'compact' | 'wide') {
 	} as unknown as MediaQueryList);
 }
 
-/** Interactive elements that contain another interactive element, i.e. the illegal nestings. */
 function nestedInteractive(container: HTMLElement) {
 	return [...container.querySelectorAll<HTMLElement>(INTERACTIVE)]
 		.filter(el => el.querySelector(INTERACTIVE) !== null)
@@ -145,12 +109,6 @@ function accessibleName(el: Element) {
 	return (el.getAttribute('aria-label') ?? el.textContent ?? '').replace(/\s+/g, ' ').trim();
 }
 
-/**
- * Press a key on a control the way a browser does: the keydown is dispatched first and bubbles,
- * and the activation click follows only if the control is STILL in the document — a handler on an
- * ancestor that unmounts it during keydown swallows the activation entirely, which is exactly how
- * keyboard Delete used to be lost inside a selected split row.
- */
 async function pressKey(el: HTMLElement, key: 'Enter' | ' ') {
 	el.focus();
 	await fireEvent.keyDown(el, { key, bubbles: true });
@@ -158,16 +116,10 @@ async function pressKey(el: HTMLElement, key: 'Enter' | ' ') {
 	if (el.isConnected) await fireEvent.keyUp(el, { key, bubbles: true });
 }
 
-/** The delete confirmation is an AlertDialog, portalled to the body rather than into `container`. */
 function confirmationDialog() {
 	return document.body.querySelector('[role="alertdialog"]');
 }
 
-/**
- * The innermost match, i.e. a control with no interactive content of its own. Taking the first
- * match in document order is how you accidentally measure a ROW that contains the button you
- * meant — the exact mis-measurement that makes a nested-interactive bug look fine.
- */
 function byText<T extends Element>(root: HTMLElement, selector: string, text: string) {
 	const match = [...root.querySelectorAll<T>(selector)].find(
 		el => el.textContent?.includes(text) && el.querySelector(INTERACTIVE) === null
@@ -176,8 +128,6 @@ function byText<T extends Element>(root: HTMLElement, selector: string, text: st
 	return match;
 }
 
-/** The compact layout's rows: the direct children of the rows container. Matching on a plain
- *  `div` would match an ancestor of the whole table and assert nothing. */
 function compactRows(container: HTMLElement) {
 	const list = container.querySelector('.divide-y');
 	if (!list) throw new Error('the compact layout rendered no rows container');
@@ -194,7 +144,6 @@ function compactRowsWith(container: HTMLElement, text: string) {
 	return compactRows(container).filter(el => el.textContent?.includes(text));
 }
 
-/** The wide layout's group parent row, found by the badge only a split expense renders. */
 function groupRow(container: HTMLElement, label: string) {
 	const row = [...container.querySelectorAll<HTMLTableRowElement>('tbody tr')].find(
 		tr => tr.textContent?.includes('Split') && tr.textContent?.includes(label)
@@ -223,8 +172,6 @@ describe('wide layout: a split group opens by keyboard, not only by mouse', () =
 		const { container } = mountTable();
 		const toggle = disclosure(groupRow(container, 'Maintenance'));
 
-		// A `<tr>` with a click handler is not focusable and has no state: the control has to be a
-		// real button for Tab to reach it and for anything to announce collapsed/expanded.
 		expect(toggle.tagName).toBe('BUTTON');
 		expect(toggle.getAttribute('aria-expanded')).toBe('false');
 		expect(accessibleName(toggle)).not.toBe('');
@@ -237,7 +184,6 @@ describe('wide layout: a split group opens by keyboard, not only by mouse', () =
 
 		await pressKey(toggle, 'Enter');
 
-		// The two children of the plain group, which exist in the DOM only while expanded.
 		expect(bodyRowCount(container)).toBe(collapsed + 2);
 		expect(disclosure(groupRow(container, 'Maintenance')).getAttribute('aria-expanded')).toBe(
 			'true'
@@ -267,7 +213,6 @@ describe('wide layout: a split group opens by keyboard, not only by mouse', () =
 
 		await fireEvent.click(disclosure(groupRow(container, 'Maintenance')));
 
-		// Without `stopPropagation` the row's own toggle would run as well and cancel this one out.
 		expect(bodyRowCount(container)).toBe(collapsed + 2);
 	});
 
@@ -286,12 +231,9 @@ describe('wide layout: row controls are visible when focused and named when icon
 		const { container } = mountTable();
 		const hidden = [...container.querySelectorAll('[class*="opacity-0"]')];
 
-		// The clusters exist; if this ever reaches zero the assertion below proves nothing.
 		expect(hidden.length).toBeGreaterThan(0);
 		for (const cluster of hidden) {
 			const classes = cluster.getAttribute('class') ?? '';
-			// Any variant of the focus escape counts (`focus-within:`, `group-focus-within:`,
-			// `lg:group-focus-within:`); having none is the defect.
 			const revealedByFocus = classes
 				.split(/\s+/)
 				.some(token => token.endsWith('focus-within:opacity-100'));
@@ -308,8 +250,6 @@ describe('wide layout: row controls are visible when focused and named when icon
 
 		expect(controls.length).toBeGreaterThan(0);
 		for (const control of controls) {
-			// `title` is deliberately NOT accepted: the house rule is `aria-label` on icon-only
-			// controls, and a title is also unreachable by touch and by keyboard.
 			expect(
 				accessibleName(control),
 				`nameless control: ${control.outerHTML.slice(0, 120)}`
@@ -336,7 +276,6 @@ describe('compact layout: a row never nests one control inside another', () => {
 		expect(byText(container, 'a[href]', 'Edit')).toBeTruthy();
 		expect(byText(container, 'button', 'Delete')).toBeTruthy();
 		expect(nestedInteractive(container)).toEqual([]);
-		// The row button's name is its summary, not a run-on that swallows its own actions.
 		expect(accessibleName(summary)).not.toMatch(/Edit|Delete/);
 	});
 
@@ -355,8 +294,6 @@ describe('compact layout: a row never nests one control inside another', () => {
 		const { container } = mountTable({ canWrite: false });
 		const row = compactRow(container, 'Fuel & Charging');
 
-		// `matches` as well as `querySelector`: the row itself used to BE the button, which a
-		// descendants-only query would never see.
 		expect(row.matches(INTERACTIVE)).toBe(false);
 		expect(row.querySelector(INTERACTIVE)).toBeNull();
 	});
@@ -382,7 +319,6 @@ describe('compact layout: rows and their actions are operable by keyboard', () =
 
 		await pressKey(byText<HTMLElement>(container, 'button', 'Maintenance'), 'Enter');
 
-		// $60 and $40 are the two portions; only their $100 total shows while collapsed.
 		expect(compactRowsWith(container, '$60.00')).toHaveLength(1);
 		expect(compactRowsWith(container, '$40.00')).toHaveLength(1);
 	});
@@ -395,7 +331,6 @@ describe('compact layout: rows and their actions are operable by keyboard', () =
 
 			await pressKey(del, key);
 
-			// The row used to deselect on this keydown and unmount the button mid-press.
 			expect(del.isConnected).toBe(true);
 			expect(confirmationDialog()?.textContent).toContain('split expense');
 		});
@@ -420,7 +355,6 @@ describe('a Delete owned by an insurance policy explains itself', () => {
 		)!;
 
 		expect(del).not.toBeNull();
-		// `disabled` would take it out of the tab order, which is what made the reason unreachable.
 		expect(del.disabled).toBe(false);
 		del.focus();
 		expect(document.activeElement).toBe(del);
@@ -430,8 +364,6 @@ describe('a Delete owned by an insurance policy explains itself', () => {
 		expect(describedBy).toBeTruthy();
 		expect(document.getElementById(describedBy!)?.textContent).toBe(INSURANCE_REASON);
 		expect(del.getAttribute('title')).toBe(INSURANCE_REASON);
-		// The kit dims an aria-disabled control AND kills its pointer events; the second half has
-		// to be undone or the hover tooltip never fires and the click below never happens.
 		const classes = (del.getAttribute('class') ?? '').split(/\s+/);
 		expect(classes).not.toContain('aria-disabled:pointer-events-none');
 		expect(classes).toContain('aria-disabled:pointer-events-auto');

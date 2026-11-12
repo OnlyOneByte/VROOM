@@ -1,92 +1,82 @@
-/**
- * Regression GUARD against a NON-ATOMIC Google Sheets backup:
- * the Sheets BACKUP must be ATOMIC — stage every table into temp `__vroom_staging` tabs, then
- * swap them in with ONE batchUpdate (delete old canonical sheets + rename staging → canonical).
- *
- * The original design did per-sheet `values.clear()` THEN `values.update()` on the LIVE sheets, so a
- * failure mid-run left a TORN backup — some sheets rewritten, the one mid-write EMPTIED by its own
- * preceding clear, the rest stale — on what may be the user's ONLY copy (silent data-loss).
- *
- * The fake-seam test (google-sheets-service.test.ts) proves the CURRENT path is atomic by simulating
- * a mid-backup failure, but it only drives the one code path that exists today. This SOURCE SCAN is the
- * tree-wide structural net: it pins the invariant that the safety rests on, so a future refactor that
- * silently reintroduces the clear-then-write footgun regresses RED here even if no test happens to
- * exercise the new path.
- *
- * The load-bearing properties (any one reverting = the data-loss bug is back):
- *   1. NO `values.clear(` anywhere in the Sheets service — clearing a live sheet before writing IS the
- *      destructive in-place mechanism. The atomic design has no clear at all (staging tabs are born
- *      empty).
- *   2. The staging mechanism is present — a `SHEET_STAGING_SUFFIX` constant, and the swap uses
- *      `deleteSheet` + `updateSheetProperties` (delete-old + rename-staging) in the commit batch.
- *   3. The staging suffix is SPACE-FREE — it's interpolated UNQUOTED into A1 ranges
- *      (`${title}${suffix}!A1`), so a space would silently corrupt every staging write's range.
- *
- * Pure source scan — no DB, no network. Runs in the fast suite.
- */
+import { beforeEach, describe, expect, test } from 'bun:test';
+import {
+  FakeGoogleStore,
+  googleApiError,
+  makeFakeSheetsClients,
+} from '../../../../test-helpers/fake-google-clients';
+import { createTestApp, type TestApp } from '../../../../test-helpers/http-client';
 
-import { describe, expect, test } from 'bun:test';
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+type SheetsModule = typeof import('../google-sheets-service');
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-// The Sheets service is the only module that writes the backup spreadsheet.
-const SHEETS_SERVICE = join(HERE, '..', 'google-sheets-service.ts');
+let ctx: TestApp;
+let store: FakeGoogleStore;
+let mod: SheetsModule;
 
-function serviceSource(): string {
-  return readFileSync(SHEETS_SERVICE, 'utf8');
+beforeEach(async () => {
+  ctx = await createTestApp();
+  store = new FakeGoogleStore();
+  mod = await import('../google-sheets-service');
+});
+
+function makeSvc() {
+  return new mod.GoogleSheetsService('fake-refresh-token', makeFakeSheetsClients(store));
+}
+
+function backup() {
+  return makeSvc().createOrUpdateVroomSpreadsheet(ctx.user.id, 'VROOM/Backups', 'Demo User');
+}
+
+async function seedVehicle(make: string): Promise<void> {
+  const { db } = await import('../../../../db/connection');
+  const schema = await import('../../../../db/schema');
+  await db
+    .insert(schema.vehicles)
+    .values({ userId: ctx.user.id, make, model: 'Civic', year: 2021 });
+}
+
+async function backupWithFailedSwap(): Promise<string> {
+  await seedVehicle('Toyota');
+  const info = await backup();
+  await seedVehicle('Honda');
+  store.injectFault('spreadsheets.batchUpdate', googleApiError(500, 'swap failed'), 1, 1);
+  await expect(backup()).rejects.toThrow('swap failed');
+  return info.id;
 }
 
 describe('Sheets backup is atomic — stage-then-swap', () => {
-  test('the scan resolves the real Sheets service file (guard is live, not a no-op)', () => {
-    expect(serviceSource().length, `unreadable/empty: ${SHEETS_SERVICE}`).toBeGreaterThan(100);
+  test('a re-backup never clears a live tab in place', async () => {
+    await seedVehicle('Toyota');
+    const info = await backup();
+
+    store.injectFault('spreadsheets.values.clear', googleApiError(500, 'live tab cleared'), 1000);
+    await seedVehicle('Honda');
+    await backup();
+
+    const data = await makeSvc().readSpreadsheetData(info.id);
+    expect(data.vehicles.map((v) => v.make).sort()).toEqual(['Honda', 'Toyota']);
   });
 
-  test('the backup path never calls values.clear (no destructive in-place clear)', () => {
-    const src = serviceSource();
-    // Match an actual call `…values.clear(` (any receiver), tolerant of whitespace. The atomic design
-    // removed clearing entirely; reverting to clear-then-write is exactly the footgun this guard exists
-    // to catch.
-    const clearCalls = [...src.matchAll(/\.values\s*\.\s*clear\s*\(/g)];
-    expect(
-      clearCalls.length,
-      `google-sheets-service.ts calls values.clear() ${clearCalls.length} time(s). Clearing a LIVE backup ` +
-        `sheet before writing is the non-atomic footgun: a mid-run failure leaves a torn/emptied ` +
-        `backup on the user's only copy. Stage into temp tabs + swap atomically instead.`
-    ).toBe(0);
+  test('a failure during the swap leaves the previous backup readable', async () => {
+    const id = await backupWithFailedSwap();
+
+    const data = await makeSvc().readSpreadsheetData(id);
+    expect(data.vehicles.map((v) => v.make)).toEqual(['Toyota']);
   });
 
-  test('the atomic staging + swap mechanism is present', () => {
-    const src = serviceSource();
-    expect(
-      /SHEET_STAGING_SUFFIX\s*=\s*['"][^'"]+['"]/.test(src),
-      'no SHEET_STAGING_SUFFIX constant — the staging-tab mechanism the atomic swap needs is gone.'
-    ).toBe(true);
-    // The commit swap deletes the old canonical sheets and renames staging → canonical in one batch.
-    expect(
-      src.includes('deleteSheet'),
-      'swap no longer issues deleteSheet (commit step missing)'
-    ).toBe(true);
-    expect(
-      src.includes('updateSheetProperties'),
-      'swap no longer renames staging → canonical via updateSheetProperties (commit step missing)'
-    ).toBe(true);
+  test('the next backup recovers from an interrupted swap and restores the tab roster', async () => {
+    const id = await backupWithFailedSwap();
+
+    await backup();
+
+    const svc = makeSvc();
+    const data = await svc.readSpreadsheetData(id);
+    expect(data.vehicles.map((v) => v.make).sort()).toEqual(['Honda', 'Toyota']);
+    const titles = (await svc.getSpreadsheetInfo(id)).sheets.map((s) => s.title);
+    expect(titles.some((t) => t.includes(mod.SHEET_STAGING_SUFFIX))).toBe(false);
+    expect(titles).toEqual([...mod.SHEET_NAMES]);
   });
 
-  test('the staging suffix is space-free (interpolated UNQUOTED into A1 ranges)', () => {
-    const src = serviceSource();
-    const m = src.match(/SHEET_STAGING_SUFFIX\s*=\s*['"]([^'"]+)['"]/);
-    expect(m, 'SHEET_STAGING_SUFFIX assignment not found').not.toBeNull();
-    const suffix = m?.[1] ?? '';
-    expect(
-      /\s/.test(suffix),
-      `SHEET_STAGING_SUFFIX ("${suffix}") contains whitespace. It's interpolated UNQUOTED into A1 ranges ` +
-        `(\`\${title}\${suffix}!A1:…\`), so a space silently corrupts every staging write's range.`
-    ).toBe(false);
-    expect(
-      suffix.length,
-      'SHEET_STAGING_SUFFIX is empty — staging tabs would collide with canonical ones'
-    ).toBeGreaterThan(0);
+  test('the staging suffix is non-empty and space-free (it is spliced unquoted into A1 ranges)', () => {
+    expect(mod.SHEET_STAGING_SUFFIX).toMatch(/^\S+$/);
   });
 });

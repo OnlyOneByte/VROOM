@@ -1,21 +1,3 @@
-/**
- * Guard: a photo_ref the worker cannot sync must be ADVANCED, never silently re-polled.
- *
- * A photo with no `active` copy to download from is reachable today: deleting a storage provider
- * drops that provider's refs, including the only `active` one, while the pending backup refs on
- * other providers survive. If `processSingleRef` returns without writing anything for such a ref,
- * `findPendingOrFailed` — `ORDER BY created_at ASC LIMIT batchSize` — hands back the identical row
- * every 30s forever. Those rows are by construction the oldest, so once batchSize of them exist
- * they own the whole batch and photo fan-out stops for every newer photo, with nothing above debug
- * in the logs.
- *
- * The tests below drive the REAL `processBatch` against an in-memory store that reproduces the
- * query's ordering, limit and `retryCount < MAX_RETRY_COUNT` bound, so they fail on the liveness
- * property itself rather than on a specific write.
- *
- * Collaborators are INJECTED (never `mock.module`'d) — see TestingExternalAPIs.md.
- */
-
 import { beforeEach, describe, expect, test } from 'bun:test';
 import { CONFIG } from '../../../config';
 import type { Photo, PhotoRef } from '../../../db/schema';
@@ -55,11 +37,6 @@ function makePhoto(id: string): Photo {
   };
 }
 
-/**
- * The photo_refs table as the worker sees it: `findPendingOrFailed` mirrors the real query
- * (pending/failed, under the retry ceiling, oldest first, capped at batchSize) and `updateStatus`
- * writes through, so a cycle that writes nothing really does hand back the same rows next time.
- */
 class FakeRefStore {
   rows: PhotoRef[] = [];
   uploadedRefIds: string[] = [];
@@ -99,11 +76,6 @@ class FakeRefStore {
     return row;
   }
 
-  /**
-   * Pretend the exponential backoff window has elapsed for every failed row. A failed ref is
-   * skipped (but still occupies a batch slot) until `30 * 2^retryCount` seconds pass, so without
-   * this the suite would have to wait minutes of real time to observe the retry ceiling.
-   */
   ageFailedRows(): void {
     for (const row of this.rows) {
       if (row.status === 'failed') row.syncedAt = new Date(Date.now() - 60 * 60 * 1000);
@@ -152,12 +124,10 @@ describe('a ref with no active source copy', () => {
     expect(parked.status).toBe('failed');
     expect(parked.retryCount).toBe(1);
     expect(parked.errorMessage).toBe('No active source copy available for this photo');
-    // syncedAt is the backoff clock — without it the next attempt is immediate.
     expect(parked.syncedAt).toBeInstanceOf(Date);
   });
 
   test('leaves the work set, so a newer ref behind it is eventually synced', async () => {
-    // batchSize source-less refs, all older than the healthy one → they fill every slot.
     store.rows = Array.from({ length: BATCH_SIZE }, (_, i) =>
       makeRef({
         id: `stuck-${i}`,
@@ -181,8 +151,6 @@ describe('a ref with no active source copy', () => {
       })
     );
 
-    // Generous cycle budget: the ceiling is reached in MAX_RETRY_COUNT cycles, and the ref behind
-    // the wall syncs on the next one. Pre-fix NO number of cycles is enough.
     const maxCycles = MAX_RETRY_COUNT + 3;
     let cycles = 0;
     while (store.row('newest').status !== 'active' && cycles < maxCycles) {
@@ -194,7 +162,6 @@ describe('a ref with no active source copy', () => {
     expect(store.row('newest').status).toBe('active');
     expect(store.row('newest').storageRef).toBe('uploaded-id');
     expect(cycles).toBeLessThanOrEqual(maxCycles);
-    // Every stuck ref ended at the ceiling, which is what took them out of the query's reach.
     for (let i = 0; i < BATCH_SIZE; i++) {
       expect(store.row(`stuck-${i}`).retryCount).toBe(MAX_RETRY_COUNT);
     }

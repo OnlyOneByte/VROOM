@@ -1,47 +1,74 @@
-/**
- * Source-scan GUARD — a photo upload must compensate (best-effort delete the just-uploaded
- * provider object) if the post-upload DB writes fail.
- *
- * uploadPhotoForEntity does provider.upload (external bytes) → photoRepository.create (photo row) →
- * photoRefRepository.create (active ref). Those last two are not in the same transaction as the
- * upload, so a DB error/constraint after the bytes land would ORPHAN the external object: no DB row
- * references it, so it's never reconcilable or deletable through the app (no silent
- * leak). The fix (persistUploadedPhotoOrCleanup) wraps the inserts in try/catch and best-effort
- * provider.delete(storageRef)s the object before re-throwing.
- *
- * This is a SOURCE SCAN (mirroring photo-change-tracker.test.ts / photo-serve-headers.test.ts,
- * ): a full upload needs a real storage provider's bytes (not exercisable in the in-memory harness
- * without the process-global mock.module leak trap). So we pin that the compensating-delete
- * EXISTS — a refactor that drops it fails here, travelling with the merge.
- */
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
+import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { logger } from '../../../utils/logger';
+import type { StorageRef } from '../../providers/domains/storage/storage-provider';
+import { photoRefRepository } from '../photo-ref-repository';
+import { uploadPhotoForEntity } from '../photo-service';
+import { type FakePhotoStorage, installFakePhotoStorage } from './fake-photo-storage';
 
-import { describe, expect, test } from 'bun:test';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+let ctx: TestApp;
+let storage: FakePhotoStorage;
 
-const SERVICE_SRC = readFileSync(join(import.meta.dir, '..', 'photo-service.ts'), 'utf-8');
+beforeEach(async () => {
+  ctx = await createTestApp();
+  ctx.sqlite.run(
+    `INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('veh-1', ?, 'Toyota', 'Camry', 2022)`,
+    [ctx.user.id]
+  );
+  storage = installFakePhotoStorage(ctx);
+});
 
-describe('photo upload compensates on a failed DB write (orphan-byte source guard)', () => {
-  test('the persist helper exists and is invoked by uploadPhotoForEntity', () => {
-    expect(SERVICE_SRC).toContain('async function persistUploadedPhotoOrCleanup(');
-    expect(SERVICE_SRC).toContain('await persistUploadedPhotoOrCleanup(');
+afterEach(() => {
+  storage.restore();
+  ctx.close();
+});
+
+function jpeg(): File {
+  return new File([new Uint8Array([1, 2, 3])], 'receipt.jpg', { type: 'image/jpeg' });
+}
+
+function photoRowCount(): number {
+  return (ctx.sqlite.query('SELECT COUNT(*) AS n FROM photos').get() as { n: number }).n;
+}
+
+describe('upload compensates when the DB write fails after the provider upload', () => {
+  test('a failed photo_refs insert removes the photo row and the uploaded object, then rethrows', async () => {
+    const dbError = new Error('disk I/O error');
+    const uploadSpy = spyOn(storage.provider, 'upload');
+    const refSpy = spyOn(photoRefRepository, 'create').mockRejectedValueOnce(dbError);
+
+    await expect(uploadPhotoForEntity('vehicle', 'veh-1', ctx.user.id, jpeg())).rejects.toBe(
+      dbError
+    );
+
+    const uploaded = (await uploadSpy.mock.results[0].value) as StorageRef;
+    expect(await storage.provider.getExternalUrl(uploaded)).toBeNull();
+    expect(photoRowCount()).toBe(0);
+
+    refSpy.mockRestore();
+    uploadSpy.mockRestore();
   });
 
-  test('the persist path catches a DB-write failure and best-effort deletes the uploaded object', () => {
-    // Isolate the helper body, then assert it has a catch that calls provider.delete with the
-    // upload's storageRef.externalId (the just-uploaded object) — the compensating delete.
-    const start = SERVICE_SRC.indexOf('async function persistUploadedPhotoOrCleanup(');
-    expect(start).toBeGreaterThan(-1);
-    const next = SERVICE_SRC.indexOf('\nexport async function uploadPhotoForEntity(', start);
-    const body = SERVICE_SRC.slice(start, next === -1 ? undefined : next);
+  test('a failed compensating delete is logged and the original DB error still reaches the caller', async () => {
+    const dbError = new Error('disk I/O error');
+    const refSpy = spyOn(photoRefRepository, 'create').mockRejectedValueOnce(dbError);
+    const deleteSpy = spyOn(storage.provider, 'delete').mockRejectedValueOnce(
+      new Error('network down')
+    );
+    const warnSpy = spyOn(logger, 'warn');
 
-    expect(body).toMatch(/}\s*catch\s*\(error\)\s*{/);
-    expect(body).toMatch(/provider\.delete\(\s*{[^}]*externalId:\s*storageRef\.externalId/);
-    // The original error must NOT be swallowed — it re-throws after the cleanup attempt.
-    expect(body).toContain('throw error;');
-  });
+    await expect(uploadPhotoForEntity('vehicle', 'veh-1', ctx.user.id, jpeg())).rejects.toBe(
+      dbError
+    );
 
-  test('a failed compensating delete is logged (reconcilable), not silently dropped', () => {
-    expect(SERVICE_SRC).toMatch(/Failed to clean up orphaned upload/);
+    expect(deleteSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Failed to clean up orphaned upload after a DB write error',
+      expect.objectContaining({ error: 'network down' })
+    );
+
+    warnSpy.mockRestore();
+    deleteSpy.mockRestore();
+    refSpy.mockRestore();
   });
 });

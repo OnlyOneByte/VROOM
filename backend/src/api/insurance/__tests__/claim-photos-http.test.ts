@@ -1,14 +1,3 @@
-/**
- * HTTP test for the insurance_claim photo entity-type wiring (claim document
- * uploads). The photo routes are entityType-generic; the only gate for a new
- * type is validateEntityOwnership's switch in photos/helpers.ts. This proves the
- * new 'insurance_claim' case end-to-end through the real route stack:
- *  GET /photos/insurance_claim/:claimId — own claim passes the gate (200),
- *  a non-existent / unowned claim is rejected (404).
- * listPhotosForEntity calls validateEntityOwnership, so a GET exercises the same
- * ownership check an upload would — without needing a storage provider.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -51,8 +40,8 @@ async function seedClaim(policyId: string): Promise<string> {
   return body.data.id;
 }
 
-describe('insurance_claim photo entity-type', () => {
-  test('GET photos for an owned claim passes the ownership gate (200, empty list)', async () => {
+describe('insurance_claim photos', () => {
+  test('GET photos for an owned claim returns an empty list', async () => {
     const vehicleId = await seedVehicle(ctx);
     const policyId = await seedPolicy(vehicleId);
     const claimId = await seedClaim(policyId);

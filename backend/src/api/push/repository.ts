@@ -8,16 +8,7 @@ import { DatabaseError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { BaseRepository } from '../../utils/repository';
 
-// ============================================================================
-// Repository — per-user, per-device Web Push subscriptions (push-notifications T1)
-// ============================================================================
-
-/**
- * The subscription store. Every method is userId-SCOPED — the endpoint alone NEVER authorizes a
- * read/write (the IDOR discipline). A user owns many devices, each one row; an
- * idempotent upsert keys on (userId, endpoint) so a browser re-subscribing updates its row rather
- * than duplicating it. Mirrors the reminder_notifications userId-owned-row shape.
- */
+// Every method is scoped by userId: the endpoint alone is not a capability.
 export class PushSubscriptionRepository extends BaseRepository<
   PushSubscription,
   NewPushSubscription
@@ -26,11 +17,6 @@ export class PushSubscriptionRepository extends BaseRepository<
     super(db, pushSubscriptions);
   }
 
-  /**
-   * Idempotently persist a subscription for a user. A re-subscribe from the SAME browser returns the
-   * SAME endpoint, so conflict on (userId, endpoint) UPDATES the stored keys + resets failureCount
-   * (the device is alive again) rather than inserting a duplicate. Returns the stored row.
-   */
   async upsertByEndpoint(
     userId: string,
     sub: { endpoint: string; p256dh: string; auth: string; userAgent?: string | null }
@@ -56,10 +42,6 @@ export class PushSubscriptionRepository extends BaseRepository<
         })
         .returning();
       const stored = result[0] as PushSubscription;
-      // Hygiene cap: bound the rows one user may hold. Device rotation is normal, so a new device past
-      // the cap EVICTS the user's OLDEST subscriptions (keep the newest N incl. the one just stored)
-      // rather than rejecting a legitimate new phone; this also bounds a crafted-endpoint flood to N
-      // rows. A no-op in the common case (under the cap); only touches rows on overflow.
       await this.evictOldestBeyondCap(userId);
       return stored;
     } catch (error) {
@@ -71,11 +53,6 @@ export class PushSubscriptionRepository extends BaseRepository<
     }
   }
 
-  /**
-   * Enforce CONFIG.validation.push.maxSubscriptionsPerUser: if a user holds more than the cap, delete
-   * their oldest surplus rows (by createdAt asc, id asc as a stable tiebreak) so exactly the newest N
-   * survive. Called after an upsert; a no-op when the user is at/under the cap.
-   */
   private async evictOldestBeyondCap(userId: string): Promise<void> {
     const cap = CONFIG.validation.push.maxSubscriptionsPerUser;
     const rows = await this.db
@@ -88,7 +65,6 @@ export class PushSubscriptionRepository extends BaseRepository<
     await this.db.delete(pushSubscriptions).where(inArray(pushSubscriptions.id, surplusIds));
   }
 
-  /** All of a user's subscriptions (every device). UserId-scoped. */
   async findByUser(userId: string): Promise<PushSubscription[]> {
     try {
       return await this.db
@@ -104,10 +80,6 @@ export class PushSubscriptionRepository extends BaseRepository<
     }
   }
 
-  /**
-   * Remove a user's subscription by endpoint (the unsubscribe path). UserId-scoped so a user can only
-   * delete their OWN subscription — the endpoint is not a capability. Returns true if a row was removed.
-   */
   async deleteByEndpoint(userId: string, endpoint: string): Promise<boolean> {
     const result = await this.db
       .delete(pushSubscriptions)
@@ -116,7 +88,6 @@ export class PushSubscriptionRepository extends BaseRepository<
     return result.length > 0;
   }
 
-  /** Mark a successful send: clear the failure streak + stamp lastSuccessAt. */
   async markSuccess(id: string): Promise<void> {
     await this.db
       .update(pushSubscriptions)
@@ -124,7 +95,6 @@ export class PushSubscriptionRepository extends BaseRepository<
       .where(eq(pushSubscriptions.id, id));
   }
 
-  /** Increment the consecutive-failure counter (a transient send error); returns the new count. */
   async incrementFailure(id: string): Promise<number> {
     const result = await this.db
       .update(pushSubscriptions)
@@ -134,11 +104,9 @@ export class PushSubscriptionRepository extends BaseRepository<
     return (result[0] as PushSubscription | undefined)?.failureCount ?? 0;
   }
 
-  /** Reap a dead subscription by id (a 404/410 "gone" result, or a row past the failure cap). */
   async prune(id: string): Promise<void> {
     await this.db.delete(pushSubscriptions).where(eq(pushSubscriptions.id, id));
   }
 }
 
-// Export singleton instance
 export const pushSubscriptionRepository = new PushSubscriptionRepository(getDb());

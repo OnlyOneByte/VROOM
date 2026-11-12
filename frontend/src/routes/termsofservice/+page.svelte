@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { routes } from '$lib/routes';
+	import { routes } from '#lib/routes.ts';
 </script>
 
 <svelte:head>

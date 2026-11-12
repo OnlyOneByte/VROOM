@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { goto, invalidateAll } from '$app/navigation';
+	import { goto, refreshAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { routes, paramRoutes } from '$lib/routes';
-	import { appStore } from '$lib/stores/app.svelte';
-	import { settingsStore } from '$lib/stores/settings.svelte';
+	import { routes, paramRoutes } from '#lib/routes.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import {
 		ArrowLeft,
 		Car,
@@ -16,21 +16,21 @@
 		ChevronsUpDown,
 		Ruler
 	} from '@lucide/svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
-	import DatePicker from '$lib/components/common/date-picker.svelte';
-	import Input from '$lib/components/ui/input/input.svelte';
-	import Label from '$lib/components/ui/label/label.svelte';
-	import { Switch } from '$lib/components/ui/switch';
-	import * as Select from '$lib/components/ui/select';
-	import * as Collapsible from '$lib/components/ui/collapsible';
-	import { FormFieldError } from '$lib/components/ui/form-field';
+	import Button from '#lib/components/ui/button/button.svelte';
+	import DatePicker from '#lib/components/common/date-picker.svelte';
+	import Input from '#lib/components/ui/input/input.svelte';
+	import Label from '#lib/components/ui/label/label.svelte';
+	import { Switch } from '#lib/components/ui/switch/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import * as Collapsible from '#lib/components/ui/collapsible/index.ts';
+	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
 	import {
 		Card,
 		CardContent,
 		CardDescription,
 		CardHeader,
 		CardTitle
-	} from '$lib/components/ui/card';
+	} from '#lib/components/ui/card/index.ts';
 	import {
 		AlertDialog,
 		AlertDialogAction,
@@ -40,11 +40,11 @@
 		AlertDialogFooter,
 		AlertDialogHeader,
 		AlertDialogTitle
-	} from '$lib/components/ui/alert-dialog';
+	} from '#lib/components/ui/alert-dialog/index.ts';
 	import FinancingFormSection from './FinancingFormSection.svelte';
-	import { vehicleApi } from '$lib/services/vehicle-api';
-	import { getLongFormLabel } from '$lib/utils/units';
-	import { dateOnlyToISO, toDateInputValue } from '$lib/utils/formatters';
+	import { vehicleApi } from '#lib/services/vehicle-api.ts';
+	import { getLongFormLabel } from '#lib/utils/units.ts';
+	import { dateOnlyToISO, toDateInputValue } from '#lib/utils/formatters.ts';
 	import type {
 		Vehicle,
 		VehicleFinancing,
@@ -56,10 +56,10 @@
 		DistanceUnit,
 		VolumeUnit,
 		ChargeUnit
-	} from '$lib/types';
+	} from '#lib/types/index.ts';
 	import { validateVehicleFields, validateFinancingFields } from './vehicle-form-validation';
-	import { calculatePayoffDateFromStart } from '$lib/utils/financing-calculations';
-	import FormLayout from '$lib/components/common/form-layout.svelte';
+	import { calculatePayoffDateFromStart } from '#lib/utils/financing-calculations.ts';
+	import FormLayout from '#lib/components/common/form-layout.svelte';
 
 	interface Props {
 		vehicleId?: string;
@@ -67,39 +67,23 @@
 
 	let { vehicleId }: Props = $props();
 
-	// Determine mode
 	const isEditMode = $derived(!!vehicleId);
 
-	// Component state
-	// `vehicleId` is a route param, so this only supplies the first-paint value (the spinner
-	// branch, instead of a flash of the empty form); the load $effect below re-arms `isLoading`
-	// on any later change. It is reassigned, so it can't become a $derived. Svelte's
-	// state_referenced_locally warning here is the false positive MainSteering tells us to tolerate.
 	let isLoading = $state(!!vehicleId);
 	let isSubmitting = $state(false);
 	let isDeleting = $state(false);
 	let showDeleteConfirm = $state(false);
 	let vehicle = $state<Vehicle | null>(null);
 
-	// Energy tracking flags
 	let trackFuel = $state(true);
 	let trackCharging = $state(false);
 
-	// Unit preferences — default from global settings on create, vehicle values on edit
 	let unitPrefsOpen = $state(false);
 	let distanceUnit = $state<DistanceUnit>(settingsStore.unitPreferences.distanceUnit);
 	let volumeUnit = $state<VolumeUnit>(settingsStore.unitPreferences.volumeUnit);
 	let chargeUnit = $state<ChargeUnit>(settingsStore.unitPreferences.chargeUnit);
-	// True once the user picks a unit OR edit-mode loads the vehicle's saved units, so
-	// the create-mode seeding effect below stops overriding their choice.
 	let unitsTouched = $state(false);
 
-	// Create mode: the $state initializers above run ONCE at mount, but the global
-	// settings store hydrates ASYNC in the root layout — so on a cold/direct load of
-	// /vehicles/new the initializers capture the USD/imperial DEFAULT, and a metric
-	// user would get "Miles · Gallons" pre-selected (and silently saved). Re-seed from
-	// the store once it resolves, but only while the user hasn't touched the units and
-	// only in create mode (edit mode populates from the vehicle, not global prefs).
 	$effect(() => {
 		if (isEditMode || unitsTouched) return;
 		const prefs = settingsStore.unitPreferences;
@@ -112,7 +96,6 @@
 	let volumeLabel = $derived(getLongFormLabel(volumeUnit));
 	let chargeLabel = $derived(getLongFormLabel(chargeUnit));
 
-	// Form data
 	let vehicleForm = $state<VehicleFormData>({
 		make: '',
 		model: '',
@@ -128,7 +111,6 @@
 
 	function handleVehicleTypeChange(newType: string) {
 		vehicleForm.vehicleType = newType as VehicleType;
-		// Auto-set tracking defaults based on vehicle type
 		if (newType === 'gas') {
 			trackFuel = true;
 			trackCharging = false;
@@ -158,10 +140,8 @@
 		excessMileageFee: undefined as number | undefined
 	});
 
-	// Form validation
 	let errors = $state<VehicleFormErrors & FinancingFormErrors>({});
 
-	// Amortization preview
 	let amortizationPreview = $state<{
 		monthlyPayment: number;
 		totalInterest: number;
@@ -169,7 +149,6 @@
 		payoffDate: Date;
 	} | null>(null);
 
-	// Load vehicle data if in edit mode
 	$effect(() => {
 		if (isEditMode && vehicleId) {
 			loadVehicle();
@@ -181,14 +160,9 @@
 		try {
 			vehicle = await vehicleApi.getVehicle(vehicleId!);
 
-			// Fetch financing data separately
-			try {
-				const financingData = await vehicleApi.getFinancing(vehicleId!);
-				if (financingData && vehicle) {
-					vehicle.financing = financingData;
-				}
-			} catch {
-				// Financing may not exist — that's fine
+			const financingData = await vehicleApi.getFinancing(vehicleId!);
+			if (financingData && vehicle) {
+				vehicle.financing = financingData;
 			}
 
 			populateForm();
@@ -206,7 +180,6 @@
 	function populateForm() {
 		if (!vehicle) return;
 
-		// Replace the entire object to ensure reactivity
 		vehicleForm = {
 			make: vehicle.make,
 			model: vehicle.model,
@@ -220,12 +193,9 @@
 			purchaseDate: vehicle.purchaseDate ? toDateInputValue(vehicle.purchaseDate) : ''
 		};
 
-		// Set tracking flags from vehicle data
 		trackFuel = vehicle.trackFuel;
 		trackCharging = vehicle.trackCharging;
 
-		// Set unit preferences from vehicle data (edit mode). Mark touched so the
-		// create-mode seeding effect never overrides the vehicle's own saved units.
 		if (vehicle.unitPreferences) {
 			distanceUnit = vehicle.unitPreferences.distanceUnit;
 			volumeUnit = vehicle.unitPreferences.volumeUnit;
@@ -234,7 +204,6 @@
 		}
 
 		if (vehicle.financing?.isActive) {
-			// Set ownership type based on financing type
 			if (vehicle.financing.financingType === 'loan') {
 				ownershipType = 'finance';
 			} else if (vehicle.financing.financingType === 'lease') {
@@ -305,7 +274,6 @@
 		};
 	}
 
-	// Recalculate when financing parameters change
 	$effect(() => {
 		const amount = financingForm.originalAmount;
 		const apr = financingForm.apr;
@@ -322,14 +290,12 @@
 		}
 	});
 
-	// Sync payment amount from amortization preview
 	$effect(() => {
 		if (amortizationPreview && financingForm.financingType === 'loan') {
 			financingForm.paymentAmount = amortizationPreview.monthlyPayment;
 		}
 	});
 
-	// Update financingType when ownershipType changes
 	$effect(() => {
 		if (ownershipType === 'finance') {
 			financingForm.financingType = 'loan';
@@ -340,7 +306,6 @@
 		}
 	});
 
-	// Real-time VIN validation
 	$effect(() => {
 		if (errors['vin'] && vehicleForm.vin) {
 			const vinRegex = /^[A-Z0-9]+$/i;
@@ -363,7 +328,6 @@
 		isSubmitting = true;
 
 		try {
-			// Always-present (required) fields, shared by create and update.
 			const base = {
 				make: vehicleForm.make,
 				model: vehicleForm.model,
@@ -377,7 +341,6 @@
 					chargeUnit
 				}
 			};
-			// Raw optional values ('' / undefined when the field is empty).
 			const plate = vehicleForm.licensePlate || undefined;
 			const nick = vehicleForm.nickname || undefined;
 			const vinVal = vehicleForm.vin ? vehicleForm.vin.toUpperCase() : undefined;
@@ -385,12 +348,9 @@
 			const price = vehicleForm.purchasePrice ?? undefined;
 			const pDate = vehicleForm.purchaseDate ? dateOnlyToISO(vehicleForm.purchaseDate) : undefined;
 
-			// Update/create vehicle.
 			let savedVehicle: Vehicle;
 			if (isEditMode) {
-				// On EDIT, an emptied optional field must be sent as null so the
-				// column is actually CLEARED — JSON.stringify drops undefined, so
-				// omitting it would leave the old value intact (silent data loss).
+				// JSON drops undefined; send null to clear an emptied optional.
 				savedVehicle = await vehicleApi.updateVehicle(vehicleId!, {
 					...base,
 					licensePlate: plate ?? null,
@@ -401,7 +361,6 @@
 					purchaseDate: pDate ?? null
 				});
 			} else {
-				// On CREATE there's nothing to clear → omit empty optionals.
 				savedVehicle = await vehicleApi.createVehicle({
 					...base,
 					licensePlate: plate,
@@ -415,7 +374,6 @@
 
 			const finalVehicleId = isEditMode ? vehicleId! : savedVehicle.id;
 
-			// Handle financing data separately if provided
 			if (ownershipType !== 'own' && financingForm.provider.trim() && financingForm.startDate) {
 				const financingData: Partial<
 					Omit<VehicleFinancing, 'id' | 'vehicleId' | 'createdAt' | 'updatedAt'>
@@ -430,12 +388,10 @@
 					paymentDayOfMonth: Number(financingForm.dayOfMonth)
 				};
 
-				// Add APR for loans
 				if (financingForm.financingType === 'loan') {
 					financingData.apr = Number(financingForm.apr);
 				}
 
-				// Add lease-specific fields
 				if (financingForm.financingType === 'lease') {
 					if (financingForm.residualValue !== undefined) {
 						financingData.residualValue = Number(financingForm.residualValue);
@@ -460,15 +416,13 @@
 				}
 			}
 
-			// Update store and navigate
 			if (isEditMode) {
 				appStore.updateVehicle(vehicleId!, savedVehicle);
 				appStore.addNotification({
 					type: 'success',
 					message: 'Vehicle updated successfully!'
 				});
-				// Invalidate all data to force reload on the vehicle detail page
-				await invalidateAll();
+				await refreshAll();
 				goto(resolve(paramRoutes.vehicle, { id: vehicleId! }));
 			} else {
 				appStore.addVehicle(savedVehicle);
@@ -533,7 +487,6 @@
 		</div>
 	{:else}
 		<div class="space-y-6">
-			<!-- Header -->
 			<div class="flex items-center gap-4">
 				<Button variant="outline" size="icon" aria-label="Go back" onclick={handleBack}>
 					<ArrowLeft class="h-4 w-4" />
@@ -556,7 +509,6 @@
 			</div>
 
 			<form onsubmit={handleSubmit} class="space-y-6 pb-32 sm:pb-24">
-				<!-- Vehicle Information -->
 				<Card>
 					<CardHeader>
 						<div class="flex items-center gap-2">
@@ -734,7 +686,6 @@
 							</div>
 						</div>
 
-						<!-- Energy Tracking Preferences -->
 						<div class="mt-6 space-y-2">
 							<Label class="text-sm font-medium text-foreground">Energy Tracking</Label>
 							<div class="flex items-center gap-4">
@@ -753,7 +704,6 @@
 					</CardContent>
 				</Card>
 
-				<!-- Unit Preferences -->
 				<Card>
 					<Collapsible.Root bind:open={unitPrefsOpen}>
 						<CardHeader>
@@ -854,7 +804,6 @@
 					</Collapsible.Root>
 				</Card>
 
-				<!-- Financing Information -->
 				<FinancingFormSection
 					bind:ownershipType
 					bind:financingForm
@@ -865,7 +814,6 @@
 				/>
 			</form>
 
-			<!-- Floating Action Bar -->
 			<div class="fixed bottom-4 left-4 right-4 z-50 sm:bottom-8 sm:right-8 sm:left-auto sm:w-auto">
 				<div
 					class="flex flex-row gap-3 sm:gap-4 justify-center sm:justify-end items-center bg-background sm:bg-transparent p-3 sm:p-0 rounded-full sm:rounded-none shadow-2xl sm:shadow-none border sm:border-0"
@@ -880,10 +828,7 @@
 							class="rounded-full shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 px-5 flex-shrink-0"
 						>
 							<Trash2 class="h-5 w-5 sm:mr-2" />
-							<!-- Clipped, not `hidden`, below `sm`: the icon is all that is left there and every Lucide
-							     icon is aria-hidden, so display:none on the text leaves the button with no accessible
-							     name at all. `max-sm:sr-only` (not `sr-only sm:not-sr-only`) because a later vendor
-							     `.sr-only` rule outranks `sm:not-sr-only` and would hide the label at every width. -->
+							<!-- Clip, not hidden, below sm: sr-only would outrank sm:not-sr-only at every width. -->
 							<span class="max-sm:sr-only font-semibold">Delete</span>
 						</Button>
 					{/if}
@@ -919,7 +864,6 @@
 			</div>
 		</div>
 
-		<!-- Delete Confirmation AlertDialog -->
 		<AlertDialog bind:open={showDeleteConfirm}>
 			<AlertDialogContent>
 				<AlertDialogHeader>

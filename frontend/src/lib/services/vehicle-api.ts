@@ -5,25 +5,19 @@ import type {
 	Vehicle,
 	VehicleFinancing,
 	VehicleStats
-} from '$lib/types';
-import type { TimePeriod } from '$lib/constants/time-periods';
-import { apiClient, getApiBaseUrl, withPagination } from './api-client';
+} from '#lib/types/index.ts';
+import type { TimePeriod } from '#lib/constants/time-periods.ts';
+import { apiClient } from './api-client';
+import { photoCollection } from './photo-api';
 
-/**
- * Vehicle API service
- * Centralized API calls for vehicle-related operations
- */
+const vehiclePhotos = (vehicleId: string) =>
+	photoCollection(`/api/v1/vehicles/${vehicleId}/photos`);
+
 export const vehicleApi = {
 	async getVehicle(vehicleId: string): Promise<Vehicle> {
 		return apiClient.get<Vehicle>(`/api/v1/vehicles/${vehicleId}`);
 	},
 
-	/**
-	 * List the user's vehicles. With `{ includeShared: true }` the response ALSO includes vehicles
-	 * owned by others that have been ACCEPTED-shared with the user (T5a `?include=shared`), each
-	 * carrying a `sharedAccess` annotation. Default (no arg) returns owned vehicles only — every
-	 * existing caller is unchanged.
-	 */
 	async getVehicles(opts?: { includeShared?: boolean }): Promise<Vehicle[]> {
 		const path = opts?.includeShared ? '/api/v1/vehicles?include=shared' : '/api/v1/vehicles';
 		return apiClient.get<Vehicle[]>(path);
@@ -42,17 +36,14 @@ export const vehicleApi = {
 	},
 
 	async deleteVehicle(vehicleId: string): Promise<void> {
-		await apiClient.delete('/api/v1/vehicles/' + vehicleId);
+		await apiClient.delete(`/api/v1/vehicles/${vehicleId}`);
 	},
 
+	// The backend answers 200 with data: null when the vehicle has no financing; any error is real.
 	async getFinancing(vehicleId: string): Promise<VehicleFinancing | null> {
-		try {
-			return await apiClient.get<VehicleFinancing>(
-				`/api/v1/financing/vehicles/${vehicleId}/financing`
-			);
-		} catch {
-			return null;
-		}
+		return apiClient.get<VehicleFinancing | null>(
+			`/api/v1/financing/vehicles/${vehicleId}/financing`
+		);
 	},
 
 	async createFinancing(
@@ -71,38 +62,30 @@ export const vehicleApi = {
 		});
 	},
 
-	async getPhotos(
+	getPhotos(
 		vehicleId: string,
 		params?: { limit?: number; offset?: number }
 	): Promise<PaginatedResponse<Photo>> {
-		return apiClient.getPaginated<Photo>(
-			withPagination(`/api/v1/vehicles/${vehicleId}/photos`, params)
-		);
+		return vehiclePhotos(vehicleId).list(params);
 	},
 
-	/**
-	 * Batch-fetch all of the user's vehicle photos in a single request, keyed by
-	 * vehicleId. Avoids the dashboard N+1 of one getPhotos() call per vehicle.
-	 */
 	async getAllVehiclePhotos(): Promise<Record<string, Photo[]>> {
 		return apiClient.get<Record<string, Photo[]>>('/api/v1/photos?entityType=vehicle');
 	},
 
-	async uploadPhoto(vehicleId: string, file: File): Promise<Photo> {
-		const formData = new FormData();
-		formData.append('photo', file);
-		return apiClient.post<Photo>(`/api/v1/vehicles/${vehicleId}/photos`, formData);
+	uploadPhoto(vehicleId: string, file: File): Promise<Photo> {
+		return vehiclePhotos(vehicleId).upload(file);
 	},
 
 	async setCoverPhoto(vehicleId: string, photoId: string): Promise<Photo> {
 		return apiClient.put<Photo>(`/api/v1/vehicles/${vehicleId}/photos/${photoId}/cover`);
 	},
 
-	async deletePhoto(vehicleId: string, photoId: string): Promise<void> {
-		await apiClient.delete(`/api/v1/vehicles/${vehicleId}/photos/${photoId}`);
+	deletePhoto(vehicleId: string, photoId: string): Promise<void> {
+		return vehiclePhotos(vehicleId).remove(photoId);
 	},
 
 	getPhotoThumbnailUrl(vehicleId: string, photoId: string): string {
-		return `${getApiBaseUrl()}/api/v1/vehicles/${vehicleId}/photos/${photoId}/thumbnail`;
+		return vehiclePhotos(vehicleId).thumbnailUrl(photoId);
 	}
 };

@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { Pencil, Trash2, RefreshCw } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Badge } from '$lib/components/ui/badge';
-	import ConfirmDialog from '$lib/components/common/ConfirmDialog.svelte';
-	import { formatCurrency, formatDate } from '$lib/utils/formatters';
-	import type { InsuranceTerm } from '$lib/types';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
+	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
+	import type { InsuranceTerm } from '#lib/types/index.ts';
 
 	interface Props {
 		term: InsuranceTerm;
@@ -17,9 +17,6 @@
 
 	let { term, isCurrent = false, vehicleNames = [], onEdit, onDelete, onRenew }: Props = $props();
 
-	// Styled confirm dialog (replaces native confirm()). The backend deletes the
-	// auto-created premium expenses for this term (deleteBySource('insurance_term')),
-	// so the confirmation says so.
 	let confirmOpen = $state(false);
 </script>
 

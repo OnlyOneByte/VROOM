@@ -1,18 +1,10 @@
-/**
- * expense-location T4 — the api-transformer `location` mapping (both ways + the clear-on-edit contract).
- * Mirrors the `description` field exactly: toBackendExpense sets location when present, omits it on a
- * create with no value, and sends explicit `null` on an EDIT with an emptied value (so the backend's
- * .nullish() column clears); fromBackendExpense copies a present location through. Drives the REAL
- * transformer (not a re-implementation — the coverage-theater lesson).
- */
-
 import { describe, expect, test } from 'vitest';
 import { fromBackendExpense, toBackendExpense } from '../api-transformer';
-import type { ExpenseCategory } from '$lib/types';
+import type { ExpenseCategory } from '#lib/types/index.ts';
 
 const base = { vehicleId: 'v1', category: 'misc' as ExpenseCategory, amount: 10 };
 
-describe('api-transformer location mapping (expense-location T4)', () => {
+describe('api-transformer location mapping', () => {
 	test('toBackendExpense sends a provided location', () => {
 		const out = toBackendExpense({ ...base, location: 'Shell, Main St' });
 		expect(out.location).toBe('Shell, Main St');

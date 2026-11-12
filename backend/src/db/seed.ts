@@ -15,12 +15,10 @@ import {
   vehicles,
 } from './schema.js';
 
-// Sample data for development and testing
 export async function seedDatabase() {
   try {
     logger.info('Seeding database with sample data...');
 
-    // Create a sample user
     const [sampleUser] = await db
       .insert(users)
       .values({
@@ -31,7 +29,6 @@ export async function seedDatabase() {
 
     logger.info('Created sample user', { userId: sampleUser.id });
 
-    // Create auth-domain provider row for demo user
     await db.insert(userProviders).values({
       userId: sampleUser.id,
       domain: 'auth',
@@ -43,7 +40,6 @@ export async function seedDatabase() {
       status: 'active',
     });
 
-    // Create user preferences and sync state
     await db.insert(userPreferences).values({
       userId: sampleUser.id,
     });
@@ -51,7 +47,6 @@ export async function seedDatabase() {
       userId: sampleUser.id,
     });
 
-    // Create sample vehicles
     const [vehicle1] = await db
       .insert(vehicles)
       .values({
@@ -84,7 +79,6 @@ export async function seedDatabase() {
 
     logger.info('Created sample vehicles', { vehicle1Id: vehicle1.id, vehicle2Id: vehicle2.id });
 
-    // Create sample financing for vehicle1 (no currentBalance — computed on read)
     await db.insert(vehicleFinancing).values({
       vehicleId: vehicle1.id,
       financingType: 'loan',
@@ -98,7 +92,6 @@ export async function seedDatabase() {
       paymentDayOfMonth: 15,
     });
 
-    // Create sample insurance policies (v2: no terms JSON, no currentTermStart/End)
     const [policy1] = await db
       .insert(insurancePolicies)
       .values({
@@ -117,7 +110,6 @@ export async function seedDatabase() {
       })
       .returning();
 
-    // Create insurance terms with flat columns
     const termSf1Id = createId();
     const termGe1Id = createId();
 
@@ -142,15 +134,12 @@ export async function seedDatabase() {
       },
     ]);
 
-    // Link terms to vehicles via junction table
     await db.insert(insuranceTermVehicles).values([
       { termId: termSf1Id, vehicleId: vehicle1.id },
       { termId: termGe1Id, vehicleId: vehicle2.id },
     ]);
 
-    // Create sample standalone expenses (v2: volume instead of fuelAmount)
     const sampleExpenses = [
-      // Fuel expenses for vehicle1
       {
         vehicleId: vehicle1.id,
         userId: sampleUser.id,
@@ -173,7 +162,6 @@ export async function seedDatabase() {
         volume: 14.2,
         description: 'Chevron Gas Station',
       },
-      // Maintenance expenses
       {
         vehicleId: vehicle1.id,
         userId: sampleUser.id,
@@ -194,7 +182,6 @@ export async function seedDatabase() {
         mileage: 15200,
         description: 'Brake pad replacement',
       },
-      // Insurance payments
       {
         vehicleId: vehicle1.id,
         userId: sampleUser.id,
@@ -204,7 +191,6 @@ export async function seedDatabase() {
         date: new Date('2024-01-01'),
         description: 'State Farm - Monthly premium',
       },
-      // Parking and tolls
       {
         vehicleId: vehicle1.id,
         userId: sampleUser.id,
@@ -227,7 +213,6 @@ export async function seedDatabase() {
 
     await db.insert(expenses).values(sampleExpenses);
 
-    // Create sample split expense (car wash shared evenly across both vehicles)
     const splitGroupId = createId();
     const splitGroupTotal = dollarsToCents(60.0);
     const splitDate = new Date('2024-02-01');

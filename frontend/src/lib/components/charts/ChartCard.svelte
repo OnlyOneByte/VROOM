@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { animateOnView } from '$lib/utils/animate-on-view';
-	import { createVisibilityWatch } from '$lib/utils/visibility-watch.svelte';
-	import * as Card from '$lib/components/ui/card';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import EmptyState from '$lib/components/common/empty-state.svelte';
+	import { animateOnView } from '#lib/utils/animate-on-view.ts';
+	import { createVisibilityWatch } from '#lib/utils/visibility-watch.svelte.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import type { Snippet } from 'svelte';
 
 	interface Props {
@@ -38,19 +38,9 @@
 
 	let placeholderHeight = $derived(height ?? 300);
 
-	// Gate chart rendering until the container is visible with positive dimensions.
-	// Charts in inactive tabs (bits-ui uses `hidden` attribute → display:none) or
-	// below the fold mount into 0×0 containers, causing LayerChart to compute
-	// negative internal widths and emit zero-dimension warnings.
-	//
-	// Uses synchronous visibility detection via offsetParent + MutationObserver
-	// on the hidden ancestor. Unlike IntersectionObserver (async callbacks),
-	// MutationObserver fires synchronously when the `hidden` attribute is
-	// removed, so the visibility flag flips before Svelte renders children.
+	// LayerChart measures 0x0 in hidden containers; gate rendering on visibility.
 	let gate = createVisibilityWatch();
 
-	// The "ready" class hides chart content before the animation fires,
-	// preventing a flash of the fully-drawn chart on tab switch / scroll-in.
 	const READY_CLASS_MAP: Record<string, string> = {
 		'chart-line-animated': 'chart-line-animate-ready',
 		'chart-bar-animated': 'chart-bar-animate-ready',
@@ -109,9 +99,6 @@
 						{@render children()}
 					{/if}
 				{:else}
-					<!-- Visibility-gated (below the fold / inactive tab): show a Skeleton,
-					     never a blank box, so the card always reads as "loading" until the
-					     chart mounts on scroll-in. (UIQuality Four-States: no empty white box.) -->
 					<Skeleton class="w-full" style="height: {placeholderHeight}px" />
 				{/if}
 			</div>

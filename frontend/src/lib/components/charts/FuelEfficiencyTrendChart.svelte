@@ -2,19 +2,18 @@
 	import './line-chart-animations.css';
 	import { LineChart } from 'layerchart';
 	import { scaleTime } from 'd3-scale';
-	import * as Chart from '$lib/components/ui/chart';
+	import * as Chart from '#lib/components/ui/chart/index.ts';
 	import ChartCard from './ChartCard.svelte';
 	import {
 		formatDecimalAxis,
 		CHART_PADDING,
 		getTrendLineProps,
 		monthlyXAxisProps
-	} from '$lib/utils/chart-formatters';
-	import { getFuelEfficiencyLabel, getElectricEfficiencyLabel } from '$lib/utils/units';
-	import type { UnitPreferences } from '$lib/types';
-	import { settingsStore } from '$lib/stores/settings.svelte';
+	} from '#lib/utils/chart-formatters.ts';
+	import { getFuelEfficiencyLabel, getElectricEfficiencyLabel } from '#lib/utils/units.ts';
+	import type { UnitPreferences } from '#lib/types/index.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 
-	// Chart configuration constants
 	const CHART_HEIGHT = 280;
 	const MIN_DATA_POINTS = 1;
 
@@ -36,7 +35,6 @@
 
 	let units = $derived(unitPreferences ?? settingsStore.unitPreferences);
 
-	// Title and unit label based on fuel type
 	let title = $derived(fuelType === 'electric' ? 'Electric Efficiency' : 'Fuel Efficiency');
 	let unitLabel = $derived(
 		fuelType === 'electric'
@@ -45,7 +43,6 @@
 	);
 	let description = $derived(`Measured in ${unitLabel}`);
 
-	// Chart configuration for shadcn styling
 	const chartConfig: Chart.ChartConfig = {
 		efficiency: {
 			label: 'Efficiency',
@@ -53,7 +50,6 @@
 		}
 	};
 
-	// Series configuration for the chart
 	const series = $derived([
 		{
 			key: 'efficiency',

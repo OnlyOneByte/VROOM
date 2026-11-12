@@ -1,43 +1,8 @@
-/**
- * Property-Based Tests for Expense Repository
- *
- * Property 1: Pagination Completeness
- * Iterating all pages yields exactly totalCount unique expenses with no duplicates.
- *
- * Property 2: TotalCount Accuracy
- * totalCount equals the number of matching expenses regardless of limit/offset.
- *
- * Property 4: Limit Clamping
- * Actual limit = min(requested, maxPageSize), defaulting to defaultPageSize.
- *
- * Property 5: Tag Filter SQL Equivalence
- * SQL-filtered results equal JS expense.tags.includes(tag) filtering.
- *
- * Property 6: Summary Consistency
- * totalAmount equals sum of categoryBreakdown[].amount;
- * expenseCount equals sum of categoryBreakdown[].count.
- * Monthly trend periods are sorted chronologically.
- *
- * Property 7: Financing Expense Query Correctness
- * Query should return exactly those expenses where `sourceType === 'financing'`
- * and `vehicleId` matches, sorted by date ascending.
- *
- * **Validates: Requirements 1.1, 1.2, 1.3, 1.4, 3.1, 3.2, 4.1, 4.2, 4.3, 4.4, 6.1, 6.2**
- *
- * Approach: We test the specification at the data level — generate a mixed set of
- * expenses, apply the same filtering/sorting/pagination contract that the repository
- * implements, and verify the result matches expectations.
- */
-
 import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { CONFIG } from '../../../config';
 import type { Expense } from '../../../db/schema';
 import type { PaginatedExpenseFilters, PaginatedResult } from '../repository';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 const VEHICLE_IDS = ['vehicle-A', 'vehicle-B', 'vehicle-C'];
 const USER_VEHICLES: Record<string, string[]> = {
@@ -47,7 +12,6 @@ const USER_VEHICLES: Record<string, string[]> = {
 const CATEGORIES = ['fuel', 'maintenance', 'financial', 'regulatory', 'enhancement', 'misc'];
 const SAMPLE_TAGS = ['oil-change', 'tire', 'brake', 'filter', 'inspection', 'wash'];
 
-/** Build a synthetic Expense for pagination property tests. */
 function makePaginatedExpense(overrides: {
   vehicleId: string;
   category: string;
@@ -81,10 +45,6 @@ function makePaginatedExpense(overrides: {
   };
 }
 
-/**
- * Reference implementation of findPaginated filtering contract.
- * Mirrors the SQL logic: userId ownership via vehicle join, category, date range, tags.
- */
 function referenceFindPaginated(
   allExpenses: Expense[],
   filters: PaginatedExpenseFilters
@@ -95,7 +55,6 @@ function referenceFindPaginated(
   );
   const offset = filters.offset ?? 0;
 
-  // Filter by userId ownership (via vehicle mapping)
   let filtered = allExpenses.filter((e) => {
     const userVehicles = USER_VEHICLES[filters.userId ?? ''] ?? [];
     return userVehicles.includes(e.vehicleId);
@@ -121,7 +80,6 @@ function referenceFindPaginated(
     }
   }
 
-  // Sort by date descending
   filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const totalCount = filtered.length;
@@ -130,7 +88,6 @@ function referenceFindPaginated(
   return { data, totalCount };
 }
 
-/** Build a synthetic Expense for testing filtering/sorting logic. */
 function makeExpense(overrides: {
   vehicleId: string;
   sourceType: string | null;
@@ -164,22 +121,11 @@ function makeExpense(overrides: {
   };
 }
 
-/**
- * Reference implementation of the filtering/sorting contract that
- * `findFinancingByVehicleId` must satisfy:
- *  - Only expenses with `sourceType === 'financing'`
- *  - Only expenses matching the target `vehicleId`
- *  - Sorted by date ascending
- */
 function referenceQuery(allExpenses: Expense[], vehicleId: string): Expense[] {
   return allExpenses
     .filter((e) => e.sourceType === 'financing' && e.vehicleId === vehicleId)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 }
-
-// ---------------------------------------------------------------------------
-// Generators (Pagination Properties 1, 2, 4, 5)
-// ---------------------------------------------------------------------------
 
 const paginatedVehicleIdArb = fc.constantFrom(...VEHICLE_IDS);
 const userIdArb = fc.constantFrom('user-1', 'user-2');
@@ -213,11 +159,7 @@ const filtersArb = fc.record({
   }),
 });
 
-// ---------------------------------------------------------------------------
-// Property 1: Pagination Completeness
-// **Validates: Requirements 1.1**
-// ---------------------------------------------------------------------------
-describe('Property 1: Pagination Completeness', () => {
+describe('Pagination Completeness', () => {
   test('iterating all pages yields exactly totalCount unique expenses', () => {
     fc.assert(
       fc.property(
@@ -227,7 +169,6 @@ describe('Property 1: Pagination Completeness', () => {
         (expenseInputs, filters, pageSize) => {
           const allExpenses = expenseInputs.map((input) => makePaginatedExpense(input));
 
-          // Get totalCount from first page
           const firstPage = referenceFindPaginated(allExpenses, {
             ...filters,
             limit: pageSize,
@@ -235,7 +176,6 @@ describe('Property 1: Pagination Completeness', () => {
           });
           const { totalCount } = firstPage;
 
-          // Iterate all pages
           const collectedIds: string[] = [];
           let offset = 0;
           while (offset < totalCount) {
@@ -250,7 +190,6 @@ describe('Property 1: Pagination Completeness', () => {
             offset += pageSize;
           }
 
-          // Exactly totalCount unique expenses
           const uniqueIds = new Set(collectedIds);
           expect(uniqueIds.size).toBe(totalCount);
           expect(collectedIds.length).toBe(totalCount);
@@ -261,11 +200,7 @@ describe('Property 1: Pagination Completeness', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Property 2: TotalCount Accuracy
-// **Validates: Requirements 1.4**
-// ---------------------------------------------------------------------------
-describe('Property 2: TotalCount Accuracy', () => {
+describe('TotalCount Accuracy', () => {
   test('totalCount equals full result count regardless of limit/offset', () => {
     fc.assert(
       fc.property(
@@ -282,14 +217,12 @@ describe('Property 2: TotalCount Accuracy', () => {
             offset,
           });
 
-          // Get the full count with no pagination
           const fullResult = referenceFindPaginated(allExpenses, {
             ...filters,
             limit: CONFIG.pagination.maxPageSize,
             offset: 0,
           });
 
-          // totalCount should be the same regardless of limit/offset
           expect(result.totalCount).toBe(fullResult.totalCount);
           expect(result.totalCount).toBe(fullResult.data.length);
         }
@@ -299,11 +232,7 @@ describe('Property 2: TotalCount Accuracy', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Property 4: Limit Clamping
-// **Validates: Requirements 1.2, 1.3**
-// ---------------------------------------------------------------------------
-describe('Property 4: Limit Clamping', () => {
+describe('Limit Clamping', () => {
   test('actual page size never exceeds maxPageSize', () => {
     fc.assert(
       fc.property(
@@ -363,11 +292,7 @@ describe('Property 4: Limit Clamping', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Property 5: Tag Filter SQL Equivalence
-// **Validates: Requirements 3.1, 3.2**
-// ---------------------------------------------------------------------------
-describe('Property 5: Tag Filter SQL Equivalence', () => {
+describe('Tag Filter SQL Equivalence', () => {
   test('tag filtering matches JS-level Array.includes filtering', () => {
     fc.assert(
       fc.property(
@@ -377,7 +302,6 @@ describe('Property 5: Tag Filter SQL Equivalence', () => {
         (expenseInputs, userId, filterTags) => {
           const allExpenses = expenseInputs.map((input) => makePaginatedExpense(input));
 
-          // Reference: SQL-level tag filtering via referenceFindPaginated
           const sqlResult = referenceFindPaginated(allExpenses, {
             userId,
             tags: filterTags,
@@ -385,7 +309,6 @@ describe('Property 5: Tag Filter SQL Equivalence', () => {
             offset: 0,
           });
 
-          // JS-level: filter manually with Array.includes (AND semantics)
           const userVehicles = USER_VEHICLES[userId] ?? [];
           const jsFiltered = allExpenses.filter((e) => {
             if (!userVehicles.includes(e.vehicleId)) return false;
@@ -393,12 +316,10 @@ describe('Property 5: Tag Filter SQL Equivalence', () => {
             return filterTags.every((tag) => expTags.includes(tag));
           });
 
-          // Same set of IDs
           const sqlIds = new Set(sqlResult.data.map((e) => e.id));
           const jsIds = new Set(jsFiltered.map((e) => e.id));
           expect(sqlIds).toEqual(jsIds);
 
-          // totalCount matches
           expect(sqlResult.totalCount).toBe(jsFiltered.length);
         }
       ),
@@ -431,15 +352,10 @@ describe('Property 5: Tag Filter SQL Equivalence', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Generators (Property 7: Financing)
-// ---------------------------------------------------------------------------
-
 const vehicleIdArb = fc.constantFrom('vehicle-A', 'vehicle-B', 'vehicle-C');
 
-/** Generate a valid date by building from integer components to avoid NaN dates. */
 const expenseDateArb = fc
-  .integer({ min: 1672531200000, max: 1767139200000 }) // 2023-01-01 to 2025-12-31 in ms
+  .integer({ min: 1672531200000, max: 1767139200000 })
   .map((ms) => new Date(ms));
 
 const expenseArb = (index: number) =>
@@ -455,27 +371,21 @@ const expenseListArb = fc
   .integer({ min: 0, max: 30 })
   .chain((len) => fc.tuple(...Array.from({ length: len }, (_, i) => expenseArb(i))));
 
-// ---------------------------------------------------------------------------
-// Property 7: Financing Expense Query Correctness
-// ---------------------------------------------------------------------------
-describe('Property 7: Financing Expense Query Correctness', () => {
+describe('Financing Expense Query Correctness', () => {
   test('filtering returns exactly expenses with sourceType === financing for the target vehicleId', () => {
     fc.assert(
       fc.property(expenseListArb, vehicleIdArb, (expenseInputs, targetVehicleId) => {
         const allExpenses = expenseInputs.map((input) => makeExpense(input));
         const result = referenceQuery(allExpenses, targetVehicleId);
 
-        // Every returned expense must have sourceType === 'financing'
         for (const e of result) {
           expect(e.sourceType).toBe('financing');
         }
 
-        // Every returned expense must match the target vehicleId
         for (const e of result) {
           expect(e.vehicleId).toBe(targetVehicleId);
         }
 
-        // No matching expense should be missing from the result
         const expectedIds = new Set(
           allExpenses
             .filter((e) => e.sourceType === 'financing' && e.vehicleId === targetVehicleId)
@@ -494,7 +404,6 @@ describe('Property 7: Financing Expense Query Correctness', () => {
         const allExpenses = expenseInputs.map((input) => makeExpense(input));
         const result = referenceQuery(allExpenses, targetVehicleId);
 
-        // Each date should be <= the next date
         for (let i = 1; i < result.length; i++) {
           const prev = new Date(result[i - 1].date).getTime();
           const curr = new Date(result[i].date).getTime();
@@ -538,10 +447,6 @@ describe('Property 7: Financing Expense Query Correctness', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Helpers (Property 6: Summary Consistency)
-// ---------------------------------------------------------------------------
-
 interface SummaryExpenseInput {
   vehicleId: string;
   category: string;
@@ -550,7 +455,6 @@ interface SummaryExpenseInput {
   index: number;
 }
 
-/** Build a synthetic Expense for summary property tests. */
 function makeSummaryExpense(input: SummaryExpenseInput): Expense {
   return {
     id: `exp-sum-${input.index}`,
@@ -578,11 +482,6 @@ function makeSummaryExpense(input: SummaryExpenseInput): Expense {
   };
 }
 
-/**
- * Reference implementation of getSummary aggregation contract.
- * Mirrors the SQL logic: filter by userId ownership + optional vehicleId,
- * then compute totals, category breakdown, and monthly trend.
- */
 function referenceGetSummary(
   allExpenses: Expense[],
   filters: { userId: string; vehicleId?: string }
@@ -592,7 +491,6 @@ function referenceGetSummary(
   categoryBreakdown: Array<{ category: string; amount: number; count: number }>;
   monthlyTrend: Array<{ period: string; amount: number; count: number }>;
 } {
-  // Filter by userId ownership via vehicle mapping
   const userVehicles = USER_VEHICLES[filters.userId] ?? [];
   let filtered = allExpenses.filter((e) => userVehicles.includes(e.vehicleId));
 
@@ -600,11 +498,9 @@ function referenceGetSummary(
     filtered = filtered.filter((e) => e.vehicleId === filters.vehicleId);
   }
 
-  // Totals
   const totalAmount = filtered.reduce((sum, e) => sum + e.expenseAmount, 0);
   const expenseCount = filtered.length;
 
-  // Category breakdown: group by category
   const categoryMap = new Map<string, { amount: number; count: number }>();
   for (const e of filtered) {
     const existing = categoryMap.get(e.category) ?? { amount: 0, count: 0 };
@@ -618,7 +514,6 @@ function referenceGetSummary(
     count: data.count,
   }));
 
-  // Monthly trend: group by YYYY-MM, sorted chronologically
   const monthMap = new Map<string, { amount: number; count: number }>();
   for (const e of filtered) {
     const d = new Date(e.date);
@@ -634,10 +529,6 @@ function referenceGetSummary(
 
   return { totalAmount, expenseCount, categoryBreakdown, monthlyTrend };
 }
-
-// ---------------------------------------------------------------------------
-// Generators (Property 6: Summary Consistency)
-// ---------------------------------------------------------------------------
 
 const summaryExpenseAmountArb = fc.double({
   min: 0.01,
@@ -664,11 +555,7 @@ const summaryFiltersArb = fc.record({
   vehicleId: fc.option(paginatedVehicleIdArb, { nil: undefined }),
 });
 
-// ---------------------------------------------------------------------------
-// Property 6: Summary Consistency
-// **Validates: Property 6**
-// ---------------------------------------------------------------------------
-describe('Property 6: Summary Consistency', () => {
+describe('Summary Consistency', () => {
   test('totalAmount equals sum of categoryBreakdown[].amount', () => {
     fc.assert(
       fc.property(summaryExpenseListArb, summaryFiltersArb, (expenseInputs, filters) => {
@@ -677,7 +564,6 @@ describe('Property 6: Summary Consistency', () => {
 
         const categorySum = summary.categoryBreakdown.reduce((sum, c) => sum + c.amount, 0);
 
-        // Use approximate equality for floating point
         expect(Math.abs(summary.totalAmount - categorySum)).toBeLessThan(0.001);
       }),
       { numRuns: 50 }

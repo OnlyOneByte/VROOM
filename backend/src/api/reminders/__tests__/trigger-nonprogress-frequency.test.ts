@@ -1,21 +1,3 @@
-/**
- * (recurring-expenses engine hardening — completes the bug fix) The MAIN catch-up loop in
- * processReminder had no non-progress guard. The fix guarded advanceCustom (bad UNIT) +
- * fastForwardPastNow (non-progress backstop), but left two reachable holes in the main loop:
- *  (a) a corrupt top-level `frequency` (e.g. 'monthy') hit computeNextDueDate's switch with NO
- *  default → returned the date UNCHANGED;
- *  (b) `intervalValue = 0` (frequency='custom') → `?? 1` doesn't replace 0 → setDate(+0)/setMonth(+0)
- *  is a no-op.
- * Either way `nextDue` never advanced, so the `while (nextDue <= now)` loop materialized up to
- * maxCatchUp (12) DUPLICATE expense rows at the same date before fastForwardPastNow's backstop fired.
- *
- * The fix: computeNextDueDate now `throw`s on an unknown frequency (default case) and advanceCustom
- * `throw`s on intervalValue<=0 — both BEFORE the period commits (processExpensePeriod's transaction
- * rolls back), so the throw lands in processReminder's per-reminder try/catch as a clean SKIP with
- * ZERO expense rows. Reachable only via DB corruption / validation bypass (Zod blocks both on the API),
- * so the corrupt rows are seeded directly via sqlite — the test pattern.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -38,10 +20,6 @@ interface TriggerResultShape {
   skipped: Array<{ reminderId: string; reason: string; message?: string }>;
 }
 
-/**
- * Seed an EXPENSE reminder with a corrupt advance config, lapsed ~13 months in the past (>maxCatchUp),
- * so pre-fix the catch-up loop would materialize a dozen duplicate $100 expenses at the same date.
- */
 function seedCorruptExpenseReminder(
   id: string,
   vehicleId: string,
@@ -67,11 +45,11 @@ function expenseCount(reminderId: string): number {
   return row.n;
 }
 
-describe('main catch-up loop non-progress guard (completes)', () => {
-  test('a corrupt top-level frequency is skipped with ZERO duplicate expenses', async () => {
+describe('catch-up loop non-progress guard', () => {
+  test('a corrupt top-level frequency is skipped with zero expenses', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Kia', model: 'Soul', year: 2019 });
     seedCorruptExpenseReminder('badfreq', vehicleId, {
-      frequency: 'monthy', // typo / corruption — not in the enum
+      frequency: 'monthy',
       intervalValue: 1,
       intervalUnit: 'month',
     });
@@ -83,15 +61,14 @@ describe('main catch-up loop non-progress guard (completes)', () => {
     const skip = body.data.skipped.find((s) => s.reminderId === 'badfreq');
     expect(skip?.reason).toBe('error');
     expect(skip?.message ?? '').toContain('frequency');
-    // The load-bearing assertion: pre-fix this was up to 12; the throw rolls back before any commit.
     expect(expenseCount('badfreq')).toBe(0);
   });
 
-  test('a custom reminder with intervalValue=0 is skipped with ZERO duplicate expenses', async () => {
+  test('a custom reminder with intervalValue 0 is skipped with zero expenses', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Kia', model: 'Soul', year: 2019 });
     seedCorruptExpenseReminder('zeroiv', vehicleId, {
       frequency: 'custom',
-      intervalValue: 0, // a 0 interval can't advance — would re-fire every iteration
+      intervalValue: 0,
       intervalUnit: 'month',
     });
 
@@ -112,7 +89,6 @@ describe('main catch-up loop non-progress guard (completes)', () => {
       intervalValue: 1,
       intervalUnit: 'month',
     });
-    // A healthy monthly expense reminder, also overdue.
     const created = await ctx.authed('POST', '/api/v1/reminders', {
       name: 'Healthy recurring',
       type: 'expense',
@@ -129,7 +105,6 @@ describe('main catch-up loop non-progress guard (completes)', () => {
     const res = await ctx.authed('POST', '/api/v1/reminders/trigger');
     expect(res.status).toBe(200);
 
-    // Bad one skipped + zero rows; good one materialized at least one expense.
     expect(expenseCount('badfreq2')).toBe(0);
     expect(expenseCount(goodId)).toBeGreaterThanOrEqual(1);
   });

@@ -1,10 +1,3 @@
-/**
- * photos-import-api.ts client (photos-auto-expense T3) — the service-test pattern: apiClient is
- * mocked so we assert the exact endpoints + payloads, the draft→create-body mapping, and crucially the
- * `clientId = photos:<photoId>` idempotency key the confirm path must send. The fork-free FE wrapper over
- * the shipped GET /api/v1/photos/receipt-drafts (stage) + the unchanged POST /api/v1/expenses (confirm).
- */
-
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 const get = vi.fn();
@@ -59,10 +52,7 @@ describe('photosImportApi.confirmDraft', () => {
 		expect(post).toHaveBeenCalledTimes(1);
 		const [url, body] = post.mock.calls[0] ?? [];
 		expect(url).toBe('/api/v1/expenses');
-		// The idempotency key is the crux of D3 — a re-import must be a no-op.
 		expect(body.clientId).toBe('photos:m-1');
-		// Draft fields mapped to the backend shape (dollars → expenseAmount; the money-cents boundary is
-		// the route's job, not the client's).
 		expect(body.vehicleId).toBe('veh-1');
 		expect(body.category).toBe('fuel');
 		expect(body.expenseAmount).toBe(47.83);

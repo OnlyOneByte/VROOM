@@ -1,33 +1,33 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { gotoDynamic } from '$lib/utils/navigation';
-	import { resetSplitAllocations } from '$lib/utils/expense-helpers';
-	import { dateOnlyToISO, toDateInputValue } from '$lib/utils/formatters';
-	import { appStore } from '$lib/stores/app.svelte';
+	import { gotoDynamic } from '#lib/utils/navigation.ts';
+	import { resetSplitAllocations } from '#lib/utils/expense-helpers.ts';
+	import { dateOnlyToISO, toDateInputValue } from '#lib/utils/formatters.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { ArrowLeft, Check, LoaderCircle, X, FileText } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import { Textarea } from '$lib/components/ui/textarea';
-	import { Checkbox } from '$lib/components/ui/checkbox';
-	import * as Select from '$lib/components/ui/select';
-	import { FormFieldError } from '$lib/components/ui/form-field';
-	import DatePicker from '$lib/components/common/date-picker.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { Textarea } from '#lib/components/ui/textarea/index.ts';
+	import { Checkbox } from '#lib/components/ui/checkbox/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
+	import DatePicker from '#lib/components/common/date-picker.svelte';
 	import {
 		Card,
 		CardContent,
 		CardDescription,
 		CardHeader,
 		CardTitle
-	} from '$lib/components/ui/card';
-	import FormLayout from '$lib/components/common/form-layout.svelte';
-	import SplitConfigEditor from '$lib/components/expenses/split/SplitConfigEditor.svelte';
-	import { insuranceApi } from '$lib/services/insurance-api';
-	import { vehicleApi } from '$lib/services/vehicle-api';
-	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
-	import { prefillFromPreviousTerm } from '$lib/utils/insurance';
-	import { getCurrencySymbol } from '$lib/utils/formatters';
-	import type { InsurancePolicy, InsuranceTerm, Vehicle } from '$lib/types';
+	} from '#lib/components/ui/card/index.ts';
+	import FormLayout from '#lib/components/common/form-layout.svelte';
+	import SplitConfigEditor from '#lib/components/expenses/split/SplitConfigEditor.svelte';
+	import { insuranceApi } from '#lib/services/insurance-api.ts';
+	import { vehicleApi } from '#lib/services/vehicle-api.ts';
+	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
+	import { prefillFromPreviousTerm } from '#lib/utils/insurance.ts';
+	import { getCurrencySymbol } from '#lib/utils/formatters.ts';
+	import type { InsurancePolicy, InsuranceTerm, Vehicle } from '#lib/types/index.ts';
 
 	interface Props {
 		policyId: string;
@@ -38,8 +38,6 @@
 
 	let { policyId, termId, renewFrom, returnTo = '/insurance' }: Props = $props();
 
-	// Money-field labels follow the user's currency symbol, not a hardcoded "$"
-	// (EUR/GBP users would otherwise see the wrong unit). Same class as.
 	const currencySymbol = $derived(getCurrencySymbol());
 
 	const isEditMode = $derived(!!termId);
@@ -49,7 +47,6 @@
 	let policy = $state<InsurancePolicy | null>(null);
 	let vehicles = $state<Vehicle[]>([]);
 
-	// Form fields
 	let startDate = $state('');
 	let endDate = $state('');
 	let policyNumber = $state('');
@@ -65,7 +62,6 @@
 	let paymentAmount = $state('');
 	let selectedVehicleIds = $state<string[]>([]);
 
-	// Split state
 	let splitMethod = $state<'even' | 'absolute' | 'percentage'>('even');
 	let splitAllocations = $state<Array<{ vehicleId: string; amount?: number; percentage?: number }>>(
 		[]
@@ -74,7 +70,6 @@
 	let parsedTotalCost = $derived(parseFloat(totalCost) || 0);
 	let showSplitEditor = $derived(parsedTotalCost > 0 && selectedVehicleIds.length >= 2);
 
-	// Validation
 	interface FormErrors {
 		startDate?: string;
 		endDate?: string;
@@ -87,7 +82,6 @@
 	}
 	let errors = $state<FormErrors>({});
 
-	// Derive title
 	let pageTitle = $derived(isEditMode ? 'Edit Term' : renewFrom ? 'Renew Term' : 'Add Term');
 
 	onMount(async () => {
@@ -130,10 +124,6 @@
 	});
 
 	function populateFromTerm(source: InsuranceTerm | Partial<InsuranceTerm>) {
-		// Read the stored ISO back as the LOCAL calendar date, NOT a bare UTC `.split('T')[0]` (, the
-		// family). The save path persists via dateOnlyToISO → NOON LOCAL, so for a UTC+13/+14 user
-		// noon-local lands on the prior UTC day and the slice would show the day before — shifting the term
-		// start/end back a day every edit-open. toDateInputValue reads local Y/M/D (the sibling-form fix).
 		if (source.startDate && typeof source.startDate === 'string') {
 			startDate = toDateInputValue(source.startDate);
 		}
@@ -159,17 +149,11 @@
 		} else {
 			selectedVehicleIds = [...selectedVehicleIds, id];
 		}
-		resetAllocationsForMethod(splitMethod);
+		splitAllocations = resetSplitAllocations(splitMethod, selectedVehicleIds);
 	}
 
 	function handleSplitMethodChange(method: 'even' | 'absolute' | 'percentage') {
 		splitMethod = method;
-		resetAllocationsForMethod(method);
-	}
-
-	function resetAllocationsForMethod(method: 'even' | 'absolute' | 'percentage') {
-		// resetSplitAllocations is the shared source of truth — the expense form runs the identical
-		// reset, so the 100/N rounded-to-1-decimal percentage seed can't drift between them.
 		splitAllocations = resetSplitAllocations(method, selectedVehicleIds);
 	}
 
@@ -198,13 +182,7 @@
 		return Object.keys(newErrors).length === 0;
 	}
 
-	/**
-	 * Build the optional term fields for the request.
-	 * - forEdit=false (add/renew): omit empty fields — there's no value to clear.
-	 * - forEdit=true (edit): send `null` for an emptied field so the backend
-	 *  CLEARS the column. Omitting it (undefined) would be dropped by
-	 *  JSON.stringify and the repo would keep the old value — silent data loss.
-	 */
+	// JSON drops undefined; send null to clear an emptied field.
 	function buildTermData(forEdit = false): Record<string, unknown> {
 		const data: Record<string, unknown> = {};
 		const str = (key: string, raw: string) => {
@@ -225,7 +203,6 @@
 		str('agentEmail', agentEmail);
 		num('totalCost', totalCost);
 		num('monthlyCost', monthlyCost);
-		// premiumFrequency is a select string, not a free-text field.
 		if (premiumFrequency) data['premiumFrequency'] = premiumFrequency;
 		else if (forEdit) data['premiumFrequency'] = null;
 		num('paymentAmount', paymentAmount);
@@ -245,12 +222,7 @@
 			};
 
 			if (isEditMode && termId) {
-				// forEdit=true → emptied optionals are sent as null to clear them.
 				await insuranceApi.updateTerm(policyId, termId, {
-					// Persist date-only inputs at NOON LOCAL so the stored ISO round-trips to the same
-					// calendar day under formatDate in every timezone — the dateOnlyToISO convention every other
-					// date-only form uses (Expense/Reminder/Vehicle/Claims). Raw "YYYY-MM-DD" → z.coerce.date()
-					// → UTC midnight → displayed a day early for Americas users.
 					startDate: dateOnlyToISO(startDate),
 					endDate: dateOnlyToISO(endDate),
 					...buildTermData(true),
@@ -259,7 +231,6 @@
 				appStore.showSuccess('Term updated successfully');
 			} else {
 				await insuranceApi.addTerm(policyId, {
-					// Noon-local persistence — see the updateTerm note above.
 					startDate: dateOnlyToISO(startDate),
 					endDate: dateOnlyToISO(endDate),
 					...buildTermData(),
@@ -288,7 +259,6 @@
 		</div>
 	{:else}
 		<div class="space-y-6">
-			<!-- Header -->
 			<div class="flex items-center gap-4">
 				<Button variant="outline" size="icon" aria-label="Go back" onclick={handleBack}>
 					<ArrowLeft class="h-4 w-4" />
@@ -302,7 +272,6 @@
 			</div>
 
 			<form onsubmit={handleSubmit} class="space-y-6 pb-32 sm:pb-24">
-				<!-- Coverage Period -->
 				<Card>
 					<CardHeader>
 						<CardTitle>Coverage Period</CardTitle>
@@ -338,7 +307,6 @@
 					</CardContent>
 				</Card>
 
-				<!-- Finance Details -->
 				<Card>
 					<CardHeader>
 						<CardTitle>Finance Details</CardTitle>
@@ -416,7 +384,6 @@
 					</CardContent>
 				</Card>
 
-				<!-- Vehicle Coverage -->
 				<Card>
 					<CardHeader>
 						<CardTitle>Covered Vehicles</CardTitle>
@@ -457,7 +424,6 @@
 					</CardContent>
 				</Card>
 
-				<!-- Policy Details -->
 				<Card>
 					<CardHeader>
 						<div class="flex items-center gap-2">
@@ -533,7 +499,6 @@
 				</Card>
 			</form>
 
-			<!-- Floating Action Bar -->
 			<div class="fixed bottom-4 left-4 right-4 z-50 sm:bottom-8 sm:right-8 sm:left-auto sm:w-auto">
 				<div
 					class="flex flex-row gap-3 sm:gap-4 justify-center sm:justify-end items-center bg-background sm:bg-transparent p-3 sm:p-0 rounded-full sm:rounded-none shadow-2xl sm:shadow-none border sm:border-0"

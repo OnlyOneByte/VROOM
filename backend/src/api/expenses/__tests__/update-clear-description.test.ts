@@ -1,16 +1,3 @@
-/**
- * Regression guard for the clear-optional-field data-loss class,
- * the LAST open instance: an expense `description` emptied on edit must actually
- * CLEAR (column → NULL), not silently keep its old value. The frontend fix sends
- * description:null on edit (toBackendExpense isEdit); this proves the backend half
- * — the update schema accepts null (.nullish()) and BaseRepository.update writes
- * it through. Also pins that a normal (undefined) update leaves it untouched, and
- * that create still omits an empty description (the offline-safe create payload).
- *
- * createTestApp() rewrites env + dynamic-imports DB-bound modules, so keep static
- * imports to the harness + bun:test.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -50,13 +37,12 @@ async function createWithDescription(vehicleId: string, description: string): Pr
   return body.data.id;
 }
 
-describe('expense description clear-on-edit (clear-field class, last instance)', () => {
+describe('expense description clear-on-edit', () => {
   test('PUT description:null clears a previously-saved description', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const id = await createWithDescription(vehicleId, 'Parking garage downtown');
     expect(descriptionOf(id)).toBe('Parking garage downtown');
 
-    // What the edit form now sends when the user empties the description field.
     const res = await ctx.authed('PUT', `/api/v1/expenses/${id}`, { description: null });
     expect(res.status, await res.text()).toBe(200);
 
@@ -67,14 +53,13 @@ describe('expense description clear-on-edit (clear-field class, last instance)',
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const id = await createWithDescription(vehicleId, 'Keep me');
 
-    // An unrelated field update must not disturb description (undefined is dropped).
     const res = await ctx.authed('PUT', `/api/v1/expenses/${id}`, { expenseAmount: 99 });
     expect(res.status, await res.text()).toBe(200);
 
     expect(descriptionOf(id)).toBe('Keep me');
   });
 
-  test('create still persists a provided description (no regression)', async () => {
+  test('create still persists a provided description', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const id = await createWithDescription(vehicleId, 'Oil change');
     expect(descriptionOf(id)).toBe('Oil change');

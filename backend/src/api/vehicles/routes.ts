@@ -36,10 +36,6 @@ import { vehicleRepository } from './repository';
 
 const routes = new Hono();
 
-// unitPreferencesSchema + partialUnitPreferencesSchema now live in utils/unit-preferences-schema.ts
-// (shared with settings/routes.ts — the dedup).
-
-// Validation schemas derived from db schema
 const baseVehicleSchema = createInsertSchema(vehiclesTable, {
   make: z
     .string()
@@ -78,15 +74,12 @@ const baseVehicleSchema = createInsertSchema(vehiclesTable, {
     )
     .optional(),
   initialMileage: z.number().int().min(0, 'Initial mileage cannot be negative').optional(),
-  // money (T3): client sends DOLLARS, store integer CENTS. The update schema re-derives this via
-  // baseVehicleSchema.shape.purchasePrice.nullish(), so the transform propagates to both create + update.
   purchasePrice: moneyDollarsToCents((n) =>
     n.min(0, 'Purchase price cannot be negative')
   ).optional(),
   purchaseDate: z.coerce.date().optional(),
 });
 
-// Omit auto-generated fields for create/update
 const createVehicleSchema = baseVehicleSchema
   .omit({
     id: true,
@@ -99,11 +92,6 @@ const createVehicleSchema = baseVehicleSchema
     unitPreferences: unitPreferencesSchema.optional(),
   });
 
-// Exported so the `.partial()`+`.default()` no-clobber net can assert against it directly
-// (partial-update-no-default-injection.test.ts) — it's a createInsertSchema(...).partial() over a
-// table with four .default() columns (vehicleType/trackFuel/trackCharging/unitPreferences), the exact
-// shape that class targets. Safe today (drizzle-zod doesn't surface DB defaults as Zod defaults), but
-// the highest-risk uncovered instance, so it belongs under the standing guard.
 export const updateVehicleSchema = baseVehicleSchema
   .omit({
     id: true,
@@ -114,12 +102,6 @@ export const updateVehicleSchema = baseVehicleSchema
   })
   .extend({
     unitPreferences: partialUnitPreferencesSchema.optional(),
-    // On UPDATE, the nullable optional columns are nullish so an emptied field
-    // can be CLEARED with an explicit null (the form sends null on edit). The
-    // base schema overrides these as .optional() (rejects null); re-declare them
-    // here. Drizzle's .set() passes null through and drops undefined, so null
-    // clears and omitting leaves unchanged. (vin keeps drizzle-zod's nullable
-    // default, but is re-declared here for consistency.)
     licensePlate: baseVehicleSchema.shape.licensePlate.nullish(),
     nickname: baseVehicleSchema.shape.nickname.nullish(),
     vin: baseVehicleSchema.shape.vin.nullish(),
@@ -129,21 +111,11 @@ export const updateVehicleSchema = baseVehicleSchema
   })
   .partial();
 
-// Apply authentication and change tracking to all routes
 routes.use('*', requireAuth);
 routes.use('*', changeTracker);
 
-// Mount photo sub-router
 routes.route('/:vehicleId/photos', photoRoutes);
 
-/**
- * Assert a license plate is free within THIS user's fleet (plate uniqueness is per-user, not global —
- * see findByLicensePlate + migration 0005, the fix). One source of truth for the create + update
- * checks: the conflict message + the per-user-scoped lookup lived in two hand-rolled
- * copies. `excludeId` lets the update path ignore the vehicle being edited (so re-saving without
- * changing the plate, or hitting its own row, never false-409s itself).
- * @throws ConflictError if another of the user's vehicles already carries the plate.
- */
 async function assertLicensePlateAvailable(
   licensePlate: string,
   userId: string,
@@ -155,11 +127,6 @@ async function assertLicensePlateAvailable(
   }
 }
 
-// GET /api/vehicles - List the user's own vehicles. With ?include=shared, ALSO append vehicles shared
-// TO the user via an ACCEPTED share (vehicle-sharing T5a, R3). Shared rows carry a `sharedAccess`
-// annotation ({ level, sharedBy }) so the fleet UI can badge "shared by X" and gate edit affordances by
-// level; owned rows are unchanged (no annotation). The widening is READ-ONLY + additive — it does not
-// touch the expense read/write model (T5b, the editor-write widening, is a separate decision).
 const listVehiclesQuerySchema = z.object({
   include: z.enum(['shared']).optional(),
 });
@@ -169,8 +136,6 @@ routes.get('/', zValidator('query', listVehiclesQuerySchema), async (c) => {
 
   const userVehicles = await vehicleRepository.findByUserId(user.id);
 
-  // ?include=shared: fetch the vehicles the user has ACCEPTED-share access to (owned by others) and
-  // annotate each with its access level + owner name. Resolved via the shares repo (accepted-only).
   let sharedRows: Array<
     (typeof userVehicles)[number] & {
       sharedAccess: { level: string; sharedBy: string };
@@ -193,8 +158,6 @@ routes.get('/', zValidator('query', listVehiclesQuerySchema), async (c) => {
 
   const allVehicles = [...userVehicles, ...sharedRows];
 
-  // Enrich financing with computed balance. Batch all balances in two queries
-  // (computeBalances) instead of an N+1 over each financed vehicle.
   const financingIds = allVehicles
     .map((v) => v.financing?.id)
     .filter((id): id is string => id !== undefined);
@@ -208,7 +171,6 @@ routes.get('/', zValidator('query', listVehiclesQuerySchema), async (c) => {
     return v;
   });
 
-  // T6 display edge: vehicle purchasePrice + embedded financing money/balance cents → dollars.
   const apiVehicles = enrichedVehicles.map(vehicleRowToApi);
   const response: ApiResponse<typeof apiVehicles> = {
     success: true,
@@ -219,17 +181,14 @@ routes.get('/', zValidator('query', listVehiclesQuerySchema), async (c) => {
   return c.json(response);
 });
 
-// POST /api/vehicles - Create new vehicle
 routes.post('/', zValidator('json', createVehicleSchema), async (c) => {
   const user = c.get('user');
   const vehicleData = c.req.valid('json');
 
-  // Plate uniqueness is per-user (see assertLicensePlateAvailable / migration 0005).
   if (vehicleData.licensePlate) {
     await assertLicensePlateAvailable(vehicleData.licensePlate, user.id);
   }
 
-  // Default unitPreferences from user's settings if not provided
   let { unitPreferences } = vehicleData;
   if (!unitPreferences) {
     const userSettings = await preferencesRepository.getOrCreate(user.id);
@@ -251,25 +210,16 @@ routes.post('/', zValidator('json', createVehicleSchema), async (c) => {
   return c.json(response, 201);
 });
 
-// GET /api/vehicles/:id - Get specific vehicle (owner OR shared viewer/editor).
-// vehicle-sharing T12b-3 (BE): the single-vehicle GET widens to shared READ via the resolver seam, and
-// returns a `sharedAccess { level, sharedBy }` annotation for a NON-owner (the same shape the fleet-list
-// ?include=shared path emits) so the FE [id] page can gate its edit affordances by level — a VIEWER sees
-// no edit/delete/share controls, an EDITOR sees expense/odometer write affordances but NOT the owner-only
-// ones (delete vehicle, financing, share management, which stay strict server-side). An OWNER response is
-// unchanged (no sharedAccess). A stranger gets the same 404 (existence-hiding) as a missing vehicle.
 routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
 
-  // Resolve access first: owner | viewer | editor | null. Null → 404 (never 403, the oracle rule).
+  // 404, not 403, so a non-member cannot learn that the vehicle exists.
   const access = await resolveVehicleAccess(id, user.id);
   if (!access) {
     throw new NotFoundError('Vehicle');
   }
 
-  // Load the vehicle. For the OWNER this is their own row (findByIdWithAccess returns owner-only); for a
-  // shared invitee load by id (access already proven via the resolver), so the editor/viewer sees the row.
   const vehicle =
     access.role === 'owner'
       ? await vehicleRepository.findByIdWithAccess(id, user.id)
@@ -279,9 +229,6 @@ routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
     throw new NotFoundError('Vehicle');
   }
 
-  // For a NON-owner, attach the sharedAccess annotation (level + owner displayName) — the same shape the
-  // ?include=shared fleet list emits. Resolved from the accepted-grants list (accepted-only, carries the
-  // owner name); the resolver already proved an accepted share exists, so the find is a label lookup.
   let sharedAccess: { level: string; sharedBy: string } | undefined;
   if (access.role !== 'owner') {
     const grants = await vehicleShareRepository.findAcceptedAccessForUser(user.id);
@@ -289,7 +236,6 @@ routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
     sharedAccess = { level: grant?.level ?? access.role, sharedBy: grant?.ownerName ?? 'Unknown' };
   }
 
-  // Enrich financing with computed balance so the frontend can show progress
   let responseData: typeof vehicle & {
     financing?: (typeof vehicle)['financing'] & {
       computedBalance?: number;
@@ -316,7 +262,6 @@ routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   return c.json(response);
 });
 
-// PUT /api/vehicles/:id - Update vehicle (with shared access check)
 routes.put(
   '/:id',
   zValidator('param', commonSchemas.idParam),
@@ -326,18 +271,15 @@ routes.put(
     const { id } = c.req.valid('param');
     const updateData = c.req.valid('json');
 
-    // Check if vehicle exists and user has access
     const existingVehicle = await vehicleRepository.findByIdWithAccess(id, user.id);
     if (!existingVehicle) {
       throw new NotFoundError('Vehicle');
     }
 
-    // Plate uniqueness is per-user; skip when unchanged, and exclude THIS vehicle from the check.
     if (updateData.licensePlate && updateData.licensePlate !== existingVehicle.licensePlate) {
       await assertLicensePlateAvailable(updateData.licensePlate, user.id, id);
     }
 
-    // Merge partial unitPreferences with existing values (shared helper — the dedup).
     const { unitPreferences: partialUnitPrefs, ...restUpdateData } = updateData;
     const mergedUnitPreferences = mergeUnitPreferences(
       existingVehicle.unitPreferences,
@@ -357,7 +299,7 @@ routes.put(
   }
 );
 
-/** The split-expense groups this vehicle has a leg in — read BEFORE the FK cascade removes them. */
+// Must run before the vehicle delete: the FK cascade removes the legs.
 async function splitGroupIdsForVehicle(vehicleId: string, userId: string): Promise<string[]> {
   const rows = await getDb()
     .selectDistinct({ groupId: expenses.groupId })
@@ -372,24 +314,9 @@ async function splitGroupIdsForVehicle(vehicleId: string, userId: string): Promi
   return rows.map((r) => r.groupId).filter((groupId): groupId is string => groupId !== null);
 }
 
-/**
- * Shrink each named split group's `groupTotal` to the sum of the legs that still exist.
- *
- * A split expense is one row per vehicle: each carries its own leg in `expenseAmount` plus
- * `groupTotal`, the pre-split total repeated on every sibling, and both split write paths enforce
- * "the legs sum to groupTotal". A vehicle delete breaks that — the FK cascade removes only the
- * deleted vehicle's sibling row — and the stale header is not merely cosmetic: an even or percentage
- * edit that omits `totalAmount` re-divides the stored `groupTotal`, so the survivor's recorded cost
- * silently grows toward the whole pre-delete amount.
- *
- * Shrinking (rather than redistributing) is the honest answer and matches how a deleted vehicle's leg
- * is pruned from a reminder's split config: each surviving vehicle keeps exactly the cost it incurred.
- * One correlated UPDATE per batch, so a group is never left half-repaired.
- */
 async function shrinkSplitGroupsToSurvivingLegs(userId: string, groupIds: string[]): Promise<void> {
   const db = getDb();
-  // Chunked because `inArray` binds one parameter per id and a long-lived fleet's expense history has
-  // no bound on how many split groups one vehicle appears in.
+  // SQLite caps bound parameters, and inArray binds one per id: keep batches small.
   for (const batch of chunk(groupIds)) {
     await db
       .update(expenses)
@@ -402,24 +329,16 @@ async function shrinkSplitGroupsToSurvivingLegs(userId: string, groupIds: string
   }
 }
 
-// DELETE /api/vehicles/:id - Delete vehicle
 routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
 
-  // Check if vehicle exists and belongs to user
   await validateVehicleOwnership(id, user.id);
 
-  // Cascade delete all photos (provider files + DB) BEFORE removing the vehicle.
-  // The photos table links to entities by (entity_type, entity_id) strings with
-  // NO foreign key, so the DB FK-cascade that removes the vehicle's expenses and
-  // odometer entries would otherwise orphan their photo rows AND leak the
-  // external storage files. Clean the vehicle's own photos plus every dependent
-  // entity's photos here, while those entities still exist to be enumerated.
+  // Photos have no FK: the vehicle cascade would orphan them, so delete them before the row goes.
   const [expenseIds, odometerIds, splitGroupIds] = await Promise.all([
     expenseRepository.findIdsByVehicleId(id),
     odometerRepository.findIdsByVehicleId(id),
-    // The groups whose totals the cascade is about to invalidate — only readable while the legs exist.
     splitGroupIdsForVehicle(id, user.id),
   ]);
   await deleteAllPhotosForEntity('vehicle', id, user.id);
@@ -428,27 +347,11 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
 
   await vehicleRepository.delete(id);
 
-  // Post-delete cleanups of the state the FK cascade cannot reach. These run AFTER the vehicle is
-  // already deleted, so they're best-effort: the delete the user asked for is DONE, and a cleanup
-  // hiccup must NOT 500 a successful delete — that would show "failed", prompt a retry (→ a confusing
-  // 404), AND leave the very states these calls prevent (stale split-group totals, orphaned
-  // split-config legs, vehicleless active reminders) un-fixed because the throw skipped them. Log +
-  // swallow; return the earned 200.
+  // Errors are logged, not thrown: the delete has already committed, and a retry would 404.
   try {
-    // FIRST, because this is the only one of the three that does NOT self-heal: the reminder
-    // normalizations below are re-run by the next /trigger, whereas a split group's total stays wrong
-    // until the next vehicle delete touches the same group. The log line is the only signal.
     await shrinkSplitGroupsToSurvivingLegs(user.id, splitGroupIds);
-
-    // The reminder_vehicles junction cascades, but a reminder's `expenseSplitConfig` JSON blob is NOT
-    // FK-managed — its leg for the deleted vehicle lingers, so the next trigger builds a split sibling for
-    // the dead vehicleId → an FK violation that leaves the surviving legs half-committed.
-    // Prune the deleted leg + renormalize FIRST (clears the blob when <2 legs remain).
+    // Split configs are JSON with no FK: prune deleted legs or reminders will target them.
     await reminderRepository.pruneSplitConfigsForDeletedVehicle(user.id, id);
-
-    // The reminder_vehicles junction rows cascade away with the vehicle, but a reminder whose
-    // sole/last vehicle was this one is left active with ZERO vehicles — the trigger skips it
-    // 'no_vehicles' forever with no user signal. Deactivate any such now-vehicleless active reminder.
     await reminderRepository.deactivateVehicleless(user.id);
   } catch (error) {
     logger.error('Post-delete vehicle cleanup failed (vehicle already deleted)', {
@@ -463,12 +366,10 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   });
 });
 
-// Validation schema for stats
 const statsQuerySchema = z.object({
   period: z.enum(['7d', '30d', '90d', '1y', 'all']).optional().default('all'),
 });
 
-// GET /api/vehicles/:id/stats - Get vehicle statistics
 routes.get(
   '/:id/stats',
   zValidator('param', commonSchemas.idParam),
@@ -478,10 +379,6 @@ routes.get(
     const { id } = c.req.valid('param');
     const { period } = c.req.valid('query');
 
-    // vehicle-sharing T12b-3c: per-vehicle stats READ widening — owner | accepted viewer/editor | 404
-    // (the sibling of the T8a analytics reads; this stat card on the [id] overview was the one
-    // per-vehicle read the viewer-mode page still fired owner-only). Shared rows are OWNER-stamped, so
-    // scope the fuel-expense + odometer queries to the OWNER's books (an invitee's own id → empty).
     const access = await requireVehicleRead(id, user.id);
     const ownerId =
       access.role === 'owner' ? user.id : ((await resolveVehicleOwnerId(id)) ?? user.id);
@@ -493,24 +390,20 @@ routes.get(
       throw new NotFoundError('Vehicle');
     }
 
-    // Get all fuel expenses for this vehicle (OWNER-scoped — shared rows ride the owner's books).
     const fuelExpenses = await expenseRepository.findAll({
       vehicleId: id,
       userId: ownerId,
       category: 'fuel',
     });
 
-    // Filter by time period (null for 'all' = no lower bound). Shared one-source-of-truth window.
     const startDate = getPeriodStartDate(period);
 
     const filteredFuelExpenses = startDate
       ? fuelExpenses.filter((e) => new Date(e.date) >= (startDate as Date))
       : fuelExpenses;
 
-    // Sort by date ascending for calculations (sortExpensesByDate — the shared pairwise-order invariant)
     const sortedExpenses = sortExpensesByDate(filteredFuelExpenses);
 
-    // Calculate statistics
     const stats = calculateVehicleStats(
       sortedExpenses,
       vehicle.initialMileage || 0,
@@ -518,12 +411,6 @@ routes.get(
       vehicle.trackCharging
     );
 
-    // `stats.currentMileage` is period-filtered + fuel-only (MAX over the filtered fuel
-    // expenses), so it can drop/disappear under a 7d/30d window and never sees manual
-    // odometer entries. `currentOdometer` is the canonical ALL-TIME, ALL-SOURCES reading
-    // (the D2 helper the mileage trigger uses) — period-independent by design, so a
-    // consumer that needs the vehicle's true odometer (lease overage, loan miles-used)
-    // can use it instead of the period-scoped stat. Additive: currentMileage is unchanged.
     const currentOdometer = await odometerRepository.getCurrentOdometer(id, ownerId);
 
     return c.json({

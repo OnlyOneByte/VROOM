@@ -1,22 +1,19 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { Upload, Trash2, FileText, Download, LoaderCircle, ImagePlus } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import MediaCaptureDialog from '$lib/components/common/MediaCaptureDialog.svelte';
-	import ConfirmDialog from '$lib/components/common/ConfirmDialog.svelte';
-	import { insuranceApi } from '$lib/services/insurance-api';
-	import { handleErrorWithNotification } from '$lib/utils/error-handling';
-	import type { Photo } from '$lib/types';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import MediaCaptureDialog from '#lib/components/common/MediaCaptureDialog.svelte';
+	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
+	import { insuranceApi } from '#lib/services/insurance-api.ts';
+	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
+	import type { Photo } from '#lib/types/index.ts';
 
 	const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 	const ALLOWED_TYPES = [...IMAGE_TYPES, 'application/pdf'];
 
 	interface Props {
-		// The entity the documents hang off. Defaults to insurance_policy for
-		// back-compat; ClaimsSection passes 'insurance_claim'.
 		entityId: string;
 		entityType?: string;
-		// T12b-3c: read-only shared view hides upload + per-document delete (documents stay viewable).
 		readOnly?: boolean;
 	}
 
@@ -50,8 +47,6 @@
 		documents = [...documents, result as Photo];
 	}
 
-	// Styled confirm dialog (replaces native confirm()) — deletion is permanent
-	// (removes the file from storage too).
 	let confirmOpen = $state(false);
 	let pendingDeleteId = $state<string | null>(null);
 
@@ -68,7 +63,7 @@
 			documents = documents.filter(d => d.id !== docId);
 		} catch (err) {
 			handleErrorWithNotification(err, 'Failed to delete document');
-			throw err; // keep the dialog open on failure
+			throw err;
 		}
 	}
 </script>

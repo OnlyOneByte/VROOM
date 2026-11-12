@@ -1,19 +1,3 @@
-/**
- * T4: mileage reminders are now API-creatable — the validation refinements (D4) + the
- * server-derived nextDueOdometer / nullable nextDueDate wiring, end-to-end through the real stack.
- *
- * Before this, the mileage trigger engine was dormant: no route accepted triggerMode/
- * intervalMileage, so a mileage reminder could only be seeded via sqlite. This pins the create +
- * update contract:
- *  - a mileage reminder requires intervalMileage + exactly one vehicle (D4); lastServiceOdometer
- *  defaults to the vehicle's current odometer when omitted
- *  - nextDueOdometer is SERVER-DERIVED (= lastServiceOdometer + intervalMileage), not client input
- *  - a pure-mileage reminder persists with a NULL next_due_date; a 'both' reminder keeps startDate
- *  - the refinements reject the bad shapes (no intervalMileage, multi-vehicle)
- *
- * createTestApp() rewrites env + dynamic-imports DB-bound modules; keep imports to harness + bun:test.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -22,6 +6,7 @@ import {
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
+import { addOdometerReading } from './_helpers';
 
 let ctx: TestApp;
 
@@ -29,14 +14,6 @@ beforeEach(async () => {
   ctx = await createTestApp();
 });
 afterEach(() => ctx.close());
-
-async function addOdometerReading(vehicleId: string, odometer: number): Promise<void> {
-  const res = await ctx.authed('POST', `/api/v1/odometer/${vehicleId}`, {
-    odometer,
-    recordedAt: '2024-06-01T00:00:00.000Z',
-  });
-  expect(res.status, `odometer ${odometer}`).toBe(201);
-}
 
 interface ReminderRowDb {
   trigger_mode: string;
@@ -63,7 +40,7 @@ const MILEAGE_BASE = {
   startDate: '2024-01-01T00:00:00.000Z',
 };
 
-describe('create mileage reminder (T4 — API-creatable + derived fields)', () => {
+describe('create mileage reminder', () => {
   test('explicit lastServiceOdometer → nextDueOdometer is derived (last + interval)', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'CR-V', year: 2021 });
     const res = await ctx.authed('POST', '/api/v1/reminders', {
@@ -86,14 +63,13 @@ describe('create mileage reminder (T4 — API-creatable + derived fields)', () =
 
   test('omitted lastServiceOdometer defaults to the vehicle current odometer', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'CR-V', year: 2021 });
-    await addOdometerReading(vehicleId, 42000);
+    await addOdometerReading(ctx, vehicleId, 42000);
 
     const res = await ctx.authed('POST', '/api/v1/reminders', {
       ...MILEAGE_BASE,
       triggerMode: 'mileage',
       intervalMileage: 6000,
       vehicleIds: [vehicleId],
-      // lastServiceOdometer omitted → defaults to current (42000)
     });
     const body = await json<DataEnvelope<{ reminder: { id: string } }>>(res);
     expect(res.status, JSON.stringify(body)).toBe(201);
@@ -140,19 +116,18 @@ describe('create mileage reminder (T4 — API-creatable + derived fields)', () =
     expect(r.next_due_date).not.toBeNull();
   });
 
-  test('rejects a mileage reminder with no intervalMileage (D4)', async () => {
+  test('rejects a mileage reminder with no intervalMileage', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'CR-V', year: 2021 });
     const res = await ctx.authed('POST', '/api/v1/reminders', {
       ...MILEAGE_BASE,
       triggerMode: 'mileage',
       lastServiceOdometer: 30000,
       vehicleIds: [vehicleId],
-      // no intervalMileage
     });
     expect(res.status).toBe(400);
   });
 
-  test('rejects a mileage reminder linked to more than one vehicle (D4)', async () => {
+  test('rejects a mileage reminder linked to more than one vehicle', async () => {
     const v1 = await seedVehicle(ctx, { make: 'Honda', model: 'CR-V', year: 2021 });
     const v2 = await seedVehicle(ctx, { make: 'Honda', model: 'CR-V', year: 2021 });
     const res = await ctx.authed('POST', '/api/v1/reminders', {
@@ -181,7 +156,6 @@ describe('create mileage reminder (T4 — API-creatable + derived fields)', () =
 
     const upd = await ctx.authed('PUT', `/api/v1/reminders/${id}`, { intervalMileage: 8000 });
     expect(upd.status, await upd.text()).toBe(200);
-    // 30000 (unchanged anchor) + 8000 = 38000
     expect(reminderRow(id).next_due_odometer).toBe(38000);
   });
 });

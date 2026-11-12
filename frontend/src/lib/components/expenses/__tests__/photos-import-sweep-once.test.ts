@@ -1,25 +1,8 @@
-/**
- * "Import from Photos" must sweep the album ONCE per time the dialog is opened.
- *
- * The sweep is expensive on the server (one Google Photos album search plus a
- * per-photo already-imported lookup) and the steady state — everything already imported, or an
- * empty album — returns ZERO drafts. An open-gate that infers "we have not swept yet" from the
- * RESULT (no rows, not loading, no error) can never recognise that state as swept, so an empty
- * album re-arms the gate on every sweep and the dialog hammers the endpoint for as long as it
- * stays open. The gate must therefore key on the OPEN TRANSITION, not on the result.
- *
- * The mocked endpoint below fails the test by its own call budget, so a regression shows up as a
- * bounded failure instead of a hung test run.
- */
-
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { render } from '@testing-library/svelte';
-import type { ReceiptDraftItem } from '$lib/services/photos-import-api';
-import type { Vehicle } from '$lib/types';
+import type { ReceiptDraftItem } from '#lib/services/photos-import-api.ts';
+import type { Vehicle } from '#lib/types/index.ts';
 
-vi.mock('svelte', () => import('../../../../../node_modules/svelte/src/index-client.js' as string));
-
-/** Hard budget: past this the dialog is looping, and the rejection breaks the loop. */
 const CALL_BUDGET = 8;
 
 let drafts: ReceiptDraftItem[] = [];
@@ -30,7 +13,7 @@ const getReceiptDrafts = vi.fn(async () => {
 	return drafts;
 });
 const confirmDraft = vi.fn(async () => ({}));
-vi.mock('$lib/services/photos-import-api', () => ({
+vi.mock('#lib/services/photos-import-api.ts', () => ({
 	photosImportApi: { getReceiptDrafts, confirmDraft }
 }));
 
@@ -56,7 +39,6 @@ function draftItem(photoId: string): ReceiptDraftItem {
 	};
 }
 
-/** Let every queued effect + the sweep's promise settle, repeatedly (a loop would keep re-arming). */
 async function settle(): Promise<void> {
 	for (let i = 0; i < 20; i++) {
 		await new Promise(resolve => setTimeout(resolve, 0));
@@ -81,7 +63,6 @@ describe('ImportFromPhotosDialog open-gate', () => {
 		await settle();
 
 		expect(getReceiptDrafts).toHaveBeenCalledTimes(1);
-		// And the user is told so, rather than being left on the loading skeleton.
 		expect(
 			container.ownerDocument.querySelector('[data-testid="photos-import-empty"]')
 		).not.toBeNull();
@@ -115,7 +96,6 @@ describe('ImportFromPhotosDialog open-gate', () => {
 		mount();
 		await settle();
 
-		// Nothing is read from Photos until the user has seen what will be read.
 		expect(getReceiptDrafts).not.toHaveBeenCalled();
 		const acknowledge = [...document.querySelectorAll('button')].find(
 			button => button.textContent?.trim() === 'Continue'

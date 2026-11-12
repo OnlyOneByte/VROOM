@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
+	import { Button } from '#lib/components/ui/button/index.ts';
 	import { LoaderCircle, ChevronLeft, ChevronRight } from '@lucide/svelte';
 
 	interface Props {
@@ -13,8 +13,6 @@
 	let { currentOffset, pageSize, totalCount, isLoading = false, onPageChange }: Props = $props();
 
 	let currentPage = $derived(Math.floor(currentOffset / pageSize) + 1);
-	// A page count is never below one: the bar always reports the page the user is on, and
-	// `Math.ceil(0 / pageSize)` would render the nonsense "Page 1 of 0" on an empty list.
 	let totalPages = $derived(Math.max(1, Math.ceil(totalCount / pageSize)));
 	let isPrevDisabled = $derived(currentOffset === 0);
 	let isNextDisabled = $derived(currentOffset + pageSize >= totalCount);

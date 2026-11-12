@@ -1,15 +1,15 @@
 <script lang="ts">
 	import { Search, X, Car, Tag } from '@lucide/svelte';
-	import Input from '$lib/components/ui/input/input.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Badge } from '$lib/components/ui/badge';
-	import * as CardNs from '$lib/components/ui/card';
-	import * as Select from '$lib/components/ui/select';
-	import DateRangePicker from '$lib/components/common/date-range-picker.svelte';
-	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
-	import { extractUniqueTags } from '$lib/utils/expense-filters';
-	import { COMMON_MESSAGES } from '$lib/constants/messages';
-	import type { Vehicle, Expense, ExpenseFilters } from '$lib/types';
+	import Input from '#lib/components/ui/input/input.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import * as CardNs from '#lib/components/ui/card/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import DateRangePicker from '#lib/components/common/date-range-picker.svelte';
+	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
+	import { extractUniqueTags } from '#lib/utils/expense-filters.ts';
+	import { COMMON_MESSAGES } from '#lib/constants/messages.ts';
+	import type { Vehicle, Expense, ExpenseFilters } from '#lib/types/index.ts';
 
 	interface Props {
 		searchTerm: string;
@@ -35,24 +35,20 @@
 		onClearFilters
 	}: Props = $props();
 
-	// Tag filter state
 	let selectedTags = $state<string[]>([]);
 	let tagMatchMode = $state<'any' | 'all'>('any');
 	let tagSearchTerm = $state('');
 	let tagSearchFocused = $state(false);
 	let tagInputEl = $state<HTMLInputElement | null>(null);
 
-	// Get all unique tags from expenses
 	let allTags = $derived(extractUniqueTags(expenses));
 
-	// Filtered tag suggestions
 	let tagSuggestions = $derived.by(() => {
 		if (!tagSearchTerm.trim()) return allTags.filter(t => !selectedTags.includes(t));
 		const term = tagSearchTerm.toLowerCase();
 		return allTags.filter(t => !selectedTags.includes(t) && t.toLowerCase().includes(term));
 	});
 
-	// Check if any filters are active
 	let hasActiveFilters = $derived(
 		!!searchTerm ||
 			!!selectedVehicleId ||
@@ -117,7 +113,6 @@
 		</div>
 	</CardNs.Header>
 	<CardNs.Content class="space-y-4">
-		<!-- Search Bar + Vehicle/Category Selector Row -->
 		<div class="flex flex-col sm:flex-row gap-3">
 			<div class="flex-1 relative">
 				<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -169,7 +164,6 @@
 			{/if}
 		</div>
 
-		<!-- Tag Search Input -->
 		<div class="space-y-2">
 			<div class="flex items-center justify-between">
 				<p class="text-sm font-medium text-muted-foreground">Tags</p>
@@ -257,7 +251,6 @@
 			</div>
 		</div>
 
-		<!-- Clear Filters -->
 		{#if hasActiveFilters}
 			<div class="flex justify-end pt-2">
 				<Button variant="outline" size="sm" onclick={onClearFilters}>

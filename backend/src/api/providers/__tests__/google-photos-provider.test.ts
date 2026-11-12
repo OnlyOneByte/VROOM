@@ -1,10 +1,3 @@
-/**
- * GooglePhotosProvider against a real GooglePhotosService wired to the in-memory
- * fake PhotosClient (injected — NO mock.module). Verifies the StorageProvider
- * contract incl. the REDUCED capabilities (delete:false/list:false/arbitraryFiles:
- * false), the delete no-op (D1a), list→[] (D3b), and fresh-URL behavior.
- */
-
 import { beforeEach, describe, expect, test } from 'bun:test';
 import {
   FakePhotosStore,
@@ -79,7 +72,6 @@ describe('GooglePhotosProvider', () => {
       pathHint: '',
     });
     await expect(provider.delete(ref)).resolves.toBeUndefined();
-    // The media item is still present — VROOM-side row removal is the caller's job.
     expect(store.media.has(ref.externalId)).toBe(true);
   });
 

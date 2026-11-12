@@ -1,21 +1,3 @@
-/**
- * Tests for server-side expense sort in findPaginated().
- *
- * Regression guard for the sort/pagination bug: the table sorted client-side over
- * the current 20-row page only, so "sort by amount desc" surfaced the biggest
- * expense ON PAGE 1, not overall (same class as the cycle-10 search fix). Sort now
- * runs in SQL across the whole result set, with an allowlisted column + a stable id
- * tiebreaker so paginated ties don't drop or duplicate rows.
- *
- * Properties verified:
- * - sort by amount spans ALL pages (the global max appears on page 1, not page N)
- * - asc / desc both honored
- * - sort by category works
- * - default (no sortBy) is date desc — backward-compatible
- * - the id tiebreaker makes equal-key ordering stable across pages (no overlap/gap)
- * - user-scoped (sort never leaks another user's rows)
- */
-
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
@@ -69,18 +51,14 @@ function input(overrides: Partial<NewExpense>): NewExpense {
 
 describe('findPaginated sort', () => {
   test('sort by amount desc surfaces the GLOBAL max on page 1 (not just the page max)', async () => {
-    // 25 small filler rows, then one large expense with the OLDEST date so a default
-    // date-desc sort would bury it on the last page. Amount-desc must float it to top.
     for (let i = 0; i < 25; i++) {
       await repo.create(input({ expenseAmount: 10 + i, date: new Date(2026, 0, 28 - i) }));
     }
     await repo.create(input({ expenseAmount: 9999.99, date: new Date(2020, 0, 1) }));
 
-    // Default (date desc) page 1 does NOT contain the big old expense.
     const byDate = await repo.findPaginated({ userId: USER_A, limit: 20, offset: 0 });
     expect(byDate.data.some((e) => e.expenseAmount === 9999.99)).toBe(false);
 
-    // Amount desc puts it first, even though it's the oldest row.
     const byAmount = await repo.findPaginated({
       userId: USER_A,
       sortBy: 'amount',
@@ -120,9 +98,6 @@ describe('findPaginated sort', () => {
   });
 
   test('stable id tiebreaker — paginating equal-amount rows never drops or duplicates', async () => {
-    // 30 rows all the SAME amount → ties. Without a deterministic tiebreaker, SQLite
-    // could order ties differently per query, so a row could appear on both pages or
-    // neither. Page through and assert we see exactly the 30 distinct ids, once each.
     for (let i = 0; i < 30; i++) {
       await repo.create(input({ expenseAmount: 50, description: `tie ${i}` }));
     }
@@ -134,7 +109,7 @@ describe('findPaginated sort', () => {
     const unique = new Set(ids);
     expect(page1.data).toHaveLength(20);
     expect(page2.data).toHaveLength(10);
-    expect(unique.size).toBe(30); // no overlap between pages, no gaps
+    expect(unique.size).toBe(30);
   });
 
   test("sort is user-scoped — never returns another user's rows", async () => {
@@ -149,9 +124,6 @@ describe('findPaginated sort', () => {
 
 describe('findPaginated category filter', () => {
   test('category filter spans ALL pages, not just the current slice', async () => {
-    // 25 fuel filler rows (push past a 20-row page) + 1 maintenance row buried on an
-    // OLD date so default date-desc puts it last. A page-local filter (the bug this
-    // closes) would miss it on page 1; the SQL filter must find it regardless.
     for (let i = 0; i < 25; i++) {
       await repo.create(input({ category: 'fuel', date: new Date(2026, 0, 27 - i) }));
     }
@@ -184,7 +156,6 @@ describe('findPaginated category filter', () => {
     await repo.create(input({ category: 'maintenance', description: 'oil change' }));
     await repo.create(input({ category: 'fuel', description: 'brake cleaner top-up' }));
 
-    // "brake" matches a maintenance row AND a fuel row; category=maintenance narrows it.
     const res = await repo.findPaginated({
       userId: USER_A,
       category: 'maintenance',

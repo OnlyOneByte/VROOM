@@ -25,11 +25,6 @@ import {
 
 const routes = new Hono();
 
-/**
- * T6 display edge for an insurance policy API object: convert each embedded term's money columns
- * (deductibleAmount/coverageLimit/totalCost/monthlyCost/paymentAmount) from integer CENTS → dollars.
- * The policy row itself carries no money; only its `terms[]` do. Pure, shallow per term.
- */
 function policyToApi<T extends Record<string, unknown>>(policy: T): T {
   const terms = policy.terms;
   if (!Array.isArray(terms)) return policy;
@@ -39,16 +34,6 @@ function policyToApi<T extends Record<string, unknown>>(policy: T): T {
   };
 }
 
-/**
- * vehicle-sharing T8b blast-radius filter (design §6.4: "a share must never pull the owner's OTHER
- * vehicles into the invitee's view"). `findByVehicleId` returns the WHOLE policy — all its terms, the
- * full termVehicleCoverage junction, and the deduped vehicleIds across ALL terms — because a policy can
- * span several of the owner's vehicles. For a NON-owner viewing a SHARED vehicle that would leak the
- * owner's other vehicles' ids + their coverage. So when the acting user is not the owner, narrow the
- * policy to the shared vehicle ONLY: drop terms that do not cover it, filter the coverage rows to it,
- * and reduce vehicleIds to just it. The OWNER (owner-read) gets the full policy unchanged — this only
- * narrows a shared invitee's view, never the owner's. Pure; returns a shallow-narrowed copy.
- */
 function narrowPolicyToVehicle<
   T extends {
     terms: Array<{ id: string }>;
@@ -56,41 +41,25 @@ function narrowPolicyToVehicle<
     vehicleIds: string[];
   },
 >(policy: T, vehicleId: string): T {
-  // Terms that actually cover the shared vehicle (via the junction).
   const coveredTermIds = new Set(
     policy.termVehicleCoverage.filter((c) => c.vehicleId === vehicleId).map((c) => c.termId)
   );
   return {
     ...policy,
     terms: policy.terms.filter((t) => coveredTermIds.has(t.id)),
-    // Only this vehicle's coverage rows — never reveal which OTHER vehicles a term covers.
     termVehicleCoverage: policy.termVehicleCoverage.filter((c) => c.vehicleId === vehicleId),
     vehicleIds: policy.vehicleIds.filter((v) => v === vehicleId),
   };
 }
 
-/**
- * vehicle-sharing T12b-3c — resolve READ access to a POLICY for a shared invitee. A policy has no
- * single vehicle (it can span several of the owner's vehicles via its terms' coverage junction), and
- * the claims route is policy-keyed, but a share grants access PER VEHICLE. So: the OWNER always reads
- * (validateInsuranceOwnership); a NON-owner reads the policy only if they hold read access to AT LEAST
- * ONE vehicle the policy covers. Returns the set of vehicleIds the acting user may read (for the
- * blast-radius claim narrow) — empty for the owner (a sentinel meaning "no narrowing, see all"). A
- * non-owner with no covered-vehicle access gets a 404 (existence-hiding), exactly like the
- * per-vehicle policies route. Mirrors design §6.4: a share must never pull the owner's OTHER vehicles
- * (or unattributed claims) into the invitee's view.
- */
 async function requirePolicyReadVehicles(
   policyId: string,
   userId: string
 ): Promise<{ isOwner: boolean; readableVehicleIds: Set<string> }> {
   const policy = await insurancePolicyRepository.findById(policyId);
-  // Existence-hiding: a missing policy and a policy you cannot see are indistinguishable (404).
   if (!policy) throw new NotFoundError('Insurance policy');
   if (policy.userId === userId) return { isOwner: true, readableVehicleIds: new Set() };
 
-  // Non-owner: keep only the covered vehicles this user may READ (accepted share or — impossible here —
-  // ownership). If none, they have no business reading this policy at all → 404.
   const readableVehicleIds = new Set<string>();
   for (const vehicleId of policy.vehicleIds) {
     if (await resolveVehicleAccess(vehicleId, userId)) readableVehicleIds.add(vehicleId);
@@ -113,15 +82,6 @@ const claimParamsSchema = z.object({
   claimId: z.string().min(1, 'Claim ID is required'),
 });
 
-/**
- * Validate a claim's OPTIONAL vehicleId/termId links before a create/update write. The route already
- * proves policy ownership, but the claim schema accepts a free-form `vehicleId` (a cross-tenant FK —
- * the within-tenant-integrity class) and `termId` (which must belong to THIS policy, not another
- * — including another tenant's). The repository wrote both VERBATIM, so without this a user could attach
- * a claim to a vehicle they don't own or a term from a different policy, corrupting claim attribution
- * and planting a cross-tenant reference. Only checks fields that are present (a `null` clear on update is
- * a no-op here). Mirrors the term-vehicle ownership guard (addTerm/updateTerm validateVehicleOwnership).
- */
 async function validateClaimRefs(
   data: { vehicleId?: string | null; termId?: string | null },
   policyId: string,
@@ -143,30 +103,22 @@ const vehiclePoliciesParamSchema = z.object({
   vehicleId: z.string().min(1, 'Vehicle ID is required'),
 });
 
-// Apply authentication and change tracking to all routes
 routes.use('*', requireAuth);
 routes.use('*', changeTracker);
 
-// GET /api/v1/insurance — all policies for authenticated user
 routes.get('/', async (c) => {
   const user = c.get('user');
   const policies = await insurancePolicyRepository.findByUserId(user.id);
-  // T6 display edge: each policy's embedded term money cents → dollars.
   return c.json({ success: true, data: policies.map(policyToApi), count: policies.length });
 });
 
-// GET /api/v1/insurance/expiring-soon — expiring policies
 routes.get('/expiring-soon', async (c) => {
   const user = c.get('user');
-  // Both params go through parseClampedInt: a non-numeric value → the fallback, never
-  // a NaN that would make `endDate = new Date(now + NaN)` an Invalid Date and silently empty the
-  // result. `days` → 30-day default, clamped 1..366; `limit` → 100, clamped 1..200.
   const daysAhead = parseClampedInt(c.req.query('days'), 30, 1, 366);
   const limit = parseClampedInt(c.req.query('limit'), 100, 1, 200);
   const now = new Date();
   const endDate = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
   const terms = await insurancePolicyRepository.findExpiringTerms(now, endDate, user.id, limit);
-  // T6 display edge: these are bare term rows (money cents → dollars).
   return c.json({
     success: true,
     data: terms.map((t) => insuranceTermToApi(t)),
@@ -176,33 +128,25 @@ routes.get('/expiring-soon', async (c) => {
   });
 });
 
-// GET /api/v1/insurance/vehicles/:vehicleId/policies — policies for a vehicle
 routes.get(
   '/vehicles/:vehicleId/policies',
   zValidator('param', vehiclePoliciesParamSchema),
   async (c) => {
     const user = c.get('user');
     const { vehicleId } = c.req.valid('param');
-    // vehicle-sharing T8b READ widening: owner | accepted viewer/editor | 404 (existence-hiding).
     const access = await requireVehicleRead(vehicleId, user.id);
     const policies = await insurancePolicyRepository.findByVehicleId(vehicleId);
-    // Blast-radius (design §6.4): for a NON-owner, narrow each policy to the shared vehicle only so the
-    // owner's OTHER vehicles (other terms + their coverage + ids) never leak. The owner sees the full
-    // policy unchanged. findByVehicleId already returns only policies that cover THIS vehicle.
     const scoped =
       access.role === 'owner' ? policies : policies.map((p) => narrowPolicyToVehicle(p, vehicleId));
     return c.json({ success: true, data: scoped.map(policyToApi), count: scoped.length });
   }
 );
 
-// POST /api/v1/insurance — create policy
 routes.post('/', zValidator('json', createPolicySchema), async (c) => {
   const user = c.get('user');
   const data = c.req.valid('json');
   const policy = await insurancePolicyRepository.create(data, user.id);
 
-  // Auto-create split expenses for each term that has a cost (totalCost OR a monthly premium).
-  // The hook computes the effective total (createTermExpenses → effectiveTermCost) and no-ops on 0.
   for (const term of policy.terms) {
     const termVehicleIds = vehicleIdsForTerm(policy.termVehicleCoverage, term.id);
     await createTermExpenses({
@@ -223,7 +167,6 @@ routes.post('/', zValidator('json', createPolicySchema), async (c) => {
   );
 });
 
-// GET /api/v1/insurance/:id — single policy
 routes.get('/:id', zValidator('param', idParamSchema), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
@@ -231,7 +174,6 @@ routes.get('/:id', zValidator('param', idParamSchema), async (c) => {
   return c.json({ success: true, data: policyToApi(policy) });
 });
 
-// PUT /api/v1/insurance/:id — update policy
 routes.put(
   '/:id',
   zValidator('param', idParamSchema),
@@ -250,28 +192,18 @@ routes.put(
   }
 );
 
-// DELETE /api/v1/insurance/:id — delete policy
 routes.delete('/:id', zValidator('param', idParamSchema), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
   await validateInsuranceOwnership(id, user.id);
 
-  // Clean photos (provider files + DB) BEFORE deleting the policy. Deleting the
-  // policy FK-cascades its claims, but the photos table has no FK — so the
-  // policy's own documents AND its claims' documents (rows + external storage
-  // files) would orphan. Enumerate the claims while they still exist.
+  // Photos have no FK, so they must be removed before the policy cascade orphans them.
   const claims = await insuranceClaimRepository.findByPolicyId(id);
   const claimIds = claims.map((claim) => claim.id);
   await deleteAllPhotosForEntity('insurance_policy', id, user.id);
   await deletePhotosForEntities('insurance_claim', claimIds, user.id);
 
-  // Clean the auto-materialized premium expenses too. Each costed term spawned a split expense
-  // (hooks.ts createTermExpenses, sourceType:'insurance_term', sourceId:termId), but expenses link to
-  // terms by plain text columns, NOT an FK — so the term cascade-delete below leaves those expense rows
-  // ORPHANED, still summed into TCO insurance cost forever (analytics categorizes any financial +
-  // sourceType:'insurance_term' row, with no term-exists check) and leaking their own expense photos.
-  // DELETE-term + UPDATE-term already deleteBySource these; the parent-policy delete was the one gap.
-  // Enumerate the policy's terms while they still exist, mirroring the claim-photo cleanup above.
+  // Premium expenses link to terms by text, not FK, so they must be deleted explicitly before the cascade.
   const policyToDelete = await insurancePolicyRepository.findById(id);
   for (const term of policyToDelete?.terms ?? []) {
     await expenseRepository.deleteBySource('insurance_term', term.id, user.id);
@@ -281,7 +213,6 @@ routes.delete('/:id', zValidator('param', idParamSchema), async (c) => {
   return c.json({ success: true, message: 'Insurance policy deleted successfully' });
 });
 
-// POST /api/v1/insurance/:id/terms — add term (flat fields)
 routes.post(
   '/:id/terms',
   zValidator('param', idParamSchema),
@@ -293,7 +224,6 @@ routes.post(
     const termData = c.req.valid('json');
     const policy = await insurancePolicyRepository.addTerm(id, termData, user.id);
 
-    // Auto-create split expenses if the new term has a cost (totalCost OR a monthly premium).
     const termVehicleIds = vehicleIdsForTerm(policy.termVehicleCoverage, policy.newTermId);
     await createTermExpenses({
       termId: policy.newTermId,
@@ -313,7 +243,6 @@ routes.post(
   }
 );
 
-// PUT /api/v1/insurance/:id/terms/:termId — update term (flat fields)
 routes.put(
   '/:id/terms/:termId',
   zValidator('param', termParamsSchema),
@@ -325,7 +254,6 @@ routes.put(
     const updates = c.req.valid('json');
     const policy = await insurancePolicyRepository.updateTerm(id, termId, updates, user.id);
 
-    // Sync auto-created expenses with updated term data
     const updatedTerm = policy.terms.find((t) => t.id === termId);
     if (updatedTerm) {
       const termVehicleIds = vehicleIdsForTerm(policy.termVehicleCoverage, termId);
@@ -349,35 +277,26 @@ routes.put(
   }
 );
 
-// DELETE /api/v1/insurance/:id/terms/:termId — delete term
 routes.delete('/:id/terms/:termId', zValidator('param', termParamsSchema), async (c) => {
   const user = c.get('user');
   const { id, termId } = c.req.valid('param');
   await validateInsuranceOwnership(id, user.id);
 
-  // Delete auto-created expenses before deleting the term (FK cascade is gone)
+  // Premium expenses link to terms by text, not FK, so they must be deleted explicitly.
   await expenseRepository.deleteBySource('insurance_term', termId, user.id);
 
   const policy = await insurancePolicyRepository.deleteTerm(id, termId, user.id);
   return c.json({ success: true, data: policyToApi(policy), message: 'Term deleted successfully' });
 });
 
-// --- Claims (filed against a policy) ---
-
-// GET /api/v1/insurance/:id/claims — list claims for a policy
 routes.get('/:id/claims', zValidator('param', idParamSchema), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
-  // vehicle-sharing T12b-3c READ widening: owner | accepted viewer/editor on a covered vehicle | 404.
   const { isOwner, readableVehicleIds } = await requirePolicyReadVehicles(id, user.id);
   const claims = await insuranceClaimRepository.findByPolicyId(id);
-  // Blast-radius (design §6.4): the OWNER sees every claim; a NON-owner sees ONLY claims attributed to
-  // a vehicle they may read. A claim with no vehicleId (unattributed) or one on the owner's OTHER
-  // vehicle is dropped for a shared invitee — never reveal claims about vehicles outside the share.
   const scoped = isOwner
     ? claims
     : claims.filter((cl) => cl.vehicleId !== null && readableVehicleIds.has(cl.vehicleId));
-  // T6 display edge: each claim's payoutAmount cents → dollars.
   return c.json({
     success: true,
     data: scoped.map((cl) => insuranceClaimToApi(cl)),
@@ -385,7 +304,6 @@ routes.get('/:id/claims', zValidator('param', idParamSchema), async (c) => {
   });
 });
 
-// POST /api/v1/insurance/:id/claims — file a claim
 routes.post(
   '/:id/claims',
   zValidator('param', idParamSchema),
@@ -395,8 +313,6 @@ routes.post(
     const { id } = c.req.valid('param');
     await validateInsuranceOwnership(id, user.id);
     const data = c.req.valid('json');
-    // Validate the optional vehicleId/termId links (owned vehicle; term on THIS policy) — the route
-    // only proved policy ownership, and the repo writes these FKs verbatim.
     await validateClaimRefs(data, id, user.id);
     const claim = await insuranceClaimRepository.create(id, data);
     return c.json(
@@ -406,7 +322,6 @@ routes.post(
   }
 );
 
-// PUT /api/v1/insurance/:id/claims/:claimId — update a claim
 routes.put(
   '/:id/claims/:claimId',
   zValidator('param', claimParamsSchema),
@@ -416,7 +331,6 @@ routes.put(
     const { id, claimId } = c.req.valid('param');
     await validateInsuranceOwnership(id, user.id);
     const updates = c.req.valid('json');
-    // Re-validate a CHANGED vehicleId/termId link (mirror the create-path guard).
     await validateClaimRefs(updates, id, user.id);
     const claim = await insuranceClaimRepository.update(id, claimId, updates);
     return c.json({
@@ -427,12 +341,10 @@ routes.put(
   }
 );
 
-// DELETE /api/v1/insurance/:id/claims/:claimId — delete a claim
 routes.delete('/:id/claims/:claimId', zValidator('param', claimParamsSchema), async (c) => {
   const user = c.get('user');
   const { id, claimId } = c.req.valid('param');
   await validateInsuranceOwnership(id, user.id);
-  // Clean the claim's documents (provider files + DB) before deleting the row.
   await deleteAllPhotosForEntity('insurance_claim', claimId, user.id);
   await insuranceClaimRepository.delete(id, claimId);
   return c.json({ success: true, message: 'Claim deleted successfully' });

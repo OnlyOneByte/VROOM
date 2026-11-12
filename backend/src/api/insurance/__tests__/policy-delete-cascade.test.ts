@@ -1,15 +1,3 @@
-/**
- * In-process HTTP tests for insurance POLICY deletion CASCADE — through the REAL
- * stack. Same data-integrity class as vehicle-delete-cascade: deleting a policy
- * FK-cascades its terms and claims, but the photos table links by
- * (entity_type, entity_id) strings with NO foreign key — so the policy's own
- * documents AND its claims' documents (DB rows + external storage files) would
- * be orphaned unless the route cleans them explicitly before deletion.
- *
- * These tests pin the desired behavior: after deleting a policy, NO photo rows
- * for that policy or its claims remain.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -41,7 +29,6 @@ function photoCount(entityType: string, entityId: string): number {
   return row.n;
 }
 
-/** Count the auto-materialized premium expense rows linked to ANY insurance term (sourceType). */
 function insuranceExpenseCount(): number {
   const row = ctx.sqlite
     .query(`SELECT COUNT(*) AS n FROM expenses WHERE source_type = 'insurance_term'`)
@@ -75,8 +62,8 @@ async function seedPolicyWithClaim(
   return { policyId, claimId: claimBody.data.id };
 }
 
-describe('insurance policy deletion cascades photo cleanup to itself + claims', () => {
-  test("deleting a policy removes its own AND its claims' photo rows (no orphans)", async () => {
+describe('insurance policy deletion cascade', () => {
+  test("deleting a policy removes its own and its claims' photo rows", async () => {
     const vehicleId = await seedVehicle(ctx);
     const { policyId, claimId } = await seedPolicyWithClaim(vehicleId);
 
@@ -98,7 +85,7 @@ describe('insurance policy deletion cascades photo cleanup to itself + claims', 
     ).toBe(0);
   });
 
-  test('deleting a single claim directly removes its photo rows (no orphans)', async () => {
+  test('deleting a single claim removes its photo rows', async () => {
     const vehicleId = await seedVehicle(ctx);
     const { policyId, claimId } = await seedPolicyWithClaim(vehicleId);
     seedPhoto({ id: 'claim-doc-direct', entityType: 'insurance_claim', entityId: claimId });
@@ -113,13 +100,8 @@ describe('insurance policy deletion cascades photo cleanup to itself + claims', 
     ).toBe(0);
   });
 
-  // A costed term auto-materializes a premium expense (hooks.createTermExpenses,
-  // sourceType:'insurance_term'). Expenses link to terms by plain text columns, NOT an FK, so the term
-  // cascade-delete leaves the expense ORPHANED (still summed into TCO insurance cost forever) unless the
-  // DELETE-policy route deletes it explicitly — which DELETE-term/UPDATE-term did but policy-delete didn't.
-  test("deleting a policy removes its terms' auto-materialized premium expenses (no orphan)", async () => {
+  test("deleting a policy removes its terms' premium expenses", async () => {
     const vehicleId = await seedVehicle(ctx);
-    // A term WITH a totalCost → createTermExpenses fires (the seedPolicyWithClaim term has none).
     const pol = await ctx.authed('POST', '/api/v1/insurance', {
       company: 'Acme Mutual',
       terms: [
@@ -135,16 +117,14 @@ describe('insurance policy deletion cascades photo cleanup to itself + claims', 
     expect(pol.status, JSON.stringify(polBody)).toBe(201);
     const policyId = polBody.data.id;
 
-    // Sanity: the premium expense materialized.
     expect(insuranceExpenseCount(), 'a costed term should auto-create a premium expense').toBe(1);
 
     const del = await ctx.authed('DELETE', `/api/v1/insurance/${policyId}`);
     expect(del.status, await del.text()).toBe(200);
 
-    // Pre-fix: the expense row survived with a dangling sourceId (orphan in TCO). Post-fix: cleaned up.
     expect(
       insuranceExpenseCount(),
-      'premium expense rows should be cleaned up on policy delete (no orphan in TCO)'
+      'premium expense rows should be cleaned up on policy delete'
     ).toBe(0);
   });
 });

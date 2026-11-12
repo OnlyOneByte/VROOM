@@ -1,14 +1,3 @@
-/**
- * In-process HTTP tests for the import-trackers ROUTE extension (spec T3): POST /import with an
- * optional `mapping`. Proves the foreign-tracker path is BACKWARD-COMPATIBLE
- * (no mapping → today's native path unchanged), that a mapped file is translated then run through
- * the EXISTING buildImportPlan/dryRun/importExpenses flow (so idempotency/atomicity/tenant-safety
- * are inherited), unit conversion targets the resolved vehicle's units (wiring risk), unmapped
- * categories surface, and malformed rows still report per-row.
- *
- * createTestApp() rewrites env + dynamic-imports DB-bound modules — import only the harness here.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, json, type TestApp } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
@@ -20,10 +9,6 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-// Seed the file's fixture vehicle: a Honda Civic 2021 (default unit prefs = miles / US gallons) with
-// the given nickname — the foreign-tracker mappings target it by name. Converged onto the shared
-// test-helpers/seed seedVehicle ; make/model/year passed explicitly
-// to preserve the prior fixture exactly (the shared default is a Toyota Camry).
 async function listExpenses(): Promise<
   Array<{ category: string; expenseAmount: number; mileage: number | null; volume: number | null }>
 > {
@@ -51,9 +36,6 @@ interface ImportResponse {
   };
 }
 
-// A FLAT single-header metric fuel log (Fuelly-shaped): dmy dates, km odometer, litres, comma
-// decimals, no vehicle column. NOT a real Fuelio export — those are multi-section (`## Log`) and
-// route to the dedicated adapter instead, so this must not carry `source: 'fuelio'`.
 const FLAT_TRACKER_CSV = [
   'Data,Odo (km),Fuel (litres),Price,Type',
   '15/03/2024,160.9344,37.854,"52,40",Gas',
@@ -86,11 +68,11 @@ describe('POST /import — backward compatibility (no mapping)', () => {
     const body = await json<ImportResponse>(res);
     expect(res.status, JSON.stringify(body)).toBe(200);
     expect(body.data.imported).toBe(1);
-    expect(body.data.unmappedCategories).toEqual([]); // present + empty on the native path
+    expect(body.data.unmappedCategories).toEqual([]);
   });
 });
 
-describe('POST /import — foreign-tracker mapping path (T3)', () => {
+describe('POST /import — foreign-tracker mapping path', () => {
   test('a flat metric fuel log maps + converts into a miles/US-gal vehicle and commits', async () => {
     await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021, nickname: 'Daily Driver' });
     const res = await ctx.authed('POST', '/api/v1/expenses/import', {
@@ -103,10 +85,26 @@ describe('POST /import — foreign-tracker mapping path (T3)', () => {
     expect(body.data.errorCount).toBe(0);
 
     const [row] = await listExpenses();
-    expect(row.category).toBe('fuel'); // 'Gas' → fuel via categoryMap
-    expect(row.expenseAmount).toBeCloseTo(52.4, 2); // comma decimal normalized
-    expect(row.mileage).toBe(100); // 160.9344 km → 100 mi (converted into the vehicle's unit)
-    expect(row.volume).toBeCloseTo(10, 2); // 37.854 L → ~10 US gal
+    expect(row.category).toBe('fuel');
+    expect(row.expenseAmount).toBeCloseTo(52.4, 2);
+    expect(row.mileage).toBe(100);
+    expect(row.volume).toBeCloseTo(10, 2);
+  });
+
+  test('a stored nickname with surrounding whitespace matches for both units and rows', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
+    ctx.sqlite.run('UPDATE vehicles SET nickname = ? WHERE id = ?', ['  Daily Driver ', vehicleId]);
+    const res = await ctx.authed('POST', '/api/v1/expenses/import', {
+      csv: FLAT_TRACKER_CSV,
+      mapping: FLAT_TRACKER_MAPPING,
+    });
+    const body = await json<ImportResponse>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.data.imported, JSON.stringify(body.data.rows)).toBe(1);
+
+    const [row] = await listExpenses();
+    expect(row.mileage, 'converted into the matched vehicle units').toBe(100);
+    expect(row.volume).toBeCloseTo(10, 2);
   });
 
   test('dry-run previews the mapped plan without writing', async () => {
@@ -120,7 +118,7 @@ describe('POST /import — foreign-tracker mapping path (T3)', () => {
     expect(body.data.dryRun).toBe(true);
     expect(body.data.readyCount).toBe(1);
     expect(body.data.imported).toBe(0);
-    expect((await listExpenses()).length).toBe(0); // nothing written
+    expect((await listExpenses()).length).toBe(0);
   });
 
   test('re-importing the same mapped file is idempotent (inherits the native dedup)', async () => {
@@ -140,10 +138,10 @@ describe('POST /import — foreign-tracker mapping path (T3)', () => {
     );
     expect(second.data.imported).toBe(0);
     expect(second.data.duplicates).toBe(1);
-    expect((await listExpenses()).length).toBe(1); // still 1, not 2
+    expect((await listExpenses()).length).toBe(1);
   });
 
-  test('an unmapped category word surfaces in unmappedCategories (D2 visible note)', async () => {
+  test('an unmapped category word surfaces in unmappedCategories', async () => {
     await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021, nickname: 'Daily Driver' });
     const csv = ['Data,Price,Type', '15/03/2024,"10,00",Parking'].join('\n');
     const res = await ctx.authed('POST', '/api/v1/expenses/import', {
@@ -155,12 +153,11 @@ describe('POST /import — foreign-tracker mapping path (T3)', () => {
       },
     });
     const body = await json<ImportResponse>(res);
-    expect(body.data.unmappedCategories).toEqual(['Parking']); // mapped to misc + reported
+    expect(body.data.unmappedCategories).toEqual(['Parking']);
   });
 
   test('a malformed mapped row is reported per-row, not a whole-file 500', async () => {
     await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021, nickname: 'Daily Driver' });
-    // Fuel row with a non-numeric amount → buildImportPlan flags it as a row error.
     const csv = ['Data,Price,Type', '15/03/2024,not-a-number,Gas'].join('\n');
     const res = await ctx.authed('POST', '/api/v1/expenses/import', {
       csv,
@@ -186,44 +183,30 @@ describe('POST /import — foreign-tracker mapping path (T3)', () => {
     expect(res.status).toBe(400);
   });
 
-  // GUARD (bug-scout pivot): a mapping whose `targetVehicle` the user does NOT own must NOT import
-  // against another tenant's vehicle. The route resolves targetVehicle ONLY against the
-  // caller's own fleet on BOTH legs — resolveTargetUnits returns {} (skip unit conversion, no guessing
-  // toward a foreign vehicle's units, the risk) AND buildImportPlan rejects the rows by name. So an
-  // unowned target → 0 ready, a clean "No vehicle named X in your garage" per-row error, no leak, no
-  // insert. This route-level cross-tenant path had no test (the existing cases all target an owned vehicle).
   test('a mapping targeting an UNOWNED vehicle imports nothing (cross-tenant safe, no leak)', async () => {
-    await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021, nickname: 'Daily Driver' }); // the user's ONLY vehicle
+    await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021, nickname: 'Daily Driver' });
     const res = await ctx.authed('POST', '/api/v1/expenses/import', {
       csv: ['Data,Odo (km),Fuel (litres),Price', '15/03/2024,160,37,52.40'].join('\n'),
       mapping: {
         columns: { date: 'Data', mileage: 'Odo (km)', volume: 'Fuel (litres)', amount: 'Price' },
-        targetVehicle: "Somebody Else's Car", // NOT in the user's garage
+        targetVehicle: "Somebody Else's Car",
         dateFormat: 'dmy',
         distanceUnit: 'kilometers',
         volumeUnit: 'liters',
         defaultCategory: 'fuel',
       },
-      dryRun: true, // preview only — assert it would import nothing even before committing
+      dryRun: true,
     });
     const body = await json<ImportResponse>(res);
     expect(res.status, JSON.stringify(body)).toBe(200);
-    expect(body.data.readyCount).toBe(0); // unowned target → nothing ready
+    expect(body.data.readyCount).toBe(0);
     expect(body.data.errorCount).toBe(1);
-    expect(body.data.rows[0].message).toMatch(/no vehicle named/i); // safe by-name rejection, no leak
-    // And nothing was written (dryRun, but also confirm the garage is untouched).
+    expect(body.data.rows[0].message).toMatch(/no vehicle named/i);
     expect((await listExpenses()).length).toBe(0);
   });
 });
 
-// GUARD (the defaultCategory at the ROUTE layer): pinned the pure applyMapping/buildImportPlan
-// path, but the actual user flow the fix enables — a DETECTED fuel tracker (NO category column) committed
-// through the real HTTP stack — had no route-level coverage. columnMappingSchema must ACCEPT defaultCategory
-// (bounded to a real ExpenseCategory) and the route must translate → commit a real fuel expense. Pins the
-// end-to-end wiring so a schema/route regression (e.g. dropping defaultCategory from columnMappingSchema →
-// stripped before applyMapping → back to 0-ready) can't silently return.
 describe('POST /import — fuel-tracker defaultCategory commits through the route', () => {
-  // A Fuelly-shaped file with NO category column (the real case: refuel exports are all-fuel, no category field).
   const FUELLY_NO_CATEGORY_CSV = [
     'Date,Odometer,Fill Amount,Price',
     '03/01/2026,30000,9,36.00',
@@ -246,11 +229,11 @@ describe('POST /import — fuel-tracker defaultCategory commits through the rout
     });
     const body = await json<ImportResponse>(res);
     expect(res.status, JSON.stringify(body)).toBe(200);
-    expect(body.data.imported).toBe(1); // was 0-ready "Unknown category" before the defaultCategory fix
+    expect(body.data.imported).toBe(1);
     expect(body.data.errorCount).toBe(0);
     const [row] = await listExpenses();
-    expect(row.category).toBe('fuel'); // the blank category cell was defaulted to fuel server-side
-    expect(row.mileage).toBe(30000); // fuel-row fields preserved (no over-clear)
+    expect(row.category).toBe('fuel');
+    expect(row.mileage).toBe(30000);
     expect(row.volume).toBe(9);
   });
 

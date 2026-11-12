@@ -1,18 +1,3 @@
-/**
- * trips-location T8 — PUT/GET /settings `businessMileageRate` + the trip-summary rate fallback, through the
- * REAL HTTP stack.
- *
- * Migration 0008 added `user_preferences.business_mileage_rate` (real NOT NULL DEFAULT 0). T8 wires it into
- * the settings route with an EXPLICIT bounded field (`z.number().min(0).max(100)`) and has the trip
- * mileage-summary consume it as the DEFAULT rate when no explicit ?rate= override is passed (D3: a default
- * rate in preferences + a per-request override). These pin the contract end-to-end:
- *  - GET returns the column default (0) for a fresh user;
- *  - a PUT persists a rate and GET round-trips it;
- *  - the merge is per-field: setting the rate leaves sibling prefs untouched + vice-versa;
- *  - the bound rejects a negative rate and an absurd (>100 $/mile) one;
- *  - the trip summary uses the STORED rate when ?rate= is absent, and an explicit ?rate= OVERRIDES it.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -39,8 +24,8 @@ async function getSettings(): Promise<SettingsBody['data']> {
   return (await json<SettingsBody>(res)).data;
 }
 
-describe('PUT/GET /settings businessMileageRate (trips-location T8)', () => {
-  test('a fresh user businessMileageRate defaults to 0 (the migration-0008 column default)', async () => {
+describe('PUT/GET /settings businessMileageRate', () => {
+  test('a fresh user businessMileageRate defaults to 0', async () => {
     expect((await getSettings()).businessMileageRate).toBe(0);
   });
 
@@ -57,9 +42,8 @@ describe('PUT/GET /settings businessMileageRate (trips-location T8)', () => {
     await ctx.authed('PUT', '/api/v1/settings', { businessMileageRate: 0.5 });
     const data = await getSettings();
     expect(data.businessMileageRate).toBe(0.5);
-    expect(data.currencyUnit).toBe('EUR'); // not wiped by the rate-only PUT
+    expect(data.currencyUnit).toBe('EUR');
 
-    // ...and the reverse: a sibling PUT leaves the rate untouched.
     await ctx.authed('PUT', '/api/v1/settings', { currencyUnit: 'GBP' });
     const after = await getSettings();
     expect(after.businessMileageRate).toBe(0.5);
@@ -71,19 +55,17 @@ describe('PUT/GET /settings businessMileageRate (trips-location T8)', () => {
     expect(neg.status).toBe(400);
     const huge = await ctx.authed('PUT', '/api/v1/settings', { businessMileageRate: 500 });
     expect(huge.status).toBe(400);
-    // The stored value is unchanged (still the default 0).
     expect((await getSettings()).businessMileageRate).toBe(0);
   });
 });
 
-describe('GET /trips/summary uses the stored businessMileageRate as the default (D3, T8)', () => {
-  /** Seed a vehicle + a single 100-mile business trip; returns the vehicleId. */
+describe('GET /trips/summary uses the stored businessMileageRate as the default', () => {
   async function seedBusinessTrip(): Promise<string> {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     await ctx.authed('POST', '/api/v1/trips', {
       vehicleId,
       startOdometer: 1000,
-      endOdometer: 1100, // 100 business miles
+      endOdometer: 1100,
       purpose: 'business',
       tripDate: '2024-06-20T13:30:00.000Z',
     });
@@ -95,7 +77,7 @@ describe('GET /trips/summary uses the stored businessMileageRate as the default 
     businessMileageValue: number;
   }
 
-  test('summary with NO ?rate= uses the stored businessMileageRate (100 mi × 0.5 = 50)', async () => {
+  test('summary without ?rate= uses the stored rate (100 mi × 0.5 = 50)', async () => {
     await seedBusinessTrip();
     await ctx.authed('PUT', '/api/v1/settings', { businessMileageRate: 0.5 });
 
@@ -103,19 +85,19 @@ describe('GET /trips/summary uses the stored businessMileageRate as the default 
     const body = await json<DataEnvelope<SummaryBody>>(res);
     expect(res.status, JSON.stringify(body)).toBe(200);
     expect(body.data.businessMiles).toBe(100);
-    expect(body.data.businessMileageValue).toBe(50); // 100 × the STORED 0.5, no override passed
+    expect(body.data.businessMileageValue).toBe(50);
   });
 
-  test('an explicit ?rate= OVERRIDES the stored default (100 mi × 1.0 = 100)', async () => {
+  test('an explicit ?rate= overrides the stored default (100 mi × 1.0 = 100)', async () => {
     await seedBusinessTrip();
     await ctx.authed('PUT', '/api/v1/settings', { businessMileageRate: 0.5 });
 
     const res = await ctx.authed('GET', '/api/v1/trips/summary?rate=1');
     const body = await json<DataEnvelope<SummaryBody>>(res);
-    expect(body.data.businessMileageValue).toBe(100); // the ?rate=1 override wins over the stored 0.5
+    expect(body.data.businessMileageValue).toBe(100);
   });
 
-  test('with no stored rate and no override, businessMileageValue is 0 (pre-T8 behavior preserved)', async () => {
+  test('with no stored rate and no override, businessMileageValue is 0', async () => {
     await seedBusinessTrip();
     const res = await ctx.authed('GET', '/api/v1/trips/summary');
     const body = await json<DataEnvelope<SummaryBody>>(res);

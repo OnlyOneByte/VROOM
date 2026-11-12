@@ -1,18 +1,3 @@
-/**
- * HTTP characterization of GET /api/v1/reminders/recurring-cost (recurring-expenses T7 backend).
- *
- * The route exposes the recurringCostSummary over the user's ACTIVE expense reminders, normalized
- * to a monthly run-rate — the endpoint the T7 dashboard widget (eyes-on) will fetch. Goes through the
- * REAL stack (route → reminderRepository.findByUserId → reminder-cost helper). Pins:
- *  - a $100 monthly + a $1200 yearly expense reminder → count 2, monthlyTotal $200 ($100 + $100/mo),
- *  - a notification reminder contributes nothing (count/total unchanged),
- *  - a fresh user with no reminders → a clean zero,
- *  - the summary is user-scoped (another user's reminders don't leak in).
- *
- * createTestApp() rewrites env + dynamic-imports DB-bound modules, so keep static imports to the
- * harness + bun:test.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -56,7 +41,6 @@ async function getSummary(): Promise<CostSummary> {
 describe('GET /reminders/recurring-cost — monthly recurring run-rate', () => {
   test('sums active expense reminders normalized to a monthly rate; ignores notifications', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
-    // $100/mo monthly + $1200/yr yearly (=$100/mo) → $200/mo across 2 reminders.
     await createReminder(vehicleId, {
       type: 'expense',
       frequency: 'monthly',
@@ -69,7 +53,6 @@ describe('GET /reminders/recurring-cost — monthly recurring run-rate', () => {
       expenseCategory: 'financial',
       expenseAmount: 1200,
     });
-    // A notification reminder carries no cost → must not change the summary.
     await createReminder(vehicleId, { type: 'notification', frequency: 'monthly' });
 
     const summary = await getSummary();
@@ -92,7 +75,6 @@ describe('GET /reminders/recurring-cost — monthly recurring run-rate', () => {
     });
     expect((await getSummary()).count).toBe(1);
 
-    // A second, independent user sees only their own (empty) set.
     const other = await createTestApp();
     try {
       const res = await other.authed('GET', '/api/v1/reminders/recurring-cost');

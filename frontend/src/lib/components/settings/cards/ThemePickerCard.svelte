@@ -1,9 +1,4 @@
 <script lang="ts">
-	// Theming engine T10 — the theme-ID picker. A responsive grid of theme cards (one per registry theme),
-	// each previewing its OWN palette via a swatch strip (resolved from that theme's definition, NOT the
-	// active theme), with a selected-state ring. Click → themeStore.setTheme(id) → instant live re-skin.
-	// Composes the kit (Card) per DesignSystem.md — no bespoke controls. Orthogonal to the light/dark mode
-	// selector in ThemeCard (D3): this picks the theme ID; that picks the variant.
 	import { Check } from '@lucide/svelte';
 	import {
 		Card,
@@ -11,27 +6,20 @@
 		CardDescription,
 		CardHeader,
 		CardTitle
-	} from '$lib/components/ui/card';
-	import { getSystemTheme, themeStore } from '$lib/stores/theme.svelte';
-	import { THEME_REGISTRY } from '$lib/theme/theme-registry';
-	import { resolveVariant } from '$lib/theme/resolve-theme';
-	import type { ThemeDefinition } from '$lib/theme/theme-types';
-	import { cn } from '$lib/utils';
+	} from '#lib/components/ui/card/index.ts';
+	import { getSystemTheme, themeStore } from '#lib/stores/theme.svelte.ts';
+	import { THEME_REGISTRY } from '#lib/theme/theme-registry.ts';
+	import { resolveVariant } from '#lib/theme/resolve-theme.ts';
+	import type { ThemeDefinition } from '#lib/theme/theme-types.ts';
+	import { cn } from '#lib/utils.ts';
 
-	// The static built-in registry (order: default first, then the rest). Empty-safe: the registry always
-	// contains `default`, so the grid is never empty (four-states: only the "data" state is reachable).
 	const themes: ThemeDefinition[] = Object.values(THEME_REGISTRY);
 
 	let activeId = $derived(themeStore.themeId);
 	let mode = $derived(themeStore.current);
 
-	// The concrete variant (light|dark) the previews should show, tracking the active mode. Under `system`
-	// the OS preference is resolved by the SAME getSystemTheme the store's applyTheme uses (single source of
-	// truth — so the preview can never disagree with what applying the theme will actually render).
 	let variant = $derived(resolveVariant(mode, getSystemTheme()));
 
-	// Each theme's own swatch colors, resolved from ITS definition (not the live CSS vars, which only
-	// reflect the active theme). Values are the raw oklch strings from the registry → safe inline styles.
 	function swatchColors(theme: ThemeDefinition): string[] {
 		const tokens = theme[variant];
 		return theme.swatch.map(key => tokens[key]);
@@ -69,10 +57,7 @@
 						</span>
 					{/if}
 					<div class="flex gap-1" aria-hidden="true">
-						<!-- Key by INDEX, not color value: the swatch is a static, never-reordered, presentation-only
-						     strip, and a minimalist/monochrome theme can legitimately resolve two swatch tokens to the
-						     SAME color (e.g. background === card) — keying on (color) would throw Svelte's
-						     each_key_duplicate at runtime and crash the whole picker for that theme. -->
+						<!-- Index-keyed: swatch colours can repeat, and duplicate keys throw. -->
 						{#each swatchColors(theme) as color, i (i)}
 							<span class="h-6 w-6 rounded-md border border-border/50" style={`background:${color}`}
 							></span>

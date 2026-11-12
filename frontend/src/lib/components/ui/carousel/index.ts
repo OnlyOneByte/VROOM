@@ -10,7 +10,6 @@ export {
 	Item,
 	Previous,
 	Next,
-	//
 	Root as Carousel,
 	Content as CarouselContent,
 	Item as CarouselItem,

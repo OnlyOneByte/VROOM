@@ -1,36 +1,33 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { gotoDynamic } from '$lib/utils/navigation';
+	import { gotoDynamic } from '#lib/utils/navigation.ts';
 	import { onMount } from 'svelte';
 	import { z } from 'zod';
 	import { ArrowLeft, LoaderCircle, TriangleAlert } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import { Textarea } from '$lib/components/ui/textarea';
-	import PendingPhotoPreview from '$lib/components/expenses/form/PendingPhotoPreview.svelte';
-	import { odometerApi } from '$lib/services/odometer-api';
-	import { dateOnlyToISO, toDateInputValue } from '$lib/utils/formatters';
-	import FormLayout from '$lib/components/common/form-layout.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { Textarea } from '#lib/components/ui/textarea/index.ts';
+	import PendingPhotoPreview from '#lib/components/expenses/form/PendingPhotoPreview.svelte';
+	import { odometerApi } from '#lib/services/odometer-api.ts';
+	import { dateOnlyToISO, toDateInputValue } from '#lib/utils/formatters.ts';
+	import FormLayout from '#lib/components/common/form-layout.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 	let vehicleId = $derived(data.vehicleId);
 	let returnTo = $derived(page.url.searchParams.get('returnTo') || `/vehicles/${vehicleId}`);
 
-	// Form state
 	let odometer = $state('');
 	let date = $state(toDateInputValue(new Date()));
 	let note = $state('');
 	let pendingFiles = $state<File[]>([]);
 
-	// UI state
 	let isSubmitting = $state(false);
 	let latestOdometer = $state<number | null>(null);
 	let fieldErrors = $state<{ odometer?: string; date?: string; note?: string }>({});
 	let submitError = $state<string | null>(null);
 
-	// Soft warning for non-monotonic reading
 	let showWarning = $derived.by(() => {
 		if (latestOdometer === null) return false;
 		const val = Number(odometer);
@@ -55,7 +52,7 @@
 				latestOdometer = first.odometer;
 			}
 		} catch {
-			// Non-critical — just means we can't show the soft warning
+			// The soft warning is optional; ignore failures.
 		}
 	});
 
@@ -96,7 +93,6 @@
 				note: note || undefined
 			});
 
-			// Upload pending photos after entry is created
 			if (pendingFiles.length > 0) {
 				let failCount = 0;
 				for (const file of pendingFiles) {
@@ -127,7 +123,6 @@
 </svelte:head>
 
 <FormLayout>
-	<!-- Header -->
 	<div class="mb-6 flex items-center gap-3">
 		<Button variant="ghost" size="icon" aria-label="Back" onclick={() => gotoDynamic(returnTo)}>
 			<ArrowLeft class="h-5 w-5" />
@@ -135,7 +130,6 @@
 		<h1 class="text-2xl font-bold text-foreground">Add Odometer Reading</h1>
 	</div>
 
-	<!-- Form -->
 	<form
 		class="space-y-6 rounded-lg border bg-card p-6"
 		onsubmit={e => {
@@ -143,7 +137,6 @@
 			handleSubmit();
 		}}
 	>
-		<!-- Odometer field -->
 		<div class="space-y-2">
 			<Label for="odometer">Odometer Reading</Label>
 			<Input
@@ -167,7 +160,6 @@
 			{/if}
 		</div>
 
-		<!-- Date field -->
 		<div class="space-y-2">
 			<Label for="date">Date</Label>
 			<Input
@@ -181,7 +173,6 @@
 			{/if}
 		</div>
 
-		<!-- Note field -->
 		<div class="space-y-2">
 			<Label for="note">Note (optional)</Label>
 			<Textarea
@@ -197,21 +188,18 @@
 			<p class="text-xs text-muted-foreground">{note.length}/500</p>
 		</div>
 
-		<!-- Photo upload -->
 		<PendingPhotoPreview
 			files={pendingFiles}
 			onAdd={file => (pendingFiles = [...pendingFiles, file])}
 			onRemove={i => (pendingFiles = pendingFiles.filter((_, idx) => idx !== i))}
 		/>
 
-		<!-- Submit error -->
 		{#if submitError}
 			<div class="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
 				{submitError}
 			</div>
 		{/if}
 
-		<!-- Actions -->
 		<div class="flex gap-3">
 			<Button type="button" variant="outline" onclick={() => gotoDynamic(returnTo)} class="flex-1">
 				Cancel

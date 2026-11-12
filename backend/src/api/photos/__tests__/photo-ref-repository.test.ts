@@ -2,8 +2,6 @@ import { afterEach, describe, expect, mock, test } from 'bun:test';
 import type { NewPhotoRef, PhotoRef } from '../../../db/schema';
 import { PhotoRefRepository } from '../photo-ref-repository';
 
-// --- Test fixtures ---
-
 const now = new Date();
 
 const activeRef: PhotoRef = {
@@ -45,11 +43,6 @@ const failedRef: PhotoRef = {
   createdAt: now,
 };
 
-/**
- * Creates a mock DB that supports chained Drizzle query methods.
- * Each call through a full chain (ending at limit/returning/execute) consumes
- * the next result from the queue.
- */
 function createMockDb(resultQueue: unknown[][]) {
   let callIndex = 0;
 
@@ -65,17 +58,14 @@ function createMockDb(resultQueue: unknown[][]) {
     orderBy: mock(() => chain),
     limit: mock(() => chain._currentResult ?? []),
     innerJoin: mock(() => chain),
-    // For insert().values().returning()
     insert: mock(() => chain),
     values: mock(() => chain),
     returning: mock(() => {
       const idx = callIndex++;
       return resultQueue[idx] ?? [];
     }),
-    // For update().set().where()
     update: mock(() => chain),
     set: mock(() => chain),
-    // For delete().where()
     delete: mock(() => chain),
   };
 
@@ -220,56 +210,12 @@ describe('PhotoRefRepository', () => {
     });
   });
 
-  describe('countByProviderAndCategory', () => {
-    test('returns count of active refs for provider and entity types', async () => {
-      // countByProviderAndCategory uses select().from().innerJoin().where()
-      // The where() call returns the result array directly (no .limit())
-      const countResult = [{ count: 42 }];
-      const countDb = {
-        select: mock(() => countDb),
-        from: mock(() => countDb),
-        innerJoin: mock(() => countDb),
-        where: mock(() => countResult),
-      };
-      const repo = new PhotoRefRepository(countDb as never);
-
-      const count = await repo.countByProviderAndCategory('provider-1', ['vehicle']);
-
-      expect(count).toBe(42);
-    });
-
-    test('returns 0 when no matching refs', async () => {
-      const countDb = {
-        select: mock(() => countDb),
-        from: mock(() => countDb),
-        innerJoin: mock(() => countDb),
-        where: mock(() => [{ count: 0 }]),
-      };
-      const repo = new PhotoRefRepository(countDb as never);
-
-      const count = await repo.countByProviderAndCategory('provider-99', ['vehicle']);
-
-      expect(count).toBe(0);
-    });
-  });
-
   describe('deleteByProvider', () => {
     test('deletes all refs for a provider', async () => {
       const db = createMockDb([[]]);
       const repo = new PhotoRefRepository(db as never);
 
       await repo.deleteByProvider('provider-1');
-
-      expect(db.delete).toHaveBeenCalled();
-    });
-  });
-
-  describe('deleteByPhoto', () => {
-    test('deletes all refs for a photo', async () => {
-      const db = createMockDb([[]]);
-      const repo = new PhotoRefRepository(db as never);
-
-      await repo.deleteByPhoto('photo-1');
 
       expect(db.delete).toHaveBeenCalled();
     });

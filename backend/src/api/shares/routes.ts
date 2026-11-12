@@ -9,16 +9,7 @@ import { changeTracker, requireAuth } from '../../middleware';
 import { commonSchemas, validateVehicleOwnership, zValidator } from '../../utils/validation';
 import { type ReceivedShare, vehicleShareRepository } from './repository';
 
-/**
- * Vehicle-sharing — OWNER-side share-management routes (T3, `/api/v1/shares`). The owner invites
- * another existing VROOM user (by email) to ONE of their vehicles, lists shares they granted, changes
- * a share's level, or revokes it. EVERY owner-side action gates on the STRICT `validateVehicleOwnership`
- * (owner === acting via vehicles.userId) — managing shares is an owner-only action, NOT something an
- * editor/viewer can do, so it never uses the requireVehicleWrite seam. Invitee-side accept/decline is T4.
- *
- * Cross-tenant discipline (R6): the IDOR sweep proves a non-owner cannot invite to / list / change /
- * revoke a share on someone else's vehicle — see cross-tenant-idor.test.ts (shares entries, same cycle).
- */
+// Non-owners and non-invitees get 404, not 403, so share existence is not revealed.
 
 const routes = new Hono();
 
@@ -35,21 +26,12 @@ const inviteSchema = z.object({
 
 const levelSchema = z.object({ level: z.enum(LEVELS) });
 
-/** Owner-facing share view: the raw row is already owner-safe (no cross-tenant data); returned as-is. */
-function shareToApi(share: VehicleShare): VehicleShare {
-  return share;
-}
-
-// POST /api/v1/shares — invite an existing user to a vehicle I own (→ pending). R1.
 routes.post('/', zValidator('json', inviteSchema), async (c) => {
   const user = c.get('user');
   const { vehicleId, email, level } = c.req.valid('json');
 
-  // Owner-only: the vehicle must be the acting user's own (404 if not — never leaks existence). This is
-  // the validate-before-insert order: every rejection throws BEFORE any row write.
   await validateVehicleOwnership(vehicleId, user.id);
 
-  // Invitee must be an existing VROOM user (D4 — no email-signup invites in v1).
   const db = getDb();
   const [invitee] = await db
     .select({ id: users.id })
@@ -60,14 +42,10 @@ routes.post('/', zValidator('json', inviteSchema), async (c) => {
     throw new NotFoundError('No VROOM account with that email');
   }
 
-  // Cannot share a vehicle with yourself (you are already the owner).
   if (invitee.id === user.id) {
     throw new ValidationError('You cannot share a vehicle with yourself');
   }
 
-  // One ACTIVE (pending|accepted) share per (vehicle, invitee) — mirrors the partial-unique DB index,
-  // but checked here first so the user gets a clean 409 instead of a raw constraint error. A prior
-  // declined/revoked share does NOT block a fresh invite (the partial index excludes those).
   const existing = await vehicleShareRepository.findActiveForVehicleAndUser(vehicleId, invitee.id);
   if (existing) {
     throw new ConflictError('This vehicle is already shared with that user');
@@ -83,25 +61,23 @@ routes.post('/', zValidator('json', inviteSchema), async (c) => {
 
   const response: ApiResponse<VehicleShare> = {
     success: true,
-    data: shareToApi(created),
+    data: created,
     message: 'Invitation sent',
   };
   return c.json(response, 201);
 });
 
-// GET /api/v1/shares/granted — every share I granted, across all my vehicles. R5.
 routes.get('/granted', async (c) => {
   const user = c.get('user');
   const shares = await vehicleShareRepository.findByOwner(user.id);
   const response: ApiResponse<VehicleShare[]> = {
     success: true,
-    data: shares.map(shareToApi),
+    data: shares,
     message: `Found ${shares.length} share${shares.length !== 1 ? 's' : ''}`,
   };
   return c.json(response);
 });
 
-// PUT /api/v1/shares/:id — change a share's level (owner of the share's vehicle only). R5.
 routes.put(
   '/:id',
   zValidator('param', commonSchemas.idParam),
@@ -111,19 +87,16 @@ routes.put(
     const { id } = c.req.valid('param');
     const { level } = c.req.valid('json');
 
-    // Scope by ownerId: a non-owner gets the same 404 a nonexistent share does (existence-hiding).
     const share = await vehicleShareRepository.findByIdAndOwner(id, user.id);
     if (!share) {
       throw new NotFoundError('Share');
     }
 
     const updated = await vehicleShareRepository.update(id, { level, updatedAt: new Date() });
-    return c.json({ success: true, data: shareToApi(updated), message: 'Share level updated' });
+    return c.json({ success: true, data: updated, message: 'Share level updated' });
   }
 );
 
-// DELETE /api/v1/shares/:id — revoke a share (→ revoked; D8). The row is kept (status flip), so the
-// partial-unique slot frees and the same user can be re-invited later. R5.
 routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
@@ -137,14 +110,6 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   return c.json({ success: true, message: 'Share revoked' });
 });
 
-// ---------------------------------------------------------------------------
-// Invitee-side endpoints (T4). Every action is scoped to `sharedWithId === acting` — only the invitee
-// can act on their OWN invite (a third party gets the same 404 a nonexistent share does, R2/R6).
-// ---------------------------------------------------------------------------
-
-// GET /api/v1/shares/received — invites/grants TO me (pending + accepted), each enriched with the
-// vehicle's display name + the owner's name so the "Shared with me" surface (T12) can render a human
-// label even for a still-PENDING invite (which the accepted-only fleet widening cannot surface). R5.
 routes.get('/received', async (c) => {
   const user = c.get('user');
   const shares = await vehicleShareRepository.findReceivedByUser(user.id);
@@ -156,18 +121,14 @@ routes.get('/received', async (c) => {
   return c.json(response);
 });
 
-// POST /api/v1/shares/:id/accept — invitee accepts a PENDING invite (→ accepted). R2.
 routes.post('/:id/accept', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
 
-  // Scope by sharedWithId: only the invitee can accept; anyone else gets the same 404 (existence-hiding).
   const share = await vehicleShareRepository.findByIdAndSharedWith(id, user.id);
   if (!share) {
     throw new NotFoundError('Share');
   }
-  // Only a PENDING invite can be accepted — a declined/revoked one is inert, an accepted one is a no-op
-  // that should not silently "re-activate" something the owner may have since revoked. Reject non-pending.
   if (share.status !== 'pending') {
     throw new ConflictError('This invitation is no longer pending');
   }
@@ -176,11 +137,9 @@ routes.post('/:id/accept', zValidator('param', commonSchemas.idParam), async (c)
     status: 'accepted',
     updatedAt: new Date(),
   });
-  return c.json({ success: true, data: shareToApi(updated), message: 'Invitation accepted' });
+  return c.json({ success: true, data: updated, message: 'Invitation accepted' });
 });
 
-// POST /api/v1/shares/:id/decline — invitee declines a pending invite OR self-removes an accepted
-// share (both → declined; D5/R5). Frees the partial-unique active slot so the owner can re-invite. R2.
 routes.post('/:id/decline', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
@@ -189,8 +148,6 @@ routes.post('/:id/decline', zValidator('param', commonSchemas.idParam), async (c
   if (!share) {
     throw new NotFoundError('Share');
   }
-  // Decline works from pending (reject the invite) OR accepted (self-remove). An already
-  // declined/revoked share is inert — nothing to do (reject as a conflict so the client is not misled).
   if (share.status !== 'pending' && share.status !== 'accepted') {
     throw new ConflictError('This share is no longer active');
   }

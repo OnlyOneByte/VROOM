@@ -5,14 +5,10 @@ import { getDb, transaction } from '../../db/connection';
 import type { NewReminder, Reminder, ReminderNotification } from '../../db/schema';
 import { reminderNotifications, reminders, reminderVehicles } from '../../db/schema';
 import type { DrizzleTransaction } from '../../db/types';
-import { DatabaseError, NotFoundError } from '../../errors';
+import { DatabaseError, isUniqueConstraintError, NotFoundError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { BaseRepository } from '../../utils/repository';
 import { pruneVehicleFromSplitConfig } from './split-config-helpers';
-
-// ============================================================================
-// Types
-// ============================================================================
 
 export interface ReminderWithVehicles {
   reminder: Reminder;
@@ -25,41 +21,24 @@ export interface ReminderFilters {
   isActive?: boolean;
 }
 
-// ============================================================================
-// Repository
-// ============================================================================
-
 export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
   constructor(db: AppDatabase) {
     super(db, reminders);
   }
 
-  // --------------------------------------------------------------------------
-  // Private helpers
-  // --------------------------------------------------------------------------
-
-  /**
-   * Fetch vehicleIds for a single reminder from the junction table.
-   */
-  private async getVehicleIds(reminderId: string): Promise<string[]> {
-    const rows = await this.db
+  private getVehicleIdsSync(
+    handle: AppDatabase | DrizzleTransaction,
+    reminderId: string
+  ): string[] {
+    return handle
       .select({ vehicleId: reminderVehicles.vehicleId })
       .from(reminderVehicles)
-      .where(eq(reminderVehicles.reminderId, reminderId));
-    return rows.map((r) => r.vehicleId);
+      .where(eq(reminderVehicles.reminderId, reminderId))
+      .all()
+      .map((r) => r.vehicleId);
   }
 
-  /**
-   * Insert the reminder→vehicle junction rows inside the caller's transaction. One source of truth for
-   * the `for (vehicleId) insert(reminderVehicles)` loop the create + update-replace paths would
-   * otherwise repeat byte-identically (mirrors insurance/repository.ts insertJunctionRowsSync), so a
-   * future change to the junction write (batch insert, a new column) lands once, not twice.
-   *
-   * SYNCHRONOUS on purpose — do NOT make this `async`. bun-sqlite is a sync dialect, so a transaction
-   * with an async callback autocommits each write alone instead of rolling back as one unit, which here
-   * could leave a reminder with NO vehicles (the vehicle-less-but-active state). `.run()` executes
-   * inline inside the caller's tx.
-   */
+  // bun:sqlite: an async transaction callback autocommits each write, so keep this synchronous.
   private insertVehicleJunctionsSync(
     tx: DrizzleTransaction,
     reminderId: string,
@@ -70,9 +49,6 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     }
   }
 
-  /**
-   * Batch-fetch vehicleIds for multiple reminders. Returns a map of reminderId → vehicleIds.
-   */
   private async getVehicleIdsForReminders(reminderIds: string[]): Promise<Map<string, string[]>> {
     const map = new Map<string, string[]>();
     if (reminderIds.length === 0) return map;
@@ -94,9 +70,6 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     return map;
   }
 
-  /**
-   * Attach vehicleIds to a list of reminders using a batch query.
-   */
   private async attachVehicleIds(reminderList: Reminder[]): Promise<ReminderWithVehicles[]> {
     const ids = reminderList.map((r) => r.id);
     const vehicleMap = await this.getVehicleIdsForReminders(ids);
@@ -106,14 +79,6 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     }));
   }
 
-  // --------------------------------------------------------------------------
-  // Query methods
-  // --------------------------------------------------------------------------
-
-  /**
-   * Find all reminders for a user with optional filters.
-   * When vehicleId is provided, JOINs with reminder_vehicles to filter.
-   */
   async findByUserId(userId: string, filters?: ReminderFilters): Promise<ReminderWithVehicles[]> {
     try {
       const conditions: SQL[] = [eq(reminders.userId, userId)];
@@ -128,7 +93,6 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
       let reminderList: Reminder[];
 
       if (filters?.vehicleId) {
-        // JOIN with junction table to filter by vehicle
         const rows = await this.db
           .select({ reminder: reminders })
           .from(reminders)
@@ -152,9 +116,6 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     }
   }
 
-  /**
-   * Find a single reminder by ID scoped to a user, including vehicleIds.
-   */
   async findByIdAndUserId(id: string, userId: string): Promise<ReminderWithVehicles | null> {
     const result = await this.db
       .select()
@@ -165,30 +126,19 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     const reminder = result[0];
     if (!reminder) return null;
 
-    const vehicleIds = await this.getVehicleIds(id);
+    const vehicleIds = this.getVehicleIdsSync(this.db, id);
     return { reminder, vehicleIds };
   }
 
-  /**
-   * vehicle-sharing T7b: find a reminder by id UNSCOPED (no userId filter), with its vehicleIds. The
-   * share-aware write routes (PUT/DELETE/mark-serviced) load the reminder this way FIRST — a reminder
-   * on a shared vehicle is OWNER-stamped (userId = vehicle owner, T7b), so the old userId-scoped
-   * findByIdAndUserId would 404 a shared editor on a reminder they can legitimately mutate. The caller
-   * then authorizes via the share seam on the reminder's vehicleIds (requireVehicleWrite) and scopes
-   * all subsequent repo reads/writes to the reminder's stamped userId (the owner). Returns null when
-   * the reminder does not exist (caller → 404, existence-hiding).
-   */
+  // Unscoped by user: callers must authorize against the returned vehicleIds.
   async findByIdWithVehicles(id: string): Promise<ReminderWithVehicles | null> {
     const result = await this.db.select().from(reminders).where(eq(reminders.id, id)).limit(1);
     const reminder = result[0];
     if (!reminder) return null;
-    const vehicleIds = await this.getVehicleIds(id);
+    const vehicleIds = this.getVehicleIdsSync(this.db, id);
     return { reminder, vehicleIds };
   }
 
-  /**
-   * Find all overdue active reminders for a user (nextDueDate <= now).
-   */
   async findOverdue(userId: string, now: Date): Promise<ReminderWithVehicles[]> {
     try {
       const reminderList = await this.db
@@ -212,13 +162,6 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     }
   }
 
-  /**
-   * Find active mileage-tracking reminders for a user — `triggerMode` in ('mileage','both') with a
-   * non-null `nextDueOdometer` milestone. Unlike findOverdue (the time axis), due-ness can't be
-   * decided in SQL: it depends on the vehicle's CURRENT odometer (max across expenses + odometer
-   * entries), which the trigger service fetches per vehicle. So this returns the candidate set; the
-   * service evaluates `currentOdometer >= nextDueOdometer` against each.
-   */
   async findMileageTracking(userId: string): Promise<ReminderWithVehicles[]> {
     try {
       const reminderList = await this.db
@@ -243,13 +186,6 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     }
   }
 
-  /**
-   * Whether a mileage notification already exists for this reminder + odometer milestone.
-   * App-level guard for the mileage dedup (the partial unique index
-   * `(reminderId, dueOdometer) WHERE dueOdometer IS NOT NULL` is the DB backstop). A mileage axis
-   * has no auto-re-arm — re-arm is the explicit mark-serviced path — so one notification per
-   * milestone is correct, and re-running the trigger must be a no-op.
-   */
   async mileageNotificationExists(reminderId: string, dueOdometer: number): Promise<boolean> {
     const rows = await this.db
       .select({ id: reminderNotifications.id })
@@ -264,10 +200,6 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     return rows.length > 0;
   }
 
-  /**
-   * Insert a mileage-fired notification (null dueDate, dueOdometer set). Returns the created row,
-   * or null if the partial unique index rejects a concurrent duplicate (idempotent under races).
-   */
   async createMileageNotification(
     reminderId: string,
     userId: string,
@@ -280,29 +212,15 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
         .returning();
       return created ?? null;
     } catch (error) {
-      // Unique-index violation = another pass already wrote this milestone; treat as a no-op.
-      if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
+      if (isUniqueConstraintError(error)) {
         return null;
       }
       throw new DatabaseError('Failed to create mileage notification', error);
     }
   }
 
-  // --------------------------------------------------------------------------
-  // Mutation methods
-  // --------------------------------------------------------------------------
-
-  /**
-   * Create a reminder with associated vehicle junction rows in a single transaction.
-   * The caller supplies the final `nextDueDate` (= startDate for a time/both reminder, or null for a
-   * pure-mileage reminder — T4) and any mileage fields; this method no longer overrides it.
-   */
   async createWithVehicles(data: NewReminder, vehicleIds: string[]): Promise<ReminderWithVehicles> {
     try {
-      // SYNCHRONOUS transaction: insert the reminder THEN its vehicle-junction rows.
-      // Under the old async callback a throw on the junction insert left the reminder row committed with
-      // zero vehicles (the vehicle-less-but-active state, skipped forever by the trigger). Running
-      // synchronously keeps both in ONE real transaction that rolls back atomically.
       return transaction((tx) => {
         const reminder = tx.insert(reminders).values(data).returning().get();
 
@@ -319,10 +237,6 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     }
   }
 
-  /**
-   * Update a reminder and optionally replace all junction rows in a single transaction.
-   * When vehicleIds is provided, performs a full replacement of junction rows.
-   */
   async updateWithVehicles(
     id: string,
     userId: string,
@@ -330,13 +244,7 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     vehicleIds?: string[]
   ): Promise<ReminderWithVehicles> {
     try {
-      // SYNCHRONOUS transaction: the replace path DELETEs all junction rows then
-      // re-inserts them. Under the old async callback a throw on the re-insert left the reminder with its
-      // vehicles deleted and none re-added — the vehicle-less-but-active state, silently. Running
-      // synchronously keeps the verify + update + delete + re-insert in ONE real transaction that rolls
-      // back atomically.
       return transaction((tx) => {
-        // Verify ownership
         const existing = tx
           .select()
           .from(reminders)
@@ -348,7 +256,6 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
           throw new NotFoundError('Reminder');
         }
 
-        // Update reminder fields
         const updateData = { ...data, updatedAt: new Date() };
         const reminder = tx
           .update(reminders)
@@ -357,23 +264,12 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
           .returning()
           .get();
 
-        // Replace junction rows if vehicleIds provided
         if (vehicleIds) {
           tx.delete(reminderVehicles).where(eq(reminderVehicles.reminderId, id)).run();
           this.insertVehicleJunctionsSync(tx, id, vehicleIds);
         }
 
-        // Fetch current vehicleIds for the response
-        const currentVehicleIds =
-          vehicleIds ??
-          tx
-            .select({ vehicleId: reminderVehicles.vehicleId })
-            .from(reminderVehicles)
-            .where(eq(reminderVehicles.reminderId, id))
-            .all()
-            .map((r) => r.vehicleId);
-
-        return { reminder, vehicleIds: currentVehicleIds };
+        return { reminder, vehicleIds: vehicleIds ?? this.getVehicleIdsSync(tx, id) };
       });
     } catch (error) {
       if (error instanceof NotFoundError) throw error;
@@ -385,14 +281,6 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     }
   }
 
-  // --------------------------------------------------------------------------
-  // Due date advancement (optimistic locking)
-  // --------------------------------------------------------------------------
-
-  /**
-   * Advance nextDueDate with optimistic locking.
-   * WHERE next_due_date = expectedCurrentDueDate prevents double-processing.
-   */
   async advanceNextDueDate(
     id: string,
     expectedCurrentDueDate: Date,
@@ -404,20 +292,7 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
       .where(and(eq(reminders.id, id), eq(reminders.nextDueDate, expectedCurrentDueDate)));
   }
 
-  /**
-   * CLAIM one reminder period inside the caller's transaction: compare-and-swap `nextDueDate` from
-   * `expectedCurrentDueDate` to `nextDueDate` (also stamping `lastTriggeredAt`) and report whether
-   * this caller won the claim. `false` means the row no longer holds the expected value — a
-   * concurrent trigger already processed that period — and the caller MUST NOT materialize it.
-   * Returning the CAS outcome is what makes the guard real: a `.update()` whose WHERE matches
-   * nothing does not throw, so an unchecked CAS lets every racing trigger write the period's rows.
-   *
-   * SYNCHRONOUS on purpose — do NOT make this `async`, and do not call it from an async transaction
-   * callback. bun-sqlite is a sync dialect: a transaction whose callback awaits anything autocommits
-   * each statement on its own while BEGIN/COMMIT wrap nothing, so the claim and the rows it guards
-   * would be independent writes and the claim would guard nothing. `.returning().all()` executes
-   * inline inside the caller's tx, and its length is the affected-row count the CAS needs.
-   */
+  // bun:sqlite: awaited statements inside a transaction autocommit separately, so keep this synchronous.
   claimPeriodSync(
     tx: DrizzleTransaction,
     id: string,
@@ -434,9 +309,6 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     return claimed.length > 0;
   }
 
-  /**
-   * Deactivate a reminder by setting isActive = false.
-   */
   async deactivate(id: string): Promise<void> {
     await this.db
       .update(reminders)
@@ -444,16 +316,7 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
       .where(eq(reminders.id, id));
   }
 
-  /**
-   * Deactivate any of the user's ACTIVE reminders that have NO remaining vehicles. When a
-   * vehicle is deleted, its `reminder_vehicles` junction rows cascade away (schema onDelete:cascade), but
-   * the reminder ROW survives — a reminder whose sole/last vehicle was the deleted one is left
-   * `is_active=1` with zero vehicles, which the trigger then skips `no_vehicles` every run forever with no
-   * user signal. Called after a vehicle delete: flip those to inactive so they leave the "active" surface
-   * (and stop inflating the recurring-cost run-rate). Returns the count deactivated. Scoped by userId.
-   */
   async deactivateVehicleless(userId: string): Promise<number> {
-    // Active reminders for this user that have no junction row at all.
     const orphanRows = await this.db
       .select({ id: reminders.id })
       .from(reminders)
@@ -474,23 +337,11 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     return ids.length;
   }
 
-  /**
-   * Prune a deleted vehicle from every reminder's `expenseSplitConfig` blob and renormalize.
-   * Unlike the reminder_vehicles junction (FK onDelete:cascade), the split-config JSON is NOT FK-managed,
-   * so a deleted vehicle's leg lingers in the blob — and on the next trigger `createExpenseFromReminder`
-   * builds siblings from the blob's vehicleIds → an INSERT for the dead vehicleId → an FK violation that
-   * (the async-tx footgun) leaves the surviving legs partially committed. Call this BEFORE
-   * `deactivateVehicleless` on a vehicle delete: each affected config is pruned via
-   * `pruneVehicleFromSplitConfig` (drop the leg, rescale a percentage split, keep absolute amounts) when
-   * ≥2 legs remain, else the blob is CLEARED to null so the reminder falls back to the single-vehicle
-   * junction path (and deactivateVehicleless then catches a now-vehicleless reminder). Scoped by userId.
-   * Returns the count of configs changed.
-   */
+  // Split JSON is not FK-managed: the vehicle delete does not prune it, so this must be called explicitly.
   async pruneSplitConfigsForDeletedVehicle(
     userId: string,
     deletedVehicleId: string
   ): Promise<number> {
-    // Only reminders that actually carry a split config can reference the deleted vehicle in their blob.
     const rows = await this.db
       .select({ id: reminders.id, expenseSplitConfig: reminders.expenseSplitConfig })
       .from(reminders)
@@ -501,7 +352,6 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
       const config = row.expenseSplitConfig;
       if (!config) continue;
       const pruned = pruneVehicleFromSplitConfig(config, deletedVehicleId);
-      // The helper returns the SAME reference when the deleted id wasn't in the config → skip the write.
       if (pruned === config) continue;
       await this.db
         .update(reminders)
@@ -512,13 +362,6 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     return changed;
   }
 
-  /**
-   * Apply a mark-serviced re-arm (D3) and return the updated row. The caller (route) has already
-   * computed the new axis values from the reminder's mode: for the mileage axis the new
-   * lastServiceOdometer (= current odometer) + nextDueOdometer; for the time axis the advanced
-   * nextDueDate. Both are optional so a pure-mileage or pure-time reminder only moves its own axis.
-   * `lastTriggeredAt` is stamped to now. Ownership-scoped (id + userId) so a cross-tenant id no-ops.
-   */
   async markServiced(
     id: string,
     userId: string,
@@ -538,13 +381,6 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     return reminder;
   }
 
-  // --------------------------------------------------------------------------
-  // Notification methods
-  // --------------------------------------------------------------------------
-
-  /**
-   * Find notifications for a user, optionally filtered to unread only.
-   */
   async findNotifications(userId: string, unreadOnly?: boolean): Promise<ReminderNotification[]> {
     try {
       const conditions: SQL[] = [eq(reminderNotifications.userId, userId)];
@@ -556,14 +392,8 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
       return await this.db
         .select()
         .from(reminderNotifications)
-        // Order by createdAt (the true recency axis spanning BOTH notification types), NOT dueDate.
-        // A MILEAGE notification carries dueDate=NULL (its milestone lives in dueOdometer), and NULLs
-        // sort LAST under `DESC` — so ordering by dueDate sank every mileage notification beneath every
-        // time notification regardless of when it fired, and the limit(100) truncated the mileage axis
-        // entirely for a user with ≥100 time notifications (a just-due service buried/invisible —,
-        // feature-disabling for the maintenance-schedule mileage axis). createdAt is non-null on every
-        // row ($defaultFn) and is the real "when it fired" order for the feed.
         .where(and(...conditions))
+        // Order by createdAt: a null dueDate (mileage notifications) sorts last under DESC.
         .orderBy(desc(reminderNotifications.createdAt))
         .limit(CONFIG.validation.reminder.notificationsHistoryLimit);
     } catch (error) {
@@ -575,9 +405,6 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     }
   }
 
-  /**
-   * Mark a notification as read with ownership check.
-   */
   async markNotificationRead(id: string, userId: string): Promise<void> {
     const result = await this.db
       .update(reminderNotifications)
@@ -591,5 +418,4 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
   }
 }
 
-// Export singleton instance
 export const reminderRepository = new ReminderRepository(getDb());

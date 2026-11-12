@@ -2,8 +2,6 @@ import { beforeEach, describe, expect, mock, test } from 'bun:test';
 import { S3CompatProvider } from '../domains/storage/s3-compat-provider';
 import type { StorageRef } from '../domains/storage/storage-provider';
 
-// --- Mock AWS SDK ---
-
 const mockSend = mock<(command: unknown) => Promise<unknown>>(() => Promise.resolve({}));
 
 mock.module('@aws-sdk/client-s3', () => {

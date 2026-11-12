@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
-	import { authStore } from '$lib/stores/auth.svelte';
-	import { routes } from '$lib/routes';
+	import { authStore } from '#lib/stores/auth.svelte.ts';
+	import { routes } from '#lib/routes.ts';
 	import {
 		House,
 		Receipt,
@@ -16,24 +16,23 @@
 		Bot
 	} from '@lucide/svelte';
 	import SyncStatusInline from '../sync/SyncStatusInline.svelte';
-	import { syncState, onlineStatus, offlineExpenseQueue } from '$lib/stores/offline.svelte';
-	import { syncConflicts } from '$lib/utils/sync/sync-manager';
-	import { getSyncStatusInfo } from '$lib/utils/sync/sync-status';
-	import { countPendingSync } from '$lib/utils/sync/pending-expenses';
-	import { Badge } from '$lib/components/ui/badge';
+	import { syncState, onlineStatus, offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
+	import { syncConflicts } from '#lib/utils/sync/sync-manager.ts';
+	import { getSyncStatusInfo } from '#lib/utils/sync/sync-status.ts';
+	import { countPendingSync } from '#lib/utils/sync/pending-expenses.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import {
 		Sheet,
 		SheetContent,
 		SheetHeader,
 		SheetTitle,
 		SheetTrigger
-	} from '$lib/components/ui/sheet';
-	import { ScrollArea } from '$lib/components/ui/scroll-area';
-	import { cn } from '$lib/utils';
+	} from '#lib/components/ui/sheet/index.ts';
+	import { ScrollArea } from '#lib/components/ui/scroll-area/index.ts';
+	import { cn } from '#lib/utils.ts';
 
 	let mobileMenuOpen = $state(false);
 
-	// Use page rune from $app/state
 	let currentPath = $derived(page.url.pathname);
 
 	const navigation = [
@@ -64,18 +63,15 @@
 		mobileMenuOpen = false;
 	}
 
-	// Desktop sidebar expansion: pointer hover OR keyboard focus inside it. Hover alone made the
-	// labels a mouse-only affordance — a keyboard user tabbing the sidebar got bare icons.
 	let isDesktopSidebarExpanded = $state(false);
 
 	function collapseSidebarOnFocusLeave(event: FocusEvent & { currentTarget: HTMLElement }): void {
-		// A null relatedTarget means focus left the document entirely, which should also collapse.
+		// relatedTarget is null when focus leaves the document; collapse then too.
 		if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
 			isDesktopSidebarExpanded = false;
 		}
 	}
 
-	// Mobile sync status helpers
 	let pendingCount = $derived(countPendingSync(offlineExpenseQueue.current));
 
 	let syncStatusInfo = $derived(
@@ -88,7 +84,6 @@
 	);
 </script>
 
-<!-- Mobile menu button -->
 <div
 	class="lg:hidden fixed top-0 left-0 right-0 z-40 bg-background border-b border-border pt-[env(safe-area-inset-top)]"
 >
@@ -99,7 +94,6 @@
 		</div>
 
 		<div class="flex items-center gap-3">
-			<!-- Mobile sync status icon -->
 			{#snippet mobileStatusIcon()}
 				{@const StatusIcon = syncStatusInfo.icon}
 				<div class="{syncStatusInfo.color} relative" role="status" aria-label="Sync status">
@@ -134,7 +128,6 @@
 						</SheetTitle>
 					</SheetHeader>
 
-					<!-- Mobile Navigation -->
 					<ScrollArea class="flex-1 px-3 mt-8">
 						<nav class="space-y-1">
 							{#each navigation as item (item.href)}
@@ -162,7 +155,6 @@
 						</nav>
 					</ScrollArea>
 
-					<!-- Mobile User menu -->
 					<div class="flex-shrink-0 px-3 pb-4">
 						<div class="space-y-1">
 							{#each userNavigation as item (item.href)}
@@ -199,7 +191,6 @@
 						</button>
 					</div>
 
-					<!-- Mobile Sync Status -->
 					<div class="flex-shrink-0 px-3 pb-4 border-t border-border pt-3">
 						<SyncStatusInline isExpanded={true} />
 					</div>
@@ -209,13 +200,7 @@
 	</div>
 </div>
 
-<!--
-	Desktop Sidebar. The wrapper is explicitly presentational: it exists only for the width
-	transition and the hover/focus handlers that expand it, and the <nav> it contains is already the
-	navigation landmark. Giving this element role="navigation" too made two nested, unlabelled
-	navigation landmarks, so neither was distinguishable (axe landmark-unique). role="none" rather
-	than no role at all because a static element carrying pointer handlers needs one.
--->
+<!-- Presentational wrapper: a role here would duplicate the nav landmark. -->
 <div
 	class={cn(
 		'hidden lg:fixed lg:inset-y-0 lg:flex lg:flex-col z-40',
@@ -235,7 +220,6 @@
 			'pt-5 pb-4'
 		)}
 	>
-		<!-- Logo -->
 		<div class={cn('flex items-center flex-shrink-0 px-6', 'transition-all duration-300')}>
 			<div class="flex items-center">
 				<span class="text-2xl">🚗</span>
@@ -247,7 +231,6 @@
 			</div>
 		</div>
 
-		<!-- Navigation -->
 		<nav class={cn('mt-8 flex-1 px-3 space-y-1')}>
 			{#each navigation as item (item.href)}
 				{@const IconComponent = item.icon}
@@ -279,9 +262,7 @@
 			{/each}
 		</nav>
 
-		<!-- Desktop User menu -->
 		<div class={cn('flex-shrink-0 px-3 pb-3')}>
-			<!-- User Navigation -->
 			<div class="space-y-1">
 				{#each userNavigation as item (item.href)}
 					{@const IconComponent = item.icon}
@@ -332,12 +313,10 @@
 			</button>
 		</div>
 
-		<!-- Sync Status -->
 		<div class={cn('flex-shrink-0 px-3 pb-4')}>
 			<SyncStatusInline isExpanded={isDesktopSidebarExpanded} />
 		</div>
 	</div>
 </div>
 
-<!-- Mobile content padding — accounts for fixed top bar + safe area -->
 <div class="lg:hidden h-16 pt-[env(safe-area-inset-top)]"></div>

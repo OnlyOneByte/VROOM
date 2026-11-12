@@ -23,7 +23,6 @@ export interface SyncConfig {
 	conflictResolution: 'ask_user' | 'keep_local' | 'keep_server';
 }
 
-// --- Sync configuration ---
 let _syncConfig = $state<SyncConfig>({
 	maxRetries: 3,
 	retryDelay: 1000,
@@ -43,7 +42,6 @@ export const syncConfig = {
 	}
 };
 
-// --- Sync conflicts ---
 let _syncConflicts = $state<SyncConflict[]>([]);
 
 export const syncConflicts = {
@@ -55,7 +53,6 @@ export const syncConflicts = {
 	}
 };
 
-// --- Timestamps ---
 let _lastSyncTime = $state<Date | null>(null);
 let _lastBackupTime = $state<Date | null>(null);
 let _lastSheetsSync = $state<Date | null>(null);
@@ -97,7 +94,6 @@ export const lastDataChangeTime = {
 	}
 };
 
-// --- Feature flags ---
 let _backupEnabled = $state(false);
 let _sheetsSyncEnabled = $state(false);
 

@@ -1,5 +1,5 @@
 import { logger } from '../../../utils/logger';
-import { resolveBackupFolderPath } from '../../sync/backup';
+import { backupService, resolveBackupFolderPath } from '../../sync/backup';
 import type {
   BackupCapabilityResult,
   BackupStrategy,
@@ -9,12 +9,7 @@ import type {
 import { GoogleDriveProvider } from '../domains/storage/google-drive-provider';
 import { GoogleSheetsService } from '../services/google-sheets-service';
 
-/**
- * Factories for the Drive provider + Sheets service this strategy uses. Injected
- * in tests (via the constructor) to substitute fakes WITHOUT `mock.module` — whose
- * process-global stubs leak across files. Production omits them and the real
- * `new GoogleDriveProvider` / `new GoogleSheetsService` are built per refresh token.
- */
+// bun mock.module leaks across test files, so tests inject fakes instead.
 export interface GoogleDriveStrategyDeps {
   createDriveProvider: (refreshToken: string) => GoogleDriveProvider;
   createSheetsService: (refreshToken: string) => GoogleSheetsService;
@@ -44,11 +39,7 @@ export class GoogleDriveStrategy implements BackupStrategy {
       capabilities.sheets = await this.executeSheetsSync(context, refreshToken);
     }
 
-    // HONEST partial-failure reporting: a provider's backup is `success` ONLY when EVERY
-    // attempted capability (ZIP + Sheets) succeeded. The old `.some()` marked a run successful when
-    // ANY capability worked — so a failed ZIP beside an OK Sheets advanced the sync anchor and the
-    // failed ZIP was NEVER retried (silent backup loss). A run with no attempted
-    // capability (neither enabled) is vacuously successful (nothing failed).
+    // A partial success advances the sync anchor, so any failed capability must fail the run.
     const attempted = Object.values(capabilities);
     const failed = attempted.filter((c) => !c.success);
     return {
@@ -82,7 +73,6 @@ export class GoogleDriveStrategy implements BackupStrategy {
         rawPath: folderPath,
       });
 
-      const { backupService } = await import('../../sync/backup');
       const deletedOldBackups = await backupService.enforceRetention(
         context.userId,
         context.providerId

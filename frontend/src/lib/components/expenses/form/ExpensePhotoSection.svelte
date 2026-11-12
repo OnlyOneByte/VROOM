@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { Upload, Trash2, ImagePlus, LoaderCircle } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import MediaCaptureDialog from '$lib/components/common/MediaCaptureDialog.svelte';
-	import ConfirmDialog from '$lib/components/common/ConfirmDialog.svelte';
-	import { expenseApi } from '$lib/services/expense-api';
-	import { handleErrorWithNotification } from '$lib/utils/error-handling';
-	import type { Photo } from '$lib/types';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import MediaCaptureDialog from '#lib/components/common/MediaCaptureDialog.svelte';
+	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
+	import { expenseApi } from '#lib/services/expense-api.ts';
+	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
+	import type { Photo } from '#lib/types/index.ts';
 
 	interface Props {
 		entityType: 'expense';
@@ -39,9 +39,6 @@
 		photos = [...photos, result as Photo];
 	}
 
-	// Styled confirm dialog (replaces native confirm()) — deletion is permanent
-	// (removes the file from storage too) and the trash button sits on a hover
-	// overlay where a misclick is easy.
 	let confirmOpen = $state(false);
 	let pendingDeleteId = $state<string | null>(null);
 
@@ -58,7 +55,7 @@
 			photos = photos.filter(p => p.id !== photoId);
 		} catch (err) {
 			handleErrorWithNotification(err, 'Failed to delete photo');
-			throw err; // keep the dialog open on failure
+			throw err;
 		}
 	}
 </script>

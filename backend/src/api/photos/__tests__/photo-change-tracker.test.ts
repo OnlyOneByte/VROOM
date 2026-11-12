@@ -1,42 +1,48 @@
-/**
- * Source-scan GUARD — the photos routes must wire `changeTracker`.
- *
- * Photo upload (POST) and delete (DELETE) mutate data that IS in the backup payload (the `photos` +
- * `photo_refs` tables, backup.ts). The auto-backup orchestrator SKIPS when
- * `!hasChangesSinceLastSync(userId)` (backup-orchestrator.ts), and that flag is bumped only by the
- * `changeTracker` middleware on a 2xx mutation. photos/routes.ts was the LONE mutating route module
- * missing `changeTracker` — so a photo-only change between backups silently failed to re-trigger the
- * next auto-backup until some OTHER tracked mutation bumped the timestamp (the silent-backup-gap
- * class).
- *
- * This is a SOURCE SCAN (mirroring photo-serve-headers.test.ts): a full POST upload needs a real
- * storage provider's bytes (not exercisable in the in-memory harness), and the DELETE path likewise
- * routes through the provider. So we pin that the middleware is wired — a refactor that drops it fails
- * here, travelling with the merge. The middleware's own 2xx-gating + markDataChanged behavior is
- * covered by the activity-tracker tests; this guard pins the WIRING that connects photos to it.
- */
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
+import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
+import { activityTracker } from '../../sync/activity-tracker';
 
-import { describe, expect, test } from 'bun:test';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+let ctx: TestApp;
+let markSpy: ReturnType<typeof spyOn<typeof activityTracker, 'markDataChanged'>> | undefined;
 
-const ROUTES_SRC = readFileSync(join(import.meta.dir, '..', 'routes.ts'), 'utf-8');
+beforeEach(async () => {
+  ctx = await createTestApp();
+  ctx.sqlite.run(
+    `INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('veh-1', ?, 'Toyota', 'Camry', 2022)`,
+    [ctx.user.id]
+  );
+  ctx.sqlite.run(
+    `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
+     VALUES ('photo-1', ?, 'vehicle', 'veh-1', 'shot.jpg', 'image/jpeg', 1024)`,
+    [ctx.user.id]
+  );
+  markSpy = spyOn(activityTracker, 'markDataChanged').mockResolvedValue(undefined);
+});
 
-describe('photos routes wire changeTracker (backup-gap source guard)', () => {
-  test('changeTracker is imported from the middleware barrel', () => {
-    expect(ROUTES_SRC).toMatch(
-      /import\s*\{[^}]*\bchangeTracker\b[^}]*\}\s*from\s*'\.\.\/\.\.\/middleware'/
-    );
+afterEach(() => {
+  markSpy?.mockRestore();
+  ctx.close();
+});
+
+describe('photo routes mark data changed on successful mutations', () => {
+  test('a successful photo delete marks the user data changed', async () => {
+    const res = await ctx.authed('DELETE', '/api/v1/photos/vehicle/veh-1/photo-1');
+
+    expect(res.status).toBe(204);
+    expect(markSpy).toHaveBeenCalledWith(ctx.user.id);
   });
 
-  test('changeTracker is registered as middleware on the router', () => {
-    expect(ROUTES_SRC).toContain("routes.use('*', changeTracker)");
+  test('a read does not mark data changed', async () => {
+    const res = await ctx.authed('GET', '/api/v1/photos/vehicle/veh-1');
+
+    expect(res.status).toBe(200);
+    expect(markSpy).not.toHaveBeenCalled();
   });
 
-  test('the mutating endpoints that depend on it still exist (POST upload + DELETE)', () => {
-    // Anchors WHY the middleware matters — if these mutations are ever removed the guard can be
-    // revisited, but while they exist the change-stamp must be wired.
-    expect(ROUTES_SRC).toContain("routes.post('/:entityType/:entityId'");
-    expect(ROUTES_SRC).toContain("routes.delete('/:entityType/:entityId/:photoId'");
+  test('a failed delete does not mark data changed', async () => {
+    const res = await ctx.authed('DELETE', '/api/v1/photos/vehicle/veh-1/no-such-photo');
+
+    expect(res.status).toBe(404);
+    expect(markSpy).not.toHaveBeenCalled();
   });
 });

@@ -1,12 +1,3 @@
-/**
- * GooglePhotosService against an in-memory fake PhotosClient (injected via the
- * constructor seam — NO mock.module). Exercises the real service logic: album
- * resolve-or-create + caching, 2-step upload, fresh-URL fetch, download, and
- * error/resilience paths — all zero-network.
- *
- * Pattern doc: .kiro/steering/TestingExternalAPIs.md
- */
-
 import { beforeEach, describe, expect, test } from 'bun:test';
 import {
   FakePhotosStore,
@@ -24,11 +15,16 @@ beforeEach(() => {
 });
 
 describe('GooglePhotosService — album resolution', () => {
-  test('creates the VROOM album when none exists, and caches the id', async () => {
+  test('creates the VROOM album when none exists', async () => {
     const id = await svc.resolveAlbumId();
     expect(id).toBeTruthy();
     expect([...store.albums.values()].some((a) => a.title === VROOM_ALBUM_TITLE)).toBe(true);
-    expect(svc.cachedAlbumId).toBe(id);
+  });
+
+  test('caches the resolved album id, so later calls skip the album lookup', async () => {
+    const id = await svc.resolveAlbumId();
+    store.injectFault('listAlbums', photosApiError(500, 'album lookup should be cached'));
+    expect(await svc.resolveAlbumId()).toBe(id);
   });
 
   test('reuses an existing VROOM album instead of creating a duplicate', async () => {
@@ -42,7 +38,7 @@ describe('GooglePhotosService — album resolution', () => {
   test('a constructor-cached album id skips the resolve round-trip', async () => {
     const cached = new GooglePhotosService('t', makeFakePhotosClient(store), 'album-cached');
     expect(await cached.resolveAlbumId()).toBe('album-cached');
-    expect(store.albums.size).toBe(0); // never listed or created
+    expect(store.albums.size).toBe(0);
   });
 });
 

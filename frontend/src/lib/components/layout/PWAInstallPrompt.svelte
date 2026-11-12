@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { initializePWA, promptInstall, pwaInstallState } from '$lib/utils/pwa';
+	import { initializePWA, promptInstall, pwaInstallState } from '#lib/utils/pwa.ts';
 	import { Download, X, LoaderCircle } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
 
 	let showPrompt = $state(false);
 	let installing = $state(false);
@@ -11,7 +11,6 @@
 	onMount(() => {
 		initializePWA();
 
-		// Check periodically if install prompt is available
 		const checkInterval = setInterval(() => {
 			if (pwaInstallState.canInstall && !pwaInstallState.isInstalled) {
 				showPrompt = true;
@@ -19,7 +18,6 @@
 			}
 		}, 1000);
 
-		// Clean up interval after 10 seconds
 		setTimeout(() => clearInterval(checkInterval), 10000);
 
 		return () => clearInterval(checkInterval);

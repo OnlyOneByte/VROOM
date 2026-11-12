@@ -1,23 +1,11 @@
-/**
- * Coverage ratchet for error-handling.ts — the report's top FE low spot (34% line)
- * and a load-bearing module: every page's catch routes a thrown value through
- * `handleErrorWithNotification`, which drives the private `handleApiError` mapping (the user-facing
- * error copy). `extractErrorMessage` is already pinned; this covers the rest — the `ApiError`
- * class, the 3-way `handleApiError` branch (VroomError → friendly-or-own message / network error /
- * unknown fallback), the error-code→friendly-message map, and the notification side-effect.
- *
- * The store is mocked (the analytics-api.test.ts pattern) so we can spy on what message + shape
- * actually reaches the notification — i.e. what the user would see — without a live rune store.
- */
-
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 const addNotification = vi.fn();
-vi.mock('$lib/stores/app.svelte', () => ({
+vi.mock('#lib/stores/app.svelte.ts', () => ({
 	appStore: { addNotification }
 }));
 
-const { ApiError, handleErrorWithNotification } = await import('../error-handling');
+const { ApiError, NetworkError, handleErrorWithNotification } = await import('../error-handling');
 
 interface NotificationArg {
 	type: string;
@@ -25,7 +13,6 @@ interface NotificationArg {
 	duration?: number;
 }
 
-/** The single notification raised by one handleErrorWithNotification call. */
 function notified(): NotificationArg {
 	expect(addNotification).toHaveBeenCalledTimes(1);
 	const arg = addNotification.mock.calls[0]?.[0] as NotificationArg | undefined;
@@ -53,7 +40,6 @@ describe('ApiError', () => {
 
 describe('handleErrorWithNotification (drives handleApiError)', () => {
 	beforeEach(() => {
-		// DEV builds console.error the AppError; silence it so the run stays clean.
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 	});
 	afterEach(() => {
@@ -62,7 +48,6 @@ describe('handleErrorWithNotification (drives handleApiError)', () => {
 	});
 
 	test('a known error code maps to its user-friendly message (not the raw message)', () => {
-		// VALIDATION_ERROR is in ERROR_CODE_MESSAGES → the friendly copy wins over "Raw backend text".
 		handleErrorWithNotification(
 			new ApiError('Raw backend text', 400, undefined, 'VALIDATION_ERROR')
 		);
@@ -74,15 +59,21 @@ describe('handleErrorWithNotification (drives handleApiError)', () => {
 	});
 
 	test('an unmapped code falls back to the error’s own message', () => {
-		// 'API_ERROR' (the ApiError default) is NOT in the friendly map → the real message surfaces.
 		handleErrorWithNotification(new ApiError('Specific failure detail', 500));
 		expect(notified().message).toBe('Specific failure detail');
 	});
 
-	test('a network TypeError (fetch) maps to the connection message', () => {
-		// isNetworkError = TypeError whose message includes "fetch".
-		handleErrorWithNotification(new TypeError('Failed to fetch'));
-		expect(notified().message).toBe('Network error. Please check your connection and try again.');
+	test.each(['Failed to fetch', 'Load failed'])(
+		'a NetworkError (%s) maps to the connection message',
+		browserMessage => {
+			handleErrorWithNotification(new NetworkError(new TypeError(browserMessage)));
+			expect(notified().message).toBe('Network error. Please check your connection and try again.');
+		}
+	);
+
+	test('a bare TypeError is a bug, not a network failure', () => {
+		handleErrorWithNotification(new TypeError('x.fetchAll is not a function'));
+		expect(notified().message).toBe('x.fetchAll is not a function');
 	});
 
 	test('a plain Error (not Vroom, not network) surfaces its own message under UNKNOWN_ERROR', () => {

@@ -1,19 +1,3 @@
-/**
- * T4 part 2: POST /:id/mark-serviced re-arm (D3).
- *
- * A fired mileage reminder stays due until the user marks it serviced (there's no auto-re-arm on the
- * mileage axis). This endpoint re-arms it: anchor lastServiceOdometer to the CURRENT odometer
- * and recompute the nextDueOdometer milestone; for the time axis, advance nextDueDate one period.
- * Pinned end-to-end through the real route → repo → DB stack:
- *  - mileage: lastServiceOdometer := current, nextDueOdometer := current + interval
- *  - time: nextDueDate advances one period; lastTriggeredAt stamped
- *  - both: both axes move
- *  - after re-arm, a mileage reminder that WAS due is no longer due at the trigger (the milestone moved)
- *  - cross-tenant id → 404, no mutation
- *
- * createTestApp() rewrites env + dynamic-imports DB-bound modules; keep imports to harness + bun:test.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -22,6 +6,7 @@ import {
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
+import { addOdometerReading } from './_helpers';
 
 let ctx: TestApp;
 
@@ -29,14 +14,6 @@ beforeEach(async () => {
   ctx = await createTestApp();
 });
 afterEach(() => ctx.close());
-
-async function addOdometerReading(vehicleId: string, odometer: number): Promise<void> {
-  const res = await ctx.authed('POST', `/api/v1/odometer/${vehicleId}`, {
-    odometer,
-    recordedAt: '2024-06-01T00:00:00.000Z',
-  });
-  expect(res.status, `odometer ${odometer}`).toBe(201);
-}
 
 interface ReminderRowDb {
   trigger_mode: string;
@@ -76,14 +53,13 @@ async function createMileageReminder(
   return body.data.reminder.id;
 }
 
-describe('POST /:id/mark-serviced — re-arm (D3)', () => {
+describe('POST /:id/mark-serviced re-arms the reminder', () => {
   test('mileage: anchors lastServiceOdometer to current + recomputes nextDueOdometer', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Mazda', model: 'CX-5', year: 2020 });
-    const id = await createMileageReminder(vehicleId); // last=30000, next=35000
+    const id = await createMileageReminder(vehicleId);
     expect(reminderRow(id).next_due_odometer).toBe(35000);
 
-    // Vehicle has driven to 36500; servicing now should re-anchor there.
-    await addOdometerReading(vehicleId, 36500);
+    await addOdometerReading(ctx, vehicleId, 36500);
     const res = await ctx.authed('POST', `/api/v1/reminders/${id}/mark-serviced`);
     expect(res.status, await res.text()).toBe(200);
 
@@ -95,10 +71,9 @@ describe('POST /:id/mark-serviced — re-arm (D3)', () => {
 
   test('a re-armed mileage reminder that was due is no longer due at the trigger', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Mazda', model: 'CX-5', year: 2020 });
-    const id = await createMileageReminder(vehicleId); // next milestone 35000
-    await addOdometerReading(vehicleId, 35200); // past it → due
+    const id = await createMileageReminder(vehicleId);
+    await addOdometerReading(ctx, vehicleId, 35200);
 
-    // Fires once.
     await ctx.authed('POST', '/api/v1/reminders/trigger');
     const firedCount = () =>
       (
@@ -108,19 +83,16 @@ describe('POST /:id/mark-serviced — re-arm (D3)', () => {
       ).n;
     expect(firedCount()).toBe(1);
 
-    // Service it → milestone moves to 35200 + 5000 = 40200, ahead of the current 35200.
     const res = await ctx.authed('POST', `/api/v1/reminders/${id}/mark-serviced`);
     expect(res.status).toBe(200);
     expect(reminderRow(id).next_due_odometer).toBe(40200);
 
-    // Trigger again: not due (current 35200 < 40200) → no new notification.
     await ctx.authed('POST', '/api/v1/reminders/trigger');
     expect(firedCount(), 'no new notification after re-arm moved the milestone ahead').toBe(1);
   });
 
   test('time: advances nextDueDate one period', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Mazda', model: 'CX-5', year: 2020 });
-    // A monthly time reminder; nextDueDate starts at startDate (2024-02-15).
     const created = await ctx.authed('POST', '/api/v1/reminders', {
       name: 'Registration',
       type: 'notification',
@@ -137,16 +109,12 @@ describe('POST /:id/mark-serviced — re-arm (D3)', () => {
     const res = await ctx.authed('POST', `/api/v1/reminders/${id}/mark-serviced`);
     expect(res.status).toBe(200);
     const after = reminderRow(id).next_due_date;
-    // Advanced by ~one month (28-31 days); assert it moved strictly forward.
     expect(after).not.toBeNull();
     expect((after as number) > (before as number), 'nextDueDate advanced forward').toBe(true);
   });
 
   test('time: a MULTI-period-overdue reminder advances to a FUTURE due date (not still overdue)', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Mazda', model: 'CX-5', year: 2020 });
-    // A monthly reminder whose startDate is YEARS in the past → nextDueDate starts many periods
-    // overdue. A single one-period advance would leave it still <= now (re-fires immediately); the
-    // catch-up loop must land it strictly in the future.
     const created = await ctx.authed('POST', '/api/v1/reminders', {
       name: 'Monthly check',
       type: 'notification',
@@ -163,20 +131,12 @@ describe('POST /:id/mark-serviced — re-arm (D3)', () => {
 
     const after = reminderRow(id).next_due_date;
     expect(after).not.toBeNull();
-    // The re-armed due date must be in the FUTURE — the user serviced it, so it must not still be due.
-    // next_due_date is a drizzle `mode:'timestamp'` column → stored as unix SECONDS, so compare against
-    // now-in-seconds (NOT Date.now() ms).
     const nowSeconds = Math.floor(Date.now() / 1000);
     expect((after as number) > nowSeconds, 'serviced reminder is no longer overdue').toBe(true);
   });
 
   test('time: an EARLY service (nextDueDate already in the FUTURE) advances exactly one period, stays future', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Mazda', model: 'CX-5', year: 2020 });
-    // A yearly reminder anchored FAR in the future → nextDueDate is already > now, so the catch-up
-    // `while (nextDue <= now)` loop never runs. This is the early-service path (servicing before due,
-    // e.g. registering in May for a July-due reminder): schedule-anchored, so it advances ONE period
-    // forward from the scheduled date — not "reset relative to now". This branch was uncovered (all
-    // other time tests seed PAST startDates that exercise the overdue loop).
     const created = await ctx.authed('POST', '/api/v1/reminders', {
       name: 'Future registration',
       type: 'notification',
@@ -194,12 +154,9 @@ describe('POST /:id/mark-serviced — re-arm (D3)', () => {
     expect(res.status).toBe(200);
     const after = reminderRow(id).next_due_date;
     expect(after).not.toBeNull();
-    // Advanced exactly one year forward from the already-future scheduled date (≈365-366 days),
-    // NOT collapsed back toward now. Bounds the delta to one yearly period (in unix SECONDS).
     const deltaDays = ((after as number) - (before as number)) / 86_400;
     expect(deltaDays).toBeGreaterThanOrEqual(364);
     expect(deltaDays).toBeLessThanOrEqual(367);
-    // Still strictly in the future (it was future before, advanced forward → trivially future).
     expect((after as number) > Math.floor(Date.now() / 1000)).toBe(true);
   });
 
@@ -209,7 +166,7 @@ describe('POST /:id/mark-serviced — re-arm (D3)', () => {
       triggerMode: 'both',
       startDate: '2024-02-15T00:00:00.000Z',
     });
-    await addOdometerReading(vehicleId, 38000);
+    await addOdometerReading(ctx, vehicleId, 38000);
     const before = reminderRow(id);
     expect(before.next_due_date).not.toBeNull();
 
@@ -221,11 +178,6 @@ describe('POST /:id/mark-serviced — re-arm (D3)', () => {
     expect((after.next_due_date as number) > (before.next_due_date as number)).toBe(true);
   });
 
-  // Mark-serviced must honor endDate on the time-axis re-arm, mirroring the trigger-service
-  // fastForwardPastNow guard. A BOUNDED reminder serviced AFTER its endDate would otherwise be
-  // re-armed to a FUTURE nextDueDate and left is_active=1 — living past its end + firing again. The re-arm
-  // must instead DEACTIVATE the reminder. Pin it: a monthly reminder with start+end both in the past,
-  // serviced now → is_active=0, no future nextDueDate write.
   test('a bounded reminder serviced past its endDate is DEACTIVATED, not re-armed forward', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Mazda', model: 'CX-5', year: 2020 });
     const created = await ctx.authed('POST', '/api/v1/reminders', {
@@ -233,7 +185,7 @@ describe('POST /:id/mark-serviced — re-arm (D3)', () => {
       type: 'notification',
       frequency: 'monthly',
       startDate: '2024-01-01T00:00:00.000Z',
-      endDate: '2024-06-01T00:00:00.000Z', // well in the past relative to the test clock (2026+)
+      endDate: '2024-06-01T00:00:00.000Z',
       vehicleIds: [vehicleId],
     });
     const body = await json<DataEnvelope<{ reminder: { id: string } }>>(created);
@@ -244,12 +196,10 @@ describe('POST /:id/mark-serviced — re-arm (D3)', () => {
     const resBody = await json<DataEnvelope<{ isActive: boolean }>>(res);
     expect(res.status, JSON.stringify(resBody)).toBe(200);
 
-    // The re-arm crosses endDate → the reminder is done: deactivated, not advanced to a future date.
     const row = ctx.sqlite.query('SELECT is_active FROM reminders WHERE id = ?').get(id) as {
       is_active: number;
     };
     expect(row.is_active, 'a serviced-past-endDate reminder must be deactivated').toBe(0);
-    // The response echoes the deactivated state.
     expect(resBody.data.isActive).toBe(false);
   });
 

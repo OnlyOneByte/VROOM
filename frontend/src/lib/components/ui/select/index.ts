@@ -23,7 +23,6 @@ export {
 	ScrollDownButton,
 	ScrollUpButton,
 	GroupHeading,
-	//
 	Root as Select,
 	Group as SelectGroup,
 	Label as SelectLabel,

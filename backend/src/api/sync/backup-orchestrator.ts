@@ -5,32 +5,25 @@ import type { BackupConfig, ProviderBackupSettings } from '../../types';
 import { decrypt } from '../../utils/encryption';
 import { logger } from '../../utils/logger';
 import { OPERATION_TIMEOUTS, withTimeout } from '../../utils/timeout';
-import type {
-  BackupOrchestratorResult,
-  BackupOutcome,
-  BackupStrategyResult,
+import {
+  type BackupOrchestratorResult,
+  type BackupOutcome,
+  type BackupStrategyResult,
+  hasZipBackup,
+  isSyncEnabled,
 } from './backup-strategy';
 import { backupStrategyRegistry } from './backup-strategy-registry';
 
-const MUTEX_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const MUTEX_TTL_MS = 5 * 60 * 1000;
 const MUTEX_MAX_SIZE = 500;
 const backupMutex = new Map<string, number>();
 
-/**
- * The providers a backup run will fan out to: enabled (ZIP) OR sheetsSyncEnabled. Pure +
- * exported so the orchestrator and its tests share ONE source of truth — previously the test
- * re-implemented this filter locally and asserted against the copy, leaving the real branch
- * uncovered. execute() calls this so the test now pins real code.
- */
 export function filterEnabledProviders(config: BackupConfig): [string, ProviderBackupSettings][] {
-  return Object.entries(config.providers).filter(
-    ([, s]) => s.enabled || s.sheetsSyncEnabled === true
-  );
+  return Object.entries(config.providers).filter(([, s]) => isSyncEnabled(s));
 }
 
-/** A ZIP is generated only if at least one selected provider has enabled=true (Sheets-only skips it). */
 export function needsZipGeneration(enabledProviders: [string, ProviderBackupSettings][]): boolean {
-  return enabledProviders.some(([, s]) => s.enabled);
+  return enabledProviders.some(([, s]) => hasZipBackup(s));
 }
 
 function acquireMutex(userId: string): boolean {
@@ -39,7 +32,6 @@ function acquireMutex(userId: string): boolean {
   if (existing && now - existing < MUTEX_TTL_MS) {
     return false;
   }
-  // Evict stale entries if map is too large
   if (backupMutex.size >= MUTEX_MAX_SIZE) {
     for (const [key, ts] of backupMutex) {
       if (now - ts >= MUTEX_TTL_MS) {
@@ -55,6 +47,10 @@ function releaseMutex(userId: string): void {
   backupMutex.delete(userId);
 }
 
+function failedAttempt(message: string): BackupStrategyResult {
+  return { success: false, message, capabilities: {} };
+}
+
 export class BackupOrchestrator {
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Orchestrator fan-out logic requires sequential steps with error handling per provider
   async execute(
@@ -64,7 +60,6 @@ export class BackupOrchestrator {
   ): Promise<BackupOrchestratorResult> {
     const timestamp = new Date().toISOString();
 
-    // Mutex check
     if (!acquireMutex(userId)) {
       return {
         timestamp,
@@ -76,7 +71,6 @@ export class BackupOrchestrator {
     }
 
     try {
-      // Change detection
       if (!force) {
         const { activityTracker } = await import('./activity-tracker');
         const hasChanges = await activityTracker.hasChangesSinceLastSync(userId);
@@ -86,7 +80,6 @@ export class BackupOrchestrator {
         }
       }
 
-      // Load backup config — own filter including sheetsSyncEnabled
       const { preferencesRepository } = await import('../settings/repository');
       const settings = await preferencesRepository.getOrCreate(userId);
       const config: BackupConfig = (settings.backupConfig as BackupConfig | null) ?? {
@@ -95,13 +88,11 @@ export class BackupOrchestrator {
 
       const enabledProviders = filterEnabledProviders(config);
 
-      // No enabled providers
       if (enabledProviders.length === 0) {
         releaseMutex(userId);
         return { timestamp, outcome: 'noop', failedProviders: [], results: {} };
       }
 
-      // Conditional ZIP generation — only if any provider has enabled=true
       const needsZip = needsZipGeneration(enabledProviders);
       let zipBuffer: Buffer | null = null;
       if (needsZip) {
@@ -116,7 +107,6 @@ export class BackupOrchestrator {
         }
       }
 
-      // Load provider rows and decrypt credentials
       const db = getDb();
       const providerRows = await db
         .select()
@@ -125,7 +115,6 @@ export class BackupOrchestrator {
 
       const providerRowMap = new Map(providerRows.map((r) => [r.id, r]));
 
-      // Parallel fan-out via Promise.allSettled
       const strategyPromises = enabledProviders.map(async ([providerId, providerConfig]) => {
         const strategy = backupStrategyRegistry.get(
           providerRowMap.get(providerId)?.providerType ?? ''
@@ -171,39 +160,37 @@ export class BackupOrchestrator {
           );
           return { providerId, result };
         } catch (error) {
-          // A thrown/timed-out strategy is a REAL failure of an attempted provider, not a silent
-          // skip: catch it HERE so the providerId is retained and the run is marked failed.
-          // (Previously the rejection was swallowed in the settled loop → fail-open 200.)
           const message = error instanceof Error ? error.message : 'Backup strategy failed';
           logger.warn('Backup strategy threw, marking provider failed', {
             providerId,
             error: message,
           });
-          return { providerId, result: { success: false, message, capabilities: {} } };
+          return { providerId, result: failedAttempt(message) };
         }
       });
 
       const settled = await Promise.allSettled(strategyPromises);
 
-      // Collect results — track BOTH succeeded and failed providers so the run-level outcome is honest.
       const results: Record<string, BackupStrategyResult> = {};
-      // Only the stamps THIS run earned, keyed by provider, applied later as an atomic JSON patch
-      // rather than as a rewrite of the whole column (see the persist step below).
       const configPatch: Record<string, Record<string, string>> = {};
       let anySuccess = false;
       const failedProviders: string[] = [];
 
-      for (const outcome of settled) {
-        // A null result = a provider we never attempted (no strategy registered / no row / undecryptable
-        // credentials). It is a skip, not a backup failure — excluded from the success/failure tally.
-        if (outcome.status !== 'fulfilled' || !outcome.value.result) {
-          if (outcome.status === 'rejected') {
-            // The map body catches its own throws, so a rejection here is unexpected — count it as a
-            // failure rather than swallow it (no providerId available, so it cannot retry-stamp anyway).
-            logger.warn('Strategy execution rejected', { error: outcome.reason });
-          }
+      for (const [index, outcome] of settled.entries()) {
+        if (outcome.status === 'rejected') {
+          const [providerId] = enabledProviders[index];
+          const reason = outcome.reason;
+          const message = reason instanceof Error ? reason.message : 'Backup strategy failed';
+          logger.warn('Backup strategy rejected, marking provider failed', {
+            providerId,
+            error: message,
+          });
+          results[providerId] = failedAttempt(message);
+          failedProviders.push(providerId);
           continue;
         }
+
+        if (!outcome.value.result) continue;
 
         const { providerId, result } = outcome.value;
         results[providerId] = result;
@@ -212,7 +199,6 @@ export class BackupOrchestrator {
           anySuccess = true;
           configPatch[providerId] = { lastBackupAt: timestamp };
 
-          // Persist sheetsSpreadsheetId from strategy result
           const sheetsId = result.capabilities.sheets?.metadata?.spreadsheetId as
             | string
             | undefined;
@@ -224,8 +210,6 @@ export class BackupOrchestrator {
         }
       }
 
-      // Honest run-level outcome: failed = every attempted provider failed; partial = a mix;
-      // success = all clean; noop = nothing attempted (no provider produced a result).
       const attemptedCount = Object.keys(results).length;
       let runOutcome: BackupOutcome;
       if (attemptedCount === 0) {
@@ -238,20 +222,6 @@ export class BackupOrchestrator {
         runOutcome = 'failed';
       }
 
-      // Persist config updates (succeeded providers always record their lastBackupAt + sheets id so a
-      // partial run does not lose a provider that DID succeed). But the GLOBAL sync/backup anchor only
-      // advances on a fully-clean run — if ANY provider failed, the user still has un-synced changes,
-      // so leaving the anchor un-advanced is what makes the failed provider RETRY next run. A
-      // partial-success that advanced the anchor would strand the failed provider forever.
-      //
-      // Patch the column, never rewrite it. The config was read at the top of a run whose per-provider
-      // budget is OPERATION_TIMEOUTS.BACKUP, so writing back a whole-column value derived from that
-      // snapshot discards every concurrent edit made during the run — a provider the user disconnected
-      // mid-run came back, and a backup the user switched OFF in Settings mid-run was silently switched
-      // on again. The patch names only the providers this run actually backed up and only the stamps it
-      // earned, so siblings and concurrent edits survive; it carries no `enabled`/`sheetsSyncEnabled`
-      // key, so a key re-created for a provider deleted mid-run cannot make a ghost eligible for the
-      // next run.
       if (anySuccess) {
         await preferencesRepository.mergeJsonField(userId, 'backupConfig', {
           providers: configPatch,
@@ -259,12 +229,6 @@ export class BackupOrchestrator {
       }
       if (runOutcome === 'success') {
         const { syncStateRepository } = await import('../settings/repository');
-        // Stamp lastSyncDate from the run's START timestamp (the snapshot anchor — taken before the
-        // change-check + ZIP export above), NOT a fresh end-of-run time. A long backup can run for
-        // minutes; a data change made mid-run (after the snapshot) must stay "unsynced" so the NEXT
-        // backup captures it. Stamping end-of-run would mark that change already-synced and silently
-        // drop it from every future backup. Using the start timestamp (slightly before the
-        // actual L85 snapshot) errs safe: at worst a redundant re-backup, never a lost change.
         await syncStateRepository.updateSyncDate(userId, new Date(timestamp));
         await syncStateRepository.updateBackupDate(userId);
       }

@@ -1,13 +1,3 @@
-/**
- * Contract tests for FakeStorageProvider.
- *
- * Proves the fake honors the StorageProvider interface end-to-end in memory
- * (upload → download → list → getExternalUrl → delete), so a test that selects
- * it via a `providerType: 'fake'` row exercises the real photo-service/registry
- * code paths with zero network. This is the reusable seam for testing every
- * external storage provider (Google Photos, S3, OneDrive, …).
- */
-
 import { describe, expect, test } from 'bun:test';
 import { FakeStorageProvider } from '../fake-provider';
 import type { UploadParams } from '../storage-provider';

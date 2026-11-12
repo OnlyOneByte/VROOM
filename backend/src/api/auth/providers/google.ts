@@ -2,28 +2,41 @@ import { Google } from 'arctic';
 import { CONFIG } from '../../../config';
 import type { OAuthProviderConfig } from './types';
 
-const google = new Google(
-  CONFIG.auth.googleClientId || '',
-  CONFIG.auth.googleClientSecret || '',
-  CONFIG.auth.googleRedirectUri
-);
+// Google requires the token exchange to repeat the authorize step's redirect URI.
+function createGoogleClient(redirectUri: string): Google {
+  return new Google(
+    CONFIG.auth.googleClientId || '',
+    CONFIG.auth.googleClientSecret || '',
+    redirectUri
+  );
+}
 
-const SCOPES = ['openid', 'profile', 'email'];
+const googleLoginClient = createGoogleClient(CONFIG.auth.googleLoginRedirectUri);
+
+export const googleStorageClient = createGoogleClient(CONFIG.auth.googleStorageRedirectUri);
+
+const LOGIN_SCOPES = ['openid', 'profile', 'email'];
+
+export const STORAGE_SCOPES = [
+  ...LOGIN_SCOPES,
+  'https://www.googleapis.com/auth/drive.file',
+  // Read-only and limited to items this app created; never widen to the camera roll.
+  'https://www.googleapis.com/auth/photoslibrary.readonly.appcreateddata',
+];
 
 export const googleAuthProvider: OAuthProviderConfig = {
   id: 'google',
   displayName: 'Google',
   supportsPKCE: true,
-  scopes: SCOPES,
   createAuthorizationURL: (state, codeVerifier) => {
     // biome-ignore lint/style/noNonNullAssertion: codeVerifier is guaranteed present for PKCE providers
-    const url = google.createAuthorizationURL(state, codeVerifier!, SCOPES);
+    const url = googleLoginClient.createAuthorizationURL(state, codeVerifier!, LOGIN_SCOPES);
     url.searchParams.set('prompt', 'select_account');
     return url;
   },
   validateAuthorizationCode: async (code, codeVerifier) => {
     // biome-ignore lint/style/noNonNullAssertion: codeVerifier is guaranteed present for PKCE providers
-    const tokens = await google.validateAuthorizationCode(code, codeVerifier!);
+    const tokens = await googleLoginClient.validateAuthorizationCode(code, codeVerifier!);
     return {
       accessToken: tokens.accessToken(),
       refreshToken: tokens.hasRefreshToken() ? tokens.refreshToken() : undefined,

@@ -5,12 +5,6 @@ export interface PaginatedResult<T> {
   totalCount: number;
 }
 
-/**
- * Clamp pagination parameters to configured bounds.
- *
- * - limit: min(max(requested ?? defaultPageSize, minPageSize), maxPageSize)
- * - offset: max(requested ?? 0, 0)
- */
 export function clampPagination(pagination?: { limit?: number; offset?: number }): {
   limit: number;
   offset: number;
@@ -32,11 +26,6 @@ interface PaginatedApiResponse<T> {
   };
 }
 
-/**
- * Build a unified paginated API response envelope.
- *
- * Computes `hasMore` as `offset + data.length < totalCount`.
- */
 export function buildPaginatedResponse<T>(
   data: T[],
   totalCount: number,

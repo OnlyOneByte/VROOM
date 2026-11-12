@@ -1,4 +1,3 @@
-// Virtual modules from @vite-pwa/sveltekit
 declare module 'virtual:pwa-info' {
 	export interface PwaInfo {
 		pwaInDevEnvironment: boolean;

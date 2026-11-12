@@ -8,15 +8,7 @@ import {
 	RECURRING_TRIGGER_TS_KEY,
 	shouldTriggerRecurringExpenses
 } from '../reminder-helpers';
-import type { Reminder } from '$lib/types/reminder';
-
-/**
- * Guard for the null-nextDueDate invariant (backend rebuild made next_due_date nullable →
- * frontend). A pure-mileage reminder has nextDueDate=null; the time-due check must treat that as
- * NOT due — never feed it to `new Date(...)`, which yields the 1970 epoch and would mark every
- * mileage reminder wrongly "due". This pins isReminderTimeDue (extracted) so a future edit can't
- * re-introduce the unguarded deref.
- */
+import type { Reminder } from '#lib/types/reminder.ts';
 
 const NOW = Date.parse('2024-06-15T00:00:00.000Z');
 
@@ -64,9 +56,7 @@ describe('isReminderTimeDue', () => {
 		expect(isReminderTimeDue(mk({ nextDueDate: '2024-07-01T00:00:00.000Z' }), NOW)).toBe(false);
 	});
 
-	it('a pure-mileage reminder (null nextDueDate) is NEVER time-due — the load-bearing guard', () => {
-		// Without the null guard, `new Date(null)` is the 1970 epoch ≤ now → wrongly "due". This is
-		// the exact crash/wrong-render the nullable-type change introduced at the boundary.
+	it('a pure-mileage reminder (null nextDueDate) is never time-due', () => {
 		expect(isReminderTimeDue(mk({ triggerMode: 'mileage', nextDueDate: null }), NOW)).toBe(false);
 	});
 });
@@ -107,19 +97,12 @@ describe('frequencyLabel', () => {
 	});
 
 	it('is null for a pure-mileage reminder — the inert stored frequency must NOT render', () => {
-		// The load-bearing assertion: a pure-mileage reminder still carries frequency='monthly'
-		// (backend requires one, the form sends its default), but the time axis is inert — showing
-		// "Monthly" would be a lie. null lets the card omit the badge.
 		expect(frequencyLabel(mk({ triggerMode: 'mileage', frequency: 'monthly' }))).toBeNull();
 	});
 });
 
-describe('shouldTriggerRecurringExpenses (T5 opportunistic-materialization gate)', () => {
-	// The gate debounces on the user's LOCAL calendar day, so its fixtures are built from LOCAL date
-	// PARTS rather than hardcoded UTC instants: `Date.parse('2024-06-15T00:00Z')` vs
-	// `'2024-06-14T23:00Z'` is "yesterday" only at offset 0 — in every other zone the pair lands on
-	// one local day and the "PRIOR day" claim is vacuous. Local parts make these true in ANY zone.
-	const NOW_LOCAL = new Date(2024, 5, 15, 12, 0, 0).getTime(); // 2024-06-15 noon LOCAL
+describe('shouldTriggerRecurringExpenses gate', () => {
+	const NOW_LOCAL = new Date(2024, 5, 15, 12, 0, 0).getTime();
 	const base = { isAuthed: true, isOnline: true, lastRunMs: null as number | null, now: NOW_LOCAL };
 
 	it('triggers when authed + online + never run before', () => {
@@ -132,13 +115,11 @@ describe('shouldTriggerRecurringExpenses (T5 opportunistic-materialization gate)
 	});
 
 	it('skips when the last run was already TODAY (the user local calendar day)', () => {
-		// Earlier the same local day → debounced.
 		const earlierToday = new Date(2024, 5, 15, 6, 30, 0).getTime();
 		expect(shouldTriggerRecurringExpenses({ ...base, lastRunMs: earlierToday })).toBe(false);
 	});
 
 	it('triggers when the last run was a PRIOR day', () => {
-		// Late on the PREVIOUS local day — a different local calendar day, so the gate re-opens.
 		const yesterday = new Date(2024, 5, 14, 23, 0, 0).getTime();
 		expect(shouldTriggerRecurringExpenses({ ...base, lastRunMs: yesterday })).toBe(true);
 	});
@@ -150,13 +131,8 @@ describe('shouldTriggerRecurringExpenses (T5 opportunistic-materialization gate)
 	});
 });
 
-// T5: the orchestration helper the app-init hook calls — it reads/writes the localStorage
-// debounce timestamp around the pure gate, POSTs the (injected) trigger, and stamps the timestamp ONLY
-// on success. `trigger` is injected so this is unit-testable without the service/network.
-describe('maybeTriggerRecurringExpenses (T5 app-init hook orchestration)', () => {
-	// Local-part-constructed for the same reason as the gate's own fixtures: the wrapped debounce is a
-	// LOCAL-calendar-day comparison, so a UTC instant pair only reads as "same day" at some offsets.
-	const NOW = new Date(2024, 5, 15, 12, 0, 0).getTime(); // 2024-06-15 noon LOCAL
+describe('maybeTriggerRecurringExpenses orchestration', () => {
+	const NOW = new Date(2024, 5, 15, 12, 0, 0).getTime();
 
 	beforeEach(() => {
 		localStorage.clear();
@@ -189,7 +165,6 @@ describe('maybeTriggerRecurringExpenses (T5 app-init hook orchestration)', () =>
 		});
 		expect(fired).toBe(false);
 		expect(trigger).not.toHaveBeenCalled();
-		// The prior stamp is untouched (no re-stamp on a skip).
 		expect(localStorage.getItem(RECURRING_TRIGGER_TS_KEY)).toBe(String(earlierToday));
 	});
 
@@ -227,114 +202,6 @@ describe('maybeTriggerRecurringExpenses (T5 app-init hook orchestration)', () =>
 		});
 		expect(fired).toBe(false);
 		expect(trigger).toHaveBeenCalledTimes(1);
-		// No stamp on failure → the daily window isn't burned; the next open retries.
-		expect(localStorage.getItem(RECURRING_TRIGGER_TS_KEY)).toBeNull();
-	});
-
-	it('is a no-op off the browser (no localStorage / SSR)', async () => {
-		const trigger = vi.fn().mockResolvedValue({});
-		const fired = await maybeTriggerRecurringExpenses({
-			isAuthed: true,
-			isOnline: true,
-			isBrowser: false,
-			trigger,
-			now: NOW
-		});
-		expect(fired).toBe(false);
-		expect(trigger).not.toHaveBeenCalled();
-	});
-
-	it('treats a corrupt stored timestamp as never-run (triggers, does not pass NaN to the gate)', async () => {
-		localStorage.setItem(RECURRING_TRIGGER_TS_KEY, 'not-a-number');
-		const trigger = vi.fn().mockResolvedValue({});
-		const fired = await maybeTriggerRecurringExpenses({
-			isAuthed: true,
-			isOnline: true,
-			isBrowser: true,
-			trigger,
-			now: NOW
-		});
-		expect(fired).toBe(true);
-		expect(trigger).toHaveBeenCalledTimes(1);
-	});
-});
-
-// T5 (C12): the orchestration helper the app-init hook calls — it reads/writes the localStorage
-// debounce timestamp around the pure gate, POSTs the (injected) trigger, and stamps the timestamp ONLY
-// on success. `trigger` is injected so this is unit-testable without the service/network.
-describe('maybeTriggerRecurringExpenses (T5 app-init hook orchestration)', () => {
-	const NOW = Date.parse('2024-06-15T12:00:00.000Z');
-
-	beforeEach(() => {
-		localStorage.clear();
-	});
-
-	it('triggers + stamps the timestamp when authed/online/never-run', async () => {
-		const trigger = vi.fn().mockResolvedValue({ createdExpenses: [], notifications: [] });
-		const fired = await maybeTriggerRecurringExpenses({
-			isAuthed: true,
-			isOnline: true,
-			isBrowser: true,
-			trigger,
-			now: NOW
-		});
-		expect(fired).toBe(true);
-		expect(trigger).toHaveBeenCalledTimes(1);
-		expect(localStorage.getItem(RECURRING_TRIGGER_TS_KEY)).toBe(String(NOW));
-	});
-
-	it('does NOT trigger (or stamp) when the gate declines — already ran today', async () => {
-		const earlierToday = Date.parse('2024-06-15T06:00:00.000Z');
-		localStorage.setItem(RECURRING_TRIGGER_TS_KEY, String(earlierToday));
-		const trigger = vi.fn().mockResolvedValue({});
-		const fired = await maybeTriggerRecurringExpenses({
-			isAuthed: true,
-			isOnline: true,
-			isBrowser: true,
-			trigger,
-			now: NOW
-		});
-		expect(fired).toBe(false);
-		expect(trigger).not.toHaveBeenCalled();
-		// The prior stamp is untouched (no re-stamp on a skip).
-		expect(localStorage.getItem(RECURRING_TRIGGER_TS_KEY)).toBe(String(earlierToday));
-	});
-
-	it('does NOT trigger when offline / unauthed', async () => {
-		const trigger = vi.fn().mockResolvedValue({});
-		expect(
-			await maybeTriggerRecurringExpenses({
-				isAuthed: false,
-				isOnline: true,
-				isBrowser: true,
-				trigger,
-				now: NOW
-			})
-		).toBe(false);
-		expect(
-			await maybeTriggerRecurringExpenses({
-				isAuthed: true,
-				isOnline: false,
-				isBrowser: true,
-				trigger,
-				now: NOW
-			})
-		).toBe(false);
-		expect(trigger).not.toHaveBeenCalled();
-	});
-
-	it('does NOT stamp the timestamp when the trigger POST fails (retries next app open)', async () => {
-		const trigger = vi.fn().mockRejectedValue(new Error('network'));
-		const fired = await maybeTriggerRecurringExpenses({
-			isAuthed: true,
-			isOnline: true,
-			isBrowser: true,
-			trigger,
-			now: NOW
-		});
-		expect(fired).toBe(false);
-		expect(trigger).toHaveBeenCalledTimes(1);
-		// No stamp on failure → the daily window isn't burned; the next open retries.
 		expect(localStorage.getItem(RECURRING_TRIGGER_TS_KEY)).toBeNull();
 	});
 

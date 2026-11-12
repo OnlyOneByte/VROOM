@@ -6,7 +6,6 @@ export {
 	Root,
 	Content,
 	Trigger,
-	//
 	Root as Popover,
 	Content as PopoverContent,
 	Trigger as PopoverTrigger

@@ -3,31 +3,31 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { HardDrive, Plus, LoaderCircle, Download, Upload, RefreshCw } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Label } from '$lib/components/ui/label';
-	import * as Select from '$lib/components/ui/select';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
 	import {
 		Card,
 		CardContent,
 		CardDescription,
 		CardHeader,
 		CardTitle
-	} from '$lib/components/ui/card';
-	import { Separator } from '$lib/components/ui/separator';
+	} from '#lib/components/ui/card/index.ts';
+	import { Separator } from '#lib/components/ui/separator/index.ts';
 	import DefaultPhotoSources from '../storage-provider/DefaultPhotoSources.svelte';
 	import ProviderCard from '../storage-provider/ProviderInfoCard.svelte';
-	import { providerApi } from '$lib/services/provider-api';
-	import { settingsApi } from '$lib/services/settings-api';
-	import { fetchLastSyncTime } from '$lib/utils/sync/sync-manager';
-	import { appStore } from '$lib/stores/app.svelte';
-	import { routes, paramRoutes } from '$lib/routes';
+	import { providerApi } from '#lib/services/provider-api.ts';
+	import { settingsApi } from '#lib/services/settings-api.ts';
+	import { fetchLastSyncTime } from '#lib/utils/sync/sync-manager.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { routes, paramRoutes } from '#lib/routes.ts';
 	import type {
 		PhotoCategory,
 		CategorySetting,
 		StorageConfig,
 		UserProviderInfo,
 		BackupConfig
-	} from '$lib/types';
+	} from '#lib/types/index.ts';
 
 	interface Props {
 		isBackingUp?: boolean;
@@ -115,7 +115,6 @@
 	function getCategorySettings(providerId: string): Record<PhotoCategory, CategorySetting> {
 		const stored = storageConfig.providerCategories[providerId];
 		if (!stored) return DEFAULT_CATEGORY_SETTINGS;
-		// Merge with defaults so newly added categories get a default value
 		return { ...DEFAULT_CATEGORY_SETTINGS, ...stored };
 	}
 
@@ -158,8 +157,6 @@
 		try {
 			await settingsApi.updateSettings({ backupConfig: updatedConfig });
 			backupConfig = updatedConfig;
-			// Refresh the sync-status store so the menu's backup state/time updates
-			// immediately instead of staying stale until the next poll or a reload.
 			await fetchLastSyncTime();
 			appStore.showSuccess(
 				enabled ? 'ZIP backup enabled for provider' : 'ZIP backup disabled for provider'
@@ -187,7 +184,6 @@
 		try {
 			await settingsApi.updateSettings({ backupConfig: updatedConfig });
 			backupConfig = updatedConfig;
-			// Refresh the sync-status store so the menu reflects the change immediately.
 			await fetchLastSyncTime();
 			appStore.showSuccess(
 				enabled ? 'Sheets sync enabled for provider' : 'Sheets sync disabled for provider'
@@ -214,7 +210,6 @@
 		{:else if error}
 			<p class="text-sm text-destructive">{error}</p>
 		{:else}
-			<!-- Backup & Restore -->
 			<div class="space-y-4">
 				<p class="text-sm font-medium">Data Backups</p>
 
@@ -280,12 +275,10 @@
 
 			<Separator class="my-6" />
 
-			<!-- Default Photo Sources -->
 			<DefaultPhotoSources {storageConfig} {providers} onUpdate={handleConfigUpdate} />
 
 			<Separator class="my-6" />
 
-			<!-- Providers -->
 			<div class="space-y-3">
 				<div class="flex items-center justify-between">
 					<p class="text-sm font-medium">Providers</p>

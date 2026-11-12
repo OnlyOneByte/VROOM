@@ -1,8 +1,3 @@
-/**
- * Google Drive Service - Manages VROOM folder structure and file operations
- */
-
-import type { OAuth2Client } from 'google-auth-library';
 import { type drive_v3, google } from 'googleapis';
 import { SyncError, SyncErrorCode } from '../../../errors';
 
@@ -24,39 +19,30 @@ export interface DriveFile {
   modifiedTime?: string;
 }
 
-/** Escape single quotes for Drive API query strings */
 function escapeDriveQuery(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
 
 export class GoogleDriveService {
-  private oauth2Client?: OAuth2Client;
   private drive: drive_v3.Drive;
 
-  /**
-   * @param refreshToken Google OAuth refresh token (ignored when `driveClient` is injected).
-   * @param driveClient Optional pre-built Drive client. Inject an in-memory fake in tests
-   *  to exercise the real service logic (folder dedup, path walking,
-   *  upload/list/delete) with ZERO network and no `mock.module` leakage.
-   *  Production callers omit it and an OAuth2-authed client is built.
-   */
   constructor(refreshToken: string, driveClient?: drive_v3.Drive) {
     if (driveClient) {
       this.drive = driveClient;
       return;
     }
 
-    this.oauth2Client = new google.auth.OAuth2(
+    const oauth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
       process.env.GOOGLE_REDIRECT_URI
     );
 
-    this.oauth2Client.setCredentials({
+    oauth2Client.setCredentials({
       refresh_token: refreshToken,
     });
 
-    this.drive = google.drive({ version: 'v3', auth: this.oauth2Client });
+    this.drive = google.drive({ version: 'v3', auth: oauth2Client });
   }
 
   async findFolder(name: string, parentId?: string): Promise<DriveFolder | null> {
@@ -137,22 +123,11 @@ export class GoogleDriveService {
     return allFiles;
   }
 
-  async getFolderPermissions(folderId: string): Promise<drive_v3.Schema$Permission[]> {
-    const response = await this.drive.permissions.list({
-      fileId: folderId,
-      fields: 'permissions(id, type, role, emailAddress)',
-    });
-    return response.data.permissions || [];
-  }
-
-  async setFolderPermissions(
-    folderId: string,
-    email: string,
-    role: 'reader' | 'writer' | 'owner' = 'writer'
-  ): Promise<void> {
-    await this.drive.permissions.create({
-      fileId: folderId,
-      requestBody: { type: 'user', role, emailAddress: email },
+  async moveFile(fileId: string, newParentId: string, oldParentId: string): Promise<void> {
+    await this.drive.files.update({
+      fileId,
+      addParents: newParentId,
+      removeParents: oldParentId,
     });
   }
 
@@ -196,34 +171,6 @@ export class GoogleDriveService {
     return Buffer.from(response.data as ArrayBuffer);
   }
 
-  async getFileMetadata(fileId: string): Promise<DriveFile> {
-    const response = await this.drive.files.get({
-      fileId,
-      fields: 'id, name, mimeType, parents, webViewLink, size, createdTime, modifiedTime',
-    });
-
-    if (!response.data) {
-      throw new SyncError(
-        SyncErrorCode.NETWORK_ERROR,
-        'Failed to get file metadata from Google Drive'
-      );
-    }
-
-    return response.data as DriveFile;
-  }
-
-  /** Rename an existing Drive folder (best-effort). */
-  async renameFolder(folderId: string, newName: string): Promise<void> {
-    await this.drive.files.update({
-      fileId: folderId,
-      requestBody: { name: newName },
-    });
-  }
-
-  /**
-   * Check whether a folder ID still exists and is not trashed.
-   * Returns true if the folder is accessible, false if deleted/trashed/missing.
-   */
   async folderExists(folderId: string): Promise<boolean> {
     try {
       const response = await this.drive.files.get({

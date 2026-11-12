@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Cloud, Database, FileArchive, FileSpreadsheet } from '@lucide/svelte';
-	import { Badge } from '$lib/components/ui/badge';
-	import type { RestoreProviderInfo } from '$lib/types';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import type { RestoreProviderInfo } from '#lib/types/index.ts';
 
 	let {
 		providers,

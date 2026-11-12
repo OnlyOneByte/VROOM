@@ -1,10 +1,3 @@
-/**
- * push-api.ts client guard (push-notifications T5) — the service-test pattern: apiClient is
- * mocked so we assert the exact endpoints + payloads the FE opt-in surface sends to the shipped backend
- * push router (GET vapid-public-key / POST subscribe / DELETE subscribe), including that the unsubscribe
- * carries the endpoint in the request BODY (the backend DELETE reads `{ endpoint }` from the body).
- */
-
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 const get = vi.fn();
@@ -76,7 +69,6 @@ describe('pushApi.unsubscribe', () => {
 		expect(del).toHaveBeenCalledTimes(1);
 		const [url, options] = del.mock.calls[0] ?? [];
 		expect(url).toBe('/api/v1/push/subscribe');
-		// The backend DELETE reads `{ endpoint }` from the body — it must ride in options.body.
 		expect(options?.body).toEqual({ endpoint: 'https://fcm.googleapis.com/fcm/send/abc' });
 		expect(out).toEqual({ removed: true });
 	});

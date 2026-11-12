@@ -14,7 +14,6 @@ export function getProvider(id: string): OAuthProviderConfig | undefined {
   return providers[id];
 }
 
-/** Check if a provider is both registered and has valid credentials configured. */
 export function getEnabledProvider(id: string): OAuthProviderConfig | undefined {
   const provider = providers[id];
   if (!provider) return undefined;

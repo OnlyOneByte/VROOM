@@ -1,19 +1,3 @@
-/**
- * Tests for server-side expense search in findPaginated().
- *
- * Regression guard for the search/pagination UX bug: search was applied
- * client-side over the current 20-row page only, so a term that matched an
- * expense on page 2+ returned zero results. Search now runs in SQL across the
- * whole result set.
- *
- * Properties verified:
- * - search matches across ALL pages (not just the first page)
- * - case-insensitive
- * - matches description OR category
- * - user-scoped (never leaks another user's rows)
- * - totalCount reflects the filtered set
- */
-
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
@@ -67,18 +51,14 @@ function input(overrides: Partial<NewExpense>): NewExpense {
 
 describe('findPaginated search', () => {
   test('finds a match that lives beyond the first page', async () => {
-    // 25 filler rows so the match is pushed past a 20-row first page. Rows are
-    // ordered by date desc, so make the match the OLDEST row.
     for (let i = 0; i < 25; i++) {
       await repo.create(input({ description: `filler ${i}`, date: new Date(2026, 0, 28 - i) }));
     }
     await repo.create(input({ description: 'rare needle expense', date: new Date(2025, 0, 1) }));
 
-    // Without search, page 1 (limit 20) would NOT contain the needle.
     const unfiltered = await repo.findPaginated({ userId: USER_A, limit: 20, offset: 0 });
     expect(unfiltered.data.some((e) => e.description === 'rare needle expense')).toBe(false);
 
-    // With search, it is found regardless of page.
     const result = await repo.findPaginated({
       userId: USER_A,
       search: 'needle',
@@ -131,7 +111,6 @@ describe('findPaginated search', () => {
     expect(blank.totalCount).toBe(2);
   });
 
-  // bug: LIKE metacharacters in the search term must be treated as LITERALS, not wildcards.
   describe('LIKE-wildcard escaping', () => {
     test('a literal "%" matches only rows containing "%", not every row', async () => {
       await repo.create(input({ description: '50% synthetic oil' }));
@@ -139,7 +118,6 @@ describe('findPaginated search', () => {
       await repo.create(input({ description: 'plain gas' }));
 
       const result = await repo.findPaginated({ userId: USER_A, search: '50%' });
-      // Pre-fix `%50%%` matched "1000 mile service" (contains "50") too → 2. Now only the literal.
       expect(result.totalCount).toBe(1);
       expect(result.data[0]?.description).toBe('50% synthetic oil');
     });
@@ -149,7 +127,6 @@ describe('findPaginated search', () => {
       await repo.create(input({ description: 'oilXchange' }));
 
       const result = await repo.findPaginated({ userId: USER_A, search: 'oil_change' });
-      // Pre-fix `_` was "any one char" → matched "oilXchange" too. Now the underscore is literal.
       expect(result.totalCount).toBe(1);
       expect(result.data[0]?.description).toBe('oil_change');
     });
@@ -160,7 +137,6 @@ describe('findPaginated search', () => {
       await repo.create(input({ description: '100% beef' }));
 
       const result = await repo.findPaginated({ userId: USER_A, search: '%' });
-      // Pre-fix `%%%` matched all 3. Now only the row with a literal "%".
       expect(result.totalCount).toBe(1);
       expect(result.data[0]?.description).toBe('100% beef');
     });

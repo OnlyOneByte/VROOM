@@ -1,19 +1,7 @@
-/**
- * EmptyState is a top-level region of whatever page renders it, so its title sits directly under
- * that page's `h1`. It used to render an `h3`, which skips `h2` — an axe `heading-order` failure
- * on every route that shows an empty state (/reminders and /vehicles/[id] among them) and a
- * screen-reader outline with a hole in it.
- *
- * The level is asserted through the heading ROLE, so the guard reads what assistive tech reads
- * rather than a class string.
- */
-
-import { describe, expect, test, vi } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { render } from '@testing-library/svelte';
 import { createRawSnippet } from 'svelte';
 import EmptyState from '../empty-state.svelte';
-
-vi.mock('svelte', () => import('../../../../../node_modules/svelte/src/index-client.js' as string));
 
 const text = (value: string) => createRawSnippet(() => ({ render: () => `<span>${value}</span>` }));
 

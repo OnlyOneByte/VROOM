@@ -1,36 +1,28 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { browser } from '$app/environment';
+	import { browser } from '$app/env';
 	import { resolve } from '$app/paths';
 	import { CircleAlert, Upload, Camera, HardDrive } from '@lucide/svelte';
-	import * as Dialog from '$lib/components/ui/dialog';
-	import * as Tabs from '$lib/components/ui/tabs';
-	import { Button } from '$lib/components/ui/button';
-	import { routes } from '$lib/routes';
-	import { providerApi } from '$lib/services/provider-api';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
+	import * as Tabs from '#lib/components/ui/tabs/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { routes } from '#lib/routes.ts';
+	import { providerApi } from '#lib/services/provider-api.ts';
 	import UploadTab from './media/UploadTab.svelte';
 	import CameraTab from './media/CameraTab.svelte';
 
 	const DEFAULT_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-	const DEFAULT_MAX_SIZE = 10_485_760; // 10MB
+	const DEFAULT_MAX_SIZE = 10_485_760;
 
 	interface Props {
 		open: boolean;
-		/** Dialog title */
 		title?: string;
-		/** Dialog description */
 		description?: string;
-		/** Accepted MIME types */
 		acceptedTypes?: string[];
-		/** Max file size in bytes */
 		maxFileSize?: number;
-		/** Allow selecting multiple files */
 		multiple?: boolean;
-		/** Called for each file to upload. Return value is passed to onUploadComplete. */
 		onUpload: (_file: File) => Promise<unknown>;
-		/** Called after each successful upload */
 		onUploadComplete?: (_result: unknown) => void;
-		/** Called when dialog closes */
 		onClose: () => void;
 	}
 
@@ -46,7 +38,6 @@
 		onClose
 	}: Props = $props();
 
-	// --- Orchestrator state ---
 	let activeTab = $state('upload');
 	let uploading = $state(false);
 	let uploadIndex = $state(0);
@@ -57,9 +48,6 @@
 
 	let hasCameraSupport = $derived(browser && !!navigator.mediaDevices?.getUserMedia);
 
-	// Storage-provider gate: uploads fail server-side if the user has no storage
-	// provider configured (getDefaultProvider throws). Surface that up-front with
-	// guidance instead of a generic post-attempt error. null = not yet checked.
 	let hasStorageProvider = $state<boolean | null>(null);
 
 	async function checkStorageProvider() {
@@ -68,17 +56,13 @@
 			const providers = await providerApi.getProviders('storage');
 			hasStorageProvider = providers.length > 0;
 		} catch {
-			// Don't block uploads on a failed check — assume configured and let the
-			// upload surface any real error.
 			hasStorageProvider = true;
 		}
 	}
 
-	// Child component refs
 	let uploadTabRef = $state<ReturnType<typeof UploadTab> | null>(null);
 	let cameraTabRef = $state<ReturnType<typeof CameraTab> | null>(null);
 
-	// --- Reset on open/close ---
 	let previousOpen = $state(false);
 	$effect(() => {
 		const isOpen = open;
@@ -97,7 +81,6 @@
 		previousOpen = isOpen;
 	});
 
-	// --- Upload loop (orchestrated by parent) ---
 	async function handleFilesReady(files: File[]) {
 		if (files.length === 0 || uploading) return;
 		uploading = true;
@@ -121,7 +104,6 @@
 		uploading = false;
 	}
 
-	// --- Camera capture upload ---
 	async function handleUploadCapture(file: File) {
 		try {
 			const result = await onUpload(file);
@@ -134,7 +116,6 @@
 		}
 	}
 
-	// --- Dialog close ---
 	function handleClose() {
 		if (uploading) return;
 		open = false;
@@ -150,7 +131,6 @@
 		</Dialog.Header>
 
 		{#if allDone}
-			<!-- Done state -->
 			<div class="py-4 text-center">
 				<p class="text-sm font-medium text-foreground">
 					Upload complete{uploadErrors.length > 0
@@ -174,8 +154,6 @@
 				<Button variant="outline" onclick={handleClose}>Close</Button>
 			</Dialog.Footer>
 		{:else if hasStorageProvider === false}
-			<!-- No storage provider configured → uploads would fail server-side.
-			     Guide the user to Settings instead of letting them try and fail. -->
 			<div class="space-y-4 py-2">
 				<div class="flex items-start gap-3 rounded-lg border border-border bg-muted/50 p-4">
 					<HardDrive class="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />

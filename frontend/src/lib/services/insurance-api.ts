@@ -9,13 +9,10 @@ import type {
 	UpdateClaimRequest,
 	UpdatePolicyRequest,
 	UpdateTermRequest
-} from '$lib/types';
-import { apiClient, getApiBaseUrl, withPagination } from './api-client';
+} from '#lib/types/index.ts';
+import { apiClient } from './api-client';
+import { entityPhotos } from './photo-api';
 
-/**
- * Insurance API service
- * Centralized API calls for insurance policy operations
- */
 export const insuranceApi = {
 	async getAllPolicies(): Promise<InsurancePolicy[]> {
 		return apiClient.get<InsurancePolicy[]>('/api/v1/insurance');
@@ -57,35 +54,25 @@ export const insuranceApi = {
 		return apiClient.delete<InsurancePolicy>(`/api/v1/insurance/${policyId}/terms/${termId}`);
 	},
 
-	// --- Document methods (delegate to the entityType-generic photo endpoints) ---
-	// entityType is 'insurance_policy' or 'insurance_claim'; both route to the
-	// insurance_docs storage category on the backend.
-
-	async getEntityDocuments(
+	getEntityDocuments(
 		entityType: string,
 		entityId: string,
 		params?: { limit?: number; offset?: number }
 	): Promise<PaginatedResponse<Photo>> {
-		return apiClient.getPaginated<Photo>(
-			withPagination(`/api/v1/photos/${entityType}/${entityId}`, params)
-		);
+		return entityPhotos(entityType, entityId).list(params);
 	},
 
-	async uploadEntityDocument(entityType: string, entityId: string, file: File): Promise<Photo> {
-		const formData = new FormData();
-		formData.append('photo', file);
-		return apiClient.post<Photo>(`/api/v1/photos/${entityType}/${entityId}`, formData);
+	uploadEntityDocument(entityType: string, entityId: string, file: File): Promise<Photo> {
+		return entityPhotos(entityType, entityId).upload(file);
 	},
 
-	async deleteEntityDocument(entityType: string, entityId: string, photoId: string): Promise<void> {
-		await apiClient.delete(`/api/v1/photos/${entityType}/${entityId}/${photoId}`);
+	deleteEntityDocument(entityType: string, entityId: string, photoId: string): Promise<void> {
+		return entityPhotos(entityType, entityId).remove(photoId);
 	},
 
 	getEntityDocumentThumbnailUrl(entityType: string, entityId: string, photoId: string): string {
-		return `${getApiBaseUrl()}/api/v1/photos/${entityType}/${entityId}/${photoId}/thumbnail`;
+		return entityPhotos(entityType, entityId).thumbnailUrl(photoId);
 	},
-
-	// --- Claims methods ---
 
 	async getClaims(policyId: string): Promise<InsuranceClaim[]> {
 		return apiClient.get<InsuranceClaim[]>(`/api/v1/insurance/${policyId}/claims`);

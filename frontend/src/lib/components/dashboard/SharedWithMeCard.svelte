@@ -1,21 +1,16 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { Inbox, Check, X, CircleAlert } from '@lucide/svelte';
-	import * as Card from '$lib/components/ui/card';
-	import { Button } from '$lib/components/ui/button';
-	import { Badge } from '$lib/components/ui/badge';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { toast } from 'svelte-sonner';
-	import { shareApi } from '$lib/services/share-api';
-	import { ApiError } from '$lib/utils/error-handling';
-	import { shareLevelLabel } from '$lib/utils/share-helpers';
-	import type { ReceivedShare } from '$lib/types';
+	import { shareApi } from '#lib/services/share-api.ts';
+	import { ApiError } from '#lib/utils/error-handling.ts';
+	import { shareLevelLabel } from '#lib/utils/share-helpers.ts';
+	import type { ReceivedShare } from '#lib/types/index.ts';
 
 	interface Props {
-		/**
-		 * Called after an invite is accepted so the parent can refresh the fleet — the accepted
-		 * vehicle then appears via `GET /vehicles?include=shared` (wired in T12b-2). Optional: the
-		 * card works standalone, this just lets the dashboard reflect the new vehicle without a reload.
-		 */
 		onAccepted?: () => void;
 	}
 
@@ -24,7 +19,7 @@
 	let isLoading = $state(true);
 	let loadError = $state<string | null>(null);
 	let pending = $state<ReceivedShare[]>([]);
-	let acting = $state<string | null>(null); // the share id mid accept/decline (disables its buttons)
+	let acting = $state<string | null>(null);
 
 	onMount(load);
 
@@ -33,7 +28,6 @@
 		loadError = null;
 		try {
 			const received = await shareApi.listReceived();
-			// Only PENDING invites are actionable here; an accepted share surfaces as a fleet card (T12b-2).
 			pending = received.filter(s => s.status === 'pending');
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to load invitations:', error);
@@ -75,13 +69,6 @@
 	}
 </script>
 
-<!--
-  This is a NOTIFICATION widget — it only takes up dashboard space when there is something to act on.
-  Its four states map to: loading → absent (no skeleton flash on the common no-invites path), empty →
-  absent, error → a compact retry card (a load failure is surfaced, never silently swallowed — a user
-  must not miss a real invite), data → the actionable list. So nothing renders unless there is a
-  pending invite or a fetch error.
--->
 {#if loadError && !isLoading}
 	<Card.Root>
 		<Card.Content class="p-4">

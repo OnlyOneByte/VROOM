@@ -1,16 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { VEHICLE_CAMRY, VEHICLE_CIVIC, addSessionCookie, mockApi } from './support/mock-api';
 
-/**
- * Seeing the fleet and adding a vehicle.
- *
- * The app calls `/api/v1/vehicles`; the previous version of this file mocked an
- * unversioned `/api/vehicles` pattern that never matched, so every fixture here was dead
- * and the app saw the real, absent backend. The fleet lives on `/dashboard`; the create
- * form is its own route at `/vehicles/new`, reached from the "Add Vehicle" floating
- * action button.
- */
-
 test.describe('Fleet overview', () => {
 	test.beforeEach(async ({ context }) => {
 		await addSessionCookie(context);
@@ -31,14 +21,11 @@ test.describe('Fleet overview', () => {
 
 		await page.goto('/dashboard');
 
-		// Nickname wins as the card's heading, with the year/make/model underneath.
 		const camryLink = page.getByRole('link', { name: VEHICLE_CAMRY.nickname });
 		await expect(camryLink).toBeVisible();
 		await expect(camryLink).toHaveAttribute('href', `/vehicles/${VEHICLE_CAMRY.id}`);
 		await expect(page.getByText('2020 Toyota Camry')).toBeVisible();
 
-		// The second card may be scrolled out of the carousel viewport depending on width,
-		// so assert it is rendered rather than on-screen.
 		await expect(page.getByRole('link', { name: '2019 Honda Civic' })).toHaveAttribute(
 			'href',
 			`/vehicles/${VEHICLE_CIVIC.id}`
@@ -84,10 +71,6 @@ test.describe('Adding a vehicle', () => {
 	test('the create form is reachable from the dashboard', async ({ page }) => {
 		await page.goto('/dashboard');
 
-		// Retry the click rather than asserting once: a dev-server HMR reload (another
-		// process touching a source file mid-run) reloads the DOCUMENT url, which cancels an
-		// in-flight client-side navigation and lands back on /dashboard. The retry still
-		// fails if the link is missing or points somewhere else — only the race is absorbed.
 		await expect(async () => {
 			if (!/\/vehicles\/new$/.test(page.url())) {
 				await page.getByRole('link', { name: 'Add Vehicle' }).click();

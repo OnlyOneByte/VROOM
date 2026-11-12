@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { LoaderCircle, Upload, X, CircleAlert, ImagePlus } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
+	import { Button } from '#lib/components/ui/button/index.ts';
 
 	interface Props {
 		acceptedTypes: string[];
@@ -27,13 +27,11 @@
 		onClose
 	}: Props = $props();
 
-	// --- Local state ---
 	let selectedFiles = $state<File[]>([]);
 	let validationErrors = $state<string[]>([]);
 	let isDragOver = $state(false);
 	let fileInputEl = $state<HTMLInputElement | null>(null);
 
-	// --- Derived ---
 	let acceptedInputStr = $derived(acceptedTypes.join(','));
 	let maxSizeMB = $derived(Math.round(maxFileSize / (1024 * 1024)));
 	let acceptedLabels = $derived(
@@ -48,7 +46,6 @@
 			.join(', ')
 	);
 
-	// --- File validation ---
 	function validateFile(file: File): string | null {
 		if (!acceptedTypes.includes(file.type)) {
 			return `"${file.name}" is not a supported format. Allowed: ${acceptedLabels}.`;
@@ -121,7 +118,6 @@
 </script>
 
 {#if !uploading}
-	<!-- Drop zone -->
 	<div
 		role="button"
 		tabindex="0"
@@ -156,7 +152,6 @@
 	/>
 {/if}
 
-<!-- Validation errors -->
 {#if validationErrors.length > 0}
 	<div class="rounded-lg border border-destructive bg-destructive/10 p-3">
 		{#each validationErrors as error, idx (idx)}
@@ -168,7 +163,6 @@
 	</div>
 {/if}
 
-<!-- Selected files list -->
 {#if selectedFiles.length > 0 && !uploading}
 	<div class="max-h-48 space-y-2 overflow-y-auto">
 		{#each selectedFiles as file, i (file.name + i)}
@@ -191,7 +185,6 @@
 	</div>
 {/if}
 
-<!-- Upload progress -->
 {#if uploading}
 	<div class="flex flex-col items-center gap-3 py-4">
 		<LoaderCircle class="h-8 w-8 animate-spin text-primary" />
@@ -201,7 +194,6 @@
 	</div>
 {/if}
 
-<!-- Upload errors during progress -->
 {#if uploadErrors.length > 0}
 	<div class="rounded-lg border border-destructive bg-destructive/10 p-3">
 		{#each uploadErrors as error, idx (idx)}

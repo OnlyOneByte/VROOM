@@ -1,14 +1,5 @@
-/**
- * Unit tests for OAuth Provider Registry
- *
- * Tests getProvider, getEnabledProviders, unknown provider, and PKCE flags.
- *
- * **Validates: Requirements 1.1, 1.2, 1.3, 1.4**
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
-// Store original env values to restore after each test
 let originalGoogleClientId: string | undefined;
 let originalGoogleClientSecret: string | undefined;
 let originalGithubClientId: string | undefined;
@@ -22,7 +13,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  // Restore original env values
   if (originalGoogleClientId !== undefined) {
     process.env.GOOGLE_CLIENT_ID = originalGoogleClientId;
   } else {
@@ -44,10 +34,6 @@ afterEach(() => {
     delete process.env.GITHUB_CLIENT_SECRET;
   }
 });
-
-// ---------------------------------------------------------------------------
-// getProvider
-// ---------------------------------------------------------------------------
 
 describe('getProvider', () => {
   test('returns Google provider config for "google"', async () => {
@@ -79,10 +65,6 @@ describe('getProvider', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// PKCE flags
-// ---------------------------------------------------------------------------
-
 describe('PKCE flags', () => {
   test('Google supports PKCE', async () => {
     const { getProvider } = await import('../providers/registry');
@@ -97,10 +79,6 @@ describe('PKCE flags', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Provider interface completeness
-// ---------------------------------------------------------------------------
-
 describe('Provider interface', () => {
   test('each provider has required methods', async () => {
     const { getProvider } = await import('../providers/registry');
@@ -113,7 +91,6 @@ describe('Provider interface', () => {
       expect(typeof provider?.id).toBe('string');
       expect(typeof provider?.displayName).toBe('string');
       expect(typeof provider?.supportsPKCE).toBe('boolean');
-      expect(Array.isArray(provider?.scopes)).toBe(true);
     }
   });
 });

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { DollarSign, Clock, TrendingUp } from '@lucide/svelte';
-	import StatCardGrid from '$lib/components/charts/StatCardGrid.svelte';
-	import { formatCurrency } from '$lib/utils/formatters';
+	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
+	import { formatCurrency } from '#lib/utils/formatters.ts';
 
 	interface LocalStats {
 		totalExpenses: number;

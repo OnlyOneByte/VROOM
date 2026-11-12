@@ -1,24 +1,7 @@
-/**
- * The desktop sidebar's three accessibility defects, and its pending badge.
- *
- * - The active page was signalled by colour alone: `isActive(href)` drove only a class swap, so
- *   assistive tech had no way to report which of the identical-sounding links was the current page.
- * - The labels were revealed by `onmouseenter` only, so a keyboard user tabbing the sidebar got bare
- *   icons — a mouse-only affordance.
- * - The wrapper `<div>` carried `role="navigation"` around the real `<nav>`, giving every
- *   authenticated route two nested, unlabelled navigation landmarks (axe landmark-unique). It still
- *   needs SOME role because it carries pointer handlers, so it is explicitly presentational.
- *
- * The badge assertions belong here because the sidebar is the third of the three chrome surfaces
- * that counted `!synced` and so advertised a parked row as syncable.
- */
-
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import { offlineExpenseQueue, onlineStatus, syncState } from '$lib/stores/offline.svelte';
-import type { OfflineExpense } from '$lib/utils/offline-storage';
-
-vi.mock('svelte', () => import('../../../../../node_modules/svelte/src/index-client.js' as string));
+import { offlineExpenseQueue, onlineStatus, syncState } from '#lib/stores/offline.svelte.ts';
+import type { OfflineExpense } from '#lib/utils/offline-storage.ts';
 
 let currentUrl = new URL('http://localhost/expenses');
 vi.mock('$app/state', () => ({
@@ -27,7 +10,7 @@ vi.mock('$app/state', () => ({
 	}
 }));
 
-vi.mock('$lib/utils/sync/sync-manager', () => {
+vi.mock('#lib/utils/sync/sync-manager.ts', () => {
 	const store = <T>(value: T) => ({
 		get current() {
 			return value;
@@ -101,7 +84,6 @@ describe('labels reveal on keyboard focus, not only on hover', () => {
 		render(Navigation);
 		const expensesLink = screen.getByRole('link', { name: 'Expenses' });
 
-		// Collapsed: the only accessible name is the title attribute, there is no label text.
 		expect(screen.queryByText('Expenses')).toBeNull();
 
 		await fireEvent.focusIn(expensesLink);

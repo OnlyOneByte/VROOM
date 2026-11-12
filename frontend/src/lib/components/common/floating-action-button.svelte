@@ -1,15 +1,11 @@
 <script lang="ts">
 	import { Plus } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
+	import { Button } from '#lib/components/ui/button/index.ts';
 
 	interface Props {
-		/** Navigation URL (use href for links) */
 		href?: string;
-		/** Button label text */
 		label: string;
-		/** Accessible label for screen readers */
 		ariaLabel?: string;
-		/** Click handler (for non-link FABs) */
 		onclick?: () => void;
 	}
 

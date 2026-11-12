@@ -1,27 +1,26 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { routes, paramRoutes } from '$lib/routes';
+	import { routes, paramRoutes } from '#lib/routes.ts';
 	import { onMount } from 'svelte';
 	import { Shield, Plus, CircleAlert } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import FloatingActionButton from '$lib/components/common/floating-action-button.svelte';
-	import PageHeader from '$lib/components/common/page-header.svelte';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import EmptyState from '$lib/components/common/empty-state.svelte';
-	import PolicyList from '$lib/components/insurance/PolicyList.svelte';
-	import { insuranceApi } from '$lib/services/insurance-api';
-	import { vehicleApi } from '$lib/services/vehicle-api';
-	import { handleErrorWithNotification } from '$lib/utils/error-handling';
-	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
-	import type { InsurancePolicy, Vehicle } from '$lib/types';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import FloatingActionButton from '#lib/components/common/floating-action-button.svelte';
+	import PageHeader from '#lib/components/common/page-header.svelte';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import PolicyList from '#lib/components/insurance/PolicyList.svelte';
+	import { insuranceApi } from '#lib/services/insurance-api.ts';
+	import { vehicleApi } from '#lib/services/vehicle-api.ts';
+	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
+	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
+	import type { InsurancePolicy, Vehicle } from '#lib/types/index.ts';
 
 	let policies = $state<InsurancePolicy[]>([]);
 	let vehicles = $state<Vehicle[]>([]);
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
 
-	// Build a map of vehicleId → display name for showing on policy cards
 	let vehicleNameMap = $derived(new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)])));
 
 	onMount(async () => {
@@ -86,7 +85,6 @@
 	</div>
 {:else}
 	<div class="space-y-6 pb-24">
-		<!-- Header -->
 		<PageHeader title="Insurance" description="Manage your insurance policies across all vehicles">
 			{#snippet actions()}
 				<Button class="hidden sm:flex" onclick={handleAddPolicy}>
@@ -126,7 +124,6 @@
 		{/if}
 	</div>
 
-	<!-- Floating Action Button (mobile) -->
 	<FloatingActionButton
 		onclick={handleAddPolicy}
 		label="New Policy"

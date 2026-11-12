@@ -1,11 +1,3 @@
-/**
- * StorageProviderRegistry — resolves storage providers for photo operations.
- *
- * Reads user_settings.storage_config to determine which provider serves each
- * photo category, loads provider rows from user_providers, decrypts credentials,
- * and instantiates the correct StorageProvider implementation.
- */
-
 import { and, eq } from 'drizzle-orm';
 import { CONFIG } from '../../../../config';
 import { getDb } from '../../../../db/connection';
@@ -28,8 +20,6 @@ export interface ResolvedProvider {
   folderPath: string;
 }
 
-// Per-providerType credential/config validation + construction. Extracted from the
-// createProviderInstance switch so each branch stays small and the dispatcher flat.
 function buildGoogleDriveProvider(credentials: Record<string, unknown>): StorageProvider {
   const refreshToken = credentials.refreshToken;
   if (typeof refreshToken !== 'string') {
@@ -46,8 +36,6 @@ function buildGooglePhotosProvider(
   if (typeof refreshToken !== 'string') {
     throw new ValidationError('Invalid Google Photos credentials: missing refreshToken');
   }
-  // Reuse the cached VROOM album id from config (set on first upload) to skip the
-  // resolve-or-create round-trip.
   const albumId = typeof config?.albumId === 'string' ? config.albumId : undefined;
   return new GooglePhotosProvider(refreshToken, undefined, albumId);
 }
@@ -71,14 +59,6 @@ function buildS3Provider(credentials: Record<string, unknown>, config: unknown):
 export class StorageProviderRegistry {
   constructor(private db: ReturnType<typeof getDb>) {}
 
-  /**
-   * Fetch a provider row scoped to its owner (id AND userId), or null if there's no such owned
-   * provider. ONE source of truth for the tenant-scoped provider lookup the user-facing resolvers
-   * (getDefaultProvider / getBackupProviders / getProvider) repeated byte-for-byte — callers keep
-   * their own null/status handling (throw vs skip). A divergent copy dropping the userId predicate
-   * would be a cross-tenant read, so collapsing it keeps the ownership scope in lockstep. (The
-   * no-auth getProviderInternal queries by id ALONE by design and is deliberately NOT routed here.)
-   */
   private async findOwnedProvider(
     providerId: string,
     userId: string
@@ -91,10 +71,6 @@ export class StorageProviderRegistry {
     return row[0] ?? null;
   }
 
-  /**
-   * Get the user's default provider for a photo category.
-   * Reads storage_config.defaults, loads the provider, resolves the full folder path.
-   */
   async getDefaultProvider(userId: string, category: PhotoCategory): Promise<ResolvedProvider> {
     const storageConfig = await this.loadStorageConfig(userId);
 
@@ -118,9 +94,6 @@ export class StorageProviderRegistry {
     return { provider, providerId, folderPath };
   }
 
-  /**
-   * Get all backup providers for a category (providers with category enabled, excluding the default).
-   */
   async getBackupProviders(userId: string, category: PhotoCategory): Promise<ResolvedProvider[]> {
     const storageConfig = await this.loadStorageConfig(userId);
     const defaultProviderId = storageConfig.defaults[category];
@@ -128,7 +101,6 @@ export class StorageProviderRegistry {
     const results: ResolvedProvider[] = [];
 
     for (const [providerId, categories] of Object.entries(storageConfig.providerCategories)) {
-      // Skip the default provider
       if (providerId === defaultProviderId) continue;
 
       const categorySetting = categories[category];
@@ -146,10 +118,6 @@ export class StorageProviderRegistry {
     return results;
   }
 
-  /**
-   * Get a specific provider by ID with user ownership check.
-   * Use this from user-facing code paths (routes, photo-service).
-   */
   async getProvider(providerId: string, userId: string): Promise<StorageProvider> {
     const providerRow = await this.findOwnedProvider(providerId, userId);
     if (!providerRow) {
@@ -159,11 +127,6 @@ export class StorageProviderRegistry {
     return this.createProviderInstance(providerRow);
   }
 
-  /**
-   * Get a specific provider by ID without ownership check.
-   * Only for trusted server-side code (sync worker) where userId is unavailable.
-   * @internal — Do NOT use from route handlers. Use `getProvider()` with userId instead.
-   */
   async getProviderInternal(providerId: string): Promise<StorageProvider> {
     const row = await this.db
       .select()
@@ -179,9 +142,6 @@ export class StorageProviderRegistry {
     return this.createProviderInstance(providerRow);
   }
 
-  /**
-   * Get all providers for a user in a given domain (for settings UI).
-   */
   async getProvidersByDomain(userId: string, domain: string): Promise<UserProvider[]> {
     return this.db
       .select()
@@ -189,10 +149,6 @@ export class StorageProviderRegistry {
       .where(and(eq(userProviders.userId, userId), eq(userProviders.domain, domain)));
   }
 
-  /**
-   * Resolve the full folder path for a provider and category.
-   * Used by the sync worker to determine where to upload files.
-   */
   async resolveProviderFolderPath(providerId: string, category: PhotoCategory): Promise<string> {
     const row = await this.db
       .select()
@@ -207,13 +163,8 @@ export class StorageProviderRegistry {
     return this.resolveFolderPath(providerRow, storageConfig, providerId, category);
   }
 
-  /**
-   * Factory: instantiate a StorageProvider from a user_providers row.
-   * Decrypts credentials and switches on providerType.
-   */
   createProviderInstance(row: UserProvider): StorageProvider {
-    // Fake provider carries no real credentials; short-circuit before decrypt.
-    // Double-gated: only outside production AND only when explicitly opted in.
+    // Fakes are double-gated: only outside production and only when explicitly opted in.
     if (row.providerType === 'fake') {
       if (!CONFIG.allowFakeStorageProvider) {
         throw new ValidationError('Fake storage provider is not enabled in this environment');
@@ -236,11 +187,7 @@ export class StorageProviderRegistry {
     }
   }
 
-  /**
-   * Load the storage config from user_settings for a given user.
-   * Defensively merges with DEFAULT_STORAGE_CONFIG to handle rows created by
-   * the migration SQL default which is missing `odometer_readings`.
-   */
+  // Merge with defaults: older rows predate newer categories.
   private async loadStorageConfig(userId: string): Promise<StorageConfig> {
     const row = await this.db
       .select({ storageConfig: userPreferences.storageConfig })
@@ -259,9 +206,6 @@ export class StorageProviderRegistry {
     };
   }
 
-  /**
-   * Resolve the full folder path: providerRootPath + photoRootPath + category folderPath.
-   */
   private resolveFolderPath(
     providerRow: UserProvider,
     storageConfig: StorageConfig,
@@ -280,7 +224,6 @@ export class StorageProviderRegistry {
   }
 }
 
-/** Lazy singleton registry instance — avoids calling getDb() at module scope. */
 let _registryInstance: StorageProviderRegistry | null = null;
 export function getStorageProviderRegistry(): StorageProviderRegistry {
   if (!_registryInstance) {
@@ -289,10 +232,7 @@ export function getStorageProviderRegistry(): StorageProviderRegistry {
   return _registryInstance;
 }
 
-/**
- * Direct singleton for backward compat with existing import sites.
- * Uses a Proxy to defer getDb() until first property access.
- */
+// Keep this lazy: getDb() must not run at import time.
 export const storageProviderRegistry: StorageProviderRegistry = new Proxy(
   {} as StorageProviderRegistry,
   {

@@ -1,21 +1,9 @@
-/**
- * Fuelio import adapter guard (data-migration spec). Drives the PURE `parseFuelioExport` against a
- * realistic multi-section Fuelio backup (a `## Vehicle` / `## Log` / `## CostCategories` / `## Costs`
- * file in km/litres, imported into a miles/US-gallons target so unit conversion is exercised), then
- * feeds the emitted native CSV through the REAL `buildImportPlan` to prove the end-to-end contract:
- * every downstream guarantee (per-row validation, vehicle resolution, cents conversion, idempotency)
- * is inherited. Pins the four things a naive Fuelio importer gets wrong: multi-section splitting,
- * header-embedded units, `Missed`→missedFillup, and migrating the non-fuel `## Costs` section.
- */
-
 import { describe, expect, test } from 'bun:test';
 import { DistanceUnit, VolumeUnit } from '../../../types';
 import { convertDistance, convertVolume } from '../../../utils/unit-conversions';
 import { isFuelioExport, parseFuelioExport } from '../fuelio-import';
 import { buildImportPlan, type ImportableExpense, type ImportVehicle } from '../import-csv';
 
-// A realistic Fuelio export: metric (km / litres), two fuel rows (one full, one partial+Missed),
-// and two costs (Service → maintenance; Ferry → unmapped → misc).
 const FUELIO_CSV = `"## Vehicle"
 "Name","Description","DistUnit","FuelUnit","ConsumptionUnit","ImportCSVDateFormat","VIN","Insurance","Plate","Make","Model","Year","TankCount","Tank1Type","Tank2Type"
 "Golf","Daily driver","0","0","2","yyyy-MM-dd","","","ABC-123","Volkswagen","Golf","2018","1","0","0"
@@ -42,26 +30,26 @@ const VEHICLES: ImportVehicle[] = [
   { id: 'veh-1', make: 'Volkswagen', model: 'Golf', year: 2018, nickname: null },
 ];
 
+function categoryCounts(csv: string): { fuel: number; other: number } {
+  const plan = buildImportPlan(csv, VEHICLES);
+  const fuel = plan.rows.filter((r) => r.expense?.category === 'fuel').length;
+  return { fuel, other: plan.rows.length - fuel };
+}
+
 describe('isFuelioExport', () => {
   test('recognizes a Fuelio multi-section export', () => {
     expect(isFuelioExport(FUELIO_CSV)).toBe(true);
   });
-  // The negative case is covered through the public API by 'throws on a non-Fuelio file' below —
-  // isFuelioExport is that guard's only caller, so asserting it twice pins one branch twice.
 });
 
 describe('parseFuelioExport', () => {
-  test('detects the vehicle name and the file units from the headers', () => {
+  test('emits every log and cost row and reports the unmapped cost category', () => {
     const r = parseFuelioExport(FUELIO_CSV, {
       targetVehicle: TARGET_VEHICLE,
       targetUnits: TARGET_UNITS,
     });
-    expect(r.fileVehicleName).toBe('Golf');
-    expect(r.fileDistanceUnit).toBe(DistanceUnit.KILOMETERS);
-    expect(r.fileVolumeUnit).toBe(VolumeUnit.LITERS);
-    expect(r.logCount).toBe(2);
-    expect(r.costCount).toBe(2);
-    expect(r.unmappedCategories).toEqual(['Ferry']); // Service maps → maintenance; Ferry falls to misc
+    expect(categoryCounts(r.csv)).toEqual({ fuel: 2, other: 2 });
+    expect(r.unmappedCategories).toEqual(['Ferry']);
   });
 
   test('throws on a non-Fuelio file', () => {
@@ -76,8 +64,7 @@ describe('parseFuelioExport', () => {
       targetUnits: TARGET_UNITS,
       includeCosts: false,
     });
-    expect(r.logCount).toBe(2);
-    expect(r.costCount).toBe(0);
+    expect(categoryCounts(r.csv)).toEqual({ fuel: 2, other: 0 });
   });
 });
 
@@ -100,8 +87,8 @@ describe('Fuelio → native CSV → buildImportPlan (end-to-end)', () => {
     );
     expect(fuel).toHaveLength(2);
 
-    const full = fuel[0]; // 2024-01-05, Missed=0
-    expect(full.expenseAmount).toBe(6890); // $68.90 → cents
+    const full = fuel[0];
+    expect(full.expenseAmount).toBe(6890);
     expect(full.mileage).toBe(
       Math.round(convertDistance(45210, DistanceUnit.KILOMETERS, DistanceUnit.MILES))
     );
@@ -111,7 +98,7 @@ describe('Fuelio → native CSV → buildImportPlan (end-to-end)', () => {
     );
     expect(full.missedFillup).toBe(false);
 
-    const partial = fuel[1]; // 2024-01-19, Missed=1
+    const partial = fuel[1];
     expect(partial.expenseAmount).toBe(3280);
     expect(partial.missedFillup).toBe(true);
   });
@@ -124,21 +111,19 @@ describe('Fuelio → native CSV → buildImportPlan (end-to-end)', () => {
 
     const service = costs.find((e) => e.description?.includes('Oil change'));
     if (!service) throw new Error('no "Oil change" cost row in the plan');
-    expect(service.category).toBe('maintenance'); // Fuelio "Service" → maintenance
+    expect(service.category).toBe('maintenance');
     expect(service.expenseAmount).toBe(8900);
-    expect(service.mileage).toBeNull(); // non-fuel row must not carry an odometer
+    expect(service.mileage).toBeNull();
     expect(service.volume).toBeNull();
 
     const ferry = costs.find((e) => e.description?.includes('Ferry'));
     if (!ferry) throw new Error('no "Ferry" cost row in the plan');
-    expect(ferry.category).toBe('misc'); // unmapped Fuelio category → misc
+    expect(ferry.category).toBe('misc');
     expect(ferry.expenseAmount).toBe(2500);
   });
 });
 
 describe('cost categories that resolve to no name are still surfaced (never a silent misc)', () => {
-  // A cost row whose CostTypeID is absent from ## CostCategories. Fuelio users delete categories,
-  // which orphans the id on rows that referenced it.
   const ORPHAN_ID_CSV = `"## Vehicle"
 "Name","DistUnit","FuelUnit","ImportCSVDateFormat"
 "Golf","0","0","yyyy-MM-dd"
@@ -156,7 +141,6 @@ describe('cost categories that resolve to no name are still surfaced (never a si
 "Mystery charge","2024-02-01","46000","99","","25.00"
 `;
 
-  // A partial export: costs reference ids, but the CostCategories section is missing entirely.
   const NO_CATEGORIES_CSV = ORPHAN_ID_CSV.replace(
     /"## CostCategories"\n"CostTypeID","Name","priority","color"\n"1","Service","0","#795548"\n\n/,
     ''
@@ -167,8 +151,7 @@ describe('cost categories that resolve to no name are still surfaced (never a si
       targetVehicle: TARGET_VEHICLE,
       targetUnits: TARGET_UNITS,
     });
-    expect(r.costCount).toBe(1);
-    // The whole point: the user is told the row was bucketed, naming the id we could not resolve.
+    expect(categoryCounts(r.csv)).toEqual({ fuel: 1, other: 1 });
     expect(r.unmappedCategories).toEqual(['Unknown category 99']);
 
     const plan = buildImportPlan(r.csv, VEHICLES);
@@ -182,7 +165,7 @@ describe('cost categories that resolve to no name are still surfaced (never a si
       targetVehicle: TARGET_VEHICLE,
       targetUnits: TARGET_UNITS,
     });
-    expect(r.costCount).toBe(1);
+    expect(categoryCounts(r.csv)).toEqual({ fuel: 1, other: 1 });
     expect(r.unmappedCategories).toEqual(['Unknown category 99']);
   });
 
@@ -195,7 +178,6 @@ describe('cost categories that resolve to no name are still surfaced (never a si
   });
 });
 
-/** A minimal Fuelio file whose Log header carries the given odometer/fuel column names. */
 function fileWithLogHeaders(odoHeader: string, fuelHeader: string, odo = '45210', fuel = '42.10') {
   return `"## Vehicle"
 "Name","ImportCSVDateFormat"
@@ -207,17 +189,14 @@ function fileWithLogHeaders(odoHeader: string, fuelHeader: string, odo = '45210'
 `;
 }
 
-describe('unit detection from the ## Log header', () => {
-  // Only the metric pair was exercised before, leaving every imperial branch unguarded in an app
-  // whose default is miles. Driven through parseFuelioExport (which reports the detected units)
-  // rather than by exporting the detectors.
+describe('the ## Log header units drive conversion into the vehicle units', () => {
   const CASES: [string, string, DistanceUnit | null, VolumeUnit | null][] = [
     ['Odo (km)', 'Fuel (litres)', DistanceUnit.KILOMETERS, VolumeUnit.LITERS],
     ['Odo (mi)', 'Fuel (us gallons)', DistanceUnit.MILES, VolumeUnit.GALLONS_US],
     ['Odo (mi)', 'Fuel (uk gallons)', DistanceUnit.MILES, VolumeUnit.GALLONS_UK],
-    ['Odo (miles)', 'Fuel (gallons)', DistanceUnit.MILES, VolumeUnit.GALLONS_US], // bare gallons → US
-    ['Odo (kilometers)', 'Fuel (liters)', DistanceUnit.KILOMETERS, VolumeUnit.LITERS], // US spelling
-    ['Odometer', 'Fuel', null, null], // undecorated → unknown, so no conversion is attempted
+    ['Odo (miles)', 'Fuel (gallons)', DistanceUnit.MILES, VolumeUnit.GALLONS_US],
+    ['Odo (kilometers)', 'Fuel (liters)', DistanceUnit.KILOMETERS, VolumeUnit.LITERS],
+    ['Odometer', 'Fuel', null, null],
   ];
 
   for (const [odoHeader, fuelHeader, distance, volume] of CASES) {
@@ -226,8 +205,14 @@ describe('unit detection from the ## Log header', () => {
         targetVehicle: TARGET_VEHICLE,
         targetUnits: TARGET_UNITS,
       });
-      expect(r.fileDistanceUnit).toBe(distance);
-      expect(r.fileVolumeUnit).toBe(volume);
+      const expense = buildImportPlan(r.csv, VEHICLES).rows[0]?.expense;
+      expect(expense?.mileage).toBe(
+        distance ? Math.round(convertDistance(45210, distance, DistanceUnit.MILES)) : 45210
+      );
+      expect(expense?.volume).toBeCloseTo(
+        volume ? convertVolume(42.1, volume, VolumeUnit.GALLONS_US) : 42.1,
+        2
+      );
     });
   }
 
@@ -241,14 +226,13 @@ describe('unit detection from the ## Log header', () => {
     );
     const row = buildImportPlan(r.csv, VEHICLES).rows[0];
     expect(row?.status).toBe('ready');
-    expect(row?.expense?.mileage).toBe(45210); // same unit in and out — no conversion drift
+    expect(row?.expense?.mileage).toBe(45210);
     expect(row?.expense?.volume).toBe(11.5);
   });
 });
 
 describe('per-row errors survive the adapter', () => {
   test('a fill-up with a blank price is reported, not silently imported', () => {
-    // Every fixture row had a price, so the per-row error path was never exercised end-to-end.
     const csv = `"## Vehicle"
 "Name","ImportCSVDateFormat"
 "Golf","yyyy-MM-dd"
@@ -271,9 +255,6 @@ describe('per-row errors survive the adapter', () => {
 
 describe('re-importing the same export dedups', () => {
   test('every emitted row carries a distinct clientId, including identical fill-ups', () => {
-    // The load-bearing property. Dedup is (userId, clientId) and clientId is derived from the row's
-    // own values, so two genuinely identical fill-ups would collide — and one real refuel would be
-    // dropped — without the occurrence index that distinguishes them.
     const twinRows = `"## Vehicle"
 "Name","ImportCSVDateFormat"
 "Golf","yyyy-MM-dd"
@@ -291,12 +272,10 @@ describe('re-importing the same export dedups', () => {
     const ids = plan.rows.map((row) => row.expense?.clientId);
     expect(plan.readyCount).toBe(2);
     expect(ids.every((id) => typeof id === 'string' && id.length > 0)).toBe(true);
-    expect(new Set(ids).size).toBe(2); // distinct → both survive, neither is silently dropped
+    expect(new Set(ids).size).toBe(2);
   });
 
   test('the same file re-parsed derives the same clientIds (stable dedup key)', () => {
-    // Weaker than it looks — one build re-running one pure path — so it guards a *shape* change
-    // (a clock, a random salt, or Map-order leaking into the key), not rounding drift across versions.
     const ids = () => {
       const r = parseFuelioExport(FUELIO_CSV, {
         targetVehicle: TARGET_VEHICLE,

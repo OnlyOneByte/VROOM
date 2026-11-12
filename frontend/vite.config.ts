@@ -1,12 +1,9 @@
-import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig } from 'vitest/config';
-import { SvelteKitPWA } from '@vite-pwa/sveltekit';
+import adapter from '@sveltejs/adapter-node';
+import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
+import { withPwa } from '@vite-pwa/sveltekit';
 import tailwindcss from '@tailwindcss/vite';
+import { defineConfig } from 'vitest/config';
 
-// Same `/api` -> backend proxy for `vite dev` AND `vite preview`. One object so the two
-// servers can't drift: `preview` previously had no proxy at all, so the built app it serves
-// answered every `/api/v1/...` call with its own 404 — the app looked signed out and empty
-// with a healthy backend running on :3001.
 const apiProxy = {
 	'/api': {
 		target: 'http://localhost:3001',
@@ -17,76 +14,79 @@ const apiProxy = {
 export default defineConfig({
 	plugins: [
 		tailwindcss(),
-		sveltekit(),
-		SvelteKitPWA({
-			strategies: 'injectManifest',
-			srcDir: 'src',
-			filename: 'service-worker.ts',
-			registerType: 'autoUpdate',
-			injectManifest: {
-				globPatterns: ['client/**/*.{js,css,ico,png,svg,webp,webmanifest}']
+		withPwa(
+			{
+				preprocess: vitePreprocess(),
+				adapter: adapter(),
+				serviceWorker: { register: false }
 			},
-			manifest: {
-				name: 'VROOM Car Tracker',
-				short_name: 'VROOM',
-				id: '/',
-				description: 'Track your vehicle expenses and analyze costs with VROOM Car Tracker',
-				start_url: '/',
+			{
+				strategies: 'buildSW',
+				filename: 'service-worker.js',
+				registerType: 'autoUpdate',
+				buildBase: '/',
 				scope: '/',
-				display: 'standalone',
-				background_color: '#ffffff',
-				theme_color: '#1f2937',
-				orientation: 'portrait-primary',
-				icons: [
-					{
-						src: '/pwa-64x64.png',
-						sizes: '64x64',
-						type: 'image/png'
-					},
-					{
-						src: '/pwa-192x192.png',
-						sizes: '192x192',
-						type: 'image/png'
-					},
-					{
-						src: '/pwa-512x512.png',
-						sizes: '512x512',
-						type: 'image/png'
-					},
-					{
-						src: '/maskable-icon-512x512.png',
-						sizes: '512x512',
-						type: 'image/png',
-						purpose: 'maskable'
-					}
-				]
+				buildSW: {
+					swSrc: 'src/service-worker/index.ts',
+					globPatterns: ['client/**/*.{js,css,ico,png,svg,webp,webmanifest}'],
+					// withPwa appends a prerendered/ pattern that this app never matches; strict globbing would fail the build.
+					globStrict: false
+				},
+				manifest: {
+					name: 'VROOM Car Tracker',
+					short_name: 'VROOM',
+					id: '/',
+					description: 'Track your vehicle expenses and analyze costs with VROOM Car Tracker',
+					start_url: '/',
+					scope: '/',
+					display: 'standalone',
+					background_color: '#ffffff',
+					theme_color: '#1f2937',
+					orientation: 'portrait-primary',
+					icons: [
+						{ src: '/pwa-64x64.png', sizes: '64x64', type: 'image/png' },
+						{ src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png' },
+						{ src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png' },
+						{
+							src: '/maskable-icon-512x512.png',
+							sizes: '512x512',
+							type: 'image/png',
+							purpose: 'maskable'
+						}
+					]
+				}
 			}
-		})
+		)
 	],
 	test: {
 		include: ['src/**/*.{test,spec}.{js,ts}'],
 		environment: 'happy-dom',
 		setupFiles: ['src/test-setup.ts'],
 		globals: true,
+		server: {
+			deps: {
+				inline: ['svelte', '@testing-library/svelte', '@testing-library/svelte-core']
+			}
+		},
 		coverage: {
 			provider: 'v8',
 			reporter: ['text', 'json-summary'],
 			reportsDirectory: './coverage'
 		},
 		alias: {
-			$lib: new URL('./src/lib', import.meta.url).pathname,
-			$app: new URL('./node_modules/@sveltejs/kit/src/runtime/app', import.meta.url).pathname,
-			'$env/dynamic/public': new URL('./src/test-env-mock.ts', import.meta.url).pathname
+			'$app/env/public': new URL('./src/test-env-mock.ts', import.meta.url).pathname
 		}
+	},
+	// Vitest's default conditions omit 'browser'; without it inlined svelte loads its server entry, where mount() throws.
+	resolve: {
+		conditions: ['browser']
 	},
 	server: {
 		proxy: apiProxy
 	},
-	// Pinned explicitly (4173 is also vite's default) with strictPort so a port already in use
-	// fails loudly instead of silently shifting to 4174 while a caller waits on 4173 forever —
-	// which is exactly how playwright.config.ts used to hang (it waited on 5173).
 	preview: {
 		port: 4173,
+		// Without strictPort a busy port silently shifts, leaving callers waiting on the pinned one.
 		strictPort: true,
 		proxy: apiProxy
 	}

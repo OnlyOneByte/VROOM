@@ -1,80 +1,94 @@
-/**
- * The create-or-replace financing path must RESET every nullable cross-type/schedule
- * column to a clean value on reuse, so switching a vehicle's financing TYPE can't leave a prior type's
- * field stale (a `loan` row carrying a lease `mileageLimit`, etc). fixed this by
- * coalescing each `.optional()` field to null on the reused row (routes.ts replace branch); the
- * behavioral test (refinance-cross-type-field-reset) pins the CURRENTLY-known fields in both directions.
- *
- * GAP this closes: that behavioral test enumerates today's fields by hand, so a FUTURE schema migration
- * adding a new NULLABLE financing column would leave the replace path silently merging it stale (the
- * class reopens) while every existing test stays green. This is the source-scan completeness guard (the
- * idiom): it censuses the live `vehicleFinancing` nullable columns via getTableColumns and
- * asserts EACH one is explicitly handled in the replace-path SET object — so adding a nullable column
- * forces the author to either reset it there or consciously exempt it here.
- *
- * Pure source-scan + schema reflection — no DB, no HTTP. Fast.
- */
-
-import { describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { getTableColumns } from 'drizzle-orm';
 import { vehicleFinancing } from '../../../db/schema';
+import {
+  createTestApp,
+  type DataEnvelope,
+  json,
+  type TestApp,
+} from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
 
-const ROUTES_SRC = await Bun.file(`${import.meta.dir}/../routes.ts`).text();
+const OPTIONAL_FIELDS = [
+  'apr',
+  'paymentDayOfMonth',
+  'paymentDayOfWeek',
+  'residualValue',
+  'mileageLimit',
+  'excessMileageFee',
+] as const;
 
-/**
- * Isolate the create-OR-REPLACE branch's `financingRepository.update(existingFinancing.id, { ... })` SET
- * object — the block that must reset every nullable cross-type field. Scoped to that call so a field name
- * appearing elsewhere (the schema derivation, the create() call) can't satisfy the assertion spuriously.
- */
-function replaceSetObject(): string {
-  const anchor = 'financingRepository.update(existingFinancing.id, {';
-  const start = ROUTES_SRC.indexOf(anchor);
-  if (start === -1) return '';
-  // The SET object literal ends at the first `});` after the anchor.
-  const end = ROUTES_SRC.indexOf('});', start);
-  return end === -1 ? ROUTES_SRC.slice(start) : ROUTES_SRC.slice(start, end);
+const ROUTE_MANAGED = new Set(['endDate', 'isActive', 'createdAt', 'updatedAt']);
+
+let ctx: TestApp;
+
+beforeEach(async () => {
+  ctx = await createTestApp();
+});
+afterEach(() => ctx.close());
+
+interface FinancingShape {
+  id: string;
+  financingType: string;
+  [field: string]: unknown;
 }
 
-/**
- * System-managed nullable columns the replace path does NOT (and must not) set from the request body:
- * the create/update timestamps are driven by `$defaultFn` / the explicit `updatedAt: new Date()`.
- */
-const SYSTEM_MANAGED = new Set(['createdAt', 'updatedAt']);
+async function postFinancing(
+  vehicleId: string,
+  payload: Record<string, unknown>
+): Promise<FinancingShape> {
+  const res = await ctx.authed(
+    'POST',
+    `/api/v1/financing/vehicles/${vehicleId}/financing`,
+    payload
+  );
+  const body = await json<DataEnvelope<FinancingShape>>(res);
+  return body.data;
+}
 
 describe('create-or-replace coalesce-list completeness', () => {
-  const cols = getTableColumns(vehicleFinancing) as Record<string, { notNull: boolean }>;
-  const nullableCols = Object.entries(cols)
-    .filter(([, c]) => !c.notNull)
-    .map(([name]) => name);
+  test('the optional-field list matches every nullable financing column the route does not manage', () => {
+    const nullable = Object.entries(getTableColumns(vehicleFinancing))
+      .filter(([, column]) => !column.notNull)
+      .map(([name]) => name)
+      .filter((name) => !ROUTE_MANAGED.has(name));
 
-  test('the census found the expected nullable financing columns (non-vacuous)', () => {
-    // Guards the guard: if the schema reflection returns nothing, the completeness check below is vacuous.
-    expect(nullableCols).toContain('apr');
-    expect(nullableCols).toContain('mileageLimit');
-    expect(nullableCols.length).toBeGreaterThanOrEqual(7);
+    expect(nullable.sort()).toEqual([...OPTIONAL_FIELDS].sort());
   });
 
-  test('the replace-path SET object exists and is isolable', () => {
-    expect(replaceSetObject()).toContain('isActive: true');
-  });
+  test('replacing a financing that set every optional field leaves none of them on the reused row', async () => {
+    const vehicleId = await seedVehicle(ctx);
 
-  test('every nullable cross-type/schedule column is explicitly reset on the replace path', () => {
-    const setObj = replaceSetObject();
-    const unmanaged: string[] = [];
-    for (const col of nullableCols) {
-      if (SYSTEM_MANAGED.has(col)) continue;
-      // Each must appear in the SET object — either coalesced (`col: financingData.col ?? null`) or set
-      // explicitly (`endDate: null`). A new nullable column not handled here trips this.
-      if (!new RegExp(`\\b${col}\\b`).test(setObj)) {
-        unmanaged.push(col);
-      }
+    const first = await postFinancing(vehicleId, {
+      financingType: 'loan',
+      provider: 'LoanBank',
+      originalAmount: 25000,
+      apr: 5.9,
+      termMonths: 60,
+      startDate: '2024-01-01',
+      paymentAmount: 480,
+      paymentDayOfMonth: 15,
+      paymentDayOfWeek: 3,
+      residualValue: 18000,
+      mileageLimit: 12000,
+      excessMileageFee: 0.25,
+    });
+    for (const field of OPTIONAL_FIELDS) {
+      expect(first[field], `precondition: ${field} set on the first financing`).not.toBeNull();
     }
-    expect(
-      unmanaged,
-      `These nullable vehicleFinancing columns are NOT reset on the create-or-replace path — a financing ` +
-        `TYPE switch will leave them STALE (cross-type class). Coalesce each to null in the ` +
-        `replace-branch SET object (financing/routes.ts), or add it to SYSTEM_MANAGED if it's ` +
-        `system-driven:\n  ${unmanaged.join(', ')}`
-    ).toEqual([]);
+
+    const replacement = await postFinancing(vehicleId, {
+      financingType: 'lease',
+      provider: 'LeaseCo',
+      originalAmount: 30000,
+      termMonths: 36,
+      startDate: '2024-06-01',
+      paymentAmount: 400,
+    });
+
+    expect(replacement.id).toBe(first.id);
+    for (const field of OPTIONAL_FIELDS) {
+      expect(replacement[field], `${field} must be reset on replace`).toBeNull();
+    }
   });
 });

@@ -11,11 +11,7 @@
 </script>
 
 {#if child}
-	<!-- Forward the `child` snippet to the PRIMITIVE's own `child` prop so bits-ui
-	     renders ONLY the delegated element (merging its trigger behavior via `props`)
-	     instead of wrapping it in its own <button>. Rendering child *inside*
-	     <Trigger> emits a button-in-button (nested-interactive) whose outer button
-	     has no accessible name (button-name) — a real a11y bug the date pickers hit. -->
+	<!-- Pass child to the primitive's own prop; a button nested in the bits-ui trigger breaks accessible names. -->
 	<PopoverPrimitive.Trigger {...restProps} {child} />
 {:else}
 	<PopoverPrimitive.Trigger {...restProps}>

@@ -1,19 +1,7 @@
-/**
- * Property-Based Tests for Odometer Input Validation
- *
- * Property 4: Input validation rejects invalid odometer data
- * For any negative or non-integer number, the validation schema rejects it.
- * For any future date, the schema rejects it.
- * For any valid non-negative integer + non-future date, the schema accepts it.
- *
- * **Validates: Requirements 1.2, 1.3**
- */
-
 import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { z } from 'zod';
 
-// Recreate the createSchema matching the definition in routes.ts
 const createSchema = z.object({
   odometer: z.number().int().min(0, 'Odometer must be a non-negative integer'),
   recordedAt: z.coerce
@@ -22,7 +10,7 @@ const createSchema = z.object({
   note: z.string().max(500).optional(),
 });
 
-describe('Property 4: Input validation rejects invalid odometer data', () => {
+describe('Input validation rejects invalid odometer data', () => {
   test('rejects negative odometer values', () => {
     fc.assert(
       fc.property(fc.double({ min: -1_000_000, max: -0.01, noNaN: true }), (negativeValue) => {
@@ -69,7 +57,6 @@ describe('Property 4: Input validation rejects invalid odometer data', () => {
   });
 
   test('accepts valid non-negative integer odometer + non-future date', () => {
-    // Use a fixed "now" snapshot to avoid race conditions between generation and validation
     const now = new Date();
     const schemaWithFixedNow = z.object({
       odometer: z.number().int().min(0, 'Odometer must be a non-negative integer'),

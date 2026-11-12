@@ -1,59 +1,28 @@
-/**
- * Regression guard: an accepted EDITOR must be able to reach the photos of the owner-stamped rows
- * they are allowed to write.
- *
- * Expenses and odometer readings written on a shared vehicle are OWNER-stamped — the row carries the
- * vehicle owner's userId, and `createdBy` records the editor. The photo entity gate used to match
- * the acting user against that stamped userId, so an editor who logged an expense on a shared car
- * was refused its own receipt: `POST /photos/expense/<id>` returned 404 "Expense not found", and so
- * did the GET. The expense form reports that as "1 photo failed to upload. You can re-upload in
- * edit mode." — guidance that can never work, because edit mode hits the same gate, so the receipt
- * was silently dropped on a flow (receipt capture, then VLM receipt parsing) that is a headline
- * feature.
- *
- * The widening must stop exactly where the right to EDIT the row stops: a viewer, and a user with
- * no share at all, keep the existence-hiding 404 on both the read and the write.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
   type DataEnvelope,
   json,
+  type RequestFn,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { createInvitee } from '../../../test-helpers/invitee';
 import { seedVehicle } from '../../../test-helpers/seed';
 
-let ctx: TestApp; // owner (user A)
-let bCookie: string; // invitee B (the shared editor / viewer)
+let ctx: TestApp;
+let asB: RequestFn;
+let bCookie: string;
 let bEmail: string;
-let bCounter = 0;
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  const { db } = await import('../../../db/connection');
-  const schema = await import('../../../db/schema');
-  const { lucia } = await import('../../auth/lucia');
-  const bId = `photo-sharee-${++bCounter}`;
-  bEmail = `photo-sharee-${bCounter}@test.com`;
-  await db.insert(schema.users).values({ id: bId, email: bEmail, displayName: 'Sharee B' });
-  const session = await lucia.createSession(bId, {});
-  const sc = lucia.createSessionCookie(session.id);
-  bCookie = `${sc.name}=${sc.value}`;
+  const b = await createInvitee(ctx, 'photo-sharee', 'Sharee B');
+  bEmail = b.email;
+  bCookie = b.cookie;
+  asB = b.request;
 });
 afterEach(() => ctx.close());
 
-async function asB(method: string, path: string, body?: unknown): Promise<Response> {
-  const headers: Record<string, string> = { Cookie: bCookie, 'Sec-Fetch-Site': 'same-origin' };
-  let init: RequestInit = { method, headers };
-  if (body !== undefined) {
-    headers['Content-Type'] = 'application/json';
-    init = { ...init, body: JSON.stringify(body) };
-  }
-  return ctx.app.request(path, init);
-}
-
-/** Upload a one-pixel-ish JPEG to a photo entity route as B (multipart, like the real client). */
 async function uploadAsB(entityType: string, entityId: string): Promise<Response> {
   const form = new FormData();
   form.append(
@@ -67,7 +36,6 @@ async function uploadAsB(entityType: string, entityId: string): Promise<Response
   });
 }
 
-/** A owns a vehicle and invites B at `level`; B accepts. Returns the vehicleId. */
 async function shareAccepted(level: 'viewer' | 'editor'): Promise<string> {
   const vehicleId = await seedVehicle(ctx, { make: 'Shared', model: 'Car', year: 2021 });
   const invite = await ctx.authed('POST', '/api/v1/shares', { vehicleId, email: bEmail, level });
@@ -78,7 +46,6 @@ async function shareAccepted(level: 'viewer' | 'editor'): Promise<string> {
   return vehicleId;
 }
 
-/** B logs an expense on the shared vehicle. Owner-stamped, so B's own id is NOT on the row. */
 async function expenseByB(vehicleId: string): Promise<string> {
   const res = await asB('POST', '/api/v1/expenses', {
     vehicleId,
@@ -88,7 +55,6 @@ async function expenseByB(vehicleId: string): Promise<string> {
   });
   const body = await json<DataEnvelope<{ id: string }>>(res);
   expect(res.status, JSON.stringify(body)).toBe(201);
-  // Pin the premise: the row is stamped with the OWNER, which is what used to lock B out.
   const row = ctx.sqlite.query('SELECT user_id FROM expenses WHERE id = ?').get(body.data.id) as {
     user_id: string;
   };
@@ -113,8 +79,6 @@ describe('photo access on owner-stamped rows of a shared vehicle', () => {
 
     const res = await uploadAsB('expense', expenseId);
     expect(res.status, 'authorization must not be the thing that rejects the editor').not.toBe(404);
-    // Neither party has a storage provider in this fixture, so the request stops at that — which is
-    // proof the entity gate passed: the owner's identical upload stops in exactly the same place.
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error?: { message?: string } };
     expect(body.error?.message ?? '').toContain('No storage provider configured');
@@ -135,7 +99,6 @@ describe('photo access on owner-stamped rows of a shared vehicle', () => {
 
   test('a VIEWER is still denied both the read and the write (existence-hiding 404)', async () => {
     const vehicleId = await shareAccepted('viewer');
-    // The owner logs the expense — a viewer cannot write one.
     const own = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId,
       category: 'maintenance',
@@ -162,7 +125,7 @@ describe('photo access on owner-stamped rows of a shared vehicle', () => {
     expect((await uploadAsB('expense', expenseId)).status).toBe(404);
   });
 
-  test('the OWNER still reaches their own rows (no regression on the unshared path)', async () => {
+  test('the owner still reaches their own rows on an unshared vehicle', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Solo', model: 'Car', year: 2019 });
     const own = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId,

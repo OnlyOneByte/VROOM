@@ -3,20 +3,18 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { authStore } from '$lib/stores/auth.svelte';
-	import { routes } from '$lib/routes';
+	import { authStore } from '#lib/stores/auth.svelte.ts';
+	import { routes } from '#lib/routes.ts';
 	import { LoaderCircle, Check, X } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
+	import { Button } from '#lib/components/ui/button/index.ts';
 
 	let status = $state('processing');
 	let error = $state('');
 
-	// Use automatic store subscription
 	const authState = authStore;
 
 	onMount(async () => {
 		try {
-			// Get the current URL parameters
 			const urlParams = new URLSearchParams(page.url.search);
 			const code = urlParams.get('code');
 
@@ -30,8 +28,6 @@
 				throw new Error('No authorization code received');
 			}
 
-			// The backend should handle the OAuth callback and set the session
-			// We just need to check if we're now authenticated
 			await authStore.initialize();
 		} catch (err) {
 			status = 'error';
@@ -39,7 +35,6 @@
 		}
 	});
 
-	// Check auth state and redirect
 	$effect(() => {
 		if (!authState.isLoading) {
 			if (authState.isAuthenticated) {

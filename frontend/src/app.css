@@ -4,6 +4,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Text-colored tokens must clear WCAG AA 4.5:1 on white/card; light chart ambers do not. */
 :root {
 	--radius: 0.625rem;
 	--background: oklch(1 0 0);
@@ -17,28 +18,11 @@
 	--secondary: oklch(0.967 0.001 286.375);
 	--secondary-foreground: oklch(0.21 0.006 285.885);
 	--muted: oklch(0.967 0.001 286.375);
-	/* Darkened from 0.552 → 0.486 so muted text clears WCAG AA 4.5:1 on white/card
-	   backgrounds (axe color-contrast). 0.552 was ~4.0:1; 0.486 is ~5.0:1. */
 	--muted-foreground: oklch(0.486 0.016 285.938);
 	--accent: oklch(0.967 0.001 286.375);
 	--accent-foreground: oklch(0.21 0.006 285.885);
-	/* Darkened from 0.577 → 0.505 so `text-destructive` clears WCAG AA 4.5:1 on
-	   white/card (was ~3.9:1). Still clearly red; used as text in 76 sites
-	   (delete buttons, form errors, error icons). The gallery's a11y gate caught this. */
 	--destructive: oklch(0.505 0.22 27.325);
-	/* The label on a `bg-destructive` fill. It is the variant's own page background —
-	   inverted ink — because `--destructive` is a saturated red that must be DARK in
-	   light mode (so `text-destructive` error copy is readable on white) and LIGHT in
-	   dark mode (same reason, against near-black). A fixed white would therefore clear
-	   AA in one variant and fail it in the other, so this token tracks the variant.
-	   theme-contrast.test.ts pins the pair at AA for every theme in both variants. */
 	--destructive-foreground: oklch(1 0 0);
-	/* "Attention"/"due now" amber. Used as TEXT (text-warning) and a tint
-	   (bg-warning/10) for reminder due-state cues. Deliberately DARK (L=0.52) so it
-	   clears WCAG AA 4.5:1 on white/card — the light chart-4/5 ambers (L≈0.83/0.77)
-	   fail as text (cycle 189). This token was referenced by reminders + the dashboard
-	   DueRemindersCard but never defined, so text-warning/bg-warning were silent
-	   no-ops (cycle 194). */
 	--warning: oklch(0.52 0.12 75);
 	--border: oklch(0.92 0.004 286.32);
 	--input: oklch(0.92 0.004 286.32);
@@ -78,8 +62,6 @@
 	--accent-foreground: oklch(0.985 0 0);
 	--destructive: oklch(0.704 0.191 22.216);
 	--destructive-foreground: oklch(0.141 0.005 285.823);
-	/* Lighter amber on the dark surface (mirrors how --destructive lightens in dark
-	   mode) so text-warning/bg-warning stay legible against the near-black bg. */
 	--warning: oklch(0.8 0.13 80);
 	--border: oklch(1 0 0 / 10%);
 	--input: oklch(1 0 0 / 15%);
@@ -154,7 +136,6 @@
 		@apply bg-background text-foreground;
 	}
 
-	/* iOS PWA standalone safe area insets */
 	.safe-top {
 		padding-top: env(safe-area-inset-top);
 	}
@@ -165,7 +146,6 @@
 }
 
 @layer utilities {
-	/* Screen reader only - visually hidden but accessible to screen readers */
 	.sr-only {
 		position: absolute;
 		width: 1px;
@@ -179,9 +159,7 @@
 	}
 }
 
-/* Sonner Toast Customization */
 @layer components {
-	/* Individual toast styling */
 	[data-sonner-toast] {
 		@apply rounded-lg shadow-lg border;
 		overflow: hidden !important;
@@ -189,7 +167,6 @@
 		max-width: 32rem;
 	}
 
-	/* Close button styling - left side, vertically centered */
 	[data-sonner-toast] [data-close-button] {
 		position: absolute !important;
 		left: 0.75rem !important;
@@ -197,7 +174,6 @@
 		transform: translateY(-50%) !important;
 	}
 
-	/* Message text - add left padding for close button */
 	[data-sonner-toast] [data-title] {
 		font-size: 0.875rem;
 		font-weight: 500;
@@ -205,7 +181,6 @@
 		padding-left: 2.5rem;
 	}
 
-	/* Progress bar at bottom of toast */
 	[data-sonner-toast]::after {
 		content: '';
 		position: absolute;
@@ -218,7 +193,6 @@
 		animation: toast-progress var(--toast-duration, 5000ms) linear forwards;
 	}
 
-	/* Success toast colors */
 	[data-sonner-toast][data-type='success'] {
 		background-color: rgb(240 253 244) !important;
 		border-color: rgb(187 247 208) !important;
@@ -229,7 +203,6 @@
 		background-color: rgb(34 197 94) !important;
 	}
 
-	/* Error toast colors */
 	[data-sonner-toast][data-type='error'] {
 		background-color: rgb(254 242 242) !important;
 		border-color: rgb(254 202 202) !important;
@@ -240,7 +213,6 @@
 		background-color: rgb(239 68 68) !important;
 	}
 
-	/* Warning toast colors */
 	[data-sonner-toast][data-type='warning'] {
 		background-color: rgb(254 252 232) !important;
 		border-color: rgb(254 240 138) !important;
@@ -251,7 +223,6 @@
 		background-color: rgb(234 179 8) !important;
 	}
 
-	/* Info toast colors */
 	[data-sonner-toast][data-type='info'] {
 		background-color: rgb(239 246 255) !important;
 		border-color: rgb(191 219 254) !important;
@@ -262,7 +233,6 @@
 		background-color: rgb(59 130 246) !important;
 	}
 
-	/* Progress bar animation */
 	@keyframes toast-progress {
 		from {
 			width: 100%;

@@ -1,24 +1,10 @@
-/**
- * OpenAiCompatibleLlmProvider adapter (llm-assistant T3a). Drives the REAL adapter against a stubbed
- * global fetch (no live key/endpoint) and pins the request SHAPE + the dumb-transport normalization +
- * the failure-honesty rules:
- *  - POSTs to {baseUrl}/chat/completions with the transcript messages + a `tools` array (function shape);
- *  - a Bearer Authorization header is present with a key, ABSENT for keyless self-hosted (Ollama);
- *  - a model response with `tool_calls` normalizes to ChatResult.toolCalls (name + RAW args string), and
- *  a plain content response normalizes to ChatResult.text — the orchestrator (T4) validates either;
- *  - a non-2xx / network failure THROWS (the chat route maps it to 502 — never a faked success);
- *  - a missing/non-string content with no tool calls returns { text: '' } (no throw).
- *
- * Adapter = dumb transport: it does NOT execute tools or validate args (that is the orchestrator), so
- * these tests assert transport + headers + the wire mapping + error-honesty, not tool semantics.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type { UserProvider } from '../../../../../db/schema';
 import { encrypt } from '../../../../../utils/encryption';
+import { type ModelProviderSettings, resolveModelSettings } from '../../model/model-registry';
 import type { ChatMessage, ToolDefinition } from '../llm-provider';
 import { OpenAiCompatibleLlmProvider } from '../openai-compatible';
-import { getLlmProvider, type LlmProviderSettings, resolveLlmSettings } from '../registry';
+import { getLlmProvider } from '../registry';
 
 const realFetch = globalThis.fetch;
 
@@ -59,12 +45,12 @@ function toolCallResponse(name: string, args: string): Response {
   );
 }
 
-const KEYED: LlmProviderSettings = {
+const KEYED: ModelProviderSettings = {
   apiKey: 'sk-assistant-key',
   model: 'gpt-4o',
   baseUrl: 'https://api.openai.com/v1',
 };
-const KEYLESS: LlmProviderSettings = { model: 'llama3.1', baseUrl: 'http://localhost:11434/v1' };
+const KEYLESS: ModelProviderSettings = { model: 'llama3.1', baseUrl: 'http://localhost:11434/v1' };
 
 const MESSAGES: ChatMessage[] = [
   { role: 'system', content: 'You are a car-data assistant.' },
@@ -134,6 +120,89 @@ describe('OpenAiCompatibleLlmProvider.chat — request shape', () => {
   });
 });
 
+describe('OpenAiCompatibleLlmProvider.chat — tool round-trip wire protocol', () => {
+  test('tool results follow an assistant turn whose tool_calls carry the matching ids', async () => {
+    stubFetch(() => textResponse('done'));
+    const transcript: ChatMessage[] = [
+      ...MESSAGES,
+      {
+        role: 'assistant',
+        content: '',
+        toolCalls: [
+          { id: 'call_a', name: 'getExpenseSummary', argumentsJson: '{"range":"ytd"}' },
+          { id: 'call_b', name: 'listVehicles', argumentsJson: '{}' },
+        ],
+      },
+      {
+        role: 'tool',
+        content: '{"totalAmount":50}',
+        toolName: 'getExpenseSummary',
+        toolCallId: 'call_a',
+      },
+      { role: 'tool', content: '[]', toolName: 'listVehicles', toolCallId: 'call_b' },
+    ];
+    await new OpenAiCompatibleLlmProvider(KEYED).chat({ messages: transcript, tools: TOOLS });
+
+    expect(captured?.body).toEqual({
+      model: 'gpt-4o',
+      max_tokens: 1024,
+      temperature: 0,
+      messages: [
+        { role: 'system', content: 'You are a car-data assistant.' },
+        { role: 'user', content: 'How much did I spend on fuel?' },
+        {
+          role: 'assistant',
+          content: null,
+          tool_calls: [
+            {
+              id: 'call_a',
+              type: 'function',
+              function: { name: 'getExpenseSummary', arguments: '{"range":"ytd"}' },
+            },
+            { id: 'call_b', type: 'function', function: { name: 'listVehicles', arguments: '{}' } },
+          ],
+        },
+        {
+          role: 'tool',
+          tool_call_id: 'call_a',
+          name: 'getExpenseSummary',
+          content: '{"totalAmount":50}',
+        },
+        { role: 'tool', tool_call_id: 'call_b', name: 'listVehicles', content: '[]' },
+      ],
+      tools: [
+        {
+          type: 'function',
+          function: {
+            name: 'getExpenseSummary',
+            description: 'Total spend over a range.',
+            parameters: TOOLS[0].parameters,
+          },
+        },
+      ],
+    });
+  });
+
+  test('assistant text that accompanies tool calls is kept on the assistant turn', async () => {
+    stubFetch(() => textResponse('done'));
+    await new OpenAiCompatibleLlmProvider(KEYED).chat({
+      messages: [
+        ...MESSAGES,
+        {
+          role: 'assistant',
+          content: 'Let me check.',
+          toolCalls: [{ id: 'c1', name: 'listVehicles', argumentsJson: '{}' }],
+        },
+        { role: 'tool', content: '[]', toolName: 'listVehicles', toolCallId: 'c1' },
+      ],
+      tools: [],
+    });
+    const msgs = captured?.body.messages as Record<string, unknown>[];
+    expect(msgs[2]?.content).toBe('Let me check.');
+    expect(captured?.body.tools).toBeUndefined();
+  });
+});
+
 describe('OpenAiCompatibleLlmProvider.chat — response normalization (dumb transport)', () => {
   test('a content response normalizes to ChatResult.text', async () => {
     stubFetch(() => textResponse('You spent $50 on fuel.'));
@@ -170,7 +239,7 @@ describe('OpenAiCompatibleLlmProvider.chat — response normalization (dumb tran
   });
 });
 
-describe('OpenAiCompatibleLlmProvider.chat — failure honesty (anti-fail-open)', () => {
+describe('OpenAiCompatibleLlmProvider.chat failures', () => {
   test('a non-2xx response THROWS (the route maps it to 502, never a fake answer)', async () => {
     stubFetch(() => new Response('rate limited', { status: 429 }));
     await expect(
@@ -193,7 +262,7 @@ describe('OpenAiCompatibleLlmProvider.chat — failure honesty (anti-fail-open)'
   });
 });
 
-describe('getLlmProvider / resolveLlmSettings — registry dispatch (T3a)', () => {
+describe('getLlmProvider / resolveModelSettings dispatch by provider type', () => {
   function llmRow(
     over: Partial<{ providerType: string; config: unknown; credentials: unknown }> = {}
   ): UserProvider {
@@ -206,18 +275,20 @@ describe('getLlmProvider / resolveLlmSettings — registry dispatch (T3a)', () =
     } as any;
   }
 
-  test('resolveLlmSettings decrypts the api key + reads model/baseUrl', () => {
-    const s = resolveLlmSettings(llmRow());
+  test('resolveModelSettings decrypts the api key + reads model/baseUrl', () => {
+    const s = resolveModelSettings(llmRow(), 'LLM');
     expect(s.apiKey).toBe('sk-x');
     expect(s.model).toBe('gpt-4o');
     expect(s.baseUrl).toBe('https://api.openai.com/v1');
   });
 
-  test('resolveLlmSettings throws when the model is missing (defense-in-depth vs a restored bad row)', () => {
-    expect(() => resolveLlmSettings(llmRow({ config: { baseUrl: 'https://x' } }))).toThrow();
+  test('resolveModelSettings throws when the model is missing (defense-in-depth vs a restored bad row)', () => {
+    expect(() => resolveModelSettings(llmRow({ config: { baseUrl: 'https://x' } }), 'LLM')).toThrow(
+      /LLM provider config is missing a model name/
+    );
   });
 
-  test('getLlmProvider returns a live adapter for openai-compatible + ollama (T3a)', () => {
+  test('getLlmProvider returns a live adapter for openai-compatible and ollama', () => {
     expect(getLlmProvider(llmRow({ providerType: 'openai-compatible' }))).toBeInstanceOf(
       OpenAiCompatibleLlmProvider
     );
@@ -232,14 +303,24 @@ describe('getLlmProvider / resolveLlmSettings — registry dispatch (T3a)', () =
     ).toBeInstanceOf(OpenAiCompatibleLlmProvider);
   });
 
-  test('getLlmProvider returns a live adapter for anthropic + gemini (T3b)', () => {
-    // T3b wired both first-party adapters; the registry now resolves all four D1 types live.
+  test('getLlmProvider returns a live adapter for anthropic and gemini', () => {
     expect(
       getLlmProvider(llmRow({ providerType: 'anthropic', config: { model: 'claude-3-5-sonnet' } }))
     ).toBeDefined();
     expect(
       getLlmProvider(llmRow({ providerType: 'gemini', config: { model: 'gemini-1.5-pro' } }))
     ).toBeDefined();
+  });
+
+  test('getLlmProvider names the LLM domain when a required field is missing', () => {
+    expect(() =>
+      getLlmProvider(llmRow({ providerType: 'ollama', config: { model: 'llama3.1' } }))
+    ).toThrow(/Ollama LLM requires a base URL/);
+    expect(() =>
+      getLlmProvider(
+        llmRow({ providerType: 'anthropic', credentials: {}, config: { model: 'claude' } })
+      )
+    ).toThrow(/Anthropic LLM requires an API key/);
   });
 
   test('getLlmProvider throws on an unknown/non-LLM provider type', () => {

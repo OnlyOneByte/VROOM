@@ -1,7 +1,3 @@
-/**
- * User Activity Tracker - Activity and change tracking for auto-sync
- */
-
 import { eq } from 'drizzle-orm';
 import { getDb } from '../../db/connection';
 import { users as usersTable } from '../../db/schema';
@@ -17,21 +13,6 @@ export interface UserActivity {
   syncInProgress: boolean;
 }
 
-/**
- * User Activity Tracker
- *
- * IMPORTANT: Activity data is stored in-memory and will be lost on server restart.
- *
- * For production deployments:
- * - Consider persisting activity timestamps to database
- * - Use Redis for distributed systems
- * - Implement graceful degradation on restart
- *
- * Current implementation is suitable for:
- * - Development environments
- * - Single-instance deployments
- * Note: lastDataChangeDate is persisted to database via sync_state table
- */
 export class UserActivityTracker {
   private static instance: UserActivityTracker;
   private userActivities: Map<string, UserActivity> = new Map();
@@ -121,15 +102,6 @@ export class UserActivityTracker {
       clearTimeout(activity.inactivityTimer);
     }
     this.userActivities.delete(userId);
-  }
-
-  cleanupInactiveUsers(maxInactiveHours: number = 24): void {
-    const cutoffTime = new Date(Date.now() - maxInactiveHours * 60 * 60 * 1000);
-    for (const [userId, activity] of this.userActivities.entries()) {
-      if (activity.lastActivity < cutoffTime && !activity.syncInProgress) {
-        this.stopTracking(userId);
-      }
-    }
   }
 
   async markDataChanged(userId: string): Promise<void> {

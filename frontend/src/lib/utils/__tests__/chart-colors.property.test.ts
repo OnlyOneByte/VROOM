@@ -1,12 +1,3 @@
-/**
- * Property-Based Tests for chart-colors utilities
- *
- * Property 8: Category maps completeness
- * Property 10: buildChartConfig structure preservation
- * Property 11: buildCategoryPieData correctness
- * Property 12: Category key fallback safety
- */
-
 import { describe, expect, test } from 'vitest';
 import fc from 'fast-check';
 import {
@@ -15,17 +6,13 @@ import {
 	CHART_COLORS,
 	buildChartConfig,
 	buildCategoryPieData,
-	getCategoryColor,
+	getCategoryChartColor,
 	getCategoryLabel
-} from '$lib/utils/chart-colors';
+} from '#lib/utils/chart-colors.ts';
 
 const CATEGORY_ENUM = ['fuel', 'maintenance', 'financial', 'regulatory', 'enhancement', 'misc'];
 
-// ---------------------------------------------------------------------------
-// Property 8: Category maps completeness
-// **Validates: Requirements 11.1, 11.2, 11.4**
-// ---------------------------------------------------------------------------
-describe('Property 8: Category maps completeness', () => {
+describe('Category maps completeness', () => {
 	test('CATEGORY_COLORS covers the full enum and uses CSS custom property syntax', () => {
 		for (const cat of CATEGORY_ENUM) {
 			expect(CATEGORY_COLORS[cat]).toBeDefined();
@@ -44,7 +31,6 @@ describe('Property 8: Category maps completeness', () => {
 	});
 
 	test('CHART_COLORS has 8 entries all using CSS custom property syntax', () => {
-		// Extended 5→8: a ≥6-vehicle fleet gets distinct series colors instead of wrapping to chart-1.
 		expect(CHART_COLORS).toHaveLength(8);
 		for (const color of CHART_COLORS) {
 			expect(color).toMatch(/^var\(--chart-\d\)$/);
@@ -52,11 +38,7 @@ describe('Property 8: Category maps completeness', () => {
 	});
 });
 
-// ---------------------------------------------------------------------------
-// Property 10: buildChartConfig structure preservation
-// **Validates: Requirements 13.1, 13.2**
-// ---------------------------------------------------------------------------
-describe('Property 10: buildChartConfig structure preservation', () => {
+describe('buildChartConfig structure preservation', () => {
 	const seriesArb = fc.array(
 		fc.record({
 			key: fc.string({ minLength: 1, maxLength: 20 }),
@@ -70,7 +52,6 @@ describe('Property 10: buildChartConfig structure preservation', () => {
 		fc.assert(
 			fc.property(seriesArb, series => {
 				const config = buildChartConfig(series);
-				// Last entry wins for duplicate keys (same as the implementation)
 				const uniqueKeys = new Set(series.map(s => s.key));
 				expect(Object.keys(config)).toHaveLength(uniqueKeys.size);
 				for (const s of series) {
@@ -84,11 +65,7 @@ describe('Property 10: buildChartConfig structure preservation', () => {
 	});
 });
 
-// ---------------------------------------------------------------------------
-// Property 11: buildCategoryPieData correctness
-// **Validates: Requirements 14.1, 14.2, 14.3, 14.4, 14.5**
-// ---------------------------------------------------------------------------
-describe('Property 11: buildCategoryPieData correctness', () => {
+describe('buildCategoryPieData correctness', () => {
 	const breakdownArb = fc.array(
 		fc.record({
 			category: fc.constantFrom(...CATEGORY_ENUM),
@@ -126,7 +103,7 @@ describe('Property 11: buildCategoryPieData correctness', () => {
 			fc.property(breakdownArb, breakdown => {
 				const result = buildCategoryPieData(breakdown);
 				for (const item of result) {
-					expect(item.color).toBe(getCategoryColor(item.key));
+					expect(item.color).toBe(getCategoryChartColor(item.key));
 					expect(item.label).toBe(getCategoryLabel(item.key));
 				}
 			}),
@@ -147,11 +124,7 @@ describe('Property 11: buildCategoryPieData correctness', () => {
 	});
 });
 
-// ---------------------------------------------------------------------------
-// Property 12: Category key fallback safety
-// **Validates: Requirements 15.1, 15.2**
-// ---------------------------------------------------------------------------
-describe('Property 12: Category key fallback safety', () => {
+describe('Category key fallback safety', () => {
 	const unknownKeyArb = fc
 		.string({ minLength: 1, maxLength: 20 })
 		.filter(key => !CATEGORY_ENUM.includes(key));
@@ -159,7 +132,7 @@ describe('Property 12: Category key fallback safety', () => {
 	test('∀ unknown key, color falls back to var(--primary)', () => {
 		fc.assert(
 			fc.property(unknownKeyArb, key => {
-				expect(getCategoryColor(key)).toBe('var(--primary)');
+				expect(getCategoryChartColor(key)).toBe('var(--primary)');
 			}),
 			{ numRuns: 100 }
 		);

@@ -1,16 +1,16 @@
 <script lang="ts">
-	import '$lib/components/charts/bar-chart-animations.css';
-	import { formatDecimalAxis, parseMonthToDate } from '$lib/utils/chart-formatters';
-	import { AppBarChart } from '$lib/components/charts';
+	import '#lib/components/charts/bar-chart-animations.css';
+	import { formatDecimalAxis, parseMonthToDate } from '#lib/utils/chart-formatters.ts';
+	import { AppBarChart } from '#lib/components/charts/index.ts';
 	import {
 		CHART_COLORS,
 		CATEGORY_COLORS,
 		CATEGORY_LABELS,
 		buildChartConfig
-	} from '$lib/utils/chart-colors';
-	import type { FuelAdvancedResponse } from '$lib/types';
-	import { settingsStore } from '$lib/stores/settings.svelte';
-	import { getFuelEfficiencyLabel } from '$lib/utils/units';
+	} from '#lib/utils/chart-colors.ts';
+	import type { FuelAdvancedResponse } from '#lib/types/index.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
+	import { getFuelEfficiencyLabel } from '#lib/utils/units.ts';
 
 	interface Props {
 		fuelAdvanced: FuelAdvancedResponse;
@@ -18,7 +18,6 @@
 
 	let { fuelAdvanced }: Props = $props();
 
-	// --- 2. Seasonal Efficiency ---
 	let units = $derived(settingsStore.unitPreferences);
 	let efficiencyLabel = $derived(getFuelEfficiencyLabel(units.distanceUnit, units.volumeUnit));
 
@@ -27,17 +26,12 @@
 	]);
 	let seasonalConfig = $derived(buildChartConfig(seasonalSeries));
 
-	// buildSeasonalEfficiency always returns all 4 seasons (avgEfficiency 0 when there's
-	// no fuel data), so a length check is always true and the chart would render a bare
-	// empty axis. Gate on REAL data; when there's none, pass [] so AppBarChart shows its
-	// kit empty-state, matching the sibling charts (same fix as the day-of-week chart).
 	let seasonalData = $derived(
 		fuelAdvanced.seasonalEfficiency.some(d => d.fillupCount > 0)
 			? fuelAdvanced.seasonalEfficiency
 			: []
 	);
 
-	// --- 3. Vehicle Performance Comparison (Radar) ---
 	const radarMetrics = [
 		{ key: 'fuelEfficiency', label: 'Fuel Efficiency' },
 		{ key: 'maintenanceCost', label: 'Maintenance Cost' },
@@ -66,7 +60,6 @@
 
 	let radarConfig = $derived(buildChartConfig(radarVehicleSeries));
 
-	// --- 5. Monthly Cost Heatmap (Stacked Bar) ---
 	const heatmapCategories = [
 		'fuel',
 		'maintenance',
@@ -86,7 +79,6 @@
 
 	let heatmapConfig = $derived(buildChartConfig(heatmapSeries));
 
-	// --- 6. Fill-up Intervals ---
 	const intervalSeries = [{ key: 'count', label: 'Count', color: CHART_COLORS[2] as string }];
 	const intervalConfig = buildChartConfig(intervalSeries);
 
@@ -114,7 +106,6 @@
 
 <div class="space-y-6">
 	<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-		<!-- Seasonal Efficiency → AppBarChart -->
 		<AppBarChart
 			title="Seasonal Efficiency"
 			description="Average {efficiencyLabel} by season"
@@ -130,11 +121,6 @@
 			}}
 		/>
 
-		<!-- Vehicle Performance Comparison — grouped bar (was a radial LineChart, but
-		     layerchart@2.0.0-next.65's radial geometry produced infinite-radius paths
-		     `M-Infinity,… aInfinity,Infinity`; see TODO.md. A grouped bar conveys the
-		     same per-vehicle, per-metric comparison and renders cleanly via the kit.
-		     Scores are normalized 0–100 server-side, so yDomain is fixed. -->
 		<AppBarChart
 			title="Vehicle Performance Comparison"
 			description="Normalized 0–100 scores by metric (higher is better)"
@@ -151,7 +137,6 @@
 	</div>
 
 	<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-		<!-- Monthly Cost Heatmap → AppBarChart (stacked) -->
 		<AppBarChart
 			title="Monthly Cost Heatmap"
 			description="Spending by category over time"
@@ -165,7 +150,6 @@
 			xAxisProps={{ ticks: Math.min(heatmapData.length, 6), format: formatMonthLabel }}
 		/>
 
-		<!-- Time Between Fill-ups → AppBarChart (horizontal) -->
 		<AppBarChart
 			title="Time Between Fill-ups"
 			description="Distribution of fill-up intervals"

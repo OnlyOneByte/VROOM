@@ -5,11 +5,6 @@ import type { DrizzleTransaction } from '../../db/types';
 import type { SplitConfig } from './validation';
 
 export class ExpenseSplitService {
-  /**
-   * Compute per-vehicle amounts (integer CENTS) from a split config and total.
-   * `totalAmount` is integer CENTS (money-cents-migration T5 — the input edge already converted
-   * dollars→cents); allocation amounts in an `absolute` config are likewise cents. Pure — no DB.
-   */
   computeAllocations(
     config: SplitConfig,
     totalAmount: number
@@ -31,10 +26,6 @@ export class ExpenseSplitService {
     vehicleIds: string[],
     totalCents: number
   ): Array<{ vehicleId: string; amount: number }> {
-    // money-cents-migration (T5): `totalCents` arrives as integer CENTS (the input edge already
-    // converted dollars→cents), so this is now NATIVE integer arithmetic — no `*100` in, no `/100` out.
-    // The largest-remainder distribution (baseCents + 1 for the first `remainderCents` legs) was already
-    // the cents-correct algorithm; it now operates directly on the stored unit, so Σlegs == totalCents EXACTLY.
     const n = vehicleIds.length;
     const baseCents = Math.floor(totalCents / n);
     const remainderCents = totalCents - baseCents * n;
@@ -49,9 +40,6 @@ export class ExpenseSplitService {
     allocations: Array<{ vehicleId: string; percentage: number }>,
     totalCents: number
   ): Array<{ vehicleId: string; amount: number }> {
-    // money-cents-migration (T5): `totalCents` is integer CENTS. Each leg is `floor(totalCents *
-    // percentage / 100)` — `percentage` is a non-money ratio, so the result is cents — and the LAST leg
-    // takes the exact integer remainder so Σlegs == totalCents EXACTLY (no float remainder, no `/100`).
     const result: Array<{ vehicleId: string; amount: number }> = [];
     let runningTotal = 0;
     const lastIndex = allocations.length - 1;
@@ -61,7 +49,6 @@ export class ExpenseSplitService {
       let amount: number;
 
       if (i === lastIndex) {
-        // Assign the exact remaining cents to the last vehicle, clamped to ≥ 0.
         amount = Math.max(0, totalCents - runningTotal);
       } else {
         amount = Math.floor((totalCents * percentage) / 100);
@@ -74,10 +61,6 @@ export class ExpenseSplitService {
     return result;
   }
 
-  /**
-   * Insert sibling expense rows sharing the same groupId.
-   * Runs inside the caller's transaction.
-   */
   async createSiblings(
     tx: DrizzleTransaction,
     params: {
@@ -92,10 +75,6 @@ export class ExpenseSplitService {
       description?: string;
       sourceType?: string;
       sourceId?: string;
-      // vehicle-sharing T5b-2b: provenance of a shared-editor-created split (design §2.1 rule 2).
-      // `userId` is the vehicle OWNER (owner-stamp); `createdBy` records the actual author — the
-      // acting editor when they are not the owner, else NULL (the legacy/self sentinel). Omitted ⇒
-      // NULL, so an owner-authored split is byte-identical to pre-T5b-2b.
       createdBy?: string | null;
     }
   ): Promise<Expense[]> {
@@ -127,13 +106,7 @@ export class ExpenseSplitService {
     return siblings;
   }
 
-  /**
-   * SYNCHRONOUS sibling of createSiblings. bun-sqlite is a sync dialect, so the split
-   * create/update transactions run their callbacks synchronously for real atomic rollback — an async
-   * callback autocommits each insert alone, which on the update path (delete-then-
-   * reinsert) could irrecoverably lose a split group. `.returning().get()` executes inline inside the
-   * caller's tx. Identical row shape to createSiblings — the two MUST stay in lockstep.
-   */
+  // bun:sqlite transactions roll back only when the callback is synchronous; an async insert autocommits alone.
   createSiblingsSync(
     tx: DrizzleTransaction,
     params: {

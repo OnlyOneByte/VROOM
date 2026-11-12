@@ -6,10 +6,10 @@
 		getLocalTimeZone,
 		parseDate
 	} from '@internationalized/date';
-	import { cn } from '$lib/utils.js';
-	import { Button } from '$lib/components/ui/button/index.js';
-	import { RangeCalendar } from '$lib/components/ui/range-calendar/index.js';
-	import * as Popover from '$lib/components/ui/popover/index.js';
+	import { cn } from '#lib/utils.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import { RangeCalendar } from '#lib/components/ui/range-calendar/index.js';
+	import * as Popover from '#lib/components/ui/popover/index.js';
 
 	interface Props {
 		startValue?: string | undefined;
@@ -36,7 +36,6 @@
 	let rangeValue = $state<{ start: DateValue; end: DateValue } | undefined>(undefined);
 	let open = $state(false);
 
-	// Sync string values to range DateValue
 	$effect(() => {
 		if (startValue && endValue) {
 			try {
@@ -49,7 +48,6 @@
 		}
 	});
 
-	// Sync range DateValue back to strings
 	$effect(() => {
 		if (rangeValue?.start && rangeValue?.end) {
 			const newStart = rangeValue.start.toString();

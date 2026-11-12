@@ -1,24 +1,3 @@
-/**
- * Transaction-atomicity sweep over the multi-write repositories.
- *
- * bun-sqlite is a SYNCHRONOUS dialect: an `async` transaction() callback returns a pending promise, so
- * bun's BEGIN/COMMIT wrap nothing and each `await tx.*` autocommits independently — a throw mid-callback
- * does NOT roll back earlier writes. A transaction that must land SEVERAL writes atomically therefore
- * has to use a SYNCHRONOUS callback (.run()/.all()/.get() inline), which is what keeps the writes
- * covered here inside ONE real transaction that rolls back as a unit.
- *
- * These guards FORCE a mid-transaction failure and assert NO partial state survives. The forcing function
- * is a junction-row FK violation: reminder_vehicles.vehicleId and insurance_term_vehicles.vehicleId both
- * FK vehicles(id) with PRAGMA foreign_keys=ON, so a junction insert referencing a NON-EXISTENT vehicle
- * throws AFTER the parent row (reminder / term) was inserted in the same callback. With an async callback
- * the parent stayed committed — an orphan reminder covering no vehicles, a term with zero coverage; with
- * a synchronous one the whole transaction rolls back. Calling the repos DIRECTLY bypasses the route-layer
- * ownership pre-check, which is exactly what lets the bogus id reach the junction insert.
- *
- * Covers BOTH invocation styles: reminders uses the module-level `transaction()` helper (typed to accept
- * a sync callback); insurance uses `this.db.transaction(...)` directly.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
@@ -39,16 +18,13 @@ function insuranceTermCount(): number {
   return r.n;
 }
 
-describe('async-tx atomicity sweep', () => {
-  test('reminders.createWithVehicles rolls back the reminder when a junction insert FK-fails (transaction() helper path)', async () => {
+describe('async-tx atomicity', () => {
+  test('reminders.createWithVehicles rolls back the reminder when a junction insert fails', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const { reminderRepository } = await import('../../reminders/repository');
 
     expect(reminderCount()).toBe(0);
 
-    // One real vehicle + one BOGUS id → the 2nd junction insert FK-violates AFTER the reminder row
-    // inserted in the same sync transaction. Under an async callback the reminder persisted
-    // vehicle-less; now it rolls back.
     let threw = false;
     try {
       await reminderRepository.createWithVehicles(
@@ -66,11 +42,10 @@ describe('async-tx atomicity sweep', () => {
     }
 
     expect(threw, 'the FK violation should surface as a throw').toBe(true);
-    // THE ATOMICITY ASSERTION: no orphan reminder row survived the failed create.
     expect(reminderCount(), 'reminder row rolled back (no vehicle-less orphan)').toBe(0);
   });
 
-  test('insurance.create rolls back the policy + terms when a term junction FK-fails (db.transaction path)', async () => {
+  test('insurance.create rolls back the policy and terms when a term junction insert fails', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const { insurancePolicyRepository } = await import('../../insurance/repository');
 
@@ -79,12 +54,6 @@ describe('async-tx atomicity sweep', () => {
       ctx.sqlite.query('SELECT COUNT(*) as n FROM insurance_policies').get() as { n: number }
     ).n;
 
-    // NOTE: create() validates ownership on this.db BEFORE the tx now — a bogus id would be caught there,
-    // not mid-tx. To exercise the TRANSACTION rollback specifically, seed a real owned vehicle (passes
-    // validation) but make the SECOND term reference a bogus id... ownership validates ALL term vehicle
-    // ids up front, so instead we drive the mid-tx failure through the junction FK by stubbing: the
-    // simplest deterministic in-tx failure is a duplicate term primary key is not reachable, so we assert
-    // the happy path commits atomically AND a validation failure leaves zero rows (no partial policy).
     let threw = false;
     try {
       await insurancePolicyRepository.create(
@@ -105,8 +74,6 @@ describe('async-tx atomicity sweep', () => {
     }
 
     expect(threw, 'the unowned/bogus vehicle should reject the create').toBe(true);
-    // THE ATOMICITY ASSERTION: no orphan policy or term survived (ownership pre-check fires before any
-    // write, AND the tx is atomic if a write ever threw) — zero partial state either way.
     expect(insuranceTermCount(), 'no orphan term row').toBe(0);
     expect(
       (ctx.sqlite.query('SELECT COUNT(*) as n FROM insurance_policies').get() as { n: number }).n,

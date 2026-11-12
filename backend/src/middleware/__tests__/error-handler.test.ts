@@ -1,13 +1,3 @@
-/**
- * Tests for the global errorHandler — the ONLY thing that shapes a thrown error into a response.
- * Routes throw and hand-roll no catch blocks, so every branch here is load-bearing: an error class
- * that matches none of them answers a generic 500 and loses its status and message.
- *
- * The SyncError block is the branch that needs the most pinning. SyncError extends Error, not
- * AppError, so without its own branch it falls through to the generic 500 and loses its
- * code→status mapping — a VALIDATION_ERROR would 500 instead of 400.
- */
-
 import { describe, expect, test } from 'bun:test';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
@@ -22,13 +12,11 @@ import {
 } from '../../errors';
 import { errorHandler } from '../error-handler';
 
-/** Shape of the standard error envelope, for typed assertions on res.json() (which is unknown). */
 interface ErrorBody {
   success: boolean;
   error: { code: string; message: string; details?: unknown };
 }
 
-/** Build a minimal app whose single route throws the given error, routed through errorHandler. */
 function appThatThrows(err: unknown): Hono {
   const app = new Hono();
   app.onError(errorHandler);
@@ -84,17 +72,11 @@ describe('errorHandler — application error branches', () => {
     expect(res.status).toBe(500);
     const body = (await res.json()) as ErrorBody;
     expect(body.success).toBe(false);
-    // In non-development the raw message is hidden behind a generic InternalServerError.
     expect(body.error.code).toBe('InternalServerError');
   });
 });
 
 describe('errorHandler — SyncError convergence', () => {
-  /**
-   * Keyed by the enum rather than listed, so adding a SyncErrorCode cannot land UNCOVERED: a
-   * `Record<SyncErrorCode, number>` missing a member fails type-check, and the cases are then
-   * enumerated from `Object.values` so no member can be silently skipped at runtime either.
-   */
   const EXPECTED_STATUS: Record<SyncErrorCode, number> = {
     [SyncErrorCode.VALIDATION_ERROR]: 400,
     [SyncErrorCode.AUTH_INVALID]: 401,
@@ -120,7 +102,7 @@ describe('errorHandler — SyncError convergence', () => {
       expect(res.status).toBe(status);
       const body = (await res.json()) as ErrorBody;
       expect(body.success).toBe(false);
-      expect(body.error.code).toBe(code); // the SyncErrorCode IS the response code
+      expect(body.error.code).toBe(code);
       expect(body.error.message).toBe(`${code} happened`);
     }
   });

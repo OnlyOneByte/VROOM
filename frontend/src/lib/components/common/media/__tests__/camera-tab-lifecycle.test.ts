@@ -1,27 +1,5 @@
-/**
- * Camera lifecycle: one hardware open per switch, and no blob URL left behind.
- *
- * Two defects, one root shape — the component did work twice, or not at all, because ownership of a
- * resource was unclear.
- *
- * 1. `startCamera` reads `facingMode` to build its getUserMedia constraints, so calling it from a
- *    tracked `$effect` body made the lifecycle effect depend on it. "Switch camera" wrote
- *    `facingMode` and restarted the camera itself, which ALSO invalidated the effect: its teardown
- *    stopped the stream the switch had just acquired and its body opened the hardware a second time.
- *    A generation counter kept the state correct, so the only symptom was a wasted camera
- *    acquisition — hundreds of milliseconds and a blanked viewfinder on a phone.
- * 2. `uploadCapture` cleared `capturedPreview` without revoking it, so the full-resolution JPEG
- *    behind the blob URL stayed resident for the life of the page — once per receipt uploaded. Only
- *    the upload path had this hole; retake, reset and unmount all revoked.
- */
-
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
-
-vi.mock(
-	'svelte',
-	() => import('../../../../../../node_modules/svelte/src/index-client.js' as string)
-);
 
 const CameraTab = (await import('../CameraTab.svelte')).default;
 
@@ -81,8 +59,7 @@ beforeEach(() => {
 	HTMLVideoElement.prototype.play = vi.fn(
 		async () => {}
 	) as unknown as typeof HTMLVideoElement.prototype.play;
-	// happy-dom's HTMLMediaElement.srcObject setter throws "not implemented", which the component
-	// would report as a camera failure. Shadow it with a plain accessor.
+	// happy-dom's srcObject setter throws; shadow it with a plain accessor.
 	Object.defineProperty(HTMLVideoElement.prototype, 'srcObject', {
 		configurable: true,
 		get() {
@@ -121,7 +98,6 @@ function mount(onUploadCapture = vi.fn(async () => {})) {
 	return { ...result, onUploadCapture };
 }
 
-/** The viewfinder is live once the capture button is enabled (startCamera awaits a 50ms settle). */
 async function waitForViewfinder(): Promise<HTMLElement> {
 	const button = await screen.findByRole('button', { name: 'Take photo' });
 	await waitFor(() => expect(button).toBeEnabled(), { timeout: 2000 });

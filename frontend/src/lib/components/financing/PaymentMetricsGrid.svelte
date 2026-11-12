@@ -1,12 +1,12 @@
 <script lang="ts">
-	import StatCardGrid from '$lib/components/charts/StatCardGrid.svelte';
+	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
 	import { Banknote, Calendar, TrendingUp, Hash, DollarSign, TriangleAlert } from '@lucide/svelte';
-	import { formatCurrency, formatDate } from '$lib/utils/formatters';
-	import { getDistanceUnitLabel } from '$lib/utils/units';
-	import { settingsStore } from '$lib/stores/settings.svelte';
-	import type { VehicleFinancing, UnitPreferences } from '$lib/types';
-	import { calculateLeaseOverage } from '$lib/utils/financing-calculations';
-	import type { AmortizationEntry } from '$lib/utils/financing-calculations';
+	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
+	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
+	import type { VehicleFinancing, UnitPreferences } from '#lib/types/index.ts';
+	import { calculateLeaseOverage } from '#lib/utils/financing-calculations.ts';
+	import type { AmortizationEntry } from '#lib/utils/financing-calculations.ts';
 
 	interface Props {
 		financing: VehicleFinancing;
@@ -30,7 +30,6 @@
 		unitPreferences
 	}: Props = $props();
 
-	// Resolve distance label from vehicle unitPreferences, falling back to global settings
 	let units = $derived(unitPreferences ?? settingsStore.unitPreferences);
 	let distLabel = $derived(getDistanceUnitLabel(units.distanceUnit, true));
 
@@ -38,10 +37,8 @@
 		financing.financingType === 'loan' && financing.apr != null && financing.apr > 0
 	);
 
-	// Remaining term in months
 	let remainingMonths = $derived(Math.max(0, financing.termMonths - paymentsCount));
 
-	// Total cost of loan = original amount + total projected interest from amortization schedule
 	let totalCostOfLoan = $derived.by(() => {
 		if (!isLoanWithApr || amortizationSchedule.length === 0) return financing.originalAmount;
 		const totalProjectedInterest = amortizationSchedule.reduce(
@@ -57,10 +54,6 @@
 		return Math.round((totalInterest / financing.originalAmount) * 100);
 	});
 
-	// Lease mileage overage. `financing.mileageLimit` is the ANNUAL allowance; calculateLeaseOverage
-	// scales it by the term (annual × termMonths/12) before comparing against the lifetime `mileageUsed`,
-	// matching the sibling LeaseMetricsCard. Comparing driven miles against the bare ANNUAL number
-	// over-reported the overage + $ fee ~Nx on an N-year lease (the annual-vs-total class).
 	let leaseOverage = $derived(calculateLeaseOverage(financing, mileageUsed));
 	let excessMiles = $derived(leaseOverage.excessMiles);
 	let overageCost = $derived(leaseOverage.overageCost);

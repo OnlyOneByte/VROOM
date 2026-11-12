@@ -1,12 +1,3 @@
-/**
- * Rate Limiting Middleware
- *
- * Protects against abuse by limiting request frequency per user/IP.
- *
- * IMPORTANT: Uses in-memory storage. For production with multiple instances,
- * consider using Redis or a distributed cache.
- */
-
 import type { Context, Next } from 'hono';
 import { CONFIG } from '../config';
 import { createErrorResponse } from '../errors';
@@ -23,9 +14,9 @@ interface RateLimitEntry {
   resetTime: number;
 }
 
+// In-memory and per process: with several instances, each one enforces its own limit.
 const rateLimitStore = new Map<string, RateLimitEntry>();
 
-// Cleanup expired entries periodically
 let cleanupTimer: ReturnType<typeof setInterval> | null = null;
 
 function ensureCleanupTimer(): void {
@@ -36,22 +27,14 @@ function ensureCleanupTimer(): void {
       if (entry.resetTime < now) rateLimitStore.delete(key);
     }
   }, CONFIG.rateLimit.cleanupInterval);
-  // Allow the process to exit even if the timer is still running
   if (cleanupTimer && typeof cleanupTimer === 'object' && 'unref' in cleanupTimer) {
     cleanupTimer.unref();
   }
 }
 
-/**
- * Rate limiter middleware factory
- * Creates a rate limiter with specified configuration
- */
 export function rateLimiter(config: RateLimitConfig) {
   ensureCleanupTimer();
   return async (c: Context, next: Next) => {
-    // Local E2E harness opt-out (double-gated: only outside production). The harness's
-    // own request volume otherwise exhausts the in-memory window and flakes specs with
-    // 429s. Never active in production — see CONFIG.disableRateLimit.
     if (CONFIG.disableRateLimit) return next();
 
     const key = config.keyGenerator(c);

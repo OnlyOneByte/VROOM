@@ -11,28 +11,28 @@
 		Save,
 		Trash2
 	} from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
+	import { Button } from '#lib/components/ui/button/index.ts';
 	import {
 		Card,
 		CardContent,
 		CardDescription,
 		CardHeader,
 		CardTitle
-	} from '$lib/components/ui/card';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import { Badge } from '$lib/components/ui/badge';
+	} from '#lib/components/ui/card/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import S3ProviderForm from './S3Form.svelte';
 	import GoogleDriveProviderForm from './GoogleDriveForm.svelte';
 	import ProviderFolderSettings from './PhotoFolderSection.svelte';
 	import BackupSection from './BackupSection.svelte';
 	import { useGoogleOAuth } from '../use-google-oauth.svelte';
-	import { providerApi } from '$lib/services/provider-api';
-	import { settingsApi } from '$lib/services/settings-api';
-	import { appStore } from '$lib/stores/app.svelte';
-	import FormLayout from '$lib/components/common/form-layout.svelte';
-	import { routes } from '$lib/routes';
-	import { DEFAULT_FOLDER_SETTINGS, type ProviderTypeOption } from '$lib/constants/providers';
+	import { providerApi } from '#lib/services/provider-api.ts';
+	import { settingsApi } from '#lib/services/settings-api.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
+	import FormLayout from '#lib/components/common/form-layout.svelte';
+	import { routes } from '#lib/routes.ts';
+	import { DEFAULT_FOLDER_SETTINGS, type ProviderTypeOption } from '#lib/constants/providers.ts';
 	import type {
 		PhotoCategory,
 		CategorySetting,
@@ -40,7 +40,7 @@
 		UserProviderInfo,
 		BackupConfig,
 		ProviderBackupSettings
-	} from '$lib/types';
+	} from '#lib/types/index.ts';
 	import { onMount } from 'svelte';
 
 	const PROVIDER_TYPES: ProviderTypeOption[] = [
@@ -93,7 +93,6 @@
 	let isSaving = $state(false);
 	let isDeleting = $state(false);
 
-	// --- Google OAuth ---
 	const oauth = useGoogleOAuth(() => ({
 		isEditMode,
 		providerId,
@@ -102,7 +101,6 @@
 		selectedType
 	}));
 
-	// Restore form state saved before OAuth redirect (synchronous, runs during init)
 	const restoredState = oauth.restoreFormState();
 	if (restoredState) {
 		if (restoredState.selectedType) selectedType = restoredState.selectedType;
@@ -115,46 +113,28 @@
 		return oauth.pendingEmail;
 	});
 
-	// --- S3 form state ---
 	let s3Config = $state({ endpoint: '', bucket: '', region: '' });
 	let s3Credentials = $state({ accessKeyId: '', secretAccessKey: '' });
 
-	// --- Storage paths ---
 	let providerRootPath = $state('VROOM');
-	/**
-	 * Owned here, edited in PhotoFolderSection and written by handleSave, so what the user sees is
-	 * what is stored. It is a real path segment server-side (the upload path is
-	 * providerRootPath / photoRootPath / category folder), so a default written over a configured
-	 * value sends new photos to a different folder from the existing ones. Only an explicit provider
-	 * type pick re-seeds it — see the type picker.
-	 */
 	let photoRootPath = $state(getDefaultPhotoRootPath('google-drive'));
 
-	// --- Folder settings ---
 	let folderSettings = $state<Record<PhotoCategory, CategorySetting>>({
 		...DEFAULT_FOLDER_SETTINGS
 	});
 
-	// --- Backup settings ---
 	let backupEnabled = $state(false);
 	let backupFolderPath = $state('Backups');
 	let backupRetentionCount = $state(10);
 	let sheetsSyncEnabled = $state(false);
 	let sheetsSpreadsheetId = $state('');
 	let backupConfig = $state<BackupConfig>({ providers: {} });
-	/**
-	 * The per-category default providers, as loaded from the server. This form edits ONE provider's
-	 * folder settings and no defaults, so it round-trips what it loaded (the server merges
-	 * storageConfig per key) — inventing a value here would re-point or clear a default the user set
-	 * elsewhere. Empty until the load lands, which is a no-op for the merge.
-	 */
 	let storageDefaults = $state<Partial<StorageConfig['defaults']>>({});
 
 	let providerRootPrefix = $derived(
 		providerRootPath ? `${providerRootPath.replace(/\/+$/, '')}/` : ''
 	);
 
-	// Backup validation (used by canSave)
 	let folderPathError = $derived.by(() => {
 		if (!backupFolderPath.trim()) return 'Folder path is required';
 		if (backupFolderPath.length > 255) return 'Folder path must be 255 characters or less';
@@ -169,7 +149,6 @@
 	let hasBackupErrors = $derived(!!(folderPathError || retentionCountError));
 	let anyBackupEnabled = $derived(backupEnabled || sheetsSyncEnabled);
 
-	// --- Initialize from existing provider in edit mode ---
 	let initialized = $state(false);
 	$effect(() => {
 		if (existingProvider && !initialized) {
@@ -209,13 +188,11 @@
 				}
 			}
 		} catch {
-			// Non-critical — backup settings are optional
+			// Backup settings are optional.
 		}
 	}
 
 	onMount(async () => {
-		// Independent calls, so one latency round: the settings load and the OAuth return
-		// (reads URL params, fetches pending email, cleans URL) need nothing from each other.
 		const [, oauthResult] = await Promise.all([loadSettings(), oauth.handleOAuthReturn()]);
 		if (oauthResult.restoredSelectedType) selectedType = oauthResult.restoredSelectedType;
 		if (oauthResult.restoredDisplayName) displayName = oauthResult.restoredDisplayName;
@@ -266,9 +243,6 @@
 		isSaving = true;
 		try {
 			let credentials: Record<string, unknown> = {};
-			// Seeded from the stored config so the keys this form does not manage survive the save —
-			// `accountEmail` is written server-side from the OAuth grant and is the only record of
-			// which Google account this provider is.
 			let config: Record<string, unknown> = {
 				...(existingProvider?.config ?? {}),
 				providerRootPath: providerRootPath.trim(),
@@ -320,13 +294,8 @@
 				resultId = created.id;
 			}
 
-			// What could not be saved, named for the user. The provider row itself is saved by now, so
-			// a failure here is never rolled back — but it is never reported as success either: these
-			// two calls carry the folder paths and the backup toggles, which is what decides whether
-			// photos and backups go anywhere at all.
 			const unsaved: string[] = [];
 
-			// Persist folder settings
 			try {
 				await settingsApi.updateSettings({
 					storageConfig: {
@@ -340,7 +309,6 @@
 				unsaved.push('folder settings');
 			}
 
-			// Persist backup settings
 			if (backupEnabled || sheetsSyncEnabled || backupConfig.providers[resultId]) {
 				try {
 					const providerBackup: ProviderBackupSettings = {
@@ -421,7 +389,6 @@
 	</div>
 
 	<div class="space-y-6 pb-32 sm:pb-24">
-		<!-- Provider Type -->
 		{#if isEditMode}
 			{@const pt = PROVIDER_TYPES.find(p => p.id === selectedType)}
 			{#if pt}
@@ -458,9 +425,6 @@
 								onclick={() => {
 									if (pt.disabled) return;
 									selectedType = pt.id;
-									// The only place the photo root path is re-seeded: picking a type is an
-									// explicit choice of a new provider, so its default path is expected. Anything
-									// else (a keystroke elsewhere, a reload) must leave what the user typed alone.
 									photoRootPath = getDefaultPhotoRootPath(pt.id);
 								}}
 							>
@@ -481,7 +445,6 @@
 		{/if}
 
 		{#if selectedType}
-			<!-- Display Name -->
 			<Card>
 				<CardHeader>
 					<CardTitle class="text-base">Display Name</CardTitle>
@@ -500,7 +463,6 @@
 				</CardContent>
 			</Card>
 
-			<!-- Provider-specific Configuration -->
 			<Card>
 				<CardHeader>
 					<CardTitle class="text-base">Connection Settings</CardTitle>
@@ -556,7 +518,6 @@
 				</CardContent>
 			</Card>
 
-			<!-- Photo Folder Settings -->
 			<Card>
 				<CardHeader>
 					<CardTitle class="text-base">Photo Folder Settings</CardTitle>
@@ -573,7 +534,6 @@
 				</CardContent>
 			</Card>
 
-			<!-- Backup Settings -->
 			<Card>
 				<CardHeader>
 					<CardTitle class="text-base">Backup Settings</CardTitle>
@@ -593,7 +553,6 @@
 			</Card>
 
 			{#if isEditMode}
-				<!-- Danger Zone -->
 				<Card class="border-destructive/50">
 					<CardHeader>
 						<CardTitle class="text-base text-destructive">Danger Zone</CardTitle>
@@ -615,7 +574,6 @@
 		{/if}
 	</div>
 
-	<!-- Save FAB -->
 	{#if selectedType}
 		<Button
 			onclick={handleSave}

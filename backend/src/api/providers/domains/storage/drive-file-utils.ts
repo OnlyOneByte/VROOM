@@ -1,19 +1,10 @@
-/**
- * Pure utility functions for Google Drive file metadata coalescing.
- *
- * Extracted into a separate module so tests can import these without
- * transitively pulling in `googleapis` (which can fail in CI environments).
- */
+// Must not import googleapis; tests load this module without that dependency.
 
 import type { DriveFile } from '../../services/google-drive-service';
 import type { StorageFileInfo } from './storage-provider';
 
 const EPOCH_ISO = new Date(0).toISOString();
 
-/**
- * Coalesce a Google Drive file into a StorageFileInfo, handling null/undefined
- * `createdTime`, `modifiedTime`, and `size` fields with safe fallbacks.
- */
 export function coalesceGoogleDriveFile(f: DriveFile): StorageFileInfo {
   return {
     key: f.id,

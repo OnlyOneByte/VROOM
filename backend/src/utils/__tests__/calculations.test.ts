@@ -1,22 +1,11 @@
-/**
- * Unit tests for calculateMilesPerKwh and calculateAverageMilesPerKwh
- *
- * Validates: Requirements 4.8, 4.9, 4.10, 4.11
- */
-
 import { describe, expect, test } from 'bun:test';
 import type { Expense } from '../../db/schema';
 import {
   averageConsecutiveMpg,
   calculateAverageMilesPerKwh,
-  calculateMilesPerKwh,
   parseClampedInt,
   sortExpensesByDate,
 } from '../calculations';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 function makeChargeExpense(overrides: {
   mileage: number | null;
@@ -50,36 +39,6 @@ function makeChargeExpense(overrides: {
   };
 }
 
-// ---------------------------------------------------------------------------
-// calculateMilesPerKwh
-// ---------------------------------------------------------------------------
-describe('calculateMilesPerKwh', () => {
-  test('returns miles / kwh for positive kwh', () => {
-    expect(calculateMilesPerKwh(100, 25)).toBe(4);
-  });
-
-  test('returns 0 when kwh is 0', () => {
-    expect(calculateMilesPerKwh(100, 0)).toBe(0);
-  });
-
-  test('returns 0 when kwh is negative', () => {
-    expect(calculateMilesPerKwh(100, -5)).toBe(0);
-  });
-
-  test('result is never NaN', () => {
-    const result = calculateMilesPerKwh(0, 0);
-    expect(Number.isNaN(result)).toBe(false);
-  });
-
-  test('result is never Infinity', () => {
-    const result = calculateMilesPerKwh(100, 0);
-    expect(Number.isFinite(result)).toBe(true);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// calculateAverageMilesPerKwh
-// ---------------------------------------------------------------------------
 describe('calculateAverageMilesPerKwh', () => {
   test('returns null for fewer than 2 expenses', () => {
     const single = [makeChargeExpense({ mileage: 1000, volume: 30, index: 0 })];
@@ -96,7 +55,6 @@ describe('calculateAverageMilesPerKwh', () => {
   });
 
   test('calculates correct average for valid pair', () => {
-    // 100 miles / 30 kWh = 3.333 mi/kWh
     const expenses = [
       makeChargeExpense({ mileage: 1000, volume: 30, index: 0 }),
       makeChargeExpense({ mileage: 1100, volume: 30, index: 1 }),
@@ -112,14 +70,10 @@ describe('calculateAverageMilesPerKwh', () => {
       makeChargeExpense({ mileage: 1100, volume: 30, missedFillup: true, index: 1 }),
       makeChargeExpense({ mileage: 1200, volume: 25, index: 2 }),
     ];
-    // Pair (0,1) skipped because 1 is missedFillup
-    // Pair (1,2) skipped because 1 is missedFillup
-    // No valid pairs → null
     expect(calculateAverageMilesPerKwh(expenses)).toBeNull();
   });
 
   test('filters out unrealistic values > 10 mi/kWh', () => {
-    // 500 miles / 10 kWh = 50 mi/kWh → filtered out
     const expenses = [
       makeChargeExpense({ mileage: 1000, volume: 10, index: 0 }),
       makeChargeExpense({ mileage: 1500, volume: 10, index: 1 }),
@@ -133,15 +87,14 @@ describe('calculateAverageMilesPerKwh', () => {
       makeChargeExpense({ mileage: 2000, volume: 5, index: 1 }),
       makeChargeExpense({ mileage: 3000, volume: 5, index: 2 }),
     ];
-    // 1000/5 = 200, 1000/5 = 200 → both > 10 → null
     expect(calculateAverageMilesPerKwh(expenses)).toBeNull();
   });
 
   test('averages multiple valid pairs', () => {
     const expenses = [
       makeChargeExpense({ mileage: 1000, volume: 30, index: 0 }),
-      makeChargeExpense({ mileage: 1120, volume: 40, index: 1 }), // 120/40 = 3.0
-      makeChargeExpense({ mileage: 1240, volume: 30, index: 2 }), // 120/30 = 4.0
+      makeChargeExpense({ mileage: 1120, volume: 40, index: 1 }),
+      makeChargeExpense({ mileage: 1240, volume: 30, index: 2 }),
     ];
     const result = calculateAverageMilesPerKwh(expenses);
     expect(result).not.toBeNull();
@@ -149,32 +102,18 @@ describe('calculateAverageMilesPerKwh', () => {
   });
 
   test('sorts expenses by date before calculating', () => {
-    // Provide out-of-order expenses
     const expenses = [
       makeChargeExpense({ mileage: 1100, volume: 30, index: 2 }),
       makeChargeExpense({ mileage: 1000, volume: 30, index: 0 }),
     ];
     const result = calculateAverageMilesPerKwh(expenses);
     expect(result).not.toBeNull();
-    // After sorting: index 0 (mileage 1000) then index 2 (mileage 1100)
-    // 100 miles / 30 kWh = 3.333
     expect(result).toBeCloseTo(100 / 30, 5);
   });
 });
 
-// ---------------------------------------------------------------------------
-// averageConsecutiveMpg — the SHARED consecutive-fill-up MPG loop that calculateAverageMPG
-// (calculations.ts) and calculateAverageMpg (vehicle-stats.ts) both delegate to. Before the loop was
-// hand-copied at both sites (proved a copy once lost its guard); now it's ONE helper. It was only
-// tested INDIRECTLY through its two callers (the "helper tested only in isolation" gap, same as
-// monthsBetween) — these pin its OWN cells directly so a future edit to the band / skip / guard can't
-// drift undetected. The helper takes PRE-SORTED rows (callers own the sort) + the minimal {mileage,
-// volume, missedFillup} shape. The outlier band is the CANONICAL inclusive [MIN_VALID_MPG, MAX_VALID_MPG]
-// = [5,100] shared with the analytics charts.
-// ---------------------------------------------------------------------------
-describe('averageConsecutiveMpg (shared consecutive-pair MPG loop)', () => {
+describe('averageConsecutiveMpg', () => {
   test('averages consecutive pairs: miles-driven / current.volume', () => {
-    // (1500−1000)/20 = 25; (2100−1500)/20 = 30 → mean 27.5 (both in the [5,100] band)
     expect(
       averageConsecutiveMpg([
         { mileage: 1000, volume: 20, missedFillup: false },
@@ -184,13 +123,12 @@ describe('averageConsecutiveMpg (shared consecutive-pair MPG loop)', () => {
     ).toBeCloseTo((500 / 20 + 600 / 20) / 2, 5);
   });
 
-  test('< 2 rows (and an empty list) → null (no pair to average)', () => {
+  test('fewer than 2 rows (and an empty list) gives null', () => {
     expect(averageConsecutiveMpg([])).toBeNull();
     expect(averageConsecutiveMpg([{ mileage: 1000, volume: 20 }])).toBeNull();
   });
 
-  test('skips a pair touching a missedFillup row (current OR previous)', () => {
-    // 3 rows, the middle one missedFillup → both pairs (0,1) and (1,2) skipped → null.
+  test('skips a pair touching a missedFillup row (current or previous)', () => {
     expect(
       averageConsecutiveMpg([
         { mileage: 1000, volume: 20 },
@@ -200,8 +138,7 @@ describe('averageConsecutiveMpg (shared consecutive-pair MPG loop)', () => {
     ).toBeNull();
   });
 
-  test('requires both odometer readings AND the current volume (else the pair is dropped)', () => {
-    // previous mileage null → pair (0,1) dropped; current volume null → pair (1,2) dropped → null.
+  test('requires both odometer readings and the current volume', () => {
     expect(
       averageConsecutiveMpg([
         { mileage: null, volume: 20 },
@@ -211,57 +148,48 @@ describe('averageConsecutiveMpg (shared consecutive-pair MPG loop)', () => {
     ).toBeNull();
   });
 
-  test('drops unrealistic MPG outside [5,100]: a too-LOW (<5) and too-HIGH (>100) pair both excluded', () => {
-    // (1080−1000)/20 = 4 → below MIN_VALID_MPG (5) → dropped; (3200−1080)/20 = 106 → above MAX (100) → dropped.
+  test('drops unrealistic MPG outside [5,100]', () => {
     expect(
       averageConsecutiveMpg([
         { mileage: 1000, volume: 20 },
-        { mileage: 1080, volume: 20 }, // 4 mpg → < 5 → dropped
-        { mileage: 3200, volume: 20 }, // 106 mpg → > 100 → dropped
+        { mileage: 1080, volume: 20 },
+        { mileage: 3200, volume: 20 },
       ])
     ).toBeNull();
   });
 
   test('the [5,100] band is INCLUSIVE at both edges (exactly 5 and exactly 100 are kept)', () => {
-    // NOTE the loop guard is `current.mileage && previous.mileage` (truthy) — a 0 odometer is falsy and
-    // drops the pair, so anchor at a non-zero start. delta 100 / vol 20 = exactly 5 (=MIN) → kept.
     expect(
       averageConsecutiveMpg([
         { mileage: 10, volume: 20 },
-        { mileage: 110, volume: 20 }, // delta 100 → 5.0 (== MIN_VALID_MPG) → kept
+        { mileage: 110, volume: 20 },
       ])
     ).toBeCloseTo(5, 5);
-    // delta 2000 / vol 20 = exactly 100 (=MAX) → kept.
     expect(
       averageConsecutiveMpg([
         { mileage: 10, volume: 20 },
-        { mileage: 2010, volume: 20 }, // delta 2000 → 100.0 (== MAX_VALID_MPG) → kept
+        { mileage: 2010, volume: 20 },
       ])
     ).toBeCloseTo(100, 5);
-    // just OUTSIDE: 4.95 (<5) and 100.05 (>100) → both dropped → null.
     expect(
       averageConsecutiveMpg([
         { mileage: 10, volume: 20 },
-        { mileage: 109, volume: 20 }, // delta 99 → 4.95 → < 5 → dropped → null
+        { mileage: 109, volume: 20 },
       ])
     ).toBeNull();
   });
 });
-
-// ---------------------------------------------------------------------------
-// parseClampedInt (— the insurance /expiring-soon days/limit dedup; the guard)
-// ---------------------------------------------------------------------------
 
 describe('parseClampedInt', () => {
   test('a valid in-range value parses through unchanged', () => {
     expect(parseClampedInt('45', 30, 1, 366)).toBe(45);
   });
 
-  test('undefined (missing param) → fallback', () => {
+  test('undefined (missing param) gives the fallback', () => {
     expect(parseClampedInt(undefined, 30, 1, 366)).toBe(30);
   });
 
-  test('a non-numeric value → fallback (the guard: never NaN)', () => {
+  test('a non-numeric value gives the fallback, never NaN', () => {
     expect(parseClampedInt('abc', 30, 1, 366)).toBe(30);
     expect(parseClampedInt('', 30, 1, 366)).toBe(30);
   });
@@ -275,17 +203,11 @@ describe('parseClampedInt', () => {
   });
 
   test('parseInt tolerates a trailing unit but not a leading non-digit', () => {
-    // parseInt('45px') = 45 (then clamped); parseInt('px45') = NaN → fallback. Documents the
-    // parse semantics so a future change to a stricter parser is a conscious one.
     expect(parseClampedInt('45px', 30, 1, 366)).toBe(45);
     expect(parseClampedInt('px45', 30, 1, 366)).toBe(30);
   });
 });
 
-// sortExpensesByDate is the ONE source of truth for the chronological-order invariant the pairwise
-// efficiency calcs require (calculateAverageMPG / calculateAverageMilesPerKwh / the /stats handler all
-// pair consecutive rows; unsorted input silently mis-pairs — the class). Pins ascending order,
-// no input mutation, and Date+string date handling.
 describe('sortExpensesByDate', () => {
   test('sorts ASCENDING by date', () => {
     const rows = [
@@ -302,7 +224,7 @@ describe('sortExpensesByDate', () => {
       { date: '2024-01-05', id: 'a' },
     ];
     const sorted = sortExpensesByDate(rows);
-    expect(rows.map((r) => r.id)).toEqual(['b', 'a']); // original order untouched
+    expect(rows.map((r) => r.id)).toEqual(['b', 'a']);
     expect(sorted.map((r) => r.id)).toEqual(['a', 'b']);
     expect(sorted).not.toBe(rows);
   });
@@ -316,7 +238,7 @@ describe('sortExpensesByDate', () => {
     expect(sortExpensesByDate(rows).map((r) => r.id)).toEqual(['early', 'mid', 'late']);
   });
 
-  test('empty + single-element inputs are returned as-is (sorted copy)', () => {
+  test('empty and single-element inputs are returned as a sorted copy', () => {
     expect(sortExpensesByDate([])).toEqual([]);
     expect(sortExpensesByDate([{ date: '2024-01-01', id: 'x' }]).map((r) => r.id)).toEqual(['x']);
   });

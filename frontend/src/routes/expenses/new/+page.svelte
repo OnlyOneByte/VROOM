@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import ExpenseForm from '$lib/components/expenses/form/ExpenseForm.svelte';
+	import ExpenseForm from '#lib/components/expenses/form/ExpenseForm.svelte';
 
 	let returnTo = $derived(page.url.searchParams.get('returnTo') || '/expenses');
 	let preselectedVehicleId = $derived(page.url.searchParams.get('vehicleId'));
@@ -8,7 +8,6 @@
 	let preselectedFinancingId = $derived(page.url.searchParams.get('financingId'));
 	let preselectedAmount = $derived(page.url.searchParams.get('amount'));
 	let preselectedDescription = $derived(page.url.searchParams.get('description'));
-	// Tags arrive as a comma-separated list (from "Duplicate expense").
 	let preselectedTags = $derived(page.url.searchParams.get('tags'));
 </script>
 

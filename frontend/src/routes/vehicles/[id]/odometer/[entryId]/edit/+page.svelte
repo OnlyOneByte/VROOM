@@ -1,17 +1,17 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { gotoDynamic } from '$lib/utils/navigation';
+	import { gotoDynamic } from '#lib/utils/navigation.ts';
 	import { onMount } from 'svelte';
 	import { z } from 'zod';
 	import { ArrowLeft, LoaderCircle, Trash2, TriangleAlert } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import { Textarea } from '$lib/components/ui/textarea';
-	import * as Dialog from '$lib/components/ui/dialog';
-	import { odometerApi } from '$lib/services/odometer-api';
-	import { dateOnlyToISO, toDateInputValue } from '$lib/utils/formatters';
-	import FormLayout from '$lib/components/common/form-layout.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { Textarea } from '#lib/components/ui/textarea/index.ts';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
+	import { odometerApi } from '#lib/services/odometer-api.ts';
+	import { dateOnlyToISO, toDateInputValue } from '#lib/utils/formatters.ts';
+	import FormLayout from '#lib/components/common/form-layout.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -19,12 +19,10 @@
 	let entryId = $derived(data.entryId);
 	let returnTo = $derived(page.url.searchParams.get('returnTo') || `/vehicles/${vehicleId}`);
 
-	// Form state
 	let odometer = $state('');
 	let date = $state('');
 	let note = $state('');
 
-	// UI state
 	let isLoadingEntry = $state(true);
 	let isSubmitting = $state(false);
 	let isDeleting = $state(false);
@@ -35,7 +33,6 @@
 	let deleteError = $state<string | null>(null);
 	let latestOdometer = $state<number | null>(null);
 
-	// Soft warning for non-monotonic reading
 	let showWarning = $derived.by(() => {
 		if (latestOdometer === null) return false;
 		const val = Number(odometer);
@@ -54,7 +51,6 @@
 
 	onMount(async () => {
 		try {
-			// Load the entry and latest reading in parallel
 			const [entry, latestResponse] = await Promise.all([
 				odometerApi.getEntry(entryId),
 				odometerApi.getEntries(vehicleId, { limit: 1, offset: 0 })
@@ -145,7 +141,6 @@
 </svelte:head>
 
 <FormLayout>
-	<!-- Header -->
 	<div class="mb-6 flex items-center gap-3">
 		<Button variant="ghost" size="icon" aria-label="Back" onclick={() => gotoDynamic(returnTo)}>
 			<ArrowLeft class="h-5 w-5" />
@@ -162,7 +157,6 @@
 			{loadError}
 		</div>
 	{:else}
-		<!-- Form -->
 		<form
 			class="space-y-6 rounded-lg border bg-card p-6"
 			onsubmit={e => {
@@ -170,7 +164,6 @@
 				handleSubmit();
 			}}
 		>
-			<!-- Odometer field -->
 			<div class="space-y-2">
 				<Label for="odometer">Odometer Reading</Label>
 				<Input
@@ -194,7 +187,6 @@
 				{/if}
 			</div>
 
-			<!-- Date field -->
 			<div class="space-y-2">
 				<Label for="date">Date</Label>
 				<Input
@@ -208,7 +200,6 @@
 				{/if}
 			</div>
 
-			<!-- Note field -->
 			<div class="space-y-2">
 				<Label for="note">Note (optional)</Label>
 				<Textarea
@@ -224,14 +215,12 @@
 				<p class="text-xs text-muted-foreground">{note.length}/500</p>
 			</div>
 
-			<!-- Submit error -->
 			{#if submitError}
 				<div class="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
 					{submitError}
 				</div>
 			{/if}
 
-			<!-- Actions -->
 			<div class="flex gap-3">
 				<Button
 					type="button"
@@ -263,7 +252,6 @@
 	{/if}
 </FormLayout>
 
-<!-- Delete Confirmation Dialog -->
 <Dialog.Root bind:open={deleteDialogOpen}>
 	<Dialog.Content class="sm:max-w-sm">
 		<Dialog.Header>

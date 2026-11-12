@@ -1,16 +1,3 @@
-/**
- * Shared Calculation Utilities
- *
- * Pure functions for common calculations used across the application.
- * These functions are extracted from analytics services to avoid duplication.
- */
-
-import type { Expense } from '../db/schema';
-
-/**
- * Minimal shape required by efficiency calculations.
- * Both Expense (full DB row) and FuelExpense (lightweight stats type) satisfy this.
- */
 interface EfficiencyExpense {
   mileage: number | null;
   volume: number | null;
@@ -18,64 +5,25 @@ interface EfficiencyExpense {
   date: Date | string;
 }
 
-/**
- * Sort rows ASCENDING by date, on a COPY (never mutates the input). ONE source of truth for the
- * chronological order every PAIRWISE efficiency calc requires — calculateAverageMPG, calculateAverageMilesPerKwh,
- * and the /stats handler each pair CONSECUTIVE rows (current − previous), so an unsorted or wrong-direction
- * input silently mis-pairs into garbage with no error. A divergent inline copy (flipped
- * subtraction, or sorting in place and corrupting the caller's array) reintroduces exactly that. `date` is
- * `Date | string`; new Date() normalizes both.
- */
 export function sortExpensesByDate<T extends { date: Date | string }>(expenses: T[]): T[] {
   return [...expenses].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 }
 
-// ============================================================================
-// FUEL EFFICIENCY CALCULATIONS
-// ============================================================================
-
-/**
- * Calculate MPG (Miles Per Gallon) from miles driven and fuel consumed
- */
-/**
- * The ONE canonical realistic-efficiency band. Both the
- * per-vehicle stats averages here AND the analytics charts (analytics-charts.ts imports these) gate
- * outliers on the SAME inclusive bounds, so the same car can't show two different averages on the
- * per-vehicle stats card vs the Analytics Fuel Stats card. Matches the documented chart band ([5,100]
- * gas mi/gal, [1,10] electric mi/kWh) + the frontend expense-helpers.ts filter.
- */
 export const MIN_VALID_MPG = 5;
 export const MAX_VALID_MPG = 100;
 export const MIN_VALID_MI_KWH = 1;
 export const MAX_VALID_MI_KWH = 10;
 
-export function calculateMPG(miles: number, fuel: number): number {
+function calculateMPG(miles: number, fuel: number): number {
   return fuel > 0 ? miles / fuel : 0;
 }
 
-/** The minimal row shape the consecutive-MPG pairing reads (id/date/etc. are irrelevant to the math). */
 interface MpgPairRow {
   mileage?: number | null;
   volume?: number | null;
   missedFillup?: boolean;
 }
 
-/**
- * Average MPG over CONSECUTIVE fill-up pairs of an ALREADY-CHRONOLOGICALLY-SORTED list.
- *
- * The identical pairing loop — skip a pair touching a `missedFillup` (the unlogged-gap rule),
- * require both odometer readings + the current volume, `mpg = miles/volume`, drop unrealistic values
- * outside (0,150) — was hand-copied in `calculateAverageMPG` (here) and `calculateAverageMpg`
- * (vehicle-stats.ts). recorded that a hand-copied variant of this exact loop once LOST its guard,
- * so the copies are a live bug vector. ONE source of truth.
- *
- * Takes PRE-SORTED rows so each caller keeps its OWN sort contract (calculations.ts via
- * `sortExpensesByDate`; vehicle-stats.ts via a defensive inline date sort) — the dedup is
- * behavior-preserving, not a sort-policy change. The outlier band is now the CANONICAL [MIN_VALID_MPG,
- * MAX_VALID_MPG] = [5,100] shared with the analytics charts — it
- * used to be (0,150) here, so the same car showed two different averages on the per-vehicle stats card
- * vs the Analytics Fuel Stats card; unified on the documented [5,100] band.
- */
 export function averageConsecutiveMpg(sortedExpenses: MpgPairRow[]): number | null {
   const mpgValues: number[] = [];
 
@@ -83,7 +31,6 @@ export function averageConsecutiveMpg(sortedExpenses: MpgPairRow[]): number | nu
     const current = sortedExpenses[i];
     const previous = sortedExpenses[i - 1];
 
-    // Skip pairs affected by missed fill-ups (the segment spans an unlogged gap).
     if (current.missedFillup || previous.missedFillup) {
       continue;
     }
@@ -92,7 +39,6 @@ export function averageConsecutiveMpg(sortedExpenses: MpgPairRow[]): number | nu
       const miles = current.mileage - previous.mileage;
       const mpg = calculateMPG(miles, current.volume);
 
-      // Filter out unrealistic values, on the canonical [5,100] band shared with analytics.
       if (mpg >= MIN_VALID_MPG && mpg <= MAX_VALID_MPG) {
         mpgValues.push(mpg);
       }
@@ -107,40 +53,17 @@ export function averageConsecutiveMpg(sortedExpenses: MpgPairRow[]): number | nu
   return sum / mpgValues.length;
 }
 
-/**
- * Calculate average MPG from a series of fuel expenses
- * Uses consecutive mileage readings to determine miles driven between fill-ups
- */
-export function calculateAverageMPG(fuelExpenses: Expense[]): number | null {
-  if (fuelExpenses.length < 2) {
-    return null;
-  }
-
-  // Sort by date to ensure chronological order (sortExpensesByDate — the shared pairwise-order invariant),
-  // then run the shared consecutive-pair MPG average.
-  return averageConsecutiveMpg(sortExpensesByDate(fuelExpenses));
-}
-
-/**
- * Calculate mi/kWh (Miles Per Kilowatt-Hour) from miles driven and energy consumed
- */
-export function calculateMilesPerKwh(miles: number, kwh: number): number {
+function calculateMilesPerKwh(miles: number, kwh: number): number {
   return kwh > 0 ? miles / kwh : 0;
 }
 
-/**
- * Calculate average mi/kWh from a series of charge expenses
- * Uses consecutive mileage readings to determine miles driven between charges
- */
 export function calculateAverageMilesPerKwh(chargeExpenses: EfficiencyExpense[]): number | null {
   if (chargeExpenses.length < 2) {
     return null;
   }
 
-  // Sort by date to ensure chronological order (sortExpensesByDate — the shared pairwise-order invariant)
   const sortedExpenses = sortExpensesByDate(chargeExpenses);
 
-  // Need at least 2 expenses with mileage data
   const withMileage = sortedExpenses.filter((e) => e.mileage != null);
   if (withMileage.length < 2) {
     return null;
@@ -152,7 +75,6 @@ export function calculateAverageMilesPerKwh(chargeExpenses: EfficiencyExpense[])
     const current = sortedExpenses[i];
     const previous = sortedExpenses[i - 1];
 
-    // Skip pairs affected by missed fill-ups
     if (current.missedFillup || previous.missedFillup) {
       continue;
     }
@@ -161,8 +83,6 @@ export function calculateAverageMilesPerKwh(chargeExpenses: EfficiencyExpense[])
       const miles = current.mileage - previous.mileage;
       const milesPerKwh = calculateMilesPerKwh(miles, current.volume);
 
-      // Filter out unrealistic values, on the canonical [1,10] mi/kWh band shared with analytics
-      // — was (0,10) here, diverging from analytics' lower bound of 1.
       if (milesPerKwh >= MIN_VALID_MI_KWH && milesPerKwh <= MAX_VALID_MI_KWH) {
         milesPerKwhValues.push(milesPerKwh);
       }
@@ -177,11 +97,6 @@ export function calculateAverageMilesPerKwh(chargeExpenses: EfficiencyExpense[])
   return sum / milesPerKwhValues.length;
 }
 
-// ============================================================================
-// STATS PERIOD
-// ============================================================================
-
-/** The fixed stats-period selector shared by GET /vehicles/:id/stats and the expenses repository. */
 export type StatsPeriod = '7d' | '30d' | '90d' | '1y' | 'all';
 
 const PERIOD_DAYS: Record<Exclude<StatsPeriod, 'all'>, number> = {
@@ -191,32 +106,11 @@ const PERIOD_DAYS: Record<Exclude<StatsPeriod, 'all'>, number> = {
   '1y': 365,
 };
 
-/**
- * Start-of-window Date for a stats period, or null for 'all' (no lower bound). This was the
- * identical day-offset switch duplicated in vehicles/routes.ts and expenses/repository.ts;
- * extracted here so the window is one source of truth. 'all' → null (the caller applies no
- * date filter); each bounded period → now − N days. A caller that needs an epoch sentinel
- * instead of null for an out-of-range value can `?? new Date(0)` at the call site.
- */
 export function getPeriodStartDate(period: StatsPeriod, now: Date = new Date()): Date | null {
   if (period === 'all') return null;
   return new Date(now.getTime() - PERIOD_DAYS[period] * 24 * 60 * 60 * 1000);
 }
 
-// ============================================================================
-// QUERY-PARAM PARSING
-// ============================================================================
-
-/**
- * Parse a raw query-string value to a bounded integer, falling back when it isn't finite.
- *
- * The `Number.parseInt(raw ?? String(fallback), 10)` + `Number.isFinite(x) ? clamp : fallback`
- * idiom was hand-rolled twice in the SAME handler (insurance /expiring-soon `days` and `limit`) —
- * and that copy-paste is exactly how happened: `limit` carried the finite-guard, `days` was
- * written without it, so a non-numeric `?days=` became NaN → an Invalid Date → a silently-empty
- * result. One source of truth so the guard can't be present on one param and forgotten on its
- * sibling. NaN/missing/non-numeric → `fallback`; otherwise clamped to `[min, max]`.
- */
 export function parseClampedInt(
   raw: string | undefined,
   fallback: number,
@@ -227,21 +121,7 @@ export function parseClampedInt(
   return Number.isFinite(parsed) ? Math.min(Math.max(parsed, min), max) : fallback;
 }
 
-// ============================================================================
-// ARRAY MIN/MAX (spread-safe)
-// ============================================================================
-
-/**
- * Max / min of a numeric array WITHOUT the `Math.max(...arr)` argument spread.
- *
- * `Math.max(...arr)` / `Math.min(...arr)` pass each element as a separate function argument, so a
- * large array (a heavy logger's thousands of fuel/mileage rows over the all-time window — these
- * analytics queries have NO LIMIT) overflows the engine's argument-count cap and throws
- * `RangeError: Maximum call stack size exceeded`, crashing the whole analytics request — the
- * feature breaks for the most-engaged users. Reduce avoids the spread entirely and is
- * O(n) with constant stack. Caller MUST guard emptiness (these return -Infinity/+Infinity on []
- * exactly like Math.max/min, so behavior is identical at every existing call site).
- */
+// Spreading into Math.max overflows the call stack on large arrays, so these loop.
 export function maxOf(values: number[]): number {
   let max = Number.NEGATIVE_INFINITY;
   for (const v of values) {

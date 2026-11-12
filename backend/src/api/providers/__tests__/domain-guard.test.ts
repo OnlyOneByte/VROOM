@@ -1,100 +1,55 @@
-/**
- * Source-code property tests for domain guard on provider routes.
- *
- * Verifies that DELETE, PUT, and POST handlers reject auth-domain rows
- * with ValidationError.
- *
- * **Validates: Requirements 8.2**
- */
+import { beforeEach, describe, expect, test } from 'bun:test';
+import { eq } from 'drizzle-orm';
+import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 
-import { describe, expect, test } from 'bun:test';
-import fc from 'fast-check';
+// Auth-domain providers are sign-in identities; routes must never modify or delete them.
 
-describe('Domain guard on provider routes', () => {
-  /**
-   * **Validates: Requirements 8.2**
-   *
-   * DELETE handler checks existing[0].domain === 'auth' and throws ValidationError.
-   */
-  test('DELETE handler rejects auth-domain rows with ValidationError', async () => {
-    const routesSource = await Bun.file(`${import.meta.dir}/../routes.ts`).text();
+let ctx: TestApp;
+let authProviderId: string;
 
-    fc.assert(
-      fc.property(fc.constant(null), () => {
-        // Find the DELETE handler
-        const deleteIdx = routesSource.indexOf("routes.delete('/:id'");
-        expect(deleteIdx).not.toBe(-1);
+beforeEach(async () => {
+  ctx = await createTestApp();
+  const { db } = await import('../../../db/connection');
+  const schema = await import('../../../db/schema');
+  const [row] = await db
+    .insert(schema.userProviders)
+    .values({
+      userId: ctx.user.id,
+      domain: 'auth',
+      providerType: 'google',
+      providerAccountId: `acct-${ctx.user.id}`,
+      displayName: 'Google sign-in',
+      credentials: 'opaque',
+      status: 'active',
+    })
+    .returning();
+  authProviderId = row.id;
+});
 
-        // Extract the DELETE handler body (up to the next routes. definition or end)
-        const nextRouteIdx = routesSource.indexOf('routes.', deleteIdx + 1);
-        const deleteBody = routesSource.slice(
-          deleteIdx,
-          nextRouteIdx !== -1 ? nextRouteIdx : undefined
-        );
+async function storedDisplayName(): Promise<string | undefined> {
+  const { db } = await import('../../../db/connection');
+  const schema = await import('../../../db/schema');
+  const [row] = await db
+    .select()
+    .from(schema.userProviders)
+    .where(eq(schema.userProviders.id, authProviderId));
+  return row?.displayName;
+}
 
-        // Must check domain === 'auth'
-        expect(deleteBody).toContain("domain === 'auth'");
-        // Must throw ValidationError
-        expect(deleteBody).toContain('ValidationError');
-      }),
-      { numRuns: 100 }
-    );
+describe('Provider routes refuse auth-domain rows', () => {
+  test('PUT rejects an auth-domain provider with 400 and does not rename it', async () => {
+    const res = await ctx.authed('PUT', `/api/v1/providers/${authProviderId}`, {
+      displayName: 'Renamed',
+    });
+
+    expect(res.status).toBe(400);
+    expect(await storedDisplayName()).toBe('Google sign-in');
   });
 
-  /**
-   * **Validates: Requirements 8.2**
-   *
-   * PUT handler checks existing[0].domain === 'auth' and throws ValidationError.
-   */
-  test('PUT handler rejects auth-domain rows with ValidationError', async () => {
-    const routesSource = await Bun.file(`${import.meta.dir}/../routes.ts`).text();
+  test('DELETE rejects an auth-domain provider with 400 and keeps the row', async () => {
+    const res = await ctx.authed('DELETE', `/api/v1/providers/${authProviderId}`);
 
-    fc.assert(
-      fc.property(fc.constant(null), () => {
-        // Find the PUT handler
-        const putIdx = routesSource.indexOf('routes.put(');
-        expect(putIdx).not.toBe(-1);
-
-        // Extract the PUT handler body
-        const nextRouteIdx = routesSource.indexOf('routes.', putIdx + 1);
-        const putBody = routesSource.slice(putIdx, nextRouteIdx !== -1 ? nextRouteIdx : undefined);
-
-        // Must check domain === 'auth'
-        expect(putBody).toContain("domain === 'auth'");
-        // Must throw ValidationError
-        expect(putBody).toContain('ValidationError');
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  /**
-   * **Validates: Requirements 8.2**
-   *
-   * POST handler checks body.domain === 'auth' and throws ValidationError.
-   */
-  test('POST handler rejects auth-domain creation with ValidationError', async () => {
-    const routesSource = await Bun.file(`${import.meta.dir}/../routes.ts`).text();
-
-    fc.assert(
-      fc.property(fc.constant(null), () => {
-        // Find the POST handler for creating providers
-        const postIdx = routesSource.indexOf("routes.post('/'");
-        expect(postIdx).not.toBe(-1);
-
-        // Extract the POST handler body
-        const nextRouteIdx = routesSource.indexOf('routes.', postIdx + 1);
-        const postBody = routesSource.slice(
-          postIdx,
-          nextRouteIdx !== -1 ? nextRouteIdx : undefined
-        );
-
-        // Must check domain === 'auth' on the body
-        expect(postBody).toContain("=== 'auth'");
-        // Must throw ValidationError
-        expect(postBody).toContain('ValidationError');
-      }),
-      { numRuns: 100 }
-    );
+    expect(res.status).toBe(400);
+    expect(await storedDisplayName()).toBe('Google sign-in');
   });
 });

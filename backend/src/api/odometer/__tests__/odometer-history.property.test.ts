@@ -1,11 +1,3 @@
-/**
- * Property-Based Tests for Odometer UNION Query
- *
- * Tests Property 8: UNION query completeness and source labeling.
- *
- * **Validates: Requirements 6.3, 6.4**
- */
-
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
@@ -52,10 +44,6 @@ afterEach(() => {
   sqliteDb.close();
 });
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 function insertExpenseWithMileage(mileage: number, dateUnix: number): string {
   const id = `exp-odo-${++expenseCounter}`;
   sqliteDb.run(
@@ -83,18 +71,10 @@ function insertOdometerEntry(odometer: number, dateUnix: number): string {
   return id;
 }
 
-// ---------------------------------------------------------------------------
-// Generators
-// ---------------------------------------------------------------------------
-
 const mileageArb = fc.integer({ min: 1000, max: 200000 });
 const dateUnixArb = fc.integer({ min: 1600000000, max: 1750000000 });
 
-// ===========================================================================
-// Property 8: Odometer UNION query completeness and source labeling
-// **Validates: Requirements 6.3, 6.4**
-// ===========================================================================
-describe('Property 8: Odometer UNION query completeness and source labeling', () => {
+describe('Odometer UNION query completeness and source labeling', () => {
   test('UNION returns all expense mileage + manual entries with correct source labels', async () => {
     await fc.assert(
       fc.asyncProperty(
@@ -106,38 +86,31 @@ describe('Property 8: Odometer UNION query completeness and source labeling', ()
           const expenseIds: string[] = [];
           const manualIds: string[] = [];
 
-          // Insert expenses with mileage
           for (const [mileage, date] of expenseMileages) {
             expenseIds.push(insertExpenseWithMileage(mileage, date));
           }
 
-          // Insert expenses without mileage (should NOT appear in history)
           for (let i = 0; i < noMileageCount; i++) {
             insertExpenseWithoutMileage(1700000000 + i);
           }
 
-          // Insert manual odometer entries
           for (const [odometer, date] of manualEntries) {
             manualIds.push(insertOdometerEntry(odometer, date));
           }
 
           const expectedTotal = expenseMileages.length + manualEntries.length;
 
-          // Fetch full history (large limit to get all)
           const result = await repo.getHistory(VEHICLE_ID, USER_ID, { limit: 100, offset: 0 });
 
-          // Total count matches
           expect(result.totalCount).toBe(expectedTotal);
           expect(result.data.length).toBe(expectedTotal);
 
-          // Check source labels
           const expenseEntries = result.data.filter((e) => e.source === 'expense');
           const manualEntriesResult = result.data.filter((e) => e.source === 'manual');
 
           expect(expenseEntries.length).toBe(expenseMileages.length);
           expect(manualEntriesResult.length).toBe(manualEntries.length);
 
-          // Check source IDs are present
           for (const entry of expenseEntries) {
             expect(expenseIds).toContain(entry.sourceId);
           }
@@ -145,14 +118,12 @@ describe('Property 8: Odometer UNION query completeness and source labeling', ()
             expect(manualIds).toContain(entry.sourceId);
           }
 
-          // Check ordering: descending by recordedAt
           for (let i = 1; i < result.data.length; i++) {
             expect(result.data[i - 1].recordedAt.getTime()).toBeGreaterThanOrEqual(
               result.data[i].recordedAt.getTime()
             );
           }
 
-          // Clean up
           sqliteDb.run(`DELETE FROM expenses WHERE vehicle_id = '${VEHICLE_ID}'`);
           sqliteDb.run(`DELETE FROM odometer_entries WHERE vehicle_id = '${VEHICLE_ID}'`);
         }
@@ -162,27 +133,22 @@ describe('Property 8: Odometer UNION query completeness and source labeling', ()
   });
 
   test('pagination returns correct subset', async () => {
-    // Insert 5 manual entries with known dates
     for (let i = 0; i < 5; i++) {
       insertOdometerEntry(10000 + i * 1000, 1700000000 + i * 86400);
     }
 
-    // Page 1: limit 2, offset 0
     const page1 = await repo.getHistory(VEHICLE_ID, USER_ID, { limit: 2, offset: 0 });
     expect(page1.totalCount).toBe(5);
     expect(page1.data.length).toBe(2);
 
-    // Page 2: limit 2, offset 2
     const page2 = await repo.getHistory(VEHICLE_ID, USER_ID, { limit: 2, offset: 2 });
     expect(page2.totalCount).toBe(5);
     expect(page2.data.length).toBe(2);
 
-    // Page 3: limit 2, offset 4
     const page3 = await repo.getHistory(VEHICLE_ID, USER_ID, { limit: 2, offset: 4 });
     expect(page3.totalCount).toBe(5);
     expect(page3.data.length).toBe(1);
 
-    // No overlap between pages
     const allIds = [...page1.data, ...page2.data, ...page3.data].map((e) => e.sourceId);
     expect(new Set(allIds).size).toBe(5);
   });

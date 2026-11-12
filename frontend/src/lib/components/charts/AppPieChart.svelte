@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { PieChart } from 'layerchart';
-	import * as Chart from '$lib/components/ui/chart';
+	import * as Chart from '#lib/components/ui/chart/index.ts';
 	import ChartCard from './ChartCard.svelte';
-	import { createVisibilityWatch } from '$lib/utils/visibility-watch.svelte';
-	import { formatCurrency } from '$lib/utils/formatters';
+	import { createVisibilityWatch } from '#lib/utils/visibility-watch.svelte.ts';
+	import { formatCurrency } from '#lib/utils/formatters.ts';
 	import type { Snippet } from 'svelte';
 
 	interface PieDataItem {
@@ -46,10 +46,7 @@
 		return config;
 	});
 
-	// Gate PieChart rendering until the container is visible in the viewport.
-	// The SVG motion tween (endAngle sweep from 0→2π) fires at mount time,
-	// so we must delay mounting until the user can see it. Uses synchronous
-	// MutationObserver + offsetParent check instead of async IntersectionObserver.
+	// Tween starts at mount, so mount only once the container is visible.
 	let pieGate = createVisibilityWatch();
 </script>
 

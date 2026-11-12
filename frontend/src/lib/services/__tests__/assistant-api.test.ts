@@ -1,9 +1,3 @@
-/**
- * assistant-api.ts client (llm-assistant T5a) — the service-test pattern: apiClient is mocked
- * so we assert the exact endpoint + payload sendMessage builds, and that it returns the {reply, toolsUsed}
- * envelope. The fork-free FE wrapper over the shipped POST /api/v1/assistant/chat.
- */
-
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 const post = vi.fn();

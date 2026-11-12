@@ -1,17 +1,3 @@
-/**
- * Property-Based Tests for Year-End Summary Analytics
- *
- * Property 24: Biggest expense is the maximum
- * For any non-empty set of expenses in a given year, the reported biggest expense
- * amount should be >= every other expense amount in that year.
- * **Validates: Requirement 12.4**
- *
- * Property 25: Year-over-year percentage change formula
- * For any two consecutive years where the previous year has positive total spending,
- * percentageChange = ((currentYearTotal - previousYearTotal) / previousYearTotal) × 100
- * **Validates: Requirement 12.5**
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { AnalyticsRepository } from '../repository';
@@ -26,9 +12,6 @@ import {
   type TestVehicle,
 } from './analytics-test-generators';
 
-// ---------------------------------------------------------------------------
-// Shared setup
-// ---------------------------------------------------------------------------
 let testDb: TestDb;
 let repo: AnalyticsRepository;
 
@@ -41,19 +24,14 @@ afterEach(() => {
   testDb.sqlite.close();
 });
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 const TEST_YEAR = 2024;
 
-/** Reset DB and repo for a fresh property test iteration. */
 function resetDb(): void {
   testDb.sqlite.close();
   testDb = createTestDb();
   repo = new AnalyticsRepository(testDb.drizzle);
 }
 
-/** Create user and a single vehicle, returning IDs. */
 function setupUserAndVehicle(): { userId: string; vehicle: TestVehicle } {
   const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
   seedUser(testDb.sqlite, user);
@@ -70,18 +48,13 @@ function setupUserAndVehicle(): { userId: string; vehicle: TestVehicle } {
   return { userId: user.id, vehicle: v };
 }
 
-// ---------------------------------------------------------------------------
-// Property 24: Biggest expense is the maximum
-// **Validates: Requirement 12.4**
-// ---------------------------------------------------------------------------
-describe('Property 24: Biggest expense is the maximum', () => {
+describe('Biggest expense is the maximum', () => {
   test('biggest expense amount >= every other expense amount in that year', async () => {
     await fc.assert(
       fc.asyncProperty(fc.integer({ min: 1, max: 10 }), async (expenseCount) => {
         resetDb();
         const { userId, vehicle } = setupUserAndVehicle();
 
-        // Generate and seed expenses for the test year
         const generated = fc.sample(expenseArb(vehicle.id, 0, TEST_YEAR), expenseCount);
         const seededExpenses: TestExpense[] = [];
         for (let i = 0; i < generated.length; i++) {
@@ -99,14 +72,11 @@ describe('Property 24: Biggest expense is the maximum', () => {
           return;
         }
 
-        // biggestExpense must not be null when there are expenses
         expect(result.biggestExpense).not.toBeNull();
 
-        // The biggest expense amount must be >= every seeded expense amount
         const maxAmount = Math.max(...seededExpenses.map((e) => e.expenseAmount));
         expect(result.biggestExpense?.amount).toBeCloseTo(maxAmount, 2);
 
-        // Verify it's >= every individual expense
         for (const e of seededExpenses) {
           expect(result.biggestExpense?.amount).toBeGreaterThanOrEqual(e.expenseAmount - 0.001);
         }
@@ -116,12 +86,6 @@ describe('Property 24: Biggest expense is the maximum', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Property 25: Year-over-year percentage change formula
-// **Validates: Requirement 12.5**
-// ---------------------------------------------------------------------------
-
-/** Seed expenses for a given year and return the total amount. */
 function seedExpensesForYear(
   vehicleId: string,
   year: number,
@@ -140,7 +104,7 @@ function seedExpensesForYear(
   return total;
 }
 
-describe('Property 25: Year-over-year percentage change formula', () => {
+describe('Year-over-year percentage change formula', () => {
   test('percentageChange = ((currentTotal - prevTotal) / prevTotal) * 100', async () => {
     await fc.assert(
       fc.asyncProperty(
@@ -171,15 +135,6 @@ describe('Property 25: Year-over-year percentage change formula', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// FE↔BE response contract-drift guard (loop-improvement; /stats, /vehicles list,
-// single-financing, /analytics/insurance — this locks /analytics/year-end). getYearEnd
-// hand-assembles an 11-field object literal (repository.ts:1889) with NO type binding to the
-// frontend YearEndResponse (types/analytics.ts:237). The existing Property-24/25 tests pin the
-// MATH (biggest-expense, YoY %) but NOT the key shape, so a dropped/renamed field would silently
-// break the year-end view with no failing test. Exact top-level key equality (shape is built
-// from a fixed literal, so it's data-independent — an empty-vehicle case is sufficient).
-// ---------------------------------------------------------------------------
 const YEAR_END_KEYS = [
   'year',
   'totalSpent',
@@ -194,7 +149,7 @@ const YEAR_END_KEYS = [
   'units',
 ].sort();
 
-describe('getYearEnd — FE↔BE response contract shape (drift guard)', () => {
+describe('getYearEnd — response shape matches the frontend contract', () => {
   test('the response has exactly the frontend YearEndResponse top-level keys', async () => {
     const { userId } = setupUserAndVehicle();
     const result = await repo.getYearEnd(userId, TEST_YEAR);
@@ -204,7 +159,6 @@ describe('getYearEnd — FE↔BE response contract shape (drift guard)', () => {
   test('biggestExpense/previousYearComparison are null on an empty year (not absent keys)', async () => {
     const { userId } = setupUserAndVehicle();
     const result = await repo.getYearEnd(userId, TEST_YEAR);
-    // The keys must be PRESENT (= null), not omitted — the frontend reads them unconditionally.
     expect(result.biggestExpense).toBeNull();
     expect(result.previousYearComparison).toBeNull();
     expect(Object.hasOwn(result, 'biggestExpense')).toBe(true);

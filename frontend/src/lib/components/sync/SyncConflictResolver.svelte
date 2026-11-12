@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { syncConflicts, syncManager, type SyncConflict } from '$lib/utils/sync/sync-manager';
+	import { syncConflicts, syncManager, type SyncConflict } from '#lib/utils/sync/sync-manager.ts';
 	import { TriangleAlert, Check, X, Merge, LoaderCircle } from '@lucide/svelte';
 	import {
 		Dialog,
@@ -7,31 +7,17 @@
 		DialogDescription,
 		DialogHeader,
 		DialogTitle
-	} from '$lib/components/ui/dialog';
-	import { ScrollArea } from '$lib/components/ui/scroll-area';
-	import { Button } from '$lib/components/ui/button';
-	import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert';
-	import { formatCurrency, formatDate } from '$lib/utils/formatters';
-	// A conflicting row's `category` is whatever the local draft or the server holds, so these
-	// go through the key-tolerant label helper rather than indexing `categoryLabels` directly.
-	import { getCategoryLabel } from '$lib/utils/chart-colors';
+	} from '#lib/components/ui/dialog/index.ts';
+	import { ScrollArea } from '#lib/components/ui/scroll-area/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Alert, AlertDescription, AlertTitle } from '#lib/components/ui/alert/index.ts';
+	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
+	import { getCategoryLabel } from '#lib/utils/chart-colors.ts';
 
 	let showModal = $state(false);
 	let currentConflict = $state<SyncConflict | null>(null);
 	let resolving = $state(false);
 
-	/**
-	 * The conflict batch the user has deferred, held by identity.
-	 *
-	 * Dismissal MUST be remembered: the effect below opens the dialog whenever a conflict is queued,
-	 * so without this every exit — Skip, the X, Escape, an overlay click — was undone in the same
-	 * flush, and the only way out of the dialog was to resolve every conflict.
-	 *
-	 * Identity is the right granularity because `syncConflicts.current` is REPLACED wholesale by each
-	 * sync run and appended to by a retry: deferring the batch on screen leaves it queued (the sidebar
-	 * keeps counting it) and the next sync attempt, or any newly discovered conflict, produces a
-	 * different array and brings the dialog back.
-	 */
 	let dismissedBatch = $state<SyncConflict[] | null>(null);
 
 	$effect(() => {
@@ -81,10 +67,6 @@
 <Dialog
 	bind:open={showModal}
 	onOpenChange={open => {
-		// Escape, an overlay click and the X close through the primitive rather than closeModal(), so
-		// the deferral has to be recorded here as well — otherwise the effect re-opens the dialog in
-		// the same flush and those three controls do nothing. Only the primitive's own close paths
-		// reach this; a programmatic `showModal = false` does not.
 		if (!open) dismissedBatch = syncConflicts.current;
 	}}
 >
@@ -121,9 +103,7 @@
 						</AlertDescription>
 					</Alert>
 
-					<!-- Local vs Server comparison -->
 					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-						<!-- Local version -->
 						<div class="border border-primary/30 rounded-lg p-4">
 							<div class="flex items-center gap-2 mb-3">
 								<div class="w-3 h-3 bg-primary rounded-full"></div>
@@ -174,7 +154,6 @@
 							</div>
 						</div>
 
-						<!-- Server version -->
 						{#if currentConflict.serverExpense}
 							<div class="border border-chart-2/30 rounded-lg p-4">
 								<div class="flex items-center gap-2 mb-3">
@@ -229,7 +208,6 @@
 				</div>
 			</ScrollArea>
 
-			<!-- Actions -->
 			<div class="flex flex-col sm:flex-row gap-3 pt-4 border-t border-border">
 				<Button onclick={() => resolveConflict('keep_local')} disabled={resolving} class="flex-1">
 					<Check class="h-4 w-4 mr-2" />
