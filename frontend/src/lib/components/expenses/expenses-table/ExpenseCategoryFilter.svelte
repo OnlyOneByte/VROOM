@@ -7,7 +7,6 @@
 	interface Props {
 		value: string;
 		onChange: (_category: string) => void;
-		/** `compact` is the mobile toolbar; `table` is the desktop column header. */
 		density: 'compact' | 'table';
 	}
 

@@ -8,7 +8,6 @@ const GAS_FILL: MileageEfficiencyInput = {
 	fuelType: '87 (Regular)',
 	volume: '10',
 	charge: ''
-	// Not an electric fuelType, so volume is the energy field.
 };
 
 describe('calculateMileageEfficiency', () => {

@@ -5,13 +5,10 @@ interface EfficiencyExpense {
   date: Date | string;
 }
 
-// Pairwise efficiency math needs ascending date order; this sorts a copy so the input is not
-// mutated.
 export function sortExpensesByDate<T extends { date: Date | string }>(expenses: T[]): T[] {
   return [...expenses].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 }
 
-// Shared with analytics-charts so the per-vehicle stats and the analytics charts agree on outliers.
 export const MIN_VALID_MPG = 5;
 export const MAX_VALID_MPG = 100;
 export const MIN_VALID_MI_KWH = 1;
@@ -27,7 +24,6 @@ interface MpgPairRow {
   missedFillup?: boolean;
 }
 
-// Expects rows already sorted ascending by date. Callers own their sort.
 export function averageConsecutiveMpg(sortedExpenses: MpgPairRow[]): number | null {
   const mpgValues: number[] = [];
 
@@ -35,7 +31,6 @@ export function averageConsecutiveMpg(sortedExpenses: MpgPairRow[]): number | nu
     const current = sortedExpenses[i];
     const previous = sortedExpenses[i - 1];
 
-    // A pair touching a missed fill-up spans an unlogged gap.
     if (current.missedFillup || previous.missedFillup) {
       continue;
     }
@@ -111,13 +106,11 @@ const PERIOD_DAYS: Record<Exclude<StatsPeriod, 'all'>, number> = {
   '1y': 365,
 };
 
-// 'all' returns null, meaning no lower date bound.
 export function getPeriodStartDate(period: StatsPeriod, now: Date = new Date()): Date | null {
   if (period === 'all') return null;
   return new Date(now.getTime() - PERIOD_DAYS[period] * 24 * 60 * 60 * 1000);
 }
 
-// Non-numeric or missing input falls back; otherwise the value is clamped to [min, max].
 export function parseClampedInt(
   raw: string | undefined,
   fallback: number,
@@ -128,8 +121,7 @@ export function parseClampedInt(
   return Number.isFinite(parsed) ? Math.min(Math.max(parsed, min), max) : fallback;
 }
 
-// Math.max(...arr) overflows the call stack on large arrays, so these use a loop. Like
-// Math.max/min, they return -Infinity/+Infinity for an empty array; callers must guard emptiness.
+// Spreading into Math.max overflows the call stack on large arrays, so these loop.
 export function maxOf(values: number[]): number {
   let max = Number.NEGATIVE_INFINITY;
   for (const v of values) {

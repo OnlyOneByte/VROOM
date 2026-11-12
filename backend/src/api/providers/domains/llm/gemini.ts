@@ -1,7 +1,3 @@
-/**
- * Gemini generateContent adapter. Dumb transport: it never executes tools or trusts tool args.
- */
-
 import type { ModelProviderSettings } from '../model/model-registry';
 import { postModelJson, trimBaseUrl } from '../model/model-transport';
 import {
@@ -69,10 +65,7 @@ export class GeminiLlmProvider implements LlmProvider {
   }
 }
 
-/**
- * Tool calls become functionCall parts on the model turn, and every result for that turn goes in ONE
- * following function-role content, one functionResponse part per call in the same order.
- */
+// Gemini requires every functionResponse for a turn in one following function-role content.
 function toGeminiContents(messages: ChatMessage[]): GeminiContent[] {
   const out: GeminiContent[] = [];
   for (const m of messages) {
@@ -109,7 +102,6 @@ function toGeminiFunctionDecl(t: ToolDefinition): Record<string, unknown> {
   return { name: t.name, description: t.description, parameters: t.parameters };
 }
 
-/** A malformed 2xx body yields empty text rather than throwing. */
 function normalizeResponse(json: GeminiResponse | null): ChatResult {
   const parts = json?.candidates?.[0]?.content?.parts ?? [];
   const text = parts

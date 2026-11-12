@@ -1,8 +1,3 @@
-/**
- * VAPID public-key route. The route reads CONFIG.push on every request, so each branch is driven by
- * setting the push fields directly and restoring them afterwards.
- */
-
 import { afterEach, describe, expect, test } from 'bun:test';
 import { CONFIG } from '../../../config';
 import { createTestApp } from '../../../test-helpers/http-client';
@@ -12,7 +7,6 @@ const PRIVATE_KEY = 'PrivateKeySentinelMustNotLeak';
 
 const savedPush = { ...CONFIG.push };
 
-/** CONFIG is typed read-only, but the route reads it per request, so a test can override fields. */
 function stubPushConfig(fields: Partial<typeof savedPush>): void {
   Object.assign(CONFIG.push, fields);
 }

@@ -1,8 +1,3 @@
-/**
- * The pause and resume toggle sends PUT { isActive }. Zod would strip the field if the update schema
- * omitted it, so these tests pin that updateReminderSchema keeps it and createReminderSchema treats it as optional.
- */
-
 import { describe, expect, test } from 'bun:test';
 import { createReminderSchema, updateReminderSchema } from '../validation';
 
@@ -68,7 +63,7 @@ describe('updateReminderSchema split-config partial', () => {
           method: 'percentage',
           allocations: [
             { vehicleId: 'v1', percentage: 70 },
-            { vehicleId: 'v2', percentage: 20 }, // sums to 90 ≠ 100
+            { vehicleId: 'v2', percentage: 20 },
           ],
         },
       })

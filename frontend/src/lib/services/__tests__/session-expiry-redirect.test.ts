@@ -1,5 +1,3 @@
-// A 401 clears the auth store and redirects to sign-in. The auth probe and refresh endpoints are excluded because they report 401 themselves.
-
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { goto } from '$app/navigation';
 import { apiClient } from '../api-client';

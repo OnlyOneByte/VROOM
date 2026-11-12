@@ -22,7 +22,6 @@ export class PreferencesRepository {
     }
   }
 
-  // Insert is conflict-tolerant: concurrent first requests for a new user must not hit the primary key.
   async getOrCreate(userId: string): Promise<UserPreferences> {
     const existing = await this.getByUserId(userId);
     if (existing) return existing;
@@ -69,14 +68,13 @@ export class PreferencesRepository {
     }
   }
 
-  // One-statement RFC-7386 merge, so concurrent patches cannot clobber each other. A null value
-  // deletes its key. Returns null when the user has no prefs row.
+  // One UPDATE statement: a read-modify-write here would lose concurrent patches.
   async mergeJsonField(
     userId: string,
     column: 'storageConfig' | 'backupConfig',
     patch: Record<string, unknown>
   ): Promise<UserPreferences | null> {
-    // Closed literal map; no user input reaches the column name.
+    // Column names come from a closed map; never interpolate user input into SQL.
     const sqlColumn = column === 'storageConfig' ? 'storage_config' : 'backup_config';
     try {
       const result = await this.db
@@ -94,11 +92,9 @@ export class PreferencesRepository {
   }
 }
 
-// sync_state has no createdAt/updatedAt columns.
 export class SyncStateRepository {
   constructor(private db: AppDatabase) {}
 
-  // Conflict-tolerant insert, same reason as PreferencesRepository.getOrCreate.
   async getOrCreate(userId: string): Promise<SyncState> {
     try {
       const existing = await this.read(userId);
@@ -159,8 +155,7 @@ export class SyncStateRepository {
     }
   }
 
-  // syncedAt must be the snapshot time, not the run's end: a change made mid-run would otherwise be
-  // stamped as already synced and dropped from every future backup.
+  // syncedAt must be the snapshot time: a mid-run change stamped as synced would be dropped from every future backup.
   async updateSyncDate(userId: string, syncedAt: Date = new Date()): Promise<void> {
     try {
       await this.getOrCreate(userId);

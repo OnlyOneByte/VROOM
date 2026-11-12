@@ -65,9 +65,16 @@ A green build is the floor, not "done".
 4. **Compose, don't reinvent.** One way to do a thing. Use the kit (`/dev/gallery` in dev,
    `DesignSystem.md`) and the shared helpers.
 5. **Leave a guard.** When you fix a bug class, commit a test that fails without the fix.
-6. **Self-documenting code.** Names and structure carry the intent; comments explain only
-   non-obvious *why* — an invariant, a footgun, a deliberate trade-off. Never leave changelog
-   prose, ticket IDs, or dated "fixed in…" notes in source; that history belongs in git.
+6. **No comments in code.** Names, types, and structure carry the intent. Do not add comments,
+   JSDoc, file headers, section labels, or commented-out code: they go stale and mislead the next
+   reader, human or agent. When a comment feels necessary, rename or extract a well-named
+   function or constant instead. The only exceptions are tool directives (`biome-ignore`,
+   `eslint-disable`, `ts-expect-error`, `svelte-ignore`), a one-line reason inside an
+   intentionally empty block, and a one-line note for an external constraint the code cannot
+   express (a vendor quirk, a SQLite limit, a security invariant). Never write ticket IDs,
+   changelog prose, or "fixed in…" notes; history belongs in git.
+   `backend/src/__tests__/no-code-comments.test.ts` scans both apps and fails CI on any comment not
+   listed in its allowlist; adding an entry needs the same justification as an exception.
 
 ## Hard rules
 

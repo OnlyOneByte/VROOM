@@ -45,7 +45,6 @@
 
 	let settings = $derived(settingsStore.settings);
 	let isLoading = $derived(settingsStore.isLoading);
-	// Gate the form on loaded settings: seeded defaults would let Save overwrite real preferences.
 	let loadError = $derived(settingsStore.error && !settings ? settingsStore.error : null);
 
 	let isSaving = $state(false);

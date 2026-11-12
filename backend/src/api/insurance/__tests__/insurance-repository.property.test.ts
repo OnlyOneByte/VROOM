@@ -1,7 +1,3 @@
-/**
- * Property tests for the insurance repository, run against an in-memory SQLite database with all migrations.
- */
-
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { eq } from 'drizzle-orm';
@@ -59,7 +55,6 @@ afterEach(() => {
   sqliteDb.close();
 });
 
-/** Picks one to three of the user's vehicle ids. */
 const userVehicleIdsArb = fc
   .subarray(VEHICLE_IDS, { minLength: 1, maxLength: VEHICLE_IDS.length })
   .filter((arr) => arr.length > 0);
@@ -222,7 +217,6 @@ describe('expiring terms date range query', () => {
   });
 
   test('findExpiringTerms returns empty for range with no matching terms', async () => {
-    // Create a term in 2025
     await repo.create(
       {
         company: 'TestCo',

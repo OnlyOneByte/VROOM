@@ -1,5 +1,3 @@
-// Source-scan guard: on mobile the title must stack above its actions, or it is occluded.
-
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,12 +14,10 @@ describe('reminder card mobile stack (occlusion guard)', () => {
 	});
 
 	test('does NOT use an unconditional single-row justify-between on the card (the occluding layout)', () => {
-		// Guards against a single-row justify-between layout, which starves the title on phones.
 		expect(SRC).not.toMatch(/CardContent class="flex items-start justify-between/);
 	});
 
 	test('the action cluster wraps on mobile (flex-wrap), nowrap only at sm:', () => {
-		// The action cluster must wrap on narrow phones.
 		expect(SRC).toMatch(/flex-wrap sm:flex-nowrap/);
 	});
 });

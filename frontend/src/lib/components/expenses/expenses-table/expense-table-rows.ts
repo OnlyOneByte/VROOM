@@ -25,7 +25,6 @@ export interface GroupRow {
 
 export type DisplayRow = ExpenseRow | GroupRow;
 
-// Mirrors the backend sort allowlist (date|amount).
 export type SortField = 'date' | 'amount';
 
 export interface SortOptions {
@@ -35,13 +34,10 @@ export interface SortOptions {
 
 export interface VisibleExpenseOptions extends SortOptions {
 	categoryFilter: string;
-	/** Off when the parent owns the category filter and has already applied it to the page. */
 	filterByCategory: boolean;
-	/** Off in controlled mode: re-sorting would only reorder the visible page. */
 	sortLocally: boolean;
 }
 
-/** Filters and sorts the raw list. Controlled mode trusts the server's order; this only narrows or reorders what the parent handed in. */
 export function visibleExpenses(
 	expenses: readonly Expense[],
 	options: VisibleExpenseOptions
@@ -58,11 +54,6 @@ export function visibleExpenses(
 	return filtered;
 }
 
-/**
- * Folds split siblings into one group row per groupId and orders standalone and group rows
- * together by the active sort. Group totals are rounded to cents so the sum matches the
- * displayed currency.
- */
 export function buildDisplayRows(
 	expenses: readonly Expense[],
 	vehicleMap: ReadonlyMap<string, Vehicle>,
@@ -113,7 +104,6 @@ export function buildDisplayRows(
 		});
 	}
 
-	// The id tiebreak keeps server order for equal keys.
 	rows.sort((a, b) => {
 		const rowA: SortableRow =
 			a.type === 'standalone'

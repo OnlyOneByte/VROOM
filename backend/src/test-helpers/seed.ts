@@ -6,7 +6,6 @@ export interface SeedVehicleOptions {
   model?: string;
   year?: number;
   nickname?: string;
-  /** Merged last, so these override the fields above. */
   extra?: Record<string, unknown>;
 }
 

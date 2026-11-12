@@ -15,7 +15,6 @@
 
 	let { financing, amortizationSchedule = [] }: Props = $props();
 
-	// Gated like ChartCard: this chart renders directly, so it needs its own visibility guard in hidden tabs.
 	let chartGate = createVisibilityWatch();
 
 	let showAmortizationChart = $derived(

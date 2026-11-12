@@ -1,9 +1,3 @@
-/**
- * Concurrent unlinks must never remove every sign-in method. VROOM has no password auth, so a user
- * with zero auth rows cannot recover the account. The count and the delete must therefore run
- * without a yield point between them.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 

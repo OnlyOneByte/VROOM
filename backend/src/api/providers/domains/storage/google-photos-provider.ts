@@ -1,8 +1,3 @@
-/**
- * Google Photos provider. The Library API is append-only and photos-only, so the declared
- * capabilities are reduced; callers check capabilitiesOf() before delete, list or non-image upload.
- */
-
 import { logger } from '../../../../utils/logger';
 import { GooglePhotosService } from '../../services/google-photos-service';
 import type {
@@ -40,12 +35,12 @@ export class GooglePhotosProvider implements StorageProvider {
     return this.service.download(ref.externalId);
   }
 
-  /** No-op: the Library API cannot delete, so the photo stays in the user's Google Photos library. */
+  // Library API cannot delete; the photo stays in the user's Google Photos library.
   async delete(_ref: StorageRef): Promise<void> {
     logger.debug('GooglePhotosProvider.delete is a no-op (Library API is append-only)');
   }
 
-  /** Stored base URLs expire after about 60 minutes, so this always fetches a fresh one. */
+  // Base URLs expire after about 60 minutes, so always fetch a fresh one.
   async getExternalUrl(ref: StorageRef): Promise<string | null> {
     try {
       return await this.service.getFreshUrl(ref.externalId);
@@ -62,7 +57,6 @@ export class GooglePhotosProvider implements StorageProvider {
     return this.service.healthCheck();
   }
 
-  /** Always empty: Google Photos is only a photo destination, not a backup target. */
   async list(_folderPath: string): Promise<StorageFileInfo[]> {
     return [];
   }

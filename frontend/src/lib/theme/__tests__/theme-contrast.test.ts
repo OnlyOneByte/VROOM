@@ -1,5 +1,3 @@
-// Every built-in theme must clear WCAG AA contrast on each foreground/background pair in both variants.
-
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { describe, expect, test } from 'vitest';

@@ -1,10 +1,4 @@
-/**
- * After a vehicle delete, each surviving split group's group_total must equal the sum of its surviving
- * legs. A split expense is one row per vehicle, each carrying its leg in expense_amount and the
- * pre-split total in group_total. A stale total would make a later even or percentage edit re-divide
- * the old amount. createTestApp() must run before any DB-bound import, so this file imports only the
- * harness and bun:test.
- */
+// createTestApp() must run before any DB-bound import: import only the harness and bun:test.
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
@@ -51,7 +45,6 @@ async function createEvenSplit(vehicleIds: string[], totalAmount: number): Promi
   return (await json<DataEnvelope<SplitCreateResponse>>(res)).data.groupId;
 }
 
-/** Reads the group's rows directly from the table, in cents. */
 function legs(
   groupId: string
 ): Array<{ vehicle_id: string; expense_amount: number; group_total: number }> {
@@ -89,7 +82,6 @@ describe('vehicle delete and materialized split groups', () => {
 
     expect((await ctx.authed('DELETE', `/api/v1/vehicles/${v2}`)).status).toBe(200);
 
-    // Omitting totalAmount makes the update re-divide the stored group total.
     const edit = await ctx.authed('PUT', `/api/v1/expenses/split/${groupId}`, {
       splitConfig: { method: 'even', vehicleIds: [v1] },
     });

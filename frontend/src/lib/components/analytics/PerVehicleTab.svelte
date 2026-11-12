@@ -86,7 +86,7 @@
 	let costPerDistLabel = $derived(getCostPerDistanceLabel(units.distanceUnit));
 	let distLongLabel = $derived(getDistanceUnitLabel(units.distanceUnit));
 
-	// Score text is not tinted: the tier colours fail WCAG contrast on their own tint, so the ring and a text label carry the tier.
+	// Tier colours fail WCAG contrast as text on their tint; the ring and a label carry the tier.
 	function getScoreBgColor(score: number): string {
 		if (score >= 70) return 'bg-chart-2/10';
 		if (score >= 40) return 'bg-chart-5/10';

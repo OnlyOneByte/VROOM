@@ -59,7 +59,7 @@
 					>
 						<div class="flex-1 min-w-0">
 							<div class="flex items-center gap-2 mb-1">
-								<!-- Neutral label text: the category colour is carried by the icon chip only. -->
+								<!-- Tinted label text fails WCAG AA; only the icon chip takes the category colour. -->
 								<span
 									class="flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium {getCategoryBadgeClasses(
 										expense.category

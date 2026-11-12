@@ -1,6 +1,3 @@
-// A split create that fails transiently must stay on the form: the offline outbox only holds single
-// expenses, so queueing it would record the full total against one vehicle.
-
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { ApiError } from '$lib/utils/error-handling';

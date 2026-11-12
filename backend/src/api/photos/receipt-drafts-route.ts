@@ -1,9 +1,3 @@
-/**
- * GET /api/v1/photos/receipt-drafts. Stages receipt photos from the app's Google Photos album as
- * expense drafts. Persists nothing: the client confirms each draft through POST /expenses with
- * clientId `photos:<mediaId>`, which makes re-runs idempotent.
- */
-
 import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { getDb } from '../../db/connection';
@@ -55,7 +49,6 @@ function buildRealPhotosService(row: UserProvider): GooglePhotosService {
 type PhotosServiceBuilder = (row: UserProvider) => GooglePhotosService;
 let photosServiceBuilder: PhotosServiceBuilder = buildRealPhotosService;
 
-/** Test seam: pass null to restore the real builder. */
 export function setPhotosServiceBuilderForTest(builder: PhotosServiceBuilder | null): void {
   photosServiceBuilder = builder ?? buildRealPhotosService;
 }
@@ -89,7 +82,6 @@ routes.get('/receipt-drafts', async (c) => {
       (await expenseRepository.findByClientId(`photos:${photoId}`, user.id)) !== null,
   };
 
-  // A Photos read failure is reported as 502 rather than an empty list.
   try {
     const drafts = await stageReceiptDrafts(deps);
     return c.json({ success: true, data: { drafts } });

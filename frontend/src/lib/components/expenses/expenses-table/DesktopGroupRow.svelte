@@ -52,7 +52,6 @@
 <TableRow class="group cursor-pointer hover:bg-muted/50" onclick={() => onToggle(row.groupId)}>
 	<TableCell class="font-medium text-muted-foreground">
 		<div class="flex items-center gap-1.5">
-			<!-- Keyboard-accessible toggle; the row click is only a mouse convenience. -->
 			<Button
 				variant="ghost"
 				size="icon-sm"
@@ -123,7 +122,7 @@
 				</Button>
 			{/if}
 			{#if canDelete}
-				<!-- aria-disabled rather than disabled keeps the reason tooltip reachable by hover and keyboard. -->
+				<!-- disabled drops the control from the tab order and swallows hover, so use aria-disabled. -->
 				<Button
 					variant="ghost"
 					size="icon"

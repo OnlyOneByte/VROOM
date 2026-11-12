@@ -160,7 +160,6 @@ export class BackupOrchestrator {
           );
           return { providerId, result };
         } catch (error) {
-          // A throw or timeout is a failure of an attempted provider, not a skip.
           const message = error instanceof Error ? error.message : 'Backup strategy failed';
           logger.warn('Backup strategy threw, marking provider failed', {
             providerId,
@@ -179,8 +178,6 @@ export class BackupOrchestrator {
 
       for (const [index, outcome] of settled.entries()) {
         if (outcome.status === 'rejected') {
-          // The per-provider body catches its own failures, so a rejection is an unexpected throw
-          // outside them. The provider was still attempted, so it counts as failed.
           const [providerId] = enabledProviders[index];
           const reason = outcome.reason;
           const message = reason instanceof Error ? reason.message : 'Backup strategy failed';
@@ -193,8 +190,6 @@ export class BackupOrchestrator {
           continue;
         }
 
-        // A null result means the provider was never attempted (no strategy, row, or decryptable
-        // credentials). That is a skip, not a failure.
         if (!outcome.value.result) continue;
 
         const { providerId, result } = outcome.value;
@@ -227,16 +222,11 @@ export class BackupOrchestrator {
         runOutcome = 'failed';
       }
 
-      // Patch only the stamps this run earned. A whole-column write from the run-start snapshot would
-      // discard concurrent edits made during the run. The patch carries no enabled/sheetsSyncEnabled
-      // key, so a provider deleted mid-run cannot be resurrected as eligible.
       if (anySuccess) {
         await preferencesRepository.mergeJsonField(userId, 'backupConfig', {
           providers: configPatch,
         });
       }
-      // The sync anchor advances only on a fully clean run. It uses the run's start time, so a data
-      // change made mid-run stays unsynced and is captured by the next backup.
       if (runOutcome === 'success') {
         const { syncStateRepository } = await import('../settings/repository');
         await syncStateRepository.updateSyncDate(userId, new Date(timestamp));

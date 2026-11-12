@@ -1,5 +1,3 @@
-// CategorySelector labels must be single words so none wrap in the 2-column mobile grid.
-
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

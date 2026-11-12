@@ -1,9 +1,3 @@
-/**
- * Guards the enriched financing object on GET /vehicles. The list route injects computedBalance and
- * eligibleForPayoff, which the frontend depends on and the repository never stores. Without this
- * check, dropping the injection would silently break payoff math.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -35,7 +29,6 @@ interface VehicleWithFinancing {
   financing?: FinancingShape;
 }
 
-/** Attaches a loan so the list route's enrichment branch runs. The path is doubled by the router mounts. */
 async function seedLoan(vehicleId: string): Promise<void> {
   const res = await ctx.authed('POST', `/api/v1/financing/vehicles/${vehicleId}/financing`, {
     financingType: 'loan',
@@ -82,7 +75,6 @@ describe('GET /vehicles list: enriched financing contract', () => {
   });
 
   test('a fresh loan is not eligible for payoff (computedBalance tracks the real balance)', async () => {
-    // Key presence alone would pass a hardcoded balance, so the value itself is asserted.
     const id = await seedVehicle(ctx, { nickname: 'FreshLoan' });
     await seedLoan(id);
 
@@ -100,8 +92,6 @@ describe('GET /vehicles list: enriched financing contract', () => {
   });
 
   test('a paid-off financing row still appears on the list, flagged isActive:false', async () => {
-    // The join has no isActive filter. Consumers gate on isActive, so the paid-off row is ignored.
-    // Filtering it out in the query would be a deliberate change that this test should catch.
     const id = await seedVehicle(ctx, { nickname: 'PaidOff' });
     await seedLoan(id);
 

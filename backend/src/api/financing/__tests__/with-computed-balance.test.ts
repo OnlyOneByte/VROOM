@@ -1,8 +1,3 @@
-/**
- * withComputedBalance spreads the financing object, attaches computedBalance verbatim, and derives
- * eligibleForPayoff from the payoff threshold.
- */
-
 import { describe, expect, test } from 'bun:test';
 import { PAYOFF_BALANCE_THRESHOLD, withComputedBalance } from '../repository';
 
@@ -36,7 +31,7 @@ describe('withComputedBalance', () => {
   test('does not mutate the input financing object', () => {
     const financing = { id: 'fin-3', originalAmount: 5000 };
     const enriched = withComputedBalance(financing, 100);
-    expect(enriched).not.toBe(financing); // new object
-    expect('computedBalance' in financing).toBe(false); // input untouched
+    expect(enriched).not.toBe(financing);
+    expect('computedBalance' in financing).toBe(false);
   });
 });

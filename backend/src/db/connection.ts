@@ -29,17 +29,13 @@ sqlite.run(`PRAGMA wal_autocheckpoint = ${CONFIG.database.walCheckpointPages}`);
 
 export const db = drizzle(sqlite, { schema });
 
-// Repositories depend on this alias rather than the dialect-specific Drizzle type.
 export type AppDatabase = typeof db;
 
-// No test override: repositories take an AppDatabase in their constructor, so tests build one over
-// their own in-memory database.
 export function getDb(): typeof db {
   return db;
 }
 
-// Use a synchronous callback for multi-write transactions. With an async callback, each awaited
-// statement autocommits on its own, so a throw partway through does not roll back earlier writes.
+// bun:sqlite transactions must use a synchronous callback: an awaited statement autocommits on its own.
 export async function transaction<T>(
   callback: (
     tx: Parameters<typeof db.transaction>[0] extends (tx: infer U) => unknown ? U : never

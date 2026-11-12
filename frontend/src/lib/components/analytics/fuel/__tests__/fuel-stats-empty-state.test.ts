@@ -1,5 +1,3 @@
-// Pins FuelStatsTab's empty-data gate: any fillup or distance must show the full grid, otherwise one EmptyState. Source scan, since analytics has no component harness.
-
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 
@@ -12,7 +10,6 @@ describe('FuelStatsTab keeps its empty-data four-state gate', () => {
 	});
 
 	test('hasFuelData stays CONSERVATIVE — any fillup year-bucket OR recorded distance shows the grid', () => {
-		// The OR-of-three (never hide real data): currentYear fillups, previousYear fillups, or totalDistance.
 		expect(SRC).toMatch(/fillups\.currentYear\s*>\s*0/);
 		expect(SRC).toMatch(/fillups\.previousYear\s*>\s*0/);
 		expect(SRC).toMatch(/distance\.totalDistance\s*>\s*0/);

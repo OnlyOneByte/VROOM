@@ -1,9 +1,3 @@
-/**
- * Provider OAuth callback isolation. The provider flow must never create or modify the login
- * session. It stores credentials only, redirects without PII, and checks that the session user
- * matches the user who started the flow.
- */
-
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
@@ -25,13 +19,11 @@ beforeEach(() => {
     applyMigration(sqliteDb, m);
   }
 
-  // Seed User A (the logged-in user)
   sqliteDb.run(
     `INSERT INTO users (id, email, display_name)
      VALUES ('${USER_A_ID}', '${USER_A_EMAIL}', 'Alice')`
   );
 
-  // Seed a session for User A
   const expiresAt = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
   sqliteDb.run(
     `INSERT INTO sessions (id, user_id, expires_at)
@@ -43,7 +35,6 @@ afterEach(() => {
   sqliteDb.close();
 });
 
-/** Google sub IDs are numeric strings. */
 const googleSubArb = fc.stringMatching(/^[0-9]{10,21}$/).filter((s) => s !== USER_A_SUB);
 
 const googleEmailArb = fc
@@ -182,7 +173,6 @@ describe('provider OAuth callback never modifies the session', () => {
   });
 
   test('provider credentials contain the refresh token via the pending store', () => {
-    // Import the pending credentials helpers
     const { storePending, consumePending } = require('../../../utils/pending-credentials');
 
     fc.assert(

@@ -1,5 +1,3 @@
-/** Unit tests for the OAuth provider registry: lookup, unknown ids, and PKCE flags. */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
 let originalGoogleClientId: string | undefined;

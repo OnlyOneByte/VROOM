@@ -1,8 +1,3 @@
-/**
- * Vehicle deletion cascades. The database cascades expenses and odometer entries, but photos link to
- * entities by string id with no foreign key, so the vehicle route must remove their photos explicitly.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -20,7 +15,6 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-/** Inserts a photo row directly, bypassing the storage provider. */
 function seedPhoto(opts: { id: string; entityType: string; entityId: string }): void {
   ctx.sqlite.run(
     `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
@@ -66,7 +60,6 @@ describe('vehicle deletion cascades photo cleanup to dependent entities', () => 
     ).toBe(0);
   });
 
-  // Trips are not a photo-bearing entity, so they need no photo cleanup; the FK cascade removes them.
   test('deleting a vehicle cascades to its trips (no orphaned trip rows)', async () => {
     const vehicleId = await seedVehicle(ctx);
     ctx.sqlite.run(
@@ -89,7 +82,6 @@ describe('vehicle deletion cascades photo cleanup to dependent entities', () => 
   });
 });
 
-// Deleting a vehicle removes its reminder links. A reminder left with no vehicles is deactivated.
 describe('a single-vehicle reminder is auto-deactivated when its only vehicle is deleted', () => {
   function reminderRow(id: string): { is_active: number } | null {
     return (
@@ -104,7 +96,6 @@ describe('a single-vehicle reminder is auto-deactivated when its only vehicle is
       .get(reminderId) as { n: number };
     return row.n;
   }
-  /** Seeds a time reminder linked to the given vehicles. */
   function seedReminder(id: string, vehicleIds: string[]): void {
     ctx.sqlite.run(
       `INSERT INTO reminders
@@ -128,11 +119,9 @@ describe('a single-vehicle reminder is auto-deactivated when its only vehicle is
     const del = await ctx.authed('DELETE', `/api/v1/vehicles/${vehicleId}`);
     expect(del.status, await del.text()).toBe(200);
 
-    // The junction cascaded away AND the now-vehicleless reminder was deactivated.
     expect(junctionCount('rm-orphan')).toBe(0);
     expect(reminderRow('rm-orphan')?.is_active).toBe(0);
 
-    // Inactive reminders are not evaluated by the trigger at all.
     const res = await ctx.authed('POST', '/api/v1/reminders/trigger');
     const body =
       await json<DataEnvelope<{ skipped: Array<{ reminderId: string; reason: string }> }>>(res);
@@ -154,10 +143,7 @@ describe('a single-vehicle reminder is auto-deactivated when its only vehicle is
   });
 });
 
-// The split config is a JSON blob that the database does not cascade. Deleting a vehicle must drop its
-// leg from the blob, or the next reminder trigger builds a split for a vehicle that no longer exists.
 describe('a deleted vehicle is pruned from reminders’ expenseSplitConfig blob', () => {
-  /** Seed an EXPENSE reminder with a split-config blob + matching junction rows. */
   function seedSplitReminder(id: string, config: object, vehicleIds: string[]): void {
     ctx.sqlite.run(
       `INSERT INTO reminders
@@ -248,7 +234,6 @@ describe('a deleted vehicle is pruned from reminders’ expenseSplitConfig blob'
     expect(cfg?.method).toBe('percentage');
     expect(cfg?.allocations.map((a) => a.vehicleId).sort()).toEqual([v1, v3].sort());
     expect(cfg?.allocations.some((a) => a.vehicleId === v2)).toBe(false);
-    // Surviving allocations are rescaled to sum to 100.
     expect(cfg?.allocations.reduce((s, a) => s + a.percentage, 0)).toBeCloseTo(100, 5);
   });
 
@@ -266,8 +251,7 @@ describe('a deleted vehicle is pruned from reminders’ expenseSplitConfig blob'
   });
 });
 
-// Unlike the cascade foreign keys above, insurance_claims.vehicle_id is set to null on vehicle delete.
-// A claim is a financial record owned by its policy, so deleting a vehicle must never remove it.
+// insurance_claims.vehicle_id is nulled on delete, not cascaded: claims are financial records.
 describe('deleting a vehicle PRESERVES its insurance claims (vehicleId set null, not cascade-deleted)', () => {
   function claimRow(
     id: string
@@ -308,8 +292,6 @@ describe('deleting a vehicle PRESERVES its insurance claims (vehicleId set null,
   });
 });
 
-// Photos link to entities by string id with no foreign key. Every photo-bearing entity type is listed
-// here as either reaped with its vehicle or surviving it, so a new type fails until someone decides.
 describe('vehicle delete handles photos for every photo-bearing entity type', () => {
   type Seeder = (vehicleId: string) => Promise<string>;
 
@@ -337,7 +319,6 @@ describe('vehicle delete handles photos for every photo-bearing entity type', ()
     odometer_entry: seedOdometerEntry,
   };
 
-  // Policies and claims are financial records that outlive the vehicle, so their photos must stay.
   const SURVIVES: Record<string, Seeder> = {
     insurance_policy: async () => seedPolicy(),
     insurance_claim: async (vehicleId) => {
@@ -384,7 +365,6 @@ describe('vehicle delete handles photos for every photo-bearing entity type', ()
   }
 });
 
-// Post-delete reminder cleanup is best-effort: a throw there must not fail a delete that already committed.
 describe('a post-delete reminder-cleanup throw does NOT fail the vehicle delete', () => {
   test('deactivateVehicleless throwing still returns 200 and the vehicle is deleted', async () => {
     const vehicleId = await seedVehicle(ctx);

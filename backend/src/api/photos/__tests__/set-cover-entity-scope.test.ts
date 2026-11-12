@@ -1,9 +1,3 @@
-/**
- * setCoverPhoto against a real in-memory database. The target must belong to the named entity, and
- * that check runs before any write: a throw after a write in a bun:sqlite async transaction does not
- * roll the write back.
- */
-
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';

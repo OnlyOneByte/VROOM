@@ -13,7 +13,6 @@
 
 	let { value, error, touched = false, onSelect }: Props = $props();
 
-	/** Short labels for the 2-column grid; icons come from CATEGORY_ICONS so they match the table rows. */
 	const categories = [
 		{ value: 'fuel', label: 'Fuel', description: 'Gas, diesel, and EV charging' },
 		{

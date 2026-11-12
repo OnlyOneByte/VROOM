@@ -1,5 +1,3 @@
-// Pins ChartCard's visibility gate: chart children render only behind gate.visible, and the gated fallback is a Skeleton. Source scan.
-
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -15,12 +13,10 @@ describe('ChartCard keeps its visibility-gate + four-state contract', () => {
 
 	test('gates the chart children behind gate.visible', () => {
 		expect(SRC).toMatch(/\{#if gate\.visible\}/);
-		// children render INSIDE the gate (the {@render children()} call exists under the gate branch).
 		expect(SRC).toContain('@render children()');
 	});
 
 	test('the not-yet-visible (gated) state renders a Skeleton, never a blank box', () => {
-		// The gated fallback must be a Skeleton, not a blank box.
 		const gateIdx = SRC.indexOf('{#if gate.visible}');
 		expect(gateIdx).toBeGreaterThan(-1);
 		const afterGate = SRC.slice(gateIdx);

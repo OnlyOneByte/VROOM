@@ -1,10 +1,3 @@
-/**
- * The login OAuth round trip through the real app: /login issues a state, /callback consumes it,
- * resolves the user, sets the session cookie, and lands on the dashboard. Only the provider's
- * network calls are stubbed. App modules are imported after createTestApp so CONFIG reads the
- * in-memory test database URL.
- */
-
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 import type { OAuthProviderConfig, OAuthUserInfo } from '../providers/types';
@@ -24,6 +17,7 @@ const spies: { mockRestore: () => void }[] = [];
 
 beforeEach(async () => {
   ctx = await createTestApp();
+  // App modules must be imported after createTestApp, or they bind the wrong database.
   mutableConfig = (await import('../../../config')).CONFIG as unknown as MutableConfig;
   ({ githubAuthProvider } = await import('../providers/github'));
   ({ NoVerifiedEmailError } = await import('../providers/types'));
@@ -59,7 +53,6 @@ function providerReturns(result: OAuthUserInfo | Error): void {
   spies.push(spy);
 }
 
-/** Start a login and follow the provider's redirect back with an authorization code. */
 async function loginRoundTrip(): Promise<Response> {
   const start = await ctx.anon('GET', '/api/v1/auth/login/github');
   expect(start.status).toBe(302);

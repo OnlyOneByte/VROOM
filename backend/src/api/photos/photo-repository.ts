@@ -6,7 +6,6 @@ import { NotFoundError } from '../../errors';
 import { chunk } from '../../utils/chunk';
 import type { PaginatedResult } from '../../utils/pagination';
 
-/** Entity-agnostic data access for photos. User-scoped queries filter on photos.user_id directly. */
 export class PhotoRepository {
   constructor(private db: AppDatabase) {}
 
@@ -30,7 +29,7 @@ export class PhotoRepository {
       .orderBy(asc(photos.sortOrder), asc(photos.createdAt));
   }
 
-  /** Batched to stay under SQLite's bound-parameter limit. */
+  // SQLite caps bound parameters at 32766; batch large IN lists.
   async findByEntities(entityType: string, entityIds: string[]): Promise<Photo[]> {
     if (entityIds.length === 0) return [];
     const out: Photo[] = [];
@@ -51,8 +50,7 @@ export class PhotoRepository {
     limit: number,
     offset: number
   ): Promise<PaginatedResult<Photo>> {
-    // Scoped by userId in the query itself, so a caller that skips the ownership check cannot page
-    // another user's photos.
+    // Scoped by userId in SQL, so a caller that skips the ownership check cannot page others' photos.
     const whereClause = and(
       eq(photos.entityType, entityType),
       eq(photos.entityId, entityId),
@@ -85,11 +83,9 @@ export class PhotoRepository {
   }
 
   async setCoverPhoto(entityType: string, entityId: string, photoId: string): Promise<Photo> {
-    // Uses the instance db rather than the module-level transaction() helper so the injected connection
-    // is used and NotFoundError is not wrapped as a 500.
+    // Must use the instance db: the module-level transaction() helper ignores the injected connection.
     return this.db.transaction(async (tx) => {
-      // Validate before any write: a throw after a write in a bun:sqlite async transaction does not roll
-      // that write back, and a photo from another entity must never become this entity's cover.
+      // bun:sqlite does not roll back a write when a later statement throws in an async transaction; validate first.
       const target = await tx
         .select({ id: photos.id })
         .from(photos)

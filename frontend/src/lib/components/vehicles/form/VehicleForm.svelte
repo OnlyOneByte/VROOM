@@ -69,7 +69,6 @@
 
 	const isEditMode = $derived(!!vehicleId);
 
-	// Seeds the first paint only, so the form does not flash while loading; the load effect handles later changes.
 	let isLoading = $state(!!vehicleId);
 	let isSubmitting = $state(false);
 	let isDeleting = $state(false);
@@ -83,10 +82,8 @@
 	let distanceUnit = $state<DistanceUnit>(settingsStore.unitPreferences.distanceUnit);
 	let volumeUnit = $state<VolumeUnit>(settingsStore.unitPreferences.volumeUnit);
 	let chargeUnit = $state<ChargeUnit>(settingsStore.unitPreferences.chargeUnit);
-	// Set once the user picks units or edit mode loads them, so create-mode seeding stops overriding the choice.
 	let unitsTouched = $state(false);
 
-	// Global settings hydrate asynchronously, so re-seed create-mode units once they resolve, unless the user already chose.
 	$effect(() => {
 		if (isEditMode || unitsTouched) return;
 		const prefs = settingsStore.unitPreferences;
@@ -199,7 +196,6 @@
 		trackFuel = vehicle.trackFuel;
 		trackCharging = vehicle.trackCharging;
 
-		// Mark units touched so create-mode seeding never overrides the vehicle's saved units.
 		if (vehicle.unitPreferences) {
 			distanceUnit = vehicle.unitPreferences.distanceUnit;
 			volumeUnit = vehicle.unitPreferences.volumeUnit;
@@ -354,7 +350,7 @@
 
 			let savedVehicle: Vehicle;
 			if (isEditMode) {
-				// On edit, send null for emptied optionals: JSON.stringify drops undefined, so the old value would survive.
+				// JSON drops undefined; send null to clear an emptied optional.
 				savedVehicle = await vehicleApi.updateVehicle(vehicleId!, {
 					...base,
 					licensePlate: plate ?? null,

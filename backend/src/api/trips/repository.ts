@@ -6,7 +6,6 @@ import { trips } from '../../db/schema';
 import { BaseRepository } from '../../utils/repository';
 import { localDayWindow } from '../odometer/repository';
 
-/** Distance is derived, never stored, so an odometer correction cannot desync it. Clamped at zero. */
 export function tripDistance(trip: Pick<Trip, 'startOdometer' | 'endOdometer'>): number {
   return Math.max(0, trip.endOdometer - trip.startOdometer);
 }
@@ -30,10 +29,7 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
     return row ?? null;
   }
 
-  /**
-   * Counts other trips sharing this vehicle, owner, end reading and local day. The odometer entry is
-   * deduplicated on that key, so it must not be removed while another trip still maps to it.
-   */
+  // Odometer dedup key: do not remove the linked odometer entry while this returns > 0.
   async countOthersAtOdometerKey(args: {
     excludeTripId: string;
     vehicleId: string;
@@ -58,7 +54,6 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
     return result?.count ?? 0;
   }
 
-  /** Newest first. Always scoped to userId, even when filtered by vehicle. */
   async findByUserId(userId: string, filters?: TripFilters): Promise<Trip[]> {
     const conditions = [eq(trips.userId, userId)];
     if (filters?.vehicleId) conditions.push(eq(trips.vehicleId, filters.vehicleId));
@@ -101,7 +96,6 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
     return { data, totalCount: result?.count ?? 0 };
   }
 
-  /** Deletes only when the row belongs to userId. False means nothing matched. */
   async deleteByIdAndUserId(id: string, userId: string): Promise<boolean> {
     const deleted = await this.db
       .delete(trips)

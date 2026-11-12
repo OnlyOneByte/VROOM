@@ -54,7 +54,6 @@ export interface ValidationResult {
   errors: string[];
 }
 
-/** Money fields stored as integer cents in the 2.0.0 schema, keyed by camelCase field name. */
 export const MONEY_CENTS_FIELDS = new Set<string>([
   'purchasePrice',
   'originalAmount',
@@ -70,10 +69,6 @@ export const MONEY_CENTS_FIELDS = new Set<string>([
   'groupTotal',
 ]);
 
-/**
- * Pre-2.0.0 backups stored money as dollar floats and must be shimmed to cents on restore. Future
- * majors are not pre-cents; validateBackupData rejects them.
- */
 export function isPreCentsBackup(version: string | undefined): boolean {
   const major = Number.parseInt(String(version ?? '').split('.')[0], 10);
   return Number.isFinite(major) && major < 2;
@@ -107,8 +102,6 @@ export function coerceRow(
     const col = column as any;
     const val = coerced[columnName];
 
-    // A NOT NULL column with a static default must resolve blank cells to that default, never null:
-    // a null insert fails and aborts the whole restore.
     const hasStaticDefault = col.notNull && col.hasDefault && col.default !== undefined;
 
     if (val === undefined || val === null) {
@@ -120,6 +113,7 @@ export function coerceRow(
       continue;
     }
     const strVal = String(val);
+    // A null in a NOT NULL column aborts the restore, so blanks take the static default.
     if (strVal === '' || strVal === 'null' || strVal === 'NULL' || strVal === 'undefined') {
       coerced[columnName] = BOOLEAN_TYPES.has(col.columnType)
         ? false
@@ -133,12 +127,12 @@ export function coerceRow(
       const date = new Date(strVal);
       coerced[columnName] = Number.isNaN(date.getTime()) ? null : date;
     } else if (BOOLEAN_TYPES.has(col.columnType)) {
+      // CSV round-trips present booleans as true, 1, '1' or 'true'.
       coerced[columnName] = strVal === 'true' || strVal === '1' || strVal === 'TRUE';
     } else if (JSON_TYPES.has(col.columnType)) {
       try {
         coerced[columnName] = JSON.parse(strVal);
       } catch {
-        // Resolves like an absent cell. Warn because the default may reinterpret the row's values.
         logger.warn('Backup cell is not valid JSON; substituted the column default', {
           table: getTableName(table),
           column: columnName,
@@ -147,13 +141,12 @@ export function coerceRow(
         coerced[columnName] = hasStaticDefault ? col.default : null;
       }
     } else if (INTEGER_TYPES.has(col.columnType)) {
-      // Whole-string numeric parse: parseInt would turn Sheets' "12,345" into 12. Strip grouping
-      // commas, and round so "12345.0" stays whole.
+      // Sheets exports grouped numbers such as "12,345"; parseInt would read them as 12.
       const num = Number(strVal.replace(/,/g, ''));
       if (Number.isNaN(num)) {
         coerced[columnName] = null;
       } else if (shimMoneyToCents && MONEY_CENTS_FIELDS.has(columnName)) {
-        // Round before truncating: 12.34 * 100 is 1233.99… in floating point.
+        // Float products such as 12.34 * 100 land just below the integer, so round.
         coerced[columnName] = Math.round(num * 100);
       } else {
         coerced[columnName] = Math.round(num);
@@ -162,7 +155,7 @@ export function coerceRow(
       const num = Number(strVal.replace(/,/g, ''));
       coerced[columnName] = Number.isNaN(num) ? null : num;
     } else if (TEXT_TYPES.has(col.columnType)) {
-      // Sheets may return numeric-looking text (license plates) as numbers.
+      // Sheets returns numeric-looking text such as license plates as numbers.
       coerced[columnName] = strVal;
     }
   }
@@ -186,7 +179,6 @@ export class BackupService {
     return prefs.backupConfig ?? { providers: {} };
   }
 
-  /** Returns the number of files actually deleted. */
   async enforceRetention(userId: string, providerId: string): Promise<number> {
     const config = await this.loadBackupConfig(userId);
     const settings = config.providers[providerId];
@@ -271,8 +263,6 @@ export class BackupService {
 
   async listAllBackups(userId: string): Promise<ProviderBackupList[]> {
     const config = await this.loadBackupConfig(userId);
-    // Only ZIP backups have files to list. A Sheets-only provider is excluded here even though a
-    // sync run includes it.
     const zipProviderIds = Object.entries(config.providers)
       .filter(([, settings]) => hasZipBackup(settings))
       .map(([providerId]) => providerId);
@@ -310,7 +300,6 @@ export class BackupService {
     return results;
   }
 
-  /** Ownership of providerId is enforced by storageProviderRegistry.getProvider. */
   async downloadBackup(userId: string, providerId: string, fileRef: string): Promise<Buffer> {
     const { storageProviderRegistry } = await import('../providers/domains/storage/registry');
     const provider = await storageProviderRegistry.getProvider(providerId, userId);
@@ -336,7 +325,6 @@ export class BackupService {
           .innerJoin(vehicles, eq(odometerEntries.vehicleId, vehicles.id))
           .where(eq(vehicles.userId, userId))
           .then((r) => r.map((x) => x.odometer_entries)),
-        // vehicleId is exported verbatim for the restore referential check.
         db.select().from(trips).where(eq(trips.userId, userId)),
       ]);
 
@@ -365,7 +353,6 @@ export class BackupService {
 
     const userPhotos = await db.select().from(photos).where(eq(photos.userId, userId));
 
-    // Chunked to stay under SQLite's bind-parameter limit.
     const photoIds = userPhotos.map((p) => p.id);
     const userPhotoRefs: (typeof photoRefs.$inferSelect)[] = [];
     for (const batch of chunk(photoIds)) {
@@ -395,11 +382,10 @@ export class BackupService {
       .from(reminderNotifications)
       .where(eq(reminderNotifications.userId, userId));
 
-    // Only accepted grants this user made. Scoping by ownerId keeps invitees' grants out of their own
-    // backup, and pending, declined or revoked grants are not restored.
     const userVehicleShares = await db
       .select()
       .from(vehicleShares)
+      // Scoped by ownerId so invitees' grants stay out of this user's backup.
       .where(and(eq(vehicleShares.ownerId, userId), eq(vehicleShares.status, 'accepted')));
 
     return {
@@ -460,7 +446,7 @@ export class BackupService {
         } else if (value instanceof Date) {
           row[col] = value.toISOString();
         } else if (typeof value === 'object') {
-          // Without serialization these would render as [object Object].
+          // Sheets renders a raw object as [object Object].
           row[col] = JSON.stringify(value);
         } else {
           row[col] = value;
@@ -476,9 +462,8 @@ export class BackupService {
     const zip = new AdmZip(file);
     const zipEntries = zip.getEntries();
 
-    // Zip-bomb guard. Header sizes are attacker-declared, so check the per-entry compression ratio
-    // first, before any getData() inflates anything. Then cap the declared total.
     for (const e of zipEntries) {
+      // Entry sizes are attacker-declared: check the compression ratio before inflating.
       const compressed = e.header?.compressedSize ?? 0;
       const uncompressed = e.header?.size ?? 0;
       if (compressed > 0 && uncompressed / compressed > CONFIG.backup.maxCompressionRatio) {
@@ -510,8 +495,6 @@ export class BackupService {
 
     const metadata = JSON.parse(metadataEntry.getData().toString('utf-8')) as BackupMetadata;
 
-    // Pre-2.0.0 money is shimmed to cents during coercion, so the recovered data is upgraded to the
-    // current version. An unshimmable future version is left unchanged, so validation rejects it.
     const shimMoneyToCents = isPreCentsBackup(metadata.version);
 
     const getCSVData = (fileName: string): Record<string, unknown>[] => {
@@ -575,11 +558,6 @@ export class BackupService {
     return { valid: errors.length === 0, errors };
   }
 
-  /**
-   * Refuses a backup whose JSON cell parses but is invalid for its column, naming the table, column
-   * and row. Defaulting instead would relabel raw distances and volumes in the wrong units, so the
-   * restore must fail as a whole.
-   */
   private validateJsonColumnShapes(backup: ParsedBackupData): string[] {
     const errors: string[] = [];
     const checkUnitPreferences = (
@@ -588,7 +566,6 @@ export class BackupService {
       idField: string
     ): void => {
       for (const row of rows ?? []) {
-        // Absent cells were already resolved to defaults during coercion.
         if (row.unitPreferences == null) continue;
         const result = unitPreferencesSchema.safeParse(row.unitPreferences);
         if (!result.success) {
@@ -669,25 +646,19 @@ export class BackupService {
     ];
   }
 
-  /**
-   * Rejects a backup whose rows would violate a DB UNIQUE index. This runs before the replace-mode
-   * wipe: a duplicate caught after the wipe leaves the account empty.
-   */
   private validateUniqueConstraints(backup: ParsedBackupData): string[] {
     const errors: string[] = [];
-    // Composite-key check shared by every UNIQUE index. Rows with a null key column are skipped,
-    // because SQLite treats NULLs as distinct.
     const dupCheck = (
       rows: Record<string, unknown>[] | undefined,
       fields: string[],
       label: string,
-      /** Mirrors a partial index predicate; rows outside it cannot collide. */
       inIndex?: (row: Record<string, unknown>) => boolean
     ): void => {
       const seen = new Set<string>();
       for (const row of rows ?? []) {
         if (inIndex && !inIndex(row)) continue;
         const values = fields.map((f) => row[f]);
+        // SQLite treats NULLs as distinct in UNIQUE indexes, so null-keyed rows cannot collide.
         if (values.some((v) => v == null)) continue;
         const key = values.map((v) => String(v)).join('\u0000');
         if (seen.has(key)) {
@@ -696,25 +667,22 @@ export class BackupService {
         seen.add(key);
       }
     };
-    /** A CSV round-trip can present a boolean as `true`, `1`, `'1'` or `'true'`. */
     const isTruthyFlag = (value: unknown): boolean =>
       value === true || value === 1 || value === '1' || value === 'true';
-    dupCheck(backup.expenses, ['clientId'], 'expense clientId'); // expenses_user_client_idx
-    dupCheck(backup.vehicles, ['licensePlate'], 'vehicle licensePlate'); // vehicles_user_license_plate_idx
-    dupCheck(backup.photoRefs, ['photoId', 'providerId'], 'photoRef photo+provider'); // pr_photo_provider_idx
+    dupCheck(backup.expenses, ['clientId'], 'expense clientId');
+    dupCheck(backup.vehicles, ['licensePlate'], 'vehicle licensePlate');
+    dupCheck(backup.photoRefs, ['photoId', 'providerId'], 'photoRef photo+provider');
     dupCheck(
       backup.reminderNotifications,
       ['reminderId', 'dueDate'],
       'reminderNotification reminder+dueDate'
-    ); // rn_reminder_due_idx
+    );
     dupCheck(
       backup.reminderNotifications,
       ['reminderId', 'dueOdometer'],
       'reminderNotification reminder+dueOdometer'
-    ); // rn_reminder_odo_idx
-    // vehicle_shares_active_idx. Export is accepted-only, so every exported row is active.
+    );
     dupCheck(backup.vehicleShares, ['vehicleId', 'sharedWithId'], 'vehicleShare vehicle+invitee');
-    // Partial index (is_active = 1): several settled agreements per vehicle are valid, one active.
     dupCheck(backup.financing, ['vehicleId'], 'active financing vehicleId', (row) =>
       isTruthyFlag(row.isActive)
     );
@@ -738,7 +706,6 @@ export class BackupService {
     return errors;
   }
 
-  /** Checks rows that cascade-delete with their vehicle via vehicleId. */
   private validateVehicleFkRefs(
     rows: Record<string, unknown>[],
     vehicleIds: Set<string>,
@@ -753,10 +720,6 @@ export class BackupService {
     return errors;
   }
 
-  /**
-   * The vehicle must be in this backup and the owner must be the backup creator. The invitee is not
-   * checked: users are not backed up, and restore skips grants whose invitee is absent.
-   */
   private validateShareRefs(
     shareList: Record<string, unknown>[],
     vehicleIds: Set<string>,
@@ -808,7 +771,6 @@ export class BackupService {
       if (!policyIds.has(String(claim.policyId))) {
         errors.push(`Insurance claim ${claim.id} references non-existent policy ${claim.policyId}`);
       }
-      // termId / vehicleId are optional links; validate only when present.
       if (claim.termId != null && claim.termId !== '' && !termIds.has(String(claim.termId))) {
         errors.push(`Insurance claim ${claim.id} references non-existent term ${claim.termId}`);
       }
@@ -853,8 +815,6 @@ export class BackupService {
     }
   ): string[] {
     const errors: string[] = [];
-    // Keys must match the photo upload allowlist (photos/helpers.ts validateEntityOwnership). A type
-    // accepted on upload but missing here rejects the whole restore.
     const entityTypeToIds: Record<string, Set<string>> = {
       vehicle: entityIds.vehicleIds,
       expense: entityIds.expenseIds,
@@ -886,7 +846,6 @@ export class BackupService {
       if (!photoIds.has(String(ref.photoId))) {
         errors.push(`PhotoRef ${ref.id} references non-existent photo ${ref.photoId}`);
       }
-      // providerId is filtered at insert time: user_providers are not backed up.
     }
     return errors;
   }

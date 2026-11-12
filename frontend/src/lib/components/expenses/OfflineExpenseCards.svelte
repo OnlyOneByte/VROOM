@@ -6,16 +6,13 @@
 	import { DISPLAY_LIMITS } from '$lib/constants/limits';
 	import { EXPENSE_MESSAGES } from '$lib/constants/messages';
 	import { formatCurrency, formatDate } from '$lib/utils/formatters';
-	// Category is unvalidated user input, so use the key-tolerant label helper instead of indexing categoryLabels.
 	import { getCategoryLabel } from '$lib/utils/chart-colors';
 
 	interface Props {
 		pendingExpenses: OfflineExpense[];
-		/** Rows parked as permanently-unsyncable — surfaced so the user can fix or discard them. */
 		needsAttentionExpenses?: OfflineExpense[];
 		syncedExpenses: OfflineExpense[];
 		onRemovePending: (_id: string) => void;
-		/** Discard a needs-attention row. Defaults to onRemovePending (same removeOfflineExpense path). */
 		onRemoveNeedsAttention?: (_id: string) => void;
 	}
 

@@ -1,5 +1,3 @@
-// Builds the Hono app with no side effects. index.ts adds the runtime concerns, and tests drive app.request().
-
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { csrf } from 'hono/csrf';
@@ -36,9 +34,7 @@ app.onError(errorHandler);
 
 export const GLOBAL_MAX_BODY_SIZE = 10 * 1024 * 1024;
 
-// Paths whose bodies may exceed the global cap. A route-level bodyLimit can only tighten the global
-// check, which runs first, so these paths are exempted here. The unversioned alias is listed because its
-// 308 redirect would otherwise reject a large upload before it reached the real route.
+// A route-level bodyLimit can only tighten the global cap, which runs first, so exemptions live here.
 const LARGER_BODY_LIMITS: Record<string, number> = {
   '/api/v1/sync/restore/from-backup': CONFIG.backup.maxFileSize,
   '/api/sync/restore/from-backup': CONFIG.backup.maxFileSize,
@@ -57,7 +53,6 @@ const largerBodyLimits = new Map(
 
 app.use('*', (c, next) => (largerBodyLimits.get(c.req.path) ?? globalBodyLimit)(c, next));
 
-// Widen these directives when a feature needs an external image, API, or font origin.
 app.use(
   '*',
   secureHeaders({
@@ -83,13 +78,12 @@ app.use(
 const globalRateLimiter = rateLimiter({
   ...CONFIG.rateLimit.global,
   keyGenerator: (c) => {
-    // Anonymous requests key by the trusted client IP. The raw X-Forwarded-For header is spoofable.
+    // Keys by trusted client IP: the raw X-Forwarded-For header is spoofable.
     const user = c.get('user');
     return `global:${user?.id || getClientIp(c)}`;
   },
 });
 
-// Runs before the rate limiter so the limiter can key by user. Scoped to /api/* to skip DB lookups elsewhere.
 app.use('/api/*', optionalAuth);
 
 app.use('*', globalRateLimiter);
@@ -147,7 +141,6 @@ app.route('/api/v1/trips', tripRoutes);
 app.route('/api/v1/shares', shareRoutes);
 app.route('/api/v1/push', pushRoutes);
 
-// Unversioned /api/* requests redirect to /api/v1. 308 keeps the HTTP method.
 app.use('/api/*', async (c, next) => {
   const path = c.req.path;
 
@@ -172,7 +165,6 @@ app.get('/api', (c) => {
   });
 });
 
-// Must use the standard error envelope. Clients read error.message, which a string-valued error lacks.
 app.notFound((c) =>
   c.json(
     createErrorResponse('NotFoundError', 'The requested endpoint does not exist', {

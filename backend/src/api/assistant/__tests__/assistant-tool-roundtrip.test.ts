@@ -1,9 +1,3 @@
-/**
- * Tool results are fed back to the model. Read tools run over seeded data, and the captured request
- * bodies must contain each real result. The scripted answer can only mention a figure if the result
- * was threaded through. Covers the seam without a live LLM.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -23,10 +17,8 @@ import {
 
 let ctx: TestApp;
 const realFetch = globalThis.fetch;
-/** Every outbound request body the adapter sent, in order, so a test can inspect what the model saw. */
 let sentBodies: SentBody[];
 
-/** Collect every `role:'tool'` message content the orchestrator sent back to the model (all turns). */
 function toolMessagesSent(): string[] {
   const out: string[] = [];
   for (const body of sentBodies) {
@@ -53,7 +45,6 @@ describe('assistant tool results are fed back to the model', () => {
     expect(v1).toBeTruthy();
     expect(v2).toBeTruthy();
 
-    // The answer can only mention two vehicles if the tool result was sent back.
     sentBodies = stubScript([
       callTurn('listVehicles', '{}'),
       answerTurn('You have 2 vehicles: a Honda Civic and a Tesla Model 3.'),
@@ -78,7 +69,6 @@ describe('assistant tool results are fed back to the model', () => {
   test('getExpenseSummary result reflects a REAL seeded expense fed back to the model', async () => {
     await seedLlmProvider(ctx);
     const vehicleId = await seedVehicle(ctx, { make: 'Ford', model: 'F150', year: 2021 });
-    // Seeds a $120 fuel expense through the create route.
     const created = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId,
       category: 'fuel',
@@ -99,7 +89,6 @@ describe('assistant tool results are fed back to the model', () => {
     const data = (await json<DataEnvelope<ChatReply>>(res)).data;
     expect(data.toolsUsed).toEqual(['getExpenseSummary']);
 
-    // Summed cents are converted to dollars before reaching the model; a raw 12000 would read as $12,000.
     const combined = toolMessagesSent().join('\n');
     expect(combined.length).toBeGreaterThan(0);
     expect(combined).toContain('"totalAmount":120');
@@ -110,7 +99,6 @@ describe('assistant tool results are fed back to the model', () => {
     await seedLlmProvider(ctx);
     await seedVehicle(ctx, { make: 'Mazda', model: 'CX5', year: 2022 });
 
-    // Turn 1: listVehicles. Turn 2: getAnalyticsSummary. Turn 3: the grounded answer.
     sentBodies = stubScript([
       callTurn('listVehicles', '{}'),
       callTurn('getAnalyticsSummary', '{"range":"all"}'),

@@ -1,8 +1,3 @@
-/**
- * recheckMileageReminders must resolve, not reject, when its candidate query fails. It runs after the
- * odometer or expense write has already persisted, so a query error must not fail the request.
- */
-
 import { afterEach, describe, expect, spyOn, test } from 'bun:test';
 import { reminderRepository } from '../repository';
 import { reminderTriggerService } from '../trigger-service';

@@ -1,19 +1,13 @@
-// Neutralizes spreadsheet formula injection (CWE-1236) on CSV export. Every CSV reader of VROOM
-// exports must undo it with denormalizeCsvCell, or re-imported cells gain a leading apostrophe.
+// CSV readers must run denormalizeCsvCell, or exported formula escapes leak into re-imported cells.
 
-/** First-character triggers a spreadsheet treats as the start of a formula. */
 const FORMULA_TRIGGERS = new Set(['=', '+', '-', '@', '\t', '\r']);
 
-// Matches the exact shape neutralizeCsvCell escapes. A leading apostrophe followed by ordinary text
-// does not match.
 function isApostropheRunThenTrigger(s: string): boolean {
   let i = 0;
   while (i < s.length && s[i] === "'") i++;
   return i < s.length && FORMULA_TRIGGERS.has(s[i] as string);
 }
 
-// Adds one apostrophe to a string that starts with a formula trigger, after any existing apostrophe
-// run. Prepending to the run keeps denormalizeCsvCell an exact inverse.
 export function neutralizeCsvCell<T>(value: T): T | string {
   if (typeof value !== 'string' || value.length === 0) return value;
   return isApostropheRunThenTrigger(value) ? `'${value}` : value;
@@ -29,8 +23,6 @@ export function neutralizeCsvRow<T extends Record<string, unknown>>(
   return out;
 }
 
-// Removes the one apostrophe neutralizeCsvCell added. A bare formula with no leading apostrophe is
-// left intact.
 export function denormalizeCsvCell(value: string): string {
   return value[0] === "'" && isApostropheRunThenTrigger(value) ? value.slice(1) : value;
 }

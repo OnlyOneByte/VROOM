@@ -1,10 +1,3 @@
-/**
- * Built-in column presets for common fuel trackers, used to auto-detect the source from a
- * file's header row. Column names are best-effort from each tracker's CSV export and matched
- * loosely; a null detection is the safe failure (the user maps manually). These exports are
- * fill-up logs with no category column, so each preset defaults blank categories to fuel.
- */
-
 import type { ExpenseCategory } from '../../db/types';
 import { DistanceUnit, VolumeUnit } from '../../types';
 import type { ColumnMapping, ImportDateFormat, NativeField } from './import-mapping';

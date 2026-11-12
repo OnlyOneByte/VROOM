@@ -1,8 +1,3 @@
-// buildTCOMonthlyTrend buckets rows by (category, sourceType) per month. Only the four named
-// buckets appear in the trend. Reminder and manual financial rows, regulatory, enhancement and misc
-// are excluded, dateless rows are dropped, and months sort ascending. Dates are built in local time
-// so month keys do not depend on the timezone.
-
 import { describe, expect, test } from 'bun:test';
 import { buildTCOMonthlyTrend } from '../analytics-charts';
 
@@ -59,14 +54,13 @@ describe('buildTCOMonthlyTrend — (category, sourceType) bucketing', () => {
 
   test('groups across months and SORTS ascending by month key', () => {
     const trend = buildTCOMonthlyTrend([
-      { category: 'fuel', sourceType: null, expenseAmount: 30, date: new Date(2024, 2, 5) }, // Mar
-      { category: 'fuel', sourceType: null, expenseAmount: 40, date: new Date(2024, 0, 5) }, // Jan
-      { category: 'fuel', sourceType: null, expenseAmount: 50, date: new Date(2023, 11, 5) }, // 2023-12
-      { category: 'fuel', sourceType: null, expenseAmount: 10, date: new Date(2024, 0, 20) }, // Jan again
+      { category: 'fuel', sourceType: null, expenseAmount: 30, date: new Date(2024, 2, 5) },
+      { category: 'fuel', sourceType: null, expenseAmount: 40, date: new Date(2024, 0, 5) },
+      { category: 'fuel', sourceType: null, expenseAmount: 50, date: new Date(2023, 11, 5) },
+      { category: 'fuel', sourceType: null, expenseAmount: 10, date: new Date(2024, 0, 20) },
     ]);
 
     expect(trend.map((t) => t.month)).toEqual(['2023-12', '2024-01', '2024-03']);
-    // Jan's two fuel rows accumulate (40 + 10).
     expect(trend.find((t) => t.month === '2024-01')?.fuel).toBe(50);
   });
 
@@ -76,7 +70,7 @@ describe('buildTCOMonthlyTrend — (category, sourceType) bucketing', () => {
       { category: 'fuel', sourceType: null, expenseAmount: 999, date: null },
     ]);
     expect(trend).toHaveLength(1);
-    expect(trend[0]?.fuel).toBe(25); // the dateless row never landed
+    expect(trend[0]?.fuel).toBe(25);
   });
 
   test('empty input → empty series (no crash)', () => {

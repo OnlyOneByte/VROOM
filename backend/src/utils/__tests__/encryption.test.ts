@@ -67,7 +67,6 @@ describe('tampered ciphertext throws', () => {
   test('flipping a byte in ciphertext throws', () => {
     const ciphertext = encrypt('sensitive');
     const buf = Buffer.from(ciphertext, 'base64');
-    // Byte 28 is the first byte after the 12-byte IV and 16-byte auth tag.
     if (buf.length > 28) {
       buf[28] ^= 0xff;
     }

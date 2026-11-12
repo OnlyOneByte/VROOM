@@ -34,12 +34,10 @@ async function seedVehicle(make: string): Promise<void> {
     .values({ userId: ctx.user.id, make, model: 'Civic', year: 2021 });
 }
 
-/** Leaves a completed backup holding Toyota, then a second backup whose swap fails. */
 async function backupWithFailedSwap(): Promise<string> {
   await seedVehicle('Toyota');
   const info = await backup();
   await seedVehicle('Honda');
-  // A re-backup's first batchUpdate adds the staging tabs; the second is the swap. Fail only the swap.
   store.injectFault('spreadsheets.batchUpdate', googleApiError(500, 'swap failed'), 1, 1);
   await expect(backup()).rejects.toThrow('swap failed');
   return info.id;
@@ -50,7 +48,6 @@ describe('Sheets backup is atomic — stage-then-swap', () => {
     await seedVehicle('Toyota');
     const info = await backup();
 
-    // Any clear call fails the backup, so a passing run proves the write path stages instead.
     store.injectFault('spreadsheets.values.clear', googleApiError(500, 'live tab cleared'), 1000);
     await seedVehicle('Honda');
     await backup();

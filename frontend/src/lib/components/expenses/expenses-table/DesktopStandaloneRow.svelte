@@ -75,7 +75,7 @@
 		{formatCurrency(expense.amount)}
 	</TableCell>
 	<TableCell class="text-right">
-		<!-- Focus variant is required: opacity-0 keeps these controls in the tab order. -->
+		<!-- opacity-0 keeps these controls in the tab order, so they must reveal on focus. -->
 		<div
 			class="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100"
 		>

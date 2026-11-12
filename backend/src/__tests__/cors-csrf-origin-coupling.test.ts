@@ -1,6 +1,3 @@
-// Source-scan guard: cors() and csrf() in app.ts must both read the origin allowlist from CONFIG.cors.origins.
-// If either drifts to a hardcoded or different list, the two trust boundaries split.
-
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -9,7 +6,6 @@ import { fileURLToPath } from 'node:url';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const APP = join(HERE, '..', 'app.ts');
 
-// Captures each call's options object. Whitespace is collapsed first so multi-line objects match.
 const CORS_CALL = /\bcors\(\{([^}]*)\}/;
 const CSRF_CALL = /\bcsrf\(\{([^}]*)\}/;
 

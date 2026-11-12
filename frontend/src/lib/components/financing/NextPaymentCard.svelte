@@ -19,7 +19,6 @@
 		recordPaymentHref?: string;
 		progressPercentage?: number;
 		onChangePayment?: () => void;
-		/** Owner-only payment actions; shared invitees see the summary read-only. Defaults to true for the owner view. */
 		isOwner?: boolean;
 	}
 
@@ -97,7 +96,7 @@
 					: `Due in ${daysUntilPayment} days`
 	);
 
-	// Percent uses text-foreground: chart colours on white fail WCAG AA contrast.
+	// Percent uses text-foreground: chart colours fail WCAG AA on white.
 	let progressIndicatorClass = $derived(
 		progressPercentage > 75
 			? '[&_[data-slot=progress-indicator]]:bg-chart-2'
@@ -186,7 +185,7 @@
 				<div class="space-y-2">
 					<div class="flex justify-between items-center">
 						<span class="text-sm font-medium text-muted-foreground">Payment Progress</span>
-						<!-- text-foreground, not a chart colour: chart colours on white fail WCAG AA. -->
+						<!-- text-foreground: chart colours fail WCAG AA on white. -->
 						<span class="text-lg font-bold text-foreground">
 							{Math.round(progressPercentage)}%
 						</span>
@@ -210,7 +209,7 @@
 					</div>
 					<div>
 						<p class="text-xs text-muted-foreground">Paid</p>
-						<!-- text-foreground, not text-chart-2: chart-2 text fails WCAG AA on white. -->
+						<!-- text-foreground: chart-2 text fails WCAG AA on white. -->
 						<p class="text-sm sm:text-base font-semibold text-foreground">
 							{formatCurrency(amountPaid)}
 						</p>

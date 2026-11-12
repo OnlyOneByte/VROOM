@@ -1,9 +1,3 @@
-/**
- * HTTP tests for the insurance term and policy update routes. An optional field sent as null clears the
- * column, and an omitted field keeps its value. Vehicle links must be owned by the caller, and a term
- * update replaces its premium expense.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -35,7 +29,6 @@ interface PolicyRow {
   terms: TermRow[];
 }
 
-/** Seed a policy with one fully-populated term; return policy + term ids. */
 async function seedPolicyWithTerm(
   vehicleId: string
 ): Promise<{ policyId: string; termId: string }> {
@@ -71,8 +64,8 @@ describe('insurance term update clears optional fields', () => {
     expect(partial.status, JSON.stringify(partialBody)).toBe(200);
     const afterPartial = partialBody.data.terms.find((t) => t.id === termId);
     expect(afterPartial?.policyNumber).toBe('POL-456');
-    expect(afterPartial?.deductibleAmount).toBe(500); // preserved
-    expect(afterPartial?.agentName).toBe('Pat Agent'); // preserved
+    expect(afterPartial?.deductibleAmount).toBe(500);
+    expect(afterPartial?.agentName).toBe('Pat Agent');
 
     const cleared = await ctx.authed('PUT', `/api/v1/insurance/${policyId}/terms/${termId}`, {
       deductibleAmount: null,
@@ -118,12 +111,7 @@ describe('insurance term update clears optional fields', () => {
   });
 });
 
-/**
- * Term writes reject vehicle ids the caller does not own, so a term cannot plant a cross-tenant reference.
- * The foreign vehicle is raw-seeded so it coexists with the harness user in the shared database.
- */
 describe('insurance term writes reject a foreign vehicleId', () => {
-  /** Seeds a vehicle owned by another user. */
   function seedForeignVehicle(id: string): void {
     ctx.sqlite.run(
       `INSERT INTO users (id, email, display_name) VALUES ('u-foreign-84', 'f84@test.com', 'Foreign 84')`
@@ -134,7 +122,6 @@ describe('insurance term writes reject a foreign vehicleId', () => {
     );
   }
 
-  /** Counts junction rows for a vehicle, to prove nothing was written. */
   function junctionCountFor(vehicleId: string): number {
     const rows = ctx.sqlite
       .query('SELECT COUNT(*) AS n FROM insurance_term_vehicles WHERE vehicle_id = ?')
@@ -181,7 +168,6 @@ describe('insurance term writes reject a foreign vehicleId', () => {
       vehicleCoverage: { vehicleIds: ['veh-foreign-updateterm'] },
     });
     expect(res.status).toBe(404);
-    // The foreign vehicle never got a junction row, and the term keeps its original owned coverage.
     expect(junctionCountFor('veh-foreign-updateterm')).toBe(0);
     expect(junctionCountFor(ownVehicle)).toBe(1);
   });
@@ -202,7 +188,6 @@ describe('insurance term writes reject a foreign vehicleId', () => {
 });
 
 describe('a term cost update replaces its premium expense', () => {
-  /** Sums and counts the premium expenses linked to a term. */
   function premiumExpenses(termId: string): { count: number; total: number } {
     const rows = ctx.sqlite
       .query(

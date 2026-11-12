@@ -420,7 +420,6 @@ describe('Gas price always positive', () => {
   });
 });
 
-// slice(0, 12) would keep the oldest months and hide the current period.
 describe('monthlyConsumption keeps the most recent 12 months', () => {
   test('with 14 months of fill-ups, returns 2023-03 .. 2024-02', async () => {
     seedUser(testDb.sqlite, { id: 'user-1', email: 'test@test.com', displayName: 'Test' });

@@ -1,22 +1,16 @@
-// A second signed-in user for cross-user and shared-vehicle tests.
-
 import { expect } from 'bun:test';
 import { type DataEnvelope, json, type RequestFn, requestAs, type TestApp } from './http-client';
 
 export interface Invitee {
   id: string;
   email: string;
-  /** Session cookie, for requests the JSON helper cannot send (multipart uploads). */
   cookie: string;
-  /** Sends a JSON request authenticated as the invitee. */
   request: RequestFn;
-  /** The owner (ctx user) shares the vehicle at `level`, and the invitee accepts. */
   acceptShare(vehicleId: string, level: 'viewer' | 'editor'): Promise<void>;
 }
 
 let inviteeCounter = 0;
 
-/** Creates a second user with a live session, to act as the invitee on the owner's shared vehicles. */
 export async function createInvitee(
   ctx: TestApp,
   idPrefix: string,

@@ -1,8 +1,3 @@
-/**
- * PUT /settings storageConfig consistency rules, through the HTTP stack. A default must reference an
- * owned provider that has its category enabled, so photos cannot route to a foreign or disabled one.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, json, type TestApp } from '../../../test-helpers/http-client';
 
@@ -13,7 +8,6 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-/** Raw-seed an owned storage provider so storageConfig references to it pass ownership. */
 function seedProvider(id: string): void {
   ctx.sqlite.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, status)
@@ -31,7 +25,6 @@ function putStorageConfig(storageConfig: unknown) {
   return ctx.authed('PUT', '/api/v1/settings', { storageConfig });
 }
 
-/** All-null defaults (the shape DEFAULT_STORAGE_CONFIG uses); override one key per test. */
 function defaults(over: Record<string, string | null> = {}) {
   return {
     vehicle_photos: null,

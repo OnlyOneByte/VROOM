@@ -65,8 +65,6 @@ export function idempotency(options: { required?: boolean } = {}) {
     const status = c.res.status;
     if (status < 200 || status >= 300) return;
 
-    // Only JSON can be replayed through c.json. Parsing a non-JSON success body here would throw and turn
-    // the success into a 500, so skip caching it.
     try {
       const responseBody = await c.res.clone().json();
       idempotencyStore.set(storeKey, responseBody, status);

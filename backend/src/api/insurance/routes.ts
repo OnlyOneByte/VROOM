@@ -25,9 +25,6 @@ import {
 
 const routes = new Hono();
 
-/**
- * Converts each embedded term's money fields from cents to dollars. The policy row itself has no money.
- */
 function policyToApi<T extends Record<string, unknown>>(policy: T): T {
   const terms = policy.terms;
   if (!Array.isArray(terms)) return policy;
@@ -37,10 +34,6 @@ function policyToApi<T extends Record<string, unknown>>(policy: T): T {
   };
 }
 
-/**
- * Narrows a policy to one shared vehicle for a non-owner viewer, so the owner's other vehicles
- * (terms, coverage, ids) do not leak.
- */
 function narrowPolicyToVehicle<
   T extends {
     terms: Array<{ id: string }>;
@@ -59,10 +52,6 @@ function narrowPolicyToVehicle<
   };
 }
 
-/**
- * Read access to a policy. The owner always reads. A non-owner reads only if they can read at least one
- * covered vehicle, and otherwise gets a 404. Returns the vehicles they may read, used to narrow claims.
- */
 async function requirePolicyReadVehicles(
   policyId: string,
   userId: string
@@ -93,10 +82,6 @@ const claimParamsSchema = z.object({
   claimId: z.string().min(1, 'Claim ID is required'),
 });
 
-/**
- * Checks a claim's optional vehicleId and termId links. The vehicle must be owned by the user, and the term
- * must belong to this policy. The repository writes both verbatim, so this check is the only guard.
- */
 async function validateClaimRefs(
   data: { vehicleId?: string | null; termId?: string | null },
   policyId: string,
@@ -129,7 +114,6 @@ routes.get('/', async (c) => {
 
 routes.get('/expiring-soon', async (c) => {
   const user = c.get('user');
-  // parseClampedInt falls back on non-numeric input; a NaN here would produce an Invalid Date.
   const daysAhead = parseClampedInt(c.req.query('days'), 30, 1, 366);
   const limit = parseClampedInt(c.req.query('limit'), 100, 1, 200);
   const now = new Date();
@@ -219,7 +203,7 @@ routes.delete('/:id', zValidator('param', idParamSchema), async (c) => {
   await deleteAllPhotosForEntity('insurance_policy', id, user.id);
   await deletePhotosForEntities('insurance_claim', claimIds, user.id);
 
-  // Premium expenses link to terms by text columns, not an FK, so they must be deleted explicitly.
+  // Premium expenses link to terms by text, not FK, so they must be deleted explicitly before the cascade.
   const policyToDelete = await insurancePolicyRepository.findById(id);
   for (const term of policyToDelete?.terms ?? []) {
     await expenseRepository.deleteBySource('insurance_term', term.id, user.id);
@@ -298,7 +282,7 @@ routes.delete('/:id/terms/:termId', zValidator('param', termParamsSchema), async
   const { id, termId } = c.req.valid('param');
   await validateInsuranceOwnership(id, user.id);
 
-  // Premium expenses are not FK-linked to the term, so delete them explicitly.
+  // Premium expenses link to terms by text, not FK, so they must be deleted explicitly.
   await expenseRepository.deleteBySource('insurance_term', termId, user.id);
 
   const policy = await insurancePolicyRepository.deleteTerm(id, termId, user.id);
@@ -310,7 +294,6 @@ routes.get('/:id/claims', zValidator('param', idParamSchema), async (c) => {
   const { id } = c.req.valid('param');
   const { isOwner, readableVehicleIds } = await requirePolicyReadVehicles(id, user.id);
   const claims = await insuranceClaimRepository.findByPolicyId(id);
-  // A non-owner sees only claims attributed to a vehicle they can read.
   const scoped = isOwner
     ? claims
     : claims.filter((cl) => cl.vehicleId !== null && readableVehicleIds.has(cl.vehicleId));

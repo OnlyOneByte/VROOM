@@ -27,7 +27,7 @@ type DbInstance =
   | ReturnType<typeof getDb>
   | Parameters<Parameters<ReturnType<typeof getDb>['transaction']>[0]>[0];
 
-/** A provider owned by another user is indistinguishable from a missing one, so no cross-tenant probing. */
+// Another user's provider must look missing, so ids cannot be probed.
 async function findOwnedProviderOrThrow(
   db: DbInstance,
   id: string,
@@ -85,7 +85,6 @@ async function countPhotoRefsByStatus(
   return result[0]?.count ?? 0;
 }
 
-/** Credentials are omitted: secrets are never returned to the frontend. */
 function formatProviderResponse(row: UserProvider) {
   return {
     id: row.id,
@@ -114,7 +113,6 @@ routes.get('/pending/:nonce', async (c) => {
   return c.json({ success: true, data: { email } });
 });
 
-// Model provider types are shared by the `vlm` and `llm` domains; the same type string is valid in either.
 const MODEL_PROVIDER_TYPES = ['openai-compatible', 'anthropic', 'gemini', 'ollama'] as const;
 type ModelProviderType = (typeof MODEL_PROVIDER_TYPES)[number];
 const MODEL_DOMAINS = ['vlm', 'llm'] as const;
@@ -196,7 +194,6 @@ routes.get('/', async (c) => {
   return c.json({ success: true, data });
 });
 
-/** Shared by CREATE and PUT so an edit cannot persist a config the provider can never run with. */
 function validateStorageProviderConfig(
   providerType: string,
   config: Record<string, unknown> | null
@@ -209,10 +206,6 @@ function validateStorageProviderConfig(
   }
 }
 
-/**
- * Config-shape and credentials checks are split so a config-only PUT does not demand the api key
- * again; the key is already stored encrypted.
- */
 function validateModelConfigShape(
   domain: string,
   providerType: ModelProviderType,
@@ -291,7 +284,6 @@ routes.post('/', zValidator('json', createProviderSchema), async (c) => {
     throw new ValidationError('Fake storage provider is not enabled in this environment');
   }
 
-  // Model types and model domains must match in both directions, or the domain-keyed registries misroute the row.
   if (isModelProviderType(body.providerType) !== isModelDomain(body.domain)) {
     throw new ValidationError(
       'A model provider type requires domain "vlm" or "llm", and vice-versa'
@@ -307,8 +299,7 @@ routes.post('/', zValidator('json', createProviderSchema), async (c) => {
     body.nonce
   );
 
-  // Synchronous on purpose: bun-sqlite cannot hold a transaction across awaits, so the duplicate
-  // check and the insert must run without yielding or a racing request can insert the same account twice.
+  // bun:sqlite transactions must be synchronous.
   const created = db.transaction((tx) => {
     const existingProviders = tx
       .select({ id: userProviders.id, config: userProviders.config })
@@ -394,14 +385,12 @@ routes.put(
     }
     const existingType = existing.providerType;
     if (body.config !== undefined) {
-      // Validates the payload, not the merged result, so required fields are edited as a unit.
       if (isModelProviderType(existingType)) {
         validateModelConfigShape(existing.domain, existingType, body.config);
       } else {
         validateStorageProviderConfig(existingType, body.config);
       }
-      // Partial merge: server-written keys such as accountEmail and albumId are not echoed by forms,
-      // so a wholesale replace would drop them. PUT cannot delete a config key as a result.
+      // Server-written keys (accountEmail, albumId) are not sent by forms; a wholesale replace would drop them.
       updates.config = { ...(existing.config ?? {}), ...body.config };
     }
     if (body.credentials !== undefined) {
@@ -411,7 +400,7 @@ routes.put(
       updates.credentials = encrypt(JSON.stringify(body.credentials));
     }
 
-    // Tenant-scoped on id AND userId so the write stays safe if the ownership check above is reordered.
+    // Scope by userId too so the write stays tenant-safe if the ownership check moves.
     const result = await db
       .update(userProviders)
       .set(updates)
@@ -444,7 +433,7 @@ async function cleanupStorageConfig(userId: string, providerId: string): Promise
   await preferencesRepository.update(userId, { storageConfig });
 }
 
-// Single-key JSON merge patch (null deletes the key) so a concurrent settings write to sibling providers is not clobbered.
+// JSON merge patch, not read-modify-write, so concurrent writes to sibling providers are not clobbered.
 async function cleanupBackupConfig(userId: string, providerId: string): Promise<void> {
   const prefs = await preferencesRepository.getOrCreate(userId);
   if (!prefs.backupConfig?.providers?.[providerId]) return;
@@ -516,7 +505,7 @@ routes.post('/:id/backfill', zValidator('param', commonSchemas.idParam), async (
   }
 
   let created = 0;
-  // Synchronous so bun-sqlite keeps the whole backfill in one transaction that rolls back on error.
+  // bun:sqlite transactions must be synchronous.
   db.transaction((tx) => {
     for (const [category, setting] of Object.entries(providerCategories)) {
       if (!setting?.enabled || !isPhotoCategory(category)) continue;

@@ -1,8 +1,4 @@
 #!/usr/bin/env node
-// Guarded svelte-check runner. svelte-check exits 0 on internal crashes and ignores its
-// --tsgo child's exit code, so this wrapper verifies that checking actually happened.
-// Exit codes: 0 clean, 1 type errors reported, 2 guards failed (result not trustworthy).
-// The spawn guard fails closed if svelte-check stops delegating to a spawned compiler.
 
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync, statSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
@@ -11,19 +7,14 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-/** Captured child output cap, so a pathological compiler run cannot exhaust memory. */
 const MAX_CAPTURED_CHILD_OUTPUT = 1024 * 1024;
 
-// Blank override must fall back to the default: Number('') is 0, which would silently disable the floor.
 const MIN_CHECKED_FILES = Number(process.env.VROOM_TYPE_CHECK_MIN_FILES?.trim() || 50);
 
-// Five-digit codes (17xxx, 18xxx) are real type errors; a four-digit-only pattern misses them.
 const TS_DIAGNOSTIC_CODE = /\bTS\d{4,5}\b/;
 
-// Anchored to the machine writer's line shape so a diagnostic containing the word is not a crash.
 const MACHINE_FAILURE_LINE = /^\d+ FAILURE\b/m;
 
-// Asserted on every run: a pattern that stops matching the tools' output looks like a clean run.
 const PATTERN_FIXTURES = [
 	{
 		name: 'TS_DIAGNOSTIC_CODE',
@@ -66,7 +57,7 @@ function installSpawnGuard() {
 	const reportPath = process.env.VROOM_TSGO_GUARD_REPORT;
 	if (!reportPath) return;
 
-	// svelte-check's CJS bundle reads child_process.spawn at call time, so patch before it loads.
+	// svelte-check's CJS bundle reads child_process.spawn at call time, so the patch must land before it loads.
 	const cjsRequire = createRequire(import.meta.url);
 	const childProcess = cjsRequire('child_process');
 	const realSpawn = childProcess.spawn;
@@ -97,7 +88,6 @@ function installSpawnGuard() {
 				if (observation.output.length >= MAX_CAPTURED_CHILD_OUTPUT) return;
 				observation.output += typeof chunk === 'string' ? chunk : String(chunk);
 			};
-			// Extra 'data' listeners do not steal chunks from svelte-check's own listeners.
 			child.stdout?.on('data', absorb);
 			child.stderr?.on('data', absorb);
 			child.on('error', err => {
@@ -115,7 +105,6 @@ function installSpawnGuard() {
 		return child;
 	};
 
-	// Written up front so "guard never installed" differs from "no compiler spawn".
 	flush();
 }
 
@@ -134,7 +123,6 @@ async function main() {
 	const require = createRequire(pathToFileURL(path.join(frontendDir, 'package.json')));
 	const forwarded = process.argv.slice(2);
 
-	// Unlike package.json's `prepare` hook, a failed sync must not be tolerated here.
 	const kitBin = resolveBin(require, '@sveltejs/kit', 'svelte-kit');
 	const sync = await runNode([kitBin, 'sync'], { cwd: frontendDir, inherit: true });
 	if (sync.code !== 0 || sync.signal) {
@@ -143,7 +131,6 @@ async function main() {
 		);
 	}
 
-	// svelte-check discards the compiler child's failures, so prove it runs before checking.
 	const tsgo = resolveTsgo(require);
 	const version = await runNode([tsgo.binPath, '--version'], { cwd: frontendDir });
 	if (version.code !== 0 || !/\d+\.\d+\.\d+/.test(version.output)) {
@@ -156,8 +143,7 @@ async function main() {
 		);
 	}
 
-	// --tsgo writes a shadow .ts per component here and never prunes it, so a deleted component's
-	// stale shadow would keep reporting errors against code that no longer exists.
+	// svelte-check --tsgo never prunes its shadow .ts files, so stale ones would keep reporting errors.
 	rmSync(path.join(frontendDir, '.svelte-kit', '.svelte-check'), { recursive: true, force: true });
 
 	const reportDir = mkdtempSync(path.join(tmpdir(), 'vroom-type-check-'));
@@ -167,7 +153,6 @@ async function main() {
 
 	const svelteCheckBin = require.resolve('svelte-check/bin/svelte-check');
 	const checkArgs = [svelteCheckBin, '--tsconfig', './tsconfig.json', '--tsgo'];
-	// Only the machine format reports a total file count, so prefer it unless a human is watching.
 	if (!forwarded.some(arg => arg === '--output' || arg.startsWith('--output='))) {
 		if (process.env.CI || !process.stdout.isTTY) checkArgs.push('--output', 'machine');
 	}
@@ -182,7 +167,6 @@ async function main() {
 			tee: true,
 			env: {
 				VROOM_TSGO_GUARD_REPORT: reportPath,
-				// Keep colors alive across our pipe when a human is watching.
 				...(process.stdout.isTTY && !process.env.FORCE_COLOR ? { FORCE_COLOR: '1' } : {})
 			}
 		});
@@ -195,7 +179,6 @@ async function main() {
 
 	if (run.signal) fail(`svelte-check was killed by signal ${run.signal}.`);
 
-	// The human writer prints a crash without any marker; the completion check below covers it.
 	if (/svelte-check failed/.test(output) || MACHINE_FAILURE_LINE.test(output)) {
 		fail(
 			'svelte-check crashed. It reports internal errors without setting an exit code, so this\n' +
@@ -236,7 +219,6 @@ async function main() {
 				`the TypeScript compiler child did not exit cleanly (signal ${observation.signal ?? 'none'}).\n  ${where}`
 			);
 		}
-		// A non-zero exit is normal for type errors; without a diagnostic code it is a silent failure.
 		if (observation.exitCode !== 0 && !TS_DIAGNOSTIC_CODE.test(stripAnsi(observation.output))) {
 			fail(
 				`the TypeScript compiler child failed (exit ${observation.exitCode}) without reporting any\n` +
@@ -247,7 +229,6 @@ async function main() {
 		}
 	}
 
-	// Only the machine format reports a total file count; interactive runs skip this floor.
 	if (completion[0].startsWith('COMPLETED')) {
 		const fileCount = Number(completion[1]);
 		if (!(fileCount >= MIN_CHECKED_FILES)) {
@@ -293,7 +274,6 @@ function indent(text) {
 		.join('\n');
 }
 
-// Resolved from package.json, not the PATH shim, matching svelte-check.
 function resolveBin(require, packageName, binName) {
 	let pkgJsonPath;
 	try {
@@ -311,8 +291,8 @@ function resolveBin(require, packageName, binName) {
 	return binPath;
 }
 
-// Must mirror svelte-check's own --tsgo resolution order.
 function resolveTsgo(require) {
+	// Must mirror svelte-check's own --tsgo resolution order.
 	for (const packageName of ['@typescript/native', '@typescript/native-preview']) {
 		let pkgJsonPath;
 		try {

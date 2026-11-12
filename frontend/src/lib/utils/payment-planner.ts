@@ -41,7 +41,6 @@ export function computePlannerState(
 		};
 	}
 
-	// A 0%-APR loan has no minimum payment, so fall back to the contractual payment.
 	const baselinePayment = minimumPayment > 0 ? minimumPayment : financing.paymentAmount;
 
 	const extraVsMinimum = inputAmount - baselinePayment;

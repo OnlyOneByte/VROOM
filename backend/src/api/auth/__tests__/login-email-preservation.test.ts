@@ -1,9 +1,3 @@
-/**
- * Re-login must not overwrite users.email with the provider's current email: the login identity is
- * only backfilled when empty, while displayName always syncs. users.email is NOT NULL, so "unset"
- * is the empty string. App modules are imported after createTestApp so they bind the test database.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 
@@ -12,6 +6,7 @@ let updateExistingUserProfile: typeof import('../routes').updateExistingUserProf
 
 beforeEach(async () => {
   ctx = await createTestApp();
+  // App modules must be imported after createTestApp, or they bind the wrong database.
   ({ updateExistingUserProfile } = await import('../routes'));
 });
 afterEach(() => ctx.close());

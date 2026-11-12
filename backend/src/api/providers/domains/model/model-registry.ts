@@ -1,16 +1,9 @@
-/**
- * Resolves a model-domain (llm or vlm) user_providers row into an adapter instance. The api key is the
- * only secret; it is decrypted here and must never be logged.
- */
-
 import type { UserProvider } from '../../../../db/schema';
 import { ValidationError } from '../../../../errors';
 import { decrypt } from '../../../../utils/encryption';
 import type { ModelDomainLabel } from './model-transport';
 
-/** Resolved, decrypted settings handed to an adapter constructor. */
 export interface ModelProviderSettings {
-  /** Absent for keyless self-hosted ollama. */
   apiKey?: string;
   model: string;
   baseUrl?: string;
@@ -19,13 +12,12 @@ export interface ModelProviderSettings {
 type AdapterCtor<P> = new (settings: ModelProviderSettings) => P;
 
 export interface ModelAdapters<P> {
-  /** Also serves ollama, which speaks the OpenAI-compatible API. */
   'openai-compatible': AdapterCtor<P>;
   anthropic: AdapterCtor<P>;
   gemini: AdapterCtor<P>;
 }
 
-/** Rows that bypass the create/PUT gate (for example via restore) still fail here instead of building a broken adapter. */
+// Restored rows can bypass the create/PUT gate, so resolution must validate too.
 export function resolveModelSettings(
   row: UserProvider,
   domain: ModelDomainLabel

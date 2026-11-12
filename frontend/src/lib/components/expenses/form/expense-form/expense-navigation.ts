@@ -1,6 +1,5 @@
 import type { ExpenseFormData } from './expense-form-data';
 
-/** Duplicate-tag input arrives comma-separated; trim, drop blanks, and apply the 10-tag cap. */
 export function parsePreselectedTags(raw: string): string[] {
 	return raw
 		.split(',')
@@ -9,10 +8,6 @@ export function parsePreselectedTags(raw: string): string[] {
 		.slice(0, 10);
 }
 
-/**
- * Query for a new-expense page seeded from this one. The date is omitted on purpose: a duplicate is
- * the next occurrence of a recurring expense, not a copy.
- */
 export function buildDuplicateQuery(
 	returnTo: string,
 	form: ExpenseFormData

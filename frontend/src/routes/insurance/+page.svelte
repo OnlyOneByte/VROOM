@@ -21,7 +21,6 @@
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
 
-	// vehicleId -> display name for policy cards.
 	let vehicleNameMap = $derived(new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)])));
 
 	onMount(async () => {

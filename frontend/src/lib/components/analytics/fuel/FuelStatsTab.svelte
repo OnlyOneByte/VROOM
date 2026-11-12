@@ -55,7 +55,6 @@
 	let effLabel = $derived(getFuelEfficiencyLabel(units.distanceUnit, units.volumeUnit));
 	let costPerDistLabel = $derived(getCostPerDistanceLabel(units.distanceUnit));
 
-	// Show one empty state unless there is any fuel data; any fill-up or recorded distance shows the full grid.
 	let hasFuelData = $derived(
 		!!fuelStats &&
 			(fuelStats.fillups.currentYear > 0 ||
@@ -100,7 +99,7 @@
 {#snippet changeBadge(current: number, previous: number)}
 	{@const change = pctChange(current, previous)}
 	{#if change != null}
-		<!-- Direction colour lives on the icon; the percentage text stays neutral in both branches. -->
+		<!-- Tinted percentage text fails WCAG AA; only the icon takes the direction colour. -->
 		<span class="inline-flex items-center gap-1 text-xs font-medium text-foreground">
 			{#if change >= 0}
 				<TrendingUp class="h-3 w-3 text-chart-2" />

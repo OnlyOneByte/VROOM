@@ -70,13 +70,11 @@
 				lastActivity: vStats?.lastActivity ?? null,
 				hasActiveFinancing: v.financing?.isActive || false,
 				coverPhotoUrl,
-				// Set only for vehicles shared with this user.
 				sharedBy: v.sharedAccess?.sharedBy ?? null
 			};
 		});
 	});
 
-	// Owned vehicles only: totals are owner-scoped on the backend. The fleet carousel also shows shared vehicles.
 	let ownedVehicles = $derived(vehicles.filter(v => !v.sharedAccess));
 
 	let stats = $derived.by(() => ({
@@ -89,7 +87,6 @@
 	let trendChartData = $derived.by(() => {
 		if (!periodSummary?.monthlyTrend) return [];
 		return periodSummary.monthlyTrend.map(t => ({
-			// Parse as local time: new Date('YYYY-MM-01') is UTC midnight and shifts the label.
 			date: parseMonthToDate(t.period),
 			amount: t.amount
 		}));
@@ -121,36 +118,32 @@
 		}));
 	});
 
-	// Soonest first; the due rule matches /reminders so the two views agree.
 	let dueReminders = $derived.by(() => {
 		const now = Date.now();
 		const horizon = now + UPCOMING_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 		const vehicleMap = new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)]));
-		return (
-			remindersList
-				.filter(r => r.reminder.isActive)
-				// Pure-mileage reminders have no nextDueDate and are excluded here.
-				.filter(
-					(r): r is typeof r & { reminder: { nextDueDate: string } } =>
-						r.reminder.nextDueDate !== null
-				)
-				.filter(r => new Date(r.reminder.nextDueDate).getTime() <= horizon)
-				.sort(
-					(a, b) =>
-						new Date(a.reminder.nextDueDate).getTime() - new Date(b.reminder.nextDueDate).getTime()
-				)
-				.map(r => ({
-					id: r.reminder.id,
-					name: r.reminder.name,
-					nextDueDate: r.reminder.nextDueDate,
-					isOverdue: new Date(r.reminder.nextDueDate).getTime() <= now,
-					expenseAmount: r.reminder.expenseAmount,
-					vehicleNames: r.vehicleIds
-						.map(id => vehicleMap.get(id))
-						.filter(Boolean)
-						.join(', ')
-				}))
-		);
+		return remindersList
+			.filter(r => r.reminder.isActive)
+			.filter(
+				(r): r is typeof r & { reminder: { nextDueDate: string } } =>
+					r.reminder.nextDueDate !== null
+			)
+			.filter(r => new Date(r.reminder.nextDueDate).getTime() <= horizon)
+			.sort(
+				(a, b) =>
+					new Date(a.reminder.nextDueDate).getTime() - new Date(b.reminder.nextDueDate).getTime()
+			)
+			.map(r => ({
+				id: r.reminder.id,
+				name: r.reminder.name,
+				nextDueDate: r.reminder.nextDueDate,
+				isOverdue: new Date(r.reminder.nextDueDate).getTime() <= now,
+				expenseAmount: r.reminder.expenseAmount,
+				vehicleNames: r.vehicleIds
+					.map(id => vehicleMap.get(id))
+					.filter(Boolean)
+					.join(', ')
+			}));
 	});
 
 	onMount(loadDashboardData);
@@ -159,7 +152,6 @@
 		isLoading = true;
 		loadError = null;
 		try {
-			// One round for all requests; the lookup maps are built after they resolve.
 			const [
 				loadedVehicles,
 				allTimeData,
@@ -170,18 +162,14 @@
 				photosByVehicle,
 				vehicleStats
 			] = await Promise.all([
-				// include=shared also returns vehicles shared with this user, annotated with sharedAccess.
 				vehicleApi.getVehicles({ includeShared: true }),
 				expenseApi.getExpenseSummary({ period: 'all' }),
 				selectedPeriod !== 'all'
 					? expenseApi.getExpenseSummary({ period: selectedPeriod })
 					: Promise.resolve(null),
 				expenseApi.getAllExpenses({ limit: 5 }),
-				// Secondary widgets degrade instead of failing the whole dashboard.
 				reminderApi.list().catch(() => [] as ReminderWithVehicles[]),
-				// Recurring run-rate degrades to zero on failure.
 				reminderApi.getRecurringCost().catch(() => ({ count: 0, monthlyTotal: 0 })),
-				// Photos are one batch request; cover art degrades to none.
 				vehicleApi.getAllVehiclePhotos().catch(() => ({}) as Record<string, Photo[]>),
 				expenseApi.getVehicleStats()
 			]);
@@ -215,7 +203,6 @@
 			vehiclePhotosMap = photosMap;
 			vehicleStatsMap = statsMap;
 		} catch (error) {
-			// Persist the error: an empty state would look like lost data.
 			loadError = error instanceof Error ? error.message : 'Failed to load dashboard data';
 			handleErrorWithNotification(error, 'Failed to load dashboard data');
 		} finally {
@@ -223,10 +210,8 @@
 		}
 	}
 
-	// Deep-links to the fuel expense form; the vehicle is preselected only when the user owns one.
 	function handleLogFillup() {
 		const query: Record<string, string> = { category: 'fuel', returnTo: routes.dashboard };
-		// Shared vehicles are not preselected; their writes are gated server-side.
 		if (ownedVehicles.length === 1) {
 			query['vehicleId'] = ownedVehicles[0]!.id;
 		}

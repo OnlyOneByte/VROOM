@@ -25,7 +25,6 @@
 		expenses: Expense[];
 		vehicles?: Vehicle[];
 		showVehicleColumn?: boolean;
-		/** When false, Edit links and delete are hidden; defaults to true for the owner's own view. */
 		canWrite?: boolean;
 		returnTo?: string;
 		onDelete?: (_expense: Expense) => Promise<void>;
@@ -41,11 +40,9 @@
 		pageSize?: number;
 		isLoadingPage?: boolean;
 		onPageChange?: (_offset: number) => void;
-		// Controlled mode: client-side sorting would only reorder the visible page, so the parent owns the sort.
 		activeSortBy?: SortField;
 		activeSortDir?: 'asc' | 'desc';
 		onSortChange?: (_by: SortField, _dir: 'asc' | 'desc') => void;
-		// Controlled mode: client-side filtering would only narrow the visible page, so the parent owns the filter.
 		activeCategory?: string;
 		onCategoryChange?: (_category: string) => void;
 	}
@@ -76,15 +73,10 @@
 		onCategoryChange
 	}: Props = $props();
 
-	// Suppressing onDelete here hides every delete affordance in one place; Edit links are gated on canWrite per href.
 	let onDelete = $derived(canWrite ? onDeleteProp : undefined);
 
-	// O(1) vehicle lookups — avoids an O(n) vehicles.find() per row per render
-	// (the vehicle is looked up at several render sites for every expense + child).
 	let vehicleMap = $derived(new Map(vehicles.map(v => [v.id, v])));
 
-	// Pagination derived values. Nothing to page through means no bar: an empty list already
-	// explains itself with its empty state, and a Previous/Next pair under it is dead chrome.
 	let showPagination = $derived(
 		totalCount !== undefined && totalCount > 0 && onPageChange !== undefined
 	);

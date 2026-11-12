@@ -1,6 +1,3 @@
-// clampedPaginationFields must stay distinct from commonSchemas.pagination. Merging them would
-// change clamp and default behavior, and the cap would stop tracking CONFIG.
-
 import { describe, expect, test } from 'bun:test';
 import { z } from 'zod';
 import { CONFIG } from '../../config';

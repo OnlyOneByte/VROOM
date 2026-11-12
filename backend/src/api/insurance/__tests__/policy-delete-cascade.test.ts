@@ -1,8 +1,3 @@
-/**
- * Deleting an insurance policy removes its photos, its claims' photos, and its premium expenses. Photos and
- * expenses link by string keys with no foreign key, so the route must clean them up explicitly.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -34,7 +29,6 @@ function photoCount(entityType: string, entityId: string): number {
   return row.n;
 }
 
-/** Count the auto-materialized premium expense rows linked to ANY insurance term (sourceType). */
 function insuranceExpenseCount(): number {
   const row = ctx.sqlite
     .query(`SELECT COUNT(*) AS n FROM expenses WHERE source_type = 'insurance_term'`)

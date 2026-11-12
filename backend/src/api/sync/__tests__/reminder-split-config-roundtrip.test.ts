@@ -1,6 +1,3 @@
-// A reminder's nested expenseSplitConfig JSON must survive backup and restore byte-for-byte. Nested
-// objects with commas and quotes stress the CSV quoting on both the write and read paths.
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
@@ -26,7 +23,6 @@ describe('backup → restore round-trip preserves a reminder expenseSplitConfig 
     const vehA = await seedVehicle(ctx, { make: 'Toyota', model: 'M', year: 2022 });
     const vehB = await seedVehicle(ctx, { make: 'Honda', model: 'M', year: 2022 });
 
-    // Two-vehicle absolute split: its JSON body carries the commas and quotes.
     const splitConfig = {
       method: 'absolute' as const,
       allocations: [
@@ -34,7 +30,6 @@ describe('backup → restore round-trip preserves a reminder expenseSplitConfig 
         { vehicleId: vehB, amount: 50 },
       ],
     };
-    // Allocation amounts are stored as cents, and the round-trip must preserve that blob.
     const storedConfig = {
       method: 'absolute' as const,
       allocations: [
@@ -57,7 +52,7 @@ describe('backup → restore round-trip preserves a reminder expenseSplitConfig 
 
     const before = reminderRows();
     expect(before).toHaveLength(1);
-    const reminderId = before[0].id; // shape-independent: read the persisted row's id.
+    const reminderId = before[0].id;
     expect(JSON.parse(before[0].expense_split_config ?? 'null')).toEqual(storedConfig);
 
     const { backupService } = await import('../backup');

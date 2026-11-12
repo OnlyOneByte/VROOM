@@ -1,8 +1,3 @@
-/**
- * Gemini generateContent adapter for receipt extraction. Dumb transport: parseExtraction validates the
- * output.
- */
-
 import type { ModelProviderSettings } from '../model/model-registry';
 import { postModelJson, trimBaseUrl } from '../model/model-transport';
 import { RECEIPT_EXTRACTION_PROMPT } from './prompt';
@@ -51,7 +46,6 @@ export class GeminiVlmProvider implements VlmProvider {
       },
     });
 
-    // Missing or non-string text becomes an empty draft.
     const text = json?.candidates?.[0]?.content?.parts?.find(
       (p) => typeof p.text === 'string'
     )?.text;

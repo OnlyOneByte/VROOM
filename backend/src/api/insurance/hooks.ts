@@ -1,5 +1,3 @@
-// Cross-domain side effects of insurance operations. Called from routes, not the repository.
-
 import { AppError } from '../../errors';
 import { monthKeysInRange } from '../../utils/analytics-charts';
 import { logger } from '../../utils/logger';
@@ -19,17 +17,12 @@ interface TermExpenseParams {
   vehicleIds: string[];
   totalCost: number;
   startDate: Date;
-  /** Used when totalCost is absent. */
   monthlyCost?: number | null;
   endDate?: Date | null;
   policyNumber?: string;
   userId: string;
 }
 
-/**
- * The cost a term contributes to TCO: totalCost when set, otherwise monthlyCost times the calendar months
- * the term spans. Analytics reads term.monthlyCost directly, so the materialized row does not double-count.
- */
 export function effectiveTermCost(params: {
   totalCost: number;
   monthlyCost?: number | null;
@@ -44,9 +37,6 @@ export function effectiveTermCost(params: {
   return 0;
 }
 
-/**
- * Writes the premium as a split expense tagged 'insurance', which the UI uses to block manual edits.
- */
 async function materializeTermExpenses(
   params: TermExpenseParams,
   totalCost: number
@@ -65,7 +55,6 @@ async function materializeTermExpenses(
       sourceType: 'insurance_term',
       sourceId: termId,
     },
-    // Only the policy owner can write terms, so the owner is also the author.
     { ownerId: userId, createdBy: null }
   );
 
@@ -84,7 +73,6 @@ export async function createTermExpenses(params: TermExpenseParams): Promise<voi
   try {
     await materializeTermExpenses(params, totalCost);
   } catch (error) {
-    // The term is already saved, so a failure only leaves the ledger incomplete. Do not fail the write.
     logger.error('Failed to auto-create insurance expenses', {
       termId: params.termId,
       error: error instanceof Error ? error.message : String(error),
@@ -92,15 +80,12 @@ export async function createTermExpenses(params: TermExpenseParams): Promise<voi
   }
 }
 
-/**
- * Replaces a term's premium expenses. Delete and recreate cannot share a transaction, so a failed recreate
- * is surfaced as an error. Swallowing it would silently drop the premium from the ledger.
- */
+// Delete and recreate are not atomic: a failed recreate must throw rather than silently drop the premium.
 export async function updateTermExpenses(params: TermExpenseParams): Promise<void> {
   const { termId, vehicleIds, userId } = params;
   const totalCost = effectiveTermCost(params);
 
-  // deleteBySource drops photo rows with raw SQL and leaves external files behind, so remove the files first.
+  // Photo files must be removed first: deleteBySource drops photo rows with raw SQL and orphans the files.
   const linked = await expenseRepository.findBySource('insurance_term', termId, userId);
   await deletePhotosForEntities(
     'expense',

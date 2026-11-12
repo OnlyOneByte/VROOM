@@ -13,7 +13,6 @@
 		open: boolean;
 		reminderId: string | null;
 		reminderName: string;
-		/** Maps vehicleId to display name; the parent resolves reminder names. */
 		vehicleNames: Map<string, string>;
 	}
 
@@ -23,7 +22,6 @@
 	let loadError = $state<string | null>(null);
 	let expenses = $state<Expense[]>([]);
 
-	// Keyed on open:reminderId, so switching reminders or reopening refetches the expenses.
 	let lastKey = $state('');
 	$effect(() => {
 		const key = `${open}:${reminderId ?? ''}`;

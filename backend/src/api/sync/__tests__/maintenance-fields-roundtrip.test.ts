@@ -1,7 +1,3 @@
-// Maintenance-schedule reminder fields must survive a backup and restore. A NULL due date or
-// mileage value must come back NULL rather than 0 or an empty string. Mileage rows are seeded
-// directly into SQLite.
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -79,7 +75,6 @@ describe('backup → restore round-trip preserves maintenance-schedule fields', 
 
     await roundTrip();
 
-    // The reminder survived with all four mileage columns + the NULL date intact.
     const r = reminderRow('mr1');
     expect(r, 'reminder survived the round-trip').toBeTruthy();
     expect(r.trigger_mode).toBe('mileage');
@@ -91,7 +86,6 @@ describe('backup → restore round-trip preserves maintenance-schedule fields', 
       'a mileage-only reminder keeps a NULL date (not coerced to 0)'
     ).toBeNull();
 
-    // The mileage notification survived: NULL due_date preserved, dueOdometer milestone intact.
     const n = notifRow('mn1');
     expect(n, 'notification survived the round-trip').toBeTruthy();
     expect(n.due_date, 'a mileage notification keeps a NULL due_date').toBeNull();
@@ -127,7 +121,6 @@ describe('backup → restore round-trip preserves maintenance-schedule fields', 
   test('a plain time reminder restores with mileage columns NULL (not 0 or empty)', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Forester', year: 2021 });
 
-    // Mileage columns must come back NULL, not 0.
     const created = await ctx.authed('POST', '/api/v1/reminders', {
       name: 'Registration renewal',
       type: 'notification',

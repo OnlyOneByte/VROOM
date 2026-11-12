@@ -6,7 +6,6 @@ export type ReminderType = 'expense' | 'notification';
 
 export type TriggerMode = 'time' | 'mileage' | 'both';
 
-// Split config for reminder expenses (mirrors backend SplitConfig in db/types)
 export type ReminderSplitConfig =
 	| { method: 'even'; vehicleIds: string[] }
 	| { method: 'absolute'; allocations: { vehicleId: string; amount: number }[] }
@@ -22,8 +21,6 @@ export interface Reminder {
 	frequency: ReminderFrequency;
 	intervalValue: number | null;
 	intervalUnit: IntervalUnit | null;
-	// Mileage fields apply only to triggerMode 'mileage' or 'both'. nextDueOdometer is derived as
-	// lastServiceOdometer + intervalMileage. Distances are unitless ints in the vehicle's distanceUnit.
 	triggerMode: TriggerMode;
 	intervalMileage: number | null;
 	lastServiceOdometer: number | null;
@@ -51,7 +48,6 @@ export interface ReminderNotification {
 	id: string;
 	reminderId: string;
 	userId: string;
-	// Exactly one of dueDate (time trigger) or dueOdometer (mileage trigger) is set.
 	dueDate: string | null;
 	dueOdometer: number | null;
 	isRead: boolean;
@@ -65,10 +61,7 @@ export interface TriggerResult {
 	skipped: Array<{ reminderId: string; reason: string; message?: string }>;
 }
 
-/** Mirrors the backend recurringCostSummary shape. */
 export interface RecurringCostSummary {
-	/** Count of active expense reminders contributing a positive monthly run-rate. */
 	count: number;
-	/** Total normalized monthly run-rate across those reminders (currency/month). */
 	monthlyTotal: number;
 }

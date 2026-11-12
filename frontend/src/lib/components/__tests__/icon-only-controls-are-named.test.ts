@@ -1,5 +1,3 @@
-// Icon-only controls need an aria-label; a title alone does not name them for touch or keyboard users.
-
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -45,7 +43,6 @@ describe('the offline expense cards', () => {
 			).toBeTruthy();
 		}
 
-		// The two names, so a rename has to be deliberate rather than a silent drop to `title`.
 		expect(container.querySelector('button[aria-label="Delete pending expense"]')).not.toBeNull();
 		expect(container.querySelector('button[aria-label="Discard this entry"]')).not.toBeNull();
 	});
@@ -53,7 +50,6 @@ describe('the offline expense cards', () => {
 
 const CONTROL_TAGS = new Set(['a', 'button', 'Button']);
 
-/** Collects the title attribute of every control; a title on a non-control is a tooltip, not a name. */
 function controlTitles(source: string): string[] {
 	return [...source.matchAll(/\btitle="([^"]+)"/g)]
 		.filter(match => {

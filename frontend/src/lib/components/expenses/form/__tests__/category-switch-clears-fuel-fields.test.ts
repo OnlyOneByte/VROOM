@@ -1,5 +1,3 @@
-// Switching a category away from fuel must clear the fuel-only fields, so hidden inputs never submit stale values.
-
 import { describe, expect, test } from 'vitest';
 import { ExpenseFormState } from '../expense-form/expense-form-state.svelte';
 

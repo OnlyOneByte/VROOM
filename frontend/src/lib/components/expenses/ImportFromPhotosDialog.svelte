@@ -1,5 +1,4 @@
 <script lang="ts">
-	/** Reads only receipts VROOM uploaded to its Photos album, never the camera roll. */
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Select from '$lib/components/ui/select';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
@@ -31,9 +30,9 @@
 		photoId: string;
 		thumbnailUrl: string | null;
 		include: boolean;
-		amount: string; // string-bound input; parsed on confirm
+		amount: string;
 		category: ExpenseCategory;
-		date: string; // YYYY-MM-DD
+		date: string;
 		vehicleId: string;
 	}
 
@@ -60,7 +59,6 @@
 		};
 	}
 
-	/** Keyed on the open transition, not the sweep result: deriving "not yet swept" from the rows re-armed the sweep after every empty result. */
 	let lastOpenKey = '';
 	$effect(() => {
 		const key = String(open);
@@ -80,7 +78,7 @@
 		try {
 			localStorage.setItem(DISCLOSURE_KEY, '1');
 		} catch {
-			// localStorage may be unavailable (private mode) — proceed; we just re-ask next time.
+			// localStorage throws in private mode or when site data is blocked.
 		}
 		showDisclosure = false;
 		void sweep();
@@ -123,7 +121,6 @@
 			rows = [];
 			onImported();
 		} catch (e) {
-			// Committed creates stay committed; the dialog stays open so a retry skips them via clientId.
 			appStore.showError(e instanceof Error ? e.message : 'Failed to add some expenses');
 		} finally {
 			isImporting = false;

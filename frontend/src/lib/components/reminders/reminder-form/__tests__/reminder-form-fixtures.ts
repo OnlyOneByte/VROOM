@@ -56,7 +56,6 @@ export function makeReminderWithVehicles(
 	return { reminder: makeReminder(reminderOverrides), vehicleIds };
 }
 
-// A new-reminder draft with a name and one vehicle, so validation tests start from a valid state.
 export function validDraft(overrides: Partial<ReminderDraft> = {}): ReminderDraft {
 	return {
 		...emptyReminderDraft([], new Date('2026-03-01T12:00:00')),

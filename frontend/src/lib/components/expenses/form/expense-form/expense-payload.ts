@@ -8,10 +8,6 @@ export interface ExpensePayloadContext {
 	sourceId: string | null;
 }
 
-/**
- * The single-expense body sent to the server, and queued verbatim when it cannot be sent. Built
- * before the try block so the offline fallback queues exactly what the server would have received.
- */
 export function buildExpenseData(form: ExpenseFormData, ctx: ExpensePayloadContext) {
 	return {
 		vehicleId: form.vehicleId,

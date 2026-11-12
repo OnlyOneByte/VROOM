@@ -1,5 +1,3 @@
-// Pins the vehicle and financing form validators: required fields, ranges, VIN format, the year window and the loan-only APR band.
-
 import { describe, expect, test } from 'vitest';
 import type { VehicleFormData } from '$lib/types';
 import { validateFinancingFields, validateVehicleFields } from '../vehicle-form-validation';
@@ -82,7 +80,6 @@ describe('validateVehicleFields', () => {
 
 describe('validateFinancingFields', () => {
 	test("ownershipType 'own' short-circuits to no validation", () => {
-		// Even an all-invalid form is skipped when owned outright.
 		const allBad = financing({ provider: '', originalAmount: 0, termMonths: 0, paymentAmount: 0 });
 		expect(validateFinancingFields(allBad, 'own')).toEqual({});
 	});
@@ -116,7 +113,6 @@ describe('validateFinancingFields', () => {
 		expect(
 			validateFinancingFields(financing({ financingType: 'loan', apr: -1 }), 'finance').apr
 		).toBe('APR must be between 0% and 50%');
-		// A lease never has its apr checked (the band is guarded by financingType === 'loan').
 		expect(
 			validateFinancingFields(financing({ financingType: 'lease', apr: 999 }), 'finance').apr
 		).toBeUndefined();

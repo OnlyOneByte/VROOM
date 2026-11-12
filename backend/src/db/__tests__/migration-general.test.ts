@@ -16,7 +16,6 @@ import {
   seedCoreData,
 } from './migration-helpers';
 
-// Derived from schema.ts so tables added later are covered without editing this file.
 const schemaColumns = new Map(
   Object.values<unknown>(schema)
     .filter((value): value is SQLiteTable => is(value, SQLiteTable))
@@ -27,8 +26,7 @@ const schemaColumns = new Map(
 );
 const schemaTables = [...schemaColumns.keys()].sort();
 
-// Compared by SQL type, nullability and index set, not just names. Type drift makes drizzle-kit emit a
-// table rebuild that drops rows, and index drift makes it emit a CREATE INDEX that fails on existing installs.
+// Type drift makes drizzle-kit emit a table rebuild that drops rows; index drift emits a CREATE INDEX that fails on existing installs.
 const schemaShapes = new Map(
   Object.values<unknown>(schema)
     .filter((value): value is SQLiteTable => is(value, SQLiteTable))
@@ -43,7 +41,6 @@ const schemaShapes = new Map(
               { type: column.getSQLType(), notNull: column.notNull, primaryKey: column.primary },
             ])
           ),
-          // drizzle-kit records column-level unique constraints as indexes in the snapshot.
           indexes: [
             ...indexes.map((index) => index.config.name),
             ...columns.filter((column) => column.isUnique).map((column) => column.uniqueName),
@@ -55,8 +52,7 @@ const schemaShapes = new Map(
     })
 );
 
-// Frozen. The migrator replays entries whose `when` exceeds the newest recorded value, so editing a
-// shipped row replays or hides that migration on existing databases. Append rows when migrations ship.
+// Frozen: the migrator replays entries whose `when` exceeds the newest recorded one, so shipped rows must not change.
 const SHIPPED_JOURNAL: readonly { idx: number; tag: string; when: number }[] = [
   { idx: 0, tag: '0000_baseline', when: 1794413530056 },
 ];
@@ -82,7 +78,6 @@ describe('Migrations: General', () => {
   });
 
   test('the schema-derived table and column lists are populated', () => {
-    // A broken filter would yield [] and silently pass the set checks below.
     expect(schemaTables.length).toBeGreaterThanOrEqual(21);
     expect(schemaTables).toContain('users');
     expect(schemaColumns.get('users')).toContain('email');
@@ -136,14 +131,11 @@ describe('Migrations: General', () => {
     const schemaChanging = migrations.filter(migrationChangesSchema);
 
     expect(snapshots.length).toBeGreaterThanOrEqual(1);
-    // If the DDL classifier marked everything data-only, the comparison below would be against an empty list.
     expect(schemaChanging.map((m) => m.tag)).toContain(migrations[0].tag);
 
-    // A snapshot naming a migration the journal lacks would diff against a state the migrator never reaches.
     const journalIdxs = new Set(entries.map((entry) => entry.idx));
     expect(snapshots.filter((s) => !journalIdxs.has(s.idx)).map((s) => s.file)).toEqual([]);
 
-    // Data-only migrations need no snapshot of their own.
     expect(snapshots[snapshots.length - 1].idx).toBe(schemaChanging[schemaChanging.length - 1].idx);
   });
 
@@ -154,7 +146,6 @@ describe('Migrations: General', () => {
     for (let i = 1; i < snapshots.length; i++) {
       expect(snapshots[i].prevId).toBe(snapshots[i - 1].id);
     }
-    // A shared parent is the collision drizzle-kit refuses to generate against.
     expect(new Set(snapshots.map((s) => s.prevId)).size).toBe(snapshots.length);
   });
 
@@ -163,7 +154,6 @@ describe('Migrations: General', () => {
 
     expect(Object.keys(head.tables).sort()).toEqual(schemaTables);
 
-    // Content, not just the file name: a drifted head makes db:generate re-emit DDL that already shipped.
     const snapshotColumns = Object.fromEntries(
       Object.entries(head.tables).map(([table, { columns }]) => [
         table,

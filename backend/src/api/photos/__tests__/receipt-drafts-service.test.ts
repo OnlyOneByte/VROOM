@@ -1,10 +1,3 @@
-/**
- * stageReceiptDrafts with injected fakes and no DB or HTTP. Covers one draft per photo, skipping
- * already-imported photos, per-item parse or download failures becoming an empty draft, thumbnail
- * failures becoming null, list failures propagating, and the per-run cap. HTTP wiring is tested in
- * the route test.
- */
-
 import { describe, expect, test } from 'bun:test';
 import type { ReceiptDraft } from '../../providers/domains/vlm/prompt';
 import type { PhotosMediaItem } from '../../providers/services/google-photos-service';
@@ -14,7 +7,6 @@ import {
   stageReceiptDrafts,
 } from '../receipt-drafts-service';
 
-/** Build a StageDeps over simple in-memory fakes; override any seam per test. */
 function makeDeps(overrides: Partial<StageDeps> = {}): StageDeps {
   return {
     listReceiptPhotos: async () => [],
@@ -39,7 +31,6 @@ describe('stageReceiptDrafts', () => {
     const deps = makeDeps({
       listReceiptPhotos: async () => [photo('m-1'), photo('m-2')],
       parseImage: async (bytes) => {
-        // Downloaded bytes encode the photo id, so the parse can be routed per photo.
         const id = bytes.toString().replace('bytes-', '');
         return parsed[id] ?? {};
       },
@@ -126,7 +117,6 @@ describe('stageReceiptDrafts', () => {
   });
 
   test('PERSISTS NOTHING — the orchestration only reads (no write seam in StageDeps)', () => {
-    // No write seam exists in StageDeps, so staging cannot persist an expense.
     const deps = makeDeps();
     expect(Object.keys(deps).sort()).toEqual([
       'downloadPhoto',

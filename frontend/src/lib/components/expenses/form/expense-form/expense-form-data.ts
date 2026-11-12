@@ -1,6 +1,5 @@
 import { toDateInputValue } from '$lib/utils/formatters';
 
-/** Raw text as typed; numbers are parsed only when the payload is built. */
 export interface ExpenseFormData {
 	vehicleId: string;
 	tags: string[];

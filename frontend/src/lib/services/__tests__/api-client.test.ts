@@ -1,8 +1,5 @@
-// Drives the real apiClient methods with a stubbed fetch; sibling service tests mock this module.
-
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-// Pins PUBLIC_API_URL to empty so the asserted URLs are bare paths.
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
 const { apiClient, getApiBaseUrl, withPagination } = await import('../api-client');
@@ -190,7 +187,6 @@ describe('withPagination', () => {
 	});
 });
 
-// raw() must always send credentials, or every download is a 401.
 describe('apiClient.raw', () => {
 	test('prefixes a relative url with the base and always sends credentials: include', async () => {
 		const resp = jsonResponse({ ok: true });

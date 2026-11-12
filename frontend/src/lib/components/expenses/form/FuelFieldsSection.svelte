@@ -12,13 +12,10 @@
 
 	export interface EnergyModeDecision {
 		mode: EnergyMode;
-		/** Mode whose fields to (re)apply, clearing the other mode's. `null` touches nothing. */
 		applyFields: EnergyMode | null;
-		/** fuelType to write into a form carrying no energy values yet. `null` writes nothing. */
 		seedFuelType: string | null;
 	}
 
-	/** Volume/charge/fuelType implied by a mode; the other mode's value is cleared so stale values cannot ride along. */
 	export function energyModeFields(
 		mode: EnergyMode,
 		current: { volume: string; charge: string }
@@ -28,10 +25,6 @@
 			: { volume: current.volume, charge: '', fuelType: '' };
 	}
 
-	/**
-	 * Mode and fuelType must agree, since requiredness follows fuelType. Compare against `seen`: ExpenseForm
-	 * re-emits identical capabilities on load, and a re-run must not clear the expense being edited.
-	 */
 	export function reconcileEnergyMode(current: {
 		mode: EnergyMode;
 		seen: EnergyCapabilities | null;
@@ -46,7 +39,6 @@
 		if (seen && seen.canFuel === caps.canFuel && seen.canCharge === caps.canCharge) return stay;
 
 		if (!seen) {
-			// A filled fuelType decides the mode and must not be overwritten; edit-mode loads restore it.
 			if (fuelType) {
 				return {
 					mode: isElectricFuelType(fuelType) ? 'charging' : 'fuel',
@@ -54,19 +46,15 @@
 					seedFuelType: null
 				};
 			}
-			// Rows with a volume but no fuelType (e.g. Fuelio imports) open volume mode so the loaded value stays visible.
 			if (volume || charge) {
 				return { mode: 'fuel', applyFields: null, seedFuelType: null };
 			}
-			// A charge-only vehicle needs an electric fuelType, or validateForm requires the hidden volume field.
 			if (caps.canCharge && !caps.canFuel) {
 				return { mode: 'charging', applyFields: null, seedFuelType: DEFAULT_CHARGING_FUEL_TYPE };
 			}
-			// Vehicles tracking neither fall back to fuel mode; seeding electric would file the row as a charge.
 			return { mode: 'fuel', applyFields: null, seedFuelType: null };
 		}
 
-		// Keep the current mode when it is still supported; both switches off is a valid vehicle state.
 		if (mode === 'fuel' && !caps.canFuel && caps.canCharge) {
 			return { mode: 'charging', applyFields: 'charging', seedFuelType: null };
 		}
@@ -134,7 +122,6 @@
 		onMileageChange
 	}: Props = $props();
 
-	// Mutable because the user can toggle it; not seeded from props, since the section stays mounted across vehicle changes.
 	let energyMode = $state<EnergyMode>('fuel');
 	let seenCapabilities: EnergyCapabilities | null = null;
 
@@ -172,7 +159,6 @@
 		applyEnergyModeFields(mode);
 	}
 
-	// The writes below re-trigger this effect; the seen comparison makes that re-run a no-op.
 	$effect(() => {
 		const caps: EnergyCapabilities = { canFuel: trackFuel, canCharge: trackCharging };
 		const decision = reconcileEnergyMode({
@@ -355,7 +341,6 @@
 
 	{#if showMpgCalculation}
 		{#if calculatedMpg && energyMode === 'fuel'}
-			<!-- Good/poor is signalled by the glyph, not colour alone. -->
 			<div class="bg-chart-2/10 border border-chart-2/20 rounded-lg p-3">
 				<div class="flex items-center gap-2 text-foreground">
 					<Gauge class="h-4 w-4 text-chart-2" />

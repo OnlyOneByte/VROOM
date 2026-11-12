@@ -41,8 +41,6 @@ describe('maxOf / minOf — behavior identity with Math.max/min', () => {
 });
 
 describe('maxOf / minOf — large arrays', () => {
-  // Math.max(...big) throws RangeError past the engine's argument cap. The cap varies by engine, so
-  // this asserts only the correct answer at a size beyond it.
   test('returns correct results on 500k elements', () => {
     const big = new Array(500_000);
     for (let i = 0; i < big.length; i++) big[i] = i;

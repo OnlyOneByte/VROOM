@@ -1,9 +1,3 @@
-/**
- * Unit tests for validateAndRefreshSession with a mocked Lucia. Covers invalid sessions, untouched
- * sessions (no cookie churn), and extended sessions (cookie re-issued with the same id and the new
- * expiry).
- */
-
 import { describe, expect, test } from 'bun:test';
 import { Hono } from 'hono';
 import type { Lucia } from 'lucia';
@@ -12,7 +6,6 @@ import { validateAndRefreshSession } from '../utils';
 
 const USER = { id: 'u-1' } as { id: string };
 
-/** Build a mock Lucia exposing only the methods validateAndRefreshSession touches + a call log. */
 function makeLucia(opts: { validate: { session: unknown; user: unknown } }): {
   lucia: Lucia;
   calls: string[];
@@ -36,7 +29,6 @@ function makeLucia(opts: { validate: { session: unknown; user: unknown } }): {
   return { lucia, calls };
 }
 
-/** A session as validateSession returns it. `fresh` is true when the expiry was just extended. */
 function session(opts: { fresh: boolean; expiresInMs: number }) {
   return {
     id: 'session-1',
@@ -46,7 +38,6 @@ function session(opts: { fresh: boolean; expiresInMs: number }) {
   };
 }
 
-/** Run the helper inside a real Hono request so the Set-Cookie header can be asserted. */
 async function runWithContext(lucia: Lucia): Promise<{ refreshed: boolean; setCookie: string }> {
   const app = new Hono();
   let refreshed = false;
@@ -64,7 +55,7 @@ describe('validateAndRefreshSession', () => {
     const { lucia, calls } = makeLucia({ validate: { session: null, user: null } });
     const result = await validateAndRefreshSession('bad', lucia);
     expect(result).toBeNull();
-    expect(calls).toEqual(['validate']); // never tried to create/invalidate
+    expect(calls).toEqual(['validate']);
   });
 
   test('an untouched session is returned as-is (refreshed:false, no churn)', async () => {
@@ -72,8 +63,8 @@ describe('validateAndRefreshSession', () => {
     const { lucia, calls } = makeLucia({ validate: { session: untouched, user: USER } });
     const result = await validateAndRefreshSession('ok', lucia);
     expect(result?.refreshed).toBe(false);
-    expect(result?.session).toBe(untouched as never); // same session object, untouched
-    expect(calls).toEqual(['validate']); // NOT create/invalidate — the no-churn invariant
+    expect(result?.session).toBe(untouched as never);
+    expect(calls).toEqual(['validate']);
   });
 
   test('an untouched session emits no Set-Cookie', async () => {

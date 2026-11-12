@@ -1,6 +1,3 @@
-// HOST must reach Bun's server options. Bun binds every interface unless the default export carries a hostname.
-// Source-scan rather than boot: importing index.ts runs migrations and starts timers and a sync worker.
-
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';

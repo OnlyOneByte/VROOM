@@ -1,5 +1,3 @@
-// A parked row must not count as pending: the sync loop skips it, so a badge counting it would never clear.
-
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { offlineExpenseQueue, onlineStatus, syncState } from '$lib/stores/offline.svelte';

@@ -9,7 +9,6 @@ export interface MileageEfficiency {
 export interface MileageEfficiencyInput {
 	category: string;
 	mileage: string;
-	/** Odometer of the previous fuel entry; without it there is nothing to difference against. */
 	previousMileage: number | null | undefined;
 	fuelType: string;
 	volume: string;
@@ -22,11 +21,6 @@ const HIDDEN: MileageEfficiency = {
 	showMpgCalculation: false
 };
 
-/**
- * Efficiency for the fuel entry being typed, measured from the previous fuel entry's odometer.
- * Returns null when there is no previous reading to measure against, meaning the existing figures
- * should be left as they are.
- */
 export function calculateMileageEfficiency(
 	input: MileageEfficiencyInput
 ): MileageEfficiency | null {

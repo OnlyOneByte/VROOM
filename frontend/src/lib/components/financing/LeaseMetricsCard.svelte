@@ -31,7 +31,6 @@
 		}
 	});
 
-	// Whole-lease allowance (annual limit × termMonths/12): burn and limit compare against lifetime miles, so the annual figure would over-report usage.
 	let totalMileageAllowance = $derived(leaseTotalMileageAllowance(financing));
 
 	let mileageUsagePercentage = $derived.by(() => {

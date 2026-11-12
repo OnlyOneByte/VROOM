@@ -12,14 +12,12 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert';
 	import { formatCurrency, formatDate } from '$lib/utils/formatters';
-	// Conflict rows may hold any category string, so use the key-tolerant label helper.
 	import { getCategoryLabel } from '$lib/utils/chart-colors';
 
 	let showModal = $state(false);
 	let currentConflict = $state<SyncConflict | null>(null);
 	let resolving = $state(false);
 
-	/** Remembers the deferred conflict batch by identity, so dismissing the dialog is not undone by the effect that reopens it. */
 	let dismissedBatch = $state<SyncConflict[] | null>(null);
 
 	$effect(() => {
@@ -69,7 +67,6 @@
 <Dialog
 	bind:open={showModal}
 	onOpenChange={open => {
-		// Escape, overlay click and the X close via the primitive, so the deferral is recorded here; a programmatic close is not.
 		if (!open) dismissedBatch = syncConflicts.current;
 	}}
 >

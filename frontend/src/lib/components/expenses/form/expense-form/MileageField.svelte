@@ -6,11 +6,8 @@
 
 	interface Props {
 		value?: string;
-		/** Fuel expenses require an odometer reading; other categories treat it as optional. */
 		required: boolean;
-		/** Already gated on touched by the parent. */
 		error?: string;
-		/** Odometer of the last fuel entry, shown as a hint only when the entry is tagged fuel. */
 		previousFuelMileage: number | null;
 		distanceLabel: string;
 		onInput: () => void;

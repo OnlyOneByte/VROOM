@@ -1,7 +1,3 @@
-// The photo entity-type allowlists in the upload gate, the restore validator and provider routing
-// must stay equal. A type missing from the restore validator aborts the whole restore.
-// ENTITY_TO_CATEGORY is the canonical source; the other two are asserted against its keys.
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { getTableColumns } from 'drizzle-orm';
 import { photos, vehicles } from '../../../db/schema';
@@ -60,7 +56,6 @@ function emptyBackup(userId: string): ParsedBackupData {
 }
 
 describe('photo entity-type allowlist sync (drift guard)', () => {
-  // Each type gets a target row, so only the unknown-type error can signal drift.
   for (const entityType of PHOTO_ENTITY_TYPES) {
     test(`restore validator recognizes photo entityType "${entityType}" (no unknown-type abort)`, () => {
       const backup = emptyBackup('u1');
@@ -108,7 +103,6 @@ describe('photo entity-type allowlist sync (drift guard)', () => {
     });
   }
 
-  // Types outside the canonical set are rejected, so the set is pinned in both directions.
   test('restore validator rejects a photo entityType NOT in the canonical set', () => {
     const backup = emptyBackup('u1');
     backup.photos = [
@@ -121,8 +115,6 @@ describe('photo entity-type allowlist sync (drift guard)', () => {
     expect(result.errors.some((e) => e.includes('unknown entity type'))).toBe(true);
   });
 
-  // A type is recognized when the gate does not throw the unknown-type error. The ownership lookup
-  // fails for the nonexistent id, which is expected.
   describe('upload gate (validateEntityOwnership) recognizes exactly the canonical set', () => {
     let ctx: TestApp;
     beforeEach(async () => {
@@ -138,7 +130,6 @@ describe('photo entity-type allowlist sync (drift guard)', () => {
         } catch (err) {
           msg = err instanceof Error ? err.message : String(err);
         }
-        // Only the unknown-type error signals drift.
         expect(
           msg.includes('Unknown entity type'),
           `upload gate validateEntityOwnership does NOT recognize "${entityType}" though it is in ENTITY_TO_CATEGORY — add a case in photos/helpers.ts`

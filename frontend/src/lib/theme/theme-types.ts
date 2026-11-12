@@ -1,18 +1,10 @@
-/**
- * Theme type model. A theme is a pure value swap on the app.css custom properties declared in both
- * `:root` and `.dark`. `--radius` is `:root`-only, so it is not a themeable key. theme-registry.test.ts
- * checks this list against app.css.
- */
-
 import type { ThemePreference } from '$lib/stores/theme.svelte';
 
-// Orthogonal to the theme id: each theme has a light and a dark variant. Aliases the store's type so both share one vocabulary.
 export type ThemeMode = ThemePreference;
 
-/** Unknown ids resolve to the default theme at runtime. */
 export type ThemeId = string;
 
-// Keys match the app.css custom properties without the leading `--`. A variant missing one would leak the previous theme's value.
+// Keys must match the app.css custom properties; a missing key leaks the previous theme value.
 export type ThemeTokenKey =
 	| 'accent'
 	| 'accent-foreground'
@@ -51,7 +43,6 @@ export type ThemeTokenKey =
 	| 'sidebar-ring'
 	| 'warning';
 
-/** Runtime list of every {@link ThemeTokenKey}. Consumers must not depend on order. */
 export const THEME_TOKEN_KEYS = [
 	'accent',
 	'accent-foreground',
@@ -91,7 +82,6 @@ export const THEME_TOKEN_KEYS = [
 	'warning'
 ] as const satisfies readonly ThemeTokenKey[];
 
-/** One variant's complete token map. Every key is required; values are CSS color strings such as `oklch(1 0 0)`. */
 export type ThemeTokens = Record<ThemeTokenKey, string>;
 
 export interface ThemeVariant {
@@ -99,15 +89,12 @@ export interface ThemeVariant {
 	dark: ThemeTokens;
 }
 
-/** Shipped built-in, or user-authored custom. */
 export type ThemeSource = 'builtin' | 'custom';
 
-/** Identity, picker metadata, and the light and dark token maps. `swatch` lists keys, not colors. */
 export interface ThemeDefinition extends ThemeVariant {
 	id: ThemeId;
 	label: string;
 	description: string;
-	/** Token keys whose colors the picker card previews as a swatch strip. */
 	swatch: ThemeTokenKey[];
 	source: ThemeSource;
 }

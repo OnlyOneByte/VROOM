@@ -15,16 +15,11 @@ import {
 	type SplitState
 } from './split-config';
 
-/** Route-owned values, read on each access so the state follows the current props. */
 export interface ExpenseFormContext {
 	readonly expenseId: string | undefined;
 	readonly returnTo: string;
 }
 
-/**
- * Everything the expense form reads and writes, shared by the component, its children, and the
- * load/submit modules. Handlers are arrow fields so they can be passed as callbacks unbound.
- */
 export class ExpenseFormState {
 	readonly ctx: ExpenseFormContext;
 
@@ -35,7 +30,6 @@ export class ExpenseFormState {
 	showDeleteConfirm = $state(false);
 	vehicles = $state<Vehicle[]>([]);
 	errors = $state<ExpenseFormErrors>({});
-	// Failures no single field owns (server rejection or storage failure); shown next to Save.
 	submitError = $state<string | null>(null);
 	touched = $state<Record<string, boolean>>({});
 	originalExpense = $state<Expense | null>(null);
@@ -73,7 +67,6 @@ export class ExpenseFormState {
 
 	parsedTotalAmount = $derived(parseFloat(this.formData.amount) || 0);
 
-	// Common tags first, then the user's previously-used tags not already in the common list.
 	tagSuggestions = $derived.by(() => {
 		const historical = extractUniqueTags(this.allVehicleExpenses);
 		const common: readonly string[] = COMMON_EXPENSE_TAGS;
@@ -91,7 +84,6 @@ export class ExpenseFormState {
 	);
 	distLabel = $derived(getDistanceUnitLabel(this.effectiveDistanceUnit, false));
 
-	// Shown only for a fuel-tagged entry; the same odometer also drives the MPG calculation.
 	previousFuelHint = $derived(
 		this.lastFuelExpense?.mileage && this.formData.tags.includes('fuel')
 			? this.lastFuelExpense.mileage
@@ -120,6 +112,7 @@ export class ExpenseFormState {
 		};
 	}
 
+	// Arrow-function fields: handlers are passed unbound as callbacks, so they must not become methods.
 	applySplitState = (next: SplitState) => {
 		this.splitMethod = next.splitMethod;
 		this.selectedVehicleIds = next.selectedVehicleIds;
@@ -171,7 +164,6 @@ export class ExpenseFormState {
 			this.sourceId = null;
 		}
 
-		// Clear fuel-only fields when leaving fuel; hidden inputs would otherwise persist and submit stale values.
 		if (categoryValue !== 'fuel') {
 			this.formData.volume = '';
 			this.formData.charge = '';

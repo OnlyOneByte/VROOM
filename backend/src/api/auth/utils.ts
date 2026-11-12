@@ -43,11 +43,7 @@ export function clearSessionCookie(c: Context, cookieName: string): void {
   deleteCookie(c, cookieName, sessionCookieOptions());
 }
 
-/**
- * Single-use, flow-isolated consume of an OAuth state. The entry is deleted whether or not it
- * matches, so a failed or replayed state cannot be retried. `expectedFlow` is `undefined` for the
- * login flow, which requires an entry with no flowType.
- */
+// Single-use: the entry is deleted even on mismatch, so a replayed state cannot be retried.
 export function consumeOAuthState(
   store: Map<string, OAuthStateEntry>,
   stateParam: string | null,
@@ -63,11 +59,7 @@ export function consumeOAuthState(
   return entry;
 }
 
-/**
- * Validates a session and re-issues the browser cookie when Lucia extends the session. Lucia moves
- * the DB expiry during validateSession (signalled by `fresh`), but the cookie is only written at
- * login, so without this the browser drops a still-valid session on the original deadline.
- */
+// Lucia extends the DB expiry without rewriting the cookie; re-issue it or the browser drops a live session.
 export async function validateAndRefreshSession(
   sessionId: string,
   lucia: Lucia,

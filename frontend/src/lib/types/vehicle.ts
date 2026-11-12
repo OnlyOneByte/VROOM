@@ -20,13 +20,11 @@ export interface Vehicle {
 	purchaseDate?: string;
 	financing?: VehicleFinancing;
 	unitPreferences?: UnitPreferences;
-	/** Only on vehicles shared with the current user; owned vehicles have none. */
 	sharedAccess?: SharedAccess;
 	createdAt: string;
 	updatedAt: string;
 }
 
-/** Nullable optional fields accept null to clear them; undefined leaves them unchanged. */
 export interface UpdateVehicleRequest {
 	make?: string;
 	model?: string;
@@ -70,9 +68,7 @@ export interface VehicleFinancing {
 export interface VehicleStats {
 	period: '7d' | '30d' | '90d' | '1y' | 'all';
 	totalMileage: number;
-	/** Fuel-only max within the period; can drop in a short window and ignores manual odometer entries. */
 	currentMileage: number | null;
-	/** All-time odometer across expenses and manual entries; not affected by the period. */
 	currentOdometer: number | null;
 	totalFuelConsumed: number;
 	totalChargeConsumed: number;

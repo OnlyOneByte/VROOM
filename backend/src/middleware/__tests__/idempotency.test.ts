@@ -1,6 +1,3 @@
-// Idempotency contract: method and key gating, cached replay, user scoping, only 2xx cached, and TTL expiry.
-// The store is process-wide, so each test uses its own Idempotency-Key.
-
 import { describe, expect, setSystemTime, test } from 'bun:test';
 import { type Context, Hono } from 'hono';
 import type { AuthUser } from '../../api/auth/lucia';
@@ -16,7 +13,6 @@ interface ErrorBody {
   error: { code: string; message: string };
 }
 
-// getCount() reports handler executions, so a cache replay leaves it unchanged.
 function makeApp(
   opts: { required?: boolean; userId?: string; failStatus?: number; nonJsonBody?: boolean } = {}
 ) {
@@ -42,7 +38,6 @@ function makeApp(
       );
     }
     if (opts.nonJsonBody) {
-      // response.json() would throw on this body.
       return c.body('id,amount\nx,1', 200, { 'content-type': 'text/csv' });
     }
     return c.json({ count });
@@ -145,7 +140,6 @@ describe('idempotency middleware — caching contract', () => {
       await app.request('/op', { method: 'POST', headers });
       expect(getCount()).toBe(1);
 
-      // 25h is past the 24h TTL.
       setSystemTime(new Date('2024-01-02T01:00:00.000Z'));
       await app.request('/op', { method: 'POST', headers });
       expect(getCount()).toBe(2);

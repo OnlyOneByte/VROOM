@@ -1,6 +1,3 @@
-// Property-based tests for pagination.ts: response shape and hasMore, full page iteration, and
-// clampPagination bounds.
-
 import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { buildPaginatedResponse, clampPagination } from '../pagination';

@@ -21,7 +21,6 @@ export interface ManualMappingInput {
 	volumeUnit: VolumeUnit;
 }
 
-/** Only the fields the mapping's display name reads. */
 export type TargetVehicle = Pick<Vehicle, 'year' | 'make' | 'model' | 'nickname'>;
 
 export interface MappingInput {
@@ -31,12 +30,10 @@ export interface MappingInput {
 	categoryRemap: Record<string, ExpenseCategory | undefined>;
 }
 
-/** Drops unset entries so an unmapped field never reaches the server as an empty header name. */
 export function definedColumns(columns: ManualColumns): ManualColumns {
 	return Object.fromEntries(Object.entries(columns).filter(([, v]) => v)) as ManualColumns;
 }
 
-/** Drops cleared category selections; a remap entry only exists once a category is chosen. */
 export function assignedCategoryMap(
 	categoryRemap: Record<string, ExpenseCategory | undefined>
 ): Record<string, ExpenseCategory> {
@@ -46,10 +43,6 @@ export function assignedCategoryMap(
 	>;
 }
 
-/**
- * The column mapping the server needs to import the file, or null while the user still has to
- * supply something (a target vehicle, or the required Date and Amount columns).
- */
 export function buildImportMapping(input: MappingInput): ImportColumnMapping | null {
 	const { preset, targetVehicle, manual, categoryRemap } = input;
 	const remap = assignedCategoryMap(categoryRemap);
@@ -67,7 +60,6 @@ export function buildImportMapping(input: MappingInput): ImportColumnMapping | n
 			dateFormat: manual.dateFormat,
 			...(columns.mileage ? { distanceUnit: manual.distanceUnit } : {}),
 			...(columns.volume ? { volumeUnit: manual.volumeUnit } : {}),
-			// Sent only once a remap exists; otherwise a manual file's category column passes through verbatim.
 			...(hasRemap ? { categoryMap: remap } : {}),
 			...(columns.vehicle || !targetVehicle
 				? {}

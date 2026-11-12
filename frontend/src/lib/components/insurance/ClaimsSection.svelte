@@ -74,7 +74,7 @@
 		not_at_fault: 'Not at fault',
 		shared: 'Shared fault'
 	};
-	// Token-based badge colours that pass WCAG AA; text-chart-* on a chart tint fails contrast for some palette entries.
+	// Token colours pass WCAG AA; text-chart-* on a chart tint fails for some palette entries.
 	const STATUS_VARIANT: Record<ClaimStatus, 'secondary' | 'outline' | 'destructive'> = {
 		filed: 'outline',
 		in_progress: 'secondary',
@@ -143,7 +143,7 @@
 		};
 		try {
 			if (editingId) {
-				// On edit, send null for emptied optionals: JSON.stringify drops undefined, so the old value would survive.
+				// JSON drops undefined; send null to clear an emptied optional.
 				await insuranceApi.updateClaim(policyId, editingId, {
 					...common,
 					description: description.trim() || null,
@@ -185,7 +185,7 @@
 			claims = claims.filter(c => c.id !== claimId);
 		} catch (err) {
 			handleErrorWithNotification(err, 'Failed to delete claim');
-			throw err; // keep the dialog open on failure
+			throw err;
 		}
 	}
 </script>
@@ -252,7 +252,6 @@
 							</div>
 							<div class="flex shrink-0 items-center gap-0.5">
 								{#if !readOnly}
-									<!-- Paperclip toggles the claim's document drawer; the policy drawer lives in PolicyCard. -->
 									<Button
 										variant="ghost"
 										size="icon"

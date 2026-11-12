@@ -1,8 +1,4 @@
-/**
- * HTTP tests for vehicle updates: an optional field can be cleared with null, omitting it keeps the
- * stored value, and license plates are unique per user. createTestApp() must run before any DB-bound
- * import, so this file imports only the harness.
- */
+// createTestApp() must run before any DB-bound import: import only the harness and bun:test.
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
@@ -97,7 +93,7 @@ describe('vehicle license-plate uniqueness is per-user, not global', () => {
   });
 
   test('CREATE with a plate the same user already owns returns 409', async () => {
-    await seedFullVehicle(); // owns 'ABC-123'
+    await seedFullVehicle();
 
     const res = await ctx.authed('POST', '/api/v1/vehicles', {
       make: 'Mazda',
@@ -110,7 +106,7 @@ describe('vehicle license-plate uniqueness is per-user, not global', () => {
 
   test('UPDATE to a plate another tenant owns succeeds', async () => {
     seedForeignVehicleWithPlate('SHARED-9');
-    const id = await seedFullVehicle(); // owns 'ABC-123'
+    const id = await seedFullVehicle();
 
     const res = await ctx.authed('PUT', `/api/v1/vehicles/${id}`, { licensePlate: 'SHARED-9' });
     const body = await json<DataEnvelope<VehicleRow>>(res);

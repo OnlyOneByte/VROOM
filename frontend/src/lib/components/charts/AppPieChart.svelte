@@ -46,7 +46,7 @@
 		return config;
 	});
 
-	// Delay mounting until visible: the motion tween starts at mount time; the MutationObserver check fires synchronously.
+	// Tween starts at mount, so mount only once the container is visible.
 	let pieGate = createVisibilityWatch();
 </script>
 

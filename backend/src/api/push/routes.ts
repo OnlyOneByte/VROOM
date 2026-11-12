@@ -1,9 +1,3 @@
-/**
- * Web Push routes, mounted at `/api/v1/push`. The private VAPID key never leaves the server. When push
- * is disabled, the vapid key route answers 503 PUSH_NOT_CONFIGURED so the client can fall back to the
- * in-app feed. Subscriptions are always scoped to the session user.
- */
-
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
@@ -17,7 +11,6 @@ const routes = new Hono();
 
 routes.use('*', requireAuth);
 
-// Bounds keep an oversized body from bloating the stored row or the later web-push call.
 const MAX_ENDPOINT_CHARS = 2000;
 const MAX_KEY_CHARS = 512;
 const MAX_USER_AGENT_CHARS = 512;
@@ -45,14 +38,14 @@ routes.get('/vapid-public-key', (c) => {
       503
     );
   }
-  // Only the public key is returned; the private key is never sent to clients.
+  // The private VAPID key must never be returned.
   return c.json({ success: true, data: { publicKey: CONFIG.push.vapidPublicKey } });
 });
 
 routes.post('/subscribe', zValidator('json', subscribeSchema), async (c) => {
   const user = c.get('user');
   const body = c.req.valid('json');
-  // The server will later POST to this URL, so reject anything off the push-vendor allowlist first.
+  // The server later POSTs to this URL; reject anything off the push-vendor allowlist.
   if (!isAllowedPushEndpoint(body.endpoint)) {
     throw new ValidationError('Unsupported push endpoint.');
   }
@@ -62,11 +55,9 @@ routes.post('/subscribe', zValidator('json', subscribeSchema), async (c) => {
     auth: body.keys.auth,
     userAgent: body.userAgent ?? null,
   });
-  // The keys are not echoed back; the client already holds them.
   return c.json({ success: true, data: { id: stored.id } }, 201);
 });
 
-/** Removes the session user's own subscription. An unknown endpoint is a no-op. */
 routes.delete('/subscribe', zValidator('json', unsubscribeSchema), async (c) => {
   const user = c.get('user');
   const { endpoint } = c.req.valid('json');

@@ -1,8 +1,4 @@
-/**
- * Read-only tools the assistant may call. Every tool takes its userId from the session, never from
- * model arguments, validates args with Zod, and returns dollar amounts through the same transform
- * the HTTP routes use. Raw cents would make the model state every figure 100x too large.
- */
+// userId always comes from the session, never from model arguments.
 
 import { z } from 'zod';
 import {
@@ -69,7 +65,6 @@ const rangeVehicleArgs = z
   .object({ range: rangeSchema, vehicleId: z.string().min(1).optional() })
   .strip();
 
-/** Derived from the Zod schema itself so the advertised arguments cannot drift from the validated ones. */
 function toToolParameters(schema: z.ZodType): Record<string, unknown> {
   const { $schema: _dialect, ...jsonSchema } = z.toJSONSchema(schema);
   return jsonSchema;
@@ -79,7 +74,6 @@ export interface AssistantTool<A = unknown> {
   name: string;
   description: string;
   schema: z.ZodType<A>;
-  /** JSON Schema advertised to the model for the same argument object. */
   parameters: Record<string, unknown>;
   run(args: A, userId: string, nowMs: number): Promise<unknown>;
 }
@@ -88,9 +82,7 @@ interface AssistantToolSpec<A, R> {
   name: string;
   description: string;
   schema: z.ZodType<A>;
-  /** Money comes back in integer cents. */
   read(args: A, userId: string, nowMs: number): Promise<R>;
-  /** Must be the same mapper the matching HTTP route uses, so the two surfaces cannot diverge. */
   toApi(data: R): unknown;
 }
 
@@ -104,12 +96,7 @@ function defineTool<A, R>(spec: AssistantToolSpec<A, R>): AssistantTool<A> {
   };
 }
 
-/**
- * Scope for a model-supplied vehicleId: throws unless the session user can read the vehicle, then
- * returns the owner's id because shared-vehicle rows are owner-stamped. Without a vehicleId the scope
- * is the acting user's own fleet, which deliberately excludes vehicles shared to them: including them
- * would double-count co-owned totals and send the other user's name to the LLM provider.
- */
+// Without a vehicleId, scope to the user's own vehicles: shared ones would leak another user's name to the LLM provider.
 async function resolveScope(vehicleId: string | undefined, userId: string): Promise<string> {
   if (!vehicleId) return userId;
   return requireVehicleOwnerScope(vehicleId, userId, 'read');

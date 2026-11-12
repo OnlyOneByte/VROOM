@@ -14,8 +14,6 @@ interface LogContext {
   [key: string]: unknown;
 }
 
-// Bounds the cause walk. A cyclic cause chain would recurse forever, because JSON.stringify cycle
-// detection never sees the freshly built objects.
 const MAX_CAUSE_DEPTH = 4;
 
 interface SerializedError {
@@ -39,15 +37,12 @@ function serializeCause(cause: unknown, depth: number): unknown {
   return serializeError(cause, depth + 1);
 }
 
-// Applied at every nesting depth. bigint is stringified because JSON.stringify throws on it.
 function serializeLogValue(_key: string, value: unknown): unknown {
   if (value instanceof Error) return serializeError(value, 0);
   if (typeof value === 'bigint') return String(value);
   return value;
 }
 
-// Never throws: this runs while an error is already being handled, so a serialization failure must
-// not replace it.
 function stringifyContext(context: LogContext): string {
   try {
     return JSON.stringify(context, serializeLogValue);

@@ -1,6 +1,3 @@
-// An unmatched route must answer the same error envelope as a thrown error. A string-valued error
-// leaves the client's error.message undefined.
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, json, type TestApp } from '../test-helpers/http-client';
 
@@ -23,7 +20,6 @@ describe('the 404 handler', () => {
 
     const body = await json<ErrorBody>(res);
     expect(body.success).toBe(false);
-    // A string error would leave error.message undefined on the client.
     expect(typeof body.error).toBe('object');
     expect(body.error.code).toBe('NotFoundError');
     expect(body.error.message).toBe('The requested endpoint does not exist');
@@ -31,7 +27,6 @@ describe('the 404 handler', () => {
   });
 
   test('a thrown NotFoundError on a REAL route uses the same envelope keys', async () => {
-    // Same shape from the other direction, so the two 404 paths cannot drift apart.
     const res = await ctx.authed('GET', '/api/v1/vehicles/no-such-vehicle');
     expect(res.status).toBe(404);
     const body = await json<ErrorBody>(res);

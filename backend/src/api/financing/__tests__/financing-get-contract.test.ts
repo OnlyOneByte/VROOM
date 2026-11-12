@@ -1,8 +1,3 @@
-/**
- * Pins the enriched shape of the single-financing GET: the computed computedBalance and
- * eligibleForPayoff fields the frontend reads, alongside the base row.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -33,7 +28,6 @@ interface FinancingShape {
 const seedVehicle = (nickname: string): Promise<string> =>
   seedVehicleShared(ctx, { make: 'Honda', model: 'Civic', year: 2022, nickname });
 
-/** Attach a loan so the GET returns an enriched record. */
 async function seedLoan(vehicleId: string): Promise<void> {
   const res = await ctx.authed('POST', `/api/v1/financing/vehicles/${vehicleId}/financing`, {
     financingType: 'loan',
@@ -77,7 +71,6 @@ describe('GET single financing — enriched contract (FE↔BE drift guard)', () 
   });
 
   test('a fresh loan is not eligible for payoff and its computedBalance is the real balance', async () => {
-    // Guards against a hardcoded or zeroed balance, not just the presence of the keys.
     const id = await seedVehicle('FreshLoan');
     await seedLoan(id);
 
@@ -109,7 +102,6 @@ describe('POST financing upsert re-activates a paid-off record', () => {
     expect(paidOff, 'financing row should still exist after payoff').not.toBeNull();
     expect(paidOff?.isActive).toBe(false);
 
-    // The payload omits isActive, as the real form does.
     const refi = await ctx.authed('POST', `/api/v1/financing/vehicles/${id}/financing`, {
       financingType: 'lease',
       provider: 'New Leasing Co',

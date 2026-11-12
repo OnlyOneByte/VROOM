@@ -25,7 +25,6 @@ describe('effectiveMonthlyPremium', () => {
   });
 
   test('totalCost-only term amortizes across the inclusive month span', () => {
-    // Jan through Jun is 6 month keys, so 1200 / 6 = 200.
     expect(
       effectiveMonthlyPremium({
         startDate: new Date('2024-01-15'),
@@ -37,7 +36,6 @@ describe('effectiveMonthlyPremium', () => {
   });
 
   test('totalCost amortization is day-1 anchored — a day-31 start does not skip a month', () => {
-    // Jan 31 .. Mar 1 spans Jan, Feb, and Mar. A raw setMonth walk would skip February.
     expect(
       effectiveMonthlyPremium({
         startDate: new Date('2024-01-31'),
@@ -79,7 +77,6 @@ describe('effectiveMonthlyPremium', () => {
         totalCost: 1200,
       })
     ).toBe(0);
-    // Half-open span (one date missing) also has no resolvable range.
     expect(
       effectiveMonthlyPremium({
         startDate: new Date('2024-01-01'),

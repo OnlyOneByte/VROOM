@@ -1,6 +1,3 @@
-// Money is stored and computed as integer cents. Dollars exist only at the input edge
-// (dollarsToCents) and the response edge (centsToDollars).
-
 import { z } from 'zod';
 import type { ExpenseSummary } from '../api/expenses/repository';
 
@@ -13,7 +10,6 @@ export function centsToDollars(cents: number): number {
   return cents / 100;
 }
 
-// Shallow copy. Null or undefined money values stay absent.
 function centsFieldsToDollars<T extends Record<string, unknown>>(
   row: T,
   moneyFields: readonly (keyof T)[]
@@ -28,7 +24,6 @@ function centsFieldsToDollars<T extends Record<string, unknown>>(
   return out;
 }
 
-// Apply at route response boundaries only. Repositories and analytics must keep reading cents.
 const EXPENSE_MONEY_FIELDS = ['expenseAmount', 'groupTotal'] as const;
 const FINANCING_MONEY_FIELDS = [
   'originalAmount',
@@ -72,9 +67,6 @@ const vehicleToApi = <T extends Record<string, unknown>>(row: T) =>
 export const reminderToApi = <T extends Record<string, unknown>>(row: T) =>
   mapMoney(row, REMINDER_MONEY_FIELDS as readonly (keyof T)[]);
 
-// computedBalance is derived in cents upstream. It is converted only when present, because a
-// freshly written row has none. The financing route and the vehicle route both embed financing, so
-// they share this mapper to show the same balance.
 export function financingWithBalanceToApi<T extends Record<string, unknown>>(row: T): T {
   const withMoney = financingToApi(row);
   return typeof withMoney.computedBalance === 'number'
@@ -82,8 +74,6 @@ export function financingWithBalanceToApi<T extends Record<string, unknown>>(row
     : withMoney;
 }
 
-// Also converts the embedded financing. Shared with the assistant tools, which return vehicle rows
-// too.
 export function vehicleRowToApi<T extends Record<string, unknown>>(row: T): T {
   const v = vehicleToApi(row);
   const fin = v.financing as Record<string, unknown> | null | undefined;
@@ -113,10 +103,7 @@ export function expenseSummaryToApi(summary: ExpenseSummary): ExpenseSummary {
   };
 }
 
-// Bounds apply to the dollar value the client sent, so compose them on the base z.number()
-// before the transform.
-//  moneyDollarsToCents((n) => n.positive('Amount must be positive'))
-//  moneyDollarsToCents((n) => n.min(0, 'Cannot be negative')).optional()
+// Refinements apply to the dollar value, so compose them before the cents transform.
 export function moneyDollarsToCents(build: (base: z.ZodNumber) => z.ZodNumber = (n) => n) {
   return build(z.number()).transform(dollarsToCents);
 }

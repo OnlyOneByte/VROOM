@@ -1,10 +1,3 @@
-/**
- * notifyUser against the in-memory DB with a fake PushSender. Covers marking success, pruning gone
- * endpoints, counting transient failures and pruning past the cap, fan-out across devices, swallowing
- * sender exceptions, and sending only to the target user. An injected sender runs even when VAPID is
- * not configured.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 import {
@@ -20,7 +13,6 @@ let userA: string;
 let userB: string;
 let bCounter = 0;
 
-/** A fake sender that returns a scripted result per endpoint (default ok), and records calls. */
 function scriptedSender(
   byEndpoint: Record<string, PushResult> = {}
 ): PushSender & { calls: string[] } {
@@ -59,7 +51,7 @@ async function sub(userId: string, endpoint: string): Promise<void> {
 describe('notifyUser lifecycle', () => {
   test('ok → markSuccess, the subscription survives', async () => {
     await sub(userA, 'ep-ok');
-    setPushSenderForTest(scriptedSender()); // default ok
+    setPushSenderForTest(scriptedSender());
 
     const summary = await notifyUser(userA, PAYLOAD);
     expect(summary).toEqual({ sent: 1, pruned: 0, failed: 0 });
@@ -85,7 +77,7 @@ describe('notifyUser lifecycle', () => {
 
     await notifyUser(userA, PAYLOAD);
     const rows = await pushSubscriptionRepository.findByUser(userA);
-    expect(rows).toHaveLength(1); // survives the first miss
+    expect(rows).toHaveLength(1);
     expect(rows[0].failureCount).toBe(1);
   });
 
@@ -93,7 +85,7 @@ describe('notifyUser lifecycle', () => {
     await sub(userA, 'ep-dead');
     setPushSenderForTest(scriptedSender({ 'ep-dead': { kind: 'transientError' } }));
 
-    const cap = 5; // Matches CONFIG.validation.push.maxConsecutiveFailures.
+    const cap = 5;
     for (let i = 0; i < cap; i++) await notifyUser(userA, PAYLOAD);
     expect(await pushSubscriptionRepository.findByUser(userA)).toHaveLength(0);
   });
@@ -124,11 +116,9 @@ describe('notifyUser lifecycle', () => {
       },
     });
 
-    // Must not reject, and must still try both endpoints.
     const summary = await notifyUser(userA, PAYLOAD);
     expect(calls).toBe(2);
     expect(summary.failed).toBe(2);
-    // Both rows survive (a thrown transport error is not a definitive "gone").
     expect(await pushSubscriptionRepository.findByUser(userA)).toHaveLength(2);
   });
 
@@ -139,6 +129,6 @@ describe('notifyUser lifecycle', () => {
     setPushSenderForTest(sender);
 
     await notifyUser(userA, PAYLOAD);
-    expect(sender.calls).toEqual(['ep-a']); // never ep-b
+    expect(sender.calls).toEqual(['ep-a']);
   });
 });

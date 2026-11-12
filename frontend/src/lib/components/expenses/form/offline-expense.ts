@@ -20,11 +20,6 @@ export interface ParsedExpenseForm {
 	missedFillup?: boolean | undefined;
 }
 
-/**
- * The outbox payload for an expense that could not reach the server. fuelType must ride along
- * because the sync transform routes charge vs volume on it, and missedFillup because dropping it
- * makes MPG pairing span the unlogged gap.
- */
 export function toOfflineExpense(expense: ParsedExpenseForm): QueuedExpenseInput {
 	return {
 		vehicleId: expense.vehicleId,

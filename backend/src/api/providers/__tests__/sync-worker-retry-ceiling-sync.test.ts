@@ -25,7 +25,6 @@ describe('sync-worker retry ceiling matches the repository query', () => {
         status: 'active',
       })
       .returning();
-    // One photo per ref: a photo can hold only one ref per provider.
     const seedRef = async (id: string, retryCount: number) => {
       const [photo] = await db
         .insert(schema.photos)
@@ -52,8 +51,6 @@ describe('sync-worker retry ceiling matches the repository query', () => {
 
     const queued = (await photoRefRepository.findPendingOrFailed(100)).map((r) => r.id);
 
-    // A ref at the ceiling is parked on purpose (terminal auth errors park there); if the query
-    // includes it, the worker re-picks it forever.
     expect(queued).toContain('one-below-ceiling');
     expect(queued).not.toContain('at-ceiling');
   });

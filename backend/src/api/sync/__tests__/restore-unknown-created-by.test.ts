@@ -1,6 +1,3 @@
-// A backup restored onto another instance must not fail on an expenses.created_by that names a user
-// absent here. Such an author is dropped to NULL, and the rest of the row is kept.
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import AdmZip from 'adm-zip';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
@@ -33,7 +30,6 @@ describe('restore of a backup whose created_by names a user absent from this ins
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');
 
-    // The harness user is the fleet OWNER; a second user is the editor who authored one row.
     const editorId = 'editor-on-the-old-instance';
     await db
       .insert(schema.users)
@@ -51,7 +47,6 @@ describe('restore of a backup whose created_by names a user absent from this ins
       [vehicleId, ctx.user.id]
     );
 
-    // The author id is one this instance never issued, as in a backup from another instance.
     const zip = new AdmZip(await backupService.exportAsZip(ctx.user.id));
     const entry = zip.getEntry('expenses.csv');
     if (!entry) throw new Error('expenses.csv missing from the exported backup');

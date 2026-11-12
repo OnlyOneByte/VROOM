@@ -25,17 +25,11 @@ interface FuelEfficiencyResponse {
 	fuelEfficiencyTrend: FuelEfficiencyPoint[];
 }
 
-/**
- * Twelve local months ending at the start of tomorrow, in unix seconds. Not "now": date-only expenses
- * are anchored at noon and the upper bound is exclusive, so an end of "now" would hide today's rows
- * until noon.
- */
 export function getDefaultDateRange(): { startDate: number; endDate: number } {
 	const now = new Date();
 	const year = now.getFullYear();
 	const month = now.getMonth();
 	const day = now.getDate();
-	// The Date constructor normalizes day/month overflow, so day + 1 is safe.
 	const start = Math.floor(new Date(year - 1, month, day).getTime() / 1000);
 	const end = Math.floor(new Date(year, month, day + 1).getTime() / 1000);
 	return { startDate: start, endDate: end };
@@ -127,7 +121,6 @@ export const analyticsApi = {
 				`/api/v1/analytics/summary${buildQueryString({ startDate: params.startDate, endDate: params.endDate })}`
 			);
 		} catch (error: unknown) {
-			// Fall back only for 404 (endpoint not deployed yet) or network errors.
 			const is404 = error instanceof ApiError && error.statusCode === 404;
 			if (!is404 && !(error instanceof NetworkError)) throw error;
 

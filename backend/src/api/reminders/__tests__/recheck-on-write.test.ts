@@ -1,8 +1,3 @@
-/**
- * Mileage reminders fire as soon as an odometer reading or mileaged expense crosses their milestone,
- * without waiting for /trigger. Reminder rows are seeded via sqlite so the setup can sit below the milestone.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -35,7 +30,6 @@ describe('mileage re-check on write', () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'RAV4', year: 2022 });
     seedMileageReminder(ctx, 'rw1', vehicleId, 35000);
 
-    // Just the write — no POST /trigger. The recheck hook should fire it.
     await addOdometerReading(ctx, vehicleId, 35100);
 
     expect(mileageNotifCount('rw1')).toBe(1);
@@ -71,10 +65,10 @@ describe('mileage re-check on write', () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'RAV4', year: 2022 });
     seedMileageReminder(ctx, 'rw4', vehicleId, 35000);
 
-    await addOdometerReading(ctx, vehicleId, 36000); // recheck fires it
+    await addOdometerReading(ctx, vehicleId, 36000);
     expect(mileageNotifCount('rw4')).toBe(1);
 
-    await ctx.authed('POST', '/api/v1/reminders/trigger'); // must NOT add a second
+    await ctx.authed('POST', '/api/v1/reminders/trigger');
     expect(mileageNotifCount('rw4')).toBe(1);
   });
 
@@ -82,7 +76,6 @@ describe('mileage re-check on write', () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'RAV4', year: 2022 });
     seedMileageReminder(ctx, 'rw5', vehicleId, 35000);
 
-    // An expense with NO mileage — even though the milestone is 35000, no reading exists.
     const res = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId,
       category: 'misc',
@@ -95,13 +88,11 @@ describe('mileage re-check on write', () => {
   });
 });
 
-/** Editing a reading or expense across a milestone must fire too, not only creating one. */
 describe('mileage re-check on update', () => {
   test('editing an odometer reading UP across the milestone fires immediately (no /trigger)', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'RAV4', year: 2022 });
     seedMileageReminder(ctx, 'ru1', vehicleId, 35000);
 
-    // Create a reading BELOW the milestone — fires nothing yet.
     const created = await ctx.authed('POST', `/api/v1/odometer/${vehicleId}`, {
       odometer: 34000,
       recordedAt: '2024-06-01T00:00:00.000Z',
@@ -119,7 +110,6 @@ describe('mileage re-check on update', () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'RAV4', year: 2022 });
     seedMileageReminder(ctx, 'ru2', vehicleId, 35000);
 
-    // A fuel expense BELOW the milestone — fires nothing yet.
     const created = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId,
       category: 'fuel',
@@ -132,23 +122,17 @@ describe('mileage re-check on update', () => {
     expect(created.status, JSON.stringify(body)).toBeLessThan(300);
     expect(mileageNotifCount('ru2')).toBe(0);
 
-    // Correct the mileage up across the milestone — recheck must fire it.
     const put = await ctx.authed('PUT', `/api/v1/expenses/${body.data.id}`, { mileage: 35500 });
     expect(put.status, await put.text()).toBe(200);
     expect(mileageNotifCount('ru2')).toBe(1);
   });
 });
 
-/**
- * Deleting a reading must not un-fire or re-fire a notification. Crossings only move forward and dedup
- * holds, so a recheck on delete would be a regression.
- */
 describe('deleting an odometer reading', () => {
   test('keeps an already-fired mileage notification and does not re-fire it', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'RAV4', year: 2022 });
     seedMileageReminder(ctx, 'rd1', vehicleId, 35000);
 
-    // A reading across the milestone fires the notification (via the create recheck).
     const created = await ctx.authed('POST', `/api/v1/odometer/${vehicleId}`, {
       odometer: 36000,
       recordedAt: '2024-06-01T00:00:00.000Z',
@@ -157,7 +141,6 @@ describe('deleting an odometer reading', () => {
     expect(created.status, JSON.stringify(body)).toBe(201);
     expect(mileageNotifCount('rd1')).toBe(1);
 
-    // Delete that highest reading — the current odometer drops back below the milestone.
     const del = await ctx.authed('DELETE', `/api/v1/odometer/${body.data.id}`);
     expect(del.status, await del.text()).toBe(200);
 

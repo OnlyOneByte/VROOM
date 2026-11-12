@@ -1,8 +1,3 @@
-// Every backed-up table with a foreign key to another backed-up table must have a referential
-// validator in validateReferentialIntegrity. A missing one lets a dangling FK pass validation and
-// then fail mid-restore, after the wipe. FK targets that are not backed up (users, user_providers,
-// sessions) are skipped. Pure introspection of the schema and backup.ts source, no DB.
-
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -14,10 +9,8 @@ import { TABLE_SCHEMA_MAP } from '../../../config';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BACKUP_SRC = readFileSync(join(HERE, '..', 'backup.ts'), 'utf-8');
 
-// Parent tables that are never backed up. Mirrors EXCLUDED_BY_DESIGN in backup-table-coverage.
 const NON_BACKED_UP_PARENTS = new Set(['users', 'user_providers', 'sessions']);
 
-/** Source of validateReferentialIntegrity, up to the next method. */
 function refIntegrityBody(): string {
   const start = BACKUP_SRC.indexOf('private validateReferentialIntegrity(');
   expect(start, 'validateReferentialIntegrity should exist in backup.ts').toBeGreaterThan(-1);
@@ -45,7 +38,6 @@ describe('backup referential-integrity validation coverage', () => {
       ];
       if (crossBackupFkParents.length === 0) continue;
 
-      // Word boundary, so `backup.insurance` does not match `backup.insuranceTerms`.
       const referenced = new RegExp(`backup\\.${key}\\b`).test(body);
       if (!referenced) {
         missing.push(`${key} (FK → ${crossBackupFkParents.join(', ')})`);
@@ -63,7 +55,6 @@ describe('backup referential-integrity validation coverage', () => {
   });
 
   test('the FK introspection finds cross-backup FKs', () => {
-    // Fails if introspection finds nothing, so the coverage test cannot pass trivially.
     const withCrossBackupFk = Object.entries(TABLE_SCHEMA_MAP)
       .filter(([, table]) =>
         getTableConfig(table)
@@ -79,7 +70,6 @@ describe('backup referential-integrity validation coverage', () => {
   });
 
   test('userId-PK-only tables (userPreferences, syncState) are NOT required to have a ref-validator', () => {
-    // Their only FK is userId → users, which is not backed up, so no validator is required.
     for (const key of ['userPreferences', 'syncState']) {
       const cfg = getTableConfig(TABLE_SCHEMA_MAP[key]);
       const crossBackupFks = cfg.foreignKeys

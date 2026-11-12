@@ -7,14 +7,12 @@ import { DatabaseError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { BaseRepository } from '../../utils/repository';
 
-/** Balance in integer cents at or below which a financing counts as paid off. */
 export const PAYOFF_BALANCE_THRESHOLD = 100;
 
 export function isEligibleForPayoff(computedBalance: number): boolean {
   return computedBalance <= PAYOFF_BALANCE_THRESHOLD;
 }
 
-/** Adds computedBalance and eligibleForPayoff to a financing row. Pure; the caller supplies the balance. */
 export function withComputedBalance<T>(
   financing: T,
   computedBalance: number
@@ -36,19 +34,11 @@ export class FinancingRepository extends BaseRepository<VehicleFinancing, NewVeh
     return result[0] || null;
   }
 
-  /**
-   * Balance (cents) for one financing record, clamped to 0; 0 if the record does not exist.
-   * Delegates to computeBalances so the balance SQL lives in one place.
-   */
   async computeBalance(financingId: string): Promise<number> {
     const balances = await this.computeBalances([financingId]);
     return balances.get(financingId) ?? 0;
   }
 
-  /**
-   * Balances (cents) keyed by financing id, computed in two queries. Ids with no record are
-   * omitted, so a miss means "no balance".
-   */
   async computeBalances(financingIds: string[]): Promise<Map<string, number>> {
     const balances = new Map<string, number>();
     if (financingIds.length === 0) {

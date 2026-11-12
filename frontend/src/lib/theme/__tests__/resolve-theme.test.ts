@@ -1,5 +1,3 @@
-// resolveTheme is total: it returns a valid token map for any input and never throws.
-
 import { describe, expect, test } from 'vitest';
 import { resolveTheme, resolveThemeDefinition, resolveVariant } from '../resolve-theme';
 import { DEFAULT_THEME_ID, THEME_REGISTRY } from '../theme-registry';

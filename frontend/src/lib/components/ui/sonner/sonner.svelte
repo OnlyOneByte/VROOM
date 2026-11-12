@@ -5,5 +5,5 @@
 	let { ...restProps }: SonnerProps = $props();
 </script>
 
-<!-- sonner styles from its theme prop, not the .dark class, so the store value is passed through. -->
+<!-- sonner takes its theme from the theme prop, not the .dark class. -->
 <Sonner theme={themeStore.current} class="toaster group" {...restProps} />

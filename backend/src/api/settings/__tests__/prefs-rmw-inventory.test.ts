@@ -1,9 +1,3 @@
-/**
- * Drift guard for read-modify-write updates of the JSON config columns on user_preferences. Those
- * updates can lose concurrent writes, so the exact count of such call sites is pinned here. A new
- * one should use the atomic mergeJsonField instead, or update the count deliberately.
- */
-
 import { describe, expect, test } from 'bun:test';
 
 async function countRmwUpdates(relPath: string): Promise<number> {
@@ -13,12 +7,10 @@ async function countRmwUpdates(relPath: string): Promise<number> {
 
 describe('userPreferences RMW inventory', () => {
   test('settings PUT keeps exactly one read-modify-write update', async () => {
-    // Writes the merged config after validating the merged result.
     expect(await countRmwUpdates('api/settings/routes.ts')).toBe(1);
   });
 
   test('providers routes keep exactly two read-modify-write updates', async () => {
-    // cleanupStorageConfig depends on the current value, so it cannot be a static patch.
     expect(await countRmwUpdates('api/providers/routes.ts')).toBe(2);
   });
 

@@ -1,7 +1,3 @@
-// Restore must stamp the importer's userId onto every owned row and never trust the userId in the
-// backup file. Validation only checks the envelope, so a tampered row would otherwise land under
-// another user.
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -51,7 +47,6 @@ function photoRows(): PhotoRowDb[] {
 
 describe('restore stamps the importer userId (cross-tenant write guard)', () => {
   test('a backup whose vehicle row carries a FOREIGN userId still restores as the importer', async () => {
-    // Seed a vehicle for the importing (harness) user, then export a real ZIP.
     const created = await ctx.authed('POST', '/api/v1/vehicles', {
       make: 'Honda',
       model: 'Civic',
@@ -67,7 +62,6 @@ describe('restore stamps the importer userId (cross-tenant write guard)', () => 
 
     const zip = await backupService.exportAsZip(ctx.user.id);
 
-    // The foreign user must exist to satisfy the FK.
     const { db } = await import('../../../db/connection');
     const schema = await import('../../../db/schema');
     const foreignId = 'victim-user-1';
@@ -83,11 +77,9 @@ describe('restore stamps the importer userId (cross-tenant write guard)', () => 
     archive.updateFile('vehicles.csv', Buffer.from(tampered, 'utf-8'));
     const tamperedZip = archive.toBuffer();
 
-    // metadata.userId stays the importer's, so the envelope check passes.
     const result = await restoreService.restoreFromBackup(ctx.user.id, tamperedZip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 
-    // The restored row must be owned by the importer.
     const rows = vehicleRows();
     expect(rows, 'exactly the one restored vehicle').toHaveLength(1);
     expect(rows[0].id).toBe(vehicleId);
@@ -97,7 +89,6 @@ describe('restore stamps the importer userId (cross-tenant write guard)', () => 
     expect(rows.filter((r) => r.user_id === foreignId)).toHaveLength(0);
   });
 
-  // Validation does not check userId on insurance policies, so the stamp is their only defense.
   test('a backup whose insurance row carries a foreign userId still restores as the importer', async () => {
     const vehRes = await ctx.authed('POST', '/api/v1/vehicles', {
       make: 'Honda',
@@ -146,7 +137,6 @@ describe('restore stamps the importer userId (cross-tenant write guard)', () => 
     const result = await restoreService.restoreFromBackup(ctx.user.id, tamperedZip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 
-    // The restored policy must be owned by the importer.
     const rows = policyRows();
     expect(rows, 'exactly the one restored policy').toHaveLength(1);
     expect(rows[0].id).toBe(polBody.data.id);
@@ -156,7 +146,6 @@ describe('restore stamps the importer userId (cross-tenant write guard)', () => 
     expect(rows.filter((r) => r.user_id === foreignId)).toHaveLength(0);
   });
 
-  // Photo validation does not check userId, so the stamp is the only defense here.
   test('a backup whose photo row carries a foreign userId still restores as the importer', async () => {
     const vehRes = await ctx.authed('POST', '/api/v1/vehicles', {
       make: 'Honda',
@@ -196,7 +185,6 @@ describe('restore stamps the importer userId (cross-tenant write guard)', () => 
     const result = await restoreService.restoreFromBackup(ctx.user.id, tamperedZip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 
-    // The restored photo must be owned by the importer.
     const rows = photoRows();
     expect(rows, 'exactly the one restored photo').toHaveLength(1);
     expect(rows[0].id).toBe('photo-stamp-1');
@@ -207,7 +195,6 @@ describe('restore stamps the importer userId (cross-tenant write guard)', () => 
   });
 
   test('a normal (untampered) backup still round-trips intact', async () => {
-    // Guard that stamping is a no-op for legitimate backups.
     const created = await ctx.authed('POST', '/api/v1/vehicles', {
       make: 'Toyota',
       model: 'Camry',

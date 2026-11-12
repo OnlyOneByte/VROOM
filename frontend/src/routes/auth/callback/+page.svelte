@@ -28,7 +28,6 @@
 				throw new Error('No authorization code received');
 			}
 
-			// The backend sets the session; this page only checks auth state.
 			await authStore.initialize();
 		} catch (err) {
 			status = 'error';

@@ -1,6 +1,3 @@
-// Rate-limit keys must not let a spoofed X-Forwarded-For buy a fresh bucket. getConnInfo is mocked,
-// and the trusted-proxy list is passed in.
-
 import { beforeEach, describe, expect, mock, test } from 'bun:test';
 import type { Context } from 'hono';
 
@@ -16,7 +13,6 @@ mock.module('hono/bun', () => ({
 
 import { getClientIp } from '../client-ip';
 
-/** Minimal Context stub: only req.header() is read. */
 function ctx(headers: Record<string, string> = {}): Context {
   const lower: Record<string, string> = {};
   for (const [k, v] of Object.entries(headers)) lower[k.toLowerCase()] = v;
@@ -59,14 +55,11 @@ describe('getClientIp — behind a trusted proxy', () => {
     );
   });
 
-  // Without a forwarded header, a trusted socket must key on its own IP, not pool everything into
-  // 'unknown'.
   test('falls back to the socket IP when trusted but no X-Forwarded-For is sent', () => {
     socketAddress = '10.0.0.1';
     expect(getClientIp(ctx({}), ['10.0.0.1'])).toBe('10.0.0.1');
   });
 
-  // An empty forwarded value must not become an empty rate-limit key shared by every such request.
   test('falls back to the socket IP when trusted but X-Forwarded-For is empty/whitespace', () => {
     socketAddress = '10.0.0.1';
     expect(getClientIp(ctx({ 'X-Forwarded-For': '   ' }), ['10.0.0.1'])).toBe('10.0.0.1');
@@ -84,7 +77,6 @@ describe('getClientIp — no socket IP (in-process app.request)', () => {
     expect(getClientIp(ctx({}), [])).toBe('unknown');
   });
 
-  // Matches the trusted-proxy parse: the first entry, trimmed.
   test('takes the leftmost entry of a multi-hop X-Forwarded-For in the fallback', () => {
     connInfoThrows = true;
     expect(getClientIp(ctx({ 'X-Forwarded-For': ' 5.6.7.8 , 9.9.9.9 ' }), [])).toBe('5.6.7.8');

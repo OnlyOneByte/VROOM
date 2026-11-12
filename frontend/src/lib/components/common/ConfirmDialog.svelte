@@ -1,5 +1,4 @@
 <script lang="ts">
-	/** Confirmation dialog for destructive actions. It stays open if onConfirm throws, so the caller's error stays visible. */
 	import {
 		AlertDialog,
 		AlertDialogAction,
@@ -36,8 +35,7 @@
 	let isWorking = $state(false);
 
 	async function handleConfirm(e: Event) {
-		// Prevent the AlertDialog Action's default auto-close so we control closing
-		// (only on success) and can show the in-flight spinner.
+		// AlertDialog Action auto-closes unless its default is prevented.
 		e.preventDefault();
 		if (isWorking) return;
 		isWorking = true;
@@ -45,7 +43,7 @@
 			await onConfirm();
 			open = false;
 		} catch {
-			// Stay open; the caller surfaces its own error toast. Re-enable the buttons.
+			// Caller shows the error; stay open so the user can retry.
 		} finally {
 			isWorking = false;
 		}

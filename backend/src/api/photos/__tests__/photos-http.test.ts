@@ -1,8 +1,4 @@
-/**
- * HTTP tests for GET /api/v1/photos?entityType= through the full route stack, checking user and
- * entity-type scoping. Other test files must not mock.module photo-repository: a process-global mock
- * is never restored and breaks this file.
- */
+// Bun's mock.module is process-global and never restored, so no other file may mock photo-repository.
 
 import { beforeEach, describe, expect, test } from 'bun:test';
 import type { Photo } from '../../../db/schema';
@@ -15,7 +11,6 @@ import {
 
 let ctx: TestApp;
 
-/** Inserts a photo row directly. */
 function seedPhoto(
   sqlite: TestApp['sqlite'],
   opts: { id: string; userId: string; entityType: string; entityId: string; fileName?: string }

@@ -1,6 +1,3 @@
-// Rate limiter window and limit behavior, including the 429 headers and window reset.
-// The store is process-wide, so each test uses its own key.
-
 import { describe, expect, setSystemTime, test } from 'bun:test';
 import { type Context, Hono } from 'hono';
 import { CONFIG } from '../../config';
@@ -25,7 +22,6 @@ function makeApp(opts: { windowMs: number; limit: number; key: string }) {
   return app;
 }
 
-// If the E2E opt-out were active, every assertion below would pass vacuously.
 test('precondition: rate limiting is ACTIVE in the test process (not the E2E opt-out)', () => {
   expect(CONFIG.disableRateLimit).toBe(false);
 });

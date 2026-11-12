@@ -1,7 +1,3 @@
-// Two JSON-cell hazards. An unparseable unit_preferences cell resolves to the column default, so the
-// rest of the restore survives. A parseable but invalid one refuses the restore, because defaulting it
-// would reinterpret the vehicle's raw distances and volumes under the wrong units.
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import AdmZip from 'adm-zip';
 import { parse } from 'csv-parse/sync';
@@ -16,7 +12,6 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-/** Rewrites one column of every row in a real backup ZIP, using the exporter's CSV settings. */
 function patchColumn(zipBuffer: Buffer, filename: string, column: string, rawCell: string): Buffer {
   const zip = new AdmZip(zipBuffer);
   const entry = zip.getEntry(filename);
@@ -47,7 +42,6 @@ function expenseCount(): number {
   return row.n;
 }
 
-/** Seed one vehicle with one expense and return the ids plus a real exported ZIP. */
 async function seedAndExport(): Promise<{ vehicleId: string; zip: Buffer }> {
   const vehicleId = await seedVehicle(ctx, {
     make: 'Volvo',
@@ -72,7 +66,6 @@ describe('a backup whose unit_preferences cell is not valid JSON', () => {
     const { restoreService } = await import('../restore');
     const { DEFAULT_UNIT_PREFERENCES, parseUnitPreferences } = await import('../../../types');
 
-    // A truncated JSON object — what a clipped download or a hand-edit leaves behind.
     const broken = patchColumn(
       zip,
       'vehicles.csv',
@@ -97,7 +90,6 @@ describe('a backup whose unit_preferences cell parses but is not valid unit pref
     const { parseUnitPreferences } = await import('../../../types');
     const goodPrefsBefore = vehiclePrefsCell(vehicleId);
 
-    // Valid JSON with unrecognized unit spellings.
     const badShape = patchColumn(
       zip,
       'vehicles.csv',
@@ -121,7 +113,6 @@ describe('a backup whose unit_preferences cell parses but is not valid unit pref
     expect(message).toContain('unitPreferences');
     expect(message, 'the offending row is named').toContain(vehicleId);
 
-    // Refused before the wipe, so the account is unchanged.
     expect(vehiclePrefsCell(vehicleId), 'the stored prefs are untouched').toBe(goodPrefsBefore);
     expect(expenseCount(), 'the existing expense is untouched').toBe(1);
     expect(
@@ -135,7 +126,6 @@ describe('a backup whose unit_preferences cell parses but is not valid unit pref
     );
     expect(stats.status, await stats.text()).toBe(200);
 
-    // The write route refuses this value, so the restore must refuse it too.
     const write = await ctx.authed('PUT', `/api/v1/vehicles/${vehicleId}`, {
       unitPreferences: { distanceUnit: 'mi', volumeUnit: 'gal', chargeUnit: 'kWh' },
     });

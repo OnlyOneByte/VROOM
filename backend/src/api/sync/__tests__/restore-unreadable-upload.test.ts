@@ -1,7 +1,3 @@
-// Unreadable restore uploads are a 400 client error, not a 500. Parser refusals keep their specific
-// message. Driven over HTTP because the status code is the point. Multipart needs an explicit Origin
-// header to pass the csrf guard.
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 
@@ -55,7 +51,6 @@ describe('an unreadable restore upload is a 400, not a 500', () => {
 
     const zip = new AdmZip(await backupService.exportAsZip(ctx.user.id));
     const expensesCsv = zip.getEntry('expenses.csv')?.getData().toString('utf-8') ?? '';
-    // One row with more fields than the header, which csv-parse rejects.
     const columnCount = expensesCsv.split('\n')[0].split(',').length;
     zip.updateFile(
       'expenses.csv',

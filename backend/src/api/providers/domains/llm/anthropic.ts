@@ -1,7 +1,3 @@
-/**
- * Anthropic Messages API adapter. Dumb transport: it never executes tools or trusts tool args.
- */
-
 import type { ModelProviderSettings } from '../model/model-registry';
 import { postModelJson, trimBaseUrl } from '../model/model-transport';
 import {
@@ -75,11 +71,7 @@ export class AnthropicLlmProvider implements LlmProvider {
   }
 }
 
-/**
- * Tool calls become tool_use blocks on the assistant turn, and every tool result for that turn goes in
- * ONE following user message: Anthropic rejects a tool_result without a matching tool_use in the
- * immediately preceding assistant turn.
- */
+// Anthropic requires every tool_result for a turn in one user message after the tool_use turn.
 function toAnthropicMessages(messages: ChatMessage[]): AnthropicMessage[] {
   const out: AnthropicMessage[] = [];
   for (const m of messages) {
@@ -122,7 +114,6 @@ function toAnthropicTool(t: ToolDefinition): Record<string, unknown> {
   return { name: t.name, description: t.description, input_schema: t.parameters };
 }
 
-/** A malformed 2xx body yields empty text rather than throwing. */
 function normalizeResponse(json: AnthropicResponse | null): ChatResult {
   const blocks = json?.content ?? [];
   const text = blocks

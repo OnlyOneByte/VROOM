@@ -1,7 +1,3 @@
-/**
- * Paying off or deleting financing severs the source link on its expenses but keeps the expense rows.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,

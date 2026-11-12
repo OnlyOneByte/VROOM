@@ -19,7 +19,6 @@ import { triggerBlobDownload } from '$lib/utils/download';
 
 type PaginatedExpenseResponse = PaginatedResponse<Expense>;
 
-/** One row's outcome from a CSV import (mirrors the backend summarizeImportPlan). */
 export interface ExpenseImportRow {
 	row: number;
 	status: 'ready' | 'error';
@@ -27,7 +26,6 @@ export interface ExpenseImportRow {
 	raw?: { vehicle: string; category: string; amount: string; date: string };
 }
 
-/** Result of POST /expenses/import (preview when dryRun, else the commit summary). */
 export interface ExpenseImportResult {
 	dryRun: boolean;
 	imported: number;
@@ -35,13 +33,10 @@ export interface ExpenseImportResult {
 	errorCount: number;
 	totalRows: number;
 	rows: ExpenseImportRow[];
-	/** Commit only: rows skipped because they were already imported. */
 	duplicates?: number;
-	/** Foreign-tracker import: unrecognized category words, imported as `misc`. */
 	unmappedCategories?: string[];
 }
 
-/** Columns the expense list can be sorted by (must match the backend allowlist). */
 export type ExpenseSortBy = 'date' | 'amount' | 'category';
 export type ExpenseSortDir = 'asc' | 'desc';
 
@@ -68,11 +63,7 @@ type ExpenseExportParams = Pick<
 	'category' | 'startDate' | 'endDate' | 'search' | 'tags'
 > & { vehicleId?: string };
 
-/**
- * Builds the expense list/export query suffix, including the leading '?', or '' when no filter is set.
- * Tags travel as one comma-joined param: the backend schema takes a single string and splits it, and
- * a repeated `tags=` key would arrive as an array and fail validation.
- */
+// Tags must travel as one comma-joined param: a repeated `tags=` key fails backend validation.
 export function buildExpenseQuery(params?: ExpenseListParams, vehicleId?: string): string {
 	return buildQueryString({
 		vehicleId: vehicleId || undefined,
@@ -89,7 +80,6 @@ export function buildExpenseQuery(params?: ExpenseListParams, vehicleId?: string
 	});
 }
 
-// Uses getPaginated so pagination metadata is kept; get() would unwrap it away.
 async function fetchPaginatedExpenses(url: string): Promise<PaginatedExpenseResponse> {
 	const result = await apiClient.getPaginated<BackendExpenseResponse>(url);
 
@@ -99,7 +89,6 @@ async function fetchPaginatedExpenses(url: string): Promise<PaginatedExpenseResp
 	};
 }
 
-/** Expense endpoints. Responses are mapped from backend to frontend field names. */
 export const expenseApi = {
 	async getExpense(expenseId: string): Promise<Expense> {
 		const data = await apiClient.get<BackendExpenseResponse>(`/api/v1/expenses/${expenseId}`);
@@ -117,7 +106,6 @@ export const expenseApi = {
 		return fetchPaginatedExpenses(`/api/v1/expenses${buildExpenseQuery(params)}`);
 	},
 
-	// Accepts the same filters as the list view so the export matches what the user sees.
 	async downloadExpensesCsv(params?: ExpenseExportParams): Promise<void> {
 		const { vehicleId, ...filters } = params ?? {};
 		const res = await apiClient.raw(
@@ -127,7 +115,6 @@ export const expenseApi = {
 		triggerBlobDownload(blob, `vroom-expenses-${toDateInputValue(new Date())}.csv`);
 	},
 
-	// dryRun previews without writing. A foreign-tracker file needs `mapping`; omit it for native VROOM CSV.
 	async importExpensesCsv(
 		csv: string,
 		dryRun = false,
@@ -140,7 +127,6 @@ export const expenseApi = {
 		});
 	},
 
-	// Matches a known tracker by header names only; null means the user maps columns manually.
 	async detectImportSource(headers: string[]): Promise<ImportMappingPreset | null> {
 		return apiClient.post<ImportMappingPreset | null>('/api/v1/expenses/import/detect', {
 			headers
@@ -180,7 +166,6 @@ export const expenseApi = {
 		expenseId: string,
 		expense: Partial<Expense> & { vehicleId: string; category: ExpenseCategory; amount: number }
 	): Promise<Expense> {
-		// Edit only: an emptied description is sent as null so it can be cleared.
 		const backendExpense = toBackendExpense(expense, { isEdit: true });
 		const data = await apiClient.put<BackendExpenseResponse>(
 			`/api/v1/expenses/${expenseId}`,

@@ -21,7 +21,6 @@
 		acceptedTypes?: string[];
 		maxFileSize?: number;
 		multiple?: boolean;
-		/** Called for each file to upload. Return value is passed to onUploadComplete. */
 		onUpload: (_file: File) => Promise<unknown>;
 		onUploadComplete?: (_result: unknown) => void;
 		onClose: () => void;
@@ -49,9 +48,6 @@
 
 	let hasCameraSupport = $derived(browser && !!navigator.mediaDevices?.getUserMedia);
 
-	// Storage-provider gate: uploads fail server-side if the user has no storage
-	// provider configured (getDefaultProvider throws). Surface that up-front with
-	// guidance instead of a generic post-attempt error. null = not yet checked.
 	let hasStorageProvider = $state<boolean | null>(null);
 
 	async function checkStorageProvider() {
@@ -60,8 +56,6 @@
 			const providers = await providerApi.getProviders('storage');
 			hasStorageProvider = providers.length > 0;
 		} catch {
-			// Don't block uploads on a failed check — assume configured and let the
-			// upload surface any real error.
 			hasStorageProvider = true;
 		}
 	}
@@ -160,8 +154,6 @@
 				<Button variant="outline" onclick={handleClose}>Close</Button>
 			</Dialog.Footer>
 		{:else if hasStorageProvider === false}
-			<!-- No storage provider configured → uploads would fail server-side.
-			     Guide the user to Settings instead of letting them try and fail. -->
 			<div class="space-y-4 py-2">
 				<div class="flex items-start gap-3 rounded-lg border border-border bg-muted/50 p-4">
 					<HardDrive class="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />

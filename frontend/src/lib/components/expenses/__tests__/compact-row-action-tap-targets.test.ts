@@ -1,5 +1,3 @@
-// Compact row Edit/Delete keep their drawn size and reach the 40px tap-target floor through a vertical hit-area overhang.
-
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render } from '@testing-library/svelte';
 import ExpensesTable from '../ExpensesTable.svelte';
@@ -41,8 +39,6 @@ async function revealRowActions() {
 		onDelete: async () => {}
 	});
 
-	// Scoped to the rows container: the toolbar above it holds a category Select whose trigger
-	// also reports `aria-expanded`, and that one reveals a dropdown rather than a row's actions.
 	const rows = container.querySelector('.divide-y');
 	if (!rows) throw new Error('the compact layout rendered no rows container');
 	const summary = rows.querySelector<HTMLButtonElement>('button[aria-expanded]');
@@ -80,14 +76,11 @@ describe('the compact row action pair', () => {
 			expect(drawnHeight, `${label} sets no height`).not.toBeNull();
 			expect(overhang, `${label} has no vertical hit area`).not.toBeNull();
 
-			// Positioned against the control, or the overhang lands on a distant ancestor instead.
 			expect(classes, `${label}'s hit area has no positioning context`).toContain('relative');
 			expect(classes).toContain('before:absolute');
-			// Vertical only: the pair sits side by side and one of them deletes money rows.
 			expect(classes, `${label}'s hit area is not pinned to its own width`).toContain(
 				'before:inset-x-0'
 			);
-			// An empty pseudo-element with no `content` never generates a box, so never takes a tap.
 			expect(classes).toContain("before:content-['']");
 
 			expect(
@@ -103,8 +96,6 @@ describe('the compact row action pair', () => {
 		const overhang = spacing(edit.getAttribute('class') ?? '', /\bbefore:-inset-y-([\d.]+)\b/);
 		const stripPadTop = spacing(strip.getAttribute('class') ?? '', /\bpt-([\d.]+)\b/);
 
-		// Without this padding the upward overhang covers the bottom edge of the row's own
-		// disclosure button, so a tap meant to collapse the row would open the editor instead.
 		expect(stripPadTop, 'the action strip does not pad for the hit area above it').not.toBeNull();
 		expect(stripPadTop!).toBeGreaterThanOrEqual(overhang!);
 	});

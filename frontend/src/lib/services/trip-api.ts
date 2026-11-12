@@ -14,7 +14,6 @@ interface CreateTripRequest {
 	startOdometer: number;
 	endOdometer: number;
 	purpose: TripPurpose;
-	/** ISO timestamp; send noon-local (see dateOnlyToISO) so the calendar day does not shift across timezones. */
 	tripDate: string;
 	startLocation?: string;
 	endLocation?: string;
@@ -58,7 +57,6 @@ export const tripApi = {
 		return apiClient.put<Trip>(`/api/v1/trips/${id}`, data);
 	},
 
-	// Creating a trip also writes an odometer entry. Keeping it is the default; keepOdometer=false removes it too.
 	async delete(id: string, keepOdometer = true): Promise<void> {
 		const qs = keepOdometer ? '' : '?keepOdometer=false';
 		await apiClient.delete(`/api/v1/trips/${id}${qs}`);

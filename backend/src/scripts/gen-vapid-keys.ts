@@ -1,4 +1,4 @@
-// Prints a VAPID keypair as .env lines. Rotating the keypair invalidates existing push subscriptions.
+// Rotating the keypair invalidates every existing push subscription.
 
 import webpush from 'web-push';
 

@@ -1,8 +1,3 @@
-/**
- * Photo mutations must mark the user's data as changed, so the next auto-backup runs (photos are in
- * the backup payload). Reads must not, and a mutation that fails must not either.
- */
-
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 import { activityTracker } from '../../sync/activity-tracker';

@@ -19,33 +19,27 @@ export interface ExpenseFilters {
   category?: string;
   startDate?: Date;
   endDate?: Date;
-  /** Tags — a row must carry EVERY listed tag (AND semantics). */
   tags?: string[];
-  /** Free-text search over description + category (case-insensitive substring). */
   search?: string;
 }
 
-/** Columns a caller may sort the expense list by. */
 type ExpenseSortBy = 'date' | 'amount' | 'category';
 type SortDirection = 'asc' | 'desc';
 
 export interface PaginatedExpenseFilters extends ExpenseFilters {
   limit?: number;
   offset?: number;
-  /** Sort column (default 'date'). Allowlisted — never an arbitrary string. */
   sortBy?: ExpenseSortBy;
-  /** Sort direction (default 'desc'). */
   sortDir?: SortDirection;
 }
 
-// A lookup rather than SQL interpolation, so unexpected input can only fall back to the default.
+// Sort columns are looked up here, never interpolated into SQL.
 const EXPENSE_SORT_COLUMNS = {
   date: expenses.date,
   amount: expenses.expenseAmount,
   category: expenses.category,
 } as const;
 
-// Local-midnight detection, so the result does not depend on the server's timezone.
 function endOfDayIfDateOnly(d: Date): Date {
   const isLocalMidnight =
     d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0 && d.getMilliseconds() === 0;
@@ -53,8 +47,6 @@ function endOfDayIfDateOnly(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
 }
 
-// Shared by the list and export queries so they filter identically. Tags use AND semantics.
-// The caller adds the userId scope.
 function buildExpenseConditions(filters: ExpenseFilters): SQL[] {
   const conditions: SQL[] = [];
 
@@ -68,7 +60,6 @@ function buildExpenseConditions(filters: ExpenseFilters): SQL[] {
     conditions.push(gte(expenses.date, filters.startDate));
   }
   if (filters.endDate) {
-    // A date-only end bound is local midnight; extend it to the end of that day so same-day rows are included.
     conditions.push(lte(expenses.date, endOfDayIfDateOnly(filters.endDate)));
   }
   if (filters.tags?.length) {
@@ -78,7 +69,6 @@ function buildExpenseConditions(filters: ExpenseFilters): SQL[] {
       );
     }
   }
-  // Escape LIKE wildcards so the term matches literally. The backslash is escaped first.
   const search = filters.search?.trim();
   if (search) {
     const escaped = search.toLowerCase().replace(/[\\%_]/g, (ch) => `\\${ch}`);
@@ -108,7 +98,6 @@ export interface ExpenseSummary {
   monthlyTrend: Array<{ period: string; amount: number; count: number }>;
 }
 
-// Divides by the calendar span of the trend, so months with no expenses still count.
 function computeMonthlyAverage(
   totalAmount: number,
   monthlyTrend: Array<{ period: string }>
@@ -137,7 +126,6 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     return result[0] ?? null;
   }
 
-  // Every source-linked read and write goes through this predicate so the userId scope cannot drift.
   private sourceScope(sourceType: string, sourceId: string, userId: string): SQL | undefined {
     return and(
       eq(expenses.sourceType, sourceType),
@@ -170,7 +158,6 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     return rows.map((r) => r.id);
   }
 
-  // Reads by groupId alone because the group is owner-stamped. Returns null when the group is absent.
   async getSplitGroupAccessInfo(
     groupId: string
   ): Promise<{ vehicleIds: string[]; ownerId: string } | null> {
@@ -191,8 +178,6 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     return result[0] ?? null;
   }
 
-  // A retry with the same (userId, clientId) returns the existing row. With overwrite set, the
-  // existing row is updated with the new data instead.
   async createIdempotent(data: NewExpense, overwrite = false): Promise<Expense> {
     if (!data.clientId) {
       return this.create(data);
@@ -213,15 +198,12 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     }
   }
 
-  // clientId and userId are stripped from the patch so the identity and idempotency key never change.
   private applyLocalOverwrite(rowId: string, data: NewExpense): Promise<Expense> {
     const { clientId: _clientId, userId: _userId, ...patch } = data;
     return this.update(rowId, patch);
   }
 
-  // All inserts run in one transaction. The callback must stay synchronous, since bun-sqlite would
-  // otherwise autocommit each insert separately. Keys already present are skipped as duplicates;
-  // existing clientIds are read once up front and the set grows as rows insert.
+  // bun:sqlite transactions must stay synchronous; an async callback autocommits each insert alone.
   async importExpenses(
     rows: NewExpense[],
     userId: string
@@ -321,7 +303,6 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     }
   }
 
-  // One grouped query, so the dashboard does not need one call per vehicle.
   async getPerVehicleStats(
     userId: string,
     recentDays = 30
@@ -454,8 +435,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     }
   }
 
-  // Callers must first remove the linked receipts through photo-service, which owns the storage
-  // files. This repository cannot import it because photo helpers import this module.
+  // photo-service imports this module, so receipt file removal has to stay with the caller.
   async deleteBySource(sourceType: string, sourceId: string, userId: string): Promise<number> {
     try {
       const linked = await this.db
@@ -517,7 +497,6 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       sourceType?: string;
       sourceId?: string;
     },
-    // ownerId stamps every sibling; createdBy is the acting author when not the owner. Callers check access.
     { ownerId, createdBy }: { ownerId: string; createdBy: string | null }
   ): Promise<Expense[]> {
     try {
@@ -527,7 +506,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       );
       const splitMethod: SplitMethod = data.splitConfig.method;
 
-      // Synchronous so every sibling inserts in one transaction that rolls back as a whole.
+      // bun:sqlite transactions must stay synchronous; an async callback autocommits each insert alone.
       return this.db.transaction((tx) => {
         const groupId = createId();
 
@@ -613,14 +592,11 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       throw new NotFoundError('Split expense');
     }
 
-    // Vehicle access and the single-owner rule are enforced by the route before this runs.
     try {
       const firstOld = oldSiblings[0];
       if (!firstOld) {
         throw new NotFoundError('Split expense');
       }
-      // An absolute split's total is the sum of its allocations, so an omitted totalAmount cannot
-      // leave a stale groupTotal behind. Even and percentage splits still need the caller's total.
       const totalAmount =
         data.splitConfig.method === 'absolute'
           ? data.splitConfig.allocations.reduce((sum, a) => sum + a.amount, 0)
@@ -629,7 +605,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       const splitMethod: SplitMethod = data.splitConfig.method;
       const oldSiblingIds = oldSiblings.map((s) => s.id);
 
-      // Synchronous: the delete and re-insert must roll back together, or a failure loses the group.
+      // bun:sqlite transactions must stay synchronous; an async callback autocommits each insert alone.
       return this.db.transaction((tx) => {
         const oldPhotos = tx
           .select({ id: photos.id })

@@ -216,7 +216,7 @@
 										+{yearEnd.previousYearComparison.percentageChange.toFixed(1)}%
 									</span>
 								{:else if yearEnd.previousYearComparison.percentageChange < 0}
-									<!-- Icon carries the hue; the text stays neutral because tinted text falls below WCAG AA at this size. -->
+									<!-- Tinted text fails WCAG AA at this size; only the icon takes the hue. -->
 									<TrendingDown class="h-5 w-5 text-chart-2" />
 									<span class="text-lg font-medium text-foreground">
 										{yearEnd.previousYearComparison.percentageChange.toFixed(1)}%

@@ -12,7 +12,6 @@
 	interface Props {
 		vehicleId: string;
 		photos: Photo[];
-		/** Photo upload, delete and set-cover are owner-only on the server. Defaults to true for owner call sites. */
 		isOwner?: boolean;
 		onUpload: () => void;
 		onDelete: (_photoId: string) => void | Promise<void>;

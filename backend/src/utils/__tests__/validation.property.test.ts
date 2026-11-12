@@ -1,7 +1,3 @@
-// Property-based tests for validateFuelExpenseData. Fuel expenses always need volume and mileage.
-// Non-fuel categories always pass. Error messages name charge amounts for electric fuel types and
-// fuel amounts otherwise.
-
 import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { ELECTRIC_FUEL_TYPES, EXPENSE_CATEGORIES } from '../../db/types';

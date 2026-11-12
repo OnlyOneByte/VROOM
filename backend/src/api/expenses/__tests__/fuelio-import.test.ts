@@ -206,7 +206,6 @@ describe('the ## Log header units drive conversion into the vehicle units', () =
         targetUnits: TARGET_UNITS,
       });
       const expense = buildImportPlan(r.csv, VEHICLES).rows[0]?.expense;
-      // An undetected unit passes the value through unconverted.
       expect(expense?.mileage).toBe(
         distance ? Math.round(convertDistance(45210, distance, DistanceUnit.MILES)) : 45210
       );

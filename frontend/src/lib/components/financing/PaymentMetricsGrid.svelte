@@ -54,7 +54,6 @@
 		return Math.round((totalInterest / financing.originalAmount) * 100);
 	});
 
-	// Compare driven miles against the whole-lease allowance (annual × termMonths/12), or multi-year leases over-report the overage.
 	let leaseOverage = $derived(calculateLeaseOverage(financing, mileageUsed));
 	let excessMiles = $derived(leaseOverage.excessMiles);
 	let overageCost = $derived(leaseOverage.overageCost);

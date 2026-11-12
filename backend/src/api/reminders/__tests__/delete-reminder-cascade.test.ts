@@ -1,8 +1,3 @@
-/**
- * Deleting an expense reminder keeps the expenses it materialized, but clears their source link. Runs
- * through the real route, trigger, and delete stack.
- */
-
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import {
   createTestApp,
@@ -41,7 +36,6 @@ interface ExpenseRow {
   source_id: string | null;
 }
 
-/** All expense rows that WERE materialized by this reminder (by id, regardless of current source). */
 function expensesByIds(ids: string[]): ExpenseRow[] {
   if (ids.length === 0) return [];
   const placeholders = ids.map(() => '?').join(',');
@@ -109,7 +103,6 @@ describe('reminder delete cascade', () => {
   });
 
   test('a failure clearing the source link fails the delete and keeps the reminder', async () => {
-    // A dangling reminder source fails backup validation, so the delete must not proceed without it.
     const { expenseRepository } = await import('../../expenses/repository');
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const reminderId = await createOverdueExpenseReminder(vehicleId);

@@ -27,7 +27,6 @@ export async function loadVehicles(state: ExpenseFormState): Promise<void> {
 	}
 }
 
-/** Create-mode prefill from the URL. Date stays today: a duplicate is a new occurrence of a recurring expense. */
 export function applyPreselections(state: ExpenseFormState, values: PreselectedValues): void {
 	if (values.vehicleId) state.formData.vehicleId = values.vehicleId;
 	if (values.category) state.formData.category = values.category;
@@ -142,7 +141,6 @@ export async function loadAllVehicleExpenses(state: ExpenseFormState): Promise<v
 	}
 }
 
-/** Loads the vehicle, its last fuel entry, and its expense history for the selected vehicle. */
 export async function loadVehicleContext(state: ExpenseFormState): Promise<void> {
 	await loadVehicle(state);
 	await loadLastFuelExpense(state);

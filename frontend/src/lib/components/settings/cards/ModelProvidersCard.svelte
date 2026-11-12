@@ -1,5 +1,4 @@
 <script lang="ts">
-	/** AI model provider settings for one domain (vlm = receipt parsing, llm = assistant). The API key is write-only; blank on edit keeps the stored key. */
 	import { onMount } from 'svelte';
 	import { Bot, Sparkles, Plus, LoaderCircle, Pencil, Trash2 } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
@@ -65,7 +64,7 @@
 	let error = $state<string | null>(null);
 
 	let dialogOpen = $state(false);
-	let editingId = $state<string | null>(null); // null = creating
+	let editingId = $state<string | null>(null);
 	let formType = $state<string>('openai-compatible');
 	let formDisplayName = $state('');
 	let formApiKey = $state('');
@@ -73,7 +72,6 @@
 	let formBaseUrl = $state('');
 	let isSaving = $state(false);
 
-	// The provider type set is non-empty, so [0] is defined; the assertion satisfies noUncheckedIndexedAccess.
 	let fallbackType = $derived(providerTypes[0] as ModelProviderTypeOption);
 	let selectedTypeOption = $derived<ModelProviderTypeOption>(
 		providerTypes.find(t => t.id === formType) ?? fallbackType
@@ -107,7 +105,7 @@
 		editingId = p.id;
 		formType = p.providerType;
 		formDisplayName = p.displayName;
-		formApiKey = ''; // write-only — never pre-filled (server strips credentials)
+		formApiKey = '';
 		formModel = typeof p.config['model'] === 'string' ? p.config['model'] : '';
 		formBaseUrl = typeof p.config['baseUrl'] === 'string' ? p.config['baseUrl'] : '';
 		dialogOpen = true;
@@ -121,16 +119,13 @@
 	function onTypeChange(v: string | undefined) {
 		if (!v) return;
 		formType = v;
-		// Only re-seed defaults on the CREATE flow — never clobber an existing provider's values on edit.
 		if (editingId === null) applyTypeDefaults();
 	}
 
 	let canSave = $derived(
 		formDisplayName.trim().length > 0 &&
 			formModel.trim().length > 0 &&
-			// non-ollama create needs a key; edit may keep the existing key (blank allowed)
 			(selectedTypeOption.keyless || editingId !== null || formApiKey.trim().length > 0) &&
-			// self-hosted / compatible needs a base URL
 			(!selectedTypeOption.needsBaseUrl || formBaseUrl.trim().length > 0)
 	);
 
@@ -151,8 +146,6 @@
 				});
 				appStore.showSuccess(`${formDisplayName.trim()} added`);
 			} else {
-				// Only send credentials when the user typed a new key — a blank key keeps the stored one
-				// (the backend's config-only PUT does not demand the apiKey be re-sent).
 				await providerApi.updateProvider(editingId, {
 					displayName: formDisplayName.trim(),
 					config,

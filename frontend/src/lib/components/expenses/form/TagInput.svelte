@@ -7,7 +7,6 @@
 		tags: string[];
 		error?: string;
 		touched?: boolean;
-		/** Suggestion pool; defaults to COMMON_EXPENSE_TAGS, and callers may widen it with history. */
 		suggestions?: readonly string[];
 	}
 

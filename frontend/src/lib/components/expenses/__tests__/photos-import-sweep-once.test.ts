@@ -1,11 +1,8 @@
-// The Photos sweep runs once per dialog open; gating on the sweep result would re-sweep an empty album forever.
-
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { render } from '@testing-library/svelte';
 import type { ReceiptDraftItem } from '$lib/services/photos-import-api';
 import type { Vehicle } from '$lib/types';
 
-/** Hard budget: past this the dialog is looping, and the rejection breaks the loop. */
 const CALL_BUDGET = 8;
 
 let drafts: ReceiptDraftItem[] = [];
@@ -42,7 +39,6 @@ function draftItem(photoId: string): ReceiptDraftItem {
 	};
 }
 
-/** Let every queued effect + the sweep's promise settle, repeatedly (a loop would keep re-arming). */
 async function settle(): Promise<void> {
 	for (let i = 0; i < 20; i++) {
 		await new Promise(resolve => setTimeout(resolve, 0));
@@ -67,7 +63,6 @@ describe('ImportFromPhotosDialog open-gate', () => {
 		await settle();
 
 		expect(getReceiptDrafts).toHaveBeenCalledTimes(1);
-		// And the user is told so, rather than being left on the loading skeleton.
 		expect(
 			container.ownerDocument.querySelector('[data-testid="photos-import-empty"]')
 		).not.toBeNull();
@@ -101,7 +96,6 @@ describe('ImportFromPhotosDialog open-gate', () => {
 		mount();
 		await settle();
 
-		// Nothing is read from Photos until the user has seen what will be read.
 		expect(getReceiptDrafts).not.toHaveBeenCalled();
 		const acknowledge = [...document.querySelectorAll('button')].find(
 			button => button.textContent?.trim() === 'Continue'

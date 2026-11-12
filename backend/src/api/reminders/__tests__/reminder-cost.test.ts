@@ -1,13 +1,7 @@
-/**
- * Monthly run-rate normalizer. Pure functions over a Reminder row: the four frequencies share an
- * occurrences-per-year ÷ 12 basis, and only active positive-amount expense reminders contribute.
- */
-
 import { describe, expect, test } from 'bun:test';
 import type { Reminder } from '../../../db/schema';
 import { monthlyRunRate, occurrencesPerYear, recurringCostSummary } from '../reminder-cost';
 
-/** Minimal valid expense Reminder; override per case. */
 function reminder(overrides: Partial<Reminder> = {}): Reminder {
   const base: Reminder = {
     id: 'rem-1',

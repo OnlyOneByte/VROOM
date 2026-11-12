@@ -16,7 +16,6 @@ import {
 } from './expense-submit-outcome';
 import type { ExpenseFormState } from './expense-form-state.svelte';
 
-/** Message for when the offline outbox write itself fails; the user stays on the form so nothing is lost. */
 function reportUnqueuedSave(state: ExpenseFormState): void {
 	state.submitError = UNQUEUED_SAVE_MESSAGE;
 	appStore.addNotification({ type: 'error', message: state.submitError });
@@ -53,7 +52,6 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 	state.isSubmitting = true;
 	state.submitError = null;
 
-	// Built outside try so the offline fallback queues exactly what the server would have received.
 	const expenseData = buildExpenseData(state.formData, {
 		currency: state.currencyUnit,
 		sourceType: state.sourceType,
@@ -139,7 +137,6 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 	} catch (error) {
 		if (import.meta.env.DEV) console.error('Failed to save expense:', error);
 
-		// Server-decided failures stay on screen; only failures that can succeed later may be queued.
 		const failureKind = classifySyncFailure(error);
 
 		if (canQueueFailedSave({ isEditMode: state.isEditMode, isSplitCreate, failureKind })) {
@@ -172,7 +169,6 @@ export async function deleteExpense(state: ExpenseFormState): Promise<void> {
 	state.isDeleting = true;
 
 	try {
-		// Split members share a groupId; deleting only expenseId would orphan the other vehicles' portions.
 		if (state.groupId) {
 			await expenseApi.deleteSplitExpense(state.groupId);
 		} else {

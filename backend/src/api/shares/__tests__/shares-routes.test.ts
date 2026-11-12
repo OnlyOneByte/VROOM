@@ -1,9 +1,3 @@
-/**
- * Owner-side /api/v1/shares routes and the invitee accept and decline routes, through the real app on
- * an in-memory database. Cross-tenant denials are covered by the IDOR sweep. createTestApp() seeds user
- * A; a second user B is created on the same database.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -15,9 +9,9 @@ import {
 import { createInvitee } from '../../../test-helpers/invitee';
 import { seedVehicle } from '../../../test-helpers/seed';
 
-let ctx: TestApp; // owner (user A)
+let ctx: TestApp;
 let asInvitee: RequestFn;
-let bId: string; // invitee (user B)
+let bId: string;
 let bEmail: string;
 
 beforeEach(async () => {
@@ -36,7 +30,6 @@ interface Share {
   sharedWithId: string;
   level: string;
   status: string;
-  // Present only on /received rows.
   vehicleName?: string;
   sharedBy?: string;
 }
@@ -147,7 +140,6 @@ describe('invitee side: received, accept, decline', () => {
     expect(accBody.data.status).toBe('accepted');
   });
 
-  // Pending invites are not in the fleet list, so /received must carry the vehicle name and owner.
   test('a pending /received row includes vehicleName and sharedBy', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     await invite(vehicleId, bEmail, 'viewer');
@@ -158,7 +150,6 @@ describe('invitee side: received, accept, decline', () => {
     expect(recv.data.length).toBe(1);
     const row = recv.data[0];
     expect(row.status).toBe('pending');
-    // Falls back to year make model; sharedBy is the owner.
     expect(row.vehicleName).toBe('2021 Honda Civic');
     expect(row.sharedBy).toBe(ctx.user.displayName);
   });

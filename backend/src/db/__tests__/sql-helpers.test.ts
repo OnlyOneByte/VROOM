@@ -1,6 +1,3 @@
-// The date helpers must pass 'unixepoch'. Without it SQLite reads the seconds-epoch column as a Julian day,
-// and months collapse into wrong buckets. These tests run the fragments against real SQLite.
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import {

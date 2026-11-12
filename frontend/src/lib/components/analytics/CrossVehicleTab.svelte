@@ -28,7 +28,6 @@
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
 
-	// Visibility-gated rendering for inline charts that bypass ChartCard.
 	let costBarGate = createVisibilityWatch();
 
 	let units = $derived(crossVehicle?.units ?? settingsStore.unitPreferences);

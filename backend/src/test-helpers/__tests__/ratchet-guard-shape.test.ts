@@ -1,10 +1,3 @@
-// Guards the ratchet guards. Hand-written tolerated-debt guards must use the shared helper in debt-ratchet.ts.
-// Three failure modes are flagged:
-//  1. Non-vacuity anchored on a live site, which becomes unsatisfiable once the list reaches zero.
-//  2. Exact equality against a tolerated list, which turns a fix into a red test.
-//  3. A MAX_ ceiling beside the list, which drifts from it.
-// Only files that maintain a tolerated list are inspected, so ordinary domain constants are untouched.
-
 import { describe, expect, test } from 'bun:test';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -12,7 +5,6 @@ import { join, relative } from 'node:path';
 const BACKEND_SRC = join(import.meta.dir, '../../');
 const FRONTEND_SRC = join(import.meta.dir, '../../../../frontend/src');
 
-// Names that mark a collection as a tolerated list rather than a domain constant.
 const TOLERATED_LIST =
   /\b[A-Z0-9_]*(?:DEBT|PENDING|TOLERATED|INVENTORY|EXCLUDED|ALLOWLIST|EXEMPT)[A-Z0-9_]*\b/;
 const DECLARES_TOLERATED_LIST =
@@ -82,7 +74,6 @@ function inspect(roots: string[]): Offence[] {
   const repoRoot = join(import.meta.dir, '../../../../');
   return roots.flatMap((root) =>
     testFiles(root)
-      // This file quotes each anti-pattern as a fixture, so it would always flag itself.
       .filter((file) => !file.endsWith('ratchet-guard-shape.test.ts'))
       .flatMap((file) => inspectSource(readFileSync(file, 'utf-8'), relative(repoRoot, file)))
   );
@@ -97,8 +88,6 @@ describe('ratchet guards use the shared helper semantics', () => {
   });
 
   test('the scan recognises each anti-pattern (proven on fixtures)', () => {
-    // Fixture-based on purpose: anchoring this on a real offending guard would make it
-    // unsatisfiable once every guard is migrated, which is the goal.
     const probe = (body: string): string[] =>
       inspectSource(`const KNOWN_DEBT = new Set<string>([]);\n${body}`).map((o) => o.pattern);
 
@@ -113,7 +102,6 @@ describe('ratchet guards use the shared helper semantics', () => {
     );
     expect(probe('const MAX_THINGS = 6;')).toContain('a MAX_ ceiling beside a tolerated list');
 
-    // Every tolerated-list name in use must match, including names where the marker sits mid-name.
     for (const name of [
       'KNOWN_DEBT',
       'PENDING_VIEWPORT_OVERRIDES',
@@ -126,11 +114,9 @@ describe('ratchet guards use the shared helper semantics', () => {
       expect(DECLARES_TOLERATED_LIST.test(`const ${name} = new Set([]);`), name).toBe(true);
       expect(TOLERATED_LIST.test(`expect(x).toEqual([...${name}]);`), name).toBe(true);
     }
-    // And a domain constant must NOT be treated as a tolerated list.
     for (const name of ['TRIP_PURPOSES', 'SHEET_NAMES', 'SHIPPED_JOURNAL', 'RANGE_VALUES']) {
       expect(DECLARES_TOLERATED_LIST.test(`const ${name} = ['a'];`), name).toBe(false);
     }
-    // And that it does NOT fire on the correct shapes.
     expect(probe('expect(unexpected).toEqual([]);')).toEqual([]);
     expect(probe('expect(stale).toEqual([]);')).toEqual([]);
   });

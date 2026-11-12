@@ -28,7 +28,6 @@
 		vehicle: Vehicle;
 		vehicleId: string;
 		vehicleStatsData: VehicleStats | null;
-		/** Financing changes are owner-only on the server; a shared invitee sees the summary read-only. Defaults to true for the owner. */
 		isOwner?: boolean;
 	}
 
@@ -142,7 +141,6 @@
 		{/if}
 
 		{#if vehicle.financing.paymentAmount && vehicle.financing.paymentAmount > 0}
-			<!-- Loan miles-used uses the all-time odometer, not the period-scoped one; falls back to initialMileage. -->
 			<PaymentMetricsGrid
 				financing={vehicle.financing}
 				{totalInterestPaid}
@@ -173,7 +171,6 @@
 	{/if}
 
 	{#if vehicle.financing.financingType === 'lease'}
-		<!-- Lease overage uses the all-time odometer, matching PaymentMetricsGrid; falls back to currentMileage then initialMileage. -->
 		<LeaseMetricsCard
 			financing={vehicle.financing}
 			currentMileage={resolveCurrentOdometer(

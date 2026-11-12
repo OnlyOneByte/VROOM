@@ -1,11 +1,6 @@
-/**
- * Unit tests for the cross-field refinements of createReminderSchema. Pure Zod, no DB.
- */
-
 import { describe, expect, test } from 'bun:test';
 import { createReminderSchema } from '../validation';
 
-/** A minimal valid NOTIFICATION reminder (no expense/ mileage requirements). */
 function validNotification(over: Record<string, unknown> = {}) {
   return {
     name: 'Oil change',
@@ -106,7 +101,6 @@ describe('refineDateRange', () => {
     ).toBe(true);
   });
 
-  // Guards the <= boundary: a same-instant start and end must be rejected.
   test('endDate EQUAL to startDate is rejected (the <= boundary, not just <)', () => {
     expect(
       failsWith(
@@ -159,7 +153,7 @@ describe('refineSplitConfig', () => {
         method: 'absolute',
         allocations: [
           { vehicleId: 'v1', amount: 70 },
-          { vehicleId: 'v2', amount: 20 }, // sums to 90, not 100
+          { vehicleId: 'v2', amount: 20 },
         ],
       },
     });

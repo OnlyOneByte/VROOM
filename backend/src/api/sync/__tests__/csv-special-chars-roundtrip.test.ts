@@ -1,6 +1,3 @@
-// Free-text values with commas, quotes and newlines must survive a backup and restore byte-for-byte.
-// Backups keep a leading '=' verbatim; only human-facing exports neutralize formula triggers.
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -41,7 +38,6 @@ function expenseDescription(id: string): string | null {
 }
 
 describe('backup → restore round-trip preserves RFC-4180 special characters in free text', () => {
-  // A comma, a double quote and an embedded newline. Breaking any of them shifts or truncates the field.
   const HOSTILE = 'Joe\'s "Daily", commute\nsecond line';
 
   test('a vehicle nickname with comma + quote + embedded newline survives byte-for-byte', async () => {
@@ -54,7 +50,6 @@ describe('backup → restore round-trip preserves RFC-4180 special characters in
     const body = await json<DataEnvelope<{ id: string }>>(res);
     expect(res.status, JSON.stringify(body)).toBeLessThan(300);
     const id = body.data.id;
-    // Confirms the value was stored as typed before the round-trip.
     expect(vehicleNickname(id)).toBe(HOSTILE);
 
     await roundTrip();

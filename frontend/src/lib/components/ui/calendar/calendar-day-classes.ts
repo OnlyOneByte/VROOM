@@ -1,7 +1,6 @@
 import { buttonVariants } from '$lib/components/ui/button/index.js';
 import { cn } from '$lib/utils.js';
 
-/** Day-cell classes shared by the single and range calendars; each adds only its selection styling. */
 export const calendarDayBaseClass = cn(
 	buttonVariants({ variant: 'ghost' }),
 	'size-(--cell-size) flex select-none flex-col items-center justify-center gap-1 whitespace-nowrap p-0 font-normal leading-none',

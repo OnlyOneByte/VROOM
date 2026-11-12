@@ -34,7 +34,7 @@ export function validateExpenseField(field: string, ctx: ValidationContext): str
 		}
 		case 'date': {
 			if (!value) return 'Date is required';
-			// Compare calendar days as strings: new Date('YYYY-MM-DD') parses as UTC and would reject today in positive offsets.
+			// new Date('YYYY-MM-DD') parses as UTC, so compare calendar-day strings instead.
 			const todayStr = toDateInputValue(new Date());
 			if ((value as string) > todayStr) return 'Date cannot be in the future';
 			break;

@@ -1,8 +1,3 @@
-/**
- * Bounded tool-calling loop. It is the only place model tool calls are checked: names against the
- * allowlist, args through the Zod schema, and execution scoped to the session user.
- */
-
 import { logger } from '../../../../utils/logger';
 import type { ChatMessage, LlmProvider, ToolCall } from './llm-provider';
 import { ASSISTANT_TOOLS, toolDefinitions } from './tools';
@@ -10,7 +5,7 @@ import { ASSISTANT_TOOLS, toolDefinitions } from './tools';
 export const MAX_TOOL_CALLS = 5;
 export const MAX_TURNS = 4;
 
-// Constant by design: never build this from user input.
+// Never build this allowlist from user input.
 const SYSTEM_PROMPT = [
   'You are VROOM, a helpful assistant for a personal car-expense tracker. Answer the user questions',
   'about THEIR OWN vehicles and spending using ONLY the data the provided tools return — never invent',
@@ -21,7 +16,6 @@ const SYSTEM_PROMPT = [
 
 export interface AssistantChatResult {
   reply: string;
-  /** Which tools actually ran (transparency for the UI — NOT trusted for any decision). */
   toolsUsed: string[];
 }
 
@@ -29,7 +23,6 @@ function toolMessage(name: string, id: string, content: string): ChatMessage {
   return { role: 'tool', content, toolName: name, toolCallId: id };
 }
 
-/** Unknown names, bad args and tool throws all become error messages for the model, never a 500. */
 async function runOneToolCall(
   call: ToolCall,
   userId: string,
@@ -70,7 +63,6 @@ async function runOneToolCall(
   }
 }
 
-/** Appends the assistant tool-call turn, then one result per call in the same order. */
 async function appendToolTurn(
   messages: ChatMessage[],
   toolsUsed: string[],
@@ -92,10 +84,6 @@ function finalReply(text: string | undefined): string {
   return reply.length > 0 ? reply : 'Sorry, I could not produce an answer for that.';
 }
 
-/**
- * Throws only on provider transport failure. Hitting the turn or tool-call cap without an answer
- * returns a bounded apology instead of a fabricated reply.
- */
 export async function runAssistant(
   provider: LlmProvider,
   userId: string,
@@ -120,8 +108,7 @@ export async function runAssistant(
       return { reply: finalReply(result.text), toolsUsed };
     }
 
-    // Every call echoed on the assistant turn must get a result, so calls past the budget are
-    // dropped from the turn rather than left unanswered.
+    // Every echoed tool call needs a result, so calls past the budget are dropped from the turn.
     const batch = requested.slice(0, toolCallBudget);
     if (batch.length === 0) break;
     toolCallBudget -= batch.length;

@@ -1,25 +1,16 @@
-/** Single entry point for HTTP calls: credentials, error mapping, envelope unwrapping. */
-
 import { browser } from '$app/environment';
 import { env } from '$env/dynamic/public';
 import { ApiError, NetworkError } from '$lib/utils/error-handling';
 import { buildQueryString } from './api-utils';
 
-/** Empty string means same-origin. */
 export function getApiBaseUrl(): string {
 	return env['PUBLIC_API_URL'] ?? '';
 }
 
-// A 401 here means "not signed in", which the callers handle; the global expiry handler must skip it.
 const SELF_REPORTED_401_PATHS = ['/api/v1/auth/me', '/api/v1/auth/refresh'];
 
-/** One toast and one navigation per expiry, however many in-flight requests see the same 401. */
 let sessionExpiryHandled = false;
 
-/**
- * Clears the auth store and redirects to sign-in. Never throws: the caller is about to throw the
- * real ApiError and a secondary failure here must not replace it.
- */
 async function handleSessionExpiry(url: string): Promise<void> {
 	if (!browser || sessionExpiryHandled) return;
 	if (SELF_REPORTED_401_PATHS.some(path => url.includes(path))) return;
@@ -30,7 +21,7 @@ async function handleSessionExpiry(url: string): Promise<void> {
 	}, 1000);
 
 	try {
-		// Lazy: the stores import this module, so static imports would be circular.
+		// Dynamic import: the stores import this module, so a static import is circular.
 		const [{ authStore }, { appStore }] = await Promise.all([
 			import('$lib/stores/auth.svelte'),
 			import('$lib/stores/app.svelte')
@@ -47,7 +38,7 @@ async function handleSessionExpiry(url: string): Promise<void> {
 			import('$app/paths'),
 			import('$lib/routes')
 		]);
-		// Not awaited: a navigation that stalls (e.g. a beforeNavigate hold) must not block the ApiError.
+		// Not awaited: a stalled navigation must not block the ApiError.
 		void goto(resolve(routes.auth)).catch((error: unknown) => {
 			if (import.meta.env.DEV) console.error('Session-expiry redirect failed:', error);
 		});
@@ -69,11 +60,6 @@ function toFetchBody(body: unknown): globalThis.BodyInit | undefined {
 	return undefined;
 }
 
-/**
- * Shared fetch core for every apiClient method. Throws an ApiError built from the backend
- * `{ error: { message, code, details } }` envelope on non-ok responses, and a NetworkError when no
- * response arrives; callers handle success bodies.
- */
 async function fetchOrThrow(url: string, options: ApiOptions): Promise<Response> {
 	const { body, headers: customHeaders, method, signal } = options;
 	const fullUrl = url.startsWith('http') ? url : `${getApiBaseUrl()}${url}`;
@@ -96,7 +82,6 @@ async function fetchOrThrow(url: string, options: ApiOptions): Promise<Response>
 			body: toFetchBody(body)
 		});
 	} catch (error) {
-		// A caller-aborted request is the caller's decision, not a connectivity problem.
 		if (signal?.aborted) throw error;
 		throw new NetworkError(error);
 	}
@@ -117,7 +102,7 @@ async function fetchOrThrow(url: string, options: ApiOptions): Promise<Response>
 					: (errorBody.error.details as Record<string, unknown>);
 			}
 		} catch {
-			// Error body is not JSON; keep the status-based message.
+			// Non-JSON error body: keep the status-based message.
 		}
 		throw new ApiError(message, response.status, details, code);
 	}
@@ -128,7 +113,6 @@ async function fetchOrThrow(url: string, options: ApiOptions): Promise<Response>
 async function request<T>(url: string, options: ApiOptions = {}): Promise<T> {
 	const response = await fetchOrThrow(url, options);
 
-	// Non-JSON bodies (e.g. 204) are returned as the raw Response.
 	const contentType = response.headers.get('content-type');
 	if (!contentType?.includes('application/json')) {
 		return response as unknown as T;
@@ -163,10 +147,8 @@ export const apiClient = {
 	delete: <T>(url: string, options?: ApiOptions) =>
 		request<T>(url, { ...options, method: 'DELETE' }),
 
-	// For file downloads: the unparsed Response, after the same error and session-expiry handling.
 	raw: (url: string, options: Omit<ApiOptions, 'body'> = {}) => fetchOrThrow(url, options),
 
-	// Unlike get(), keeps the { data, pagination } envelope.
 	getPaginated: <T>(url: string, options?: ApiOptions) =>
 		requestFull<{
 			data: T[];

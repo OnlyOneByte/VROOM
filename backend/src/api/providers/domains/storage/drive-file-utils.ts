@@ -1,4 +1,4 @@
-/** Kept free of googleapis imports so tests can load it without that dependency. */
+// Must not import googleapis; tests load this module without that dependency.
 
 import type { DriveFile } from '../../services/google-drive-service';
 import type { StorageFileInfo } from './storage-provider';

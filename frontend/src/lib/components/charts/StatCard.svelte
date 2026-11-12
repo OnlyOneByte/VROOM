@@ -1,5 +1,4 @@
 <script lang="ts" module>
-	/** Design-system colour tokens a StatCard icon can render in. */
 	export type StatCardIconColor =
 		| 'primary'
 		| 'chart-1'
@@ -19,7 +18,7 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import type { AnyIcon } from './types';
 
-	// Tailwind only generates classes it can see in full, so each token maps to its complete class pair.
+	// Tailwind only generates complete class names it can see; keep each class string literal.
 	const ICON_COLOR_MAP: Record<StatCardIconColor, { bg: string; text: string }> = {
 		primary: { bg: 'bg-primary/10', text: 'text-primary' },
 		'chart-1': { bg: 'bg-chart-1/10', text: 'text-chart-1' },
@@ -41,7 +40,6 @@
 		value: string | number;
 		unit?: string;
 		icon?: AnyIcon;
-		/** Typed string because item builders infer string; unknown tokens fall back to primary at runtime. */
 		iconColor?: string;
 		secondaryLabel?: string;
 		secondaryValue?: string | number;
@@ -70,7 +68,6 @@
 		if (Object.hasOwn(ICON_COLOR_MAP, iconColor)) {
 			return ICON_COLOR_MAP[iconColor as StatCardIconColor];
 		}
-		// Unknown tokens fall back to primary so the card renders, but warn in dev so typos are visible.
 		if (import.meta.env.DEV) {
 			console.warn(
 				`StatCard: unknown iconColor "${iconColor}" — rendering the primary tint. ` +
@@ -93,7 +90,7 @@
 				<div class="flex-1 space-y-1 min-w-0">
 					<span class="text-sm font-medium text-muted-foreground">{label}</span>
 					<div class="flex items-baseline gap-1 flex-wrap">
-						<!-- min-w-0 and break-words keep long currency values inside their grid track. -->
+						<!-- min-w-0 is required: grid items default to min-width auto and overflow. -->
 						<span class="text-2xl font-bold min-w-0 break-words">{value}</span>
 						{#if unit}
 							<span class="text-xs text-muted-foreground">{unit}</span>

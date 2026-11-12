@@ -1,8 +1,3 @@
-/**
- * Anthropic Messages API adapter for receipt extraction. Dumb transport: parseExtraction validates the
- * output.
- */
-
 import type { ModelProviderSettings } from '../model/model-registry';
 import { postModelJson, trimBaseUrl } from '../model/model-transport';
 import { RECEIPT_EXTRACTION_PROMPT } from './prompt';
@@ -10,7 +5,6 @@ import type { RawExtraction, ReceiptImage, VlmProvider } from './vlm-provider';
 
 const REQUEST_TIMEOUT_MS = 30_000;
 const MAX_TOKENS = 1024;
-/** Pinned so the wire format cannot drift. */
 const ANTHROPIC_VERSION = '2023-06-01';
 const DEFAULT_BASE_URL = 'https://api.anthropic.com';
 
@@ -63,7 +57,6 @@ export class AnthropicVlmProvider implements VlmProvider {
       },
     });
 
-    // Missing or non-string text becomes an empty draft.
     const textBlock = json?.content?.find((b) => b.type === 'text');
     return typeof textBlock?.text === 'string' ? textBlock.text : '';
   }

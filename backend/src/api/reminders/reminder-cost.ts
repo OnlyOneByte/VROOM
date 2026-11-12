@@ -1,18 +1,10 @@
-/**
- * Normalizes expense reminders to a monthly run-rate. Frequencies follow the same rules as
- * computeNextDueDate in trigger-service.ts, so the two must change together. Basis: occurrences per year ÷ 12,
- * with a year taken as 365.25 days.
- */
-
+// Frequency rules mirror computeNextDueDate in trigger-service.ts; change both together.
 import type { Reminder } from '../../db/schema';
 
 const DAYS_PER_YEAR = 365.25;
 const WEEKS_PER_YEAR = DAYS_PER_YEAR / 7;
 const MONTHS_PER_YEAR = 12;
 
-/**
- * Returns 0 for a shape that cannot fire on a time cadence, so it contributes nothing.
- */
 export function occurrencesPerYear(
   frequency: string,
   intervalValue?: number | null,
@@ -46,9 +38,6 @@ export function occurrencesPerYear(
   }
 }
 
-/**
- * Zero unless the reminder is an active expense with a positive amount.
- */
 export function monthlyRunRate(reminder: Reminder): number {
   if (reminder.type !== 'expense' || !reminder.isActive) return 0;
   const amount = reminder.expenseAmount ?? 0;
@@ -63,13 +52,9 @@ export function monthlyRunRate(reminder: Reminder): number {
 
 export interface RecurringCostSummary {
   count: number;
-  /** Currency per month. */
   monthlyTotal: number;
 }
 
-/**
- * Reminders contributing zero are excluded from both the count and the total.
- */
 export function recurringCostSummary(reminders: Reminder[]): RecurringCostSummary {
   let count = 0;
   let monthlyTotal = 0;

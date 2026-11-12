@@ -1,5 +1,3 @@
-// Pins which cells get the formula-injection escape, and which do not, so exports stay faithful.
-
 import { describe, expect, test } from 'bun:test';
 import { denormalizeCsvCell, neutralizeCsvCell, neutralizeCsvRow } from '../csv-safety';
 
@@ -16,8 +14,6 @@ describe('neutralizeCsvCell — escapes formula-trigger strings', () => {
     expect(neutralizeCsvCell(input)).toBe(expected);
   });
 
-  // A value the user typed as an apostrophe followed by a trigger gets one more apostrophe, so the
-  // importer can restore it.
   test.each([
     ["'=Daily", "''=Daily"],
     ["'=mc2 rebate", "''=mc2 rebate"],
@@ -50,7 +46,6 @@ describe('neutralizeCsvCell — leaves safe values untouched', () => {
   });
 
   test('numbers pass through with their type intact (incl. negatives)', () => {
-    // A negative amount must stay numeric, not become a string.
     expect(neutralizeCsvCell(-50)).toBe(-50);
     expect(neutralizeCsvCell(52.4)).toBe(52.4);
     expect(neutralizeCsvCell(0)).toBe(0);
@@ -101,7 +96,6 @@ describe('denormalizeCsvCell — symmetric inverse for round-trip import', () =>
     expect(denormalizeCsvCell(input)).toBe(expected);
   });
 
-  // A bare formula is never produced by export, so denormalize must not strip it.
   test.each(["'24 road trip", "'twas the night", 'plain text', '=not-prefixed', '', "'"])(
     'leaves a non-neutralized value untouched: %p',
     (input) => {
@@ -125,8 +119,6 @@ describe('denormalizeCsvCell — symmetric inverse for round-trip import', () =>
   });
 });
 
-// Export followed by import restores every value exactly, including a user-typed apostrophe before
-// a trigger.
 describe('neutralizeCsvCell ↔ denormalizeCsvCell — lossless round-trip for every value', () => {
   test.each([
     "'=Daily",

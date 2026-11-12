@@ -150,7 +150,6 @@ describe('Property 2: fuelType-based mutual exclusivity', () => {
 	});
 });
 
-// An emptied description is sent as null only on edit, so it can be cleared; create omits it.
 describe('toBackendExpense description clear-on-edit', () => {
 	const base = { vehicleId: 'v1', category: 'misc' as const, amount: 10 };
 
@@ -172,7 +171,6 @@ describe('toBackendExpense description clear-on-edit', () => {
 	});
 });
 
-// Offline-queued electric expenses must carry fuelType, or the charge is dropped on sync.
 describe('toBackendExpense — charge survives only when fuelType is carried', () => {
 	const electric = { vehicleId: 'v1', category: 'fuel' as const, amount: 30, charge: 42 };
 

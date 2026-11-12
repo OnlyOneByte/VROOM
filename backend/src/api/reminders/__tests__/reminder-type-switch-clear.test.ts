@@ -1,8 +1,3 @@
-/**
- * Switching an expense reminder to notification must clear its template fields in the DB. Sending null
- * must write NULL, not keep the old value. Reads the row straight from sqlite.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,

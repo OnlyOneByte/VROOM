@@ -1,9 +1,3 @@
-/**
- * Checks the Response built by photoThumbnailResponse: its headers and body. nosniff is required
- * because Content-Type is client-asserted, and `private` Cache-Control keeps shared proxies from
- * caching one user's photo.
- */
-
 import { describe, expect, test } from 'bun:test';
 import { photoThumbnailResponse } from '../helpers';
 
@@ -19,7 +13,6 @@ describe('photoThumbnailResponse', () => {
   test('echoes the passed mimeType verbatim (client-asserted, never sniffed)', () => {
     const res = photoThumbnailResponse(Buffer.from('x'), 'image/webp');
     expect(res.headers.get('Content-Type')).toBe('image/webp');
-    // nosniff applies regardless of the declared type.
     expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
   });
 

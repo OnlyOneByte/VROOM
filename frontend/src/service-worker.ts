@@ -1,12 +1,7 @@
 /// <reference lib="webworker" />
-// Must stay named service-worker.ts: SvelteKit's reserved entry, precached via injectManifest.
-// Excluded from the DOM-typed app type-check, so the webworker lib reference does not leak.
-// No `sync` listener: the offline outbox lives in localStorage, which workers cannot read.
 import { clientsClaim } from 'workbox-core';
 import { precacheAndRoute } from 'workbox-precaching';
 
-// The app tsconfig types `self` as a Window, so the manifest is read through a cast.
-// workbox replaces the literal `self.__WB_MANIFEST` token by string match; keep it verbatim.
 interface PushServiceWorker extends ServiceWorkerGlobalScope {
 	__WB_MANIFEST: Array<string | { url: string; revision: string | null }>;
 }
@@ -16,7 +11,6 @@ precacheAndRoute((self as unknown as PushServiceWorker).__WB_MANIFEST);
 sw.skipWaiting();
 clientsClaim();
 
-// Every field is optional so a malformed push still notifies.
 interface PushPayload {
 	title?: string;
 	body?: string;
@@ -35,6 +29,7 @@ function readPushPayload(event: PushEvent): PushPayload {
 	}
 }
 
+// No sync listener: the offline outbox lives in localStorage, which workers cannot read.
 sw.addEventListener('push', (event: PushEvent) => {
 	const payload = readPushPayload(event);
 	const title = payload.title ?? DEFAULT_TITLE;

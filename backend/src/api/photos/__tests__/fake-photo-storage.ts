@@ -1,9 +1,3 @@
-/**
- * Routes a test user's photo storage through one in-memory FakeStorageProvider, and makes it the
- * default for every photo category. Only the registry's provider factory is stubbed: ownership,
- * provider status, storage config, and ref resolution all run for real.
- */
-
 import type { TestApp } from '../../../test-helpers/http-client';
 import { FakeStorageProvider } from '../../providers/domains/storage/fake-provider';
 import { getStorageProviderRegistry } from '../../providers/domains/storage/registry';

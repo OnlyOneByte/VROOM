@@ -1,5 +1,3 @@
-// Saving the provider form must never drop or rewrite config it does not show, and a failed follow-up save must be reported.
-
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import type { UserProviderInfo } from '$lib/types';
@@ -122,8 +120,6 @@ describe('ProviderForm — an edit-save preserves config the form does not manag
 		await fireEvent.click(saveButton());
 		await vi.waitFor(() => expect(updateProvider).toHaveBeenCalled());
 
-		// accountEmail is written once, server-side, when the account is connected. Dropping it
-		// un-names the provider everywhere it is shown and blinds the duplicate-account check.
 		expect(sentConfig()['accountEmail']).toBe('owner@example.com');
 	});
 
@@ -169,9 +165,6 @@ describe('ProviderForm — an edit-save preserves config the form does not manag
 		const sent = updateSettings.mock.calls[0]?.[0] as {
 			storageConfig?: { defaults: unknown; providerCategories: Record<string, unknown> };
 		};
-		// The server merges storageConfig per key, and this form edits no defaults — so it sends back
-		// exactly what it loaded. Fabricating entries here (nulls for the categories it knows nothing
-		// about) would clear the default providers the user picked on the settings page.
 		expect(sent.storageConfig?.defaults).toEqual(SETTINGS_RESPONSE.storageConfig.defaults);
 		expect(Object.keys(sent.storageConfig?.providerCategories ?? {})).toEqual(['drive-1']);
 	});
@@ -189,7 +182,6 @@ describe('ProviderForm — a new provider stores the photo root path the user ty
 		render(ProviderForm, { props: {} });
 
 		await fireEvent.click(screen.getByRole('button', { name: /S3 \/ B2 \/ R2/i }));
-		// Choosing a provider type is the one explicit action that re-seeds the field.
 		expect(rootPathInput().value).toBe('vroom/photos');
 
 		await fireEvent.input(rootPathInput(), { target: { value: 'vroom/scans' } });
@@ -236,7 +228,6 @@ describe('ProviderForm — a settings save that fails is reported, not announced
 	});
 
 	test('a rejected backup-settings save warns instead of claiming success', async () => {
-		// Only the backup PUT fails: the folder-settings PUT lands first and succeeds.
 		updateSettings
 			.mockResolvedValueOnce({})
 			.mockRejectedValueOnce(new Error('503'))
@@ -244,7 +235,6 @@ describe('ProviderForm — a settings save that fails is reported, not announced
 
 		renderEdit();
 		await awaitLoaded();
-		// Tick the backup toggle so the form has backup settings to persist.
 		await fireEvent.click(screen.getByLabelText(/zip backup/i));
 		await fireEvent.click(saveButton());
 		await vi.waitFor(() => expect(updateSettings).toHaveBeenCalledTimes(2));

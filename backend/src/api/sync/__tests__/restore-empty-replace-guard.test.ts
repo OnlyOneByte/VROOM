@@ -1,6 +1,3 @@
-// A replace-mode restore must refuse a backup with zero rows. Otherwise the replace deletes all data
-// and inserts nothing. Preview and merge never delete, so they serve as controls.
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
@@ -26,10 +23,8 @@ describe('restore refuses an empty-backup replace', () => {
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');
 
-    // Exported before seeding, so every data array is empty.
     const emptyZip = await backupService.exportAsZip(ctx.user.id);
 
-    // Seeds the data a wipe would destroy.
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'X', year: 2021 });
     expect(vehicleRows()).toHaveLength(1);
 
@@ -37,7 +32,6 @@ describe('restore refuses an empty-backup replace', () => {
       restoreService.restoreFromBackup(ctx.user.id, emptyZip, 'replace')
     ).rejects.toThrow(/empty backup/i);
 
-    // The guard fires before the transaction, so the data is still there.
     const rows = vehicleRows();
     expect(rows, 'existing data must survive a rejected empty replace').toHaveLength(1);
     expect(rows[0].id).toBe(vehicleId);
@@ -73,7 +67,6 @@ describe('restore refuses an empty-backup replace', () => {
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');
 
-    // Seed, then export a backup that DOES carry a row.
     const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'X', year: 2021 });
     const fullZip = await backupService.exportAsZip(ctx.user.id);
 

@@ -123,7 +123,6 @@ export class GoogleDriveService {
     return allFiles;
   }
 
-  /** Moves a file by swapping its parent in one call, so it is never listed under both folders. */
   async moveFile(fileId: string, newParentId: string, oldParentId: string): Promise<void> {
     await this.drive.files.update({
       fileId,

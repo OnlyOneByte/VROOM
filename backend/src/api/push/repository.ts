@@ -8,10 +8,7 @@ import { DatabaseError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { BaseRepository } from '../../utils/repository';
 
-/**
- * Every method is scoped by userId; the endpoint alone never authorizes a read or write. Rows are
- * keyed by (userId, endpoint).
- */
+// Every method is scoped by userId: the endpoint alone is not a capability.
 export class PushSubscriptionRepository extends BaseRepository<
   PushSubscription,
   NewPushSubscription
@@ -20,7 +17,6 @@ export class PushSubscriptionRepository extends BaseRepository<
     super(db, pushSubscriptions);
   }
 
-  /** Inserts or refreshes by (userId, endpoint). A re-subscribe resets failureCount. */
   async upsertByEndpoint(
     userId: string,
     sub: { endpoint: string; p256dh: string; auth: string; userAgent?: string | null }
@@ -46,7 +42,6 @@ export class PushSubscriptionRepository extends BaseRepository<
         })
         .returning();
       const stored = result[0] as PushSubscription;
-      // Evicts the oldest rows instead of rejecting a new device, so device rotation keeps working.
       await this.evictOldestBeyondCap(userId);
       return stored;
     } catch (error) {
@@ -58,7 +53,6 @@ export class PushSubscriptionRepository extends BaseRepository<
     }
   }
 
-  /** Deletes a user's oldest rows beyond maxSubscriptionsPerUser (createdAt, then id, ascending). */
   private async evictOldestBeyondCap(userId: string): Promise<void> {
     const cap = CONFIG.validation.push.maxSubscriptionsPerUser;
     const rows = await this.db
@@ -86,7 +80,6 @@ export class PushSubscriptionRepository extends BaseRepository<
     }
   }
 
-  /** Returns false when no row matched. */
   async deleteByEndpoint(userId: string, endpoint: string): Promise<boolean> {
     const result = await this.db
       .delete(pushSubscriptions)

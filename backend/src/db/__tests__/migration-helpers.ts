@@ -64,7 +64,6 @@ export function loadSnapshots(): SnapshotFile[] {
   });
 }
 
-// Content matters here: a stale head snapshot keeps the right file name and only the payload reveals it.
 export function loadHeadSnapshot(): SnapshotContent {
   const names = snapshotFileNames();
   const file = names[names.length - 1];
@@ -104,7 +103,6 @@ export function splitStatements(migration: MigrationFile): string[] {
 const DDL_STATEMENT =
   /^(CREATE|ALTER|DROP)\s+(UNIQUE\s+|VIRTUAL\s+|TEMP(ORARY)?\s+)*(TABLE|INDEX|VIEW|TRIGGER)\b/i;
 
-// Only DDL changes the snapshotted schema. Data-only migrations need no snapshot of their own.
 export function migrationChangesSchema(migration: MigrationFile): boolean {
   return splitStatements(migration).some((statement) =>
     DDL_STATEMENT.test(statement.replace(/^(--[^\n]*\n|\s)+/, ''))
@@ -160,7 +158,6 @@ export function countRows(db: Database, table: string): number {
   return result.count;
 }
 
-// expense_amount is integer cents (4550 = $45.50). A float would be stored as REAL without error.
 export function seedCoreData(db: Database): void {
   db.run(
     "INSERT INTO users (id, email, display_name) VALUES ('u1', 'test@example.com', 'Test User')"

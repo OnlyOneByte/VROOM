@@ -1,9 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { E2E_USER, addSessionCookie, mockApi } from './support/mock-api';
 
-// There is no /login route: sign-in is /auth, and provider buttons come from GET /api/v1/auth/providers.
-
-// On narrow viewports sign-out lives in the navigation sheet, which only exists after the hamburger opens.
 async function openNavigationForNarrowViewports(page: Page) {
 	const hamburger = page.getByRole('button', { name: 'Open navigation menu' });
 	if (await hamburger.isVisible()) {
@@ -48,7 +45,6 @@ test.describe('Signed out', () => {
 	});
 
 	test('choosing a provider hands off to the backend OAuth start endpoint', async ({ page }) => {
-		// The real endpoint redirects to Google; stub it to stay on localhost.
 		await page.route('**/api/v1/auth/login/google', route =>
 			route.fulfill({ status: 200, contentType: 'text/html', body: '<html>provider</html>' })
 		);

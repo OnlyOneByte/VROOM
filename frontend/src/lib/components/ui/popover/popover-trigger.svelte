@@ -11,7 +11,7 @@
 </script>
 
 {#if child}
-	<!-- Pass `child` to the primitive's own prop: rendering it inside a bits-ui trigger nests a button in a button, which breaks accessible names. -->
+	<!-- Pass child to the primitive's own prop; a button nested in the bits-ui trigger breaks accessible names. -->
 	<PopoverPrimitive.Trigger {...restProps} {child} />
 {:else}
 	<PopoverPrimitive.Trigger {...restProps}>

@@ -1,9 +1,3 @@
-/**
- * SSRF guard for push endpoints. isAllowedPushEndpoint accepts only https URLs on browser-vendor push
- * hosts and rejects SSRF vectors. POST /api/v1/push/subscribe rejects a rogue endpoint and stores
- * nothing.
- */
-
 import { describe, expect, test } from 'bun:test';
 import { createTestApp } from '../../../test-helpers/http-client';
 import { isAllowedPushEndpoint } from '../push-endpoint';
@@ -23,23 +17,23 @@ describe('isAllowedPushEndpoint allowlist', () => {
 
   test('rejects every SSRF vector + non-vendor host', () => {
     for (const ep of [
-      'http://169.254.169.254/latest/meta-data/iam/security-credentials/', // EC2 metadata
-      'https://169.254.169.254/latest/meta-data/', // metadata over https
-      'http://127.0.0.1:6379/', // loopback admin port (Redis)
-      'https://localhost/x', // localhost name
-      'http://10.0.0.5:22/', // private RFC1918
-      'http://[::1]/', // IPv6 loopback
-      'http://2130706433/', // 127.0.0.1 as an int
-      'http://0x7f000001/', // 127.0.0.1 as hex
-      'https://fcm.googleapis.com.evil.com/x', // look-alike suffix (not a real subdomain)
-      'https://evilfcm.googleapis.com.attacker.tld/x', // another look-alike
-      'https://user:pass@fcm.googleapis.com/x', // userinfo bypass attempt (rejected even on a good host)
-      'http://fcm.googleapis.com/x', // right host, wrong scheme (http)
-      'ftp://fcm.googleapis.com/x', // other scheme
-      'file:///etc/passwd', // file scheme
-      'not-a-url', // malformed
-      '', // empty
-      'https://example.com/x', // a valid https URL but not a push vendor
+      'http://169.254.169.254/latest/meta-data/iam/security-credentials/',
+      'https://169.254.169.254/latest/meta-data/',
+      'http://127.0.0.1:6379/',
+      'https://localhost/x',
+      'http://10.0.0.5:22/',
+      'http://[::1]/',
+      'http://2130706433/',
+      'http://0x7f000001/',
+      'https://fcm.googleapis.com.evil.com/x',
+      'https://evilfcm.googleapis.com.attacker.tld/x',
+      'https://user:pass@fcm.googleapis.com/x',
+      'http://fcm.googleapis.com/x',
+      'ftp://fcm.googleapis.com/x',
+      'file:///etc/passwd',
+      'not-a-url',
+      '',
+      'https://example.com/x',
     ]) {
       expect(isAllowedPushEndpoint(ep), `should reject: ${ep}`).toBe(false);
     }

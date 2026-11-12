@@ -1,11 +1,3 @@
-/**
- * Source guard: photo entity-ownership must delegate to the shared seams in utils/validation.ts and
- * utils/sharing.ts, not a local copy or an inlined repository query. The behavior of each leg (strict
- * vehicle and policy checks, editor access to owner-stamped expenses and odometer readings) is
- * covered over HTTP by shared-entity-photo-access.test.ts and entity-ownership-gate.test.ts, so this
- * file only pins the structure that behavior cannot see.
- */
-
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';

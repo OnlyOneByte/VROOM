@@ -1,8 +1,3 @@
-/**
- * OpenAI Chat Completions vision adapter, also used for Ollama and other compatible endpoints.
- * Dumb transport: parseExtraction validates the output.
- */
-
 import type { ModelProviderSettings } from '../model/model-registry';
 import { postModelJson, trimBaseUrl } from '../model/model-transport';
 import { RECEIPT_EXTRACTION_PROMPT } from './prompt';
@@ -55,7 +50,6 @@ export class OpenAiCompatibleVlmProvider implements VlmProvider {
       },
     });
 
-    // Missing or non-string content becomes an empty draft.
     const content = json?.choices?.[0]?.message?.content;
     return typeof content === 'string' ? content : '';
   }

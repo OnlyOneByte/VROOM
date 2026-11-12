@@ -43,11 +43,6 @@ const failedRef: PhotoRef = {
   createdAt: now,
 };
 
-/**
- * Creates a mock DB that supports chained Drizzle query methods.
- * Each call through a full chain (ending at limit/returning/execute) consumes
- * the next result from the queue.
- */
 function createMockDb(resultQueue: unknown[][]) {
   let callIndex = 0;
 
@@ -63,17 +58,14 @@ function createMockDb(resultQueue: unknown[][]) {
     orderBy: mock(() => chain),
     limit: mock(() => chain._currentResult ?? []),
     innerJoin: mock(() => chain),
-    // For insert().values().returning()
     insert: mock(() => chain),
     values: mock(() => chain),
     returning: mock(() => {
       const idx = callIndex++;
       return resultQueue[idx] ?? [];
     }),
-    // For update().set().where()
     update: mock(() => chain),
     set: mock(() => chain),
-    // For delete().where()
     delete: mock(() => chain),
   };
 

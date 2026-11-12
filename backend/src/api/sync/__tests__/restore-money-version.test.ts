@@ -1,6 +1,3 @@
-// Money is stored as integer cents. Restoring a pre-2.0.0 dollar backup must scale its money to cents,
-// and an unknown future version must be rejected rather than coerced.
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import AdmZip from 'adm-zip';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
@@ -12,7 +9,6 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-/** Raw cents value of an expense, read straight from SQLite. */
 function expenseAmountCents(id: string): number | undefined {
   const row = ctx.sqlite.query('SELECT expense_amount FROM expenses WHERE id = ?').get(id) as {
     expense_amount: number;
@@ -20,7 +16,6 @@ function expenseAmountCents(id: string): number | undefined {
   return row?.expense_amount;
 }
 
-/** Builds a valid backup ZIP at the given version, with one vehicle and one expense. */
 function buildBackupZip(version: string, expenseAmountCell: string): Buffer {
   const userId = ctx.user.id;
   const vehicleId = 'v_t2';
@@ -44,7 +39,6 @@ function buildBackupZip(version: string, expenseAmountCell: string): Buffer {
       'utf-8'
     )
   );
-  // Required files must be present, so empty ones are added.
   for (const f of ['vehicle_financing.csv', 'insurance_policies.csv']) {
     zip.addFile(f, Buffer.from('id\n', 'utf-8'));
   }
@@ -64,7 +58,6 @@ describe('backup version bump and restore shim', () => {
     const vehicle = (await veh.json()) as { data: { id: string } };
     expect(veh.status, JSON.stringify(vehicle)).toBe(201);
 
-    // Written in cents directly. This checks the round-trip, not input conversion.
     const expenseId = 'e_t2_roundtrip';
     ctx.sqlite.run(
       `INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount) VALUES (?, ?, ?, 'fuel', 1700000000, 4550)`,
@@ -76,18 +69,15 @@ describe('backup version bump and restore shim', () => {
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 
-    // Current-version backups get no shim, so the value must match exactly.
     expect(expenseAmountCents(expenseId)).toBe(4550);
   });
 
   test('a PRE-CENTS 1.0.0 dollar backup is ×100-shimmed to cents on restore (12.34 → 1234)', async () => {
     const { restoreService } = await import('../restore');
-    // Without the shim, 12.34 would round to 12 cents.
     const zip = buildBackupZip('1.0.0', '12.34');
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 
-    // Rounds before scaling, so 12.34 becomes 1234 cents, not 1233.
     expect(expenseAmountCents('e_t2')).toBe(1234);
   });
 
@@ -101,9 +91,7 @@ describe('backup version bump and restore shim', () => {
 
   test('a future-version backup is rejected', async () => {
     const { restoreService } = await import('../restore');
-    // 3.0.0 is not pre-cents, so no shim runs and the version check rejects it.
     const zip = buildBackupZip('3.0.0', '12.34');
-    // The failure must be the version check, not some other validation error.
     let thrown: unknown;
     try {
       await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
@@ -113,7 +101,6 @@ describe('backup version bump and restore shim', () => {
     expect(thrown).toBeDefined();
     const details = (thrown as { details?: string[] }).details ?? [];
     expect(details.some((d) => /version/i.test(d))).toBe(true);
-    // The expense must not be inserted.
     expect(expenseAmountCents('e_t2')).toBeUndefined();
   });
 
@@ -121,8 +108,8 @@ describe('backup version bump and restore shim', () => {
     const { isPreCentsBackup } = await import('../backup');
     expect(isPreCentsBackup('1.0.0')).toBe(true);
     expect(isPreCentsBackup('1.5.2')).toBe(true);
-    expect(isPreCentsBackup('2.0.0')).toBe(false); // already cents
-    expect(isPreCentsBackup('3.0.0')).toBe(false); // future — not shimmable, fail-closed
-    expect(isPreCentsBackup(undefined)).toBe(false); // no version → fail-closed (validate rejects)
+    expect(isPreCentsBackup('2.0.0')).toBe(false);
+    expect(isPreCentsBackup('3.0.0')).toBe(false);
+    expect(isPreCentsBackup(undefined)).toBe(false);
   });
 });

@@ -1,7 +1,3 @@
-// The single seam for cross-user vehicle access. Shared routes call one of the require* helpers
-// below; owner-only actions call validateVehicleOwnership. Denials return 404, never 403, so a
-// missing vehicle looks the same as one the caller cannot see.
-
 import { and, eq } from 'drizzle-orm';
 import type { AppDatabase } from '../db/connection';
 import { getDb } from '../db/connection';
@@ -10,8 +6,7 @@ import { NotFoundError } from '../errors';
 
 export type VehicleAccess = { role: 'owner' } | { role: 'viewer' } | { role: 'editor' };
 
-// vehicles.userId is authoritative. The denormalized ownerId on vehicle_shares is only for the
-// owner-side list.
+// Authorize against vehicles.userId; vehicle_shares.ownerId is only a list key.
 export async function resolveVehicleAccess(
   vehicleId: string,
   userId: string,
@@ -52,8 +47,7 @@ export async function requireVehicleRead(
   return access;
 }
 
-// A viewer gets the same 404 as a user with no access, so the response does not reveal the share
-// level. Owner-only actions must use validateVehicleOwnership, because an editor passes this gate.
+// Owner-only actions must use validateVehicleOwnership: an editor passes this gate.
 export async function requireVehicleWrite(
   vehicleId: string,
   userId: string,
@@ -64,8 +58,6 @@ export async function requireVehicleWrite(
   return access;
 }
 
-// Rows an editor creates on a shared vehicle are stamped with the owner's userId, so they count
-// once in the owner's totals and backup.
 export async function resolveVehicleOwnerId(
   vehicleId: string,
   db: AppDatabase = getDb()
@@ -78,7 +70,6 @@ export async function resolveVehicleOwnerId(
   return owned[0]?.userId ?? null;
 }
 
-// Rows on a shared vehicle are stamped with the owner's id, so shared reads and writes scope to the owner.
 export async function requireVehicleOwnerScope(
   vehicleId: string,
   userId: string,

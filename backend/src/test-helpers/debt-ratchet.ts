@@ -1,15 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 
-// Source-scan ratchet. Both directions fail: a new offender, and a tolerated entry that no longer offends.
-// The matcher is proven on fixtures, not on live offenders, so the guard stays satisfiable at zero.
-// Fixing a site must never turn the guard red on its own.
 export interface RatchetSpec {
   name: string;
   scan: () => string[];
   tolerated: Iterable<string>;
   guidance: string;
   probe: () => void;
-  // 'exclusion' is a deliberate permanent choice. Only the wording differs.
   kind?: 'debt' | 'exclusion';
 }
 
@@ -73,7 +69,6 @@ export function countRatchet(spec: {
     });
 
     test('no tolerated count is stale (fixed sites must be removed, lowered counts tightened)', () => {
-      // A count left above the actual number would re-permit what was already fixed.
       const stale = toleratedKeys
         .filter((file) => (counts.get(file) ?? 0) < (spec.tolerated[file] ?? 0))
         .map(

@@ -1,13 +1,5 @@
-/*
- * SSRF guard for Web Push endpoints. The endpoint is user-supplied and the server POSTs to it, so it
- * must be pinned to browser-vendor push hosts. A host allowlist is a string match, so it is immune to
- * DNS rebinding, and IP-literal hosts never match.
- */
+// SSRF guard: the server POSTs to a user-supplied URL, so it is pinned to browser-vendor push hosts.
 
-/**
- * Browser-vendor push services; the browser picks the host, not the app. A host matches if it equals
- * an entry or is a subdomain of one, so `fcm.googleapis.com.evil.com` does not match.
- */
 export const ALLOWED_PUSH_HOSTS = [
   'fcm.googleapis.com',
   'push.services.mozilla.com',
@@ -20,10 +12,6 @@ function hostAllowed(hostname: string): boolean {
   return ALLOWED_PUSH_HOSTS.some((d) => h === d || h.endsWith(`.${d}`));
 }
 
-/**
- * True only for an https URL on an allowed push host with no userinfo. Checked at subscribe time and
- * again before each send.
- */
 export function isAllowedPushEndpoint(endpoint: string): boolean {
   let url: URL;
   try {

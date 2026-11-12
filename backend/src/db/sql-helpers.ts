@@ -1,5 +1,3 @@
-// SQLite date SQL. Swap these bodies for the target dialect when adding another database.
-
 import { type Column, type SQL, sql } from 'drizzle-orm';
 
 // Timestamp columns store Unix seconds. 'unixepoch' is required, or SQLite reads the value as a Julian day.

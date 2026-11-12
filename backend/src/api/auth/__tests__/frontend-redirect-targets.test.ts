@@ -1,9 +1,3 @@
-/**
- * Every frontend page the auth routes redirect to must exist in the SvelteKit route tree. A
- * missing page turns a handled OAuth error into a 404. Dynamic targets built from a caller-supplied
- * returnTo cannot be checked statically and are skipped. Pure source scan, no DB or network.
- */
-
 import { describe, expect, test } from 'bun:test';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -13,16 +7,13 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const AUTH_ROUTES = join(HERE, '..', 'routes.ts');
 const FRONTEND_ROUTES = join(HERE, '..', '..', '..', '..', '..', 'frontend', 'src', 'routes');
 
-/** `${CONFIG.frontend.url}` followed by the literal part of the template string. */
 const FRONTEND_REDIRECT = /\$\{CONFIG\.frontend\.url\}([^`$]*)/g;
-/** The provider-callback fallback used when the stored OAuth state is gone. */
 const RETURN_TO_FALLBACK = /returnTo\s*\?\?\s*'([^']+)'/g;
 
 function authRoutesSrc(): string {
   return readFileSync(AUTH_ROUTES, 'utf8');
 }
 
-/** Collect the literal redirect paths, query strings stripped, duplicates removed. */
 function redirectPaths(): string[] {
   const src = authRoutesSrc();
   const found = new Set<string>();

@@ -34,7 +34,6 @@
 	/>
 </div>
 
-<!-- Location: a single-line free-text label, deliberately not GPS coordinates -->
 <div class="space-y-2">
 	<Label for="location">Location (Optional)</Label>
 	<Input

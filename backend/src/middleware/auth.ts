@@ -30,9 +30,7 @@ export const requireAuth: MiddlewareHandler = async (c, next) => {
   return next();
 };
 
-// Must go through validateAndRefreshSession, not lucia.validateSession. validateSession reports a
-// sliding-expiry refresh only once, and this middleware runs on every /api request ahead of requireAuth,
-// so calling it here would leave the browser cookie on its original deadline.
+// Use validateAndRefreshSession: lucia.validateSession refreshes the sliding expiry only once per request.
 export const optionalAuth: MiddlewareHandler = async (c, next) => {
   try {
     const sessionId = getCookie(c, lucia.sessionCookieName);

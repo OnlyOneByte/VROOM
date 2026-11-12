@@ -1,8 +1,3 @@
-/**
- * S3-compatible provider (AWS S3, Backblaze B2, Cloudflare R2, MinIO). Keys are
- * {pathHint}/{entityType}/{entityId}/{fileName}.
- */
-
 import {
   DeleteObjectCommand,
   GetObjectCommand,
@@ -177,7 +172,6 @@ export class S3CompatProvider implements StorageProvider {
     return segments.join('/');
   }
 
-  /** Backup uploads bypass the entity key layout. */
   private buildRawKey(rawPath: string, fileName: string): string {
     const cleanPath = rawPath.replace(/^\/+/, '').replace(/\/+$/, '');
     return cleanPath ? `${cleanPath}/${fileName}` : fileName;

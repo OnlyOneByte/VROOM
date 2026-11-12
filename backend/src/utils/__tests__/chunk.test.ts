@@ -41,8 +41,6 @@ describe('chunk', () => {
   });
 });
 
-// A multi-row INSERT over the bind-parameter ceiling fails with a count that names neither the
-// table nor a real number.
 describe('rowsPerInsert', () => {
   test('a 25-column table still gets a full batch', () => {
     expect(rowsPerInsert(25)).toBe(SQLITE_BATCH_SIZE);

@@ -18,7 +18,6 @@
 
 	type FlowType = 'file' | 'provider';
 
-	/** Steps: 1 = entry point, 2 = file or provider flow, 3 = preview and execute. */
 	type ProviderSubStep = 'pick-provider' | 'pick-file' | 'loading-sheets';
 
 	interface Props {

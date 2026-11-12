@@ -1,9 +1,3 @@
-/**
- * Corrupt advance configs (unknown frequency, zero interval) must be skipped with zero expense rows.
- * Left unchecked, the catch-up loop would write up to maxCatchUp duplicates at the same date.
- * Zod blocks these on the API, so the rows are seeded directly via sqlite.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -26,7 +20,6 @@ interface TriggerResultShape {
   skipped: Array<{ reminderId: string; reason: string; message?: string }>;
 }
 
-/** Seeds an expense reminder with a corrupt advance config, lapsed past the catch-up cap. */
 function seedCorruptExpenseReminder(
   id: string,
   vehicleId: string,
@@ -112,7 +105,6 @@ describe('catch-up loop non-progress guard', () => {
     const res = await ctx.authed('POST', '/api/v1/reminders/trigger');
     expect(res.status).toBe(200);
 
-    // Bad one skipped + zero rows; good one materialized at least one expense.
     expect(expenseCount('badfreq2')).toBe(0);
     expect(expenseCount(goodId)).toBeGreaterThanOrEqual(1);
   });

@@ -38,7 +38,6 @@
 
 	let { policyId, termId, renewFrom, returnTo = '/insurance' }: Props = $props();
 
-	// Money labels use the user's currency symbol; a hardcoded $ would show the wrong unit for EUR/GBP users.
 	const currencySymbol = $derived(getCurrencySymbol());
 
 	const isEditMode = $derived(!!termId);
@@ -183,7 +182,7 @@
 		return Object.keys(newErrors).length === 0;
 	}
 
-	/** Builds the optional term fields. On edit, emptied fields are sent as null so the backend clears them; undefined would silently keep the old value. */
+	// JSON drops undefined; send null to clear an emptied field.
 	function buildTermData(forEdit = false): Record<string, unknown> {
 		const data: Record<string, unknown> = {};
 		const str = (key: string, raw: string) => {
@@ -204,7 +203,6 @@
 		str('agentEmail', agentEmail);
 		num('totalCost', totalCost);
 		num('monthlyCost', monthlyCost);
-		// premiumFrequency is a select string, not a free-text field.
 		if (premiumFrequency) data['premiumFrequency'] = premiumFrequency;
 		else if (forEdit) data['premiumFrequency'] = null;
 		num('paymentAmount', paymentAmount);

@@ -3,9 +3,6 @@ import { eq } from 'drizzle-orm';
 import type { AppDatabase } from '../db/connection';
 import { NotFoundError } from '../errors';
 
-/**
- * Common CRUD over a Drizzle table. Subclasses add their own queries with direct Drizzle calls.
- */
 export abstract class BaseRepository<T, TNew extends Record<string, unknown>> {
   constructor(
     protected db: AppDatabase,
@@ -23,7 +20,6 @@ export abstract class BaseRepository<T, TNew extends Record<string, unknown>> {
   }
 
   async update(id: string, data: Partial<TNew>): Promise<T> {
-    // Tables without an updatedAt column are valid targets, so the stamp is conditional.
     const updateData = {
       ...data,
       ...('updatedAt' in this.table ? { updatedAt: new Date() } : {}),
@@ -50,10 +46,7 @@ export abstract class BaseRepository<T, TNew extends Record<string, unknown>> {
     }
   }
 
-  // Protected so subclasses expose a typed findIdsBy<Column> that delegates here.
   protected async findIdsByColumn(column: Column, value: unknown): Promise<string[]> {
-    // Full rows rather than an id-only projection, because the generic table type does not satisfy
-    // a narrower select.
     const rows = await this.db.select().from(this.table).where(eq(column, value));
     return rows.map((r) => (r as { id: string }).id);
   }

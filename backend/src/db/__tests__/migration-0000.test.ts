@@ -34,7 +34,6 @@ const EXPECTED_TABLES = [
   'vehicles',
 ];
 
-// Set equality, not toContain: a dropped index fails by name, and an unexpected one fails too.
 const EXPECTED_INDEXES: Record<string, string[]> = {
   expenses: [
     'expenses_category_date_idx',
@@ -69,7 +68,6 @@ const EXPECTED_INDEXES: Record<string, string[]> = {
   vehicles: ['vehicles_user_id_idx', 'vehicles_user_license_plate_idx'],
 };
 
-// Money is integer cents; float dollars do not round-trip. See utils/money.ts.
 const MONEY_COLUMNS: Record<string, string[]> = {
   expenses: ['expense_amount', 'group_total'],
   insurance_claims: ['payout_amount'],
@@ -100,7 +98,6 @@ describe('Migration 0000: baseline schema', () => {
   });
 
   test('the baseline is the only migration', () => {
-    // Adding a migration means updating this expectation and the journal checks in migration-general.
     expect(migrations.map((m) => m.tag)).toEqual(['0000_baseline']);
   });
 
@@ -123,8 +120,6 @@ describe('Migration 0000: baseline schema', () => {
   });
 
   test('every partial index really is partial (a WHERE clause, not just the right name)', () => {
-    // A regenerate can drop a .where() and keep the index name. A name check alone would miss that,
-    // and a non-partial unique on vehicle_id would reject a vehicle's second financing, not second active one.
     const partial = db
       .query<{ name: string; sql: string }, []>(
         "SELECT name, sql FROM sqlite_master WHERE type = 'index' AND sql LIKE '%WHERE%'"
@@ -392,7 +387,6 @@ describe('Migration 0000: baseline schema', () => {
     db.run("DELETE FROM insurance_terms WHERE id = 'it1'");
 
     expect(countRows(db, 'insurance_term_vehicles')).toBe(0);
-    // source_type/source_id are a polymorphic pair, not a foreign key, so nothing cascades through them.
     const expense = db
       .query<{ source_type: string | null; source_id: string | null }, []>(
         "SELECT source_type, source_id FROM expenses WHERE id = 'e1'"
@@ -493,7 +487,6 @@ describe('Property: license plate partial unique index enforcement', () => {
   });
 
   test('the plate index is scoped PER USER — two users may hold the same plate', () => {
-    // A global unique index would reject the second user here.
     db.run("INSERT INTO users (id, email, display_name) VALUES ('u2', 'b@test.com', 'User B')");
     db.run(
       "INSERT INTO vehicles (id, user_id, make, model, year, license_plate) VALUES ('v1', 'u1', 'Toyota', 'Camry', 2022, 'ABC123')"

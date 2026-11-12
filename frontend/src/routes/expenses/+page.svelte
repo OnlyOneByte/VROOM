@@ -63,14 +63,11 @@
 	let selectedTags = $state<string[]>([]);
 	let tagMatchMode = $state<'any' | 'all'>('any');
 
-	// Default: date descending.
 	let sortBy = $state<'date' | 'amount'>('date');
 	let sortDir = $state<'asc' | 'desc'>('desc');
 
-	// Applied server-side so it spans all pages.
 	let categoryFilter = $state<string>('');
 
-	// Parked rows (needsAttention) are kept out of pending sync so they stay visible, not silently stuck.
 	let pendingExpenses = $derived(
 		offlineExpenseQueue.current.filter(expense => !expense.synced && !expense.needsAttention)
 	);
@@ -108,7 +105,6 @@
 		}
 	]);
 
-	// Date changes arrive via bind, so they are detected by comparing a snapshot. Search is debounced.
 	const expenseListReload = useExpenseListReload({
 		ready: () => !isLoading,
 		search: () => searchTerm,
@@ -118,7 +114,6 @@
 
 	onMount(loadInitial);
 
-	// Loads settings, vehicles and page 0 in parallel; any failure shows a retryable error.
 	async function loadInitial() {
 		isLoading = true;
 		loadError = null;
@@ -171,7 +166,6 @@
 			currentOffset = offset;
 			summary = summaryResult;
 		} catch (error) {
-			// The initial load rethrows to the full-page error; later refreshes toast instead.
 			if (isLoading) throw error;
 			handleErrorWithNotification(error, 'Failed to load expenses');
 		} finally {
@@ -217,7 +211,6 @@
 	function handleCategoryChange(category: string) {
 		categoryFilter = category;
 		currentOffset = 0;
-		// Only the page is refetched: the overview card totals all categories for the vehicle.
 		fetchPage(0);
 	}
 
@@ -236,7 +229,6 @@
 	async function handleExportCsv() {
 		isExporting = true;
 		try {
-			// Export uses every active list filter, so the CSV matches what is on screen.
 			await expenseApi.downloadExpensesCsv({
 				vehicleId: selectedVehicleId,
 				category: categoryFilter || undefined,
@@ -252,7 +244,6 @@
 		}
 	}
 
-	// Reload from page 0 so imported rows and counts appear.
 	let importOpen = $state(false);
 	let photosImportOpen = $state(false);
 	function handleImported() {
@@ -273,8 +264,6 @@
 		await fetchPageAndSummary(currentOffset);
 	}
 
-	// Filters apply on the server, so rows arrive pre-filtered. Vehicle names are joined reactively
-	// so the page and fleet requests can run in parallel.
 	let vehicleById = $derived(new Map(vehicles.map(v => [v.id, v])));
 	let displayExpenses = $derived<ExpenseWithVehicle[]>(
 		expenses.map(expense => ({ ...expense, vehicle: vehicleById.get(expense.vehicleId) }))

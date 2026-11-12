@@ -1,5 +1,4 @@
 <script lang="ts">
-	/** Imports from another tracker: preview, then commit through the standard import pipeline. */
 	import { onMount } from 'svelte';
 	import { DatabaseZap, Upload, LoaderCircle, CircleCheck, CircleAlert } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
@@ -32,8 +31,6 @@
 	let preview = $state<ExpenseImportResult | null>(null);
 	let isPreviewing = $state(false);
 	let isImporting = $state(false);
-	// Monotonic token: only the newest preview request may write `preview`. Changing the vehicle while
-	// an earlier request is still in flight would otherwise paint counts for the wrong vehicle.
 	let previewSeq = 0;
 
 	let targetVehicle = $derived(vehicles.find(v => v.id === targetVehicleId));
@@ -55,7 +52,6 @@
 
 	onMount(loadVehicles);
 
-	/** Only the source tag and target vehicle matter here; the Fuelio adapter owns parsing. */
 	function buildMapping(): ImportColumnMapping | null {
 		if (!targetVehicle) return null;
 		return {
@@ -93,7 +89,7 @@
 		if (!file) return;
 		fileName = file.name;
 		csvText = await file.text();
-		// Clear the input so re-picking the SAME file after a cancel still fires a change event.
+		// Clear so re-picking the same file after a cancel still fires change.
 		input.value = '';
 		await runPreview();
 	}
@@ -120,7 +116,6 @@
 		}
 	}
 
-	/** Resets state; bumping the request token drops any in-flight response from a previous open. */
 	function openDialog() {
 		fileName = null;
 		csvText = '';

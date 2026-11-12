@@ -13,7 +13,6 @@ export interface UserActivity {
   syncInProgress: boolean;
 }
 
-// Activity timers are in-memory and lost on restart; only lastDataChangeDate is persisted (sync_state).
 export class UserActivityTracker {
   private static instance: UserActivityTracker;
   private userActivities: Map<string, UserActivity> = new Map();

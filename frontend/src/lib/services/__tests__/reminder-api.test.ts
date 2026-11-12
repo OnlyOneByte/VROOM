@@ -19,7 +19,6 @@ const mockPost = vi.mocked(apiClient.post);
 const mockPut = vi.mocked(apiClient.put);
 const mockDelete = vi.mocked(apiClient.delete);
 
-// The route returns raw backend rows, so the wrapper must map them through fromBackendExpense.
 const mockMaterialized: BackendExpenseResponse[] = [
 	{
 		id: 'e1',

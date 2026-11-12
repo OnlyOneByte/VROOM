@@ -87,7 +87,6 @@ describe('tripApi.getSummary', () => {
 		expect(url).toContain('rate=0.67');
 	});
 
-	// A rate of 0 is a real value and must survive query building.
 	test('rate=0 SURVIVES (a meaningful explicit-zero, not a dropped falsy)', async () => {
 		get.mockResolvedValueOnce(SUMMARY);
 		await tripApi.getSummary({ rate: 0 });
@@ -136,7 +135,6 @@ describe('tripApi CRUD wiring', () => {
 	});
 });
 
-// Errors must propagate; a swallowed error would render an empty state instead of a failure.
 describe('tripApi propagates apiClient errors (does not swallow — the loadError/toast contract)', () => {
 	test('list rejects when getPaginated throws (→ the list page error pane, not empty state)', async () => {
 		getPaginated.mockRejectedValueOnce(new ApiError('Server unavailable', 503));

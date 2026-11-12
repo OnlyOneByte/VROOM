@@ -1,9 +1,4 @@
-/**
- * HTTP tests for the vehicle photo routes that need no storage provider: listing and setting the
- * cover photo. Upload and thumbnail need a provider and are not exercised here. Covers ownership,
- * pagination, and the single-cover rule. createTestApp() must run before any DB-bound import, so this
- * file imports only the harness and bun:test.
- */
+// createTestApp() must run before any DB-bound import: import only the harness and bun:test.
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
@@ -21,7 +16,6 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-/** Inserts a photo row directly, bypassing the storage provider. */
 function seedPhoto(opts: {
   id: string;
   vehicleId: string;

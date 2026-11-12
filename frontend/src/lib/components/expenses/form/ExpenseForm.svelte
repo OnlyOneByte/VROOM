@@ -73,7 +73,6 @@
 		}
 	};
 
-	// expenseId is fixed for this component's life and the load runs only in onMount; the state_referenced_locally warning here is intentional.
 	const form = new ExpenseFormState(ctx, !!expenseId);
 
 	let previousVehicleId = $state('');
@@ -81,7 +80,6 @@
 		if (form.formData.vehicleId && form.formData.vehicleId !== previousVehicleId) {
 			previousVehicleId = form.formData.vehicleId;
 			if (form.vehicle !== null || !form.isLoading) {
-				// Skipped during the edit-mode load, where loadExpense sets the correct value.
 				if (!form.isEditMode || form.vehicle !== null) {
 					form.sourceType = null;
 					form.sourceId = null;
@@ -113,20 +111,17 @@
 			await loadVehicleContext(form);
 		}
 
-		// Set after the vehicle load so the vehicle-change $effect does not reset them.
 		if (!form.isEditMode && preselectedFinancingId) {
 			form.sourceType = 'financing';
 			form.sourceId = preselectedFinancingId;
 		}
 	});
 
-	/** Applies a VLM receipt draft: only fields the draft carries are set; category goes through selectCategory so its side effects fire. */
 	function handleReceiptDraft(draft: ReceiptDraft, image: File) {
 		if (typeof draft.amount === 'number') form.formData.amount = String(draft.amount);
 		if (draft.date) form.formData.date = draft.date;
 		if (typeof draft.odometer === 'number') form.formData.mileage = String(draft.odometer);
 		if (draft.category) form.selectCategory(draft.category);
-		// Only fill an EMPTY description — never clobber something the user already typed.
 		if (draft.vendor && !form.formData.description.trim()) {
 			form.formData.description = draft.vendor;
 		}
@@ -145,7 +140,6 @@
 		);
 	}
 
-	// Date is omitted on purpose: a duplicate is the next occurrence of a recurring expense.
 	function handleDuplicate() {
 		gotoWithQuery(resolve(routes.expenseNew), buildDuplicateQuery(returnTo, form.formData));
 	}

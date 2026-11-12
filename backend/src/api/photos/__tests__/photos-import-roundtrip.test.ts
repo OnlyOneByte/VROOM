@@ -1,9 +1,3 @@
-/**
- * Receipt import round trip: stage, confirm through POST /expenses with clientId `photos:<mediaId>`,
- * then re-run. A re-run skips imported photos, and re-confirming a clientId never creates a duplicate.
- * Photos and VLM are faked. The dedup key is the clientId; the source image stays in Google Photos.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   FakePhotosStore,
@@ -60,7 +54,6 @@ async function seedVlmProvider(): Promise<void> {
 
 let photosProviderSeq = 0;
 function seedPhotosProvider(): void {
-  // Unique per call: the in-memory DB persists across tests in this file.
   photosProviderSeq += 1;
   ctx.sqlite.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
@@ -80,10 +73,6 @@ async function sweep(): Promise<ReceiptDraftItem[]> {
   return (await json<DataEnvelope<{ drafts: ReceiptDraftItem[] }>>(res)).data.drafts;
 }
 
-/**
- * Confirms a draft the way the client does: POST /expenses with the photos:<id> clientId. Defaults to
- * a non-fuel category because fuel also requires mileage and volume.
- */
 async function confirm(
   photoId: string,
   vehicleId: string,
@@ -121,7 +110,6 @@ describe('Photos import round-trip: stage, confirm, re-run', () => {
     }
     expect(expenseCount()).toBe(before + 2);
 
-    // Each expense keeps its photos:<id> clientId, which is the dedup key.
     for (const id of ids) {
       const row = ctx.sqlite
         .query('SELECT client_id FROM expenses WHERE client_id = ?')

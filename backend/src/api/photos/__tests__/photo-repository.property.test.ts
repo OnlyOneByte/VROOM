@@ -1,10 +1,3 @@
-/**
- * Property tests over PhotoRepository's cover and entity-isolation rules, run against the real
- * repository on a migrated in-memory SQLite database. After every operation, at most one photo per
- * entity is the cover, and an operation on one entity leaves every other entity's photos and cover
- * exactly as they were.
- */
-
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
@@ -40,7 +33,6 @@ interface EntityKey {
   entityId: string;
 }
 
-/** Shared entityIds across types, so same-id different-type collisions get exercised. */
 const ENTITY_KEYS: EntityKey[] = ['vehicle', 'expense', 'trip'].flatMap((entityType) =>
   ['e1', 'e2'].map((entityId) => ({ entityType, entityId }))
 );
@@ -91,7 +83,6 @@ async function applyOp(op: Op): Promise<void> {
   }
 }
 
-/** A stable, comparable view of one entity: each photo id with its cover flag. */
 async function snapshot(key: EntityKey): Promise<string[]> {
   const rows = await repo.findByEntity(key.entityType, key.entityId);
   return rows.map((p) => `${p.id}:${p.isCover ? 1 : 0}`).sort();

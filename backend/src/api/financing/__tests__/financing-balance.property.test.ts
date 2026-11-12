@@ -1,8 +1,3 @@
-/**
- * Property-based checks of financing balance and payoff eligibility against in-memory SQLite. Money
- * is integer cents end to end, so every assertion is exact.
- */
-
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
@@ -49,10 +44,8 @@ afterEach(() => {
   sqliteDb.close();
 });
 
-/** Original loan amounts in cents: $10.00 to $1,000,000.00. */
 const originalAmountCentsArb = fc.integer({ min: 1_000, max: 100_000_000 });
 
-/** Individual payment amounts in cents: $0.01 to $5,000.00. */
 const paymentCentsArb = fc.integer({ min: 1, max: 500_000 });
 
 const nowSeconds = (): number => Math.floor(Date.now() / 1000);
@@ -243,17 +236,16 @@ describe('computeBalances (batch) equivalence', () => {
       );
     };
 
-    // Three financing records (distinct vehicles) with distinct payment profiles.
     const vA = newVehicle();
     const finA = finOn(1_000_000, vA);
     payOn(250_000, finA, vA);
     payOn(250_000, finA, vA);
     const vB = newVehicle();
     const finB = finOn(500_000, vB);
-    payOn(500_000, finB, vB); // fully paid, clamps to 0
+    payOn(500_000, finB, vB);
     const vC = newVehicle();
-    const finC = finOn(800_000, vC); // no payments
-    createNonFinancingExpense(99_900); // must not affect any balance
+    const finC = finOn(800_000, vC);
+    createNonFinancingExpense(99_900);
 
     const expectedA = await repo.computeBalance(finA);
     const expectedB = await repo.computeBalance(finB);

@@ -2,8 +2,7 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 
-// Auth-domain providers are sign-in identities, managed only by the auth flow. The provider routes
-// must refuse to modify or delete them, and leave the row untouched.
+// Auth-domain providers are sign-in identities; routes must never modify or delete them.
 
 let ctx: TestApp;
 let authProviderId: string;

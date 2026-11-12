@@ -1,9 +1,3 @@
-/**
- * A term update whose premium expense cannot be recreated must report failure, not success. The old
- * premium is deleted first, so a silent swallow would lose it. The failure is forced by a spy, since the
- * route cannot reach the realistic triggers.
- */
-
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import {
   createTestApp,
@@ -25,7 +19,6 @@ interface PolicyBody {
   terms: Array<{ id: string }>;
 }
 
-/** The premium expense rows a term has materialized. */
 function premiumRows(termId: string): Array<{ id: string; expense_amount: number }> {
   return ctx.sqlite
     .query(
@@ -35,7 +28,6 @@ function premiumRows(termId: string): Array<{ id: string; expense_amount: number
     .all(termId) as Array<{ id: string; expense_amount: number }>;
 }
 
-/** A policy with one costed term covering one vehicle, so a premium expense exists to lose. */
 async function seedCostedTerm(): Promise<{ policyId: string; termId: string }> {
   const vehicleId = await seedVehicle(ctx, { nickname: 'Insured' });
   const res = await ctx.authed('POST', '/api/v1/insurance', {

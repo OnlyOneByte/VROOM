@@ -9,8 +9,7 @@ import { logger } from './utils/logger';
 logger.startup(`VROOM Backend starting on ${CONFIG.server.host}:${CONFIG.server.port}`);
 logger.startup(`Environment: ${CONFIG.env}`);
 
-// Probe an ephemeral port so a bad HOST fails here with a clear message. Bun reports an address this
-// machine does not own as a port conflict, which would send operators chasing the wrong problem.
+// Bun reports an address this machine does not own as a port conflict, not as a bad address.
 try {
   const probe = Bun.serve({
     hostname: CONFIG.server.host,
@@ -27,9 +26,7 @@ try {
   process.exit(1);
 }
 
-// Re-running applied migrations is a no-op, so any failure here means the schema is not what the
-// code expects. A database bootstrapped with db:push fails with "already exists" and must be
-// recovered per DatabaseMigrations.md rather than served on an unknown schema.
+// A db:push-bootstrapped database fails here with 'already exists'; see DatabaseMigrations.md.
 try {
   await runMigrations();
 } catch (error) {
@@ -70,7 +67,7 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 
 export default {
   port: CONFIG.server.port,
-  // Bun binds every interface when no hostname is given. Passing HOST through keeps a loopback-only setup private.
+  // Bun binds every interface when no hostname is given, so HOST must always be passed through.
   hostname: CONFIG.server.host,
   fetch: app.fetch,
   reusePort: true,

@@ -1,8 +1,3 @@
-/**
- * The premium-to-expense hook over HTTP. A costed term creates an even-split insurance expense per covered
- * vehicle. Updating the term replaces those expenses, and deleting the term removes them. Reads rows from sqlite.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -48,7 +43,6 @@ async function createPolicy(
   return { policyId: body.data.id, termId: body.data.terms[0].id };
 }
 
-/** Creates a policy whose single term is priced monthly, with no totalCost. */
 async function createMonthlyPolicy(
   vehicleIds: string[],
   monthlyCost: number
@@ -108,7 +102,6 @@ describe('insurance premium → expense hook lifecycle', () => {
     expect(new Set(rows.map((r) => r.vehicle_id))).toEqual(new Set([v1, v2]));
   });
 
-  // Uneven legs must still sum exactly to the total: a rounding bug would lose or invent a cent.
   test('a non-even premium split across three vehicles sums exactly to the total', async () => {
     const v1 = await seedVehicle('Honda');
     const v2 = await seedVehicle('Toyota');
@@ -121,19 +114,17 @@ describe('insurance premium → expense hook lifecycle', () => {
     const totalCents = rows.reduce((s, r) => s + r.expense_amount, 0);
     expect(totalCents).toBe(10000);
 
-    // Largest remainder: two legs at 3333 and one at 3334.
     const cents = rows.map((r) => r.expense_amount).sort((a, b) => a - b);
     expect(cents).toEqual([3333, 3333, 3334]);
     expect(new Set(rows.map((r) => r.vehicle_id))).toEqual(new Set([v1, v2, v3]));
   });
 
-  // 2024-01-01 to 2025-01-01 spans 13 inclusive month keys, so $100 a month materializes as $1300.
   test('a monthly-only term materializes monthlyCost times its months', async () => {
     const v1 = await seedVehicle('Honda');
     const { termId } = await createMonthlyPolicy([v1], 100);
 
     const rows = autoExpensesForTerm(termId);
-    expect(rows).toHaveLength(1); // one covered vehicle → one sibling
+    expect(rows).toHaveLength(1);
     expect(rows[0].expense_amount).toBe(130000);
     expect(rows[0].category).toBe('financial');
     expect(rows[0].tags ?? '').toContain('insurance');
@@ -178,7 +169,6 @@ describe('insurance premium → expense hook lifecycle', () => {
     const after = autoExpensesForTerm(termId);
     expect(after).toHaveLength(1);
     expect(after[0].expense_amount).toBe(150000);
-    // Regenerated, not mutated in place.
     expect(after[0].id).not.toBe(beforeId);
   });
 

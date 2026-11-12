@@ -2,7 +2,6 @@
 
 export const DEFAULT_THEME_ID = 'default';
 
-/** Each theme's background as hex: browser chrome does not reliably honor oklch() in theme-color. */
 export const THEME_BACKGROUND_HEX: Record<string, { light: string; dark: string }> = {
 	aurora: { light: '#f5f8ff', dark: '#091123' },
 	bento: { light: '#f3f5f9', dark: '#0d0f15' },

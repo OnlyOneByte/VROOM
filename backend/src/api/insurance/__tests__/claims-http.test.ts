@@ -1,8 +1,3 @@
-/**
- * HTTP tests for insurance claims: the file, list, update, and delete lifecycle, ownership scoping, and enum
- * validation.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -19,7 +14,6 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-/** Seed a policy (with one term covering the vehicle) and return its id. */
 async function seedPolicy(vehicleId: string): Promise<string> {
   const res = await ctx.authed('POST', '/api/v1/insurance', {
     company: 'Acme Mutual',
@@ -52,7 +46,6 @@ describe('insurance claims HTTP routes', () => {
     const vehicleId = await seedVehicle(ctx);
     const policyId = await seedPolicy(vehicleId);
 
-    // File a claim.
     const created = await ctx.authed('POST', `/api/v1/insurance/${policyId}/claims`, {
       claimDate: '2024-06-15T00:00:00.000Z',
       claimType: 'collision',
@@ -67,14 +60,12 @@ describe('insurance claims HTTP routes', () => {
     expect(createdBody.data.claimType).toBe('collision');
     const claimId = createdBody.data.id;
 
-    // List shows it.
     const list = await ctx.authed('GET', `/api/v1/insurance/${policyId}/claims`);
     const listBody = await json<DataEnvelope<ClaimRow[]>>(list);
     expect(list.status).toBe(200);
     expect(listBody.data).toHaveLength(1);
     expect(listBody.data[0].id).toBe(claimId);
 
-    // Update status → settled.
     const updated = await ctx.authed('PUT', `/api/v1/insurance/${policyId}/claims/${claimId}`, {
       status: 'settled',
       payoutAmount: 1500,
@@ -84,7 +75,6 @@ describe('insurance claims HTTP routes', () => {
     expect(updatedBody.data.status).toBe('settled');
     expect(updatedBody.data.payoutAmount).toBe(1500);
 
-    // Delete → list empties.
     const del = await ctx.authed('DELETE', `/api/v1/insurance/${policyId}/claims/${claimId}`);
     expect(del.status).toBe(200);
     const listAfter = await ctx.authed('GET', `/api/v1/insurance/${policyId}/claims`);
@@ -95,7 +85,6 @@ describe('insurance claims HTTP routes', () => {
     const vehicleId = await seedVehicle(ctx);
     const policyId = await seedPolicy(vehicleId);
 
-    // File a claim with every optional field set.
     const created = await ctx.authed('POST', `/api/v1/insurance/${policyId}/claims`, {
       claimDate: '2024-06-15T00:00:00.000Z',
       claimType: 'collision',
@@ -112,7 +101,6 @@ describe('insurance claims HTTP routes', () => {
     expect(createdBody.data.faultDesignation).toBe('not_at_fault');
     expect(createdBody.data.vehicleId).toBe(vehicleId);
 
-    // Omitting a field on update preserves it (only status changes here).
     const partial = await ctx.authed('PUT', `/api/v1/insurance/${policyId}/claims/${claimId}`, {
       status: 'settled',
     });
@@ -228,7 +216,6 @@ describe('insurance claim vehicleId and termId links', () => {
     const ownVehicle = await seedVehicle(ctx);
     const policyId = await seedPolicy(ownVehicle);
 
-    // Pull the policy's real term id.
     const get = await ctx.authed('GET', `/api/v1/insurance/${policyId}`);
     const policy = (await json<DataEnvelope<{ terms: { id: string }[] }>>(get)).data;
     const termId = policy.terms[0]?.id;
@@ -263,7 +250,6 @@ describe('insurance claim vehicleId and termId links', () => {
   test('a PUT re-pointing a claim at a termId NOT on this policy → 400', async () => {
     const ownVehicle = await seedVehicle(ctx);
     const policyId = await seedPolicy(ownVehicle);
-    // A SECOND policy with its own term — its term id is valid but foreign to the first policy.
     const otherPolicyId = await seedPolicy(ownVehicle);
     const otherGet = await ctx.authed('GET', `/api/v1/insurance/${otherPolicyId}`);
     const otherTermId = (await json<DataEnvelope<{ terms: { id: string }[] }>>(otherGet)).data

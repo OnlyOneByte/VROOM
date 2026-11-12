@@ -1,10 +1,3 @@
-/**
- * POST and DELETE /api/v1/push/subscribe over the in-memory app. Covers persisting for the session
- * user (id only, keys not echoed), idempotent re-subscribe, DELETE as a no-op for unknown endpoints,
- * IDOR protection between users, and auth and validation errors. These routes do not check whether
- * push is configured.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -99,9 +92,8 @@ describe('DELETE /api/v1/push/subscribe', () => {
 
   test('the same endpoint is per-user — A and B each own their own row', async () => {
     await ctx.authed('POST', '/api/v1/push/subscribe', SUB);
-    await asB('POST', '/api/v1/push/subscribe', SUB); // B subscribes the same endpoint string
+    await asB('POST', '/api/v1/push/subscribe', SUB);
 
-    // Each user has exactly one, independently.
     expect(await pushSubscriptionRepository.findByUser(ctx.user.id)).toHaveLength(1);
     expect(await pushSubscriptionRepository.findByUser(bId)).toHaveLength(1);
 

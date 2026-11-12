@@ -1,7 +1,6 @@
 export type ExpenseCategory =
 	'fuel' | 'maintenance' | 'financial' | 'regulatory' | 'enhancement' | 'misc';
 
-// Common tag suggestions (not enforced)
 export const COMMON_EXPENSE_TAGS = [
 	'fuel',
 	'tolls',
@@ -72,7 +71,6 @@ export interface ExpenseSummary {
 	monthlyTrend: Array<{ period: string; amount: number; count: number }>;
 }
 
-/** Expense as the backend sends it, before fromBackendExpense maps it to Expense. */
 export interface BackendExpenseResponse {
 	id: string;
 	vehicleId: string;

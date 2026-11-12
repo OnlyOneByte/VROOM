@@ -3,9 +3,6 @@ import { scanA11y } from './support/axe';
 import { addSessionCookie, mockApi } from './support/mock-api';
 import { THEME_REGISTRY, DEFAULT_THEME_ID } from '../src/lib/theme/theme-registry';
 
-// Manifest, service worker, install meta tags, offline badge, responsive layout and axe scans.
-// The manifest and service-worker tests need the production bundle (E2E_TARGET=preview); the
-// dev server serves neither, and enabling devOptions would test a different artifact.
 const PREVIEW = process.env['E2E_TARGET'] === 'preview';
 const needsRealBundle = () =>
 	test.skip(!PREVIEW, 'needs the production bundle; run with E2E_TARGET=preview');
@@ -54,7 +51,6 @@ test.describe('PWA surface', () => {
 		needsRealBundle();
 		await page.goto('/');
 
-		// `ready` resolves once the worker is active, after the precache list is written.
 		const cachedAssets = await page.evaluate(async () => {
 			if (!('serviceWorker' in navigator) || !('caches' in window)) return null;
 			await navigator.serviceWorker.ready;
@@ -67,7 +63,6 @@ test.describe('PWA surface', () => {
 			return urls;
 		});
 
-		// Any non-empty cache would pass; the precache list must contain a built JS chunk.
 		expect(cachedAssets).not.toBeNull();
 		expect(cachedAssets!.some(path => path.endsWith('.js'))).toBe(true);
 	});
@@ -75,12 +70,10 @@ test.describe('PWA surface', () => {
 	test('declares the install meta tags exactly once', async ({ page }) => {
 		await page.goto('/');
 
-		// app.html owns these tags; a copy in <svelte:head> would land later and win.
 		await expect(page.locator('meta[name="theme-color"]')).toHaveCount(1);
 		const viewport = page.locator('meta[name="viewport"]');
 		await expect(viewport).toHaveCount(1);
 		await expect(viewport).toHaveAttribute('content', /width=device-width/);
-		// viewport-fit=cover is what makes env(safe-area-inset-*) report non-zero.
 		await expect(viewport).toHaveAttribute('content', /viewport-fit=cover/);
 		await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveCount(1);
 	});
@@ -88,8 +81,6 @@ test.describe('PWA surface', () => {
 	test('shows the offline badge when the browser goes offline', async ({ page }) => {
 		await page.goto('/');
 
-		// The store listens for window offline/online events, so dispatch them directly.
-		// Re-dispatch until it takes: the listener is attached during hydration, after goto resolves.
 		const offlineBadge = page.getByText('Offline', { exact: true });
 		await expect(async () => {
 			await page.evaluate(() => window.dispatchEvent(new Event('offline')));
@@ -132,25 +123,18 @@ test.describe('Responsive layout', () => {
 		const hamburger = page.getByRole('button', { name: 'Open navigation menu' });
 		await expect(hamburger).toBeVisible();
 		await hamburger.click();
-		// `exact`: the dashboard also has a "View All Expenses" link.
 		await expect(page.getByRole('link', { name: 'Expenses', exact: true })).toBeVisible();
 	});
 });
 
-// Ratchet: each route lists the WCAG rule ids it violates today, and only a rule id outside
-// that list fails. Remove an id once it is fixed, or the ratchet stays looser than the app.
-// Routes that need a tap or a fixture id are covered in expenses-a11y.spec.ts instead.
 interface A11yRoute {
-	/** WCAG rule ids this route violates today. */
 	debt: string[];
-	/** Signed-out surfaces; every other route needs the session cookie. */
 	anonymous?: true;
 	ready: (page: Page) => Locator;
 }
 
 const signInControl = (page: Page) =>
 	page.getByRole('button', { name: /Sign In|Continue with/i }).first();
-// Pages repeat their name on card headings, so readiness takes the first match.
 const pageHeading = (name: string) => (page: Page) => page.getByRole('heading', { name }).first();
 
 const A11Y_ROUTES: Record<string, A11yRoute> = {
@@ -201,19 +185,15 @@ test.describe('Accessibility (axe)', () => {
 			await mockApi(page, { authenticated: !anonymous });
 
 			await page.goto(route);
-			// Must match the route's own content, or the scan covers the shell or a redirect.
 			await expect(ready(page)).toBeVisible();
 
 			await expectNoNewViolations(page, testInfo, attachmentLabel(route), debt);
 
-			// Last on purpose: route protection redirects asynchronously after /auth/me.
 			await expect(page).toHaveURL(route);
 		});
 	}
 });
 
-// A low-contrast palette fails on every route at once, which default-theme scans cannot see.
-// Dashboard paints most of the token set. Chromium only: axe contrast does not vary by engine.
 const NON_DEFAULT_THEMES = Object.keys(THEME_REGISTRY).filter(id => id !== DEFAULT_THEME_ID);
 
 test.describe('Accessibility (axe) — theme palettes', () => {
@@ -239,7 +219,6 @@ test.describe('Accessibility (axe) — theme palettes', () => {
 
 			await page.goto('/dashboard');
 			await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
-			// A mis-set storage key would silently scan the default palette.
 			await expect(page.locator('html')).toHaveAttribute('data-theme', themeId);
 			await expect(page.locator('html')).toHaveClass(/dark/);
 

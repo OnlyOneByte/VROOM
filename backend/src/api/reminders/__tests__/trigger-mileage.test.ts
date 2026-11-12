@@ -1,8 +1,3 @@
-/**
- * The mileage axis of the reminder trigger: a milestone notification fires once the vehicle's odometer
- * reaches nextDueOdometer. Reminder rows are seeded via sqlite, then the real trigger endpoint is driven.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -42,19 +37,17 @@ async function trigger(): Promise<void> {
 describe('mileage-reminder trigger (whichever-comes-first, odometer axis)', () => {
   test('current odometer at/over the milestone fires exactly one mileage notification', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2020 });
-    await addOdometerReading(ctx, vehicleId, 35200); // past the 35000 milestone
+    await addOdometerReading(ctx, vehicleId, 35200);
     seedMileageReminder(ctx, 'rm1', vehicleId, 35000);
 
     await trigger();
 
     const notifs = mileageNotifs('rm1');
     expect(notifs).toHaveLength(1);
-    expect(notifs[0]?.due_date).toBeNull(); // mileage axis carries no date
+    expect(notifs[0]?.due_date).toBeNull();
     expect(notifs[0]?.due_odometer).toBe(35000);
   });
 
-  // Other firing cases sit strictly past the milestone, so this guards the >= boundary: a `<` to `<=` slip would
-  // otherwise go unnoticed.
   test('current odometer exactly on the milestone fires', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2020 });
     await addOdometerReading(ctx, vehicleId, 35000);
@@ -69,7 +62,7 @@ describe('mileage-reminder trigger (whichever-comes-first, odometer axis)', () =
 
   test('current odometer below the milestone fires nothing', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2020 });
-    await addOdometerReading(ctx, vehicleId, 34000); // below 35000
+    await addOdometerReading(ctx, vehicleId, 34000);
     seedMileageReminder(ctx, 'rm2', vehicleId, 35000);
 
     await trigger();
@@ -86,11 +79,10 @@ describe('mileage-reminder trigger (whichever-comes-first, odometer axis)', () =
     expect(mileageNotifs('rm3')).toHaveLength(1);
 
     await trigger();
-    expect(mileageNotifs('rm3')).toHaveLength(1); // still one — stays due until marked serviced
+    expect(mileageNotifs('rm3')).toHaveLength(1);
   });
 
   test('a mileage reminder with no linked vehicle is skipped, not errored', async () => {
-    // Seed the reminder row but NO junction row.
     ctx.sqlite.run(
       `INSERT INTO reminders
          (id, user_id, name, type, action_mode, frequency, trigger_mode,
@@ -109,9 +101,7 @@ describe('mileage-reminder trigger (whichever-comes-first, odometer axis)', () =
 
   test('current odometer is the MAX across expense mileage + odometer entries', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2020 });
-    // A manual odometer entry below the milestone...
     await addOdometerReading(ctx, vehicleId, 34000);
-    // ...but a fuel expense whose mileage is past it — the max-by-value should win.
     const expRes = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId,
       category: 'fuel',
@@ -128,10 +118,9 @@ describe('mileage-reminder trigger (whichever-comes-first, odometer axis)', () =
     expect(mileageNotifs('rm5')).toHaveLength(1);
   });
 
-  // Dedup is per milestone, not per reminder: a re-armed milestone must fire again.
   test('a new milestone after mark-serviced fires a new notification', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2020 });
-    await addOdometerReading(ctx, vehicleId, 35200); // past the first 35000 milestone
+    await addOdometerReading(ctx, vehicleId, 35200);
     seedMileageReminder(ctx, 'rm6', vehicleId, 35000);
 
     await trigger();
@@ -139,16 +128,12 @@ describe('mileage-reminder trigger (whichever-comes-first, odometer axis)', () =
     expect(first).toHaveLength(1);
     expect(first[0]?.due_odometer).toBe(35000);
 
-    // Mark serviced now: re-anchors lastServiceOdometer to the current odometer (35200) and
-    // recomputes nextDueOdometer = 35200 + intervalMileage(5000) = 40200.
     const serviced = await ctx.authed('POST', '/api/v1/reminders/rm6/mark-serviced');
     expect(serviced.status).toBe(200);
 
-    // Still at 35200 → below the NEW 40200 milestone → no new notification yet.
     await trigger();
     expect(mileageNotifs('rm6')).toHaveLength(1);
 
-    // Drive past the new milestone → a SECOND notification at the new dueOdometer.
     await addOdometerReading(ctx, vehicleId, 40500);
     await trigger();
     const after = mileageNotifs('rm6').sort(
@@ -158,13 +143,10 @@ describe('mileage-reminder trigger (whichever-comes-first, odometer axis)', () =
     expect(after.map((n) => n.due_odometer)).toEqual([35000, 40200]);
   });
 
-  // The time and mileage notifications sit in disjoint unique-index domains, so both must survive a single trigger.
   test('a `both` reminder overdue on BOTH axes fires two distinct notifications (time + mileage, no collision)', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2020 });
-    await addOdometerReading(ctx, vehicleId, 36000); // past the 35000 milestone
+    await addOdometerReading(ctx, vehicleId, 36000);
 
-    // A `both`-type reminder: past odometer milestone (35000) AND a past next_due_date (time-overdue).
-    // start_date in the past + a monthly cadence so the time axis materializes a period notification.
     const pastDate = Math.floor(new Date('2024-01-01T00:00:00.000Z').getTime() / 1000);
     ctx.sqlite.run(
       `INSERT INTO reminders
@@ -186,13 +168,11 @@ describe('mileage-reminder trigger (whichever-comes-first, odometer axis)', () =
       .query('SELECT id, due_date, due_odometer FROM reminder_notifications WHERE reminder_id = ?')
       .all('rm-both') as NotifRow[];
 
-    // Exactly one mileage-axis notification (dueOdometer set, dueDate null)...
     const mileage = all.filter((n) => n.due_odometer !== null);
     expect(mileage).toHaveLength(1);
     expect(mileage[0]?.due_odometer).toBe(35000);
     expect(mileage[0]?.due_date).toBeNull();
 
-    // ...AND at least one time-axis notification (dueDate set, dueOdometer null) — the two axes coexist.
     const time = all.filter((n) => n.due_date !== null);
     expect(time.length).toBeGreaterThanOrEqual(1);
     expect(time.every((n) => n.due_odometer === null)).toBe(true);

@@ -13,8 +13,6 @@ import {
 import { buildReminderPayload, type ReminderPayload } from './reminder-form-payload';
 import { validateReminderDraft } from './reminder-form-validation';
 
-// Shared by the dialog shell and its field sections. Sections write into `values` directly; the
-// shell owns open/close, reset-on-open, and submit.
 export class ReminderFormState {
 	values = $state<ReminderDraft>(emptyReminderDraft([], new SvelteDate()));
 	errors = $state<Record<string, string>>({});

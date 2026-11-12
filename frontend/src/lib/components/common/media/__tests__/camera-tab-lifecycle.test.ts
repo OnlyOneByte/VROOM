@@ -1,5 +1,3 @@
-// Camera lifecycle: one hardware open per switch, and every capture's blob URL is revoked after upload.
-
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
 
@@ -61,8 +59,7 @@ beforeEach(() => {
 	HTMLVideoElement.prototype.play = vi.fn(
 		async () => {}
 	) as unknown as typeof HTMLVideoElement.prototype.play;
-	// happy-dom's HTMLMediaElement.srcObject setter throws "not implemented", which the component
-	// would report as a camera failure. Shadow it with a plain accessor.
+	// happy-dom's srcObject setter throws; shadow it with a plain accessor.
 	Object.defineProperty(HTMLVideoElement.prototype, 'srcObject', {
 		configurable: true,
 		get() {
@@ -101,7 +98,6 @@ function mount(onUploadCapture = vi.fn(async () => {})) {
 	return { ...result, onUploadCapture };
 }
 
-/** The viewfinder is live once the capture button is enabled (startCamera awaits a 50ms settle). */
 async function waitForViewfinder(): Promise<HTMLElement> {
 	const button = await screen.findByRole('button', { name: 'Take photo' });
 	await waitFor(() => expect(button).toBeEnabled(), { timeout: 2000 });

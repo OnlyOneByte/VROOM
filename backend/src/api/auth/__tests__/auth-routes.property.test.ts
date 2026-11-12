@@ -1,20 +1,13 @@
-/**
- * Structural guards over auth/routes.ts source: state-flow wiring, route ordering, public
- * /providers route, and rate limiting on the unauthenticated routes.
- */
-
 import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 
 describe('Auth routes structural properties', () => {
-  // Behavior is covered in consume-oauth-state.test.ts; this guards that the validator delegates.
   test('login callback delegates to consumeOAuthState for the login flow (no flowType)', async () => {
     const routesSource = await Bun.file(`${import.meta.dir}/../routes.ts`).text();
 
     const fnStart = routesSource.indexOf('function validateLoginState');
     expect(fnStart).toBeGreaterThan(-1);
     const fnBody = routesSource.slice(fnStart, routesSource.indexOf('\n}', fnStart) + 2);
-    // Login flow → consumeOAuthState(..., undefined): the entry must carry NO flowType.
     expect(fnBody).toContain('consumeOAuthState(oauthStateStore, stateParam, undefined)');
   });
 

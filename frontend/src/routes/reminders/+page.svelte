@@ -42,7 +42,6 @@
 	let vehicles = $state<Vehicle[]>([]);
 	let notifications = $state<ReminderNotification[]>([]);
 
-	// reminderId -> name; notifications carry only the id, and the reminder may be deleted.
 	let reminderNames = $derived(new Map(reminders.map(r => [r.reminder.id, r.reminder.name])));
 	let unreadNotifications = $derived(notifications.filter(n => !n.isRead));
 
@@ -71,7 +70,6 @@
 
 	let vehicleNames = $derived(new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)])));
 
-	// Pure-mileage reminders have a null nextDueDate; never pass it to `new Date`.
 	const isDue = (r: ReminderWithVehicles) => isReminderTimeDue(r.reminder);
 
 	let dueReminders = $derived(reminders.filter(r => r.reminder.isActive && isDue(r)));
@@ -92,7 +90,6 @@
 			notifications = notificationList;
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to load reminders:', error);
-			// Persist the failure so it is not rendered as an empty list.
 			loadError = error instanceof Error ? error.message : 'Failed to load reminders';
 			appStore.addNotification({ type: 'error', message: 'Failed to load reminders' });
 		} finally {
@@ -153,7 +150,6 @@
 		}
 	}
 
-	// Tracked per reminder so only the clicked button shows a spinner.
 	let servicingId = $state<string | null>(null);
 	async function markServiced(item: ReminderWithVehicles) {
 		servicingId = item.reminder.id;
@@ -186,11 +182,10 @@
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to delete reminder:', error);
 			appStore.addNotification({ type: 'error', message: 'Failed to delete reminder' });
-			throw error; // keep the dialog open on failure
+			throw error;
 		}
 	}
 
-	// Null for pure-mileage reminders, whose stored frequency is inert.
 	const frequencyLabel = (r: ReminderWithVehicles) => reminderFrequencyLabel(r.reminder);
 
 	const isMileageTracking = (r: ReminderWithVehicles) => isMileageTrackingReminder(r.reminder);

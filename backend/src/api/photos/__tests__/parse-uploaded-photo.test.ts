@@ -1,8 +1,3 @@
-/**
- * parseUploadedPhoto returns the multipart `photo` File and throws a 400 when it is missing or is a
- * plain string. Driven through a minimal Hono app with real FormData requests.
- */
-
 import { describe, expect, test } from 'bun:test';
 import { Hono } from 'hono';
 import { parseUploadedPhoto } from '../helpers';
@@ -45,7 +40,6 @@ describe('parseUploadedPhoto', () => {
   });
 
   test('throws 400 when `photo` is a text field, not a File', async () => {
-    // A client sending photo as a string (not a file part) must be rejected, not coerced.
     const app = makeApp();
     const fd = new FormData();
     fd.append('photo', 'just-a-string');

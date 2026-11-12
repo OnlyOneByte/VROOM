@@ -20,10 +20,6 @@ export async function validatePhotoOwnership(photoId: string, userId: string): P
   if (!photo || photo.userId !== userId) throw new NotFoundError('Photo');
 }
 
-/**
- * Ownership check for a new upload's entity, resolved through the entity tables. Existing photos
- * use validatePhotoOwnership. Throws NotFoundError on a miss and ValidationError for unknown types.
- */
 export async function validateEntityOwnership(
   entityType: string,
   entityId: string,
@@ -39,15 +35,12 @@ export async function validateEntityOwnership(
       break;
     }
     case 'insurance_claim': {
-      // Ownership is transitive through the claim's policy.
       const ownerId = await insuranceClaimRepository.findOwnerUserId(entityId);
       if (ownerId !== userId) throw new NotFoundError('Insurance claim');
       break;
     }
     case 'expense': {
-      // Rows on a shared vehicle are stamped with the owner's userId, so authorize through the same
-      // vehicle write gate the expense routes use rather than matching userId. Odometer entries
-      // follow the same pattern.
+      // Shared-vehicle rows carry the owner's userId, so authorize through the vehicle write gate.
       const expense = await expenseRepository.findById(entityId);
       if (!expense) throw new NotFoundError('Expense');
       await requireVehicleWrite(expense.vehicleId, userId);
@@ -64,7 +57,6 @@ export async function validateEntityOwnership(
   }
 }
 
-/** Returns the multipart `photo` file, or throws a 400 if it is missing or not a file. */
 export async function parseUploadedPhoto(c: Context): Promise<File> {
   const body = await c.req.parseBody();
   const file = body.photo;
@@ -74,10 +66,7 @@ export async function parseUploadedPhoto(c: Context): Promise<File> {
   return file;
 }
 
-/**
- * Byte-serving response for a photo. The mimeType is client-asserted, so X-Content-Type-Options:
- * nosniff is required to stop the browser from sniffing and executing user-uploaded content.
- */
+// mimeType is client-asserted; nosniff stops the browser from executing uploaded content.
 export function photoThumbnailResponse(buffer: Buffer, mimeType: string): Response {
   return new Response(buffer, {
     headers: {

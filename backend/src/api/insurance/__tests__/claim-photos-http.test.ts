@@ -1,8 +1,3 @@
-/**
- * Photo ownership for insurance claims. GET /photos/insurance_claim/:claimId runs the same ownership gate
- * an upload would, so it is enough to test the gate without a storage provider.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,

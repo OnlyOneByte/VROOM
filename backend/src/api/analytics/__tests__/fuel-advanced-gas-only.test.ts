@@ -1,6 +1,3 @@
-// Gas-MPG series must not average in a PHEV's charge mi/kWh, and a split fuel expense (one
-// volume-bearing row plus volume-null siblings) is one fill-up, not several.
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { AnalyticsRepository } from '../repository';
 import {
@@ -44,7 +41,6 @@ function fuel(over: Partial<TestExpense> & Pick<TestExpense, 'id' | 'date'>): Te
 }
 
 describe('PHEV charge sessions stay out of the gas-MPG averages', () => {
-  // Two gas fill-ups 300 mi apart on 10 gal (30 MPG), then a charge session (60 mi on 15 kWh = 4).
   beforeEach(() => {
     seedExpense(testDb.sqlite, fuel({ id: 'g1', date: new Date(2024, 0, 1), mileage: 10_000 }));
     seedExpense(testDb.sqlite, fuel({ id: 'g2', date: new Date(2024, 0, 8), mileage: 10_300 }));

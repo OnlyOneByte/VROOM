@@ -1,6 +1,3 @@
-// A user's themePreference must survive a backup and restore, rather than resetting to 'default'.
-// The NOT NULL default must also keep an empty cell from aborting the restore.
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, json, type TestApp } from '../../../test-helpers/http-client';
 
@@ -27,7 +24,6 @@ async function roundTrip(): Promise<void> {
 
 describe('backup → restore round-trip preserves themePreference', () => {
   test('a non-default theme id survives a full export→restore (not reset to default)', async () => {
-    // Set through the settings route, which also creates the prefs row.
     const put = await ctx.authed('PUT', '/api/v1/settings', { themePreference: 'instrument' });
     expect(put.status, await put.text()).toBe(200);
     expect(themeRow().theme_preference).toBe('instrument');
@@ -38,7 +34,6 @@ describe('backup → restore round-trip preserves themePreference', () => {
   });
 
   test("the default theme round-trips as 'default' (control — no spurious change)", async () => {
-    // Touch settings so the prefs row exists with the column default.
     await ctx.authed('PUT', '/api/v1/settings', { currencyUnit: 'USD' });
     expect(themeRow().theme_preference).toBe('default');
 

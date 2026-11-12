@@ -53,7 +53,7 @@
 </script>
 
 <div class="rounded-md border bg-card overflow-hidden">
-	<!-- Height must be an inline style: Tailwind cannot generate arbitrary classes from a runtime value. -->
+	<!-- Tailwind cannot generate classes from a runtime value, so the height stays an inline style. -->
 	<ScrollArea class="w-full" style="height: {scrollHeight}">
 		<Table>
 			<TableHeader>

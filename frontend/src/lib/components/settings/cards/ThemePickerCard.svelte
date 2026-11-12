@@ -1,5 +1,4 @@
 <script lang="ts">
-	// Picks the theme ID; the light/dark variant is chosen separately in ThemeCard.
 	import { Check } from '@lucide/svelte';
 	import {
 		Card,
@@ -14,16 +13,13 @@
 	import type { ThemeDefinition } from '$lib/theme/theme-types';
 	import { cn } from '$lib/utils';
 
-	// The registry always contains `default`, so the grid is never empty.
 	const themes: ThemeDefinition[] = Object.values(THEME_REGISTRY);
 
 	let activeId = $derived(themeStore.themeId);
 	let mode = $derived(themeStore.current);
 
-	// Same system-preference resolver as applyTheme, so previews match what gets rendered.
 	let variant = $derived(resolveVariant(mode, getSystemTheme()));
 
-	// Swatches come from each theme's own definition, not the live CSS variables (active theme only).
 	function swatchColors(theme: ThemeDefinition): string[] {
 		const tokens = theme[variant];
 		return theme.swatch.map(key => tokens[key]);
@@ -61,7 +57,7 @@
 						</span>
 					{/if}
 					<div class="flex gap-1" aria-hidden="true">
-						<!-- Keyed by index: swatch colours can repeat, and duplicate keys crash the picker. -->
+						<!-- Index-keyed: swatch colours can repeat, and duplicate keys throw. -->
 						{#each swatchColors(theme) as color, i (i)}
 							<span class="h-6 w-6 rounded-md border border-border/50" style={`background:${color}`}
 							></span>

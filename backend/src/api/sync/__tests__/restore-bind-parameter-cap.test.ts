@@ -1,6 +1,3 @@
-// A large backup must restore. A multi-row INSERT is capped by SQLite's bind-parameter limit, so
-// inserts are batched. These tests run row counts past that cap for the expenses and reminders tables.
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
@@ -12,9 +9,7 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-/** Rows over the 22-column expenses cap (floor(65535 / 22) = 2978). */
 const EXPENSES_OVER_CAP = 3000;
-/** Rows over the 25-column reminders cap (floor(65535 / 25) = 2621) — the widest backed-up table. */
 const REMINDERS_OVER_CAP = 2700;
 
 function countOf(table: string): number {
@@ -48,7 +43,6 @@ describe('restore of a backup larger than one statement can bind', () => {
     await roundTripReplace();
 
     expect(countOf('expenses'), 'every expense came back').toBe(EXPENSES_OVER_CAP);
-    // Spot-checks first, middle and last rows, so a batching bug cannot pass on the count alone.
     for (const i of [0, Math.floor(EXPENSES_OVER_CAP / 2), EXPENSES_OVER_CAP - 1]) {
       const row = ctx.sqlite
         .query('SELECT expense_amount FROM expenses WHERE id = ?')
@@ -80,8 +74,6 @@ describe('restore of a backup larger than one statement can bind', () => {
   });
 
   test('merge mode reports EVERY colliding row, across batch boundaries', async () => {
-    // Merge probes are batched too. A row count that is not a multiple of the batch size exercises
-    // a short final batch.
     const collidingRows = 1001;
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Fit', year: 2016 });
     const insert = ctx.sqlite.prepare(
@@ -96,7 +88,6 @@ describe('restore of a backup larger than one statement can bind', () => {
 
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');
-    // Re-importing a backup over the data it came from: every id collides.
     const zip = await backupService.exportAsZip(ctx.user.id);
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'merge');
 

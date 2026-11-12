@@ -92,7 +92,6 @@ export interface UserSettings {
 	userId: string;
 	unitPreferences: UnitPreferences;
 	currencyUnit: string;
-	/** Selected theme id; synced server-side so it follows the user across devices. */
 	themePreference?: string;
 	autoBackupEnabled: boolean;
 	backupFrequency: 'daily' | 'weekly' | 'monthly';

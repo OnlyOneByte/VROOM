@@ -42,7 +42,6 @@ describe('BackupStrategyRegistry', () => {
     expect(registry.get('google-drive')).toBe(second);
     expect(registry.get('google-drive')).not.toBe(first);
 
-    // Verify the replaced strategy actually executes differently
     const result = await registry.get('google-drive')?.execute({} as BackupStrategyContext);
     expect(result?.message).toBe('second');
   });

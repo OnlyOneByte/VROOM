@@ -12,7 +12,6 @@
 	const ALLOWED_TYPES = [...IMAGE_TYPES, 'application/pdf'];
 
 	interface Props {
-		// The entity the documents attach to; defaults to insurance_policy.
 		entityId: string;
 		entityType?: string;
 		readOnly?: boolean;
@@ -64,7 +63,7 @@
 			documents = documents.filter(d => d.id !== docId);
 		} catch (err) {
 			handleErrorWithNotification(err, 'Failed to delete document');
-			throw err; // keep the dialog open on failure
+			throw err;
 		}
 	}
 </script>

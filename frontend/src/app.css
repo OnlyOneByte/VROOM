@@ -4,6 +4,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Text-colored tokens must clear WCAG AA 4.5:1 on white/card; light chart ambers do not. */
 :root {
 	--radius: 0.625rem;
 	--background: oklch(1 0 0);
@@ -17,15 +18,11 @@
 	--secondary: oklch(0.967 0.001 286.375);
 	--secondary-foreground: oklch(0.21 0.006 285.885);
 	--muted: oklch(0.967 0.001 286.375);
-	/* Must clear WCAG AA 4.5:1 on white/card. */
 	--muted-foreground: oklch(0.486 0.016 285.938);
 	--accent: oklch(0.967 0.001 286.375);
 	--accent-foreground: oklch(0.21 0.006 285.885);
-	/* Must clear WCAG AA 4.5:1 as text on white/card. */
 	--destructive: oklch(0.505 0.22 27.325);
-	/* Tracks the variant: a fixed ink would fail AA in either light or dark mode. */
 	--destructive-foreground: oklch(1 0 0);
-	/* Dark enough to pass AA as text on white/card; light chart ambers do not. */
 	--warning: oklch(0.52 0.12 75);
 	--border: oklch(0.92 0.004 286.32);
 	--input: oklch(0.92 0.004 286.32);
@@ -139,7 +136,6 @@
 		@apply bg-background text-foreground;
 	}
 
-	/* iOS PWA standalone safe area insets */
 	.safe-top {
 		padding-top: env(safe-area-inset-top);
 	}
@@ -178,7 +174,6 @@
 		transform: translateY(-50%) !important;
 	}
 
-	/* Clears the absolutely positioned close button on the left. */
 	[data-sonner-toast] [data-title] {
 		font-size: 0.875rem;
 		font-weight: 500;

@@ -1,9 +1,3 @@
-/**
- * oklch() to #rrggbb for the PWA theme-color meta, since some browser chrome ignores raw oklch there.
- * Out-of-gamut channels are clamped rather than rejected.
- */
-
-// Alpha is ignored because the status bar is opaque.
 function parseOklch(s: string): { L: number; C: number; H: number } | null {
 	const m = s.match(/oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*[\d.]+%?)?\s*\)/);
 	if (!m) return null;
@@ -12,7 +6,6 @@ function parseOklch(s: string): { L: number; C: number; H: number } | null {
 
 const clamp01 = (x: number): number => Math.min(1, Math.max(0, x));
 
-// sRGB transfer function (IEC 61966-2-1).
 function linearToSrgb(x: number): number {
 	const c = clamp01(x);
 	return c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055;
@@ -24,7 +17,6 @@ function channelToHex(v: number): string {
 		.padStart(2, '0');
 }
 
-// Returns null for unparseable input so callers can fall back instead of emitting a broken meta value.
 export function oklchToHex(oklch: string): string | null {
 	const parsed = parseOklch(oklch);
 	if (!parsed) return null;
@@ -34,7 +26,7 @@ export function oklchToHex(oklch: string): string | null {
 	const a = C * Math.cos(h);
 	const b = C * Math.sin(h);
 
-	// Ottosson's matrices. Must match theme-contrast.test.ts so the tint and the contrast gate agree.
+	// Ottosson matrices; must match theme-contrast.test.ts so the tint and contrast gate agree.
 	const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
 	const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
 	const s_ = L - 0.0894841775 * a - 1.291485548 * b;

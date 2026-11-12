@@ -106,9 +106,7 @@ export class ExpenseSplitService {
     return siblings;
   }
 
-  // Must stay synchronous: bun-sqlite transactions only roll back atomically when the callback
-  // runs inline; an async insert autocommits alone and can strand a split group mid-update.
-  // Row shape must match createSiblings.
+  // bun:sqlite transactions roll back only when the callback is synchronous; an async insert autocommits alone.
   createSiblingsSync(
     tx: DrizzleTransaction,
     params: {

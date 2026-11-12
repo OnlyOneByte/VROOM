@@ -1,5 +1,3 @@
-// The energy mode must agree with vehicle capabilities and fuelType, and must never rewrite a value it was handed.
-
 import { describe, expect, test } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -16,7 +14,6 @@ import FuelFieldsSection, {
 } from '../FuelFieldsSection.svelte';
 import { validateExpenseField } from '../expense-form-validation';
 
-// Props are real $state so the component's $effect re-runs when a capability prop changes.
 const GAS: EnergyCapabilities = { canFuel: true, canCharge: false };
 const EV: EnergyCapabilities = { canFuel: false, canCharge: true };
 const HYBRID: EnergyCapabilities = { canFuel: true, canCharge: true };
@@ -117,7 +114,6 @@ describe('reconcileEnergyMode — first run (no capabilities seen yet)', () => {
 	});
 
 	test('a vehicle tracking NEITHER opens in fuel mode, which keeps volume visible', () => {
-		// Charging mode with an empty fuelType would require the hidden volume field — unsatisfiable.
 		expect(decide({ caps: NEITHER })).toEqual({
 			mode: 'fuel',
 			applyFields: null,
@@ -146,8 +142,6 @@ describe('reconcileEnergyMode — first run (no capabilities seen yet)', () => {
 	});
 
 	test('a volume with no fuelType is left alone on every vehicle, in the mode that requires it', () => {
-		// A Fuelio-imported fill-up: `fuel_type` is blank, so seeding one would retype the row as a
-		// charge and hide the gallons it was storing.
 		for (const caps of ALL_CAPABILITIES) {
 			expect(decide({ caps, volume: '12.5' })).toEqual({
 				mode: 'fuel',
@@ -169,8 +163,6 @@ describe('reconcileEnergyMode — first run (no capabilities seen yet)', () => {
 });
 
 describe('reconcileEnergyMode — a re-run with the SAME capabilities decides nothing', () => {
-	// ExpenseForm reassigns `vehicle` more than once per load, and the child's capability props are
-	// plain getters over that state source, so the effect re-runs with identical booleans.
 	test('every capability pair, in either mode, is a clean no-op', () => {
 		for (const caps of ALL_CAPABILITIES) {
 			for (const mode of ['fuel', 'charging'] as EnergyMode[]) {
@@ -270,7 +262,6 @@ function mountSection(caps: EnergyCapabilities, loaded: Partial<BoundForm> = {})
 		missedFillup: false,
 		...loaded
 	});
-	// Accessor props mirror how ExpenseForm binds the section, so the section sees the real prop protocol.
 	const props = {
 		get trackFuel() {
 			return state.vehicle.canFuel;
@@ -376,8 +367,6 @@ describe('mounted: opening the form', () => {
 
 		expect(section.heading()).toBe(HEADING_FOR_MODE.charging);
 		expect(section.visibleEnergyField()).toBe('charge');
-		// Without the seed the required field is `volume`, which charging mode hides: Save would
-		// fail on an error with nowhere to appear.
 		expect(section.form.fuelType).toBe(DEFAULT_CHARGING_FUEL_TYPE);
 		expectRequiredFieldVisible(section);
 	});
@@ -393,8 +382,6 @@ describe('mounted: opening the form', () => {
 	});
 
 	test('an imported fill-up with no fuelType keeps its gallons on a charge-only vehicle', () => {
-		// The Fuelio importer stores every fill-up with an empty fuel_type, and the user may since
-		// have turned that vehicle's fuel tracking off. Opening the row must not retype it.
 		const section = mountSection(EV, { volume: '12.5' });
 
 		expect(section.heading()).toBe(HEADING_FOR_MODE.fuel);
@@ -405,9 +392,6 @@ describe('mounted: opening the form', () => {
 	});
 
 	test('a loaded charge with no fuelType is left alone too, on the vehicle that invites seeding', () => {
-		// The same rule from the other side: a stored quantity of EITHER kind is data, so the
-		// charge-only vehicle gets no seed here either. With no fuelType the validator requires
-		// volume, so fuel mode is the only mode that keeps the required field on screen.
 		const section = mountSection(EV, { charge: '38.4' });
 
 		expect(section.heading()).toBe(HEADING_FOR_MODE.fuel);
@@ -429,8 +413,6 @@ describe('mounted: opening the form', () => {
 	});
 
 	test('the vehicle being re-emitted during one load rewrites nothing', () => {
-		// ExpenseForm's onMount and its vehicleId `$effect` both call loadVehicle(), so the section
-		// sees the same capabilities arrive twice as different objects.
 		const section = mountSection(GAS, { volume: '12.5', fuelType: '87 (Regular)' });
 
 		section.reemitVehicle();
@@ -490,7 +472,6 @@ describe('mounted: switching vehicle under a live form', () => {
 		section.selectVehicle(NEITHER);
 
 		expect(section.heading()).toBe(HEADING_FOR_MODE.fuel);
-		// `bind:value` on a number input hands the parent a number, not the typed string.
 		expect(String(section.form.volume)).toBe('9');
 		expectRequiredFieldVisible(section);
 	});
@@ -510,7 +491,6 @@ describe('mounted: switching vehicle under a live form', () => {
 describe('mounted: the hybrid toggle', () => {
 	test('only a vehicle tracking both energies offers the toggle', () => {
 		expect(mountSection(HYBRID).modeToggleLabels()).toEqual(['Fuel', 'Charging']);
-		// One-energy vehicles have no way back, so the mode they open in has to be the right one.
 		expect(mountSection(GAS).modeToggleLabels()).toEqual([]);
 		expect(mountSection(EV).modeToggleLabels()).toEqual([]);
 		expect(mountSection(NEITHER).modeToggleLabels()).toEqual([]);
@@ -554,7 +534,6 @@ describe('mounted: the hybrid toggle', () => {
 	});
 });
 
-// The seeded fuelType must be one the charging dropdown offers, or the user cannot pick it back after clearing.
 test('the charging dropdown offers the fuelType the reconciler seeds', () => {
 	const source = readFileSync(
 		join(dirname(fileURLToPath(import.meta.url)), '..', 'FuelFieldsSection.svelte'),

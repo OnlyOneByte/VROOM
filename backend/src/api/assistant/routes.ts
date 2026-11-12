@@ -1,11 +1,3 @@
-/**
- * POST /api/v1/assistant/chat. Stateless: the transcript lives in the client. The orchestrator lets the
- * model call only a fixed allowlist of read-only tools, scoped to the session user.
- *
- * Errors: no provider configured returns 400; a provider failure returns 502 rather than a made-up
- * reply. A loop that hits its caps returns an honest bounded reply.
- */
-
 import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
@@ -23,7 +15,6 @@ const routes = new Hono();
 
 routes.use('*', requireAuth);
 
-// Bound the prompt size so provider cost and injection surface stay limited.
 const MAX_MESSAGE_CHARS = 2000;
 const MAX_HISTORY_TURNS = 12;
 
@@ -32,7 +23,7 @@ const chatBodySchema = z.object({
   history: z
     .array(
       z.object({
-        // Tool turns are produced server-side and never accepted from the request.
+        // Tool turns are server-produced; accepting them from the request would let a client inject tool results.
         role: z.enum(['user', 'assistant']),
         content: z.string().max(MAX_MESSAGE_CHARS),
       })

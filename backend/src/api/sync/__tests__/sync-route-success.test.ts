@@ -1,7 +1,3 @@
-// Success and derivation paths of the sync routes, driven through the real routes over in-memory
-// SQLite with no provider network: status flags, restore provider sourceTypes, the empty-backup
-// success envelope, and the backup download.
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, json, type TestApp } from '../../../test-helpers/http-client';
 
@@ -12,7 +8,6 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-/** Seed (or replace) the user's backup_config JSON directly (the raw-seed pattern). */
 function seedBackupConfig(config: unknown): void {
   ctx.sqlite.run('INSERT OR REPLACE INTO user_preferences (user_id, backup_config) VALUES (?, ?)', [
     ctx.user.id,
@@ -20,7 +15,6 @@ function seedBackupConfig(config: unknown): void {
   ]);
 }
 
-/** Seed an active storage provider owned by the test user; returns its id. */
 function seedStorageProvider(id: string, displayName = 'My Drive'): string {
   ctx.sqlite.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
@@ -108,12 +102,10 @@ describe('GET /api/v1/sync/restore/providers — sourceTypes derivation', () => 
   });
 
   test('a provider enabled but with NO lastBackupAt (and no sheets) offers NO sourceTypes → skipped', async () => {
-    // zip needs enabled+lastBackupAt; sheets needs sheetsSyncEnabled+sheetsSpreadsheetId. Neither holds
-    // (enabled but never backed up) → sourceTypes empty → the provider is omitted from the list.
     seedStorageProvider('prov-empty');
     seedBackupConfig({
       providers: {
-        'prov-empty': { enabled: true, folderPath: 'B', retentionCount: 5 }, // no lastBackupAt
+        'prov-empty': { enabled: true, folderPath: 'B', retentionCount: 5 },
       },
     });
 
@@ -125,7 +117,6 @@ describe('GET /api/v1/sync/restore/providers — sourceTypes derivation', () => 
 
   test('a provider with no backupConfig entry at all is skipped (continue branch)', async () => {
     seedStorageProvider('prov-unconfigured');
-    // No seedBackupConfig → config.providers is empty → the provider has no config entry → continue.
     const res = await ctx.authed('GET', '/api/v1/sync/restore/providers');
     const body = await json<RestoreProvidersBody>(res);
     expect(res.status).toBe(200);
@@ -143,8 +134,6 @@ describe('POST /api/v1/sync — success envelope', () => {
   });
 });
 
-// A backup where every provider failed must not return 200. A failing fake strategy is registered
-// for the test and overwritten with a no-op afterwards.
 describe('POST /api/v1/sync — honest HTTP status on backup failure', () => {
   test('all providers fail → 502 error envelope (not a 200 false success)', async () => {
     const { backupStrategyRegistry } = await import('../backup-strategy-registry');
@@ -185,11 +174,8 @@ describe('POST /api/v1/sync — honest HTTP status on backup failure', () => {
   });
 });
 
-// Provider-free paths: the download exports the user's own data, and the list is empty when no
-// backup provider is enabled.
 describe('GET /api/v1/sync/backups/download — the manual backup-export route', () => {
   test('returns a real ZIP with the attachment headers (no provider needed — own-data export)', async () => {
-    // Seed a row so the export has content (the user already exists via the harness).
     await ctx.authed('POST', '/api/v1/vehicles', { make: 'Toyota', model: 'Camry', year: 2022 });
 
     const res = await ctx.authed('GET', '/api/v1/sync/backups/download');
@@ -197,8 +183,6 @@ describe('GET /api/v1/sync/backups/download — the manual backup-export route',
     expect(res.headers.get('content-type')).toBe('application/zip');
     expect(res.headers.get('content-disposition') ?? '').toContain('attachment');
     expect(res.headers.get('content-disposition') ?? '').toContain('vroom-backup-');
-    // A real ZIP body: the central-directory/local-file signature starts with 'PK', and
-    // Content-Length matches the bytes.
     const buf = Buffer.from(await res.arrayBuffer());
     expect(buf.length).toBeGreaterThan(0);
     expect(buf.subarray(0, 2).toString('latin1')).toBe('PK');

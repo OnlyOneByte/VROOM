@@ -1,10 +1,3 @@
-/**
- * Concurrent POST /reminders/trigger calls must materialize each period at most once. Each period is
- * claimed by a compare-and-swap on nextDueDate inside the same synchronous transaction as its money row,
- * so the loser of the claim writes nothing. The second block checks the other half: a claim and its rows
- * commit or roll back together.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -143,7 +136,6 @@ describe('a reminder period commits all-or-nothing', () => {
       expenseSplitConfig: { method: 'even', vehicleIds: [live, doomed] },
     });
 
-    // Deleting without pruning the split config leaves the doomed vehicle in it, so its leg violates the FK.
     ctx.sqlite.run('DELETE FROM vehicles WHERE id = ?', [doomed]);
     const dueBefore = ctx.sqlite
       .query('SELECT next_due_date, last_triggered_at FROM reminders WHERE id = ?')
@@ -159,7 +151,6 @@ describe('a reminder period commits all-or-nothing', () => {
     expect(body.data.skipped.map((s) => s.reminderId)).toEqual([reminderId]);
 
     expect(materializedRows(reminderId)).toEqual([]);
-    // The period must stay due: marking it done with no money row would be silent data loss.
     const dueAfter = ctx.sqlite
       .query('SELECT next_due_date, last_triggered_at FROM reminders WHERE id = ?')
       .get(reminderId) as { next_due_date: number; last_triggered_at: number | null };

@@ -1,8 +1,3 @@
-/**
- * themePreference through the HTTP stack: the 'default' column default, a per-field merge that leaves
- * sibling preferences alone, and the length bound. The bound is an abuse guard, not an allow-list.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, json, type TestApp } from '../../../test-helpers/http-client';
 

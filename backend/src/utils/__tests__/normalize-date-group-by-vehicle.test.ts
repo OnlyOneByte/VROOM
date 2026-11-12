@@ -1,8 +1,3 @@
-// normalizeDate and groupByVehicle, the primitives under every date-bucketing and per-vehicle chart
-// builder. normalizeDate's 1e12 threshold separates epoch seconds from milliseconds, and a wrong
-// threshold would shift every chart date by 1000x. groupByVehicle keeps two cars' consecutive rows
-// from ever being paired.
-
 import { describe, expect, test } from 'bun:test';
 import { groupByVehicle, normalizeDate } from '../analytics-charts';
 
@@ -17,7 +12,6 @@ describe('normalizeDate', () => {
   });
 
   test('a SECONDS epoch (< 1e12) is multiplied by 1000', () => {
-    // 1_700_000_000 s = 2023-11-14T22:13:20Z. Read as ms it would be 1970.
     const seconds = 1_700_000_000;
     const out = normalizeDate(seconds) as Date;
     expect(out.getTime()).toBe(seconds * 1000);
@@ -25,14 +19,13 @@ describe('normalizeDate', () => {
   });
 
   test('a MILLISECONDS epoch (>= 1e12) is used verbatim', () => {
-    const ms = 1_700_000_000_000; // 2023-11-14, already ms
+    const ms = 1_700_000_000_000;
     const out = normalizeDate(ms) as Date;
     expect(out.getTime()).toBe(ms);
     expect(out.getUTCFullYear()).toBe(2023);
   });
 
   test('the 1e12 boundary itself is treated as milliseconds (NOT < 1e12 → no ×1000)', () => {
-    // 1e12 ms is 2001-09-09. Mis-scaled by 1000 it would land around year 33658.
     const out = normalizeDate(1e12) as Date;
     expect(out.getTime()).toBe(1e12);
     expect(out.getUTCFullYear()).toBe(2001);

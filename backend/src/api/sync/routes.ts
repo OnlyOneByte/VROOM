@@ -73,7 +73,7 @@ routes.post('/', syncRateLimiter, idempotency({ required: false }), async (c) =>
   const user = c.get('user');
   const userId = user.id;
 
-  // null is valid JSON, so the body is optional-chained.
+  // null parses as valid JSON, so the parsed body can be null and must be optional-chained.
   const body = await readJsonBody<{ syncTypes?: unknown; force?: unknown } | null>(c);
   validateSyncTypes(body?.syncTypes);
   const force = body?.force === true;
@@ -87,8 +87,6 @@ routes.post('/', syncRateLimiter, idempotency({ required: false }), async (c) =>
     );
   }
 
-  // 502 when every provider failed; 207 when some did. Failed providers retry because the sync
-  // anchor did not advance.
   if (result.outcome === 'failed') {
     return c.json(
       createErrorResponse('BACKUP_FAILED', 'All backup providers failed', {
@@ -210,10 +208,10 @@ routes.post(
   }
 );
 
+// Full backup ZIPs exceed the app-wide body cap, which app.ts must relax for this path.
 routes.post(
   '/restore/from-backup',
   restoreRateLimiter,
-  // Full backup ZIPs exceed the app-wide body cap, which app.ts must relax for this path.
   bodyLimit({ maxSize: CONFIG.backup.maxFileSize }),
   idempotency({ required: true }),
   async (c) => {

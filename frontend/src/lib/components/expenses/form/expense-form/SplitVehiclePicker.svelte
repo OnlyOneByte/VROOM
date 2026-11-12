@@ -7,7 +7,6 @@
 	interface Props {
 		vehicles: Vehicle[];
 		selectedVehicleIds: string[];
-		/** Editing an existing split group cannot drop back to a single vehicle. */
 		showRemove: boolean;
 		onToggle: (_vehicleId: string) => void;
 		onRemoveSplit: () => void;

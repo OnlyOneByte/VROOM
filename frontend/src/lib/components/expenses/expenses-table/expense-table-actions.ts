@@ -3,7 +3,7 @@ import { paramRoutes } from '$lib/routes';
 import { expenseApi } from '$lib/services/expense-api';
 import type { Expense } from '$lib/types';
 
-/** Insurance-generated expenses cannot be deleted here; the reason is visible text because a title on a disabled control is unreachable. */
+// A title on a disabled control is unreachable, so the blocked reason must stay visible text.
 export const INSURANCE_DELETE_BLOCKED = 'Delete the insurance policy to remove this expense';
 
 export function isInsuranceLinked(tags: readonly string[]): boolean {
@@ -18,7 +18,6 @@ export function expenseEditHref(expenseId: string, returnTo: string): string {
 	return `${resolve(paramRoutes.expenseEdit, { id: expenseId })}?returnTo=${returnTo}`;
 }
 
-/** Deleting one split sibling would orphan the rest, so route through the group-delete endpoint. */
 export async function deleteExpenseRecord(expense: Expense): Promise<void> {
 	if (expense.groupId) {
 		await expenseApi.deleteSplitExpense(expense.groupId);

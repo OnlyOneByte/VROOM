@@ -1,5 +1,3 @@
-/** Property tests: photo create stores userId, and user-scoped queries return only that user's photos. */
-
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
@@ -130,8 +128,6 @@ describe('photo create stores userId and user-scoped queries work', () => {
   });
 });
 
-// findByEntityPaginated must filter by userId as well as by entity, so one tenant's photos never
-// appear in another tenant's page even when entity keys collide.
 describe('findByEntityPaginated is userId-scoped', () => {
   test('excludes another user’s photo that shares the same (entityType, entityId)', async () => {
     const SHARED_ENTITY = 'shared-veh';

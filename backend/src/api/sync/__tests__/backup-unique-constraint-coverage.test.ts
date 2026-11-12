@@ -1,7 +1,3 @@
-// Every UNIQUE index on a backed-up table must be checked by validateUniqueConstraints, or a
-// duplicate would empty the account during restore. Indexes are enumerated from the schema. The
-// userId prefix is dropped because each backup is single-user. Pure introspection, no DB.
-
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -13,7 +9,6 @@ import { TABLE_SCHEMA_MAP } from '../../../config';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BACKUP_SRC = readFileSync(join(HERE, '..', 'backup.ts'), 'utf-8');
 
-/** snake_case DB column → camelCase backup-row field. */
 function toCamel(col: string): string {
   return col.replace(/_([a-z])/g, (_m, c: string) => c.toUpperCase());
 }
@@ -25,7 +20,6 @@ function uniqueCheckBody(): string {
   return BACKUP_SRC.slice(start, after > start ? after : undefined);
 }
 
-/** Every unique index drizzle reports for a table, as {name, nonUserCols[]} (userId prefix dropped). */
 function uniqueIndexesFor(table: Parameters<typeof getTableConfig>[0]) {
   const cfg = getTableConfig(table);
   return (cfg.indexes ?? [])
@@ -41,18 +35,16 @@ function uniqueIndexesFor(table: Parameters<typeof getTableConfig>[0]) {
     }));
 }
 
-/** The field-name arrays from every `dupCheck(backup.<key>, [ ... ], …)` call in the method body. */
 function dupCheckFieldSets(body: string, key: string): string[][] {
   const callRe = new RegExp(`dupCheck\\(\\s*backup\\.${key}\\b([\\s\\S]*?)\\)`, 'g');
   const sets: string[][] = [];
   for (const m of body.matchAll(callRe)) {
-    const fieldsMatch = (m[1] ?? '').match(/\[([^\]]*)\]/); // the first [..] is the fields array
+    const fieldsMatch = (m[1] ?? '').match(/\[([^\]]*)\]/);
     if (fieldsMatch) sets.push([...fieldsMatch[1].matchAll(/'([^']+)'/g)].map((f) => f[1]));
   }
   return sets;
 }
 
-/** True if some dupCheck(backup.<key>, …) covers EVERY non-userId column of this index. */
 function indexIsChecked(body: string, key: string, nonUserCols: string[]): boolean {
   return dupCheckFieldSets(body, key).some((fields) =>
     nonUserCols.every((c) => fields.includes(c))
@@ -66,7 +58,6 @@ describe('backup unique-constraint coverage', () => {
 
     for (const [key, table] of Object.entries(TABLE_SCHEMA_MAP)) {
       for (const idx of uniqueIndexesFor(table)) {
-        // A userId-only unique index cannot collide within a single-user backup.
         if (idx.nonUserCols.length === 0) continue;
         if (!indexIsChecked(body, key, idx.nonUserCols)) {
           missing.push(
@@ -86,7 +77,6 @@ describe('backup unique-constraint coverage', () => {
   });
 
   test('the introspection finds the known unique indexes', () => {
-    // Pins the known set so a drizzle API change cannot make the coverage test pass vacuously.
     const all = Object.entries(TABLE_SCHEMA_MAP).flatMap(([, table]) =>
       uniqueIndexesFor(table).map((ix) => `${getTableName(table)}:${ix.name}`)
     );

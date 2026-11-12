@@ -1,4 +1,4 @@
-/** Adapters are transport only. Callers must run parseExtraction on what they return. */
+// Adapters are transport only; callers must run parseExtraction on the output.
 
 export interface ReceiptImage {
   data: Buffer;
@@ -8,6 +8,5 @@ export interface ReceiptImage {
 export type RawExtraction = string | Record<string, unknown>;
 
 export interface VlmProvider {
-  /** Throws on transport or auth failure so the parse route can answer 502. */
   extractReceipt(image: ReceiptImage): Promise<RawExtraction>;
 }

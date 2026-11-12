@@ -150,7 +150,6 @@
 			</div>
 		{/if}
 
-		<!-- Hidden in the read-only shared view; documents are secondary to terms and claims. -->
 		{#if !readOnly}
 			<div class="mt-3 border-t border-border pt-3">
 				<DocumentViewer entityType="insurance_policy" entityId={policy.id} />

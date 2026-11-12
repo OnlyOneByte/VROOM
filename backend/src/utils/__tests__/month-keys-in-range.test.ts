@@ -1,6 +1,3 @@
-// A setMonth walk from a day-29..31 start overshoots short months and skips them, so
-// monthKeysInRange walks from day 1.
-
 import { describe, expect, test } from 'bun:test';
 import { monthKeysInRange } from '../analytics-charts';
 
@@ -11,7 +8,6 @@ describe('monthKeysInRange — no month skipped on end-of-month starts', () => {
   });
 
   test('day-31 start across a 6-month term keeps every month', () => {
-    // Aug 31 2023 -> Feb 28 2024: 7 inclusive months, none dropped.
     const keys = monthKeysInRange(new Date(2023, 7, 31), new Date(2024, 1, 28));
     expect(keys).toEqual([
       '2023-08',

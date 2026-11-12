@@ -1,7 +1,3 @@
-/**
- * PhotoRepository.findById against a migrated in-memory SQLite database.
- */
-
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';

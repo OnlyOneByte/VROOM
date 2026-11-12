@@ -14,7 +14,6 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-/** Replays scripted results (repeating the last) and records a snapshot of every request. */
 function scriptedProvider(results: ChatResult[]): { provider: LlmProvider; sent: ChatMessage[][] } {
   const sent: ChatMessage[][] = [];
   let i = 0;
@@ -35,7 +34,6 @@ function calls(n: number, prefix: string): ToolCall[] {
   }));
 }
 
-/** Every assistant tool call must be answered, in order, by the tool messages right after it. */
 function expectWellFormedToolProtocol(messages: ChatMessage[]): void {
   let unanswered: string[] = [];
   for (const m of messages) {
@@ -82,7 +80,6 @@ describe('runAssistant tool-call transcript', () => {
 
     expect(result.toolsUsed).toHaveLength(MAX_TOOL_CALLS);
     expect(result.reply).toMatch(/not able to finish/);
-    // The third request sees the second turn trimmed to the one call the budget still allowed.
     const third = sent[2] ?? [];
     const assistantTurns = third.filter((m) => m.role === 'assistant');
     expect(assistantTurns.map((m) => m.toolCalls?.map((c) => c.id))).toEqual([
@@ -90,7 +87,6 @@ describe('runAssistant tool-call transcript', () => {
       ['b0'],
     ]);
     expectWellFormedToolProtocol(third);
-    // Once the budget is spent the loop stops instead of resending a transcript it cannot extend.
     expect(sent).toHaveLength(3);
   });
 

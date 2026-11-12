@@ -1,5 +1,3 @@
-// EmptyState's title is an h2, so it sits directly under the page's h1 and the heading outline has no gap.
-
 import { describe, expect, test } from 'vitest';
 import { render } from '@testing-library/svelte';
 import { createRawSnippet } from 'svelte';

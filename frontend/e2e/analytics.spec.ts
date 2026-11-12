@@ -1,8 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { ANALYTICS_SUMMARY, addSessionCookie, mockApi } from './support/mock-api';
 
-// The page loads everything from GET /api/v1/analytics/summary; /auth/me must answer too.
-
 test.describe('Analytics', () => {
 	test.beforeEach(async ({ context }) => {
 		await addSessionCookie(context);
@@ -18,7 +16,6 @@ test.describe('Analytics', () => {
 
 		await expect(page.getByText('Total Vehicles')).toBeVisible();
 		await expect(page.getByText('YTD Spending')).toBeVisible();
-		// The efficiency card's label is unit-derived, not the literal "Avg MPG".
 		await expect(page.getByText('Avg mi/gal')).toBeVisible();
 		await expect(page.getByText('Fleet Health')).toBeVisible();
 		await expect(page.getByText('$5,000.00')).toBeVisible();
@@ -47,7 +44,6 @@ test.describe('Analytics', () => {
 
 		await page.getByRole('tab', { name: 'Cross-Vehicle', exact: true }).click();
 
-		// Other tabs lazy-load their own endpoints, which this spec does not fixture.
 		await expect(page.getByRole('tab', { name: 'Cross-Vehicle', exact: true })).toHaveAttribute(
 			'aria-selected',
 			'true'
@@ -88,7 +84,6 @@ test.describe('Analytics', () => {
 
 		await expect(page.getByText('$0.00')).toBeVisible();
 		await expect(page.getByText('N/A')).toBeVisible();
-		// No fill-ups or distance collapses the fuel tab to a single empty state.
 		await expect(page.getByRole('heading', { name: 'Fill-ups' })).toBeHidden();
 	});
 

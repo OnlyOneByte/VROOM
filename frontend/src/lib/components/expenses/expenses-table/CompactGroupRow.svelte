@@ -54,7 +54,6 @@
 </script>
 
 <div class="transition-colors {isSelected ? 'bg-muted/50' : ''}">
-	<!-- Group parent row: the per-vehicle portions are always revealable, so this is always a control. -->
 	<button
 		type="button"
 		class="{MOBILE_ROW_SUMMARY_CLASS} cursor-pointer"

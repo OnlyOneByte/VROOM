@@ -1,9 +1,3 @@
-/**
- * The photo ownership gate for each entity type, exercised through GET /photos/:entityType/:entityId
- * (the same check an upload runs). Owned entity: 200. Another user's or a missing entity: 404.
- * Unknown entity type: 400.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,

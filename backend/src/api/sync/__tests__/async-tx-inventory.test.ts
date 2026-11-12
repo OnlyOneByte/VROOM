@@ -1,7 +1,3 @@
-// Ratchet: the number of async transaction callbacks in production code may fall but never rise.
-// Converting a site to a synchronous callback lowers MAX_ASYNC_TX_CALLBACKS; adding one fails.
-// Comments are stripped before matching so prose about the pattern cannot trip the scan.
-
 import { describe, expect, test } from 'bun:test';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -9,15 +5,11 @@ import { countRatchet } from '../../../test-helpers/debt-ratchet';
 
 const SRC_ROOT = join(import.meta.dir, '../../../');
 
-/** Files holding an async transaction callback today. The counts are a ceiling. */
 const INVENTORY: Record<string, number> = {
-  // Policy update, policy delete and term delete read, then write.
   'api/insurance/repository.ts': 3,
-  // setCoverPhoto validates before its first write, so a bad id cannot leave the entity cover-less.
   'api/photos/photo-repository.ts': 1,
 };
 
-/** Every production .ts file under src, excluding tests and type declarations. */
 function productionSources(dir: string = SRC_ROOT): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir)) {
@@ -32,7 +24,6 @@ function productionSources(dir: string = SRC_ROOT): string[] {
   return out;
 }
 
-/** Strips comments; crude by design, since only `.transaction(async` matters. */
 function stripComments(src: string): string {
   return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
 }
@@ -64,8 +55,6 @@ countRatchet({
       countAsyncTransactions('// never db.transaction(async (tx) => …\ndb.transaction(() => 1);')
     ).toBe(0);
     expect(countAsyncTransactions('/* db.transaction(async (tx) => … */')).toBe(0);
-    // Guards against a scan over zero files passing forever. Not anchored on any file that still
-    // holds a callback, so the guard stays satisfiable once the inventory reaches zero.
     expect(productionSources().length).toBeGreaterThan(100);
   },
 });
@@ -73,7 +62,6 @@ countRatchet({
 describe('async transaction callbacks: the highest-stakes site', () => {
   test('the restore service — the highest-stakes transaction in the app — has none', () => {
     const restore = readFileSync(join(SRC_ROOT, 'api/sync/restore.ts'), 'utf-8');
-    // An async callback here would let a mid-restore throw commit the wipe without the re-insert.
     expect(countAsyncTransactions(restore)).toBe(0);
     expect(restore).toContain('this.db.transaction((tx) => {');
   });

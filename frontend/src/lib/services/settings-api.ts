@@ -1,5 +1,3 @@
-/** Settings and backup/restore sync endpoints. */
-
 import type {
 	BackupFileInfo,
 	BackupOrchestratorResult,

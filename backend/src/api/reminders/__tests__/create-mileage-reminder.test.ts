@@ -1,8 +1,3 @@
-/**
- * Creating mileage reminders through the API: nextDueOdometer is derived server-side, a pure-mileage
- * reminder has no due date, and malformed mileage shapes are rejected.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -75,7 +70,6 @@ describe('create mileage reminder', () => {
       triggerMode: 'mileage',
       intervalMileage: 6000,
       vehicleIds: [vehicleId],
-      // lastServiceOdometer omitted → defaults to current (42000)
     });
     const body = await json<DataEnvelope<{ reminder: { id: string } }>>(res);
     expect(res.status, JSON.stringify(body)).toBe(201);
@@ -129,7 +123,6 @@ describe('create mileage reminder', () => {
       triggerMode: 'mileage',
       lastServiceOdometer: 30000,
       vehicleIds: [vehicleId],
-      // no intervalMileage
     });
     expect(res.status).toBe(400);
   });
@@ -163,7 +156,6 @@ describe('create mileage reminder', () => {
 
     const upd = await ctx.authed('PUT', `/api/v1/reminders/${id}`, { intervalMileage: 8000 });
     expect(upd.status, await upd.text()).toBe(200);
-    // 30000 (unchanged anchor) + 8000 = 38000
     expect(reminderRow(id).next_due_odometer).toBe(38000);
   });
 });

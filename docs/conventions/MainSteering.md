@@ -134,6 +134,7 @@ All monetary values are stored AND computed as **integer cents** — the 14 mone
 
 `CodeQualityRules.md` adds the frontend-only rules: the shadcn/Tailwind styling rules, the status and accent color tokens, the ESLint-config rule, the static source-scan guards and the chart-color contract. The rules below apply to the whole repo:
 
+- No comments in code. CLAUDE.md quality bar #6 states the rule and its narrow exceptions; rename or extract before reaching for a comment.
 - Floating action buttons paint with `bg-foreground` / `text-background`, as `common/floating-action-button.svelte` does — never `bg-gray-900 text-white`, and never a gradient stack with `!text-white` overrides.
 - Pages with a floating action button must add `pb-24` to the main content wrapper so the fixed FAB doesn't cover the last row. `fab-bottom-clearance.test.ts` enforces this.
 - Never access browser-only APIs (`window`, `document`, `PerformanceObserver`) at module top level or without a guard — including `window.location` inside event handlers, since SvelteKit may SSR the component. Guard with `browser` from `$app/environment` or initialize lazily.

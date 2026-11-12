@@ -193,7 +193,6 @@ describe('analyticsApi.getSummary()', () => {
 	});
 });
 
-// The window ends at the start of tomorrow, not now, because date-only expenses are anchored at noon.
 describe('getDefaultDateRange', () => {
 	afterEach(() => {
 		vi.useRealTimers();

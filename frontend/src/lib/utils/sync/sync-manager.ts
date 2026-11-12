@@ -135,7 +135,6 @@ class SyncManager {
 		}
 	}
 
-	// Guards run before re-admitting so a refused sync never silently un-parks rows the user still has to act on.
 	async retryParked(): Promise<SyncResult> {
 		if (this.syncInProgress) {
 			throw new Error('Sync already in progress');

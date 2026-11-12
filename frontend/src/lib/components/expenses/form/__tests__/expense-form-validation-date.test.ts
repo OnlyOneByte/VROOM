@@ -1,5 +1,3 @@
-// Today must not be rejected as future for users at a positive UTC offset; compares calendar-day strings.
-
 import { describe, expect, test } from 'vitest';
 import type { Vehicle } from '$lib/types';
 import { validateExpenseField } from '../expense-form-validation';

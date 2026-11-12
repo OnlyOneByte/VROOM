@@ -1,6 +1,3 @@
-// In-memory fake of the Google Photos client surface. Inject it into GooglePhotosService to run real service
-// logic with no network and no mock.module.
-
 import type {
   PhotosAlbum,
   PhotosClient,
@@ -32,11 +29,9 @@ export function photosApiError(
   return err;
 }
 
-// Shared backing store for the fake Photos client. Create one per test.
 export class FakePhotosStore {
   albums = new Map<string, PhotosAlbum>();
   media = new Map<string, StoredMedia>();
-  // Consumed by batchCreate.
   uploadTokens = new Map<string, { bytes: Buffer; mimeType: string; fileName: string }>();
   private idCounter = 0;
   private faults: FaultRule[] = [];
@@ -64,7 +59,6 @@ export class FakePhotosStore {
     return id;
   }
 
-  // Scripts the items searchMediaItems returns, paged by pageSize. Each item is also stored, so download() resolves it.
   seedSearchablePhotos(
     specs: Array<{ filename?: string; mimeType?: string; bytes?: Buffer }>,
     pageSize = specs.length || 1
@@ -129,7 +123,6 @@ export function makeFakePhotosClient(store: FakePhotosStore): PhotosClient {
       store.maybeFail('getMediaItem');
       const m = store.media.get(mediaItemId);
       if (!m) return Promise.reject(photosApiError(404, `Media item not found: ${mediaItemId}`));
-      // A FRESH baseUrl each call — models the real API's expiring URLs.
       return Promise.resolve({
         id: m.id,
         filename: m.filename,
@@ -160,7 +153,6 @@ export function makeFakePhotosClient(store: FakePhotosStore): PhotosClient {
 
     searchMediaItems(_albumId, pageToken) {
       store.maybeFail('searchMediaItems');
-      // pageToken is the offset into the seeded id list (absent → start at 0); page by searchPageSize.
       const start = pageToken ? Number.parseInt(pageToken, 10) : 0;
       const end = start + store.searchPageSize;
       const pageIds = store.searchableIds.slice(start, end);

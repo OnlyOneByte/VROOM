@@ -9,6 +9,7 @@ import {
 } from './calculations';
 
 const MAX_REASONABLE_MILES_BETWEEN_FILLUPS = 1000;
+const EPOCH_MILLISECONDS_THRESHOLD = 1e12;
 
 export const DAY_NAMES = [
   'Sunday',
@@ -68,8 +69,6 @@ export interface FuelExpenseRow {
   vehicleId: string;
 }
 
-// A split fuel expense creates one sibling per vehicle with volume=null, so only volume-bearing
-// rows are fillups.
 export const isFillup = (r: Pick<FuelExpenseRow, 'volume'>): boolean =>
   r.volume != null && r.volume > 0;
 
@@ -122,7 +121,6 @@ export function computeEfficiencyPoint(
   };
 }
 
-// Charge sessions store kWh in volume, so their mi/kWh must not feed a mi/gal average.
 export function gasEfficiencyPoint(
   current: FuelRow,
   previous: FuelRow
@@ -135,7 +133,7 @@ export function toMonthKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-// The cursor is pinned to day 1: stepping a day 29-31 date with setMonth skips short months.
+// setMonth on days 29-31 skips short months, so the cursor stays on day 1.
 export function monthKeysInRange(start: Date | null, end: Date | null): string[] {
   if (!start || !end) return [];
   const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
@@ -148,7 +146,6 @@ export function monthKeysInRange(start: Date | null, end: Date | null): string[]
   return keys;
 }
 
-// Ignoring totalCost when monthlyCost is null would zero out every lump-sum term.
 export function effectiveMonthlyPremium(term: {
   startDate: Date | null;
   endDate: Date | null;
@@ -169,7 +166,6 @@ export interface AmortizationLoan {
   paymentAmount: number;
 }
 
-// Interest accrues on the running balance, so it declines as principal is repaid.
 export function buildAmortizationSchedule(
   loans: AmortizationLoan[],
   monthKeys: string[]
@@ -183,7 +179,6 @@ export function buildAmortizationSchedule(
       const balance = balances[i];
       if (balance <= 0) continue;
       const interest = balance * (loans[i].apr / 100 / 12);
-      // The final payment is smaller than paymentAmount, so principal is capped at the balance.
       const principal = Math.min(Math.max(0, loans[i].paymentAmount - interest), balance);
       totalInterest += Math.max(0, interest);
       totalPrincipal += principal;
@@ -197,8 +192,7 @@ export function normalizeDate(d: Date | number | null): Date | null {
   if (d == null) return null;
   if (d instanceof Date) return d;
   if (typeof d === 'number') {
-    // Seconds below 1e12, milliseconds above.
-    return new Date(d < 1e12 ? d * 1000 : d);
+    return new Date(d < EPOCH_MILLISECONDS_THRESHOLD ? d * 1000 : d);
   }
   return new Date(d);
 }
@@ -213,7 +207,6 @@ export function groupByVehicle<T extends { vehicleId: string }>(rows: T[]): Map<
   return byVehicle;
 }
 
-// Pairing is per vehicle so two cars' odometer readings are never subtracted from each other.
 export function forEachVehiclePair<T extends { vehicleId: string }>(
   rows: T[],
   callback: (current: T, previous: T) => void
@@ -250,7 +243,6 @@ export function computeMpgAndCostPerMile(rows: FuelExpenseRow[]): {
     const point = computeEfficiencyPoint(current, previous);
     if (!point) return;
 
-    // Only gas pairs count toward MPG; cost per mile spans all energy, so it is not filtered.
     if (gasEfficiencyPoint(current, previous)) {
       mpgValues.push(point.efficiency);
     }
@@ -332,8 +324,6 @@ export function computeAverageCosts(
   avgCostPerDay: number | null;
 } {
   const withCost = fuelRows.filter((r) => r.expenseAmount > 0);
-  // Numerator and denominator must share the same row basis, or split-fuel siblings skew the
-  // average.
   const fillups = fuelRows.filter(isFillup);
   const perFillup =
     fillups.length > 0 ? fillups.reduce((s, r) => s + r.expenseAmount, 0) / fillups.length : null;
@@ -350,8 +340,6 @@ export function computeAverageCosts(
   };
 }
 
-// Returns null for a window spanning a missed fill-up, a non-positive delta, or an implausibly
-// large gap.
 function validMilesBetween(
   current: { mileage: number | null; missedFillup: boolean },
   previous: { mileage: number | null; missedFillup: boolean }
@@ -528,7 +516,6 @@ function computePerVehicleFuelEfficiency(
   }
 }
 
-// Only fuelEfficiency and mileage carry units; costs and the reliability count do not.
 export interface RadarUnitConverters {
   efficiency: (value: number, vehicleId: string) => number;
   distance: (value: number, vehicleId: string) => number;
@@ -565,7 +552,6 @@ export function buildVehicleRadar(
   accumulateExpenseMetrics(allExpenses, metrics);
   computePerVehicleFuelEfficiency(fuelRows, metrics);
 
-  // Convert before the cross-fleet min/max normalization, or mixed-unit fleets rank unlike values.
   if (convert) {
     for (const [vId, m] of metrics) {
       if (m.fuelEfficiency > 0) m.fuelEfficiency = convert.efficiency(m.fuelEfficiency, vId);
@@ -670,7 +656,6 @@ function accumulateIntervalBuckets(
   vehicleRows: FuelExpenseRow[],
   buckets: Array<{ label: string; min: number; max: number; count: number }>
 ): void {
-  // Sort a copy so the caller's array keeps its order.
   const sorted = [...vehicleRows].sort((a, b) => {
     const da = normalizeDate(a.date);
     const db = normalizeDate(b.date);
@@ -813,8 +798,6 @@ function accumulateFuelRow(
   const entry = monthData.get(key) ?? { totalCost: 0, totalGallons: 0, totalMiles: 0, count: 0 };
   entry.totalCost += row.expenseAmount;
 
-  // A volume is only paired with miles from a valid window, or one tank's fuel gets divided by two
-  // tanks' miles.
   const miles = prevRow ? validMilesBetween(row, prevRow) : null;
   if (miles !== null && row.volume != null && row.volume > 0) {
     entry.totalMiles += miles;

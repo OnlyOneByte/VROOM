@@ -9,7 +9,6 @@
 		vehicles: Vehicle[];
 		selectedVehicleIds: string[];
 		mileages: Record<string, string>;
-		/** Lives in the parent so the disclosure stays open across split-count changes. */
 		open?: boolean;
 		onMileageInput: (_vehicleId: string, _value: string) => void;
 	}

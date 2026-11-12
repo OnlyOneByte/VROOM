@@ -1,8 +1,3 @@
-/**
- * Batch photo fetch for GET /api/v1/photos?entityType=. Results must be scoped to the user and the
- * entity type, and grouped by entityId.
- */
-
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
@@ -61,7 +56,6 @@ function addPhoto(userId: string, entityType: string, entityId: string) {
   });
 }
 
-/** Mirrors listPhotosByEntityType's grouping, which binds the singleton repo. */
 function groupByEntityId(photos: Photo[]): Record<string, Photo[]> {
   const grouped: Record<string, Photo[]> = {};
   for (const p of photos) {

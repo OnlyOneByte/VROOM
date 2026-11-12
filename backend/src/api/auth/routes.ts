@@ -28,7 +28,6 @@ import {
 
 const routes = new Hono();
 
-/** Payload for GET /me and POST /refresh. PATCH /me and GET /accounts differ on purpose. */
 function serializeSessionUser(u: {
   id: string;
   email: string;
@@ -45,7 +44,7 @@ function serializeSessionUser(u: {
   };
 }
 
-// In-memory: pending OAuth states are lost on restart and not shared across instances.
+// In-memory OAuth state: single instance only, and lost on restart.
 const oauthStateStore = new Map<
   string,
   {
@@ -78,8 +77,7 @@ const cleanupExpiredStates = () => {
 
 const authRateLimiter = rateLimiter({
   ...CONFIG.rateLimit.auth,
-  // Keyed on the trusted client IP. A raw X-Forwarded-For header is spoofable and would give
-  // every request a fresh bucket.
+  // Key on the trusted client IP; a raw X-Forwarded-For header is spoofable.
   keyGenerator: (c) => `auth:${getClientIp(c)}`,
 });
 
@@ -158,8 +156,7 @@ export async function updateExistingUserProfile(
     displayName: userInfo.displayName,
     avatarUrl: userInfo.avatarUrl,
   });
-  // users.email is the login identity: it is only backfilled when empty, never re-synced from the
-  // provider on each login.
+  // users.email is the login identity: backfill only when empty, never re-sync from the provider.
   const [current] = await db
     .select({ email: users.email })
     .from(users)
@@ -173,7 +170,6 @@ export async function updateExistingUserProfile(
       .where(eq(users.id, userId));
     return;
   }
-  // Another account may already hold the provider's email; fall back to a display-only update.
   try {
     await db
       .update(users)
@@ -214,8 +210,7 @@ export async function resolveNewUser(
   }
 
   try {
-    // The callback must stay synchronous: bun-sqlite would otherwise autocommit each awaited insert,
-    // leaving a user row with no auth link if the second insert fails.
+    // Keep this callback synchronous: bun:sqlite would autocommit each awaited insert.
     const result = db.transaction((tx) => {
       const newUser = tx
         .insert(users)
@@ -264,7 +259,7 @@ function validateLoginState(stateParam: string | null) {
   return storedData ? { data: storedData } : { error: 'invalid_state' as const };
 }
 
-// Account-takeover boundary: an identity bound to another user must never be re-linked.
+// Account takeover: an identity bound to another user must never be re-linked.
 export async function checkLinkConflicts(
   authProviderId: string,
   providerAccountId: string,
@@ -277,7 +272,7 @@ export async function checkLinkConflicts(
   return 'account_conflict';
 }
 
-// Must be registered before the generic /callback/:authProvider route, which would shadow it.
+// Register before the generic /callback/:authProvider route, which would shadow it.
 routes.get('/callback/link/:authProvider', authRateLimiter, async (c) => {
   const authProviderId = c.req.param('authProvider') ?? '';
   const url = new URL(c.req.url);
@@ -423,7 +418,6 @@ routes.get('/me', async (c) => {
   const { session, user } = await lucia.validateSession(sessionId);
 
   if (!session) {
-    // Clear the dead cookie so the browser stops resending it.
     clearSessionCookie(c, lucia.sessionCookieName);
     throw new HTTPException(401, { message: 'Invalid session' });
   }
@@ -534,8 +528,7 @@ routes.delete('/accounts/:id', requireAuth, async (c) => {
   const accountId = c.req.param('id');
   const db = getDb();
 
-  // Keep the count and the delete free of yield points (no awaits): the last-sign-in-method guard
-  // is a read-then-write and must not race with a concurrent unlink.
+  // No awaits between the count and the delete: the last-sign-in guard is read-then-write.
   const result = db.transaction((tx) => {
     const authRows = tx
       .select({ id: userProviders.id })
@@ -577,11 +570,7 @@ routes.delete('/accounts/:id', requireAuth, async (c) => {
   return c.body(null, 204);
 });
 
-/**
- * Same-origin path check for the provider flow's returnTo. Rejects `@host` (becomes userinfo),
- * `//host` and `/\host` (scheme-relative), `?`/`#` (would swallow the callback's own query), and
- * whitespace (CR/LF header injection).
- */
+// Rejects //host, /\host and @host, which browsers resolve off-origin.
 export function isSafeReturnPath(value: string | undefined): value is string {
   return value !== undefined && /^\/(?![/\\])[^?#\\\s]*$/.test(value);
 }
@@ -696,7 +685,7 @@ function resolveProviderState(
   const storedData = stateParam ? oauthStateStore.get(stateParam) : undefined;
   // Fallback must be a page that renders provider_error, or the error lands on a 404.
   const requestedReturnTo = storedData?.returnTo ?? '/settings/providers/new';
-  // Validated again on output so no state, whatever wrote it, can steer the redirect off-origin.
+  // Validated again on output, so no state can steer the redirect off-origin.
   const returnTo = isSafeReturnPath(requestedReturnTo)
     ? requestedReturnTo
     : '/settings/providers/new';
@@ -752,7 +741,6 @@ routes.get('/callback/provider/google', async (c) => {
   }
 
   const { state } = resolved;
-  // resolveProviderState returns an error whenever code is missing.
   const authCode = code as string;
 
   const sessionId = getCookie(c, lucia.sessionCookieName);

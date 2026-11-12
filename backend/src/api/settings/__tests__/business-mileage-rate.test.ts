@@ -1,8 +1,3 @@
-/**
- * businessMileageRate through the HTTP stack: the stored default rate, per-field merge, the bound
- * on accepted values, and the trip summary using the stored rate unless ?rate= overrides it.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -65,7 +60,6 @@ describe('PUT/GET /settings businessMileageRate', () => {
 });
 
 describe('GET /trips/summary uses the stored businessMileageRate as the default', () => {
-  /** Seeds a vehicle and one 100-mile business trip. */
   async function seedBusinessTrip(): Promise<string> {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     await ctx.authed('POST', '/api/v1/trips', {

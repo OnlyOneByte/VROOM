@@ -1,7 +1,3 @@
-// Access matrix for the sharing resolver, run against a migrated throwaway DB. Owner gets full
-// access, accepted viewers read only, accepted editors read and write, and pending, declined,
-// revoked, or absent access gets nothing. Every denial is a 404, never a 403.
-
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
@@ -48,7 +44,6 @@ beforeEach(() => {
 });
 afterEach(() => sqlite.close());
 
-/** Seed one share row (defaults: invitee, viewer). */
 function share(status: string, level = 'viewer', sharedWith = INVITEE): void {
   sqlite.run(
     `INSERT INTO vehicle_shares (id, vehicle_id, owner_id, shared_with_id, level, status, created_at, updated_at)
@@ -98,9 +93,7 @@ describe('resolveVehicleAccess — owner / accepted-share / none', () => {
       STRANGER,
       STRANGER,
     ]);
-    // A share whose ownerId names the stranger must not elevate them to owner.
     expect(await resolveVehicleAccess(VEHICLE, STRANGER, db)).toEqual({ role: 'editor' });
-    // And the real owner is still owner.
     expect(await resolveVehicleAccess(VEHICLE, OWNER, db)).toEqual({ role: 'owner' });
   });
 });

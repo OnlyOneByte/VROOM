@@ -45,8 +45,6 @@ function createSettingsStore() {
 			error = null;
 			try {
 				settings = await settingsApi.getSettings();
-				// Server wins: adopt the theme id if it differs from the local mirror (e.g. set on another device).
-				// The theme store no-ops when they already agree, so this never re-pushes.
 				themeStore.reconcileServerTheme(settings.themePreference);
 				isLoading = false;
 			} catch (err) {

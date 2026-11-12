@@ -1,6 +1,3 @@
-// Guards the self-host examples (compose, portainer, .env.example, the nginx snippet in deployment.md)
-// against drift from the backend: pass-through variables, required variables, callback paths, and body caps.
-
 import { beforeAll, describe, expect, test } from 'bun:test';
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, sep } from 'node:path';
@@ -19,15 +16,12 @@ const ENV_EXAMPLE = 'docs/examples/.env.example';
 const DEPLOYMENT_GUIDE = 'docs/deployment.md';
 const STACKS = [COMPOSE, PORTAINER];
 
-// Keys of config.ts's envSchema.
 const SCHEMA_KEY = /^ {2}([A-Z][A-Z0-9_]*):/gm;
 const ENV_FILE_KEY = /^([A-Z][A-Z0-9_]*)=/gm;
 const COMPOSE_VAR_REF = /\$\{([A-Z][A-Z0-9_]*)/g;
-// Matches both compose (`- NAME=value`) and portainer (`NAME: value`) syntax.
 const YAML_ENV_KEY = /^\s*-?\s*([A-Z][A-Z0-9_]*)\s*[:=]/gm;
 const REQUIRED_FIELD = /field: '([A-Z_]+)'/g;
 const PROCESS_ENV_READ = /process\.env\.([A-Z][A-Z0-9_]*)/g;
-// Matches callback URLs in docs and examples.
 const CALLBACK_URL = /https?:\/\/[^\s`'"<>)|]*\/auth\/callback\/[^\s`'"<>),|]*/g;
 
 function repoFile(relative: string): string {
@@ -38,7 +32,6 @@ function matches(text: string, pattern: RegExp): string[] {
   return [...text.matchAll(pattern)].map((match) => match[1]);
 }
 
-// Only these variables reach the backend container.
 function backendEnvKeys(stack: string): string[] {
   const yaml = repoFile(stack);
   const service = yaml.slice(yaml.search(/^ {2}backend:$/m));
@@ -50,20 +43,17 @@ function backendEnvKeys(stack: string): string[] {
   return matches((end === -1 ? body : body.slice(0, end)).join('\n'), YAML_ENV_KEY);
 }
 
-// Read from validateProductionConfig, so the list cannot drift.
 function requiredInProduction(): string[] {
   const config = repoFile('backend/src/config.ts');
   const validator = config.slice(config.indexOf('export const validateProductionConfig'));
   return matches(validator, REQUIRED_FIELD);
 }
 
-// Schema keys plus direct process.env reads.
 function backendReadsEnvVars(): Set<string> {
   const config = repoFile('backend/src/config.ts');
   const read = new Set(matches(config, SCHEMA_KEY));
   const sources = readdirSync(SRC_ROOT, { recursive: true, encoding: 'utf8' })
     .map((file) => file.split(sep).join('/'))
-    // Test scaffolding sets variables nothing in production reads, which would mask the drift.
     .filter((file) => file.endsWith('.ts') && !/__tests__|test-helpers/.test(file));
   for (const file of sources) {
     for (const name of matches(readFileSync(join(SRC_ROOT, file), 'utf8'), PROCESS_ENV_READ)) {
@@ -76,7 +66,6 @@ function backendReadsEnvVars(): Set<string> {
 const MEGABYTE = 1024 * 1024;
 const RESTORE_PATH = '/api/v1/sync/restore/from-backup';
 const NGINX_EXAMPLE = /```nginx\n([\s\S]*?)```/;
-// The example has no nested blocks.
 const NGINX_LOCATION = /location\s+([^{]+?)\s*\{([^}]*)\}/g;
 const BODY_SIZE_CAP = /client_max_body_size\s+(\d+)m;/;
 function nginxExample(): string {
@@ -85,7 +74,6 @@ function nginxExample(): string {
   return example ?? '';
 }
 
-// Null when the block sets no cap of its own.
 function capMb(block: string): number | null {
   const cap = block.match(BODY_SIZE_CAP)?.[1];
   return cap ? Number(cap) : null;
@@ -100,7 +88,6 @@ function locationBlocks(): { header: string; body: string }[] {
   return [...nginxExample().matchAll(NGINX_LOCATION)].map(([, header, body]) => ({ header, body }));
 }
 
-// Matched the way nginx matches regex locations.
 function restoreLocation(): { header: string; body: string } | undefined {
   return locationBlocks().find(({ header }) => {
     const pattern = header.replace(/^~\s*/, '');
@@ -120,7 +107,6 @@ describe('documented deployment examples match the backend', () => {
   test('the sources parse (guard is live, not a no-op)', () => {
     expect(requiredInProduction()).toContain('PROVIDER_ENCRYPTION_KEY');
     expect(backendReadsEnvVars().has('DATABASE_URL')).toBe(true);
-    // Assumes no session secret is read. Revisit the guards below if that changes.
     expect(backendReadsEnvVars().has('SESSION_SECRET')).toBe(false);
     for (const stack of STACKS) {
       expect(backendEnvKeys(stack), `no backend environment block found in ${stack}`).toContain(
@@ -176,7 +162,6 @@ describe('documented deployment examples match the backend', () => {
   describe('documented OAuth callback URLs', () => {
     let ctx: TestApp;
 
-    // Unauthenticated GETs that write nothing. The timeout covers the cold module load behind the source scans.
     beforeAll(async () => {
       ctx = await createTestApp();
     }, 30_000);
@@ -209,7 +194,6 @@ describe('documented deployment examples match the backend', () => {
     });
   });
 
-  // The proxy rejects oversized bodies before the backend sees them, so the nginx example is part of the restore limit.
   describe('the documented nginx example', () => {
     test('allows a full-size restore upload', () => {
       const restore = restoreLocation();
@@ -226,7 +210,6 @@ describe('documented deployment examples match the backend', () => {
       const appCapMb = GLOBAL_MAX_BODY_SIZE / MEGABYTE;
       const serverCap = serverCapMb();
       expect(serverCap, 'the example must still cap bodies: nginx defaults to 1MB').not.toBeNull();
-      // Matches the app's global cap. A server-wide restore-sized cap would widen every JSON route.
       expect(serverCap).toBe(appCapMb);
       expect(serverCap ?? 0).toBeLessThan(capMb(restoreLocation()?.body ?? '') ?? 0);
     });

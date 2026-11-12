@@ -1,6 +1,3 @@
-// Pins bodyLimit: a strict size check, a 413 with an MB-formatted message, and passthrough when
-// Content-Length is absent or malformed. The middleware trusts the declared header, so the body need not be that large.
-
 import { describe, expect, test } from 'bun:test';
 import { type Context, Hono } from 'hono';
 import { bodyLimit } from '../body-limit';
@@ -10,7 +7,6 @@ interface BodyLimitErrorBody {
   error: { code: string; message: string };
 }
 
-// The run counter shows whether next() reached the handler.
 function makeApp(opts: { maxSize: number; message?: string }) {
   let handlerRuns = 0;
   const app = new Hono();
@@ -80,8 +76,8 @@ describe('body-limit middleware — size enforcement', () => {
   });
 
   test('the MB-formatted default message reflects a multi-MB max and received size', async () => {
-    const { app } = makeApp({ maxSize: 5 * 1024 * 1024 }); // 5.00MB cap
-    const res = await uploadWithLength(app, `${10 * 1024 * 1024}`); // received 10.00MB
+    const { app } = makeApp({ maxSize: 5 * 1024 * 1024 });
+    const res = await uploadWithLength(app, `${10 * 1024 * 1024}`);
     expect(res.status).toBe(413);
     const body = (await res.json()) as BodyLimitErrorBody;
     expect(body.error.message).toContain('5.00MB');

@@ -1,8 +1,3 @@
-/**
- * Unit tests for pruneVehicleFromSplitConfig, which removes a deleted vehicle's leg from a split config
- * and renormalizes the remaining legs for each split method.
- */
-
 import { describe, expect, test } from 'bun:test';
 import type { SplitConfig } from '../../../db/types';
 import { pruneVehicleFromSplitConfig } from '../split-config-helpers';

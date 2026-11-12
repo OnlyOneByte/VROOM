@@ -1,12 +1,8 @@
-// Backup and restore of vehicle_shares. Only accepted grants are exported, and an invitee's export
-// never includes the owner's shares. Restore re-stamps the owner, and skips a grant whose invitee
-// is absent instead of failing the whole restore. Shares are seeded directly into SQLite.
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
 
-let ctx: TestApp; // the OWNER (harness-seeded user)
+let ctx: TestApp;
 
 beforeEach(async () => {
   ctx = await createTestApp();
@@ -26,7 +22,6 @@ function shareRows(): ShareRowDb[] {
   return ctx.sqlite.query('SELECT * FROM vehicle_shares ORDER BY id').all() as ShareRowDb[];
 }
 
-/** Seed an invitee user + return its id. */
 function seedUser(id: string, email: string): string {
   ctx.sqlite.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [id, email, id]);
   return id;
@@ -102,7 +97,6 @@ describe('backup → restore round-trip preserves vehicle_shares', () => {
     seedShare('s-blast', vehicleId, invitee, 'accepted');
 
     const { backupService } = await import('../backup');
-    // The invitee is never an ownerId, so their export scopes to nothing.
     const inviteeBackup = await backupService.createBackup(invitee);
     expect(inviteeBackup.vehicleShares ?? []).toHaveLength(0);
     expect(inviteeBackup.vehicles.find((v) => v.id === vehicleId)).toBeUndefined();
@@ -122,11 +116,9 @@ describe('backup → restore round-trip preserves vehicle_shares', () => {
     const { restoreService } = await import('../restore');
     const zip = await backupService.exportAsZip(ctx.user.id);
 
-    // The invitee is removed before restore, as in a cross-instance restore.
     ctx.sqlite.run('DELETE FROM users WHERE id = ?', [absent]);
 
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
-    // The restore succeeds, skipping the absent-invitee grant.
     expect(result.success, JSON.stringify(result)).toBe(true);
     const rows = shareRows();
     expect(rows).toHaveLength(1);

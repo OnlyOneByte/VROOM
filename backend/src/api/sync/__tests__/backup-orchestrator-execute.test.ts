@@ -1,6 +1,3 @@
-// Real execute() skip paths against the in-memory harness DB. These return before any provider or
-// ZIP work. createTestApp() must run before static config/connection imports.
-
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import {
   createTestApp,
@@ -28,7 +25,6 @@ interface OrchestratorResult {
 
 describe('BackupOrchestrator.execute() real skip paths', () => {
   test('force=false with no data changes since last sync → skipped (the no-op-backup guard)', async () => {
-    // A brand-new user has no tracked data change, so there is nothing to back up.
     const { backupOrchestrator } = await import('../backup-orchestrator');
     const result = (await backupOrchestrator.execute(
       ctx.user.id,
@@ -40,7 +36,6 @@ describe('BackupOrchestrator.execute() real skip paths', () => {
   });
 
   test('a user WITH changes but NO enabled providers → not skipped, empty results', async () => {
-    // Seeding a vehicle through the route bumps lastDataChangeDate, so the change gate passes.
     const veh = await ctx.authed('POST', '/api/v1/vehicles', {
       make: 'Toyota',
       model: 'Camry',
@@ -54,9 +49,9 @@ describe('BackupOrchestrator.execute() real skip paths', () => {
       'Test User'
     )) as OrchestratorResult;
 
-    expect(result.skipped).toBeUndefined(); // it had changes → did NOT skip on the change gate
-    expect(result.results).toEqual({}); // ...but no enabled providers → empty results
-    expect(result.outcome).toBe('noop'); // nothing attempted → noop (not a false success)
+    expect(result.skipped).toBeUndefined();
+    expect(result.results).toEqual({});
+    expect(result.outcome).toBe('noop');
   });
 
   test('force=true bypasses the change gate; with no providers still yields empty results', async () => {
@@ -67,14 +62,13 @@ describe('BackupOrchestrator.execute() real skip paths', () => {
       true
     )) as OrchestratorResult;
 
-    expect(result.skipped).toBeUndefined(); // forced → did not take the change-skip path
+    expect(result.skipped).toBeUndefined();
     expect(result.results).toEqual({});
     expect(result.outcome).toBe('noop');
   });
 
   test('a second run for the same user while one is in flight returns in_progress', async () => {
     const { backupOrchestrator } = await import('../backup-orchestrator');
-    // The mutex is taken synchronously on entry, before the first await, so the second call sees it.
     const first = backupOrchestrator.execute(ctx.user.id, 'Test User', true);
     const second = (await backupOrchestrator.execute(
       ctx.user.id,
@@ -91,7 +85,6 @@ describe('BackupOrchestrator.execute() real skip paths', () => {
     const TTL_MS = 5 * 60 * 1000;
     const clock = spyOn(Date, 'now').mockReturnValue(1_000_000);
     try {
-      // The stuck run takes the mutex at t0 and is still in flight when the clock moves past the TTL.
       const stuck = backupOrchestrator.execute(ctx.user.id, 'Test User', true);
       clock.mockReturnValue(1_000_000 + TTL_MS + 1);
 
@@ -109,10 +102,7 @@ describe('BackupOrchestrator.execute() real skip paths', () => {
   });
 });
 
-// A fake strategy registered under a custom provider type drives the real fan-out and outcome
-// aggregation without any provider network. Each test registers and then unregisters it.
 describe('BackupOrchestrator.execute() outcome', () => {
-  /** Seeds an enabled storage provider, merging into any existing backup config. */
   function seedEnabledProvider(ctxApp: TestApp, id: string, providerType: string): void {
     ctxApp.sqlite.run(
       `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
@@ -130,16 +120,13 @@ describe('BackupOrchestrator.execute() outcome', () => {
       'INSERT OR REPLACE INTO user_preferences (user_id, backup_config) VALUES (?, ?)',
       [ctxApp.user.id, JSON.stringify(config)]
     );
-    // A data change so the run passes the change gate.
     ctxApp.sqlite.run(
       'INSERT INTO vehicles (id, user_id, make, model, year) VALUES (?, ?, ?, ?, ?)',
       [`v-${id}`, ctxApp.user.id, 'T', 'C', 2022]
     );
   }
 
-  /** A credentials blob the orchestrator can decrypt and parse. */
   function encryptedCreds(): string {
-    // Uses the real encryption util so decrypt() round-trips.
     return enc(JSON.stringify({ refreshToken: 'fake' }));
   }
 
@@ -173,7 +160,6 @@ describe('BackupOrchestrator.execute() outcome', () => {
         },
       });
     };
-    // The registry has no delete, so the custom type is overwritten with a no-op.
     unregister = (type) =>
       backupStrategyRegistry.register(type, {
         async execute() {
@@ -197,7 +183,6 @@ describe('BackupOrchestrator.execute() outcome', () => {
       expect(result.failedProviders).toContain('pf');
       expect(result.results.pf?.success).toBe(false);
 
-      // A failed backup must leave the user with unsynced changes so it retries.
       const sync = ctx.sqlite
         .query('SELECT last_sync_date FROM sync_state WHERE user_id = ?')
         .get(ctx.user.id) as { last_sync_date: string | null } | null;
@@ -208,7 +193,6 @@ describe('BackupOrchestrator.execute() outcome', () => {
   });
 
   test('a single provider that did not fully back up → outcome failed', async () => {
-    // A lone provider with success:false has no complete backup, so the run is failed, not partial.
     registerFake('fake-cap-partial', 'partial');
     try {
       seedEnabledProvider(ctx, 'pcp', 'fake-cap-partial');
@@ -243,7 +227,6 @@ describe('BackupOrchestrator.execute() outcome', () => {
       expect(result.failedProviders).toEqual(['pbad']);
       expect(result.results.pok?.success).toBe(true);
 
-      // A partial run must not advance the sync anchor, so the failed provider retries.
       const sync = ctx.sqlite
         .query('SELECT last_sync_date FROM sync_state WHERE user_id = ?')
         .get(ctx.user.id) as { last_sync_date: string | null } | null;
@@ -275,7 +258,6 @@ describe('BackupOrchestrator.execute() outcome', () => {
   test('a rejected per-provider attempt counts as a failed provider, not a skip', async () => {
     registerFake('fake-reject', true);
     const { backupStrategyRegistry } = await import('../backup-strategy-registry');
-    // The lookup runs outside the per-provider try, so a throw there rejects the attempt itself.
     const lookup = spyOn(backupStrategyRegistry, 'get').mockImplementation(() => {
       throw new Error('lookup exploded');
     });
@@ -303,7 +285,6 @@ describe('BackupOrchestrator.execute() outcome', () => {
     try {
       seedEnabledProvider(ctx, 'plive', 'fake-live');
       seedEnabledProvider(ctx, 'pghost', 'fake-live');
-      // The config still names pghost, but its provider row was deleted.
       ctx.sqlite.run('DELETE FROM user_providers WHERE id = ?', ['pghost']);
       const { backupOrchestrator } = await import('../backup-orchestrator');
       const result = (await backupOrchestrator.execute(

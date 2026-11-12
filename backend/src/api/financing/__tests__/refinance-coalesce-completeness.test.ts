@@ -1,9 +1,3 @@
-/**
- * Create-or-replace reuses the vehicle's financing row. Every optional column is set on the first
- * financing, and the replacement omits all of them. Each one must come back null, so a column added
- * later cannot carry a stale value across a replace. Drives the real POST route.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { getTableColumns } from 'drizzle-orm';
 import { vehicleFinancing } from '../../../db/schema';
@@ -15,7 +9,6 @@ import {
 } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
 
-/** Optional columns the replace path must reset. Timestamps and the id are not user-entered. */
 const OPTIONAL_FIELDS = [
   'apr',
   'paymentDayOfMonth',
@@ -25,7 +18,6 @@ const OPTIONAL_FIELDS = [
   'excessMileageFee',
 ] as const;
 
-/** Set by the route itself on the replace path, not coalesced from the request body. */
 const ROUTE_MANAGED = new Set(['endDate', 'isActive', 'createdAt', 'updatedAt']);
 
 let ctx: TestApp;

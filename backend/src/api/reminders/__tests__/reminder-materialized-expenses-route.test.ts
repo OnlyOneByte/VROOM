@@ -1,9 +1,3 @@
-/**
- * GET /reminders/:id/expenses lists the expense rows a reminder has materialized. Covers source-linked
- * rows after a trigger, an empty list for notification reminders, and ownership: unknown and foreign
- * reminder ids return 404.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,

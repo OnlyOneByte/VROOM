@@ -1,5 +1,3 @@
-/** Property-based tests for vehicle unit preferences. */
-
 import type { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import fc from 'fast-check';

@@ -1,9 +1,3 @@
-/**
- * Served photo bytes carry a client-asserted Content-Type. Both thumbnail routes must answer with
- * X-Content-Type-Options: nosniff and the stored MIME type, or a browser could sniff and execute an
- * uploaded HTML file. Checked over HTTP on the generic and the vehicle-scoped routes.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 import { uploadPhotoForEntity } from '../photo-service';

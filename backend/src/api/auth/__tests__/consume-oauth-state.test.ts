@@ -1,8 +1,3 @@
-/**
- * Behavior of consumeOAuthState: single use, flow isolation between login, link and provider
- * states, and eviction of any state on a failed lookup.
- */
-
 import { describe, expect, test } from 'bun:test';
 import { consumeOAuthState, type OAuthStateEntry } from '../utils';
 

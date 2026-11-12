@@ -24,11 +24,6 @@ import {
 
 const routes = new Hono();
 
-/**
- * Derives the mileage fields server-side. A mileage or both reminder defaults lastServiceOdometer to the
- * vehicle's current odometer and sets nextDueOdometer = lastServiceOdometer + intervalMileage. A time
- * reminder clears all three.
- */
 async function resolveMileageFields(
   data: {
     triggerMode?: string;
@@ -57,10 +52,6 @@ async function resolveMileageFields(
   };
 }
 
-/**
- * Requires WRITE on every linked vehicle and returns the owner the reminder is stamped with. A reminder
- * has one userId, so all its vehicles must share an owner. A vehicleless reminder belongs to the actor.
- */
 async function requireReminderVehiclesWrite(
   vehicleIds: readonly string[],
   actingUserId: string
@@ -77,10 +68,6 @@ async function requireReminderVehiclesWrite(
   return { ownerId: ownerId ?? actingUserId };
 }
 
-/**
- * Advances a time reminder to its first occurrence after now. Loops without the catch-up cap because
- * nothing is materialized here, and a single advance could leave a long-lapsed reminder still due.
- */
 function advanceToFirstFutureDue(reminder: Reminder, from: Date): Date {
   const now = new Date();
   let nextDue = advanceReminderDueDate(reminder, from);
@@ -114,7 +101,6 @@ routes.post('/trigger', triggerRateLimiter, async (c) => {
   });
 });
 
-// Derived from existing reminder rows; there is no separate summary table.
 routes.get('/recurring-cost', async (c) => {
   const user = c.get('user');
   const expenseReminders = await reminderRepository.findByUserId(user.id, { type: 'expense' });
@@ -133,17 +119,16 @@ routes.post(
     const user = c.get('user');
     const { id } = c.req.valid('param');
 
-    // Odometer reads and the write use the owner id: shared-vehicle odometer rows are owner-stamped.
     const existing = await reminderRepository.findByIdWithVehicles(id);
     if (!existing) throw new NotFoundError('Reminder');
     const { reminder, vehicleIds } = existing;
     const { ownerId } = await requireReminderVehiclesWrite(vehicleIds, user.id);
 
-    // Re-arm math lives in the route so the repository doesn't import the trigger service.
     const fields: { lastServiceOdometer?: number; nextDueOdometer?: number; nextDueDate?: Date } =
       {};
 
     if (reminder.triggerMode === 'mileage' || reminder.triggerMode === 'both') {
+      // Shared-vehicle odometer rows are owner-stamped, so reads must use ownerId, not the actor.
       const vehicleId = vehicleIds[0];
       const current = vehicleId
         ? await odometerRepository.getCurrentOdometer(vehicleId, ownerId)
@@ -158,7 +143,6 @@ routes.post(
       reminder.nextDueDate
     ) {
       const nextDue = advanceToFirstFutureDue(reminder, reminder.nextDueDate);
-      // A reminder serviced after its endDate must be deactivated, not re-armed to a future date.
       if (reminder.endDate && nextDue > reminder.endDate) {
         await reminderRepository.deactivate(id);
         return c.json({ success: true, data: reminderToApi({ ...reminder, isActive: false }) });
@@ -196,7 +180,6 @@ routes.post('/', zValidator('json', createReminderSchema), async (c) => {
     {
       ...reminderData,
       userId: ownerId,
-      // Pure mileage has no time axis, so no due date.
       nextDueDate: reminderData.triggerMode === 'mileage' ? null : reminderData.startDate,
       ...mileage,
     },
@@ -217,8 +200,6 @@ routes.get('/', async (c) => {
   if (type) filters.type = type;
   if (isActiveParam !== undefined) filters.isActive = isActiveParam === 'true';
 
-  // A vehicleId filter lists the owner's reminders for that vehicle, gated by read access. Without it the
-  // list stays scoped to the acting user, so shared reminders never mix into the all-reminders list.
   let listUserId = user.id;
   if (vehicleId) {
     const ownerId = await requireVehicleOwnerScope(vehicleId, user.id, 'read');
@@ -261,8 +242,6 @@ routes.put(
     if (!existing) throw new NotFoundError('Reminder');
     const { ownerId } = await requireReminderVehiclesWrite(existing.vehicleIds, user.id);
 
-    // A new vehicle set must resolve to the same owner, or the reminder and its expenses would move to
-    // another user's books.
     if (partialUpdate.vehicleIds) {
       const { ownerId: newOwnerId } = await requireReminderVehiclesWrite(
         partialUpdate.vehicleIds,
@@ -281,13 +260,11 @@ routes.put(
       vehicleIds: partialUpdate.vehicleIds ?? existing.vehicleIds,
     };
 
-    // Merged data already holds cents, so validate with the transform-free gate.
     assertMergedReminderValid(merged);
 
     const { vehicleIds: mergedVehicleIds, ...reminderFields } = partialUpdate;
     const updateFields: Partial<NewReminder> = { ...reminderFields };
 
-    // Recompute derived mileage fields from the merged state so the milestone and dedup key stay consistent.
     const touchesMileage =
       reminderFields.triggerMode !== undefined ||
       reminderFields.intervalMileage !== undefined ||
@@ -323,8 +300,7 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   if (!existing) throw new NotFoundError('Reminder');
   const { ownerId } = await requireReminderVehiclesWrite(existing.vehicleIds, user.id);
 
-  // Materialized expenses are history, so sever their link instead of deleting them. This must succeed
-  // before the delete: a dangling reminder sourceId fails backup validation on restore.
+  // clearSource must run before the delete: a dangling sourceId fails backup validation on restore.
   await expenseRepository.clearSource('reminder', id, ownerId);
 
   await reminderRepository.delete(id);

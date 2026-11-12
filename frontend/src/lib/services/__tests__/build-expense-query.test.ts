@@ -39,7 +39,6 @@ describe('buildExpenseQuery', () => {
 		expect(buildExpenseQuery({ search: '   ' })).toBe('');
 	});
 
-	// The backend query schema takes tags as one string; a repeated key reaches it as an array and 400s.
 	test('tags become ONE comma-joined tags= param, preserving order', () => {
 		const map = new URLSearchParams(buildExpenseQuery({ tags: ['tolls', 'highway'] }));
 		expect(map.getAll('tags')).toEqual(['tolls,highway']);

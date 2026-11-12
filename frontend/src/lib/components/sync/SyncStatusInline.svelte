@@ -25,7 +25,6 @@
 	let { isExpanded = true } = $props();
 
 	let pendingCount = $derived(countPendingSync(offlineExpenseQueue.current));
-	// Parked rows wait on the user rather than the network, so they are counted separately from pendingCount.
 	let parkedCount = $derived(countParked(offlineExpenseQueue.current));
 	let parkedLinkLabel = $derived(
 		parkedCount === 1

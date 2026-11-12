@@ -1,7 +1,3 @@
-// Source scan: a month-key sort must not be sliced from the start, because that keeps the oldest
-// months and hides the current period. Use slice(-N) for the most recent window. Numeric sorts
-// followed by slice(0, N) are fine, so the regex requires localeCompare.
-
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -14,8 +10,6 @@ const FILES = [
   join(SRC, 'api', 'analytics', 'repository.ts'),
 ];
 
-// `[^;]*?` keeps the match inside one statement, so an unrelated slice(0) later in the file does
-// not match.
 const OLDEST_MONTH_SLICE = /localeCompare[^;]*?\.slice\(\s*0\s*,/;
 
 describe('no oldest-month slice in analytics month series', () => {
@@ -28,7 +22,6 @@ describe('no oldest-month slice in analytics month series', () => {
   test('no month-key sort is truncated from the start', () => {
     const offenders: string[] = [];
     for (const f of FILES) {
-      // Collapse whitespace so a multi-line `.sort(...).slice(...)` chain is matched as one.
       const collapsed = readFileSync(f, 'utf8').replace(/\s+/g, ' ');
       if (OLDEST_MONTH_SLICE.test(collapsed)) {
         offenders.push(f.replace(`${SRC}/`, ''));

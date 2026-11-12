@@ -1,6 +1,3 @@
-// Expense-summary chart builders. Percentages sum to 100, unknown categories fold into misc,
-// and the monthly trend keeps the newest 24 months.
-
 import { describe, expect, test } from 'bun:test';
 import {
   buildExpenseByCategory,
@@ -10,7 +7,6 @@ import {
   type GeneralExpenseRow,
 } from '../analytics-charts';
 
-// Local time, so bucketing by local month does not depend on the timezone.
 function d(year: number, month1to12: number, day: number): Date {
   return new Date(year, month1to12 - 1, day);
 }
@@ -131,8 +127,6 @@ describe('buildMonthlyExpenseTrends', () => {
   });
 
   test('keeps the newest 24 months', () => {
-    // 30 distinct months from Jan 2022 to Jun 2024. A slice(0, 24) would keep the oldest months
-    // instead.
     const rows: GeneralExpenseRow[] = [];
     for (let i = 0; i < 30; i++) {
       const year = 2022 + Math.floor(i / 12);

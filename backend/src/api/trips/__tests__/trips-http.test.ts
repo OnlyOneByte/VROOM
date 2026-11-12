@@ -1,8 +1,3 @@
-/**
- * HTTP tests for the trip routes through the real stack. The harness seeds one user. Cross-tenant cases
- * seed a second user directly in SQLite and assert the first user cannot reach that data.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -28,7 +23,6 @@ const VALID = (vehicleId: string, over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-/** Seeds a second user with a vehicle and a trip, via raw SQL. */
 function seedForeignTrip(): { tripId: string; vehicleId: string } {
   ctx.sqlite.run(
     `INSERT INTO users (id, email, display_name) VALUES ('u2', 'other@x.com', 'Other')`
@@ -77,8 +71,6 @@ describe('POST /api/v1/trips (create)', () => {
     expect(res.status).toBe(400);
   });
 
-  // The future guard compares local calendar days. The client sends noon-local dates, so an instant
-  // comparison would wrongly reject today's trip before noon.
   test('accepts a trip dated today sent as noon local time', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const now = new Date();
@@ -129,8 +121,6 @@ describe('POST /api/v1/trips (create)', () => {
     expect(res.status).toBe(404);
   });
 
-  // Omitted optional fields must be stored as NULL, not as empty strings or the text 'undefined'.
-  // The row is read straight from SQLite so a coercion the JSON response would hide is still caught.
   test('a create omitting optional locations and note stores NULL', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const res = await ctx.authed('POST', '/api/v1/trips', {
@@ -170,8 +160,6 @@ describe('POST /api/v1/trips (create)', () => {
     expect(body.data.note).toBe('Standup');
   });
 
-  // Creating a trip also writes an odometer entry at its end reading, so the reading feeds the
-  // current odometer and mileage reminders.
   test('creating a trip feeds currentOdometer through a deduplicated odometer entry', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const res = await ctx.authed(
@@ -214,7 +202,6 @@ describe('POST /api/v1/trips (create)', () => {
     expect(n).toBe(1);
   });
 
-  // The odometer side effect is best-effort: the trip is already persisted, so its failure must not fail the create.
   test('a failing odometer side effect does not fail the create; the trip persists', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const { odometerRepository } = await import('../../odometer/repository');
@@ -241,9 +228,7 @@ describe('POST /api/v1/trips (create)', () => {
   });
 });
 
-// Covers the full path: trip create, odometer entry, recheck, then notification.
 describe('a trip crossing a mileage reminder milestone fires the notification', () => {
-  /** Seeds a mileage reminder due at dueOdometer for one vehicle. */
   function seedMileageReminder(id: string, vehicleId: string, dueOdometer: number): void {
     ctx.sqlite.run(
       `INSERT INTO reminders (id, user_id, name, type, action_mode, frequency, trigger_mode,
@@ -318,7 +303,6 @@ describe('trip edit and delete keep the linked odometer entry in sync', () => {
     expect(put.status).toBe(200);
 
     const { odometerRepository } = await import('../../odometer/repository');
-    // The stale entry is replaced, so the current odometer follows the correction.
     expect(odoCount(ctx, vehicleId)).toBe(1);
     expect(await odometerRepository.getCurrentOdometer(vehicleId, ctx.user.id)).toBe(500);
   });
@@ -378,7 +362,7 @@ describe('GET /api/v1/trips (list)', () => {
   });
 
   test('a foreign user’s trips never appear in the list (tenant scope)', async () => {
-    seedForeignTrip(); // u2's trip exists in the DB
+    seedForeignTrip();
     const res = await ctx.authed('GET', '/api/v1/trips');
     const body = await json<{ data: { id: string }[] }>(res);
     expect(res.status).toBe(200);
@@ -451,9 +435,6 @@ describe('GET /api/v1/trips/summary (mileage rollup)', () => {
     expect(body.data.milesByPurpose.personal).toBe(30);
   });
 
-  // Characterizes a known limitation: the cross-fleet summary sums raw odometer deltas even when vehicles
-  // use different distance units. Fixing it is a product decision, so this assertion should change
-  // deliberately when units are converted.
   test('cross-fleet summary sums raw deltas across mixed-unit vehicles', async () => {
     const miVehicle = await seedVehicle(ctx, {
       make: 'Toyota',
@@ -507,7 +488,7 @@ describe('GET /api/v1/trips/summary (mileage rollup)', () => {
     const body = await json<DataEnvelope<{ totalMiles: number; tripCount: number }>>(res);
     expect(res.status).toBe(200);
     expect(body.data.tripCount).toBe(1);
-    expect(body.data.totalMiles).toBe(100); // v2's 999 excluded
+    expect(body.data.totalMiles).toBe(100);
   });
 
   test('summary on an UNOWNED vehicle is 404 (no cross-tenant rollup)', async () => {
@@ -524,7 +505,6 @@ describe('GET /api/v1/trips/summary (mileage rollup)', () => {
     expect(body.data.averageTripMiles).toBe(0);
   });
 
-  // The rate multiplies into a displayed dollar figure, so negative and non-finite values must be rejected.
   test('a negative rate is rejected', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     await ctx.authed(
@@ -594,7 +574,6 @@ describe('PUT /api/v1/trips/:id', () => {
     expect(res.status).toBe(400);
   });
 
-  // A partial update must be checked against the stored value of the other odometer, not just the body.
   test('rejects a partial update that sets endOdometer below the stored startOdometer', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const created = await ctx.authed(
@@ -680,13 +659,7 @@ describe('DELETE /api/v1/trips/:id', () => {
   });
 });
 
-/**
- * The odometer entry linked to a trip. Create writes a deduplicated row stamped note 'From trip'.
- * Delete keeps it unless keepOdometer=false, and that removal never touches a manual reading.
- * Editing the reading or date moves the linked entry.
- */
 describe('trip-linked odometer lifecycle', () => {
-  /** Counts trip-linked odometer entries at a reading. */
   function linkedEntryCount(vehicleId: string, odometer: number): number {
     const row = ctx.sqlite
       .query(
@@ -773,7 +746,6 @@ describe('trip-linked odometer lifecycle', () => {
     expect(linkedEntryCount(vehicleId, 1200)).toBe(1);
   });
 
-  // The removal must key on the old date, or the entry would be left behind on the old day.
   test('editing the trip date moves the linked entry to the new day', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const created = await ctx.authed(
@@ -783,7 +755,6 @@ describe('trip-linked odometer lifecycle', () => {
     );
     const { data } = await json<DataEnvelope<{ id: string }>>(created);
 
-    /** Counts trip-linked entries on a local calendar day (YYYY-MM-DD). */
     const linkedOnDay = (day: string): number => {
       const start = Math.floor(new Date(`${day}T00:00:00`).getTime() / 1000);
       const end = start + 86400;
@@ -806,8 +777,6 @@ describe('trip-linked odometer lifecycle', () => {
     expect(linkedEntryCount(vehicleId, 1080)).toBe(1);
   });
 
-  // Trips on the same key share one entry. Removing it while another trip still maps to it would
-  // orphan the survivor's reading.
   test('deleting one of two trips that share an odometer entry keeps the entry', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const a = await ctx.authed('POST', '/api/v1/trips', VALID(vehicleId, { endOdometer: 1080 }));

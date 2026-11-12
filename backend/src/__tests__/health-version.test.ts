@@ -1,5 +1,3 @@
-// GET /health and GET /api must report the package version. app.ts must read CONFIG.version and carry no literal.
-
 import { beforeAll, describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -10,13 +8,11 @@ import { createTestApp, type TestApp } from '../test-helpers/http-client';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const APP = join(HERE, '..', 'app.ts');
 
-// Any version string literal, which app.ts must not contain.
 const VERSION_LITERAL = /version\s*:\s*['"][^'"]+['"]/g;
 
 describe('reported version comes from the package, not a literal', () => {
   let ctx: TestApp;
 
-  // Read-only probes (unauthenticated GETs that write nothing), so one app for the suite.
   beforeAll(async () => {
     ctx = await createTestApp();
   });
@@ -34,7 +30,6 @@ describe('reported version comes from the package, not a literal', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { version: string; apiVersion: string };
     expect(body.version).toBe(packageJson.version);
-    // apiVersion is the ROUTE contract (/api/v1/*), unrelated to the build version.
     expect(body.apiVersion).toBe('v1');
   });
 

@@ -1,5 +1,4 @@
 <script lang="ts">
-	// Dev-only component gallery: every kit component in its key states.
 	import { dev } from '$app/environment';
 	import PageHeader from '$lib/components/common/page-header.svelte';
 	import EmptyState from '$lib/components/common/empty-state.svelte';

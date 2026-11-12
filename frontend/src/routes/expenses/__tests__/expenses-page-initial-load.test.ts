@@ -1,5 +1,3 @@
-// The three opening reads go out together, rows keep their vehicle, and the search box keeps a name.
-
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, waitFor } from '@testing-library/svelte';
 import type { Expense, UserSettings, Vehicle } from '$lib/types';
@@ -7,7 +5,6 @@ import type { Expense, UserSettings, Vehicle } from '$lib/types';
 vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
-// Records the props: they carry live getters, so reads see the page's current state.
 let tableProps: Record<string, unknown> = {};
 vi.mock('$lib/components/expenses/ExpensesTable.svelte', () => ({
 	default: (_anchor: unknown, props: Record<string, unknown>) => {
@@ -38,7 +35,6 @@ vi.mock('$lib/services/settings-api', () => ({
 	}
 }));
 
-// Imported eagerly so module transforms happen outside test timeouts.
 import Page from '../+page.svelte';
 
 const VEHICLE: Vehicle = {
@@ -102,7 +98,6 @@ function rowsGivenToTable(): Array<Expense & { vehicle?: Vehicle }> {
 
 describe('/expenses initial load', () => {
 	test('the expense page is requested WITHOUT waiting for settings or the vehicle list', async () => {
-		// The other two reads never resolve here, so a serial load could never reach the expense request.
 		getSettings.mockImplementation(() => new Promise<never>(() => {}));
 		getVehicles.mockImplementation(() => new Promise<never>(() => {}));
 
@@ -112,7 +107,6 @@ describe('/expenses initial load', () => {
 			expect(getAllExpenses).toHaveBeenCalled();
 			expect(getExpenseSummary).toHaveBeenCalled();
 		});
-		// The two slow reads were genuinely in flight together.
 		expect(getSettings).toHaveBeenCalled();
 		expect(getVehicles).toHaveBeenCalled();
 	});
@@ -125,7 +119,6 @@ describe('/expenses initial load', () => {
 	});
 
 	test('a row whose vehicle is not in the fleet is still rendered, without a vehicle', async () => {
-		// A shared or deleted vehicle degrades to undefined rather than dropping the row.
 		getAllExpenses.mockImplementation(() =>
 			Promise.resolve({
 				data: [{ ...SERVER_PAGE[0], id: 'orphan', vehicleId: 'gone' }],
@@ -148,7 +141,6 @@ describe('/expenses initial load', () => {
 		);
 		await fireEvent.input(input, { target: { value: 'cost' } });
 
-		// A placeholder disappears once typed into, so the name must come from the label.
 		expect(input).toHaveAccessibleName('Search expenses and vehicles');
 		expect(input.getAttribute('aria-label')).not.toBe(input.getAttribute('placeholder'));
 	});

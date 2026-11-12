@@ -1,8 +1,3 @@
-// POST /sync/restore/from-provider's preconditions, over the real route and in-memory DB. The route
-// requires an Idempotency-Key header, which the shared harness cannot set, so requests go through
-// app.request directly. A ZIP restore needs a live provider download, so its restore orchestration
-// is covered by the restore-* suites, which drive restoreFromBackup with a real archive.
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, json, type TestApp } from '../../../test-helpers/http-client';
 
@@ -33,7 +28,6 @@ function seedBackupConfig(providers: Record<string, unknown>): void {
   ]);
 }
 
-/** POSTs to the restore route with a fresh Idempotency-Key, as a browser would. */
 async function postFromProvider(body: unknown): Promise<Response> {
   return ctx.app.request('/api/v1/sync/restore/from-provider', {
     method: 'POST',

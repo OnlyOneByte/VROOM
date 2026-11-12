@@ -26,9 +26,6 @@ export interface CreateTermInput {
   vehicleCoverage: { vehicleIds: string[] };
 }
 
-/**
- * Nullable columns accept null to clear them. startDate and endDate are NOT NULL, so they are never null.
- */
 export interface UpdateTermInput {
   startDate?: Date;
   endDate?: Date;
@@ -70,10 +67,7 @@ export type InsurancePolicyWithVehicles = InsurancePolicy & {
   vehicleIds: string[];
 };
 
-/**
- * Every write scopes the policy row by owner, so a caller that skips the route-level ownership check
- * still cannot touch another user's policy: the lookup misses and the write reports NotFound.
- */
+// Owner-scoped lookups keep writes safe even if a caller skips the route ownership check.
 function ownedPolicy(policyId: string, userId: string) {
   return and(eq(insurancePolicies.id, policyId), eq(insurancePolicies.userId, userId));
 }
@@ -85,9 +79,6 @@ export class InsurancePolicyRepository {
     this.db = db;
   }
 
-  /**
-   * Accepts a transaction handle so the check can run inside a write.
-   */
   private async validateVehicleOwnership(
     dbOrTx: AppDatabase | DrizzleTransaction,
     vehicleIds: string[],
@@ -96,10 +87,7 @@ export class InsurancePolicyRepository {
     await assertVehiclesOwned(dbOrTx, vehicleIds, userId);
   }
 
-  /**
-   * Must stay synchronous: an async transaction callback under bun-sqlite autocommits each write on its own,
-   * which could leave a term with partial coverage.
-   */
+  // bun:sqlite: an async transaction callback autocommits each write, which could leave partial coverage.
   private insertJunctionRowsSync(
     tx: DrizzleTransaction,
     termId: string,
@@ -110,9 +98,6 @@ export class InsurancePolicyRepository {
     }
   }
 
-  /**
-   * Loads a policy's terms and coverage. Accepts a transaction handle so in-transaction callers see their own writes.
-   */
   private async fetchTermsAndCoverage(
     handle: AppDatabase | DrizzleTransaction,
     policyId: string
@@ -155,7 +140,6 @@ export class InsurancePolicyRepository {
       const allVehicleIds = [...new Set(data.terms.flatMap((t) => t.vehicleCoverage.vehicleIds))];
       await this.validateVehicleOwnership(this.db, allVehicleIds, userId);
 
-      // Synchronous: see insertJunctionRowsSync.
       // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Policy creation requires sequential steps within a transaction
       return this.db.transaction((tx) => {
         const policyId = createId();
@@ -329,7 +313,6 @@ export class InsurancePolicyRepository {
           throw new NotFoundError('Insurance policy');
         }
 
-        // Delete the policy — terms and junction rows cascade via FK ON DELETE CASCADE
         await tx.delete(insurancePolicies).where(ownedPolicy(id, userId));
       });
     } catch (error) {
@@ -350,7 +333,6 @@ export class InsurancePolicyRepository {
     try {
       await this.validateVehicleOwnership(this.db, term.vehicleCoverage.vehicleIds, userId);
 
-      // Synchronous: see insertJunctionRowsSync.
       const termId = createId();
       this.db.transaction((tx) => {
         const existing = tx
@@ -426,7 +408,6 @@ export class InsurancePolicyRepository {
         await this.validateVehicleOwnership(this.db, vehicleCoverage.vehicleIds, userId);
       }
 
-      // Synchronous: see insertJunctionRowsSync. A coverage replace deletes then re-inserts junction rows.
       // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Term update requires field-by-field mapping and junction management
       this.db.transaction((tx) => {
         const existing = tx
@@ -531,7 +512,6 @@ export class InsurancePolicyRepository {
           throw new NotFoundError('Term');
         }
 
-        // Premium expenses link by text columns, not an FK, so the caller must deleteBySource first.
         await tx.delete(insuranceTerms).where(eq(insuranceTerms.id, termId));
 
         await tx
@@ -560,9 +540,6 @@ export class InsurancePolicyRepository {
     }
   }
 
-  /**
-   * Terms ending in the range, for active policies only. A cancelled policy must not show as expiring.
-   */
   async findExpiringTerms(
     startDate: Date,
     endDate: Date,

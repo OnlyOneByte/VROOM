@@ -2,8 +2,7 @@ import { Google } from 'arctic';
 import { CONFIG } from '../../../config';
 import type { OAuthProviderConfig } from './types';
 
-// One OAuth app, two clients: Google requires the token exchange to repeat the authorize step's
-// redirect URI, and login and storage-provider consent return to different callbacks.
+// Google requires the token exchange to repeat the authorize step's redirect URI.
 function createGoogleClient(redirectUri: string): Google {
   return new Google(
     CONFIG.auth.googleClientId || '',
@@ -14,7 +13,6 @@ function createGoogleClient(redirectUri: string): Google {
 
 const googleLoginClient = createGoogleClient(CONFIG.auth.googleLoginRedirectUri);
 
-/** Drive/Photos consent; returns to /callback/provider/google and never touches the login session. */
 export const googleStorageClient = createGoogleClient(CONFIG.auth.googleStorageRedirectUri);
 
 const LOGIN_SCOPES = ['openid', 'profile', 'email'];
@@ -22,7 +20,7 @@ const LOGIN_SCOPES = ['openid', 'profile', 'email'];
 export const STORAGE_SCOPES = [
   ...LOGIN_SCOPES,
   'https://www.googleapis.com/auth/drive.file',
-  // Narrowest Photos scope: read-only, and only items this app created, never the camera roll.
+  // Read-only and limited to items this app created; never widen to the camera roll.
   'https://www.googleapis.com/auth/photoslibrary.readonly.appcreateddata',
 ];
 

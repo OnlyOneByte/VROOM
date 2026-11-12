@@ -1,9 +1,4 @@
-/**
- * currentOdometer on GET /vehicles/:id/stats is the all-time reading across all sources. Unlike
- * currentMileage it is independent of the period and includes manual odometer entries.
- * createTestApp() must run before any static config or connection import, so keep imports to the
- * harness and bun:test.
- */
+// createTestApp() must run before any DB-bound import: import only the harness and bun:test.
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, json, type TestApp } from '../../../test-helpers/http-client';
@@ -98,9 +93,7 @@ describe('GET /vehicles/:id/stats — currentOdometer', () => {
   });
 });
 
-// The stats response is hand-assembled in the route with no type link to the frontend VehicleStats.
-// This set mirrors that frontend type exactly. Change it together with the type and the route. The
-// check is two-sided, so a dropped field and an unmirrored extra field both fail.
+// Mirrors the frontend VehicleStats type: change this set together with that type and the route.
 const EXPECTED_STATS_FIELDS = [
   'period',
   'totalMileage',

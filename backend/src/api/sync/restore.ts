@@ -70,12 +70,10 @@ export interface RestoreResponse {
 const shareConsentKey = (vehicleId: string, sharedWithId: string): string =>
   `${vehicleId}\u0000${sharedWithId}`;
 
-/** Narrows an untrusted share level to a value the routes could have written. */
 const clampShareLevel = (level: unknown): string => (level === 'editor' ? 'editor' : 'viewer');
 
 type RestoreMode = 'replace' | 'merge' | 'preview';
 
-/** Row counts per table, reported as the preview or as the imported totals. */
 function summarizeBackup(data: ParsedBackupData): ImportSummary {
   return {
     vehicles: data.vehicles.length,
@@ -98,7 +96,6 @@ function summarizeBackup(data: ParsedBackupData): ImportSummary {
   };
 }
 
-/** Sheet cells arrive as text, so each row is coerced to its table's column types. */
 function coerceRows(rows: Record<string, unknown>[], table: Table): Record<string, unknown>[] {
   return rows.map((row) => coerceRow(row, table));
 }
@@ -133,10 +130,6 @@ class RestoreService {
     return this.applyRestore(userId, parsedBackup, mode);
   }
 
-  /**
-   * The restore tail shared by every source: preview, the merge conflict check, the replace guard,
-   * then one transaction that wipes (replace only) and inserts.
-   */
   private async applyRestore(
     userId: string,
     data: ParsedBackupData,
@@ -157,11 +150,9 @@ class RestoreService {
 
     this.assertReplaceNotEmpty(summary, mode);
 
-    // Must stay synchronous: bun-sqlite runs this callback inside client.transaction(), which only
-    // wraps work that completes synchronously. An async callback autocommits each statement, so a
-    // throw mid-insert would leave the wipe committed.
+    // bun:sqlite transactions must be synchronous: an async callback autocommits each statement.
     this.db.transaction((tx) => {
-      // Must be read before the wipe, which cascades vehicle_shares.
+      // Read before the wipe: deleteUserData cascades vehicle_shares.
       const consented = this.consentedShareKeys(tx, userId);
       if (mode === 'replace') {
         this.deleteUserData(tx, userId);
@@ -172,10 +163,6 @@ class RestoreService {
     return { success: true, imported: summary };
   }
 
-  /**
-   * Reports unreadable bytes as a client error rather than a 500. A ValidationError, not a SyncError,
-   * so the global handler logs it at client-error level.
-   */
   private async parseOrReject(file: Buffer): Promise<ParsedBackupData> {
     try {
       return await backupService.parseZipBackup(file);
@@ -188,10 +175,6 @@ class RestoreService {
     }
   }
 
-  /**
-   * Replace mode deletes all data first, so a backup with zero rows across every table would wipe
-   * the account and restore nothing. Preview and merge never delete, so they are not affected.
-   */
   private assertReplaceNotEmpty(
     summary: ImportSummary,
     mode: 'replace' | 'merge' | 'preview'
@@ -229,8 +212,6 @@ class RestoreService {
     const sheetsService = await createSheetsServiceForProvider(providerId, userId);
     const sheet = await sheetsService.readSpreadsheetData(sheetsSpreadsheetId);
 
-    // The sheet mirrors the DB, so its money cells are already in cents and need no shim. Sheets
-    // carries no real metadata version, so stamp the current one for validation.
     const sheetData: ParsedBackupData = {
       ...sheet,
       metadata: { ...sheet.metadata, version: CONFIG.backup.currentVersion },
@@ -278,8 +259,6 @@ class RestoreService {
   private async detectConflicts(data: ParsedBackupData, userId: string): Promise<Conflict[]> {
     const conflicts: Conflict[] = [];
 
-    // Scope every probe to the importer's rows. Unscoped, a merge whose ids collide with another
-    // user's rows would return that user's data in localData.
     const userVehicleRows = await this.db
       .select({ id: vehicles.id })
       .from(vehicles)
@@ -291,8 +270,7 @@ class RestoreService {
       .where(eq(photos.userId, userId));
     const userPhotoIds = userPhotoRows.map((p) => p.id);
 
-    // Every owned table is probed, so an id collision is reported as a conflict instead of a raw
-    // UNIQUE error that aborts the restore. idField is the row property matching idColumn.
+    // Scoped to the importer: an unscoped probe on an id collision would leak another user's row.
     const tables = [
       {
         data: data.vehicles,
@@ -327,7 +305,6 @@ class RestoreService {
         idField: 'id' as const,
       },
       {
-        // Reminders are userId-owned and can exist with no vehicles.
         data: data.reminders ?? [],
         table: reminders,
         name: 'reminders',
@@ -351,7 +328,6 @@ class RestoreService {
         idColumn: photoRefs.id,
         idField: 'id' as const,
       },
-      // Keyed by userId; the conflict id is the userId.
       {
         data: (data.userPreferences ?? []).map((r) => ({ ...r, id: String(r.userId) })),
         table: userPreferences,
@@ -377,7 +353,6 @@ class RestoreService {
         idField: 'id' as const,
       },
       {
-        // Scoped by ownerId, the same ownership restore re-stamps onto the importer.
         data: data.vehicleShares ?? [],
         table: vehicleShares,
         name: 'vehicle_shares',
@@ -390,7 +365,6 @@ class RestoreService {
     for (const { data: items, table, name, scope, idColumn, idField } of tables) {
       if (items.length === 0) continue;
       const idOf = (row: Record<string, unknown>): string => String(row[idField]);
-      // Chunked to stay under SQLite's bind-parameter limit.
       const existing: Record<string, unknown>[] = [];
       for (const idBatch of chunk(items.map((item) => String(item.id)))) {
         const rows = await this.db
@@ -415,7 +389,6 @@ class RestoreService {
     return conflicts;
   }
 
-  // Synchronous so the whole wipe stays inside the caller's transaction.
   private deleteUserData(tx: DrizzleTransaction, userId: string): void {
     const userVehicles = tx
       .select({ id: vehicles.id })
@@ -428,16 +401,13 @@ class RestoreService {
     tx.delete(expenses).where(eq(expenses.userId, userId)).run();
     tx.delete(trips).where(eq(trips.userId, userId)).run();
 
-    // Children before vehicles (FK). Chunked to stay under SQLite's bind-parameter limit.
     for (const idBatch of chunk(vehicleIds)) {
       tx.delete(odometerEntries).where(inArray(odometerEntries.vehicleId, idBatch)).run();
       tx.delete(vehicleFinancing).where(inArray(vehicleFinancing.vehicleId, idBatch)).run();
     }
 
-    // Terms, junction rows and claims cascade from policies.
     tx.delete(insurancePolicies).where(eq(insurancePolicies.userId, userId)).run();
 
-    // Cascades to reminder_vehicles and reminder_notifications.
     tx.delete(reminders).where(eq(reminders.userId, userId)).run();
 
     tx.delete(userPreferences).where(eq(userPreferences.userId, userId)).run();
@@ -446,10 +416,7 @@ class RestoreService {
     tx.delete(vehicles).where(eq(vehicles.userId, userId)).run();
   }
 
-  /**
-   * Forces every owned row onto the importer. The backup is untrusted, and this is the single
-   * chokepoint preventing cross-tenant writes.
-   */
+  // Backup files are untrusted; this is the chokepoint against cross-tenant writes.
   private stampUserId<T extends Record<string, unknown>>(
     rows: T[] | undefined,
     userId: string
@@ -457,14 +424,11 @@ class RestoreService {
     return (rows ?? []).map((row) => ({ ...row, userId }));
   }
 
-  /**
-   * Clears createdBy when the named author is not a user on this instance. Users are not backed up,
-   * so an absent author would fail the FK and abort the restore.
-   */
   private dropUnknownAuthors<T extends Record<string, unknown>>(
     rows: T[],
     knownUserIds: Set<string>
   ): T[] {
+    // Users are not backed up, so an absent author would fail the createdBy foreign key.
     const isAbsent = (row: T): boolean =>
       row.createdBy != null && !knownUserIds.has(String(row.createdBy));
     const absentCount = rows.filter(isAbsent).length;
@@ -476,10 +440,6 @@ class RestoreService {
     return rows.map((row) => (isAbsent(row) ? { ...row, createdBy: null } : row));
   }
 
-  /**
-   * Batched to stay under SQLite's bind-parameter limit. Synchronous, so every batch shares the
-   * caller's transaction.
-   */
   private insertRows<TTable extends SQLiteTable>(
     tx: DrizzleTransaction,
     table: TTable,
@@ -488,22 +448,18 @@ class RestoreService {
     if (rows.length === 0) return;
     const columnCount = Object.keys(getTableColumns(table)).length;
     for (const batch of chunk(rows, rowsPerInsert(columnCount))) {
-      // The rows are coerced Record maps — coerceRow walked this very table's columns to build them,
-      // which is the only thing that can vouch for their shape; the cast just restates that.
       tx.insert(table)
         .values(batch as unknown as TTable['$inferInsert'][])
         .run();
     }
   }
 
-  // Synchronous, like insertRows, so the whole FK-ordered sequence shares the caller's transaction.
   private insertBackupData(
     tx: DrizzleTransaction,
     data: ParsedBackupData,
     userId: string,
     consentedShares: Set<string>
   ): void {
-    // Users are not backed up, so a cross-instance restore may name users absent here.
     const knownUserIds = new Set(
       tx
         .select({ id: users.id })
@@ -512,10 +468,10 @@ class RestoreService {
         .map((u) => u.id)
     );
 
+    // SQLite checks foreign keys on insert, so parents must be inserted before children.
     this.insertRows(tx, vehicles, this.stampUserId(data.vehicles, userId));
     this.insertRows(tx, vehicleFinancing, data.financing ?? []);
     this.insertRows(tx, insurancePolicies, this.stampUserId(data.insurance, userId));
-    // FK order: terms after policies, junction after terms, claims last.
     this.insertRows(tx, insuranceTerms, data.insuranceTerms ?? []);
     this.insertRows(tx, insuranceTermVehicles, data.insuranceTermVehicles ?? []);
     this.insertRows(tx, insuranceClaims, data.insuranceClaims ?? []);
@@ -533,7 +489,6 @@ class RestoreService {
     );
     this.insertRows(tx, odometerEntries, this.stampUserId(data.odometer, userId));
     this.insertRows(tx, trips, this.stampUserId(data.trips, userId));
-    // Grants to invitees absent from this instance are skipped, since their FK would fail.
     this.insertRows(
       tx,
       vehicleShares,
@@ -548,9 +503,7 @@ class RestoreService {
     );
     this.insertRows(tx, userPreferences, this.stampUserId(data.userPreferences, userId));
     this.insertRows(tx, syncState, this.stampUserId(data.syncState, userId));
-    // After all entity tables, so entityId references resolve.
     this.insertRows(tx, photos, this.stampUserId(data.photos, userId));
-    // Refs to providers absent from this instance are dropped, since providers are not backed up.
     const refRows = (data.photoRefs ?? []) as Record<string, unknown>[];
     const knownProviders = this.knownProviderIds(tx, refRows, userId);
     this.insertRows(
@@ -560,11 +513,6 @@ class RestoreService {
     );
   }
 
-  /**
-   * The (vehicle, invitee) pairs the invitee has accepted, read before the restore writes anything.
-   * Share status is another user's consent, so it is re-derived from this snapshot rather than
-   * trusted from the backup file. Must run before deleteUserData, which cascades vehicle_shares.
-   */
   private consentedShareKeys(tx: DrizzleTransaction, userId: string): Set<string> {
     return new Set(
       tx
@@ -576,21 +524,17 @@ class RestoreService {
     );
   }
 
-  /** Keeps 'accepted' only for pairs the invitee accepted; anything else becomes 'pending'. */
   private resolveShareStatus(share: Record<string, unknown>, consented: Set<string>): string {
     const key = shareConsentKey(String(share.vehicleId), String(share.sharedWithId));
     return consented.has(key) ? 'accepted' : 'pending';
   }
 
-  /**
-   * Providers named by refRows that exist here and belong to the importer. Ownership matters: the
-   * sync worker resolves a ref's provider by id alone.
-   */
   private knownProviderIds(
     tx: DrizzleTransaction,
     refRows: Record<string, unknown>[],
     userId: string
   ): Set<string> {
+    // Ownership matters: the sync worker resolves a ref's provider by id alone.
     const providerIds = [...new Set(refRows.map((ref) => String(ref.providerId)))];
     const known = new Set<string>();
     for (const batch of chunk(providerIds)) {

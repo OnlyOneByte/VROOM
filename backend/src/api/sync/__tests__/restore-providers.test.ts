@@ -1,7 +1,3 @@
-// GET /sync/restore/providers over the real route and in-memory DB. sync-route-success covers the
-// both-sources and neither-source cases; this file covers each source on its own, the Sheets flag
-// without a spreadsheet, inactive providers, and per-provider independence.
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, json, type TestApp } from '../../../test-helpers/http-client';
 

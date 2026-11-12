@@ -15,10 +15,8 @@
 	import { ApiError } from '$lib/utils/error-handling';
 
 	const DISCLOSURE_KEY = 'vroom.llm.assistant-disclosed';
-	// The backend rejects longer histories, so only the most recent turns are sent.
 	const MAX_HISTORY_TURNS = 12;
 
-	// toolsUsed is display-only; the backend history accepts user/assistant turns without it.
 	interface ChatMessage {
 		role: 'user' | 'assistant';
 		content: string;
@@ -60,7 +58,7 @@
 		try {
 			localStorage.setItem(DISCLOSURE_KEY, '1');
 		} catch {
-			// localStorage can be unavailable (private mode); the disclosure is simply shown again.
+			// Storage can be unavailable (private mode); the disclosure is then shown again.
 		}
 		showDisclosure = false;
 		void send();
@@ -78,7 +76,6 @@
 	async function send() {
 		const text = input.trim();
 		if (!text || isSending) return;
-		// The first message is gated behind the privacy disclosure.
 		if (!isDisclosed()) {
 			showDisclosure = true;
 			return;

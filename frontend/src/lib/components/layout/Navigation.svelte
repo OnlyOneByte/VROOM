@@ -63,11 +63,10 @@
 		mobileMenuOpen = false;
 	}
 
-	// Expand on hover or focus-within; hover alone would make the labels mouse-only.
 	let isDesktopSidebarExpanded = $state(false);
 
 	function collapseSidebarOnFocusLeave(event: FocusEvent & { currentTarget: HTMLElement }): void {
-		// A null relatedTarget means focus left the document entirely, which should also collapse.
+		// relatedTarget is null when focus leaves the document; collapse then too.
 		if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
 			isDesktopSidebarExpanded = false;
 		}
@@ -201,7 +200,7 @@
 	</div>
 </div>
 
-<!-- The wrapper is presentational: the nav inside is the landmark, so a role here would duplicate it. -->
+<!-- Presentational wrapper: a role here would duplicate the nav landmark. -->
 <div
 	class={cn(
 		'hidden lg:fixed lg:inset-y-0 lg:flex lg:flex-col z-40',

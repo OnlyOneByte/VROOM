@@ -27,7 +27,6 @@
 	import EmptyState from '$lib/components/common/empty-state.svelte';
 	import FinanceTab from '$lib/components/vehicles/FinanceTab.svelte';
 	import OdometerTab from '$lib/components/vehicles/OdometerTab.svelte';
-	// Lazy-loaded: only imported once the overview tab is viewed.
 	let InsuranceTab = $state<Component<{ vehicleId: string; readOnly?: boolean }> | null>(null);
 	let hasLoadedInsurance = $state(false);
 	import { categoryLabels } from '$lib/utils/expense-helpers';
@@ -65,7 +64,6 @@
 
 	let summary = $state<ExpenseSummary | null>(null);
 	let fuelEfficiencyPoints = $state<FuelEfficiencyPoint[]>([]);
-	// A failed summary must show an error, not the empty state.
 	let summaryLoadError = $state<string | null>(null);
 
 	let expenses = $state<Expense[]>([]);
@@ -74,7 +72,6 @@
 	let totalCount = $state(0);
 	let isLoadingPage = $state(false);
 	let hasLoadedExpensesTab = $state(false);
-	// A failed fetch must show error+retry, not an empty table.
 	let expensesLoadError = $state<string | null>(null);
 	let expenseSortBy = $state<'date' | 'amount'>('date');
 	let expenseSortDir = $state<'asc' | 'desc'>('desc');
@@ -82,19 +79,15 @@
 	let vehiclePhotos = $state<Photo[]>([]);
 	let showUploadDialog = $state(false);
 
-	// Owner-only: invites and manages access.
 	let shareOpen = $state(false);
 
-	// Expense filters are applied server-side so they span all pages.
 	let searchTerm = $state('');
 	let filters = $state<ExpenseFilters>({});
-	// Owned here, not in the table, for the same server-side reason.
 	let expenseCategoryFilter = $state<string>('');
 
 	let expenseTrendData = $derived.by(() => {
 		if (!summary?.monthlyTrend.length) return [];
 		return summary.monthlyTrend.map(item => ({
-			// Local midnight: new Date('YYYY-MM-01') is UTC and shifts the x-axis label.
 			date: parseMonthToDate(item.period),
 			amount: item.amount,
 			count: item.count
@@ -140,8 +133,6 @@
 		vehicle ? vehicle.nickname || `${vehicle.year} ${vehicle.make} ${vehicle.model}` : ''
 	);
 
-	// Access gates for the UI. The server enforces every denial; hiding controls only avoids
-	// buttons that would error. Owned vehicles carry no sharedAccess, so isOwner is true for them.
 	let isOwner = $derived(!vehicle?.sharedAccess);
 	let canWrite = $derived(!vehicle?.sharedAccess || vehicle.sharedAccess.level === 'editor');
 
@@ -151,7 +142,6 @@
 		return vehicleApi.getPhotoThumbnailUrl(vehicleId, cover.id);
 	});
 
-	// Shared viewers also load the insurance tab, read-only via `readOnly={!isOwner}`.
 	$effect(() => {
 		if (!isLoading && !hasLoadedInsurance && activeTab === 'overview') {
 			hasLoadedInsurance = true;
@@ -161,7 +151,6 @@
 		}
 	});
 
-	// Photos are owner-only, so they load in a second round; the rest load with the vehicle.
 	onMount(async () => {
 		await Promise.all([loadVehicle(), loadSummary(), loadFuelEfficiency(), loadVehicleStats()]);
 		if (vehicle && isOwner) {
@@ -170,7 +159,6 @@
 		isLoading = false;
 	});
 
-	// Skips the first run; onMount already loads.
 	let previousStatsPeriod = $state<TimePeriod | null>(null);
 	$effect(() => {
 		if (
@@ -201,7 +189,6 @@
 		]);
 	}
 
-	// Search and filter changes refetch the expenses tab from page 0 once it has loaded.
 	const expenseListReload = useExpenseListReload({
 		ready: () => hasLoadedExpensesTab,
 		search: () => searchTerm,
@@ -299,7 +286,6 @@
 	}
 
 	async function handleDeleteExpense(_deletedExpense: Expense) {
-		// Step back a page if this delete empties the last page.
 		const remaining = Math.max(0, totalCount - 1);
 		const offset =
 			currentOffset >= remaining ? Math.max(0, currentOffset - pageSize) : currentOffset;
@@ -314,16 +300,13 @@
 		searchTerm = '';
 		filters = {};
 		expenseCategoryFilter = '';
-		// Clearing several axes triggers one refetch from page 0.
 		expenseListReload.reloadNow();
 	}
 
-	// Vehicle-scoped CSV export; the endpoint filters by vehicleId.
 	let isExporting = $state(false);
 	async function handleExportCsv() {
 		isExporting = true;
 		try {
-			// Export matches the active filters.
 			await expenseApi.downloadExpensesCsv({
 				vehicleId,
 				category: expenseCategoryFilter || undefined,

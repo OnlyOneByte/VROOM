@@ -9,7 +9,7 @@ import type {
 import { GoogleDriveProvider } from '../domains/storage/google-drive-provider';
 import { GoogleSheetsService } from '../services/google-sheets-service';
 
-/** Tests inject fakes here; module mocks would leak into other test files. */
+// bun mock.module leaks across test files, so tests inject fakes instead.
 export interface GoogleDriveStrategyDeps {
   createDriveProvider: (refreshToken: string) => GoogleDriveProvider;
   createSheetsService: (refreshToken: string) => GoogleSheetsService;
@@ -39,8 +39,7 @@ export class GoogleDriveStrategy implements BackupStrategy {
       capabilities.sheets = await this.executeSheetsSync(context, refreshToken);
     }
 
-    // Every attempted capability must succeed. A partial success would advance the sync anchor and the
-    // failed capability would never be retried.
+    // A partial success advances the sync anchor, so any failed capability must fail the run.
     const attempted = Object.values(capabilities);
     const failed = attempted.filter((c) => !c.success);
     return {

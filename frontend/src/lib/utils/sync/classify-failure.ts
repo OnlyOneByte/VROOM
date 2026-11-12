@@ -1,6 +1,6 @@
 import { ApiError } from '$lib/utils/error-handling';
 
-// Lives here, not in sync-manager: offline-storage and sync-manager both need it, and import each other.
+// Kept here, not in sync-manager, to avoid an offline-storage/sync-manager import cycle.
 export type SyncFailureKind = 'transient' | 'auth' | 'terminal';
 
 export function classifySyncFailure(error: unknown): SyncFailureKind {

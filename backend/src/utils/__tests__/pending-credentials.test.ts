@@ -1,7 +1,3 @@
-// Pending OAuth credentials: a credential must expire after its 10-minute window, be consumable
-// exactly once, and the store must stay bounded. Expiry is simulated by back-dating an entry's
-// createdAt.
-
 import { beforeEach, describe, expect, test } from 'bun:test';
 import {
   consumePending,
@@ -74,8 +70,6 @@ describe('max-size eviction', () => {
     expect(pendingProviderCredentials.size).toBe(1);
   });
 
-  // Abandoned OAuth flows must not grow the store without bound. At capacity the oldest
-  // (insertion-order) entry is evicted.
   test('at MAX_SIZE, storing one more evicts the OLDEST entry and holds the cap', () => {
     const MAX_SIZE = 1000;
     for (let i = 0; i < MAX_SIZE; i++) {
@@ -89,7 +83,6 @@ describe('max-size eviction', () => {
     expect(pendingProviderCredentials.size).toBe(MAX_SIZE);
     expect(pendingProviderCredentials.has('user-0:n')).toBe(false);
     expect(getPendingEmail('newcomer', 'n')).toBe('new@example.com');
-    // Only one entry is evicted per insert.
     expect(pendingProviderCredentials.has('user-1:n')).toBe(true);
   });
 });

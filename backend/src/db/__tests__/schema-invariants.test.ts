@@ -1,6 +1,3 @@
-// Behavioral invariants the database enforces: partial-index predicates, uniqueness, and cascade rules.
-// Table structure is pinned separately in migration-0000.test.ts.
-
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { applyMigration, countRows, loadMigrations } from './migration-helpers';
@@ -33,7 +30,6 @@ describe('offline-sync idempotency: expenses_user_client_idx', () => {
   }
 
   test('a client_id cannot be replayed by the same user', () => {
-    // Makes a retried offline flush safe: the database rejects the replayed client_id.
     insertExpense('e1', 'u1', 'client-abc');
     expect(() => insertExpense('e2', 'u1', 'client-abc')).toThrow(/UNIQUE constraint failed/);
   });
@@ -46,7 +42,6 @@ describe('offline-sync idempotency: expenses_user_client_idx', () => {
   });
 
   test('server-created expenses carry NULL client_id and never collide', () => {
-    // Partial so NULL client_ids are exempt. A plain unique would allow one server-created expense per user.
     for (const id of ['e1', 'e2', 'e3']) insertExpense(id, 'u1', null);
     expect(countRows(db, 'expenses')).toBe(3);
   });
@@ -79,7 +74,6 @@ describe('insurance claims', () => {
   });
 
   test('deleting a claimed-against term SETS NULL rather than deleting the claim', () => {
-    // A claim is financial history. Tidying up an expired term must not erase it.
     db.run(
       "INSERT INTO insurance_terms (id, policy_id, start_date, end_date) VALUES ('it1', 'ip1', 1700000000, 1730000000)"
     );
@@ -103,7 +97,6 @@ describe('mileage-triggered reminders', () => {
   afterEach(() => db.close());
 
   test('a mileage-only reminder persists with a NULL next_due_date', () => {
-    // next_due_date must be nullable: a NOT NULL column would force a sentinel date onto mileage-only reminders.
     db.run(
       `INSERT INTO reminders (id, user_id, name, type, action_mode, frequency, trigger_mode,
          interval_mileage, last_service_odometer, next_due_odometer, start_date, next_due_date, is_active)
@@ -168,7 +161,6 @@ describe('user preference defaults', () => {
   });
 
   test('business_mileage_rate keeps fractional precision (a real, not cents)', () => {
-    // A rate, not an amount, so it stays real rather than integer cents.
     db.run("INSERT INTO user_preferences (user_id, business_mileage_rate) VALUES ('u1', 0.655)");
     const row = db
       .query<{ business_mileage_rate: number }, []>(
@@ -245,7 +237,6 @@ describe('vehicle sharing: vehicle_shares_active_idx', () => {
   });
 
   test('a declined or revoked share does NOT block re-inviting the same user', () => {
-    // The index predicate covers only pending/accepted. Without it, one decline would bar the invitee for good.
     share('s1', 'declined');
     share('s2', 'revoked');
     share('s3', 'pending');
@@ -298,7 +289,6 @@ describe('expense provenance: created_by', () => {
   });
 
   test('deleting the AUTHOR nulls the provenance and keeps the owner cost row', () => {
-    // SET NULL, not CASCADE (would delete the owner's cost history) and not NO ACTION (would block deleting the editor).
     insertExpense('e1', 'u2');
     db.run("DELETE FROM users WHERE id = 'u2'");
     const row = db

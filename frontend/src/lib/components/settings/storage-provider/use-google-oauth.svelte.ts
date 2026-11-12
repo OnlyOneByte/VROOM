@@ -26,12 +26,10 @@ interface GoogleOAuthReturn extends GoogleOAuthState {
 	restoreFormState: () => { selectedType?: string; displayName?: string } | null;
 }
 
-/** Google Drive OAuth flow; form state survives the redirect via sessionStorage. */
 export function useGoogleOAuth(getOptions: () => GoogleOAuthOptions): GoogleOAuthReturn {
 	let pendingEmail = $state('');
 	let oauthNonce = $state('');
 
-	/** Call synchronously during component init, outside onMount. */
 	function restoreFormState(): { selectedType?: string; displayName?: string } | null {
 		if (!browser) return null;
 		const saved = sessionStorage.getItem('provider-form-state');
@@ -67,7 +65,6 @@ export function useGoogleOAuth(getOptions: () => GoogleOAuthOptions): GoogleOAut
 		window.location.href = `${getApiBaseUrl()}/api/v1/auth/providers/connect/google?${params.toString()}`;
 	}
 
-	/** Call from onMount. Returns restored form state only when the OAuth flow completed. */
 	async function handleOAuthReturn(): Promise<{
 		restoredSelectedType?: string;
 		restoredDisplayName?: string;
@@ -94,7 +91,7 @@ export function useGoogleOAuth(getOptions: () => GoogleOAuthOptions): GoogleOAut
 					restoredSelectedType = parsed.selectedType;
 					restoredDisplayName = parsed.displayName;
 				} catch {
-					// ignore
+					// Corrupt stored state: keep the defaults.
 				}
 			}
 

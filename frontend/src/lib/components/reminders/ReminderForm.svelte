@@ -26,7 +26,6 @@
 	const form = new ReminderFormState();
 	let isEdit = $derived(!!reminder);
 
-	// Keyed on open so reopening after a cancel starts clean.
 	let lastKey = $state('');
 	$effect(() => {
 		const key = `${open}:${reminder?.reminder.id ?? 'new'}`;

@@ -1,8 +1,3 @@
-/**
- * Property-based tests for AuthProviderRepository against a migrated in-memory database. Auth
- * operations must never touch storage-domain rows.
- */
-
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
@@ -272,7 +267,6 @@ describe('updateProfile', () => {
     expect(config.avatarUrl).toBe('https://example.com/avatar');
   });
 
-  // Scoped on (id, userId) like delete, so a profile write for another user is a no-op.
   test('does not update rows belonging to other users', async () => {
     const row = await repo.create({
       userId: USER_ID_2,

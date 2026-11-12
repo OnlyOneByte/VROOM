@@ -1,6 +1,3 @@
-// A sheets-only-sync provider (enabled:false, sheetsSyncEnabled:true) must arm the inactivity timer,
-// matching the orchestrator's own "would back up" predicate.
-
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { createTestApp, json, type TestApp } from '../../test-helpers/http-client';
 

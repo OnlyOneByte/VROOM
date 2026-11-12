@@ -1,5 +1,4 @@
-// The vehicle owner is vehicles.userId. vehicle_shares.ownerId is a denormalized copy used only for
-// listing; it is never the access gate. Finders key on the acting user's relationship to the row.
+// vehicle_shares.ownerId is a denormalized copy for listing only; never use it as the access gate.
 
 import { and, eq } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
@@ -16,26 +15,16 @@ export interface AcceptedShareAccess {
   ownerName: string;
 }
 
-/** A received share joined to its vehicle and owner names, so pending invites can be labelled. */
 export interface ReceivedShare extends VehicleShare {
-  /** Nickname, else "year make model". Mirrors the frontend getVehicleDisplayName. */
   vehicleName: string;
-  /** Same value as sharedAccess.sharedBy in the fleet list. */
   sharedBy: string;
 }
 
-/**
- * Pending and accepted shares occupy the one-per-(vehicle, invitee) slot. Declined and revoked shares
- * grant nothing and do not block a re-invite.
- *
- * Must match the partial unique index vehicle_shares_active_idx in db/schema.ts, which hard-codes the
- * same list in its WHERE clause. Changing one side requires a migration; a test enforces the pairing.
- */
+// Must match the partial unique index vehicle_shares_active_idx in db/schema.ts; changing either requires a migration.
 export const ACTIVE_SHARE_STATUSES = ['pending', 'accepted'] as const;
 
 export type ActiveShareStatus = (typeof ACTIVE_SHARE_STATUSES)[number];
 
-/** Narrows a status string, which the database stores as free text. */
 export function isActiveShareStatus(status: string): status is ActiveShareStatus {
   return ACTIVE_SHARE_STATUSES.includes(status as ActiveShareStatus);
 }
@@ -45,7 +34,6 @@ export class VehicleShareRepository extends BaseRepository<VehicleShare, NewVehi
     super(db, vehicleShares);
   }
 
-  /** The active share for a vehicle and invitee, if one exists. */
   async findActiveForVehicleAndUser(
     vehicleId: string,
     sharedWithId: string
@@ -76,10 +64,6 @@ export class VehicleShareRepository extends BaseRepository<VehicleShare, NewVehi
     return row ?? null;
   }
 
-  /**
-   * Pending and accepted shares received by the invitee, oldest first. The joins read the share's own
-   * vehicle and owner, so they do not widen access.
-   */
   async findReceivedByUser(sharedWithId: string): Promise<ReceivedShare[]> {
     const rows = await this.db
       .select({
@@ -104,7 +88,6 @@ export class VehicleShareRepository extends BaseRepository<VehicleShare, NewVehi
       }));
   }
 
-  /** Accepted grants to a user, with the owner's display name. Only these grant fleet visibility. */
   async findAcceptedAccessForUser(sharedWithId: string): Promise<AcceptedShareAccess[]> {
     const rows = await this.db
       .select({

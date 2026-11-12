@@ -26,7 +26,6 @@
 
 	let hasCameraSupport = $derived(browser && !!navigator.mediaDevices?.getUserMedia);
 
-	// Mount/unmount only: startCamera reads facingMode, so tracking it here would restart the stream on every switch.
 	$effect(() => {
 		untrack(() => startCamera());
 		return () => {
@@ -121,7 +120,6 @@
 		cameraReady = false;
 	}
 
-	/** Releases the capture's blob URL before clearing it; nulling the reference first leaks the full-size JPEG. */
 	function discardCapture() {
 		if (capturedPreview) {
 			URL.revokeObjectURL(capturedPreview);
@@ -140,7 +138,7 @@
 				await startCamera();
 				if (!cameraError) return;
 			} catch {
-				// startCamera handles its own errors
+				// startCamera records its failure in cameraError.
 			}
 			if (
 				cameraError === 'Could not access camera. Please try again.' &&
@@ -187,7 +185,6 @@
 		uploadingCapture = true;
 		try {
 			await onUploadCapture(capturedFile);
-			// Revoke before dropping the reference, or the full-size JPEG stays resident and cannot be freed.
 			discardCapture();
 			uploadingCapture = false;
 		} catch {

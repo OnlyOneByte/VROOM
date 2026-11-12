@@ -1,5 +1,3 @@
-// Seed values are integer cents. A bare dollar literal is stored without error and reads back about 100x low.
-
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -7,7 +5,6 @@ import { ratchet } from '../../test-helpers/debt-ratchet';
 
 const SEED_PATH = join(import.meta.dir, '../seed.ts');
 
-// Mirrors MONEY_COLUMNS in migration-0000.test.ts.
 const MONEY_FIELDS = [
   'coverageLimit',
   'deductibleAmount',
@@ -23,7 +20,6 @@ const MONEY_FIELDS = [
   'totalCost',
 ];
 
-// Matches a bare numeric literal. An assignment wrapping dollarsToCents(...) does not match.
 const BARE_MONEY_LITERAL = new RegExp(`\\b(?:${MONEY_FIELDS.join('|')}):\\s*-?\\d`);
 
 function offendingLines(source: string): string[] {
@@ -43,7 +39,6 @@ ratchet({
     'reads ~100x low. Wrap the dollar figure: `expenseAmount: dollarsToCents(45.5)`.',
   scan: () => offendingLines(readFileSync(SEED_PATH, 'utf-8')),
   probe: () => {
-    // Fixtures rather than the live seed file, so the probe stays satisfiable as offenders are fixed.
     expect(offendingLines('        expenseAmount: 45.5,')).toHaveLength(1);
     expect(offendingLines('        purchasePrice: 22000,')).toHaveLength(1);
     expect(offendingLines('      paymentAmount: 372.86,')).toHaveLength(1);

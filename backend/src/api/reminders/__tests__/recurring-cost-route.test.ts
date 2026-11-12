@@ -1,8 +1,3 @@
-/**
- * GET /reminders/recurring-cost returns the monthly run-rate of active expense reminders. Covers the
- * sum across frequencies, notifications contributing nothing, a clean zero for a new user, and user scoping.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,

@@ -1,10 +1,3 @@
-/**
- * resolveNewUser must never merge accounts by email. The pre-check refuses an email already in use;
- * if the insert transaction then hits a UNIQUE conflict, the user is returned only when the same
- * provider identity won the race, and any other collision yields email_exists. App modules are
- * imported after createTestApp so they bind the test database.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 
@@ -14,6 +7,7 @@ let emailExists: string;
 
 beforeEach(async () => {
   ctx = await createTestApp();
+  // App modules must be imported after createTestApp, or they bind the wrong database.
   ({ resolveNewUser } = await import('../routes'));
   const { CONFIG } = await import('../../../config');
   emailExists = `${CONFIG.frontend.url}/auth?auth_error=email_exists`;
@@ -72,7 +66,6 @@ describe('resolveNewUser — pre-check (no implicit account merge)', () => {
 
 describe('resolveNewUser — UNIQUE conflict inside the insert transaction', () => {
   test('the same provider identity already linked → its user is returned and nothing is half-created', async () => {
-    // A different stored email gets past the pre-check, so the identity insert is what collides.
     seedAuthUser('u-winner', 'winner@example.com', 'google', 'g-race');
     const before = userCount();
 
@@ -88,7 +81,6 @@ describe('resolveNewUser — UNIQUE conflict inside the insert transaction', () 
 
   test('a collision with a different identity → email_exists, never a cross-account login', async () => {
     seedAuthUser('u-other', 'other@example.com', 'github', 'shared-account-id');
-    // Force the new identity's insert to collide with a row it does not own.
     ctx.sqlite.run(
       'CREATE UNIQUE INDEX temp_one_account_id ON user_providers (provider_account_id)'
     );

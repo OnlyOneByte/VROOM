@@ -1,7 +1,3 @@
-// A malformed body from the client must answer 400, not 500. Driven through the real HTTP stack
-// with raw bodies. The source scan at the end stops new direct c.req.json() calls from
-// reintroducing the bug.
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, sep } from 'node:path';
@@ -21,8 +17,6 @@ interface ErrorBody {
   error: { code: string; message: string };
 }
 
-// Sends a raw string body. ctx.authed JSON.stringifies its argument and cannot produce malformed
-// JSON.
 function rawBody(
   method: string,
   path: string,
@@ -43,7 +37,6 @@ function rawBody(
   );
 }
 
-/** Every route that parses its own JSON body, with a body that is not valid JSON. */
 const MALFORMED_CASES: { name: string; send: () => Promise<Response> }[] = [
   {
     name: 'POST /api/v1/sync (truncated array)',
@@ -84,7 +77,6 @@ describe('a malformed JSON body is a client error', () => {
   }
 
   test('a well-formed body on the same route still reaches the handler', async () => {
-    // Positive control: valid bodies must still reach the handler.
     const res = await rawBody('PATCH', '/api/v1/auth/me', '{"displayName":"Renamed User"}');
     const body = await json<{ data: { user: { displayName: string } } }>(res);
 
@@ -93,7 +85,6 @@ describe('a malformed JSON body is a client error', () => {
   });
 
   test('a well-formed body that fails validation keeps its own 400 message', async () => {
-    // Schema failures keep their own message.
     const res = await rawBody('POST', '/api/v1/sync', '{"syncTypes": []}');
     const body = await json<ErrorBody>(res);
 
@@ -103,7 +94,6 @@ describe('a malformed JSON body is a client error', () => {
 });
 
 describe('a body that parses but is not an object is a client error too', () => {
-  // These parse as JSON but are not objects, so they must be rejected before any property access.
   const SHAPES = ['null', '5', '"nope"', '[1,2]'];
 
   for (const shape of SHAPES) {
@@ -142,10 +132,7 @@ describe('no route hand-rolls its own JSON body read', () => {
       .map((file) => file.split(sep).join('/'))
       .filter(
         (file) =>
-          file.endsWith('.ts') &&
-          !file.includes('__tests__') &&
-          // The helper itself is the one legitimate call site.
-          file !== 'utils/request-body.ts'
+          file.endsWith('.ts') && !file.includes('__tests__') && file !== 'utils/request-body.ts'
       )
       .filter((file) => /\breq\.json\(/.test(readFileSync(join(srcRoot, file), 'utf8')))
       .sort();

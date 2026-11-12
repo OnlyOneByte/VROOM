@@ -1,9 +1,3 @@
-/**
- * Property tests for the photo service's upload validation and cover rules. The real upload, cover,
- * and delete functions run against the migrated database; storage is an in-memory fake. A model
- * predicts each cover state, and the database must match it after every operation.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { AppError, NotFoundError } from '../../../errors';
@@ -57,7 +51,6 @@ function photoCount(vehicleId: string): number {
   ).n;
 }
 
-/** Database view of one vehicle's photos: id and cover flag, sorted by id. */
 function dbState(vehicleId: string): { id: string; isCover: boolean }[] {
   const rows = ctx.sqlite
     .query(
@@ -154,7 +147,6 @@ type Model = Map<string, ModelPhoto[]>;
 
 async function uploadOp(photos: ModelPhoto[], vehicleId: string, seq: number): Promise<void> {
   const photo = await uploadPhotoForEntity('vehicle', vehicleId, ctx.user.id, jpeg());
-  // Auto-cover: the first photo an entity receives becomes its cover.
   photos.push({ id: photo.id, isCover: photos.length === 0, seq });
   // created_at has 1s resolution, so pin the creation order for deterministic promotion.
   ctx.sqlite.run('UPDATE photos SET created_at = ? WHERE id = ?', [seq, photo.id]);
@@ -168,14 +160,12 @@ async function setCoverOp(photos: ModelPhoto[], vehicleId: string, target: Model
 async function deleteOp(photos: ModelPhoto[], vehicleId: string, target: ModelPhoto) {
   await deletePhotoForEntity('vehicle', vehicleId, target.id, ctx.user.id);
   photos.splice(photos.indexOf(target), 1);
-  // Cover deletion promotes the oldest remaining photo.
   if (target.isCover && photos.length > 0) {
     const oldest = photos.reduce((a, b) => (a.seq <= b.seq ? a : b));
     oldest.isCover = true;
   }
 }
 
-/** Runs one operation against the real service and mirrors it in the model. Returns the next seq. */
 async function applyOp(model: Model, op: Op, seq: number): Promise<number> {
   const vehicleId = VEHICLES[op.vehicle];
   const photos = model.get(vehicleId) ?? [];
@@ -208,7 +198,6 @@ describe('cover rules through the real service', () => {
   test('after every upload, cover change, or delete, the database matches the cover model on both vehicles', async () => {
     await fc.assert(
       fc.asyncProperty(fc.array(opArb, { minLength: 1, maxLength: 20 }), async (ops) => {
-        // Fresh state per run: remove the photos the previous run created.
         ctx.sqlite.run('DELETE FROM photos');
         const model: Model = new Map(VEHICLES.map((v) => [v, []]));
         let seq = 0;

@@ -37,7 +37,6 @@
 		<CardDescription>{description}</CardDescription>
 	</CardHeader>
 	<CardContent>
-		<!-- Decorative preview of a feature not yet built; the Coming Soon badge is the real status. -->
 		<div class="space-y-3" aria-hidden="true">
 			{#each items as item (item.label)}
 				<div class="flex items-center justify-between">

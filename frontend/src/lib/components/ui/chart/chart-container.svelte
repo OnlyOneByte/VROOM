@@ -37,7 +37,6 @@
 		'[&_.lc-highlight-line]:stroke-0',
 		'[&_.lc-area-path]:opacity-100 [&_.lc-highlight-line]:opacity-100 [&_.lc-highlight-point]:opacity-100 [&_.lc-spline-path]:opacity-100 [&_.lc-text]:text-xs [&_.lc-text-svg]:overflow-visible',
 
-		// Axis rules render after the marks and would overlap them; grid lines already cover that position.
 		'[&_.lc-axis-tick]:stroke-0',
 		'[&_.lc-rule-x-line:not(.lc-grid-x-rule)]:stroke-0 [&_.lc-rule-y-line:not(.lc-grid-y-rule)]:stroke-0',
 		'[&_.lc-grid-x-radial-line]:stroke-border [&_.lc-grid-x-radial-circle]:stroke-border',

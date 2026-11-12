@@ -1,5 +1,3 @@
-// Pins the anti-FOUC head script in app.html to the theme store's constants; that script is raw HTML the unit tests cannot see.
-
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { DEFAULT_THEME_ID } from '$lib/theme/theme-registry';

@@ -11,7 +11,6 @@
 	import type { ReceivedShare } from '$lib/types';
 
 	interface Props {
-		/** Called after an invite is accepted so the dashboard can show the new vehicle without a reload. Optional. */
 		onAccepted?: () => void;
 	}
 
@@ -20,7 +19,7 @@
 	let isLoading = $state(true);
 	let loadError = $state<string | null>(null);
 	let pending = $state<ReceivedShare[]>([]);
-	let acting = $state<string | null>(null); // the share id mid accept/decline (disables its buttons)
+	let acting = $state<string | null>(null);
 
 	onMount(load);
 
@@ -29,7 +28,6 @@
 		loadError = null;
 		try {
 			const received = await shareApi.listReceived();
-			// Only pending invites are actionable here.
 			pending = received.filter(s => s.status === 'pending');
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to load invitations:', error);
@@ -71,7 +69,6 @@
 	}
 </script>
 
-<!-- Renders only for a pending invite or a load error, so the common no-invite path shows nothing. -->
 {#if loadError && !isLoading}
 	<Card.Root>
 		<Card.Content class="p-4">

@@ -1,8 +1,3 @@
-/**
- * Converts a Fuelio multi-section backup export into VROOM's native CSV, which then goes through
- * the normal import plan. Pure: no DB access.
- */
-
 import { parse } from 'csv-parse/sync';
 import type { ExpenseCategory } from '../../db/types';
 import { DistanceUnit, VolumeUnit } from '../../types';
@@ -88,7 +83,6 @@ function parseBlock(block: string | undefined): Record<string, string>[] {
   }) as Record<string, string>[];
 }
 
-// Headers carry unit suffixes and "(optional)" markers, so columns are matched by pattern.
 function findKey(record: Record<string, string> | undefined, re: RegExp): string | undefined {
   return record ? Object.keys(record).find((k) => re.test(k)) : undefined;
 }
@@ -131,7 +125,7 @@ function buildLogRows(
   const odoKey = findKey(first, /odo/i);
   const fuelKey = findKey(first, /^fuel\b/i);
   const dateKey = findKey(first, /^data$|^date$/i);
-  const priceKey = findKey(first, /^price/i); // "Price (optional)" = TOTAL price
+  const priceKey = findKey(first, /^price/i);
   const notesKey = findKey(first, /note/i);
   const missedKey = findKey(first, /missed/i);
   const fileDistanceUnit = detectDistanceUnit(odoKey);
@@ -144,7 +138,7 @@ function buildLogRows(
     amount: normalizeDecimal(cell(rec, priceKey)),
     mileage: mapMileage(cell(rec, odoKey), fileDistanceUnit, opts.targetUnits.distanceUnit),
     volume: mapVolume(cell(rec, fuelKey), fileVolumeUnit, opts.targetUnits.volumeUnit),
-    // Fuelio's numeric FuelType code has no reliable VROOM string mapping.
+    // Fuelio's numeric fuel-type codes have no reliable VROOM mapping, so the field stays blank.
     fuelType: '',
     description: cell(rec, notesKey),
     tags: '',
@@ -177,7 +171,6 @@ function buildCostRows(
     const typeId = cell(rec, cTypeKey).trim();
     const catName = catById.get(typeId) ?? '';
     const mapped = FUELIO_COST_CATEGORY_MAP[catName.toLowerCase()];
-    // Unresolvable type ids are surfaced rather than silently mapped to misc.
     const label = catName || (typeId ? `Unknown category ${typeId}` : '');
     if (!mapped && label) unmapped.add(label);
     const title = cell(rec, cTitleKey).trim();

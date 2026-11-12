@@ -1,8 +1,3 @@
-/**
- * Property-based tests for PreferencesRepository and SyncStateRepository. Preferences and sync
- * state are stored independently, and getOrCreate creates default rows.
- */
-
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { eq } from 'drizzle-orm';
@@ -230,14 +225,12 @@ describe('Independence: preferences and sync state', () => {
   });
 });
 
-// updateSyncDate stamps the snapshot time, so a change made mid-run stays unsynced for the next run.
 describe('SyncStateRepository.updateSyncDate snapshot-time semantics', () => {
   test('a change made after the snapshot but before the run finishes stays unsynced', async () => {
     const tSnap = new Date('2026-01-01T10:00:00.000Z');
     const tEdit = new Date('2026-01-01T10:02:00.000Z');
     const tEnd = new Date('2026-01-01T10:05:00.000Z');
 
-    // Set directly so the edit time is deterministic; markDataChanged stamps "now".
     await syncRepo.getOrCreate(USER_ID);
     await db
       .update(schema.syncState)

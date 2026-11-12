@@ -1,12 +1,8 @@
-// Restore must not trust a vehicle_share's status from the backup file. Status is re-derived from
-// the invitee's recorded consent, so a forged accept cannot grant access. A genuine accepted grant
-// must still come back accepted.
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
 
-let ctx: TestApp; // the importing user, who owns the vehicles and the backup
+let ctx: TestApp;
 
 beforeEach(async () => {
   ctx = await createTestApp();
@@ -38,7 +34,6 @@ function seedUser(id: string): string {
   return id;
 }
 
-/** Seeded directly: the round-trip under test is independent of the share routes. */
 function seedShare(
   id: string,
   vehicleId: string,
@@ -53,7 +48,6 @@ function seedShare(
   );
 }
 
-/** Appends one hand-built row to a member CSV of a backup ZIP, keyed by the CSV's own header. */
 async function appendCsvRow(
   zipBuffer: Buffer,
   fileName: string,
@@ -81,7 +75,6 @@ describe('restore re-derives vehicle_share consent instead of trusting the backu
     const honestZip = await backupService.exportAsZip(ctx.user.id);
     expect(shareRows()).toHaveLength(0);
 
-    // One appended row: the importer's own vehicle, a stranger as invitee, already accepted.
     const craftedZip = await appendCsvRow(honestZip, 'vehicle_shares.csv', {
       id: 'forged-share',
       vehicleId,
@@ -97,7 +90,6 @@ describe('restore re-derives vehicle_share consent instead of trusting the backu
     expect(result.success, JSON.stringify(result)).toBe(true);
     expect(result.imported?.vehicleShares).toBe(1);
 
-    // The grant must arrive as a pending invite.
     const forged = shareById('forged-share');
     expect(forged?.status, 'a backup cannot mint an accepted grant').toBe('pending');
   });
@@ -110,9 +102,7 @@ describe('restore re-derives vehicle_share consent instead of trusting the backu
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');
 
-    // Exported while the grant was accepted.
     const zip = await backupService.exportAsZip(ctx.user.id);
-    // The invitee declines after the export.
     ctx.sqlite.run('UPDATE vehicle_shares SET status = ? WHERE id = ?', [
       'declined',
       'share-declined',
@@ -154,7 +144,6 @@ describe('restore re-derives vehicle_share consent instead of trusting the backu
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 
-    // A too-late snapshot would downgrade the real grant. A verbatim status would promote the forged one.
     expect(shareById('share-real')?.status, 'a genuine accepted grant round-trips intact').toBe(
       'accepted'
     );
@@ -164,7 +153,6 @@ describe('restore re-derives vehicle_share consent instead of trusting the backu
   test('a level outside the route enum is narrowed to viewer rather than stored verbatim', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2020 });
     const invitee = seedUser('odd-level-1');
-    // The level column is free text, so a hand-edited backup can carry any value.
     seedShare('share-odd-level', vehicleId, invitee, 'accepted', 'OWNER-PLUS');
 
     const { backupService } = await import('../backup');

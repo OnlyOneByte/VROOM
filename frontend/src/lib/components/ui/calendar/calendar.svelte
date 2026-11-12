@@ -39,7 +39,7 @@
 	});
 </script>
 
-<!-- Destructuring a bindable loses the discriminated union, so `value` is cast to `never`. -->
+<!-- Destructuring a bindable drops its discriminated union; the `never` cast is required. -->
 <CalendarPrimitive.Root
 	bind:value={value as never}
 	bind:ref

@@ -15,7 +15,7 @@
 	import { loadOfflineExpenses } from '$lib/utils/offline-storage';
 	import { offlineExpenseQueue } from '$lib/stores/offline.svelte';
 	import '../app.css';
-	// Theme token blocks are imported after app.css so non-default themes paint without FOUC.
+	// Theme overrides must load after app.css, or non-default themes flash the default palette.
 	import '$lib/theme/themes.css';
 
 	import { LoaderCircle } from '@lucide/svelte';
@@ -31,7 +31,6 @@
 	let settingsLoaded = $state(false);
 	let recurringTriggered = $state(false);
 
-	// Formatters fall back to USD/imperial until settings load, so load them app-wide.
 	async function loadUserSettings() {
 		if (settingsLoaded) return;
 		try {
@@ -42,7 +41,6 @@
 		}
 	}
 
-	// Runs once per session; the daily gate lives in maybeTriggerRecurringExpenses.
 	async function maybeTriggerRecurring() {
 		if (recurringTriggered) return;
 		recurringTriggered = true;
@@ -54,11 +52,9 @@
 		});
 	}
 
-	// The only toast dedup: the effect removes each notification as it toasts it, so a snapshot would be empty.
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- intentionally non-reactive tracking Set, not used in $state or $derived
 	const shownNotifications = new Set<string>();
 
-	// Lazy-loaded and never unmounted: clearing the last conflict must not tear down the dialog mid-close.
 	let SyncConflictResolver = $state<Component | null>(null);
 
 	let webManifestLink = $derived(pwaInfo ? pwaInfo.webManifest.linkTag : '');
@@ -144,9 +140,7 @@
 </script>
 
 <svelte:head>
-	<!-- Do not redeclare viewport or theme-color here: the copy lands later and overrides app.html's.
-	     viewport-fit=cover is then lost (safe-area insets read 0), and theme-color stops following the
-	     active theme, because themeStore rewrites only app.html's tag. -->
+	<!-- Viewport and theme-color belong in app.html: a copy here lands later and overrides it. -->
 	<!-- eslint-disable-next-line svelte/no-at-html-tags -- PWA manifest link from @vite-pwa/sveltekit -->
 	{@html webManifestLink}
 </svelte:head>

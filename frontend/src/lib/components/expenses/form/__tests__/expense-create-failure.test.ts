@@ -1,5 +1,3 @@
-// Create failures: server rejections stay on the form, connection failures are queued, and a failed queue write is surfaced.
-
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { ApiError } from '$lib/utils/error-handling';
@@ -44,8 +42,6 @@ async function fillAndSave(): Promise<void> {
 			preselectedAmount: '42.50'
 		}
 	});
-	// The preselected values are applied in onMount, AFTER its awaits — clicking before they land
-	// would just fail validation. The populated amount field is the signal that the form is ready.
 	await vi.waitFor(() => expect(screen.getByDisplayValue('42.50')).toBeTruthy());
 	await fireEvent.click(screen.getByRole('button', { name: /save expense/i }));
 	await vi.waitFor(() => expect(createExpense).toHaveBeenCalled());
@@ -96,7 +92,6 @@ describe('ExpenseForm — a failed create is classified before anything is queue
 
 	test('a queue write that fails is reported, not announced as saved', async () => {
 		createExpense.mockRejectedValue(new ApiError('Service Unavailable', 503));
-		// Site data blocked / quota exhausted: the one localStorage write this submit makes throws.
 		localStorageMock.setItem.mockImplementationOnce(() => {
 			throw new DOMException('site data is blocked', 'SecurityError');
 		});
@@ -105,7 +100,6 @@ describe('ExpenseForm — a failed create is classified before anything is queue
 
 		await vi.waitFor(() => expect(submitError()).toMatch(/could not store the expense/i));
 		expect(loadOfflineExpenses()).toEqual([]);
-		// Navigating away would be the silent data loss: the form is the only remaining copy.
 		expect(goto).not.toHaveBeenCalled();
 	});
 });

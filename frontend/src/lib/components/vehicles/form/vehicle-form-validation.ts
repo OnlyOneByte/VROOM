@@ -10,7 +10,6 @@ interface FinancingFormData {
 	paymentAmount: number;
 }
 
-/** Returns vehicle field errors keyed by field; empty means valid. */
 export function validateVehicleFields(vehicleForm: VehicleFormData): VehicleFormErrors {
 	const errors: VehicleFormErrors = {};
 
@@ -46,7 +45,6 @@ export function validateVehicleFields(vehicleForm: VehicleFormData): VehicleForm
 	return errors;
 }
 
-/** Returns financing field errors; skipped when ownershipType is 'own'. */
 export function validateFinancingFields(
 	financingForm: FinancingFormData,
 	ownershipType: 'own' | 'lease' | 'finance'

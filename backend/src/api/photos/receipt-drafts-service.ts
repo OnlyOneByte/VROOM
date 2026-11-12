@@ -2,7 +2,6 @@ import type { ReceiptDraft } from '../providers/domains/vlm/prompt';
 import type { PhotosMediaItem } from '../providers/services/google-photos-service';
 
 export interface ReceiptDraftItem {
-  /** Google Photos media-item id; also the dedup key (clientId `photos:<photoId>`). */
   photoId: string;
   draft: ReceiptDraft;
   thumbnailUrl: string | null;
@@ -16,7 +15,6 @@ export interface StageDeps {
   isAlreadyImported: (photoId: string) => Promise<boolean>;
 }
 
-/** Caps VLM cost and sweep duration per run. */
 export const MAX_RECEIPT_PHOTOS_PER_RUN = 25;
 
 export async function stageReceiptDrafts(
@@ -27,7 +25,6 @@ export async function stageReceiptDrafts(
   const drafts: ReceiptDraftItem[] = [];
 
   for (const photo of photos) {
-    // Already-imported photos are skipped so re-running the sweep never duplicates an expense.
     if (await deps.isAlreadyImported(photo.id)) continue;
 
     const draft = await stageOne(deps, photo);
@@ -37,7 +34,6 @@ export async function stageReceiptDrafts(
   return drafts;
 }
 
-/** Download and parse one photo. Any failure here degrades to an empty draft, never a batch failure. */
 async function stageOne(deps: StageDeps, photo: PhotosMediaItem): Promise<ReceiptDraftItem> {
   const thumbnailUrl = await safeFreshUrl(deps, photo);
 

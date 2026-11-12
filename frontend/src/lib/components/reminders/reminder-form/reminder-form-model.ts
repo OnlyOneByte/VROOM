@@ -20,7 +20,6 @@ export type IntervalUnit = (typeof INTERVAL_UNITS)[number];
 export type ReminderKind = 'notification' | 'expense';
 export type SplitMethod = 'even' | 'absolute' | 'percentage';
 
-// Plain snapshot of every field the form edits. Numeric inputs stay strings until validation/payload.
 export interface ReminderDraft {
 	kind: ReminderKind;
 	name: string;
@@ -37,7 +36,6 @@ export interface ReminderDraft {
 	expenseCategory: ExpenseCategory;
 	expenseAmount: string;
 	expenseTags: string[];
-	// 'even' stores no per-vehicle rows (the backend splits cents); absolute and percentage store allocations.
 	splitMethod: SplitMethod;
 	splitAllocations: SplitAllocationDraft[];
 }
@@ -66,8 +64,6 @@ export function emptyReminderDraft(vehicles: Vehicle[], today: Date): ReminderDr
 
 export function draftFromReminder(reminder: ReminderWithVehicles): ReminderDraft {
 	const r = reminder.reminder;
-	// Seed the split editor from the stored config: 'even' has no per-vehicle rows; absolute/
-	// percentage carry their allocations. A null config (single-vehicle / unsplit) defaults to even.
 	const split = r.expenseSplitConfig?.method === 'even' ? null : r.expenseSplitConfig;
 
 	return {
@@ -111,8 +107,6 @@ export function parsedExpenseAmount(amount: string): number {
 	return parseFloat(amount) || 0;
 }
 
-// The split editor is only relevant for an expense reminder spanning ≥2 vehicles with a positive
-// amount; a single-vehicle expense reminder keeps the no-split (null config) path unchanged.
 export function shouldShowSplitEditor(draft: ReminderDraft): boolean {
 	return (
 		draft.kind === 'expense' &&
@@ -121,8 +115,6 @@ export function shouldShowSplitEditor(draft: ReminderDraft): boolean {
 	);
 }
 
-// The distance-unit label of the single selected vehicle (mileage requires exactly one). Falls
-// back to 'miles' when no vehicle is resolved yet.
 export function mileageUnitLabel(
 	vehicles: Vehicle[],
 	selectedVehicleId: string | undefined

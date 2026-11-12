@@ -1,5 +1,3 @@
-// THEME_TOKEN_KEYS must match the per-variant custom properties declared in app.css.
-
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { THEME_TOKEN_KEYS } from '../theme-types';

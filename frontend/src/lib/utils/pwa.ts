@@ -65,8 +65,7 @@ export function initializePWA(): void {
 	window.addEventListener('appinstalled', handleAppInstalled);
 }
 
-// No Background Sync: the outbox lives in localStorage, which service-worker scope cannot read.
-// Offline writes are delivered by the foreground sync manager.
+// Service-worker scope cannot read localStorage, where the outbox lives; writes are delivered by the foreground sync manager.
 export async function promptInstall(): Promise<boolean> {
 	if (!deferredPrompt) {
 		return false;

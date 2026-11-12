@@ -39,7 +39,6 @@
 		photos = [...photos, result as Photo];
 	}
 
-	// Styled dialog: deletion also removes the stored file, and the trash button sits where misclicks are easy.
 	let confirmOpen = $state(false);
 	let pendingDeleteId = $state<string | null>(null);
 
@@ -56,7 +55,7 @@
 			photos = photos.filter(p => p.id !== photoId);
 		} catch (err) {
 			handleErrorWithNotification(err, 'Failed to delete photo');
-			throw err; // keep the dialog open on failure
+			throw err;
 		}
 	}
 </script>

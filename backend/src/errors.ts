@@ -141,7 +141,6 @@ const ERROR_STATUS_MAP: Record<string, number> = {
 };
 
 // bun:sqlite sets `code`; drizzle may wrap the driver error, so the cause chain is walked too.
-// A primary-key collision is reported as its own code but is the same violation.
 const UNIQUE_VIOLATION_CODES = new Set([
   'SQLITE_CONSTRAINT_UNIQUE',
   'SQLITE_CONSTRAINT_PRIMARYKEY',
@@ -167,7 +166,6 @@ export const handleDatabaseError = (error: unknown): AppError => {
   return new DatabaseError('A database error occurred');
 };
 
-// The errorHandler middleware is the only place a thrown SyncError becomes a response.
 export function syncErrorResponse(error: SyncError): { body: ErrorResponse; status: number } {
   const status = ERROR_STATUS_MAP[error.code] || 500;
   return { body: createErrorResponse(error.code, error.message, error.details), status };

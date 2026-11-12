@@ -392,7 +392,7 @@ describe('Vehicle Management Components', () => {
 		});
 
 		it('calculates loan amortization correctly', () => {
-			// Use the shared date helper: a bare new Date('YYYY-MM-DD') is UTC midnight and shifts the payoff date by timezone.
+			// Date-only strings parse as UTC midnight, which shifts by timezone.
 			const calculateAmortization = (
 				principal: number,
 				apr: number,
@@ -425,7 +425,6 @@ describe('Vehicle Management Components', () => {
 			expect(result!.totalInterest).toBeCloseTo(2371.62, 2);
 			expect(result!.totalPayments).toBeCloseTo(22371.62, 2);
 
-			// Must match the production minimum payment, because the form writes this preview straight into paymentAmount.
 			expect(
 				calculateMinimumPayment({
 					...mockVehicles[0]!.financing!,
@@ -435,7 +434,6 @@ describe('Vehicle Management Components', () => {
 				})
 			).toBe(result!.monthlyPayment);
 
-			// Jan 1 2024 plus 60 months is the same local day in every timezone, so an exact check is valid.
 			const payoff = result!.payoffDate;
 			expect([payoff.getFullYear(), payoff.getMonth(), payoff.getDate()]).toEqual([2029, 0, 1]);
 
@@ -716,7 +714,7 @@ describe('Vehicle Management Components', () => {
 			expect(formatCurrency(1234.56)).toBe('$1,234.56');
 			expect(formatCurrency(0)).toBe('$0.00');
 
-			// Build from local parts at noon: a fixed UTC instant formats to a different day at UTC+13/+14.
+			// Local noon: a fixed UTC instant formats to another day at UTC+13/+14.
 			const testDate = new Date(2024, 0, 15, 12);
 			expect(formatDate(testDate)).toBe('Jan 15, 2024');
 		});

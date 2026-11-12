@@ -9,7 +9,7 @@ import { changeTracker, requireAuth } from '../../middleware';
 import { commonSchemas, validateVehicleOwnership, zValidator } from '../../utils/validation';
 import { type ReceivedShare, vehicleShareRepository } from './repository';
 
-// Share management. Owner actions check strict vehicle ownership: an editor or viewer cannot manage shares.
+// Non-owners and non-invitees get 404, not 403, so share existence is not revealed.
 
 const routes = new Hono();
 
@@ -30,10 +30,8 @@ routes.post('/', zValidator('json', inviteSchema), async (c) => {
   const user = c.get('user');
   const { vehicleId, email, level } = c.req.valid('json');
 
-  // Every rejection happens before the insert.
   await validateVehicleOwnership(vehicleId, user.id);
 
-  // Only existing accounts can be invited.
   const db = getDb();
   const [invitee] = await db
     .select({ id: users.id })
@@ -48,8 +46,6 @@ routes.post('/', zValidator('json', inviteSchema), async (c) => {
     throw new ValidationError('You cannot share a vehicle with yourself');
   }
 
-  // Checked here for a clean 409; the partial unique index enforces the same rule. Declined and revoked
-  // shares do not block a new invite.
   const existing = await vehicleShareRepository.findActiveForVehicleAndUser(vehicleId, invitee.id);
   if (existing) {
     throw new ConflictError('This vehicle is already shared with that user');
@@ -91,7 +87,6 @@ routes.put(
     const { id } = c.req.valid('param');
     const { level } = c.req.valid('json');
 
-    // Non-owners get the same 404 as a missing share.
     const share = await vehicleShareRepository.findByIdAndOwner(id, user.id);
     if (!share) {
       throw new NotFoundError('Share');
@@ -102,7 +97,6 @@ routes.put(
   }
 );
 
-// The row is kept and only its status changes, so the active slot frees up and re-invites work.
 routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
@@ -116,7 +110,6 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   return c.json({ success: true, message: 'Share revoked' });
 });
 
-// Invitee actions key on sharedWithId. Anyone else gets the same 404 as a missing share.
 routes.get('/received', async (c) => {
   const user = c.get('user');
   const shares = await vehicleShareRepository.findReceivedByUser(user.id);
@@ -136,7 +129,6 @@ routes.post('/:id/accept', zValidator('param', commonSchemas.idParam), async (c)
   if (!share) {
     throw new NotFoundError('Share');
   }
-  // Only pending invites can be accepted, so a stale accept cannot revive a share the owner revoked.
   if (share.status !== 'pending') {
     throw new ConflictError('This invitation is no longer pending');
   }
@@ -148,7 +140,6 @@ routes.post('/:id/accept', zValidator('param', commonSchemas.idParam), async (c)
   return c.json({ success: true, data: updated, message: 'Invitation accepted' });
 });
 
-// Declining a pending invite or leaving an accepted share both set the status to declined.
 routes.post('/:id/decline', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');

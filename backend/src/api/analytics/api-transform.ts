@@ -1,5 +1,3 @@
-/** Converts analytics money from cents to dollars at the API boundary. */
-
 import { centsToDollars as c } from '../../utils/money';
 import type {
   AnalyticsSummaryData,
@@ -41,7 +39,7 @@ export function fuelStatsToApi(d: FuelStatsData): FuelStatsData {
 export function fuelAdvancedToApi(d: FuelAdvancedData): FuelAdvancedData {
   return {
     ...d,
-    // vehicleRadar is left untouched: its cost-named fields hold 0-100 radar scores, not money.
+    // Do not convert vehicleRadar: its cost-named fields hold 0-100 scores, not money.
     dayOfWeekPatterns: d.dayOfWeekPatterns.map((p) => ({ ...p, avgCost: c(p.avgCost) })),
     monthlyCostHeatmap: d.monthlyCostHeatmap.map((m) => ({
       ...m,

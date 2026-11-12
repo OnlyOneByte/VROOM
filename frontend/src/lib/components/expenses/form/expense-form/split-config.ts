@@ -9,7 +9,6 @@ export interface SplitState {
 	splitAllocations: SplitAllocationDraft[];
 }
 
-/** Rebuilds the split editor state from a saved split group, in the method it was saved with. */
 export function splitStateFromGroup(
 	method: string,
 	groupTotal: number,
@@ -33,10 +32,6 @@ export function splitStateFromGroup(
 	return { splitMethod, selectedVehicleIds, splitAllocations };
 }
 
-/**
- * Turning split on resets the method to even. The selection is seeded with the current vehicle
- * when there is one; otherwise it is kept as it was.
- */
 export function enableSplit(currentVehicleId: string, selectedVehicleIds: string[]): SplitState {
 	return {
 		splitMethod: 'even',
@@ -45,10 +40,6 @@ export function enableSplit(currentVehicleId: string, selectedVehicleIds: string
 	};
 }
 
-/**
- * Turning split off keeps the first selected vehicle as the single vehicle, so the user does not
- * lose their choice. Returns the vehicle to write back to the form, or null to leave it alone.
- */
 export function disableSplit(selectedVehicleIds: string[]): {
 	vehicleId: string | null;
 	state: SplitState;

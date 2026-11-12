@@ -115,7 +115,6 @@
 	function getCategorySettings(providerId: string): Record<PhotoCategory, CategorySetting> {
 		const stored = storageConfig.providerCategories[providerId];
 		if (!stored) return DEFAULT_CATEGORY_SETTINGS;
-		// Merge with defaults so newly added categories get a default value
 		return { ...DEFAULT_CATEGORY_SETTINGS, ...stored };
 	}
 
@@ -158,7 +157,6 @@
 		try {
 			await settingsApi.updateSettings({ backupConfig: updatedConfig });
 			backupConfig = updatedConfig;
-			// Refresh sync status now so the menu's backup state is not stale until the next poll.
 			await fetchLastSyncTime();
 			appStore.showSuccess(
 				enabled ? 'ZIP backup enabled for provider' : 'ZIP backup disabled for provider'

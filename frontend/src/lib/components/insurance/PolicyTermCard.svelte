@@ -17,7 +17,6 @@
 
 	let { term, isCurrent = false, vehicleNames = [], onEdit, onDelete, onRenew }: Props = $props();
 
-	// Deleting a term also deletes its auto-created premium expenses; the confirmation says so.
 	let confirmOpen = $state(false);
 </script>
 

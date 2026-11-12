@@ -1,5 +1,3 @@
-/** Background worker that syncs pending/failed photo refs to their target providers, in-process via setInterval. */
-
 import { CONFIG } from '../../config';
 import type { PhotoRef } from '../../db/schema';
 import { isSyncError, SyncErrorCode } from '../../errors';
@@ -11,7 +9,7 @@ import { storageProviderRegistry } from './domains/storage/registry';
 import type { PhotoCategory, StorageProvider } from './domains/storage/storage-provider';
 import { ENTITY_TO_CATEGORY } from './domains/storage/storage-provider';
 
-/** Tests pass fakes through `processBatch`'s deps arg; module mocks would leak across test files. */
+// bun mock.module leaks across test files, so tests inject fakes through deps instead.
 export interface SyncWorkerDeps {
   photoRefRepository: Pick<
     typeof photoRefRepository,
@@ -41,13 +39,12 @@ const MAX_IN_FLIGHT_ENTRIES = 500;
 
 const BASE_BACKOFF_SECONDS = 30;
 
-/** Must match the retryCount bound in photoRefRepository.findPendingOrFailed. */
+// Must match the retry bound in photoRefRepository.findPendingOrFailed.
 export const MAX_RETRY_COUNT = 3;
 
 export function shouldSkipDueToBackoff(ref: PhotoRef, now: Date): boolean {
   if (ref.status !== 'failed') return false;
 
-  // syncedAt is bumped on every attempt; createdAt covers refs never attempted.
   const lastAttempt = ref.syncedAt ?? ref.createdAt;
   if (!lastAttempt) return false;
 
@@ -140,11 +137,7 @@ async function getCachedProvider(
   return provider;
 }
 
-/**
- * Must record a failure rather than return silently: findPendingOrFailed is ordered by created_at,
- * so untouched unsyncable rows would fill every batch slot and starve newer photos. Bumping
- * retryCount lets the retry ceiling eventually drop the row from the work set.
- */
+// Every skipped ref must record a failure: findPendingOrFailed is ordered by created_at, so untouched rows starve newer ones.
 async function recordUnsyncableRef(
   ref: PhotoRef,
   reason: string,
@@ -202,7 +195,6 @@ async function processSingleRef(
       try {
         pathHint = await deps.registry.resolveProviderFolderPath(ref.providerId, category);
       } catch (error) {
-        // Uploading to the provider's root beats failing the whole sync over a folder lookup.
         logger.warn('Sync worker: folder path lookup failed, uploading without a path hint', {
           refId: ref.id,
           photoId: ref.photoId,
@@ -238,9 +230,7 @@ async function processSingleRef(
   } catch (error) {
     const errorMessage = extractErrorMessage(error);
 
-    // Retrying a revoked token or denied scope never succeeds, so park the ref at the retry ceiling.
-    // AUTH_INVALID is reserved for VROOM session expiry (the frontend prompts a re-login on it), so
-    // provider auth errors must not reuse that code.
+    // AUTH_INVALID is reserved for VROOM session expiry; provider auth errors must not reuse it.
     const isTerminalAuth =
       isSyncError(error) &&
       (error.code === SyncErrorCode.AUTH_INVALID || error.code === SyncErrorCode.PERMISSION_DENIED);

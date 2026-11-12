@@ -1,9 +1,3 @@
-/**
- * DELETE /api/v1/auth/accounts/:id over the real HTTP stack. Covers the last-sign-in-method guard,
- * ownership (other users' rows and non-auth rows return 404), and the happy path. Auth rows are
- * seeded directly because the harness seeds only the user.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 
@@ -13,7 +7,6 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-/** Insert an auth provider row for a user directly (the harness seeds none). Returns the row id. */
 function seedAuthProvider(
   id: string,
   userId: string,
@@ -64,7 +57,6 @@ describe('DELETE /auth/accounts/:id — unlink an auth provider', () => {
       'Other',
     ]);
     const foreignId = seedAuthProvider('ap-foreign', 'other-user', 'google', 'g-foreign');
-    // Our own account keeps the failure on the ownership check, not the last-account guard.
     seedAuthProvider('ap-mine', ctx.user.id, 'google', 'g-mine');
 
     const res = await ctx.authed('DELETE', `/api/v1/auth/accounts/${foreignId}`);

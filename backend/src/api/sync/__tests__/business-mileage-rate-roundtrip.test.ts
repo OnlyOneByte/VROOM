@@ -1,6 +1,3 @@
-// The businessMileageRate setting must survive a backup and restore. A configured reimbursement rate
-// must not silently reset to 0.
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, json, type TestApp } from '../../../test-helpers/http-client';
 
@@ -27,7 +24,6 @@ async function roundTrip(): Promise<void> {
 
 describe('backup → restore round-trip preserves businessMileageRate', () => {
   test('a non-zero fractional rate survives a full export→restore (not reset to 0)', async () => {
-    // Set through the settings route, which also creates the prefs row.
     const put = await ctx.authed('PUT', '/api/v1/settings', { businessMileageRate: 0.67 });
     expect(put.status, await put.text()).toBe(200);
     expect(rateRow().business_mileage_rate).toBe(0.67);
@@ -38,7 +34,6 @@ describe('backup → restore round-trip preserves businessMileageRate', () => {
   });
 
   test('the default rate round-trips as 0 (control — no spurious change)', async () => {
-    // Touch settings so the prefs row exists with the column default.
     await ctx.authed('PUT', '/api/v1/settings', { currencyUnit: 'USD' });
     expect(rateRow().business_mileage_rate).toBe(0);
 

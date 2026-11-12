@@ -1,7 +1,3 @@
-// Startup treats every migration failure as fatal. That is safe only because re-running the
-// committed migrations on an up-to-date database applies nothing, and the one way to hit
-// "already exists" is a database whose schema drizzle has no record of.
-
 import { Database } from 'bun:sqlite';
 import { describe, expect, test } from 'bun:test';
 import { join } from 'node:path';

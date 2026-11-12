@@ -50,7 +50,6 @@ describe('Activity tracker', () => {
     expect(tracker.getSyncStatus(userId).lastActivity).toBeUndefined();
   });
 
-  // On a repo error the check returns true, so a backup runs rather than being silently skipped.
   describe('hasChangesSinceLastSync — fails open on a repo error', () => {
     test('a throwing syncStateRepository.hasChangesSinceLastSync returns true', async () => {
       const tracker = UserActivityTracker.getInstance();

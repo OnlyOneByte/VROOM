@@ -9,9 +9,6 @@ import {
 	VEHICLE_CIVIC
 } from './support/mock-api';
 
-// Scans the expense table in states pwa.spec.ts cannot reach: after tapping rows or expanding
-// split groups. No allowlist here; any violation fails.
-
 const SPLIT_GROUP = [
 	{
 		id: 'expense-split-camry',
@@ -45,7 +42,6 @@ const SPLIT_GROUP = [
 	}
 ];
 
-// Materialized from an insurance policy, so its Delete is blocked and must explain why.
 const INSURANCE_GROUP = [
 	{
 		id: 'expense-premium-camry',
@@ -89,7 +85,6 @@ const INSURANCE_REASON = 'Delete the insurance policy to remove this expense';
 
 async function openExpenses(page: Page) {
 	await page.goto('/expenses');
-	// Wait for the populated table; the loading shell would scan nothing.
 	await expect(page.getByText('$45.50').filter({ visible: true }).first()).toBeVisible();
 }
 
@@ -110,14 +105,12 @@ test.describe('Expense list accessibility — wide layout', () => {
 
 		expect(await axeViolationIds(page, testInfo, 'wide-collapsed')).toEqual([]);
 
-		// Expand by keyboard: the portions must be reachable without a mouse.
 		const disclosure = page.getByRole('button', { name: 'Split expense portions' }).first();
 		await disclosure.focus();
 		await expect(disclosure).toHaveAttribute('aria-expanded', 'false');
 		await page.keyboard.press('Enter');
 
 		await expect(disclosure).toHaveAttribute('aria-expanded', 'true');
-		// The Civic portion only exists in the DOM while the group is expanded.
 		await expect(page.getByRole('cell', { name: '$100.00' })).toBeVisible();
 
 		expect(await axeViolationIds(page, testInfo, 'wide-expanded')).toEqual([]);
@@ -130,7 +123,6 @@ test.describe('Expense list accessibility — wide layout', () => {
 	test('the disclosure does not make a split row taller than a plain one', async ({ page }) => {
 		await openExpenses(page);
 
-		// Split rows must match plain rows' 32px action height or the table looks ragged.
 		const plain = await page.getByRole('row', { name: /Costco fill-up/ }).boundingBox();
 		const split = await page.getByRole('row', { name: /Shared detailing/ }).boundingBox();
 
@@ -142,7 +134,6 @@ test.describe('Expense list accessibility — wide layout', () => {
 	}) => {
 		await openExpenses(page);
 
-		// Hovering the row reveals its action cluster.
 		const premiumRow = page.getByRole('row', { name: /Policy premium/ });
 		await premiumRow.hover();
 		const blockedDelete = premiumRow.getByRole('button', { name: 'Delete expense' });
@@ -150,16 +141,13 @@ test.describe('Expense list accessibility — wide layout', () => {
 		await expect(blockedDelete).toHaveAttribute('aria-disabled', 'true');
 		await expect(blockedDelete).toHaveAccessibleDescription(INSURANCE_REASON);
 
-		// Hover is a real pointer-events check: disabled kit controls set pointer-events: none.
 		await blockedDelete.hover();
 		await expect(blockedDelete).toHaveAttribute('title', INSURANCE_REASON);
 
-		// `disabled` would make this unfocusable and hide the reason.
 		await blockedDelete.focus();
 		await expect(blockedDelete).toBeFocused();
 		await page.keyboard.press('Enter');
 
-		// Scoped to the toast; the same sentence also backs the button's aria-describedby.
 		await expect(page.locator('[data-sonner-toast]').getByText(INSURANCE_REASON)).toBeVisible();
 		await expect(page.getByRole('alertdialog')).toHaveCount(0);
 	});
@@ -178,7 +166,6 @@ test.describe('Expense list accessibility — compact layout', () => {
 
 		expect(await axeViolationIds(page, testInfo, 'compact-collapsed')).toEqual([]);
 
-		// Edit and Delete must stay outside the row button, or axe reports nested-interactive.
 		await page
 			.getByRole('button', { name: /Costco fill-up|Fuel & Charging/ })
 			.first()
@@ -199,7 +186,6 @@ test.describe('Expense list accessibility — compact layout', () => {
 		await page.keyboard.press('Enter');
 		await expect(splitRow).toHaveAttribute('aria-expanded', 'true');
 
-		// The row's keydown handler must not unmount this button before its click fires.
 		const del = page.getByRole('button', { name: 'Delete', exact: true });
 		await del.focus();
 		await page.keyboard.press('Enter');

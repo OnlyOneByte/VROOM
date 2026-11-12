@@ -37,9 +37,6 @@ photoRoutes.get('/', zValidator('query', commonSchemas.pagination), async (c) =>
   return c.json(buildPaginatedResponse(result.data, result.totalCount, limit, offset));
 });
 
-// Serves the full-resolution original; nothing resizes. Conditional GETs are answered before the
-// provider round-trip, since the ETag comes from the photo row. Keep in step with the generic
-// /photos/:entityType thumbnail handler.
 photoRoutes.get('/:photoId/thumbnail', async (c) => {
   const vehicleId = c.req.param('vehicleId');
   const photoId = c.req.param('photoId');
@@ -54,7 +51,7 @@ photoRoutes.get('/:photoId/thumbnail', async (c) => {
   );
 
   if (ifNoneMatchSatisfies(c.req.header('if-none-match'), etag)) {
-    // A 304 must carry the same validator and caching headers as the 200 (RFC 9110 §15.4.5).
+    // RFC 9110 §15.4.5: a 304 must carry the same validators and caching headers as the 200.
     const headers = photoThumbnailResponse(Buffer.alloc(0), storedMimeType).headers;
     headers.set('ETag', etag);
     return new Response(null, { status: 304, headers });

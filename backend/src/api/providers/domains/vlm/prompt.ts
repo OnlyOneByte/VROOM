@@ -1,14 +1,8 @@
-/**
- * Receipt extraction prompt, strict response schema, and fail-closed parser. Model output is untrusted:
- * any field that fails validation is dropped, never coerced. Amounts stay in dollars; cents conversion
- * happens only at the POST /expenses boundary.
- */
-
 import { z } from 'zod';
 import { EXPENSE_CATEGORIES } from '../../../../db/types';
 import type { RawExtraction } from './vlm-provider';
 
-// Constant by design. Instructions inside the image cannot escalate past the schema because the parser enforces it.
+// Receipt content is untrusted; the parser, not the prompt, enforces the schema.
 export const RECEIPT_EXTRACTION_PROMPT = [
   'You are a receipt parser for a car-expense tracker. Extract ONLY the following fields from the',
   'receipt image and return a SINGLE JSON object — no prose, no markdown, no code fences.',
@@ -56,7 +50,6 @@ export interface ReceiptDraft {
   vendor?: string;
 }
 
-/** Unparseable output yields an empty draft rather than a throw, so the route never 500s on a bad reply. */
 export function parseExtraction(raw: RawExtraction): ReceiptDraft {
   let candidate: unknown = raw;
 
@@ -73,7 +66,6 @@ export function parseExtraction(raw: RawExtraction): ReceiptDraft {
   return pruneUndefined(result.data);
 }
 
-/** Models often wrap JSON in prose or code fences, so fall back to the outermost braces. */
 function extractJsonObject(text: string): unknown {
   const trimmed = text.trim();
   const direct = tryParse(trimmed);

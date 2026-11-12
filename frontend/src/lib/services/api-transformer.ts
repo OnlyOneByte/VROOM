@@ -1,5 +1,3 @@
-/** Maps frontend expense models to and from the backend API contract. */
-
 import type { BackendExpenseResponse, Expense, ExpenseCategory } from '$lib/types';
 import { isElectricFuelType } from '$lib/utils/units';
 
@@ -12,7 +10,6 @@ interface BackendExpenseRequest {
 	mileage?: number;
 	volume?: number;
 	fuelType?: string;
-	// `null` clears the stored value on edit; omitted/undefined leaves it unchanged.
 	description?: string | null;
 	location?: string | null;
 	missedFillup?: boolean;
@@ -21,7 +18,6 @@ interface BackendExpenseRequest {
 }
 
 interface ToBackendOptions {
-	// Edit only: an emptied description/location is sent as null so it gets cleared.
 	isEdit?: boolean;
 }
 

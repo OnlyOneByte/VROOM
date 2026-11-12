@@ -86,7 +86,6 @@ function mergeStorageConfig(
   };
 }
 
-// Providers absent from a partial PUT must survive; a named provider's entry is replaced whole.
 function mergeBackupConfig(
   existing: BackupConfig | null | undefined,
   incoming: BackupConfigUpdate
@@ -123,9 +122,7 @@ const updateSettingsSchema = baseSettingsSchema
     unitPreferences: partialUnitPreferencesSchema.optional(),
     storageConfig: storageConfigSchema.optional(),
     backupConfig: backupConfigSchema.optional(),
-    // Bounded because the column is plain text; the cap is an abuse bound, not an allow-list.
     themePreference: z.string().min(1).max(64).optional(),
-    // Non-negative and capped; the cap is an abuse bound, not a product limit.
     businessMileageRate: z.number().min(0).max(100).optional(),
   })
   .partial();
@@ -144,7 +141,6 @@ routes.get('/', async (c) => {
 routes.put('/', async (c) => {
   const user = c.get('user');
   const body = await readJsonBody(c);
-  // ZodError is mapped to a 400 by the central error handler.
   const updates = updateSettingsSchema.parse(body);
 
   const existingSettings = await preferencesRepository.getOrCreate(user.id);
@@ -163,7 +159,6 @@ routes.put('/', async (c) => {
   let mergedStorageConfig: StorageConfig | undefined;
   if (storageConfig) {
     mergedStorageConfig = mergeStorageConfig(existingSettings.storageConfig, storageConfig);
-    // Validate the merged result so a category cannot be disabled while it is still a default.
     await validateStorageConfig(mergedStorageConfig, user.id);
   }
 

@@ -1,5 +1,3 @@
-// Shared unitPreferences validation for the vehicle and settings routes.
-
 import { z } from 'zod';
 import { ChargeUnit, DistanceUnit, type UnitPreferences, VolumeUnit } from '../types';
 
@@ -17,7 +15,6 @@ export const unitPreferencesSchema = z.object({
 
 export const partialUnitPreferencesSchema = unitPreferencesSchema.partial();
 
-// Returns undefined when there is no partial to merge, so the caller leaves the column untouched.
 export function mergeUnitPreferences(
   existing: UnitPreferences | null | undefined,
   partial: Partial<UnitPreferences> | undefined

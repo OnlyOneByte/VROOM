@@ -38,10 +38,9 @@
 
 	let placeholderHeight = $derived(height ?? 300);
 
-	// Hidden or below-the-fold containers measure 0×0 and break LayerChart; gate on visibility using MutationObserver, which fires synchronously.
+	// LayerChart measures 0x0 in hidden containers; gate rendering on visibility.
 	let gate = createVisibilityWatch();
 
-	// Hide chart content until the animation class is applied, to avoid a flash on tab switch.
 	const READY_CLASS_MAP: Record<string, string> = {
 		'chart-line-animated': 'chart-line-animate-ready',
 		'chart-bar-animated': 'chart-bar-animate-ready',
@@ -100,7 +99,6 @@
 						{@render children()}
 					{/if}
 				{:else}
-					<!-- Skeleton until visible, so below-the-fold charts do not show an empty box. -->
 					<Skeleton class="w-full" style="height: {placeholderHeight}px" />
 				{/if}
 			</div>

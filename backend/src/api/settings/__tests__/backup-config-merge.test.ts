@@ -1,9 +1,3 @@
-/**
- * PUT /settings merges backupConfig per provider, so a partial PUT that names one provider must not
- * wipe the others. Runs through the HTTP stack; the providers are raw-seeded because ownership is
- * validated.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, json, type TestApp } from '../../../test-helpers/http-client';
 
@@ -14,7 +8,6 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-/** Raw-seed an owned storage provider so its backupConfig entry passes the ownership check. */
 function seedProvider(id: string, displayName: string): void {
   ctx.sqlite.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, status)
@@ -64,7 +57,6 @@ describe('PUT /settings backupConfig is merged per provider, not replaced wholes
       'drive-b',
     ]);
 
-    // Names only drive-b, as a client editing just that provider would.
     const partial = await ctx.authed('PUT', '/api/v1/settings', {
       backupConfig: {
         providers: {
@@ -79,7 +71,6 @@ describe('PUT /settings backupConfig is merged per provider, not replaced wholes
     expect(providers['drive-a'], 'drive-a must not be wiped by a partial PUT').toBeDefined();
     expect(providers['drive-a']?.retentionCount).toBe(5);
     expect(providers['drive-a']?.sheetsSyncEnabled).toBe(true);
-    // drive-b is updated to the new value.
     expect(providers['drive-b']?.retentionCount).toBe(12);
   });
 
@@ -92,7 +83,6 @@ describe('PUT /settings backupConfig is merged per provider, not replaced wholes
       },
     });
 
-    // Re-PUT without sheetsSyncEnabled: the entry is replaced, so the flag is dropped.
     const res = await ctx.authed('PUT', '/api/v1/settings', {
       backupConfig: { providers: { 'drive-a': providerSettings('drive-a') } },
     });

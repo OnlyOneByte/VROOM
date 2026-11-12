@@ -1,8 +1,3 @@
-/**
- * In-memory StorageProvider for tests and local E2E. Only instantiated when
- * CONFIG.allowFakeStorageProvider is set, which is never true in production.
- */
-
 import type {
   StorageFileInfo,
   StorageProvider,
@@ -43,7 +38,7 @@ export class FakeStorageProvider implements StorageProvider {
     const key = params.rawPath
       ? `${params.rawPath}/${params.fileName}`
       : `${params.pathHint}/${params.entityType}/${params.entityId}/${params.fileName}`;
-    const now = new Date(0).toISOString(); // fixed epoch — deterministic for snapshots
+    const now = new Date(0).toISOString();
     this.files.set(key, {
       key,
       name: params.fileName,

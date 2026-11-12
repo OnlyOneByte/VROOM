@@ -1,5 +1,3 @@
-// Checks THEME_REGISTRY integrity, and that the default theme matches app.css.
-
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { DEFAULT_THEME_ID, THEME_REGISTRY } from '../theme-registry';

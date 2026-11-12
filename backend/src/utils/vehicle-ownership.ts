@@ -4,9 +4,7 @@ import { vehicles } from '../db/schema';
 import type { DrizzleTransaction } from '../db/types';
 import { NotFoundError } from '../errors';
 
-// Requires both the userId and id predicates. Dropping userId would let a split or insurance write
-// reach another user's vehicle. Accepts a transaction handle. Duplicate ids are removed before the
-// count check.
+// Keep the userId predicate: without it a write can reach another user's vehicle.
 export async function assertVehiclesOwned(
   handle: AppDatabase | DrizzleTransaction,
   vehicleIds: readonly string[],

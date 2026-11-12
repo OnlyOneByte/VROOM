@@ -5,8 +5,6 @@ export async function withTimeout<T>(
   timeoutMs: number,
   operation: string
 ): Promise<T> {
-  // The timer is always cleared. A pending timer holds the event loop open for the full budget, so
-  // a script or test cannot exit.
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(

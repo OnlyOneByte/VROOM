@@ -13,7 +13,6 @@
 
 	interface Props {
 		vehicleId: string;
-		// Defaults to false; insurance writes are owner-only server-side, so the read-only view hides every mutate affordance.
 		readOnly?: boolean;
 	}
 

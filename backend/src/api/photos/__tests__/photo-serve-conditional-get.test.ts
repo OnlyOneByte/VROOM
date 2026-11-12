@@ -1,8 +1,3 @@
-/**
- * Conditional GET on the photo serve route. Responses are the full original (nothing resizes), so a
- * revalidation must answer 304 with zero bytes and without a provider download.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 import type {
@@ -17,14 +12,9 @@ const STORAGE_KEY = 'receipts/receipt.jpg';
 const PHOTO_PATH = '/api/v1/photos/expense/exp-1/photo-1/thumbnail';
 
 let ctx: TestApp;
-/** Provider download() calls — a 304 must not touch the provider at all. */
 let downloads = 0;
 let restoreRegistry: () => void;
 
-/**
- * Wraps the fake storage provider to count downloads. Only the registry's instance factory is
- * stubbed; ownership, status, and ref resolution stay live.
- */
 async function installCountingProvider(): Promise<void> {
   const { FakeStorageProvider } = await import('../../providers/domains/storage/fake-provider');
   const fake = new FakeStorageProvider();
@@ -59,7 +49,6 @@ async function installCountingProvider(): Promise<void> {
   };
 }
 
-/** Seed an owned expense with one photo whose active ref points at the stubbed provider. */
 function seedServablePhoto(): void {
   ctx.sqlite.run(
     `INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('veh-1', ?, 'Toyota', 'Camry', 2022)`,
@@ -138,7 +127,6 @@ describe('photo serve: conditional GET', () => {
 
     expect(revalidated.status).toBe(304);
     expect(await servedBytes(revalidated)).toBe(0);
-    // A 304 must still carry the validator and the caching policy, or the next request can't revalidate.
     expect(revalidated.headers.get('ETag')).toBe(etag);
     expect(revalidated.headers.get('Cache-Control')).toContain('private');
   });
@@ -154,8 +142,6 @@ describe('photo serve: conditional GET', () => {
   });
 
   test("a conditional GET for another user's photo is still 404, never 304", async () => {
-    // The ownership gate must run BEFORE the validator check — otherwise a guessed tag would confirm
-    // the existence of someone else's photo (and a shared cache could be primed against it).
     ctx.sqlite.run(
       `INSERT INTO users (id, email, display_name) VALUES ('other-user', 'other@test.com', 'Other')`
     );
@@ -179,7 +165,6 @@ describe('photo serve: conditional GET', () => {
   });
 
   test("another photo's validator never short-circuits this one", async () => {
-    // Shares the stored object so the second photo is servable.
     ctx.sqlite.run(
       `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
        VALUES ('photo-2', ?, 'expense', 'exp-1', 'receipt-2.jpg', 'image/jpeg', ?)`,

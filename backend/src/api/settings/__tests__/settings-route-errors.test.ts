@@ -1,8 +1,3 @@
-/**
- * Settings route error responses through the HTTP stack. Validation failures must come back as 400
- * through the central error handler.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, json, type TestApp } from '../../../test-helpers/http-client';
 
@@ -64,10 +59,6 @@ describe('settings route error responses', () => {
   });
 });
 
-/**
- * POST /settings/backup writes sync_state.last_backup_date, which the backup-status UI reads, so the
- * test checks the row and not only the response.
- */
 describe('settings POST /backup', () => {
   function backupDateRow(userId: string): { last_backup_date: number | null } | undefined {
     return ctx.sqlite

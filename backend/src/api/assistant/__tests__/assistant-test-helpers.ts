@@ -1,8 +1,3 @@
-/**
- * Drives POST /api/v1/assistant/chat against a scripted OpenAI-compatible provider: the global fetch is
- * replaced so each model turn returns the next scripted response body.
- */
-
 import { expect } from 'bun:test';
 import type { TestApp } from '../../../test-helpers/http-client';
 
@@ -13,27 +8,20 @@ export interface ChatReply {
   toolsUsed: string[];
 }
 
-/** One outbound Chat Completions request body, as the adapter sent it. */
 export interface SentBody {
   messages: Array<Record<string, unknown> & { role: string; content?: unknown }>;
 }
 
-/** A model turn that requests a tool call (OpenAI tool_calls wire shape). */
 export function callTurn(name: string, argsJson: string, id = 'c1'): Record<string, unknown> {
   return {
     choices: [{ message: { tool_calls: [{ id, function: { name, arguments: argsJson } }] } }],
   };
 }
 
-/** A model turn that returns a final text answer. */
 export function answerTurn(text: string): Record<string, unknown> {
   return { choices: [{ message: { content: text } }] };
 }
 
-/**
- * Installs a fetch stub that yields the next scripted body per call, repeating the last one, and
- * returns the list it appends every request body to. Callers restore the real fetch in afterEach.
- */
 export function stubScript(turns: Record<string, unknown>[]): SentBody[] {
   const sentBodies: SentBody[] = [];
   let idx = 0;
@@ -55,7 +43,6 @@ export function stubFailure(status: number): void {
   globalThis.fetch = (async () => new Response('upstream error', { status })) as any;
 }
 
-/** Seeds an enabled openai-compatible llm provider through the real create route. */
 export async function seedLlmProvider(ctx: TestApp): Promise<void> {
   const res = await ctx.authed('POST', '/api/v1/providers', {
     domain: 'llm',

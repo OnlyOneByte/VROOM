@@ -1,7 +1,6 @@
 import type { PaginatedResponse, Photo } from '$lib/types';
 import { apiClient, getApiBaseUrl, withPagination } from './api-client';
 
-/** List, upload, delete, and thumbnail calls for the photos under one collection path. */
 export function photoCollection(collectionPath: string) {
 	return {
 		list(params?: { limit?: number; offset?: number }): Promise<PaginatedResponse<Photo>> {
@@ -24,7 +23,6 @@ export function photoCollection(collectionPath: string) {
 	};
 }
 
-/** Photos attached to an expense, odometer entry, or insurance record. */
 export function entityPhotos(entityType: string, entityId: string) {
 	return photoCollection(`/api/v1/photos/${entityType}/${entityId}`);
 }

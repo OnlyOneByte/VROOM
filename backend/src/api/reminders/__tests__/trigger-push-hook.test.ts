@@ -1,8 +1,3 @@
-/**
- * The trigger fires notifyUser after each notification row is written, on both the time and mileage axes.
- * A fake PushSender is injected, so no network or VAPID keys are needed.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -27,11 +22,10 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
-  setPushSenderForTest(null); // restore the real sender
+  setPushSenderForTest(null);
   ctx.close();
 });
 
-/** A fake sender that records the payloads it was asked to send; optionally throws. */
 function recordingSender(opts: { throwOnSend?: boolean } = {}): PushSender & {
   payloads: PushPayload[];
 } {
@@ -46,7 +40,6 @@ function recordingSender(opts: { throwOnSend?: boolean } = {}): PushSender & {
   };
 }
 
-/** Give the seeded user one push subscription so the fan-out has a target. */
 async function subscribe(endpoint = 'ep-hook'): Promise<void> {
   await pushSubscriptionRepository.upsertByEndpoint(ctx.user.id, {
     endpoint,
@@ -61,7 +54,6 @@ async function trigger(): Promise<DataEnvelope<{ notifications: unknown[] }>> {
   return json<DataEnvelope<{ notifications: unknown[] }>>(res);
 }
 
-/** Seed a past-due TIME reminder (monthly, start in the past) so the trigger materializes a notification. */
 function seedTimeReminder(reminderId: string, vehicleId: string, name: string): void {
   const past = Math.floor(new Date('2024-01-01T00:00:00.000Z').getTime() / 1000);
   ctx.sqlite.run(
@@ -90,14 +82,14 @@ describe('trigger push hook', () => {
     expect(sender.payloads.length).toBeGreaterThanOrEqual(1);
     const p = sender.payloads[0];
     expect(p?.title).toBe('Registration renewal due');
-    expect(p?.body).toBe('This reminder is now due'); // time axis → no mileage wording
+    expect(p?.body).toBe('This reminder is now due');
     expect(p?.tag).toBe('rp-time');
     expect(p?.url).toBe('/reminders');
   });
 
   test('a mileage-axis notification fires notifyUser with a mileage-worded body', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2020 });
-    await addOdometerReading(ctx, vehicleId, 60200); // past the 60000 milestone
+    await addOdometerReading(ctx, vehicleId, 60200);
     await subscribe();
     seedMileageReminder(ctx, 'rp-mi', vehicleId, 60000);
     const sender = recordingSender();
@@ -120,7 +112,6 @@ describe('trigger push hook', () => {
     seedMileageReminder(ctx, 'rp-boom', vehicleId, 60000);
     setPushSenderForTest(recordingSender({ throwOnSend: true }));
 
-    // The in-app notification is the source of truth, so it must be written even when push fails.
     const body = await trigger();
     expect(body.data.notifications.length).toBeGreaterThanOrEqual(1);
 
@@ -132,7 +123,7 @@ describe('trigger push hook', () => {
 
   test('nothing due means no push is sent', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2020 });
-    await addOdometerReading(ctx, vehicleId, 34000); // below the milestone
+    await addOdometerReading(ctx, vehicleId, 34000);
     await subscribe();
     seedMileageReminder(ctx, 'rp-none', vehicleId, 60000);
     const sender = recordingSender();

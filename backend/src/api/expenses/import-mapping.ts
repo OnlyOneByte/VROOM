@@ -1,8 +1,3 @@
-/**
- * Translates a foreign tracker CSV (Fuelly, Fuelio, Drivvo, ...) into VROOM's native CSV shape
- * so the regular import plan can validate and commit it. Pure: no DB access.
- */
-
 import { parse } from 'csv-parse/sync';
 import { z } from 'zod';
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from '../../db/types';
@@ -32,16 +27,11 @@ export interface ColumnMapping {
   distanceUnit?: DistanceUnit;
   volumeUnit?: VolumeUnit;
   categoryMap?: Record<string, ExpenseCategory>;
-  /** Applied only to a blank category cell; a named but unrecognized word still maps to misc. */
   defaultCategory?: ExpenseCategory;
 }
 
 const mappedHeader = z.string().min(1).max(200).optional();
 
-/**
- * Validates a client-supplied ColumnMapping. `columns` is listed field by field as optional
- * because `z.record(z.enum(...))` would require every key and reject partial mappings.
- */
 export const columnMappingSchema = z.object({
   source: z.string().max(64).optional(),
   columns: z.object({
@@ -64,8 +54,6 @@ export const columnMappingSchema = z.object({
   defaultCategory: z.enum(EXPENSE_CATEGORIES).optional(),
 });
 
-// VROOM stores each expense in its vehicle's own units, so values are converted into these.
-// An omitted unit skips conversion.
 export interface TargetUnits {
   distanceUnit?: DistanceUnit;
   volumeUnit?: VolumeUnit;
@@ -91,8 +79,6 @@ const NATIVE_HEADER: NativeField[] = [
   'missedFillup',
 ];
 
-// When both separators appear, the last one is the decimal point (handles 1.234,56 and 1,234.56).
-// A lone comma is read as the decimal point.
 export function normalizeDecimal(raw: string): string {
   const s = raw.trim();
   if (!s) return s;
@@ -112,10 +98,6 @@ function epochToIso(n: number): string | null {
   const dt = new Date(ms);
   return Number.isNaN(dt.getTime()) ? null : dt.toISOString();
 }
-
-// Built from numeric parts in local time: `new Date('YYYY-MM-DD')` parses as UTC and would shift
-// the day back for users west of UTC. Unparseable input is returned unchanged so the import plan
-// reports it per row.
 
 export function normalizeForeignDate(raw: string, format: ImportDateFormat): string {
   const s = raw.trim();
@@ -142,6 +124,7 @@ export function normalizeForeignDate(raw: string, format: ImportDateFormat): str
 
   const [hh = 0, mm = 0, ss = 0] = timePart.split(':').map((t) => Number.parseInt(t, 10) || 0);
 
+  // new Date("YYYY-MM-DD") would shift the day; buildLocalDate keeps the calendar day.
   const dt = buildLocalDate(year, month, day, hh, mm, ss);
   return dt ? dt.toISOString() : s;
 }
@@ -160,7 +143,6 @@ function mapCategory(
   return { value: 'misc', unmapped: word };
 }
 
-// Non-numeric input is passed through verbatim so buildImportPlan reports the offending text.
 export function mapVolume(
   raw: string,
   from: VolumeUnit | null | undefined,
@@ -169,12 +151,11 @@ export function mapVolume(
   const s = normalizeDecimal(raw);
   if (!s) return '';
   const n = Number(s);
-  if (!Number.isFinite(n)) return raw; // let buildImportPlan error it
+  if (!Number.isFinite(n)) return raw;
   if (!from || !to) return String(n);
   return String(Number(convertVolume(n, from, to).toFixed(3)));
 }
 
-// Rounded to a whole number because the native mileage parser requires one.
 export function mapMileage(
   raw: string,
   from: DistanceUnit | null | undefined,
@@ -183,7 +164,7 @@ export function mapMileage(
   const s = normalizeDecimal(raw);
   if (!s) return '';
   const n = Number(s);
-  if (!Number.isFinite(n)) return raw; // let buildImportPlan error it
+  if (!Number.isFinite(n)) return raw;
   const dist = from && to ? convertDistance(n, from, to) : n;
   return String(Math.round(dist));
 }
@@ -200,7 +181,6 @@ export function stringifyNative(rows: Record<NativeField, string>[]): string {
   return lines.join('\n');
 }
 
-// Throws CsvMappingError only for an unparseable file.
 export function applyMapping(
   foreignCsv: string,
   mapping: ColumnMapping,

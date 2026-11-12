@@ -26,7 +26,6 @@
 	const PAGE_SIZE = 20;
 	const MIN_CHART_POINTS = 2;
 
-	// Writes are owner or accepted-editor only; a read-only shared view hides the Add and per-row controls.
 	let {
 		vehicleId,
 		unitPreferences,

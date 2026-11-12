@@ -1,10 +1,3 @@
-/**
- * Every session-cookie write and delete must carry the same security attributes: `Secure` in
- * production, `HttpOnly`, `SameSite=Lax`, and `Path=/`. A browser only clears a cookie when the
- * delete matches the write, so a drift on one path either weakens the cookie or strands it. Each
- * path is exercised through the real app and its Set-Cookie header inspected.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 
@@ -25,12 +18,11 @@ afterEach(() => {
 const BOGUS_COOKIE = 'auth_session=not-a-real-session';
 
 function withCookie(method: string, path: string, cookie: string): Promise<Response> {
-  // Sec-Fetch-Site satisfies csrf() on POST, as a browser would.
+  // csrf() requires Sec-Fetch-Site on POST, as browsers send.
   const headers = { Cookie: cookie, 'Sec-Fetch-Site': 'same-origin' };
   return Promise.resolve(ctx.app.request(path, { method, headers }));
 }
 
-/** Push the acting session past its half-life so the next validation extends and re-issues it. */
 function agePastHalfLife(): void {
   const id = ctx.cookie.split('=')[1];
   const twentyHoursFromNow = Math.floor((Date.now() + 20 * 60 * 60 * 1000) / 1000);

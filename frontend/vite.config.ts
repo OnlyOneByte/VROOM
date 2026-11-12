@@ -3,10 +3,6 @@ import { defineConfig } from 'vitest/config';
 import { SvelteKitPWA } from '@vite-pwa/sveltekit';
 import tailwindcss from '@tailwindcss/vite';
 
-// Same `/api` -> backend proxy for `vite dev` AND `vite preview`. One object so the two
-// servers can't drift: `preview` previously had no proxy at all, so the built app it serves
-// answered every `/api/v1/...` call with its own 404 — the app looked signed out and empty
-// with a healthy backend running on :3001.
 const apiProxy = {
 	'/api': {
 		target: 'http://localhost:3001',
@@ -68,9 +64,6 @@ export default defineConfig({
 		environment: 'happy-dom',
 		setupFiles: ['src/test-setup.ts'],
 		globals: true,
-		// Component tests mount with svelte's client build. Vitest externalizes node_modules, so
-		// Node would otherwise load svelte's server entry (where mount() throws). Inlining these
-		// packages routes them through Vite, which applies the browser condition below.
 		server: {
 			deps: {
 				inline: ['svelte', '@testing-library/svelte', '@testing-library/svelte-core']
@@ -87,20 +80,16 @@ export default defineConfig({
 			'$env/dynamic/public': new URL('./src/test-env-mock.ts', import.meta.url).pathname
 		}
 	},
-	// Vitest's config sets resolve.conditions to server defaults, which lack 'browser', so without
-	// this the inlined svelte still resolves its server entry. 'browser' is already a default for
-	// the client build, and the SSR build reads ssr.resolve.conditions instead.
+	// Vitest's default conditions omit 'browser'; without it inlined svelte loads its server entry, where mount() throws.
 	resolve: {
 		conditions: ['browser']
 	},
 	server: {
 		proxy: apiProxy
 	},
-	// Pinned explicitly (4173 is also vite's default) with strictPort so a port already in use
-	// fails loudly instead of silently shifting to 4174 while a caller waits on 4173 forever —
-	// which is exactly how playwright.config.ts used to hang (it waited on 5173).
 	preview: {
 		port: 4173,
+		// Without strictPort a busy port silently shifts, leaving callers waiting on the pinned one.
 		strictPort: true,
 		proxy: apiProxy
 	}

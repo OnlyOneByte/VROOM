@@ -1,8 +1,3 @@
-/**
- * Unit tests for vehicleIdsForTerm. It preserves order and does not de-duplicate, and it never returns
- * vehicles from another term.
- */
-
 import { describe, expect, test } from 'bun:test';
 import { vehicleIdsForTerm } from '../hooks';
 import type { TermCoverageRow } from '../repository';

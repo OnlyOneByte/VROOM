@@ -18,7 +18,6 @@ vi.mock('$lib/utils/pwa', () => ({
 	requestBackgroundSync: vi.fn()
 }));
 
-// apiClient calls the global fetch, so tests assert the URLs the app actually sends.
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
@@ -52,7 +51,6 @@ describe('Expense Form Logic', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 
-		// Overridden per test with mockResolvedValueOnce.
 		mockFetch.mockResolvedValue(jsonResponse(mockVehicles));
 	});
 
@@ -79,7 +77,6 @@ describe('Expense Form Logic', () => {
 		});
 
 		it('loads vehicles from the versioned vehicles endpoint', async () => {
-			// Drives the real service, so the asserted URL is the one the app sends.
 			mockFetch.mockResolvedValueOnce(jsonResponse(mockVehicles));
 
 			const vehicles = await vehicleApi.getVehicles();
@@ -290,7 +287,6 @@ describe('Expense Form Logic', () => {
 		});
 
 		it('POSTs a new expense to the collection endpoint with backend field names', async () => {
-			// Drives the real service so the assertion can catch a wrong URL.
 			mockFetch.mockResolvedValueOnce(
 				jsonResponse({ id: 'expense-1', vehicleId: '1', category: 'fuel', expenseAmount: 50 })
 			);
@@ -307,7 +303,6 @@ describe('Expense Form Logic', () => {
 			expect(requestedUrl(0)).toBe('/api/v1/expenses');
 			const init = mockFetch.mock.calls[0]?.[1];
 			expect(init.method).toBe('POST');
-			// amount is renamed on the wire; the vehicle is a body field, not a path segment.
 			expect(JSON.parse(init.body)).toMatchObject({
 				vehicleId: '1',
 				category: 'fuel',

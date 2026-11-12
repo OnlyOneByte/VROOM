@@ -1,6 +1,3 @@
-// In-process HTTP client for the backend. Drives the real Hono app with app.request() against an in-memory DB.
-// The test environment (NODE_ENV, DATABASE_URL) is set by the bunfig preload, test-helpers/preload.ts.
-
 import type { Hono } from 'hono';
 
 export async function json<T>(res: Response): Promise<T> {
@@ -33,7 +30,6 @@ export interface TestApp {
 }
 
 let counter = 0;
-// The DB singleton is cached for the whole process. Migrate once, then wipe data between calls.
 let migrated = false;
 
 export async function createTestApp(seedUser: Partial<TestUser> = {}): Promise<TestApp> {
@@ -67,12 +63,10 @@ export async function createTestApp(seedUser: Partial<TestUser> = {}): Promise<T
     cookie,
     authed: (method, path, body) => sendRequest(app, method, path, body, cookie),
     anon: (method, path, body) => sendRequest(app, method, path, body),
-    // No-op: the in-memory DB is shared by the process, and the next createTestApp() wipes it.
     close: () => {},
   };
 }
 
-// async so the return type is Promise<Response>, matching TestApp.authed and anon.
 async function sendRequest(
   app: Hono,
   method: string,
@@ -80,8 +74,6 @@ async function sendRequest(
   body: unknown,
   cookie?: string
 ): Promise<Response> {
-  // csrf() rejects state-changing requests that lack a JSON content type and a same-origin signal.
-  // Browsers always send this header, so the harness must too.
   const headers: Record<string, string> = { 'Sec-Fetch-Site': 'same-origin' };
   if (cookie) headers.Cookie = cookie;
   if (body === undefined) return app.request(path, { method, headers });
@@ -91,7 +83,6 @@ async function sendRequest(
 
 export type RequestFn = (method: string, path: string, body?: unknown) => Promise<Response>;
 
-/** Creates a session for an existing user and returns its cookie plus a JSON request function bound to it. */
 export async function requestAs(
   ctx: TestApp,
   userId: string
@@ -105,7 +96,6 @@ export async function requestAs(
   };
 }
 
-// Foreign keys are off during the sweep, so the delete order does not matter.
 function resetAllTables(sqlite: import('bun:sqlite').Database): void {
   const rows = sqlite
     .query(

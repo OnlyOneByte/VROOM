@@ -1,10 +1,3 @@
-/**
- * Reminder writes on shared vehicles. POST, PUT, DELETE, and mark-serviced require WRITE on every linked
- * vehicle, and all vehicles must share one owner. The reminder is stamped with the owner's userId, so
- * its expenses and odometer reads land in the owner's books.
- * User A owns the vehicle. User B is invited as editor or viewer.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -15,8 +8,8 @@ import {
 import { createInvitee, type Invitee } from '../../../test-helpers/invitee';
 import { seedVehicle } from '../../../test-helpers/seed';
 
-let ctx: TestApp; // owner (user A)
-let b: Invitee; // invitee B (the shared editor/viewer)
+let ctx: TestApp;
+let b: Invitee;
 
 beforeEach(async () => {
   ctx = await createTestApp();
@@ -24,14 +17,12 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-/** A owns a vehicle and invites B at `level`, B accepts → an ACCEPTED share. Returns vehicleId. */
 async function shareAccepted(level: 'viewer' | 'editor'): Promise<string> {
   const vehicleId = await seedVehicle(ctx, { make: 'Shared', model: 'Car', year: 2021 });
   await b.acceptShare(vehicleId, level);
   return vehicleId;
 }
 
-/** The raw stored reminder row's userId, read directly so we assert the owner-stamp (not the API echo). */
 function storedReminderUserId(reminderId: string): string {
   return (
     ctx.sqlite.query('SELECT user_id FROM reminders WHERE id = ?').get(reminderId) as {
@@ -60,9 +51,8 @@ describe('reminder writes on shared vehicles', () => {
     expect(res.status, JSON.stringify(body)).toBe(201);
     const rid = body.data.reminder.id;
 
-    expect(storedReminderUserId(rid)).toBe(ctx.user.id); // owner A — not the acting editor B
+    expect(storedReminderUserId(rid)).toBe(ctx.user.id);
 
-    // It rides the OWNER's surface: A's per-vehicle reminder list shows it.
     const ownerList = await json<DataEnvelope<ReminderEnvelope[]>>(
       await ctx.authed('GET', `/api/v1/reminders?vehicleId=${vehicleId}`)
     );
@@ -71,7 +61,6 @@ describe('reminder writes on shared vehicles', () => {
 
   test('an editor expense reminder materializes its expense onto the owner books', async () => {
     const vehicleId = await shareAccepted('editor');
-    // An automatic expense reminder due in the past → /trigger materializes an expense row.
     const res = await b.request('POST', '/api/v1/reminders', {
       name: 'Editor annual reg',
       type: 'expense',
@@ -92,7 +81,7 @@ describe('reminder writes on shared vehicles', () => {
       .query("SELECT user_id FROM expenses WHERE source_type = 'reminder' AND source_id = ?")
       .all(rid) as Array<{ user_id: string }>;
     for (const row of materialized) {
-      expect(row.user_id).toBe(ctx.user.id); // owner books, not the editor's
+      expect(row.user_id).toBe(ctx.user.id);
     }
   });
 
@@ -111,7 +100,7 @@ describe('reminder writes on shared vehicles', () => {
   });
 
   test('a reminder spanning two owners is rejected', async () => {
-    const sharedFromA = await shareAccepted('editor'); // owned by A, B is editor
+    const sharedFromA = await shareAccepted('editor');
     const bVehRes = await b.request('POST', '/api/v1/vehicles', {
       make: 'BOwn',
       model: 'Car',
@@ -160,7 +149,6 @@ describe('reminder writes on shared vehicles', () => {
 
   test('a viewer cannot create, update, delete, or mark-serviced a shared reminder (404)', async () => {
     const vehicleId = await shareAccepted('viewer');
-    // Owner seeds a reminder for the mutate attempts.
     const created = await ctx.authed('POST', '/api/v1/reminders', {
       name: 'Owner reminder',
       type: 'notification',

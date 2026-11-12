@@ -1,8 +1,3 @@
-// Transactions must roll back fully when a write fails mid-way. bun-sqlite only wraps synchronous
-// callbacks, so an async callback would leave earlier writes committed. A junction insert against a
-// non-existent vehicle forces the mid-transaction failure. Repos are called directly to bypass the
-// route-layer ownership check that would otherwise catch the bogus id.
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
@@ -47,7 +42,6 @@ describe('async-tx atomicity', () => {
     }
 
     expect(threw, 'the FK violation should surface as a throw').toBe(true);
-    // No orphan reminder row survives the failed create.
     expect(reminderCount(), 'reminder row rolled back (no vehicle-less orphan)').toBe(0);
   });
 
@@ -60,8 +54,6 @@ describe('async-tx atomicity', () => {
       ctx.sqlite.query('SELECT COUNT(*) as n FROM insurance_policies').get() as { n: number }
     ).n;
 
-    // Ownership is validated before the transaction, so a bogus id is caught there. The happy path
-    // commits atomically, and a validation failure leaves zero rows.
     let threw = false;
     try {
       await insurancePolicyRepository.create(
@@ -82,7 +74,6 @@ describe('async-tx atomicity', () => {
     }
 
     expect(threw, 'the unowned/bogus vehicle should reject the create').toBe(true);
-    // No orphan policy or term survives.
     expect(insuranceTermCount(), 'no orphan term row').toBe(0);
     expect(
       (ctx.sqlite.query('SELECT COUNT(*) as n FROM insurance_policies').get() as { n: number }).n,

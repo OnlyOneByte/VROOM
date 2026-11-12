@@ -1,6 +1,3 @@
-// Missed fill-ups and implausibly large gaps must not feed monthly MPG or cost-per-distance.
-// A missed fill-up spans more than one tank, so folding it in inflates both figures.
-
 import { describe, expect, test } from 'bun:test';
 import {
   buildCostPerDistanceChart,
@@ -41,14 +38,12 @@ describe('buildFuelEfficiencyAndCost — missed-fill-up does not inflate monthly
     const out = buildFuelEfficiencyAndCost(rows);
     const june = out.find((m) => m.month === '2024-06');
     expect(june).toBeTruthy();
-    // Every consecutive pair touches the missed row, so no valid window remains.
     expect(june?.efficiency).toBeNull();
   });
 
   test('an implausibly large gap (> cap) is excluded', () => {
     const rows: GeneralExpenseRow[] = [
       general({ id: 'a', mileage: 10000, volume: 10, date: new Date(2024, 6, 1) }),
-      // 5000 mi exceeds the 1000 mi cap.
       general({ id: 'b', mileage: 15000, volume: 10, date: new Date(2024, 6, 15) }),
     ];
     const out = buildFuelEfficiencyAndCost(rows);
@@ -63,7 +58,6 @@ describe('buildFuelEfficiencyAndCost — missed-fill-up does not inflate monthly
     ];
     const out = buildFuelEfficiencyAndCost(rows);
     const aug = out.find((m) => m.month === '2024-08');
-    // 300 mi / 10 gal = 30 MPG.
     expect(aug?.efficiency).toBeCloseTo(30, 5);
   });
 });
@@ -92,7 +86,6 @@ describe('buildCostPerDistanceChart — missed-fill-up does not spike cost/dista
         date: new Date(2024, 2, 15),
       }),
     ];
-    // The only pair touches a missed fill-up, so no month is emitted.
     const out = buildCostPerDistanceChart(rows, new Map([['veh-1', 'My Car']]));
     expect(out.length).toBe(0);
   });

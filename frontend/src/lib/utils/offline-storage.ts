@@ -9,7 +9,6 @@ const OFFLINE_STORAGE_VERSION = '3.0';
 
 export interface OfflineExpense {
 	id: string;
-	// Idempotency key: a retried POST returns the original row. Backfilled deterministically on read.
 	clientId?: string;
 	vehicleId: string;
 	type?: string;
@@ -91,7 +90,7 @@ function stashCorruptedBlob(): void {
 		const raw = localStorage.getItem(OFFLINE_STORAGE_KEY);
 		if (raw) localStorage.setItem(CORRUPT_STORAGE_KEY, raw);
 	} catch {
-		// Best-effort: failing to preserve the corrupt copy must not block startup.
+		// Best-effort: a failed stash must not block startup.
 	}
 }
 

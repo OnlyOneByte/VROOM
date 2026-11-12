@@ -1,7 +1,3 @@
-/**
- * Every query is scoped by policyId, so the route's policy-ownership check also covers claims.
- */
-
 import { and, desc, eq } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
@@ -24,7 +20,6 @@ export interface CreateClaimInput {
 export interface UpdateClaimInput {
   claimDate?: Date;
   claimType?: string;
-  // null clears a column; undefined leaves it unchanged.
   description?: string | null;
   status?: string;
   payoutAmount?: number | null;
@@ -53,9 +48,6 @@ export class InsuranceClaimRepository {
     }
   }
 
-  /**
-   * Resolves the owning user through the claim's policy. Used for photo ownership checks when only claimId is known.
-   */
   async findOwnerUserId(claimId: string): Promise<string | null> {
     const [row] = await this.db
       .select({ userId: insurancePolicies.userId })

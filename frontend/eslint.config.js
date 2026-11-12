@@ -6,13 +6,6 @@ import svelteParser from 'svelte-eslint-parser';
 import prettier from 'eslint-config-prettier';
 import globals from 'globals';
 
-// The charts barrel re-exports the layerchart wrappers, and three of them import a CSS file for
-// their enter animation, so those modules are side-effectful and cannot be tree-shaken. Any name
-// taken from the barrel therefore pulls layerchart + the d3 cluster (~120 KB gzip) into the
-// importing route's chunk. Only the wrappers — which need that runtime anyway — may come from the
-// barrel; chart-free neighbours such as StatCardGrid must be imported from their own file so
-// chartless routes stay chartless. Listed per specifier because the rule matches exact strings and
-// a glob would also catch the direct `charts/StatCardGrid.svelte` imports this rule exists to force.
 const chartsBarrelSpecifiers = ['$lib/components/charts', '../charts', '../../charts'];
 const restrictedChartsBarrelPaths = chartsBarrelSpecifiers.map(name => ({
 	name,
@@ -24,18 +17,9 @@ const restrictedChartsBarrelPaths = chartsBarrelSpecifiers.map(name => ({
 export default [
 	js.configs.recommended,
 	{
-		ignores: [
-			'.svelte-kit/**',
-			'build/**',
-			'dist/**',
-			'node_modules/**',
-			'static/sw.js' // Service worker is often auto-generated
-		]
+		ignores: ['.svelte-kit/**', 'build/**', 'dist/**', 'node_modules/**', 'static/sw.js']
 	},
 	{
-		// The push service worker runs in a WebWorker/ServiceWorker scope, so it references worker
-		// globals (ServiceWorkerGlobalScope, PushEvent, NotificationEvent, WindowClient) the browser
-		// env does not define. Give this one file the serviceworker globals so no-undef resolves them.
 		files: ['src/service-worker.ts'],
 		languageOptions: {
 			globals: {
@@ -59,7 +43,6 @@ export default [
 				...globals.browser,
 				...globals.node,
 				...globals.es2020,
-				// Svelte 5 runes
 				$state: 'readonly',
 				$derived: 'readonly',
 				$effect: 'readonly',
@@ -80,11 +63,11 @@ export default [
 				}
 			],
 			'@typescript-eslint/no-explicit-any': 'warn',
-			'no-console': 'off', // Allow console in development
+			'no-console': 'off',
 			'no-debugger': 'error',
 			'prefer-const': 'error',
 			'no-var': 'error',
-			'no-unused-vars': 'off' // Use TypeScript version instead
+			'no-unused-vars': 'off'
 		}
 	},
 	...svelte.configs['flat/recommended'],
@@ -129,7 +112,6 @@ export default [
 		}
 	},
 	{
-		// Svelte module files (.svelte.ts) use runes syntax that the standard TS parser can't handle
 		files: ['**/*.svelte.ts'],
 		languageOptions: {
 			parser: tsParser,
@@ -160,7 +142,7 @@ export default [
 				}
 			],
 			'no-unused-vars': 'off',
-			'no-undef': 'off' // Runes are global
+			'no-undef': 'off'
 		}
 	},
 	{
@@ -170,8 +152,6 @@ export default [
 		}
 	},
 	{
-		// Upstream-managed shadcn-svelte components — disable Svelte-specific lint rules
-		// but keep TypeScript checks active
 		files: ['src/lib/components/ui/**/*.svelte'],
 		rules: {
 			'svelte/require-each-key': 'off',

@@ -39,7 +39,6 @@
 	import type { InsurancePolicy, Vehicle, CreateTermRequest } from '$lib/types';
 	import FormLayout from '$lib/components/common/form-layout.svelte';
 
-	// Money labels use the user's currency symbol; a hardcoded $ would show the wrong unit for EUR/GBP users.
 	const currencySymbol = $derived(getCurrencySymbol());
 
 	interface Props {
@@ -170,7 +169,7 @@
 			if (isEditMode && policy) {
 				await insuranceApi.updatePolicy(policy.id, {
 					company: company.trim(),
-					// Send null, not undefined: JSON drops undefined and the old notes would survive.
+					// JSON drops undefined; send null to clear the notes.
 					notes: notes.trim() || null,
 					isActive
 				});

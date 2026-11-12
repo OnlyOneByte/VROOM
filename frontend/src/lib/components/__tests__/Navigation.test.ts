@@ -77,7 +77,6 @@ describe('Navigation Component Logic', () => {
 	});
 
 	it('documents the current navigation items', () => {
-		// Mirrors the Navigation.svelte arrays, which are not exported; keep it in sync when the nav changes.
 		const navigation = [
 			{ name: 'Dashboard', href: '/dashboard' },
 			{ name: 'Expenses', href: '/expenses' },

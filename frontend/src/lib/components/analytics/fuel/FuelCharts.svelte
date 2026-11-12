@@ -160,7 +160,6 @@
 		{ key: 'fillupCount', label: 'Fill-ups', color: CHART_COLORS[0] as string }
 	];
 
-	// Gate on real data: the backend always returns all 7 days, so a length check would show an empty axis.
 	let dayPatternData = $derived(
 		(dayOfWeekPatterns ?? []).some(d => d.fillupCount > 0) ? (dayOfWeekPatterns ?? []) : []
 	);

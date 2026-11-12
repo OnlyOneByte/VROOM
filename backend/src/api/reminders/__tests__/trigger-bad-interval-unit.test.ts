@@ -1,9 +1,3 @@
-/**
- * An invalid custom intervalUnit must not hang the trigger. The bad reminder is reported as a per-reminder
- * skip, and well-formed reminders in the same batch still process. Zod blocks bad units on write, so the
- * row is seeded directly via sqlite.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -26,14 +20,13 @@ interface TriggerResultShape {
   skipped: Array<{ reminderId: string; reason: string; message?: string }>;
 }
 
-/** Seeds a custom reminder with a corrupt intervalUnit, overdue since 2020, with a linked vehicle. */
 function seedCorruptCustomReminder(id: string, vehicleId: string): void {
   ctx.sqlite.run(
     `INSERT INTO reminders
        (id, user_id, name, type, action_mode, frequency, interval_value, interval_unit,
         trigger_mode, start_date, next_due_date, is_active)
      VALUES (?, ?, 'Corrupt', 'notification', 'automatic', 'custom', 1, 'fortnight',
-        'time', 1577836800, 1577836800, 1)`, // 2020-01-01
+        'time', 1577836800, 1577836800, 1)`,
     [id, ctx.user.id]
   );
   ctx.sqlite.run(`INSERT INTO reminder_vehicles (reminder_id, vehicle_id) VALUES (?, ?)`, [
@@ -61,7 +54,6 @@ describe('invalid custom intervalUnit is skipped, never hangs', () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Kia', model: 'Soul', year: 2018 });
     seedCorruptCustomReminder('bad2', vehicleId);
 
-    // A normal monthly notification reminder, also overdue (startDate in the past).
     const created = await ctx.authed('POST', '/api/v1/reminders', {
       name: 'Healthy monthly',
       type: 'notification',
@@ -77,7 +69,6 @@ describe('invalid custom intervalUnit is skipped, never hangs', () => {
     const body = await json<DataEnvelope<TriggerResultShape>>(res);
     expect(res.status).toBe(200);
 
-    // Bad one skipped...
     expect(body.data.skipped.some((s) => s.reminderId === 'bad2')).toBe(true);
     const goodNotifs = ctx.sqlite
       .query('SELECT COUNT(*) AS n FROM reminder_notifications WHERE reminder_id = ?')

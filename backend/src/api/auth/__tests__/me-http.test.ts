@@ -1,8 +1,3 @@
-/**
- * HTTP tests for GET /api/v1/auth/me. The profile page's "Member Since" row depends on createdAt,
- * so it must stay in the response.
- */
-
 import { beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 
@@ -61,10 +56,6 @@ describe('POST /api/v1/auth/refresh — success body shape', () => {
   });
 });
 
-/**
- * PATCH /me throws HTTPException and relies on the central error handler for the response
- * envelope. These tests pin that envelope.
- */
 interface ErrorEnvelope {
   success: false;
   error: { code: string; message: string };
@@ -104,7 +95,6 @@ describe('PATCH /api/v1/auth/me — validation errors via the central handler', 
   });
 });
 
-/** A rejected session cookie is cleared so the browser stops resending it. */
 describe('bad-session 401 clears the session cookie', () => {
   async function withGarbageSession(method: string, path: string): Promise<Response> {
     const cookieName = ctx.cookie.split('=')[0];

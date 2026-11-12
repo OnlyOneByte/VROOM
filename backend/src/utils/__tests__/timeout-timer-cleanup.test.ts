@@ -1,7 +1,3 @@
-// withTimeout must clear its timer on every exit path. An uncleared timer keeps the event loop
-// alive for the full budget. Swaps the global timer functions for recorders, so nothing actually
-// waits.
-
 import { afterEach, describe, expect, test } from 'bun:test';
 import { withTimeout } from '../timeout';
 
@@ -13,7 +9,6 @@ interface TimerLog {
   cleared: unknown[];
 }
 
-/** Record every timer `withTimeout` creates and clears while `run` executes. */
 async function recordTimers(run: () => Promise<unknown>): Promise<TimerLog> {
   const log: TimerLog = { created: [], cleared: [] };
 
@@ -67,7 +62,6 @@ describe('withTimeout timer cleanup', () => {
   });
 
   test('a cleared timer never fires, so the resolved value still wins', async () => {
-    // Clearing the timer keeps a late rejection from firing on a settled race.
     const slowWork = new Promise<string>((resolve) => realSetTimeout(() => resolve('done'), 5));
     expect(await withTimeout(slowWork, 1000, 'op')).toBe('done');
   });

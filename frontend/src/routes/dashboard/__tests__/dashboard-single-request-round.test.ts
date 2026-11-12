@@ -1,5 +1,3 @@
-// Pins that the independent opening reads are issued in one round, not chained.
-
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { render, waitFor } from '@testing-library/svelte';
 import type { Vehicle } from '$lib/types';
@@ -7,7 +5,6 @@ import type { Vehicle } from '$lib/types';
 vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
-// Charts and the carousel are stubbed: they dominate the module graph.
 vi.mock('$lib/components/charts', () => ({ AppPieChart: () => {} }));
 vi.mock('$lib/components/charts/ExpenseTrendChart.svelte', () => ({ default: () => {} }));
 vi.mock('$lib/components/dashboard/VehicleCarousel.svelte', () => ({ default: () => {} }));
@@ -42,7 +39,6 @@ vi.mock('$lib/services/reminder-api', () => ({
 	}
 }));
 
-// Imported eagerly so module transforms happen outside test timeouts.
 import Page from '../+page.svelte';
 
 const VEHICLE: Vehicle = {
@@ -80,7 +76,6 @@ beforeEach(() => {
 
 describe('dashboard initial load', () => {
 	test('cover photos and per-vehicle stats do NOT queue behind the vehicle list', async () => {
-		// The vehicle list never resolves here, so a second round could never be reached.
 		getVehicles.mockImplementation(() => new Promise<Vehicle[]>(() => {}));
 
 		render(Page);
@@ -105,7 +100,6 @@ describe('dashboard initial load', () => {
 		] as const) {
 			expect(spy.mock.calls.length, `${name} requested exactly once`).toBe(1);
 		}
-		// The summary is requested once per distinct period: all-time, and the selected one if different.
 		expect(getExpenseSummary.mock.calls.length).toBe(1);
 	});
 });

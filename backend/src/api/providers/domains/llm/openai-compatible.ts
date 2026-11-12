@@ -1,8 +1,3 @@
-/**
- * OpenAI Chat Completions adapter, also used for Ollama and other OpenAI-compatible endpoints.
- * Dumb transport: it never executes tools or trusts tool args.
- */
-
 import type { ModelProviderSettings } from '../model/model-registry';
 import { postModelJson, trimBaseUrl } from '../model/model-transport';
 import type {
@@ -88,7 +83,6 @@ function toOpenAiTool(t: ToolDefinition): Record<string, unknown> {
   };
 }
 
-/** A malformed 2xx body yields empty text rather than throwing. */
 function normalizeResponse(json: OpenAiResponse | null): ChatResult {
   const message = json?.choices?.[0]?.message;
   const content = typeof message?.content === 'string' ? message.content : '';

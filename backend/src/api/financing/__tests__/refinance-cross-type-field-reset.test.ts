@@ -1,9 +1,3 @@
-/**
- * Switching a vehicle's financing type through create-or-replace must not leave the previous type's
- * fields on the reused row. update() skips undefined keys and the cross-type fields are optional, so
- * each one must be reset to null explicitly. Drives the real POST route.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -56,7 +50,6 @@ describe('create-or-replace financing clears stale cross-type fields', () => {
   test('lease → loan: the prior lease fields (residualValue/mileageLimit/excessMileageFee) are cleared', async () => {
     const vehicleId = await createVehicle();
 
-    // 1) A lease carrying all three lease-only fields.
     await postFinancing(vehicleId, {
       financingType: 'lease',
       provider: 'LeaseCo',
@@ -69,7 +62,6 @@ describe('create-or-replace financing clears stale cross-type fields', () => {
       excessMileageFee: 0.25,
     });
 
-    // 2) Re-save the SAME vehicle as a LOAN that omits every lease field.
     const loan = await postFinancing(vehicleId, {
       financingType: 'loan',
       provider: 'LoanBank',
@@ -90,7 +82,6 @@ describe('create-or-replace financing clears stale cross-type fields', () => {
   test('loan → lease: the prior loan-only field (apr) is cleared', async () => {
     const vehicleId = await createVehicle();
 
-    // 1) A loan with an APR.
     await postFinancing(vehicleId, {
       financingType: 'loan',
       provider: 'LoanBank',
@@ -101,7 +92,6 @@ describe('create-or-replace financing clears stale cross-type fields', () => {
       paymentAmount: 480,
     });
 
-    // 2) Re-save as a LEASE that omits apr.
     const lease = await postFinancing(vehicleId, {
       financingType: 'lease',
       provider: 'LeaseCo',

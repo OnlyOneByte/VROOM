@@ -144,7 +144,6 @@ export interface FinancingResponse {
 	summary: {
 		totalMonthlyPayments: number;
 		remainingBalance: number;
-		// Forward estimate of this month's interest on current balances; not year-to-date and not paid.
 		monthlyInterestEstimate: number;
 		activeCount: number;
 		loanCount: number;

@@ -1,9 +1,3 @@
-/**
- * An accepted editor can reach the photos of owner-stamped rows (expenses and odometer readings on a
- * shared vehicle) they are allowed to edit. Viewers and users with no share keep the existence-hiding
- * 404 on both read and write.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -29,7 +23,6 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-/** Upload a one-pixel-ish JPEG to a photo entity route as B (multipart, like the real client). */
 async function uploadAsB(entityType: string, entityId: string): Promise<Response> {
   const form = new FormData();
   form.append(
@@ -43,7 +36,6 @@ async function uploadAsB(entityType: string, entityId: string): Promise<Response
   });
 }
 
-/** A owns a vehicle and invites B at `level`; B accepts. Returns the vehicleId. */
 async function shareAccepted(level: 'viewer' | 'editor'): Promise<string> {
   const vehicleId = await seedVehicle(ctx, { make: 'Shared', model: 'Car', year: 2021 });
   const invite = await ctx.authed('POST', '/api/v1/shares', { vehicleId, email: bEmail, level });
@@ -54,7 +46,6 @@ async function shareAccepted(level: 'viewer' | 'editor'): Promise<string> {
   return vehicleId;
 }
 
-/** B logs an expense on the shared vehicle. Owner-stamped, so B's own id is NOT on the row. */
 async function expenseByB(vehicleId: string): Promise<string> {
   const res = await asB('POST', '/api/v1/expenses', {
     vehicleId,
@@ -64,7 +55,6 @@ async function expenseByB(vehicleId: string): Promise<string> {
   });
   const body = await json<DataEnvelope<{ id: string }>>(res);
   expect(res.status, JSON.stringify(body)).toBe(201);
-  // The row is stamped with the owner's id, not the editor's.
   const row = ctx.sqlite.query('SELECT user_id FROM expenses WHERE id = ?').get(body.data.id) as {
     user_id: string;
   };
@@ -89,7 +79,6 @@ describe('photo access on owner-stamped rows of a shared vehicle', () => {
 
     const res = await uploadAsB('expense', expenseId);
     expect(res.status, 'authorization must not be the thing that rejects the editor').not.toBe(404);
-    // No storage provider is configured, so the request stops after the gate; the 400 shows the gate passed.
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error?: { message?: string } };
     expect(body.error?.message ?? '').toContain('No storage provider configured');

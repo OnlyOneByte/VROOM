@@ -25,8 +25,6 @@ export interface VehicleStats {
   chargeExpenseCount: number;
 }
 
-// Gas and charge expenses are split by fuel type. Efficiency is computed only for the groups the
-// tracking flags enable.
 export function calculateVehicleStats(
   fuelExpenses: FuelExpense[],
   initialMileage: number,
@@ -112,8 +110,6 @@ function calculateMileageStats(
   const mileages = expensesWithMileage.map((e) => e.mileage as number);
   const latestMileage = maxOf(mileages);
   stats.currentMileage = latestMileage;
-  // Clamped at 0: a mistyped odometer reading below the initial mileage must not yield negative
-  // distance.
   stats.totalMileage = Math.max(0, latestMileage - initialMileage);
 
   if (stats.totalMileage > 0) {
@@ -121,8 +117,6 @@ function calculateMileageStats(
   }
 }
 
-// Pairs consecutive fill-ups, so the input must be chronological. Sorting a copy keeps the helper
-// correct for any caller.
 function calculateAverageMpg(unorderedExpenses: FuelExpense[]): number | null {
   const sorted = [...unorderedExpenses].sort((a, b) => a.date.getTime() - b.date.getTime());
   return averageConsecutiveMpg(sorted);

@@ -1,5 +1,3 @@
-// Dismissing the conflict dialog must stick: the auto-open effect must not reopen it, but a new sync batch does.
-
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import type { SyncConflict } from '$lib/utils/sync/sync-state.svelte';
@@ -89,7 +87,6 @@ describe('SyncConflictResolver dismissal', () => {
 		await settle();
 		expect(screen.queryByText(TITLE)).toBeNull();
 
-		// What syncAll does: `syncConflicts.current = result.conflicts` — a fresh array, same rows.
 		syncConflicts.current = [...deferred];
 		await settle();
 

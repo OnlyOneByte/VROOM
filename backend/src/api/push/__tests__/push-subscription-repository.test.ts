@@ -1,9 +1,3 @@
-/**
- * PushSubscriptionRepository against a fresh in-memory DB built from the migration chain. Upsert is
- * idempotent on (userId, endpoint) and resets failureCount. Every method is userId-scoped, since the
- * endpoint alone is not a capability. The reaping counters work.
- */
-
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
@@ -138,7 +132,7 @@ describe('PushSubscriptionRepository', () => {
   });
 
   test('per-user cap: a flood of distinct endpoints is bounded to maxSubscriptionsPerUser', async () => {
-    const cap = 20; // CONFIG.validation.push.maxSubscriptionsPerUser
+    const cap = 20;
     for (let i = 0; i < cap + 5; i++) {
       await repo.upsertByEndpoint(USER_A, {
         endpoint: `https://fcm.googleapis.com/fcm/send/dev-${i}`,
@@ -146,7 +140,7 @@ describe('PushSubscriptionRepository', () => {
         auth: 'a',
       });
     }
-    expect(await repo.findByUser(USER_A)).toHaveLength(cap); // never exceeds the cap
+    expect(await repo.findByUser(USER_A)).toHaveLength(cap);
   });
 
   test('under the cap nothing is evicted', async () => {
@@ -162,7 +156,6 @@ describe('PushSubscriptionRepository', () => {
 
   test('device rotation: a NEW device past the cap evicts the OLDEST, keeps the new one', async () => {
     const cap = 20;
-    // Old created_at values make these the eviction candidates.
     for (let i = 0; i < cap; i++) {
       sqliteDb.run(
         `INSERT INTO push_subscriptions (id, user_id, endpoint, p256dh, auth, failure_count, created_at)
@@ -176,10 +169,10 @@ describe('PushSubscriptionRepository', () => {
 
     const rows = await repo.findByUser(USER_A);
     expect(rows).toHaveLength(cap);
-    expect(rows.some((r) => r.endpoint === newEndpoint)).toBe(true); // the new device is kept
+    expect(rows.some((r) => r.endpoint === newEndpoint)).toBe(true);
     expect(rows.some((r) => r.endpoint === 'https://fcm.googleapis.com/fcm/send/old-0')).toBe(
       false
-    ); // an old one evicted
+    );
   });
 
   test('re-subscribe (same endpoint) at the cap does NOT evict — it updates in place', async () => {
@@ -192,7 +185,6 @@ describe('PushSubscriptionRepository', () => {
       });
     }
     expect(await repo.findByUser(USER_A)).toHaveLength(cap);
-    // Re-subscribing an existing endpoint updates it without evicting anything.
     await repo.upsertByEndpoint(USER_A, {
       endpoint: 'https://fcm.googleapis.com/fcm/send/r-0',
       p256dh: 'rotated',

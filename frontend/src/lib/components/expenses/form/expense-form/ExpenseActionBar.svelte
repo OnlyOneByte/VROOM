@@ -40,7 +40,6 @@
 				class="sm:rounded-full rounded-full shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 sm:h-14 px-5 border-0 flex-shrink-0"
 			>
 				<Trash2 class="h-5 w-5 sm:mr-2" />
-				<!-- Clip rather than hide below sm: a sr-only rule would otherwise outrank sm:not-sr-only. -->
 				<span class="max-sm:sr-only font-semibold">Delete</span>
 			</Button>
 		{/if}

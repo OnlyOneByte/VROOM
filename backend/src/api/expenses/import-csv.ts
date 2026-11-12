@@ -1,8 +1,3 @@
-/**
- * Parses a VROOM CSV export and builds a per-row import plan. Vehicles are matched only against
- * the importing user's own garage. Pure: no DB access.
- */
-
 import { createHash } from 'node:crypto';
 import { parse } from 'csv-parse/sync';
 import { z } from 'zod';
@@ -33,14 +28,12 @@ export interface ImportableExpense {
   location: string | null;
   tags: string[];
   missedFillup: boolean;
-  /** Deterministic key so re-importing the same file dedups via the (userId, clientId) unique index. */
   clientId: string;
 }
 
 export type ImportRowStatus = 'ready' | 'error';
 
 export interface ImportRowResult {
-  /** 1-based, counting the header as row 1. */
   row: number;
   status: ImportRowStatus;
   expense?: ImportableExpense;
@@ -61,12 +54,10 @@ const EXP = CONFIG.validation.expense;
 type CellGetter = (key: string) => string;
 
 function makeCellGetter(record: Record<string, string>): CellGetter {
-  // Undoes the leading apostrophe the export adds to formula-like cells, so a VROOM CSV round-trips.
-  // Only `'` followed by a trigger character is stripped, so a genuine leading apostrophe survives.
+  // Only the apostrophe the export adds to formula-like cells is stripped, so a genuine leading apostrophe survives.
   return (k: string) => denormalizeCsvCell((record[k] ?? '').trim());
 }
 
-/** Returns integer cents. The import path bypasses the Zod money schemas, so it must convert here too. */
 function parseAmount(raw: string): { value: number } | { error: string } {
   const amount = Number(raw);
   if (!raw || !Number.isFinite(amount) || amount <= 0) {
@@ -102,7 +93,7 @@ function parseCategory(
 
 function parseDate(raw: string): { value: Date } | { error: string } {
   if (!raw) return { error: `Invalid date "${raw}"` };
-  // Date-only values are built in local time; `new Date('YYYY-MM-DD')` would shift the day west of UTC.
+  // new Date("YYYY-MM-DD") parses as UTC and would shift the day west of UTC.
   const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw.trim());
   if (dateOnly) {
     const date = buildLocalDate(Number(dateOnly[1]), Number(dateOnly[2]), Number(dateOnly[3]));
@@ -141,12 +132,10 @@ function parseTags(raw: string): { value: string[] } | { error: string } {
   return { value: tags };
 }
 
-// Every vehicle-name match (row resolution and target-unit lookup) compares through this key.
 export function vehicleNameKey(name: string): string {
   return name.trim().toLowerCase();
 }
 
-// `null` in the map marks a name shared by several vehicles, which must never resolve silently.
 function resolveImportVehicleId(
   vehicleName: string,
   vehicleByName: Map<string, string | null>
@@ -201,7 +190,6 @@ function parseRow(
   const fuelType = fuelTypeResult.value;
   const missedFillup = /^(true|1|yes)$/i.test(get('missedFillup'));
 
-  // Mirrors the create route so a bad row fails at preview rather than mid-commit.
   if (category === 'fuel' && (!volume || mileage === null)) {
     return {
       error: isElectricFuelType(fuelType)
@@ -228,8 +216,6 @@ function parseRow(
   };
 }
 
-// The occurrence index lets identical rows in one file both import, while re-importing the same file
-// yields the same keys in the same order. The `csv:` prefix keeps them apart from offline client ids.
 export function deriveImportClientId(expense: ImportableExpense, occurrence: number): string {
   const content = [
     expense.vehicleId,

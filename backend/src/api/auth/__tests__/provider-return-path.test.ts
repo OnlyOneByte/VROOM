@@ -1,9 +1,3 @@
-/**
- * The provider-OAuth returnTo must never steer the browser off this origin, since the callback
- * redirects to `${frontend}${returnTo}`. Covers the isSafeReturnPath predicate and the HTTP intake
- * and round-trip.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 
@@ -63,7 +57,6 @@ describe('GET /auth/providers/connect/google', () => {
     const state = authorizeUrl.searchParams.get('state') ?? '';
     expect(state).not.toBe('');
 
-    // The cancellation leg (no code) is the cheapest route back through the redirect.
     const callback = await ctx.authed(
       'GET',
       `/api/v1/auth/callback/provider/google?state=${encodeURIComponent(state)}`

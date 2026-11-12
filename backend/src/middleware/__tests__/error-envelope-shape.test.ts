@@ -1,6 +1,3 @@
-// Every error response uses the { success, error: { code, message, details? } } envelope that the frontend parses.
-// Hand-built envelopes and the raw @hono/zod-validator package both break it, so source scans check for both.
-
 import { describe, expect, test } from 'bun:test';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -27,10 +24,8 @@ function sourceFiles(dir: string, acc: string[] = []): string[] {
 const files = sourceFiles(SRC);
 const rel = (file: string) => relative(SRC, file).split('\\').join('/');
 
-// Matched on whitespace-collapsed source so multi-line literals are caught too.
 const HAND_ROLLED = /c\.json\(\s*\{\s*success:\s*false/;
 
-// Files allowed to build or pass through a raw envelope.
 const ENVELOPE_OWNERS = ['errors.ts', 'middleware/error-handler.ts', 'api/sync/sync-errors.ts'];
 
 ratchet({
@@ -46,7 +41,6 @@ ratchet({
       .filter((file) => HAND_ROLLED.test(readFileSync(file, 'utf-8').replace(/\s+/g, ' ')))
       .map(rel),
   probe: () => {
-    // Fixtures rather than live offenders, so the probe stays satisfiable as they are fixed.
     expect(HAND_ROLLED.test('return c.json({ success: false, error: { code: "X" } }, 400);')).toBe(
       true
     );
@@ -77,7 +71,6 @@ ratchet({
 });
 
 describe('a live validation failure wears the envelope', () => {
-  // Exercises the hook end to end. The source scans cannot tell whether it still fires.
   const app = new Hono().post(
     '/t',
     zValidator('json', z.object({ n: z.number(), label: z.string() })),
@@ -100,7 +93,6 @@ describe('a live validation failure wears the envelope', () => {
     expect(status).toBe(400);
     expect(body.success).toBe(false);
     expect(error.code).toBe('ValidationError');
-    // A message that does not name the field is unactionable on a multi-field form.
     expect(error.message).toContain('n');
     expect(error.message).not.toContain('"code"');
     expect(error.message.trimStart().startsWith('[')).toBe(false);

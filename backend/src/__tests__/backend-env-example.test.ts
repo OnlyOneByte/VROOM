@@ -1,6 +1,3 @@
-// Guards backend/.env.example against drift from the backend: every variable it sets must be read,
-// HOST must be an address literal, and every documented OAuth callback must be a mounted route.
-
 import { beforeAll, describe, expect, test } from 'bun:test';
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, sep } from 'node:path';
@@ -13,12 +10,9 @@ const REPO_ROOT = join(HERE, '..', '..', '..');
 
 const BACKEND_ENV_EXAMPLE = 'backend/.env.example';
 
-// Keys of config.ts's envSchema.
 const SCHEMA_KEY = /^ {2}([A-Z][A-Z0-9_]*):/gm;
-// Active assignments only: commented-out lines do not match.
 const ENV_FILE_KEY = /^([A-Z][A-Z0-9_]*)=(.*)$/gm;
 const PROCESS_ENV_READ = /process\.env\.([A-Z][A-Z0-9_]*)/g;
-// Matches callback URLs whether active or commented out.
 const CALLBACK_URL = /https?:\/\/[^\s`'"<>)|]*\/auth\/callback\/[^\s`'"<>),|]*/g;
 
 function exampleEnv(): string {
@@ -28,18 +22,15 @@ function exampleEnv(): string {
 function assignments(): { name: string; value: string }[] {
   return [...exampleEnv().matchAll(ENV_FILE_KEY)].map(([, name, value]) => ({
     name,
-    // Strip the trailing `# why` annotations the file uses on some lines.
     value: value.replace(/\s+#.*$/, '').trim(),
   }));
 }
 
-// Everything the backend consumes: schema keys plus direct process.env reads.
 function backendReadsEnvVars(): Set<string> {
   const config = readFileSync(join(SRC_ROOT, 'config.ts'), 'utf8');
   const read = new Set([...config.matchAll(SCHEMA_KEY)].map((match) => match[1]));
   const sources = readdirSync(SRC_ROOT, { recursive: true, encoding: 'utf8' })
     .map((file) => file.split(sep).join('/'))
-    // Test scaffolding sets variables nothing in production reads, which would mask the drift.
     .filter((file) => file.endsWith('.ts') && !/__tests__|test-helpers/.test(file));
   for (const file of sources) {
     const source = readFileSync(join(SRC_ROOT, file), 'utf8');
@@ -59,7 +50,6 @@ describe('backend/.env.example matches the backend', () => {
 
   test('HOST is a literal address, not a resolvable name', () => {
     const host = assignments().find((entry) => entry.name === 'HOST')?.value;
-    // A name makes the bind family resolver-dependent, so one loopback family refuses clients.
     expect(host, 'HOST must be an address literal so the bind family is deterministic').toMatch(
       /^(\d{1,3}(\.\d{1,3}){3}|\[?[0-9a-fA-F:]+\]?)$/
     );
@@ -80,7 +70,6 @@ describe('backend/.env.example matches the backend', () => {
   describe('its OAuth callback URLs', () => {
     let ctx: TestApp;
 
-    // Unauthenticated GETs that write nothing. The timeout covers the cold module load behind the source scan.
     beforeAll(async () => {
       ctx = await createTestApp();
     }, 30_000);

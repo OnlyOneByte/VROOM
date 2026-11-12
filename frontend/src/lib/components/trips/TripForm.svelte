@@ -26,7 +26,6 @@
 		open: boolean;
 		vehicles: Vehicle[];
 		onSaved: () => void;
-		/** When set, the form edits this trip instead of creating one. */
 		trip?: Trip | null;
 	}
 
@@ -34,7 +33,6 @@
 
 	let isEdit = $derived(!!trip);
 
-	// Odometer inputs hold numbers or null at runtime, so their types admit all three; parseOdometer accepts each.
 	let vehicleId = $state('');
 	let startOdometer = $state<string | number | null>('');
 	let endOdometer = $state<string | number | null>('');
@@ -47,7 +45,6 @@
 	let isSubmitting = $state(false);
 	let errors = $state<TripFormErrors>({});
 
-	// Falls back to the global unit preference when no vehicle is resolved yet.
 	let unitLabel = $derived.by(() => {
 		const v = vehicles.find(veh => veh.id === vehicleId);
 		return getDistanceUnitLabel(
@@ -56,7 +53,6 @@
 		);
 	});
 
-	// Keyed on open. Edit hydrates from the existing row so a never-populated field cannot wipe data on save.
 	let lastOpen = $state(false);
 	$effect(() => {
 		if (open === lastOpen) return;
@@ -101,7 +97,6 @@
 		errors = validateTripFields(currentForm());
 		if (Object.keys(errors).length > 0) return;
 
-		// Same parser as validation, which already guarantees non-null; ?? 0 only narrows the type.
 		const startValue = parseOdometer(startOdometer) ?? 0;
 		const endValue = parseOdometer(endOdometer) ?? 0;
 
@@ -117,7 +112,6 @@
 				note: note.trim() || undefined
 			};
 			if (trip) {
-				// Edit sends only editable fields: vehicleId is immutable and the backend re-syncs the linked odometer entry.
 				await tripApi.update(trip.id, payload);
 				appStore.addNotification({ type: 'success', message: 'Trip updated' });
 			} else {
@@ -160,7 +154,6 @@
 				{#if vehicles.length === 0}
 					<p class="text-sm text-muted-foreground">Add a vehicle first to log a trip.</p>
 				{:else if isEdit}
-					<!-- A trip's vehicle is immutable, so it is shown read-only in edit. -->
 					<Input
 						id="trip-vehicle"
 						value={getVehicleDisplayName(vehicles.find(v => v.id === vehicleId)) ?? 'Vehicle'}

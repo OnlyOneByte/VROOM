@@ -1,7 +1,3 @@
-/**
- * Google Sheets Service - Syncs VROOM data to Google Sheets
- */
-
 import { and, eq, inArray } from 'drizzle-orm';
 import { google, type sheets_v4 } from 'googleapis';
 import { getDb } from '../../../db/connection';
@@ -29,10 +25,7 @@ import { NotFoundError, SyncError, SyncErrorCode, ValidationError } from '../../
 import { decrypt } from '../../../utils/encryption';
 import { GoogleDriveService } from './google-drive-service';
 
-/**
- * Column order per table, keyed like TABLE_SCHEMA_MAP in config.ts. Hand-maintained, so a schema
- * column missing here is silently dropped on backup. sheets-header-coverage.test.ts guards it.
- */
+// Hand-maintained: a schema column missing here is silently dropped from backups.
 export const SHEET_HEADERS = {
   vehicles: [
     'id',
@@ -247,7 +240,6 @@ export const SHEET_HEADERS = {
   ],
 } as const satisfies Record<string, readonly string[]>;
 
-/** Display title of each backup tab, keyed like SHEET_HEADERS. The only place a tab title is written. */
 export const SHEET_TABS = {
   vehicles: 'Vehicles',
   expenses: 'Expenses',
@@ -270,10 +262,10 @@ export const SHEET_TABS = {
 
 type SheetTableKey = keyof typeof SHEET_TABS;
 
-/** Tab titles in creation order. The backup swap relies on this order to index each tab. */
+// Order matters: the backup swap indexes each tab by position.
 export const SHEET_NAMES = Object.values(SHEET_TABS);
 
-// Space-free so the range needs no A1 quoting.
+// Keep titles space-free: ranges would otherwise need A1 quoting.
 export const SHEET_STAGING_SUFFIX = '__vroom_staging';
 
 export interface SpreadsheetInfo {
@@ -283,7 +275,6 @@ export interface SpreadsheetInfo {
   sheets: { id: number; title: string }[];
 }
 
-/** Injected in tests. Both clients must share one backing store so Sheets and Drive stay consistent. */
 export interface GoogleSheetsClients {
   sheets: sheets_v4.Sheets;
   driveService: GoogleDriveService;
@@ -337,7 +328,6 @@ export class GoogleSheetsService {
       }
       spreadsheetId = spreadsheet.spreadsheetId;
 
-      // New spreadsheets land in My Drive root; move it into the backup folder.
       await this.driveService.moveFile(spreadsheetId, targetFolderId, 'root');
     }
 
@@ -435,7 +425,6 @@ export class GoogleSheetsService {
     }
   }
 
-  /** Skips the query when there are no parent ids, avoiding an empty inArray. */
   private async queryIfNonEmpty<T>(
     ids: readonly unknown[],
     query: () => Promise<T[]>
@@ -483,7 +472,7 @@ export class GoogleSheetsService {
 
     const userPhotos = await db.select().from(photos).where(eq(photos.userId, userId));
 
-    // Batched to stay under the SQLite bound-variable limit.
+    // SQLite caps bound parameters per statement; batch to stay under it.
     const photoIds = userPhotos.map((p) => p.id);
     const userPhotoRefs: (typeof photoRefs.$inferSelect)[] = [];
     const BATCH_SIZE = 500;
@@ -512,13 +501,11 @@ export class GoogleSheetsService {
 
     const userTrips = await db.select().from(trips).where(eq(trips.userId, userId));
 
-    // Shares this user granted; accepted-only so restore recreates exactly what was exported.
     const userVehicleShares = await db
       .select()
       .from(vehicleShares)
       .where(and(eq(vehicleShares.ownerId, userId), eq(vehicleShares.status, 'accepted')));
 
-    // Record-typed so a table missing its rows is a compile error, not an empty tab.
     const rowsByTable: Record<SheetTableKey, Record<string, unknown>[]> = {
       vehicles: userVehicles,
       expenses: userExpenses,
@@ -539,7 +526,6 @@ export class GoogleSheetsService {
       vehicleShares: userVehicleShares,
     };
 
-    // Object key order matches SHEET_NAMES, which the atomic swap relies on to index each tab.
     const tables = (Object.keys(SHEET_TABS) as SheetTableKey[]).map((key) => ({
       title: SHEET_TABS[key],
       rows: rowsByTable[key],
@@ -549,16 +535,11 @@ export class GoogleSheetsService {
     await this.writeAllSheetsAtomically(spreadsheetId, tables);
   }
 
-  /**
-   * Stages every table in a staging tab, then swaps them in with one batchUpdate. A failure while
-   * staging leaves the previous backup intact, and readers never see a mix of old and new tabs.
-   */
   private async writeAllSheetsAtomically(
     spreadsheetId: string,
     tables: { title: string; rows: Record<string, unknown>[]; headers: readonly string[] }[]
   ): Promise<void> {
     const stagingTitles = tables.map((t) => `${t.title}${SHEET_STAGING_SUFFIX}`);
-    // Staging tabs left by an interrupted run would collide with the create below.
     await this.deleteSheetsByTitle(spreadsheetId, stagingTitles);
 
     try {
@@ -579,11 +560,11 @@ export class GoogleSheetsService {
         )
       );
     } catch (err) {
-      await this.deleteSheetsByTitle(spreadsheetId, stagingTitles).catch(() => {});
+      await this.deleteSheetsByTitle(spreadsheetId, stagingTitles).catch(() => undefined);
       throw err;
     }
 
-    // Each rename sets index explicitly: a staging tab is created at the end, so without it tab order drifts.
+    // Sheets appends new tabs at the end, so the index must be set explicitly.
     const info = await this.getSpreadsheetInfo(spreadsheetId);
     const idByTitle = new Map(info.sheets.map((s) => [s.title, s.id]));
     const requests: sheets_v4.Schema$Request[] = [];
@@ -618,7 +599,6 @@ export class GoogleSheetsService {
     }
   }
 
-  /** Assumes the sheet exists and is empty. */
   private async writeSheetValues<T extends Record<string, unknown>>(
     spreadsheetId: string,
     sheetName: string,
@@ -633,8 +613,7 @@ export class GoogleSheetsService {
     await this.sheets.spreadsheets.values.update({
       spreadsheetId,
       range: `${sheetName}!A1:${String.fromCharCode(64 + headers.length)}${data.length + 1}`,
-      // RAW keeps values byte-exact. USER_ENTERED would turn "=..." into formulas and reformat numbers
-      // and dates. Do not add apostrophe escaping here; that is for one-way CSV export only.
+      // RAW, not USER_ENTERED: USER_ENTERED turns values like '=...' into formulas.
       valueInputOption: 'RAW',
       requestBody: { values },
     });
@@ -656,7 +635,6 @@ export class GoogleSheetsService {
     return response.data.values || [];
   }
 
-  /** `optional` tabs read as empty when absent, which covers backups made before the tab existed. */
   private readTab(
     spreadsheetId: string,
     key: SheetTableKey,
@@ -720,7 +698,6 @@ export class GoogleSheetsService {
       this.readTab(spreadsheetId, 'reminders', true),
       this.readTab(spreadsheetId, 'reminderVehicles', true),
       this.readTab(spreadsheetId, 'reminderNotifications', true),
-      // Older backups lack these tabs.
       this.readTab(spreadsheetId, 'trips', true),
       this.readTab(spreadsheetId, 'vehicleShares', true),
     ]);
@@ -794,7 +771,6 @@ export class GoogleSheetsService {
   }
 }
 
-/** Ownership-checked lookup of a storage provider's Google credentials. Used by restore only. */
 export async function createSheetsServiceForProvider(
   providerId: string,
   userId: string

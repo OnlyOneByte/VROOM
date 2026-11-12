@@ -1,5 +1,3 @@
-/** Shared setup for the reminder HTTP tests. */
-
 import { expect } from 'bun:test';
 import type { TestApp } from '../../../test-helpers/http-client';
 
@@ -15,10 +13,6 @@ export async function addOdometerReading(
   expect(res.status, `odometer create ${odometer}`).toBe(201);
 }
 
-/**
- * Seeds a pure-mileage reminder row directly, so a test can place the milestone below or above the
- * current odometer without the create route deriving it. The interval is 5000, and next_due_date is NULL.
- */
 export function seedMileageReminder(
   ctx: TestApp,
   id: string,

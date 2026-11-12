@@ -1,10 +1,3 @@
-/**
- * Per-vehicle reminder reads for shared vehicles. Reminders belong to the owner, so the per-vehicle list
- * (?vehicleId) shows the owner's reminders for that vehicle to viewers and editors. The cross-fleet list
- * stays scoped to the acting user, so shared reminders never mix into it.
- * User A owns the vehicle. User B is invited as viewer or editor.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -15,8 +8,8 @@ import {
 import { createInvitee, type Invitee } from '../../../test-helpers/invitee';
 import { seedVehicle } from '../../../test-helpers/seed';
 
-let ctx: TestApp; // owner (user A)
-let b: Invitee; // invitee B (the shared viewer/editor)
+let ctx: TestApp;
+let b: Invitee;
 
 beforeEach(async () => {
   ctx = await createTestApp();
@@ -29,7 +22,6 @@ interface ReminderJoin {
   vehicleIds: string[];
 }
 
-/** A owns a vehicle + a notification reminder on it, invites B at `level`, B accepts. Returns [vehicleId, reminderId]. */
 async function shareWithReminder(level: 'viewer' | 'editor'): Promise<[string, string]> {
   const vehicleId = await seedVehicle(ctx, { make: 'Shared', model: 'Car', year: 2021 });
   const created = await ctx.authed('POST', '/api/v1/reminders', {
@@ -73,7 +65,6 @@ describe('shared reminder reads', () => {
     );
     expect(body.data.length).toBe(0);
 
-    // And the OWNER still sees their reminder on their own cross-fleet list.
     const ownerBody = await json<DataEnvelope<ReminderJoin[]>>(
       await ctx.authed('GET', '/api/v1/reminders')
     );

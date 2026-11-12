@@ -42,11 +42,6 @@ export class ApiError extends VroomError {
 	}
 }
 
-/**
- * The request never got a response (offline, DNS, CORS, connection reset). Extends TypeError so code
- * that treats a rejected fetch as a network failure keeps working; unlike a bare TypeError it cannot
- * be confused with a programming bug.
- */
 export class NetworkError extends TypeError {
 	constructor(cause: unknown) {
 		super(cause instanceof Error ? cause.message : 'Network request failed', { cause });

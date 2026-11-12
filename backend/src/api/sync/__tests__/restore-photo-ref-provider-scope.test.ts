@@ -1,11 +1,8 @@
-// A restored photo_ref may only name a storage provider the importer owns. The sync worker resolves
-// providers by id alone, so a foreign provider would receive the importer's photos.
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
 
-let ctx: TestApp; // the importing user
+let ctx: TestApp;
 
 beforeEach(async () => {
   ctx = await createTestApp();
@@ -53,7 +50,6 @@ describe('restore scopes the photo_ref provider probe to the importer', () => {
     const ownProvider = seedProvider('own-provider', ctx.user.id);
     const foreignProvider = seedProvider('foreign-provider', 'other-user');
 
-    // Two refs on the importer's own photos; one names a provider the importer does not own.
     seedPhotoWithRef('photo-own', vehicleId, 'ref-own', ownProvider);
     seedPhotoWithRef('photo-foreign', vehicleId, 'ref-foreign', foreignProvider);
     expect(refRows()).toHaveLength(2);
@@ -65,7 +61,6 @@ describe('restore scopes the photo_ref provider probe to the importer', () => {
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 
-    // Both directions: without the ownership check the foreign ref survives; an over-narrow probe drops the own ref.
     expect(refRows().map((r) => r.id)).toEqual(['ref-own']);
     expect(refRows()[0].provider_id).toBe(ownProvider);
   });

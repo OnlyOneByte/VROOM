@@ -17,7 +17,6 @@ async function themeOfMountedToaster(): Promise<string | null> {
 
 beforeEach(() => {
 	localStorage.clear();
-	// Pin matchMedia to light so a 'system' preference resolves to light.
 	vi.mocked(window.matchMedia).mockReturnValue({
 		matches: false,
 		addEventListener: vi.fn(),

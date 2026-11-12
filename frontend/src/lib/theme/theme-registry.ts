@@ -1,18 +1,7 @@
-/**
- * Runtime source of truth for built-in theme token values. `default` must mirror app.css exactly;
- * theme-registry.test.ts fails on drift. Add a theme by adding one defineBuiltinTheme call.
- */
-
 import type { ThemeDefinition, ThemeTokenKey, ThemeTokens } from './theme-types';
 
-// Representative preview used when a theme does not set its own swatch.
 const DEFAULT_SWATCH: ThemeTokenKey[] = ['primary', 'accent', 'background', 'foreground'];
 
-/**
- * Builds a built-in theme with the default swatch unless one is given.
- * `destructive` is used as text on card/background and as a fill labelled `destructive-foreground`, so
- * each variant sets `destructive-foreground` to its own `background`. theme-contrast.test.ts enforces both roles.
- */
 function defineBuiltinTheme(
 	def: Pick<ThemeDefinition, 'id' | 'label' | 'description' | 'light' | 'dark'> & {
 		swatch?: ThemeTokenKey[];
@@ -29,7 +18,6 @@ function defineBuiltinTheme(
 	};
 }
 
-/** `default` light palette. Mirrors app.css `:root`; theme-registry.test.ts fails on drift. */
 const DEFAULT_LIGHT: ThemeTokens = {
 	background: 'oklch(1 0 0)',
 	foreground: 'oklch(0.141 0.005 285.823)',
@@ -69,7 +57,6 @@ const DEFAULT_LIGHT: ThemeTokens = {
 	'sidebar-ring': 'oklch(0.705 0.015 286.067)'
 };
 
-/** `default` dark palette. Mirrors app.css `.dark`; theme-registry.test.ts fails on drift. */
 const DEFAULT_DARK: ThemeTokens = {
 	background: 'oklch(0.141 0.005 285.823)',
 	foreground: 'oklch(0.985 0 0)',
@@ -977,7 +964,6 @@ const NEOBRUTALIST_THEME: ThemeDefinition = defineBuiltinTheme({
 	dark: NEOBRUTALIST_DARK
 });
 
-/** Every built-in theme by id. `default` is the always-present fallback. */
 export const THEME_REGISTRY: Record<string, ThemeDefinition> = {
 	default: DEFAULT_THEME,
 	blueprint: BLUEPRINT_THEME,

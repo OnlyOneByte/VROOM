@@ -14,7 +14,6 @@ import { parseCsvHeaders } from '$lib/utils/import-mapping-helpers';
 import { detectionOutcome } from './import-detection';
 import { buildImportMapping, type ManualColumns } from './import-mapping';
 
-/** Shared state for the import dialog and its sections. The dialog owns one instance per open. */
 export class ImportExpensesForm {
 	csvText = $state('');
 	fileName = $state<string | null>(null);
@@ -117,7 +116,6 @@ export class ImportExpensesForm {
 				this.#seedManualUnitsFromTarget();
 			}
 		} catch {
-			// Detection is best-effort — a failure just falls back to the native (manual) path.
 			this.detectedPreset = null;
 		} finally {
 			this.isDetecting = false;
@@ -179,7 +177,6 @@ export class ImportExpensesForm {
 		this.runPreview();
 	}
 
-	/** Resolves true only when the import succeeded, so the caller knows to close the dialog. */
 	async commit(onImported: () => void): Promise<boolean> {
 		if (!this.preview || this.preview.readyCount === 0) return false;
 		this.isImporting = true;

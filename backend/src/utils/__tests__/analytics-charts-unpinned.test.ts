@@ -1,7 +1,3 @@
-// Tests for analytics-charts builders that lacked direct coverage. Empty and single-element inputs
-// must not produce NaN or throw, divide-by-zero guards hold, monthly windows keep the newest
-// months, and buildFillupIntervals does not mutate its input.
-
 import { describe, expect, test } from 'bun:test';
 import {
   buildFillupCostByVehicle,
@@ -20,7 +16,6 @@ import {
   sortByVehicleThenDate,
 } from '../analytics-charts';
 
-// Local time, so bucketing by local weekday and month does not depend on the timezone.
 function d(year: number, month1to12: number, day: number): Date {
   return new Date(year, month1to12 - 1, day);
 }
@@ -66,7 +61,6 @@ describe('buildMonthlyCostHeatmap', () => {
   });
 
   test('keeps the newest 24 months', () => {
-    // 30 distinct months, Jan 2022 .. Jun 2024. The newest 24 run Jul 2022 .. Jun 2024.
     const rows: GeneralExpenseRow[] = [];
     for (let i = 0; i < 30; i++) {
       const year = 2022 + Math.floor(i / 12);
@@ -127,7 +121,6 @@ describe('computePreviousYearComparison', () => {
 
 describe('buildFillupIntervals does not mutate its input', () => {
   test('the caller-visible row order is preserved after building intervals', () => {
-    // Deliberately out of date order, so an in-place sort would reorder them.
     const rows: FuelExpenseRow[] = [
       fuelRow({ vehicleId: 'v1', date: d(2024, 3, 1) }),
       fuelRow({ vehicleId: 'v1', date: d(2024, 1, 1) }),
@@ -148,8 +141,6 @@ describe('buildFillupIntervals does not mutate its input', () => {
     expect(bucket?.count).toBe(1);
   });
 
-  // Same-date rows form 0-day pairs, which accumulateIntervalBuckets drops. Without that guard, the
-  // null-volume siblings of a split fillup would show up as phantom intervals.
   test('a same-date split fillup creates no phantom 0-day intervals', () => {
     const out = buildFillupIntervals([
       fuelRow({ vehicleId: 'v1', date: d(2024, 1, 1), volume: 12 }),
@@ -164,15 +155,12 @@ describe('buildFillupIntervals does not mutate its input', () => {
   });
 });
 
-// Split siblings have no volume and must not enlarge the per-fillup denominator.
 describe('computeAverageCosts.perFillup — split fuel siblings do not inflate the denominator', () => {
   const YEAR_START = d(2024, 1, 1);
   const YEAR_END = d(2025, 1, 1);
   const NOW = d(2024, 6, 1);
 
   test('a split fillup (N null-volume siblings) counts as the volume-bearing fillups only', () => {
-    // Two real fillups ($50, $60) plus a split fillup stored as two null-volume siblings. Only the
-    // two real rows count.
     const rows: FuelExpenseRow[] = [
       fuelRow({ expenseAmount: 50, volume: 10 }),
       fuelRow({ expenseAmount: 60, volume: 12 }),
@@ -202,8 +190,6 @@ describe('computeAverageCosts.perFillup — split fuel siblings do not inflate t
   });
 });
 
-// sortByVehicleThenDate groups by vehicle and sorts by date. Numeric dates are epoch milliseconds,
-// and null sorts as 0.
 describe('sortByVehicleThenDate', () => {
   test('groups by vehicleId, then orders within a vehicle by date ascending', () => {
     const rows: FuelExpenseRow[] = [
@@ -241,11 +227,7 @@ describe('sortByVehicleThenDate', () => {
   });
 });
 
-// A charge stores kWh in volume, so its mi/kWh must not feed the mi/gal average. costPerMileValues
-// stays unfiltered because cost per mile spans all energy.
 describe('computeMpgAndCostPerMile — charge rows excluded from MPG, kept in cost-per-mile', () => {
-  // Gas pair: 300 mi on 10 gal = 30 MPG. Charge pair on the same vehicle: 60 mi on 15 kWh = 4
-  // mi/kWh, inside the electric band.
   const rows: FuelExpenseRow[] = [
     fuelRow({
       vehicleId: 'v1',
@@ -307,8 +289,6 @@ describe('computeMpgAndCostPerMile — charge rows excluded from MPG, kept in co
   });
 });
 
-// gasEfficiencyPoint is the one gas/charge partition that every gas-MPG builder uses. It returns
-// null for an electric row.
 describe('gasEfficiencyPoint', () => {
   test('returns a point for a gas pair, null for an electric current row', () => {
     const gas = fuelRow({ mileage: 10300, volume: 10, fuelType: 'regular' });
@@ -319,10 +299,7 @@ describe('gasEfficiencyPoint', () => {
   });
 });
 
-// An EV-only vehicle must give an empty gas-MPG series, with no mi/kWh value labeled as mi/gal. Its
-// cost per mile must still come from the charge spend.
 describe('an EV-only vehicle yields an empty gas-MPG series but a real cost-per-mile', () => {
-  // Two charge sessions on one all-electric vehicle: 240 mi on 60 kWh each, $9 each.
   const evRows: FuelExpenseRow[] = [
     fuelRow({
       vehicleId: 'ev1',
@@ -358,11 +335,7 @@ describe('an EV-only vehicle yields an empty gas-MPG series but a real cost-per-
   });
 });
 
-// Pins the realistic-band limits against the real computeEfficiencyPoint: gas 5–100 mi/gal,
-// electric 1–10 mi/kWh.
 describe('computeEfficiencyPoint realistic-band boundaries (gas 5–100, electric 1–10)', () => {
-  // Volume is 1, so efficiency equals the mileage delta. 'regular' uses the gas band and 'Level 2
-  // (AC)' uses the electric band.
   const prev = (mileage: number, fuelType = 'regular') => fuelRow({ mileage, volume: 1, fuelType });
   const cur = (mileage: number, fuelType = 'regular') => fuelRow({ mileage, volume: 1, fuelType });
 
@@ -405,8 +378,6 @@ describe('buildFillupCostByVehicle', () => {
     expect(jan?.avgCost).toBe(50);
   });
 
-  // A split-share leg has volume=null. It must not count as a fillup or dilute the average, so the
-  // expected value is the real $40 fillup.
   test('a split fuel cost-allocation sibling (volume=null) is not counted as a fillup', () => {
     const out = buildFillupCostByVehicle(
       [

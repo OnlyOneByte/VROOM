@@ -1,9 +1,3 @@
-/**
- * Upload compensation. The bytes reach the provider before the DB rows are written, so a failed DB
- * write must leave neither a photo row nor an uploaded object behind, and the original error must
- * still reach the caller.
- */
-
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 import { logger } from '../../../utils/logger';

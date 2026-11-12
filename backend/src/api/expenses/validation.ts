@@ -3,8 +3,7 @@ import { CONFIG } from '../../config';
 import type { SplitConfig } from '../../db/types';
 import { dollarsToCents } from '../../utils/money';
 
-// Tags cannot contain separators: the CSV export joins tags with '; ' and the importer splits
-// on /[;,]/, so such a tag would silently re-import as several tags.
+// Tags cannot contain ';' or ',': the CSV export joins tags with '; ' and the importer splits on /[;,]/.
 export const tagElementSchema = z
   .string()
   .min(1)
@@ -16,7 +15,6 @@ export const tagElementSchema = z
     message: 'Tag cannot contain a semicolon or comma',
   });
 
-// A stray mileage on a non-fuel row would skew getCurrentOdometer, which reads across categories.
 export function clearFuelFieldsIfNotFuel<
   T extends {
     category?: string;
@@ -63,8 +61,7 @@ export const splitConfigSchema = z.discriminatedUnion('method', [
   percentageSplitSchema,
 ]) satisfies z.ZodType<SplitConfig>;
 
-// Transform-free twin for re-validating values already stored in cents (the reminder merge gate);
-// running the dollars-to-cents transform again would double-convert them.
+// Transform-free twin: running the dollars-to-cents transform on values already in cents would double-convert them.
 const absoluteAllocationStructuralSchema = z.object({
   vehicleId: z.string().min(1),
   amount: z.number().min(0, 'Amount must be non-negative'),
@@ -126,8 +123,7 @@ export const createSplitExpenseSchema = z
     date: z.coerce.date(),
     description: z.string().optional(),
     totalAmount: centsAmount,
-    // Only financing links are accepted from the API; insurance and reminder splits are created by
-    // system paths that bypass this route, so a client-supplied link of those types would be unvalidated.
+    // Insurance and reminder splits bypass this route, so only financing links are accepted from the API.
     sourceType: z.literal('financing').optional(),
     sourceId: z.string().min(1).optional(),
   })

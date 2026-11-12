@@ -1,7 +1,3 @@
-// listBackups and enforceRetention run against the real BackupService over the in-memory harness DB.
-// Only the storage provider is replaced, at the registry boundary, with a fake whose list() and
-// delete() record what the service asked for.
-
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import fc from 'fast-check';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
@@ -10,7 +6,6 @@ import type { StorageFileInfo } from '../../providers/domains/storage/storage-pr
 const PROVIDER_ID = 'prov-listing';
 const BASE_MS = Date.UTC(2024, 0, 1);
 
-// The fake only implements what listBackups and enforceRetention call.
 type FakeProvider = {
   type: string;
   list: (folder: string) => Promise<StorageFileInfo[]>;
@@ -43,7 +38,6 @@ function seedRetention(retentionCount: number): void {
   ]);
 }
 
-/** Routes the storage registry to a fake whose list() returns `files` and delete() is recorded. */
 async function stubStorage(files: StorageFileInfo[]): Promise<string[]> {
   const { getStorageProviderRegistry } = await import('../../providers/domains/storage/registry');
   const deleted: string[] = [];
@@ -54,14 +48,11 @@ async function stubStorage(files: StorageFileInfo[]): Promise<string[]> {
       deleted.push(externalId);
     },
   };
-  // Only list() and delete() are exercised, so the fake stands in for the full provider.
-  // The exported registry is a Proxy, so the spy must sit on the instance it forwards to.
   storageSpy ??= spyOn(getStorageProviderRegistry(), 'getProvider');
   storageSpy.mockResolvedValue(fake as never);
   return deleted;
 }
 
-/** Unique keys and lastModified values, so ordering has no ties to resolve. */
 function uniqueFiles(files: StorageFileInfo[]): StorageFileInfo[] {
   return files.map((f, i) => ({
     ...f,

@@ -11,7 +11,6 @@
 
 	interface Props {
 		vehicle: Vehicle;
-		/** Editing vehicle info is owner-only on the server. Defaults to true so owner call sites are unchanged. */
 		isOwner?: boolean;
 	}
 

@@ -24,14 +24,10 @@ function getEncryptionKey(): Buffer {
   return key;
 }
 
-// Test-only: resets the cached key after PROVIDER_ENCRYPTION_KEY changes.
 export function _clearKeyCache(): void {
   _cachedKey = null;
 }
 
-/**
- * Returns base64 of IV (12 bytes) + auth tag (16 bytes) + ciphertext.
- */
 export function encrypt(plaintext: string): string {
   const key = getEncryptionKey();
   const iv = randomBytes(IV_LENGTH);
@@ -46,9 +42,6 @@ export function encrypt(plaintext: string): string {
   return combined.toString('base64');
 }
 
-/**
- * Throws on a wrong key, tampered ciphertext, or malformed input.
- */
 export function decrypt(ciphertext: string): string {
   const key = getEncryptionKey();
   const combined = Buffer.from(ciphertext, 'base64');

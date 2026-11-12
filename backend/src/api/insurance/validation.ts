@@ -41,11 +41,8 @@ export const createTermSchema = z
 
 export const updateTermSchema = z
   .object({
-    // NOT NULL columns, so optional but never nullable.
     startDate: z.coerce.date().optional(),
     endDate: z.coerce.date().optional(),
-    // Nullish, so an explicit null clears the column. JSON.stringify drops undefined,
-    // so null is the only clear signal.
     policyNumber: z.string().max(ins.policyNumberMaxLength).nullish(),
     coverageDescription: z.string().max(ins.coverageDescriptionMaxLength).nullish(),
     deductibleAmount: moneyDollarsToCents((n) =>
@@ -79,7 +76,6 @@ export const updateTermSchema = z
 
 export const createPolicySchema = z.object({
   company: z.string().min(1, 'Company is required').max(ins.companyMaxLength),
-  // Shares createTermSchema with addTerm so the two cannot drift.
   terms: z.array(createTermSchema).min(1, 'At least one term is required'),
   notes: z.string().max(ins.notesMaxLength).optional(),
   isActive: z.boolean().optional().default(true),

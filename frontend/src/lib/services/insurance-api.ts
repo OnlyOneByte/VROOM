@@ -54,7 +54,6 @@ export const insuranceApi = {
 		return apiClient.delete<InsurancePolicy>(`/api/v1/insurance/${policyId}/terms/${termId}`);
 	},
 
-	// entityType is 'insurance_policy' or 'insurance_claim'; both are stored in the insurance_docs category.
 	getEntityDocuments(
 		entityType: string,
 		entityId: string,

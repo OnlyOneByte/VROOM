@@ -1,5 +1,4 @@
 <script lang="ts">
-	/** Browser push opt-in: a toggle plus a status line; enabling is gated behind a one-time disclosure. */
 	import { onMount } from 'svelte';
 	import { Bell, LoaderCircle } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
@@ -26,8 +25,6 @@
 	let showDisclosure = $state(false);
 
 	let statusLine = $derived(pushUtil.pushStatusLabel(status));
-	// The toggle is only meaningful when the browser can actually enable/disable — the other states are
-	// terminal messages (nothing to toggle), so we hide the switch and just explain.
 	let toggleable = $derived(status === 'off' || status === 'subscribed');
 	let isOn = $derived(status === 'subscribed');
 
@@ -40,7 +37,6 @@
 				status = 'unsupported';
 				return;
 			}
-			// Is push configured on the server? A 503 PUSH_NOT_CONFIGURED means the feature is off.
 			let configured = true;
 			try {
 				await pushApi.getVapidPublicKey();
@@ -72,13 +68,12 @@
 		try {
 			localStorage.setItem(DISCLOSURE_KEY, '1');
 		} catch {
-			// localStorage may be unavailable (private mode) — proceed anyway; we just re-ask next time.
+			// Storage may be unavailable (private mode); the disclosure is re-asked next time.
 		}
 		showDisclosure = false;
 		void doEnable();
 	}
 
-	/** The Switch intent handler: turning on gates behind the disclosure; turning off is immediate. */
 	function onToggle(checked: boolean) {
 		if (isToggling) return;
 		if (checked) {

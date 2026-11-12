@@ -27,21 +27,14 @@ export interface BackupStrategy {
   execute(context: BackupStrategyContext): Promise<BackupStrategyResult>;
 }
 
-/** The single definition of each per-provider backup flag. Every reader goes through these. */
 export const hasZipBackup = (settings: ProviderBackupSettings): boolean => settings.enabled;
 
-/** Strict equality: an absent or false flag means Sheets sync is off. */
 export const hasSheetsSync = (settings: ProviderBackupSettings): boolean =>
   settings.sheetsSyncEnabled === true;
 
-/** A provider a sync run works on: it has a ZIP backup, a Sheets mirror, or both. */
 export const isSyncEnabled = (settings: ProviderBackupSettings): boolean =>
   hasZipBackup(settings) || hasSheetsSync(settings);
 
-/**
- * success: every attempted provider backed up cleanly. partial: some succeeded and some failed.
- * failed: every attempted provider failed. noop: nothing was attempted.
- */
 export type BackupOutcome = 'success' | 'partial' | 'failed' | 'noop';
 
 export interface BackupOrchestratorResult {
@@ -49,7 +42,6 @@ export interface BackupOrchestratorResult {
   status?: 'in_progress';
   skipped?: boolean;
   outcome: BackupOutcome;
-  /** Provider ids that did not fully succeed. A non-empty list keeps the sync anchor from advancing. */
   failedProviders: string[];
   results: Record<string, BackupStrategyResult>;
 }

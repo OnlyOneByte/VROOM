@@ -1,9 +1,3 @@
-/**
- * storageConfig and backupConfig request schemas must accept partial updates at the granularity the
- * route merges them: `defaults` per category, and provider entries replaced whole, so an omitted
- * key there would be data loss rather than "leave it alone".
- */
-
 import { describe, expect, test } from 'bun:test';
 import { DEFAULT_STORAGE_CONFIG, type StorageConfig } from '../../../types';
 import { backupConfigSchema, storageConfigSchema } from '../validation';
@@ -88,7 +82,6 @@ describe('a parsed update satisfies what the route does with it', () => {
       providerCategories: { 'drive-1': FULL_ENTRY },
     });
 
-    // A schema whose `defaults` could be undefined would break this spread at compile time.
     const merged: StorageConfig = {
       defaults: { ...DEFAULT_STORAGE_CONFIG.defaults, ...incoming.defaults },
       providerCategories: {

@@ -1,15 +1,10 @@
-// withTimeout returns the work's result or rejects with a typed SyncError on timeout. Uses short
-// real timers with a wide margin.
-
 import { describe, expect, test } from 'bun:test';
 import { SyncError, SyncErrorCode } from '../../errors';
 import { OPERATION_TIMEOUTS, withTimeout } from '../timeout';
 
-/** A promise that resolves with `value` after `ms`. */
 function resolveAfter<T>(ms: number, value: T): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(value), ms));
 }
-/** A promise that rejects with `err` after `ms`. */
 function rejectAfter(ms: number, err: Error): Promise<never> {
   return new Promise((_, reject) => setTimeout(() => reject(err), ms));
 }
@@ -33,7 +28,6 @@ describe('withTimeout', () => {
   });
 
   test("the underlying promise's OWN rejection wins when it rejects before the timeout", async () => {
-    // A genuine error must not be masked as a timeout.
     const ownError = new Error('upstream failure');
     let thrown: unknown;
     try {

@@ -1,9 +1,6 @@
-// Pins the trip-form validator: required fields, the end >= start rule, and the local-day future guard, computed relative to now.
-
 import { describe, expect, test } from 'vitest';
 import { parseOdometer, validateTripFields, type TripFormData } from '../trip-form-validation';
 
-/** A date-only 'YYYY-MM-DD' offset from today by `days` (local calendar). */
 function localDateOffset(days: number): string {
 	const now = new Date();
 	const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + days);
@@ -47,7 +44,7 @@ describe('validateTripFields', () => {
 		expect(validateTripFields(form({ startOdometer: '12.5' })).startOdometer).toBeTruthy();
 	});
 
-	// Svelte passes numbers or null for number inputs at runtime, so the validator must accept those shapes, not only strings.
+	// Svelte binds number inputs as numbers or null at runtime.
 	test('accepts NUMBER-typed odometers (the Svelte type=number coercion the live form sends)', () => {
 		expect(validateTripFields(form({ startOdometer: 1000, endOdometer: 1080 }))).toEqual({});
 	});

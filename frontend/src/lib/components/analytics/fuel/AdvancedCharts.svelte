@@ -26,7 +26,6 @@
 	]);
 	let seasonalConfig = $derived(buildChartConfig(seasonalSeries));
 
-	// Gate on real data: the builder always returns every season, so a length check would show an empty axis.
 	let seasonalData = $derived(
 		fuelAdvanced.seasonalEfficiency.some(d => d.fillupCount > 0)
 			? fuelAdvanced.seasonalEfficiency
@@ -122,7 +121,6 @@
 			}}
 		/>
 
-		<!-- Scores are normalized 0–100 server-side, so yDomain is fixed. -->
 		<AppBarChart
 			title="Vehicle Performance Comparison"
 			description="Normalized 0–100 scores by metric (higher is better)"

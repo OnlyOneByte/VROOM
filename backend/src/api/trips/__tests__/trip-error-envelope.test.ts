@@ -1,7 +1,4 @@
-/**
- * Trip errors must use the object-shaped error envelope. The frontend client reads error.message, then
- * message, then falls back to the bare status, so a string-valued error would lose the reason.
- */
+// The frontend client reads error.message, so a string-valued error would lose the reason.
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
@@ -18,7 +15,6 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-/** What the frontend's api-client would surface to the user for a failed response. */
 async function clientMessage(res: Response): Promise<string> {
   const body = (await res.json()) as { error?: { message?: string }; message?: string };
   return body.error?.message ?? body.message ?? `Request failed with status ${res.status}`;

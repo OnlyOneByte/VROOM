@@ -6,7 +6,6 @@ const KEYS = (n: number) =>
 
 describe('buildAmortizationSchedule', () => {
   test('interest declines and principal rises month over month', () => {
-    // $20,000 @ 6% APR, $400/mo. Month 1 interest = 20000 * 0.005 = 100; principal = 300.
     const sched = buildAmortizationSchedule(
       [{ balance: 20000, apr: 6, paymentAmount: 400 }],
       KEYS(3)
@@ -31,10 +30,8 @@ describe('buildAmortizationSchedule', () => {
       [{ balance: 500, apr: 12, paymentAmount: 400 }],
       KEYS(4)
     );
-    // Month 1: interest = 500 * 0.01 = 5; principal = min(395, 500) = 395 → balance 105.
     expect(sched[0].interest).toBeCloseTo(5, 6);
     expect(sched[0].principal).toBeCloseTo(395, 6);
-    // Month 2: interest = 105 * 0.01 = 1.05; principal = min(398.95, 105) = 105 → balance 0.
     expect(sched[1].principal).toBeCloseTo(105, 6);
     expect(sched[2].interest).toBe(0);
     expect(sched[2].principal).toBe(0);
@@ -50,7 +47,6 @@ describe('buildAmortizationSchedule', () => {
       ],
       KEYS(1)
     );
-    // Loan A: interest 100, principal 300. Loan B: interest 100, principal 200.
     expect(sched[0].interest).toBeCloseTo(200, 6);
     expect(sched[0].principal).toBeCloseTo(500, 6);
   });
@@ -69,7 +65,6 @@ describe('buildAmortizationSchedule', () => {
     ]);
   });
 
-  // The balance is frozen here, so the loan never pays down and interest never declines.
   test('a payment below the monthly interest → principal 0, balance never moves (negative amortization)', () => {
     const sched = buildAmortizationSchedule(
       [{ balance: 10000, apr: 24, paymentAmount: 150 }],

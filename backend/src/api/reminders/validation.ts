@@ -13,7 +13,7 @@ const frequencySchema = z.enum(['weekly', 'monthly', 'yearly', 'custom']);
 const intervalUnitSchema = z.enum(['day', 'week', 'month', 'year']);
 const triggerModeSchema = z.enum(['time', 'mileage', 'both']);
 
-// Use .nullish() for nullable DB columns: the update flow re-validates a merged DB row whose unset columns are null.
+// Use .nullish() for nullable DB columns: the PUT merge re-validates DB rows, whose unset columns are null.
 const reminderBaseSchema = z.object({
   name: z.string().min(1).max(CONFIG.validation.reminder.nameMaxLength),
   description: z.string().max(CONFIG.validation.reminder.descriptionMaxLength).nullish(),
@@ -22,8 +22,7 @@ const reminderBaseSchema = z.object({
   frequency: frequencySchema,
   intervalValue: z.number().int().positive().nullish(),
   intervalUnit: intervalUnitSchema.nullish(),
-  // Not defaulted: a default would survive .partial() and flip an existing mileage reminder back to 'time'.
-  // nextDueOdometer is derived in the route, never client input.
+  // Not defaulted: a default survives .partial() and flips existing mileage reminders to 'time'.
   triggerMode: triggerModeSchema.optional(),
   intervalMileage: z
     .number()
@@ -34,7 +33,7 @@ const reminderBaseSchema = z.object({
   lastServiceOdometer: z.number().int().min(0).nullish(),
   startDate: z.coerce.date(),
   endDate: z.coerce.date().nullish(),
-  // Must be listed here, or Zod strips it and the pause/resume toggle silently no-ops.
+  // Zod strips unlisted keys: isActive must stay listed or the pause toggle silently no-ops.
   isActive: z.boolean().optional(),
   vehicleIds: z.array(z.string().min(1)).min(1),
   expenseCategory: z.enum(EXPENSE_CATEGORIES).nullish(),
@@ -42,7 +41,6 @@ const reminderBaseSchema = z.object({
     .array(z.string().min(1).max(CONFIG.validation.reminder.tagMaxLength))
     .max(CONFIG.validation.reminder.maxTags)
     .nullish(),
-  // Client sends dollars; the max bound applies before the cents transform.
   expenseAmount: moneyDollarsToCents((n) =>
     n.positive().max(CONFIG.validation.reminder.maxExpenseAmount)
   ).nullish(),
@@ -51,7 +49,6 @@ const reminderBaseSchema = z.object({
 });
 
 type ReminderInput = z.infer<typeof reminderBaseSchema>;
-// Refinements run on both the create and partial update schemas, so each one guards on the fields it reads.
 type ReminderRefineInput = Partial<ReminderInput>;
 
 function refineCustomFrequency(data: ReminderRefineInput, ctx: z.RefinementCtx) {
@@ -100,8 +97,6 @@ function refineMileageTrigger(data: ReminderRefineInput, ctx: z.RefinementCtx) {
       path: ['intervalMileage'],
     });
   }
-  // lastServiceOdometer is not required here: the route defaults it to the vehicle's current odometer.
-  // A mileage axis tracks one vehicle, since odometers are per-vehicle.
   if (data.vehicleIds && data.vehicleIds.length !== 1) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -124,7 +119,6 @@ function refineDateRange(data: ReminderRefineInput, ctx: z.RefinementCtx) {
 function refineSplitConfig(data: ReminderRefineInput, ctx: z.RefinementCtx) {
   if (!data.expenseSplitConfig) return;
 
-  // Partial updates may omit vehicleIds; the route's merged re-validation covers the match check then.
   if (data.vehicleIds) {
     const provided = new Set(data.vehicleIds);
     const split = new Set(splitConfigVehicleIds(data.expenseSplitConfig));
@@ -178,8 +172,7 @@ export const updateReminderSchema = reminderBaseSchema.partial().superRefine((da
   refineMileageTrigger(data, ctx);
 });
 
-// Transform-free twin of createReminderSchema for the PUT merge gate. The merged object already holds cents,
-// so re-running the dollar transform or its max bound would double-convert or reject large amounts.
+// Transform-free: merged data already holds cents, so re-running the dollar transform would double-convert.
 const reminderMergeGateSchema = reminderBaseSchema
   .extend({
     expenseAmount: z.number().nonnegative().nullish(),

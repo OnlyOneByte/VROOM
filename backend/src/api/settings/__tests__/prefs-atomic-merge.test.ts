@@ -1,8 +1,3 @@
-/**
- * PreferencesRepository.mergeJsonField runs one json_patch UPDATE. Covers deep merge, null deleting
- * a key, and two concurrent patches both surviving, which a read-modify-write cannot guarantee.
- */
-
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
@@ -18,7 +13,6 @@ beforeEach(async () => {
   sqlite = new Database(':memory:');
   sqlite.run('PRAGMA foreign_keys = ON');
   for (const m of loadMigrations()) applyMigration(sqlite, m);
-  // A user row (FK target) + a prefs row to patch.
   sqlite.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
     USER,
     'u100@example.com',
@@ -27,7 +21,7 @@ beforeEach(async () => {
   // biome-ignore lint/suspicious/noExplicitAny: drizzle's bun-sqlite generic vs AppDatabase alias
   const db = drizzle(sqlite, { schema }) as any;
   repo = new PreferencesRepository(db);
-  await repo.getOrCreate(USER); // ensure the prefs row exists
+  await repo.getOrCreate(USER);
 });
 afterEach(() => sqlite.close());
 
@@ -72,7 +66,6 @@ describe('mergeJsonField — atomic deep-merge', () => {
     const cfg = backupConfig() as { providers: Record<string, unknown> };
     expect(Object.keys(cfg.providers).sort()).toEqual(['base', 'reqA', 'reqB']);
 
-    // Non-vacuity: a read-modify-write of the same two deltas loses reqA.
     const stale = { providers: { base: { enabled: true } } };
     const rmwA = { providers: { ...stale.providers, reqA: { enabled: true } } };
     const rmwB = { providers: { ...stale.providers, reqB: { enabled: false } } };

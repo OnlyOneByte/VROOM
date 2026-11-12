@@ -1,8 +1,3 @@
-/**
- * Concurrent first-time getOrCreate calls for user_preferences and sync_state must all return the
- * same single row instead of failing on the primary key.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 

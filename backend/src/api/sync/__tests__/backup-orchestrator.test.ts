@@ -1,7 +1,3 @@
-// The provider selection rules, against the real exports. Run-level behavior (mutex, fan-out,
-// outcome aggregation, result persistence) needs the DB and is covered against the real execute()
-// in backup-orchestrator-execute.test.ts.
-
 import { describe, expect, test } from 'bun:test';
 import type { BackupConfig, ProviderBackupSettings } from '../../../types';
 import { filterEnabledProviders, needsZipGeneration } from '../backup-orchestrator';
@@ -52,7 +48,7 @@ describe('filterEnabledProviders / needsZipGeneration', () => {
     };
     const enabled = filterEnabledProviders(config);
     expect(enabled).toHaveLength(1);
-    expect(needsZipGeneration(enabled)).toBe(false); // the data-cost guard: don't build a ZIP nobody uploads
+    expect(needsZipGeneration(enabled)).toBe(false);
   });
 
   test('a ZIP-enabled provider alongside a Sheets-only one needs a ZIP', () => {

@@ -1,8 +1,4 @@
-/**
- * ACTIVE_SHARE_STATUSES must match the status list in the partial unique index vehicle_shares_active_idx.
- * The index is generated DDL, so a mismatch would otherwise surface only as a constraint error.
- * createTestApp() must run before any DB-bound import, so this file imports only the harness and bun:test.
- */
+// createTestApp() must run before any DB-bound import: import only the harness and bun:test.
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
@@ -14,7 +10,6 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-/** The `status in (...)` literals in the live index definition, lower-cased and sorted. */
 function indexActiveStatuses(): string[] {
   const row = ctx.sqlite
     .query(`SELECT sql FROM sqlite_master WHERE type = 'index' AND name = ?`)
@@ -29,7 +24,6 @@ function indexActiveStatuses(): string[] {
     .sort();
 }
 
-/** Seeds a share row directly, bypassing the invite route. */
 function seedShare(id: string, status: string, vehicleId: string, sharedWithId: string): void {
   ctx.sqlite.run(
     `INSERT INTO vehicle_shares (id, vehicle_id, owner_id, shared_with_id, level, status, created_at)
@@ -74,7 +68,6 @@ describe('active-share status pairing', () => {
   test('the dup-invite gate admits exactly the statuses the index reserves a slot for', async () => {
     const { vehicleShareRepository } = await import('../repository');
 
-    // Compared against the index, not the constant, so a reader with its own hard-coded list is caught.
     const slotHolders = indexActiveStatuses();
 
     seedVehicle('veh-1');
@@ -92,7 +85,6 @@ describe('active-share status pairing', () => {
     const { vehicleShareRepository } = await import('../repository');
 
     seedInvitee('invitee-multi');
-    // One vehicle per status, because the index allows only one active share per vehicle and invitee.
     for (const status of ['pending', 'accepted', 'declined', 'revoked']) {
       seedVehicle(`veh-${status}`);
       seedShare(`recv-${status}`, status, `veh-${status}`, 'invitee-multi');

@@ -58,10 +58,6 @@ import { FinancingRepository } from '../financing/repository';
 
 export type { FuelEfficiencyPoint } from '../../utils/analytics-charts';
 
-/**
- * Calendar months of `year` the vehicle was owned, inclusive of both endpoint months; 0 outside ownership.
- * `now` is injected rather than read from the clock so the function stays pure.
- */
 export function monthsOwnedInYear(ownershipStart: Date, now: Date, year: number): number {
   const yearStartMonth = ownershipStart.getFullYear() < year ? 0 : ownershipStart.getMonth();
   const yearEndMonth = now.getFullYear() > year ? 11 : now.getMonth();
@@ -69,12 +65,10 @@ export function monthsOwnedInYear(ownershipStart: Date, now: Date, year: number)
   return Math.max(0, yearEndMonth - yearStartMonth + 1);
 }
 
-/** Signed whole calendar months from `from` to `to`. Callers apply their own clamp. */
 export function monthsBetween(from: Date, to: Date): number {
   return (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth());
 }
 
-/** Some builder inputs arrive as raw timestamps rather than Dates, so coerce defensively. */
 export function toDate(value: Date | number | string): Date {
   return value instanceof Date ? value : new Date(value);
 }
@@ -83,10 +77,6 @@ export function calendarYearRange(year: number): { start: Date; end: Date } {
   return { start: new Date(year, 0, 1), end: new Date(year + 1, 0, 1) };
 }
 
-/**
- * Converts one vehicle's value into the user's units. Every fleet-pooled figure goes through one,
- * so a mixed mi/km or gal/L fleet never sums unlike units.
- */
 interface FleetUnitConverter extends RadarUnitConverters {
   volume: (value: number, vehicleId: string) => number;
 }
@@ -218,7 +208,6 @@ export interface FinancingData {
   summary: {
     totalMonthlyPayments: number;
     remainingBalance: number;
-    // Forward estimate of one month's interest on current balances, not interest actually paid.
     monthlyInterestEstimate: number;
     activeCount: number;
     loanCount: number;
@@ -348,10 +337,7 @@ export class AnalyticsRepository {
     this.vehicleNameCache.set(cacheKey, { data, timestamp: now });
   }
 
-  /**
-   * Falls back to defaults on a missing or unparseable row. getAllVehicleUnits must not reuse this:
-   * it throws on invalid prefs so that data errors surface instead of being masked.
-   */
+  // Do not reuse for getAllVehicleUnits: that path must throw on invalid prefs, not default.
   private resolveUnitsOrDefault(row: { unitPreferences: unknown } | undefined): UnitPreferences {
     if (!row) return { ...DEFAULT_UNIT_PREFERENCES };
     const parsed = parseUnitPreferences(row.unitPreferences);
@@ -408,7 +394,6 @@ export class AnalyticsRepository {
     }
   }
 
-  /** True when every vehicle already uses the target units, so no conversion is needed. */
   private allVehiclesMatchUnits(
     vehicleUnitsMap: Map<string, UnitPreferences>,
     target: UnitPreferences
@@ -425,7 +410,6 @@ export class AnalyticsRepository {
     return true;
   }
 
-  /** Falls back to default units so callers never read unit fields off undefined. */
   private vehicleUnitsFor(
     vehicleUnitsMap: Map<string, UnitPreferences>,
     vehicleId: string
@@ -465,10 +449,6 @@ export class AnalyticsRepository {
     return v === 0 ? 0 : convert.volume(v, row.vehicleId);
   }
 
-  /**
-   * Gas-only efficiency pairs in the user's units. The gas gate must run before conversion:
-   * a PHEV charge session stores kWh in `volume`, and converting that as mi/gal would corrupt the value.
-   */
   private *gasEfficiencyPoints(
     fuelRows: FuelExpenseRow[],
     convert: FleetUnitConverter
@@ -553,7 +533,6 @@ export class AnalyticsRepository {
   ): Array<{ season: string; avgEfficiency: number; fillupCount: number }> {
     const seasonData = new Map<string, { effSum: number; effCount: number; fillupCount: number }>();
 
-    // Split fuel siblings carry no volume and are not fillups, so they must not inflate the count.
     for (const row of fuelRows) {
       const d = normalizeDate(row.date);
       if (!d) continue;
@@ -626,16 +605,13 @@ export class AnalyticsRepository {
       monthMap.set(month, entry);
     }
 
-    return (
-      Array.from(monthMap.entries())
-        .sort(([a], [b]) => a.localeCompare(b))
-        // Most recent 12 months, not the first 12.
-        .slice(-12)
-        .map(([month, data]) => ({
-          month,
-          efficiency: data.effCount > 0 ? data.effSum / data.effCount : 0,
-        }))
-    );
+    return Array.from(monthMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-12)
+      .map(([month, data]) => ({
+        month,
+        efficiency: data.effCount > 0 ? data.effSum / data.effCount : 0,
+      }));
   }
 
   private buildFuelEfficiencyComparison(
@@ -787,8 +763,6 @@ export class AnalyticsRepository {
       lt(expenses.date, new Date(range.end * 1000)),
     ];
     if (vehicleId) conditions.push(eq(expenses.vehicleId, vehicleId));
-    // Counts only volume-bearing rows, matching isFillup. Volume is summed per vehicle so each sum can be
-    // converted to the user's volume unit before pooling.
     const rows = await this.db
       .select({
         vehicleId: expenses.vehicleId,
@@ -835,10 +809,6 @@ export class AnalyticsRepository {
       .slice(-120);
   }
 
-  /**
-   * Batched balances for active financing rows, computed once per request so both financing builders
-   * agree. An id missing from the map means no balance.
-   */
   private async computeActiveBalances(
     financingRows: Array<{ id: string; isActive: boolean }>
   ): Promise<Map<string, number>> {
@@ -927,7 +897,6 @@ export class AnalyticsRepository {
   ): FinancingData['vehicleDetails'][number] {
     const monthlyInterestEstimate =
       fin.financingType === 'loan' && fin.apr ? (computedBalance * (fin.apr / 100)) / 12 : 0;
-    // startDate is non-null in the schema; the `?? 0` only satisfies the local nullable type.
     const startDate = toDate(fin.startDate ?? 0);
     const now = new Date();
     const monthsElapsed = Math.max(0, monthsBetween(startDate, now));
@@ -977,13 +946,11 @@ export class AnalyticsRepository {
     }>,
     balances: Map<string, number>
   ): FinancingData['loanBreakdown'] {
-    // Do not filter on truthy apr: a 0% loan is valid and must stay in the schedule.
     const activeLoans = financingRows.filter((f) => f.isActive && f.financingType === 'loan');
     if (activeLoans.length === 0) return [];
 
     const now = new Date();
 
-    // Balances amortize month to month; holding one constant would repeat the same row twelve times.
     const loans = activeLoans.map((loan) => ({
       balance: balances.get(loan.id) ?? 0,
       apr: loan.apr ?? 0,
@@ -1029,17 +996,14 @@ export class AnalyticsRepository {
         const aEnd = a.endDate instanceof Date ? a.endDate.getTime() : 0;
         const bEnd = b.endDate instanceof Date ? b.endDate.getTime() : 0;
         if (bEnd !== aEnd) return bEnd - aEnd;
-        // Ties break by start date so the pick is deterministic; the term query has no ORDER BY.
         const aStart = a.startDate instanceof Date ? a.startDate.getTime() : 0;
         const bStart = b.startDate instanceof Date ? b.startDate.getTime() : 0;
         return bStart - aStart;
       })[0];
       if (!latestTerm) continue;
 
-      // A term may be priced by monthly cost or by a lump sum over its span; both must be honored.
       const monthlyPremium = effectiveMonthlyPremium(latestTerm);
       const annualPremium = monthlyPremium * 12;
-      // Covered vehicles come from the latest term only, matching the term the premium is taken from.
       const coveredVehicleIds = [
         ...new Set(junctionRows.filter((j) => j.termId === latestTerm.id).map((j) => j.vehicleId)),
       ];
@@ -1109,7 +1073,6 @@ export class AnalyticsRepository {
     if (!term.startDate || !term.endDate) return;
     const start = toDate(term.startDate);
     const end = toDate(term.endDate);
-    // Anchors each month to day 1, so a term starting on day 29-31 does not skip short months.
     for (const key of monthKeysInRange(start, end)) {
       monthlyMap.set(key, (monthlyMap.get(key) ?? 0) + monthlyPremium);
     }
@@ -1145,11 +1108,6 @@ export class AnalyticsRepository {
     return { financingInterest, insuranceCost, fuelCost, maintenanceCost, otherCosts };
   }
 
-  /**
-   * The purchase price is counted only in the all-time total. The financing bucket holds full loan
-   * payments, which retire the same principal, so it is dropped whenever the price is counted to avoid
-   * double-counting. Returns the financing value actually included so the breakdown sums to the total.
-   */
   private computeTCOTotal(
     costs: {
       financingInterest: number;
@@ -1175,7 +1133,6 @@ export class AnalyticsRepository {
 
   async getFuelEfficiencyTrend(userId: string, vehicleId?: string): Promise<FuelEfficiencyPoint[]> {
     try {
-      // Filters on the denormalized expenses.userId rather than joining vehicles.
       const conditions = [
         eq(expenses.userId, userId),
         eq(expenses.category, 'fuel'),
@@ -1198,7 +1155,6 @@ export class AnalyticsRepository {
       if (rows.length < 2) return [];
       const points: FuelEfficiencyPoint[] = [];
       forEachVehiclePair(rows, (current, previous) => {
-        // Gas-only: PHEV charge sessions would otherwise pollute the mi/gal trend.
         const point = gasEfficiencyPoint(current as FuelRow, previous as FuelRow);
         if (point) points.push(point);
       });
@@ -1371,10 +1327,8 @@ export class AnalyticsRepository {
     const rangeStartDate = new Date(range.start * 1000);
     const rangeEndDate = new Date(range.end * 1000);
 
-    // Split fuel siblings lack volume, so they must not count as fillups.
     const currentYearFillups = fuelRows.filter(isFillup).length;
     const previousYearFillups = prevYearAgg.count;
-    // Month matching must include the year, since the range can span several years.
     const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
     const prevMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
     const inCurrentMonth = (r: FuelExpenseRow) => {
@@ -1391,7 +1345,6 @@ export class AnalyticsRepository {
     const sumGallons = (rows: FuelExpenseRow[]) =>
       rows.reduce((s, r) => s + this.rowVolume(r, convert), 0);
     const currentYearGallons = sumGallons(fuelRows);
-    // Prior-year volume is grouped per vehicle so each vehicle's sum converts before pooling.
     const previousYearGallons = [...prevYearAgg.volumeByVehicle.entries()].reduce(
       (s, [vId, vol]) => s + convert.volume(vol, vId),
       0
@@ -1419,7 +1372,6 @@ export class AnalyticsRepository {
       now
     );
 
-    // Distance is max-min per vehicle, then summed; pooling odometers would invent a span across cars.
     const totalDistance = this.computeTotalDistance(fuelRows, convert);
     const daysSoFar = Math.max(
       1,
@@ -1505,7 +1457,6 @@ export class AnalyticsRepository {
     return {
       maintenanceTimeline: buildMaintenanceTimeline(maintenanceRows, new Date()),
       seasonalEfficiency: this.buildSeasonalEfficiency(fuelRowsByVehicle, convert),
-      // Radar min/max normalization ranks across the fleet, so mixed units must convert before it runs.
       vehicleRadar: buildVehicleRadar(allExpenses, fuelRowsByVehicle, vehicleNameMap, convert),
       dayOfWeekPatterns: this.buildDayOfWeekPatterns(fuelRows, convert),
       monthlyCostHeatmap: buildMonthlyCostHeatmap(allExpenses),
@@ -1712,7 +1663,6 @@ export class AnalyticsRepository {
       const { vehicleDetails, totalMonthlyPremiums, totalAnnualPremiums, carrierMap, monthlyMap } =
         this.buildInsuranceDetails(activePolicies, termRows, junctionRows, vehicleNameMap);
 
-      // Only policies with a term count, matching the premium path, so the count agrees with the totals.
       const policyIdsWithTerms = new Set(termRows.map((t) => t.policyId));
       const activePoliciesWithTerms = activePolicies.filter((p) => policyIdsWithTerms.has(p.id));
 
@@ -1824,7 +1774,6 @@ export class AnalyticsRepository {
 
       const now = new Date();
       const ownershipStart = purchaseDate ? toDate(purchaseDate) : now;
-      // The divisor must cover the same window as the total.
       const ownershipMonths = year
         ? Math.max(1, monthsOwnedInYear(ownershipStart, now, year))
         : Math.max(1, monthsBetween(ownershipStart, now));

@@ -13,7 +13,6 @@
 		description: string;
 		tags: string[];
 		policyId: string | null;
-		/** Null hides the photo section; insurance-managed expenses only show photos for a split group. */
 		photoEntityId: string | null;
 		isDeleting: boolean;
 		onBack: () => void;
@@ -74,7 +73,6 @@
 			</div>
 			<div>
 				<p class="text-muted-foreground">Date</p>
-				<!-- Date-only values go through dateOnlyToISO, which also avoids throwing on an empty picker. -->
 				<p class="font-medium text-foreground">
 					{formatDate(dateOnlyToISO(date))}
 				</p>

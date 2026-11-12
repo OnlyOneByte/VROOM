@@ -1,7 +1,3 @@
-/**
- * Property tests for insurance term validation and the photo MIME allowlist.
- */
-
 import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { ALLOWED_MIME_TYPES } from '../../photos/photo-service';
@@ -96,7 +92,6 @@ describe('insurance validation accepts flat term fields', () => {
 
 const ACCEPTED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'] as const;
 
-/** Generator for MIME types that are NOT in the accepted list. */
 const rejectedMimeTypeArb = fc
   .tuple(fc.stringMatching(/^[a-z]{1,20}$/), fc.stringMatching(/^[a-z0-9.+-]{1,30}$/))
   .map(([type, subtype]) => `${type}/${subtype}`)
@@ -129,8 +124,6 @@ describe('document MIME type validation', () => {
   });
 });
 
-// The update schema is partial, so the order check runs only when both dates are sent. A lone date is
-// accepted because the stored counterpart is not visible to the schema.
 describe('updateTermSchema date-order refine', () => {
   const T1 = '2024-01-01T00:00:00.000Z';
   const T2 = '2024-06-01T00:00:00.000Z';

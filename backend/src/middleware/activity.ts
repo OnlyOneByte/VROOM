@@ -22,8 +22,6 @@ export const activityTracker: MiddlewareHandler = async (c, next) => {
 
     const settings = await preferencesRepository.getOrCreate(user.id);
     const backupConfig = settings.backupConfig as BackupConfig | null;
-    // Use the orchestrator's predicate, which also counts sheets-only-sync providers. A narrower check
-    // would leave the inactivity timer unarmed for those users.
     const hasSyncEnabled = backupConfig?.providers
       ? filterEnabledProviders(backupConfig).length > 0
       : false;
@@ -45,7 +43,6 @@ export async function changeTracker(c: Context, next: Next) {
   if (c.res.status >= 200 && c.res.status < 300) {
     const user = c.get('user');
     if (user?.id) {
-      // Not awaited, so tracking never delays the response. A failure only affects sync timing.
       userActivityTracker.markDataChanged(user.id).catch((error) => {
         logger.error('Failed to mark data changed', { userId: user.id, error });
       });

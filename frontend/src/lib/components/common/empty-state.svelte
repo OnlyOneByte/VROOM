@@ -18,7 +18,6 @@
 		{#if icon}
 			{@render icon()}
 		{/if}
-		<!-- h2: the card is a top-level region of whatever page renders it. -->
 		<h2 class="text-lg font-semibold mb-2">
 			{@render title()}
 		</h2>

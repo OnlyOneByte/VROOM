@@ -27,10 +27,8 @@
 	let summary = $state<TripSummary | null>(null);
 	let totalCount = $state(0);
 
-	// Global distance label, used only by the cross-fleet summary card; mixed mi/km fleets need per-vehicle labels.
 	let distLabel = $derived(getDistanceUnitLabel(settingsStore.unitPreferences.distanceUnit, true));
 	let vehicleNames = $derived(new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)])));
-	// Trip odometers use the vehicle's own unit, so label each trip by its vehicle, not the global setting.
 	let vehicleDistLabels = $derived(
 		new Map(
 			vehicles.map(v => [
@@ -58,14 +56,13 @@
 		formOpen = true;
 	}
 
-	// Defaults to keeping the linked odometer reading, which may be part of the history.
 	let deleteTarget = $state<Trip | null>(null);
 	let keepOdometer = $state(true);
 	let isDeleting = $state(false);
 
 	function openDelete(trip: Trip) {
 		deleteTarget = trip;
-		keepOdometer = true; // reset to the safe default each time
+		keepOdometer = true;
 	}
 
 	async function confirmDelete() {
@@ -89,7 +86,6 @@
 		isLoading = true;
 		loadError = null;
 		try {
-			// Requests the max page; the "Showing N of M" footer surfaces any remainder.
 			const [tripPage, vehicleList, tripSummary] = await Promise.all([
 				tripApi.list({ limit: 100 }),
 				vehicleApi.getVehicles(),
@@ -101,7 +97,6 @@
 			summary = tripSummary;
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to load trips:', error);
-			// Persist the failure so it is not rendered as an empty list.
 			loadError = error instanceof Error ? error.message : 'Failed to load trips';
 			appStore.addNotification({ type: 'error', message: 'Failed to load trips' });
 		} finally {

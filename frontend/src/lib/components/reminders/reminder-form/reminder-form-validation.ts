@@ -5,7 +5,6 @@ import {
 	type ReminderDraft
 } from './reminder-form-model';
 
-// Keyed by field name; the form renders each message under its field.
 export function validateReminderDraft(draft: ReminderDraft): Record<string, string> {
 	const e: Record<string, string> = {};
 	const mileage = hasMileageTrigger(draft.triggerMode);
@@ -34,7 +33,6 @@ export function validateReminderDraft(draft: ReminderDraft): Record<string, stri
 	if (draft.kind === 'expense') {
 		const amt = parseFloat(draft.expenseAmount);
 		if (!(amt > 0)) e['expenseAmount'] = 'Enter an amount greater than 0';
-		// Mirrors the backend refineSplitConfig so the form blocks invalid splits before a 400.
 		const showSplit = shouldShowSplitEditor(draft);
 		if (showSplit && draft.splitMethod === 'percentage') {
 			const sum = draft.splitAllocations.reduce((s, a) => s + (a.percentage ?? 0), 0);

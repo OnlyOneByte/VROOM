@@ -33,7 +33,6 @@ const MESSAGES: ChatMessage[] = [
   { role: 'system', content: 'You are a car-data assistant.' },
   { role: 'user', content: 'How much did I spend on fuel?' },
 ];
-/** A full tool round-trip: two parallel calls, then both results. */
 const TOOL_TRANSCRIPT: ChatMessage[] = [
   ...MESSAGES,
   {

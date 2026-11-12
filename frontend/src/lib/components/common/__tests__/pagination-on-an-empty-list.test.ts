@@ -1,5 +1,3 @@
-// Empty lists show no pagination: the bar never reports fewer than one page, and the table renders no bar for a zero count.
-
 import { describe, expect, test } from 'vitest';
 import { render } from '@testing-library/svelte';
 import PaginationControls from '../pagination-controls.svelte';

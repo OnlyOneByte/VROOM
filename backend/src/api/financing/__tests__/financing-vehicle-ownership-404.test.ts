@@ -1,8 +1,3 @@
-/**
- * GET and POST on the financing vehicle route return 404 "Vehicle not found" when the vehicle is
- * missing or not owned by the caller, and the POST does so before any financing write.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 

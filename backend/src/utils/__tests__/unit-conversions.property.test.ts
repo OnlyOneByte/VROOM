@@ -1,6 +1,3 @@
-// Property-based tests for unit-conversions.ts: conversion factors, identity when units match, and
-// round-trip fidelity.
-
 import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { DistanceUnit, VolumeUnit } from '../../types';

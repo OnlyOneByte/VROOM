@@ -1,6 +1,3 @@
-// Unit tests for calculateAverageMilesPerKwh, averageConsecutiveMpg,
-// parseClampedInt and sortExpensesByDate.
-
 import { describe, expect, test } from 'bun:test';
 import type { Expense } from '../../db/schema';
 import {
@@ -73,7 +70,6 @@ describe('calculateAverageMilesPerKwh', () => {
       makeChargeExpense({ mileage: 1100, volume: 30, missedFillup: true, index: 1 }),
       makeChargeExpense({ mileage: 1200, volume: 25, index: 2 }),
     ];
-    // Both pairs touch the missed row, so neither counts.
     expect(calculateAverageMilesPerKwh(expenses)).toBeNull();
   });
 
@@ -116,8 +112,6 @@ describe('calculateAverageMilesPerKwh', () => {
   });
 });
 
-// Used by vehicle-stats. Takes pre-sorted rows and applies the inclusive
-// [5,100] band from analytics charts.
 describe('averageConsecutiveMpg', () => {
   test('averages consecutive pairs: miles-driven / current.volume', () => {
     expect(
@@ -164,7 +158,6 @@ describe('averageConsecutiveMpg', () => {
     ).toBeNull();
   });
 
-  // A zero odometer is falsy and drops the pair, so these cases anchor at a non-zero reading.
   test('the [5,100] band is INCLUSIVE at both edges (exactly 5 and exactly 100 are kept)', () => {
     expect(
       averageConsecutiveMpg([
@@ -209,15 +202,12 @@ describe('parseClampedInt', () => {
     expect(parseClampedInt('-5', 100, 1, 200)).toBe(1);
   });
 
-  // Pins the parse semantics, so a switch to a stricter parser is a deliberate change.
   test('parseInt tolerates a trailing unit but not a leading non-digit', () => {
     expect(parseClampedInt('45px', 30, 1, 366)).toBe(45);
     expect(parseClampedInt('px45', 30, 1, 366)).toBe(30);
   });
 });
 
-// Pairwise efficiency math assumes chronological order, so these tests pin ascending order and that
-// the input is not mutated.
 describe('sortExpensesByDate', () => {
   test('sorts ASCENDING by date', () => {
     const rows = [

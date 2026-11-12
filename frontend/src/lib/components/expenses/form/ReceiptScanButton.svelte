@@ -1,5 +1,4 @@
 <script lang="ts">
-	/** Scan-receipt button: parses a photo and hands the draft to the parent; it never writes an expense itself. */
 	import { Sparkles, LoaderCircle } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
@@ -17,14 +16,14 @@
 	let isScanning = $state(false);
 	let errorMessage = $state<string | null>(null);
 	let showDisclosure = $state(false);
-	let pendingFile = $state<File | null>(null); // file awaiting the post-disclosure scan
+	let pendingFile = $state<File | null>(null);
 
 	function onScanClick() {
 		errorMessage = null;
 		const disclosed =
 			typeof localStorage !== 'undefined' && localStorage.getItem(DISCLOSURE_KEY) === '1';
 		if (!disclosed) {
-			showDisclosure = true; // open the picker only after they acknowledge
+			showDisclosure = true;
 			return;
 		}
 		fileInput?.click();
@@ -34,7 +33,7 @@
 		try {
 			localStorage.setItem(DISCLOSURE_KEY, '1');
 		} catch {
-			// localStorage may be unavailable (private mode) — proceed anyway; we just re-ask next time.
+			// localStorage throws when storage is unavailable (private mode, blocked site data).
 		}
 		showDisclosure = false;
 		fileInput?.click();
@@ -43,7 +42,7 @@
 	async function onFileChange(e: Event) {
 		const input = e.currentTarget as HTMLInputElement;
 		const file = input.files?.[0];
-		// Reset the input so picking the SAME file again re-fires change.
+		// Browsers skip the change event when the same file is picked again unless the value is cleared.
 		input.value = '';
 		if (!file) return;
 		pendingFile = file;

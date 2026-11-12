@@ -1,6 +1,3 @@
-// Trips must survive a real export and restore with their data intact. Rows are seeded directly
-// into SQLite, so the test does not depend on the create route.
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
@@ -29,7 +26,6 @@ function tripRows(): TripRowDb[] {
   return ctx.sqlite.query('SELECT * FROM trips ORDER BY id').all() as TripRowDb[];
 }
 
-/** Inserts a trip row directly, stamping userId the way restore does. */
 function seedTrip(
   ctx: TestApp,
   id: string,
@@ -40,7 +36,7 @@ function seedTrip(
     start_odometer = 1000,
     end_odometer = 1080,
     purpose = 'business',
-    trip_date = 1718841600, // 2024-06-20 (unix seconds, timestamp mode)
+    trip_date = 1718841600,
     start_location = null,
     end_location = null,
     note = null,
@@ -67,7 +63,6 @@ function seedTrip(
 describe('backup → restore round-trip preserves trips', () => {
   test('a fully-populated trip survives export + restore with its fields intact', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
-    // A non-midnight UTC instant catches date-only truncation or timezone shifts in the round trip.
     const tripDateSec = Math.floor(Date.UTC(2024, 5, 20, 13, 30, 0) / 1000);
     seedTrip(ctx, 'trip-1', vehicleId, {
       start_odometer: 24000,
@@ -117,7 +112,6 @@ describe('backup → restore round-trip preserves trips', () => {
     const rows = tripRows();
     expect(rows).toHaveLength(1);
     expect(rows[0].purpose).toBe('personal');
-    // An empty optional cell restores as NULL, not an empty string.
     expect(rows[0].start_location).toBeNull();
     expect(rows[0].end_location).toBeNull();
     expect(rows[0].note).toBeNull();
@@ -141,13 +135,11 @@ describe('backup → restore round-trip preserves trips', () => {
   });
 
   test('a trip referencing a vehicle absent from the backup is rejected (referential integrity)', async () => {
-    // A trip whose vehicle is missing must fail validation, so the restore aborts before the wipe.
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     seedTrip(ctx, 'trip-ok', vehicleId);
 
     const { backupService } = await import('../backup');
 
-    // Export a valid backup, then corrupt it: point the trip at a non-existent vehicle.
     const zip = await backupService.exportAsZip(ctx.user.id);
     const AdmZip = (await import('adm-zip')).default;
     const archive = new AdmZip(zip);

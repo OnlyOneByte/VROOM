@@ -19,7 +19,6 @@ interface ReminderListFilters {
 
 function buildReminderQuery(filters?: ReminderListFilters): string {
 	if (!filters) return '';
-	// isActive=false must survive the query; empty vehicleId/type are dropped.
 	return buildQueryString({
 		vehicleId: filters.vehicleId || undefined,
 		type: filters.type || undefined,
@@ -56,12 +55,10 @@ export const reminderApi = {
 		return apiClient.post<TriggerResult>('/api/v1/reminders/trigger');
 	},
 
-	// Re-arms the reminder: the mileage axis re-anchors to the current odometer and/or the time axis advances one period.
 	async markServiced(id: string): Promise<Reminder> {
 		return apiClient.post<Reminder>(`/api/v1/reminders/${id}/mark-serviced`);
 	},
 
-	// The route returns raw backend rows, so each must go through fromBackendExpense.
 	async getMaterializedExpenses(id: string): Promise<Expense[]> {
 		const data = await apiClient.get<BackendExpenseResponse[]>(`/api/v1/reminders/${id}/expenses`);
 		return data.map(fromBackendExpense);

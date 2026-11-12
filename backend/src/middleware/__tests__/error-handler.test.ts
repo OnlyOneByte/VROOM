@@ -1,5 +1,3 @@
-// Every thrown error class must map to its status and code through errorHandler.
-
 import { describe, expect, test } from 'bun:test';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
@@ -74,13 +72,11 @@ describe('errorHandler — application error branches', () => {
     expect(res.status).toBe(500);
     const body = (await res.json()) as ErrorBody;
     expect(body.success).toBe(false);
-    // Outside development the raw message is hidden.
     expect(body.error.code).toBe('InternalServerError');
   });
 });
 
 describe('errorHandler — SyncError convergence', () => {
-  // Keyed by the enum, so a new SyncErrorCode fails type-check until it has a status.
   const EXPECTED_STATUS: Record<SyncErrorCode, number> = {
     [SyncErrorCode.VALIDATION_ERROR]: 400,
     [SyncErrorCode.AUTH_INVALID]: 401,
@@ -106,7 +102,7 @@ describe('errorHandler — SyncError convergence', () => {
       expect(res.status).toBe(status);
       const body = (await res.json()) as ErrorBody;
       expect(body.success).toBe(false);
-      expect(body.error.code).toBe(code); // the SyncErrorCode IS the response code
+      expect(body.error.code).toBe(code);
       expect(body.error.message).toBe(`${code} happened`);
     }
   });

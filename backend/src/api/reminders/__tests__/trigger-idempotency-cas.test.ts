@@ -1,8 +1,3 @@
-/**
- * Pins reminder-trigger idempotency. advanceNextDueDate is a compare-and-swap on nextDueDate. A stale
- * expected date matches no rows and is a silent no-op, so the trigger loop must supply the current value.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -24,7 +19,7 @@ async function createOverdueExpenseReminder(vehicleId: string): Promise<string> 
     name: 'Monthly premium',
     type: 'expense',
     frequency: 'monthly',
-    startDate: '2024-01-15T00:00:00.000Z', // past => immediately overdue
+    startDate: '2024-01-15T00:00:00.000Z',
     vehicleIds: [vehicleId],
     expenseCategory: 'financial',
     expenseAmount: 100,
@@ -59,12 +54,10 @@ describe('reminder-trigger idempotency (CAS on nextDueDate)', () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const reminderId = await createOverdueExpenseReminder(vehicleId);
 
-    // Read the real current nextDueDate (epoch seconds in sqlite).
     const before = ctx.sqlite
       .query('SELECT next_due_date FROM reminders WHERE id = ?')
       .get(reminderId) as { next_due_date: number };
 
-    // Dynamic import binds to the test database; a static import would bind the production singleton.
     const { reminderRepository } = await import('../repository');
 
     const staleExpected = new Date(before.next_due_date * 1000 - 86_400_000);

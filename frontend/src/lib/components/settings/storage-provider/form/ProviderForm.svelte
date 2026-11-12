@@ -117,7 +117,6 @@
 	let s3Credentials = $state({ accessKeyId: '', secretAccessKey: '' });
 
 	let providerRootPath = $state('VROOM');
-	/** Written on save; a default written over a configured root would move photos. Only an explicit type pick re-seeds it. */
 	let photoRootPath = $state(getDefaultPhotoRootPath('google-drive'));
 
 	let folderSettings = $state<Record<PhotoCategory, CategorySetting>>({
@@ -130,7 +129,6 @@
 	let sheetsSyncEnabled = $state(false);
 	let sheetsSpreadsheetId = $state('');
 	let backupConfig = $state<BackupConfig>({ providers: {} });
-	/** Round-tripped as loaded, not edited here: writing defaults would re-point defaults the user set elsewhere. */
 	let storageDefaults = $state<Partial<StorageConfig['defaults']>>({});
 
 	let providerRootPrefix = $derived(
@@ -190,13 +188,11 @@
 				}
 			}
 		} catch {
-			// Non-critical — backup settings are optional
+			// Backup settings are optional.
 		}
 	}
 
 	onMount(async () => {
-		// Independent calls, so one latency round: the settings load and the OAuth return
-		// (reads URL params, fetches pending email, cleans URL) need nothing from each other.
 		const [, oauthResult] = await Promise.all([loadSettings(), oauth.handleOAuthReturn()]);
 		if (oauthResult.restoredSelectedType) selectedType = oauthResult.restoredSelectedType;
 		if (oauthResult.restoredDisplayName) displayName = oauthResult.restoredDisplayName;
@@ -247,9 +243,6 @@
 		isSaving = true;
 		try {
 			let credentials: Record<string, unknown> = {};
-			// Seeded from the stored config so the keys this form does not manage survive the save —
-			// `accountEmail` is written server-side from the OAuth grant and is the only record of
-			// which Google account this provider is.
 			let config: Record<string, unknown> = {
 				...(existingProvider?.config ?? {}),
 				providerRootPath: providerRootPath.trim(),
@@ -301,10 +294,6 @@
 				resultId = created.id;
 			}
 
-			// What could not be saved, named for the user. The provider row itself is saved by now, so
-			// a failure here is never rolled back — but it is never reported as success either: these
-			// two calls carry the folder paths and the backup toggles, which is what decides whether
-			// photos and backups go anywhere at all.
 			const unsaved: string[] = [];
 
 			try {
@@ -436,9 +425,6 @@
 								onclick={() => {
 									if (pt.disabled) return;
 									selectedType = pt.id;
-									// The only place the photo root path is re-seeded: picking a type is an
-									// explicit choice of a new provider, so its default path is expected. Anything
-									// else (a keystroke elsewhere, a reload) must leave what the user typed alone.
 									photoRootPath = getDefaultPhotoRootPath(pt.id);
 								}}
 							>

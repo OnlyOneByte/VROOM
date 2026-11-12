@@ -37,7 +37,7 @@ export class VehicleRepository extends BaseRepository<Vehicle, NewVehicle> {
     }
   }
 
-  /** Hydrates vehicles by id without a user scope; the caller must have checked access. */
+  // No user scope here: callers must have checked access.
   async findByIds(vehicleIds: string[]): Promise<VehicleWithFinancing[]> {
     if (vehicleIds.length === 0) return [];
     const result = await this.db
@@ -60,7 +60,7 @@ export class VehicleRepository extends BaseRepository<Vehicle, NewVehicle> {
     return result[0] || null;
   }
 
-  /** Plate lookup within one user's fleet. A global lookup would leak plate existence across tenants. */
+  // User-scoped: a global lookup would leak plate existence across tenants.
   async findByLicensePlate(licensePlate: string, userId: string): Promise<Vehicle | null> {
     const result = await this.db
       .select()

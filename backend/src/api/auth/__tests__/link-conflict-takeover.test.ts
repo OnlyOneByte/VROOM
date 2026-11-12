@@ -1,8 +1,3 @@
-/**
- * Account-takeover boundary for checkLinkConflicts: an identity bound to another user must be
- * rejected, never silently re-bound. Runs against a seeded in-memory repository.
- */
-
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';

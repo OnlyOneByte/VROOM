@@ -26,8 +26,6 @@ const baseFinancingSchema = createInsertSchema(vehicleFinancing, {
       CONFIG.validation.financing.providerMaxLength,
       `Provider must be ${CONFIG.validation.financing.providerMaxLength} characters or less`
     ),
-  // Client sends dollars; moneyDollarsToCents stores cents. The min bound applies to the dollar value.
-  // apr is a percentage, not money.
   originalAmount: moneyDollarsToCents((n) => n.min(0.01, 'Original amount must be greater than 0')),
   apr: z
     .number()
@@ -59,7 +57,6 @@ const baseFinancingSchema = createInsertSchema(vehicleFinancing, {
     .min(CONFIG.validation.financing.minDayOfWeek)
     .max(CONFIG.validation.financing.maxDayOfWeek)
     .optional(),
-  // mileageLimit is a mileage count, not money.
   residualValue: moneyDollarsToCents((n) => n.min(0)).optional(),
   mileageLimit: z.number().int().min(0).optional(),
   excessMileageFee: moneyDollarsToCents((n) => n.min(0)).optional(),
@@ -85,7 +82,6 @@ async function enrichWithBalance(
   return withComputedBalance(financing, computedBalance);
 }
 
-// Same API shape as the vehicles route's embedded financing (utils/money.ts).
 const financingRowToApi = financingWithBalanceToApi;
 
 routes.get(
@@ -139,9 +135,7 @@ routes.post(
     const existingFinancing = await financingRepository.findByVehicleId(vehicleId);
 
     if (existingFinancing) {
-      // Reuses the vehicle's existing row. Reset what a fresh insert would default: update() skips
-      // undefined keys, so isActive/endDate and the optional cross-type fields would otherwise keep
-      // stale values from a previous financing.
+      // update() skips undefined keys, so every reset field must be set to null explicitly.
       const updatedFinancing = await financingRepository.update(existingFinancing.id, {
         ...financingData,
         apr: financingData.apr ?? null,

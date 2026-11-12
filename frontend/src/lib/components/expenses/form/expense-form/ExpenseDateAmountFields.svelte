@@ -7,9 +7,7 @@
 	interface Props {
 		date: string;
 		amount: string;
-		/** Already gated on touched by the parent. */
 		dateError?: string;
-		/** Already gated on touched by the parent. */
 		amountError?: string;
 		onAmountBlur: () => void;
 	}

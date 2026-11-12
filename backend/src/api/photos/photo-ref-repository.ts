@@ -13,7 +13,6 @@ export interface UpdateStatusOptions {
   syncedAt?: Date;
 }
 
-/** Per-provider storage locations of photos (photo_refs table). */
 export class PhotoRefRepository {
   constructor(private db: AppDatabase) {}
 

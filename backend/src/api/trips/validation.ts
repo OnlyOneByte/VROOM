@@ -1,11 +1,10 @@
 import { z } from 'zod';
 
-/** The purposes a trip may carry. The mileage summary buckets miles by these values. */
+// The mileage summary buckets miles by these values: a new purpose needs a bucket there too.
 export const TRIP_PURPOSES = ['business', 'personal', 'commute', 'other'] as const;
 export type TripPurpose = (typeof TRIP_PURPOSES)[number];
 
 const startEndRefine = (data: { startOdometer?: number; endOdometer?: number }): boolean =>
-  // Partial updates may send one odometer; the rule applies only when both are present.
   data.startOdometer === undefined ||
   data.endOdometer === undefined ||
   data.endOdometer >= data.startOdometer;
@@ -15,10 +14,7 @@ const REFINE_MSG = {
   path: ['endOdometer'],
 };
 
-/**
- * Future means a later local calendar day. The client anchors dates at local noon, so an instant
- * comparison would reject today's trip before noon on the server clock.
- */
+// Compare by local calendar day: clients anchor trip dates at local noon.
 const notFutureLocalDay = (d: Date): boolean => {
   const now = new Date();
   const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
@@ -27,7 +23,7 @@ const notFutureLocalDay = (d: Date): boolean => {
 
 const FUTURE_MSG = { message: 'tripDate cannot be in the future' };
 
-// vehicleId is checked for ownership in the route. Refined schemas cannot be .extend()ed, so it lives here.
+// Zod refined schemas cannot be .extend()ed, so vehicleId is declared here; the route checks ownership.
 export const createTripSchema = z
   .object({
     vehicleId: z.string().min(1, 'vehicleId is required'),

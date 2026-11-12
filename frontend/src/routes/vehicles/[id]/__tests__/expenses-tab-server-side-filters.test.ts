@@ -1,5 +1,3 @@
-// Filters must reach the API and restart at offset 0; the table gets server rows untouched.
-
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, waitFor } from '@testing-library/svelte';
 import type { Expense, Vehicle } from '$lib/types';
@@ -7,8 +5,6 @@ import type { Expense, Vehicle } from '$lib/types';
 vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
-// Records the props handed to ExpensesTable; live getters expose the page's current state.
-// Standing in for the table keeps the test on the page: the table adds no coverage here.
 let tableProps: Record<string, unknown> = {};
 vi.mock('$lib/components/expenses/ExpensesTable.svelte', () => ({
 	default: (_anchor: unknown, props: Record<string, unknown>) => {
@@ -16,7 +12,6 @@ vi.mock('$lib/components/expenses/ExpensesTable.svelte', () => ({
 	}
 }));
 
-// Charts, carousels and dialogs are stubbed; they dominate the module graph.
 vi.mock('$lib/components/charts', () => ({ AppPieChart: () => {} }));
 vi.mock('$lib/components/charts/ExpenseTrendChart.svelte', () => ({ default: () => {} }));
 vi.mock('$lib/components/charts/FuelEfficiencyTrendChart.svelte', () => ({ default: () => {} }));
@@ -72,10 +67,8 @@ vi.mock('$lib/services/analytics-api', () => ({
 	analyticsApi: { getFuelEfficiency: (...args: unknown[]) => getFuelEfficiency(...args) }
 }));
 
-// Imported eagerly so module transforms happen outside test timeouts.
 import Page from '../+page.svelte';
 
-// Rows the server chose; the page must pass them through untouched.
 const SERVER_PAGE: Expense[] = [
 	{
 		id: 'e1',
@@ -103,7 +96,6 @@ const SERVER_PAGE: Expense[] = [
 	}
 ] as unknown as Expense[];
 
-// A multi-page set, so the offset reset and the header count are meaningful.
 const TOTAL_COUNT = 60;
 
 beforeEach(() => {
@@ -149,7 +141,6 @@ function rowsGivenToTable(): Expense[] {
 	return (tableProps['expenses'] ?? []) as Expense[];
 }
 
-// Photos are the only read that needs the vehicle; the rest must not wait for it.
 describe('vehicle detail mount — only the photos read waits for the vehicle', () => {
 	test('summary, fuel efficiency and stats go out WHILE the vehicle request is still pending', async () => {
 		let releaseVehicle: (vehicle: Vehicle) => void = () => {};
@@ -167,7 +158,6 @@ describe('vehicle detail mount — only the photos read waits for the vehicle', 
 			expect(getFuelEfficiency).toHaveBeenCalled();
 			expect(getVehicleStats).toHaveBeenCalled();
 		});
-		// ...and the one read that DOES depend on the vehicle has correctly held back.
 		expect(getPhotos).not.toHaveBeenCalled();
 
 		releaseVehicle(VEHICLE);
@@ -186,7 +176,6 @@ describe('vehicle detail mount — only the photos read waits for the vehicle', 
 
 		await waitFor(() => expect(getExpenseSummary).toHaveBeenCalled());
 		await waitFor(() => expect(getVehicle).toHaveBeenCalled());
-		// Give any follow-up round a chance to fire before asserting it did not.
 		await new Promise(resolve => setTimeout(resolve, 50));
 		expect(getPhotos).not.toHaveBeenCalled();
 	});
@@ -239,8 +228,6 @@ describe('vehicle Expenses tab — filters are applied by the server, across all
 			const screen = await renderExpensesTab();
 			await waitFor(() => expect(rowsGivenToTable()).toHaveLength(SERVER_PAGE.length));
 
-			// A term matching neither row: a client-side filter would leave the table empty.
-			// Nothing is filtered locally.
 			const input = screen.getByRole('textbox', { name: 'Search expenses' });
 			await fireEvent.input(input, { target: { value: 'zzz-matches-nothing-locally' } });
 			await vi.advanceTimersByTimeAsync(400);
@@ -249,7 +236,6 @@ describe('vehicle Expenses tab — filters are applied by the server, across all
 				expect(lastListParams()).toMatchObject({ search: 'zzz-matches-nothing-locally' })
 			);
 			expect(rowsGivenToTable().map(e => e.id)).toEqual(['e1', 'e2']);
-			// The count still describes the whole filtered set, not the page.
 			expect(tableProps['totalCount']).toBe(TOTAL_COUNT);
 		} finally {
 			vi.useRealTimers();
@@ -259,7 +245,6 @@ describe('vehicle Expenses tab — filters are applied by the server, across all
 	test('the category axis is CONTROLLED by the page and sent to the API from offset 0', async () => {
 		await renderExpensesTab();
 
-		// Passing onCategoryChange switches the table to server-controlled filtering.
 		const onCategoryChange = tableProps['onCategoryChange'] as ((_c: string) => void) | undefined;
 		expect(onCategoryChange, 'the table is given a category handler').toBeTypeOf('function');
 

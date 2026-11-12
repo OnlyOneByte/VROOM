@@ -18,7 +18,6 @@ export const vehicleApi = {
 		return apiClient.get<Vehicle>(`/api/v1/vehicles/${vehicleId}`);
 	},
 
-	// includeShared also returns vehicles accepted-shared with the user, each with a sharedAccess annotation.
 	async getVehicles(opts?: { includeShared?: boolean }): Promise<Vehicle[]> {
 		const path = opts?.includeShared ? '/api/v1/vehicles?include=shared' : '/api/v1/vehicles';
 		return apiClient.get<Vehicle[]>(path);
@@ -70,7 +69,6 @@ export const vehicleApi = {
 		return vehiclePhotos(vehicleId).list(params);
 	},
 
-	// One request for every vehicle's photos, keyed by vehicleId, instead of one getPhotos call per vehicle.
 	async getAllVehiclePhotos(): Promise<Record<string, Photo[]>> {
 		return apiClient.get<Record<string, Photo[]>>('/api/v1/photos?entityType=vehicle');
 	},

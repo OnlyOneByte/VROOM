@@ -1,9 +1,3 @@
-/**
- * POST /api/v1/assistant/chat through the real stack, with the provider's fetch stubbed to script each
- * model turn. Covers the tool loop, the tool allowlist, argument validation, the turn cap, provider
- * errors, and user scoping.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -36,7 +30,6 @@ afterEach(() => {
 describe('POST /api/v1/assistant/chat', () => {
   test('a tool call followed by an answer returns the reply and the tool that ran', async () => {
     await seedLlmProvider(ctx);
-    // Turn 1: the model asks for getExpenseSummary; Turn 2: it answers with the grounded text.
     stubScript([
       callTurn('getExpenseSummary', '{"range":"all"}'),
       answerTurn('You have spent $0 so far.'),
@@ -77,7 +70,6 @@ describe('POST /api/v1/assistant/chat', () => {
 
   test('a runaway tool loop stops with an honest bounded reply', async () => {
     await seedLlmProvider(ctx);
-    // The model never answers, so the loop must stop at its turn cap. The stub repeats its last entry.
     stubScript([callTurn('listVehicles', '{}')]);
     const res = await ctx.authed('POST', '/api/v1/assistant/chat', { message: 'loop forever' });
     expect(res.status).toBe(200);
@@ -120,7 +112,6 @@ describe('POST /api/v1/assistant/chat', () => {
 
   test('tools only return the session user’s data', async () => {
     await seedLlmProvider(ctx);
-    // Seed the session user's vehicle + a foreign user's vehicle.
     const mine = await seedVehicle(ctx, { make: 'Mine', model: 'Car', year: 2022 });
     ctx.sqlite.run(
       `INSERT INTO users (id, email, display_name) VALUES ('other-llm-route', 'o@test.com', 'Other')`

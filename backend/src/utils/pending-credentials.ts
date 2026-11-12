@@ -1,5 +1,3 @@
-// In-memory and single-process: holds OAuth credentials between the callback and provider creation.
-
 const TTL_MS = 10 * 60 * 1000;
 const MAX_SIZE = 1000;
 
@@ -36,7 +34,6 @@ export function storePending(
   cleanupExpired();
 
   if (pendingProviderCredentials.size >= MAX_SIZE) {
-    // Map iterates in insertion order, so the first key is the oldest entry.
     const oldestKey = pendingProviderCredentials.keys().next().value;
     if (oldestKey !== undefined) {
       pendingProviderCredentials.delete(oldestKey);
@@ -50,7 +47,6 @@ export function storePending(
   });
 }
 
-// Peeks without consuming the entry.
 export function getPendingEmail(userId: string, nonce: string): string | null {
   const entry = pendingProviderCredentials.get(makeKey(userId, nonce));
   if (!entry || isExpired(entry)) {
@@ -73,5 +69,4 @@ export function consumePending(
   return { refreshToken: entry.refreshToken, email: entry.email };
 }
 
-// Exposed for tests only.
 export { pendingProviderCredentials };

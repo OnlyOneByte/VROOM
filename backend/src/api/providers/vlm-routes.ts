@@ -1,8 +1,3 @@
-/**
- * Parses a receipt image into a draft expense. Persists nothing: the user confirms the draft through
- * POST /expenses, and the photo is stored only on that confirm.
- */
-
 import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { getDb } from '../../db/connection';
@@ -55,7 +50,7 @@ routes.post('/parse', async (c) => {
     throw new ValidationError(`Unsupported image type "${file.type}". Use JPEG, PNG, or WebP.`);
   }
   const bytes = Buffer.from(await file.arrayBuffer());
-  // bodyLimit only sees Content-Length, and a chunked upload can omit it.
+  // bodyLimit only checks Content-Length; a chunked upload can omit it.
   if (bytes.byteLength > MAX_IMAGE_BYTES) {
     throw new AppError('Receipt image exceeds the 8MB limit', 413);
   }
@@ -65,13 +60,13 @@ routes.post('/parse', async (c) => {
   try {
     raw = await provider.extractReceipt({ data: bytes, mimeType: file.type });
   } catch (err) {
-    // Provider errors are logged by the adapter; the client gets a generic 502 with no key or raw error.
+    // Adapters log upstream errors; the client gets a generic 502 with no key or raw error.
     const message = err instanceof Error ? err.message : 'VLM provider error';
     logger.warn('Receipt parse failed', { providerType: providerRow.providerType, error: message });
     throw new AppError('The receipt-parsing provider could not be reached. Try again.', 502);
   }
 
-  // Draft amounts are in dollars; conversion to cents happens at POST /expenses.
+  // Draft amounts are dollars; cents conversion happens at POST /expenses.
   const draft = parseExtraction(raw);
 
   return c.json({ success: true, data: { draft } });

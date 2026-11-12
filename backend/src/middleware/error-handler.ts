@@ -31,7 +31,6 @@ export const errorHandler: ErrorHandler = (err, c) => {
     return c.json(createErrorResponse('HTTPException', err.message, err.cause), err.status);
   }
 
-  // SyncError does not extend AppError, so it needs its own branch or a VALIDATION_ERROR would become a 500.
   if (isSyncError(err)) {
     const { body, status } = syncErrorResponse(err);
     return c.json(body, status as 400 | 401 | 403 | 409 | 429 | 500 | 503);

@@ -33,25 +33,21 @@ const envSchema = z.object({
         throw new Error('PORT must be valid (1-65535)');
       return port;
     }),
-  // Default is the IPv4 loopback literal. A hostname like localhost can resolve to ::1 only, and an
-  // omitted hostname binds every interface. Containers must set 0.0.0.0.
+  // Unset HOST binds every interface, and 'localhost' can resolve to ::1 only, so keep the IPv4 literal.
   HOST: z.string().default('127.0.0.1'),
   DATABASE_URL: z.string().default('./data/vroom.db'),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
-  // Must match a real route under /api/v1. The provider redirect URI below is derived from this value.
   GOOGLE_REDIRECT_URI: z.string().default('http://localhost:3001/api/v1/auth/callback/google'),
   GOOGLE_PROVIDER_REDIRECT_URI: z.string().optional(),
   GITHUB_CLIENT_ID: z.string().optional(),
   GITHUB_CLIENT_SECRET: z.string().optional(),
   GITHUB_REDIRECT_URI: z.string().default('http://localhost:3001/api/v1/auth/callback/github'),
-  // No session secret: sessions are opaque ids in the sessions table, so nothing is signed with a configured key.
   FRONTEND_URL: z.string().optional(),
   CORS_ORIGINS: z
     .string()
     .optional()
     .transform((val) => val?.split(',').map((origin) => origin.trim()) || []),
-  // X-Forwarded-For is trusted only when the socket IP is in this list. Empty means no proxy header is trusted.
   TRUSTED_PROXY_IPS: z
     .string()
     .optional()
@@ -62,7 +58,6 @@ const envSchema = z.object({
         .filter(Boolean)
     ),
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
-  // Tests and local E2E only. The storage factory also refuses it in production.
   ALLOW_FAKE_STORAGE: z
     .string()
     .optional()
@@ -71,11 +66,8 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((val) => val === '1' || val === 'true'),
-  // Instance-wide push identity, set in the environment rather than per user. The private key never leaves
-  // the server. Leaving any of the three unset disables push. Generate a pair with `bun run vapid:gen`.
   VAPID_PUBLIC_KEY: z.string().optional(),
   VAPID_PRIVATE_KEY: z.string().optional(),
-  // mailto: or https: contact that the push service can reach.
   VAPID_SUBJECT: z.string().optional(),
 });
 
@@ -118,7 +110,6 @@ export const CONFIG = {
   version: packageJson.version,
   allowFakeStorageProvider:
     env.ALLOW_FAKE_STORAGE && (env.NODE_ENV as Environment) !== 'production',
-  // Double-gated: opt-in via env and never in production.
   disableRateLimit: env.DISABLE_RATE_LIMIT && (env.NODE_ENV as Environment) !== 'production',
   server: { port: env.PORT, host: env.HOST },
   database: {
@@ -176,13 +167,9 @@ export const CONFIG = {
   },
   backup: {
     maxFileSize: 50 * 1024 * 1024,
-    // Caps total decompressed bytes across all entries, so a zip bomb cannot exhaust memory.
     maxUncompressedSize: 200 * 1024 * 1024,
-    // Checked against the real compressed size, because the declared size in the ZIP directory is
-    // attacker-controlled. Real CSV compresses far below this ratio.
+    // Measured from the real compressed size: the ZIP directory's declared size is attacker-controlled.
     maxCompressionRatio: 1000,
-    // Bumped for integer-cents money. A pre-cents backup fails the version check instead of being
-    // silently corrupted 100x. Restore's version-gated shim converts old backups.
     currentVersion: '2.0.0',
     supportedModes: ['preview', 'replace', 'merge'] as const,
     defaultRetentionCount: 10,
@@ -206,7 +193,6 @@ export const CONFIG = {
       maxTags: 10,
       tagMaxLength: 50,
       fuelTypeMaxLength: 50,
-      // Caps rows per CSV import so a large file cannot exhaust memory.
       maxImportRows: 5000,
     },
     insurance: {
@@ -237,16 +223,12 @@ export const CONFIG = {
       maxCatchUpOccurrences: 12,
       maxTags: 10,
       tagMaxLength: 50,
-      // Covers any realistic service interval while keeping nextDueOdometer within INTEGER range.
       maxIntervalMileage: 1_000_000,
-      // Newest-first, so a reminder that fired often cannot return an unbounded list.
       notificationsHistoryLimit: 100,
     },
     settings: { maxBackupRetention: 100, maxSyncInactivityMinutes: 30 },
     push: {
-      // Reaped after this many consecutive transient send failures, so a dead endpoint is not retried forever.
       maxConsecutiveFailures: 5,
-      // A new device past this cap evicts the oldest subscription instead of being rejected.
       maxSubscriptionsPerUser: 20,
     },
   },
@@ -296,8 +278,6 @@ export function getBackupTableKeys(): string[] {
   return Object.keys(TABLE_SCHEMA_MAP);
 }
 
-// Exported so a test can check this is a subset of TABLE_FILENAME_MAP's values. A typo here would make
-// an optional file required.
 export const OPTIONAL_BACKUP_FILES = new Set([
   'insurance_terms.csv',
   'insurance_term_vehicles.csv',

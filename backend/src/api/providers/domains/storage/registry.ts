@@ -1,5 +1,3 @@
-/** Resolves storage providers for photo categories from storage_config and user_providers rows. */
-
 import { and, eq } from 'drizzle-orm';
 import { CONFIG } from '../../../../config';
 import { getDb } from '../../../../db/connection';
@@ -38,7 +36,6 @@ function buildGooglePhotosProvider(
   if (typeof refreshToken !== 'string') {
     throw new ValidationError('Invalid Google Photos credentials: missing refreshToken');
   }
-  // The album id is cached in config after the first upload, skipping a lookup per request.
   const albumId = typeof config?.albumId === 'string' ? config.albumId : undefined;
   return new GooglePhotosProvider(refreshToken, undefined, albumId);
 }
@@ -62,7 +59,6 @@ function buildS3Provider(credentials: Record<string, unknown>, config: unknown):
 export class StorageProviderRegistry {
   constructor(private db: ReturnType<typeof getDb>) {}
 
-  /** Tenant-scoped lookup on id AND userId; callers decide whether a miss throws or is skipped. */
   private async findOwnedProvider(
     providerId: string,
     userId: string
@@ -122,7 +118,6 @@ export class StorageProviderRegistry {
     return results;
   }
 
-  /** Use from user-facing code; getProviderInternal skips the ownership check. */
   async getProvider(providerId: string, userId: string): Promise<StorageProvider> {
     const providerRow = await this.findOwnedProvider(providerId, userId);
     if (!providerRow) {
@@ -132,7 +127,6 @@ export class StorageProviderRegistry {
     return this.createProviderInstance(providerRow);
   }
 
-  /** No ownership check: for trusted server-side callers such as the sync worker only. */
   async getProviderInternal(providerId: string): Promise<StorageProvider> {
     const row = await this.db
       .select()
@@ -193,7 +187,7 @@ export class StorageProviderRegistry {
     }
   }
 
-  /** Merged with defaults because older rows may predate newer categories such as odometer_readings. */
+  // Merge with defaults: older rows predate newer categories.
   private async loadStorageConfig(userId: string): Promise<StorageConfig> {
     const row = await this.db
       .select({ storageConfig: userPreferences.storageConfig })
@@ -230,7 +224,6 @@ export class StorageProviderRegistry {
   }
 }
 
-/** Lazy singleton registry instance — avoids calling getDb() at module scope. */
 let _registryInstance: StorageProviderRegistry | null = null;
 export function getStorageProviderRegistry(): StorageProviderRegistry {
   if (!_registryInstance) {
@@ -239,7 +232,7 @@ export function getStorageProviderRegistry(): StorageProviderRegistry {
   return _registryInstance;
 }
 
-/** Proxy defers getDb() until the first property access. */
+// Keep this lazy: getDb() must not run at import time.
 export const storageProviderRegistry: StorageProviderRegistry = new Proxy(
   {} as StorageProviderRegistry,
   {

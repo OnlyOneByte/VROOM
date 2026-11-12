@@ -27,7 +27,6 @@ function ensureCleanupTimer(): void {
       if (entry.resetTime < now) rateLimitStore.delete(key);
     }
   }, CONFIG.rateLimit.cleanupInterval);
-  // Unref so the timer alone does not keep the process alive.
   if (cleanupTimer && typeof cleanupTimer === 'object' && 'unref' in cleanupTimer) {
     cleanupTimer.unref();
   }
@@ -36,7 +35,6 @@ function ensureCleanupTimer(): void {
 export function rateLimiter(config: RateLimitConfig) {
   ensureCleanupTimer();
   return async (c: Context, next: Next) => {
-    // Local E2E escape hatch. CONFIG.disableRateLimit is never honored in production.
     if (CONFIG.disableRateLimit) return next();
 
     const key = config.keyGenerator(c);

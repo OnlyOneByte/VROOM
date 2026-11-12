@@ -39,7 +39,6 @@
 	{#if form.errors['vehicleIds']}<FormFieldError>{form.errors['vehicleIds']}</FormFieldError>{/if}
 </div>
 
-<!-- Single-vehicle expenses keep the no-split path, so the editor is hidden. -->
 {#if form.showSplitEditor}
 	<div class="space-y-2">
 		<Label>Split across vehicles</Label>

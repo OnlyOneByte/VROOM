@@ -35,8 +35,8 @@ contract.
 ## Static source-scan guards
 
 Committed scans under `src/lib/utils/__tests__/` fail `npm run test` on a whole bug class, not
-just the site that first hit it. Each test's header comment names the helper to use instead — read
-it before working around a failure.
+just the site that first hit it. The table names the helper to use instead; use it rather than
+working around a failure.
 
 | Guard | Fails on | Use instead |
 |---|---|---|

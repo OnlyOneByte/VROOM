@@ -49,7 +49,7 @@
 	const chart = useChart();
 	const chartCtx = getChartContext();
 
-	// Item-based charts (Pie/Arc) only populate the hovered item, so filter to defined values.
+	// Pie/Arc charts populate only the hovered item, so undefined values must be filtered out.
 	const visibleSeries = $derived(
 		chartCtx.tooltip.series.filter((s: TooltipPayload) => s.value !== undefined)
 	);

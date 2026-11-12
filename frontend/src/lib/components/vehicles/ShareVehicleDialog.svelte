@@ -15,7 +15,6 @@
 
 	interface Props {
 		open: boolean;
-		/** The vehicle being shared (owner side); null when closed. */
 		vehicleId: string | null;
 		vehicleName: string;
 	}
@@ -30,7 +29,6 @@
 	let loadError = $state<string | null>(null);
 	let shares = $state<VehicleShare[]>([]);
 
-	// Fetches the owner's shares and scopes them to this vehicle client-side; keyed on open:vehicleId.
 	let lastKey = $state('');
 	$effect(() => {
 		const key = `${open}:${vehicleId ?? ''}`;
@@ -66,7 +64,6 @@
 			level = 'viewer';
 			await load();
 		} catch (error) {
-			// Surface the backend's specific message (no account / already shared / not your vehicle).
 			const msg =
 				error instanceof ApiError ? error.message : 'Could not send the invitation. Try again.';
 			toast.error(msg);

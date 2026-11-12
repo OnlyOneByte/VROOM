@@ -33,7 +33,7 @@
 
 <div class="grid grid-cols-2 {gridCols} gap-4 {className ?? ''}">
 	{#each items as item (item.label)}
-		<!-- min-w-0 lets grid items shrink; without it a wide card overflows the narrow mobile track. -->
+		<!-- min-w-0 is required: grid items default to min-width auto and overflow. -->
 		<StatCard
 			class="min-w-0"
 			label={item.label}

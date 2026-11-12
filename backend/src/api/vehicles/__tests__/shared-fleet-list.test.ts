@@ -1,9 +1,3 @@
-/**
- * GET /api/v1/vehicles?include=shared: an accepted share adds the owner's vehicle to the invitee's
- * fleet, annotated with sharedAccess. Pending, declined and revoked shares, and unrelated users, must
- * see nothing. Expense writes are not widened.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -15,7 +9,7 @@ import {
 import { createInvitee } from '../../../test-helpers/invitee';
 import { seedVehicle } from '../../../test-helpers/seed';
 
-let ctx: TestApp; // owner (user A)
+let ctx: TestApp;
 let asB: RequestFn;
 let bEmail: string;
 
@@ -33,7 +27,6 @@ interface VehicleRow {
   sharedAccess?: { level: string; sharedBy: string };
 }
 
-/** A owns a vehicle and invites B at `level`; returns [vehicleId, shareId]. */
 async function shareWithB(level: 'viewer' | 'editor'): Promise<[string, string]> {
   const vehicleId = await seedVehicle(ctx, { make: 'Shared', model: 'Car', year: 2021 });
   const res = await ctx.authed('POST', '/api/v1/shares', { vehicleId, email: bEmail, level });
@@ -60,7 +53,7 @@ describe('GET /vehicles?include=shared fleet list', () => {
   });
 
   test('a PENDING (not yet accepted) share does NOT appear in the shared fleet', async () => {
-    const [vehicleId] = await shareWithB('editor'); // invited, not accepted
+    const [vehicleId] = await shareWithB('editor');
     const withShared = await json<DataEnvelope<VehicleRow[]>>(
       await asB('GET', '/api/v1/vehicles?include=shared')
     );
@@ -70,7 +63,7 @@ describe('GET /vehicles?include=shared fleet list', () => {
   test('a DECLINED share does NOT appear (no fleet visibility after decline)', async () => {
     const [vehicleId, shareId] = await shareWithB('viewer');
     await asB('POST', `/api/v1/shares/${shareId}/accept`);
-    await asB('POST', `/api/v1/shares/${shareId}/decline`); // self-remove
+    await asB('POST', `/api/v1/shares/${shareId}/decline`);
     const withShared = await json<DataEnvelope<VehicleRow[]>>(
       await asB('GET', '/api/v1/vehicles?include=shared')
     );
@@ -96,10 +89,6 @@ describe('GET /vehicles?include=shared fleet list', () => {
   });
 });
 
-/**
- * Full share lifecycle over the HTTP harness. A browser test cannot create an owner, because sign-in
- * is OAuth only. This covers the revoke-removes-from-fleet step, which the shares route tests do not.
- */
 describe('share lifecycle: invite, accept, appear, revoke, disappear', () => {
   test('the owner revoking an accepted share removes the vehicle from the invitee fleet', async () => {
     const [vehicleId, shareId] = await shareWithB('editor');
@@ -146,10 +135,6 @@ describe('share lifecycle: invite, accept, appear, revoke, disappear', () => {
   });
 });
 
-/**
- * GET /vehicles/:id allows shared reads and annotates non-owners with their sharedAccess level, so the
- * detail page can gate edit controls. Owners get no annotation. Strangers and pending invitees get 404.
- */
 describe('GET /vehicles/:id: shared read with level annotation', () => {
   test('an accepted VIEWER loads the shared vehicle, annotated sharedAccess.level=viewer', async () => {
     const [vehicleId, shareId] = await shareWithB('viewer');
@@ -212,7 +197,6 @@ describe('GET /vehicles/:id/stats: shared read', () => {
     const res = await asB('GET', `/api/v1/vehicles/${vehicleId}/stats?period=all`);
     const body = await json<DataEnvelope<StatsEnvelope>>(res);
     expect(res.status, JSON.stringify(body)).toBe(200);
-    // Owner-scoped: the viewer's own id has no rows, so a non-empty count proves owner-scope is active.
     expect(body.data.fuelExpenseCount).toBe(1);
     expect(body.data.currentOdometer).toBe(30000);
   });

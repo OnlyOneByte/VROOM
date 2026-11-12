@@ -1,10 +1,3 @@
-/**
- * GET /api/v1/photos/receipt-drafts through the real middleware and handler. The Photos service and
- * the VLM outbound fetch are faked, so no network is used. Covers the 400 cases when a provider is
- * missing, a clean sweep that persists nothing, skipping already-imported photos, a 502 on a Photos
- * failure, and 401 when unauthenticated.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   FakePhotosStore,
@@ -40,7 +33,6 @@ afterEach(() => {
   ctx.close();
 });
 
-/** Stub the VLM adapter's outbound fetch to return one OpenAI-style completion with `content`. */
 function stubVlm(content: string): void {
   globalThis.fetch = (async () =>
     new Response(JSON.stringify({ choices: [{ message: { content } }] }), {
@@ -50,7 +42,6 @@ function stubVlm(content: string): void {
     })) as any;
 }
 
-/** Creates an enabled vlm provider through the providers route. */
 async function seedVlmProvider(): Promise<void> {
   const res = await ctx.authed('POST', '/api/v1/providers', {
     domain: 'vlm',
@@ -62,10 +53,6 @@ async function seedVlmProvider(): Promise<void> {
   expect(res.status, await res.clone().text()).toBe(201);
 }
 
-/**
- * Inserts a google-photos provider row directly. The providers route does not accept that type; the
- * OAuth callback normally creates it.
- */
 function seedPhotosProvider(): void {
   ctx.sqlite.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
@@ -112,7 +99,6 @@ describe('GET /api/v1/photos/receipt-drafts', () => {
     expect(drafts).toHaveLength(2);
     expect(drafts[0]?.draft.amount).toBe(23.45);
     expect(drafts[0]?.thumbnailUrl).toContain(drafts[0]?.photoId);
-    // Staging is read-only; the client confirms drafts through POST /expenses.
     const count = (ctx.sqlite.query('SELECT COUNT(*) as n FROM expenses').get() as { n: number }).n;
     expect(count).toBe(0);
   });
@@ -123,7 +109,6 @@ describe('GET /api/v1/photos/receipt-drafts', () => {
     const ids = store.seedSearchablePhotos([{ filename: 'a.jpg' }, { filename: 'b.jpg' }]);
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2020 });
     stubVlm('{"amount": 10}');
-    // The first media item already backs an expense (clientId = photos:<id>).
     ctx.sqlite.run(
       `INSERT INTO expenses (id, user_id, vehicle_id, category, expense_amount, date, client_id)
        VALUES ('exp-imported', ?, ?, 'misc', 1000, '2026-05-01', ?)`,
@@ -139,7 +124,6 @@ describe('GET /api/v1/photos/receipt-drafts', () => {
     seedPhotosProvider();
     await seedVlmProvider();
     store.seedSearchablePhotos([{ filename: 'x.jpg' }]);
-    // The route must report this as 502, not as an empty 200.
     store.injectFault('searchMediaItems', photosApiError(503, 'Google Photos API 503'));
     const res = await ctx.authed('GET', '/api/v1/photos/receipt-drafts');
     expect(res.status).toBe(502);

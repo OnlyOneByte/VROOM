@@ -1,10 +1,3 @@
-/**
- * Shared-vehicle reads of insurance. A policy can span several of the owner's vehicles, so a shared viewer
- * must see only the shared vehicle's terms, coverage, and ids. Claims are filtered the same way. The owner
- * sees everything.
- * User A owns the vehicles. User B is invited as viewer or editor.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -15,8 +8,8 @@ import {
 import { createInvitee, type Invitee } from '../../../test-helpers/invitee';
 import { seedVehicle } from '../../../test-helpers/seed';
 
-let ctx: TestApp; // owner (user A)
-let b: Invitee; // invitee B
+let ctx: TestApp;
+let b: Invitee;
 
 beforeEach(async () => {
   ctx = await createTestApp();
@@ -150,7 +143,6 @@ interface ClaimRow {
   vehicleId: string | null;
 }
 
-/** Creates a policy whose term covers both vehicles, and returns the policy id. */
 async function createTwoVehiclePolicy(vehicleA: string, vehicleB: string): Promise<string> {
   const res = await ctx.authed('POST', '/api/v1/insurance', {
     company: 'Claims Mutual',
@@ -167,7 +159,6 @@ async function createTwoVehiclePolicy(vehicleA: string, vehicleB: string): Promi
   return body.data.id;
 }
 
-/** Files a claim as the owner, optionally attributed to a vehicle. */
 async function fileClaim(policyId: string, claimType: string, vehicleId?: string): Promise<string> {
   const res = await ctx.authed('POST', `/api/v1/insurance/${policyId}/claims`, {
     claimDate: '2024-06-01T00:00:00.000Z',

@@ -1,7 +1,3 @@
-// A backup run must patch backupConfig rather than rewrite it, so concurrent edits made during the
-// run survive. Driven through the real execute() with a strategy that makes the edit mid-run.
-// The registry has no delete, so custom types are overwritten with a no-op afterwards.
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 import type { BackupStrategy, BackupStrategyResult } from '../backup-strategy';
@@ -50,7 +46,6 @@ function writeProviders(providers: Record<string, ProviderConfigEntry>): void {
   ]);
 }
 
-/** A provider row whose credentials the orchestrator can decrypt and parse. */
 function seedProviderRow(id: string, providerType: string): void {
   ctx.sqlite.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
@@ -59,7 +54,6 @@ function seedProviderRow(id: string, providerType: string): void {
   );
 }
 
-/** A tracked data change, so the run passes the change gate. */
 function seedDataChange(id: string): void {
   ctx.sqlite.run('INSERT INTO vehicles (id, user_id, make, model, year) VALUES (?, ?, ?, ?, ?)', [
     id,
@@ -70,7 +64,6 @@ function seedDataChange(id: string): void {
   ]);
 }
 
-/** A strategy that runs `duringRun` before reporting success. */
 function strategyThatEditsConfig(duringRun: () => Promise<void>): BackupStrategy {
   return {
     async execute(): Promise<BackupStrategyResult> {
@@ -86,7 +79,6 @@ describe('a backup run patches backupConfig instead of rewriting it', () => {
     register(
       'fake-self-disable',
       strategyThatEditsConfig(async () => {
-        // The user turns this provider's backup off in Settings mid-run.
         await preferencesRepository.mergeJsonField(ctx.user.id, 'backupConfig', {
           providers: { p1: { enabled: false } },
         });
@@ -102,10 +94,8 @@ describe('a backup run patches backupConfig instead of rewriting it', () => {
       expect(result.outcome).toBe('success');
 
       const providers = readProviders();
-      // The run records its own stamp without resurrecting the setting it overlapped.
       expect(providers.p1?.enabled, 'the mid-run disable survives the run').toBe(false);
       expect(providers.p1?.lastBackupAt, 'the run still records when it succeeded').toBeTruthy();
-      // Untouched sibling keys survive, which shows a patch rather than a replacement.
       expect(providers.p1?.folderPath).toBe('B');
       expect(providers.p1?.retentionCount).toBe(5);
     } finally {
@@ -118,7 +108,6 @@ describe('a backup run patches backupConfig instead of rewriting it', () => {
     register(
       'fake-sibling-remover',
       strategyThatEditsConfig(async () => {
-        // The user disconnects the other provider mid-run.
         ctx.sqlite.run('DELETE FROM user_providers WHERE id = ?', ['p-gone']);
         await preferencesRepository.mergeJsonField(ctx.user.id, 'backupConfig', {
           providers: { 'p-gone': null },
@@ -144,7 +133,6 @@ describe('a backup run patches backupConfig instead of rewriting it', () => {
       expect(result.outcome).toBe('partial');
 
       const providers = readProviders();
-      // The disconnected provider stays gone. A leftover enabled entry would name a missing row.
       expect(Object.keys(providers), 'only the surviving provider remains').toEqual(['p-keep']);
       expect(providers['p-keep']?.lastBackupAt).toBeTruthy();
     } finally {

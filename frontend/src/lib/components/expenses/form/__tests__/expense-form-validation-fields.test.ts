@@ -1,5 +1,3 @@
-// Non-date branches of validateExpenseField, plus the validateMileage odometer monotonicity check.
-
 import { describe, expect, test } from 'vitest';
 import type { Vehicle } from '$lib/types';
 import { validateExpenseField } from '../expense-form-validation';
@@ -92,8 +90,6 @@ describe('validateExpenseField — volume gating (fuel + non-electric only)', ()
 	});
 
 	test('fuel + ELECTRIC fuelType skips volume (it routes to charge instead)', () => {
-		// isElectricFuelType matches the exact ELECTRIC_FUEL_TYPES members ('Electric', 'Level 2 (AC)', …),
-		// case-sensitive — so an electric fuelType makes the volume branch a no-op.
 		expect(
 			validateExpenseField(
 				'volume',
@@ -174,9 +170,7 @@ describe('validateMileage (via the mileage field) — fuel monotonicity', () => 
 			category: 'fuel',
 			vehicle: fuelVehicle,
 			formData: { mileage: '20000', date: '2024-06-01' },
-			allVehicleExpenses: [
-				{ id: 'e1', date: '2024-05-01', mileage: 25000 } // earlier date, HIGHER odo
-			]
+			allVehicleExpenses: [{ id: 'e1', date: '2024-05-01', mileage: 25000 }]
 		});
 		expect(validateExpenseField('mileage', c)).toContain('must be greater than 25,000');
 	});
@@ -186,9 +180,7 @@ describe('validateMileage (via the mileage field) — fuel monotonicity', () => 
 			category: 'fuel',
 			vehicle: fuelVehicle,
 			formData: { mileage: '30000', date: '2024-06-01' },
-			allVehicleExpenses: [
-				{ id: 'e1', date: '2024-07-01', mileage: 28000 } // later date, LOWER odo
-			]
+			allVehicleExpenses: [{ id: 'e1', date: '2024-07-01', mileage: 28000 }]
 		});
 		expect(validateExpenseField('mileage', c)).toContain('must be less than 28,000');
 	});
@@ -199,15 +191,14 @@ describe('validateMileage (via the mileage field) — fuel monotonicity', () => 
 			vehicle: fuelVehicle,
 			formData: { mileage: '26000', date: '2024-06-01' },
 			allVehicleExpenses: [
-				{ id: 'e1', date: '2024-05-01', mileage: 25000 }, // earlier, lower
-				{ id: 'e2', date: '2024-07-01', mileage: 27000 } // later, higher
+				{ id: 'e1', date: '2024-05-01', mileage: 25000 },
+				{ id: 'e2', date: '2024-07-01', mileage: 27000 }
 			]
 		});
 		expect(validateExpenseField('mileage', c)).toBeNull();
 	});
 
 	test('the row being edited (matching expenseId) is excluded from the neighbor checks', () => {
-		// The only other entry IS this expense (same id) → it must not constrain itself.
 		const c = ctx({
 			category: 'fuel',
 			vehicle: fuelVehicle,

@@ -1,10 +1,8 @@
 import type { TripPurpose } from '$lib/types';
 
-// Pure trip-form validation mirroring the backend createTripSchema, so the form blocks invalid input before a 400.
-
 export interface TripFormData {
 	vehicleId: string;
-	/** Odometers hold numbers at runtime (Svelte coerces number inputs), so parseOdometer must accept string, number or null. */
+	// Svelte binds number inputs as numbers at runtime; accept string, number or null.
 	startOdometer: string | number | null;
 	endOdometer: string | number | null;
 	purpose: TripPurpose;
@@ -16,7 +14,6 @@ export interface TripFormData {
 
 export type TripFormErrors = Partial<Record<keyof TripFormData, string>>;
 
-/** Parses to a non-negative integer or null; never calls string methods, since the form can hold numbers. */
 export function parseOdometer(raw: string | number | null | undefined): number | null {
 	if (raw === null || raw === undefined) return null;
 	const trimmed = typeof raw === 'string' ? raw.trim() : raw;
@@ -26,7 +23,6 @@ export function parseOdometer(raw: string | number | null | undefined): number |
 	return n;
 }
 
-/** True when dateOnly is after today's local day; compares Y/M/D rather than instants, matching the backend. */
 function isFutureLocalDay(dateOnly: string): boolean {
 	const [y, m, d] = dateOnly.split('-').map(Number);
 	if (!y || !m || !d) return false;
@@ -36,7 +32,6 @@ function isFutureLocalDay(dateOnly: string): boolean {
 	return picked.getTime() > today.getTime();
 }
 
-/** Returns field errors keyed by field; an empty object means valid. */
 export function validateTripFields(form: TripFormData): TripFormErrors {
 	const errors: TripFormErrors = {};
 
@@ -54,7 +49,6 @@ export function validateTripFields(form: TripFormData): TripFormErrors {
 		errors.endOdometer = 'Enter a valid end odometer';
 	}
 
-	// End must be >= start; skipped unless both values parsed cleanly.
 	if (start !== null && end !== null && end < start) {
 		errors.endOdometer = 'End odometer must be at least the start odometer';
 	}

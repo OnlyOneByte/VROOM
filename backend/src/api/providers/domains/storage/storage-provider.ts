@@ -1,5 +1,3 @@
-/** Storage backend contract: upload, download, delete and list photos across providers. */
-
 import { PHOTO_CATEGORIES, type PhotoCategory } from '../../../../types';
 
 export type { PhotoCategory };
@@ -17,20 +15,17 @@ export interface UploadParams {
   entityType: string;
   entityId: string;
   pathHint: string;
-  rawPath?: string; // If set, key = rawPath/fileName (bypasses buildKey)
+  rawPath?: string;
 }
 
 export interface StorageFileInfo {
-  /** Provider-specific identifier (Drive fileId or S3 key). */
   key: string;
   name: string;
   size: number;
-  /** ISO 8601. */
   createdTime: string;
   lastModified: string;
 }
 
-/** Declared by limited backends so callers can branch before attempting an unsupported operation. */
 export interface StorageCapabilities {
   delete: boolean;
   list: boolean;

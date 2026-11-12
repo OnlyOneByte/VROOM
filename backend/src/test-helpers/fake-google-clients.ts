@@ -1,7 +1,3 @@
-// In-memory fakes for the googleapis Drive v3 and Sheets v4 surface. Inject them into the services to run real
-// service logic with no network and no mock.module. One FakeGoogleStore backs both clients, so a spreadsheet
-// created through Sheets is also listed by Drive.
-
 import type { drive_v3, sheets_v4 } from 'googleapis';
 import { GoogleDriveService } from '../api/providers/services/google-drive-service';
 import type { GoogleSheetsClients } from '../api/providers/services/google-sheets-service';
@@ -29,11 +25,8 @@ interface FakePermission {
 interface FakeSpreadsheet {
   title: string;
   sheets: { sheetId: number; title: string }[];
-  /** sheet title → 2D cell grid (as written by values.update) */
   values: Map<string, (string | number | boolean)[][]>;
-  // Captured so tests can assert RAW versus USER_ENTERED. The stored grid is identical either way.
   valueInputOptions: Map<string, string | undefined>;
-  // Never reused, as in real Sheets. Using sheets.length would collide after a delete and rename.
   nextSheetId: number;
 }
 
@@ -41,19 +34,16 @@ interface FaultRule {
   method: string;
   error: Error;
   remaining: number;
-  // Matching calls to let through before failing, so a fault can target a later call of the same method.
   skip: number;
 }
 
 const EPOCH = new Date(0).toISOString();
 
-// Returns the id of a fake file, failing with a clear message if it was never created.
 export function idOf(file: { id: string } | undefined | null): string {
   if (!file) throw new Error('expected a fake Drive file/folder to exist, got none');
   return file.id;
 }
 
-// Gaxios-shaped, so code that reads .code or .status behaves as it does in production.
 export function googleApiError(
   code: number,
   message: string
@@ -64,7 +54,6 @@ export function googleApiError(
   return err;
 }
 
-// Shared backing store for the fake Drive and Sheets clients. Create one per test.
 export class FakeGoogleStore {
   files = new Map<string, FakeFile>();
   permissions = new Map<string, FakePermission[]>();
@@ -127,7 +116,6 @@ export class FakeGoogleStore {
     return id;
   }
 
-  // Pass '' for root-level items, which have an empty parents array.
   childrenOf(parentId: string): FakeFile[] {
     return [...this.files.values()].filter((f) => {
       if (f.trashed) return false;
@@ -139,7 +127,6 @@ export class FakeGoogleStore {
 async function streamToBuffer(body: unknown): Promise<Buffer> {
   if (Buffer.isBuffer(body)) return body;
   if (typeof body === 'string') return Buffer.from(body);
-  // Node Readable, as GoogleDriveService.uploadFile passes it.
   const chunks: Buffer[] = [];
   for await (const chunk of body as AsyncIterable<Buffer | string>) {
     chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
@@ -161,9 +148,8 @@ function toApiFile(f: FakeFile): drive_v3.Schema$File {
   };
 }
 
-// Parses the small Drive query dialect that GoogleDriveService builds.
 function matchesDriveQuery(f: FakeFile, q: string): boolean {
-  if (f.trashed) return false; // every query VROOM builds includes trashed=false
+  if (f.trashed) return false;
   const nameMatch = q.match(/name='((?:\\.|[^'\\])*)'/);
   if (nameMatch) {
     const wanted = nameMatch[1].replace(/\\'/g, "'").replace(/\\\\/g, '\\');
@@ -289,7 +275,6 @@ function sheetTitleFromRange(range: string): string {
   return bang === -1 ? range : range.slice(0, bang);
 }
 
-// Appends an empty tab with a sheetId that is never reused.
 function applyAddSheet(ss: FakeSpreadsheet, req: sheets_v4.Schema$AddSheetRequest): void {
   const title = req.properties?.title;
   if (title && !ss.sheets.some((s) => s.title === title)) {
@@ -308,7 +293,6 @@ function applyDeleteSheet(ss: FakeSpreadsheet, req: sheets_v4.Schema$DeleteSheet
   ss.sheets = ss.sheets.filter((s) => s.sheetId !== id);
 }
 
-// A rename carries the grid and value-input option to the new title. An index repositions the tab.
 function applyRenameSheet(
   ss: FakeSpreadsheet,
   req: sheets_v4.Schema$UpdateSheetPropertiesRequest
@@ -336,7 +320,6 @@ function applyRenameSheet(
   }
 }
 
-// Mirrors the atomic-swap backup, which deletes old tabs and renames staging tabs in one batch.
 function applyBatchRequests(ss: FakeSpreadsheet, requests: sheets_v4.Schema$Request[]): void {
   for (const req of requests) {
     if (req.addSheet) applyAddSheet(ss, req.addSheet);
@@ -357,7 +340,6 @@ export function makeFakeSheets(store: FakeGoogleStore): sheets_v4.Sheets {
       }));
       const id = store.nextId('spreadsheet');
       const nextSheetId = sheets.length;
-      // Register as a Drive file too, so listing the folder finds it (coherence).
       store.files.set(id, {
         id,
         name: title,
@@ -444,7 +426,6 @@ export function makeFakeSheets(store: FakeGoogleStore): sheets_v4.Sheets {
   return { spreadsheets } as unknown as sheets_v4.Sheets;
 }
 
-// Sheets, Drive, and a real GoogleDriveService share one store, so folder walks and file moves stay coherent.
 export function makeFakeSheetsClients(store: FakeGoogleStore): GoogleSheetsClients {
   return {
     sheets: makeFakeSheets(store),

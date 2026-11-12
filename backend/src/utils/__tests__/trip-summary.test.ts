@@ -1,6 +1,3 @@
-// Trip mileage summaries. Per-purpose miles sum to the total, business value is business miles
-// times rate, and empty input yields zeros, not NaN.
-
 import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { TRIP_PURPOSES } from '../../api/trips/validation';
@@ -46,10 +43,10 @@ describe('buildTripSummary', () => {
 
   test('totalMiles + per-purpose split + business-$ are correct for a mixed set', () => {
     const trips = [
-      trip({ startOdometer: 1000, endOdometer: 1100, purpose: 'business' }), // 100 business
-      trip({ startOdometer: 2000, endOdometer: 2050, purpose: 'business' }), // 50 business
-      trip({ startOdometer: 3000, endOdometer: 3030, purpose: 'personal' }), // 30 personal
-      trip({ startOdometer: 4000, endOdometer: 4020, purpose: 'commute' }), // 20 commute
+      trip({ startOdometer: 1000, endOdometer: 1100, purpose: 'business' }),
+      trip({ startOdometer: 2000, endOdometer: 2050, purpose: 'business' }),
+      trip({ startOdometer: 3000, endOdometer: 3030, purpose: 'personal' }),
+      trip({ startOdometer: 4000, endOdometer: 4020, purpose: 'commute' }),
     ];
     const s = buildTripSummary(trips, 0.67);
     expect(s.tripCount).toBe(4);
@@ -60,7 +57,7 @@ describe('buildTripSummary', () => {
     expect(s.milesByPurpose.other).toBe(0);
     expect(s.averageTripMiles).toBe(50);
     expect(s.businessMiles).toBe(150);
-    expect(s.businessMileageValue).toBeCloseTo(100.5, 5); // 150 × 0.67
+    expect(s.businessMileageValue).toBeCloseTo(100.5, 5);
     expect(s.rate).toBe(0.67);
   });
 

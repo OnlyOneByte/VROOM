@@ -144,9 +144,7 @@ export interface BackupData {
   reminders?: import('./db/schema').Reminder[];
   reminderVehicles?: import('./db/schema').ReminderVehicle[];
   reminderNotifications?: import('./db/schema').ReminderNotification[];
-  // Optional: absent from older backups, which restore still accepts (see OPTIONAL_BACKUP_FILES).
   trips?: import('./db/schema').Trip[];
-  // Only accepted grants are exported. Restore re-stamps ownerId and skips grants whose invitee is absent.
   vehicleShares?: import('./db/schema').VehicleShare[];
 }
 
@@ -173,11 +171,11 @@ export interface ParsedBackupData {
 
 export interface ProviderBackupSettings {
   enabled: boolean;
-  folderPath: string; // Appended to the provider's root path.
+  folderPath: string;
   retentionCount: number;
   lastBackupAt?: string;
-  sheetsSyncEnabled?: boolean; // google-drive providers only
-  sheetsSpreadsheetId?: string; // google-drive providers only
+  sheetsSyncEnabled?: boolean;
+  sheetsSpreadsheetId?: string;
 }
 
 export interface BackupConfig {
@@ -192,7 +190,7 @@ export interface BackupFileInfo {
   providerId: string;
   providerName: string;
   providerType: string;
-  fileRef: string; // Provider-specific reference (Drive fileId or S3 key)
+  fileRef: string;
   fileName: string;
   size: number;
   createdTime: string;

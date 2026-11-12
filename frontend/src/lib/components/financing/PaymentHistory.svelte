@@ -28,7 +28,6 @@
 
 	let visibleRange = $derived.by(() => {
 		if (sortedPayments.length <= VIRTUAL_SCROLL_THRESHOLD) {
-			// Don't use virtual scrolling for small lists
 			return { start: 0, end: sortedPayments.length, useVirtual: false };
 		}
 
@@ -145,7 +144,6 @@
 													#{payment.paymentNumber}
 												</div>
 
-												<!-- Payment Details -->
 												<div class="flex-1 min-w-0">
 													<div class="flex items-start justify-between gap-2 mb-2">
 														<div class="min-w-0">
@@ -264,7 +262,7 @@
 								>
 									<CardContent class="p-4 sm:pt-6 sm:px-6 sm:pb-6">
 										<div class="flex items-start gap-3 sm:gap-4">
-											<!-- text-foreground, not text-chart-2: chart-2 text fails WCAG AA on its tint. -->
+											<!-- text-foreground: chart-2 text fails WCAG AA on its tint. -->
 											<div
 												class="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center font-semibold text-xs sm:text-sm {isExtraPayment
 													? 'bg-chart-2/10 text-foreground'

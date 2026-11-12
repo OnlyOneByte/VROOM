@@ -1,15 +1,9 @@
-/**
- * HTTP transport shared by every LLM and VLM adapter. Failures throw so the calling route can answer
- * 502 instead of a fake success.
- */
-
 import { logger } from '../../../../utils/logger';
 
 export type ModelDomainLabel = 'LLM' | 'VLM';
 
 export interface ModelRequest {
   domain: ModelDomainLabel;
-  /** Log label only, e.g. 'anthropic'. */
   providerType: string;
   model: string;
   url: string;
@@ -22,11 +16,7 @@ export function trimBaseUrl(url: string): string {
   return url.replace(/\/+$/, '');
 }
 
-/**
- * Logs never include the url (Gemini carries the api key in the query string), the headers, or the
- * request body (the user's prompt). The upstream error body is logged, never echoed to the client.
- * A 2xx body that is not JSON resolves to null so adapters can degrade to an empty result.
- */
+// Never log the url (Gemini puts the API key in the query string), headers, or request body.
 export async function postModelJson<T>(req: ModelRequest): Promise<T | null> {
   const label = `${req.domain} ${req.providerType}`;
 

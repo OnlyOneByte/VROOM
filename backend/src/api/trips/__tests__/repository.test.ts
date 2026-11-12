@@ -1,8 +1,3 @@
-/**
- * TripRepository tests over an in-memory migrated database. Every finder is checked for user scoping,
- * and the delete must never remove another user's trip.
- */
-
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
@@ -22,7 +17,6 @@ let db: AppDatabase;
 let repo: TripRepository;
 let counter = 0;
 
-/** Builds a trip with defaults. tripDate advances on each call so newest-first ordering is deterministic. */
 function tripData(overrides: Partial<NewTrip> = {}): NewTrip {
   counter++;
   return {
@@ -119,7 +113,6 @@ describe('TripRepository', () => {
     expect(page.data).toHaveLength(2);
   });
 
-  // A delete keyed on id alone would let one user remove another user's trip.
   test('deleteByIdAndUserId removes the owner’s trip but refuses a foreign user’s delete', async () => {
     const trip = await repo.create(tripData());
 

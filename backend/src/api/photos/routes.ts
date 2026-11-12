@@ -18,7 +18,6 @@ import {
 const routes = new Hono();
 
 routes.use('*', requireAuth);
-// Mutations stamp lastDataChangeDate so a photo-only change triggers the next auto-backup.
 routes.use('*', changeTracker);
 
 routes.get(
@@ -55,8 +54,6 @@ routes.post('/:entityType/:entityId', async (c) => {
   return c.json({ success: true, data: photo }, 201);
 });
 
-// Serves the full-resolution original. Conditional requests are answered before the provider
-// round-trip, since the validator comes from the photo row and a revalidation should not re-download.
 routes.get('/:entityType/:entityId/:photoId/thumbnail', async (c) => {
   const entityType = c.req.param('entityType');
   const entityId = c.req.param('entityId');
@@ -72,7 +69,7 @@ routes.get('/:entityType/:entityId/:photoId/thumbnail', async (c) => {
   );
 
   if (ifNoneMatchSatisfies(c.req.header('if-none-match'), etag)) {
-    // A 304 must repeat the validator and caching headers (RFC 9110 §15.4.5), so reuse the 200 headers.
+    // A 304 must repeat the validator and caching headers (RFC 9110 section 15.4.5).
     const headers = photoThumbnailResponse(Buffer.alloc(0), storedMimeType).headers;
     headers.set('ETag', etag);
     return new Response(null, { status: 304, headers });

@@ -9,7 +9,6 @@
 	interface Props {
 		vehicles: Vehicle[];
 		value: string;
-		/** Already gated on touched by the parent, so presence alone means "show the error". */
 		error?: string;
 		canSplit: boolean;
 		onSelect: (_vehicleId: string) => void;

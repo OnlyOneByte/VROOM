@@ -1,6 +1,3 @@
-// Unit preferences schema, and mergeUnitPreferences: undefined when there is nothing to merge, and
-// a null existing value is spread safely.
-
 import { describe, expect, test } from 'bun:test';
 import { ChargeUnit, DistanceUnit, type UnitPreferences, VolumeUnit } from '../../types';
 import {
@@ -47,7 +44,6 @@ describe('mergeUnitPreferences', () => {
   });
 
   test('a null or undefined existing value is spread safely', () => {
-    // The return is typed UnitPreferences, so the partial expectations are cast.
     expect(mergeUnitPreferences(null, { distanceUnit: DistanceUnit.KILOMETERS })).toEqual({
       distanceUnit: DistanceUnit.KILOMETERS,
     } as UnitPreferences);

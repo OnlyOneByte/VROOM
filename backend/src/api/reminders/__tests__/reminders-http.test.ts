@@ -1,7 +1,3 @@
-/**
- * In-process HTTP tests for the reminders routes, through the real middleware, validation, and DB stack.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -11,7 +7,6 @@ import {
 } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
 
-/** Shapes the assertions read off the reminder JSON envelopes. */
 interface ReminderRow {
   id: string;
   isActive: boolean;
@@ -20,7 +15,6 @@ interface ReminderRow {
 interface ReminderWithJoins {
   reminder: ReminderRow;
 }
-/** Shape of POST /trigger's result envelope (TriggerResult). */
 interface TriggerResultShape {
   createdExpenses: unknown[];
   notifications: unknown[];
@@ -34,7 +28,6 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-/** Creates a notification reminder on the given vehicle. */
 async function createNotificationReminder(vehicleId: string) {
   const res = await ctx.authed('POST', '/api/v1/reminders', {
     name: 'Registration renewal',
@@ -63,7 +56,6 @@ describe('reminders HTTP routes', () => {
     const v1 = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const v2 = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2023 });
 
-    // A notification reminder on v1 (active), an expense reminder on v2, then pause the notification.
     const notif = await createNotificationReminder(v1);
     const notifId = (await json<DataEnvelope<ReminderWithJoins>>(notif)).data.reminder.id;
     await ctx.authed('POST', '/api/v1/reminders', {
@@ -77,21 +69,18 @@ describe('reminders HTTP routes', () => {
     });
     await ctx.authed('PUT', `/api/v1/reminders/${notifId}`, { isActive: false });
 
-    // type=notification → only the (now-paused) notification, NOT the expense reminder.
     const byType = await json<DataEnvelope<ReminderWithJoins[]>>(
       await ctx.authed('GET', '/api/v1/reminders?type=notification')
     );
     expect(byType.data).toHaveLength(1);
     expect(byType.data[0].reminder.type).toBe('notification');
 
-    // isActive=false → only the paused notification (the expense reminder is active).
     const byActive = await json<DataEnvelope<ReminderWithJoins[]>>(
       await ctx.authed('GET', '/api/v1/reminders?isActive=false')
     );
     expect(byActive.data).toHaveLength(1);
     expect(byActive.data[0].reminder.isActive).toBe(false);
 
-    // vehicleId=v2 → only the expense reminder (the junction-JOIN filter path).
     const byVehicle = await json<DataEnvelope<ReminderWithJoins[]>>(
       await ctx.authed('GET', `/api/v1/reminders?vehicleId=${v2}`)
     );
@@ -110,7 +99,6 @@ describe('reminders HTTP routes', () => {
     expect(paused.status, JSON.stringify(pausedBody)).toBe(200);
     expect(pausedBody.data.reminder.isActive).toBe(false);
 
-    // Resume round-trips too.
     const resumed = await ctx.authed('PUT', `/api/v1/reminders/${id}`, { isActive: true });
     expect(resumed.status).toBe(200);
     expect((await json<DataEnvelope<ReminderWithJoins>>(resumed)).data.reminder.isActive).toBe(
@@ -142,12 +130,8 @@ describe('reminders HTTP routes', () => {
     expect(res.status).toBeLessThan(500);
   });
 
-  // The split blob carries its own vehicleIds, so a foreign id could enter through it while vehicleIds is
-  // omitted. Two layers must reject it: the merged re-parse enforces that the split matches the owned
-  // vehicleIds, and an explicit vehicleIds goes through the ownership check.
   test('PUT cannot attach a foreign vehicle via expenseSplitConfig alone (omitting vehicleIds)', async () => {
     const owned = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
-    // A second user's vehicle, seeded directly (cross-tenant).
     ctx.sqlite.run(
       "INSERT INTO users (id, email, display_name) VALUES ('u2', 'u2@example.com', 'U2')"
     );
@@ -167,14 +151,12 @@ describe('reminders HTTP routes', () => {
     });
     const id = (await json<DataEnvelope<ReminderWithJoins>>(created)).data.reminder.id;
 
-    // Foreign vehicle only in the split blob, vehicleIds omitted.
     const viaBlob = await ctx.authed('PUT', `/api/v1/reminders/${id}`, {
       expenseSplitConfig: { method: 'even', vehicleIds: ['foreign-veh'] },
     });
     expect(viaBlob.status).toBeGreaterThanOrEqual(400);
     expect(viaBlob.status).toBeLessThan(500);
 
-    // Foreign vehicle in both vehicleIds and the matching blob.
     const viaBoth = await ctx.authed('PUT', `/api/v1/reminders/${id}`, {
       vehicleIds: ['foreign-veh'],
       expenseSplitConfig: { method: 'even', vehicleIds: ['foreign-veh'] },
@@ -182,7 +164,6 @@ describe('reminders HTTP routes', () => {
     expect(viaBoth.status).toBeGreaterThanOrEqual(400);
     expect(viaBoth.status).toBeLessThan(500);
 
-    // NOTHING leaked: the junction still holds only the owned vehicle, no foreign id persisted.
     const junction = ctx.sqlite
       .query('SELECT vehicle_id FROM reminder_vehicles WHERE reminder_id = ?')
       .all(id) as { vehicle_id: string }[];
@@ -202,7 +183,6 @@ describe('reminders HTTP routes', () => {
     const body = await json<DataEnvelope<TriggerResultShape>>(res);
     expect(res.status, JSON.stringify(body)).toBe(200);
 
-    // Assert it acted rather than an exact count, since the catch-up cap can turn periods into skips.
     const acted = body.data.notifications.length + body.data.skipped.length;
     expect(acted, JSON.stringify(body.data)).toBeGreaterThanOrEqual(1);
   });

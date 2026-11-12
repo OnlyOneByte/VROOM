@@ -1,6 +1,3 @@
-// Merge restore must report a reminders primary-key collision as a conflict. A reminder can outlive
-// its vehicles, so it has to be probed directly rather than through the vehicle link.
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -25,7 +22,6 @@ async function createVehicle(make: string): Promise<string> {
 
 describe('restore merge: reminders PK collision is detected as a conflict, not a raw DB throw', () => {
   test('merging a backup whose surviving vehicle-less reminder collides → clean conflict, not an unhandled PK throw', async () => {
-    // Own a vehicle + a reminder linked to it; export a real ZIP carrying BOTH (+ the prefs row).
     const vehicleId = await createVehicle('Honda');
     const created = await ctx.authed('POST', '/api/v1/reminders', {
       name: 'Registration renewal',
@@ -42,7 +38,6 @@ describe('restore merge: reminders PK collision is detected as a conflict, not a
     const { restoreService } = await import('../restore');
     const zip = await backupService.exportAsZip(ctx.user.id);
 
-    // Deleting the vehicle leaves the reminder row, which still collides with the backup.
     const delRes = await ctx.authed('DELETE', `/api/v1/vehicles/${vehicleId}`);
     expect(delRes.status).toBeLessThan(300);
     const reminderRow = ctx.sqlite
@@ -54,7 +49,6 @@ describe('restore merge: reminders PK collision is detected as a conflict, not a
       .all(reminderId) as unknown[];
     expect(junctionRows, 'its junction row cascaded away').toHaveLength(0);
 
-    // The prefs row also collides, so only a conflict typed 'reminders' proves reminders is probed.
     let reminderConflictReported = false;
     let threw: unknown = null;
     try {

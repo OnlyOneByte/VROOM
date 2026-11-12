@@ -1,8 +1,3 @@
-/**
- * HTTP tests for the reminder notification feed: newest-first ordering, marking a notification read, and
- * ownership. Drives the real trigger and list/mark routes, then reads rows from sqlite.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -27,7 +22,6 @@ interface NotificationRow {
   isRead: boolean;
 }
 
-/** A monthly reminder with a past startDate is overdue, so a trigger writes several notification rows. */
 async function seedFiredNotificationReminder(vehicleId: string): Promise<void> {
   const res = await ctx.authed('POST', '/api/v1/reminders', {
     name: 'Rotate tires',
@@ -56,7 +50,6 @@ describe('reminder notification feed (GET + mark-read)', () => {
       const cur = new Date(body.data[i].createdAt).getTime();
       expect(prev).toBeGreaterThanOrEqual(cur);
     }
-    // All start unread.
     expect(body.data.every((n) => n.isRead === false)).toBe(true);
   });
 
@@ -78,7 +71,6 @@ describe('reminder notification feed (GET + mark-read)', () => {
       .get(target.id) as { is_read: number };
     expect(row.is_read).toBe(1);
 
-    // unreadOnly=true now returns one fewer.
     const unreadAfter = await json<DataEnvelope<NotificationRow[]>>(
       await ctx.authed('GET', '/api/v1/reminders/notifications?unreadOnly=true')
     );
@@ -92,7 +84,6 @@ describe('reminder notification feed (GET + mark-read)', () => {
     expect(res.status).toBeLessThan(500);
   });
 
-  // Orders by createdAt, not dueDate: a mileage notification has a NULL dueDate, which would sort last.
   test('a mileage notification with a null dueDate sorts first when created later', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     await ctx.authed('POST', '/api/v1/reminders', {

@@ -70,7 +70,6 @@ const baseExpenseSchema = createInsertSchema(expensesTable, {
     .optional()
     .default([]),
   category: expenseCategorySchema,
-  // Client sends dollars; storage is integer cents. Volume is not money.
   expenseAmount: moneyDollarsToCents((n) => n.positive('Expense amount must be positive')),
   volume: z.number().positive('Volume must be positive').nullable().optional(),
   date: z.coerce.date(),
@@ -89,8 +88,7 @@ const baseExpenseSchema = createInsertSchema(expensesTable, {
       `Location must be ${CONFIG.validation.expense.locationMaxLength} characters or less`
     )
     .nullish(),
-  // Only financing links are accepted from the API; insurance and reminder links are written by
-  // system paths that bypass this route, so accepting them here would allow unvalidated links.
+  // Insurance and reminder links bypass this route's validation, so only financing links are accepted.
   sourceType: z.literal('financing').optional(),
   sourceId: z.string().min(1).optional(),
   clientId: z.string().min(1).max(64).optional(),
@@ -101,7 +99,7 @@ const createExpenseSchemaBase = baseExpenseSchema.omit({
   createdAt: true,
   updatedAt: true,
   userId: true,
-  // createdBy is server-set provenance; omitting it closes a forge vector.
+  // createdBy is server-set; accepting it from the client would allow forged authorship.
   createdBy: true,
   groupId: true,
   groupTotal: true,
@@ -109,8 +107,6 @@ const createExpenseSchemaBase = baseExpenseSchema.omit({
 });
 
 const createExpenseSchema = createExpenseSchemaBase
-  // Keep-local conflict resolution: on a (userId, clientId) collision, apply the edit instead of
-  // returning the stored row.
   .extend({ forceOverwrite: z.boolean().optional() })
   .refine(
     (data) => {
@@ -124,15 +120,14 @@ const createExpenseSchema = createExpenseSchemaBase
     }
   );
 
-// tags drops the base default: a Zod default survives .partial(), so an update that omits tags
-// would otherwise parse to [] and wipe them.
+// Zod .default() survives .partial(), so an omitted tags field would parse to [] and wipe them.
 const updateExpenseSchema = createExpenseSchemaBase
   .omit({ clientId: true })
   .partial()
   .extend({
     tags: z.array(tagElementSchema).max(CONFIG.validation.expense.maxTags).optional(),
   })
-  // Re-adds the both-or-neither source refine, which does not survive .partial().
+  // Zod refinements do not survive .partial().
   .refine(
     (data) => {
       const hasType = data.sourceType !== undefined;
@@ -145,8 +140,6 @@ const updateExpenseSchema = createExpenseSchemaBase
     }
   );
 
-// The financing balance sums expenses by (sourceType, sourceId) with no vehicle scope, so a link
-// must point at this vehicle's active financing.
 async function assertFinancingSourceValid(
   sourceType: string | undefined,
   sourceId: string | undefined,
@@ -162,7 +155,6 @@ async function assertFinancingSourceValid(
   }
 }
 
-// Each sibling of a split lands on its own vehicle, so the financing check applies to every one.
 async function assertSplitFinancingSourceValid(
   sourceType: string | undefined,
   sourceId: string | undefined,
@@ -174,8 +166,6 @@ async function assertSplitFinancingSourceValid(
   }
 }
 
-// Checks write access on every vehicle in the split and returns the owner stamp. A group carries
-// one userId, so all vehicles must share a single owner. createdBy is null when the actor owns them.
 async function requireSplitWriteAccess(
   splitConfig: SplitConfig,
   actingUserId: string
@@ -214,7 +204,6 @@ export const expenseQuerySchema = z.object({
     .transform((val) => parseInt(val, 10))
     .pipe(z.number().int().min(0))
     .optional(),
-  // Enum allowlist so the sort column can never be injected.
   sortBy: z.enum(['date', 'amount', 'category']).optional(),
   sortDir: z.enum(['asc', 'desc']).optional(),
 });
@@ -259,13 +248,10 @@ routes.put(
     const { id } = c.req.valid('param');
     const data = c.req.valid('json');
 
-    // The group is loaded by groupId because it is owner-stamped; a userId-scoped read would hide it
-    // from a shared editor. Both the existing and the new vehicle sets must be writable.
     const groupInfo = await expenseRepository.getSplitGroupAccessInfo(id);
     if (!groupInfo) throw new NotFoundError('Split expense');
     const existingConfig: SplitConfig = { method: 'even', vehicleIds: groupInfo.vehicleIds };
     await requireSplitWriteAccess(existingConfig, user.id);
-    // The new vehicle set must resolve to the group's existing owner so the cost stays in one set of books.
     const { ownerId: newOwnerId, createdBy } = await requireSplitWriteAccess(
       data.splitConfig,
       user.id
@@ -274,7 +260,6 @@ routes.put(
       throw new ValidationError('A split cannot be moved to a vehicle owned by a different user');
     }
 
-    // The carried-forward financing link must be re-checked against the new vehicles.
     const existing = await expenseRepository.getSplitExpense(id, groupInfo.ownerId);
     await assertSplitFinancingSourceValid(
       existing[0]?.sourceType ?? undefined,
@@ -341,7 +326,6 @@ routes.delete('/split/:id', zValidator('param', commonSchemas.idParam), async (c
   if (!groupInfo) throw new NotFoundError('Split expense');
   await requireSplitWriteAccess({ method: 'even', vehicleIds: groupInfo.vehicleIds }, user.id);
 
-  // Photo files and refs are removed here because the repository delete only drops the DB rows.
   const siblingIds = await expenseRepository.findIdsByGroupId(id, groupInfo.ownerId);
   await deletePhotosForEntities('expense', siblingIds, groupInfo.ownerId);
 
@@ -397,7 +381,6 @@ routes.get('/summary', zValidator('query', summaryQuerySchema), async (c) => {
   const user = c.get('user');
   const { vehicleId, period } = c.req.valid('query');
 
-  // Per-vehicle reads use the owner's rows; cross-fleet reads stay on the acting user's rows to avoid double counting.
   let summaryUserId = user.id;
   if (vehicleId) {
     const ownerId = await requireVehicleOwnerScope(vehicleId, user.id, 'read');
@@ -410,11 +393,9 @@ routes.get('/summary', zValidator('query', summaryQuerySchema), async (c) => {
     period,
   });
 
-  // Shared with the assistant tool so both report the same figures.
   return c.json({ success: true, data: expenseSummaryToApi(summary) });
 });
 
-// Uses the unpaginated findAll so the export is never truncated by the list route's page clamp.
 const exportQuerySchema = z.object({
   vehicleId: z.string().optional(),
   category: expenseCategorySchema.optional(),
@@ -427,7 +408,6 @@ const exportQuerySchema = z.object({
     .transform((val) => (val ? val.split(',').map((t) => t.trim()) : undefined)),
 });
 
-// Exported so a test can check that every column the importer reads is written here.
 export const EXPORT_COLUMNS = [
   'date',
   'vehicle',
@@ -448,7 +428,6 @@ routes.get('/export', zValidator('query', exportQuerySchema), async (c) => {
   const user = c.get('user');
   const { vehicleId, category, startDate, endDate, search, tags } = c.req.valid('query');
 
-  // Per-vehicle exports use the owner's rows; cross-fleet exports stay on the acting user's rows.
   let exportUserId = user.id;
   if (vehicleId) {
     const ownerId = await requireVehicleOwnerScope(vehicleId, user.id, 'read');
@@ -468,7 +447,6 @@ routes.get('/export', zValidator('query', exportQuerySchema), async (c) => {
     }),
     vehicleRepository.findByUserId(user.id),
     isSharedExport && vehicleId ? vehicleRepository.findByIds([vehicleId]) : Promise.resolve([]),
-    // Read-only, so an export never creates a preferences row.
     preferencesRepository.getByUserId(user.id),
   ]);
 
@@ -481,7 +459,7 @@ routes.get('/export', zValidator('query', exportQuerySchema), async (c) => {
     ])
   );
 
-  // Neutralizes spreadsheet formula injection in text cells. Safe to prefix because nothing re-parses this export.
+  // Safe to prefix formula characters only because nothing re-parses this export.
   const records = rows.map((e) =>
     neutralizeCsvRow({
       date: e.date instanceof Date ? e.date.toISOString() : e.date,
@@ -513,12 +491,10 @@ routes.get('/export', zValidator('query', exportQuerySchema), async (c) => {
   return c.body(csv);
 });
 
-// CSV text travels in the JSON body. Vehicles are resolved by name within the user's own garage.
 const importBodySchema = importCsvSchema.extend({
   mapping: columnMappingSchema.optional(),
 });
 
-// Returns {} when no vehicle matches, so values pass through rather than converting toward a guessed unit.
 function resolveTargetUnits(
   targetVehicle: string | undefined,
   vehicles: Awaited<ReturnType<typeof vehicleRepository.findByUserId>>
@@ -546,7 +522,6 @@ routes.post('/import', zValidator('json', importBodySchema), async (c) => {
     throw new ValidationError('Add a vehicle before importing expenses');
   }
 
-  // Without a target vehicle, units are not converted: a multi-vehicle file may mix units.
   let importCsv = csv;
   let unmappedCategories: string[] = [];
   if (mapping) {
@@ -589,7 +564,6 @@ routes.post('/import', zValidator('json', importBodySchema), async (c) => {
     });
   }
 
-  // Idempotent via deterministic clientIds, so re-importing the same file counts rows as duplicates.
   const readyRows = plan.rows
     .filter((row) => row.status === 'ready' && row.expense)
     .map((row) => ({ ...row.expense, userId: user.id }) as NewExpense);
@@ -615,8 +589,6 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
   const { forceOverwrite, ...body } = c.req.valid('json');
   const expenseData = clearFuelFieldsIfNotFuel(body);
 
-  // Rows are stamped with the vehicle owner's id so shared-editor entries count once in the owner's books.
-  // createdBy records the actual author when that is not the owner.
   const ownerId = await requireVehicleOwnerScope(expenseData.vehicleId, user.id, 'write');
   const createdBy = ownerId === user.id ? null : user.id;
 
@@ -633,7 +605,6 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
     expenseData.fuelType
   );
 
-  // A retried offline POST with the same clientId returns the original row. forceOverwrite applies the edit instead.
   const createdExpense = await expenseRepository.createIdempotent(
     {
       ...expenseData,
@@ -643,7 +614,6 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
     forceOverwrite ?? false
   );
 
-  // A mileage reading can cross a reminder milestone; recheck so it fires immediately.
   if (createdExpense.mileage != null) {
     await reminderTriggerService.recheckMileageReminders(ownerId, createdExpense.vehicleId);
   }
@@ -658,13 +628,10 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
   );
 });
 
-// GET /api/expenses - Get all expenses for the user (with optional vehicle filter)
 routes.get('/', zValidator('query', expenseQuerySchema), async (c) => {
   const user = c.get('user');
   const query = c.req.valid('query');
 
-  // Per-vehicle reads use the owner's rows, since shared rows are owner-stamped. Cross-fleet reads
-  // stay on the acting user's rows so shared costs are not double counted.
   let listUserId = user.id;
   if (query.vehicleId) {
     const ownerId = await requireVehicleOwnerScope(query.vehicleId, user.id, 'read');
@@ -693,7 +660,6 @@ routes.get('/', zValidator('query', expenseQuerySchema), async (c) => {
 routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
-  // Loaded by id because rows are owner-stamped; access is checked through the vehicle.
   const expense = await expenseRepository.findById(id);
   if (!expense) throw new NotFoundError('Expense');
   await requireVehicleRead(expense.vehicleId, user.id);
@@ -713,7 +679,6 @@ routes.put(
     if (!existingExpense) throw new NotFoundError('Expense');
     await requireVehicleWrite(existingExpense.vehicleId, user.id);
 
-    // Reassignment needs write access to the target and the same owner, since rows carry the owner's id.
     if (updateData.vehicleId && updateData.vehicleId !== existingExpense.vehicleId) {
       await requireVehicleWrite(updateData.vehicleId, user.id);
       const targetOwnerId = await resolveVehicleOwnerId(updateData.vehicleId);
@@ -722,7 +687,6 @@ routes.put(
       }
     }
 
-    // A forged sourceId on update would corrupt the loan balance, so it is validated as on create.
     await assertFinancingSourceValid(
       updateData.sourceType,
       updateData.sourceId,
@@ -740,12 +704,10 @@ routes.put(
 
     validateFuelExpenseData(finalCategory, finalMileage, finalVolume, finalFuelType);
 
-    // Keyed on the effective category so a non-fuel row cannot keep a stray mileage.
     const normalizedUpdate = clearFuelFieldsIfNotFuel(updateData, finalCategory);
 
     const updatedExpense = await expenseRepository.update(id, normalizedUpdate);
 
-    // An edit can also cross a reminder milestone, so it rechecks like create does.
     if (updatedExpense.mileage != null) {
       await reminderTriggerService.recheckMileageReminders(
         existingExpense.userId,
@@ -769,7 +731,6 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   if (!existingExpense) throw new NotFoundError('Expense');
   await requireVehicleWrite(existingExpense.vehicleId, user.id);
 
-  // Photos have no foreign key to the expense, so they are removed explicitly before the row.
   await deleteAllPhotosForEntity('expense', id, existingExpense.userId);
 
   await expenseRepository.delete(id);

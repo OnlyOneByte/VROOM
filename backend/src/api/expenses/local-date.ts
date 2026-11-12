@@ -1,8 +1,3 @@
-/**
- * Builds a local-time Date from parts, or null when the parts are impossible. Constructing
- * from numeric parts (not an ISO string) keeps the intended calendar day in local time, and
- * the echo check rejects Feb 30 or month 13, which JS would otherwise silently roll over.
- */
 export function buildLocalDate(
   year: number,
   month: number,

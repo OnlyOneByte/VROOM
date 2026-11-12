@@ -1,5 +1,3 @@
-// The conflict dialog stays off the root layout's eager chunk and is never unmounted once loaded.
-
 import { describe, expect, test } from 'vitest';
 import { readFileSync } from 'node:fs';
 
@@ -18,17 +16,14 @@ describe('root layout loads the sync conflict resolver lazily', () => {
 	});
 
 	test('the conflict signal comes from the lightweight sync-state module', () => {
-		// Imported from the lightweight module; sync-manager is far heavier.
 		expect(LAYOUT_SRC).toContain("from '$lib/utils/sync/sync-state.svelte'");
 	});
 
 	test('the loaded component is never unset — no destroy mid-close', () => {
-		// Only the declaration and the default-export assignment may write the binding.
 		const assignments = LAYOUT_SRC.match(/SyncConflictResolver\s*=\s*[^=]/g) ?? [];
 		expect(assignments).toHaveLength(2);
 		expect(LAYOUT_SRC).toMatch(/SyncConflictResolver\s*=\s*\$state<[^>]*>\(null\)/);
 		expect(LAYOUT_SRC).toMatch(/SyncConflictResolver\s*=\s*module\.default/);
-		// The render gate tests the loaded component; gating on the list would unmount it on the last resolve.
 		expect(LAYOUT_SRC).toContain('{#if SyncConflictResolver}');
 		expect(LAYOUT_SRC).not.toMatch(/\{#if\s+syncConflicts\.current\.length/);
 	});

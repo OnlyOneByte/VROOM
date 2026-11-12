@@ -1,7 +1,3 @@
-// A replace-mode restore wipes the importer's data and re-inserts the backup. Both steps must respect
-// the FK graph, since a violation mid-restore would empty the account. Insert order matters: parents
-// must be inserted before the children that reference them.
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -21,7 +17,6 @@ function count(sql: string): number {
   return (ctx.sqlite.query(sql).get() as { n: number }).n;
 }
 
-/** Seeds one row in every table the replace wipe touches, linked through FKs. */
 async function seedFullDataset(): Promise<void> {
   const uid = ctx.user.id;
 
@@ -101,7 +96,6 @@ async function seedFullDataset(): Promise<void> {
     [uid, vehicleId]
   );
 
-  // Ensure both exist, so the wipe must clear them.
   ctx.sqlite.run(`INSERT OR IGNORE INTO user_preferences (user_id) VALUES (?)`, [uid]);
   ctx.sqlite.run(`INSERT OR IGNORE INTO sync_state (user_id) VALUES (?)`, [uid]);
 }
@@ -110,7 +104,6 @@ describe('replace-mode restore with a complete FK-linked dataset', () => {
   test('a full FK-linked dataset replace-restores cleanly', async () => {
     await seedFullDataset();
 
-    // Counts are snapshotted, not hard-coded, since a costed insurance term adds a premium expense.
     const TABLES = [
       'vehicles',
       'vehicle_financing',
@@ -127,7 +120,6 @@ describe('replace-mode restore with a complete FK-linked dataset', () => {
     ] as const;
     const before: Record<string, number> = {};
     for (const t of TABLES) before[t] = count(`SELECT COUNT(*) n FROM ${t}`);
-    // Sanity: the core graph really is populated.
     expect(before.vehicles, 'a vehicle was seeded').toBe(1);
     expect(before.vehicle_financing, 'financing seeded').toBe(1);
     expect(before.odometer_entries, 'odometer seeded').toBe(1);
@@ -140,11 +132,9 @@ describe('replace-mode restore with a complete FK-linked dataset', () => {
     const { restoreService } = await import('../restore');
     const zip = await backupService.exportAsZip(ctx.user.id);
 
-    // With foreign keys enforced, a wrong delete order would throw here.
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 
-    // Every table returns to its exact pre-restore count.
     for (const t of TABLES) {
       expect(
         count(`SELECT COUNT(*) n FROM ${t}`),
@@ -154,7 +144,6 @@ describe('replace-mode restore with a complete FK-linked dataset', () => {
   });
 
   test('replacing twice in a row succeeds', async () => {
-    // The second replace wipes the restored graph, not the originally seeded one.
     await seedFullDataset();
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');

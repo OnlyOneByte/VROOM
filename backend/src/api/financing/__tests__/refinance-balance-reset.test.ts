@@ -1,8 +1,3 @@
-/**
- * Re-financing a paid-off vehicle reuses its financing row. The new balance is correct only because
- * payoff clears the source link on the old payments, so the SUM by source_id excludes them.
- */
-
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
@@ -68,7 +63,6 @@ describe('refinance after payoff resets the balance', () => {
     seedFinancingPayment(3000, 'fin-refi');
     expect(await repo.computeBalance('fin-refi')).toBe(12000);
 
-    // Bound to the test connection rather than the getDb() singleton.
     const localExpenseRepo = new ExpenseRepository(db);
     const cleared = await localExpenseRepo.clearSource('financing', 'fin-refi', USER_ID);
     expect(cleared).toBe(2);
@@ -78,8 +72,6 @@ describe('refinance after payoff resets the balance', () => {
   });
 
   test('WITHOUT the source-clear, the reused row would wrongly carry the old payments (proves the dependency)', async () => {
-    // Without clearSource the old payments still count: $30k − $8k = $22k. This is why payoff must
-    // clear the source links.
     seedFinancing('fin-norefi', 20000);
     seedFinancingPayment(5000, 'fin-norefi');
     seedFinancingPayment(3000, 'fin-norefi');

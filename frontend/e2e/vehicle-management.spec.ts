@@ -1,8 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { VEHICLE_CAMRY, VEHICLE_CIVIC, addSessionCookie, mockApi } from './support/mock-api';
 
-// The fleet is shown on /dashboard; the create form is /vehicles/new.
-
 test.describe('Fleet overview', () => {
 	test.beforeEach(async ({ context }) => {
 		await addSessionCookie(context);
@@ -28,7 +26,6 @@ test.describe('Fleet overview', () => {
 		await expect(camryLink).toHaveAttribute('href', `/vehicles/${VEHICLE_CAMRY.id}`);
 		await expect(page.getByText('2020 Toyota Camry')).toBeVisible();
 
-		// The carousel may scroll this card out of view, so check it exists rather than is visible.
 		await expect(page.getByRole('link', { name: '2019 Honda Civic' })).toHaveAttribute(
 			'href',
 			`/vehicles/${VEHICLE_CIVIC.id}`
@@ -74,7 +71,6 @@ test.describe('Adding a vehicle', () => {
 	test('the create form is reachable from the dashboard', async ({ page }) => {
 		await page.goto('/dashboard');
 
-		// Retries absorb a dev-server HMR reload that cancels the in-flight navigation.
 		await expect(async () => {
 			if (!/\/vehicles\/new$/.test(page.url())) {
 				await page.getByRole('link', { name: 'Add Vehicle' }).click();

@@ -1,5 +1,4 @@
-// X-Forwarded-For is client-controlled. Honour it only when the socket peer is a trusted proxy, or
-// a rate limiter keyed on it can be bypassed by sending a fresh value per request.
+// X-Forwarded-For is client-controlled: honor it only from trusted proxy sockets, or a limiter keyed on it is bypassable.
 
 import type { Context } from 'hono';
 import { getConnInfo } from 'hono/bun';
@@ -9,12 +8,10 @@ function getSocketIp(c: Context): string | undefined {
   try {
     return getConnInfo(c).remote.address;
   } catch {
-    // Throws when the Bun server is not in c.env, as in in-process tests.
     return undefined;
   }
 }
 
-// The leftmost entry is the original client; later entries are proxies.
 function clientFromForwardedFor(xff: string): string | undefined {
   const first = xff.split(',')[0]?.trim();
   return first || undefined;
@@ -32,6 +29,5 @@ export function getClientIp(c: Context, trustedProxyIps?: readonly string[]): st
 
   if (socketIp) return socketIp;
 
-  // Only in-process tests reach this branch; they set the header to exercise per-IP keying.
   return c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
 }

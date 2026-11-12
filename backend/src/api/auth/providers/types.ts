@@ -19,7 +19,6 @@ export interface OAuthProviderConfig {
   fetchUserInfo: (accessToken: string) => Promise<OAuthUserInfo>;
 }
 
-/** The provider authenticated the user but has no verified email to bind the account to. */
 export class NoVerifiedEmailError extends Error {
   constructor(provider: string) {
     super(`No verified email found for ${provider} account`);

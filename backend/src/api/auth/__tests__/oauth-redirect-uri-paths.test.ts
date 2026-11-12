@@ -1,9 +1,3 @@
-/**
- * Every OAuth redirect-URI default in config.ts must name a path the backend serves; a wrong path
- * 404s after the user grants consent. Defaults are read from the config source, not CONFIG, because
- * a developer's .env would otherwise replace them. Each path is probed against the real app.
- */
-
 import { beforeAll, describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -11,12 +5,11 @@ import { fileURLToPath } from 'node:url';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+// Read defaults from the config source, not CONFIG: a developer's .env would replace them.
 const CONFIG_SRC = join(HERE, '..', '..', '..', 'config.ts');
 
-/** e.g. `GOOGLE_REDIRECT_URI: z.string().default('http://localhost:3001/api/v1/auth/...')`. */
 const REDIRECT_URI_DEFAULT = /(\w*REDIRECT_URI):\s*z\s*\.string\(\)\s*\.default\('([^']+)'\)/g;
 
-// GOOGLE_PROVIDER_REDIRECT_URI is derived from the login URI by this substitution in config.ts.
 const PROVIDER_DERIVATION = ['/callback/google', '/callback/provider/google'] as const;
 
 function configSrc(): string {
@@ -30,12 +23,10 @@ function redirectUriDefaults(): { name: string; uri: string }[] {
 describe('OAuth redirect-URI defaults resolve to mounted routes', () => {
   let ctx: TestApp;
 
-  // Unauthenticated GETs that write nothing, so one app serves the whole suite.
   beforeAll(async () => {
     ctx = await createTestApp();
   });
 
-  /** GET the URI's path on the real app and report the status. */
   async function statusFor(uri: string): Promise<number> {
     const res = await ctx.app.request(new URL(uri).pathname);
     return res.status;

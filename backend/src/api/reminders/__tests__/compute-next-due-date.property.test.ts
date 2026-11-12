@@ -1,14 +1,8 @@
-/**
- * Property tests for computeNextDueDate: strict monotonicity, month-end clamping, exact weekly steps,
- * and a stable anchor day.
- */
-
 import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import type { Reminder } from '../../../db/schema';
 import { advanceReminderDueDate, computeNextDueDate } from '../trigger-service';
 
-/** Stub exposing only the fields advanceReminderDueDate reads. */
 function stubReminder(fields: {
   frequency: string;
   intervalValue?: number | null;
@@ -23,14 +17,12 @@ function stubReminder(fields: {
   } as Reminder;
 }
 
-/** Last day of the month (month is 0-indexed, as in Date). */
 function lastDayOfMonth(year: number, month: number): number {
   return new Date(year, month + 1, 0).getDate();
 }
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
-// Stay clear of JS Date extremes.
 const reasonableDate = fc.date({
   min: new Date('2000-01-01'),
   max: new Date('2099-12-31'),
@@ -138,25 +130,23 @@ describe('monthly advancement clamps to the last day of the target month', () =>
   });
 
   test('Jan 31 → Feb 28 in non-leap year', () => {
-    // 2025 is not a leap year
     const jan31 = new Date(2025, 0, 31);
     const result = computeNextDueDate(jan31, 'monthly', null, null, 31);
-    expect(result.getMonth()).toBe(1); // February
+    expect(result.getMonth()).toBe(1);
     expect(result.getDate()).toBe(28);
   });
 
   test('Jan 31 → Feb 29 in leap year', () => {
-    // 2024 is a leap year
     const jan31 = new Date(2024, 0, 31);
     const result = computeNextDueDate(jan31, 'monthly', null, null, 31);
-    expect(result.getMonth()).toBe(1); // February
+    expect(result.getMonth()).toBe(1);
     expect(result.getDate()).toBe(29);
   });
 
   test('Mar 31 → Apr 30', () => {
     const mar31 = new Date(2025, 2, 31);
     const result = computeNextDueDate(mar31, 'monthly', null, null, 31);
-    expect(result.getMonth()).toBe(3); // April
+    expect(result.getMonth()).toBe(3);
     expect(result.getDate()).toBe(30);
   });
 });
@@ -176,7 +166,7 @@ describe('weekly advancement adds exactly 7 days', () => {
 
 describe('anchor day prevents month-end drift', () => {
   test('starting from Jan 31, advancing monthly 12 times always clamps correctly', () => {
-    const start = new Date(2025, 0, 31); // Jan 31, 2025
+    const start = new Date(2025, 0, 31);
     let current = start;
 
     for (let i = 0; i < 12; i++) {
@@ -238,8 +228,8 @@ describe('anchor day prevents month-end drift', () => {
 
 describe('advanceReminderDueDate delegates to computeNextDueDate with the reminder config', () => {
   test('matches an explicit computeNextDueDate call for monthly/weekly/yearly/custom', () => {
-    const from = new Date(2025, 0, 15); // Jan 15 2025
-    const start = new Date(2024, 5, 15); // anchor day = 15
+    const from = new Date(2025, 0, 15);
+    const start = new Date(2024, 5, 15);
     const cases: Array<{ frequency: string; intervalValue?: number; intervalUnit?: string }> = [
       { frequency: 'weekly' },
       { frequency: 'monthly' },
@@ -260,12 +250,11 @@ describe('advanceReminderDueDate delegates to computeNextDueDate with the remind
   });
 
   test('uses startDate day-of-month as the anchor (Jan-31 monthly clamps to Feb but re-anchors)', () => {
-    // The startDate day is the stable anchor, so a clamped February must return to 31 in March.
     const reminder = stubReminder({ frequency: 'monthly', startDate: new Date(2025, 0, 31) });
-    const feb = advanceReminderDueDate(reminder, new Date(2025, 0, 31)); // Jan 31 -> Feb (clamped 28)
+    const feb = advanceReminderDueDate(reminder, new Date(2025, 0, 31));
     expect(feb.getMonth()).toBe(1);
     expect(feb.getDate()).toBe(28);
-    const mar = advanceReminderDueDate(reminder, feb); // Feb 28 -> March, re-anchored to 31
+    const mar = advanceReminderDueDate(reminder, feb);
     expect(mar.getMonth()).toBe(2);
     expect(mar.getDate()).toBe(31);
   });

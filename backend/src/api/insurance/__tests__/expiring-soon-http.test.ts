@@ -1,8 +1,3 @@
-/**
- * HTTP tests for GET /insurance/expiring-soon. A non-numeric or out-of-range `days` must fall back or clamp,
- * never produce an Invalid Date that silently hides expiring terms.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -27,7 +22,6 @@ interface ExpiringResponse {
   limit: number;
 }
 
-/** Seeds a policy whose term ends in about 20 days, inside the default 30-day window. */
 async function seedSoonExpiringTerm(vehicleId: string): Promise<string> {
   const start = new Date();
   start.setDate(start.getDate() - 345);

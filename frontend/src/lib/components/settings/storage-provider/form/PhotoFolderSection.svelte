@@ -14,7 +14,6 @@
 		'odometer_readings'
 	];
 
-	/** Bound to the parent form, which owns the value and writes it on save; a local copy would need a prop $effect. */
 	let {
 		photoRootPath = $bindable('Photos'),
 		categorySettings,
@@ -51,7 +50,6 @@
 		const newEnabled = !allEnabled;
 		const updated = { ...categorySettings };
 		for (const cat of CATEGORIES) {
-			// Don't disable categories where this provider is the default
 			if (!newEnabled && defaultCategories.has(cat)) continue;
 			updated[cat] = { ...updated[cat], enabled: newEnabled };
 		}

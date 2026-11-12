@@ -123,7 +123,7 @@
 		try {
 			syncStatus = await providerApi.getSyncStatus(provider.id);
 		} catch {
-			// Silently fail — sync status is informational
+			// Sync status is informational; a failure keeps the previous value.
 		} finally {
 			isLoadingSyncStatus = false;
 		}
@@ -152,13 +152,12 @@
 
 	let Icon = $derived(getProviderIcon(provider.providerType));
 
-	// Google Photos is photo-only (no ZIP backups), so the ZIP toggle is hidden for it.
 	let supportsZipBackup = $derived(provider.providerType !== 'google-photos');
 </script>
 
 <Card>
 	<CardHeader class="pb-3">
-		<!-- min-w-0 lets the grid item shrink so long text does not overflow on mobile. -->
+		<!-- min-w-0 is required: grid items default to min-width auto and overflow. -->
 		<div class="flex items-center justify-between gap-2 min-w-0">
 			<div class="flex items-center gap-3 min-w-0">
 				<div class="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">

@@ -26,8 +26,6 @@ export function convertVolume(value: number, from: VolumeUnit, to: VolumeUnit): 
   return liters / toLiters[to];
 }
 
-// Efficiency is distance per volume, so the distance factor multiplies and the volume factor
-// divides.
 export function convertEfficiency(
   value: number,
   fromDist: DistanceUnit,

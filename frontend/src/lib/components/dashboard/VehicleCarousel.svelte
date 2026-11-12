@@ -20,7 +20,6 @@
 		lastActivity: Date | null;
 		hasActiveFinancing: boolean;
 		coverPhotoUrl?: string | null;
-		/** Owner's display name when the vehicle is shared with the user; null when owned. */
 		sharedBy?: string | null;
 	}
 
@@ -65,7 +64,7 @@
 							class="pl-2 md:pl-4 basis-[85%] sm:basis-[70%] md:basis-1/2 lg:basis-1/3"
 						>
 							<div class="p-1">
-								<!-- Not interactive itself: a link here would nest the Add-Expense control inside it. -->
+								<!-- Not a link: a link would nest the Add-Expense button inside it. -->
 								<Card.Root class="overflow-hidden hover:shadow-lg transition-shadow group">
 									<div
 										class="relative h-40 bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center overflow-hidden"
@@ -91,7 +90,6 @@
 											</Badge>
 										{/if}
 										{#if vehicle.sharedBy}
-											<!-- Shared-with-me badge (top-LEFT so it never collides with "Financed"). -->
 											<Badge
 												variant="secondary"
 												class="absolute top-3 left-3 z-20 bg-background/90 backdrop-blur-sm inline-flex items-center gap-1"
@@ -103,7 +101,7 @@
 									</div>
 
 									<Card.Content class="relative p-4 flex flex-col h-[200px]">
-										<!-- The name is the card's navigation target via the stretched link; the action button stays clickable above it. -->
+										<!-- Stretched-link overlay: the action button must stay above it (z-10). -->
 										<div class="mb-3">
 											<h3 class="font-semibold text-lg leading-tight">
 												<a
@@ -146,7 +144,6 @@
 											</div>
 										</div>
 
-										<!-- relative z-10 keeps the action button above the stretched-link overlay. -->
 										<Button
 											variant="outline"
 											size="sm"

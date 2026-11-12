@@ -31,7 +31,7 @@
 	animation-delay: 1.5s;
 }
 
-/* Area fill should not use stroke-dash */
+/* Area fill must not inherit the line's stroke-dash animation. */
 .chart-line-animate-ready .lc-area {
 	stroke-dasharray: unset;
 	stroke-dashoffset: unset;

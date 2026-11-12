@@ -1,5 +1,3 @@
-// Insurance claims must survive a real export and restore with their fields intact.
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -88,8 +86,6 @@ describe('backup → restore round-trip preserves insurance claims', () => {
     expect(row.description).toBe('Rear-ended at a light');
   });
 
-  // The restore validator once rejected insurance_claim photos, aborting the whole restore. The photo
-  // row is seeded directly because the upload route is multipart and the validator is under test.
   test('a photo attached to an insurance claim survives the round-trip without aborting restore', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const policyId = await seedPolicy(vehicleId);
@@ -152,8 +148,6 @@ describe('backup → restore round-trip preserves insurance claims', () => {
   });
 });
 
-// The upload allowlist and the restore validator's entity-type map are separate lists. Every type
-// the upload path accepts must round-trip, or a photo of that type aborts the whole restore.
 describe('a photo on every upload-accepted entity type survives backup→restore', () => {
   test('vehicle / insurance_policy / insurance_claim / expense / odometer_entry photos all round-trip', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
@@ -204,7 +198,6 @@ describe('a photo on every upload-accepted entity type survives backup→restore
     const { restoreService } = await import('../restore');
 
     const zip = await backupService.exportAsZip(ctx.user.id);
-    // Fails if any upload-accepted type is missing from the validator's map.
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 

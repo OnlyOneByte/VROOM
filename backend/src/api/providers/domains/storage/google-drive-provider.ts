@@ -1,5 +1,3 @@
-/** pathHint is walked segment by segment, creating missing folders; the file lands in the leaf. */
-
 import { logger } from '../../../../utils/logger';
 import { GoogleDriveService } from '../../services/google-drive-service';
 import { coalesceGoogleDriveFile } from './drive-file-utils';

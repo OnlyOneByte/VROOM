@@ -22,7 +22,6 @@
 		}))
 	);
 
-	// Clean up object URLs — capture current URLs before returning destructor
 	$effect(() => {
 		const urls = previews.map(p => p.url).filter(Boolean) as string[];
 		return () => {
@@ -68,7 +67,6 @@
 							</div>
 						</div>
 					{/if}
-					<!-- Always visible below lg, where there is no hover to reveal the actions. -->
 					<button
 						type="button"
 						onclick={() => onRemove(i)}

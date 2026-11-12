@@ -83,7 +83,7 @@
 
 <div class="transition-colors {isSelected ? 'bg-muted/50' : ''}">
 	{#if canWrite}
-		<!-- The summary is the disclosure; actions are its sibling, since a button cannot contain interactive content. -->
+		<!-- A button cannot contain interactive content, so actions sit beside the summary, not inside it. -->
 		<button
 			type="button"
 			class="{MOBILE_ROW_SUMMARY_CLASS} cursor-pointer"

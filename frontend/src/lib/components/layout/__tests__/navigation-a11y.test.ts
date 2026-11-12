@@ -1,6 +1,3 @@
-// Desktop sidebar accessibility: the active page is announced, labels show on focus as well as hover, and the wrapper is presentational.
-// Also pins the pending badge, which must not count parked rows.
-
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import { offlineExpenseQueue, onlineStatus, syncState } from '$lib/stores/offline.svelte';
@@ -87,7 +84,6 @@ describe('labels reveal on keyboard focus, not only on hover', () => {
 		render(Navigation);
 		const expensesLink = screen.getByRole('link', { name: 'Expenses' });
 
-		// Collapsed: the only accessible name is the title attribute, there is no label text.
 		expect(screen.queryByText('Expenses')).toBeNull();
 
 		await fireEvent.focusIn(expensesLink);
