@@ -108,7 +108,15 @@ test.describe('Analytics', () => {
 		const retry = page.getByRole('button', { name: 'Retry' });
 		await expect(retry).toBeVisible();
 
-		await retry.click();
+		await expect(async () => {
+			const reRequested = page.waitForRequest(
+				request => new URL(request.url()).pathname === '/api/v1/analytics/summary',
+				{ timeout: 2_000 }
+			);
+			void reRequested.catch(() => undefined);
+			await retry.click({ timeout: 2_000 });
+			await reRequested;
+		}).toPass({ timeout: 15_000 });
 		await expect.poll(() => attempts).toBeGreaterThan(1);
 	});
 });
