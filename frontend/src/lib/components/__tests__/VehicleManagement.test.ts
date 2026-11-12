@@ -7,7 +7,6 @@ import {
 } from '../../utils/financing-calculations';
 import type { Vehicle, User, VehicleFormData } from '../../types/index.js';
 
-// Mock $app/navigation
 vi.mock('$app/navigation', () => ({
 	goto: vi.fn()
 }));
@@ -16,11 +15,9 @@ vi.mock('$app/state', () => ({
 	page: { params: { id: 'test-vehicle-id' }, url: { pathname: '/vehicles' } }
 }));
 
-// Mock fetch globally
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
-// Mock user data
 const mockUser: User = {
 	id: '1',
 	email: 'test@example.com',
@@ -29,7 +26,6 @@ const mockUser: User = {
 	updatedAt: '2024-01-01T00:00:00Z'
 };
 
-// Mock vehicle data
 const mockVehicles: Vehicle[] = [
 	{
 		id: '1',
@@ -97,12 +93,10 @@ describe('Vehicle Management Components', () => {
 		vi.clearAllMocks();
 		mockFetch.mockClear();
 
-		// Reset stores
 		authStore.setUser(mockUser);
 		appStore.setVehicles([]);
 		appStore.setLoading(false);
 
-		// Reset localStorage mock
 		(global as any).localStorageMock?.__reset?.();
 	});
 
@@ -112,13 +106,11 @@ describe('Vehicle Management Components', () => {
 
 	describe('Vehicle Dashboard and Listing', () => {
 		it('loads and displays vehicles correctly', async () => {
-			// Mock successful API response
 			mockFetch.mockResolvedValueOnce({
 				ok: true,
 				json: () => Promise.resolve(mockVehicles)
 			});
 
-			// Simulate loading vehicles
 			appStore.setLoading(true);
 			const response = await fetch('/api/vehicles', { credentials: 'include' });
 			const vehicles = await response.json();
@@ -133,7 +125,6 @@ describe('Vehicle Management Components', () => {
 		});
 
 		it('handles vehicle loading errors gracefully', async () => {
-			// Mock failed API response
 			mockFetch.mockResolvedValueOnce({
 				ok: false,
 				status: 500
@@ -180,31 +171,25 @@ describe('Vehicle Management Components', () => {
 				});
 			};
 
-			// Test search by make
 			let filtered = filterVehicles(mockVehicles, 'toyota');
 			expect(filtered).toHaveLength(1);
 			expect(filtered[0]?.make).toBe('Toyota');
 
-			// Test search by model
 			filtered = filterVehicles(mockVehicles, 'civic');
 			expect(filtered).toHaveLength(1);
 			expect(filtered[0]?.model).toBe('Civic');
 
-			// Test search by nickname
 			filtered = filterVehicles(mockVehicles, 'daily');
 			expect(filtered).toHaveLength(1);
 			expect(filtered[0]?.nickname).toBe('Daily Driver');
 
-			// Test search by license plate
 			filtered = filterVehicles(mockVehicles, 'xyz');
 			expect(filtered).toHaveLength(1);
 			expect(filtered[0]?.licensePlate).toBe('XYZ-789');
 
-			// Test no matches
 			filtered = filterVehicles(mockVehicles, 'nonexistent');
 			expect(filtered).toHaveLength(0);
 
-			// Test empty search
 			filtered = filterVehicles(mockVehicles, '');
 			expect(filtered).toHaveLength(3);
 		});
@@ -228,20 +213,15 @@ describe('Vehicle Management Components', () => {
 				return vehicles;
 			};
 
-			// Test all vehicles
 			let filtered = filterByCategory(mockVehicles, 'all');
 			expect(filtered).toHaveLength(3);
 
-			// Test vehicles with loans
 			filtered = filterByCategory(mockVehicles, 'with-loans');
 			expect(filtered).toHaveLength(1);
 			expect(filtered[0]?.financing?.isActive).toBe(true);
 
-			// Test recent vehicles (created in last month)
-			// Note: Since we're using current date, we need to adjust the test
-			// The Ford F-150 was created in Feb 2024, which is not recent relative to current date
 			filtered = filterByCategory(mockVehicles, 'recent');
-			expect(filtered).toHaveLength(0); // No vehicles are recent relative to current date
+			expect(filtered).toHaveLength(0);
 		});
 
 		it('calculates dashboard statistics correctly', () => {
@@ -254,7 +234,7 @@ describe('Vehicle Management Components', () => {
 				return {
 					totalVehicles,
 					activeLoans,
-					totalRecentExpenses: 0, // Would be calculated from expenses
+					totalRecentExpenses: 0,
 					totalExpenses: 0,
 					averageExpensePerVehicle: 0
 				};
@@ -270,10 +250,8 @@ describe('Vehicle Management Components', () => {
 				return vehicle.nickname || `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
 			};
 
-			// Test with nickname
 			expect(getVehicleDisplayName(mockVehicles[0]!)).toBe('Daily Driver');
 
-			// Test without nickname
 			expect(getVehicleDisplayName(mockVehicles[2]!)).toBe('2021 Ford F-150');
 		});
 	});
@@ -306,7 +284,6 @@ describe('Vehicle Management Components', () => {
 				return { isValid: Object.keys(errors).length === 0, errors };
 			};
 
-			// Test valid form
 			const validForm: Partial<VehicleFormData> = {
 				make: 'Toyota',
 				model: 'Camry',
@@ -320,7 +297,6 @@ describe('Vehicle Management Components', () => {
 			expect(result.isValid).toBe(true);
 			expect(Object.keys(result.errors)).toHaveLength(0);
 
-			// Test missing required fields
 			const invalidForm: Partial<VehicleFormData> = {
 				make: '',
 				model: '',
@@ -333,7 +309,6 @@ describe('Vehicle Management Components', () => {
 			expect(result.errors['model']).toBe('Model is required');
 			expect(result.errors['year']).toBe('Please enter a valid year');
 
-			// Test negative values
 			const negativeForm: Partial<VehicleFormData> = {
 				make: 'Toyota',
 				model: 'Camry',
@@ -382,7 +357,6 @@ describe('Vehicle Management Components', () => {
 				return { isValid: Object.keys(errors).length === 0, errors };
 			};
 
-			// Test valid loan form
 			const validLoanForm = {
 				provider: 'Chase Bank',
 				originalAmount: 20000,
@@ -395,11 +369,9 @@ describe('Vehicle Management Components', () => {
 			let result = validateLoanForm(validLoanForm, true);
 			expect(result.isValid).toBe(true);
 
-			// Test loan form disabled
 			result = validateLoanForm({}, false);
 			expect(result.isValid).toBe(true);
 
-			// Test invalid loan form
 			const invalidLoanForm = {
 				provider: '',
 				originalAmount: -1000,
@@ -420,11 +392,7 @@ describe('Vehicle Management Components', () => {
 		});
 
 		it('calculates loan amortization correctly', () => {
-			// Mirrors VehicleForm.calculateAmortization, the form's payment preview. The payoff date
-			// MUST come from the shared helper, as the component does: a local
-			// `new Date('2024-01-01')` is midnight UTC, i.e. Dec 31 2023 at any negative offset, so a
-			// 60-month loan previewed Dec 2028 west of Greenwich and Jan 2029 east of it — and a bare
-			// setMonth would also skip the month-end clamp.
+			// Date-only strings parse as UTC midnight, which shifts by timezone.
 			const calculateAmortization = (
 				principal: number,
 				apr: number,
@@ -436,7 +404,6 @@ describe('Vehicle Management Components', () => {
 				const monthlyRate = apr / 100 / 12;
 				const numPayments = termMonths;
 
-				// Calculate monthly payment using standard amortization formula
 				const monthlyPayment =
 					(principal * (monthlyRate * Math.pow(1 + monthlyRate, numPayments))) /
 					(Math.pow(1 + monthlyRate, numPayments) - 1);
@@ -458,8 +425,6 @@ describe('Vehicle Management Components', () => {
 			expect(result!.totalInterest).toBeCloseTo(2371.62, 2);
 			expect(result!.totalPayments).toBeCloseTo(22371.62, 2);
 
-			// The preview payment is the production minimum payment to the cent — the form offers to
-			// write it straight into paymentAmount, so the two formulas must not drift apart.
 			expect(
 				calculateMinimumPayment({
 					...mockVehicles[0]!.financing!,
@@ -469,12 +434,9 @@ describe('Vehicle Management Components', () => {
 				})
 			).toBe(result!.monthlyPayment);
 
-			// 60 monthly payments from Jan 1 2024 land on Jan 1 2029 — the same local calendar day in
-			// every host timezone, which is why this is exact rather than a year range.
 			const payoff = result!.payoffDate;
 			expect([payoff.getFullYear(), payoff.getMonth(), payoff.getDate()]).toEqual([2029, 0, 1]);
 
-			// Test invalid inputs
 			expect(calculateAmortization(0, 4.5, 60, '2024-01-01')).toBeNull();
 			expect(calculateAmortization(20000, 0, 60, '2024-01-01')).toBeNull();
 			expect(calculateAmortization(20000, 4.5, 0, '2024-01-01')).toBeNull();
@@ -493,7 +455,6 @@ describe('Vehicle Management Components', () => {
 				purchaseDate: '2020-01-15'
 			};
 
-			// Mock successful API response
 			mockFetch.mockResolvedValueOnce({
 				ok: true,
 				json: () => Promise.resolve({ id: 'new-vehicle-id', ...vehicleData })
@@ -519,7 +480,6 @@ describe('Vehicle Management Components', () => {
 				year: 2020
 			};
 
-			// Mock failed API response
 			mockFetch.mockResolvedValueOnce({
 				ok: false,
 				json: () => Promise.resolve({ message: 'Validation failed' })
@@ -542,23 +502,18 @@ describe('Vehicle Management Components', () => {
 		it('provides responsive CSS classes for different screen sizes', () => {
 			const getResponsiveClasses = (isMobile: boolean) => {
 				return {
-					// Grid classes for vehicle cards
 					vehicleGrid: isMobile
 						? 'grid grid-cols-1 gap-4'
 						: 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6',
 
-					// Dashboard stats grid
 					statsGrid: isMobile ? 'grid grid-cols-2 gap-4' : 'grid grid-cols-2 lg:grid-cols-4 gap-4',
 
-					// Form layout
 					formGrid: isMobile ? 'grid grid-cols-1 gap-6' : 'grid grid-cols-1 md:grid-cols-2 gap-6',
 
-					// Button layout
 					buttonLayout: isMobile
 						? 'flex flex-col gap-4'
 						: 'flex flex-col sm:flex-row gap-4 sm:justify-end',
 
-					// Navigation
 					mobileNav: 'lg:hidden fixed top-0',
 					desktopNav: 'hidden lg:fixed lg:inset-y-0'
 				};
@@ -580,16 +535,12 @@ describe('Vehicle Management Components', () => {
 		it('handles touch-friendly controls for mobile', () => {
 			const getTouchFriendlyProps = (isMobile: boolean) => {
 				return {
-					// Minimum touch target size (44px recommended)
 					buttonSize: isMobile ? 'min-h-[44px] min-w-[44px]' : 'h-10 w-auto',
 
-					// Touch-friendly spacing
 					spacing: isMobile ? 'gap-4' : 'gap-2',
 
-					// Form input sizing
 					inputSize: isMobile ? 'h-12 text-base' : 'h-10 text-sm',
 
-					// Card padding
 					cardPadding: isMobile ? 'p-4' : 'p-6'
 				};
 			};
@@ -705,7 +656,6 @@ describe('Vehicle Management Components', () => {
 				const totalAmount = expenses.reduce((sum, e) => sum + e.amount, 0);
 				const recentAmount = recentExpenses.reduce((sum, e) => sum + e.amount, 0);
 
-				// Calculate fuel efficiency
 				const fuelExpenses = expenses.filter(e => e.type === 'fuel' && e.gallons && e.mileage);
 				let avgMpg = 0;
 				if (fuelExpenses.length > 1) {
@@ -742,7 +692,7 @@ describe('Vehicle Management Components', () => {
 			const stats = calculateVehicleStats(mockExpenses);
 			expect(stats.totalExpenses).toBe(95);
 			expect(stats.expenseCount).toBe(2);
-			expect(stats.avgMpg).toBeCloseTo(27.3, 1); // 300 miles / 11 gallons ≈ 27.3 MPG
+			expect(stats.avgMpg).toBeCloseTo(27.3, 1);
 		});
 
 		it('formats currency and dates correctly', () => {
@@ -764,9 +714,7 @@ describe('Vehicle Management Components', () => {
 			expect(formatCurrency(1234.56)).toBe('$1,234.56');
 			expect(formatCurrency(0)).toBe('$0.00');
 
-			// Built from LOCAL parts at noon: Intl formats in the host zone, so the hardcoded
-			// '2024-01-15T12:00:00Z' instant this used to pass rendered 'Jan 16, 2024' at UTC+13/+14
-			// and failed there. Noon local is the one anchor no real offset can push off its day.
+			// Local noon: a fixed UTC instant formats to another day at UTC+13/+14.
 			const testDate = new Date(2024, 0, 15, 12);
 			expect(formatDate(testDate)).toBe('Jan 15, 2024');
 		});

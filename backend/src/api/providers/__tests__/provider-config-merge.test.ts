@@ -1,18 +1,3 @@
-/**
- * PUT /providers/:id treats `config` as a PARTIAL update.
- *
- * It used to assign `body.config` straight onto the column, so every edit-save wiped the config the
- * SERVER owns and no form echoes back. The headline casualty is `accountEmail`: it is written once,
- * from the OAuth grant (resolveProviderCredentials), and is the only record of which Google account a
- * provider belongs to — the provider card renders it, the restore picker labels backups with it, and
- * the create-time duplicate check compares it to refuse re-adding the same account. Renaming a Drive
- * provider answered 200 and silently dropped it. `albumId` (the resolved photo album) went the same
- * way.
- *
- * Merging makes the column's contents the union of what has ever been sent, which is what every
- * caller already assumes. Driven through the REAL stack, because the replace lived in the handler.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -33,11 +18,6 @@ interface ProviderResponse {
   config: Record<string, unknown>;
 }
 
-/**
- * Seed a connected google-drive provider directly: the POST route resolves google credentials from a
- * one-shot OAuth nonce, which is what writes `accountEmail` in production and cannot be faked over
- * HTTP here. The row below is exactly what that path persists.
- */
 function seedConnectedDrive(id: string, config: Record<string, unknown>): void {
   ctx.sqlite.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)

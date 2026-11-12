@@ -1,23 +1,3 @@
-/**
- * A backup run may stamp its own result into backupConfig without discarding anyone else's edit.
- *
- * The orchestrator reads backupConfig at the top of a run whose per-provider budget is ten minutes,
- * then used to write the WHOLE column back from that snapshot plus its lastBackupAt / spreadsheet-id
- * stamps. Every concurrent write to the column inside that window was therefore lost: a provider the
- * user disconnected mid-run came back as a ghost entry pointing at a user_providers row that no longer
- * exists, and — the user-visible half — a provider whose backup the user switched OFF in Settings
- * mid-run was silently switched on again, so backups the user had stopped kept running. Both concurrent
- * writers are already atomic json_patch merges; the run itself was the one whole-column writer left.
- *
- * Driven through the REAL execute() with a fake strategy that performs the concurrent edit while the
- * run is in flight — the only honest way to put a write inside the window. The registry is a process
- * global with no delete, so each custom type is overwritten with a no-op afterwards (the pattern
- * backup-orchestrator-execute.test.ts established).
- *
- * createTestApp() rewrites env then dynamic-imports DB-bound modules, so keep static imports to the
- * harness + bun:test.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 import type { BackupStrategy, BackupStrategyResult } from '../backup-strategy';
@@ -66,7 +46,6 @@ function writeProviders(providers: Record<string, ProviderConfigEntry>): void {
   ]);
 }
 
-/** A provider row whose credentials the orchestrator can decrypt and JSON.parse. */
 function seedProviderRow(id: string, providerType: string): void {
   ctx.sqlite.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
@@ -75,7 +54,6 @@ function seedProviderRow(id: string, providerType: string): void {
   );
 }
 
-/** A tracked data change, so the run passes the change gate even without force. */
 function seedDataChange(id: string): void {
   ctx.sqlite.run('INSERT INTO vehicles (id, user_id, make, model, year) VALUES (?, ?, ?, ?, ?)', [
     id,
@@ -86,7 +64,6 @@ function seedDataChange(id: string): void {
   ]);
 }
 
-/** A strategy that runs `duringRun` before reporting success — i.e. inside the run's window. */
 function strategyThatEditsConfig(duringRun: () => Promise<void>): BackupStrategy {
   return {
     async execute(): Promise<BackupStrategyResult> {
@@ -102,8 +79,6 @@ describe('a backup run patches backupConfig instead of rewriting it', () => {
     register(
       'fake-self-disable',
       strategyThatEditsConfig(async () => {
-        // The user opens Settings mid-run and turns this provider's backup off. The settings route
-        // merges per-provider, so this is the shape that write takes.
         await preferencesRepository.mergeJsonField(ctx.user.id, 'backupConfig', {
           providers: { p1: { enabled: false } },
         });
@@ -119,10 +94,8 @@ describe('a backup run patches backupConfig instead of rewriting it', () => {
       expect(result.outcome).toBe('success');
 
       const providers = readProviders();
-      // THE ASSERTION: the run records its own stamp without resurrecting the setting it overlapped.
       expect(providers.p1?.enabled, 'the mid-run disable survives the run').toBe(false);
       expect(providers.p1?.lastBackupAt, 'the run still records when it succeeded').toBeTruthy();
-      // The untouched sibling keys are still there — a patch, not a replacement.
       expect(providers.p1?.folderPath).toBe('B');
       expect(providers.p1?.retentionCount).toBe(5);
     } finally {
@@ -135,8 +108,6 @@ describe('a backup run patches backupConfig instead of rewriting it', () => {
     register(
       'fake-sibling-remover',
       strategyThatEditsConfig(async () => {
-        // The user disconnects the OTHER provider mid-run. Disconnecting deletes the provider row and
-        // json_patches its config key away (a null value in an RFC-7386 patch deletes the key).
         ctx.sqlite.run('DELETE FROM user_providers WHERE id = ?', ['p-gone']);
         await preferencesRepository.mergeJsonField(ctx.user.id, 'backupConfig', {
           providers: { 'p-gone': null },
@@ -162,9 +133,6 @@ describe('a backup run patches backupConfig instead of rewriting it', () => {
       expect(result.outcome).toBe('partial');
 
       const providers = readProviders();
-      // THE ASSERTION: the disconnected provider is gone for good. Left in the config with
-      // enabled:true it names a user_providers row that no longer exists, and every later run selects
-      // it, fails to find the row, and logs a skip.
       expect(Object.keys(providers), 'only the surviving provider remains').toEqual(['p-keep']);
       expect(providers['p-keep']?.lastBackupAt).toBeTruthy();
     } finally {

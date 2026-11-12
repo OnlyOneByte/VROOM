@@ -1,12 +1,3 @@
-/**
- * Unit tests for GET /api/v1/analytics/summary route
- *
- * Tests the route handler behavior: auth enforcement, query validation,
- * successful responses, and error handling.
- *
- * **Validates: Requirements 6.1, 6.2, 7.2**
- */
-
 import { describe, expect, mock, test } from 'bun:test';
 import type { MiddlewareHandler } from 'hono';
 import { Hono } from 'hono';
@@ -16,10 +7,6 @@ import { DatabaseError } from '../../../errors';
 import { errorHandler } from '../../../middleware/error-handler';
 import { zValidator } from '../../../utils/validation';
 import type { AnalyticsSummaryData } from '../repository';
-
-// ---------------------------------------------------------------------------
-// Mock data
-// ---------------------------------------------------------------------------
 
 const TEST_USER = {
   id: 'user-123',
@@ -65,10 +52,6 @@ const MOCK_SUMMARY: AnalyticsSummaryData = {
   },
 };
 
-// ---------------------------------------------------------------------------
-// Response types for test assertions
-// ---------------------------------------------------------------------------
-
 interface SuccessBody {
   success: true;
   data: AnalyticsSummaryData;
@@ -79,14 +62,6 @@ interface ErrorBody {
   error: { code: string; message: string; details?: unknown };
 }
 
-// ---------------------------------------------------------------------------
-// Test app factory
-// ---------------------------------------------------------------------------
-
-/**
- * Creates a test Hono app with controllable auth and repository behavior.
- * This avoids module-level mocking and keeps tests isolated.
- */
 function createTestApp(options: {
   authenticated?: boolean;
   getSummaryResult?: AnalyticsSummaryData;
@@ -96,10 +71,8 @@ function createTestApp(options: {
 
   const app = new Hono();
 
-  // Error handler (same as production)
   app.onError(errorHandler);
 
-  // Auth middleware — either sets user or rejects
   const testAuth: MiddlewareHandler = async (c, next) => {
     if (!authenticated) {
       throw new HTTPException(401, { message: 'Authentication required' });
@@ -109,13 +82,11 @@ function createTestApp(options: {
     return next();
   };
 
-  // Mock getSummary function
   const getSummaryMock = mock(async (_userId: string, _range: { start: number; end: number }) => {
     if (getSummaryError) throw getSummaryError;
     return getSummaryResult ?? MOCK_SUMMARY;
   });
 
-  // Mount a minimal version of the summary route with the same validation
   const dateRangeQuerySchema = z.object({
     startDate: z.coerce.number().int().positive(),
     endDate: z.coerce.number().int().positive(),
@@ -135,10 +106,6 @@ function createTestApp(options: {
   return { app, getSummaryMock };
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 describe('GET /api/v1/analytics/summary', () => {
   const VALID_QUERY = '?startDate=1704067200&endDate=1735689600';
 
@@ -154,7 +121,6 @@ describe('GET /api/v1/analytics/summary', () => {
     expect(body.data.fuelStats).toEqual(MOCK_SUMMARY.fuelStats);
     expect(body.data.fuelAdvanced).toEqual(MOCK_SUMMARY.fuelAdvanced);
 
-    // Verify repository was called with correct args
     expect(getSummaryMock).toHaveBeenCalledTimes(1);
     expect(getSummaryMock).toHaveBeenCalledWith('user-123', {
       start: 1704067200,
@@ -176,23 +142,18 @@ describe('GET /api/v1/analytics/summary', () => {
   test('returns 400 for invalid date range params', async () => {
     const { app, getSummaryMock } = createTestApp({});
 
-    // Missing both params
     const res1 = await app.request('/api/v1/analytics/summary');
     expect(res1.status).toBe(400);
 
-    // Non-numeric startDate
     const res2 = await app.request('/api/v1/analytics/summary?startDate=abc&endDate=1735689600');
     expect(res2.status).toBe(400);
 
-    // Negative endDate
     const res3 = await app.request('/api/v1/analytics/summary?startDate=1704067200&endDate=-1');
     expect(res3.status).toBe(400);
 
-    // Missing endDate
     const res4 = await app.request('/api/v1/analytics/summary?startDate=1704067200');
     expect(res4.status).toBe(400);
 
-    // Repository should never be called for invalid requests
     expect(getSummaryMock).not.toHaveBeenCalled();
   });
 

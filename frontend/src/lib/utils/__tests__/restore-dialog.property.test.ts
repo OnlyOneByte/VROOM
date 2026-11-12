@@ -1,13 +1,5 @@
-/**
- * Property 14: Restore dialog source options
- * Property 5: Restore source equivalence
- * Validates: Requirements 12.1, 5.1
- */
-
 import { describe, expect, test } from 'vitest';
 import fc from 'fast-check';
-
-// --- Property 14: Restore dialog source options ---
 
 interface BackupProviderInfo {
 	id: string;
@@ -15,10 +7,6 @@ interface BackupProviderInfo {
 	providerType: string;
 }
 
-/**
- * Pure function replicating the source options logic from UnifiedRestoreDialog.
- * Returns the list of source options that should be displayed.
- */
 function computeSourceOptions(
 	backupProviders: BackupProviderInfo[],
 	sheetsSyncEnabled: boolean
@@ -39,7 +27,7 @@ const providerArb: fc.Arbitrary<BackupProviderInfo> = fc.record({
 	providerType: fc.constantFrom('google-drive', 's3')
 });
 
-describe('Property 14: Restore dialog source options', () => {
+describe('Restore dialog source options', () => {
 	test('"Upload file" is always the first option', () => {
 		fc.assert(
 			fc.property(
@@ -104,8 +92,6 @@ describe('Property 14: Restore dialog source options', () => {
 	});
 });
 
-// --- Property 5: Restore source equivalence ---
-
 interface RestoreResponse {
 	success: boolean;
 	preview?: Record<string, number>;
@@ -113,11 +99,6 @@ interface RestoreResponse {
 	conflicts?: Array<{ table: string; id: string }>;
 }
 
-/**
- * Pure function: given a ZIP buffer's parsed content, the restore result
- * is determined solely by the content, not the source.
- * We model this as: restoreResult = f(zipContent, mode).
- */
 function simulateRestore(
 	zipContent: Record<string, number>,
 	mode: 'preview' | 'replace' | 'merge'
@@ -137,7 +118,7 @@ const zipContentArb = fc.record({
 
 const modeArb = fc.constantFrom('preview' as const, 'replace' as const, 'merge' as const);
 
-describe('Property 5: Restore source equivalence', () => {
+describe('Restore source equivalence', () => {
 	test('same content produces same result regardless of source', () => {
 		fc.assert(
 			fc.property(zipContentArb, modeArb, (content, mode) => {

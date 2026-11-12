@@ -2,11 +2,8 @@
 	import type { Snippet } from 'svelte';
 
 	interface Props {
-		/** Page title */
 		title: string;
-		/** Optional description text */
 		description?: string;
-		/** Optional snippet for action buttons (right side) */
 		actions?: Snippet;
 	}
 

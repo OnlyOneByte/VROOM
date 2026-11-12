@@ -1,30 +1,11 @@
 <script lang="ts">
-	/**
-	 * "Scan receipt" button for the expense form — vlm-receipt-parsing T6.
-	 *
-	 * Mobile-first: a hidden `<input type="file" accept="image/*" capture="environment">` so a phone
-	 * opens the camera directly. On pick it uploads to vlmApi.parseReceipt, then hands the resulting
-	 * DRAFT (+ the picked File) back to the parent via onDraft — the parent pre-fills the expense form
-	 * and pushes the image into its pending-photos list (R5: the image attaches via the existing
-	 * expense_receipts flow on save). This component NEVER writes an expense itself.
-	 *
-	 * Four-states (R9): idle (button) / loading (spinner, disabled) / error (actionable message + a
-	 * "fill manually" fallback — the form is never blocked) / data (handled by the parent pre-fill).
-	 * D3 (ruled simple): we surface the draft straight into the form with no per-field confidence UI.
-	 *
-	 * R7 first-use privacy disclosure: before the FIRST scan ever, an AlertDialog explains the image is
-	 * sent to the user's chosen provider (and that self-hosting keeps it local). Dismissal is remembered
-	 * in localStorage so it shows once. ApiError statusCode distinguishes "no provider configured" (400 —
-	 * link them to Settings) from "provider unreachable" (502).
-	 */
 	import { Sparkles, LoaderCircle } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as AlertDialog from '$lib/components/ui/alert-dialog';
-	import { vlmApi, type ReceiptDraft } from '$lib/services/vlm-api';
-	import { ApiError } from '$lib/utils/error-handling';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as AlertDialog from '#lib/components/ui/alert-dialog/index.ts';
+	import { vlmApi, type ReceiptDraft } from '#lib/services/vlm-api.ts';
+	import { ApiError } from '#lib/utils/error-handling.ts';
 
 	interface Props {
-		/** Called with the validated draft + the picked image after a successful parse. */
 		onDraft: (_draft: ReceiptDraft, _image: File) => void;
 	}
 	let { onDraft }: Props = $props();
@@ -35,15 +16,14 @@
 	let isScanning = $state(false);
 	let errorMessage = $state<string | null>(null);
 	let showDisclosure = $state(false);
-	let pendingFile = $state<File | null>(null); // file awaiting the post-disclosure scan
+	let pendingFile = $state<File | null>(null);
 
-	/** Click handler for the visible button — gate the very first scan behind the disclosure. */
 	function onScanClick() {
 		errorMessage = null;
 		const disclosed =
 			typeof localStorage !== 'undefined' && localStorage.getItem(DISCLOSURE_KEY) === '1';
 		if (!disclosed) {
-			showDisclosure = true; // open the picker only after they acknowledge
+			showDisclosure = true;
 			return;
 		}
 		fileInput?.click();
@@ -53,7 +33,7 @@
 		try {
 			localStorage.setItem(DISCLOSURE_KEY, '1');
 		} catch {
-			// localStorage may be unavailable (private mode) — proceed anyway; we just re-ask next time.
+			// localStorage throws when storage is unavailable (private mode, blocked site data).
 		}
 		showDisclosure = false;
 		fileInput?.click();
@@ -62,7 +42,7 @@
 	async function onFileChange(e: Event) {
 		const input = e.currentTarget as HTMLInputElement;
 		const file = input.files?.[0];
-		// Reset the input so picking the SAME file again re-fires change.
+		// Browsers skip the change event when the same file is picked again unless the value is cleared.
 		input.value = '';
 		if (!file) return;
 		pendingFile = file;
@@ -97,7 +77,6 @@
 </script>
 
 <div class="space-y-2">
-	<!-- Hidden capture input: accept any image, prefer the rear camera on mobile. -->
 	<input
 		bind:this={fileInput}
 		type="file"

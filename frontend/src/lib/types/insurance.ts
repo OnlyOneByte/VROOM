@@ -1,4 +1,3 @@
-// v2: Flat insurance term type matching insurance_terms table columns
 export interface InsuranceTerm {
 	id: string;
 	policyId: string;
@@ -51,7 +50,6 @@ export interface CreatePolicyRequest {
 
 export interface UpdatePolicyRequest {
 	company?: string;
-	// `null` clears notes on edit, `undefined`/absent leaves it unchanged.
 	notes?: string | null;
 	isActive?: boolean;
 }
@@ -76,8 +74,6 @@ export interface CreateTermRequest {
 export interface UpdateTermRequest {
 	startDate?: string;
 	endDate?: string;
-	// Nullable value fields: `null` clears the column on edit, `undefined`/absent
-	// leaves it unchanged (JSON drops undefined, so an emptied field sends null).
 	policyNumber?: string | null;
 	coverageDescription?: string | null;
 	deductibleAmount?: number | null;
@@ -91,8 +87,6 @@ export interface UpdateTermRequest {
 	paymentAmount?: number | null;
 	vehicleCoverage?: TermVehicleCoverage;
 }
-
-// --- Insurance claims (mirror backend claims-validation enums) ---
 
 export const CLAIM_TYPES = ['collision', 'theft', 'weather', 'vandalism', 'other'] as const;
 export type ClaimType = (typeof CLAIM_TYPES)[number];
@@ -132,8 +126,6 @@ export interface CreateClaimRequest {
 export interface UpdateClaimRequest {
 	claimDate?: string;
 	claimType?: ClaimType;
-	// `null` clears the field, `undefined`/absent leaves it unchanged. (JSON
-	// drops `undefined`, so an emptied optional must be sent as explicit null.)
 	description?: string | null;
 	status?: ClaimStatus;
 	payoutAmount?: number | null;

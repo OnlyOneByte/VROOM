@@ -1,16 +1,3 @@
-/**
- * OpenAiCompatibleVlmProvider adapter (vlm-receipt-parsing T3a). Drives the REAL adapter against
- * a stubbed global fetch (no live key/endpoint) and pins the request SHAPE + the failure-honesty rules:
- *  - the request POSTs to {baseUrl}/chat/completions with the FIXED prompt + an image_url data-URL part;
- *  - a Bearer Authorization header is present with a key, ABSENT for keyless self-hosted (Ollama);
- *  - the model's raw content string is returned verbatim (the caller's parseExtraction validates it);
- *  - a non-2xx / network failure THROWS (the parse route maps it to 502 — never a faked success);
- *  - a missing/non-string content returns '' (→ an empty draft downstream, no throw).
- *
- * Adapter = dumb transport: it does NOT validate/bound the content (that is prompt.ts), so these tests
- * assert transport + headers + error-honesty, not extraction semantics (those are the T2 schema tests).
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { OpenAiCompatibleVlmProvider } from '../openai-compatible';
 import { RECEIPT_EXTRACTION_PROMPT } from '../prompt';
@@ -26,7 +13,6 @@ interface CapturedRequest {
 
 let captured: CapturedRequest | null;
 
-/** Install a fetch stub that records the request and returns `responder()`. */
 function stubFetch(responder: () => Response | Promise<Response>): void {
   captured = null;
   globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
@@ -70,7 +56,6 @@ describe('OpenAiCompatibleVlmProvider — request shaping', () => {
 
     expect(captured?.url).toBe('https://api.openai.com/v1/chat/completions');
     expect(captured?.body.model).toBe('gpt-4o-mini');
-    // temperature 0 (deterministic) + a token cap.
     expect(captured?.body.temperature).toBe(0);
     expect(captured?.body.max_tokens).toBeGreaterThan(0);
 
@@ -120,7 +105,7 @@ describe('OpenAiCompatibleVlmProvider — request shaping', () => {
   });
 });
 
-describe('OpenAiCompatibleVlmProvider — failure honesty (anti-fail-open)', () => {
+describe('OpenAiCompatibleVlmProvider failures', () => {
   test('THROWS on a non-2xx response (route maps to 502, never a faked success)', async () => {
     stubFetch(() => new Response('rate limited', { status: 429 }));
     const provider = new OpenAiCompatibleVlmProvider({

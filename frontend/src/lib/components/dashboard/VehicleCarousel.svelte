@@ -1,15 +1,15 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { routes, paramRoutes } from '$lib/routes';
-	import { gotoWithQuery } from '$lib/utils/navigation';
+	import { routes, paramRoutes } from '#lib/routes.ts';
+	import { gotoWithQuery } from '#lib/utils/navigation.ts';
 	import { Car, Calendar, TrendingUp, DollarSign, Image as ImageIcon, Users } from '@lucide/svelte';
-	import * as Card from '$lib/components/ui/card';
-	import * as Carousel from '$lib/components/ui/carousel';
-	import { Button } from '$lib/components/ui/button';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import EmptyState from '$lib/components/common/empty-state.svelte';
-	import { formatCurrency, formatRelativeTime } from '$lib/utils/formatters';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import * as Carousel from '#lib/components/ui/carousel/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import { formatCurrency, formatRelativeTime } from '#lib/utils/formatters.ts';
 
 	interface VehicleOverview {
 		id: string;
@@ -20,7 +20,6 @@
 		lastActivity: Date | null;
 		hasActiveFinancing: boolean;
 		coverPhotoUrl?: string | null;
-		/** Owner's display name when this vehicle was shared with the user (T12b); null when owned. */
 		sharedBy?: string | null;
 	}
 
@@ -65,12 +64,8 @@
 							class="pl-2 md:pl-4 basis-[85%] sm:basis-[70%] md:basis-1/2 lg:basis-1/3"
 						>
 							<div class="p-1">
-								<!-- Card is NOT interactive itself (that would nest the Add-Expense
-								     button inside an interactive ancestor — an a11y violation). The
-								     vehicle-name link below is the navigation target; the card just
-								     provides the hover affordance. -->
+								<!-- Not a link: a link would nest the Add-Expense button inside it. -->
 								<Card.Root class="overflow-hidden hover:shadow-lg transition-shadow group">
-									<!-- Image area -->
 									<div
 										class="relative h-40 bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center overflow-hidden"
 									>
@@ -95,7 +90,6 @@
 											</Badge>
 										{/if}
 										{#if vehicle.sharedBy}
-											<!-- Shared-with-me badge (top-LEFT so it never collides with "Financed"). -->
 											<Badge
 												variant="secondary"
 												class="absolute top-3 left-3 z-20 bg-background/90 backdrop-blur-sm inline-flex items-center gap-1"
@@ -107,11 +101,7 @@
 									</div>
 
 									<Card.Content class="relative p-4 flex flex-col h-[200px]">
-										<!-- Vehicle Name — the card's navigation target. The stretched-link
-										     pattern (`after:absolute after:inset-0`) makes the whole card
-										     clickable for mouse users while keeping a single real <a> for
-										     keyboard/AT. The Add-Expense button sits above it (z-10) so it
-										     stays independently clickable without nesting interactives. -->
+										<!-- Stretched-link overlay: the action button must stay above it (z-10). -->
 										<div class="mb-3">
 											<h3 class="font-semibold text-lg leading-tight">
 												<a
@@ -126,7 +116,6 @@
 											{/if}
 										</div>
 
-										<!-- Stats - Fixed height container -->
 										<div class="space-y-2 flex-1">
 											<div class="flex items-center justify-between text-sm">
 												<span class="text-muted-foreground flex items-center gap-1.5">
@@ -155,8 +144,6 @@
 											</div>
 										</div>
 
-										<!-- Action Button — relative z-10 keeps it above the stretched-link
-										     overlay so it's independently clickable. -->
 										<Button
 											variant="outline"
 											size="sm"

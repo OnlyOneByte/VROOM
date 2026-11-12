@@ -1,41 +1,14 @@
-/**
- * Storage-provider config is the app's photo + backup destination, so a save that quietly drops
- * part of it is data loss with a success toast on top. Five contracts, all driven through the
- * MOUNTED form because every one of them only exists in the wiring:
- *
- *  - a save never un-sets config the form does not manage (`accountEmail` is written server-side at
- *    connect time and is the only record of WHICH Google account a provider belongs to);
- *  - the photo root path the user can see and type is the one that is stored and saved — it is a real
- *    path segment server-side, so resetting it makes new uploads land away from the existing ones;
- *  - typing in one field never rewrites another;
- *  - the settings payload names only what this form edits, and invents nothing;
- *  - a follow-up settings save that FAILS is said out loud, because the folder/backup toggles the
- *    user just set are what decides whether photos and backups go anywhere at all.
- */
-
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/svelte';
-import type { UserProviderInfo } from '$lib/types';
-
-/**
- * Mounting needs svelte's CLIENT entry, and this suite resolves the package's `default` (server)
- * one because vite.config.ts sets no `browser` resolve condition for tests — `mount()` from a bare
- * `svelte` import throws "not available on the server". Written `as string` so TypeScript does not
- * try to type svelte's internals (which ship no declarations) while Vite still resolves the path.
- */
-vi.mock(
-	'svelte',
-	() => import('../../../../../../../node_modules/svelte/src/index-client.js' as string)
-);
+import type { UserProviderInfo } from '#lib/types/index.ts';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
-vi.mock('$app/environment', () => ({ browser: true }));
+vi.mock('$app/env', () => ({ browser: true }));
 vi.mock('$app/state', () => ({
 	page: { url: new URL('http://localhost/settings/providers/drive-1/edit') }
 }));
 
-/** The provider payloads the form sends — the subject of most assertions below. */
 interface ProviderPayload {
 	displayName?: string;
 	config?: Record<string, unknown>;
@@ -48,7 +21,7 @@ const updateProvider = vi.fn((_id: string, _data: ProviderPayload) =>
 const createProvider = vi.fn((data: ProviderPayload) =>
 	Promise.resolve({ id: 'drive-new', ...data } as unknown as UserProviderInfo)
 );
-vi.mock('$lib/services/provider-api', () => ({
+vi.mock('#lib/services/provider-api.ts', () => ({
 	providerApi: {
 		updateProvider: (id: string, data: ProviderPayload) => updateProvider(id, data),
 		createProvider: (data: ProviderPayload) => createProvider(data),
@@ -60,17 +33,16 @@ const getSettings = vi.fn(() => Promise.resolve({} as Record<string, unknown>));
 const updateSettings = vi.fn((_updates: Record<string, unknown>) =>
 	Promise.resolve({} as Record<string, unknown>)
 );
-vi.mock('$lib/services/settings-api', () => ({
+vi.mock('#lib/services/settings-api.ts', () => ({
 	settingsApi: {
 		getSettings: () => getSettings(),
 		updateSettings: (updates: Record<string, unknown>) => updateSettings(updates)
 	}
 }));
 
-const { appStore } = await import('$lib/stores/app.svelte');
+const { appStore } = await import('#lib/stores/app.svelte.ts');
 const ProviderForm = (await import('../ProviderForm.svelte')).default;
 
-/** A connected Google Drive provider as GET /providers returns it. */
 const STORED_PROVIDER: UserProviderInfo = {
 	id: 'drive-1',
 	domain: 'storage',
@@ -119,12 +91,10 @@ const rootPathInput = () => screen.getByLabelText('Root Path') as HTMLInputEleme
 const displayNameInput = () => screen.getByLabelText('Name') as HTMLInputElement;
 const saveButton = () => screen.getByRole('button', { name: /update provider|save provider/i });
 
-/** Wait for the form's own state to be seeded from the provider props. */
 async function awaitLoaded() {
 	await vi.waitFor(() => expect(displayNameInput().value).toBe('My Drive'));
 }
 
-/** The config body of the nth updateProvider call. */
 function sentConfig(call = 0): Record<string, unknown> {
 	return updateProvider.mock.calls[call]?.[1]?.config ?? {};
 }
@@ -150,8 +120,6 @@ describe('ProviderForm — an edit-save preserves config the form does not manag
 		await fireEvent.click(saveButton());
 		await vi.waitFor(() => expect(updateProvider).toHaveBeenCalled());
 
-		// accountEmail is written once, server-side, when the account is connected. Dropping it
-		// un-names the provider everywhere it is shown and blinds the duplicate-account check.
 		expect(sentConfig()['accountEmail']).toBe('owner@example.com');
 	});
 
@@ -197,9 +165,6 @@ describe('ProviderForm — an edit-save preserves config the form does not manag
 		const sent = updateSettings.mock.calls[0]?.[0] as {
 			storageConfig?: { defaults: unknown; providerCategories: Record<string, unknown> };
 		};
-		// The server merges storageConfig per key, and this form edits no defaults — so it sends back
-		// exactly what it loaded. Fabricating entries here (nulls for the categories it knows nothing
-		// about) would clear the default providers the user picked on the settings page.
 		expect(sent.storageConfig?.defaults).toEqual(SETTINGS_RESPONSE.storageConfig.defaults);
 		expect(Object.keys(sent.storageConfig?.providerCategories ?? {})).toEqual(['drive-1']);
 	});
@@ -217,7 +182,6 @@ describe('ProviderForm — a new provider stores the photo root path the user ty
 		render(ProviderForm, { props: {} });
 
 		await fireEvent.click(screen.getByRole('button', { name: /S3 \/ B2 \/ R2/i }));
-		// Choosing a provider type is the one explicit action that re-seeds the field.
 		expect(rootPathInput().value).toBe('vroom/photos');
 
 		await fireEvent.input(rootPathInput(), { target: { value: 'vroom/scans' } });
@@ -264,7 +228,6 @@ describe('ProviderForm — a settings save that fails is reported, not announced
 	});
 
 	test('a rejected backup-settings save warns instead of claiming success', async () => {
-		// Only the backup PUT fails: the folder-settings PUT lands first and succeeds.
 		updateSettings
 			.mockResolvedValueOnce({})
 			.mockRejectedValueOnce(new Error('503'))
@@ -272,7 +235,6 @@ describe('ProviderForm — a settings save that fails is reported, not announced
 
 		renderEdit();
 		await awaitLoaded();
-		// Tick the backup toggle so the form has backup settings to persist.
 		await fireEvent.click(screen.getByLabelText(/zip backup/i));
 		await fireEvent.click(saveButton());
 		await vi.waitFor(() => expect(updateSettings).toHaveBeenCalledTimes(2));

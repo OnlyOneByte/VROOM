@@ -1,12 +1,3 @@
-/**
- * Unit tests for createSheetsServiceForProvider logic.
- * Validates: Requirement 7 — correct token extraction, provider not found,
- * missing token, ownership rejection.
- *
- * Tests the pure logic of createSheetsServiceForProvider by simulating
- * the DB query, decryption, and validation steps.
- */
-
 import { describe, expect, test } from 'bun:test';
 import { NotFoundError, ValidationError } from '../../../errors';
 
@@ -18,11 +9,6 @@ interface ProviderRow {
   credentials: string;
 }
 
-/**
- * Pure function replicating the createSheetsServiceForProvider logic.
- * Given a provider row lookup result and a decrypt function, returns
- * the refresh token or throws the appropriate error.
- */
 function extractRefreshToken(
   providerRows: ProviderRow[],
   decryptFn: (encrypted: string) => string
@@ -47,10 +33,6 @@ function extractRefreshToken(
   return credentials.refreshToken;
 }
 
-/**
- * Simulates the DB query filtering: provider must match id, userId,
- * domain='storage', status='active'.
- */
 function queryProvider(
   allProviders: ProviderRow[],
   providerId: string,

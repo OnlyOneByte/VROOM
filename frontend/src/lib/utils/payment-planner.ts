@@ -1,11 +1,9 @@
-import type { VehicleFinancing } from '$lib/types';
+import type { VehicleFinancing } from '#lib/types/index.ts';
 import {
 	calculateExtraPaymentImpact,
 	type ExtraPaymentImpact
-} from '$lib/utils/financing-calculations';
-import { formatCurrency } from '$lib/utils/formatters';
-
-// --- Types ---
+} from '#lib/utils/financing-calculations.ts';
+import { formatCurrency } from '#lib/utils/formatters.ts';
 
 export interface SecondaryDelta {
 	monthsDelta: number;
@@ -23,23 +21,6 @@ export type PlannerState =
 			secondaryDelta: SecondaryDelta;
 	  };
 
-// --- Functions ---
-
-/**
- * Compute the planner display state based on input, minimum, and saved amounts.
- *
- * Preconditions:
- *  - financing is a valid loan with apr > 0
- *  - minimumPayment > 0
- *  - inputAmount > 0
- *
- * Postconditions:
- *  - Returns 'below-minimum' iff inputAmount < minimumPayment
- *  - Returns 'at-minimum' iff inputAmount ≈ minimumPayment (within $0.01)
- *  - Returns 'with-delta' iff inputAmount > minimumPayment AND |inputAmount - savedAmount| > 0.01
- *  - Returns 'normal' iff inputAmount > minimumPayment AND |inputAmount - savedAmount| ≤ 0.01
- *  - No mutations to financing object
- */
 export function computePlannerState(
 	financing: VehicleFinancing,
 	inputAmount: number,
@@ -60,23 +41,12 @@ export function computePlannerState(
 		};
 	}
 
-	// Baseline payment the "extra" is measured against. For an apr>0 loan that's the amortizing
-	// minimumPayment. But a 0%-APR loan has NO minimum (calculateMinimumPayment returns null →
-	// minimumPayment arrives as 0 here), and a $0 baseline makes calculateExtraPaymentImpact's
-	// original schedule trip the negative-amortization guard (principal = payment − interest = 0 ≤ 0 →
-	// 0 months), so monthsSaved = max(0, 0 − accelerated) = 0 → the planner showed "0 mos / $0 saved"
-	// for an interest-free loan an extra payment clearly shortens (— the symptom re-manifested
-	// at the planner layer: the 0%-APR fix lives one layer down in calculateExtraPaymentImpact, but
-	// feeding a $0 baseline defeats it). Fall back to the loan's real contractual paymentAmount so the
-	// baseline is a genuine amortizing schedule. apr>0 paths (minimumPayment > 0) are byte-unchanged.
 	const baselinePayment = minimumPayment > 0 ? minimumPayment : financing.paymentAmount;
 
-	// Primary impact: input vs baseline
 	const extraVsMinimum = inputAmount - baselinePayment;
 	const financingAtMinimum = { ...financing, paymentAmount: baselinePayment };
 	const primaryImpact = calculateExtraPaymentImpact(financingAtMinimum, extraVsMinimum);
 
-	// Secondary delta: input vs saved (only when different)
 	if (Math.abs(inputAmount - savedAmount) > 0.01) {
 		const extraSavedVsMinimum = savedAmount - baselinePayment;
 		const savedImpact = calculateExtraPaymentImpact(financingAtMinimum, extraSavedVsMinimum);
@@ -98,9 +68,6 @@ function formatMonths(months: number): string {
 	return `${months} months`;
 }
 
-/**
- * Build a human-readable summary sentence for the current planner state.
- */
 export function buildSummary(
 	inputAmount: number,
 	savedAmount: number,
@@ -124,14 +91,6 @@ export function buildSummary(
 	return `${base} That's ${formatMonths(deltaMonths)} and ${formatCurrency(deltaInterest)} ${moreOrLess} than your current ${formatCurrency(savedAmount)}/mo.`;
 }
 
-/**
- * Determine whether the Save button should be enabled.
- *
- * Save is enabled iff:
- *  - inputAmount >= minimumPayment
- *  - |inputAmount - savedAmount| > 0.01
- *  - not currently saving
- */
 export function canSave(
 	inputAmount: number,
 	minimumPayment: number,

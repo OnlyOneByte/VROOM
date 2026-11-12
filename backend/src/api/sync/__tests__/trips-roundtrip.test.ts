@@ -1,19 +1,3 @@
-/**
- * TRUE backup → restore round-trip for trips (trips-location T4, design §4).
- *
- * The `trips` table was threaded through the backup/restore pipeline by hand across many files (config
- * maps + OPTIONAL_BACKUP_FILES, backup query + referential-integrity, restore FK-ordered insert +
- * ImportSummary + conflict-probe, sheets service headers/export/readback). The drift guards
- * (backup-table-coverage / restore-table-coverage / sheets-header-coverage) prove the wiring EXISTS; this
- * proves a real export → import PRESERVES a trip's data. Trips have no create route yet (that's T3), so
- * seed the row directly via ctx.sqlite — the round-trip path (CSV serialize → parse → FK-ordered insert)
- * is independent of the create route (same approach claims-roundtrip uses for the claim-photo case).
- *
- * createTestApp() rewrites process.env then dynamic-imports DB-bound modules, so keep this file's static
- * imports to the harness + bun:test; import backup/restore dynamically AFTER createTestApp so they bind to
- * the throwaway DB.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
@@ -42,7 +26,6 @@ function tripRows(): TripRowDb[] {
   return ctx.sqlite.query('SELECT * FROM trips ORDER BY id').all() as TripRowDb[];
 }
 
-/** Insert a trip row directly (no create route until T3). Mirrors how the restore insert stamps userId. */
 function seedTrip(
   ctx: TestApp,
   id: string,
@@ -53,7 +36,7 @@ function seedTrip(
     start_odometer = 1000,
     end_odometer = 1080,
     purpose = 'business',
-    trip_date = 1718841600, // 2024-06-20 (unix seconds, timestamp mode)
+    trip_date = 1718841600,
     start_location = null,
     end_location = null,
     note = null,
@@ -77,13 +60,9 @@ function seedTrip(
   );
 }
 
-describe('backup → restore round-trip preserves trips (T4)', () => {
+describe('backup → restore round-trip preserves trips', () => {
   test('a fully-populated trip survives export + restore with its fields intact', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
-    // A NON-midnight UTC instant (13:30:00Z) — exercises the tripDate timestamp-mode column through the
-    // CSV Date→toISOString→coerceRow `new Date()` round-trip. A date-only truncation or a tz-shift on
-    // either serializer leg would move this off the exact epoch (the date-seam class; the
-    // bug-scout verified this path clean firsthand, this pins it so a future regression goes red).
     const tripDateSec = Math.floor(Date.UTC(2024, 5, 20, 13, 30, 0) / 1000);
     seedTrip(ctx, 'trip-1', vehicleId, {
       start_odometer: 24000,
@@ -114,7 +93,6 @@ describe('backup → restore round-trip preserves trips (T4)', () => {
     expect(row.start_odometer).toBe(24000);
     expect(row.end_odometer).toBe(24135);
     expect(row.purpose).toBe('business');
-    // The timestamp survives to the exact second — no date-only truncation, no tz drift.
     expect(row.trip_date).toBe(tripDateSec);
     expect(row.start_location).toBe('Office');
     expect(row.end_location).toBe('Client site');
@@ -134,8 +112,6 @@ describe('backup → restore round-trip preserves trips (T4)', () => {
     const rows = tripRows();
     expect(rows).toHaveLength(1);
     expect(rows[0].purpose).toBe('personal');
-    // CSV coerceRow must restore an empty optional cell as NULL (not the string "") — the data-safety
-    // contract the NOT-NULL-default fix protects for required columns; these are plain nullable.
     expect(rows[0].start_location).toBeNull();
     expect(rows[0].end_location).toBeNull();
     expect(rows[0].note).toBeNull();
@@ -159,14 +135,11 @@ describe('backup → restore round-trip preserves trips (T4)', () => {
   });
 
   test('a trip referencing a vehicle absent from the backup is rejected (referential integrity)', async () => {
-    // validateTripRefs (T4, spec §4): a trip whose vehicleId is not among the backup's vehicles must fail
-    // validation, so the restore aborts cleanly rather than FK-violating mid-insert after the wipe.
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     seedTrip(ctx, 'trip-ok', vehicleId);
 
     const { backupService } = await import('../backup');
 
-    // Export a valid backup, then corrupt it: point the trip at a non-existent vehicle.
     const zip = await backupService.exportAsZip(ctx.user.id);
     const AdmZip = (await import('adm-zip')).default;
     const archive = new AdmZip(zip);
@@ -178,7 +151,6 @@ describe('backup → restore round-trip preserves trips (T4)', () => {
     const corruptedZip = archive.toBuffer();
 
     const { restoreService } = await import('../restore');
-    // The pre-wipe validation must reject this (valid:false) — the user's data is not destroyed.
     await expect(
       restoreService.restoreFromBackup(ctx.user.id, corruptedZip, 'replace')
     ).rejects.toThrow();

@@ -1,118 +1,130 @@
-/**
- * # DEEP-REVIEW (certify + guard): `resolveNewUser`'s email-collision + race-retry invariant.
- *
- * `resolveNewUser` (auth/routes.ts) creates a user on an OAuth login that has no existing auth row. Its
- * collision handling is a load-bearing data-safety + concurrency contract (— VROOM NEVER
- * implicitly merges two accounts):
- *  1. PRE-CHECK: if a user with the incoming email already exists → redirect `email_exists` (no merge).
- *  2. TRANSACTIONAL CATCH (concurrency-only): the new-user tx inserts BOTH `users(email)` (UNIQUE on email)
- *  and `user_providers(provider_type, provider_account_id)` (partial UNIQUE `up_auth_identity_idx` WHERE
- *  domain='auth'). So a concurrent request landing between our pre-check SELECT and our tx commit can
- *  UNIQUE-violate on EITHER index. The catch re-queries findByProviderIdentity(authProvider, accountId):
- *  - row FOUND → the race winner was the SAME provider identity → return its userId (idempotent login);
- *  the provider-identity UNIQUE guarantees that row is unambiguous
- *  - row ABSENT → a DIFFERENT account grabbed that email → redirect `email_exists`
- *
- * Certified CLEAN firsthand — no defect. resolveNewUser is a private handler helper, so this guard
- * models the EXACT decision logic against the REAL migrated schema (the SQL contract it runs): the pre-check
- * no-merge, and the catch-branch race-winner-vs-collision discrimination. A regression that (a) implicitly
- * merged on email, or (b) returned a userId for a different-account collision (cross-account login!), breaks it.
- */
-
-import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { applyMigration, loadMigrations } from '../../../db/__tests__/migration-helpers';
+import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 
-let db: Database;
-beforeEach(() => {
-  db = new Database(':memory:');
-  db.run('PRAGMA foreign_keys = ON');
-  for (const m of loadMigrations()) applyMigration(db, m);
+let ctx: TestApp;
+let resolveNewUser: typeof import('../routes').resolveNewUser;
+let emailExists: string;
+
+beforeEach(async () => {
+  ctx = await createTestApp();
+  // App modules must be imported after createTestApp, or they bind the wrong database.
+  ({ resolveNewUser } = await import('../routes'));
+  const { CONFIG } = await import('../../../config');
+  emailExists = `${CONFIG.frontend.url}/auth?auth_error=email_exists`;
 });
-afterEach(() => db.close());
+afterEach(() => ctx.close());
 
-function seedAuthUser(
-  userId: string,
-  email: string,
-  authProvider: string,
-  accountId: string
-): void {
-  db.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [userId, email, 'Seed']);
-  db.run(
+function seedAuthUser(userId: string, email: string, provider: string, accountId: string): void {
+  ctx.sqlite.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
+    userId,
+    email,
+    'Seed',
+  ]);
+  ctx.sqlite.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, provider_account_id, display_name, credentials, status)
      VALUES (?, ?, 'auth', ?, ?, 'Seed', '', 'active')`,
-    [`p_${userId}`, userId, authProvider, accountId]
+    [`p-${userId}`, userId, provider, accountId]
   );
 }
 
-/** The PRE-CHECK: an existing email blocks new-user creation (no implicit account merge). */
-function preCheckBlocksExistingEmail(email: string): boolean {
-  const existing = db.query('SELECT id FROM users WHERE email = ? LIMIT 1').get(email) as {
-    id: string;
-  } | null;
-  return existing !== null; // true → resolveNewUser returns { redirect: 'email_exists' }
-}
-
-/** The CATCH branch (runs after a UNIQUE(users.email) violation in the new-user tx). */
-function catchBranchResolution(
-  authProvider: string,
-  accountId: string
-): { userId: string } | { redirect: 'email_exists' } {
-  const row = db
-    .query(
-      `SELECT user_id FROM user_providers
-       WHERE domain = 'auth' AND provider_type = ? AND provider_account_id = ? LIMIT 1`
-    )
-    .get(authProvider, accountId) as { user_id: string } | null;
-  return row ? { userId: row.user_id } : { redirect: 'email_exists' };
+function userCount(): number {
+  return (ctx.sqlite.query('SELECT COUNT(*) AS n FROM users').get() as { n: number }).n;
 }
 
 describe('resolveNewUser — pre-check (no implicit account merge)', () => {
-  test('an email already owned by another account blocks new-user creation (→ email_exists)', () => {
-    seedAuthUser('u_first', 'shared@example.com', 'google', 'acc-1');
-    // A different provider account presenting the SAME email must NOT merge into u_first.
-    expect(preCheckBlocksExistingEmail('shared@example.com')).toBe(true);
+  test('an email already owned by another account is refused', async () => {
+    seedAuthUser('u-first', 'shared@example.com', 'github', 'gh-1');
+    const before = userCount();
+
+    const result = await resolveNewUser('google', {
+      providerAccountId: 'g-1',
+      email: 'shared@example.com',
+      displayName: 'Second',
+    });
+
+    expect(result).toEqual({ redirect: emailExists });
+    expect(userCount()).toBe(before);
   });
 
-  test('a fresh email is NOT blocked (new user proceeds)', () => {
-    seedAuthUser('u_first', 'taken@example.com', 'google', 'acc-1');
-    expect(preCheckBlocksExistingEmail('brand-new@example.com')).toBe(false);
-  });
-});
+  test('a fresh email creates the user and its auth link together', async () => {
+    const result = await resolveNewUser('google', {
+      providerAccountId: 'g-new',
+      email: 'brand-new@example.com',
+      displayName: 'Brand New',
+    });
 
-describe('resolveNewUser — transactional race-retry catch (concurrency-only)', () => {
-  test('SAME provider account won the race → idempotent: return the winner userId (NOT a redirect)', () => {
-    // A concurrent request for the SAME provider identity (google/acc-1) inserted the user first.
-    seedAuthUser('u_winner', 'race@example.com', 'google', 'acc-1');
-    // Our tx UNIQUE-violated on users.email; the catch re-queries our own provider identity → finds the winner.
-    expect(catchBranchResolution('google', 'acc-1')).toEqual({ userId: 'u_winner' });
-  });
-
-  test('a DIFFERENT account grabbed the email → email_exists (never a cross-account login)', () => {
-    // The winner was a DIFFERENT provider account that happens to share the email.
-    seedAuthUser('u_other', 'dup@example.com', 'github', 'acc-other');
-    // Our catch re-queries OUR identity (google/acc-new) → no row → must redirect, never return u_other.
-    expect(catchBranchResolution('google', 'acc-new')).toEqual({ redirect: 'email_exists' });
-  });
-});
-
-describe('resolveNewUser — the schema fact the catch relies on', () => {
-  test('a partial-UNIQUE auth-identity index exists on (provider_type, provider_account_id) — makes the race-winner retry unambiguous', () => {
-    // The catch returns the race winner by re-querying findByProviderIdentity(authProvider, accountId). That
-    // is only sound because the provider identity is UNIQUE for auth rows (up_auth_identity_idx, partial WHERE
-    // domain='auth') — so at most ONE row matches and a concurrent same-identity insert is the winner we
-    // adopt. Pin that this unique index exists (a migration dropping it would make the retry ambiguous +
-    // allow duplicate auth identities). users.email is ALSO unique (the other index the tx can violate).
-    const idxRows = db
+    expect('userId' in result).toBe(true);
+    const userId = (result as { userId: string }).userId;
+    const link = ctx.sqlite
       .query(
-        "SELECT name, sql FROM sqlite_master WHERE type = 'index' AND tbl_name = 'user_providers'"
+        "SELECT user_id FROM user_providers WHERE domain = 'auth' AND provider_type = 'google' AND provider_account_id = 'g-new'"
       )
-      .all() as Array<{ name: string; sql: string | null }>;
-    const uniqueAuthIdentity = idxRows.some(
-      (r) =>
-        r.sql?.toUpperCase().includes('UNIQUE') &&
-        /provider_type/.test(r.sql ?? '') &&
-        /provider_account_id/.test(r.sql ?? '')
+      .get() as { user_id: string } | null;
+    expect(link?.user_id).toBe(userId);
+  });
+});
+
+describe('resolveNewUser — UNIQUE conflict inside the insert transaction', () => {
+  test('the same provider identity already linked → its user is returned and nothing is half-created', async () => {
+    seedAuthUser('u-winner', 'winner@example.com', 'google', 'g-race');
+    const before = userCount();
+
+    const result = await resolveNewUser('google', {
+      providerAccountId: 'g-race',
+      email: 'loser@example.com',
+      displayName: 'Loser',
+    });
+
+    expect(result).toEqual({ userId: 'u-winner' });
+    expect(userCount(), 'the rolled-back user row must not survive').toBe(before);
+  });
+
+  test('a collision with a different identity → email_exists, never a cross-account login', async () => {
+    seedAuthUser('u-other', 'other@example.com', 'github', 'shared-account-id');
+    ctx.sqlite.run(
+      'CREATE UNIQUE INDEX temp_one_account_id ON user_providers (provider_account_id)'
+    );
+    try {
+      const result = await resolveNewUser('google', {
+        providerAccountId: 'shared-account-id',
+        email: 'new@example.com',
+        displayName: 'New',
+      });
+      expect(result).toEqual({ redirect: emailExists });
+    } finally {
+      ctx.sqlite.run('DROP INDEX temp_one_account_id');
+    }
+  });
+
+  test('a non-UNIQUE failure propagates even when its message mentions UNIQUE', async () => {
+    ctx.sqlite.run(
+      `CREATE TEMP TRIGGER reject_auth_link BEFORE INSERT ON user_providers
+       BEGIN SELECT RAISE(ABORT, 'UNIQUE constraint failed: simulated by message only'); END`
+    );
+    try {
+      await expect(
+        resolveNewUser('google', {
+          providerAccountId: 'g-trigger',
+          email: 'trigger@example.com',
+          displayName: 'Trigger',
+        })
+      ).rejects.toThrow();
+    } finally {
+      ctx.sqlite.run('DROP TRIGGER reject_auth_link');
+    }
+  });
+});
+
+describe('resolveNewUser — the schema the race-retry relies on', () => {
+  test('a unique auth-identity index exists on (provider_type, provider_account_id)', () => {
+    const indexes = ctx.sqlite
+      .query("SELECT sql FROM sqlite_master WHERE type = 'index' AND tbl_name = 'user_providers'")
+      .all() as Array<{ sql: string | null }>;
+    const uniqueAuthIdentity = indexes.some(
+      ({ sql }) =>
+        sql?.toUpperCase().includes('UNIQUE') &&
+        /provider_type/.test(sql) &&
+        /provider_account_id/.test(sql)
     );
     expect(uniqueAuthIdentity).toBe(true);
   });

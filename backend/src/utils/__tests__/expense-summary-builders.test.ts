@@ -1,25 +1,3 @@
-/**
- * Characterization tests for the dashboard EXPENSE-SUMMARY builder family in analytics-charts.ts
- *  These four GeneralExpenseRow[] -> chart-data builders had ZERO test
- * references — the exact never-pinned-analytics-builder class the loop's defect vein has lived in
- * (C7 pooled-distance, oldest-slice, month-skip, TCO trend, the six date builders).
- * The audit read each against source and found them CORRECT; this locks that conclusion so a
- * future edit can't silently regress it. The companion file
- * (analytics-charts-unpinned.test.ts) certified the fuel/date builders; this is the expense-summary
- * sibling set that audit did not reach:
- *
- *  - buildExpenseByCategory — the pie-chart contract: percentages SUM to 100, total===0 -> [],
- *  unknown category folds to 'misc'.
- *  - buildVehicleExpenseBreakdown — the same category fold WITHOUT percentages (no total guard).
- *  - buildMonthlyExpenseTrends — localeCompare-then-slice(-24) keeps the NEWEST 24 months (the
- *  oldest-slice direction class); same-month co-accumulate;
- *  dateless rows dropped.
- *  - findBiggestExpense — strict-greater max-by-amount (first-wins on ties), []->null,
- *  null-description fallback, ISO date.
- *
- * Pure module → no DB, no server.
- */
-
 import { describe, expect, test } from 'bun:test';
 import {
   buildExpenseByCategory,
@@ -29,9 +7,6 @@ import {
   type GeneralExpenseRow,
 } from '../analytics-charts';
 
-// Local-time date for a given Y/M/D so the bucketing assertions are timezone-independent
-// (the functions bucket on local getMonth/getFullYear via toMonthKey — matches the C6/
-// discipline of constructing local-time dates, never UTC ISO strings, in analytics tests).
 function d(year: number, month1to12: number, day: number): Date {
   return new Date(year, month1to12 - 1, day);
 }
@@ -56,7 +31,7 @@ describe('buildExpenseByCategory', () => {
     expect(buildExpenseByCategory([])).toEqual([]);
   });
 
-  test('all-zero amounts return [] (the total===0 guard, not NaN percentages)', () => {
+  test('all-zero amounts return []', () => {
     const out = buildExpenseByCategory([
       genRow({ category: 'fuel', expenseAmount: 0 }),
       genRow({ category: 'maintenance', expenseAmount: 0 }),
@@ -87,7 +62,7 @@ describe('buildExpenseByCategory', () => {
     expect(out[0]?.percentage).toBeCloseTo(100, 10);
   });
 
-  test('an unknown category folds into misc (the VALID_CATEGORIES guard)', () => {
+  test('an unknown category folds into misc', () => {
     const out = buildExpenseByCategory([
       genRow({ category: 'definitely-not-a-real-category', expenseAmount: 25 }),
       genRow({ category: 'misc', expenseAmount: 75 }),
@@ -95,7 +70,6 @@ describe('buildExpenseByCategory', () => {
     expect(out).toHaveLength(1);
     const misc = out.find((e) => e.category === 'misc');
     expect(misc?.amount).toBe(100);
-    // the bogus category never leaks through as its own slice
     expect(out.some((e) => e.category === 'definitely-not-a-real-category')).toBe(false);
   });
 });
@@ -115,7 +89,6 @@ describe('buildVehicleExpenseBreakdown', () => {
     const maint = out.find((e) => e.category === 'maintenance');
     expect(fuel?.amount).toBe(50);
     expect(maint?.amount).toBe(200);
-    // breakdown is raw amounts only — no percentage key (distinct from buildExpenseByCategory)
     expect(out.every((e) => !('percentage' in e))).toBe(true);
   });
 
@@ -153,8 +126,7 @@ describe('buildMonthlyExpenseTrends', () => {
     expect(out[0]).toEqual({ month: '2024-02', amount: 50 });
   });
 
-  test('keeps the NEWEST 24 months, not the oldest (the slice-direction class)', () => {
-    // 30 distinct months Jan-2022 .. Jun-2024, $1 each. slice(-24) must drop the OLDEST 6.
+  test('keeps the newest 24 months', () => {
     const rows: GeneralExpenseRow[] = [];
     for (let i = 0; i < 30; i++) {
       const year = 2022 + Math.floor(i / 12);
@@ -163,10 +135,8 @@ describe('buildMonthlyExpenseTrends', () => {
     }
     const out = buildMonthlyExpenseTrends(rows);
     expect(out).toHaveLength(24);
-    // newest retained is 2024-06 (i=29); oldest retained is 2022-07 (dropped 2022-01..2022-06).
     expect(out[out.length - 1]?.month).toBe('2024-06');
     expect(out[0]?.month).toBe('2022-07');
-    // the oldest 6 months are GONE — a .slice(0,24) refactor would invert this.
     expect(out.some((e) => e.month === '2022-01')).toBe(false);
   });
 });
@@ -184,7 +154,6 @@ describe('findBiggestExpense', () => {
     ]);
     expect(out?.amount).toBe(500);
     expect(out?.description).toBe('new tires');
-    // date is emitted as an ISO string
     expect(out?.date).toBe(d(2024, 2, 2).toISOString());
   });
 

@@ -1,14 +1,3 @@
-/**
- * Unit tests for GoogleDriveStrategy orchestration — ZIP only, Sheets only, both
- * enabled, partial failure, null zipBuffer, retention enforcement.
- *
- * Dependencies (the Drive provider + Sheets service) are injected via the
- * strategy's `deps` seam rather than `mock.module`. The old version registered
- * process-global module stubs that leaked into sibling test files (clobbering the
- * real GoogleDriveService/GoogleSheetsService that the service-level tests need).
- * Injection keeps everything file-local and leaks nothing.
- */
-
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import { backupService } from '../../sync/backup';
 import type { BackupStrategyContext } from '../../sync/backup-strategy';
@@ -22,7 +11,6 @@ import type { GoogleSheetsService } from '../services/google-sheets-service';
 let mockUpload: ReturnType<typeof mock>;
 let mockCreateOrUpdate: ReturnType<typeof mock>;
 
-/** Inject minimal fakes shaped like the two collaborators the strategy calls. */
 function makeDeps(): GoogleDriveStrategyDeps {
   return {
     createDriveProvider: (_token: string) =>
@@ -68,8 +56,6 @@ describe('GoogleDriveStrategy', () => {
     );
     strategy = new GoogleDriveStrategy(makeDeps());
 
-    // Spy on the real backupService singleton; RESTORE it afterEach so the mock
-    // doesn't leak into other suites that use the real enforceRetention.
     originalEnforceRetention = backupService.enforceRetention;
     mockEnforceRetention = mock(() => Promise.resolve(2));
     backupService.enforceRetention = mockEnforceRetention as typeof backupService.enforceRetention;
@@ -144,13 +130,11 @@ describe('GoogleDriveStrategy', () => {
       })
     );
 
-    // HONEST reporting: one failed capability ⇒ the provider's backup is NOT a success, so the
-    // failed ZIP is retried next run instead of being silently abandoned. (Old behavior: success=true.)
     expect(result.success).toBe(false);
     expect(result.message).toContain('Upload network error');
     expect(result.capabilities.zip?.success).toBe(false);
     expect(result.capabilities.zip?.message).toContain('Upload network error');
-    expect(result.capabilities.sheets?.success).toBe(true); // the OK capability still records success
+    expect(result.capabilities.sheets?.success).toBe(true);
   });
 
   test('partial failure — Sheets fails but ZIP succeeds → strategy reports FAILURE', async () => {

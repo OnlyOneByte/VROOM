@@ -1,31 +1,13 @@
-/**
- * Google Photos Service — stores VROOM photos in the user's Google Photos library.
- *
- * The Google Photos Library API differs fundamentally from Drive/S3 (see
- * .kiro/specs/google-photos-provider/): it is append-only (no delete of library
- * items), photos/videos only (no PDF), album-based (no folders), and its media
- * `baseUrl`s expire (~60 min) and must be re-fetched. This service exposes only the
- * operations VROOM needs and that the API supports: upload (2-step), get-fresh-url,
- * download, and album resolve-or-create.
- *
- * The HTTP boundary is the injectable {@link PhotosClient} (NOT the `googleapis`
- * typed SDK — the Library API's upload is a raw bytes POST). Inject an in-memory
- * fake in tests (test-helpers/fake-google-photos-client.ts) to exercise the real
- * service logic with ZERO network, per .kiro/steering/TestingExternalAPIs.md.
- */
-
 import type { OAuth2Client } from 'google-auth-library';
 import { google } from 'googleapis';
 import { SyncError, SyncErrorCode } from '../../../errors';
 
 const PHOTOS_API = 'https://photoslibrary.googleapis.com';
-/** The single album VROOM creates and uploads into. */
 export const VROOM_ALBUM_TITLE = 'VROOM';
 
 export interface PhotosMediaItem {
   id: string;
   filename?: string;
-  /** Short-lived (~60 min) — re-fetch via getMediaItem before use. */
   baseUrl?: string;
   mimeType?: string;
 }
@@ -35,38 +17,18 @@ export interface PhotosAlbum {
   title?: string;
 }
 
-/** One page of a `mediaItems:search` over the app-created data (photos-auto-expense R1). */
 export interface PhotosSearchPage {
   items: PhotosMediaItem[];
   nextPageToken?: string;
 }
 
-/**
- * The thin HTTP surface of the Google Photos Library API that this service uses.
- * The real implementation ({@link createRealPhotosClient}) is an OAuth2-authed
- * fetch wrapper; tests inject an in-memory fake.
- */
 export interface PhotosClient {
-  /** Upload raw bytes → opaque upload token (step 1 of media creation). */
   uploadBytes(buffer: Buffer, mimeType: string, fileName: string): Promise<string>;
-  /** Create a media item from an upload token in an album (step 2). */
   batchCreate(albumId: string, uploadToken: string, fileName: string): Promise<PhotosMediaItem>;
-  /** Fetch a media item (used to get a FRESH baseUrl — the stored one expires). */
   getMediaItem(mediaItemId: string): Promise<PhotosMediaItem>;
-  /** Download the bytes of a media item (resolves a fresh baseUrl internally). */
   downloadMediaItem(mediaItemId: string): Promise<Buffer>;
-  /** List the caller's albums (app-created) — used to find-or-create the VROOM album. */
   listAlbums(): Promise<PhotosAlbum[]>;
-  /** Create an album with the given title. */
   createAlbum(title: string): Promise<PhotosAlbum>;
-  /**
-   * Search media items over the VROOM album / app-created data, one page at a time
-   * (photos-auto-expense R1, the `mediaItems:search` Library API). OPTIONAL: the read needs the
-   * `photoslibrary.readonly.appcreateddata` OAuth scope, which is ARCC-gated + ships in a later
-   * slice (T1-live + T5). Until then the REAL client omits this method and {@link
-   * GooglePhotosService.listReceiptPhotos} reports the read is not enabled; the in-memory fake
-   * implements it so the stage-endpoint orchestration (T2) is fully exercised zero-network.
-   */
   searchMediaItems?(albumId: string, pageToken?: string): Promise<PhotosSearchPage>;
 }
 
@@ -74,19 +36,11 @@ export class GooglePhotosService {
   private client: PhotosClient;
   private albumId: string | undefined;
 
-  /**
-   * @param refreshToken Google OAuth refresh token (ignored when `client` injected).
-   * @param client Optional pre-built PhotosClient — inject an in-memory fake
-   *  in tests. Production builds an OAuth2-authed real client.
-   * @param albumId Optional cached VROOM album id (from provider `config`) so
-   *  we skip the resolve-or-create round-trip when known.
-   */
   constructor(refreshToken: string, client?: PhotosClient, albumId?: string) {
     this.client = client ?? createRealPhotosClient(refreshToken);
     this.albumId = albumId;
   }
 
-  /** Resolve (cache) the VROOM album id, creating the album if it doesn't exist. */
   async resolveAlbumId(): Promise<string> {
     if (this.albumId) return this.albumId;
     const albums = await this.client.listAlbums();
@@ -99,7 +53,6 @@ export class GooglePhotosService {
     return album.id;
   }
 
-  /** Upload an image and return the created media item. */
   async uploadImage(buffer: Buffer, mimeType: string, fileName: string): Promise<PhotosMediaItem> {
     const albumId = await this.resolveAlbumId();
     const uploadToken = await this.client.uploadBytes(buffer, mimeType, fileName);
@@ -110,26 +63,15 @@ export class GooglePhotosService {
     return item;
   }
 
-  /** Get a FRESH, currently-valid baseUrl for a media item (the stored one expires). */
   async getFreshUrl(mediaItemId: string): Promise<string | null> {
     const item = await this.client.getMediaItem(mediaItemId);
     return item.baseUrl ?? null;
   }
 
-  /** Download the bytes of a media item. */
   async download(mediaItemId: string): Promise<Buffer> {
     return this.client.downloadMediaItem(mediaItemId);
   }
 
-  /**
-   * List up to `maxItems` media items from VROOM's app-created album (photos-auto-expense R1) by
-   * paginating `mediaItems:search`, stopping at the D4 per-run cap. App-created-only by the OAuth
-   * scope (design §1) — this enumerates ONLY the receipts VROOM uploaded, never the camera roll.
-   *
-   * Throws SyncError(AUTH_INVALID) when the client cannot search yet (the read scope is ARCC-gated +
-   * lands in T1-live/T5) — an HONEST failure the route maps to an actionable message, never a fake
-   * empty result (anti-fail-open).
-   */
   async listReceiptPhotos(maxItems: number): Promise<PhotosMediaItem[]> {
     if (!this.client.searchMediaItems) {
       throw new SyncError(
@@ -140,7 +82,6 @@ export class GooglePhotosService {
     const albumId = await this.resolveAlbumId();
     const items: PhotosMediaItem[] = [];
     let pageToken: string | undefined;
-    // Bounded loop: stop at the cap OR when the API runs out of pages (no nextPageToken).
     do {
       const page = await this.client.searchMediaItems(albumId, pageToken);
       for (const item of page.items) {
@@ -152,7 +93,6 @@ export class GooglePhotosService {
     return items;
   }
 
-  /** Cheap connectivity probe — listing albums succeeds when auth is valid. */
   async healthCheck(): Promise<boolean> {
     try {
       await this.client.listAlbums();
@@ -161,18 +101,9 @@ export class GooglePhotosService {
       return false;
     }
   }
-
-  /** The resolved album id (if any) — providers persist this into `config` to cache it. */
-  get cachedAlbumId(): string | undefined {
-    return this.albumId;
-  }
 }
 
-/**
- * Build a real OAuth2-authed PhotosClient. Mirrors GoogleDriveService's OAuth2 setup;
- * the Photos Library API upload is a raw bytes POST, so this uses fetch with a fresh
- * access token from the OAuth2 client rather than the googleapis typed SDK.
- */
+// Library API upload is a raw bytes POST, so this uses fetch rather than the googleapis SDK.
 export function createRealPhotosClient(refreshToken: string): PhotosClient {
   const oauth2Client: OAuth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
@@ -219,11 +150,7 @@ export function createRealPhotosClient(refreshToken: string): PhotosClient {
         body: new Uint8Array(buffer),
       });
       if (!res.ok) {
-        // uploadBytes can't use authedFetch (it needs the raw-octet upload headers), so it must
-        // mirror authedFetch's status→code mapping: a 401/403 here is an EXPIRED/REVOKED token, not a
-        // transient network flake. Classifying it as NETWORK_ERROR makes the backoff retry it as a
-        // retryable glitch (a 401 storm) instead of surfacing AUTH_INVALID so the user re-connects
-        //  The sibling batchCreate/download/list paths already map 401→AUTH_INVALID via authedFetch.
+        // Raw upload bypasses authedFetch; keep the 401/403 mapping or expired tokens retry as network errors.
         throw new SyncError(
           res.status === 401 || res.status === 403
             ? SyncErrorCode.AUTH_INVALID
@@ -231,7 +158,7 @@ export function createRealPhotosClient(refreshToken: string): PhotosClient {
           `Google Photos upload failed: ${res.status}`
         );
       }
-      return res.text(); // body IS the upload token
+      return res.text();
     },
 
     async batchCreate(albumId, uploadToken, fileName) {
@@ -271,7 +198,7 @@ export function createRealPhotosClient(refreshToken: string): PhotosClient {
       if (!item.baseUrl) {
         throw new SyncError(SyncErrorCode.NETWORK_ERROR, 'Media item has no baseUrl');
       }
-      // `=d` returns the original bytes (download param).
+      // Google Photos '=d' suffix returns the original bytes, not a resized rendition.
       const bytes = await fetch(`${item.baseUrl}=d`);
       if (!bytes.ok) {
         throw new SyncError(
@@ -303,9 +230,7 @@ export function createRealPhotosClient(refreshToken: string): PhotosClient {
     },
 
     async searchMediaItems(albumId, pageToken) {
-      // photos-auto-expense T1: the `mediaItems:search` Library API over VROOM's app-created album.
-      // Requires the `photoslibrary.readonly.appcreateddata` read scope (added to the connect flow, T5);
-      // it returns ONLY items VROOM uploaded — the platform guarantee behind the "narrowest scope" claim.
+      // Listing needs the app-created-data scope; it returns only items VROOM uploaded.
       const res = await authedFetch(`${PHOTOS_API}/v1/mediaItems:search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

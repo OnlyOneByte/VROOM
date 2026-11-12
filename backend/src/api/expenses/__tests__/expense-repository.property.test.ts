@@ -1,13 +1,3 @@
-/**
- * Property-Based Tests for ExpenseRepository (DB-backed)
- *
- * Property 5 (Design): Split expense update preserves groupId and migrates photos
- * - Update preserves groupId: new siblings share the same groupId as old siblings
- * - Photos migrate to first new sibling: all photos from old siblings are reassigned
- *
- * **Validates: Requirements 6.1, 6.2**
- */
-
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createId } from '@paralleldrive/cuid2';
@@ -20,10 +10,6 @@ import * as schema from '../../../db/schema';
 import { expenses, photos } from '../../../db/schema';
 import { ExpenseRepository } from '../repository';
 import type { SplitConfig } from '../validation';
-
-// ---------------------------------------------------------------------------
-// Test infrastructure
-// ---------------------------------------------------------------------------
 
 let sqliteDb: Database;
 let db: AppDatabase;
@@ -59,28 +45,20 @@ afterEach(() => {
   sqliteDb.close();
 });
 
-// ---------------------------------------------------------------------------
-// Generators
-// ---------------------------------------------------------------------------
-
-/** Positive dollar amount (0.01 – 10 000), rounded to cents */
 const positiveAmountArb = fc
   .double({ min: 0.01, max: 10_000, noNaN: true })
   .map((v) => Math.round(v * 100) / 100)
   .filter((v) => v >= 0.01);
 
-/** Pick 2–5 unique vehicle IDs from the seeded set. */
 const dbVehicleIdsArb = fc
   .subarray(VEHICLE_IDS, { minLength: 2, maxLength: VEHICLE_IDS.length })
   .filter((arr) => arr.length >= 2);
 
-/** Even split config using seeded vehicle IDs. */
 const dbEvenConfigArb: fc.Arbitrary<SplitConfig> = dbVehicleIdsArb.map((vehicleIds) => ({
   method: 'even' as const,
   vehicleIds,
 }));
 
-/** Percentage split config using seeded vehicle IDs. */
 const dbPercentageConfigArb: fc.Arbitrary<SplitConfig> = dbVehicleIdsArb.chain((vehicleIds) => {
   const n = vehicleIds.length;
   return fc
@@ -101,7 +79,6 @@ const dbPercentageConfigArb: fc.Arbitrary<SplitConfig> = dbVehicleIdsArb.chain((
     });
 });
 
-/** Absolute split config using seeded vehicle IDs, amounts summing to totalAmount. */
 const dbAbsoluteConfigArb = (totalAmount: number): fc.Arbitrary<SplitConfig> =>
   dbVehicleIdsArb.chain((vehicleIds) => {
     const n = vehicleIds.length;
@@ -124,7 +101,6 @@ const dbAbsoluteConfigArb = (totalAmount: number): fc.Arbitrary<SplitConfig> =>
       });
   });
 
-/** Combined: split config + matching totalAmount. */
 const dbConfigAndTotalArb: fc.Arbitrary<{ config: SplitConfig; totalAmount: number }> =
   positiveAmountArb.chain((totalAmount) =>
     fc.oneof(
@@ -134,10 +110,8 @@ const dbConfigAndTotalArb: fc.Arbitrary<{ config: SplitConfig; totalAmount: numb
     )
   );
 
-/** Number of photos to attach (0–5). */
 const photoCountArb = fc.integer({ min: 0, max: 5 });
 
-/** Category arbitrary. */
 const categoryArb = fc.constantFrom(
   'fuel',
   'maintenance',
@@ -147,9 +121,6 @@ const categoryArb = fc.constantFrom(
   'misc'
 );
 
-// ---------------------------------------------------------------------------
-// Helper: insert photos attached to expense IDs
-// ---------------------------------------------------------------------------
 async function insertPhotos(
   drizzleDb: AppDatabase,
   expenseIds: string[],
@@ -157,7 +128,6 @@ async function insertPhotos(
 ): Promise<string[]> {
   const photoIds: string[] = [];
   for (let i = 0; i < count; i++) {
-    // Distribute photos across old siblings round-robin
     const targetExpenseId = expenseIds[i % expenseIds.length] as string;
     const photoId = createId();
     await drizzleDb.insert(photos).values({
@@ -174,14 +144,7 @@ async function insertPhotos(
   return photoIds;
 }
 
-// ---------------------------------------------------------------------------
-// Property 5 (Design): Split expense update preserves groupId and migrates photos
-// For any split expense update operation, the new sibling rows must share the
-// same groupId as the old sibling rows. All photos from old siblings must be
-// reassigned to the first new sibling after the update.
-// **Validates: Requirements 6.1, 6.2**
-// ---------------------------------------------------------------------------
-describe('Property 5 (Design): Split expense update preserves groupId and migrates photos', () => {
+describe('Split expense update preserves groupId and migrates photos', () => {
   test('update preserves groupId: new siblings share the same groupId as old siblings', async () => {
     await fc.assert(
       fc.asyncProperty(
@@ -189,7 +152,6 @@ describe('Property 5 (Design): Split expense update preserves groupId and migrat
         dbConfigAndTotalArb,
         categoryArb,
         async (initial, updated, category) => {
-          // 1. Create a split expense
           const oldSiblings = await repo.createSplitExpense(
             {
               splitConfig: initial.config,
@@ -197,25 +159,22 @@ describe('Property 5 (Design): Split expense update preserves groupId and migrat
               date: new Date(2024, 5, 15),
               totalAmount: initial.totalAmount,
             },
-            USER_ID
+            { ownerId: USER_ID, createdBy: null }
           );
 
           const originalGroupId = oldSiblings[0]?.groupId;
           expect(originalGroupId).toBeTruthy();
 
-          // 2. Update the split expense with a different config
           const newSiblings = await repo.updateSplitExpense(
             originalGroupId as string,
             { splitConfig: updated.config, totalAmount: updated.totalAmount },
             USER_ID
           );
 
-          // 3. Verify: all new siblings share the same groupId as the old ones
           for (const sibling of newSiblings) {
             expect(sibling.groupId).toBe(originalGroupId);
           }
 
-          // 4. Verify from DB: all rows with this groupId have the correct groupId
           const dbSiblings = await db
             .select()
             .from(expenses)
@@ -231,12 +190,6 @@ describe('Property 5 (Design): Split expense update preserves groupId and migrat
     );
   });
 
-  // A reminder-materialized split must STAY linked to its reminder
-  // across an edit. updateSplitExpense deletes old siblings + inserts new ones, copying
-  // sourceType/sourceId from the first old sibling (repository.ts:739-740) — but nothing
-  // pinned it, and recurring-expenses T3 (cascade-safe delete, which keys on sourceId)
-  // depends on this invariant holding. Deterministic fixture: the invariant is "source
-  // survives the edit", not a distribution property.
   test('update preserves sourceType/sourceId on the new siblings (reminder link survives an edit)', async () => {
     const reminderId = createId();
 
@@ -249,17 +202,15 @@ describe('Property 5 (Design): Split expense update preserves groupId and migrat
         sourceType: 'reminder',
         sourceId: reminderId,
       },
-      USER_ID
+      { ownerId: USER_ID, createdBy: null }
     );
     const groupId = oldSiblings[0]?.groupId as string;
     expect(groupId).toBeTruthy();
-    // Sanity: the created siblings carry the source link.
     for (const s of oldSiblings) {
       expect(s.sourceType).toBe('reminder');
       expect(s.sourceId).toBe(reminderId);
     }
 
-    // Edit the split (different vehicle set + total) — the source link must persist.
     const newSiblings = await repo.updateSplitExpense(
       groupId,
       { splitConfig: { method: 'even', vehicleIds: ['v-1', 'v-2', 'v-3'] }, totalAmount: 180 },
@@ -272,7 +223,6 @@ describe('Property 5 (Design): Split expense update preserves groupId and migrat
       expect(s.sourceId).toBe(reminderId);
     }
 
-    // Verify from the DB too (not just the returned rows).
     const dbRows = await db.select().from(expenses).where(eq(expenses.groupId, groupId));
     expect(dbRows.length).toBe(3);
     for (const row of dbRows) {
@@ -289,7 +239,6 @@ describe('Property 5 (Design): Split expense update preserves groupId and migrat
         categoryArb,
         photoCountArb,
         async (initial, updated, category, photoCount) => {
-          // 1. Create a split expense
           const oldSiblings = await repo.createSplitExpense(
             {
               splitConfig: initial.config,
@@ -297,17 +246,15 @@ describe('Property 5 (Design): Split expense update preserves groupId and migrat
               date: new Date(2024, 5, 15),
               totalAmount: initial.totalAmount,
             },
-            USER_ID
+            { ownerId: USER_ID, createdBy: null }
           );
 
           const originalGroupId = oldSiblings[0]?.groupId;
           expect(originalGroupId).toBeTruthy();
           const oldSiblingIds = oldSiblings.map((s) => s.id);
 
-          // 2. Insert photos attached to old siblings
           const insertedPhotoIds = await insertPhotos(db, oldSiblingIds, photoCount);
 
-          // 3. Update the split expense
           const newSiblings = await repo.updateSplitExpense(
             originalGroupId as string,
             { splitConfig: updated.config, totalAmount: updated.totalAmount },
@@ -316,7 +263,6 @@ describe('Property 5 (Design): Split expense update preserves groupId and migrat
 
           const firstNewSiblingId = newSiblings[0]?.id;
 
-          // 4. Verify: all photos now point to the first new sibling
           if (insertedPhotoIds.length > 0) {
             const migratedPhotos = await db
               .select()
@@ -333,7 +279,6 @@ describe('Property 5 (Design): Split expense update preserves groupId and migrat
             }
           }
 
-          // 5. Verify: no photos point to any old sibling ID
           for (const oldId of oldSiblingIds) {
             const orphaned = await db.select().from(photos).where(eq(photos.entityId, oldId));
             expect(orphaned.length).toBe(0);
@@ -345,18 +290,9 @@ describe('Property 5 (Design): Split expense update preserves groupId and migrat
   });
 });
 
-// ---------------------------------------------------------------------------
-// Split DELETE/regenerate must be userId-scoped, not groupId-alone.
-// deleteSplitExpense + updateSplitExpense each user-scope their guarding SELECT but, pre-fix, keyed the
-// destructive `delete(expenses).where(eq(groupId))` on groupId ALONE — the ownership check and the
-// write on DIFFERENT predicates. Not exploitable today (groupId is a server cuid2, single-owner), but a
-// latent cross-tenant boundary if a group ever held siblings under two userIds. These tests pin the
-// boundary at the destructive write: a same-groupId sibling owned by ANOTHER user must survive both ops.
-// ---------------------------------------------------------------------------
 describe('split delete/update is userId-scoped at the destructive write (cross-tenant safety)', () => {
   const USER_2 = 'test-user-2';
 
-  /** Seed a second user owning vehicle v-other, and inject a sibling under THAT user sharing `groupId`. */
   function injectForeignSibling(groupId: string, id: string): void {
     sqliteDb.run(
       `INSERT INTO users (id, email, display_name) VALUES ('${USER_2}', 'user2@test.com', 'User Two')`
@@ -364,7 +300,6 @@ describe('split delete/update is userId-scoped at the destructive write (cross-t
     sqliteDb.run(
       `INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('v-other', '${USER_2}', 'Honda', 'Civic', 2021)`
     );
-    // A row that (pathologically) shares user 1's groupId but belongs to user 2.
     sqliteDb.run(
       `INSERT INTO expenses (id, user_id, vehicle_id, category, expense_amount, date, group_id)
        VALUES ('${id}', '${USER_2}', 'v-other', 'financial', 99, 1718000000, '${groupId}')`
@@ -379,14 +314,13 @@ describe('split delete/update is userId-scoped at the destructive write (cross-t
         date: new Date(2024, 5, 15),
         totalAmount: 100,
       },
-      USER_ID
+      { ownerId: USER_ID, createdBy: null }
     );
     const groupId = siblings[0]?.groupId as string;
     injectForeignSibling(groupId, 'foreign-del');
 
     await repo.deleteSplitExpense(groupId, USER_ID);
 
-    // User 1's siblings are gone; user 2's same-groupId row SURVIVES (delete was userId-scoped).
     const mine = await db.select().from(expenses).where(eq(expenses.userId, USER_ID));
     expect(mine.length).toBe(0);
     const foreign = await db.select().from(expenses).where(eq(expenses.id, 'foreign-del'));
@@ -401,7 +335,7 @@ describe('split delete/update is userId-scoped at the destructive write (cross-t
         date: new Date(2024, 5, 15),
         totalAmount: 100,
       },
-      USER_ID
+      { ownerId: USER_ID, createdBy: null }
     );
     const groupId = siblings[0]?.groupId as string;
     injectForeignSibling(groupId, 'foreign-upd');
@@ -412,23 +346,13 @@ describe('split delete/update is userId-scoped at the destructive write (cross-t
       USER_ID
     );
 
-    // User 2's same-groupId row is untouched by user 1's regenerate.
     const foreign = await db.select().from(expenses).where(eq(expenses.id, 'foreign-upd'));
     expect(foreign.length).toBe(1);
     expect(foreign[0]?.userId).toBe(USER_2);
   });
 });
 
-// Editing an ABSOLUTE split via
-// updateSplitExpense WITHOUT a `totalAmount` must recompute groupTotal from the new
-// allocations — not fall back to the stale stored groupTotal. updateSplitSchema makes
-// totalAmount optional AND gates its absolute-sum refinement on it being present, so an
-// absolute edit can legitimately arrive with no total; pre-fix that fell back to the OLD
-// groupTotal, stamping every sibling with a header that no longer matched the legs (the
-// Property 3 "legs sum to groupTotal" invariant). These are deterministic invariants, not
-// distribution properties, so plain fixtures (not fast-check) are the right gate.
 describe('absolute split edit recomputes groupTotal from allocations (no stale header)', () => {
-  /** Create an absolute split (validation forces sum===total at create), return its groupId. */
   async function createAbsolute(
     allocations: Array<{ vehicleId: string; amount: number }>
   ): Promise<string> {
@@ -440,19 +364,17 @@ describe('absolute split edit recomputes groupTotal from allocations (no stale h
         date: new Date(2024, 5, 15),
         totalAmount: total,
       },
-      USER_ID
+      { ownerId: USER_ID, createdBy: null }
     );
     return siblings[0]?.groupId as string;
   }
 
   test('absolute edit with NO totalAmount stores groupTotal = sum(new allocations), legs reconcile', async () => {
-    // Start: v-1 $30 / v-2 $30 → groupTotal 60.
     const groupId = await createAbsolute([
       { vehicleId: 'v-1', amount: 30 },
       { vehicleId: 'v-2', amount: 30 },
     ]);
 
-    // Edit the allocations UP to $40/$40 but OMIT totalAmount (the reachable API shape).
     const newSiblings = await repo.updateSplitExpense(
       groupId,
       {
@@ -467,15 +389,12 @@ describe('absolute split edit recomputes groupTotal from allocations (no stale h
       USER_ID
     );
 
-    // Pre-fix: groupTotal stayed 60 while the legs summed to 80 (a stored inconsistency).
-    // Post-fix: groupTotal is derived from the new allocations → 80, matching the legs.
     const legsSum = newSiblings.reduce((s, r) => s + r.expenseAmount, 0);
     expect(legsSum).toBe(80);
     for (const s of newSiblings) {
       expect(s.groupTotal).toBe(80);
     }
 
-    // Verify from the DB too, not just the returned rows (the header is what analytics reads).
     const dbRows = await db.select().from(expenses).where(eq(expenses.groupId, groupId));
     expect(dbRows.length).toBe(2);
     const dbLegsSum = dbRows.reduce((s, r) => s + r.expenseAmount, 0);
@@ -491,7 +410,6 @@ describe('absolute split edit recomputes groupTotal from allocations (no stale h
       { vehicleId: 'v-2', amount: 30 },
     ]);
 
-    // Validation forces sum===total when total is present, so 45+35=80 is the only legal total.
     const newSiblings = await repo.updateSplitExpense(
       groupId,
       {
@@ -514,9 +432,6 @@ describe('absolute split edit recomputes groupTotal from allocations (no stale h
   });
 
   test('even-split edit with NO totalAmount still falls back to the stored groupTotal (fix scoped to absolute)', async () => {
-    // Behavior-preservation control: even/percentage carry no per-vehicle amounts, so they
-    // MUST keep using the caller-or-stored total to divide. An omitted total on an even edit
-    // therefore still reuses the old groupTotal (60) — the fix must not change this path.
     const siblings = await repo.createSplitExpense(
       {
         splitConfig: { method: 'even', vehicleIds: ['v-1', 'v-2'] },
@@ -524,7 +439,7 @@ describe('absolute split edit recomputes groupTotal from allocations (no stale h
         date: new Date(2024, 5, 15),
         totalAmount: 60,
       },
-      USER_ID
+      { ownerId: USER_ID, createdBy: null }
     );
     const groupId = siblings[0]?.groupId as string;
 
@@ -534,7 +449,6 @@ describe('absolute split edit recomputes groupTotal from allocations (no stale h
       USER_ID
     );
 
-    // Still divides the stored 60 across the new vehicle set (20/20/20).
     expect(newSiblings.length).toBe(3);
     for (const s of newSiblings) {
       expect(s.groupTotal).toBe(60);

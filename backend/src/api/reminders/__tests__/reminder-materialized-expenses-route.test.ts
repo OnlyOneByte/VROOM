@@ -1,19 +1,3 @@
-/**
- * HTTP characterization of GET /api/v1/reminders/:id/expenses (recurring-expenses T6 backend).
- *
- * The route lists the expense rows a reminder has MATERIALIZED (via findBySource('reminder', id,
- * userId)) — the read seam the T6 "this reminder created N expenses" UI will fetch. Goes through the
- * REAL stack (route → ownership check → expenseRepository.findBySource). Pins:
- *  - an expense reminder → trigger → GET /:id/expenses returns the materialized rows, all
- *  source-linked to the reminder ($125.50 template),
- *  - a notification reminder (materializes nothing) → [],
- *  - ownership-scoped: a random/foreign reminder id → 404, and one user's reminder is invisible to
- *  another user.
- *
- * createTestApp() rewrites env + dynamic-imports DB-bound modules, so keep static imports to the
- * harness + bun:test.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -62,14 +46,12 @@ describe('GET /reminders/:id/expenses — materialized expense rows', () => {
       expenseCategory: 'financial',
       expenseAmount: 125.5,
     });
-    // Materialize: process overdue reminders (startDate is in the past → immediately due).
     await ctx.authed('POST', '/api/v1/reminders/trigger');
 
     const res = await getMaterialized(reminderId);
     const body = await json<DataEnvelope<ExpenseRow[]>>(res);
     expect(res.status, JSON.stringify(body)).toBe(200);
     expect(body.data.length).toBeGreaterThanOrEqual(1);
-    // Every returned row is genuinely linked to THIS reminder.
     for (const row of body.data) {
       expect(row.sourceType).toBe('reminder');
       expect(row.sourceId).toBe(reminderId);
@@ -101,7 +83,6 @@ describe('GET /reminders/:id/expenses — materialized expense rows', () => {
       expenseCategory: 'financial',
       expenseAmount: 99,
     });
-    // A second, independent user must not be able to read user 1's reminder's expenses.
     const other = await createTestApp();
     try {
       const res = await other.authed('GET', `/api/v1/reminders/${reminderId}/expenses`);

@@ -1,21 +1,3 @@
-/**
- * push-notifications T4a — the send + reaping lifecycle (notifyUser), fork-free.
- *
- * Drives the REAL notifyUser against the in-memory DB (via createTestApp, which points the DB singleton
- * the repo binds at ':memory:') with a FAKE PushSender (the DI seam) — so the whole lifecycle runs
- * ZERO-network with no VAPID keypair. Pins:
- *  - ok → markSuccess (failure streak cleared, lastSuccessAt stamped), row survives.
- *  - gone → prune (the 404/410 endpoint is removed).
- *  - transient → incrementFailure; reaped once the streak hits the CONFIG cap.
- *  - fan-out over MANY of a user's devices; the summary counts each outcome.
- *  - best-effort: a sender that THROWS is swallowed (notifyUser never rejects) + does not abort the
- *  rest of the fan-out.
- *  - scope: only the target user's subscriptions are sent to.
- *
- * NOTE: with the fake sender injected, notifyUser runs regardless of CONFIG.push.enabled (only the REAL
- * web-push transport is gated on VAPID config) — so the harness (no VAPID env) exercises it fully.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 import {
@@ -26,12 +8,11 @@ import {
 } from '../push-service';
 import { pushSubscriptionRepository } from '../repository';
 
-let ctx: TestApp; // user A (seeded)
+let ctx: TestApp;
 let userA: string;
 let userB: string;
 let bCounter = 0;
 
-/** A fake sender that returns a scripted result per endpoint (default ok), and records calls. */
 function scriptedSender(
   byEndpoint: Record<string, PushResult> = {}
 ): PushSender & { calls: string[] } {
@@ -57,7 +38,7 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
-  setPushSenderForTest(null); // restore the real sender
+  setPushSenderForTest(null);
   ctx.close();
 });
 
@@ -67,10 +48,10 @@ async function sub(userId: string, endpoint: string): Promise<void> {
   await pushSubscriptionRepository.upsertByEndpoint(userId, { endpoint, p256dh: 'k', auth: 'a' });
 }
 
-describe('notifyUser lifecycle (T4a)', () => {
+describe('notifyUser lifecycle', () => {
   test('ok → markSuccess, the subscription survives', async () => {
     await sub(userA, 'ep-ok');
-    setPushSenderForTest(scriptedSender()); // default ok
+    setPushSenderForTest(scriptedSender());
 
     const summary = await notifyUser(userA, PAYLOAD);
     expect(summary).toEqual({ sent: 1, pruned: 0, failed: 0 });
@@ -96,7 +77,7 @@ describe('notifyUser lifecycle (T4a)', () => {
 
     await notifyUser(userA, PAYLOAD);
     const rows = await pushSubscriptionRepository.findByUser(userA);
-    expect(rows).toHaveLength(1); // survives the first miss
+    expect(rows).toHaveLength(1);
     expect(rows[0].failureCount).toBe(1);
   });
 
@@ -104,8 +85,7 @@ describe('notifyUser lifecycle (T4a)', () => {
     await sub(userA, 'ep-dead');
     setPushSenderForTest(scriptedSender({ 'ep-dead': { kind: 'transientError' } }));
 
-    // maxConsecutiveFailures sends → the last one crosses the cap and prunes.
-    const cap = 5; // CONFIG.validation.push.maxConsecutiveFailures
+    const cap = 5;
     for (let i = 0; i < cap; i++) await notifyUser(userA, PAYLOAD);
     expect(await pushSubscriptionRepository.findByUser(userA)).toHaveLength(0);
   });
@@ -136,11 +116,9 @@ describe('notifyUser lifecycle (T4a)', () => {
       },
     });
 
-    // notifyUser must NOT reject, and must attempt BOTH subscriptions despite the first throwing.
     const summary = await notifyUser(userA, PAYLOAD);
     expect(calls).toBe(2);
     expect(summary.failed).toBe(2);
-    // Both rows survive (a thrown transport error is not a definitive "gone").
     expect(await pushSubscriptionRepository.findByUser(userA)).toHaveLength(2);
   });
 
@@ -151,6 +129,6 @@ describe('notifyUser lifecycle (T4a)', () => {
     setPushSenderForTest(sender);
 
     await notifyUser(userA, PAYLOAD);
-    expect(sender.calls).toEqual(['ep-a']); // never ep-b
+    expect(sender.calls).toEqual(['ep-a']);
   });
 });

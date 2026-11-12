@@ -1,12 +1,3 @@
-/**
- * Property-Based Tests for AuthProviderRepository (DB-backed)
- *
- * Tests findByProviderIdentity, findByUserId, create, delete, countByUserId,
- * updateProfile, and domain isolation (auth ops don't affect storage rows).
- *
- * **Validates: Requirements 2.1, 2.2, 2.3, 2.4, 2.5, 8.1, 8.3**
- */
-
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
@@ -15,10 +6,6 @@ import { applyMigration, loadMigrations } from '../../../db/__tests__/migration-
 import type { AppDatabase } from '../../../db/connection';
 import * as schema from '../../../db/schema';
 import { AuthProviderRepository, buildAuthProviderConfig } from '../auth-provider-repository';
-
-// ---------------------------------------------------------------------------
-// Test infrastructure
-// ---------------------------------------------------------------------------
 
 let sqliteDb: Database;
 let db: AppDatabase;
@@ -52,10 +39,6 @@ afterEach(() => {
   sqliteDb.close();
 });
 
-// ---------------------------------------------------------------------------
-// Generators
-// ---------------------------------------------------------------------------
-
 const providerTypeArb = fc.constantFrom('google', 'github');
 
 const providerAccountIdArb = fc.stringMatching(/^[a-z0-9]{5,20}$/);
@@ -70,11 +53,6 @@ const avatarUrlArb = fc.oneof(
   fc.constant(undefined),
   fc.stringMatching(/^https:\/\/[a-z]{3,10}\.com\/[a-z]{3,10}$/)
 );
-
-// ---------------------------------------------------------------------------
-// Property: findByProviderIdentity returns the correct auth row
-// **Validates: Requirements 2.1, 2.2**
-// ---------------------------------------------------------------------------
 
 describe('findByProviderIdentity', () => {
   test('returns the created auth row when queried by identity tuple', async () => {
@@ -101,7 +79,6 @@ describe('findByProviderIdentity', () => {
           expect(found?.providerType).toBe(providerType);
           expect(found?.providerAccountId).toBe(providerAccountId);
 
-          // Cleanup for next iteration
           await repo.delete(created.id, USER_ID);
         }
       ),
@@ -114,11 +91,6 @@ describe('findByProviderIdentity', () => {
     expect(result).toBeNull();
   });
 });
-
-// ---------------------------------------------------------------------------
-// Property: findByUserId returns all auth rows ordered by createdAt
-// **Validates: Requirements 2.1, 2.3**
-// ---------------------------------------------------------------------------
 
 describe('findByUserId', () => {
   test('returns all auth rows for a user ordered by createdAt asc', async () => {
@@ -142,7 +114,6 @@ describe('findByUserId', () => {
     expect(rows[0].id).toBe(row1.id);
     expect(rows[1].id).toBe(row2.id);
 
-    // All rows are auth domain
     for (const row of rows) {
       expect(row.domain).toBe('auth');
     }
@@ -169,11 +140,6 @@ describe('findByUserId', () => {
     expect(rows[0].userId).toBe(USER_ID);
   });
 });
-
-// ---------------------------------------------------------------------------
-// Property: create inserts auth row with correct fields
-// **Validates: Requirements 2.1, 2.4**
-// ---------------------------------------------------------------------------
 
 describe('create', () => {
   test('inserts auth row with domain=auth, empty credentials, config with email', async () => {
@@ -206,7 +172,6 @@ describe('create', () => {
             expect(config.avatarUrl).toBe(avatarUrl);
           }
 
-          // Cleanup
           await repo.delete(created.id, USER_ID);
         }
       ),
@@ -214,11 +179,6 @@ describe('create', () => {
     );
   });
 });
-
-// ---------------------------------------------------------------------------
-// Property: delete removes only the specified auth row
-// **Validates: Requirements 2.1**
-// ---------------------------------------------------------------------------
 
 describe('delete', () => {
   test('removes the specified auth row', async () => {
@@ -244,17 +204,11 @@ describe('delete', () => {
       displayName: 'Other',
     });
 
-    // Try to delete with wrong userId
     await repo.delete(row.id, USER_ID);
     const found = await repo.findByProviderIdentity('google', 'other-user-row');
     expect(found).not.toBeNull();
   });
 });
-
-// ---------------------------------------------------------------------------
-// Property: countByUserId counts only auth-domain rows
-// **Validates: Requirements 2.1, 2.5**
-// ---------------------------------------------------------------------------
 
 describe('countByUserId', () => {
   test('counts only auth rows for the user', async () => {
@@ -280,7 +234,6 @@ describe('countByUserId', () => {
   });
 
   test('does not count storage rows', async () => {
-    // Insert a storage row directly via raw SQL
     sqliteDb.run(
       `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, status)
        VALUES ('storage-1', '${USER_ID}', 'storage', 'google-drive', 'My Drive', 'enc-creds', 'active')`
@@ -289,11 +242,6 @@ describe('countByUserId', () => {
     expect(await repo.countByUserId(USER_ID)).toBe(0);
   });
 });
-
-// ---------------------------------------------------------------------------
-// Property: updateProfile updates config and displayName
-// **Validates: Requirements 2.1**
-// ---------------------------------------------------------------------------
 
 describe('updateProfile', () => {
   test('updates email, displayName, and avatarUrl in config', async () => {
@@ -319,11 +267,7 @@ describe('updateProfile', () => {
     expect(config.avatarUrl).toBe('https://example.com/avatar');
   });
 
-  // The cross-tenant WRITE defense — updateProfile is scoped on (id, userId) just like delete
-  // (which has its own "does not delete other users' rows" guard), so updating another user's auth
-  // profile with the wrong userId must be a no-op (account-profile tampering defense). Was unpinned —
-  // delete had the parallel guard but updateProfile only had the happy path.
-  test('does not update rows belonging to other users (cross-tenant write defense)', async () => {
+  test('does not update rows belonging to other users', async () => {
     const row = await repo.create({
       userId: USER_ID_2,
       authProvider: 'google',
@@ -332,33 +276,24 @@ describe('updateProfile', () => {
       displayName: 'Victim',
     });
 
-    // Attacker (USER_ID) tries to rewrite USER_ID_2's auth profile.
     await repo.updateProfile(row.id, USER_ID, {
       email: 'attacker@test.com',
       displayName: 'Hijacked',
     });
 
-    // The victim's row is untouched — the userId predicate excluded it.
     const found = await repo.findByProviderIdentity('google', 'other-user-profile');
     expect(found?.displayName).toBe('Victim');
     expect((found?.config as Record<string, unknown> | undefined)?.email).toBe('victim@test.com');
   });
 });
 
-// ---------------------------------------------------------------------------
-// Property: Domain isolation — auth ops don't affect storage rows
-// **Validates: Requirements 8.1, 8.3**
-// ---------------------------------------------------------------------------
-
 describe('Domain isolation', () => {
   test('auth operations do not affect storage rows', async () => {
-    // Insert a storage row
     sqliteDb.run(
       `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, status)
        VALUES ('storage-iso', '${USER_ID}', 'storage', 'google-drive', 'My Drive', 'enc-creds', 'active')`
     );
 
-    // Create auth rows
     const authRow = await repo.create({
       userId: USER_ID,
       authProvider: 'google',
@@ -367,12 +302,10 @@ describe('Domain isolation', () => {
       displayName: 'Iso',
     });
 
-    // findByUserId only returns auth rows
     const authRows = await repo.findByUserId(USER_ID);
     expect(authRows.every((r) => r.domain === 'auth')).toBe(true);
     expect(authRows.find((r) => r.id === 'storage-iso')).toBeUndefined();
 
-    // Delete auth row — storage row survives
     await repo.delete(authRow.id, USER_ID);
 
     const storageRow = sqliteDb
@@ -383,7 +316,6 @@ describe('Domain isolation', () => {
   });
 
   test('findByProviderIdentity only searches auth domain', async () => {
-    // Insert a storage row with a providerAccountId (shouldn't happen, but test isolation)
     sqliteDb.run(
       `INSERT INTO user_providers (id, user_id, domain, provider_type, provider_account_id, display_name, credentials, status)
        VALUES ('storage-with-paid', '${USER_ID}', 'storage', 'google', 'some-id', 'Storage Google', 'enc', 'active')`
@@ -393,10 +325,6 @@ describe('Domain isolation', () => {
     expect(found).toBeNull();
   });
 });
-
-// ---------------------------------------------------------------------------
-// buildAuthProviderConfig (dedup — one source for the auth `config` shape)
-// ---------------------------------------------------------------------------
 
 describe('buildAuthProviderConfig', () => {
   test('builds the { email, avatarUrl } config shape', () => {

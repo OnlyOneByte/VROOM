@@ -1,45 +1,44 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { routes, paramRoutes } from '$lib/routes';
-	import { parseMonthToDate } from '$lib/utils/chart-formatters';
+	import { routes, paramRoutes } from '#lib/routes.ts';
+	import { parseMonthToDate } from '#lib/utils/chart-formatters.ts';
 	import { onMount, type Component } from 'svelte';
 	import { Plus, FileText, Download, CircleAlert, Users } from '@lucide/svelte';
-	import FloatingActionButton from '$lib/components/common/floating-action-button.svelte';
-	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
-	import { Button } from '$lib/components/ui/button';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { Card, CardContent } from '$lib/components/ui/card';
-	import * as CardFull from '$lib/components/ui/card';
-	import ExpensesTable from '$lib/components/expenses/ExpensesTable.svelte';
-	import ExpenseSearchFilters from '$lib/components/expenses/ExpenseSearchFilters.svelte';
-	import ExpenseTrendChart from '$lib/components/charts/ExpenseTrendChart.svelte';
-	import FuelEfficiencyTrendChart from '$lib/components/charts/FuelEfficiencyTrendChart.svelte';
-	import { AppPieChart } from '$lib/components/charts';
-	import VehicleHeader from '$lib/components/vehicles/VehicleHeader.svelte';
-	import ShareVehicleDialog from '$lib/components/vehicles/ShareVehicleDialog.svelte';
-	import VehiclePhotoCarousel from '$lib/components/vehicles/VehiclePhotoCarousel.svelte';
-	import MediaCaptureDialog from '$lib/components/common/MediaCaptureDialog.svelte';
-	import VehicleInfoCard from '$lib/components/vehicles/VehicleInfoCard.svelte';
-	import ExpenseOverviewCard from '$lib/components/vehicles/ExpenseOverviewCard.svelte';
-	import FuelEfficiencyStatsCard from '$lib/components/vehicles/FuelEfficiencyStatsCard.svelte';
-	import PeriodSelector from '$lib/components/common/period-selector.svelte';
-	import EmptyState from '$lib/components/common/empty-state.svelte';
-	import FinanceTab from '$lib/components/vehicles/FinanceTab.svelte';
-	import OdometerTab from '$lib/components/vehicles/OdometerTab.svelte';
-	// Lazy-loaded InsuranceTab — only import when overview tab has been viewed
+	import FloatingActionButton from '#lib/components/common/floating-action-button.svelte';
+	import { Tabs, TabsContent, TabsList, TabsTrigger } from '#lib/components/ui/tabs/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import { Card, CardContent } from '#lib/components/ui/card/index.ts';
+	import * as CardFull from '#lib/components/ui/card/index.ts';
+	import ExpensesTable from '#lib/components/expenses/ExpensesTable.svelte';
+	import ExpenseSearchFilters from '#lib/components/expenses/ExpenseSearchFilters.svelte';
+	import ExpenseTrendChart from '#lib/components/charts/ExpenseTrendChart.svelte';
+	import FuelEfficiencyTrendChart from '#lib/components/charts/FuelEfficiencyTrendChart.svelte';
+	import { AppPieChart } from '#lib/components/charts/index.ts';
+	import VehicleHeader from '#lib/components/vehicles/VehicleHeader.svelte';
+	import ShareVehicleDialog from '#lib/components/vehicles/ShareVehicleDialog.svelte';
+	import VehiclePhotoCarousel from '#lib/components/vehicles/VehiclePhotoCarousel.svelte';
+	import MediaCaptureDialog from '#lib/components/common/MediaCaptureDialog.svelte';
+	import VehicleInfoCard from '#lib/components/vehicles/VehicleInfoCard.svelte';
+	import ExpenseOverviewCard from '#lib/components/vehicles/ExpenseOverviewCard.svelte';
+	import FuelEfficiencyStatsCard from '#lib/components/vehicles/FuelEfficiencyStatsCard.svelte';
+	import PeriodSelector from '#lib/components/common/period-selector.svelte';
+	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import FinanceTab from '#lib/components/vehicles/FinanceTab.svelte';
+	import OdometerTab from '#lib/components/vehicles/OdometerTab.svelte';
 	let InsuranceTab = $state<Component<{ vehicleId: string; readOnly?: boolean }> | null>(null);
 	let hasLoadedInsurance = $state(false);
-	import { categoryLabels } from '$lib/utils/expense-helpers';
-	import { getCategoryChartColor } from '$lib/utils/chart-colors';
-	import { hasActiveFilters as checkActiveFilters } from '$lib/utils/expense-filters';
-	import { COMMON_MESSAGES, VEHICLE_MESSAGES } from '$lib/constants/messages';
-	import { type TimePeriod } from '$lib/constants/time-periods';
-	import { SCROLL_HEIGHTS } from '$lib/constants/ui';
-	import { vehicleApi } from '$lib/services/vehicle-api';
-	import { expenseApi } from '$lib/services/expense-api';
-	import { analyticsApi } from '$lib/services/analytics-api';
-	import { handleErrorWithNotification } from '$lib/utils/error-handling';
+	import { categoryLabels } from '#lib/utils/expense-helpers.ts';
+	import { getCategoryChartColor } from '#lib/utils/chart-colors.ts';
+	import { hasActiveFilters as checkActiveFilters } from '#lib/utils/expense-filters.ts';
+	import { COMMON_MESSAGES, VEHICLE_MESSAGES } from '#lib/constants/messages.ts';
+	import { type TimePeriod } from '#lib/constants/time-periods.ts';
+	import { SCROLL_HEIGHTS } from '#lib/constants/ui.ts';
+	import { vehicleApi } from '#lib/services/vehicle-api.ts';
+	import { expenseApi } from '#lib/services/expense-api.ts';
+	import { analyticsApi } from '#lib/services/analytics-api.ts';
+	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
 	import type {
 		Vehicle,
 		Expense,
@@ -49,14 +48,13 @@
 		ExpenseSummary,
 		FuelEfficiencyPoint,
 		ExpenseCategory
-	} from '$lib/types';
+	} from '#lib/types/index.ts';
+	import { useExpenseListReload } from '../../expenses/expense-list-reload.svelte';
 	import type { PageData } from './$types';
 
-	// Props from page load
 	let { data }: { data: PageData } = $props();
 	let vehicleId = $derived(data.vehicleId);
 
-	// Component state
 	let isLoading = $state(true);
 	let isLoadingStats = $state(false);
 	let vehicle = $state<Vehicle | null>(null);
@@ -64,49 +62,32 @@
 	let vehicleStatsData = $state<VehicleStats | null>(null);
 	let selectedStatsPeriod = $state<TimePeriod>('all');
 
-	// Server-provided summary and fuel efficiency data
 	let summary = $state<ExpenseSummary | null>(null);
 	let fuelEfficiencyPoints = $state<FuelEfficiencyPoint[]>([]);
-	// A summary load FAILURE must not fall through to the "no expenses yet" empty state —
-	// a returning user would think their data vanished (four-states: error ≠ empty).
 	let summaryLoadError = $state<string | null>(null);
 
-	// Paginated expenses state (for Expenses tab)
 	let expenses = $state<Expense[]>([]);
 	let currentOffset = $state(0);
 	let pageSize = $state(20);
 	let totalCount = $state(0);
 	let isLoadingPage = $state(false);
 	let hasLoadedExpensesTab = $state(false);
-	// Same class for the Expenses tab: a fetch failure must show error+retry, not an empty table.
 	let expensesLoadError = $state<string | null>(null);
-	// Server-side sort for the Expenses tab (default date desc).
 	let expenseSortBy = $state<'date' | 'amount'>('date');
 	let expenseSortDir = $state<'asc' | 'desc'>('desc');
 
-	// Photos state
 	let vehiclePhotos = $state<Photo[]>([]);
 	let showUploadDialog = $state(false);
 
-	// Share dialog (vehicle-sharing T11) — owner invites/manages access to this vehicle.
 	let shareOpen = $state(false);
 
-	// Filters and search for the Expenses tab. Every one of these travels to the SERVER (see
-	// buildExpenseListParams) so it spans all pages: narrowing the 20 rows already on screen
-	// searched a single page while the header count and the paginator described the whole set,
-	// so a match on page 3 was indistinguishable from a match that did not exist.
 	let searchTerm = $state('');
 	let filters = $state<ExpenseFilters>({});
-	// The category axis is owned here rather than inside the table for the same reason: the
-	// table's own dropdown can only ever filter the page it was handed.
 	let expenseCategoryFilter = $state<string>('');
 
-	// Derived chart data from server summary
 	let expenseTrendData = $derived.by(() => {
 		if (!summary?.monthlyTrend.length) return [];
 		return summary.monthlyTrend.map(item => ({
-			// parseMonthToDate builds a LOCAL-midnight Date; `new Date('YYYY-MM-01')` parses as
-			// midnight UTC, which shifts the x-axis label back a month for negative-offset users.
 			date: parseMonthToDate(item.period),
 			amount: item.amount,
 			count: item.count
@@ -136,17 +117,14 @@
 			.sort((a, b) => b.value - a.value);
 	});
 
-	// Stats for ExpenseOverviewCard from server summary
 	let localStats = $derived({
 		totalExpenses: summary?.totalAmount ?? 0,
 		recentExpenses: summary?.recentAmount ?? 0,
 		monthlyAverage: summary?.monthlyAverage ?? 0
 	});
 
-	// Whether the overview has any expense data (from summary)
 	let hasExpenseData = $derived((summary?.expenseCount ?? 0) > 0);
 
-	// Check if any filters are active
 	let hasActiveFilters = $derived(
 		checkActiveFilters(searchTerm, filters) || !!expenseCategoryFilter
 	);
@@ -155,15 +133,6 @@
 		vehicle ? vehicle.nickname || `${vehicle.year} ${vehicle.make} ${vehicle.model}` : ''
 	);
 
-	// vehicle-sharing T12b-3b: gate the edit affordances by the viewer's access level. The single-vehicle
-	// GET returns `sharedAccess { level }` for a NON-owner (undefined for the owner). Two capabilities:
-	//  - isOwner → owner-ONLY affordances (edit vehicle info, finance, share management, photos, CSV
-	//  export) — all of these stay strict `validateVehicleOwnership` server-side, so a non-owner must
-	//  not see a button that would 404.
-	//  - canWrite → owner OR an accepted EDITOR (expense + odometer add/edit/delete) — widened
-	//  server-side in T5b-2/T6 via `requireVehicleWrite`.
-	// This is defense-in-depth UX: the backend already enforces every denial; hiding the chrome avoids a
-	// viewer clicking an affordance that errors. An owned vehicle carries no `sharedAccess` → isOwner=true.
 	let isOwner = $derived(!vehicle?.sharedAccess);
 	let canWrite = $derived(!vehicle?.sharedAccess || vehicle.sharedAccess.level === 'editor');
 
@@ -173,24 +142,15 @@
 		return vehicleApi.getPhotoThumbnailUrl(vehicleId, cover.id);
 	});
 
-	// Lazy-load InsuranceTab when overview tab is active and page has loaded. T12b-3c: loaded for a
-	// shared viewer/editor too (read-only) now that the per-vehicle policies LIST (T8b) AND the claims
-	// sub-reads are both widened to shared read; the render-site passes `readOnly={!isOwner}`.
 	$effect(() => {
 		if (!isLoading && !hasLoadedInsurance && activeTab === 'overview') {
 			hasLoadedInsurance = true;
-			import('$lib/components/insurance/InsuranceTab.svelte').then(m => {
+			import('#lib/components/insurance/InsuranceTab.svelte').then(m => {
 				InsuranceTab = m.default;
 			});
 		}
 	});
 
-	// Load data on mount. Photos are the ONLY leg that depends on the vehicle: the read
-	// (GET /photos/vehicle/:id) is owner-only server-side and the carousel is already isOwner-gated,
-	// so for a shared viewer/editor the fetch is pure waste that produces nothing but a "vehicle not
-	// found" error toast (a four-states violation) — hence the second round. Summary, fuel efficiency
-	// and stats are all shared-readable and read only the route param plus the initial period, so
-	// they go out WITH the vehicle rather than after it.
 	onMount(async () => {
 		await Promise.all([loadVehicle(), loadSummary(), loadFuelEfficiency(), loadVehicleStats()]);
 		if (vehicle && isOwner) {
@@ -199,7 +159,6 @@
 		isLoading = false;
 	});
 
-	// Reload stats when period changes (skip initial — onMount already loads)
 	let previousStatsPeriod = $state<TimePeriod | null>(null);
 	$effect(() => {
 		if (
@@ -214,7 +173,6 @@
 		previousStatsPeriod = selectedStatsPeriod;
 	});
 
-	// Load expenses tab data when tab becomes active for the first time
 	$effect(() => {
 		if (activeTab === 'expenses' && !hasLoadedExpensesTab && !isLoading) {
 			hasLoadedExpensesTab = true;
@@ -222,27 +180,6 @@
 		}
 	});
 
-	// Debounce the search box, then re-fetch from page 0 so a match on any page is found.
-	let searchDebounce: ReturnType<typeof setTimeout> | undefined;
-	// Plain (non-reactive) guard: writing it must NOT re-trigger this effect, or the cleanup below
-	// would cancel the timer the same run just armed and the search would never fire.
-	let prevSearchTerm = '';
-	$effect(() => {
-		const term = searchTerm;
-		if (!hasLoadedExpensesTab) {
-			prevSearchTerm = term;
-			return;
-		}
-		if (term === prevSearchTerm) return;
-		prevSearchTerm = term;
-		clearTimeout(searchDebounce);
-		searchDebounce = setTimeout(() => void fetchExpensesPage(0), 300);
-		// Cancel a pending debounce on the next change or on unmount, so no fetch — and no state
-		// write — lands after teardown.
-		return () => clearTimeout(searchDebounce);
-	});
-
-	/** Snapshot of every non-search filter axis, for change detection. */
 	function filterKey(): string {
 		return JSON.stringify([
 			expenseCategoryFilter,
@@ -252,20 +189,11 @@
 		]);
 	}
 
-	// The tag and date-range filters arrive through `bind:filters`, so detect changes by comparing
-	// snapshots and re-fetch from page 0. Plain `let` for the same reason as prevSearchTerm.
-	let prevFilterKey = '';
-	$effect(() => {
-		const key = filterKey();
-		if (!hasLoadedExpensesTab) {
-			// Baseline while the tab has never been opened, so opening it is not also read as a
-			// filter change on top of the fetch the activation above already does.
-			prevFilterKey = key;
-			return;
-		}
-		if (key === prevFilterKey) return;
-		prevFilterKey = key;
-		void fetchExpensesPage(0);
+	const expenseListReload = useExpenseListReload({
+		ready: () => hasLoadedExpensesTab,
+		search: () => searchTerm,
+		filterKey,
+		reload: () => fetchExpensesPage(0)
 	});
 
 	async function loadVehicle() {
@@ -302,7 +230,6 @@
 		}
 	}
 
-	/** The request for one page of this vehicle's expenses: pagination, sort AND every filter. */
 	function buildExpenseListParams(offset: number) {
 		return {
 			limit: pageSize,
@@ -336,18 +263,15 @@
 		}
 	}
 
-	/** Sort changed in the Expenses tab — re-fetch from page 0 so it spans all pages. */
 	function handleExpenseSortChange(by: 'date' | 'amount', dir: 'asc' | 'desc') {
 		expenseSortBy = by;
 		expenseSortDir = dir;
 		fetchExpensesPage(0);
 	}
 
-	/** Category changed in the Expenses tab — re-fetch from page 0 so it filters all pages. */
 	function handleExpenseCategoryChange(category: string) {
 		expenseCategoryFilter = category;
-		prevFilterKey = filterKey();
-		fetchExpensesPage(0);
+		expenseListReload.reloadNow();
 	}
 
 	async function loadVehicleStats() {
@@ -362,12 +286,9 @@
 	}
 
 	async function handleDeleteExpense(_deletedExpense: Expense) {
-		// Deleting the last row of the last page would leave an empty table beside a paginator that
-		// still claims there are rows, so step back a page when this offset falls out of range.
 		const remaining = Math.max(0, totalCount - 1);
 		const offset =
 			currentOffset >= remaining ? Math.max(0, currentOffset - pageSize) : currentOffset;
-		// Re-fetch the page, summary, and fuel efficiency after deletion
 		await Promise.all([fetchExpensesPage(offset), loadSummary(), loadFuelEfficiency()]);
 	}
 
@@ -379,22 +300,13 @@
 		searchTerm = '';
 		filters = {};
 		expenseCategoryFilter = '';
-		// Prime both change guards so clearing several axes at once is ONE refetch, not one per axis,
-		// and re-fetch from page 0 since the cleared set is wider than the page we were on.
-		clearTimeout(searchDebounce);
-		prevSearchTerm = '';
-		prevFilterKey = filterKey();
-		if (hasLoadedExpensesTab) void fetchExpensesPage(0);
+		expenseListReload.reloadNow();
 	}
 
-	// Export THIS vehicle's expenses as CSV (server-generated, vehicle-scoped).
-	// Mirrors the global expenses page; the endpoint already filters by vehicleId.
 	let isExporting = $state(false);
 	async function handleExportCsv() {
 		isExporting = true;
 		try {
-			// The export mirrors EVERY active list filter, so the CSV is exactly what the user is
-			// looking at rather than this vehicle's whole history.
 			await expenseApi.downloadExpensesCsv({
 				vehicleId,
 				category: expenseCategoryFilter || undefined,
@@ -456,7 +368,6 @@
 
 {#if isLoading}
 	<div class="space-y-6">
-		<!-- Header Skeleton -->
 		<div class="flex items-center gap-4">
 			<Skeleton class="h-10 w-10 rounded-md" />
 			<div class="space-y-2">
@@ -465,14 +376,12 @@
 			</div>
 		</div>
 
-		<!-- Tabs Skeleton -->
 		<div class="space-y-6">
 			<Skeleton class="h-10 w-full" />
 			<div class="flex justify-end">
 				<Skeleton class="h-10 w-[180px]" />
 			</div>
 
-			<!-- Stats Grid Skeleton -->
 			<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
 				{#each Array(4) as _, i (i)}
 					<Card>
@@ -487,10 +396,8 @@
 	</div>
 {:else if vehicle}
 	<div class="space-y-6 pb-24">
-		<!-- Header -->
 		<div class="flex items-start justify-between gap-4">
 			<VehicleHeader {vehicle} displayName={vehicleDisplayName} {coverPhotoUrl} />
-			<!-- Share management is owner-only (server keeps strict validateVehicleOwnership on /shares). -->
 			{#if isOwner}
 				<Button variant="outline" size="sm" onclick={() => (shareOpen = true)} class="shrink-0">
 					<Users class="mr-2 h-4 w-4" />
@@ -502,7 +409,6 @@
 			<ShareVehicleDialog bind:open={shareOpen} {vehicleId} vehicleName={vehicleDisplayName} />
 		{/if}
 
-		<!-- Tabs Navigation -->
 		<Tabs bind:value={activeTab} class="space-y-6">
 			<TabsList class="grid w-full grid-cols-4">
 				<TabsTrigger value="overview">Overview</TabsTrigger>
@@ -511,9 +417,7 @@
 				<TabsTrigger value="odometer">Odometer</TabsTrigger>
 			</TabsList>
 
-			<!-- Overview Tab -->
 			<TabsContent value="overview" class="space-y-6">
-				<!-- Vehicle Info + Photos: side-by-side on desktop, stacked on mobile -->
 				<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 					<VehicleInfoCard {vehicle} {isOwner} />
 					<VehiclePhotoCarousel
@@ -526,20 +430,11 @@
 					/>
 				</div>
 
-				<!-- Insurance Summary (lazy-loaded). Shown to a shared viewer/editor in READ-ONLY
-				     mode (readOnly={!isOwner}) — the per-vehicle policies list and the claims sub-reads
-				     are both widened to shared read, and the InsuranceTab tree hides every mutate
-				     affordance (add/edit/renew/delete policy + term, file/edit/delete claim, upload/delete
-				     document) when readOnly. Insurance WRITES stay owner-only server-side (validateInsurance-
-				     Ownership denies BOTH viewer and editor), so readOnly tracks !isOwner, not !canWrite. -->
 				{#if InsuranceTab}
 					<InsuranceTab {vehicleId} readOnly={!isOwner} />
 				{/if}
 
 				{#if summaryLoadError && !isLoadingStats}
-					<!-- Error state takes precedence over the empty state: a summary load
-					     failure must NOT render "No expenses yet" (a returning user would think
-					     their data vanished). Mirrors the dashboard/analytics error+retry idiom. -->
 					<div class="rounded-lg border bg-card p-6">
 						<div class="mb-4 flex items-center gap-3 text-destructive">
 							<CircleAlert class="h-5 w-5" />
@@ -549,7 +444,6 @@
 						<Button onclick={loadSummary}>Retry</Button>
 					</div>
 				{:else if !hasExpenseData}
-					<!-- No Expenses Empty State -->
 					<EmptyState>
 						{#snippet icon()}
 							<FileText class="h-12 w-12 text-muted-foreground mb-4" />
@@ -561,7 +455,6 @@
 							Start tracking expenses for this vehicle to see insights and trends
 						{/snippet}
 						{#snippet action()}
-							<!-- Logging an expense is a WRITE (owner or accepted editor) — hide for a viewer. -->
 							{#if canWrite}
 								<Button
 									href={`${resolve(routes.expenseNew)}?vehicleId=${vehicleId}&returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`}
@@ -573,17 +466,14 @@
 						{/snippet}
 					</EmptyState>
 				{:else}
-					<!-- Period Selector -->
 					<PeriodSelector
 						selectedPeriod={selectedStatsPeriod}
 						isLoading={isLoadingStats}
 						onPeriodChange={handlePeriodChange}
 					/>
 
-					<!-- Expense Overview -->
 					<ExpenseOverviewCard stats={localStats} />
 
-					<!-- Mileage & Fuel Statistics -->
 					<FuelEfficiencyStatsCard
 						{vehicleId}
 						{vehicleStatsData}
@@ -591,9 +481,7 @@
 						{selectedStatsPeriod}
 					/>
 
-					<!-- Trend Charts - Side by Side on Desktop -->
 					<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-						<!-- Expense Trend Chart -->
 						<ExpenseTrendChart
 							data={expenseTrendData}
 							description={selectedStatsPeriod === 'all'
@@ -602,7 +490,6 @@
 							isLoading={isLoadingStats}
 						/>
 
-						<!-- Fuel Efficiency Trend Chart -->
 						{#if vehicle}
 							<FuelEfficiencyTrendChart
 								data={fuelEfficiencyData}
@@ -613,7 +500,6 @@
 						{/if}
 					</div>
 
-					<!-- Expenses by Category with Pie Chart -->
 					{#if categoryChartData.length > 0}
 						<AppPieChart
 							title="Expense by Category"
@@ -625,7 +511,6 @@
 				{/if}
 			</TabsContent>
 
-			<!-- Expenses Tab -->
 			<TabsContent value="expenses" class="space-y-6">
 				<ExpenseSearchFilters
 					{searchTerm}
@@ -635,13 +520,9 @@
 					onClearFilters={clearFilters}
 				/>
 
-				<!-- Expense List -->
 				<CardFull.Root>
 					<CardFull.Header class="flex flex-row items-center justify-between gap-2 space-y-0">
 						<CardFull.Title>All Expenses ({totalCount})</CardFull.Title>
-						<!-- CSV export is owner-only: the server /expenses/export keeps strict
-						     validateVehicleOwnership (T5b-3b export-read widening is deferred), so a shared
-						     invitee hitting it would 404. Hide rather than show a button that errors. -->
 						{#if totalCount > 0 && isOwner}
 							<Button variant="outline" size="sm" onclick={handleExportCsv} disabled={isExporting}>
 								<Download class="mr-2 h-4 w-4" />
@@ -651,8 +532,6 @@
 					</CardFull.Header>
 					<CardFull.Content>
 						{#if expensesLoadError && !isLoadingPage}
-							<!-- Load failure must show error+retry, not the table's "No expenses" empty
-							     state (which would falsely imply this vehicle has zero expenses). -->
 							<div class="flex flex-col items-center gap-3 py-8 text-center">
 								<CircleAlert class="h-8 w-8 text-destructive" />
 								<p class="font-medium">Failed to load expenses</p>
@@ -691,12 +570,10 @@
 				</CardFull.Root>
 			</TabsContent>
 
-			<!-- Odometer Tab -->
 			<TabsContent value="odometer" class="space-y-6">
 				<OdometerTab {vehicleId} {canWrite} unitPreferences={vehicle?.unitPreferences} />
 			</TabsContent>
 
-			<!-- Finance Tab -->
 			<TabsContent value="loan" class="space-y-4 sm:space-y-6">
 				{#if vehicle}
 					<FinanceTab {vehicle} {vehicleId} {isOwner} {vehicleStatsData} />
@@ -714,7 +591,6 @@
 		/>
 	</div>
 {:else}
-	<!-- Vehicle Not Found State -->
 	<EmptyState>
 		{#snippet icon()}
 			<FileText class="h-12 w-12 text-muted-foreground mb-4" />
@@ -733,7 +609,6 @@
 	</EmptyState>
 {/if}
 
-<!-- Floating Action Button — logging an expense is a WRITE; hide for a viewer (owner/editor only). -->
 {#if vehicle && canWrite}
 	<FloatingActionButton
 		href={`${resolve(routes.expenseNew)}?vehicleId=${vehicleId}&returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`}

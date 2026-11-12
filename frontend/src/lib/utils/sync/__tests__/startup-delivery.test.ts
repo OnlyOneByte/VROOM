@@ -1,14 +1,3 @@
-/**
- * `setupAutoSync` used to register only a `window` 'online' listener, and that event fires on a
- * TRANSITION. So the ordinary PWA sequence — log a fill-up with no signal, close the app, reopen it
- * the next day on wifi — never attempted delivery at all: the rows sat in localStorage until the
- * user happened to notice the pending badge and tap it, despite the app having promised they would
- * "sync when online".
- *
- * `syncManager` is a module singleton whose setup is a one-shot latch, so each case runs against a
- * freshly imported module graph.
- */
-
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OfflineExpense } from '../../offline-storage';
 
@@ -24,7 +13,6 @@ function apiOk(data: unknown): Response {
 	});
 }
 
-/** A COMPLETE row: nothing local can reject it, so only delivery decides its fate. */
 function pending(id: string): OfflineExpense {
 	return {
 		id,
@@ -40,7 +28,6 @@ function pending(id: string): OfflineExpense {
 	};
 }
 
-/** Count the create POSTs — GETs are the status fetch and the duplicate check, not delivery. */
 function deliveries(): number {
 	return mockFetch.mock.calls.filter(([url, init]) => {
 		const method = (init as { method?: string } | undefined)?.method ?? 'GET';
@@ -48,7 +35,6 @@ function deliveries(): number {
 	}).length;
 }
 
-/** Re-import the singleton so its one-shot `setupAutoSync` latch starts clear. */
 async function freshGraph() {
 	vi.resetModules();
 	const storage = await import('../../offline-storage');

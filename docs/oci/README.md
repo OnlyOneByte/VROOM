@@ -82,10 +82,11 @@ nano .env   # DATA_PATH=/home/ubuntu/vroom-data, plus the variables below
 ```
 
 Fill in `.env` from
-[Environment Variables](../deployment.md#environment-variables) — `PROVIDER_ENCRYPTION_KEY`
-in particular is missing from the template and the backend refuses to start without it. Keep
-the compose file at the repo root next to `.env`: Compose reads `.env` from the compose
-file's own directory, not from your shell's.
+[Environment Variables](../deployment.md#environment-variables). Replace the template's
+`PROVIDER_ENCRYPTION_KEY` placeholder with the output of `openssl rand -hex 32`: the placeholder
+fails the format check, so the backend refuses to start with it. Keep the compose file at the repo
+root next to `.env`: Compose reads `.env` from the compose file's own directory, not from your
+shell's.
 
 ```bash
 docker compose up -d

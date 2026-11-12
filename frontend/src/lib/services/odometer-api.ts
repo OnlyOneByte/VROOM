@@ -1,5 +1,6 @@
-import type { OdometerEntry, PaginatedResponse, Photo } from '$lib/types';
-import { apiClient, getApiBaseUrl, withPagination } from './api-client';
+import type { OdometerEntry, PaginatedResponse, Photo } from '#lib/types/index.ts';
+import { apiClient, withPagination } from './api-client';
+import { entityPhotos } from './photo-api';
 
 interface CreateOdometerRequest {
 	odometer: number;
@@ -13,10 +14,6 @@ interface UpdateOdometerRequest {
 	note?: string;
 }
 
-/**
- * Odometer API service
- * Handles all odometer entry CRUD operations
- */
 export const odometerApi = {
 	async getEntries(
 		vehicleId: string,
@@ -43,26 +40,7 @@ export const odometerApi = {
 		await apiClient.delete(`/api/v1/odometer/${entryId}`);
 	},
 
-	async uploadPhoto(entryId: string, file: File): Promise<Photo> {
-		const formData = new FormData();
-		formData.append('photo', file);
-		return apiClient.post<Photo>(`/api/v1/photos/odometer_entry/${entryId}`, formData);
-	},
-
-	async getPhotos(
-		entryId: string,
-		params?: { limit?: number; offset?: number }
-	): Promise<PaginatedResponse<Photo>> {
-		return apiClient.getPaginated<Photo>(
-			withPagination(`/api/v1/photos/odometer_entry/${entryId}`, params)
-		);
-	},
-
-	async deletePhoto(entryId: string, photoId: string): Promise<void> {
-		await apiClient.delete(`/api/v1/photos/odometer_entry/${entryId}/${photoId}`);
-	},
-
-	getPhotoThumbnailUrl(entryId: string, photoId: string): string {
-		return `${getApiBaseUrl()}/api/v1/photos/odometer_entry/${entryId}/${photoId}/thumbnail`;
+	uploadPhoto(entryId: string, file: File): Promise<Photo> {
+		return entityPhotos('odometer_entry', entryId).upload(file);
 	}
 };

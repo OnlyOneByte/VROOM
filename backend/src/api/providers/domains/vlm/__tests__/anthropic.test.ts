@@ -1,13 +1,3 @@
-/**
- * AnthropicVlmProvider adapter (vlm-receipt-parsing T3b). Drives the REAL adapter against a stubbed
- * global fetch (no live key/endpoint) and pins the request SHAPE + failure-honesty rules:
- *  - POSTs to {baseUrl}/v1/messages with the FIXED prompt + a base64 `image` source block;
- *  - auth via the `x-api-key` header (NOT Bearer) + the required `anthropic-version` header;
- *  - the model's first text-block content is returned verbatim (parseExtraction validates it);
- *  - a non-2xx / network failure THROWS (route → 502, never a faked success);
- *  - missing/non-string content → '' (empty draft downstream, no throw).
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { AnthropicVlmProvider } from '../anthropic';
 import { RECEIPT_EXTRACTION_PROMPT } from '../prompt';
@@ -36,7 +26,6 @@ function stubFetch(responder: () => Response | Promise<Response>): void {
   }) as any;
 }
 
-/** An Anthropic Messages API success body: content[] with a text block. */
 function okResponse(text: unknown): Response {
   return new Response(JSON.stringify({ content: [{ type: 'text', text }] }), {
     status: 200,
@@ -99,7 +88,7 @@ describe('AnthropicVlmProvider — request shaping', () => {
   });
 });
 
-describe('AnthropicVlmProvider — failure honesty (anti-fail-open)', () => {
+describe('AnthropicVlmProvider failures', () => {
   test('THROWS on a non-2xx response', async () => {
     stubFetch(() => new Response('overloaded', { status: 529 }));
     const provider = new AnthropicVlmProvider({ apiKey: 'k', model: 'm' });

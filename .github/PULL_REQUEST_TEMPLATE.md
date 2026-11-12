@@ -17,3 +17,4 @@
 - [ ] Tested locally
 - [ ] Docs updated if behavior changed
 - [ ] No stray `console.log`
+- [ ] No new comments in code (CLAUDE.md, "No comments in code")

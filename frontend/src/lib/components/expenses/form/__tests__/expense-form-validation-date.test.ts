@@ -1,28 +1,12 @@
-/**
- * (bug) The expense-form date field rejected TODAY as "in the future" for users at a
- * positive UTC offset. `new Date('YYYY-MM-DD')` parses as UTC midnight, so the old
- * `selectedDate > new Date()` Date-INSTANT comparison landed today's date on tomorrow-morning-local
- * and tripped the future guard (the C6/ local-vs-UTC class). Fixed to compare CALENDAR-DAY
- * strings (the date-picker value is already local 'YYYY-MM-DD'; today's local day via the same
- * getFullYear/getMonth/getDate parts idiom this file uses elsewhere).
- *
- * These assertions are HOST-INDEPENDENT (not the vacuous local-vs-UTC value comparison the
- * lesson warns about): they derive "today" from local parts exactly as the function does, so they
- * hold whether the CI host is UTC or not. The bug was a TIME-OF-DAY mismatch within the compare,
- * which a pure date-string compare eliminates on every host.
- */
-
 import { describe, expect, test } from 'vitest';
-import type { Vehicle } from '$lib/types';
+import type { Vehicle } from '#lib/types/index.ts';
 import { validateExpenseField } from '../expense-form-validation';
 
-/** Today as a local 'YYYY-MM-DD' — the same derivation the validator now uses. */
 function localToday(): string {
 	const n = new Date();
 	return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
 }
 
-/** Shift a 'YYYY-MM-DD' by N calendar days (local), returning 'YYYY-MM-DD'. */
 function shiftDays(ymd: string, days: number): string {
 	const parts = ymd.split('-').map(Number);
 	const y = parts[0] ?? 1970;
@@ -45,7 +29,6 @@ function ctxWithDate(date: string) {
 
 describe('validateExpenseField — date (timezone-safe future check)', () => {
 	test("today's local date is accepted (not rejected as future)", () => {
-		// The regression: pre-fix, a positive-UTC-offset user saw this rejected.
 		expect(validateExpenseField('date', ctxWithDate(localToday()))).toBeNull();
 	});
 

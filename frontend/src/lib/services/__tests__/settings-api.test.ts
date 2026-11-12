@@ -1,14 +1,3 @@
-/**
- * Coverage ratchet for settings-api.ts — the last FE service-layer sibling at ~7% line
- * (the api-client / expense-api / reminder-api ratchet covered the rest). Every settings/
- * sync/backup/restore UI call routes through this module; its method→endpoint wiring + the load-bearing
- * restore-body branching + the Idempotency-Key headers (the double-restore data-safety guard) were
- * unexercised.
- *
- * apiClient is mocked (the file-scoped vi.mock pattern — NOT the process-global mock.module
- * trap) so each test asserts the exact URL + verb + body + headers the real method builds.
- */
-
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 const get = vi.fn();
@@ -57,7 +46,6 @@ describe('settingsApi — backup listing', () => {
 	test('listBackupsFromProvider URL-encodes the providerId (special chars survive)', async () => {
 		get.mockResolvedValueOnce([]);
 		await settingsApi.listBackupsFromProvider('prov id/with&special');
-		// encodeURIComponent must escape the space, slash, and ampersand so the query parses correctly.
 		expect(get).toHaveBeenCalledWith(
 			'/api/v1/sync/backups/providers?providerId=prov%20id%2Fwith%26special'
 		);

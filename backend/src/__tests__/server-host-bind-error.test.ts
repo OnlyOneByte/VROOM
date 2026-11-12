@@ -1,17 +1,4 @@
-/**
- * Regression GUARD: a `HOST` this machine cannot bind must fail by NAME, and the default `HOST`
- * must actually serve.
- *
- * Bun's error for an address the host does not own is `EADDRINUSE — Failed to start server. Is
- * port <PORT> in use?`, so `HOST=vroom.example.com` sent operators hunting a port collision that
- * did not exist. index.ts probes the address on port 0 first — an ephemeral port is never
- * occupied, so a failure there can only be the address — and exits naming `HOST`.
- *
- * Boots the real entry point as a subprocess, because that is the only place the failure exists:
- * the error comes out of Bun's bind, not out of anything a unit test can call. `--env-file=/dev/null`
- * keeps a developer's `backend/.env` (which sets `HOST`) out of the run, so the default-HOST case
- * tests the default and not whatever the machine happens to have configured.
- */
+// --env-file=/dev/null keeps a developer's backend/.env from changing the default-HOST case.
 
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
@@ -23,11 +10,9 @@ const BACKEND_ROOT = join(HERE, '..', '..');
 const ENTRY = join(BACKEND_ROOT, 'src', 'index.ts');
 const CONFIG_SRC = join(HERE, '..', 'config.ts');
 
-/** RFC 5737 TEST-NET-1: never assigned to a host, so the bind fails at once and without DNS. */
 const UNBINDABLE_HOST = '192.0.2.1';
 const BOOT_TIMEOUT_MS = 20_000;
 
-/** A port nothing holds: taken by binding ephemerally and releasing it again. */
 function freePort(): number {
   const probe = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: () => new Response(null) });
   const port = probe.port ?? 0;
@@ -60,7 +45,6 @@ async function outputOf(proc: ReturnType<typeof spawnBackend>): Promise<string> 
   return `${stdout}${stderr}`;
 }
 
-/** Poll until the server answers, so the test does not race a cold start. */
 async function waitForHealth(url: string): Promise<number> {
   const deadline = Date.now() + BOOT_TIMEOUT_MS / 2;
   while (Date.now() < deadline) {
@@ -115,7 +99,6 @@ describe('an unbindable HOST fails by name', () => {
           `Caddy upstream, the browser in dev) reaches a loopback bind by that address. ` +
           `Child output:\n${output}`
       ).toBe(200);
-      // The address probe must release its ephemeral port, never the configured one.
       expect(output).not.toContain('Cannot bind HOST');
     },
     BOOT_TIMEOUT_MS

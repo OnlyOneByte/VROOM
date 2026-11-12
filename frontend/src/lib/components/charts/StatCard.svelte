@@ -1,17 +1,4 @@
 <script lang="ts" module>
-	/**
-	 * The design-system color tokens a StatCard icon can render in: the full `--chart-1` …
-	 * `--chart-8` categorical palette defined in app.css, plus `primary`, `destructive`, and the
-	 * neutral `muted`.
-	 *
-	 * `iconColor` is still declared as `string` below, so an out-of-range token is caught at
-	 * runtime (dev warning + primary fallback) rather than at compile time. Narrowing the prop to
-	 * this type is the goal, and it forces the same narrowing through `StatCardGrid`'s
-	 * `StatCardItem` and the five item-builders whose arrays currently infer `iconColor: string`
-	 * (DashboardStatsCards, ExpenseOverviewCard, ExpenseOverviewSection, PaymentMetricsGrid,
-	 * routes/analytics). Import this type when declaring an `iconColor` field so that migration is
-	 * a type annotation and not a rewrite.
-	 */
 	export type StatCardIconColor =
 		| 'primary'
 		| 'chart-1'
@@ -27,14 +14,11 @@
 </script>
 
 <script lang="ts">
-	import { Card, CardContent } from '$lib/components/ui/card';
-	import { Skeleton } from '$lib/components/ui/skeleton';
+	import { Card, CardContent } from '#lib/components/ui/card/index.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import type { AnyIcon } from './types';
 
-	// Tailwind resolves utilities by scanning source text for complete class strings. Dynamic
-	// interpolation like `bg-${token}/10` is never seen, so each token maps to its full pair
-	// up-front. `Record<StatCardIconColor, …>` keeps the two in lockstep: adding a token to the
-	// type without a pair here fails the build.
+	// Tailwind only generates complete class names it can see; keep each class string literal.
 	const ICON_COLOR_MAP: Record<StatCardIconColor, { bg: string; text: string }> = {
 		primary: { bg: 'bg-primary/10', text: 'text-primary' },
 		'chart-1': { bg: 'bg-chart-1/10', text: 'text-chart-1' },
@@ -56,8 +40,6 @@
 		value: string | number;
 		unit?: string;
 		icon?: AnyIcon;
-		/** A StatCardIconColor token. Still typed `string` because the item-builders that feed
-		 *  StatCardGrid infer `iconColor: string`; see the StatCardIconColor docs above. */
 		iconColor?: string;
 		secondaryLabel?: string;
 		secondaryValue?: string | number;
@@ -86,9 +68,6 @@
 		if (Object.hasOwn(ICON_COLOR_MAP, iconColor)) {
 			return ICON_COLOR_MAP[iconColor as StatCardIconColor];
 		}
-		// An unrecognised token used to fall back to the primary tint in total silence, so a typo
-		// ("chart-6" while the map stopped at chart-5, "chart1", "accent") shipped as a
-		// wrong-colored card. Still falls back — a stat card must render — but says so in dev.
 		if (import.meta.env.DEV) {
 			console.warn(
 				`StatCard: unknown iconColor "${iconColor}" — rendering the primary tint. ` +
@@ -107,15 +86,11 @@
 				<Skeleton class="h-8 w-32" />
 			</div>
 		{:else if hasDual}
-			<!-- Dual metric layout -->
 			<div class="flex items-start justify-between gap-4">
 				<div class="flex-1 space-y-1 min-w-0">
 					<span class="text-sm font-medium text-muted-foreground">{label}</span>
 					<div class="flex items-baseline gap-1 flex-wrap">
-						<!-- min-w-0 + break-words so a long value (e.g. a big currency figure)
-						     can't set a min-content width wider than this min-w-0 column and
-						     push the card past its grid track (the dual layout sits two of
-						     these + a divider inside a 2-col mobile grid). -->
+						<!-- min-w-0 is required: grid items default to min-width auto and overflow. -->
 						<span class="text-2xl font-bold min-w-0 break-words">{value}</span>
 						{#if unit}
 							<span class="text-xs text-muted-foreground">{unit}</span>
@@ -134,7 +109,6 @@
 				</div>
 			</div>
 		{:else}
-			<!-- Standard layout with optional icon -->
 			<div class="flex items-center gap-2">
 				{#if icon}
 					{@const Icon = icon}

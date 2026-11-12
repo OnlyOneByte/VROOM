@@ -1,17 +1,3 @@
-/**
- * Unit tests for compareExpenseRows — the stable expenses-table comparator.
- *
- * The defect: both ExpensesTable sort sites compared only by date/amount and returned 0
- * on a tie, so equal-key rows fell back to JS engine ordering / the standalone-then-group
- * array-build order — a visible reshuffle vs. the server on pagination/refresh.
- *
- * The fix mirrors the server's `orderBy(dir(sortColumn), dir(id))`
- * (backend expenses/repository.ts:287): an id tiebreaker that inherits the SAME direction
- * as the primary sort. The load-bearing assertion is the DIRECTION of the tiebreak — a
- * naive `|| id.localeCompare()` applied after the asc/desc flip would always break
- * ascending and diverge from the server on a desc sort.
- */
-
 import { describe, expect, test } from 'vitest';
 import { compareExpenseRows, type SortableRow } from '../expense-helpers';
 
@@ -21,7 +7,6 @@ const row = (id: string, over: Partial<SortableRow> = {}): SortableRow => ({
 	amount: over.amount ?? 100
 });
 
-/** Sort a copy via the comparator and return the resulting id order. */
 function order(rows: SortableRow[], by: 'date' | 'amount', dir: 'asc' | 'desc'): string[] {
 	return [...rows].sort((a, b) => compareExpenseRows(a, b, by, dir)).map(r => r.id);
 }
@@ -42,9 +27,8 @@ describe('compareExpenseRows — primary sort', () => {
 	});
 });
 
-describe('compareExpenseRows — id tiebreaker inherits the sort direction (the bug fix)', () => {
+describe('compareExpenseRows — id tiebreaker inherits the sort direction', () => {
 	const sameDate = '2024-06-15T00:00:00.000Z';
-	// All three share the same date → the date comparison is 0 → id decides.
 	const tied = [
 		row('id-a', { date: sameDate }),
 		row('id-b', { date: sameDate }),
@@ -84,8 +68,6 @@ describe('compareExpenseRows — determinism (input order independence)', () => 
 			row('b', { date: sameDate }),
 			row('a', { date: sameDate })
 		];
-		// This is the exact bug invariant: regardless of how grouping concatenated the
-		// rows (standalone-then-group), the sorted order is fixed.
 		expect(order(forward, 'date', 'desc')).toEqual(order(reversed, 'date', 'desc'));
 	});
 
@@ -95,7 +77,6 @@ describe('compareExpenseRows — determinism (input order independence)', () => 
 			row('a', { date: '2024-06-15T00:00:00.000Z' }),
 			row('z', { date: '2024-12-31T00:00:00.000Z' })
 		];
-		// desc: the Dec row first, then the two June rows tie-broken id-desc (b before a).
 		expect(order(rows, 'date', 'desc')).toEqual(['z', 'b', 'a']);
 	});
 });

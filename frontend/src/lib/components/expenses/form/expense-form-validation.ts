@@ -1,6 +1,6 @@
-import { getVolumeUnitLabel, getChargeUnitLabel, isElectricFuelType } from '$lib/utils/units';
-import { toDateInputValue } from '$lib/utils/formatters';
-import type { Vehicle, VolumeUnit, ChargeUnit } from '$lib/types';
+import { getVolumeUnitLabel, getChargeUnitLabel, isElectricFuelType } from '#lib/utils/units.ts';
+import { toDateInputValue } from '#lib/utils/formatters.ts';
+import type { Vehicle, VolumeUnit, ChargeUnit } from '#lib/types/index.ts';
 
 interface ValidationContext {
 	category: string;
@@ -34,13 +34,7 @@ export function validateExpenseField(field: string, ctx: ValidationContext): str
 		}
 		case 'date': {
 			if (!value) return 'Date is required';
-			// Compare CALENDAR DAYS, not Date instants. `new Date('YYYY-MM-DD')` parses as UTC
-			// midnight, so for a user at a positive UTC offset it lands on tomorrow-morning-local
-			// and a Date-instant `> new Date()` wrongly rejects TODAY as "in the future" (the
-			// C6/ local-vs-UTC class). The date-picker value is already a local 'YYYY-MM-DD';
-			// toDateInputValue reads today's LOCAL calendar parts (the canonical helper — one
-			// source of truth for the local-date string this file builds 3×). String compare is
-			// timezone-safe.
+			// new Date('YYYY-MM-DD') parses as UTC, so compare calendar-day strings instead.
 			const todayStr = toDateInputValue(new Date());
 			if ((value as string) > todayStr) return 'Date cannot be in the future';
 			break;

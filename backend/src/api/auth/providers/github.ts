@@ -1,8 +1,8 @@
 import { GitHub } from 'arctic';
 import { CONFIG } from '../../../config';
-import type { OAuthProviderConfig } from './types';
+import { NoVerifiedEmailError, type OAuthProviderConfig } from './types';
 
-const github = new GitHub(
+const githubLoginClient = new GitHub(
   CONFIG.auth.githubClientId || '',
   CONFIG.auth.githubClientSecret || '',
   CONFIG.auth.githubRedirectUri
@@ -29,12 +29,11 @@ export const githubAuthProvider: OAuthProviderConfig = {
   id: 'github',
   displayName: 'GitHub',
   supportsPKCE: false,
-  scopes: SCOPES,
   createAuthorizationURL: (state) => {
-    return github.createAuthorizationURL(state, SCOPES);
+    return githubLoginClient.createAuthorizationURL(state, SCOPES);
   },
   validateAuthorizationCode: async (code) => {
-    const tokens = await github.validateAuthorizationCode(code);
+    const tokens = await githubLoginClient.validateAuthorizationCode(code);
     return {
       accessToken: tokens.accessToken(),
     };
@@ -49,13 +48,12 @@ export const githubAuthProvider: OAuthProviderConfig = {
     if (!userRes.ok) throw new Error('Failed to fetch GitHub user info');
     const userData = (await userRes.json()) as GitHubUser;
 
-    // Always fetch from /user/emails to ensure we get a verified email.
-    // The /user endpoint can return an unverified email in the email field.
+    // /user can return an unverified email, so the verified primary comes from /user/emails.
     const emailRes = await fetch('https://api.github.com/user/emails', { headers });
     if (!emailRes.ok) throw new Error('Failed to fetch GitHub user emails');
     const emails = (await emailRes.json()) as GitHubEmail[];
     const primary = emails.find((e) => e.primary && e.verified);
-    if (!primary) throw new Error('No verified email found for GitHub account');
+    if (!primary) throw new NoVerifiedEmailError('GitHub');
 
     return {
       providerAccountId: String(userData.id),

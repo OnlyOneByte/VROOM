@@ -15,10 +15,6 @@ export interface SyncStatusParams {
 	conflictsCount: number;
 }
 
-/**
- * Get sync status information for display
- * Centralized logic used across SyncStatusIndicator and SyncStatusInline
- */
 export function getSyncStatusInfo(params: SyncStatusParams): SyncStatusInfo {
 	const { isOnline, syncStatus, pendingCount, conflictsCount } = params;
 

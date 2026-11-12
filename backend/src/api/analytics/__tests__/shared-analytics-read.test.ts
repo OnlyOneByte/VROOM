@@ -1,58 +1,28 @@
-/**
- * vehicle-sharing T8a — per-vehicle analytics READ widening through the REAL stack.
- *
- * The six vehicle-scoped analytics routes (fuel-stats, fuel-advanced, fuel-efficiency, vehicle-health,
- * vehicle-tco, vehicle-expenses) flip validateVehicleOwnership → requireVehicleRead + scope the query to
- * the vehicle OWNER's books (resolveVehicleScope). Because a shared vehicle's expense rows are
- * OWNER-stamped (T5b-2), an invitee querying their own id would get an empty chart; scoping to the owner
- * surfaces the shared vehicle's analytics. The CROSS-FLEET analytics (summary/quick-stats/cross-vehicle/
- * financing/insurance/year-end — no vehicleId) stay acting-user-scoped and are NOT touched here.
- *
- * Fixture: A is the OWNER (the harness-seeded session); B is a SECOND user invited as viewer/editor.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
   type DataEnvelope,
   json,
+  type RequestFn,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { createInvitee } from '../../../test-helpers/invitee';
 import { seedVehicle } from '../../../test-helpers/seed';
 
-let ctx: TestApp; // owner (user A)
-let bCookie: string; // invitee B (the shared viewer/editor)
+let ctx: TestApp;
+let asB: RequestFn;
 let bEmail: string;
-let bCounter = 0;
 
-// A wide date window covering the seeded expenses (epoch-seconds, the analytics query contract).
-const RANGE = 'startDate=1704067200&endDate=1735689600'; // 2024-01-01 .. 2025-01-01
+const RANGE = 'startDate=1704067200&endDate=1735689600';
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  const { db } = await import('../../../db/connection');
-  const schema = await import('../../../db/schema');
-  const { lucia } = await import('../../auth/lucia');
-  const bId = `an-invitee-${++bCounter}`;
-  bEmail = `an-invitee-${bCounter}@test.com`;
-  await db.insert(schema.users).values({ id: bId, email: bEmail, displayName: 'Analytics B' });
-  const session = await lucia.createSession(bId, {});
-  const sc = lucia.createSessionCookie(session.id);
-  bCookie = `${sc.name}=${sc.value}`;
+  const b = await createInvitee(ctx, 'an-invitee', 'Analytics B');
+  bEmail = b.email;
+  asB = b.request;
 });
 afterEach(() => ctx.close());
 
-async function asB(method: string, path: string, body?: unknown): Promise<Response> {
-  const headers: Record<string, string> = { Cookie: bCookie, 'Sec-Fetch-Site': 'same-origin' };
-  let init: RequestInit = { method, headers };
-  if (body !== undefined) {
-    headers['Content-Type'] = 'application/json';
-    init = { ...init, body: JSON.stringify(body) };
-  }
-  return ctx.app.request(path, init);
-}
-
-/** A owns a vehicle with a fuel expense, invites B at `level`, B accepts. Returns vehicleId. */
 async function shareWithFuel(level: 'viewer' | 'editor'): Promise<string> {
   const vehicleId = await seedVehicle(ctx, { make: 'Shared', model: 'Car', year: 2021 });
   const exp = await ctx.authed('POST', '/api/v1/expenses', {
@@ -71,7 +41,6 @@ async function shareWithFuel(level: 'viewer' | 'editor'): Promise<string> {
   return vehicleId;
 }
 
-// The six vehicle-scoped routes, built for a given vehicleId (3 required-vehicleId, 3 optional).
 function vehicleRoutes(vehicleId: string): string[] {
   return [
     `/api/v1/analytics/fuel-stats?${RANGE}&vehicleId=${vehicleId}`,
@@ -83,7 +52,7 @@ function vehicleRoutes(vehicleId: string): string[] {
   ];
 }
 
-describe('analytics per-vehicle READ widening (T8a)', () => {
+describe('analytics per-vehicle reads for shared vehicles', () => {
   test('an accepted VIEWER reads all six per-vehicle analytics routes for the shared vehicle', async () => {
     const vehicleId = await shareWithFuel('viewer');
     for (const route of vehicleRoutes(vehicleId)) {
@@ -128,8 +97,6 @@ describe('analytics per-vehicle READ widening (T8a)', () => {
     const res = await asB('GET', `/api/v1/analytics/vehicle-tco?vehicleId=${vehicleId}`);
     const body = await json<DataEnvelope<{ totalCost: number }>>(res);
     expect(res.status).toBe(200);
-    // The $50 fuel expense (owner-stamped) is visible in the viewer's per-vehicle TCO — proving the
-    // query scoped to the OWNER's books, not the (empty) invitee's. > 0 confirms the owner-scope path.
     expect(body.data.totalCost).toBeGreaterThan(0);
   });
 

@@ -1,8 +1,6 @@
-// The six expense categories used throughout the app.
 export type ExpenseCategory =
 	'fuel' | 'maintenance' | 'financial' | 'regulatory' | 'enhancement' | 'misc';
 
-// Common tag suggestions (not enforced)
 export const COMMON_EXPENSE_TAGS = [
 	'fuel',
 	'tolls',
@@ -26,8 +24,6 @@ export const COMMON_EXPENSE_TAGS = [
 	'emergency',
 	'routine'
 ] as const;
-
-// --- Expense splitting types ---
 
 export type SplitConfig =
 	| { method: 'even'; vehicleIds: string[] }
@@ -73,4 +69,27 @@ export interface ExpenseSummary {
 	recentAmount: number;
 	categoryBreakdown: Array<{ category: string; amount: number; count: number }>;
 	monthlyTrend: Array<{ period: string; amount: number; count: number }>;
+}
+
+export interface BackendExpenseResponse {
+	id: string;
+	vehicleId: string;
+	userId: string;
+	tags: string[];
+	category: string;
+	expenseAmount: number;
+	date: string;
+	mileage?: number;
+	volume?: number;
+	fuelType?: string;
+	description?: string | null;
+	location?: string | null;
+	missedFillup?: boolean;
+	sourceType?: string;
+	sourceId?: string;
+	groupId?: string;
+	groupTotal?: number;
+	splitMethod?: string;
+	createdAt: string;
+	updatedAt: string;
 }

@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { appStore } from '../app.svelte';
 import type { Vehicle, Notification } from '../../types/index.js';
 
-// Mock vehicle data
 const mockVehicle: Vehicle = {
 	id: '1',
 	make: 'Toyota',

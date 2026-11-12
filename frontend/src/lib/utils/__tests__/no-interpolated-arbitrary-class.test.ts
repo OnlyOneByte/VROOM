@@ -1,44 +1,13 @@
-/**
- * Regression GUARD (committed, travels with the merge) for the dead-interpolated-Tailwind-class
- * bug class (found it via DOM probe; fixed the load-bearing instance).
- *
- * Tailwind generates arbitrary-value utilities (e.g. `h-[600px]`) by SCANNING SOURCE TEXT for
- * the literal class at build time. A class built with a runtime `{...}` interpolation —
- * `class="h-[{scrollHeight}] w-full"` or `h-[{CHART_HEIGHT}px]` — is never seen as a literal,
- * so NO CSS rule is generated and the utility is silently dead: the height/width never applies.
- * In ExpensesTable this meant the 600px scroll cap never engaged and a many-row vehicle grew
- * unbounded (the bug fixed in by switching to an inline `style="height: …"`). The e2e harness
- * wouldn't catch it (a too-tall list still "renders"), so this static scan is the net.
- *
- * Scans every .svelte for an interpolated arbitrary value `<util>-[ … { … ]` (the `{` before the
- * closing `]` is the interpolation tell). Static arbitrary values like `h-[600px]` or `w-[1px]`
- * are FINE and never match (no brace). Dynamic sizing must use an inline `style` instead.
- *
- * Runs in the fast unit suite (`npm test`) — no browser, no server.
- */
-
 import { readFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 import { collectSvelteFiles } from './_helpers/collect-svelte-files';
 
-// This file lives at src/lib/utils/__tests__/, so src/ is three levels up from dirname.
 const SRC_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
-// An arbitrary-value Tailwind utility whose bracket body contains a `{` — i.e. a runtime
-// interpolation (`h-[{x}]`, `w-[{x}px]`, `min-h-[{x}]`). A static `h-[600px]` has no `{`, so
-// it never matches. Requires a `-[` utility prefix preceded by a non-word char (class boundary).
 const INTERPOLATED_ARBITRARY = /[\w-]+-\[[^\]]*\{[^\]]*\]/;
 
-/**
- * Two chart components carry a `h-[{CHART_HEIGHT}px]` on the inner Chart.Container that is the
- * SAME dead class, but is HARMLESS there: each passes `height={CHART_HEIGHT}` to its ChartCard
- * wrapper, which sets the real height in an inline style, so the container just fills a
- * correctly-sized parent (verified). They are excluded so the guard stays zero-tolerance
- * for the LOAD-BEARING case without forcing an eyes-on chart edit. If a chart ever loses its
- * wrapper height, that's a separate (visible) regression — revisit this exclusion then.
- */
 const KNOWN_MASKED = new Set([
 	'lib/components/charts/ExpenseTrendChart.svelte',
 	'lib/components/charts/FuelEfficiencyTrendChart.svelte'
@@ -50,13 +19,11 @@ function stripComments(source: string): string {
 		.split('\n')
 		.map(line => {
 			const trimmed = line.trimStart();
-			// Svelte/HTML comment or JSDoc continuation — drop it (so the explanatory comment
-			// in ExpensesTable that QUOTES `h-[{scrollHeight}]` isn't a false positive).
 			if (trimmed.startsWith('*') || trimmed.startsWith('<!--') || trimmed.startsWith('-->'))
 				return '';
 			const idx = line.indexOf('//');
 			if (idx === -1) return line;
-			if (idx > 0 && line[idx - 1] === ':') return line; // keep URLs
+			if (idx > 0 && line[idx - 1] === ':') return line;
 			return line.slice(0, idx);
 		})
 		.join('\n');

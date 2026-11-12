@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { Badge } from '$lib/components/ui/badge';
-	import { getDaysRemaining, isExpiringSoon } from '$lib/utils/insurance';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { getDaysRemaining, isExpiringSoon } from '#lib/utils/insurance.ts';
 
 	interface Props {
 		latestTermEnd: string;

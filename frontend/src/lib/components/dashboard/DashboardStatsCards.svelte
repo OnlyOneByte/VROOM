@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Car, DollarSign, TrendingUp, CreditCard } from '@lucide/svelte';
-	import StatCardGrid from '$lib/components/charts/StatCardGrid.svelte';
-	import { formatCurrency } from '$lib/utils/formatters';
+	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
+	import { formatCurrency } from '#lib/utils/formatters.ts';
 
 	interface Props {
 		totalVehicles: number;

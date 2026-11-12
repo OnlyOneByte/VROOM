@@ -1,19 +1,8 @@
-/**
- * buildTripSummary unit + property tests (trips-location T5, design §5, R4).
- *
- * The spec's required properties:
- *  - sum of milesByPurpose == totalMiles (no miles lost / double-counted);
- *  - businessMileageValue == businessMiles × rate (the reimbursement contract);
- *  - empty trips → all zeros, never NaN (the div-guard on averageTripMiles).
- * Plus: distance is the clamped tripDistance (R2/ — an inverted pair contributes 0), every purpose key
- * is always present, and an unexpected purpose buckets to 'other' (no crash, no dropped miles).
- */
-
 import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { TRIP_PURPOSES } from '../../api/trips/validation';
 import type { Trip } from '../../db/schema';
-import { buildTripSummary, buildTripSummaryByMonth } from '../trip-summary';
+import { buildTripSummary } from '../trip-summary';
 
 let idc = 0;
 function trip(over: Partial<Trip> = {}): Trip {
@@ -35,12 +24,12 @@ function trip(over: Partial<Trip> = {}): Trip {
   } as Trip;
 }
 
-describe('buildTripSummary (T5)', () => {
+describe('buildTripSummary', () => {
   test('empty trips → all zeros, never NaN', () => {
     const s = buildTripSummary([], 0.67);
     expect(s.tripCount).toBe(0);
     expect(s.totalMiles).toBe(0);
-    expect(s.averageTripMiles).toBe(0); // div-guard (not 0/0 = NaN)
+    expect(s.averageTripMiles).toBe(0);
     expect(s.businessMiles).toBe(0);
     expect(s.businessMileageValue).toBe(0);
     for (const p of TRIP_PURPOSES) expect(s.milesByPurpose[p]).toBe(0);
@@ -54,10 +43,10 @@ describe('buildTripSummary (T5)', () => {
 
   test('totalMiles + per-purpose split + business-$ are correct for a mixed set', () => {
     const trips = [
-      trip({ startOdometer: 1000, endOdometer: 1100, purpose: 'business' }), // 100 business
-      trip({ startOdometer: 2000, endOdometer: 2050, purpose: 'business' }), // 50 business
-      trip({ startOdometer: 3000, endOdometer: 3030, purpose: 'personal' }), // 30 personal
-      trip({ startOdometer: 4000, endOdometer: 4020, purpose: 'commute' }), // 20 commute
+      trip({ startOdometer: 1000, endOdometer: 1100, purpose: 'business' }),
+      trip({ startOdometer: 2000, endOdometer: 2050, purpose: 'business' }),
+      trip({ startOdometer: 3000, endOdometer: 3030, purpose: 'personal' }),
+      trip({ startOdometer: 4000, endOdometer: 4020, purpose: 'commute' }),
     ];
     const s = buildTripSummary(trips, 0.67);
     expect(s.tripCount).toBe(4);
@@ -68,11 +57,11 @@ describe('buildTripSummary (T5)', () => {
     expect(s.milesByPurpose.other).toBe(0);
     expect(s.averageTripMiles).toBe(50);
     expect(s.businessMiles).toBe(150);
-    expect(s.businessMileageValue).toBeCloseTo(100.5, 5); // 150 × 0.67
+    expect(s.businessMileageValue).toBeCloseTo(100.5, 5);
     expect(s.rate).toBe(0.67);
   });
 
-  test('an inverted odometer pair contributes 0 miles (tripDistance clamp, R2/)', () => {
+  test('an inverted odometer pair contributes 0 miles', () => {
     const s = buildTripSummary([
       trip({ startOdometer: 5000, endOdometer: 4000, purpose: 'business' }),
     ]);
@@ -88,18 +77,16 @@ describe('buildTripSummary (T5)', () => {
     expect(s.milesByPurpose.other).toBe(42);
   });
 
-  test('rate defaults to 0 → businessMileageValue is 0 (no rate persisted yet)', () => {
+  test('rate defaults to 0, so businessMileageValue is 0', () => {
     const s = buildTripSummary([trip({ startOdometer: 0, endOdometer: 100, purpose: 'business' })]);
     expect(s.businessMiles).toBe(100);
     expect(s.businessMileageValue).toBe(0);
   });
 
-  // PROPERTY: the per-purpose split always re-sums to the total, and business-$ = businessMiles × rate,
-  // for any set of trips and any non-negative rate.
   test('property: Σ milesByPurpose == totalMiles AND businessMileageValue == businessMiles × rate', () => {
     const tripArb = fc.record({
       start: fc.integer({ min: 0, max: 1_000_000 }),
-      delta: fc.integer({ min: -5000, max: 5000 }), // may be negative → clamp to 0
+      delta: fc.integer({ min: -5000, max: 5000 }),
       purpose: fc.constantFrom(...TRIP_PURPOSES, 'unknown'),
     });
     fc.assert(
@@ -118,40 +105,5 @@ describe('buildTripSummary (T5)', () => {
         expect(Number.isNaN(s.averageTripMiles)).toBe(false);
       })
     );
-  });
-});
-
-describe('buildTripSummaryByMonth (R5 local-month bucketing)', () => {
-  test('buckets trips by their local YYYY-MM and summarizes each', () => {
-    const trips = [
-      trip({
-        tripDate: new Date('2024-05-10T12:00:00.000Z'),
-        startOdometer: 0,
-        endOdometer: 100,
-        purpose: 'business',
-      }),
-      trip({
-        tripDate: new Date('2024-06-01T12:00:00.000Z'),
-        startOdometer: 0,
-        endOdometer: 40,
-        purpose: 'personal',
-      }),
-      trip({
-        tripDate: new Date('2024-06-20T12:00:00.000Z'),
-        startOdometer: 0,
-        endOdometer: 60,
-        purpose: 'business',
-      }),
-    ];
-    const byMonth = buildTripSummaryByMonth(trips, 1);
-    expect(Object.keys(byMonth).sort()).toEqual(['2024-05', '2024-06']);
-    expect(byMonth['2024-05'].totalMiles).toBe(100);
-    expect(byMonth['2024-06'].totalMiles).toBe(100);
-    expect(byMonth['2024-06'].milesByPurpose.business).toBe(60);
-    expect(byMonth['2024-06'].businessMileageValue).toBe(60); // 60 × 1
-  });
-
-  test('empty → empty map (no NaN month)', () => {
-    expect(buildTripSummaryByMonth([], 1)).toEqual({});
   });
 });

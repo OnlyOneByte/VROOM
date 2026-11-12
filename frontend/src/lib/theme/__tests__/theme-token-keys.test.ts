@@ -1,25 +1,10 @@
-/**
- * Theming engine T4 guard — `THEME_TOKEN_KEYS` must stay EXACTLY the set of per-variant color custom
- * properties `src/app.css` declares. The whole engine is a value swap over these keys (R1); if app.css
- * gains/loses a token and this list doesn't track it, a theme variant would either miss a key (a visual
- * leak — the token keeps the previous theme's value) or carry a dead one. This source-scans app.css's
- * `:root` (light) and `.dark` (dark) blocks and pins three invariants:
- *  1. light and dark declare the SAME key set (per-variant parity — every variant must define every key);
- *  2. `THEME_TOKEN_KEYS` equals that set EXACTLY (no missing, no extra);
- *  3. `--radius` (the `:root`-only, variant-invariant layout token) is intentionally EXCLUDED.
- *
- * Source-scan over the live app.css (the merge-surviving idiom) — no DOM, no runtime theme apply.
- */
-
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { THEME_TOKEN_KEYS } from '../theme-types';
 
 const APP_CSS = readFileSync(`${process.cwd()}/src/app.css`, 'utf8');
 
-/** Extract the raw `--token` declaration names (without the leading `--`) inside a `<selector> { ... }` block. */
 function declaredTokenKeys(selector: string): Set<string> {
-	// Grab the FIRST brace-delimited body following the selector at column start (the :root / .dark block).
 	const re = new RegExp(`${selector.replace('.', '\\.')}\\s*\\{([^}]*)\\}`);
 	const body = APP_CSS.match(re)?.[1] ?? '';
 	const keys = new Set<string>();
@@ -30,7 +15,7 @@ function declaredTokenKeys(selector: string): Set<string> {
 	return keys;
 }
 
-describe('THEME_TOKEN_KEYS mirrors the app.css per-variant token set (T4)', () => {
+describe('THEME_TOKEN_KEYS mirrors the app.css per-variant token set', () => {
 	const light = declaredTokenKeys(':root');
 	const dark = declaredTokenKeys('.dark');
 
@@ -40,7 +25,6 @@ describe('THEME_TOKEN_KEYS mirrors the app.css per-variant token set (T4)', () =
 	});
 
 	test('light (:root) and dark (.dark) declare the same key set, except the variant-invariant --radius', () => {
-		// --radius is the only :root-only token (a layout value, not swapped per dark/light).
 		const lightColorOnly = new Set([...light].filter(k => k !== 'radius'));
 		expect([...lightColorOnly].sort()).toEqual([...dark].sort());
 	});
@@ -51,7 +35,6 @@ describe('THEME_TOKEN_KEYS mirrors the app.css per-variant token set (T4)', () =
 
 	test('--radius is NOT a themeable per-variant key (excluded by design)', () => {
 		expect(THEME_TOKEN_KEYS).not.toContain('radius');
-		// ...but it IS declared in :root (proving the exclusion is deliberate, not a missed scan).
 		expect(light.has('radius')).toBe(true);
 	});
 
@@ -60,18 +43,7 @@ describe('THEME_TOKEN_KEYS mirrors the app.css per-variant token set (T4)', () =
 	});
 });
 
-/**
- * The `@theme inline` Tailwind color aliases must reference ONLY engine-managed raw
- * tokens. app.css maps each Tailwind color utility via `--color-<x>: var(--<rawToken>)`. The theme engine
- * (T7) swaps the RAW tokens per `data-theme`; a Tailwind utility re-resolves through its `--color-*` alias.
- * So if a `--color-foo: var(--foo)` alias references a raw token NOT in THEME_TOKEN_KEYS, switching themes
- * would leave `--color-foo` resolving to a stale/unmanaged value — a visual leak the registry/token guards
- * can't see. The alias set and the managed-key set map 1:1 today, and both directions are pinned below: a
- * NEW Tailwind color alias can't land without adding its raw token to the engine (THEME_TOKEN_KEYS + the
- * registry), and a new managed token can't land without its alias.
- */
 describe('@theme inline color aliases reference only engine-managed tokens', () => {
-	// The `--color-*: var(--x)` aliases inside the `@theme inline { ... }` block.
 	const themeBlock = APP_CSS.match(/@theme[^{]*\{([\s\S]*?)\}/)?.[1] ?? '';
 	const aliasedRawTokens = new Set<string>();
 	for (const m of themeBlock.matchAll(/--color-[a-z0-9-]+\s*:\s*var\(--([a-z0-9-]+)\)/gim)) {
@@ -94,11 +66,6 @@ describe('@theme inline color aliases reference only engine-managed tokens', () 
 		).toEqual([]);
 	});
 
-	// The CONVERSE direction, and the one that bites silently. A raw token with no `--color-*` alias is
-	// invisible to Tailwind, so the utility that names it (`text-destructive-foreground`, `bg-warning`, …)
-	// generates NO rule at all: the class is accepted, emits nothing, and the element quietly inherits
-	// whatever colour its ancestor had. Nothing else sees it — the token guards above check the raw
-	// declarations, the contrast gate checks the VALUES, and both stay green while the class is inert.
 	test('every managed token is exposed as a --color-* alias (no utility-less token)', () => {
 		const unaliased = [...managed].filter(t => !aliasedRawTokens.has(t)).sort();
 		expect(

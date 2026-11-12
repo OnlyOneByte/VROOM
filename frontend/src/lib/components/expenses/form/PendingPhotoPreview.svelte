@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { X, Upload, ImagePlus } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import MediaCaptureDialog from '$lib/components/common/MediaCaptureDialog.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import MediaCaptureDialog from '#lib/components/common/MediaCaptureDialog.svelte';
 
 	interface Props {
 		files: File[];
@@ -22,7 +22,6 @@
 		}))
 	);
 
-	// Clean up object URLs — capture current URLs before returning destructor
 	$effect(() => {
 		const urls = previews.map(p => p.url).filter(Boolean) as string[];
 		return () => {
@@ -68,10 +67,6 @@
 							</div>
 						</div>
 					{/if}
-					<!-- Visible unconditionally below `lg`, where there is no hover to reveal it, and
-					     revealed by focus as well as hover above it: an `opacity-0` control still takes
-					     Tab focus, so hover alone would put the focus ring somewhere invisible. Same
-					     class string as VehiclePhotoCarousel's overlay actions. -->
 					<button
 						type="button"
 						onclick={() => onRemove(i)}

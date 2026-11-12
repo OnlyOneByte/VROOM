@@ -1,12 +1,5 @@
-/**
- * Unit tests for triggerBlobDownload — the browser "save as" helper extracted from the two
- * byte-identical sites (expense-api CSV export + settings-store backup download). Pins the mechanics
- * the dedup must preserve: a same-named anchor is created with the object-URL href + the given
- * download filename, clicked, then the URL is revoked and the anchor removed (no DOM leak).
- */
-
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { triggerBlobDownload } from '$lib/utils/download';
+import { triggerBlobDownload } from '#lib/utils/download.ts';
 
 describe('triggerBlobDownload', () => {
 	let createObjectURL: ReturnType<typeof vi.fn>;
@@ -16,10 +9,8 @@ describe('triggerBlobDownload', () => {
 	beforeEach(() => {
 		createObjectURL = vi.fn(() => 'blob:mock-url');
 		revokeObjectURL = vi.fn();
-		// jsdom doesn't implement the object-URL APIs — stub them on window.URL.
 		window.URL.createObjectURL = createObjectURL as unknown as typeof window.URL.createObjectURL;
 		window.URL.revokeObjectURL = revokeObjectURL as unknown as typeof window.URL.revokeObjectURL;
-		// Anchor.click() in jsdom would attempt navigation; spy it to a no-op + capture the call.
 		clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
 	});
 
@@ -32,16 +23,13 @@ describe('triggerBlobDownload', () => {
 
 		triggerBlobDownload(blob, 'report.csv');
 
-		// The blob was turned into an object URL, and that URL was later revoked (no leak).
 		expect(createObjectURL).toHaveBeenCalledWith(blob);
 		expect(clickSpy).toHaveBeenCalledTimes(1);
 		expect(revokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
-		// The anchor is removed from the DOM (no orphan element left behind).
 		expect(document.querySelector('a[download]')).toBeNull();
 	});
 
 	test('sets the download attribute to the provided filename', () => {
-		// Capture the anchor at click time (it is removed immediately after).
 		let downloadName: string | null = null;
 		clickSpy.mockImplementation(function (this: HTMLAnchorElement) {
 			downloadName = this.getAttribute('download');

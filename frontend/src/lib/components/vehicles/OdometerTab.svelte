@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { paramRoutes } from '$lib/routes';
+	import { paramRoutes } from '#lib/routes.ts';
 	import {
 		Plus,
 		LoaderCircle,
@@ -11,35 +11,30 @@
 		Pencil,
 		Trash2
 	} from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import type { ChartConfig } from '$lib/components/ui/chart';
-	import * as Dialog from '$lib/components/ui/dialog';
-	import { AppLineChart } from '$lib/components/charts';
-	import EmptyState from '$lib/components/common/empty-state.svelte';
-	import { odometerApi } from '$lib/services/odometer-api';
-	import { formatDate, formatNumber } from '$lib/utils/formatters';
-	import { getDistanceUnitLabel } from '$lib/utils/units';
-	import { settingsStore } from '$lib/stores/settings.svelte';
-	import type { OdometerEntry, PaginatedResponse, UnitPreferences } from '$lib/types';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import type { ChartConfig } from '#lib/components/ui/chart/index.ts';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
+	import { AppLineChart } from '#lib/components/charts/index.ts';
+	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import { odometerApi } from '#lib/services/odometer-api.ts';
+	import { formatDate, formatNumber } from '#lib/utils/formatters.ts';
+	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
+	import type { OdometerEntry, PaginatedResponse, UnitPreferences } from '#lib/types/index.ts';
 
 	const PAGE_SIZE = 20;
 	const MIN_CHART_POINTS = 2;
 
-	// Adding, editing and deleting a reading are writes, which the server allows the owner or an
-	// accepted editor. A vehicle shared read-only therefore renders the readings with no Add Reading
-	// button and no per-row controls. Defaults true: the owner's own tab passes nothing.
 	let {
 		vehicleId,
 		unitPreferences,
 		canWrite = true
 	}: { vehicleId: string; unitPreferences?: UnitPreferences; canWrite?: boolean } = $props();
 
-	// Resolve distance label from vehicle unitPreferences, falling back to global settings
 	let units = $derived(unitPreferences ?? settingsStore.unitPreferences);
 	let distLabel = $derived(getDistanceUnitLabel(units.distanceUnit, true));
 
-	// State
 	let entries = $state<OdometerEntry[]>([]);
 	let totalCount = $state(0);
 	let offset = $state(0);
@@ -47,19 +42,16 @@
 	let isPageLoading = $state(false);
 	let error = $state<string | null>(null);
 
-	// Delete dialog state
 	let deleteDialogOpen = $state(false);
 	let deletingEntry = $state<OdometerEntry | null>(null);
 	let isDeleting = $state(false);
 	let deleteError = $state<string | null>(null);
 
-	// Derived pagination
 	let currentPage = $derived(Math.floor(offset / PAGE_SIZE) + 1);
 	let totalPages = $derived(Math.max(1, Math.ceil(totalCount / PAGE_SIZE)));
 	let hasPrevious = $derived(offset > 0);
 	let hasNext = $derived(offset + entries.length < totalCount);
 
-	// Chart data: sorted ascending by date for the line chart
 	let chartData = $derived(
 		entries
 			.filter(e => e.recordedAt)
@@ -189,7 +181,6 @@
 	</EmptyState>
 {:else}
 	<div class="space-y-6">
-		<!-- Add Reading Button (write — owner or accepted editor) -->
 		{#if canWrite}
 			<div class="flex justify-end">
 				<Button href={resolve(paramRoutes.vehicleOdometerNew, { id: vehicleId })}>
@@ -199,7 +190,6 @@
 			</div>
 		{/if}
 
-		<!-- Mileage Over Time Chart -->
 		{#if chartData.length >= MIN_CHART_POINTS}
 			<AppLineChart
 				title="Mileage Over Time"
@@ -214,7 +204,6 @@
 			/>
 		{/if}
 
-		<!-- Entries List -->
 		<Card.Root>
 			<Card.Header>
 				<Card.Title>Readings ({totalCount})</Card.Title>
@@ -257,7 +246,6 @@
 								</div>
 							</div>
 
-							<!-- Edit/Delete buttons (write — owner or accepted editor; hidden for a viewer) -->
 							{#if canWrite}
 								<div class="flex shrink-0 gap-1">
 									<Button
@@ -291,7 +279,6 @@
 			</Card.Content>
 		</Card.Root>
 
-		<!-- Pagination -->
 		{#if totalPages > 1}
 			<div class="flex items-center justify-center gap-4">
 				<Button
@@ -320,7 +307,6 @@
 	</div>
 {/if}
 
-<!-- Delete Confirmation Dialog -->
 <Dialog.Root bind:open={deleteDialogOpen}>
 	<Dialog.Content class="sm:max-w-sm">
 		<Dialog.Header>

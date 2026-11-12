@@ -1,24 +1,3 @@
-/**
- * Property-Based Tests for Fuel Advanced Computation
- *
- * Property 20: Maintenance timeline status assignment
- * For any maintenance timeline item, status should be `overdue` when daysRemaining < 0,
- * `warning` when 0-29, `good` when >= 30.
- *
- * Property 9: All computed scores bounded [0, 100]
- * For any vehicle, all computed scores (vehicle radar scores) should be between 0 and 100 inclusive.
- *
- * Property 21: Fillup interval bucketing completeness
- * For any set of consecutive fuel expenses, the sum of counts across all fillup interval
- * buckets should equal the number of consecutive date gaps.
- *
- * Property 22: Heatmap uses valid expense categories
- * For any monthly cost heatmap entry, the category keys should be exactly the six valid
- * values: fuel, maintenance, financial, regulatory, enhancement, misc.
- *
- * **Validates: Requirements 5.3, 5.4, 5.5, 5.6, 9.3**
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { AnalyticsRepository } from '../repository';
@@ -33,9 +12,6 @@ import {
   yearToRange,
 } from './analytics-test-generators';
 
-// ---------------------------------------------------------------------------
-// Shared setup
-// ---------------------------------------------------------------------------
 let testDb: TestDb;
 let repo: AnalyticsRepository;
 
@@ -48,9 +24,6 @@ afterEach(() => {
   testDb.sqlite.close();
 });
 
-// ---------------------------------------------------------------------------
-// Shared test helpers
-// ---------------------------------------------------------------------------
 const CATEGORIES = [
   'fuel',
   'maintenance',
@@ -124,11 +97,7 @@ function assertScoreBounded(value: number): void {
   expect(value).toBeLessThanOrEqual(100);
 }
 
-// ---------------------------------------------------------------------------
-// Property 20: Maintenance timeline status assignment
-// **Validates: Requirement 5.3**
-// ---------------------------------------------------------------------------
-describe('Property 20: Maintenance timeline status assignment', () => {
+describe('Maintenance timeline status assignment', () => {
   test('status is overdue when daysRemaining < 0, warning when 0-29, good when >= 30', async () => {
     await fc.assert(
       fc.asyncProperty(
@@ -175,11 +144,7 @@ describe('Property 20: Maintenance timeline status assignment', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Property 9: All computed scores bounded [0, 100]
-// **Validates: Requirements 9.3, 5.4**
-// ---------------------------------------------------------------------------
-describe('Property 9: All computed scores bounded [0, 100]', () => {
+describe('All computed scores bounded [0, 100]', () => {
   test('all vehicle radar scores are between 0 and 100 inclusive', async () => {
     await fc.assert(
       fc.asyncProperty(
@@ -206,11 +171,7 @@ describe('Property 9: All computed scores bounded [0, 100]', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Property 21: Fillup interval bucketing completeness
-// **Validates: Requirement 5.5**
-// ---------------------------------------------------------------------------
-describe('Property 21: Fillup interval bucketing completeness', () => {
+describe('Fillup interval bucketing completeness', () => {
   test('sum of bucket counts equals number of consecutive date gaps', async () => {
     await fc.assert(
       fc.asyncProperty(fc.integer({ min: 2, max: 15 }), async (expenseCount) => {
@@ -245,10 +206,6 @@ describe('Property 21: Fillup interval bucketing completeness', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Property 22: Heatmap uses valid expense categories
-// **Validates: Requirement 5.6**
-// ---------------------------------------------------------------------------
 function seedCategorizedExpenses(vehicleId: string, count: number): void {
   for (let i = 0; i < count; i++) {
     const cat = CATEGORIES[i % CATEGORIES.length];
@@ -267,7 +224,7 @@ function seedCategorizedExpenses(vehicleId: string, count: number): void {
   }
 }
 
-describe('Property 22: Heatmap uses valid expense categories', () => {
+describe('Heatmap uses valid expense categories', () => {
   test('every heatmap entry has exactly the six valid category keys', async () => {
     const expectedKeys = [
       'enhancement',

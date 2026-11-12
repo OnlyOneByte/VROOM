@@ -3,24 +3,12 @@ import type { UserProvider } from '../../../db/schema';
 import type { StorageConfig } from '../../../types';
 import { StorageProviderRegistry } from '../domains/storage/registry';
 
-// --- Real encryption (NOT mock.module) ---
-// This file previously did `mock.module('../../../utils/encryption', ...)` to stub encrypt/decrypt with
-// an `encrypted:`-prefix scheme for fixture convenience. But Bun's mock.module is PROCESS-GLOBAL and
-// CANNOT be restored (mock.restore only undoes mock() spies) — so the stub LEAKED into later files: when
-// CI's file ordering ran this before providers-routes-http.test.ts, the leaked `encrypt` made the real
-// PUT-credentials route store `encrypted:{...plaintext...}`, failing that file's "encrypted at rest, never
-// echoes the plaintext secret" security assertion. Per .kiro/steering/TestingExternalAPIs.md
-// (inject-don't-mock.module — the same fix the sync-worker suite already adopted), use the REAL encrypt:
-// set a deterministic key (mirrors test-helpers/http-client.ts) and build fixture credentials via encrypt().
 process.env.PROVIDER_ENCRYPTION_KEY ||= '0'.repeat(64);
 const { encrypt } = await import('../../../utils/encryption');
 
-/** Encrypt a credentials object the way the real routes store it (so registry.decrypt round-trips). */
 function enc(creds: unknown): string {
   return encrypt(JSON.stringify(creds));
 }
-
-// --- Test fixtures ---
 
 const baseProvider: UserProvider = {
   id: 'provider-1',
@@ -54,11 +42,6 @@ const baseStorageConfig: StorageConfig = {
   },
 };
 
-/**
- * Creates a mock DB that returns pre-configured results for sequential
- * select().from().where().limit() chains. Each call to the chain consumes
- * the next result from the queue.
- */
 function createMockDb(resultQueue: unknown[][]) {
   let callIndex = 0;
 
@@ -66,17 +49,12 @@ function createMockDb(resultQueue: unknown[][]) {
     select: mock(() => chain),
     from: mock(() => chain),
     where: mock(() => {
-      // For getProvidersByDomain which doesn't call .limit()
-      // Return the current result directly
       const idx = callIndex++;
       const result = resultQueue[idx] ?? [];
-      // Attach the result so .limit() can also return it
       (chain as Record<string, unknown>)._currentResult = result;
       return chain;
     }),
     limit: mock(() => {
-      // Return the result that was set by the preceding .where()
-      // But decrement callIndex since where already incremented it
       const result = (chain as Record<string, unknown>)._currentResult ?? [];
       return result;
     }),
@@ -88,8 +66,6 @@ function createMockDb(resultQueue: unknown[][]) {
 describe('StorageProviderRegistry', () => {
   describe('getDefaultProvider', () => {
     test('returns correct provider with resolved folder path', async () => {
-      // Call 1: loadStorageConfig → settings row
-      // Call 2: provider lookup → provider row
       const db = createMockDb([[{ storageConfig: baseStorageConfig }], [baseProvider]]);
 
       const registry = new StorageProviderRegistry(db as never);
@@ -111,10 +87,7 @@ describe('StorageProviderRegistry', () => {
     });
 
     test('throws NotFoundError when provider row does not exist', async () => {
-      const db = createMockDb([
-        [{ storageConfig: baseStorageConfig }],
-        [], // no provider found
-      ]);
+      const db = createMockDb([[{ storageConfig: baseStorageConfig }], []]);
 
       const registry = new StorageProviderRegistry(db as never);
 
@@ -135,13 +108,10 @@ describe('StorageProviderRegistry', () => {
     });
 
     test('returns DEFAULT_STORAGE_CONFIG when user has no settings', async () => {
-      const db = createMockDb([
-        [], // no settings row → falls back to DEFAULT_STORAGE_CONFIG
-      ]);
+      const db = createMockDb([[]]);
 
       const registry = new StorageProviderRegistry(db as never);
 
-      // DEFAULT_STORAGE_CONFIG has all defaults as null
       await expect(registry.getDefaultProvider('user-1', 'vehicle_photos')).rejects.toThrow(
         'No storage provider configured for this photo category'
       );
@@ -180,8 +150,6 @@ describe('StorageProviderRegistry', () => {
         },
       };
 
-      // Call 1: loadStorageConfig
-      // Call 2: provider-2 lookup (provider-1 is skipped as default)
       const db = createMockDb([[{ storageConfig: configWithBackup }], [backupProvider]]);
 
       const registry = new StorageProviderRegistry(db as never);
@@ -193,7 +161,6 @@ describe('StorageProviderRegistry', () => {
     });
 
     test('returns empty array when no backup providers have category enabled', async () => {
-      // Only provider-1 exists and it's the default — no backups
       const db = createMockDb([[{ storageConfig: baseStorageConfig }]]);
 
       const registry = new StorageProviderRegistry(db as never);
@@ -202,14 +169,6 @@ describe('StorageProviderRegistry', () => {
       expect(results).toHaveLength(0);
     });
 
-    // (ARCC SAX-05 Outcome-2: "validate tenant context at every data-access boundary; missing
-    // tenant validation in background jobs"): a providerId listed in the user's storageConfig whose
-    // ACTUAL row is NOT owned by them (findOwnedProvider's userId-scoped query → []) must be SKIPPED,
-    // never returned as a backup target. This is the tenant-isolation invariant that makes the sync
-    // worker's id-only getProviderInternal safe: every photo_ref reaching the worker was created from a
-    // getBackupProviders result, so its providerId is provably co-owned with the photo. A regression
-    // dropping the userId leg of findOwnedProvider would let a config-referenced foreign provider become
-    // a backup target → a photo synced via ANOTHER user's credentials (the ARCC cross-tenant breach).
     test('skips a config-listed provider whose row is NOT owned by the user (tenant isolation)', async () => {
       const configWithForeign: StorageConfig = {
         ...baseStorageConfig,
@@ -224,17 +183,11 @@ describe('StorageProviderRegistry', () => {
         },
       };
 
-      // Call 1: loadStorageConfig. Call 2: findOwnedProvider('provider-foreign', 'user-1') — the
-      // userId-scoped query returns [] because the row isn't owned by user-1 → the provider is skipped.
-      const db = createMockDb([
-        [{ storageConfig: configWithForeign }],
-        [], // findOwnedProvider → not owned → null
-      ]);
+      const db = createMockDb([[{ storageConfig: configWithForeign }], []]);
 
       const registry = new StorageProviderRegistry(db as never);
       const results = await registry.getBackupProviders('user-1', 'vehicle_photos');
 
-      // The foreign provider is NOT a backup target — no cross-tenant ref can be created.
       expect(results).toHaveLength(0);
     });
 
@@ -258,10 +211,7 @@ describe('StorageProviderRegistry', () => {
         },
       };
 
-      const db = createMockDb([
-        [{ storageConfig: configWithBackup }],
-        [inactiveBackup], // inactive — should be skipped
-      ]);
+      const db = createMockDb([[{ storageConfig: configWithBackup }], [inactiveBackup]]);
 
       const registry = new StorageProviderRegistry(db as never);
       const results = await registry.getBackupProviders('user-1', 'vehicle_photos');
@@ -281,9 +231,7 @@ describe('StorageProviderRegistry', () => {
     });
 
     test('throws NotFoundError when provider does not exist', async () => {
-      const db = createMockDb([
-        [], // no provider found
-      ]);
+      const db = createMockDb([[]]);
 
       const registry = new StorageProviderRegistry(db as never);
 
@@ -295,8 +243,6 @@ describe('StorageProviderRegistry', () => {
 
   describe('getProvidersByDomain', () => {
     test('returns providers filtered by user and domain', async () => {
-      // getProvidersByDomain calls select().from().where() without .limit()
-      // We need a special mock where .where() returns the array directly
       const providerList = [baseProvider];
       const domainDb = {
         select: mock(() => domainDb),
@@ -343,9 +289,6 @@ describe('StorageProviderRegistry', () => {
       );
     });
 
-    // The google-photos + s3 builder validation throws (registry.ts buildGooglePhotosProvider /
-    // buildS3Provider) were the uncovered createProviderInstance branches — credential/config integrity
-    // gates. createProviderInstance only CONSTRUCTS (no network), so these are pure-input tests.
     test('creates GooglePhotosProvider for google-photos type (reuses cached albumId from config)', () => {
       const db = createMockDb([]);
       const registry = new StorageProviderRegistry(db as never);
@@ -389,7 +332,7 @@ describe('StorageProviderRegistry', () => {
       const row = {
         ...baseProvider,
         providerType: 's3',
-        credentials: enc({ accessKeyId: 'AK' }), // missing secretAccessKey
+        credentials: enc({ accessKeyId: 'AK' }),
         config: { endpoint: 'https://s3.example.com', bucket: 'b', region: 'us-east-1' },
       };
       expect(() => registry.createProviderInstance(row)).toThrow(
@@ -404,22 +347,13 @@ describe('StorageProviderRegistry', () => {
         ...baseProvider,
         providerType: 's3',
         credentials: enc({ accessKeyId: 'AK', secretAccessKey: 'SK' }),
-        config: { bucket: 'b' }, // missing endpoint + region
+        config: { bucket: 'b' },
       };
       expect(() => registry.createProviderInstance(row)).toThrow(
         'Invalid S3 config: missing endpoint, bucket, or region'
       );
     });
 
-    // deep-review (CERTIFIED CLEAN — pins an unguarded PRODUCTION-SAFETY gate). createProviderInstance
-    // double-gates the `fake` storage provider (registry.ts): it instantiates a FakeStorageProvider ONLY
-    // when CONFIG.allowFakeStorageProvider is true (= ALLOW_FAKE_STORAGE set AND NODE_ENV !== production),
-    // else throws. The FakeStorageProvider bypasses real storage (in-memory, no bytes leave the process), so
-    // a `fake` row reaching production would silently swallow every backup/photo upload — a
-    // data-loss footgun. The route-create gate is pinned (providers-routes-http.test.ts), but this REGISTRY
-    // instantiation gate (a different layer — restore/sync resolve a live provider here, not via the route)
-    // was unpinned. The test env has allowFakeStorageProvider=false (NODE_ENV=test, ALLOW_FAKE_STORAGE
-    // unset), so this pins the SECURITY-DEFAULT branch directly — no CONFIG mock needed.
     test('a fake provider is REJECTED when allowFakeStorageProvider is off (the prod-safety default)', () => {
       const db = createMockDb([]);
       const registry = new StorageProviderRegistry(db as never);
@@ -433,8 +367,6 @@ describe('StorageProviderRegistry', () => {
     test('the fake gate SHORT-CIRCUITS before decrypt (a fake row with garbage creds still throws the GATE error, not a decrypt/parse error)', () => {
       const db = createMockDb([]);
       const registry = new StorageProviderRegistry(db as never);
-      // Credentials that would throw in decrypt if it ran (not valid ciphertext) — proving the gate check runs FIRST,
-      // so a fake row never even reaches the credential decrypt path (the ordering in registry.ts:217-224).
       const fakeRowBadCreds = {
         ...baseProvider,
         providerType: 'fake',

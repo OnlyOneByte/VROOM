@@ -1,17 +1,15 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { routes } from '$lib/routes';
+	import { routes } from '#lib/routes.ts';
 	import { Repeat, ArrowRight, CalendarClock } from '@lucide/svelte';
-	import * as Card from '$lib/components/ui/card';
-	import { Button } from '$lib/components/ui/button';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import EmptyState from '$lib/components/common/empty-state.svelte';
-	import { formatCurrency } from '$lib/utils/formatters';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import { formatCurrency } from '#lib/utils/formatters.ts';
 
 	interface Props {
-		/** Count of active expense reminders contributing a positive monthly run-rate. */
 		count: number;
-		/** Total normalized monthly run-rate across those reminders (currency/month). */
 		monthlyTotal: number;
 		isLoading?: boolean;
 	}

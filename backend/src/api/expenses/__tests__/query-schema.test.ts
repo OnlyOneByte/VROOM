@@ -1,15 +1,3 @@
-/**
- * Query-contract tests for the expenses list endpoint's query schema.
- *
- * This is the route boundary that the in-process repository tests bypass:
- * query params arrive as STRINGS and must be coerced/validated before they
- * reach findPaginated(). Bugs here (a stripped param, a bad coercion) are
- * exactly the class that repo-level tests can't catch — the same shape of bug
- * as the reminders PUT 400 that an interaction spec surfaced.
- *
- * The schema is exported from routes.ts for this purpose.
- */
-
 import { describe, expect, test } from 'bun:test';
 import { expenseQuerySchema } from '../routes';
 

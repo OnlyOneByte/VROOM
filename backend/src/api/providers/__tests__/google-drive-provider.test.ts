@@ -1,12 +1,3 @@
-/**
- * GoogleDriveProvider tests — exercises the REAL provider against a REAL
- * GoogleDriveService wired to an in-memory fake Drive client (injected via the
- * constructor seam). No `mock.module` here: the old version stubbed the service
- * AND re-registered a 100-line re-implementation of the provider, which (a) only
- * tested the copy, and (b) leaked process-global stubs into sibling test files.
- * Injection tests the actual shipping code and leaks nothing.
- */
-
 import { beforeEach, describe, expect, test } from 'bun:test';
 import {
   FakeGoogleStore,
@@ -47,7 +38,6 @@ describe('GoogleDriveProvider', () => {
       expect(result.externalId).toBeTruthy();
       expect(result.externalUrl).toContain(result.externalId);
 
-      // The file landed in the VROOM/Vehicle leaf with the right bytes.
       const vroom = store.childrenOf('').find((f) => f.name === 'VROOM');
       const vehicle = store.childrenOf(idOf(vroom)).find((f) => f.name === 'Vehicle');
       const uploaded = store.files.get(result.externalId);
@@ -68,7 +58,6 @@ describe('GoogleDriveProvider', () => {
         pathHint: 'VROOM/Receipts',
       });
 
-      // No duplicate folders were created.
       expect(store.childrenOf('').filter((f) => f.name === 'VROOM')).toHaveLength(1);
       expect(store.childrenOf(vroom).filter((f) => f.name === 'Receipts')).toHaveLength(1);
       expect(store.files.get(result.externalId)?.parents).toEqual([receipts]);

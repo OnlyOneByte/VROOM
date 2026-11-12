@@ -1,16 +1,3 @@
-/**
- * In-process HTTP test for GET /api/v1/expenses/summary through the REAL stack.
- *
- * Regression guard for the dashboard/analytics "blank charts + $0 monthly average"
- * bug: `expenses.date` is an integer timestamp (unix SECONDS), but the monthly-trend
- * GROUP BY used `strftime('%Y-%m', date)` WITHOUT the 'unixepoch' modifier — SQLite
- * then reads the integer as a Julian day, so the period buckets came out wrong/empty.
- * Empty monthlyTrend → blank trend chart AND computeMonthlyAverage span garbage → $0.
- *
- * This asserts the summary actually buckets expenses into the correct YYYY-MM months
- * and returns a sane monthly average — which only holds once strftime uses 'unixepoch'.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -52,10 +39,9 @@ async function createExpense(
   return body.data.id;
 }
 
-describe('GET /expenses/summary — monthly bucketing (unixepoch regression)', () => {
+describe('GET /expenses/summary — monthly bucketing', () => {
   test('buckets expenses into correct YYYY-MM months and computes a sane average', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2021 });
-    // Two expenses in 2026-01, one in 2026-03 → 3-month calendar span (Jan..Mar).
     await createExpense(vehicleId, 100, '2026-01-10T12:00:00.000Z');
     await createExpense(vehicleId, 50, '2026-01-20T12:00:00.000Z');
     await createExpense(vehicleId, 30, '2026-03-15T12:00:00.000Z');
@@ -67,18 +53,14 @@ describe('GET /expenses/summary — monthly bucketing (unixepoch regression)', (
 
     expect(s.totalAmount).toBe(180);
 
-    // The bug produced wrong/empty period buckets. Correct behavior: two month rows
-    // with real YYYY-MM keys and the right per-month sums.
     const byPeriod = Object.fromEntries(s.monthlyTrend.map((t) => [t.period, t.amount]));
     expect(s.monthlyTrend.length).toBe(2);
     expect(byPeriod['2026-01']).toBe(150);
     expect(byPeriod['2026-03']).toBe(30);
-    // Every period must be a real 'YYYY-MM' (the bug yielded null/garbage keys).
     for (const t of s.monthlyTrend) {
       expect(t.period).toMatch(/^\d{4}-\d{2}$/);
     }
 
-    // monthlyAverage = total / calendar months spanned (Jan..Mar = 3) = 180/3 = 60.
     expect(s.monthlyAverage).toBeCloseTo(60, 5);
   });
 
@@ -97,13 +79,7 @@ describe('GET /expenses/summary — monthly bucketing (unixepoch regression)', (
   });
 });
 
-// coverage: every existing summary test calls /summary with NO vehicleId (cross-fleet), so the
-// `if (filters.vehicleId)` scoping branches in expenseRepository.getSummary (repository.ts:466 + 488 — both
-// the period window AND the recent-30d window) + the route's validateVehicleOwnership branch were UNTESTED
-// (the repo sat at 78.82% line). These drive the vehicle-scoped summary through the REAL stack: a 2-vehicle
-// fleet, then ?vehicleId=<v1> must return ONLY v1's totals (v2 excluded), and an UNOWNED vehicleId → 404
-// (the ownership discipline). NOT theater — exercises the real getSummary scoping, not a reimplementation.
-describe('GET /expenses/summary — vehicleId scoping (coverage of the scoped path)', () => {
+describe('GET /expenses/summary — vehicleId scoping', () => {
   test('?vehicleId scopes totals + category breakdown to that vehicle only', async () => {
     const v1 = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2021 });
     const v2 = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2022 });
@@ -115,15 +91,13 @@ describe('GET /expenses/summary — vehicleId scoping (coverage of the scoped pa
     const s = (await json<DataEnvelope<SummaryBody>>(res)).data;
 
     expect(res.status).toBe(200);
-    // Only v1's 100 + 40 — v2's 999 is excluded by the vehicleId-scoped period window (repository.ts:466).
     expect(s.totalAmount).toBe(140);
     const byCat = Object.fromEntries(s.categoryBreakdown.map((c) => [c.category, c.amount]));
-    expect(byCat.maintenance).toBe(100); // NOT 100+999
+    expect(byCat.maintenance).toBe(100);
     expect(byCat.misc).toBe(40);
   });
 
   test('a summary scoped to an UNOWNED vehicle is 404 (ownership-checked)', async () => {
-    // Seed a 2nd user + their vehicle via raw SQL; the authed (1st) user must not summarize it.
     ctx.sqlite.run(
       `INSERT INTO users (id, email, display_name) VALUES ('u2sum', 'sum@x.com', 'Other')`
     );

@@ -1,11 +1,10 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 
 const ALGORITHM = 'aes-256-gcm';
-const IV_LENGTH = 12; // 96 bits — recommended for GCM
-const AUTH_TAG_LENGTH = 16; // 128 bits
-const KEY_LENGTH = 32; // 256 bits
+const IV_LENGTH = 12;
+const AUTH_TAG_LENGTH = 16;
+const KEY_LENGTH = 32;
 
-/** Cached encryption key — parsed once, reused for all encrypt/decrypt calls. */
 let _cachedKey: Buffer | null = null;
 
 function getEncryptionKey(): Buffer {
@@ -25,15 +24,10 @@ function getEncryptionKey(): Buffer {
   return key;
 }
 
-/** Clear the cached key. Only for tests that swap PROVIDER_ENCRYPTION_KEY between cases. */
 export function _clearKeyCache(): void {
   _cachedKey = null;
 }
 
-/**
- * Encrypt a plaintext string using AES-256-GCM.
- * Returns a base64-encoded string containing: IV (12 bytes) + auth tag (16 bytes) + ciphertext.
- */
 export function encrypt(plaintext: string): string {
   const key = getEncryptionKey();
   const iv = randomBytes(IV_LENGTH);
@@ -44,15 +38,10 @@ export function encrypt(plaintext: string): string {
   const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
   const authTag = cipher.getAuthTag();
 
-  // Layout: [IV (12)] [authTag (16)] [ciphertext (...)]
   const combined = Buffer.concat([iv, authTag, encrypted]);
   return combined.toString('base64');
 }
 
-/**
- * Decrypt a base64-encoded ciphertext produced by `encrypt()`.
- * Throws on wrong key, tampered ciphertext, or malformed input.
- */
 export function decrypt(ciphertext: string): string {
   const key = getEncryptionKey();
   const combined = Buffer.from(ciphertext, 'base64');

@@ -1,22 +1,18 @@
 <script lang="ts">
 	import { Clock, CircleCheck, X, TriangleAlert } from '@lucide/svelte';
-	import { Badge } from '$lib/components/ui/badge';
-	import * as CardNs from '$lib/components/ui/card';
-	import type { OfflineExpense } from '$lib/utils/offline-storage';
-	import { DISPLAY_LIMITS } from '$lib/constants/limits';
-	import { EXPENSE_MESSAGES } from '$lib/constants/messages';
-	import { formatCurrency, formatDate } from '$lib/utils/formatters';
-	// `OfflineExpense.category` is unvalidated user input typed `string`, so these rows go through
-	// the key-tolerant label helper rather than indexing `categoryLabels` directly.
-	import { getCategoryLabel } from '$lib/utils/chart-colors';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import * as CardNs from '#lib/components/ui/card/index.ts';
+	import type { OfflineExpense } from '#lib/utils/offline-storage.ts';
+	import { DISPLAY_LIMITS } from '#lib/constants/limits.ts';
+	import { EXPENSE_MESSAGES } from '#lib/constants/messages.ts';
+	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
+	import { getCategoryLabel } from '#lib/utils/chart-colors.ts';
 
 	interface Props {
 		pendingExpenses: OfflineExpense[];
-		/** Rows parked as permanently-unsyncable — surfaced so the user can fix or discard them. */
 		needsAttentionExpenses?: OfflineExpense[];
 		syncedExpenses: OfflineExpense[];
 		onRemovePending: (_id: string) => void;
-		/** Discard a needs-attention row. Defaults to onRemovePending (same removeOfflineExpense path). */
 		onRemoveNeedsAttention?: (_id: string) => void;
 	}
 

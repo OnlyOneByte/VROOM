@@ -1,22 +1,3 @@
-/**
- * Atomicity of the two expense deletes that also drop the rows' photos.
- *
- * `deleteBySource` and `deleteSplitExpense` each issue TWO writes — delete the attached `photos`
- * rows, then delete the expense rows — and bun-sqlite only wraps them in one real transaction when
- * the callback is SYNCHRONOUS. Under an `async` callback each `await tx.*` autocommits on its own, so
- * a throw after the photo delete leaves the expenses in place with their receipts already detached:
- * the rows still show in the ledger, the photo rows are gone (cascading photo_refs with them), and
- * the provider-side files can never be cleaned up.
- *
- * The forcing function is a temporary `BEFORE DELETE ON expenses` trigger that aborts — expenses has
- * no inbound restricting FK, so nothing else makes the SECOND write fail on demand. The trigger is
- * schema, not data, so `resetAllTables` would not clear it between tests: each test drops it in a
- * `finally` or it poisons every later file in the process.
- *
- * createTestApp() must run before static config/connection imports — keep this file's imports to the
- * harness + bun:test only.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -52,7 +33,6 @@ function expenseCount(): number {
   return r.n;
 }
 
-/** Attach a photo row to an expense directly — the real upload path needs a storage provider. */
 function attachPhoto(expenseId: string, id: string): void {
   ctx.sqlite.run(
     `INSERT INTO photos (id, entity_type, entity_id, user_id, file_name, mime_type, file_size)
@@ -90,7 +70,6 @@ describe('expense deletes that also drop photos are atomic', () => {
     }
 
     expect(threw, 'the blocked expense delete should surface as a throw').toBe(true);
-    // THE ATOMICITY ASSERTION: the expense is still here, so its photo row must be too.
     expect(expenseCount(), 'the expense survived the failed delete').toBe(1);
     expect(photoCount(), 'its photo row rolled back with it').toBe(1);
   });

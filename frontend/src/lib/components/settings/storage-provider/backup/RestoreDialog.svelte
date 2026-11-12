@@ -1,34 +1,23 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import { Badge } from '$lib/components/ui/badge';
-	import * as Dialog from '$lib/components/ui/dialog';
-	import * as RadioGroup from '$lib/components/ui/radio-group';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
+	import * as RadioGroup from '#lib/components/ui/radio-group/index.ts';
 	import { LoaderCircle, Upload, ArrowLeft, Cloud, Database, ChevronDown } from '@lucide/svelte';
 	import {
 		Collapsible,
 		CollapsibleContent,
 		CollapsibleTrigger
-	} from '$lib/components/ui/collapsible';
-	import { settingsStore } from '$lib/stores/settings.svelte';
-	import { appStore } from '$lib/stores/app.svelte';
+	} from '#lib/components/ui/collapsible/index.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
 	import ProviderPicker from './RestoreProviderPicker.svelte';
-	import type { RestoreResult, RestoreProviderInfo, BackupFileInfo } from '$lib/types';
+	import type { RestoreResult, RestoreProviderInfo, BackupFileInfo } from '#lib/types/index.ts';
 
 	type FlowType = 'file' | 'provider';
 
-	/**
-	 * Steps:
-	 * 1 = choose entry point (file upload vs provider)
-	 * 2 = file: upload ZIP / provider: pick file from backup list (ZIP) or loading sheets preview
-	 * 3 = preview + mode + execute
-	 *
-	 * Provider sub-steps handled via providerStep:
-	 * 'pick-provider' = pick provider + source type (ProviderPicker)
-	 * 'pick-file' = pick ZIP file from provider backup list
-	 * 'loading-sheets' = loading sheets preview (auto-advances to step 3)
-	 */
 	type ProviderSubStep = 'pick-provider' | 'pick-file' | 'loading-sheets';
 
 	interface Props {
@@ -51,21 +40,17 @@
 	let flowType = $state<FlowType | null>(null);
 	let providerSubStep = $state<ProviderSubStep>('pick-provider');
 
-	// Provider-based restore state
 	let restoreProviders = $state<RestoreProviderInfo[]>([]);
 	let isLoadingProviders = $state(false);
 	let selectedProviderId = $state<string | null>(null);
 	let selectedSourceType = $state<'zip' | 'sheets' | null>(null);
 
-	// ZIP from provider state
 	let providerBackups = $state<BackupFileInfo[]>([]);
 	let isLoadingBackups = $state(false);
 	let selectedBackup = $state<BackupFileInfo | null>(null);
 
-	// File upload state
 	let selectedFile = $state<File | null>(null);
 
-	// Preview state
 	let restorePreview = $state<Record<string, number> | null>(null);
 	let restoreConflicts = $state<Array<{ table: string; id: string }>>([]);
 	let restoreMode = $state<'replace' | 'merge'>('replace');
@@ -99,7 +84,6 @@
 		error = null;
 		try {
 			restoreProviders = await settingsStore.loadRestoreProviders();
-			// Auto-select: one provider + one source type -> skip picker
 			if (restoreProviders.length === 1) {
 				const singleProvider = restoreProviders[0];
 				if (singleProvider && singleProvider.sourceTypes.length === 1) {
@@ -132,7 +116,6 @@
 				isLoadingBackups = false;
 			}
 		} else {
-			// Sheets: preview directly
 			providerSubStep = 'loading-sheets';
 			isProcessing = true;
 			try {
@@ -233,7 +216,6 @@
 			open = false;
 		} catch (err) {
 			const msg = err instanceof Error ? err.message : 'Restore failed';
-			// Handle 409 backup-in-progress
 			if (msg.includes('BACKUP_IN_PROGRESS') || msg.includes('backup is already in progress')) {
 				appStore.showError('A backup is currently in progress. Please try again later.');
 			}
@@ -327,7 +309,6 @@
 				</div>
 			{/if}
 
-			<!-- Step 1: Source Selection -->
 			{#if step === 1}
 				<div class="grid gap-3">
 					<button
@@ -367,7 +348,6 @@
 				</div>
 			{/if}
 
-			<!-- Step 2: File Upload -->
 			{#if step === 2 && flowType === 'file'}
 				<div class="space-y-3">
 					<Label for="backup-file">Backup File</Label>
@@ -380,7 +360,6 @@
 				</div>
 			{/if}
 
-			<!-- Step 2: Provider Flow — Pick Provider -->
 			{#if step === 2 && flowType === 'provider' && providerSubStep === 'pick-provider'}
 				{#if isLoadingProviders}
 					<div class="flex items-center gap-2 py-4 text-sm text-muted-foreground">
@@ -391,7 +370,6 @@
 				{/if}
 			{/if}
 
-			<!-- Step 2: Provider Flow — Pick ZIP File -->
 			{#if step === 2 && flowType === 'provider' && providerSubStep === 'pick-file'}
 				{#if isLoadingBackups}
 					<div class="flex items-center gap-2 py-4 text-sm text-muted-foreground">
@@ -441,14 +419,12 @@
 				{/if}
 			{/if}
 
-			<!-- Step 2: Provider Flow — Loading Sheets -->
 			{#if step === 2 && flowType === 'provider' && providerSubStep === 'loading-sheets'}
 				<div class="flex items-center gap-2 py-4 text-sm text-muted-foreground">
 					<LoaderCircle class="h-4 w-4 animate-spin" /><span>Loading from Google Sheets...</span>
 				</div>
 			{/if}
 
-			<!-- Step 3: Preview + Mode + Execute -->
 			{#if step === 3 && restorePreview}
 				<div class="rounded-lg border border-border bg-muted p-4">
 					<h4 class="mb-3 font-medium text-foreground">Import Summary</h4>

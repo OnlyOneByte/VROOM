@@ -1,22 +1,3 @@
-/**
- * Merge-mode restore and the `reminders` primary-key collision.
- *
- * `detectConflicts` probes vehicles/expenses/financing/insurance/photos/photoRefs + prefs/syncState
- * — but once did NOT probe `reminders`, while `insertBackupData` inserts it (restore.ts). `reminders` is userId-owned with
- * its OWN id PK and is NOT FK'd to vehicles: the vehicle link is the `reminder_vehicles` junction
- * (onDelete:cascade). So a reminder SURVIVES the deletion of all its vehicles (the vehicle-less-but-
- * active state). A MERGE restore of a backup carrying that surviving reminder therefore slipped past
- * conflict detection (no probed table collides once the vehicle is gone) straight into `insert(reminders)`
- * against the existing id PK → a raw `UNIQUE constraint failed: reminders.id` that threw and rolled back the
- * WHOLE restore — the raw-throw class on a third table that fix never reached (the coverage-guard's
- * `reminders` exemption rested on a FALSE "child of vehicles" FK claim).
- *
- * FIX: detectConflicts now probes `reminders` (userId-owned, id PK) like any other owned table, so the
- * collision is reported as a normal merge conflict instead of a raw SQLite throw. RED before the fix (threw
- * "UNIQUE constraint failed: reminders.id"), GREEN after. createTestApp rewrites env + dynamic-imports the
- * DB-bound modules.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -39,9 +20,8 @@ async function createVehicle(make: string): Promise<string> {
   return body.data.id;
 }
 
-describe('restore merge: reminders PK collision is detected as a conflict, not a raw DB throw (state)', () => {
+describe('restore merge: reminders PK collision is detected as a conflict, not a raw DB throw', () => {
   test('merging a backup whose surviving vehicle-less reminder collides → clean conflict, not an unhandled PK throw', async () => {
-    // Own a vehicle + a reminder linked to it; export a real ZIP carrying BOTH (+ the prefs row).
     const vehicleId = await createVehicle('Honda');
     const created = await ctx.authed('POST', '/api/v1/reminders', {
       name: 'Registration renewal',
@@ -58,9 +38,6 @@ describe('restore merge: reminders PK collision is detected as a conflict, not a
     const { restoreService } = await import('../restore');
     const zip = await backupService.exportAsZip(ctx.user.id);
 
-    // DELETE the vehicle: reminder_vehicles cascades away, but the reminders row SURVIVES vehicle-less
-    // (the state). The backup still carries that reminder. Now the only backup rows that still collide
-    // with the live DB are the surviving reminder (id PK) + the always-present prefs row.
     const delRes = await ctx.authed('DELETE', `/api/v1/vehicles/${vehicleId}`);
     expect(delRes.status).toBeLessThan(300);
     const reminderRow = ctx.sqlite
@@ -72,11 +49,6 @@ describe('restore merge: reminders PK collision is detected as a conflict, not a
       .all(reminderId) as unknown[];
     expect(junctionRows, 'its junction row cascaded away').toHaveLength(0);
 
-    // EXPECTED (post-fix): the merge reports a conflict whose `table === 'reminders'` for the colliding
-    // surviving reminder. NON-VACUOUS: the importer's always-present prefs row ALSO collides, so a
-    // bare "conflicts.length > 0" can't distinguish the fix — the reminders-TYPED conflict can ONLY appear
-    // if detectConflicts probes `reminders`. Pre-fix (reminders unprobed) there is NO reminders conflict;
-    // the unprobed reminder instead reaches insert(reminders) on any non-conflicting merge → raw UNIQUE throw.
     let reminderConflictReported = false;
     let threw: unknown = null;
     try {
@@ -91,7 +63,7 @@ describe('restore merge: reminders PK collision is detected as a conflict, not a
     expect(
       reminderConflictReported,
       `merge should report the surviving reminder (${reminderId}) as a 'reminders'-table conflict, not omit ` +
-        `it (pre-fix: unprobed → raw UNIQUE throw on insert). threw: ${
+        `it (an unprobed row reaches the insert and throws a raw UNIQUE error). threw: ${
           threw instanceof Error ? threw.message : String(threw)
         }`
     ).toBe(true);

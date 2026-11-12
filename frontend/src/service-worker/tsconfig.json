@@ -1,0 +1,15 @@
+{
+	"extends": "$app/tsconfig/service-worker",
+	"compilerOptions": {
+		"sourceMap": true,
+		"strict": true,
+		"noUnusedLocals": true,
+		"noUnusedParameters": true,
+		"noImplicitReturns": true,
+		"noFallthroughCasesInSwitch": true,
+		"noImplicitOverride": true,
+		"noPropertyAccessFromIndexSignature": true,
+		"noUncheckedIndexedAccess": true
+	},
+	"include": ["."]
+}

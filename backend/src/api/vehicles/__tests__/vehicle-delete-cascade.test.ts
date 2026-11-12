@@ -1,29 +1,11 @@
-/**
- * In-process HTTP tests for vehicle deletion CASCADE — through the REAL stack.
- *
- * When a vehicle is deleted, the DB FK-cascade removes its expenses and odometer
- * entries (expenses.vehicle_id / odometer_entries.vehicle_id are ON DELETE
- * cascade). But the `photos` table links to entities by (entity_type, entity_id)
- * STRINGS — it has NO foreign key to those tables — so nothing cascades the
- * photos of the deleted expenses/odometer entries. The vehicle route only cleans
- * its OWN ('vehicle') photos. Result: orphaned photo rows (and their external
- * storage files) for every expense/odometer photo on the deleted vehicle.
- *
- * These tests pin the desired behavior: after deleting a vehicle, NO photo rows
- * for that vehicle's expenses or odometer entries remain.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   createTestApp,
   type DataEnvelope,
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
-import { seedVehicle as seedVehicleShared } from '../../../test-helpers/seed';
+import { seedVehicle } from '../../../test-helpers/seed';
 import { ENTITY_TO_CATEGORY } from '../../providers/domains/storage/storage-provider';
 
 let ctx: TestApp;
@@ -33,7 +15,6 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-/** Insert a photo row directly (no storage provider needed for a cascade test). */
 function seedPhoto(opts: { id: string; entityType: string; entityId: string }): void {
   ctx.sqlite.run(
     `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
@@ -48,11 +29,6 @@ function photoCount(entityType: string, entityId: string): number {
     .get(entityType, entityId) as { n: number };
   return row.n;
 }
-
-// This file's fixture is the shared default vehicle (Toyota Camry 2022); converge onto the shared
-// test-helpers/seed seedVehicle  — no opts needed since the default
-// matches exactly. A thin no-arg wrapper keeps the call sites untouched.
-const seedVehicle = (): Promise<string> => seedVehicleShared(ctx);
 
 async function seedExpense(vehicleId: string): Promise<string> {
   const res = await ctx.authed('POST', '/api/v1/expenses', {
@@ -69,29 +45,8 @@ async function seedExpense(vehicleId: string): Promise<string> {
 }
 
 describe('vehicle deletion cascades photo cleanup to dependent entities', () => {
-  test("deleting a vehicle removes its expenses' photo rows (no orphans)", async () => {
-    const vehicleId = await seedVehicle();
-    const expenseId = await seedExpense(vehicleId);
-
-    // Attach a receipt photo to the expense, and a cover photo to the vehicle.
-    seedPhoto({ id: 'exp-photo', entityType: 'expense', entityId: expenseId });
-    seedPhoto({ id: 'veh-photo', entityType: 'vehicle', entityId: vehicleId });
-    expect(photoCount('expense', expenseId)).toBe(1);
-    expect(photoCount('vehicle', vehicleId)).toBe(1);
-
-    const del = await ctx.authed('DELETE', `/api/v1/vehicles/${vehicleId}`);
-    expect(del.status, await del.text()).toBe(200);
-
-    // The expense itself is FK-cascade-deleted...
-    const expphotos = photoCount('expense', expenseId);
-    const vehphotos = photoCount('vehicle', vehicleId);
-    // ...and its photo row must be cleaned up too (this is the orphan bug).
-    expect(expphotos, 'expense photo rows should be cleaned up on vehicle delete').toBe(0);
-    expect(vehphotos, 'vehicle photo rows should be cleaned up on vehicle delete').toBe(0);
-  });
-
   test('deleting a single expense directly removes its photo rows (no orphans)', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx);
     const expenseId = await seedExpense(vehicleId);
     seedPhoto({ id: 'exp-photo-direct', entityType: 'expense', entityId: expenseId });
     expect(photoCount('expense', expenseId)).toBe(1);
@@ -105,15 +60,8 @@ describe('vehicle deletion cascades photo cleanup to dependent entities', () => 
     ).toBe(0);
   });
 
-  // trips-location (schema + cascade guard): trips.vehicle_id is ON DELETE cascade (migration
-  // 0007; the raw-SQL cascade is unit-pinned in migration-0007.test.ts). This pins it END-TO-END through the
-  // REAL vehicle-delete ROUTE — a trip is gone after its vehicle is deleted (no orphaned trip rows leaking
-  // into analytics / the mileage-summary). Trips are NOT a photo-upload entity type (the
-  // bug-scout verified `trip` is absent from the photo allowlist + ENTITY_TO_CATEGORY, so the
-  // photo-cleanup block correctly needs no trips leg; the guard above keeps that drift-proof if trip
-  // photos are ever added). Seed the trip directly (no create route until T3 — the cascade is FK-level).
-  test('deleting a vehicle CASCADE-removes its trips (no orphaned trip rows)', async () => {
-    const vehicleId = await seedVehicle();
+  test('deleting a vehicle cascades to its trips (no orphaned trip rows)', async () => {
+    const vehicleId = await seedVehicle(ctx);
     ctx.sqlite.run(
       `INSERT INTO trips (id, vehicle_id, user_id, start_odometer, end_odometer, purpose, trip_date)
        VALUES ('trip-casc', ?, ?, 1000, 1080, 'business', 1700000000)`,
@@ -130,42 +78,10 @@ describe('vehicle deletion cascades photo cleanup to dependent entities', () => 
     const del = await ctx.authed('DELETE', `/api/v1/vehicles/${vehicleId}`);
     expect(del.status, await del.text()).toBe(200);
 
-    // The vehicle's trip is FK-cascade-deleted — no orphan survives the delete.
     expect(tripCount(vehicleId), 'trip rows should cascade away with their vehicle').toBe(0);
-  });
-
-  test("deleting a vehicle removes its odometer entries' photo rows (no orphans)", async () => {
-    const vehicleId = await seedVehicle();
-
-    // Create an odometer entry for the vehicle (POST /api/v1/odometer/:vehicleId).
-    const odo = await ctx.authed('POST', `/api/v1/odometer/${vehicleId}`, {
-      odometer: 31000,
-      recordedAt: '2024-06-02T00:00:00.000Z',
-    });
-    const odoBody = await json<DataEnvelope<{ id: string }>>(odo);
-    expect(odo.status, JSON.stringify(odoBody)).toBeLessThan(300);
-    const odoId = odoBody.data.id;
-
-    seedPhoto({ id: 'odo-photo', entityType: 'odometer_entry', entityId: odoId });
-    expect(photoCount('odometer_entry', odoId)).toBe(1);
-
-    const del = await ctx.authed('DELETE', `/api/v1/vehicles/${vehicleId}`);
-    expect(del.status, await del.text()).toBe(200);
-
-    expect(
-      photoCount('odometer_entry', odoId),
-      'odometer-entry photo rows should be cleaned up on vehicle delete'
-    ).toBe(0);
   });
 });
 
-// FIXED: reminder_vehicles.vehicleId is onDelete:'cascade', so deleting a
-// vehicle removes its junction row — but the reminder ROW survives. Pre-fix a reminder linked to ONLY that
-// vehicle was left is_active=1 with ZERO vehicles (the trigger skipped it 'no_vehicles' forever, a silent
-// never-firing orphan still shown active). The vehicle-delete route now calls
-// reminderRepository.deactivateVehicleless(userId) after the delete, flipping any now-vehicleless active
-// reminder to inactive. A MULTI-vehicle reminder is unaffected — it keeps its remaining vehicles + stays
-// active. (This was a characterization test of the buggy state; flipped to the fixed behavior.)
 describe('a single-vehicle reminder is auto-deactivated when its only vehicle is deleted', () => {
   function reminderRow(id: string): { is_active: number } | null {
     return (
@@ -180,7 +96,6 @@ describe('a single-vehicle reminder is auto-deactivated when its only vehicle is
       .get(reminderId) as { n: number };
     return row.n;
   }
-  /** Seed a time reminder linked to the given vehicles (mileage/time API surface is partial). */
   function seedReminder(id: string, vehicleIds: string[]): void {
     ctx.sqlite.run(
       `INSERT INTO reminders
@@ -196,19 +111,17 @@ describe('a single-vehicle reminder is auto-deactivated when its only vehicle is
     }
   }
 
-  test('the now-vehicleless reminder is DEACTIVATED (no longer a silent no_vehicles orphan)', async () => {
-    const vehicleId = await seedVehicle();
+  test('the now-vehicleless reminder is deactivated', async () => {
+    const vehicleId = await seedVehicle(ctx);
     seedReminder('rm-orphan', [vehicleId]);
     expect(junctionCount('rm-orphan')).toBe(1);
 
     const del = await ctx.authed('DELETE', `/api/v1/vehicles/${vehicleId}`);
     expect(del.status, await del.text()).toBe(200);
 
-    // The junction cascaded away AND the now-vehicleless reminder was deactivated.
     expect(junctionCount('rm-orphan')).toBe(0);
     expect(reminderRow('rm-orphan')?.is_active).toBe(0);
 
-    // It no longer appears in the trigger run at all (not active → not even evaluated/skipped).
     const res = await ctx.authed('POST', '/api/v1/reminders/trigger');
     const body =
       await json<DataEnvelope<{ skipped: Array<{ reminderId: string; reason: string }> }>>(res);
@@ -217,30 +130,20 @@ describe('a single-vehicle reminder is auto-deactivated when its only vehicle is
   });
 
   test('a MULTI-vehicle reminder is NOT deactivated — it keeps its remaining vehicle', async () => {
-    const v1 = await seedVehicle();
-    const v2 = await seedVehicle();
+    const v1 = await seedVehicle(ctx);
+    const v2 = await seedVehicle(ctx);
     seedReminder('rm-multi', [v1, v2]);
     expect(junctionCount('rm-multi')).toBe(2);
 
-    // Delete only ONE of the two covered vehicles.
     const del = await ctx.authed('DELETE', `/api/v1/vehicles/${v1}`);
     expect(del.status, await del.text()).toBe(200);
 
-    // The reminder still has v2 → it stays active (not over-deactivated).
     expect(junctionCount('rm-multi')).toBe(1);
     expect(reminderRow('rm-multi')?.is_active).toBe(1);
   });
 });
 
-// FIXED: a reminder's `expenseSplitConfig` is a JSON blob, NOT FK-managed like
-// the reminder_vehicles junction — so when a vehicle is deleted, the junction row cascades but the blob
-// still NAMES the dead vehicleId. On the next trigger createExpenseFromReminder builds a split sibling for
-// that dead id → an FK violation that (the async-tx footgun) leaves the surviving legs half-committed
-// — a partial/inconsistent expense group every trigger. The vehicle-delete route now calls
-// reminderRepository.pruneSplitConfigsForDeletedVehicle(userId, id) BEFORE deactivateVehicleless: it drops
-// the deleted leg + renormalizes (≥2 legs remain) or clears the blob (<2 → single-vehicle fallback).
 describe('a deleted vehicle is pruned from reminders’ expenseSplitConfig blob', () => {
-  /** Seed an EXPENSE reminder with a split-config blob + matching junction rows. */
   function seedSplitReminder(id: string, config: object, vehicleIds: string[]): void {
     ctx.sqlite.run(
       `INSERT INTO reminders
@@ -267,9 +170,9 @@ describe('a deleted vehicle is pruned from reminders’ expenseSplitConfig blob'
   }
 
   test("an 'even' split drops the deleted vehicle's leg; the surviving legs renormalize", async () => {
-    const v1 = await seedVehicle();
-    const v2 = await seedVehicle();
-    const v3 = await seedVehicle();
+    const v1 = await seedVehicle(ctx);
+    const v2 = await seedVehicle(ctx);
+    const v3 = await seedVehicle(ctx);
     seedSplitReminder('rm-even', { method: 'even', vehicleIds: [v1, v2, v3] }, [v1, v2, v3]);
 
     const del = await ctx.authed('DELETE', `/api/v1/vehicles/${v2}`);
@@ -277,14 +180,13 @@ describe('a deleted vehicle is pruned from reminders’ expenseSplitConfig blob'
 
     const cfg = splitConfig('rm-even');
     expect(cfg?.method).toBe('even');
-    // The dead vehicle is gone from the blob; the other two remain (no FK-violating leg on next trigger).
     expect(cfg?.vehicleIds?.sort()).toEqual([v1, v3].sort());
     expect(cfg?.vehicleIds).not.toContain(v2);
   });
 
   test("a 'percentage' split drops the leg + RESCALES survivors back to 100%", async () => {
-    const v1 = await seedVehicle();
-    const v2 = await seedVehicle();
+    const v1 = await seedVehicle(ctx);
+    const v2 = await seedVehicle(ctx);
     seedSplitReminder(
       'rm-pct',
       {
@@ -297,7 +199,6 @@ describe('a deleted vehicle is pruned from reminders’ expenseSplitConfig blob'
       [v1, v2]
     );
 
-    // Delete v1 → only v2 would remain (<2 legs) → the blob is CLEARED (single-vehicle fallback).
     const del = await ctx.authed('DELETE', `/api/v1/vehicles/${v1}`);
     expect(del.status, await del.text()).toBe(200);
     expect(
@@ -307,9 +208,9 @@ describe('a deleted vehicle is pruned from reminders’ expenseSplitConfig blob'
   });
 
   test('a 3-way percentage split keeps ≥2 legs → rescaled to sum 100, dead leg gone', async () => {
-    const v1 = await seedVehicle();
-    const v2 = await seedVehicle();
-    const v3 = await seedVehicle();
+    const v1 = await seedVehicle(ctx);
+    const v2 = await seedVehicle(ctx);
+    const v3 = await seedVehicle(ctx);
     seedSplitReminder(
       'rm-pct3',
       {
@@ -333,31 +234,24 @@ describe('a deleted vehicle is pruned from reminders’ expenseSplitConfig blob'
     expect(cfg?.method).toBe('percentage');
     expect(cfg?.allocations.map((a) => a.vehicleId).sort()).toEqual([v1, v3].sort());
     expect(cfg?.allocations.some((a) => a.vehicleId === v2)).toBe(false);
-    // Survivors (was 25 + 50 = 75) rescale back to 100.
     expect(cfg?.allocations.reduce((s, a) => s + a.percentage, 0)).toBeCloseTo(100, 5);
   });
 
   test('an unrelated split reminder is untouched when a non-member vehicle is deleted', async () => {
-    const v1 = await seedVehicle();
-    const v2 = await seedVehicle();
-    const other = await seedVehicle();
+    const v1 = await seedVehicle(ctx);
+    const v2 = await seedVehicle(ctx);
+    const other = await seedVehicle(ctx);
     seedSplitReminder('rm-keep', { method: 'even', vehicleIds: [v1, v2] }, [v1, v2]);
 
     const del = await ctx.authed('DELETE', `/api/v1/vehicles/${other}`);
     expect(del.status, await del.text()).toBe(200);
 
     const cfg = splitConfig('rm-keep');
-    expect(cfg?.vehicleIds?.sort()).toEqual([v1, v2].sort()); // unchanged
+    expect(cfg?.vehicleIds?.sort()).toEqual([v1, v2].sort());
   });
 });
 
-// deep-review (CERTIFIED CLEAN — pins an unguarded data-safety invariant). insurance_claims.vehicleId
-// is onDelete:'set null' (schema.ts:188), deliberately UNLIKE the cascade FKs above: a claim is a financial/
-// legal record (payoutAmount, claimDate, status) that belongs to its POLICY (policyId cascades), NOT to the
-// vehicle — so deleting a vehicle must PRESERVE the claim with vehicleId nulled, never destroy it.
-// A regression flipping that FK to 'cascade' (or a manual cleanup
-// that over-deletes) would silently wipe a user's claim history on an unrelated vehicle delete. This anchors
-// survival + the null so such a change turns RED.
+// insurance_claims.vehicle_id is nulled on delete, not cascaded: claims are financial records.
 describe('deleting a vehicle PRESERVES its insurance claims (vehicleId set null, not cascade-deleted)', () => {
   function claimRow(
     id: string
@@ -374,9 +268,8 @@ describe('deleting a vehicle PRESERVES its insurance claims (vehicleId set null,
   }
 
   test('the claim row SURVIVES with vehicle_id nulled; policy link + payout are intact', async () => {
-    const vehicleId = await seedVehicle();
+    const vehicleId = await seedVehicle(ctx);
 
-    // Seed a policy (claims FK→policies is notNull cascade) and a claim referencing the vehicle.
     ctx.sqlite.run(
       `INSERT INTO insurance_policies (id, user_id, company, is_active) VALUES ('pol-claim', ?, 'Geico', 1)`,
       [ctx.user.id]
@@ -391,7 +284,6 @@ describe('deleting a vehicle PRESERVES its insurance claims (vehicleId set null,
     const del = await ctx.authed('DELETE', `/api/v1/vehicles/${vehicleId}`);
     expect(del.status, await del.text()).toBe(200);
 
-    // The financial record must NOT be lost: row survives, vehicle_id is nulled, policy + payout untouched.
     const after = claimRow('clm-1');
     expect(after, 'claim must survive vehicle delete (set null, not cascade)').not.toBeNull();
     expect(after?.vehicle_id).toBeNull();
@@ -400,76 +292,90 @@ describe('deleting a vehicle PRESERVES its insurance claims (vehicleId set null,
   });
 });
 
-// ---------------------------------------------------------------------------
-// symmetry guard (the restore-table-coverage pattern, on the photo-cascade side). The
-// vehicle-delete handler HARD-CODES which photo-bearing entity types it reaps (vehicle + expense +
-// odometer_entry — the three above). ENTITY_TO_CATEGORY is the registry of EVERY photo-bearing entity
-// type. The omitted ones (insurance_policy, insurance_claim) are correctly excluded because those
-// entities SURVIVE a vehicle delete (the policy isn't a vehicle child; the claim is set-null) —
-// but nothing pins that correspondence. If a future photo-bearing entity type is added that IS a
-// vehicle FK-cascade child (or an existing one's FK flips to cascade) without a matching cleanup call,
-// its photo rows + external bytes silently orphan (the leak class the handler exists to
-// prevent) with NO failing test. This makes the correspondence DRIFT-PROOF: every ENTITY_TO_CATEGORY
-// key must be either reaped by the delete handler OR in the documented "survives a vehicle delete" set.
-describe('every photo-bearing entity type is reaped on vehicle-delete OR documented as surviving', () => {
-  const HERE = dirname(fileURLToPath(import.meta.url));
-  const VEHICLE_ROUTES_SRC = readFileSync(join(HERE, '..', 'routes.ts'), 'utf-8');
+describe('vehicle delete handles photos for every photo-bearing entity type', () => {
+  type Seeder = (vehicleId: string) => Promise<string>;
 
-  // Photo-bearing entity types that are NOT removed by a vehicle delete (so the handler MUST NOT, and
-  // does not, reap their photos here): the policy isn't a vehicle child, and a claim's vehicleId is
-  // ON DELETE SET NULL — the claim row + its photos survive.
-  const SURVIVES_VEHICLE_DELETE = new Set(['insurance_policy', 'insurance_claim']);
+  async function seedOdometerEntry(vehicleId: string): Promise<string> {
+    const res = await ctx.authed('POST', `/api/v1/odometer/${vehicleId}`, {
+      odometer: 31000,
+      recordedAt: '2024-06-02T00:00:00.000Z',
+    });
+    const body = await json<DataEnvelope<{ id: string }>>(res);
+    expect(res.status, JSON.stringify(body)).toBeLessThan(300);
+    return body.data.id;
+  }
 
-  test('the vehicle-delete handler cleans photos for exactly the photo-entity types it should', () => {
-    const unaccounted: string[] = [];
-    for (const entityType of Object.keys(ENTITY_TO_CATEGORY)) {
-      if (SURVIVES_VEHICLE_DELETE.has(entityType)) continue; // (b) survives → must NOT be reaped here
-      // (a) a vehicle-cascade child → the handler must reap its photos. Both helpers take the entity
-      // type as the first string arg: deleteAllPhotosForEntity('vehicle',…) / deletePhotosForEntities('expense',…).
-      const reaped =
-        VEHICLE_ROUTES_SRC.includes(`deleteAllPhotosForEntity('${entityType}'`) ||
-        VEHICLE_ROUTES_SRC.includes(`deletePhotosForEntities('${entityType}'`);
-      if (!reaped) unaccounted.push(entityType);
-    }
+  function seedPolicy(): string {
+    ctx.sqlite.run(
+      `INSERT INTO insurance_policies (id, user_id, company, is_active) VALUES ('pol-photo', ?, 'Geico', 1)`,
+      [ctx.user.id]
+    );
+    return 'pol-photo';
+  }
 
-    expect(
-      unaccounted,
-      `Photo-bearing entity type(s) neither reaped by the vehicle-delete handler nor documented as ` +
-        `surviving a vehicle delete. If it's a vehicle FK-cascade child, add a deletePhotosForEntities ` +
-        `cleanup call in routes.ts delete /:id (its photo rows + external bytes would otherwise orphan, ` +
-        `the leak class); if it survives, add it to SURVIVES_VEHICLE_DELETE:\n${unaccounted.join('\n')}`
-    ).toEqual([]);
+  const REAPED: Record<string, Seeder> = {
+    vehicle: async (vehicleId) => vehicleId,
+    expense: seedExpense,
+    odometer_entry: seedOdometerEntry,
+  };
+
+  const SURVIVES: Record<string, Seeder> = {
+    insurance_policy: async () => seedPolicy(),
+    insurance_claim: async (vehicleId) => {
+      const policyId = seedPolicy();
+      ctx.sqlite.run(
+        `INSERT INTO insurance_claims (id, policy_id, vehicle_id, claim_date, claim_type, status)
+         VALUES ('clm-photo', ?, ?, 1700000000, 'collision', 'open')`,
+        [policyId, vehicleId]
+      );
+      return 'clm-photo';
+    },
+  };
+
+  test('every photo entity type is classified as reaped or surviving', () => {
+    const classified = new Set([...Object.keys(REAPED), ...Object.keys(SURVIVES)]);
+    expect(Object.keys(ENTITY_TO_CATEGORY).filter((t) => !classified.has(t))).toEqual([]);
   });
 
-  test('the guard is live: ENTITY_TO_CATEGORY has the photo-entity types it scans', () => {
-    // Non-vacuity floor — if the registry were empty/renamed away, the loop above would vacuously pass.
-    expect(Object.keys(ENTITY_TO_CATEGORY).length).toBeGreaterThanOrEqual(5);
-    expect(ENTITY_TO_CATEGORY.vehicle).toBeDefined();
-  });
+  for (const [entityType, seed] of Object.entries(REAPED)) {
+    test(`deleting a vehicle removes its ${entityType} photo rows`, async () => {
+      const vehicleId = await seedVehicle(ctx);
+      const entityId = await seed(vehicleId);
+      seedPhoto({ id: `photo-${entityType}`, entityType, entityId });
+      expect(photoCount(entityType, entityId)).toBe(1);
+
+      const del = await ctx.authed('DELETE', `/api/v1/vehicles/${vehicleId}`);
+      expect(del.status, await del.text()).toBe(200);
+
+      expect(photoCount(entityType, entityId)).toBe(0);
+    });
+  }
+
+  for (const [entityType, seed] of Object.entries(SURVIVES)) {
+    test(`deleting a vehicle keeps its ${entityType} photo rows`, async () => {
+      const vehicleId = await seedVehicle(ctx);
+      const entityId = await seed(vehicleId);
+      seedPhoto({ id: `photo-${entityType}`, entityType, entityId });
+
+      const del = await ctx.authed('DELETE', `/api/v1/vehicles/${vehicleId}`);
+      expect(del.status, await del.text()).toBe(200);
+
+      expect(photoCount(entityType, entityId)).toBe(1);
+    });
+  }
 });
 
-// ---------------------------------------------------------------------------
-// deep-review fix: the post-delete reminder cleanups (pruneSplitConfigsForDeletedVehicle +
-// deactivateVehicleless) run AFTER vehicleRepository.delete() commits + the DB FK-cascade has already
-// dropped the reminder_vehicles junction. They were `await`ed UNGUARDED, so a hiccup in either 500'd a
-// delete whose vehicle was already gone → the FE shows "failed", the user retries (a confusing 404), AND
-// the very normalization exist for never ran. They're best-effort (the next /trigger re-runs the
-// same normalization, so a missed pass self-heals); the route now wraps them in a log+swallow try/catch.
-// This pins that contract: a cleanup throw must NOT fail the (completed) delete. (The best-effort-
-// contract class — sibling of the trip-create createFromTrip fix.)
-describe('a post-delete reminder-cleanup throw does NOT fail the (completed) vehicle delete', () => {
-  test('deactivateVehicleless throwing still returns 200 + the vehicle is deleted', async () => {
-    const vehicleId = await seedVehicle();
+describe('a post-delete reminder-cleanup throw does NOT fail the vehicle delete', () => {
+  test('deactivateVehicleless throwing still returns 200 and the vehicle is deleted', async () => {
+    const vehicleId = await seedVehicle(ctx);
     const { reminderRepository } = await import('../../reminders/repository');
     const original = reminderRepository.deactivateVehicleless.bind(reminderRepository);
-    // Simulate a DB hiccup in the post-delete cleanup (after the vehicle + junction are already gone).
     reminderRepository.deactivateVehicleless = async () => {
       throw new Error('simulated cleanup hiccup');
     };
     try {
       const del = await ctx.authed('DELETE', `/api/v1/vehicles/${vehicleId}`);
       expect(del.status, await del.text()).toBe(200);
-      // The delete the user asked for is DONE despite the cleanup failure (no orphaned 500).
       const n = (
         ctx.sqlite.query('SELECT COUNT(*) AS n FROM vehicles WHERE id = ?').get(vehicleId) as {
           n: number;

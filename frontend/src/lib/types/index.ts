@@ -1,9 +1,3 @@
-/**
- * Barrel export for all types.
- * Import from '$lib/types' — resolves here.
- * Each domain has its own file for maintainability.
- */
-
 export * from './user.js';
 export * from './vehicle.js';
 export * from './expense.js';
@@ -16,6 +10,3 @@ export * from './reminder.js';
 export * from './import-mapping.js';
 export * from './trip.js';
 export * from './share.js';
-
-// Backend API types — canonical definitions live in $lib/services/api-transformer.ts
-export type { BackendExpenseResponse } from '../services/api-transformer.js';

@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { Input } from '$lib/components/ui/input';
-	import { Button } from '$lib/components/ui/button';
-	import { formatCurrency } from '$lib/utils/formatters';
-	import type { Vehicle } from '$lib/types';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { formatCurrency } from '#lib/utils/formatters.ts';
+	import type { Vehicle } from '#lib/types/index.ts';
 
 	type SplitMethod = 'even' | 'absolute' | 'percentage';
 	interface Allocation {
@@ -74,7 +74,6 @@
 </script>
 
 <div class="space-y-3">
-	<!-- Segmented method selector -->
 	<div class="flex rounded-lg border border-input p-0.5">
 		{#each methods as m (m.value)}
 			<Button
@@ -89,7 +88,6 @@
 		{/each}
 	</div>
 
-	<!-- Vehicle allocations -->
 	<div class="space-y-2">
 		{#each vehicles as vehicle (vehicle.id)}
 			<div class="flex items-center gap-2 text-sm">
@@ -141,7 +139,6 @@
 		{/each}
 	</div>
 
-	<!-- Total row -->
 	<div class="flex items-center justify-between border-t border-border pt-2 text-sm">
 		<span class="font-medium text-foreground">Total</span>
 		{#if splitMethod === 'even'}

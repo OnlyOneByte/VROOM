@@ -66,7 +66,6 @@ export interface ExpenseFormErrors {
 	[key: string]: string | undefined;
 }
 
-// DerivedPaymentEntry: computed from a financing Expense + VehicleFinancing config
 export interface DerivedPaymentEntry {
 	expense: Expense;
 	paymentNumber: number;

@@ -1,13 +1,3 @@
-/**
- * Unit tests for OdometerRepository.getCurrentOdometer (maintenance-schedule T2 / design D2).
- *
- * Contract: the current odometer is MAX(odometer) across BOTH sources
- * (`expenses.mileage` + `odometer_entries.odometer`) — by VALUE, not by date —
- * and null when the vehicle has no reading on either source. This reconciles the
- * fuel-only `vehicle-stats.currentMileage` (which ignores manual entries and
- * non-fuel mileage) for the mileage trigger.
- */
-
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
@@ -91,7 +81,6 @@ describe('OdometerRepository.getCurrentOdometer', () => {
   });
 
   test('takes the max ACROSS both sources by value, not by recency', async () => {
-    // Manual entry has the higher value; an expense (different source) is lower.
     insertExpenseWithMileage(20000);
     insertOdometerEntry(55000);
     expect(await repo.getCurrentOdometer(VEHICLE_ID, USER_ID)).toBe(55000);
@@ -112,7 +101,6 @@ describe('OdometerRepository.getCurrentOdometer', () => {
   test('is scoped per vehicle — other vehicles never leak in', async () => {
     insertExpenseWithMileage(10000, VEHICLE_ID);
     insertOdometerEntry(11000, VEHICLE_ID);
-    // Much larger readings on a different vehicle must not bleed into the result.
     insertExpenseWithMileage(999999, OTHER_VEHICLE_ID);
     insertOdometerEntry(888888, OTHER_VEHICLE_ID);
     expect(await repo.getCurrentOdometer(VEHICLE_ID, USER_ID)).toBe(11000);
@@ -123,15 +111,11 @@ describe('OdometerRepository.getCurrentOdometer', () => {
     expect(await repo.getCurrentOdometer(VEHICLE_ID, USER_ID)).toBe(0);
   });
 
-  // The query is now userId-scoped (belt-and-braces). A row that belongs to ANOTHER user must
-  // never surface, even if the caller passes a vehicleId that (pathologically) resolves to it. Pre-fix the
-  // query filtered on vehicle_id alone, so an unvalidated vehicleId could leak a cross-tenant reading.
   test('is userId-scoped — a reading owned by another user never leaks', async () => {
     const OTHER_USER = 'u-other-tenant';
     sqliteDb.run(
       `INSERT INTO users (id, email, display_name) VALUES ('${OTHER_USER}', 'other@test.com', 'Other')`
     );
-    // A vehicle + readings owned by OTHER_USER (its own vehicle id).
     sqliteDb.run(
       `INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('v-other-tenant', '${OTHER_USER}', 'Mazda', '3', 2020)`
     );
@@ -140,10 +124,7 @@ describe('OdometerRepository.getCurrentOdometer', () => {
        VALUES ('odo-other', 'v-other-tenant', '${OTHER_USER}', 77000, 1700000000)`
     );
 
-    // Querying OTHER_USER's vehicle as OUR user must return null — the userId predicate excludes the row,
-    // even though the vehicleId matches a real row.
     expect(await repo.getCurrentOdometer('v-other-tenant', USER_ID)).toBeNull();
-    // And OTHER_USER reading their own vehicle still works (the scope isn't over-broad).
     expect(await repo.getCurrentOdometer('v-other-tenant', OTHER_USER)).toBe(77000);
   });
 });

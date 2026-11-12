@@ -7,10 +7,8 @@ async function initializeDatabase() {
   try {
     console.log('🚀 Initializing VROOM database...');
 
-    // Run migrations
     await runMigrations();
 
-    // Check database health
     const isHealthy = checkDatabaseHealth();
     if (!isHealthy) {
       throw new Error('Database health check failed after migration');
@@ -18,7 +16,6 @@ async function initializeDatabase() {
 
     console.log('✅ Database initialized successfully');
 
-    // Ask if user wants to seed with sample data
     const shouldSeed = process.argv.includes('--seed');
 
     if (shouldSeed) {
@@ -34,7 +31,6 @@ async function initializeDatabase() {
   }
 }
 
-// Run if called directly
 if (import.meta.main) {
   await initializeDatabase();
 }

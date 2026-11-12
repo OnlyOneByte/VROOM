@@ -1,17 +1,17 @@
 <script lang="ts">
-	import { Card, CardContent } from '$lib/components/ui/card';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
-	import { Progress } from '$lib/components/ui/progress';
+	import { Card, CardContent } from '#lib/components/ui/card/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Progress } from '#lib/components/ui/progress/index.ts';
 	import { Calendar, CreditCard, ArrowRightLeft } from '@lucide/svelte';
-	import { formatCurrency } from '$lib/utils/formatters';
+	import { formatCurrency } from '#lib/utils/formatters.ts';
 	import {
 		calculateNextPaymentDate,
 		calculateDaysUntil,
 		calculateMinimumPayment,
 		formatPaymentFrequency
-	} from '$lib/utils/financing-calculations';
-	import type { VehicleFinancing, DerivedPaymentEntry } from '$lib/types';
+	} from '#lib/utils/financing-calculations.ts';
+	import type { VehicleFinancing, DerivedPaymentEntry } from '#lib/types/index.ts';
 
 	interface Props {
 		financing: VehicleFinancing;
@@ -19,9 +19,6 @@
 		recordPaymentHref?: string;
 		progressPercentage?: number;
 		onChangePayment?: () => void;
-		/** vehicle-sharing T12b-3b: the payment actions (Record Payment, Change payment) are owner-only
-		 *  finance management (the server keeps strict validateVehicleOwnership on /financing). A shared
-		 *  invitee sees the next-payment summary read-only. Default true so the owner view is unchanged. */
 		isOwner?: boolean;
 	}
 
@@ -36,7 +33,6 @@
 
 	let minimumPayment = $derived(calculateMinimumPayment(financing));
 
-	// Calculate next payment date
 	let nextPaymentDate = $derived.by(() => {
 		try {
 			const lastPaymentDate = lastPayment ? new Date(lastPayment.expense.date) : undefined;
@@ -100,8 +96,7 @@
 					: `Due in ${daysUntilPayment} days`
 	);
 
-	// (progressColor for the % text was removed: chart-1/chart-2 on white fail WCAG AA.
-	// The % now uses text-foreground; the colored bar below carries the progress signal.)
+	// Percent uses text-foreground: chart colours fail WCAG AA on white.
 	let progressIndicatorClass = $derived(
 		progressPercentage > 75
 			? '[&_[data-slot=progress-indicator]]:bg-chart-2'
@@ -122,7 +117,6 @@
 <Card class="border-2 {cardBorderClass}" role="region" aria-labelledby="next-payment-heading">
 	<CardContent class="p-4 sm:p-6">
 		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-			<!-- Left: Next Payment Info -->
 			<div class="space-y-3">
 				<div class="flex items-start justify-between gap-3">
 					<div class="space-y-2 flex-1 min-w-0">
@@ -187,16 +181,11 @@
 				{/if}
 			</div>
 
-			<!-- Right: Progress Summary -->
 			<div class="space-y-4 lg:border-l lg:pl-6 border-border">
-				<!-- Progress Bar -->
 				<div class="space-y-2">
 					<div class="flex justify-between items-center">
 						<span class="text-sm font-medium text-muted-foreground">Payment Progress</span>
-						<!-- text-foreground, NOT the chart color: text-chart-1 (#f54900) on white is
-						     only 3.59:1 and chart-2 3.66:1 — both fail WCAG AA for this text. The
-						     colored Progress bar below carries the progress signal; the number just
-						     needs to be legible. (Same text-on-chart-color class.) -->
+						<!-- text-foreground: chart colours fail WCAG AA on white. -->
 						<span class="text-lg font-bold text-foreground">
 							{Math.round(progressPercentage)}%
 						</span>
@@ -211,7 +200,6 @@
 					</div>
 				</div>
 
-				<!-- Balance Stats -->
 				<div class="grid grid-cols-3 gap-3 text-center">
 					<div>
 						<p class="text-xs text-muted-foreground">Original</p>
@@ -221,8 +209,7 @@
 					</div>
 					<div>
 						<p class="text-xs text-muted-foreground">Paid</p>
-						<!-- text-foreground, NOT text-chart-2: #009689 on white is 3.66:1 (fails WCAG
-						     AA). The "Paid" label above already identifies it; same class. -->
+						<!-- text-foreground: chart-2 text fails WCAG AA on white. -->
 						<p class="text-sm sm:text-base font-semibold text-foreground">
 							{formatCurrency(amountPaid)}
 						</p>

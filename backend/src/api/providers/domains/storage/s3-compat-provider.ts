@@ -1,10 +1,3 @@
-/**
- * S3-compatible storage provider — covers AWS S3, Backblaze B2, Cloudflare R2, MinIO.
- *
- * Uses the AWS SDK v3 with a custom endpoint to support any S3-compatible service.
- * Key structure: {pathHint}/{entityType}/{entityId}/{fileName}
- */
-
 import {
   DeleteObjectCommand,
   GetObjectCommand,
@@ -33,7 +26,6 @@ export interface S3Config {
   region: string;
 }
 
-/** Default presigned URL expiry: 1 hour */
 const PRESIGNED_URL_EXPIRY_SECONDS = 3600;
 
 export class S3CompatProvider implements StorageProvider {
@@ -166,10 +158,6 @@ export class S3CompatProvider implements StorageProvider {
     return results;
   }
 
-  /**
-   * Build the S3 object key from path segments.
-   * Strips leading slashes to avoid empty key segments.
-   */
   private buildKey(
     pathHint: string,
     entityType: string,
@@ -184,10 +172,6 @@ export class S3CompatProvider implements StorageProvider {
     return segments.join('/');
   }
 
-  /**
-   * Build the S3 object key from a raw path and filename.
-   * Used for backup uploads where the key bypasses the standard entity structure.
-   */
   private buildRawKey(rawPath: string, fileName: string): string {
     const cleanPath = rawPath.replace(/^\/+/, '').replace(/\/+$/, '');
     return cleanPath ? `${cleanPath}/${fileName}` : fileName;

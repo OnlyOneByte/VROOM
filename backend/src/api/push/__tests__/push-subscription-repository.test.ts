@@ -1,22 +1,3 @@
-/**
- * Round-trip + scoping guard for the push-subscription store (push-notifications T1).
- *
- * Drives the REAL PushSubscriptionRepository against a fresh in-memory DB built from the actual
- * migration chain (loadMigrations → applyMigration), so it ALSO proves migration 0013 applies
- * cleanly (the table + its indexes exist) — the merge-surviving net for the additive table.
- *
- * Pins the contract the routes (T3) + the send hook (T4) depend on:
- *  - upsertByEndpoint persists + reads back, and is IDEMPOTENT on (userId, endpoint): a
- *  re-subscribe from the same browser UPDATES the keys + RESETS failureCount, never duplicates.
- *  - findByUser is userId-scoped (a user sees only their own devices).
- *  - deleteByEndpoint is userId-scoped: user A cannot delete user B's subscription via the
- *  endpoint alone (the IDOR discipline — the endpoint is not a capability).
- *  - markSuccess / incrementFailure / prune drive the reaping lifecycle.
- *
- * Fresh per-test DB (the date-range-boundary.test.ts pattern) — host-TZ-independent, no shared
- * DB-singleton import trap.
- */
-
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
@@ -61,8 +42,8 @@ const SUB_A = {
   userAgent: 'Chrome on Pixel',
 };
 
-describe('PushSubscriptionRepository (push-notifications T1)', () => {
-  test('migration 0013 applied: the table + a subscription round-trips', async () => {
+describe('PushSubscriptionRepository', () => {
+  test('a subscription round-trips through the migrated table', async () => {
     const stored = await repo.upsertByEndpoint(USER_A, SUB_A);
     expect(stored.id).toBeTruthy();
     expect(stored.userId).toBe(USER_A);
@@ -79,7 +60,6 @@ describe('PushSubscriptionRepository (push-notifications T1)', () => {
 
   test('upsertByEndpoint is idempotent on (userId, endpoint) — re-subscribe updates, never duplicates', async () => {
     await repo.upsertByEndpoint(USER_A, SUB_A);
-    // Same endpoint, rotated keys (the browser re-subscribed); also bump+reset failure path.
     const updated = await repo.upsertByEndpoint(USER_A, {
       ...SUB_A,
       p256dh: 'BPp256dhKeyROTATED',
@@ -88,7 +68,7 @@ describe('PushSubscriptionRepository (push-notifications T1)', () => {
     });
 
     const all = await repo.findByUser(USER_A);
-    expect(all).toHaveLength(1); // NOT 2 — the same device, updated in place
+    expect(all).toHaveLength(1);
     expect(updated.p256dh).toBe('BPp256dhKeyROTATED');
     expect(updated.auth).toBe('authSecretROTATED');
     expect(updated.userAgent).toBe('Chrome on Pixel 2');
@@ -121,12 +101,10 @@ describe('PushSubscriptionRepository (push-notifications T1)', () => {
   test('deleteByEndpoint is userId-scoped (IDOR) — user B cannot delete user A subscription', async () => {
     await repo.upsertByEndpoint(USER_A, SUB_A);
 
-    // User B tries to delete user A's endpoint — no row of B's matches → no-op.
     const bDeletedAs = await repo.deleteByEndpoint(USER_B, SUB_A.endpoint);
     expect(bDeletedAs).toBe(false);
-    expect(await repo.findByUser(USER_A)).toHaveLength(1); // A's subscription survives
+    expect(await repo.findByUser(USER_A)).toHaveLength(1);
 
-    // The owner can delete it.
     const aDeleted = await repo.deleteByEndpoint(USER_A, SUB_A.endpoint);
     expect(aDeleted).toBe(true);
     expect(await repo.findByUser(USER_A)).toHaveLength(0);
@@ -154,7 +132,7 @@ describe('PushSubscriptionRepository (push-notifications T1)', () => {
   });
 
   test('per-user cap: a flood of distinct endpoints is bounded to maxSubscriptionsPerUser', async () => {
-    const cap = 20; // CONFIG.validation.push.maxSubscriptionsPerUser
+    const cap = 20;
     for (let i = 0; i < cap + 5; i++) {
       await repo.upsertByEndpoint(USER_A, {
         endpoint: `https://fcm.googleapis.com/fcm/send/dev-${i}`,
@@ -162,7 +140,7 @@ describe('PushSubscriptionRepository (push-notifications T1)', () => {
         auth: 'a',
       });
     }
-    expect(await repo.findByUser(USER_A)).toHaveLength(cap); // never exceeds the cap
+    expect(await repo.findByUser(USER_A)).toHaveLength(cap);
   });
 
   test('under the cap nothing is evicted', async () => {
@@ -178,7 +156,6 @@ describe('PushSubscriptionRepository (push-notifications T1)', () => {
 
   test('device rotation: a NEW device past the cap evicts the OLDEST, keeps the new one', async () => {
     const cap = 20;
-    // Seed exactly `cap` rows stamped in the DISTANT past (provably older than anything upsert stamps now).
     for (let i = 0; i < cap; i++) {
       sqliteDb.run(
         `INSERT INTO push_subscriptions (id, user_id, endpoint, p256dh, auth, failure_count, created_at)
@@ -187,16 +164,15 @@ describe('PushSubscriptionRepository (push-notifications T1)', () => {
     }
     expect(await repo.findByUser(USER_A)).toHaveLength(cap);
 
-    // A new device subscribes → count stays at the cap, the NEW endpoint survives, an OLD one was evicted.
     const newEndpoint = 'https://fcm.googleapis.com/fcm/send/brand-new';
     await repo.upsertByEndpoint(USER_A, { endpoint: newEndpoint, p256dh: 'k', auth: 'a' });
 
     const rows = await repo.findByUser(USER_A);
     expect(rows).toHaveLength(cap);
-    expect(rows.some((r) => r.endpoint === newEndpoint)).toBe(true); // the new device is kept
+    expect(rows.some((r) => r.endpoint === newEndpoint)).toBe(true);
     expect(rows.some((r) => r.endpoint === 'https://fcm.googleapis.com/fcm/send/old-0')).toBe(
       false
-    ); // an old one evicted
+    );
   });
 
   test('re-subscribe (same endpoint) at the cap does NOT evict — it updates in place', async () => {
@@ -209,7 +185,6 @@ describe('PushSubscriptionRepository (push-notifications T1)', () => {
       });
     }
     expect(await repo.findByUser(USER_A)).toHaveLength(cap);
-    // Re-subscribing an EXISTING endpoint is a conflict-update, not a new row → count unchanged, no eviction.
     await repo.upsertByEndpoint(USER_A, {
       endpoint: 'https://fcm.googleapis.com/fcm/send/r-0',
       p256dh: 'rotated',

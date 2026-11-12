@@ -1,25 +1,10 @@
-/**
- * An icon-only control needs an `aria-label`. A `title` is not a substitute: it is a mouse-only
- * tooltip, it never appears on a touch device, and the kit sets `pointer-events: none` on a
- * disabled control so the browser does not even hover-test it. `UIQuality.md` says so outright —
- * "Icon-only buttons MUST have aria-label" — but axe accepts `title` as an accessible name, so
- * the sweep that found the unnamed controls could not find the badly-named ones.
- *
- * These two files were the surviving instances. The offline cards are asserted by rendering them
- * and reading the names off the DOM; the odometer tab pulls in a chart and an API client, so it is
- * asserted against its source with a rule that generalises past today's two controls: a literal
- * `title` in that file must be matched by an `aria-label` carrying the same words.
- */
-
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, test, vi } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { render } from '@testing-library/svelte';
 import OfflineExpenseCards from '../expenses/OfflineExpenseCards.svelte';
-import type { OfflineExpense } from '$lib/utils/offline-storage';
-
-vi.mock('svelte', () => import('../../../../node_modules/svelte/src/index-client.js' as string));
+import type { OfflineExpense } from '#lib/utils/offline-storage.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ODOMETER_TAB = join(HERE, '..', 'vehicles', 'OdometerTab.svelte');
@@ -51,7 +36,6 @@ describe('the offline expense cards', () => {
 		expect(buttons.length).toBeGreaterThan(0);
 
 		for (const button of buttons) {
-			// Icon-only: the control renders an svg and no text of its own.
 			if (button.textContent?.trim()) continue;
 			expect(
 				button.getAttribute('aria-label'),
@@ -59,7 +43,6 @@ describe('the offline expense cards', () => {
 			).toBeTruthy();
 		}
 
-		// The two names, so a rename has to be deliberate rather than a silent drop to `title`.
 		expect(container.querySelector('button[aria-label="Delete pending expense"]')).not.toBeNull();
 		expect(container.querySelector('button[aria-label="Discard this entry"]')).not.toBeNull();
 	});
@@ -67,11 +50,6 @@ describe('the offline expense cards', () => {
 
 const CONTROL_TAGS = new Set(['a', 'button', 'Button']);
 
-/**
- * Every `title="…"` set on a control in `source`. The owning tag is found by walking back to the
- * nearest `<`, which is reliable in Svelte markup: an attribute value may hold `=>` but not `<`.
- * A `title` on a `<div>` is a truncation tooltip, not a name, so only controls are collected.
- */
 function controlTitles(source: string): string[] {
 	return [...source.matchAll(/\btitle="([^"]+)"/g)]
 		.filter(match => {

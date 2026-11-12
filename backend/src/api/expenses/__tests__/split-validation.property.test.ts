@@ -1,27 +1,12 @@
-/**
- * Property 9: Split config validation correctness
- *
- * Valid configs with correct method, non-empty vehicles, non-negative amounts,
- * percentages in [0,100] are accepted; invalid configs are rejected.
- *
- * **Validates: Requirements 3.1, 3.3, 3.4**
- */
-
 import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { splitConfigSchema } from '../validation';
-
-// ---------------------------------------------------------------------------
-// Generators
-// ---------------------------------------------------------------------------
 
 const vehicleIdArb = fc.stringMatching(/^v[a-z0-9]{1,10}$/);
 
 const vehicleIdsArb = fc
   .uniqueArray(vehicleIdArb, { minLength: 1, maxLength: 10 })
   .filter((ids) => ids.length >= 1);
-
-// --- Valid config generators ---
 
 const validEvenConfigArb = vehicleIdsArb.map((vehicleIds) => ({
   method: 'even' as const,
@@ -70,15 +55,11 @@ const validConfigArb = fc.oneof(
   validPercentageConfigArb
 );
 
-// --- Invalid config generators ---
-
-/** Even split with empty vehicleIds array */
 const invalidEvenEmptyArb = fc.constant({
   method: 'even' as const,
   vehicleIds: [] as string[],
 });
 
-/** Absolute split with negative amount */
 const invalidAbsoluteNegativeArb = vehicleIdsArb.chain((vehicleIds) =>
   fc.double({ min: -10000, max: -0.01, noNaN: true }).map((negAmount) => ({
     method: 'absolute' as const,
@@ -89,13 +70,11 @@ const invalidAbsoluteNegativeArb = vehicleIdsArb.chain((vehicleIds) =>
   }))
 );
 
-/** Absolute split with empty allocations */
 const invalidAbsoluteEmptyArb = fc.constant({
   method: 'absolute' as const,
   allocations: [] as Array<{ vehicleId: string; amount: number }>,
 });
 
-/** Percentage split with value > 100 */
 const invalidPercentageOverArb = vehicleIdsArb.chain((vehicleIds) =>
   fc.double({ min: 100.01, max: 1000, noNaN: true }).map((overPct) => ({
     method: 'percentage' as const,
@@ -106,7 +85,6 @@ const invalidPercentageOverArb = vehicleIdsArb.chain((vehicleIds) =>
   }))
 );
 
-/** Percentage split with negative value */
 const invalidPercentageNegativeArb = vehicleIdsArb.chain((vehicleIds) =>
   fc.double({ min: -1000, max: -0.01, noNaN: true }).map((negPct) => ({
     method: 'percentage' as const,
@@ -117,23 +95,17 @@ const invalidPercentageNegativeArb = vehicleIdsArb.chain((vehicleIds) =>
   }))
 );
 
-/** Percentage split with empty allocations */
 const invalidPercentageEmptyArb = fc.constant({
   method: 'percentage' as const,
   allocations: [] as Array<{ vehicleId: string; percentage: number }>,
 });
 
-/** Even split with empty-string vehicleId */
 const invalidEvenEmptyIdArb = fc.constant({
   method: 'even' as const,
   vehicleIds: [''],
 });
 
-// ---------------------------------------------------------------------------
-// Property 9: Split config validation correctness
-// **Validates: Requirements 3.1, 3.3, 3.4**
-// ---------------------------------------------------------------------------
-describe('Property 9: Split config validation correctness', () => {
+describe('Split config validation correctness', () => {
   test('valid split configs are accepted by the schema', () => {
     fc.assert(
       fc.property(validConfigArb, (config) => {

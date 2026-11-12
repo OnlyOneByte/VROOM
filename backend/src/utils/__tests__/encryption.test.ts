@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { randomBytes } from 'node:crypto';
 import { _clearKeyCache, decrypt, encrypt } from '../encryption';
 
-// Valid 32-byte hex key for tests
 const TEST_KEY = 'a'.repeat(64);
 const ALT_KEY = 'b'.repeat(64);
 
@@ -23,9 +22,6 @@ afterEach(() => {
   _clearKeyCache();
 });
 
-// ---------------------------------------------------------------------------
-// Round-trip
-// ---------------------------------------------------------------------------
 describe('encrypt/decrypt round-trip', () => {
   test('decrypts back to original plaintext', () => {
     const plaintext = 'hello world';
@@ -58,9 +54,6 @@ describe('encrypt/decrypt round-trip', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Wrong key
-// ---------------------------------------------------------------------------
 describe('wrong key throws', () => {
   test('decrypt with different key throws', () => {
     const ciphertext = encrypt('secret data');
@@ -70,14 +63,10 @@ describe('wrong key throws', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Tampered ciphertext
-// ---------------------------------------------------------------------------
 describe('tampered ciphertext throws', () => {
   test('flipping a byte in ciphertext throws', () => {
     const ciphertext = encrypt('sensitive');
     const buf = Buffer.from(ciphertext, 'base64');
-    // Flip a byte in the encrypted payload area (after IV + auth tag = 28 bytes)
     if (buf.length > 28) {
       buf[28] ^= 0xff;
     }
@@ -96,9 +85,6 @@ describe('tampered ciphertext throws', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Missing / invalid key
-// ---------------------------------------------------------------------------
 describe('missing or invalid encryption key', () => {
   test('throws when PROVIDER_ENCRYPTION_KEY is not set', () => {
     delete process.env.PROVIDER_ENCRYPTION_KEY;
@@ -109,7 +95,7 @@ describe('missing or invalid encryption key', () => {
   });
 
   test('throws when key is wrong length', () => {
-    process.env.PROVIDER_ENCRYPTION_KEY = 'abcd'; // too short
+    process.env.PROVIDER_ENCRYPTION_KEY = 'abcd';
     _clearKeyCache();
     expect(() => encrypt('test')).toThrow('must be a 32-byte hex string');
   });

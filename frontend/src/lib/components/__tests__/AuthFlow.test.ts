@@ -3,14 +3,10 @@ import { authStore } from '../../stores/auth.svelte';
 import type { User } from '../../types/index.js';
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
+import { routes } from '#lib/routes.ts';
 
-vi.mock('$app/navigation', () => ({
-	goto: vi.fn()
-}));
-
-vi.mock('$app/paths', () => ({
-	resolve: (path: string) => path
-}));
+vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
+vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
@@ -26,7 +22,6 @@ const mockUser: User = {
 	updatedAt: '2024-01-01T00:00:00Z'
 };
 
-/** Helper: mock a successful apiClient-compatible response */
 function apiOk(data: unknown) {
 	return {
 		ok: true,
@@ -66,13 +61,11 @@ describe('Authentication Flow Integration', () => {
 
 		it('manages loading state during authentication', () => {
 			authStore.setLoading(true);
-			// Direct property access
 			expect(authStore.isLoading).toBe(true);
 		});
 
 		it('handles authentication errors', () => {
 			authStore.setError('Authentication failed');
-			// Direct property access
 			expect(authStore.error).toBe('Authentication failed');
 			expect(authStore.isLoading).toBe(false);
 		});
@@ -80,7 +73,6 @@ describe('Authentication Flow Integration', () => {
 		it('clears errors on successful authentication', () => {
 			authStore.setError('Previous error');
 			authStore.setUser(mockUser);
-			// Direct property access
 			expect(authStore.error).toBe(null);
 			expect(authStore.isAuthenticated).toBe(true);
 		});
@@ -92,7 +84,6 @@ describe('Authentication Flow Integration', () => {
 				apiOk({ user: mockUser, session: { id: 'sess-1', expiresAt: '2026-04-07T00:00:00Z' } })
 			);
 			await authStore.initialize();
-			// Direct property access
 			expect(authStore.user).toEqual(mockUser);
 			expect(authStore.isAuthenticated).toBe(true);
 			expect(authStore.isLoading).toBe(false);
@@ -100,7 +91,6 @@ describe('Authentication Flow Integration', () => {
 
 		it('handles successful authentication callback', () => {
 			authStore.setUser(mockUser, 'test-token');
-			// Direct property access
 			expect(authStore.user).toEqual(mockUser);
 			expect(authStore.isAuthenticated).toBe(true);
 			expect(authStore.token).toBe('test-token');
@@ -110,7 +100,6 @@ describe('Authentication Flow Integration', () => {
 			authStore.setUser(mockUser, 'test-token');
 			mockFetch.mockResolvedValueOnce(apiError(401, 'Unauthorized'));
 			await authStore.initialize();
-			// Direct property access
 			expect(authStore.user).toBe(null);
 			expect(authStore.isAuthenticated).toBe(false);
 		});
@@ -119,16 +108,14 @@ describe('Authentication Flow Integration', () => {
 	describe('Protected Route Access', () => {
 		it('redirects unauthenticated users to login', () => {
 			authStore.clearUser();
-			// Direct property access
 			if (!authStore.isAuthenticated && !authStore.isLoading) {
-				goto(resolve('/auth'));
+				goto(resolve(routes.auth));
 			}
 			expect(goto).toHaveBeenCalledWith('/auth');
 		});
 
 		it('allows authenticated users to access protected routes', () => {
 			authStore.setUser(mockUser);
-			// Direct property access
 			expect(authStore.isAuthenticated).toBe(true);
 			expect(goto).not.toHaveBeenCalled();
 		});
@@ -137,7 +124,6 @@ describe('Authentication Flow Integration', () => {
 	describe('Dashboard Access Logic', () => {
 		it('provides correct user data for dashboard display', () => {
 			authStore.setUser(mockUser);
-			// Direct property access
 			expect(authStore.user?.displayName).toBe('Test User');
 			expect(authStore.user?.email).toBe('test@example.com');
 		});
@@ -146,7 +132,6 @@ describe('Authentication Flow Integration', () => {
 			authStore.setUser(mockUser);
 			mockFetch.mockResolvedValueOnce(apiOk(null));
 			await authStore.logout();
-			// Direct property access
 			expect(authStore.user).toBe(null);
 			expect(authStore.isAuthenticated).toBe(false);
 		});
@@ -165,7 +150,6 @@ describe('Authentication Flow Integration', () => {
 			authStore.setUser(mockUser, 'old-token');
 			mockFetch.mockResolvedValueOnce(apiError(401, 'Token refresh failed'));
 			await expect(authStore.refreshToken()).rejects.toThrow();
-			// Direct property access
 			expect(authStore.user).toBe(null);
 			expect(authStore.isAuthenticated).toBe(false);
 		});
@@ -175,7 +159,6 @@ describe('Authentication Flow Integration', () => {
 		it('handles network errors gracefully', async () => {
 			mockFetch.mockRejectedValueOnce(new Error('Network error'));
 			await authStore.initialize();
-			// Direct property access
 			expect(authStore.isAuthenticated).toBe(false);
 		});
 
@@ -193,7 +176,6 @@ describe('Authentication Flow Integration', () => {
 				apiOk({ user: mockUser, session: { id: 'sess-1', expiresAt: '2026-04-07T00:00:00Z' } })
 			);
 			await authStore.initialize();
-			// Direct property access
 			expect(authStore.user).toEqual(mockUser);
 			expect(authStore.isAuthenticated).toBe(true);
 		});
@@ -201,7 +183,6 @@ describe('Authentication Flow Integration', () => {
 		it('handles invalid sessions on page reload', async () => {
 			mockFetch.mockResolvedValueOnce(apiError(401, 'Unauthorized'));
 			await authStore.initialize();
-			// Direct property access
 			expect(authStore.user).toBe(null);
 			expect(authStore.isAuthenticated).toBe(false);
 		});

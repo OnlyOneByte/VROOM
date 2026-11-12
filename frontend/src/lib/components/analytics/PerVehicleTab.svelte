@@ -1,26 +1,26 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { routes } from '$lib/routes';
+	import { routes } from '#lib/routes.ts';
 	import { LoaderCircle, CircleAlert } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import * as Select from '$lib/components/ui/select';
-	import { Progress } from '$lib/components/ui/progress';
-	import { analyticsApi, getDefaultDateRange } from '$lib/services/analytics-api';
-	import { vehicleApi } from '$lib/services/vehicle-api';
-	import { AppPieChart } from '$lib/components/charts';
-	import StatCardGrid from '$lib/components/charts/StatCardGrid.svelte';
-	import { buildCategoryPieData } from '$lib/utils/chart-colors';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import { Progress } from '#lib/components/ui/progress/index.ts';
+	import { analyticsApi, getDefaultDateRange } from '#lib/services/analytics-api.ts';
+	import { vehicleApi } from '#lib/services/vehicle-api.ts';
+	import { AppPieChart } from '#lib/components/charts/index.ts';
+	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
+	import { buildCategoryPieData } from '#lib/utils/chart-colors.ts';
 	import type {
 		Vehicle,
 		VehicleHealthResponse,
 		VehicleTCOResponse,
 		VehicleExpensesResponse
-	} from '$lib/types';
-	import { formatCurrency } from '$lib/utils/formatters';
-	import { settingsStore } from '$lib/stores/settings.svelte';
-	import { getCostPerDistanceLabel, getDistanceUnitLabel } from '$lib/utils/units';
+	} from '#lib/types/index.ts';
+	import { formatCurrency } from '#lib/utils/formatters.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
+	import { getCostPerDistanceLabel, getDistanceUnitLabel } from '#lib/utils/units.ts';
 
 	let vehicles = $state<Vehicle[]>([]);
 	let selectedVehicleId = $state<string>('');
@@ -72,7 +72,6 @@
 		loadVehicles();
 	});
 
-	// After vehicles load, auto-select the first vehicle
 	$effect(() => {
 		if (!isLoadingVehicles && vehicles.length > 0 && !selectedVehicleId) {
 			const id = vehicles[0]!.id;
@@ -83,17 +82,11 @@
 
 	let selectedVehicle = $derived(vehicles.find(v => v.id === selectedVehicleId));
 
-	// Dynamic unit labels — per-vehicle view uses selected vehicle's unit preferences
 	let units = $derived(selectedVehicle?.unitPreferences ?? settingsStore.unitPreferences);
 	let costPerDistLabel = $derived(getCostPerDistanceLabel(units.distanceUnit));
 	let distLongLabel = $derived(getDistanceUnitLabel(units.distanceUnit));
 
-	// --- Health Score ---
-	// The score TEXT is intentionally NOT tinted with the tier color: chart-5 amber
-	// (#fe9a00) on its own bg-chart-5/10 tint is only 1.97:1 — illegible, failing WCAG
-	// AA even at the large-text 3:1 bar. The tier is instead conveyed by the
-	// tint-colored ring (graphical) PLUS an explicit text label below, so it's legible
-	// AND not signalled by color alone.
+	// Tier colours fail WCAG contrast as text on their tint; the ring and a label carry the tier.
 	function getScoreBgColor(score: number): string {
 		if (score >= 70) return 'bg-chart-2/10';
 		if (score >= 40) return 'bg-chart-5/10';
@@ -106,7 +99,6 @@
 		return 'Needs attention';
 	}
 
-	// --- TCO Summary Stat Cards ---
 	let tcoSummaryItems = $derived.by(() => {
 		if (!tco) return [];
 		return [
@@ -120,7 +112,6 @@
 		];
 	});
 
-	// --- Expense Category Breakdown → AppPieChart ---
 	let expensePieData = $derived(buildCategoryPieData(expenses?.expenseBreakdown ?? []));
 </script>
 
@@ -135,7 +126,6 @@
 	</div>
 {:else}
 	<div class="space-y-6">
-		<!-- Vehicle Selector -->
 		<Card.Root>
 			<Card.Header>
 				<Card.Title>Select Vehicle</Card.Title>
@@ -181,7 +171,6 @@
 				</Button>
 			</div>
 		{:else if health && tco && expenses}
-			<!-- Section 1: Vehicle Health Score -->
 			<Card.Root>
 				<Card.Header>
 					<Card.Title>Vehicle Health Score</Card.Title>
@@ -189,7 +178,6 @@
 				</Card.Header>
 				<Card.Content>
 					<div class="space-y-6">
-						<!-- Overall Score Badge -->
 						<div class="flex items-center gap-4">
 							<div
 								class="flex h-20 w-20 items-center justify-center rounded-full {getScoreBgColor(
@@ -206,7 +194,6 @@
 							</div>
 						</div>
 
-						<!-- Sub-scores with Progress bars -->
 						<div class="grid gap-5 md:grid-cols-3">
 							<div class="space-y-2">
 								<div class="flex items-center justify-between">
@@ -234,10 +221,8 @@
 				</Card.Content>
 			</Card.Root>
 
-			<!-- Section 2: TCO Dashboard -->
 			<StatCardGrid items={tcoSummaryItems} columns={4} />
 
-			<!-- Expense Category Breakdown (migrated to AppPieChart) -->
 			<AppPieChart
 				title="Expense Breakdown"
 				description="Category distribution"

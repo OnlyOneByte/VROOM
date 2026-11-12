@@ -1,9 +1,4 @@
-/**
- * Provider API service
- * Centralized API calls for storage provider management
- */
-
-import type { UserProviderInfo } from '$lib/types';
+import type { UserProviderInfo } from '#lib/types/index.ts';
 import { apiClient } from './api-client';
 
 interface CreateProviderData {

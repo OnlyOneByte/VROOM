@@ -5,13 +5,7 @@ import { getDb } from '../../db/connection';
 import type { UserProvider } from '../../db/schema';
 import { userProviders } from '../../db/schema';
 
-/**
- * The shape of an auth-domain provider's `config` blob (the OAuth identity profile). One source of
- * truth for the `{ email, avatarUrl }` object that was hand-assembled at 3 write sites:
- * create + updateProfile here, and the new-user insert in auth/routes.ts. It's read back via
- * `config.email` / `config.avatarUrl`, so the write sites must stay in lockstep — a future field
- * (e.g. locale) is then added in one place, not three.
- */
+// Read back via config.email / config.avatarUrl, so every write must go through this builder.
 export function buildAuthProviderConfig(
   email: string,
   avatarUrl?: string

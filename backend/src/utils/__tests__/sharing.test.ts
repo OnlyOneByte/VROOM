@@ -1,14 +1,3 @@
-/**
- * vehicle-sharing T2 — the access-resolver seam (utils/sharing.ts, design §2).
- *
- * Drives the REAL resolveVehicleAccess / requireVehicleRead / requireVehicleWrite against a migrated
- * throwaway DB seeded with an owner, an invitee, a third party, and shares at every status/level.
- * This is the ONE seam every shared route routes through, so its matrix is the load-bearing
- * cross-tenant proof: owner→full, accepted-viewer→read-only, accepted-editor→
- * read+write, pending/declined/revoked→NONE, non-share third party→404, nonexistent vehicle→404.
- * 404 (NotFoundError) — never 403 — is asserted on every denial (the enumeration-oracle rule).
- */
-
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
@@ -16,7 +5,12 @@ import { applyMigration, loadMigrations } from '../../db/__tests__/migration-hel
 import type { AppDatabase } from '../../db/connection';
 import * as schema from '../../db/schema';
 import { NotFoundError } from '../../errors';
-import { requireVehicleRead, requireVehicleWrite, resolveVehicleAccess } from '../sharing';
+import {
+  requireVehicleOwnerScope,
+  requireVehicleRead,
+  requireVehicleWrite,
+  resolveVehicleAccess,
+} from '../sharing';
 
 let sqlite: Database;
 let db: AppDatabase;
@@ -50,7 +44,6 @@ beforeEach(() => {
 });
 afterEach(() => sqlite.close());
 
-/** Seed one share row (defaults: invitee, viewer). */
 function share(status: string, level = 'viewer', sharedWith = INVITEE): void {
   sqlite.run(
     `INSERT INTO vehicle_shares (id, vehicle_id, owner_id, shared_with_id, level, status, created_at, updated_at)
@@ -64,7 +57,7 @@ describe('resolveVehicleAccess — owner / accepted-share / none', () => {
     expect(await resolveVehicleAccess(VEHICLE, OWNER, db)).toEqual({ role: 'owner' });
   });
 
-  test('an ACCEPTED viewer share resolves to viewer; an ACCEPTED editor share to editor', async () => {
+  test('an ACCEPTED viewer share resolves to viewer', async () => {
     share('accepted', 'viewer');
     expect(await resolveVehicleAccess(VEHICLE, INVITEE, db)).toEqual({ role: 'viewer' });
   });
@@ -95,17 +88,12 @@ describe('resolveVehicleAccess — owner / accepted-share / none', () => {
   });
 
   test('the OWNER truth is vehicles.userId, not the denormalized share.ownerId', async () => {
-    // A share row that LIES about ownerId (names the stranger as owner) must NOT grant the stranger
-    // owner access — ownership is vehicles.userId only. The stranger has no accepted share → null.
     share('accepted', 'editor', STRANGER);
     sqlite.run('UPDATE vehicle_shares SET owner_id = ? WHERE shared_with_id = ?', [
       STRANGER,
       STRANGER,
     ]);
-    // The stranger DOES have an accepted editor share here, so they get editor (not owner) — the
-    // point: they are never elevated to OWNER by the ownerId column.
     expect(await resolveVehicleAccess(VEHICLE, STRANGER, db)).toEqual({ role: 'editor' });
-    // And the real owner is still owner.
     expect(await resolveVehicleAccess(VEHICLE, OWNER, db)).toEqual({ role: 'owner' });
   });
 });
@@ -134,15 +122,39 @@ describe('requireVehicleWrite — owner|editor or 404 (viewer denied)', () => {
     expect(await requireVehicleWrite(VEHICLE, INVITEE, db)).toEqual({ role: 'editor' });
   });
 
-  test('an accepted VIEWER is denied write with NotFoundError (→404, never 403 — no capability oracle)', async () => {
+  test('an accepted viewer is denied write with NotFoundError', async () => {
     share('accepted', 'viewer');
-    // The viewer CAN read…
     expect(await requireVehicleRead(VEHICLE, INVITEE, db)).toEqual({ role: 'viewer' });
-    // …but is denied write with the SAME 404 a stranger gets.
     await expect(requireVehicleWrite(VEHICLE, INVITEE, db)).rejects.toBeInstanceOf(NotFoundError);
   });
 
   test('a third party is denied write with NotFoundError', async () => {
     await expect(requireVehicleWrite(VEHICLE, STRANGER, db)).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe('requireVehicleOwnerScope — scopes shared access to the owner id', () => {
+  test('the owner scopes to themselves', async () => {
+    expect(await requireVehicleOwnerScope(VEHICLE, OWNER, 'write', db)).toBe(OWNER);
+  });
+
+  test('an accepted viewer reads in the owner scope', async () => {
+    share('accepted', 'viewer');
+    expect(await requireVehicleOwnerScope(VEHICLE, INVITEE, 'read', db)).toBe(OWNER);
+  });
+
+  test('an accepted editor writes in the owner scope', async () => {
+    share('accepted', 'editor');
+    expect(await requireVehicleOwnerScope(VEHICLE, INVITEE, 'write', db)).toBe(OWNER);
+  });
+
+  test('a viewer is denied write and a stranger is denied read', async () => {
+    share('accepted', 'viewer');
+    await expect(requireVehicleOwnerScope(VEHICLE, INVITEE, 'write', db)).rejects.toBeInstanceOf(
+      NotFoundError
+    );
+    await expect(requireVehicleOwnerScope(VEHICLE, STRANGER, 'read', db)).rejects.toBeInstanceOf(
+      NotFoundError
+    );
   });
 });

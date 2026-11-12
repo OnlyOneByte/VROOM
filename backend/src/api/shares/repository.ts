@@ -1,15 +1,4 @@
-/**
- * Vehicle-shares repository (vehicle-sharing T3/T4). Thin BaseRepository subclass + the scoped finders
- * the share-management routes need. Two ownership truths are deliberately distinct:
- *  - the OWNER of a vehicle is `vehicles.userId` (validated at the route via validateVehicleOwnership),
- *  - `vehicle_shares.ownerId` is a DENORMALIZED copy, written at invite time, used ONLY to make the
- *  owner-side "shares I granted across all my vehicles" list index-friendly. Never the gate.
- *
- * EVERY destructive/mutating finder keys on the acting user's relationship to the row (ownerId for
- * owner-side, sharedWithId for invitee-side) — the id-only-delete lesson: never act on a share by
- * id alone. The route layer additionally re-validates vehicle ownership before an invite insert:
- * throw BEFORE the row write, never inside an async transaction after it.
- */
+// vehicle_shares.ownerId is a denormalized copy for listing only; never use it as the access gate.
 
 import { and, eq } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
@@ -18,7 +7,6 @@ import type { NewVehicleShare, VehicleShare } from '../../db/schema';
 import { users, vehicleShares, vehicles } from '../../db/schema';
 import { BaseRepository } from '../../utils/repository';
 
-/** An ACCEPTED grant TO a user: which vehicle, at what level, owned (and shared) by whom. */
 export interface AcceptedShareAccess {
   shareId: string;
   vehicleId: string;
@@ -27,35 +15,16 @@ export interface AcceptedShareAccess {
   ownerName: string;
 }
 
-/**
- * A share RECEIVED by an invitee, enriched for the "Shared with me" surface (T12). The raw share row
- * carries only foreign-key IDs; a PENDING invitee has no other way to resolve them (the T5a fleet
- * widening is ACCEPTED-only, so a pending invite's vehicle is otherwise invisible). So `/received`
- * joins through to the vehicle's display name + the owner's display name — exactly the columns the
- * invitee needs to render "Honda Civic — shared by Alice" without an N+1 follow-up read.
- */
 export interface ReceivedShare extends VehicleShare {
-  /** nickname, else "year make model" — mirrors the FE getVehicleDisplayName helper. */
   vehicleName: string;
-  /** The owner's display name (users.displayName), matching T5a's sharedAccess.sharedBy. */
   sharedBy: string;
 }
 
-/**
- * A share is "active" — it occupies the one-per-(vehicle, invitee) slot — while pending or accepted;
- * declined and revoked are inert history, so they neither grant access nor block a re-invite.
- *
- * PAIRED DEFINITION: the partial unique index `vehicle_shares_active_idx` (db/schema.ts) spells the
- * same list out in raw SQL, because its `WHERE status in (...)` clause is baked into generated DDL and
- * can only change through a migration. Everything in TypeScript must go through this constant so
- * adding a status is a two-place change (here + a migration) rather than a hunt for hand-written
- * comparisons — `shares-active-status-pairing.test.ts` fails if the two sides drift.
- */
+// Must match the partial unique index vehicle_shares_active_idx in db/schema.ts; changing either requires a migration.
 export const ACTIVE_SHARE_STATUSES = ['pending', 'accepted'] as const;
 
 export type ActiveShareStatus = (typeof ACTIVE_SHARE_STATUSES)[number];
 
-/** Narrowing membership test for {@link ACTIVE_SHARE_STATUSES} — `status` comes from a free text column. */
 export function isActiveShareStatus(status: string): status is ActiveShareStatus {
   return ACTIVE_SHARE_STATUSES.includes(status as ActiveShareStatus);
 }
@@ -65,7 +34,6 @@ export class VehicleShareRepository extends BaseRepository<VehicleShare, NewVehi
     super(db, vehicleShares);
   }
 
-  /** The current ACTIVE (pending|accepted) share for a (vehicle, invitee), if any — the dup-invite gate. */
   async findActiveForVehicleAndUser(
     vehicleId: string,
     sharedWithId: string
@@ -79,7 +47,6 @@ export class VehicleShareRepository extends BaseRepository<VehicleShare, NewVehi
     return rows.find((r) => isActiveShareStatus(r.status)) ?? null;
   }
 
-  /** All shares the owner granted, across ALL their vehicles (owner-side "manage" list). */
   async findByOwner(ownerId: string): Promise<VehicleShare[]> {
     return this.db
       .select()
@@ -88,7 +55,6 @@ export class VehicleShareRepository extends BaseRepository<VehicleShare, NewVehi
       .orderBy(vehicleShares.createdAt);
   }
 
-  /** A single share scoped to its OWNER — the backing read for owner-side level-change / revoke. */
   async findByIdAndOwner(id: string, ownerId: string): Promise<VehicleShare | null> {
     const [row] = await this.db
       .select()
@@ -98,13 +64,6 @@ export class VehicleShareRepository extends BaseRepository<VehicleShare, NewVehi
     return row ?? null;
   }
 
-  /**
-   * Shares RECEIVED by an invitee — the invitee-side "shared with me" list (T4/T12). Returns pending +
-   * accepted only (declined/revoked are inert history the invitee should not see surfaced), ordered
-   * oldest-first to match the owner-side list. Joins the vehicle + owner so a pending invite renders a
-   * human label without an N+1; the join columns are the SHARE's own vehicle/owner (still scoped by
-   * sharedWithId), so it widens no cross-tenant read — the invitee already knows it was shared with them.
-   */
   async findReceivedByUser(sharedWithId: string): Promise<ReceivedShare[]> {
     const rows = await this.db
       .select({
@@ -129,11 +88,6 @@ export class VehicleShareRepository extends BaseRepository<VehicleShare, NewVehi
       }));
   }
 
-  /**
-   * The ACCEPTED grants TO a user — the shared-fleet widening (T5a, GET /vehicles?include=shared).
-   * Joins the owner's display name so a shared vehicle card can render "shared by <name>" without an
-   * N+1. Accepted-only (pending/declined/revoked grant no fleet visibility).
-   */
   async findAcceptedAccessForUser(sharedWithId: string): Promise<AcceptedShareAccess[]> {
     const rows = await this.db
       .select({
@@ -151,7 +105,6 @@ export class VehicleShareRepository extends BaseRepository<VehicleShare, NewVehi
     return rows;
   }
 
-  /** A single share scoped to its INVITEE — the backing read for accept / decline (T4). */
   async findByIdAndSharedWith(id: string, sharedWithId: string): Promise<VehicleShare | null> {
     const [row] = await this.db
       .select()

@@ -1,14 +1,18 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { routes } from '$lib/routes';
+	import { routes } from '#lib/routes.ts';
 	import { Clock, ArrowRight } from '@lucide/svelte';
-	import * as Card from '$lib/components/ui/card';
-	import { Button } from '$lib/components/ui/button';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import EmptyState from '$lib/components/common/empty-state.svelte';
-	import { formatCurrency, formatRelativeTime } from '$lib/utils/formatters';
-	import { categoryLabels, getCategoryColor, getCategoryIcon } from '$lib/utils/expense-helpers';
-	import type { ExpenseCategory } from '$lib/types';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import { formatCurrency, formatRelativeTime } from '#lib/utils/formatters.ts';
+	import {
+		categoryLabels,
+		getCategoryBadgeClasses,
+		getCategoryIcon
+	} from '#lib/utils/expense-helpers.ts';
+	import type { ExpenseCategory } from '#lib/types/index.ts';
 
 	interface RecentExpense {
 		id: string;
@@ -55,14 +59,9 @@
 					>
 						<div class="flex-1 min-w-0">
 							<div class="flex items-center gap-2 mb-1">
-								<!-- Category as a colored icon chip + NEUTRAL label text. Coloring the
-								     label text itself (text-chart-N on a same-hue 10% tint) failed WCAG AA
-								     contrast — e.g. chart-2 #009689 on #e5f5f3 is only 3.26:1, and the
-								     lighter chart-4/5 tints fail worse. The color lives on the icon
-								     (graphical, exempt) so the category affordance survives at AA. Mirrors
-								     the canonical category row in ExpensesTable. -->
+								<!-- Tinted label text fails WCAG AA; only the icon chip takes the category colour. -->
 								<span
-									class="flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium {getCategoryColor(
+									class="flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium {getCategoryBadgeClasses(
 										expense.category
 									)}"
 								>

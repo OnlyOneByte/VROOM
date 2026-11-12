@@ -1,7 +1,7 @@
 <script lang="ts">
 	import './line-chart-animations.css';
 	import { AreaChart } from 'layerchart';
-	import * as Chart from '$lib/components/ui/chart';
+	import * as Chart from '#lib/components/ui/chart/index.ts';
 	import ChartCard from './ChartCard.svelte';
 	import ChartLegend from './ChartLegend.svelte';
 	import {
@@ -9,7 +9,7 @@
 		CHART_PADDING,
 		SMOOTH_CURVE,
 		monthlyXAxisProps
-	} from '$lib/utils/chart-formatters';
+	} from '#lib/utils/chart-formatters.ts';
 	import type { Snippet } from 'svelte';
 
 	interface LegendItem {

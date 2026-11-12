@@ -1,23 +1,3 @@
-/**
- * Characterization tests for the two FOUNDATIONAL analytics primitives in analytics-charts.ts
- *  — `normalizeDate` and `groupByVehicle`, both ZERO-coverage despite every
- * date-bucketing + per-vehicle builder routing through them. The (fuel/date builders),
- * (expense-summary) and (maintenance/gas-price) audits certified the LEAVES; these are the ROOTS
- * those leaves call. Read against source firsthand and found CORRECT; this locks the conclusion so a
- * future edit can't silently regress it.
- *
- *  - normalizeDate — the SECONDS-vs-MILLISECONDS epoch heuristic (`< 1e12` → ×1000). This is the exact
- *  boundary where date corruption hides: the DB stores timestamps in SECONDS (the
- *  recurring mode:'timestamp' footgun the loop re-finds at), so a
- *  drifted threshold would shift every chart's dates by a factor of 1000. NOTHING
- *  asserted this boundary before. null→null; Date→identity; number routed by 1e12.
- *  - groupByVehicle — the cross-vehicle-pooling guard: groups rows by vehicleId so a date-ordered
- *  multi-vehicle list never pairs two DIFFERENT cars' consecutive rows. Preserves
- *  per-vehicle input order; empty→empty map.
- *
- * Pure module → no DB, no server.
- */
-
 import { describe, expect, test } from 'bun:test';
 import { groupByVehicle, normalizeDate } from '../analytics-charts';
 
@@ -32,7 +12,6 @@ describe('normalizeDate', () => {
   });
 
   test('a SECONDS epoch (< 1e12) is multiplied by 1000', () => {
-    // 1_700_000_000 s = 2023-11-14T22:13:20Z. As ms it would be 1970 — the corruption this guards.
     const seconds = 1_700_000_000;
     const out = normalizeDate(seconds) as Date;
     expect(out.getTime()).toBe(seconds * 1000);
@@ -40,14 +19,13 @@ describe('normalizeDate', () => {
   });
 
   test('a MILLISECONDS epoch (>= 1e12) is used verbatim', () => {
-    const ms = 1_700_000_000_000; // 2023-11-14, already ms
+    const ms = 1_700_000_000_000;
     const out = normalizeDate(ms) as Date;
     expect(out.getTime()).toBe(ms);
     expect(out.getUTCFullYear()).toBe(2023);
   });
 
   test('the 1e12 boundary itself is treated as milliseconds (NOT < 1e12 → no ×1000)', () => {
-    // 1e12 ms = 2001-09-09; if it were mis-scaled ×1000 it would land in the year ~33658.
     const out = normalizeDate(1e12) as Date;
     expect(out.getTime()).toBe(1e12);
     expect(out.getUTCFullYear()).toBe(2001);

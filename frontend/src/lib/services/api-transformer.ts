@@ -1,18 +1,6 @@
-/**
- * API Transformation Layer
- *
- * Transforms frontend data models to backend API contracts and vice versa.
- * v2: Backend uses `volume` directly — no fuelAmount bridging needed.
- * Maps: frontend amount ↔ backend expenseAmount, frontend volume/charge ↔ backend volume.
- */
+import type { BackendExpenseResponse, Expense, ExpenseCategory } from '#lib/types/index.ts';
+import { isElectricFuelType } from '#lib/utils/units.ts';
 
-import type { Expense, ExpenseCategory } from '$lib/types';
-import { isElectricFuelType } from '$lib/utils/units';
-
-/**
- * Backend expense request format (what we send to the API).
- * Internal to this module — not exported since no external consumer needs it.
- */
 interface BackendExpenseRequest {
 	vehicleId: string;
 	tags: string[];
@@ -22,59 +10,17 @@ interface BackendExpenseRequest {
 	mileage?: number;
 	volume?: number;
 	fuelType?: string;
-	// `null` on an edit means "clear the description" (the backend schema is
-	// .nullish() and writes null through); omitted/undefined leaves it unchanged.
 	description?: string | null;
-	// expense-location: same clear-on-edit contract as description.
 	location?: string | null;
 	missedFillup?: boolean;
 	sourceType?: string;
 	sourceId?: string;
 }
 
-/** Options controlling create-vs-edit serialization differences. */
 interface ToBackendOptions {
-	/**
-	 * When true (an EDIT), an empty/missing description is sent as explicit `null`
-	 * so the user can CLEAR it. When false (the default — create, and the offline
-	 * outbox + sync paths, which are create-only in v1), an empty description is
-	 * omitted, preserving the historical create payload byte-for-byte.
-	 */
 	isEdit?: boolean;
 }
 
-/**
- * Backend expense response format (what we receive from the API)
- */
-export interface BackendExpenseResponse {
-	id: string;
-	vehicleId: string;
-	userId: string;
-	tags: string[];
-	category: string;
-	expenseAmount: number;
-	date: string;
-	mileage?: number;
-	volume?: number;
-	fuelType?: string;
-	// Nullable column: a real response can carry null (a cleared description).
-	description?: string | null;
-	// expense-location: nullable free-text location (same clear-on-edit semantics as description).
-	location?: string | null;
-	missedFillup?: boolean;
-	sourceType?: string;
-	sourceId?: string;
-	groupId?: string;
-	groupTotal?: number;
-	splitMethod?: string;
-	createdAt: string;
-	updatedAt: string;
-}
-
-/**
- * Transform frontend expense to backend request format
- * Maps: amount → expenseAmount, volume/charge → volume
- */
 export function toBackendExpense(
 	frontendExpense: Partial<Expense> & {
 		vehicleId: string;
@@ -91,7 +37,6 @@ export function toBackendExpense(
 		date: frontendExpense.date || new Date().toISOString()
 	};
 
-	// Map volume or charge to backend volume field
 	if (isElectricFuelType(frontendExpense.fuelType)) {
 		if (frontendExpense.charge !== undefined && frontendExpense.charge !== null) {
 			backendExpense.volume = frontendExpense.charge;
@@ -102,7 +47,6 @@ export function toBackendExpense(
 		}
 	}
 
-	// Optional fields
 	if (frontendExpense.mileage !== undefined) {
 		backendExpense.mileage = frontendExpense.mileage;
 	}
@@ -112,11 +56,8 @@ export function toBackendExpense(
 	if (frontendExpense.description) {
 		backendExpense.description = frontendExpense.description;
 	} else if (options.isEdit) {
-		// Edit with an emptied description → send null to clear the stored value.
-		// (Create/offline/sync omit it, matching the historical payload.)
 		backendExpense.description = null;
 	}
-	// expense-location: same set-when-present / clear-on-edit pattern as description.
 	if (frontendExpense.location) {
 		backendExpense.location = frontendExpense.location;
 	} else if (options.isEdit) {
@@ -135,10 +76,6 @@ export function toBackendExpense(
 	return backendExpense;
 }
 
-/**
- * Transform backend expense response to frontend format
- * Maps: expenseAmount → amount, volume → volume or charge (based on fuelType)
- */
 export function fromBackendExpense(backendExpense: BackendExpenseResponse): Expense {
 	const frontendExpense: Expense = {
 		id: backendExpense.id,
@@ -153,7 +90,6 @@ export function fromBackendExpense(backendExpense: BackendExpenseResponse): Expe
 		updatedAt: backendExpense.updatedAt
 	};
 
-	// Map backend volume to frontend volume or charge based on fuelType
 	if (backendExpense.volume !== undefined && backendExpense.volume !== null) {
 		if (isElectricFuelType(backendExpense.fuelType)) {
 			frontendExpense.charge = backendExpense.volume;
@@ -162,7 +98,6 @@ export function fromBackendExpense(backendExpense: BackendExpenseResponse): Expe
 		}
 	}
 
-	// Optional fields
 	if (backendExpense.mileage !== undefined) {
 		frontendExpense.mileage = backendExpense.mileage;
 	}

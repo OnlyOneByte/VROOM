@@ -1,40 +1,34 @@
 <script lang="ts">
-	import * as Dialog from '$lib/components/ui/dialog';
-	import * as Select from '$lib/components/ui/select';
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import EmptyState from '$lib/components/common/empty-state.svelte';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import { Users, CircleAlert, Trash2 } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
-	import { shareApi } from '$lib/services/share-api';
-	import { ApiError } from '$lib/utils/error-handling';
-	import { shareLevelLabel } from '$lib/utils/share-helpers';
-	import type { ShareLevel, VehicleShare } from '$lib/types';
+	import { shareApi } from '#lib/services/share-api.ts';
+	import { ApiError } from '#lib/utils/error-handling.ts';
+	import { shareLevelLabel } from '#lib/utils/share-helpers.ts';
+	import type { ShareLevel, VehicleShare } from '#lib/types/index.ts';
 
 	interface Props {
 		open: boolean;
-		/** The vehicle being shared (owner side); null when closed. */
 		vehicleId: string | null;
 		vehicleName: string;
 	}
 
 	let { open = $bindable(), vehicleId, vehicleName }: Props = $props();
 
-	// Invite form
 	let email = $state('');
 	let level = $state<ShareLevel>('viewer');
 	let inviting = $state(false);
 
-	// Current-shares list (owner-side, scoped to THIS vehicle).
 	let isLoading = $state(false);
 	let loadError = $state<string | null>(null);
 	let shares = $state<VehicleShare[]>([]);
 
-	// Load the owner's granted shares whenever the dialog opens for a vehicle, filtered to this one
-	// (the API returns shares across ALL my vehicles — scope client-side to the vehicle in view). Keyed
-	// on open:vehicleId so re-opening a different vehicle re-fetches.
 	let lastKey = $state('');
 	$effect(() => {
 		const key = `${open}:${vehicleId ?? ''}`;
@@ -70,7 +64,6 @@
 			level = 'viewer';
 			await load();
 		} catch (error) {
-			// Surface the backend's specific message (no account / already shared / not your vehicle).
 			const msg =
 				error instanceof ApiError ? error.message : 'Could not send the invitation. Try again.';
 			toast.error(msg);
@@ -113,7 +106,6 @@
 			</Dialog.Description>
 		</Dialog.Header>
 
-		<!-- Invite form -->
 		<form class="space-y-3" onsubmit={invite}>
 			<div class="space-y-1.5">
 				<Label for="share-email">Invitee email</Label>
@@ -144,7 +136,6 @@
 			</Button>
 		</form>
 
-		<!-- Current shares -->
 		<div class="mt-2">
 			<h3 class="mb-2 text-sm font-medium text-muted-foreground">People with access</h3>
 			{#if isLoading}

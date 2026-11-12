@@ -1,8 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ReceivedShare, VehicleShare } from '$lib/types';
+import type { ReceivedShare, VehicleShare } from '#lib/types/index.ts';
 
-// Mock apiClient (the reminder-api.test.ts pattern) — apiClient.get/post/put already unwrap the
-// { success, data } envelope, so these wrappers should pass through verbatim with the right URL/body.
 vi.mock('../api-client', () => ({
 	apiClient: {
 		get: vi.fn(),
@@ -35,7 +33,7 @@ beforeEach(() => {
 	vi.clearAllMocks();
 });
 
-describe('shareApi — owner side (T3)', () => {
+describe('shareApi owner-side calls', () => {
 	it('invite POSTs the {vehicleId,email,level} body to /shares', async () => {
 		mockPost.mockResolvedValue(share);
 		const res = await shareApi.invite({ vehicleId: 'v1', email: 'b@test.com', level: 'viewer' });
@@ -68,8 +66,8 @@ describe('shareApi — owner side (T3)', () => {
 	});
 });
 
-describe('shareApi — invitee side (T4)', () => {
-	it('listReceived GETs /shares/received and carries the enriched fields (T12)', async () => {
+describe('shareApi invitee-side calls', () => {
+	it('listReceived GETs /shares/received and keeps the enriched fields', async () => {
 		const received: ReceivedShare = {
 			...share,
 			vehicleName: '2021 Honda Civic',

@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { paramRoutes } from '$lib/routes';
+	import { paramRoutes } from '#lib/routes.ts';
 	import InsuranceTermCard from './PolicyTermCard.svelte';
-	import { sortTermsByEndDateDesc } from '$lib/utils/insurance';
-	import type { InsuranceTerm, Vehicle, TermCoverageRow } from '$lib/types';
+	import { sortTermsByEndDateDesc } from '#lib/utils/insurance.ts';
+	import type { InsuranceTerm, Vehicle, TermCoverageRow } from '#lib/types/index.ts';
 
 	interface Props {
 		terms: InsuranceTerm[];
@@ -13,7 +13,6 @@
 		termVehicleCoverage?: TermCoverageRow[];
 		onRefresh?: () => Promise<void>;
 		onDeleteTerm?: (_term: InsuranceTerm) => void;
-		// T12b-3c: read-only shared view hides the past-term edit/delete affordances.
 		readOnly?: boolean;
 	}
 

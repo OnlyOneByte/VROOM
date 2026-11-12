@@ -1,16 +1,4 @@
-/**
- * Regression guard: trip failures must use the app's object-shaped error envelope.
- *
- * The frontend's api-client reads `body.error?.message`, falling back to `body.message`, and finally
- * to "Request failed with status <code>". Two trip handlers answered with `error` as a plain STRING,
- * so `.message` on it was undefined and both fallbacks missed: deleting an already-deleted trip (a
- * double tap, or a stale list after another device deleted it) reported "Request failed with status
- * 404" instead of "Trip not found", and an inverted odometer pair reported a bare status instead of
- * saying which field was wrong.
- *
- * These assertions read the body exactly the way the client does, and compare against a sibling
- * route's envelope so the shape stays uniform rather than merely non-empty.
- */
+// The frontend client reads error.message, so a string-valued error would lose the reason.
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
@@ -27,7 +15,6 @@ beforeEach(async () => {
 });
 afterEach(() => ctx.close());
 
-/** What the frontend's api-client would surface to the user for a failed response. */
 async function clientMessage(res: Response): Promise<string> {
   const body = (await res.json()) as { error?: { message?: string }; message?: string };
   return body.error?.message ?? body.message ?? `Request failed with status ${res.status}`;
@@ -62,7 +49,6 @@ describe('trip error envelopes', () => {
     const get = await ctx.authed('GET', '/api/v1/trips/does-not-exist');
     expect(del.status).toBe(404);
     expect(get.status).toBe(404);
-    // Same code and message from both verbs — a string-shaped envelope on one would diverge here.
     expect(await del.json()).toEqual(await get.json());
   });
 

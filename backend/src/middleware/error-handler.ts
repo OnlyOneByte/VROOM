@@ -1,9 +1,3 @@
-/**
- * Global Error Handler
- *
- * Catches and formats all errors thrown in the application.
- */
-
 import type { ErrorHandler } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { ZodError } from 'zod';
@@ -19,41 +13,29 @@ import {
 } from '../errors';
 import { logger } from '../utils/logger';
 
-/**
- * Global error handler
- * Formats errors consistently and logs appropriately
- */
 export const errorHandler: ErrorHandler = (err, c) => {
   const isDevelopment = CONFIG.env === 'development';
 
-  // Log errors appropriately
   if (isAppError(err) && err.statusCode < 500) {
     logger.warn('Client error', { message: err.message, statusCode: err.statusCode });
   } else {
     logger.error('Server error', { error: err });
   }
 
-  // Handle Zod validation errors
   if (err instanceof ZodError) {
     const validationError = new ValidationError('Invalid request data', err.issues);
     return c.json(formatErrorResponse(validationError, isDevelopment), 400);
   }
 
-  // Handle Hono HTTP exceptions
   if (err instanceof HTTPException) {
     return c.json(createErrorResponse('HTTPException', err.message, err.cause), err.status);
   }
 
-  // Handle sync/provider errors. SyncError extends Error (not AppError), so without this branch it
-  // would fall through to the generic 500 path below, losing its code→status mapping (a
-  // VALIDATION_ERROR would 500 instead of 400). This is the only path that shapes a SyncError:
-  // routes throw them and hand-roll no catch block of their own.
   if (isSyncError(err)) {
     const { body, status } = syncErrorResponse(err);
     return c.json(body, status as 400 | 401 | 403 | 409 | 429 | 500 | 503);
   }
 
-  // Handle application errors
   if (isAppError(err)) {
     return c.json(
       formatErrorResponse(err, isDevelopment),
@@ -61,7 +43,6 @@ export const errorHandler: ErrorHandler = (err, c) => {
     );
   }
 
-  // Handle database errors
   if (err instanceof Error && err.message.includes('SQLITE_')) {
     const dbError = handleDatabaseError(err);
     return c.json(
@@ -70,7 +51,6 @@ export const errorHandler: ErrorHandler = (err, c) => {
     );
   }
 
-  // Handle unknown errors
   const response = formatErrorResponse(err, isDevelopment);
   return c.json(response, 500);
 };

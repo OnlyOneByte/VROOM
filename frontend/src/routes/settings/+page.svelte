@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { settingsStore } from '$lib/stores/settings.svelte';
-	import { appStore } from '$lib/stores/app.svelte';
-	import { authStore } from '$lib/stores/auth.svelte';
-	import { routes } from '$lib/routes';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { authStore } from '#lib/stores/auth.svelte.ts';
+	import { routes } from '#lib/routes.ts';
 	import {
 		Settings as SettingsIcon,
 		Save,
@@ -12,25 +12,24 @@
 		ChevronRight,
 		CircleAlert
 	} from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Card, CardContent } from '$lib/components/ui/card';
-	import { Avatar, AvatarFallback } from '$lib/components/ui/avatar';
-	import UnitPreferencesCard from '$lib/components/settings/cards/UnitPreferencesCard.svelte';
-	import ThemeCard from '$lib/components/settings/cards/ThemeCard.svelte';
-	import ThemePickerCard from '$lib/components/settings/cards/ThemePickerCard.svelte';
-	import PWAInstallCard from '$lib/components/settings/cards/PwaInstallCard.svelte';
-	import PushNotificationsCard from '$lib/components/settings/cards/PushNotificationsCard.svelte';
-	import BackupNowDialog from '$lib/components/settings/storage-provider/backup/BackupDialog.svelte';
-	import UnifiedRestoreDialog from '$lib/components/settings/storage-provider/backup/RestoreDialog.svelte';
-	import PhotoStorageSettings from '$lib/components/settings/cards/StorageProvidersCard.svelte';
-	import VlmProvidersCard from '$lib/components/settings/cards/VlmProvidersCard.svelte';
-	import LlmProvidersCard from '$lib/components/settings/cards/LlmProvidersCard.svelte';
-	import MigrateFromTrackerCard from '$lib/components/settings/cards/MigrateFromTrackerCard.svelte';
-	import { fetchLastSyncTime } from '$lib/utils/sync/sync-manager';
-	import { providerApi } from '$lib/services/provider-api';
-	import FormLayout from '$lib/components/common/form-layout.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Card, CardContent } from '#lib/components/ui/card/index.ts';
+	import { Avatar, AvatarFallback } from '#lib/components/ui/avatar/index.ts';
+	import UnitPreferencesCard from '#lib/components/settings/cards/UnitPreferencesCard.svelte';
+	import ThemeCard from '#lib/components/settings/cards/ThemeCard.svelte';
+	import ThemePickerCard from '#lib/components/settings/cards/ThemePickerCard.svelte';
+	import PWAInstallCard from '#lib/components/settings/cards/PwaInstallCard.svelte';
+	import PushNotificationsCard from '#lib/components/settings/cards/PushNotificationsCard.svelte';
+	import BackupNowDialog from '#lib/components/settings/storage-provider/backup/BackupDialog.svelte';
+	import UnifiedRestoreDialog from '#lib/components/settings/storage-provider/backup/RestoreDialog.svelte';
+	import PhotoStorageSettings from '#lib/components/settings/cards/StorageProvidersCard.svelte';
+	import ModelProvidersCard from '#lib/components/settings/cards/ModelProvidersCard.svelte';
+	import MigrateFromTrackerCard from '#lib/components/settings/cards/MigrateFromTrackerCard.svelte';
+	import { fetchLastSyncTime } from '#lib/utils/sync/sync-manager.ts';
+	import { providerApi } from '#lib/services/provider-api.ts';
+	import FormLayout from '#lib/components/common/form-layout.svelte';
 	import { toast } from 'svelte-sonner';
-	import type { BackupConfig, RestoreResult, UserProviderInfo } from '$lib/types';
+	import type { BackupConfig, RestoreResult, UserProviderInfo } from '#lib/types/index.ts';
 
 	let user = $derived(authStore.user);
 
@@ -44,34 +43,24 @@
 			.slice(0, 2);
 	});
 
-	// Derive state from store
 	let settings = $derived(settingsStore.settings);
 	let isLoading = $derived(settingsStore.isLoading);
-	// Only a treat-as-fatal error is one that left us with NO settings to show.
-	// A failed *save* keeps `settings` populated, so the form stays up and just
-	// toasts — we must not blow that away. Showing the form seeded with hardcoded
-	// defaults on a failed initial load would let a Save silently overwrite the
-	// user's real preferences (miles/USD/etc.), so gate the form on having data.
 	let loadError = $derived(settingsStore.error && !settings ? settingsStore.error : null);
 
 	let isSaving = $state(false);
 	let isBackingUp = $state(false);
 
-	// Unit preferences
 	let distanceUnit = $state<'miles' | 'kilometers'>('miles');
 	let volumeUnit = $state<'gallons_us' | 'gallons_uk' | 'liters'>('gallons_us');
 	let chargeUnit = $state<'kwh'>('kwh');
 	let currencyUnit = $state('USD');
 
-	// Backup settings — derived from backupConfig
 	let autoBackupEnabled = $state(false);
 	let backupFrequency = $state<'daily' | 'weekly' | 'monthly'>('weekly');
 	let syncInactivityMinutes = $state(5);
 
-	// Provider state for backup card and restore dialog
 	let storageProviders = $state<UserProviderInfo[]>([]);
 
-	// Derived backup state from backupConfig
 	let backupConfig = $derived<BackupConfig>(settings?.backupConfig ?? { providers: {} });
 
 	let backupProvidersEnabled = $derived(Object.values(backupConfig.providers).some(p => p.enabled));
@@ -89,7 +78,6 @@
 			.map(p => ({ id: p.id, displayName: p.displayName, providerType: p.providerType }));
 	});
 
-	// Dialog state
 	let showBackupDialog = $state(false);
 	let showRestoreDialog = $state(false);
 
@@ -109,7 +97,7 @@
 		try {
 			storageProviders = await providerApi.getProviders('storage');
 		} catch {
-			// Non-critical
+			// Leave the list empty; the page already renders its empty state.
 		}
 	}
 
@@ -286,16 +274,12 @@
 				onRestore={handleRestoreClick}
 				onDownloadBackup={handleBackup}
 			/>
-			<VlmProvidersCard />
-			<LlmProvidersCard />
+			<ModelProvidersCard domain="vlm" />
+			<ModelProvidersCard domain="llm" />
 			<MigrateFromTrackerCard />
 		</div>
 	{/if}
 
-	<!-- Save is a fixed FAB rendered outside the load/error/form branches, so it
-	     must be gated too: on a failed load the form shows seeded defaults, and a
-	     Save here would overwrite the user's real (unfetched) preferences. Hide it
-	     until settings actually loaded. (isSaving still disables it during a save.) -->
 	{#if !isLoading && !loadError}
 		<Button
 			onclick={handleSave}

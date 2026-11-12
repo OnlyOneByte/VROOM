@@ -1,14 +1,14 @@
 <script lang="ts">
 	import './line-chart-animations.css';
 	import { LineChart } from 'layerchart';
-	import * as Chart from '$lib/components/ui/chart';
+	import * as Chart from '#lib/components/ui/chart/index.ts';
 	import ChartCard from './ChartCard.svelte';
 	import {
 		formatCurrencyAxis,
 		CHART_PADDING,
 		getTrendLineProps,
 		monthlyXAxisProps
-	} from '$lib/utils/chart-formatters';
+	} from '#lib/utils/chart-formatters.ts';
 	import type { Snippet } from 'svelte';
 
 	const CHART_HEIGHT = 300;

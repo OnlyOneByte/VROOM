@@ -1,24 +1,12 @@
-/**
- * Property-Based Tests for derivePaymentEntries()
- *
- * Property 4: Payment Number Monotonicity and Remaining Balance
- * Property 9: Payment Type Classification
- * Property 10: Principal and Interest Derivation
- */
-
 import { describe, expect, test } from 'vitest';
 import fc from 'fast-check';
-import type { Expense, VehicleFinancing } from '$lib/types';
+import type { Expense, VehicleFinancing } from '#lib/types/index.ts';
 import {
 	calculateAmortizationSchedule,
 	calculateMinimumPayment,
 	calculatePayoffDate,
 	derivePaymentEntries
-} from '$lib/utils/financing-calculations';
-
-// ---------------------------------------------------------------------------
-// Helpers — build valid Expense and VehicleFinancing objects for testing
-// ---------------------------------------------------------------------------
+} from '#lib/utils/financing-calculations.ts';
 
 let expenseCounter = 0;
 
@@ -62,45 +50,27 @@ function makeFinancing(overrides: Partial<VehicleFinancing> = {}): VehicleFinanc
 	};
 }
 
-// ---------------------------------------------------------------------------
-// Arbitraries — smart generators that constrain to valid input space
-// ---------------------------------------------------------------------------
-
-/** Positive amount rounded to 2 decimal places */
 const arbAmount = fc
 	.double({ min: 0.01, max: 50_000, noNaN: true, noDefaultInfinity: true })
 	.map(v => Math.round(v * 100) / 100);
 
-/** Array of 1–20 positive expense amounts */
 const arbAmounts = fc.array(arbAmount, { minLength: 1, maxLength: 20 });
 
-/** Original financing amount (reasonable range) */
 const arbOriginalAmount = fc
 	.double({ min: 100, max: 200_000, noNaN: true, noDefaultInfinity: true })
 	.map(v => Math.round(v * 100) / 100);
 
-/** Payment amount for the financing schedule */
 const arbPaymentAmount = fc
 	.double({ min: 50, max: 5_000, noNaN: true, noDefaultInfinity: true })
 	.map(v => Math.round(v * 100) / 100);
 
-/** APR for loans (0.1% to 30%) */
 const arbApr = fc
 	.double({ min: 0.1, max: 30, noNaN: true, noDefaultInfinity: true })
 	.map(v => Math.round(v * 100) / 100);
 
-/** Term months (6 to 84) */
 const arbTermMonths = fc.integer({ min: 6, max: 84 });
 
-// ---------------------------------------------------------------------------
-// Property 4: Payment Number Monotonicity and Remaining Balance
-//
-// `paymentNumber` equals 1-based index, `remainingBalance` is non-increasing
-// across sequential entries (assuming all payment amounts are positive).
-//
-// **Validates: Requirements 7.1, 7.2**
-// ---------------------------------------------------------------------------
-describe('Property 4: Payment Number Monotonicity and Remaining Balance', () => {
+describe('Payment Number Monotonicity and Remaining Balance', () => {
 	test('paymentNumber equals 1-based index for all entries', () => {
 		fc.assert(
 			fc.property(
@@ -192,14 +162,7 @@ describe('Property 4: Payment Number Monotonicity and Remaining Balance', () => 
 	});
 });
 
-// ---------------------------------------------------------------------------
-// Property 9: Payment Type Classification
-//
-// `expenseAmount > paymentAmount` → 'extra'; otherwise → 'standard'
-//
-// **Validates: Requirement 7.5**
-// ---------------------------------------------------------------------------
-describe('Property 9: Payment Type Classification', () => {
+describe('Payment Type Classification', () => {
 	test('payment type is extra when expense amount exceeds financing paymentAmount, standard otherwise', () => {
 		fc.assert(
 			fc.property(
@@ -237,15 +200,7 @@ describe('Property 9: Payment Type Classification', () => {
 	});
 });
 
-// ---------------------------------------------------------------------------
-// Property 10: Principal and Interest Derivation
-//
-// Loan with APR > 0: principalAmount and interestAmount match amortization
-// schedule. Lease or no APR: principalAmount = expenseAmount, interestAmount = 0.
-//
-// **Validates: Requirements 7.3, 7.4**
-// ---------------------------------------------------------------------------
-describe('Property 10: Principal and Interest Derivation', () => {
+describe('Principal and Interest Derivation', () => {
 	test('lease financing: principalAmount equals expense amount, interestAmount is 0', () => {
 		fc.assert(
 			fc.property(
@@ -336,11 +291,9 @@ describe('Property 10: Principal and Interest Derivation', () => {
 				arbTermMonths,
 				arbAmounts,
 				(originalAmount, paymentAmount, apr, termMonths, amounts) => {
-					// Ensure paymentAmount covers at least the first month's interest
-					// so the amortization schedule produces valid entries
 					const monthlyRate = apr / 100 / 12;
 					const firstMonthInterest = originalAmount * monthlyRate;
-					if (paymentAmount <= firstMonthInterest) return; // skip degenerate cases
+					if (paymentAmount <= firstMonthInterest) return;
 
 					const expenses = amounts.map((a, i) => makeExpense(a, i + 1));
 					const financing = makeFinancing({
@@ -353,7 +306,6 @@ describe('Property 10: Principal and Interest Derivation', () => {
 
 					const entries = derivePaymentEntries(expenses, financing);
 
-					// Use the same amortization schedule the function uses internally
 					const schedule = calculateAmortizationSchedule(financing, expenses.length);
 
 					for (let i = 0; i < entries.length; i++) {
@@ -371,19 +323,7 @@ describe('Property 10: Principal and Interest Derivation', () => {
 		);
 	});
 
-	// deep-review (CERTIFIED CLEAN — pins the beyond-schedule fallback the property test
-	// above SKIPS via `if (entry && scheduleEntry)`). The amortization schedule is the CONTRACTUAL
-	// projection: it stops at termMonths, or earlier when the balance reaches 0 (paid off) or the
-	// negative-amortization guard fires. derivePaymentEntries maps logged payments POSITIONALLY
-	// onto that schedule, so a payment logged BEYOND the schedule's length has no scheduleEntry and
-	// falls back to `principal = expense.amount, interest = 0`. This is CORRECT, not a bug: those
-	// payments land after the loan has no remaining balance to amortize, so there is genuinely no
-	// interest to attribute — and remainingBalance stays floored at 0 (never negative). A future
-	// refactor that "amortizes" these phantom payments (inventing interest on a zero balance) or
-	// drops the Math.max(0, …) floor would turn this RED.
 	test('a payment logged BEYOND the amortization schedule is all-principal, zero-interest, balance floored at 0', () => {
-		// A loan that pays off inside its term: 1,000 @ 12% APR, 6-month term, paying 200/mo.
-		// The schedule reaches a 0 balance well before payment 8, so payments 6-8 are off-schedule.
 		const financing = makeFinancing({
 			originalAmount: 1000,
 			apr: 12,
@@ -391,37 +331,25 @@ describe('Property 10: Principal and Interest Derivation', () => {
 			paymentAmount: 200,
 			financingType: 'loan'
 		});
-		// 8 logged payments of 200 → 1,600 paid against a 1,000 loan (overpaid past payoff).
 		const expenses = Array.from({ length: 8 }, (_, i) => makeExpense(200, i + 1));
 
 		const entries = derivePaymentEntries(expenses, financing);
 		const schedule = calculateAmortizationSchedule(financing, expenses.length);
 
-		// The loan amortizes to 0 before all 8 payments → schedule is shorter than the payment count.
 		expect(schedule.length).toBeLessThan(entries.length);
 
-		// Every entry beyond the schedule: all-principal, zero-interest (no balance left to amortize).
 		const beyond = entries.slice(schedule.length);
-		expect(beyond.length).toBeGreaterThan(0); // the case actually triggers (non-vacuous)
+		expect(beyond.length).toBeGreaterThan(0);
 		for (const entry of beyond) {
 			expect(entry.interestAmount).toBe(0);
-			expect(entry.principalAmount).toBe(entry.expense.amount); // == 200
-			expect(entry.remainingBalance).toBe(0); // floored, never negative on overpayment
+			expect(entry.principalAmount).toBe(entry.expense.amount);
+			expect(entry.remainingBalance).toBe(0);
 		}
 	});
 });
 
-// ---------------------------------------------------------------------------
-// calculateMinimumPayment — the standard amortization formula
-//  M = P * [r(1+r)^n] / [(1+r)^n - 1]
-// The 0%-APR / lease / missing-input paths return null, which is what keeps the
-// (factor - 1) denominator from being a divide-by-zero (the cycle-168 class).
-// These were untested; the property suite above only covers derivePaymentEntries.
-// ---------------------------------------------------------------------------
 describe('calculateMinimumPayment', () => {
 	test('matches the closed-form amortization value for a known loan', () => {
-		// 20,000 at 6% APR over 60 months. Hand-computed: r=0.005, factor=1.005^60,
-		// M = 20000*0.005*factor/(factor-1) ≈ 386.66.
 		const m = calculateMinimumPayment(
 			makeFinancing({ originalAmount: 20_000, apr: 6, termMonths: 60 })
 		);
@@ -459,11 +387,6 @@ describe('calculateMinimumPayment', () => {
 	});
 });
 
-// ---------------------------------------------------------------------------
-// calculatePayoffDate — has a distinct 0%-APR branch (simple division) and a
-// with-APR amortization loop guarded against a payment that doesn't cover
-// interest. Both return a valid Date (never NaN-time / Invalid Date).
-// ---------------------------------------------------------------------------
 describe('calculatePayoffDate', () => {
 	function isValidDate(d: Date): boolean {
 		return d instanceof Date && !Number.isNaN(d.getTime());

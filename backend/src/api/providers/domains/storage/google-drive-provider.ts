@@ -1,10 +1,3 @@
-/**
- * Google Drive storage provider — wraps GoogleDriveService behind the StorageProvider interface.
- *
- * Folder resolution uses `pathHint` (e.g. "VROOM/Photos/Vehicle") to find-or-create
- * each segment in the Drive folder hierarchy, then uploads the file into the leaf folder.
- */
-
 import { logger } from '../../../../utils/logger';
 import { GoogleDriveService } from '../../services/google-drive-service';
 import { coalesceGoogleDriveFile } from './drive-file-utils';
@@ -15,19 +8,10 @@ import type {
   UploadParams,
 } from './storage-provider';
 
-// Re-export so existing consumers don't break
-export { coalesceGoogleDriveFile } from './drive-file-utils';
-
 export class GoogleDriveProvider implements StorageProvider {
   readonly type = 'google-drive';
   private driveService: GoogleDriveService;
 
-  /**
-   * @param refreshToken Google OAuth refresh token (ignored when `driveService` is injected).
-   * @param driveService Optional pre-built service. Inject one wired to an in-memory fake
-   *  Drive client in tests to exercise the REAL provider logic (folder
-   *  path walk, upload/download/delete) without network or `mock.module`.
-   */
   constructor(refreshToken: string, driveService?: GoogleDriveService) {
     this.driveService = driveService ?? new GoogleDriveService(refreshToken);
   }
@@ -62,7 +46,6 @@ export class GoogleDriveProvider implements StorageProvider {
 
   async healthCheck(): Promise<boolean> {
     try {
-      // Lightweight call — just searches for a folder, doesn't create anything
       await this.driveService.findFolder('VROOM');
       return true;
     } catch (error) {
@@ -81,10 +64,6 @@ export class GoogleDriveProvider implements StorageProvider {
     return files.map(coalesceGoogleDriveFile);
   }
 
-  /**
-   * Resolves a path like "VROOM/Photos/Vehicle" into a Drive folder ID
-   * by walking each segment and finding-or-creating folders along the way.
-   */
   private async resolveFolderPath(pathHint: string): Promise<string> {
     const segments = pathHint
       .split('/')
@@ -104,16 +83,12 @@ export class GoogleDriveProvider implements StorageProvider {
     }
 
     if (!parentId) {
-      // pathHint was empty or all-slashes — upload to Drive root
       return '';
     }
 
     return parentId;
   }
-  /**
-   * Resolves a path like "VROOM/Photos/Backups" into a Drive folder ID
-   * by walking each segment — returns null if any segment doesn't exist.
-   */
+
   private async resolveExistingFolderPath(pathHint: string): Promise<string | null> {
     const segments = pathHint
       .split('/')

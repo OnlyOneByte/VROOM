@@ -1,23 +1,8 @@
-/**
- * Property-Based Tests for validation.ts — validateFuelExpenseData
- *
- * Property 8: fuelType-based validation
- * - Fuel-category expenses always require volume + mileage regardless of fuelType
- * - Non-fuel categories always pass without error
- * - Error messages differ based on fuelType (electric vs fuel terminology)
- *
- * **Validates: Requirements 5.1, 5.2, 5.3, 5.5, 5.6**
- */
-
 import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { ELECTRIC_FUEL_TYPES, EXPENSE_CATEGORIES } from '../../db/types';
 import { ValidationError } from '../../errors';
 import { validateFuelExpenseData } from '../validation';
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
 
 const NON_ELECTRIC_FUEL_TYPES = [
   '87 (Regular)',
@@ -31,38 +16,21 @@ const NON_ELECTRIC_FUEL_TYPES = [
 
 const NON_FUEL_CATEGORIES = EXPENSE_CATEGORIES.filter((c) => c !== 'fuel');
 
-// ---------------------------------------------------------------------------
-// Generators
-// ---------------------------------------------------------------------------
-
-/** Arbitrary for a valid positive fuel amount */
 const positiveFuelAmountArb = fc.double({ min: 0.01, max: 500, noNaN: true });
 
-/** Arbitrary for a valid positive mileage */
 const positiveMileageArb = fc.integer({ min: 1, max: 500000 });
 
-/** Arbitrary for an electric fuelType */
 const electricFuelTypeArb = fc.constantFrom(...ELECTRIC_FUEL_TYPES);
 
-/** Arbitrary for a non-electric fuelType */
 const nonElectricFuelTypeArb = fc.constantFrom(...NON_ELECTRIC_FUEL_TYPES);
 
-/** Arbitrary for any fuelType (electric or non-electric) */
 const anyFuelTypeArb = fc.oneof(electricFuelTypeArb, nonElectricFuelTypeArb);
 
-/** Arbitrary for a non-fuel category */
 const nonFuelCategoryArb = fc.constantFrom(...NON_FUEL_CATEGORIES);
 
-/** Arbitrary for a "missing" value (null or undefined) */
 const missingValueArb = fc.constantFrom(null, undefined, 0);
 
-// ---------------------------------------------------------------------------
-// Property 8: fuelType-based validation
-// ---------------------------------------------------------------------------
-describe('Property 8: fuelType-based validation', () => {
-  // -------------------------------------------------------------------------
-  // 8a: Fuel-category with electric fuelType requires volume + mileage
-  // -------------------------------------------------------------------------
+describe('fuelType-based validation', () => {
   test('fuel-category + electric fuelType: valid when both volume and mileage present', () => {
     fc.assert(
       fc.property(
@@ -114,7 +82,6 @@ describe('Property 8: fuelType-based validation', () => {
       fc.property(electricFuelTypeArb, (fuelType) => {
         try {
           validateFuelExpenseData('fuel', null, null, fuelType);
-          // Should not reach here
           expect(true).toBe(false);
         } catch (e) {
           expect(e).toBeInstanceOf(ValidationError);
@@ -125,9 +92,6 @@ describe('Property 8: fuelType-based validation', () => {
     );
   });
 
-  // -------------------------------------------------------------------------
-  // 8b: Fuel-category with non-electric fuelType requires volume + mileage
-  // -------------------------------------------------------------------------
   test('fuel-category + non-electric fuelType: valid when both volume and mileage present', () => {
     fc.assert(
       fc.property(
@@ -189,9 +153,6 @@ describe('Property 8: fuelType-based validation', () => {
     );
   });
 
-  // -------------------------------------------------------------------------
-  // 8c: Non-fuel categories always pass regardless of data
-  // -------------------------------------------------------------------------
   test('non-fuel categories pass regardless of volume, fuelType, or mileage', () => {
     fc.assert(
       fc.property(
@@ -209,9 +170,6 @@ describe('Property 8: fuelType-based validation', () => {
     );
   });
 
-  // -------------------------------------------------------------------------
-  // 8d: Validation rule is the same for electric and non-electric (both require data)
-  // -------------------------------------------------------------------------
   test('fuel-category requires volume + mileage regardless of fuelType', () => {
     fc.assert(
       fc.property(
@@ -219,7 +177,6 @@ describe('Property 8: fuelType-based validation', () => {
         positiveFuelAmountArb,
         positiveMileageArb,
         (fuelType, volume, mileage) => {
-          // Both electric and non-electric pass when data is present
           expect(() => validateFuelExpenseData('fuel', mileage, volume, fuelType)).not.toThrow();
         }
       ),

@@ -1,17 +1,4 @@
-/**
- * HTTP-level tests for GET /api/v1/photos?entityType= (the batch endpoint that
- * killed the dashboard's per-vehicle N+1). Repository/property tests already pin
- * the user/entity scoping; this proves the same behavior through the FULL route
- * stack — middleware → requireAuth → zValidator → handler → service → repo → DB —
- * which is exactly the layer those bypass.
- *
- * REGRESSION GUARD (STATUS gap): an earlier version of this file passed in
- * isolation but 500'd in the full `bun test` suite, because `sync-worker.test.ts`
- * used `mock.module('../../photos/photo-repository', ...)` — a process-global stub
- * that can't be restored, so it leaked a `photoRepository` missing `findByUser`
- * into every later file. That test was converted to dependency injection; this
- * file passing IN THE FULL SUITE is the proof the leak is gone. Keep it.
- */
+// Bun's mock.module is process-global and never restored, so no other file may mock photo-repository.
 
 import { beforeEach, describe, expect, test } from 'bun:test';
 import type { Photo } from '../../../db/schema';
@@ -24,7 +11,6 @@ import {
 
 let ctx: TestApp;
 
-/** Insert a photo row directly (no storage provider needed for a read test). */
 function seedPhoto(
   sqlite: TestApp['sqlite'],
   opts: { id: string; userId: string; entityType: string; entityId: string; fileName?: string }
@@ -81,7 +67,6 @@ describe('GET /api/v1/photos?entityType= (batch list)', () => {
   });
 
   test("never returns another user's photos", async () => {
-    // The harness seeds the session user; create a second user to own foreign photos.
     ctx.sqlite.run(
       `INSERT INTO users (id, email, display_name) VALUES ('other-user', 'other@test.com', 'Other')`
     );

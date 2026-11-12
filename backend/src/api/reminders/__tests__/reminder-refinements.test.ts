@@ -1,16 +1,6 @@
-/**
- * Unit tests for the createReminderSchema cross-field REFINEMENTS (deep-review, steered by
- * the coverage baseline — reminders/validation.ts was at 64% func, the gaps being the
- * refinement FAILURE branches: the correctness guards that reject a malformed reminder). The
- * existing update-validation test covers only the isActive toggle; this pins the six refinements
- * (custom-frequency, expense-type, mileage-trigger D4, date-range, split-config sums/match).
- * Pure Zod schemas via safeParse — no DB, no server.
- */
-
 import { describe, expect, test } from 'bun:test';
 import { createReminderSchema } from '../validation';
 
-/** A minimal valid NOTIFICATION reminder (no expense/ mileage requirements). */
 function validNotification(over: Record<string, unknown> = {}) {
   return {
     name: 'Oil change',
@@ -72,7 +62,7 @@ describe('refineExpenseType', () => {
   });
 });
 
-describe('refineMileageTrigger (D4)', () => {
+describe('refineMileageTrigger', () => {
   test("a 'mileage' reminder requires intervalMileage", () => {
     expect(ok(validNotification({ triggerMode: 'mileage', intervalMileage: 5000 }))).toBe(true);
     expect(
@@ -111,11 +101,6 @@ describe('refineDateRange', () => {
     ).toBe(true);
   });
 
-  // The refinement uses `endDate <= startDate` (not `<`), so endDate EQUAL to startDate — a
-  // zero-duration reminder that would fire its start period then immediately deactivate — is rejected
-  // too. Tests above pin strictly-after (ok) + strictly-before (fail) but NOT the equality boundary,
-  // which is exactly what the `<=` (vs `<`) is load-bearing for: a regression to `<` would silently
-  // ACCEPT a same-instant start==end reminder. Pin the boundary closed.
   test('endDate EQUAL to startDate is rejected (the <= boundary, not just <)', () => {
     expect(
       failsWith(
@@ -168,7 +153,7 @@ describe('refineSplitConfig', () => {
         method: 'absolute',
         allocations: [
           { vehicleId: 'v1', amount: 70 },
-          { vehicleId: 'v2', amount: 20 }, // sums to 90, not 100
+          { vehicleId: 'v2', amount: 20 },
         ],
       },
     });

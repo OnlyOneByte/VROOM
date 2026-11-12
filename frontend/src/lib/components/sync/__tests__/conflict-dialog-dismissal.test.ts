@@ -1,27 +1,14 @@
-/**
- * The conflict dialog's dismissal controls must actually dismiss it.
- *
- * The dialog auto-opens from an effect that fires whenever a conflict is queued. Every exit — the
- * footer's Skip, the X, Escape, an overlay click — only sets `open` false, which re-satisfies that
- * effect in the same flush, so the dialog reopened immediately and the only way out was to resolve
- * every conflict. Deferring now records WHICH batch was dismissed, by identity: the conflicts stay
- * queued (the sidebar keeps counting them) and the next sync run, which replaces the array
- * wholesale, brings the dialog back.
- */
-
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import type { SyncConflict } from '$lib/utils/sync/sync-state.svelte';
-
-vi.mock('svelte', () => import('../../../../../node_modules/svelte/src/index-client.js' as string));
+import type { SyncConflict } from '#lib/utils/sync/sync-state.svelte.ts';
 
 const resolveConflict = vi.fn(async () => true);
-vi.mock('$lib/utils/sync/sync-manager', async () => {
-	const state = await import('$lib/utils/sync/sync-state.svelte');
+vi.mock('#lib/utils/sync/sync-manager.ts', async () => {
+	const state = await import('#lib/utils/sync/sync-state.svelte.ts');
 	return { syncConflicts: state.syncConflicts, syncManager: { resolveConflict } };
 });
 
-const { syncConflicts } = await import('$lib/utils/sync/sync-state.svelte');
+const { syncConflicts } = await import('#lib/utils/sync/sync-state.svelte.ts');
 const SyncConflictResolver = (await import('../SyncConflictResolver.svelte')).default;
 
 function conflict(id: string): SyncConflict {
@@ -42,7 +29,6 @@ function conflict(id: string): SyncConflict {
 	};
 }
 
-/** Let the auto-open effect and the dialog's own transitions settle. */
 async function settle(): Promise<void> {
 	for (let i = 0; i < 5; i++) {
 		await new Promise(resolve => setTimeout(resolve, 0));
@@ -101,7 +87,6 @@ describe('SyncConflictResolver dismissal', () => {
 		await settle();
 		expect(screen.queryByText(TITLE)).toBeNull();
 
-		// What syncAll does: `syncConflicts.current = result.conflicts` — a fresh array, same rows.
 		syncConflicts.current = [...deferred];
 		await settle();
 

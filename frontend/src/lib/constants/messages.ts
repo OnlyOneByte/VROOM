@@ -1,44 +1,13 @@
-/**
- * UI messages and labels for i18n readiness
- */
-
 export const COMMON_MESSAGES = {
-	// Loading states
-	LOADING: 'Loading...',
-	LOADING_VROOM: 'Loading VROOM...',
-
-	// Empty states
-	NO_DATA: 'No data available',
 	NO_EXPENSES: 'No expenses yet',
-	NO_VEHICLES: 'No vehicles yet',
 	NO_FUEL_DATA: 'No fuel data yet',
 
-	// Actions
 	ADD_EXPENSE: 'Add Expense',
 	ADD_FIRST_EXPENSE: 'Add First Expense',
 	ADD_FUEL_EXPENSE: 'Add Fuel Expense',
-	ADD_VEHICLE: 'Add Vehicle',
 	CLEAR_FILTERS: 'Clear Filters',
-	SAVE: 'Save',
-	CANCEL: 'Cancel',
-	DELETE: 'Delete',
-	EDIT: 'Edit',
-	BACK: 'Back',
 
-	// Filters
-	ALL_VEHICLES: 'All Vehicles',
-	ALL_CATEGORIES: 'All Categories',
-	FILTERS: 'Filters',
-	SEARCH_EXPENSES: 'Search expenses...',
-
-	// Errors
-	ERROR_LOADING: 'Failed to load data',
-	ERROR_SAVING: 'Failed to save',
-	ERROR_DELETING: 'Failed to delete',
-
-	// Success
-	SUCCESS_SAVED: 'Successfully saved',
-	SUCCESS_DELETED: 'Successfully deleted'
+	ALL_VEHICLES: 'All Vehicles'
 } as const;
 
 export const VEHICLE_MESSAGES = {

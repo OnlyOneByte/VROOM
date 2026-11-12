@@ -1,24 +1,28 @@
 <script lang="ts">
-	import '$lib/components/charts/pie-chart-animations.css';
-	import '$lib/components/charts/bar-chart-animations.css';
-	import { animateOnView } from '$lib/utils/animate-on-view';
-	import { createVisibilityWatch } from '$lib/utils/visibility-watch.svelte';
+	import '#lib/components/charts/pie-chart-animations.css';
+	import '#lib/components/charts/bar-chart-animations.css';
+	import { animateOnView } from '#lib/utils/animate-on-view.ts';
+	import { createVisibilityWatch } from '#lib/utils/visibility-watch.svelte.ts';
 	import { onMount } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { BarChart } from 'layerchart';
 	import { LoaderCircle, CircleAlert, TrendingUp } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import * as Chart from '$lib/components/ui/chart';
-	import { analyticsApi, getDefaultDateRange } from '$lib/services/analytics-api';
-	import ExpenseTrendChart from '$lib/components/charts/ExpenseTrendChart.svelte';
-	import { AppLineChart, AppPieChart } from '$lib/components/charts';
-	import { CHART_COLORS, buildChartConfig, buildCategoryPieData } from '$lib/utils/chart-colors';
-	import type { CrossVehicleResponse, FinancingResponse, InsuranceResponse } from '$lib/types';
-	import { formatCurrency } from '$lib/utils/formatters';
-	import { formatCurrencyAxis, parseMonthToDate } from '$lib/utils/chart-formatters';
-	import { settingsStore } from '$lib/stores/settings.svelte';
-	import { getFuelEfficiencyLabel, getDistanceUnitLabel } from '$lib/utils/units';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import * as Chart from '#lib/components/ui/chart/index.ts';
+	import { analyticsApi, getDefaultDateRange } from '#lib/services/analytics-api.ts';
+	import ExpenseTrendChart from '#lib/components/charts/ExpenseTrendChart.svelte';
+	import { AppLineChart, AppPieChart } from '#lib/components/charts/index.ts';
+	import { CHART_COLORS, buildChartConfig, buildCategoryPieData } from '#lib/utils/chart-colors.ts';
+	import type {
+		CrossVehicleResponse,
+		FinancingResponse,
+		InsuranceResponse
+	} from '#lib/types/index.ts';
+	import { formatCurrency } from '#lib/utils/formatters.ts';
+	import { formatCurrencyAxis, parseMonthToDate } from '#lib/utils/chart-formatters.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
+	import { getFuelEfficiencyLabel, getDistanceUnitLabel } from '#lib/utils/units.ts';
 	import FinancingAnalytics from './cross-vehicle/FinancingAnalytics.svelte';
 	import InsuranceAnalytics from './cross-vehicle/InsuranceAnalytics.svelte';
 
@@ -28,10 +32,8 @@
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
 
-	// Visibility-gated rendering for inline charts that bypass ChartCard.
 	let costBarGate = createVisibilityWatch();
 
-	// Dynamic unit labels — cross-vehicle view uses global unit preferences
 	let units = $derived(crossVehicle?.units ?? settingsStore.unitPreferences);
 	let efficiencyLabel = $derived(getFuelEfficiencyLabel(units.distanceUnit, units.volumeUnit));
 	let distShortLabel = $derived(getDistanceUnitLabel(units.distanceUnit, true));
@@ -59,7 +61,6 @@
 		loadData();
 	});
 
-	// --- Section 1: Monthly Expense Trends ---
 	let trendData = $derived(
 		(crossVehicle?.monthlyExpenseTrends ?? []).map(d => ({
 			...d,
@@ -67,10 +68,8 @@
 		}))
 	);
 
-	// --- Section 2: Expense Breakdown Pie ---
 	let appPieData = $derived(buildCategoryPieData(crossVehicle?.expenseByCategory ?? []));
 
-	// --- Section 3: Vehicle Cost Comparison Bar ---
 	let costBarData = $derived(crossVehicle?.vehicleCostComparison ?? []);
 
 	const costBarConfig: Chart.ChartConfig = {
@@ -79,7 +78,6 @@
 
 	const costBarSeries = [{ key: 'totalCost', label: 'Total Cost', color: 'var(--chart-1)' }];
 
-	// --- Section 3b: Fuel Efficiency Comparison ---
 	let fuelEffVehicleNames = $derived.by(() => {
 		const names = new SvelteSet<string>();
 		for (const month of crossVehicle?.fuelEfficiencyComparison ?? []) {
@@ -129,7 +127,6 @@
 	</div>
 {:else if crossVehicle && financing && insurance}
 	<div class="space-y-4 md:space-y-6">
-		<!-- Section 1: Monthly Expense Trends -->
 		{#if trendData.length > 0}
 			<ExpenseTrendChart data={trendData} title="Monthly Expense Trends">
 				{#snippet icon()}
@@ -138,9 +135,7 @@
 			</ExpenseTrendChart>
 		{/if}
 
-		<!-- Section 2: Expense by Category + Vehicle Cost Comparison (2-col grid) -->
 		<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-			<!-- Expense by Category -->
 			{#if appPieData.length > 0}
 				<AppPieChart
 					title="Expense by Category"
@@ -149,7 +144,6 @@
 				/>
 			{/if}
 
-			<!-- Vehicle Cost Comparison (kept manual — has cost-per-mile list) -->
 			{#if costBarData.length > 0}
 				<Card.Root class="p-4 sm:p-6">
 					<div class="space-y-4">
@@ -204,7 +198,6 @@
 			{/if}
 		</div>
 
-		<!-- Section 3: Fuel Efficiency Comparison -->
 		{#if fuelEffData.length > 0}
 			<AppLineChart
 				title="Fuel Efficiency Comparison"
@@ -218,10 +211,8 @@
 			/>
 		{/if}
 
-		<!-- Section 4: Financing Overview (extracted) -->
 		<FinancingAnalytics {financing} />
 
-		<!-- Section 5: Insurance Overview (extracted) -->
 		<InsuranceAnalytics {insurance} />
 	</div>
 {/if}

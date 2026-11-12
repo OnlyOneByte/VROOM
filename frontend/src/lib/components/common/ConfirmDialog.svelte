@@ -1,15 +1,4 @@
 <script lang="ts">
-	/**
-	 * Reusable confirmation dialog for destructive (or otherwise consequential)
-	 * actions — a styled, disclosing replacement for the native browser `confirm()`.
-	 * Uses the AlertDialog kit (the semantically-correct role: it interrupts and
-	 * demands an explicit choice). Controlled via `bind:open`.
-	 *
-	 * `onConfirm` may be async: while it runs the confirm button shows a spinner and
-	 * both buttons disable. The dialog closes only on SUCCESS — if `onConfirm` throws,
-	 * the dialog stays open (so the caller's error toast is visible and the user can
-	 * retry or cancel), matching the ExpensesTable delete-dialog ergonomics.
-	 */
 	import {
 		AlertDialog,
 		AlertDialogAction,
@@ -19,20 +8,17 @@
 		AlertDialogFooter,
 		AlertDialogHeader,
 		AlertDialogTitle
-	} from '$lib/components/ui/alert-dialog';
+	} from '#lib/components/ui/alert-dialog/index.ts';
 	import { LoaderCircle } from '@lucide/svelte';
-	import { cn } from '$lib/utils';
+	import { cn } from '#lib/utils.ts';
 
 	interface Props {
 		open: boolean;
 		title: string;
 		description: string;
-		/** Confirm button label. Defaults to "Delete" (the dominant use). */
 		confirmLabel?: string;
 		cancelLabel?: string;
-		/** Style the confirm button as destructive (red). Default true. */
 		destructive?: boolean;
-		/** The action to run on confirm. May be async; see the stay-open-on-error note. */
 		onConfirm: () => void | Promise<void>;
 	}
 
@@ -49,8 +35,7 @@
 	let isWorking = $state(false);
 
 	async function handleConfirm(e: Event) {
-		// Prevent the AlertDialog Action's default auto-close so we control closing
-		// (only on success) and can show the in-flight spinner.
+		// AlertDialog Action auto-closes unless its default is prevented.
 		e.preventDefault();
 		if (isWorking) return;
 		isWorking = true;
@@ -58,7 +43,7 @@
 			await onConfirm();
 			open = false;
 		} catch {
-			// Stay open; the caller surfaces its own error toast. Re-enable the buttons.
+			// Caller shows the error; stay open so the user can retry.
 		} finally {
 			isWorking = false;
 		}

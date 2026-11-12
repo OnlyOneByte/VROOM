@@ -1,18 +1,12 @@
 <script lang="ts">
-	import { FormFieldError } from '$lib/components/ui/form-field';
-	import { Label } from '$lib/components/ui/label';
-	import { COMMON_EXPENSE_TAGS } from '$lib/types';
+	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { COMMON_EXPENSE_TAGS } from '#lib/types/index.ts';
 
 	interface Props {
 		tags: string[];
 		error?: string;
 		touched?: boolean;
-		/**
-		 * The pool of suggested tags. Defaults to the static COMMON_EXPENSE_TAGS so
-		 * existing callers keep their behavior; callers can pass a wider list (e.g.
-		 * the common tags plus the user's previously-used tags) to surface history.
-		 * `readonly` so the `as const` COMMON_EXPENSE_TAGS tuple is assignable.
-		 */
 		suggestions?: readonly string[];
 	}
 

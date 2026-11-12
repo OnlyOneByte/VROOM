@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { cn, type WithElementRef, type WithoutChildren } from '$lib/utils.js';
+	import { cn, type WithElementRef, type WithoutChildren } from '#lib/utils.js';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { getPayloadConfigFromPayload, useChart, type TooltipPayload } from './chart-utils.js';
 	import { getChartContext, Tooltip as TooltipPrimitive } from 'layerchart';
@@ -49,8 +49,7 @@
 	const chart = useChart();
 	const chartCtx = getChartContext();
 
-	// Filter to series with defined values (important for item-based charts like Pie/Arc
-	// where only the hovered item has a value)
+	// Pie/Arc charts populate only the hovered item, so undefined values must be filtered out.
 	const visibleSeries = $derived(
 		chartCtx.tooltip.series.filter((s: TooltipPayload) => s.value !== undefined)
 	);
@@ -62,7 +61,6 @@
 		if (!item) return null;
 		const tooltipData = chartCtx.tooltip.data;
 
-		// Get the x-axis label value from the raw tooltip data (e.g. a Date or month string)
 		const dataLabel = tooltipData != null ? chartCtx.x(tooltipData) : undefined;
 
 		const key = labelKey ?? item?.label ?? item?.key ?? 'value';

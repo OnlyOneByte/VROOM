@@ -20,7 +20,6 @@ function createAppStore() {
 			return state.notifications;
 		},
 
-		// Vehicle management
 		setVehicles(vehicles: Vehicle[]) {
 			state.vehicles = vehicles;
 		},
@@ -45,7 +44,6 @@ function createAppStore() {
 			state.isLoading = isLoading;
 		},
 
-		// Notification system
 		addNotification(notification: Omit<Notification, 'id'>) {
 			const newNotification: Notification = {
 				...notification,

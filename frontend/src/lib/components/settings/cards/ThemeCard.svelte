@@ -1,15 +1,15 @@
 <script lang="ts">
 	import { Sun, Moon, Monitor } from '@lucide/svelte';
-	import { Label } from '$lib/components/ui/label';
+	import { Label } from '#lib/components/ui/label/index.ts';
 	import {
 		Card,
 		CardContent,
 		CardDescription,
 		CardHeader,
 		CardTitle
-	} from '$lib/components/ui/card';
-	import { themeStore, type ThemePreference } from '$lib/stores/theme.svelte';
-	import { cn } from '$lib/utils';
+	} from '#lib/components/ui/card/index.ts';
+	import { themeStore, type ThemePreference } from '#lib/stores/theme.svelte.ts';
+	import { cn } from '#lib/utils.ts';
 
 	let currentTheme = $derived(themeStore.current);
 

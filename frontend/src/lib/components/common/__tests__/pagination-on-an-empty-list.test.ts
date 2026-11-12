@@ -1,27 +1,8 @@
-/**
- * An empty list has nothing to page through, and the pagination bar used to say so in the one way
- * that reads as a bug: `Math.ceil(0 / pageSize)` is 0, so the empty expenses list rendered
- * "Page 1 of 0" above a live Previous/Next pair, directly under the "No expenses yet" card.
- *
- * Two independent guards, because the defect had two halves. The bar itself must never report a
- * page count below one for any consumer; and the table must not render the bar at all when the
- * count it was handed is zero.
- */
-
-import { describe, expect, test, vi } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { render } from '@testing-library/svelte';
 import PaginationControls from '../pagination-controls.svelte';
 import ExpensesTable from '../../expenses/ExpensesTable.svelte';
-import type { Expense } from '$lib/types';
-
-// Mounting needs svelte's CLIENT entries; vite.config.ts sets no `browser` resolve condition for
-// tests, so the package's server builds would otherwise win. `svelte/reactivity` matters too: its
-// server `MediaQuery` is a static fallback, which pins `IsMobile` to the wide layout.
-vi.mock('svelte', () => import('../../../../../node_modules/svelte/src/index-client.js' as string));
-vi.mock(
-	'svelte/reactivity',
-	() => import('../../../../../node_modules/svelte/src/reactivity/index-client.js' as string)
-);
+import type { Expense } from '#lib/types/index.ts';
 
 describe('the pagination bar itself', () => {
 	test('never reports a page count below one', () => {

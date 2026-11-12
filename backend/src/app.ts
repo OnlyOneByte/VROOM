@@ -1,12 +1,3 @@
-/**
- * Hono application factory — PURE app construction (middleware + routes), with
- * NO side effects (no migrations, no setInterval, no sync worker, no signal
- * handlers, no server start). `index.ts` imports this and adds the runtime side
- * effects; tests import this and drive it via `app.request()` against an
- * in-memory DB. Keeping construction side-effect-free is what makes the backend
- * testable in-process.
- */
-
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { csrf } from 'hono/csrf';
@@ -39,27 +30,11 @@ import { logger } from './utils/logger';
 
 const app = new Hono();
 
-// Global error handler
 app.onError(errorHandler);
 
-// Body size limit middleware - prevents DoS attacks via large payloads.
-const GLOBAL_MAX_BODY_SIZE = 10 * 1024 * 1024; // 10MB
+export const GLOBAL_MAX_BODY_SIZE = 10 * 1024 * 1024;
 
-/**
- * Paths whose bodies are legitimately LARGER than the global cap, mapped to the cap they
- * enforce instead. A route-level `bodyLimit` can only ever TIGHTEN the global one: this
- * middleware runs first and rejects on Content-Length, so a route asking for more than
- * GLOBAL_MAX_BODY_SIZE never sees the request and its larger allowance is dead code. The
- * backup restore upload takes a whole backup ZIP (CONFIG.backup.maxFileSize), so without an
- * entry here a user cannot restore a backup larger than the global cap — data recovery, the
- * one path that must never be blocked by a DoS guard tuned for JSON payloads.
- *
- * The unversioned alias is listed too: it only 308-redirects to its `/api/v1` twin (no body is
- * read there), but a 413 on the redirect stops a large upload from ever reaching the real route.
- *
- * Adding a path here does NOT remove its cap — the larger limit is still enforced below, and
- * the route keeps its own matching `bodyLimit` as the authoritative declaration.
- */
+// A route-level bodyLimit can only tighten the global cap, which runs first, so exemptions live here.
 const LARGER_BODY_LIMITS: Record<string, number> = {
   '/api/v1/sync/restore/from-backup': CONFIG.backup.maxFileSize,
   '/api/sync/restore/from-backup': CONFIG.backup.maxFileSize,
@@ -78,20 +53,6 @@ const largerBodyLimits = new Map(
 
 app.use('*', (c, next) => (largerBodyLimits.get(c.req.path) ?? globalBodyLimit)(c, next));
 
-/**
- * Security Headers Configuration
- *
- * Content Security Policy (CSP) is configured for maximum security.
- *
- * NOTE: If you add features that require external resources, you may need to adjust:
- * - imgSrc: Add specific domains for external images (e.g., Google Drive thumbnails)
- * - connectSrc: Add API domains for external services
- * - fontSrc: Add CDN domains if using external fonts
- *
- * Example for Google Drive integration:
- *  imgSrc: ["'self'", 'data:', 'https:', 'https://drive.google.com']
- *  connectSrc: ["'self'", 'https://www.googleapis.com']
- */
 app.use(
   '*',
   secureHeaders({
@@ -114,25 +75,19 @@ app.use(
   })
 );
 
-// Rate limiting middleware - global rate limiter
 const globalRateLimiter = rateLimiter({
   ...CONFIG.rateLimit.global,
   keyGenerator: (c) => {
-    // Authenticated requests key by user id; anonymous ones by the TRUSTED client IP
-    // (real socket IP, or X-Forwarded-For only behind a configured trusted proxy) —
-    // not the raw spoofable header.
+    // Keys by trusted client IP: the raw X-Forwarded-For header is spoofable.
     const user = c.get('user');
     return `global:${user?.id || getClientIp(c)}`;
   },
 });
 
-// Optional auth - sets user context if session cookie present (before rate limiter so it can key by user)
-// Scoped to /api/* to avoid unnecessary DB lookups on health checks and static paths
 app.use('/api/*', optionalAuth);
 
 app.use('*', globalRateLimiter);
 
-// CORS middleware with environment-based origins
 app.use(
   '*',
   cors({
@@ -143,8 +98,6 @@ app.use(
   })
 );
 
-// CSRF protection middleware - protects against cross-site request forgery
-// Only applies to state-changing methods (POST, PUT, DELETE, PATCH)
 app.use(
   '*',
   csrf({
@@ -152,18 +105,14 @@ app.use(
   })
 );
 
-// Logging middleware
 app.use('*', honoLogger());
 
-// Pretty JSON in development
 if (CONFIG.env === 'development') {
   app.use('*', prettyJSON());
 }
 
-// Activity tracking middleware (after auth middleware)
 app.use('*', activityTracker);
 
-// Health check endpoint — minimal response, no internal details
 app.get('/health', (c) => {
   return c.json({
     status: 'ok',
@@ -172,15 +121,13 @@ app.get('/health', (c) => {
   });
 });
 
-// API Versioning - Mount v1 routes
 app.route('/api/v1/auth', authRoutes);
 app.route('/api/v1/vehicles', vehicleRoutes);
 app.route('/api/v1/financing', financingRoutes);
 app.route('/api/v1/expenses', expenseRoutes);
 app.route('/api/v1/insurance', insuranceRoutes);
 app.route('/api/v1/odometer', odometerRoutes);
-// Mount the receipt-draft stage endpoint BEFORE the generic photo routes so its fixed
-// /receipt-drafts path is matched before the /:entityType/:entityId wildcard.
+// Must precede the generic photo routes, or /:entityType/:entityId matches /receipt-drafts first.
 app.route('/api/v1/photos', photoReceiptDraftRoutes);
 app.route('/api/v1/photos', photoRoutes);
 app.route('/api/v1/providers', providerRoutes);
@@ -194,22 +141,18 @@ app.route('/api/v1/trips', tripRoutes);
 app.route('/api/v1/shares', shareRoutes);
 app.route('/api/v1/push', pushRoutes);
 
-// Backward compatibility: Redirect /api/* to /api/v1/* (except /api root)
 app.use('/api/*', async (c, next) => {
   const path = c.req.path;
 
-  // Skip if already versioned or is the root /api endpoint
   if (path.startsWith('/api/v') || path === '/api') {
     return next();
   }
 
-  // Redirect to v1 with permanent redirect (308 preserves method)
   const newPath = path.replace('/api/', '/api/v1/');
   logger.debug('Redirecting to versioned API', { from: path, to: newPath });
   return c.redirect(newPath, 308);
 });
 
-// API info endpoint — no PII, no route enumeration
 app.get('/api', (c) => {
   return c.json({
     message: 'VROOM Car Tracker API',
@@ -222,9 +165,6 @@ app.get('/api', (c) => {
   });
 });
 
-// 404 handler. Shapes the standard error envelope, same as every thrown error: a string-valued
-// `error` would leave the client reading `error.message` of a string — undefined — so the UI could
-// only report the bare status code.
 app.notFound((c) =>
   c.json(
     createErrorResponse('NotFoundError', 'The requested endpoint does not exist', {

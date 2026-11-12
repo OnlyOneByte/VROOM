@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { browser } from '$app/environment';
+	import { browser } from '$app/env';
 	import { LoaderCircle, Upload, X, CircleAlert, SwitchCamera, Circle } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
+	import { Button } from '#lib/components/ui/button/index.ts';
 
 	interface Props {
 		uploadErrors: string[];
@@ -13,7 +13,6 @@
 
 	let { uploadErrors, onUploadCapture, onClose }: Props = $props();
 
-	// --- Camera state ---
 	let videoEl = $state<HTMLVideoElement | null>(null);
 	let canvasEl = $state<HTMLCanvasElement | null>(null);
 	let mediaStream = $state<MediaStream | null>(null);
@@ -27,11 +26,6 @@
 
 	let hasCameraSupport = $derived(browser && !!navigator.mediaDevices?.getUserMedia);
 
-	// --- Camera lifecycle ---
-	// Mount/unmount only. `startCamera` reads `facingMode` synchronously to build its constraints, so
-	// calling it tracked would make this effect re-run on every camera switch — tearing down the
-	// stream the switch had just acquired and opening the hardware a second time. Every restart is
-	// owned by the action that needs one (toggleFacingMode, retakePhoto, the error "Try Again").
 	$effect(() => {
 		untrack(() => startCamera());
 		return () => {
@@ -126,11 +120,6 @@
 		cameraReady = false;
 	}
 
-	/**
-	 * Drop the pending capture, releasing its blob URL first. The ONLY correct way to clear
-	 * `capturedPreview`: assigning null on its own leaks the full-resolution JPEG for the lifetime of
-	 * the page, because the URL is then unreachable and nothing can revoke it afterwards.
-	 */
 	function discardCapture() {
 		if (capturedPreview) {
 			URL.revokeObjectURL(capturedPreview);
@@ -149,7 +138,7 @@
 				await startCamera();
 				if (!cameraError) return;
 			} catch {
-				// startCamera handles its own errors
+				// startCamera records its failure in cameraError.
 			}
 			if (
 				cameraError === 'Could not access camera. Please try again.' &&
@@ -196,9 +185,6 @@
 		uploadingCapture = true;
 		try {
 			await onUploadCapture(capturedFile);
-			// Revoke BEFORE dropping the reference: nulling it first makes the full-resolution JPEG
-			// unreachable but still resident, and a later reset() can no longer free it. A session of
-			// several captures would otherwise retain every one of them for the page's lifetime.
 			discardCapture();
 			uploadingCapture = false;
 		} catch {
@@ -226,7 +212,6 @@
 		<Button variant="outline" size="sm" onclick={startCamera}>Try Again</Button>
 	</div>
 {:else if capturedPreview}
-	<!-- Preview captured photo -->
 	<div class="relative overflow-hidden rounded-lg border border-border">
 		<img src={capturedPreview} alt="Captured preview" class="aspect-video w-full object-cover" />
 	</div>
@@ -243,7 +228,6 @@
 		</Button>
 	</div>
 {:else}
-	<!-- Live viewfinder -->
 	<div class="relative overflow-hidden rounded-lg border border-border bg-muted">
 		{#if !cameraReady}
 			<div class="flex aspect-video items-center justify-center">
@@ -285,7 +269,6 @@
 	</div>
 {/if}
 
-<!-- Upload errors from camera capture -->
 {#if uploadErrors.length > 0}
 	<div class="rounded-lg border border-destructive bg-destructive/10 p-3">
 		{#each uploadErrors as error, idx (idx)}

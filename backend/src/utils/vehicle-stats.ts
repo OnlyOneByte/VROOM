@@ -1,14 +1,6 @@
-/**
- * Vehicle Statistics Calculations
- *
- * Extracted from vehicles/routes.ts to make these calculations reusable
- * across different endpoints and reduce route handler complexity.
- */
-
 import { isElectricFuelType } from '../db/types';
 import { averageConsecutiveMpg, calculateAverageMilesPerKwh, maxOf } from './calculations';
 
-// Helper types for vehicle stats calculations
 export interface FuelExpense {
   id: string;
   mileage: number | null;
@@ -33,12 +25,6 @@ export interface VehicleStats {
   chargeExpenseCount: number;
 }
 
-/**
- * Calculate comprehensive vehicle statistics from fuel expenses.
- *
- * Splits expenses into fuel-group and charge-group using isElectricFuelType,
- * then computes efficiency metrics gated by the tracking flags.
- */
 export function calculateVehicleStats(
   fuelExpenses: FuelExpense[],
   initialMileage: number,
@@ -63,7 +49,6 @@ export function calculateVehicleStats(
     return stats;
   }
 
-  // Split expenses into fuel-group and charge-group by fuelType
   const fuelGroup: FuelExpense[] = [];
   const chargeGroup: FuelExpense[] = [];
 
@@ -75,7 +60,6 @@ export function calculateVehicleStats(
     }
   }
 
-  // Calculate totals split by group
   stats.totalFuelConsumed = sumVolume(fuelGroup);
   stats.totalChargeConsumed = sumVolume(chargeGroup);
   stats.totalFuelCost = fuelGroup.reduce((sum, e) => sum + e.expenseAmount, 0);
@@ -83,7 +67,6 @@ export function calculateVehicleStats(
   stats.fuelExpenseCount = fuelGroup.length;
   stats.chargeExpenseCount = chargeGroup.length;
 
-  // Get all expenses with mileage data (for mileage stats)
   const expensesWithMileage = fuelExpenses.filter(
     (e) => e.mileage !== null && e.mileage !== undefined
   );
@@ -94,7 +77,6 @@ export function calculateVehicleStats(
     calculateMileageStats(stats, expensesWithMileage, initialMileage, totalEnergyCost);
   }
 
-  // Calculate fuel efficiency (MPG) — gated by trackFuel
   if (trackFuel) {
     const fuelWithMileage = fuelGroup.filter((e) => e.mileage !== null && e.mileage !== undefined);
     if (stats.totalFuelConsumed > 0 && fuelWithMileage.length >= 2) {
@@ -102,7 +84,6 @@ export function calculateVehicleStats(
     }
   }
 
-  // Calculate electric efficiency (mi/kWh) — gated by trackCharging
   if (trackCharging) {
     stats.averageMilesPerKwh = calculateAverageMilesPerKwh(chargeGroup);
   }
@@ -110,9 +91,6 @@ export function calculateVehicleStats(
   return stats;
 }
 
-/**
- * Sum volume values for a group of expenses
- */
 function sumVolume(expenses: FuelExpense[]): number {
   let total = 0;
   for (const expense of expenses) {
@@ -123,9 +101,6 @@ function sumVolume(expenses: FuelExpense[]): number {
   return total;
 }
 
-/**
- * Calculate mileage-related statistics
- */
 function calculateMileageStats(
   stats: VehicleStats,
   expensesWithMileage: FuelExpense[],
@@ -135,10 +110,6 @@ function calculateMileageStats(
   const mileages = expensesWithMileage.map((e) => e.mileage as number);
   const latestMileage = maxOf(mileages);
   stats.currentMileage = latestMileage;
-  // Distance driven can never be negative. A backdated/mistyped reading BELOW initialMileage (or the
-  // only in-window reading being lower than the purchase odometer) would otherwise surface a negative
-  // totalMileage verbatim. Clamp at 0 — correct under ANY stats-period windowing (the separate
-  // decision), since a driven distance is non-negative regardless of the window's numerator scope.
   stats.totalMileage = Math.max(0, latestMileage - initialMileage);
 
   if (stats.totalMileage > 0) {
@@ -146,20 +117,7 @@ function calculateMileageStats(
   }
 }
 
-/**
- * Calculate average miles per gallon from sequential fuel expenses.
- *
- * Pairs CONSECUTIVE fillups (current − previous) for the per-segment distance, so the input MUST be
- * in chronological order. The sole production caller (vehicles/routes.ts) already sorts by date, but a
- * pairwise odometer-delta is silently WRONG on unordered rows (negative deltas dropped by the mpg>0
- * filter, but valid out-of-order segments mis-paired) — so sort defensively here too. The sort
- * is on a copy + idempotent for already-sorted input, so it's behavior-preserving for today's caller
- * while making the helper correct for any future consumer that forgets to pre-sort.
- */
 function calculateAverageMpg(unorderedExpenses: FuelExpense[]): number | null {
-  // Defensive inline date sort (: the helper requires chronological order for correct pairwise
-  // odometer deltas), then run the SHARED consecutive-pair MPG average (dedup — the same loop +
-  // missedFillup skip + (0,150) band that calculateAverageMPG uses; proved hand-copies drift).
   const sorted = [...unorderedExpenses].sort((a, b) => a.date.getTime() - b.date.getTime());
   return averageConsecutiveMpg(sorted);
 }

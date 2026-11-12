@@ -1,233 +1,162 @@
-/**
- * Property tests for BackupService.
- *
- * Property 2: Retention enforcement correctness
- * Property 4: Backup listing filter, sort, and badge
- *
- * Provider isolation (Property 1), skip logic (Property 16), and lastBackupAt
- * updates (Property 17) are covered in backup-orchestrator.test.ts.
- *
- * Validates: Requirements 2.2, 2.3, 2.4, 4.1, 4.2
- */
-
-import { describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import fc from 'fast-check';
+import { createTestApp, type TestApp } from '../../../test-helpers/http-client';
 import type { StorageFileInfo } from '../../providers/domains/storage/storage-provider';
 
-// ---------------------------------------------------------------------------
-// Arbitraries
-// ---------------------------------------------------------------------------
+const PROVIDER_ID = 'prov-listing';
+const BASE_MS = Date.UTC(2024, 0, 1);
 
-/** Arbitrary for a valid ISO 8601 timestamp. */
-const isoTimestampArb = fc
-  .integer({ min: 1_000_000_000_000, max: 2_000_000_000_000 })
-  .map((ms) => new Date(ms).toISOString());
+type FakeProvider = {
+  type: string;
+  list: (folder: string) => Promise<StorageFileInfo[]>;
+  delete: (ref: { externalId: string }) => Promise<void>;
+};
 
-/** Arbitrary for a retention count (1–100). */
+let ctx: TestApp;
+let storageSpy: ReturnType<typeof spyOn> | undefined;
+
+beforeEach(async () => {
+  ctx = await createTestApp();
+  ctx.sqlite.run(
+    `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
+     VALUES (?, ?, 'storage', 'google-drive', 'Drive', 'enc', '{}', 'active')`,
+    [PROVIDER_ID, ctx.user.id]
+  );
+});
+afterEach(() => {
+  storageSpy?.mockRestore();
+  storageSpy = undefined;
+  ctx.close();
+});
+
+function seedRetention(retentionCount: number): void {
+  ctx.sqlite.run('INSERT OR REPLACE INTO user_preferences (user_id, backup_config) VALUES (?, ?)', [
+    ctx.user.id,
+    JSON.stringify({
+      providers: { [PROVIDER_ID]: { enabled: true, folderPath: 'B', retentionCount } },
+    }),
+  ]);
+}
+
+async function stubStorage(files: StorageFileInfo[]): Promise<string[]> {
+  const { getStorageProviderRegistry } = await import('../../providers/domains/storage/registry');
+  const deleted: string[] = [];
+  const fake: FakeProvider = {
+    type: 'google-drive',
+    list: async () => files,
+    delete: async ({ externalId }) => {
+      deleted.push(externalId);
+    },
+  };
+  storageSpy ??= spyOn(getStorageProviderRegistry(), 'getProvider');
+  storageSpy.mockResolvedValue(fake as never);
+  return deleted;
+}
+
+function uniqueFiles(files: StorageFileInfo[]): StorageFileInfo[] {
+  return files.map((f, i) => ({
+    ...f,
+    key: `key-${i}`,
+    lastModified: new Date(BASE_MS + ((i * 7919) % 100_000) * 1000).toISOString(),
+  }));
+}
+
+const backupFileArb: fc.Arbitrary<StorageFileInfo> = fc
+  .record({
+    name: fc
+      .stringMatching(/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}-[0-9]{2}$/)
+      .map((ts) => `vroom-backup-${ts}.zip`),
+    size: fc.nat({ max: 100_000_000 }),
+  })
+  .map(({ name, size }) => ({
+    key: 'unused',
+    name,
+    size,
+    createdTime: new Date(BASE_MS).toISOString(),
+    lastModified: new Date(BASE_MS).toISOString(),
+  }));
+
+const nonBackupFileArb: fc.Arbitrary<StorageFileInfo> = fc
+  .oneof(
+    fc.stringMatching(/^photo-[a-z0-9]{4,8}\.(jpg|png)$/),
+    fc.stringMatching(/^document-[a-z0-9]{4,8}\.pdf$/),
+    fc.constant('readme.txt'),
+    fc.constant('vroom-backup-incomplete'),
+    fc.constant('vroom-backup-.txt')
+  )
+  .map((name) => ({
+    key: 'unused',
+    name,
+    size: 1,
+    createdTime: new Date(BASE_MS).toISOString(),
+    lastModified: new Date(BASE_MS).toISOString(),
+  }));
+
 const retentionCountArb = fc.integer({ min: 1, max: 100 });
 
-/** Arbitrary for a backup file name matching the vroom-backup-*.zip pattern. */
-const backupFileNameArb = fc
-  .stringMatching(/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}-[0-9]{2}$/)
-  .map((ts) => `vroom-backup-${ts}.zip`);
+describe('listBackups: the backup listing', () => {
+  test('lists only vroom-backup-*.zip files, newest first, with exactly one marked latest', async () => {
+    const { backupService } = await import('../backup');
+    await fc.assert(
+      fc.asyncProperty(
+        fc.array(backupFileArb, { minLength: 0, maxLength: 12 }),
+        fc.array(nonBackupFileArb, { minLength: 0, maxLength: 12 }),
+        async (backups, nonBackups) => {
+          const files = uniqueFiles([...backups, ...nonBackups]);
+          const backupKeys = new Set(files.slice(0, backups.length).map((f) => f.key));
+          const lastModifiedByKey = new Map(files.map((f) => [f.key, f.lastModified]));
+          seedRetention(10);
+          await stubStorage(files);
 
-/** Arbitrary for a non-backup file name (does NOT match vroom-backup-*.zip). */
-const nonBackupFileNameArb = fc.oneof(
-  fc.stringMatching(/^photo-[a-z0-9]{4,8}\.(jpg|png)$/),
-  fc.stringMatching(/^document-[a-z0-9]{4,8}\.pdf$/),
-  fc.constant('readme.txt'),
-  fc.constant('vroom-backup-incomplete'),
-  fc.constant('vroom-backup-.txt')
-);
+          const result = await backupService.listBackups(ctx.user.id, PROVIDER_ID);
 
-/** Arbitrary for a StorageFileInfo representing a backup file. */
-const backupFileArb: fc.Arbitrary<StorageFileInfo> = fc.record({
-  key: fc.stringMatching(/^key-[a-zA-Z0-9]{5,20}$/),
-  name: backupFileNameArb,
-  size: fc.nat({ max: 100_000_000 }),
-  createdTime: isoTimestampArb,
-  lastModified: isoTimestampArb,
-});
-
-/** Arbitrary for a StorageFileInfo representing a non-backup file. */
-const nonBackupFileArb: fc.Arbitrary<StorageFileInfo> = fc.record({
-  key: fc.stringMatching(/^nbk-[a-zA-Z0-9]{5,20}$/),
-  name: nonBackupFileNameArb,
-  size: fc.nat({ max: 100_000_000 }),
-  createdTime: isoTimestampArb,
-  lastModified: isoTimestampArb,
-});
-
-// ---------------------------------------------------------------------------
-// Property 4: Backup listing filter, sort, and badge
-// Validates: Requirements 4.1, 4.2
-// ---------------------------------------------------------------------------
-
-describe('Property 4: Backup listing filter, sort, and badge', () => {
-  /** Pure function replicating the listBackups filter/sort/badge logic. */
-  function applyListBackupsLogic(files: StorageFileInfo[]) {
-    return files
-      .filter((f) => f.name.startsWith('vroom-backup-') && f.name.endsWith('.zip'))
-      .sort((a, b) => b.lastModified.localeCompare(a.lastModified))
-      .map((f, i) => ({
-        fileRef: f.key,
-        fileName: f.name,
-        size: f.size,
-        createdTime: f.createdTime,
-        isLatest: i === 0,
-      }));
-  }
-
-  test('only vroom-backup-*.zip files are included', () => {
-    fc.assert(
-      fc.property(
-        fc.array(backupFileArb, { minLength: 0, maxLength: 10 }),
-        fc.array(nonBackupFileArb, { minLength: 0, maxLength: 10 }),
-        (backupFiles, nonBackupFiles) => {
-          const allFiles = [...backupFiles, ...nonBackupFiles];
-          const result = applyListBackupsLogic(allFiles);
-          expect(result.length).toBe(backupFiles.length);
-          for (const r of result) {
-            expect(r.fileName.startsWith('vroom-backup-')).toBe(true);
-            expect(r.fileName.endsWith('.zip')).toBe(true);
+          const expectedKeys = files
+            .filter((f) => backupKeys.has(f.key))
+            .sort((a, b) => b.lastModified.localeCompare(a.lastModified))
+            .map((f) => f.key);
+          expect(result.map((r) => r.fileRef)).toEqual(expectedKeys);
+          for (let i = 1; i < result.length; i++) {
+            const prev = lastModifiedByKey.get(result[i - 1].fileRef) ?? '';
+            const curr = lastModifiedByKey.get(result[i].fileRef) ?? '';
+            expect(prev >= curr).toBe(true);
           }
+          expect(result.filter((r) => r.isLatest).length).toBe(result.length > 0 ? 1 : 0);
+          expect(result[0]?.isLatest ?? false).toBe(result.length > 0);
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 50 }
     );
-  });
-
-  test('results are sorted newest-first by lastModified', () => {
-    const uniqueKeyBackupFileArb = fc
-      .array(backupFileArb, { minLength: 2, maxLength: 20 })
-      .map((files) => {
-        const seen = new Set<string>();
-        return files
-          .map((f, i) => {
-            const uniqueKey = `key-${i}-${f.key}`;
-            if (seen.has(uniqueKey)) return null;
-            seen.add(uniqueKey);
-            return { ...f, key: uniqueKey };
-          })
-          .filter((f): f is StorageFileInfo => f !== null);
-      })
-      .filter((arr) => arr.length >= 2);
-
-    fc.assert(
-      fc.property(uniqueKeyBackupFileArb, (backupFiles) => {
-        const result = applyListBackupsLogic(backupFiles);
-        for (let i = 1; i < result.length; i++) {
-          const prevFile = backupFiles.find((f) => f.key === result[i - 1].fileRef);
-          const currFile = backupFiles.find((f) => f.key === result[i].fileRef);
-          if (!prevFile || !currFile) return;
-          expect(prevFile.lastModified >= currFile.lastModified).toBe(true);
-        }
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  test('exactly one file is marked isLatest when backups exist', () => {
-    fc.assert(
-      fc.property(fc.array(backupFileArb, { minLength: 1, maxLength: 20 }), (backupFiles) => {
-        const result = applyListBackupsLogic(backupFiles);
-        const latestCount = result.filter((r) => r.isLatest).length;
-        expect(latestCount).toBe(1);
-        expect(result[0].isLatest).toBe(true);
-        for (let i = 1; i < result.length; i++) {
-          expect(result[i].isLatest).toBe(false);
-        }
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  test('empty file list returns empty result with no isLatest', () => {
-    const result = applyListBackupsLogic([]);
-    expect(result).toEqual([]);
   });
 });
 
-// ---------------------------------------------------------------------------
-// Property 2: Retention enforcement correctness
-// Validates: Requirements 2.2, 2.3, 2.4
-// ---------------------------------------------------------------------------
-
-describe('Property 2: Retention enforcement correctness', () => {
-  function computeRetention(
-    files: StorageFileInfo[],
-    retentionCount: number
-  ): { toDelete: StorageFileInfo[]; preserved: StorageFileInfo[] } {
-    const backupFiles = files
-      .filter((f) => f.name.startsWith('vroom-backup-') && f.name.endsWith('.zip'))
-      .sort((a, b) => b.lastModified.localeCompare(a.lastModified));
-
-    if (backupFiles.length <= retentionCount) {
-      return { toDelete: [], preserved: backupFiles };
-    }
-
-    return {
-      preserved: backupFiles.slice(0, retentionCount),
-      toDelete: backupFiles.slice(retentionCount),
-    };
-  }
-
-  test('exactly max(0, N - R) files are marked for deletion', () => {
-    fc.assert(
-      fc.property(
-        fc.array(backupFileArb, { minLength: 0, maxLength: 30 }),
+describe('enforceRetention: the retention sweep', () => {
+  test('deletes exactly the backups beyond the retention count, oldest first, and no other file', async () => {
+    const { backupService } = await import('../backup');
+    await fc.assert(
+      fc.asyncProperty(
+        fc.array(backupFileArb, { minLength: 0, maxLength: 20 }),
+        fc.array(nonBackupFileArb, { minLength: 0, maxLength: 6 }),
         retentionCountArb,
-        (files, retentionCount) => {
-          const { toDelete } = computeRetention(files, retentionCount);
-          const expected = Math.max(0, files.length - retentionCount);
-          expect(toDelete.length).toBe(expected);
-        }
-      ),
-      { numRuns: 100 }
-    );
-  });
+        async (backups, nonBackups, retentionCount) => {
+          const files = uniqueFiles([...backups, ...nonBackups]);
+          const backupKeys = new Set(files.slice(0, backups.length).map((f) => f.key));
+          const nonBackupKeys = new Set(files.slice(backups.length).map((f) => f.key));
+          const newestFirst = files
+            .filter((f) => backupKeys.has(f.key))
+            .sort((a, b) => b.lastModified.localeCompare(a.lastModified));
+          seedRetention(retentionCount);
+          const deleted = await stubStorage(files);
 
-  test('the R newest files by lastModified are preserved', () => {
-    fc.assert(
-      fc.property(
-        fc.array(backupFileArb, { minLength: 1, maxLength: 30 }),
-        retentionCountArb,
-        (files, retentionCount) => {
-          const { preserved, toDelete } = computeRetention(files, retentionCount);
-          for (let i = 1; i < preserved.length; i++) {
-            expect(preserved[i - 1].lastModified >= preserved[i].lastModified).toBe(true);
-          }
-          if (preserved.length > 0 && toDelete.length > 0) {
-            const oldestPreserved = preserved[preserved.length - 1].lastModified;
-            for (const d of toDelete) {
-              expect(d.lastModified <= oldestPreserved).toBe(true);
-            }
+          const count = await backupService.enforceRetention(ctx.user.id, PROVIDER_ID);
+
+          expect(count).toBe(deleted.length);
+          expect(deleted).toEqual(newestFirst.slice(retentionCount).map((f) => f.key));
+          for (const key of deleted) {
+            expect(nonBackupKeys.has(key)).toBe(false);
           }
         }
       ),
-      { numRuns: 100 }
-    );
-  });
-
-  test('non-backup files are ignored during retention', () => {
-    fc.assert(
-      fc.property(
-        fc.array(backupFileArb, { minLength: 0, maxLength: 10 }),
-        fc.array(nonBackupFileArb, { minLength: 1, maxLength: 10 }),
-        retentionCountArb,
-        (backupFiles, nonBackupFiles, retentionCount) => {
-          const allFiles = [...backupFiles, ...nonBackupFiles];
-          const { toDelete, preserved } = computeRetention(allFiles, retentionCount);
-          const allRetentionKeys = new Set([
-            ...toDelete.map((f) => f.key),
-            ...preserved.map((f) => f.key),
-          ]);
-          for (const nbf of nonBackupFiles) {
-            expect(allRetentionKeys.has(nbf.key)).toBe(false);
-          }
-        }
-      ),
-      { numRuns: 100 }
+      { numRuns: 50 }
     );
   });
 });

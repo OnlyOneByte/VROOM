@@ -2,19 +2,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { authStore } from '../../stores/auth.svelte';
 import type { User } from '../../types/index.js';
 
-// Mock $app/state
 vi.mock('$app/state', () => ({
 	page: { url: { pathname: '/dashboard' } }
 }));
 
-// Mock SyncStatusIndicator component
 vi.mock('../SyncStatusIndicator.svelte', () => ({
 	default: class MockSyncStatusIndicator {
 		constructor() {}
 	}
 }));
 
-// Mock user data
 const mockUser: User = {
 	id: '1',
 	email: 'test@example.com',
@@ -26,7 +23,6 @@ const mockUser: User = {
 describe('Navigation Component Logic', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		// Reset stores to initial state
 		authStore.clearUser();
 	});
 
@@ -35,13 +31,9 @@ describe('Navigation Component Logic', () => {
 	});
 
 	it('manages authentication state correctly', () => {
-		// Initially not authenticated
-		// Direct property access
 		expect(authStore.isAuthenticated).toBe(false);
 
-		// Set user
 		authStore.setUser(mockUser);
-		// Refresh reference
 		expect(authStore.isAuthenticated).toBe(true);
 		expect(authStore.user?.displayName).toBe('Test User');
 		expect(authStore.user?.email).toBe('test@example.com');
@@ -55,12 +47,10 @@ describe('Navigation Component Logic', () => {
 			return currentPath.startsWith(href);
 		};
 
-		// Test dashboard active states
 		expect(isActive('/dashboard', '/')).toBe(true);
 		expect(isActive('/dashboard', '/dashboard')).toBe(true);
 		expect(isActive('/dashboard', '/expenses')).toBe(false);
 
-		// Test other routes
 		expect(isActive('/vehicles', '/vehicles')).toBe(true);
 		expect(isActive('/vehicles', '/vehicles/123')).toBe(true);
 		expect(isActive('/vehicles', '/expenses')).toBe(false);
@@ -71,12 +61,9 @@ describe('Navigation Component Logic', () => {
 	});
 
 	it('handles logout functionality', async () => {
-		// Set authenticated user
 		authStore.setUser(mockUser);
-		// Direct property access
 		expect(authStore.isAuthenticated).toBe(true);
 
-		// Mock successful logout (apiClient-compatible response)
 		global.fetch = vi.fn().mockResolvedValueOnce({
 			ok: true,
 			status: 200,
@@ -84,20 +71,12 @@ describe('Navigation Component Logic', () => {
 			json: () => Promise.resolve({ success: true, data: null })
 		});
 
-		// Logout
 		await authStore.logout();
-		// Refresh reference
 		expect(authStore.isAuthenticated).toBe(false);
 		expect(authStore.user).toBe(null);
 	});
 
 	it('documents the current navigation items', () => {
-		// NOTE: this mirrors the `navigation` + `userNavigation` arrays defined inside
-		// Navigation.svelte (they're local consts, not exported, so they can't be
-		// imported directly). It's a documentation/regression fixture, not proof the
-		// component renders them — keep it in sync if the nav changes. (Corrected
-		// : the old fixture still listed a "Vehicles" item the live nav
-		// dropped and omitted Insurance/Reminders/Trips — a stale self-assert.)
 		const navigation = [
 			{ name: 'Dashboard', href: '/dashboard' },
 			{ name: 'Expenses', href: '/expenses' },
@@ -109,7 +88,6 @@ describe('Navigation Component Logic', () => {
 		const userNavigation = [{ name: 'Settings', href: '/settings' }];
 
 		expect(navigation).toHaveLength(6);
-		// Every nav href must point at a real declared route (no dead links).
 		const declared = new Set([
 			'/dashboard',
 			'/expenses',
@@ -125,7 +103,6 @@ describe('Navigation Component Logic', () => {
 	});
 
 	it('handles responsive breakpoints', () => {
-		// Test responsive class logic
 		const getResponsiveClasses = (isMobile: boolean) => {
 			return {
 				mobileHeader: 'lg:hidden fixed top-0',
@@ -144,7 +121,6 @@ describe('Navigation Component Logic', () => {
 
 	it('manages user display information', () => {
 		authStore.setUser(mockUser);
-		// Direct property access
 
 		const displayName = authStore.user?.displayName || 'User';
 		const email = authStore.user?.email || '';
@@ -154,14 +130,11 @@ describe('Navigation Component Logic', () => {
 	});
 
 	it('handles navigation state changes', () => {
-		// Initial state
 		expect(authStore.isAuthenticated).toBe(false);
 
-		// Authenticate
 		authStore.setUser(mockUser);
 		expect(authStore.isAuthenticated).toBe(true);
 
-		// Logout
 		authStore.clearUser();
 		expect(authStore.isAuthenticated).toBe(false);
 	});

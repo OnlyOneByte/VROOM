@@ -1,18 +1,8 @@
-/**
- * VLM extraction schema + registry dispatch (vlm-receipt-parsing T2). The load-bearing
- * untrusted-output discipline (design §7.3): a receipt image is untrusted input, so the model's
- * response is bounded by a STRICT schema and anything failing is DROPPED (fail-closed), never coerced.
- * The draft is never auto-written — these tests prove the bounding, not a DB write.
- *
- * Also covers the registry seam: resolveVlmSettings decrypts the credential blob + reads the config,
- * and getVlmProvider switches on providerType (unknown → throw, mirroring storage/registry.ts). The
- * adapter bodies land in T3; here we assert the dispatch + the not-yet-implemented guard.
- */
-
 import { describe, expect, test } from 'bun:test';
 import { encrypt } from '../../../../../utils/encryption';
+import { resolveModelSettings } from '../../model/model-registry';
 import { parseExtraction, receiptExtractionSchema } from '../prompt';
-import { getVlmProvider, resolveVlmSettings } from '../registry';
+import { getVlmProvider } from '../registry';
 
 describe('parseExtraction — clean inputs map to a trusted draft', () => {
   test('a well-formed JSON object maps every field', () => {
@@ -69,7 +59,7 @@ describe('parseExtraction — FAIL-CLOSED: bad fields are DROPPED, never coerced
 
   test('an out-of-set category is dropped (not guessed)', () => {
     expect(parseExtraction({ category: 'groceries' })).toEqual({});
-    expect(parseExtraction({ category: 'FUEL' })).toEqual({}); // case-sensitive enum
+    expect(parseExtraction({ category: 'FUEL' })).toEqual({});
   });
 
   test('a malformed or impossible date is dropped', () => {
@@ -85,10 +75,10 @@ describe('parseExtraction — FAIL-CLOSED: bad fields are DROPPED, never coerced
 
   test('ONE bad field does not nuke the good fields (per-field salvage)', () => {
     const draft = parseExtraction({
-      amount: 25.0, // good
-      category: 'not-a-category', // bad → dropped
-      date: '2024-06-01', // good
-      odometer: -1, // bad → dropped
+      amount: 25.0,
+      category: 'not-a-category',
+      date: '2024-06-01',
+      odometer: -1,
     });
     expect(draft).toEqual({ amount: 25.0, date: '2024-06-01' });
   });
@@ -117,8 +107,6 @@ describe('parseExtraction — prompt-injection / garbage never throws or escalat
   });
 
   test('an injection-y string field that passes the schema is kept VERBATIM (data, not executed)', () => {
-    // A vendor literally named like an instruction is just a (capped) string — it is extracted as
-    // data and would still be re-validated server-side at POST /expenses. No escalation path exists.
     const draft = parseExtraction({ vendor: 'DROP TABLE expenses;' });
     expect(draft.vendor).toBe('DROP TABLE expenses;');
   });
@@ -135,7 +123,7 @@ describe('receiptExtractionSchema — direct shape checks', () => {
   });
 });
 
-describe('getVlmProvider / resolveVlmSettings — registry dispatch (T2)', () => {
+describe('getVlmProvider / resolveModelSettings dispatch by provider type', () => {
   function vlmRow(
     over: Partial<{ providerType: string; config: unknown; credentials: unknown }> = {}
   ) {
@@ -159,8 +147,8 @@ describe('getVlmProvider / resolveVlmSettings — registry dispatch (T2)', () =>
     } as any;
   }
 
-  test('resolveVlmSettings decrypts the api key + reads model/baseUrl', () => {
-    const s = resolveVlmSettings(vlmRow());
+  test('resolveModelSettings decrypts the api key + reads model/baseUrl', () => {
+    const s = resolveModelSettings(vlmRow(), 'VLM');
     expect(s).toEqual({
       apiKey: 'sk-x',
       model: 'gpt-4o-mini',
@@ -168,8 +156,10 @@ describe('getVlmProvider / resolveVlmSettings — registry dispatch (T2)', () =>
     });
   });
 
-  test('resolveVlmSettings throws when the model is missing (defense-in-depth vs a restored bad row)', () => {
-    expect(() => resolveVlmSettings(vlmRow({ config: { baseUrl: 'https://x' } }))).toThrow();
+  test('resolveModelSettings throws when the model is missing (defense-in-depth vs a restored bad row)', () => {
+    expect(() => resolveModelSettings(vlmRow({ config: { baseUrl: 'https://x' } }), 'VLM')).toThrow(
+      /VLM provider config is missing a model name/
+    );
   });
 
   test('getVlmProvider throws on an unknown/non-VLM provider type', () => {
@@ -178,9 +168,7 @@ describe('getVlmProvider / resolveVlmSettings — registry dispatch (T2)', () =>
     );
   });
 
-  test('getVlmProvider returns a LIVE adapter for ALL FOUR D1-ruled types (T3a + T3b)', () => {
-    // D1 ruled the full set (2026-06-30): openai-compatible + ollama share the /v1/chat/completions
-    // adapter; anthropic + gemini are their own first-party adapters. All four instantiate now.
+  test('getVlmProvider returns a live adapter for every model provider type', () => {
     expect(getVlmProvider(vlmRow({ providerType: 'openai-compatible' }))).toBeDefined();
     expect(
       getVlmProvider(

@@ -24,9 +24,10 @@ services:
       - "${BACKEND_PORT:-3001}:3001"
     volumes:
       - vroom-data:/app/data
-    # Every variable the backend reads has to be listed here: the container sees only
-    # what this block passes through. The three the backend refuses to start without in
-    # production are GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and PROVIDER_ENCRYPTION_KEY.
+    # The container sees only what this block passes through. The three the backend refuses
+    # to start without in production are GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and
+    # PROVIDER_ENCRYPTION_KEY. Optional features (GitHub login, web push, TRUSTED_PROXY_IPS)
+    # need their own lines here; see docs/deployment.md.
     environment:
       NODE_ENV: production
       PORT: 3001

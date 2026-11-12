@@ -1,7 +1,7 @@
 <script lang="ts">
 	import PolicyCard from './PolicyCard.svelte';
-	import { groupPoliciesByActive } from '$lib/utils/insurance';
-	import type { InsurancePolicy, Vehicle } from '$lib/types';
+	import { groupPoliciesByActive } from '#lib/utils/insurance.ts';
+	import type { InsurancePolicy, Vehicle } from '#lib/types/index.ts';
 
 	interface Props {
 		policies: InsurancePolicy[];
@@ -9,7 +9,6 @@
 		vehicles?: Vehicle[];
 		onEdit: (_policy: InsurancePolicy) => void;
 		onRefresh: () => Promise<void>;
-		// T12b-3c: read-only shared view hides every mutate affordance in the policy tree.
 		readOnly?: boolean;
 	}
 

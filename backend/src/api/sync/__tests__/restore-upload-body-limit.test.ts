@@ -1,34 +1,3 @@
-/**
- * Regression net for the body-size cap on the backup-RESTORE upload — the data-recovery path.
- *
- * Two body limits apply to `POST /api/v1/sync/restore/from-backup`:
- *  - the GLOBAL one in app.ts (10MB), a DoS guard sized for JSON payloads, and
- *  - the ROUTE's own (`CONFIG.backup.maxFileSize`, 50MB), sized for a whole backup ZIP.
- *
- * Middleware order makes the global one decisive: it runs first and rejects on Content-Length, so
- * a route-level allowance LARGER than the global cap is unreachable — a user with an 11MB backup
- * got 413 "Request body too large" and could not restore their own data, while the route's 50MB
- * allowance looked (in code and in docs) like it applied. app.ts therefore maps this path to the
- * larger cap; the route keeps its own matching bodyLimit as the authoritative declaration.
- *
- * What is pinned here:
- *  1. a body ABOVE the global cap but under the route's reaches the handler (no 413) — RED before
- *  the fix;
- *  2. a body above the ROUTE's cap is still rejected 413 — the entry widens the limit, it does not
- *  remove it;
- *  3. the unversioned alias still 308-redirects a large upload instead of 413-ing it;
- *  4. an ordinary route is still capped at the global 10MB — pins that the fix was not "raise the
- *  global cap for everyone";
- *  5. the inventory of route-level bodyLimit declarations, so the next one gets checked against
- *  the global cap.
- *
- * Bodies are hand-built multipart with an explicit Content-Length, because that header is what
- * bodyLimit reads — `app.request` with a FormData object does not always set it, which would make
- * the guard vacuous. Case 1 sends real bytes so the request genuinely flows through the handler
- * (the payload is not a valid ZIP, so the handler fails on its own terms — the point is the limit
- * boundary, not a real restore); the rejection cases only need the declared header.
- */
-
 import { beforeEach, describe, expect, test } from 'bun:test';
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, sep } from 'node:path';
@@ -43,13 +12,8 @@ interface ErrorBody {
   error?: { code?: string; message?: string };
 }
 
-/** CSRF: multipart is a "simple request" content type, so hono's csrf guard checks Origin. */
 const TEST_ORIGIN = 'http://localhost:3000';
 
-/**
- * Build a multipart/form-data body (file + mode) with a payload of `fileBytes` zero bytes, and
- * return it with the exact headers a real client would send — including Content-Length.
- */
 function buildUpload(fileBytes: number, mode = 'preview') {
   const boundary = '----vroomRestoreBodyLimitTest';
   const encoder = new TextEncoder();
@@ -84,7 +48,7 @@ describe('restore upload body limit', () => {
   });
 
   test('a backup LARGER than the global cap reaches the restore handler instead of a 413', async () => {
-    const fileBytes = GLOBAL_MAX_BODY_SIZE + 1024 * 1024; // 11MB: over the global cap, under 50MB
+    const fileBytes = GLOBAL_MAX_BODY_SIZE + 1024 * 1024;
     const upload = buildUpload(fileBytes);
     expect(upload.body.length).toBeGreaterThan(GLOBAL_MAX_BODY_SIZE);
     expect(upload.body.length).toBeLessThan(50 * 1024 * 1024);
@@ -102,13 +66,11 @@ describe('restore upload body limit', () => {
         `got ${res.status} ${JSON.stringify(body)}`
     ).not.toBe(413);
     expect(body.error?.code).not.toBe('PAYLOAD_TOO_LARGE');
-    // It reached the handler, which rejected the payload on its own terms (not a valid ZIP).
     expect(body.error?.code).toBeTruthy();
   });
 
   test("a backup larger than the ROUTE's own cap is still rejected with 413", async () => {
-    const declared = 51 * 1024 * 1024; // over CONFIG.backup.maxFileSize (50MB)
-    // bodyLimit rejects on the declared header before the body is read, so no real bytes needed.
+    const declared = 51 * 1024 * 1024;
     const res = await ctx.app.request(RESTORE_PATH, {
       method: 'POST',
       headers: {
@@ -137,7 +99,6 @@ describe('restore upload body limit', () => {
       },
     });
 
-    // 308 preserves the method and body, so the client can follow it with the same upload.
     expect(res.status).toBe(308);
     expect(res.headers.get('location')).toBe(RESTORE_PATH);
   });
@@ -159,12 +120,6 @@ describe('restore upload body limit', () => {
     expect(body.error?.code).toBe('PAYLOAD_TOO_LARGE');
   });
 
-  /**
-   * Drift tripwire for the whole class: a route-level bodyLimit is only reachable if it is
-   * TIGHTER than the global cap, so every new one has to be checked against it. This pins the
-   * inventory of files that declare one — the receipt upload (8MB, tighter, nothing to do) and
-   * this restore upload (50MB, which needs its app.ts entry).
-   */
   test('the inventory of route-level bodyLimit declarations has not drifted', () => {
     const srcRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
     const declaring = readdirSync(srcRoot, { recursive: true, encoding: 'utf8' })
@@ -173,7 +128,6 @@ describe('restore upload body limit', () => {
         (file) =>
           file.endsWith('.ts') &&
           !file.includes('__tests__') &&
-          // app.ts declares the global cap; middleware/ is the implementation itself.
           file !== 'app.ts' &&
           !file.startsWith('middleware/')
       )

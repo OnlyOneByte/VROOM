@@ -1,25 +1,3 @@
-/**
- * Concurrency guard for POST /reminders/trigger: a reminder period is materialized AT MOST ONCE,
- * no matter how many triggers run at the same time.
- *
- * Two triggers overlap routinely — the root layout fires `maybeTriggerRecurring()` on every authed
- * load (its once-per-day stamp is written only AFTER the POST resolves) while the user can press
- * "Run due reminders" on /reminders, and two tabs or two devices do it on their own. Both requests
- * read the same `nextDueDate` from `findOverdue`, so without a real claim both materialize every
- * overdue period: a 12-period monthly reminder writes 24 expense rows and doubles every total.
- *
- * The invariant this pins: each period is claimed by a compare-and-swap on `nextDueDate` INSIDE the
- * same synchronous transaction that writes the money row, so the loser of the claim writes nothing
- * (and reports a `concurrent_trigger` skip) instead of duplicating the period.
- *
- * The second describe block pins the other half of that invariant — the claim and the money rows
- * commit or roll back TOGETHER — because a claim that outlives a failed insert is the mirror defect:
- * the period is marked done while nothing (or half a split group) was written.
- *
- * createTestApp() rewrites env + dynamic-imports DB-bound modules — keep static imports to the
- * harness + bun:test.
- */
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   createTestApp,
@@ -44,7 +22,7 @@ async function createOverdueReminder(
     name: 'Monthly premium',
     type: 'expense',
     frequency: 'monthly',
-    startDate: '2024-01-15T00:00:00.000Z', // long past => many overdue periods
+    startDate: '2024-01-15T00:00:00.000Z',
     vehicleIds: [vehicleId],
     expenseCategory: 'financial',
     expenseAmount: 100,
@@ -87,12 +65,10 @@ describe('POST /reminders/trigger under concurrency', () => {
     expect(b.status).toBe(200);
 
     const periods = materializedRows(reminderId);
-    expect(periods.length).toBeGreaterThan(1); // the reminder really was multi-period overdue
+    expect(periods.length).toBeGreaterThan(1);
     const duplicated = periods.filter((p) => p.n !== 1);
     expect(duplicated).toEqual([]);
 
-    // The union of what the two responses report is exactly what landed in the DB — neither
-    // request claims a row it did not write.
     const bodyA = await json<DataEnvelope<{ createdExpenses: unknown[] }>>(a);
     const bodyB = await json<DataEnvelope<{ createdExpenses: unknown[] }>>(b);
     const reported = bodyA.data.createdExpenses.length + bodyB.data.createdExpenses.length;
@@ -132,8 +108,6 @@ describe('POST /reminders/trigger under concurrency', () => {
       ctx.authed('POST', '/api/v1/reminders/trigger'),
     ]);
 
-    // Every split group is complete (both legs present) and sums to its own groupTotal — a
-    // half-written group is the failure mode an insert that aborts mid-split would leave behind.
     const groups = ctx.sqlite
       .query(
         `SELECT group_id, COUNT(*) AS legs, SUM(expense_amount) AS total, MAX(group_total) AS declared
@@ -146,7 +120,6 @@ describe('POST /reminders/trigger under concurrency', () => {
       expect(group.total).toBe(group.declared);
     }
 
-    // One group per period, not two.
     const perDate = materializedRows(reminderId);
     expect(perDate.filter((p) => p.n !== 2)).toEqual([]);
   });
@@ -156,7 +129,6 @@ describe('a reminder period commits all-or-nothing', () => {
   test('a split leg that cannot be written leaves no partial group and keeps the period due', async () => {
     const live = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const doomed = await seedVehicle(ctx, { make: 'Mazda', model: '3', year: 2019 });
-    // One overdue period only, so the assertions below are about a single period's materialization.
     const dueDate = new Date(Date.now() - 3 * 86_400_000).toISOString();
     const reminderId = await createOverdueReminder(live, {
       startDate: dueDate,
@@ -164,8 +136,6 @@ describe('a reminder period commits all-or-nothing', () => {
       expenseSplitConfig: { method: 'even', vehicleIds: [live, doomed] },
     });
 
-    // Delete the second vehicle WITHOUT the route's split-config prune, so the reminder's split
-    // config still names it: the first leg inserts fine and the second violates the vehicle FK.
     ctx.sqlite.run('DELETE FROM vehicles WHERE id = ?', [doomed]);
     const dueBefore = ctx.sqlite
       .query('SELECT next_due_date, last_triggered_at FROM reminders WHERE id = ?')
@@ -180,10 +150,7 @@ describe('a reminder period commits all-or-nothing', () => {
     expect(body.data.createdExpenses).toEqual([]);
     expect(body.data.skipped.map((s) => s.reminderId)).toEqual([reminderId]);
 
-    // Nothing survived the failed period — no orphan leg whose group cannot sum to its total.
     expect(materializedRows(reminderId)).toEqual([]);
-    // And the period is still due, so a later trigger (once the config is pruned) can materialize
-    // it — a period marked done with no money row is silent data loss.
     const dueAfter = ctx.sqlite
       .query('SELECT next_due_date, last_triggered_at FROM reminders WHERE id = ?')
       .get(reminderId) as { next_due_date: number; last_triggered_at: number | null };

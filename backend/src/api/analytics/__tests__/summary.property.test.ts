@@ -1,14 +1,3 @@
-/**
- * Property-Based Tests for Summary Data Equivalence
- *
- * Property 2: Summary data equivalence
- * For any valid user and date range, `getSummary()` quickStats/fuelStats/fuelAdvanced
- * must be identical to calling `getQuickStats()`, `getFuelStats()`, `getFuelAdvanced()`
- * independently.
- *
- * **Validates: Requirements 3.1, 3.2, 3.3**
- */
-
 import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { AnalyticsRepository } from '../repository';
@@ -25,11 +14,7 @@ import {
   yearToRange,
 } from './analytics-test-generators';
 
-// ---------------------------------------------------------------------------
-// Property 2: Summary data equivalence
-// **Validates: Requirements 3.1, 3.2, 3.3**
-// ---------------------------------------------------------------------------
-describe('Property 2: Summary data equivalence', () => {
+describe('Summary data equivalence', () => {
   test('getSummary() produces identical results to calling getQuickStats(), getFuelStats(), getFuelAdvanced() independently', async () => {
     await fc.assert(
       fc.asyncProperty(
@@ -54,7 +39,6 @@ describe('Property 2: Summary data equivalence', () => {
               seedVehicle(testDb.sqlite, v);
             }
 
-            // Generate expenses for each vehicle (mix of fuel and non-fuel)
             const allExpenses: TestExpense[] = [];
             for (const v of vehicles) {
               const yearExpenses =
@@ -75,7 +59,6 @@ describe('Property 2: Summary data equivalence', () => {
 
             const range = yearToRange(targetYear);
 
-            // Call getSummary (consolidated) and the three individual methods
             const [summary, quickStats, fuelStats, fuelAdvanced] = await Promise.all([
               repo.getSummary(user.id, range),
               repo.getQuickStats(user.id, range),
@@ -83,7 +66,6 @@ describe('Property 2: Summary data equivalence', () => {
               repo.getFuelAdvanced(user.id, range),
             ]);
 
-            // Assert quickStats equivalence (Requirement 3.1)
             expect(summary.quickStats.vehicleCount).toBe(quickStats.vehicleCount);
             expect(summary.quickStats.fleetHealthScore).toBe(quickStats.fleetHealthScore);
             expect(Math.abs(summary.quickStats.ytdSpending - quickStats.ytdSpending)).toBeLessThan(
@@ -98,10 +80,8 @@ describe('Property 2: Summary data equivalence', () => {
               ).toBeLessThan(0.001);
             }
 
-            // Assert fuelStats equivalence (Requirement 3.2)
             expect(summary.fuelStats).toEqual(fuelStats);
 
-            // Assert fuelAdvanced equivalence (Requirement 3.3)
             expect(summary.fuelAdvanced).toEqual(fuelAdvanced);
           } finally {
             testDb.sqlite.close();

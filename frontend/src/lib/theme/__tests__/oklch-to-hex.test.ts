@@ -1,8 +1,3 @@
-/**
- * Unit tests for oklchToHex (— the PWA theme-color tint converter). Pure input→output, no DOM. Pins
- * the OKLab→sRGB→hex pipeline at known anchor points + the fail-soft null contract callers rely on.
- */
-
 import { describe, expect, test } from 'vitest';
 import { oklchToHex } from '../oklch-to-hex';
 
@@ -16,7 +11,6 @@ describe('oklchToHex — anchor colors', () => {
 	});
 
 	test('the default dark surface oklch(0.141 0.005 285.823) → near-black #09090b', () => {
-		// The exact value the theme-color meta uses for default.dark — pins the conversion the store relies on.
 		expect(oklchToHex('oklch(0.141 0.005 285.823)')).toBe('#09090b');
 	});
 
@@ -37,7 +31,6 @@ describe('oklchToHex — output shape + gamut', () => {
 	});
 
 	test('an out-of-gamut vivid token is clamped to a valid hex, not NaN/garbage', () => {
-		// A very high chroma can push a channel out of [0,1]; the converter clamps rather than emitting junk.
 		const hex = oklchToHex('oklch(0.6 0.4 25)');
 		expect(hex).toMatch(/^#[0-9a-f]{6}$/);
 	});

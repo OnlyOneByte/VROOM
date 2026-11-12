@@ -1,4 +1,5 @@
 import type {
+	BackendExpenseResponse,
 	Expense,
 	ExpenseCategory,
 	ExpenseSummary,
@@ -7,21 +8,17 @@ import type {
 	Photo,
 	SplitConfig,
 	SplitExpenseGroup
-} from '$lib/types';
-import type { ImportMappingPreset } from '$lib/types/import-mapping';
-import {
-	fromBackendExpense,
-	toBackendExpense,
-	type BackendExpenseResponse
-} from './api-transformer';
-import { apiClient, getApiBaseUrl, withPagination } from './api-client';
-import { toDateInputValue } from '$lib/utils/formatters';
-import { triggerBlobDownload } from '$lib/utils/download';
+} from '#lib/types/index.ts';
+import type { ImportMappingPreset } from '#lib/types/import-mapping.ts';
+import { fromBackendExpense, toBackendExpense } from './api-transformer';
+import { apiClient } from './api-client';
+import { buildQueryString } from './api-utils';
+import { entityPhotos } from './photo-api';
+import { toDateInputValue } from '#lib/utils/formatters.ts';
+import { triggerBlobDownload } from '#lib/utils/download.ts';
 
-/** Convenience alias for a paginated response of transformed frontend Expenses. */
 type PaginatedExpenseResponse = PaginatedResponse<Expense>;
 
-/** One row's outcome from a CSV import (mirrors the backend summarizeImportPlan). */
 export interface ExpenseImportRow {
 	row: number;
 	status: 'ready' | 'error';
@@ -29,7 +26,6 @@ export interface ExpenseImportRow {
 	raw?: { vehicle: string; category: string; amount: string; date: string };
 }
 
-/** Result of POST /expenses/import (preview when dryRun, else the commit summary). */
 export interface ExpenseImportResult {
 	dryRun: boolean;
 	imported: number;
@@ -37,14 +33,10 @@ export interface ExpenseImportResult {
 	errorCount: number;
 	totalRows: number;
 	rows: ExpenseImportRow[];
-	/** Foreign-tracker import only: rows skipped as already-present on a commit (idempotent re-import). */
 	duplicates?: number;
-	/** Foreign-tracker import only: distinct foreign category words that fell through to `misc` (D2). */
 	unmappedCategories?: string[];
 }
 
-/** Parameters accepted by paginated expense list methods. */
-/** Columns the expense list can be sorted by (must match the backend allowlist). */
 export type ExpenseSortBy = 'date' | 'amount' | 'category';
 export type ExpenseSortDir = 'asc' | 'desc';
 
@@ -61,44 +53,33 @@ interface ExpenseListParams {
 	sortDir?: ExpenseSortDir;
 }
 
-/** Parameters accepted by the expense summary endpoint. */
 interface ExpenseSummaryParams {
 	vehicleId?: string;
 	period?: string;
 }
 
-/**
- * Build a URLSearchParams from expense list params + optional vehicleId.
- * Exported for unit testing (the expense list/search/pagination correctness
- * depends on this building the query string exactly right).
- */
+type ExpenseExportParams = Pick<
+	ExpenseListParams,
+	'category' | 'startDate' | 'endDate' | 'search' | 'tags'
+> & { vehicleId?: string };
+
+// Tags must travel as one comma-joined param: a repeated `tags=` key fails backend validation.
 export function buildExpenseQuery(params?: ExpenseListParams, vehicleId?: string): string {
-	const query = new URLSearchParams();
-	if (vehicleId) query.set('vehicleId', vehicleId);
-	if (params?.limit) query.set('limit', String(params.limit));
-	if (params?.offset) query.set('offset', String(params.offset));
-	if (params?.category) query.set('category', params.category);
-	if (params?.startDate) query.set('startDate', params.startDate);
-	if (params?.endDate) query.set('endDate', params.endDate);
-	if (params?.period) query.set('period', params.period);
-	if (params?.search?.trim()) query.set('search', params.search.trim());
-	// Only emit sort params when set to a non-default — keeps URLs/queries identical
-	// to before for the default (date desc) path, so nothing else changes behavior.
-	if (params?.sortBy) query.set('sortBy', params.sortBy);
-	if (params?.sortDir) query.set('sortDir', params.sortDir);
-	if (params?.tags?.length) {
-		for (const tag of params.tags) {
-			query.append('tags', tag);
-		}
-	}
-	return query.toString();
+	return buildQueryString({
+		vehicleId: vehicleId || undefined,
+		limit: params?.limit || undefined,
+		offset: params?.offset || undefined,
+		category: params?.category || undefined,
+		startDate: params?.startDate || undefined,
+		endDate: params?.endDate || undefined,
+		period: params?.period || undefined,
+		search: params?.search?.trim() || undefined,
+		sortBy: params?.sortBy,
+		sortDir: params?.sortDir,
+		tags: params?.tags?.length ? params.tags.join(',') : undefined
+	});
 }
 
-/**
- * Fetch a paginated expense response using apiClient.getPaginated() so we keep
- * the pagination metadata that apiClient.get() would strip during envelope unwrapping.
- * Transforms backend expense fields to frontend format.
- */
 async function fetchPaginatedExpenses(url: string): Promise<PaginatedExpenseResponse> {
 	const result = await apiClient.getPaginated<BackendExpenseResponse>(url);
 
@@ -108,11 +89,6 @@ async function fetchPaginatedExpenses(url: string): Promise<PaginatedExpenseResp
 	};
 }
 
-/**
- * Expense API service
- * All expense API calls go through here to ensure field name transformations
- * (backend `expenseAmount`/`fuelAmount` ↔ frontend `amount`/`volume`/`charge`)
- */
 export const expenseApi = {
 	async getExpense(expenseId: string): Promise<Expense> {
 		const data = await apiClient.get<BackendExpenseResponse>(`/api/v1/expenses/${expenseId}`);
@@ -123,57 +99,22 @@ export const expenseApi = {
 		vehicleId: string,
 		params?: ExpenseListParams
 	): Promise<PaginatedExpenseResponse> {
-		const qs = buildExpenseQuery(params, vehicleId);
-		return fetchPaginatedExpenses(`/api/v1/expenses${qs ? `?${qs}` : ''}`);
+		return fetchPaginatedExpenses(`/api/v1/expenses${buildExpenseQuery(params, vehicleId)}`);
 	},
 
 	async getAllExpenses(params?: ExpenseListParams): Promise<PaginatedExpenseResponse> {
-		const qs = buildExpenseQuery(params);
-		return fetchPaginatedExpenses(`/api/v1/expenses${qs ? `?${qs}` : ''}`);
+		return fetchPaginatedExpenses(`/api/v1/expenses${buildExpenseQuery(params)}`);
 	},
 
-	/**
-	 * Download all matching expenses as a CSV file (server-generated). Honours the
-	 * SAME filters as the list table — vehicle / category / date-range / free-text
-	 * search / tags — so the export matches exactly what the user is viewing.
-	 * Triggers a browser download.
-	 */
-	async downloadExpensesCsv(params?: {
-		vehicleId?: string;
-		category?: string;
-		startDate?: string;
-		endDate?: string;
-		search?: string;
-		tags?: string[];
-	}): Promise<void> {
-		const query = new URLSearchParams();
-		if (params?.vehicleId) query.set('vehicleId', params.vehicleId);
-		if (params?.category) query.set('category', params.category);
-		if (params?.startDate) query.set('startDate', params.startDate);
-		if (params?.endDate) query.set('endDate', params.endDate);
-		if (params?.search?.trim()) query.set('search', params.search.trim());
-		// tags as a comma-joined param (the export schema splits on comma).
-		if (params?.tags?.length) query.set('tags', params.tags.join(','));
-		const qs = query.toString();
-
-		const res = await apiClient.raw(`/api/v1/expenses/export${qs ? `?${qs}` : ''}`);
-		if (!res.ok) throw new Error(`Export failed with status ${res.status}`);
-
+	async downloadExpensesCsv(params?: ExpenseExportParams): Promise<void> {
+		const { vehicleId, ...filters } = params ?? {};
+		const res = await apiClient.raw(
+			`/api/v1/expenses/export${buildExpenseQuery(filters, vehicleId)}`
+		);
 		const blob = await res.blob();
 		triggerBlobDownload(blob, `vroom-expenses-${toDateInputValue(new Date())}.csv`);
 	},
 
-	/**
-	 * Import expenses from a CSV. Sends the CSV TEXT; the server validates every row and resolves
-	 * each vehicle by NAME within the user's own fleet. With `dryRun: true` the server validates +
-	 * reports only (preview) and writes nothing; `dryRun: false` commits the valid rows.
-	 *
-	 * For a foreign-tracker file (import-trackers T4/T5), pass `mapping` — the server translates the
-	 * file to native shape (rename + unit-convert + category-map + date-parse) FIRST, then runs the
-	 * exact same validate/commit flow, so the result adds `unmappedCategories` (and `duplicates` on a
-	 * commit). Omit `mapping` for a native "VROOM CSV" (the round-trip target of the export) — the
-	 * request is then byte-identical to before (backward-compatible).
-	 */
 	async importExpensesCsv(
 		csv: string,
 		dryRun = false,
@@ -182,16 +123,10 @@ export const expenseApi = {
 		return apiClient.post<ExpenseImportResult>('/api/v1/expenses/import', {
 			csv,
 			dryRun,
-			// Only include mapping when provided so the native path's request is unchanged.
 			...(mapping ? { mapping } : {})
 		});
 	},
 
-	/**
-	 * Identify a known tracker (Fuelly/Fuelio/Drivvo) from the uploaded file's HEADER names, so the
-	 * mapping dialog can pre-fill. Sends only the header strings (never the data).
-	 * Returns the matched preset (its label + default mapping) or null → the user maps manually.
-	 */
 	async detectImportSource(headers: string[]): Promise<ImportMappingPreset | null> {
 		return apiClient.post<ImportMappingPreset | null>('/api/v1/expenses/import/detect', {
 			headers
@@ -199,11 +134,11 @@ export const expenseApi = {
 	},
 
 	async getExpenseSummary(params?: ExpenseSummaryParams): Promise<ExpenseSummary> {
-		const query = new URLSearchParams();
-		if (params?.vehicleId) query.set('vehicleId', params.vehicleId);
-		if (params?.period) query.set('period', params.period);
-		const qs = query.toString();
-		return apiClient.get<ExpenseSummary>(`/api/v1/expenses/summary${qs ? `?${qs}` : ''}`);
+		const qs = buildQueryString({
+			vehicleId: params?.vehicleId || undefined,
+			period: params?.period || undefined
+		});
+		return apiClient.get<ExpenseSummary>(`/api/v1/expenses/summary${qs}`);
 	},
 
 	async getVehicleStats(recentDays?: number): Promise<
@@ -214,10 +149,9 @@ export const expenseApi = {
 			lastExpenseDate: string | null;
 		}>
 	> {
-		const query = new URLSearchParams();
-		if (recentDays) query.set('recentDays', String(recentDays));
-		const qs = query.toString();
-		return apiClient.get(`/api/v1/expenses/vehicle-stats${qs ? `?${qs}` : ''}`);
+		return apiClient.get(
+			`/api/v1/expenses/vehicle-stats${buildQueryString({ recentDays: recentDays || undefined })}`
+		);
 	},
 
 	async createExpense(
@@ -232,9 +166,6 @@ export const expenseApi = {
 		expenseId: string,
 		expense: Partial<Expense> & { vehicleId: string; category: ExpenseCategory; amount: number }
 	): Promise<Expense> {
-		// isEdit: an emptied description is sent as null so the user can CLEAR it
-		// (the clear-optional-field class). Create + offline/sync paths don't pass
-		// this, so their payloads are unchanged.
 		const backendExpense = toBackendExpense(expense, { isEdit: true });
 		const data = await apiClient.put<BackendExpenseResponse>(
 			`/api/v1/expenses/${expenseId}`,
@@ -247,33 +178,25 @@ export const expenseApi = {
 		await apiClient.delete(`/api/v1/expenses/${expenseId}`);
 	},
 
-	// --- Photo methods (delegate to generic photo endpoints) ---
-
-	async getPhotos(
+	getPhotos(
 		entityType: 'expense',
 		entityId: string,
 		params?: { limit?: number; offset?: number }
 	): Promise<PaginatedResponse<Photo>> {
-		return apiClient.getPaginated<Photo>(
-			withPagination(`/api/v1/photos/${entityType}/${entityId}`, params)
-		);
+		return entityPhotos(entityType, entityId).list(params);
 	},
 
-	async uploadPhoto(entityType: 'expense', entityId: string, file: File): Promise<Photo> {
-		const formData = new FormData();
-		formData.append('photo', file);
-		return apiClient.post<Photo>(`/api/v1/photos/${entityType}/${entityId}`, formData);
+	uploadPhoto(entityType: 'expense', entityId: string, file: File): Promise<Photo> {
+		return entityPhotos(entityType, entityId).upload(file);
 	},
 
-	async deletePhoto(entityType: 'expense', entityId: string, photoId: string): Promise<void> {
-		await apiClient.delete(`/api/v1/photos/${entityType}/${entityId}/${photoId}`);
+	deletePhoto(entityType: 'expense', entityId: string, photoId: string): Promise<void> {
+		return entityPhotos(entityType, entityId).remove(photoId);
 	},
 
 	getPhotoThumbnailUrl(entityType: 'expense', entityId: string, photoId: string): string {
-		return `${getApiBaseUrl()}/api/v1/photos/${entityType}/${entityId}/${photoId}/thumbnail`;
+		return entityPhotos(entityType, entityId).thumbnailUrl(photoId);
 	},
-
-	// --- Split expense (expense group) methods ---
 
 	async createSplitExpense(data: {
 		splitConfig: SplitConfig;

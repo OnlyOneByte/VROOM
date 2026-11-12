@@ -11,17 +11,17 @@
 		RefreshCw,
 		LoaderCircle
 	} from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Card, CardContent, CardHeader } from '$lib/components/ui/card';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Separator } from '$lib/components/ui/separator';
-	import { Progress } from '$lib/components/ui/progress';
-	import { Switch } from '$lib/components/ui/switch';
-	import { Label } from '$lib/components/ui/label';
-	import { providerApi } from '$lib/services/provider-api';
-	import { appStore } from '$lib/stores/app.svelte';
-	import { PHOTO_CATEGORY_LABELS } from '$lib/constants/ui';
-	import type { PhotoCategory, CategorySetting, UserProviderInfo } from '$lib/types';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Card, CardContent, CardHeader } from '#lib/components/ui/card/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { Separator } from '#lib/components/ui/separator/index.ts';
+	import { Progress } from '#lib/components/ui/progress/index.ts';
+	import { Switch } from '#lib/components/ui/switch/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { providerApi } from '#lib/services/provider-api.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { PHOTO_CATEGORY_LABELS } from '#lib/constants/ui.ts';
+	import type { PhotoCategory, CategorySetting, UserProviderInfo } from '#lib/types/index.ts';
 
 	let {
 		provider,
@@ -123,7 +123,7 @@
 		try {
 			syncStatus = await providerApi.getSyncStatus(provider.id);
 		} catch {
-			// Silently fail — sync status is informational
+			// Sync status is informational; a failure keeps the previous value.
 		} finally {
 			isLoadingSyncStatus = false;
 		}
@@ -152,17 +152,12 @@
 
 	let Icon = $derived(getProviderIcon(provider.providerType));
 
-	// Google Photos is a photo destination only — it can't store ZIP backups (the
-	// Library API is append-only/photos-only, no folder listing). Hide the ZIP toggle
-	// for it; Drive/S3 keep it. Mirrors the backend capability gate (D3b/D2a).
 	let supportsZipBackup = $derived(provider.providerType !== 'google-photos');
 </script>
 
 <Card>
 	<CardHeader class="pb-3">
-		<!-- min-w-0: CardHeader is a CSS grid; a grid item defaults to min-width:auto,
-		     so a long provider name would expand the track past the viewport and
-		     overflow on mobile until the item is allowed to shrink. -->
+		<!-- min-w-0 is required: grid items default to min-width auto and overflow. -->
 		<div class="flex items-center justify-between gap-2 min-w-0">
 			<div class="flex items-center gap-3 min-w-0">
 				<div class="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
@@ -268,7 +263,6 @@
 		<CardContent class="pt-0">
 			<Separator class="mb-4" />
 
-			<!-- Provider-specific info -->
 			<div class="space-y-3 mb-4">
 				<p class="text-sm font-medium text-muted-foreground">Provider Settings</p>
 				{#if provider.providerType === 's3'}
@@ -291,7 +285,6 @@
 
 			<Separator class="mb-4" />
 
-			<!-- Sync & Storage -->
 			<div class="space-y-3">
 				<div class="flex items-center justify-between">
 					<p class="text-sm font-medium text-muted-foreground">

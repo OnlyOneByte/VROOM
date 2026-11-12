@@ -9,19 +9,15 @@ import { extractErrorMessage } from '../utils/error-handling';
 import { logger } from '../utils/logger';
 import * as schema from './schema.js';
 
-// Database configuration
 const DATABASE_URL = CONFIG.database.url;
 
-// Ensure data directory exists
 const dbDir = dirname(DATABASE_URL);
 if (!existsSync(dbDir)) {
   mkdirSync(dbDir, { recursive: true });
 }
 
-// Create SQLite connection
 const sqlite = new Database(DATABASE_URL);
 
-// Enable WAL mode for better performance
 sqlite.run('PRAGMA journal_mode = WAL');
 sqlite.run('PRAGMA synchronous = NORMAL');
 sqlite.run(`PRAGMA cache_size = ${CONFIG.database.cacheSize}`);
@@ -29,41 +25,17 @@ sqlite.run('PRAGMA foreign_keys = ON');
 sqlite.run('PRAGMA temp_store = MEMORY');
 sqlite.run(`PRAGMA busy_timeout = ${CONFIG.database.queryTimeout}`);
 
-// Configure WAL auto-checkpoint to prevent data loss during hot reload
-// Checkpoint after 1000 pages (~4MB) - SQLite default, good balance
-// Auto-checkpoint handles most cases, reducing need for manual checkpoints
 sqlite.run(`PRAGMA wal_autocheckpoint = ${CONFIG.database.walCheckpointPages}`);
 
-// Create Drizzle instance
 export const db = drizzle(sqlite, { schema });
 
-/**
- * Database type alias — abstracts the dialect-specific Drizzle instance.
- * Repositories and services should use this instead of importing BunSQLiteDatabase directly.
- * When adding PostgreSQL support, this becomes a union: BunSQLiteDatabase | NodePgDatabase.
- */
 export type AppDatabase = typeof db;
 
-/**
- * Accessor for the process-wide database, used where a module needs the live instance rather than
- * importing `db` directly. There is no test override here: repositories take an `AppDatabase` in
- * their constructor, so a test builds one over its own in-memory database instead of swapping this.
- */
 export function getDb(): typeof db {
   return db;
 }
 
-// ============================================================================
-// TRANSACTION HELPER
-// ============================================================================
-
-/**
- * Transaction wrapper for complex operations. The callback may be SYNCHRONOUS or async: bun-sqlite is a
- * synchronous dialect, and a multi-write transaction that must roll back atomically on a throw MUST use a
- * synchronous callback (an async callback returns a pending promise, so BEGIN/COMMIT wrap nothing and each
- * `await tx.*` autocommits independently — the footgun, see restore.ts / the async-tx sweep).
- * The return type is `T | Promise<T>` so both forms type-check; bun's native `transaction` handles each.
- */
+// bun:sqlite transactions must use a synchronous callback: an awaited statement autocommits on its own.
 export async function transaction<T>(
   callback: (
     tx: Parameters<typeof db.transaction>[0] extends (tx: infer U) => unknown ? U : never
@@ -78,17 +50,11 @@ export async function transaction<T>(
   }
 }
 
-// Migration function
-export async function runMigrations() {
+export function runMigrations(): void {
   try {
     logger.info('Running database migrations...');
     migrate(db, { migrationsFolder: './drizzle' });
     logger.info('Database migrations completed successfully');
-
-    // Hook for one-time data migrations that must run after the schema migrations. Currently a
-    // no-op stub; see data-migration.ts.
-    const { runDataMigration } = await import('./data-migration');
-    await runDataMigration(sqlite);
   } catch (error) {
     const message = extractErrorMessage(error);
     const cause = error instanceof Error && 'cause' in error ? error.cause : undefined;
@@ -97,7 +63,6 @@ export async function runMigrations() {
   }
 }
 
-// Database health check
 export function checkDatabaseHealth(): boolean {
   try {
     const result = sqlite.query('SELECT 1 as health').get() as { health: number } | null;
@@ -108,17 +73,14 @@ export function checkDatabaseHealth(): boolean {
   }
 }
 
-// Checkpoint WAL to persist data to main database file
 export function checkpointWAL(): void {
   try {
-    // TRUNCATE mode: checkpoint and truncate WAL file
     const result = sqlite.query('PRAGMA wal_checkpoint(TRUNCATE)').get() as {
       busy: number;
       log: number;
       checkpointed: number;
     } | null;
 
-    // Only log if there was actual work done
     if (result && result.checkpointed > 0) {
       logger.info(
         `WAL checkpoint completed: ${result.checkpointed} pages written, ${result.log} pages in WAL`
@@ -129,17 +91,14 @@ export function checkpointWAL(): void {
   }
 }
 
-// Force immediate checkpoint - useful for critical operations
 export function forceCheckpointWAL(): void {
   try {
-    // RESTART mode: force checkpoint even if there are readers
     const result = sqlite.query('PRAGMA wal_checkpoint(RESTART)').get() as {
       busy: number;
       log: number;
       checkpointed: number;
     } | null;
 
-    // Only log if there was actual work done
     if (result && result.checkpointed > 0) {
       logger.info(`Forced WAL checkpoint completed: ${result.checkpointed} pages written`);
     }

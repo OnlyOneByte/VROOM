@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Tag, X } from '@lucide/svelte';
-	import { Badge } from '$lib/components/ui/badge';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
 
 	interface Props {
 		allTags: string[];
@@ -12,7 +12,6 @@
 
 	let { allTags, selectedTags, tagMatchMode, onTagsChange, onMatchModeChange }: Props = $props();
 
-	// Internal state
 	let tagSearchTerm = $state('');
 	let tagSearchFocused = $state(false);
 	let tagInputEl = $state<HTMLInputElement | null>(null);

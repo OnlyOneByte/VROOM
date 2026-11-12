@@ -1,49 +1,44 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { routes, paramRoutes } from '$lib/routes';
+	import { routes, paramRoutes } from '#lib/routes.ts';
 	import { onMount } from 'svelte';
 	import { CreditCard, CircleAlert } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { Card, CardContent } from '$lib/components/ui/card';
-	import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert';
-	import EmptyState from '$lib/components/common/empty-state.svelte';
-	import PaymentMetricsGrid from '$lib/components/financing/PaymentMetricsGrid.svelte';
-	import FinancingCharts from '$lib/components/financing/FinancingCharts.svelte';
-	import PaymentPlannerDialog from '$lib/components/financing/PaymentPlannerDialog.svelte';
-	import PaymentHistory from '$lib/components/financing/PaymentHistory.svelte';
-	import NextPaymentCard from '$lib/components/financing/NextPaymentCard.svelte';
-	import LeaseMetricsCard from '$lib/components/financing/LeaseMetricsCard.svelte';
-	import { vehicleApi } from '$lib/services/vehicle-api';
-	import { expenseApi } from '$lib/services/expense-api';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import { Card, CardContent } from '#lib/components/ui/card/index.ts';
+	import { Alert, AlertDescription, AlertTitle } from '#lib/components/ui/alert/index.ts';
+	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import PaymentMetricsGrid from '#lib/components/financing/PaymentMetricsGrid.svelte';
+	import FinancingCharts from '#lib/components/financing/FinancingCharts.svelte';
+	import PaymentPlannerDialog from '#lib/components/financing/PaymentPlannerDialog.svelte';
+	import PaymentHistory from '#lib/components/financing/PaymentHistory.svelte';
+	import NextPaymentCard from '#lib/components/financing/NextPaymentCard.svelte';
+	import LeaseMetricsCard from '#lib/components/financing/LeaseMetricsCard.svelte';
+	import { vehicleApi } from '#lib/services/vehicle-api.ts';
+	import { expenseApi } from '#lib/services/expense-api.ts';
 	import {
 		calculateAmortizationSchedule,
 		calculatePayoffDate,
 		derivePaymentEntries,
 		resolveCurrentOdometer
-	} from '$lib/utils/financing-calculations';
-	import type { Vehicle, VehicleStats, DerivedPaymentEntry } from '$lib/types';
+	} from '#lib/utils/financing-calculations.ts';
+	import type { Vehicle, VehicleStats, DerivedPaymentEntry } from '#lib/types/index.ts';
 
 	interface Props {
 		vehicle: Vehicle;
 		vehicleId: string;
 		vehicleStatsData: VehicleStats | null;
-		/** vehicle-sharing T12b-3b: financing add/edit/payoff is owner-ONLY (the server keeps strict
-		 *  validateVehicleOwnership on /financing — an editor is NOT enough). A shared invitee sees the
-		 *  finance summary read-only. Default true so the owner [id] tab is unchanged. */
 		isOwner?: boolean;
 	}
 
 	let { vehicle, vehicleId, vehicleStatsData, isOwner = true }: Props = $props();
 
-	// Payment state
 	let payments = $state<DerivedPaymentEntry[]>([]);
 	let isLoadingPayments = $state(false);
 	let paymentHistoryError = $state<string | null>(null);
 	let hasAttemptedPaymentLoad = $state(false);
 	let showPaymentPlanner = $state(false);
 
-	// Financing derived state
 	let progressPercentage = $derived.by(() => {
 		try {
 			if (!vehicle?.financing?.isActive) return 0;
@@ -97,7 +92,6 @@
 		}
 	});
 
-	// Load payment history on mount
 	onMount(() => {
 		if (vehicle?.financing?.isActive && !hasAttemptedPaymentLoad) {
 			loadPaymentHistory();
@@ -147,11 +141,6 @@
 		{/if}
 
 		{#if vehicle.financing.paymentAmount && vehicle.financing.paymentAmount > 0}
-			<!-- Loan miles-used consumes the ALL-TIME `currentOdometer`, NOT the period-scoped,
-			     fuel-only `currentMileage`. Miles-used is inherently all-time, so a "7d"/"30d" stats-period
-			     selection must not shrink it, and it must see manual odometer entries too. `currentOdometer`
-			     is the canonical all-sources, period-independent reading; it falls back to currentMileage
-			     then initialMileage if absent. -->
 			<PaymentMetricsGrid
 				financing={vehicle.financing}
 				{totalInterestPaid}
@@ -182,10 +171,6 @@
 	{/if}
 
 	{#if vehicle.financing.financingType === 'lease'}
-		<!-- Same rule as PaymentMetricsGrid: lease overage consumes the ALL-TIME, all-sources
-		     `currentOdometer`, not the period-scoped, fuel-only `currentMileage`, so a non-'all' stats
-		     period can't understate the projected excess-fee $. calculateLeaseMetrics itself is correct;
-		     this only feeds it the right odometer. Falls back to currentMileage then initialMileage. -->
 		<LeaseMetricsCard
 			financing={vehicle.financing}
 			currentMileage={resolveCurrentOdometer(

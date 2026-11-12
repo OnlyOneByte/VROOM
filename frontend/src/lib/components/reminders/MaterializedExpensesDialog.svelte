@@ -1,20 +1,18 @@
 <script lang="ts">
-	import * as Dialog from '$lib/components/ui/dialog';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { Button } from '$lib/components/ui/button';
-	import EmptyState from '$lib/components/common/empty-state.svelte';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import { Receipt, CircleAlert, Car } from '@lucide/svelte';
-	import { reminderApi } from '$lib/services/reminder-api';
-	import { formatCurrency, formatDate } from '$lib/utils/formatters';
-	import { categoryLabels } from '$lib/utils/expense-helpers';
-	import type { Expense, ExpenseCategory } from '$lib/types';
+	import { reminderApi } from '#lib/services/reminder-api.ts';
+	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
+	import { categoryLabels } from '#lib/utils/expense-helpers.ts';
+	import type { Expense, ExpenseCategory } from '#lib/types/index.ts';
 
 	interface Props {
 		open: boolean;
-		/** The reminder whose materialized expenses to show (null when closed). */
 		reminderId: string | null;
 		reminderName: string;
-		/** reminderId → display name resolution is the parent's job; this maps vehicleId → name. */
 		vehicleNames: Map<string, string>;
 	}
 
@@ -24,10 +22,6 @@
 	let loadError = $state<string | null>(null);
 	let expenses = $state<Expense[]>([]);
 
-	// Fetch (recurring-expenses T6 "materialized N expenses" view) whenever the dialog opens for a
-	// reminder. Keyed on `open:reminderId` so re-opening a different reminder re-fetches, and closing
-	// then re-opening the same one refreshes. The seam (GET /reminders/:id/expenses → findBySource) is
-	// ownership-checked + user-scoped server-side.
 	let lastKey = $state('');
 	$effect(() => {
 		const key = `${open}:${reminderId ?? ''}`;

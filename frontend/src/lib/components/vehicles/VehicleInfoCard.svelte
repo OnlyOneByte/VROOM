@@ -1,19 +1,16 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { paramRoutes } from '$lib/routes';
+	import { paramRoutes } from '#lib/routes.ts';
 	import { Car, Settings } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
-	import { settingsStore } from '$lib/stores/settings.svelte';
-	import { getDistanceUnitLabel } from '$lib/utils/units';
-	import { formatCurrency, formatDate } from '$lib/utils/formatters';
-	import type { Vehicle } from '$lib/types';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Card, CardContent, CardHeader, CardTitle } from '#lib/components/ui/card/index.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
+	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
+	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
+	import type { Vehicle } from '#lib/types/index.ts';
 
 	interface Props {
 		vehicle: Vehicle;
-		/** vehicle-sharing T12b-3b: editing vehicle info is owner-only (server keeps strict
-		 *  validateVehicleOwnership on PUT /vehicles/:id). Default true so every existing owner
-		 *  call site is unchanged; the [id] page passes the resolved capability. */
 		isOwner?: boolean;
 	}
 

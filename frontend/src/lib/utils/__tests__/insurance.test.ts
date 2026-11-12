@@ -1,15 +1,6 @@
-/**
- * Property-Based Tests for Insurance Utility Functions (v2 flat term fields)
- *
- * Property 11: Policy active/inactive grouping
- * Property 12: Expiration alert computation
- * Property 13: Term history ordering
- * Property 14: Renew pre-fill from previous term
- */
-
 import { describe, expect, test } from 'vitest';
 import fc from 'fast-check';
-import type { InsuranceTerm, InsurancePolicy } from '$lib/types';
+import type { InsuranceTerm, InsurancePolicy } from '#lib/types/index.ts';
 import {
 	getDaysRemaining,
 	getLatestTerm,
@@ -17,17 +8,12 @@ import {
 	isExpiringSoon,
 	prefillFromPreviousTerm,
 	sortTermsByEndDateDesc
-} from '$lib/utils/insurance';
-
-// ---------------------------------------------------------------------------
-// Generators
-// ---------------------------------------------------------------------------
+} from '#lib/utils/insurance.ts';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 let idCounter = 0;
 
-/** Generate a flat InsuranceTerm with valid startDate < endDate */
 const arbInsuranceTerm: fc.Arbitrary<InsuranceTerm> = fc
 	.record({
 		startTs: fc.integer({ min: 946684800000, max: 2524608000000 }),
@@ -76,7 +62,6 @@ const arbInsuranceTerm: fc.Arbitrary<InsuranceTerm> = fc
 		};
 	});
 
-/** Generate an InsurancePolicy with random isActive and 1–5 terms */
 const arbInsurancePolicy: fc.Arbitrary<InsurancePolicy> = fc
 	.record({
 		isActive: fc.boolean(),
@@ -96,10 +81,7 @@ const arbInsurancePolicy: fc.Arbitrary<InsurancePolicy> = fc
 		};
 	});
 
-// ---------------------------------------------------------------------------
-// Property 11: Policy active/inactive grouping
-// ---------------------------------------------------------------------------
-describe('Property 11: Policy active/inactive grouping', () => {
+describe('Policy active/inactive grouping', () => {
 	test('active group contains only isActive===true policies', () => {
 		fc.assert(
 			fc.property(fc.array(arbInsurancePolicy, { minLength: 0, maxLength: 20 }), policies => {
@@ -135,10 +117,7 @@ describe('Property 11: Policy active/inactive grouping', () => {
 	});
 });
 
-// ---------------------------------------------------------------------------
-// Property 12: Expiration alert computation
-// ---------------------------------------------------------------------------
-describe('Property 12: Expiration alert computation', () => {
+describe('Expiration alert computation', () => {
 	test('getDaysRemaining equals ceil((endDate - now) / dayMs)', () => {
 		fc.assert(
 			fc.property(fc.integer({ min: -365, max: 365 }), offsetDays => {
@@ -180,10 +159,7 @@ describe('Property 12: Expiration alert computation', () => {
 	});
 });
 
-// ---------------------------------------------------------------------------
-// Property 13: Term history ordering
-// ---------------------------------------------------------------------------
-describe('Property 13: Term history ordering', () => {
+describe('Term history ordering', () => {
 	test('sortTermsByEndDateDesc returns terms in descending endDate order', () => {
 		fc.assert(
 			fc.property(fc.array(arbInsuranceTerm, { minLength: 0, maxLength: 20 }), terms => {
@@ -214,16 +190,12 @@ describe('Property 13: Term history ordering', () => {
 	});
 });
 
-// ---------------------------------------------------------------------------
-// Property 14: Renew pre-fill from previous term (v2 flat fields)
-// ---------------------------------------------------------------------------
-describe('Property 14: Renew pre-fill from previous term', () => {
+describe('Renew pre-fill from previous term', () => {
 	test('prefillFromPreviousTerm copies flat fields from the term', () => {
 		fc.assert(
 			fc.property(arbInsuranceTerm, term => {
 				const prefilled = prefillFromPreviousTerm(term);
 
-				// Flat fields should be copied
 				expect(prefilled.policyNumber).toEqual(term.policyNumber);
 				expect(prefilled.coverageDescription).toEqual(term.coverageDescription);
 				expect(prefilled.totalCost).toEqual(term.totalCost);
@@ -249,27 +221,17 @@ describe('Property 14: Renew pre-fill from previous term', () => {
 		);
 	});
 
-	// guard: the EQUAL-endDate tiebreak. insurance.ts:57 uses a strict `>` so on two terms sharing
-	// an identical endDate the FIRST in the array wins (latest is never reassigned on a tie). This is
-	// REACHABLE: insuranceTerms has only a NON-unique (policyId, endDate) index, so two co-terminating
-	// terms can legitimately share an endDate; the backend orders desc(endDate) but SQLite's order AMONG
-	// equal endDates is unspecified, so this FE helper is the actual decider of which term renders +
-	// renews (PolicyCard's latestTerm → displayed policyNumber, ExpirationAlert, renewFrom link). The
-	// property test above is `>=`-tolerant so it does NOT pin the tiebreak — a regression to `>=`
-	// (last-seen-wins) would flip the chosen term silently. This pins the current first-seen contract.
 	test('getLatestTerm: on an equal-endDate tie the FIRST term wins (the load-bearing `>`, not `>=`)', () => {
 		const base = {
 			policyId: 'policy-1',
 			startDate: '2024-01-01',
-			endDate: '2024-12-31', // identical end dates
+			endDate: '2024-12-31',
 			createdAt: '2024-01-01T00:00:00.000Z',
 			updatedAt: '2024-01-01T00:00:00.000Z'
 		};
 		const termA: InsuranceTerm = { ...base, id: 'term-A', policyNumber: 'POL-A' };
 		const termB: InsuranceTerm = { ...base, id: 'term-B', policyNumber: 'POL-B' };
 
-		// NON-VACUOUS: first-seen wins regardless of input order. A regression to `>=` would return the
-		// LAST same-endDate term, flipping both of these.
 		expect(getLatestTerm([termA, termB])?.id).toBe('term-A');
 		expect(getLatestTerm([termB, termA])?.id).toBe('term-B');
 	});

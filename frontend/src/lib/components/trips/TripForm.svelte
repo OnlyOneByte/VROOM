@@ -1,20 +1,20 @@
 <script lang="ts">
-	import * as Dialog from '$lib/components/ui/dialog';
-	import * as Select from '$lib/components/ui/select';
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import { Textarea } from '$lib/components/ui/textarea';
-	import { FormFieldError } from '$lib/components/ui/form-field';
-	import DatePicker from '$lib/components/common/date-picker.svelte';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { Textarea } from '#lib/components/ui/textarea/index.ts';
+	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
+	import DatePicker from '#lib/components/common/date-picker.svelte';
 	import { LoaderCircle } from '@lucide/svelte';
-	import { tripApi } from '$lib/services/trip-api';
-	import { appStore } from '$lib/stores/app.svelte';
-	import { capitalize, dateOnlyToISO, toDateInputValue } from '$lib/utils/formatters';
-	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
-	import { getDistanceUnitLabel } from '$lib/utils/units';
-	import { settingsStore } from '$lib/stores/settings.svelte';
-	import { TRIP_PURPOSES, type Trip, type TripPurpose, type Vehicle } from '$lib/types';
+	import { tripApi } from '#lib/services/trip-api.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { capitalize, dateOnlyToISO, toDateInputValue } from '#lib/utils/formatters.ts';
+	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
+	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
+	import { TRIP_PURPOSES, type Trip, type TripPurpose, type Vehicle } from '#lib/types/index.ts';
 	import {
 		parseOdometer,
 		validateTripFields,
@@ -25,9 +25,7 @@
 	interface Props {
 		open: boolean;
 		vehicles: Vehicle[];
-		/** Called after a successful create/update so the parent can refetch. */
 		onSaved: () => void;
-		/** When set, the form is in EDIT mode: hydrate from this trip + submit via update (/T6b-3). */
 		trip?: Trip | null;
 	}
 
@@ -35,9 +33,6 @@
 
 	let isEdit = $derived(!!trip);
 
-	// Form fields. The odometer fields bind to `<input type="number">`, which Svelte coerces to a NUMBER
-	// (or null when cleared) — so they're typed `string | number | null` even though seeded ''; parseOdometer
-	// tolerates all three. Everything else is a plain string the inputs bind.
 	let vehicleId = $state('');
 	let startOdometer = $state<string | number | null>('');
 	let endOdometer = $state<string | number | null>('');
@@ -50,8 +45,6 @@
 	let isSubmitting = $state(false);
 	let errors = $state<TripFormErrors>({});
 
-	// The distance-unit label of the selected vehicle (trip odometers are stored same-unit-as-the-vehicle,
-	// R2) — falls back to the global pref when no vehicle is resolved yet (the per-vehicle-units idiom).
 	let unitLabel = $derived.by(() => {
 		const v = vehicles.find(veh => veh.id === vehicleId);
 		return getDistanceUnitLabel(
@@ -60,10 +53,6 @@
 		);
 	});
 
-	// Re-seed the form whenever it opens. EDIT mode (a `trip` prop) HYDRATES from the existing row (the
-	// blank-edit-form data-loss footgun — a never-populated field must not silently wipe on save); CREATE
-	// mode starts blank (defaulting to the only vehicle when the user owns exactly one + today's date).
-	// Keyed on `open` so reopening after cancel resets cleanly.
 	let lastOpen = $state(false);
 	$effect(() => {
 		if (open === lastOpen) return;
@@ -75,9 +64,7 @@
 			startOdometer = trip.startOdometer;
 			endOdometer = trip.endOdometer;
 			purpose = trip.purpose;
-			// Stored as a noon-local ISO instant; toDateInputValue reads the LOCAL calendar day (the
-			// round-trip discipline — a bare .slice(0,10) would shift the date back a day for +TZ users).
-			tripDate = toDateInputValue(new Date(trip.tripDate));
+			tripDate = toDateInputValue(trip.tripDate);
 			startLocation = trip.startLocation ?? '';
 			endLocation = trip.endLocation ?? '';
 			note = trip.note ?? '';
@@ -110,8 +97,6 @@
 		errors = validateTripFields(currentForm());
 		if (Object.keys(errors).length > 0) return;
 
-		// Parse via the SAME helper validation used (not a divergent parseInt — which would disagree on
-		// e.g. '1e3'); validation already guaranteed both are non-null, the ?? 0 is a type-narrowing floor.
 		const startValue = parseOdometer(startOdometer) ?? 0;
 		const endValue = parseOdometer(endOdometer) ?? 0;
 
@@ -121,15 +106,12 @@
 				startOdometer: startValue,
 				endOdometer: endValue,
 				purpose,
-				// The backend reads this as noon-local (dateOnlyToISO), so "today" is accepted.
 				tripDate: dateOnlyToISO(tripDate),
 				startLocation: startLocation.trim() || undefined,
 				endLocation: endLocation.trim() || undefined,
 				note: note.trim() || undefined
 			};
 			if (trip) {
-				// EDIT: vehicleId is immutable on a trip (R1 — the trip belongs to its vehicle); send only the
-				// editable fields. The backend re-syncs the linked odometer entry when endOdometer/date change (T7).
 				await tripApi.update(trip.id, payload);
 				appStore.addNotification({ type: 'success', message: 'Trip updated' });
 			} else {
@@ -167,13 +149,11 @@
 			}}
 			class="space-y-4"
 		>
-			<!-- Vehicle -->
 			<div class="space-y-2">
 				<Label for="trip-vehicle">Vehicle *</Label>
 				{#if vehicles.length === 0}
 					<p class="text-sm text-muted-foreground">Add a vehicle first to log a trip.</p>
 				{:else if isEdit}
-					<!-- A trip's vehicle is immutable (R1 — it belongs to its vehicle); show it read-only in edit. -->
 					<Input
 						id="trip-vehicle"
 						value={getVehicleDisplayName(vehicles.find(v => v.id === vehicleId)) ?? 'Vehicle'}
@@ -199,7 +179,6 @@
 				{#if errors.vehicleId}<FormFieldError>{errors.vehicleId}</FormFieldError>{/if}
 			</div>
 
-			<!-- Odometer pair -->
 			<div class="grid grid-cols-2 gap-3">
 				<div class="space-y-2">
 					<Label for="trip-start">Start odometer *</Label>
@@ -239,7 +218,6 @@
 				</div>
 			</div>
 
-			<!-- Purpose + date -->
 			<div class="grid grid-cols-2 gap-3">
 				<div class="space-y-2">
 					<Label for="trip-purpose">Purpose *</Label>
@@ -261,7 +239,6 @@
 				</div>
 			</div>
 
-			<!-- Optional locations -->
 			<div class="grid grid-cols-2 gap-3">
 				<div class="space-y-2">
 					<Label for="trip-start-loc">From (optional)</Label>
@@ -285,7 +262,6 @@
 				</div>
 			</div>
 
-			<!-- Note (optional) -->
 			<div class="space-y-2">
 				<Label for="trip-note">Notes (optional)</Label>
 				<Textarea id="trip-note" bind:value={note} rows={2} placeholder="Any extra details…" />

@@ -1,16 +1,3 @@
-/**
- * Property-Based Tests for OdometerRepository (v2)
- *
- * v2 odometer entries are manual-only — no linked entity fields.
- * The UNION query history is tested in odometer-history.property.test.ts.
- *
- * Property: Manual odometer entry CRUD round-trip
- * For any valid odometer entry data, creating an entry and reading it back
- * should produce consistent results.
- *
- * **Validates: Requirements 6.1, 6.2**
- */
-
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';

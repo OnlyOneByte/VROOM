@@ -1,4 +1,4 @@
-import type { WithElementRef } from '$lib/utils.js';
+import type { WithElementRef } from '#lib/utils.js';
 import type {
 	EmblaCarouselSvelteType,
 	default as emblaCarouselSvelte
@@ -17,8 +17,6 @@ type EmblaCarouselConfig = NonNullable<Parameters<typeof emblaCarouselSvelte>[1]
 
 export type CarouselOptions = EmblaCarouselConfig['options'];
 export type CarouselPlugins = EmblaCarouselConfig['plugins'];
-
-////
 
 export type CarouselProps = {
 	opts?: CarouselOptions;

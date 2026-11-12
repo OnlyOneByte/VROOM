@@ -4,15 +4,6 @@
 
 - [ ] **Calendar integration** — greenlit, needs a spec.
 
-## Shipped
-
-OAuth provider abstraction · PWA asset generator · performant DB schema · reminders and
-recurring expenses (backend + frontend) · insurance and financing payments on
-`source_id`/`source_type` · odometer entry photos · offline entries (create-only, idempotent)
-· vehicle sharing · Google Photos storage provider · VLM receipt parsing · LLM assistant
-(read-only v1) · trips and expense location · Google Photos → auto-add expenses · push
-notifications.
-
 ## Open — features
 
 - [ ] **Admin page** — instance dashboard (expense/user/vehicle counts); remove or block a user.
@@ -21,9 +12,8 @@ notifications.
 - [ ] **Household view** — aggregate costs across shared vehicles. Builds on vehicle sharing.
 - [ ] **Shareable year-end summary** — exportable image or link.
 - [ ] **Anonymous cost benchmarks** — opt-in comparison against similar vehicles.
-- [ ] **Multi-app CSV import** — the column-mapping layer and the Fuelio migration ship
-  (Settings → Migrate from another tracker); Fuelly, Drivvo, and Simply Auto presets plus a
-  source picker remain.
+- [ ] **Multi-app CSV import** — the column-mapping layer ships with Fuelio, Fuelly, and Drivvo
+  presets (Settings → Migrate from another tracker). A Simply Auto preset remains.
 - [ ] **Offline edit and delete** — plus an IndexedDB outbox (the queue is `localStorage`
   today) and an offline navigation fallback (assets already precache). Deferred from offline
   entries v1, which is create-only.
@@ -44,7 +34,7 @@ notifications.
   measurement. The remaining gap is structural (DI-bound singletons, OAuth network paths,
   eyes-on UI), so it needs real new coverage from new features — do not manufacture tests
   that re-implement the logic they claim to cover.
-- [ ] **Broaden the E2E suite.** Committed specs only; anything uncommitted vanishes on merge.
+- [ ] **Broaden the E2E suite.** Known gaps are listed in `frontend/e2e/README.md`.
 
 ## Someday — scaling
 

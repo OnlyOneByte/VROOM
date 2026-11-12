@@ -1,12 +1,3 @@
-/**
- * Tests for offline-outbox idempotent expense creation (createIdempotent).
- *
- * Validates: offline-entries Requirements 6.1, 6.2, 6.3
- * - Same (userId, clientId) twice → one row, second call returns the original.
- * - Same clientId across different users → two distinct rows (per-user isolation).
- * - No clientId → plain create (no idempotency).
- */
-
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
@@ -78,8 +69,6 @@ describe('createIdempotent', () => {
     const first = await repo.createIdempotent(
       expenseInput({ clientId: 'client-key-2', expenseAmount: 10 })
     );
-    // A retry with a different amount must NOT overwrite the original (LWW is a
-    // separate update op, not a create). The original wins.
     const second = await repo.createIdempotent(
       expenseInput({ clientId: 'client-key-2', expenseAmount: 999 })
     );
@@ -118,11 +107,6 @@ describe('createIdempotent', () => {
   });
 });
 
-// A conflict-resolution keep-local must APPLY the local edit on a (userId, clientId) collision,
-// not silently no-op-return the stored row (a resolved offline edit is never lost). The
-// pre-fix sync-manager sent forceOverwrite but the backend (a) Zod-stripped it and (b) createIdempotent
-// returned the existing row unchanged. These pin the overwrite path: same row id (in-place update, no
-// duplicate), the local fields applied, and the identity + idempotency keys (id/userId/clientId) immutable.
 describe('createIdempotent — overwrite (keep-local conflict resolution)', () => {
   test('overwrite=true on a clientId collision UPDATES the existing row in place (no duplicate)', async () => {
     const first = await repo.createIdempotent(
@@ -135,7 +119,6 @@ describe('createIdempotent — overwrite (keep-local conflict resolution)', () =
       })
     );
 
-    // The local edit: a different amount + mileage. keep-local must win.
     const resolved = await repo.createIdempotent(
       expenseInput({
         clientId: 'ov-1',
@@ -152,7 +135,6 @@ describe('createIdempotent — overwrite (keep-local conflict resolution)', () =
     expect(resolved.mileage).toBe(30500);
     expect(countRows(), 'no duplicate row').toBe(1);
 
-    // Re-read confirms it persisted (not just the returned object).
     const reread = await repo.findByClientId('ov-1', USER_A);
     expect(reread?.expenseAmount).toBe(55);
   });
@@ -162,8 +144,6 @@ describe('createIdempotent — overwrite (keep-local conflict resolution)', () =
       expenseInput({ clientId: 'ov-2', expenseAmount: 10 })
     );
 
-    // Even if a (hypothetically tampered) payload carried a different userId, the existing row's identity
-    // must not change — the overwrite strips clientId/userId from the patch.
     const resolved = await repo.createIdempotent(
       expenseInput({ clientId: 'ov-2', expenseAmount: 77 }),
       true
@@ -174,15 +154,6 @@ describe('createIdempotent — overwrite (keep-local conflict resolution)', () =
     expect(resolved.clientId).toBe('ov-2');
     expect(resolved.expenseAmount).toBe(77);
   });
-
-  // NOTE: applyLocalOverwrite strips clientId/userId from the patch, but that strip is DEFENSIVE
-  // (belt-and-suspenders), NOT reachable as a mutation through the public API — createIdempotent looks up
-  // the row by (data.clientId, data.userId), so when the overwrite branch runs, data.userId already equals
-  // the row's owner and data.clientId already equals its key (a foreign userId misses the lookup and takes
-  // the create path instead). So there's no public path where the strip prevents a real identity change;
-  // the test above documents the intended immutability, and the strip keeps it true if a future caller ever
-  // hands applyLocalOverwrite a patch built differently. (A forcing test was attempted + removed: it would
-  // assert an unreachable state.)
 
   test('overwrite=false (default) still no-ops on collision — the plain-retry contract is unchanged', async () => {
     const first = await repo.createIdempotent(

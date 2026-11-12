@@ -1,11 +1,3 @@
-/**
- * Property-Based Tests for Photo userId Storage and User-Scoped Queries
- *
- * Tests Property 20: Photo create stores userId and user-scoped queries work.
- *
- * **Validates: Requirements 28.1, 28.3**
- */
-
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
@@ -58,14 +50,7 @@ afterEach(() => {
   sqliteDb.close();
 });
 
-// ---------------------------------------------------------------------------
-// Generators
-// ---------------------------------------------------------------------------
-
 const entityTypeArb = fc.constantFrom('vehicle', 'expense', 'insurance_policy', 'odometer_entry');
-const _fileNameArb = fc
-  .string({ minLength: 3, maxLength: 20 })
-  .map((s) => `${s.replace(/[^a-z0-9]/gi, 'x')}.jpg`);
 
 function makePhotoData(userId: string, entityType: string, entityId: string) {
   return {
@@ -78,11 +63,7 @@ function makePhotoData(userId: string, entityType: string, entityId: string) {
   };
 }
 
-// ===========================================================================
-// Property 20: Photo create stores userId and user-scoped queries work
-// **Validates: Requirements 28.1, 28.3**
-// ===========================================================================
-describe('Property 20: Photo create stores userId and user-scoped queries work', () => {
+describe('photo create stores userId and user-scoped queries work', () => {
   test('created photo stores the correct userId', async () => {
     await fc.assert(
       fc.asyncProperty(entityTypeArb, async (entityType) => {
@@ -91,7 +72,6 @@ describe('Property 20: Photo create stores userId and user-scoped queries work',
         expect(photo.userId).toBe(USER_A);
         expect(photo.entityType).toBe(entityType);
 
-        // Verify via findById
         const retrieved = await repo.findById(photo.id);
         expect(retrieved).not.toBeNull();
         expect(retrieved?.userId).toBe(USER_A);
@@ -106,11 +86,9 @@ describe('Property 20: Photo create stores userId and user-scoped queries work',
         fc.integer({ min: 1, max: 4 }),
         fc.integer({ min: 1, max: 4 }),
         async (countA, countB) => {
-          // Create photos for user A
           for (let i = 0; i < countA; i++) {
             await repo.create(makePhotoData(USER_A, 'vehicle', VEHICLE_A));
           }
-          // Create photos for user B
           for (let i = 0; i < countB; i++) {
             await repo.create(makePhotoData(USER_B, 'vehicle', VEHICLE_B));
           }
@@ -121,37 +99,18 @@ describe('Property 20: Photo create stores userId and user-scoped queries work',
           expect(photosA.length).toBe(countA);
           expect(photosB.length).toBe(countB);
 
-          // All photos for A have userId = USER_A
           for (const p of photosA) {
             expect(p.userId).toBe(USER_A);
           }
-          // All photos for B have userId = USER_B
           for (const p of photosB) {
             expect(p.userId).toBe(USER_B);
           }
 
-          // Clean up
           sqliteDb.run(`DELETE FROM photos`);
         }
       ),
       { numRuns: 20 }
     );
-  });
-
-  test('countByUser returns correct count per user', async () => {
-    // Create 3 photos for A, 2 for B
-    for (let i = 0; i < 3; i++) {
-      await repo.create(makePhotoData(USER_A, 'vehicle', VEHICLE_A));
-    }
-    for (let i = 0; i < 2; i++) {
-      await repo.create(makePhotoData(USER_B, 'vehicle', VEHICLE_B));
-    }
-
-    const countA = await repo.countByUser(USER_A);
-    const countB = await repo.countByUser(USER_B);
-
-    expect(countA).toBe(3);
-    expect(countB).toBe(2);
   });
 
   test('findByUser with entityType filter works correctly', async () => {
@@ -167,42 +126,22 @@ describe('Property 20: Photo create stores userId and user-scoped queries work',
     expect(expensePhotos.length).toBe(1);
     expect(allPhotos.length).toBe(3);
   });
-
-  test('countByUser with entityType filter works correctly', async () => {
-    await repo.create(makePhotoData(USER_A, 'vehicle', VEHICLE_A));
-    await repo.create(makePhotoData(USER_A, 'expense', 'exp-1'));
-    await repo.create(makePhotoData(USER_A, 'expense', 'exp-2'));
-
-    expect(await repo.countByUser(USER_A, 'vehicle')).toBe(1);
-    expect(await repo.countByUser(USER_A, 'expense')).toBe(2);
-    expect(await repo.countByUser(USER_A)).toBe(3);
-  });
 });
 
-// ===========================================================================
-// findByEntityPaginated must be userId-scoped.
-// It was the lone photo read-method filtering on (entityType, entityId) ALONE — every sibling
-// (findByUser/countByUser/findIdsByUser) scopes by user_id. Not a live leak (the route's
-// validateEntityOwnership gates it), but a latent tenant boundary: if two users' photos ever shared
-// an (entityType, entityId) — a raw cross-tenant case only constructible by direct seed — the page
-// would mix them. These pin the WHERE predicate itself (the approach), not just the route guard.
-// ===========================================================================
 describe('findByEntityPaginated is userId-scoped', () => {
   test('excludes another user’s photo that shares the same (entityType, entityId)', async () => {
-    // The load-bearing cross-tenant case: SAME entityType+entityId, different owners.
     const SHARED_ENTITY = 'shared-veh';
     await repo.create(makePhotoData(USER_A, 'vehicle', SHARED_ENTITY));
     await repo.create(makePhotoData(USER_A, 'vehicle', SHARED_ENTITY));
-    await repo.create(makePhotoData(USER_B, 'vehicle', SHARED_ENTITY)); // foreign — must not surface
+    await repo.create(makePhotoData(USER_B, 'vehicle', SHARED_ENTITY));
 
     const resultA = await repo.findByEntityPaginated('vehicle', SHARED_ENTITY, USER_A, 50, 0);
-    expect(resultA.totalCount).toBe(2); // count leg userId-scoped (not 3)
-    expect(resultA.data).toHaveLength(2); // data leg userId-scoped
+    expect(resultA.totalCount).toBe(2);
+    expect(resultA.data).toHaveLength(2);
     for (const p of resultA.data) {
       expect(p.userId).toBe(USER_A);
     }
 
-    // And user B sees only their one.
     const resultB = await repo.findByEntityPaginated('vehicle', SHARED_ENTITY, USER_B, 50, 0);
     expect(resultB.totalCount).toBe(1);
     expect(resultB.data[0]?.userId).toBe(USER_B);

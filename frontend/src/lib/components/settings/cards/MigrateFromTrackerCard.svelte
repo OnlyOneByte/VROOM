@@ -1,35 +1,23 @@
 <script lang="ts">
-	/**
-	 * Migrate data from another tracker (data-migration spec) — a DEDICATED settings surface, distinct
-	 * from the expenses page's own-format CSV re-import. v1 implements the Fuelio standard: the user
-	 * picks a target vehicle, uploads the tracker's export file, previews (dryRun), and
-	 * commits. A Fuelio export is a multi-section file, so this sends `source:'fuelio'` — the backend
-	 * routes it to the Fuelio adapter (splits sections, converts units, maps costs) and then runs the
-	 * same validate/idempotent-commit pipeline as every import.
-	 *
-	 * Mirrors the PushNotificationsCard shell (Card + four-states) with an inline migration Dialog.
-	 */
 	import { onMount } from 'svelte';
 	import { DatabaseZap, Upload, LoaderCircle, CircleCheck, CircleAlert } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as Select from '$lib/components/ui/select';
-	import * as Dialog from '$lib/components/ui/dialog';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
 	import {
 		Card,
 		CardContent,
 		CardDescription,
 		CardHeader,
 		CardTitle
-	} from '$lib/components/ui/card';
-	import { vehicleApi } from '$lib/services/vehicle-api';
-	import { expenseApi, type ExpenseImportResult } from '$lib/services/expense-api';
-	import { appStore } from '$lib/stores/app.svelte';
-	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
-	import { handleErrorWithNotification } from '$lib/utils/error-handling';
-	import type { ImportColumnMapping, Vehicle } from '$lib/types';
+	} from '#lib/components/ui/card/index.ts';
+	import { vehicleApi } from '#lib/services/vehicle-api.ts';
+	import { expenseApi, type ExpenseImportResult } from '#lib/services/expense-api.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
+	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
+	import type { ImportColumnMapping, Vehicle } from '#lib/types/index.ts';
 
-	// v1 migrates from Fuelio. A second tracker is an additive follow-on: it reuses this whole
-	// preview/commit flow, and only then is a source picker worth showing.
 	const TRACKER_LABEL = 'Fuelio';
 
 	let vehicles = $state<Vehicle[]>([]);
@@ -43,8 +31,6 @@
 	let preview = $state<ExpenseImportResult | null>(null);
 	let isPreviewing = $state(false);
 	let isImporting = $state(false);
-	// Monotonic token: only the newest preview request may write `preview`. Changing the vehicle while
-	// an earlier request is still in flight would otherwise paint counts for the wrong vehicle.
 	let previewSeq = 0;
 
 	let targetVehicle = $derived(vehicles.find(v => v.id === targetVehicleId));
@@ -66,8 +52,6 @@
 
 	onMount(loadVehicles);
 
-	/** The mapping sent to the import endpoint. The Fuelio adapter owns the parsing, so we only pass
-	 *  the source tag + target vehicle (columns/dateFormat are placeholders the adapter ignores). */
 	function buildMapping(): ImportColumnMapping | null {
 		if (!targetVehicle) return null;
 		return {
@@ -105,7 +89,7 @@
 		if (!file) return;
 		fileName = file.name;
 		csvText = await file.text();
-		// Clear the input so re-picking the SAME file after a cancel still fires a change event.
+		// Clear so re-picking the same file after a cancel still fires change.
 		input.value = '';
 		await runPreview();
 	}
@@ -132,8 +116,6 @@
 		}
 	}
 
-	/** Start every migration from a clean slate. Bumping the token abandons any request still in
-	 *  flight from a previous open, so its response cannot land in this one. */
 	function openDialog() {
 		fileName = null;
 		csvText = '';
@@ -194,7 +176,6 @@
 		</Dialog.Header>
 
 		<div class="space-y-4">
-			<!-- Target vehicle -->
 			<div class="space-y-1.5">
 				<label for="migrate-vehicle" class="text-xs font-medium text-foreground">
 					Import into vehicle *
@@ -213,7 +194,6 @@
 				</Select.Root>
 			</div>
 
-			<!-- File upload -->
 			<div class="space-y-2">
 				<label
 					for="migrate-file"
@@ -232,7 +212,6 @@
 				/>
 			</div>
 
-			<!-- Preview -->
 			{#if isPreviewing}
 				<div class="flex items-center justify-center gap-2 py-4 text-sm text-muted-foreground">
 					<LoaderCircle class="h-4 w-4 animate-spin" />

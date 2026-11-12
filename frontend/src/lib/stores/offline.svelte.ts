@@ -1,7 +1,6 @@
-import { browser } from '$app/environment';
-import type { OfflineExpense } from '$lib/utils/offline-storage';
+import { browser } from '$app/env';
+import type { OfflineExpense } from '#lib/utils/offline-storage.ts';
 
-// --- Online/offline status ---
 let _isOnline = $state(browser ? navigator.onLine : true);
 
 export const onlineStatus = {
@@ -13,7 +12,6 @@ export const onlineStatus = {
 	}
 };
 
-// Initialize online/offline detection
 if (browser) {
 	window.addEventListener('online', () => {
 		_isOnline = true;
@@ -23,7 +21,6 @@ if (browser) {
 	});
 }
 
-// --- Offline expense queue ---
 let _offlineExpenses = $state<OfflineExpense[]>([]);
 
 export const offlineExpenseQueue = {
@@ -35,7 +32,6 @@ export const offlineExpenseQueue = {
 	}
 };
 
-// --- Sync status ---
 let _syncStatus = $state<'idle' | 'syncing' | 'error' | 'success'>('idle');
 
 export const syncState = {

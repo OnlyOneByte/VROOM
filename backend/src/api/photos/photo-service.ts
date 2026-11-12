@@ -14,20 +14,37 @@ import { validateEntityOwnership } from './helpers';
 import { photoRefRepository } from './photo-ref-repository';
 import { photoRepository } from './photo-repository';
 
-/** Accepted MIME types for photo/document uploads */
 export const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
 
-/** Maximum file size in bytes (10 MB) */
 export const MAX_FILE_SIZE = 10_485_760;
 
-/**
- * Persist the DB side of an upload (photo row + active default ref) AFTER the bytes are already in
- * the provider.: the upload is not atomic — if either insert throws (DB error, constraint), the
- * external object would be orphaned (no DB row → never reconcilable or deletable through the app).
- * Compensate: best-effort delete the just-uploaded object before re-throwing, so a failed upload
- * leaves no provider-side litter. A failed compensating delete is logged (reconcilable) but never
- * masks the original error. Extracted from uploadPhotoForEntity to keep it under the complexity max.
- */
+async function removeFailedUpload(
+  provider: StorageProvider,
+  providerId: string,
+  storageRef: StorageRef,
+  photoId: string | undefined
+): Promise<void> {
+  if (photoId) {
+    try {
+      await photoRepository.delete(photoId);
+    } catch (cleanupError) {
+      logger.warn('Failed to remove photo row after a DB write error', {
+        photoId,
+        error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+      });
+    }
+  }
+  try {
+    await provider.delete({ providerType: provider.type, externalId: storageRef.externalId });
+  } catch (cleanupError) {
+    logger.warn('Failed to clean up orphaned upload after a DB write error', {
+      providerId,
+      storageRef: storageRef.externalId,
+      error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+    });
+  }
+}
+
 async function persistUploadedPhotoOrCleanup(
   provider: StorageProvider,
   providerId: string,
@@ -41,15 +58,15 @@ async function persistUploadedPhotoOrCleanup(
     fileSize: number;
   }
 ): Promise<Photo> {
+  let photoId: string | undefined;
   try {
-    // Insert logical photo record (metadata only — no provider fields)
     const photo = await photoRepository.create({
       ...meta,
       isCover: false,
       sortOrder: 0,
     });
+    photoId = photo.id;
 
-    // Insert photo_ref for the default provider (active immediately)
     await photoRefRepository.create({
       photoId: photo.id,
       providerId,
@@ -61,24 +78,11 @@ async function persistUploadedPhotoOrCleanup(
 
     return photo;
   } catch (error) {
-    try {
-      await provider.delete({ providerType: provider.type, externalId: storageRef.externalId });
-    } catch (cleanupError) {
-      logger.warn('Failed to clean up orphaned upload after a DB write error', {
-        providerId,
-        storageRef: storageRef.externalId,
-        error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
-      });
-    }
+    await removeFailedUpload(provider, providerId, storageRef, photoId);
     throw error;
   }
 }
 
-/**
- * Upload a photo for an entity. Validates ownership, file type/size,
- * uploads to the user's default storage provider, creates a DB record
- * and photo_ref, and auto-sets cover if this is the first photo.
- */
 export async function uploadPhotoForEntity(
   entityType: string,
   entityId: string,
@@ -104,9 +108,7 @@ export async function uploadPhotoForEntity(
     category
   );
 
-  // Capability gate (D2a): a limited backend like Google Photos stores images only.
-  // If the DEFAULT provider can't store this file type, fail with a clear message
-  // rather than letting the provider throw a vendor-specific error mid-upload.
+  // Google Photos stores images only; fail here rather than with a vendor error mid-upload.
   if (!capabilitiesOf(provider).arbitraryFiles && !isImageMimeType(file.type)) {
     throw new AppError(
       `${provider.type} stores images only — choose a Google Drive or S3 provider for PDF documents.`,
@@ -124,11 +126,6 @@ export async function uploadPhotoForEntity(
     pathHint: folderPath,
   });
 
-  // The upload is not atomic — the bytes now live in the provider, but the photo row + its
-  // active ref are two more writes that can throw (DB error, constraint). On ANY failure after the
-  // upload, the external object would be orphaned (no DB row → never reconcilable, never deletable
-  // through the app). Compensate: best-effort delete the just-uploaded object before re-throwing, so
-  // a failed upload leaves no provider-side litter. Mirrors the delete-path best-effort pattern.
   const photo = await persistUploadedPhotoOrCleanup(provider, providerId, storageRef, {
     userId,
     entityType,
@@ -138,9 +135,6 @@ export async function uploadPhotoForEntity(
     fileSize: file.size,
   });
 
-  // Create pending refs for backup providers (sync worker picks these up).
-  // Skip providers that can't store this file type (D2a) — e.g. don't queue a PDF
-  // to back up into Google Photos; that ref would only ever fail in the worker.
   const backups = await storageProviderRegistry.getBackupProviders(userId, category);
   for (const backup of backups) {
     if (!capabilitiesOf(backup.provider).arbitraryFiles && !isImageMimeType(file.type)) {
@@ -154,7 +148,6 @@ export async function uploadPhotoForEntity(
     });
   }
 
-  // Auto-set cover if this is the first photo for the entity
   const existingPhotos = await photoRepository.findByEntity(entityType, entityId);
   if (existingPhotos.length === 1) {
     return await photoRepository.setCoverPhoto(entityType, entityId, photo.id);
@@ -163,9 +156,6 @@ export async function uploadPhotoForEntity(
   return photo;
 }
 
-/**
- * List photos for an entity with pagination, ordered by sortOrder then createdAt.
- */
 export async function listPhotosForEntity(
   entityType: string,
   entityId: string,
@@ -182,12 +172,6 @@ export async function listPhotosForEntity(
   );
 }
 
-/**
- * Batch-list a user's photos of one entity type (e.g. all 'vehicle' photos),
- * grouped by entityId. One user-scoped query — lets callers like the dashboard
- * avoid an N+1 of per-entity list requests. Ownership is enforced by the
- * userId filter on the photos table (photos.userId is the row owner).
- */
 export async function listPhotosByEntityType(
   entityType: string,
   userId: string
@@ -205,12 +189,6 @@ export async function listPhotosByEntityType(
   return grouped;
 }
 
-/**
- * Load a photo after checking the caller owns the entity in the URL, asserting the photo really
- * belongs to that entity. The photo id alone is not enough: one of the user's OWN photo ids must
- * not be reachable through a different entity's URL, or the (entityType, entityId) path segments
- * would be decoration rather than scope.
- */
 async function requireEntityPhoto(
   entityType: string,
   entityId: string,
@@ -226,24 +204,10 @@ async function requireEntityPhoto(
   return photo;
 }
 
-/**
- * Strong HTTP validator for a stored photo's bytes.
- *
- * A photo row is write-once: an upload inserts a NEW row and no route replaces the bytes behind an
- * existing id, so (id, fileSize) names that content for the life of the row. Deriving the validator
- * from the row — not from the bytes — is what lets a conditional GET be answered without asking the
- * storage provider for the original at all.
- */
 export function photoETag(photo: Pick<Photo, 'id' | 'fileSize'>): string {
   return `"${photo.id}-${photo.fileSize}"`;
 }
 
-/**
- * Does a client's `If-None-Match` satisfy `etag`? Implements the weak comparison RFC 9110 §13.1.2
- * mandates for this header: the value is a comma-separated list, `*` matches any existing
- * representation, and a `W/` prefix is ignored on both sides — so a cache or proxy that weakened
- * our tag still revalidates for free instead of re-downloading the photo.
- */
 export function ifNoneMatchSatisfies(header: string | undefined | null, etag: string): boolean {
   if (!header) return false;
 
@@ -256,20 +220,11 @@ export function ifNoneMatchSatisfies(header: string | undefined | null, etag: st
     .some((candidate) => candidate === '*' || strip(candidate) === target);
 }
 
-/** What a serve route needs to answer a conditional GET without fetching the bytes. */
 export interface PhotoServeMetadata {
-  /** Strong validator for the stored bytes — see {@link photoETag}. */
   etag: string;
-  /** The stored MIME type the serve route echoes as Content-Type. */
   mimeType: string;
 }
 
-/**
- * Resolve the serve metadata for a photo WITHOUT downloading it — ownership gate plus two indexed
- * SQLite reads. A serve route calls this first so a revalidation can be answered with 304 before
- * the provider round-trip; it deliberately does not resolve a storage ref, because a client whose
- * cached copy is still valid does not need one (and on a provider outage gets its photo anyway).
- */
 export async function getPhotoServeMetadataForEntity(
   entityType: string,
   entityId: string,
@@ -280,16 +235,6 @@ export async function getPhotoServeMetadataForEntity(
   return { etag: photoETag(photo), mimeType: photo.mimeType };
 }
 
-/**
- * Download a photo via the provider abstraction and return the raw buffer + MIME type.
- * Uses a fallback chain: try the user's default provider first, then any active ref.
- *
- * This returns the FULL-RESOLUTION ORIGINAL — despite the route being called "thumbnail", nothing in
- * this stack resizes: there is no image codec in the Bun runtime and none is vendored, and the
- * upload path stores whatever the camera produced (capped at {@link MAX_FILE_SIZE}). So a 48px
- * avatar costs megabytes, and the conditional GET in the serve routes is what bounds the repeat
- * cost until a real resize (client-side downscale on upload, or a provider-generated size) lands.
- */
 export async function getPhotoThumbnailForEntity(
   entityType: string,
   entityId: string,
@@ -300,7 +245,6 @@ export async function getPhotoThumbnailForEntity(
 
   const category = ENTITY_TO_CATEGORY[entityType];
 
-  // Try the default provider first, fall back to any active ref
   let ref = null;
   if (category) {
     try {
@@ -310,7 +254,6 @@ export async function getPhotoThumbnailForEntity(
       );
       ref = await photoRefRepository.findActiveByPhotoAndProvider(photoId, defaultProviderId);
     } catch (error) {
-      // Only swallow "no provider configured" errors — rethrow unexpected failures
       if (!(error instanceof ValidationError) && !(error instanceof NotFoundError)) {
         throw error;
       }
@@ -337,9 +280,6 @@ export async function getPhotoThumbnailForEntity(
   return { buffer, mimeType: photo.mimeType };
 }
 
-/**
- * Set a photo as the cover photo for an entity.
- */
 export async function setCoverPhotoForEntity(
   entityType: string,
   entityId: string,
@@ -351,10 +291,6 @@ export async function setCoverPhotoForEntity(
   return photoRepository.setCoverPhoto(entityType, entityId, photoId);
 }
 
-/**
- * Delete a single photo: remove from all providers (best-effort), delete photo_refs,
- * delete DB record, and promote the next cover if the deleted photo was the cover.
- */
 export async function deletePhotoForEntity(
   entityType: string,
   entityId: string,
@@ -365,28 +301,7 @@ export async function deletePhotoForEntity(
 
   const wasCover = photo.isCover;
 
-  // Find all refs and attempt provider-side deletes (best-effort)
-  const refs = await photoRefRepository.findAllByPhoto(photoId);
-  for (const ref of refs) {
-    if (ref.status !== 'active') continue;
-    try {
-      const provider = await storageProviderRegistry.getProvider(ref.providerId, userId);
-      await provider.delete({
-        providerType: provider.type,
-        externalId: ref.storageRef,
-      });
-    } catch (error) {
-      logger.warn('Failed to delete photo from storage provider', {
-        photoId,
-        providerId: ref.providerId,
-        storageRef: ref.storageRef,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
-
-  // Delete all photo_refs, then the photo record
-  await photoRefRepository.deleteByPhoto(photoId);
+  await deletePhotoRowsAndObjects([photoId], userId);
   await photoRepository.delete(photoId);
 
   if (wasCover) {
@@ -397,40 +312,58 @@ export async function deletePhotoForEntity(
   }
 }
 
-/**
- * Best-effort delete files from providers for a set of photo refs, grouped by provider.
- */
-async function deleteRefsFromProviders(
-  refsByProvider: Map<string, PhotoRef[]>,
+async function deletePhotoRowsAndObjects(photoIds: string[], userId: string): Promise<void> {
+  if (photoIds.length === 0) return;
+
+  const refs = await photoRefRepository.findAllByPhotos(photoIds);
+  for (const [providerId, providerRefs] of groupActiveRefsByProvider(refs)) {
+    await deleteObjectsFromProvider(providerId, providerRefs, userId);
+  }
+
+  await photoRefRepository.deleteByPhotos(photoIds);
+}
+
+function groupActiveRefsByProvider(refs: PhotoRef[]): Map<string, PhotoRef[]> {
+  const byProvider = new Map<string, PhotoRef[]>();
+  for (const ref of refs) {
+    if (ref.status !== 'active') continue;
+    const bucket = byProvider.get(ref.providerId) ?? [];
+    bucket.push(ref);
+    byProvider.set(ref.providerId, bucket);
+  }
+  return byProvider;
+}
+
+async function deleteObjectsFromProvider(
+  providerId: string,
+  refs: PhotoRef[],
   userId: string
 ): Promise<void> {
-  for (const [providerId, refs] of refsByProvider) {
+  let provider: StorageProvider;
+  try {
+    provider = await storageProviderRegistry.getProvider(providerId, userId);
+  } catch (error) {
+    logger.warn('Failed to get provider for photo delete', {
+      providerId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return;
+  }
+
+  for (const ref of refs) {
     try {
-      const provider = await storageProviderRegistry.getProvider(providerId, userId);
-      for (const ref of refs) {
-        try {
-          await provider.delete({ providerType: provider.type, externalId: ref.storageRef });
-        } catch (error) {
-          logger.warn('Failed to delete photo from provider during cascade', {
-            photoId: ref.photoId,
-            providerId: ref.providerId,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-      }
+      await provider.delete({ providerType: provider.type, externalId: ref.storageRef });
     } catch (error) {
-      logger.warn('Failed to get provider for cascade delete', {
+      logger.warn('Failed to delete photo from storage provider', {
+        photoId: ref.photoId,
         providerId,
+        storageRef: ref.storageRef,
         error: error instanceof Error ? error.message : String(error),
       });
     }
   }
 }
 
-/**
- * Delete all photos for an entity (cascade). Validates ownership, removes
- * provider files best-effort, then deletes all photo_refs and photo DB records.
- */
 export async function deleteAllPhotosForEntity(
   entityType: string,
   entityId: string,
@@ -441,37 +374,14 @@ export async function deleteAllPhotosForEntity(
   const entityPhotos = await photoRepository.findByEntity(entityType, entityId);
   if (entityPhotos.length === 0) return;
 
-  const photoIds = entityPhotos.map((p) => p.id);
-  const allRefs = await photoRefRepository.findAllByPhotos(photoIds);
-
-  // Group active refs by provider to reuse provider instances
-  const refsByProvider = new Map<string, PhotoRef[]>();
-  for (const ref of allRefs) {
-    if (ref.status !== 'active') continue;
-    const existing = refsByProvider.get(ref.providerId) ?? [];
-    existing.push(ref);
-    refsByProvider.set(ref.providerId, existing);
-  }
-
-  await deleteRefsFromProviders(refsByProvider, userId);
-
-  // Batch delete all refs, then all photo records
-  await photoRefRepository.deleteByPhotos(photoIds);
+  await deletePhotoRowsAndObjects(
+    entityPhotos.map((p) => p.id),
+    userId
+  );
   await photoRepository.deleteByEntity(entityType, entityId);
 }
 
-/**
- * Delete all photos for MANY entities of one type — used during a parent cascade
- * (e.g. deleting a vehicle must clean the photos of its expenses + odometer
- * entries, which the DB FK-cascade removes but the photos table — linked only by
- * (entity_type, entity_id) strings, no FK — would otherwise leave orphaned along
- * with their external storage files).
- *
- * Unlike deleteAllPhotosForEntity, this does NOT re-validate per-entity ownership:
- * the caller has already validated the parent (vehicle/policy) it owns, and these
- * child entities are being deleted in the same operation. Best-effort on provider
- * files; always clears refs + photo rows. No-op for an empty id list.
- */
+// Photos have no FK to their entity, so children must be deleted explicitly here.
 export async function deletePhotosForEntities(
   entityType: string,
   entityIds: string[],
@@ -482,19 +392,9 @@ export async function deletePhotosForEntities(
   const entityPhotos = await photoRepository.findByEntities(entityType, entityIds);
   if (entityPhotos.length === 0) return;
 
-  const photoIds = entityPhotos.map((p) => p.id);
-  const allRefs = await photoRefRepository.findAllByPhotos(photoIds);
-
-  const refsByProvider = new Map<string, PhotoRef[]>();
-  for (const ref of allRefs) {
-    if (ref.status !== 'active') continue;
-    const existing = refsByProvider.get(ref.providerId) ?? [];
-    existing.push(ref);
-    refsByProvider.set(ref.providerId, existing);
-  }
-
-  await deleteRefsFromProviders(refsByProvider, userId);
-
-  await photoRefRepository.deleteByPhotos(photoIds);
+  await deletePhotoRowsAndObjects(
+    entityPhotos.map((p) => p.id),
+    userId
+  );
   await photoRepository.deleteByEntities(entityType, entityIds);
 }
