@@ -1,4 +1,4 @@
-import type { DerivedPaymentEntry, Expense, VehicleFinancing } from '$lib/types';
+import type { DerivedPaymentEntry, Expense, VehicleFinancing } from '#lib/types/index.ts';
 import { dateOnlyToISO } from './formatters';
 import { memoizeMulti } from './memoize';
 

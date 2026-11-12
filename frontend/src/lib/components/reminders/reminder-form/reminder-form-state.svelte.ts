@@ -1,6 +1,6 @@
 import { SvelteDate } from 'svelte/reactivity';
-import { resetSplitAllocations, type SplitAllocationDraft } from '$lib/utils/expense-helpers';
-import type { ReminderWithVehicles, Vehicle } from '$lib/types';
+import { resetSplitAllocations, type SplitAllocationDraft } from '#lib/utils/expense-helpers.ts';
+import type { ReminderWithVehicles, Vehicle } from '#lib/types/index.ts';
 import {
 	draftFromReminder,
 	emptyReminderDraft,

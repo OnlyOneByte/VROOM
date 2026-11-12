@@ -1,17 +1,17 @@
 <script lang="ts">
-	import { Card, CardContent } from '$lib/components/ui/card';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
-	import { Progress } from '$lib/components/ui/progress';
+	import { Card, CardContent } from '#lib/components/ui/card/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Progress } from '#lib/components/ui/progress/index.ts';
 	import { Calendar, CreditCard, ArrowRightLeft } from '@lucide/svelte';
-	import { formatCurrency } from '$lib/utils/formatters';
+	import { formatCurrency } from '#lib/utils/formatters.ts';
 	import {
 		calculateNextPaymentDate,
 		calculateDaysUntil,
 		calculateMinimumPayment,
 		formatPaymentFrequency
-	} from '$lib/utils/financing-calculations';
-	import type { VehicleFinancing, DerivedPaymentEntry } from '$lib/types';
+	} from '#lib/utils/financing-calculations.ts';
+	import type { VehicleFinancing, DerivedPaymentEntry } from '#lib/types/index.ts';
 
 	interface Props {
 		financing: VehicleFinancing;

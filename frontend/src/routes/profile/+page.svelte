@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
-	import { browser } from '$app/environment';
-	import { authStore } from '$lib/stores/auth.svelte';
-	import { authApi } from '$lib/services/auth-api';
-	import { getApiBaseUrl } from '$lib/services/api-client';
-	import type { LinkedAuthProvider } from '$lib/types';
+	import { browser } from '$app/env';
+	import { authStore } from '#lib/stores/auth.svelte.ts';
+	import { authApi } from '#lib/services/auth-api.ts';
+	import { getApiBaseUrl } from '#lib/services/api-client.ts';
+	import type { LinkedAuthProvider } from '#lib/types/index.ts';
 	import type { Component } from 'svelte';
 	import {
 		CircleUser,
@@ -33,18 +33,18 @@
 		CardDescription,
 		CardHeader,
 		CardTitle
-	} from '$lib/components/ui/card';
-	import { Avatar, AvatarFallback } from '$lib/components/ui/avatar';
-	import { Button } from '$lib/components/ui/button';
-	import Input from '$lib/components/ui/input/input.svelte';
-	import { Separator } from '$lib/components/ui/separator';
-	import { appStore } from '$lib/stores/app.svelte';
-	import { settingsStore } from '$lib/stores/settings.svelte';
+	} from '#lib/components/ui/card/index.ts';
+	import { Avatar, AvatarFallback } from '#lib/components/ui/avatar/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import Input from '#lib/components/ui/input/input.svelte';
+	import { Separator } from '#lib/components/ui/separator/index.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { Pencil, Check, X } from '@lucide/svelte';
-	import FormLayout from '$lib/components/common/form-layout.svelte';
-	import ComingSoonCard from '$lib/components/common/coming-soon-card.svelte';
-	import GoogleLogo from '$lib/components/icons/GoogleLogo.svelte';
-	import GitHubLogo from '$lib/components/icons/GitHubLogo.svelte';
+	import FormLayout from '#lib/components/common/form-layout.svelte';
+	import ComingSoonCard from '#lib/components/common/coming-soon-card.svelte';
+	import GoogleLogo from '#lib/components/icons/GoogleLogo.svelte';
+	import GitHubLogo from '#lib/components/icons/GitHubLogo.svelte';
 
 	const iconMap: Record<string, Component<{ class?: string }>> = {
 		google: GoogleLogo,
@@ -110,12 +110,12 @@
 	const linkErrorMessage = $derived(linkError ? (linkErrorMessages[linkError] ?? null) : null);
 	const successParam = $derived(page.url.searchParams.get('success'));
 	const successMessage = $derived(successParam ? (successMessages[successParam] ?? null) : null);
-
 	const linkedProviderTypes = $derived(new Set(accounts.map(a => a.providerType)));
 	const unlinkableProviders = $derived(providers.filter(p => !linkedProviderTypes.has(p.id)));
 
 	let initials = $derived.by(() => {
 		if (!user?.displayName) return '?';
+
 		return user.displayName
 			.split(' ')
 			.map(n => n[0])

@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { ListFilter } from '@lucide/svelte';
-	import * as Select from '$lib/components/ui/select';
-	import { categoryLabels } from '$lib/utils/expense-helpers';
-	import type { ExpenseCategory } from '$lib/types';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import { categoryLabels } from '#lib/utils/expense-helpers.ts';
+	import type { ExpenseCategory } from '#lib/types/index.ts';
 
 	interface Props {
 		value: string;

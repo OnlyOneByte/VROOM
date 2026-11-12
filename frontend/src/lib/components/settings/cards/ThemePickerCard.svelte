@@ -6,12 +6,12 @@
 		CardDescription,
 		CardHeader,
 		CardTitle
-	} from '$lib/components/ui/card';
-	import { getSystemTheme, themeStore } from '$lib/stores/theme.svelte';
-	import { THEME_REGISTRY } from '$lib/theme/theme-registry';
-	import { resolveVariant } from '$lib/theme/resolve-theme';
-	import type { ThemeDefinition } from '$lib/theme/theme-types';
-	import { cn } from '$lib/utils';
+	} from '#lib/components/ui/card/index.ts';
+	import { getSystemTheme, themeStore } from '#lib/stores/theme.svelte.ts';
+	import { THEME_REGISTRY } from '#lib/theme/theme-registry.ts';
+	import { resolveVariant } from '#lib/theme/resolve-theme.ts';
+	import type { ThemeDefinition } from '#lib/theme/theme-types.ts';
+	import { cn } from '#lib/utils.ts';
 
 	const themes: ThemeDefinition[] = Object.values(THEME_REGISTRY);
 

@@ -6,10 +6,10 @@ import type {
 	NativeImportField,
 	Vehicle,
 	VolumeUnit
-} from '$lib/types';
-import type { ImportMappingPreset } from '$lib/types/import-mapping';
-import { presetImportMapping } from '$lib/utils/import-mapping-helpers';
-import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
+} from '#lib/types/index.ts';
+import type { ImportMappingPreset } from '#lib/types/import-mapping.ts';
+import { presetImportMapping } from '#lib/utils/import-mapping-helpers.ts';
+import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 
 export type ManualColumns = Partial<Record<NativeImportField, string>>;
 

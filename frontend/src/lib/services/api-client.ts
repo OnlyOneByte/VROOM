@@ -1,10 +1,10 @@
-import { browser } from '$app/environment';
-import { env } from '$env/dynamic/public';
-import { ApiError, NetworkError } from '$lib/utils/error-handling';
+import { browser } from '$app/env';
+import { PUBLIC_API_URL } from '$app/env/public';
+import { ApiError, NetworkError } from '#lib/utils/error-handling.ts';
 import { buildQueryString } from './api-utils';
 
 export function getApiBaseUrl(): string {
-	return env['PUBLIC_API_URL'] ?? '';
+	return PUBLIC_API_URL;
 }
 
 const SELF_REPORTED_401_PATHS = ['/api/v1/auth/me', '/api/v1/auth/refresh'];
@@ -23,8 +23,8 @@ async function handleSessionExpiry(url: string): Promise<void> {
 	try {
 		// Dynamic import: the stores import this module, so a static import is circular.
 		const [{ authStore }, { appStore }] = await Promise.all([
-			import('$lib/stores/auth.svelte'),
-			import('$lib/stores/app.svelte')
+			import('#lib/stores/auth.svelte.ts'),
+			import('#lib/stores/app.svelte.ts')
 		]);
 		authStore.clearUser();
 		appStore.addNotification({
@@ -36,7 +36,7 @@ async function handleSessionExpiry(url: string): Promise<void> {
 		const [{ goto }, { resolve }, { routes }] = await Promise.all([
 			import('$app/navigation'),
 			import('$app/paths'),
-			import('$lib/routes')
+			import('#lib/routes.ts')
 		]);
 		// Not awaited: a stalled navigation must not block the ApiError.
 		void goto(resolve(routes.auth)).catch((error: unknown) => {
@@ -63,10 +63,7 @@ function toFetchBody(body: unknown): globalThis.BodyInit | undefined {
 async function fetchOrThrow(url: string, options: ApiOptions): Promise<Response> {
 	const { body, headers: customHeaders, method, signal } = options;
 	const fullUrl = url.startsWith('http') ? url : `${getApiBaseUrl()}${url}`;
-
-	const headers: Record<string, string> = {
-		...(customHeaders || {})
-	};
+	const headers: Record<string, string> = { ...(customHeaders || {}) };
 
 	if (body && !(body instanceof FormData)) {
 		headers['Content-Type'] = 'application/json';

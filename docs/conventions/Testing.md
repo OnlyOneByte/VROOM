@@ -106,7 +106,7 @@ Full pattern in `DatabaseMigrations.md`. Key points:
 
 - `src/test-setup.ts` runs for every Vitest file under the `happy-dom` environment and
   already mocks `localStorage`, `fetch`, `matchMedia`, the service worker, and
-  `$app/environment`. Don't re-mock those per file.
+  `$app/env`. Don't re-mock those per file.
 - Mock API calls — never hit the real backend.
 - Playwright needs no backend and no database: its `webServer` starts `npm run dev` on 5173
   itself (reusing one already there), a `globalSetup` pre-compiles the routes the specs visit,

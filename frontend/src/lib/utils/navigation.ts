@@ -1,9 +1,14 @@
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
+import { routes } from '#lib/routes.ts';
 
-export function gotoDynamic(path: string): ReturnType<typeof goto> {
+export async function gotoDynamic(path: string): Promise<void> {
 	// Runtime paths (e.g. a ?returnTo= value) cannot be checked against the generated route union.
-	return goto(resolve(...([path] as Parameters<typeof resolve>)));
+	try {
+		await goto(resolve(...([path] as Parameters<typeof resolve>)));
+	} catch {
+		await goto(resolve(routes.dashboard));
+	}
 }
 
 export function gotoWithQuery(

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import fc from 'fast-check';
-import type { ChargeUnit, DistanceUnit, VolumeUnit } from '$lib/types';
+import type { ChargeUnit, DistanceUnit, VolumeUnit } from '#lib/types/index.ts';
 import {
 	getChargeUnitLabel,
 	getCostPerDistanceLabel,
@@ -9,7 +9,7 @@ import {
 	getFuelEfficiencyLabel,
 	getLongFormLabel,
 	getVolumeUnitLabel
-} from '$lib/utils/units';
+} from '#lib/utils/units.ts';
 
 const DISTANCE_UNITS: DistanceUnit[] = ['miles', 'kilometers'];
 const VOLUME_UNITS: VolumeUnit[] = ['gallons_us', 'gallons_uk', 'liters'];

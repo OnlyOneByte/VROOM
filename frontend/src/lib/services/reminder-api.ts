@@ -6,7 +6,7 @@ import type {
 	ReminderNotification,
 	ReminderWithVehicles,
 	TriggerResult
-} from '$lib/types';
+} from '#lib/types/index.ts';
 import { apiClient } from './api-client';
 import { fromBackendExpense } from './api-transformer';
 import { buildQueryString } from './api-utils';

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import { offlineExpenseQueue, onlineStatus, syncState } from '$lib/stores/offline.svelte';
-import type { OfflineExpense } from '$lib/utils/offline-storage';
+import { offlineExpenseQueue, onlineStatus, syncState } from '#lib/stores/offline.svelte.ts';
+import type { OfflineExpense } from '#lib/utils/offline-storage.ts';
 
 let currentUrl = new URL('http://localhost/expenses');
 vi.mock('$app/state', () => ({
@@ -10,7 +10,7 @@ vi.mock('$app/state', () => ({
 	}
 }));
 
-vi.mock('$lib/utils/sync/sync-manager', () => {
+vi.mock('#lib/utils/sync/sync-manager.ts', () => {
 	const store = <T>(value: T) => ({
 		get current() {
 			return value;

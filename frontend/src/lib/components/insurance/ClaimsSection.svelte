@@ -2,25 +2,25 @@
 	import { onMount } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { Plus, Trash2, Pencil, LoaderCircle, ShieldAlert, X, Paperclip } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
+	import { Button } from '#lib/components/ui/button/index.ts';
 	import DocumentViewer from './DocumentViewer.svelte';
-	import ConfirmDialog from '$lib/components/common/ConfirmDialog.svelte';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import { Textarea } from '$lib/components/ui/textarea';
-	import * as Select from '$lib/components/ui/select';
-	import DatePicker from '$lib/components/common/date-picker.svelte';
-	import { insuranceApi } from '$lib/services/insurance-api';
-	import { handleErrorWithNotification } from '$lib/utils/error-handling';
+	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { Textarea } from '#lib/components/ui/textarea/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import DatePicker from '#lib/components/common/date-picker.svelte';
+	import { insuranceApi } from '#lib/services/insurance-api.ts';
+	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
 	import {
 		capitalize,
 		formatCurrency,
 		formatDate,
 		dateOnlyToISO,
 		toDateInputValue
-	} from '$lib/utils/formatters';
-	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
+	} from '#lib/utils/formatters.ts';
+	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 	import {
 		CLAIM_TYPES,
 		CLAIM_STATUSES,
@@ -30,7 +30,7 @@
 		type FaultDesignation,
 		type InsuranceClaim,
 		type Vehicle
-	} from '$lib/types';
+	} from '#lib/types/index.ts';
 
 	interface Props {
 		policyId: string;

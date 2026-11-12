@@ -1,7 +1,7 @@
-import { offlineExpenseQueue } from '$lib/stores/offline.svelte';
-import { toBackendExpense } from '$lib/services/api-transformer';
-import { browser } from '$app/environment';
-import type { ExpenseCategory } from '$lib/types';
+import { offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
+import { toBackendExpense } from '#lib/services/api-transformer.ts';
+import { browser } from '$app/env';
+import type { ExpenseCategory } from '#lib/types/index.ts';
 
 const OFFLINE_STORAGE_KEY = 'vroom_offline_expenses';
 const CORRUPT_STORAGE_KEY = 'vroom_offline_expenses.corrupt';
@@ -141,6 +141,7 @@ export function getNeedsAttentionExpenses(): OfflineExpense[] {
 
 export function markExpenseNeedsAttention(id: string, reason?: string): void {
 	const currentExpenses = loadOfflineExpenses();
+
 	const updatedExpenses = currentExpenses.map(expense =>
 		expense.id === id
 			? {
@@ -155,9 +156,17 @@ export function markExpenseNeedsAttention(id: string, reason?: string): void {
 
 export function clearNeedsAttention(id: string): void {
 	const currentExpenses = loadOfflineExpenses();
+
 	const updatedExpenses = currentExpenses.map(expense =>
-		expense.id === id ? { ...expense, needsAttention: false, attentionReason: undefined } : expense
+		expense.id === id
+			? {
+					...expense,
+					needsAttention: false,
+					attentionReason: undefined
+				}
+			: expense
 	);
+
 	saveOfflineExpenses(updatedExpenses);
 }
 
@@ -166,6 +175,7 @@ export function markExpenseAsSynced(id: string): void {
 	const updatedExpenses = currentExpenses.map(expense =>
 		expense.id === id ? { ...expense, synced: true } : expense
 	);
+
 	saveOfflineExpenses(updatedExpenses);
 }
 

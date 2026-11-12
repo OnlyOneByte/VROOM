@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
-import { DEFAULT_THEME_ID } from '$lib/theme/theme-registry';
+import { DEFAULT_THEME_ID } from '#lib/theme/theme-registry.ts';
 
 const CWD = process.cwd();
 const APP_HTML = readFileSync(`${CWD}/src/app.html`, 'utf8');

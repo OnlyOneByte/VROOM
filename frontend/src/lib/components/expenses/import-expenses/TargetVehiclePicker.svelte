@@ -1,7 +1,7 @@
 <script lang="ts">
-	import * as Select from '$lib/components/ui/select';
-	import type { Vehicle } from '$lib/types';
-	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import type { Vehicle } from '#lib/types/index.ts';
+	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 
 	interface Props {
 		vehicles: Vehicle[];

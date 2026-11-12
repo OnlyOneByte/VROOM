@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ScrollArea } from '$lib/components/ui/scroll-area';
+	import { ScrollArea } from '#lib/components/ui/scroll-area/index.ts';
 	import {
 		Table,
 		TableBody,
@@ -7,8 +7,8 @@
 		TableHead,
 		TableHeader,
 		TableRow
-	} from '$lib/components/ui/table';
-	import type { Expense, Vehicle } from '$lib/types';
+	} from '#lib/components/ui/table/index.ts';
+	import type { Expense, Vehicle } from '#lib/types/index.ts';
 	import ExpenseCategoryFilter from './ExpenseCategoryFilter.svelte';
 	import ExpenseSortButton from './ExpenseSortButton.svelte';
 	import DesktopStandaloneRow from './DesktopStandaloneRow.svelte';

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { buildSplitConfig, resetSplitAllocations } from '$lib/utils/expense-helpers';
+import { buildSplitConfig, resetSplitAllocations } from '#lib/utils/expense-helpers.ts';
 
 describe('resetSplitAllocations', () => {
 	test("'even' carries NO per-vehicle rows (the backend splits evenly itself)", () => {

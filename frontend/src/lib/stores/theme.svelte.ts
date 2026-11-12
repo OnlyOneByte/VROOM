@@ -1,7 +1,7 @@
-import { browser } from '$app/environment';
-import { settingsApi } from '$lib/services/settings-api';
+import { browser } from '$app/env';
+import { settingsApi } from '#lib/services/settings-api.ts';
 // The generated chrome module, not theme-registry, which would put every token on the root layout's path.
-import { DEFAULT_THEME_ID, THEME_BACKGROUND_HEX } from '$lib/theme/theme-chrome';
+import { DEFAULT_THEME_ID, THEME_BACKGROUND_HEX } from '#lib/theme/theme-chrome.ts';
 
 export type ThemePreference = 'light' | 'dark' | 'system';
 

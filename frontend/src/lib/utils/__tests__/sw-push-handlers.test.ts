@@ -17,10 +17,10 @@ function stripComments(source: string): string {
 		.join('\n');
 }
 
-const swSource = stripComments(readFileSync(join(SRC_ROOT, 'service-worker.ts'), 'utf8'));
+const swSource = stripComments(readFileSync(join(SRC_ROOT, 'service-worker', 'index.ts'), 'utf8'));
 const viteConfig = readFileSync(join(FRONTEND_ROOT, 'vite.config.ts'), 'utf8');
 
-describe('push service worker (src/service-worker.ts) emits the required handlers', () => {
+describe('push service worker (src/service-worker/index.ts) emits the required handlers', () => {
 	test('registers a push listener that shows a notification', () => {
 		expect(swSource).toMatch(/addEventListener\(\s*['"]push['"]/);
 		expect(swSource).toMatch(/showNotification\(/);
@@ -31,16 +31,17 @@ describe('push service worker (src/service-worker.ts) emits the required handler
 		expect(swSource).toMatch(/openWindow\(/);
 	});
 
-	test('precaches the injected manifest (offline precache preserved under injectManifest)', () => {
+	test('precaches the injected manifest (offline precache preserved under build-sw)', () => {
 		expect(swSource).toMatch(/precacheAndRoute\(/);
 		expect(swSource).toContain('__WB_MANIFEST');
 	});
 });
 
-describe('vite PWA config wires the injectManifest SW', () => {
-	test('uses the injectManifest strategy pointing at service-worker.ts', () => {
-		expect(viteConfig).toMatch(/strategies:\s*['"]injectManifest['"]/);
-		expect(viteConfig).toMatch(/filename:\s*['"]service-worker\.ts['"]/);
+describe('vite PWA config wires the build-sw service worker', () => {
+	test('builds src/service-worker/index.ts with the buildSW strategy into service-worker.js', () => {
+		expect(viteConfig).toMatch(/strategies:\s*['"]buildSW['"]/);
+		expect(viteConfig).toMatch(/swSrc:\s*['"]src\/service-worker\/index\.ts['"]/);
+		expect(viteConfig).toMatch(/filename:\s*['"]service-worker\.js['"]/);
 	});
 });
 
@@ -75,7 +76,7 @@ describe('Background Sync registration stays paired with a consuming sync listen
 			expect(
 				swSource,
 				`These files register a Background Sync tag: ${registrars.join(', ')}. ` +
-					'src/service-worker.ts has no `sync` listener, so the registration is a no-op. ' +
+					'src/service-worker/index.ts has no `sync` listener, so the registration is a no-op. ' +
 					'Either add a listener that can actually flush the outbox (which requires moving the ' +
 					'outbox off localStorage, unreadable from worker scope) or drop the registration.'
 			).toMatch(CONSUMER);
@@ -87,7 +88,7 @@ describe('Background Sync registration stays paired with a consuming sync listen
 		if (registrars.length === 0) {
 			expect(
 				swSource,
-				'src/service-worker.ts declares a `sync` listener but no app code registers a Background ' +
+				'src/service-worker/index.ts declares a `sync` listener but no app code registers a Background ' +
 					'Sync tag, so the handler can never fire.'
 			).not.toMatch(CONSUMER);
 		}

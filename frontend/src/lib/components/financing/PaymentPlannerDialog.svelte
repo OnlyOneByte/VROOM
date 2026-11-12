@@ -1,18 +1,18 @@
 <script lang="ts">
-	import type { VehicleFinancing } from '$lib/types';
-	import * as Dialog from '$lib/components/ui/dialog';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import { calculateMinimumPayment } from '$lib/utils/financing-calculations';
-	import { formatCurrency, formatDate } from '$lib/utils/formatters';
-	import { debounce } from '$lib/utils/memoize';
+	import type { VehicleFinancing } from '#lib/types/index.ts';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { calculateMinimumPayment } from '#lib/utils/financing-calculations.ts';
+	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
+	import { debounce } from '#lib/utils/memoize.ts';
 	import {
 		computePlannerState,
 		canSave as canSaveCheck,
 		buildSummary,
 		type PlannerState
-	} from '$lib/utils/payment-planner';
-	import { Button } from '$lib/components/ui/button';
+	} from '#lib/utils/payment-planner.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
 	import {
 		Calculator,
 		Calendar,

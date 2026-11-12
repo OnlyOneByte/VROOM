@@ -1,4 +1,9 @@
-import type { CreateShareRequest, ReceivedShare, ShareLevel, VehicleShare } from '$lib/types';
+import type {
+	CreateShareRequest,
+	ReceivedShare,
+	ShareLevel,
+	VehicleShare
+} from '#lib/types/index.ts';
 import { apiClient } from './api-client';
 
 export const shareApi = {

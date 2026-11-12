@@ -8,9 +8,9 @@
 		AlertDialogFooter,
 		AlertDialogHeader,
 		AlertDialogTitle
-	} from '$lib/components/ui/alert-dialog';
+	} from '#lib/components/ui/alert-dialog/index.ts';
 	import { LoaderCircle } from '@lucide/svelte';
-	import { cn } from '$lib/utils';
+	import { cn } from '#lib/utils.ts';
 
 	interface Props {
 		open: boolean;

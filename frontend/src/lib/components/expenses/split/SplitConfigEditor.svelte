@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { Input } from '$lib/components/ui/input';
-	import { Button } from '$lib/components/ui/button';
-	import { formatCurrency } from '$lib/utils/formatters';
-	import type { Vehicle } from '$lib/types';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { formatCurrency } from '#lib/utils/formatters.ts';
+	import type { Vehicle } from '#lib/types/index.ts';
 
 	type SplitMethod = 'even' | 'absolute' | 'percentage';
 	interface Allocation {

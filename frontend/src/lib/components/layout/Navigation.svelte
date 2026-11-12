@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
-	import { authStore } from '$lib/stores/auth.svelte';
-	import { routes } from '$lib/routes';
+	import { authStore } from '#lib/stores/auth.svelte.ts';
+	import { routes } from '#lib/routes.ts';
 	import {
 		House,
 		Receipt,
@@ -16,20 +16,20 @@
 		Bot
 	} from '@lucide/svelte';
 	import SyncStatusInline from '../sync/SyncStatusInline.svelte';
-	import { syncState, onlineStatus, offlineExpenseQueue } from '$lib/stores/offline.svelte';
-	import { syncConflicts } from '$lib/utils/sync/sync-manager';
-	import { getSyncStatusInfo } from '$lib/utils/sync/sync-status';
-	import { countPendingSync } from '$lib/utils/sync/pending-expenses';
-	import { Badge } from '$lib/components/ui/badge';
+	import { syncState, onlineStatus, offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
+	import { syncConflicts } from '#lib/utils/sync/sync-manager.ts';
+	import { getSyncStatusInfo } from '#lib/utils/sync/sync-status.ts';
+	import { countPendingSync } from '#lib/utils/sync/pending-expenses.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import {
 		Sheet,
 		SheetContent,
 		SheetHeader,
 		SheetTitle,
 		SheetTrigger
-	} from '$lib/components/ui/sheet';
-	import { ScrollArea } from '$lib/components/ui/scroll-area';
-	import { cn } from '$lib/utils';
+	} from '#lib/components/ui/sheet/index.ts';
+	import { ScrollArea } from '#lib/components/ui/scroll-area/index.ts';
+	import { cn } from '#lib/utils.ts';
 
 	let mobileMenuOpen = $state(false);
 

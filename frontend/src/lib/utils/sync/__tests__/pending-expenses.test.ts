@@ -4,9 +4,9 @@ import {
 	countPendingSync,
 	isParked,
 	isPendingSync
-} from '$lib/utils/sync/pending-expenses';
-import { getNeedsAttentionExpenses, getPendingExpenses } from '$lib/utils/offline-storage';
-import type { OfflineExpense } from '$lib/utils/offline-storage';
+} from '#lib/utils/sync/pending-expenses.ts';
+import { getNeedsAttentionExpenses, getPendingExpenses } from '#lib/utils/offline-storage.ts';
+import type { OfflineExpense } from '#lib/utils/offline-storage.ts';
 
 const OFFLINE_STORAGE_KEY = 'vroom_offline_expenses';
 

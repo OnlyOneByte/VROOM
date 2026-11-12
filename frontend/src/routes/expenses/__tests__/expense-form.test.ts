@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { vehicleApi } from '$lib/services/vehicle-api';
-import { expenseApi } from '$lib/services/expense-api';
+import { vehicleApi } from '#lib/services/vehicle-api.ts';
+import { expenseApi } from '#lib/services/expense-api.ts';
 
 vi.mock('$app/navigation', () => ({
 	goto: vi.fn()
@@ -10,11 +10,11 @@ vi.mock('$app/state', () => ({
 	page: { url: { pathname: '/expenses/new' } }
 }));
 
-vi.mock('$lib/utils/offline-storage', () => ({
+vi.mock('#lib/utils/offline-storage.ts', () => ({
 	addOfflineExpense: vi.fn()
 }));
 
-vi.mock('$lib/utils/pwa', () => ({
+vi.mock('#lib/utils/pwa.ts', () => ({
 	requestBackgroundSync: vi.fn()
 }));
 

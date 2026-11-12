@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { DollarSign, Search } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
+	import { Button } from '#lib/components/ui/button/index.ts';
 	import {
 		Empty,
 		EmptyContent,
@@ -8,7 +8,7 @@
 		EmptyHeader,
 		EmptyMedia,
 		EmptyTitle
-	} from '$lib/components/ui/empty';
+	} from '#lib/components/ui/empty/index.ts';
 
 	interface Props {
 		hasActiveFilters: boolean;

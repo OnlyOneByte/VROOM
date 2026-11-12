@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { Upload, Trash2, ImagePlus, LoaderCircle } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import MediaCaptureDialog from '$lib/components/common/MediaCaptureDialog.svelte';
-	import ConfirmDialog from '$lib/components/common/ConfirmDialog.svelte';
-	import { expenseApi } from '$lib/services/expense-api';
-	import { handleErrorWithNotification } from '$lib/utils/error-handling';
-	import type { Photo } from '$lib/types';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import MediaCaptureDialog from '#lib/components/common/MediaCaptureDialog.svelte';
+	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
+	import { expenseApi } from '#lib/services/expense-api.ts';
+	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
+	import type { Photo } from '#lib/types/index.ts';
 
 	interface Props {
 		entityType: 'expense';

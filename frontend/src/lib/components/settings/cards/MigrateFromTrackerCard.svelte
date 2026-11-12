@@ -1,22 +1,22 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { DatabaseZap, Upload, LoaderCircle, CircleCheck, CircleAlert } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as Select from '$lib/components/ui/select';
-	import * as Dialog from '$lib/components/ui/dialog';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
 	import {
 		Card,
 		CardContent,
 		CardDescription,
 		CardHeader,
 		CardTitle
-	} from '$lib/components/ui/card';
-	import { vehicleApi } from '$lib/services/vehicle-api';
-	import { expenseApi, type ExpenseImportResult } from '$lib/services/expense-api';
-	import { appStore } from '$lib/stores/app.svelte';
-	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
-	import { handleErrorWithNotification } from '$lib/utils/error-handling';
-	import type { ImportColumnMapping, Vehicle } from '$lib/types';
+	} from '#lib/components/ui/card/index.ts';
+	import { vehicleApi } from '#lib/services/vehicle-api.ts';
+	import { expenseApi, type ExpenseImportResult } from '#lib/services/expense-api.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
+	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
+	import type { ImportColumnMapping, Vehicle } from '#lib/types/index.ts';
 
 	const TRACKER_LABEL = 'Fuelio';
 

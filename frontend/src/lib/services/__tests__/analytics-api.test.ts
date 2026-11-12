@@ -4,9 +4,9 @@ import type {
 	FuelStatsResponse,
 	FuelAdvancedResponse,
 	AnalyticsSummaryResponse
-} from '$lib/types';
-import { ApiError } from '$lib/utils/error-handling';
-import { dateOnlyToISO, toDateInputValue } from '$lib/utils/formatters';
+} from '#lib/types/index.ts';
+import { ApiError } from '#lib/utils/error-handling.ts';
+import { dateOnlyToISO, toDateInputValue } from '#lib/utils/formatters.ts';
 
 vi.mock('../api-client', async importOriginal => ({
 	...(await importOriginal<typeof import('../api-client')>()),
@@ -16,7 +16,7 @@ vi.mock('../api-client', async importOriginal => ({
 }));
 
 const { apiClient } = await import('../api-client');
-const { NetworkError } = await import('$lib/utils/error-handling');
+const { NetworkError } = await import('#lib/utils/error-handling.ts');
 const { analyticsApi, getDefaultDateRange } = await import('../analytics-api');
 
 const mockGet = vi.mocked(apiClient.get);

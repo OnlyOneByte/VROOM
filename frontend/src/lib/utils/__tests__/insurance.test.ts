@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import fc from 'fast-check';
-import type { InsuranceTerm, InsurancePolicy } from '$lib/types';
+import type { InsuranceTerm, InsurancePolicy } from '#lib/types/index.ts';
 import {
 	getDaysRemaining,
 	getLatestTerm,
@@ -8,7 +8,7 @@ import {
 	isExpiringSoon,
 	prefillFromPreviousTerm,
 	sortTermsByEndDateDesc
-} from '$lib/utils/insurance';
+} from '#lib/utils/insurance.ts';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

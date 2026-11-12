@@ -7,8 +7,8 @@
 
 | File | Purpose |
 |---|---|
-| `frontend/vite.config.ts` | `SvelteKitPWA({...})` — the `injectManifest` strategy, `registerType: 'autoUpdate'`, and the web app manifest (name, icons, `display: standalone`, theme color) as inline config |
-| `frontend/src/service-worker.ts` | Service worker source — precaches the injected manifest, handles Web Push |
+| `frontend/vite.config.ts` | `withPwa(kitOptions, pwaOptions)` — wraps `sveltekit()` and configures the `buildSW` strategy, `registerType: 'autoUpdate'`, and the web app manifest (name, icons, `display: standalone`, theme color) as inline config |
+| `frontend/src/service-worker/index.ts` | Service worker source — precaches the injected manifest, handles Web Push. Type-checked by `frontend/src/service-worker/tsconfig.json` (extends `$app/tsconfig/service-worker`) |
 | `frontend/src/lib/utils/pwa.ts` | `getPlatformInfo()`, `pwaInstallState`, `initializePWA()`, `promptInstall()`, `requestBackgroundSync()` |
 | `frontend/src/lib/utils/push.ts` | Web Push browser lifecycle (permission, subscribe, persist server-side) plus the pure `derivePushStatus()` state machine |
 | `frontend/src/lib/utils/offline-storage.ts` | The offline expense outbox in localStorage |
@@ -18,9 +18,15 @@
 
 ## Registration
 
-`svelte.config.js` sets `serviceWorker.register: false` — SvelteKit must not register the
-worker, because the plugin does. `+layout.svelte`'s `onMount` dynamically imports
-`virtual:pwa-register` and calls `registerSW({ immediate: true })`, gated on `pwaInfo`.
+`vite.config.ts` sets `serviceWorker: { register: false }` on `sveltekit()` — SvelteKit must
+not register the worker, because the plugin does. `+layout.svelte`'s `onMount` dynamically
+imports `virtual:pwa-register` and calls `registerSW({ immediate: true })`, gated on
+`pwaInfo`.
+
+`buildBase: '/'` and `scope: '/'` are set in the PWA options on purpose. Kit's default
+`paths.relative` makes Vite's `base` `./`, and the plugin would then register
+`./service-worker.js` with scope `./`, which 404s from any nested route and scopes the
+worker to that directory. Keep both pinned to the root.
 
 The manifest `<link>` is injected from the same file's `<svelte:head>` via
 `{@html webManifestLink}` (from `virtual:pwa-info`). Do NOT add a `<link rel="manifest">`
@@ -28,8 +34,9 @@ to `app.html`.
 
 ## Service worker
 
-`src/service-worker.ts` is SvelteKit's reserved SW entry; the plugin's `injectManifest`
-step substitutes `self.__WB_MANIFEST` in the built output. Two jobs:
+`src/service-worker/index.ts` is the `swSrc` of the plugin's `buildSW` step, which bundles it
+and substitutes `self.__WB_MANIFEST` in the built output. `npm run type-check` compiles it
+against `src/service-worker/tsconfig.json`, which the root tsconfig excludes. Two jobs:
 
 1. **Precache** — `precacheAndRoute(self.__WB_MANIFEST)`, plus `skipWaiting()` and
    `clientsClaim()`. That is the entire caching layer: precached build assets, no runtime
@@ -47,7 +54,7 @@ When editing it:
   that nothing in the worker consumes; offline expenses sync from the page via
   `sync/sync-manager.ts`, not from the worker.
 - `src/lib/utils/__tests__/sw-push-handlers.test.ts` scans this source and `vite.config.ts`
-  to pin the two handlers, the precache call, the `injectManifest` wiring, and that
+  to pin the two handlers, the precache call, the `buildSW` wiring, and that
   `static/sw.js` stays deleted (two registered workers would collide). It runs in the unit
   suite.
 

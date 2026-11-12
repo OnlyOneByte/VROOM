@@ -1,20 +1,20 @@
 <script lang="ts">
-	import * as Dialog from '$lib/components/ui/dialog';
-	import * as Select from '$lib/components/ui/select';
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import { Textarea } from '$lib/components/ui/textarea';
-	import { FormFieldError } from '$lib/components/ui/form-field';
-	import DatePicker from '$lib/components/common/date-picker.svelte';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { Textarea } from '#lib/components/ui/textarea/index.ts';
+	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
+	import DatePicker from '#lib/components/common/date-picker.svelte';
 	import { LoaderCircle } from '@lucide/svelte';
-	import { tripApi } from '$lib/services/trip-api';
-	import { appStore } from '$lib/stores/app.svelte';
-	import { capitalize, dateOnlyToISO, toDateInputValue } from '$lib/utils/formatters';
-	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
-	import { getDistanceUnitLabel } from '$lib/utils/units';
-	import { settingsStore } from '$lib/stores/settings.svelte';
-	import { TRIP_PURPOSES, type Trip, type TripPurpose, type Vehicle } from '$lib/types';
+	import { tripApi } from '#lib/services/trip-api.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { capitalize, dateOnlyToISO, toDateInputValue } from '#lib/utils/formatters.ts';
+	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
+	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
+	import { TRIP_PURPOSES, type Trip, type TripPurpose, type Vehicle } from '#lib/types/index.ts';
 	import {
 		parseOdometer,
 		validateTripFields,

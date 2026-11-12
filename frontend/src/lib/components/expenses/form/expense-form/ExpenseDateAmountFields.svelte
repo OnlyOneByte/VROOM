@@ -1,8 +1,8 @@
 <script lang="ts">
-	import DatePicker from '$lib/components/common/date-picker.svelte';
-	import Input from '$lib/components/ui/input/input.svelte';
-	import Label from '$lib/components/ui/label/label.svelte';
-	import { FormFieldError } from '$lib/components/ui/form-field';
+	import DatePicker from '#lib/components/common/date-picker.svelte';
+	import Input from '#lib/components/ui/input/input.svelte';
+	import Label from '#lib/components/ui/label/label.svelte';
+	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
 
 	interface Props {
 		date: string;

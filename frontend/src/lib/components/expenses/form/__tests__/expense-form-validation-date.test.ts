@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import type { Vehicle } from '$lib/types';
+import type { Vehicle } from '#lib/types/index.ts';
 import { validateExpenseField } from '../expense-form-validation';
 
 function localToday(): string {

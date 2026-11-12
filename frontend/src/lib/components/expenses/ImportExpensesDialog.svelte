@@ -1,8 +1,8 @@
 <script lang="ts">
-	import * as Dialog from '$lib/components/ui/dialog';
-	import { Button } from '$lib/components/ui/button';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
 	import { LoaderCircle } from '@lucide/svelte';
-	import type { Vehicle } from '$lib/types';
+	import type { Vehicle } from '#lib/types/index.ts';
 	import { ImportExpensesForm } from './import-expenses/import-expenses-form.svelte';
 	import ImportCsvSource from './import-expenses/ImportCsvSource.svelte';
 	import ImportSourceDetection from './import-expenses/ImportSourceDetection.svelte';

@@ -1,6 +1,6 @@
-import { getVolumeUnitLabel, getChargeUnitLabel, isElectricFuelType } from '$lib/utils/units';
-import { toDateInputValue } from '$lib/utils/formatters';
-import type { Vehicle, VolumeUnit, ChargeUnit } from '$lib/types';
+import { getVolumeUnitLabel, getChargeUnitLabel, isElectricFuelType } from '#lib/utils/units.ts';
+import { toDateInputValue } from '#lib/utils/formatters.ts';
+import type { Vehicle, VolumeUnit, ChargeUnit } from '#lib/types/index.ts';
 
 interface ValidationContext {
 	category: string;

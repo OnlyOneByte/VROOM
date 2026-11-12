@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { Pencil, Trash2, RefreshCw } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Badge } from '$lib/components/ui/badge';
-	import ConfirmDialog from '$lib/components/common/ConfirmDialog.svelte';
-	import { formatCurrency, formatDate } from '$lib/utils/formatters';
-	import type { InsuranceTerm } from '$lib/types';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
+	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
+	import type { InsuranceTerm } from '#lib/types/index.ts';
 
 	interface Props {
 		term: InsuranceTerm;

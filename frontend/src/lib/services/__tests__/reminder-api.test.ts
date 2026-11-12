@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import type { BackendExpenseResponse, RecurringCostSummary } from '$lib/types';
-import { ApiError } from '$lib/utils/error-handling';
+import type { BackendExpenseResponse, RecurringCostSummary } from '#lib/types/index.ts';
+import { ApiError } from '#lib/utils/error-handling.ts';
 
 vi.mock('../api-client', () => ({
 	apiClient: {

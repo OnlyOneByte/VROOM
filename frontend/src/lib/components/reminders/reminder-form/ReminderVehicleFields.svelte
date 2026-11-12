@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { Checkbox } from '$lib/components/ui/checkbox';
-	import { Label } from '$lib/components/ui/label';
-	import { FormFieldError } from '$lib/components/ui/form-field';
-	import SplitConfigEditor from '$lib/components/expenses/split/SplitConfigEditor.svelte';
-	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
-	import type { Vehicle } from '$lib/types';
+	import { Checkbox } from '#lib/components/ui/checkbox/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
+	import SplitConfigEditor from '#lib/components/expenses/split/SplitConfigEditor.svelte';
+	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
+	import type { Vehicle } from '#lib/types/index.ts';
 	import type { ReminderFormState } from './reminder-form-state.svelte';
 	import { parsedExpenseAmount } from './reminder-form-model';
 

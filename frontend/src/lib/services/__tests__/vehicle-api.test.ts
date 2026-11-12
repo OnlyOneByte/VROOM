@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { ApiError } from '$lib/utils/error-handling';
+import { ApiError } from '#lib/utils/error-handling.ts';
 
 const get = vi.fn();
 const post = vi.fn();

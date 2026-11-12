@@ -1,4 +1,4 @@
-import type { PaginatedResponse, Photo } from '$lib/types';
+import type { PaginatedResponse, Photo } from '#lib/types/index.ts';
 import { apiClient, getApiBaseUrl, withPagination } from './api-client';
 
 export function photoCollection(collectionPath: string) {

@@ -1,10 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-vi.mock('$env/dynamic/public', () => ({ env: {} }));
-
 const { apiClient, getApiBaseUrl, withPagination } = await import('../api-client');
-const { NetworkError } = await import('$lib/utils/error-handling');
-const { ApiError } = await import('$lib/utils/error-handling');
+const { NetworkError } = await import('#lib/utils/error-handling.ts');
+const { ApiError } = await import('#lib/utils/error-handling.ts');
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch as unknown as typeof fetch;

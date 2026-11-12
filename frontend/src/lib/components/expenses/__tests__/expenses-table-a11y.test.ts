@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render } from '@testing-library/svelte';
 import ExpensesTable from '../ExpensesTable.svelte';
-import { appStore } from '$lib/stores/app.svelte';
-import type { Expense, Vehicle } from '$lib/types';
+import { appStore } from '#lib/stores/app.svelte.ts';
+import type { Expense, Vehicle } from '#lib/types/index.ts';
 
 const VEHICLE: Vehicle = {
 	id: 'v1',

@@ -1,18 +1,18 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/svelte';
-import { ApiError } from '$lib/utils/error-handling';
-import { loadOfflineExpenses } from '$lib/utils/offline-storage';
+import { ApiError } from '#lib/utils/error-handling.ts';
+import { loadOfflineExpenses } from '#lib/utils/offline-storage.ts';
 
 const goto = vi.fn(() => Promise.resolve());
 vi.mock('$app/navigation', () => ({
 	goto,
 	beforeNavigate: vi.fn(),
 	afterNavigate: vi.fn(),
-	invalidateAll: vi.fn()
+	refreshAll: vi.fn()
 }));
 
 const VEHICLE = { id: 'v1', make: 'Toyota', model: 'Camry', year: 2020 };
-vi.mock('$lib/services/vehicle-api', () => ({
+vi.mock('#lib/services/vehicle-api.ts', () => ({
 	vehicleApi: {
 		getVehicles: vi.fn(() => Promise.resolve([VEHICLE])),
 		getVehicle: vi.fn(() => Promise.resolve(VEHICLE))
@@ -20,7 +20,7 @@ vi.mock('$lib/services/vehicle-api', () => ({
 }));
 
 const createExpense = vi.fn();
-vi.mock('$lib/services/expense-api', () => ({
+vi.mock('#lib/services/expense-api.ts', () => ({
 	expenseApi: {
 		createExpense,
 		getExpensesByVehicle: vi.fn(() => Promise.resolve({ data: [] }))

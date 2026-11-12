@@ -6,8 +6,8 @@
 		CardDescription,
 		CardHeader,
 		CardTitle
-	} from '$lib/components/ui/card';
-	import { Badge } from '$lib/components/ui/badge';
+	} from '#lib/components/ui/card/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
 
 	interface PlaceholderItem {
 		icon: Component<{ class?: string }>;

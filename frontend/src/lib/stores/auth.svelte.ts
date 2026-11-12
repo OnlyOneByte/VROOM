@@ -1,7 +1,7 @@
 import type { User } from '../types/index.js';
-import { apiClient, getApiBaseUrl } from '$lib/services/api-client';
-import { extractErrorMessage } from '$lib/utils/error-handling';
-import { browser } from '$app/environment';
+import { apiClient, getApiBaseUrl } from '#lib/services/api-client.ts';
+import { extractErrorMessage } from '#lib/utils/error-handling.ts';
+import { browser } from '$app/env';
 
 function createAuthStore() {
 	let user = $state<User | null>(null);
@@ -72,7 +72,7 @@ function createAuthStore() {
 		},
 
 		async updateDisplayName(displayName: string) {
-			const { authApi } = await import('$lib/services/auth-api');
+			const { authApi } = await import('#lib/services/auth-api.ts');
 			const result = await authApi.updateProfile({ displayName });
 			if (user) {
 				user = { ...user, displayName: result.user.displayName };

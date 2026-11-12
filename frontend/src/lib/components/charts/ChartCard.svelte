@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { animateOnView } from '$lib/utils/animate-on-view';
-	import { createVisibilityWatch } from '$lib/utils/visibility-watch.svelte';
-	import * as Card from '$lib/components/ui/card';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import EmptyState from '$lib/components/common/empty-state.svelte';
+	import { animateOnView } from '#lib/utils/animate-on-view.ts';
+	import { createVisibilityWatch } from '#lib/utils/visibility-watch.svelte.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import type { Snippet } from 'svelte';
 
 	interface Props {

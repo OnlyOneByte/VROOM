@@ -7,7 +7,7 @@ import {
 	type MappingInput,
 	type TargetVehicle
 } from '../import-mapping';
-import type { ImportMappingPreset } from '$lib/types/import-mapping';
+import type { ImportMappingPreset } from '#lib/types/import-mapping.ts';
 
 const civic: TargetVehicle = { year: 2019, make: 'Honda', model: 'Civic' };
 

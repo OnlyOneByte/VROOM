@@ -1,4 +1,4 @@
-import type { Expense, ExpenseFilters } from '$lib/types';
+import type { Expense, ExpenseFilters } from '#lib/types/index.ts';
 
 export function hasActiveFilters(searchTerm: string, filters: ExpenseFilters): boolean {
 	return (

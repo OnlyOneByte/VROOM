@@ -6,12 +6,12 @@ import svelteParser from 'svelte-eslint-parser';
 import prettier from 'eslint-config-prettier';
 import globals from 'globals';
 
-const chartsBarrelSpecifiers = ['$lib/components/charts', '../charts', '../../charts'];
+const chartsBarrelSpecifiers = ['#lib/components/charts', '../charts', '../../charts'];
 const restrictedChartsBarrelPaths = chartsBarrelSpecifiers.map(name => ({
 	name,
 	allowImportNames: ['AppLineChart', 'AppBarChart', 'AppPieChart', 'AppAreaChart'],
 	message:
-		'The charts barrel drags layerchart + d3 into the route chunk. Import chart-free components directly, e.g. `import StatCardGrid from "$lib/components/charts/StatCardGrid.svelte"`.'
+		'The charts barrel drags layerchart + d3 into the route chunk. Import chart-free components directly, e.g. `import StatCardGrid from "#lib/components/charts/StatCardGrid.svelte"`.'
 }));
 
 export default [
@@ -20,7 +20,7 @@ export default [
 		ignores: ['.svelte-kit/**', 'build/**', 'dist/**', 'node_modules/**', 'static/sw.js']
 	},
 	{
-		files: ['src/service-worker.ts'],
+		files: ['src/service-worker/**/*.ts'],
 		languageOptions: {
 			globals: {
 				...globals.serviceworker,

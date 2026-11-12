@@ -1,4 +1,4 @@
-import type { PhotoCategory } from '$lib/types';
+import type { PhotoCategory } from '#lib/types/index.ts';
 
 export const SCROLL_HEIGHTS = {
 	TABLE_DEFAULT: '600px'

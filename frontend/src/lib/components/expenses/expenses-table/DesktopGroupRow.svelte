@@ -1,17 +1,17 @@
 <script lang="ts">
 	import { Car, ChevronRight, Pencil, Trash2 } from '@lucide/svelte';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
-	import { TableCell, TableRow } from '$lib/components/ui/table';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { TableCell, TableRow } from '#lib/components/ui/table/index.ts';
 	import SplitExpenseBadge from '../split/SplitExpenseBadge.svelte';
-	import type { Vehicle } from '$lib/types';
-	import { formatCurrency, formatDate } from '$lib/utils/formatters';
+	import type { Vehicle } from '#lib/types/index.ts';
+	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
 	import {
 		categoryLabels,
 		getCategoryBadgeClasses,
 		getCategoryIcon
-	} from '$lib/utils/expense-helpers';
-	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
+	} from '#lib/utils/expense-helpers.ts';
+	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 	import {
 		INSURANCE_DELETE_BLOCKED,
 		blockedReasonId,

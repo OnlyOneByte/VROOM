@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 const post = vi.fn();
 const del = vi.fn();
 const getPaginated = vi.fn();
-vi.mock('$env/dynamic/public', () => ({ env: { PUBLIC_API_URL: 'https://api.example.com' } }));
+vi.mock('$app/env/public', () => ({ PUBLIC_API_URL: 'https://api.example.com' }));
 vi.mock('../api-client', async importOriginal => ({
 	...(await importOriginal<typeof import('../api-client')>()),
 	apiClient: { post, delete: del, getPaginated }

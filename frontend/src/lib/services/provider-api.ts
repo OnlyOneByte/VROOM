@@ -1,4 +1,4 @@
-import type { UserProviderInfo } from '$lib/types';
+import type { UserProviderInfo } from '#lib/types/index.ts';
 import { apiClient } from './api-client';
 
 interface CreateProviderData {

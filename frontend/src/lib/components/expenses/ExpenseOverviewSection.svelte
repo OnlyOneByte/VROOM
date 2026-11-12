@@ -1,21 +1,21 @@
 <script lang="ts">
 	import type { Component } from 'svelte';
 	import { TrendingUp, ChevronDown, Receipt } from '@lucide/svelte';
-	import * as CardNs from '$lib/components/ui/card';
+	import * as CardNs from '#lib/components/ui/card/index.ts';
 	import {
 		Collapsible,
 		CollapsibleContent,
 		CollapsibleTrigger
-	} from '$lib/components/ui/collapsible';
-	import StatCardGrid from '$lib/components/charts/StatCardGrid.svelte';
+	} from '#lib/components/ui/collapsible/index.ts';
+	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
 	import {
 		categoryLabels,
 		getCategoryIcon,
 		getCategoryBadgeClasses
-	} from '$lib/utils/expense-helpers';
-	import { formatCurrency } from '$lib/utils/formatters';
-	import type { ExpenseSummary, ExpenseCategory } from '$lib/types';
-	import { EXPENSE_MESSAGES } from '$lib/constants/messages';
+	} from '#lib/utils/expense-helpers.ts';
+	import { formatCurrency } from '#lib/utils/formatters.ts';
+	import type { ExpenseSummary, ExpenseCategory } from '#lib/types/index.ts';
+	import { EXPENSE_MESSAGES } from '#lib/constants/messages.ts';
 
 	interface Props {
 		summary: ExpenseSummary | null;

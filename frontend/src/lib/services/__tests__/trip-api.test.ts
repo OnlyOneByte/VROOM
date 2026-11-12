@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import type { Trip, TripSummary } from '$lib/types';
-import { tripDistance } from '$lib/types';
-import { ApiError } from '$lib/utils/error-handling';
+import type { Trip, TripSummary } from '#lib/types/index.ts';
+import { tripDistance } from '#lib/types/index.ts';
+import { ApiError } from '#lib/utils/error-handling.ts';
 
 const get = vi.fn();
 const post = vi.fn();

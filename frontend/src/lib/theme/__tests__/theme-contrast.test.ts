@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { describe, expect, test } from 'vitest';
-import { ratchet } from '$lib/utils/__tests__/_helpers/debt-ratchet';
+import { ratchet } from '#lib/utils/__tests__/_helpers/debt-ratchet.ts';
 import { THEME_REGISTRY } from '../theme-registry';
 import type { ThemeTokenKey, ThemeTokens } from '../theme-types';
 

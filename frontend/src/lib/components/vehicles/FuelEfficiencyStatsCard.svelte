@@ -1,21 +1,21 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { routes, paramRoutes } from '$lib/routes';
+	import { routes, paramRoutes } from '#lib/routes.ts';
 	import { Gauge, Plus } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import StatCardGrid from '$lib/components/charts/StatCardGrid.svelte';
-	import EmptyState from '$lib/components/common/empty-state.svelte';
-	import { settingsStore } from '$lib/stores/settings.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
+	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import {
 		getVolumeUnitLabel,
 		getChargeUnitLabel,
 		getDistanceUnitLabel,
 		getFuelEfficiencyLabel,
 		getElectricEfficiencyLabel
-	} from '$lib/utils/units';
-	import { formatCurrency } from '$lib/utils/formatters';
-	import { COMMON_MESSAGES, EXPENSE_MESSAGES } from '$lib/constants/messages';
-	import type { VehicleStats } from '$lib/types';
+	} from '#lib/utils/units.ts';
+	import { formatCurrency } from '#lib/utils/formatters.ts';
+	import { COMMON_MESSAGES, EXPENSE_MESSAGES } from '#lib/constants/messages.ts';
+	import type { VehicleStats } from '#lib/types/index.ts';
 
 	interface Props {
 		vehicleId: string;

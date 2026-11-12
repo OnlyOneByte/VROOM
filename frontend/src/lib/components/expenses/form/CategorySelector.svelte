@@ -1,8 +1,8 @@
 <script lang="ts">
-	import type { ExpenseCategory } from '$lib/types';
-	import { Label } from '$lib/components/ui/label';
-	import { FormFieldError } from '$lib/components/ui/form-field';
-	import { getCategoryIcon } from '$lib/utils/expense-helpers';
+	import type { ExpenseCategory } from '#lib/types/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
+	import { getCategoryIcon } from '#lib/utils/expense-helpers.ts';
 
 	interface Props {
 		value: string;

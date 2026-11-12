@@ -1,4 +1,4 @@
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 import type {
 	UnitPreferences,
 	UserSettings,
@@ -7,10 +7,10 @@ import type {
 	RestoreProviderInfo,
 	RestoreResult
 } from '../types/index.js';
-import { settingsApi } from '$lib/services/settings-api';
-import { themeStore } from '$lib/stores/theme.svelte';
-import { triggerBlobDownload } from '$lib/utils/download';
-import { extractErrorMessage } from '$lib/utils/error-handling';
+import { settingsApi } from '#lib/services/settings-api.ts';
+import { themeStore } from '#lib/stores/theme.svelte.ts';
+import { triggerBlobDownload } from '#lib/utils/download.ts';
+import { extractErrorMessage } from '#lib/utils/error-handling.ts';
 
 const DEFAULT_UNIT_PREFERENCES: UnitPreferences = {
 	distanceUnit: 'miles',

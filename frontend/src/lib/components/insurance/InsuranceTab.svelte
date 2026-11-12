@@ -1,15 +1,15 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { routes, paramRoutes } from '$lib/routes';
-	import { gotoWithQuery } from '$lib/utils/navigation';
+	import { routes, paramRoutes } from '#lib/routes.ts';
+	import { gotoWithQuery } from '#lib/utils/navigation.ts';
 	import { Shield, Plus, LoaderCircle, CircleAlert } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import EmptyState from '$lib/components/common/empty-state.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import PolicyList from './PolicyList.svelte';
-	import { insuranceApi } from '$lib/services/insurance-api';
-	import { handleErrorWithNotification } from '$lib/utils/error-handling';
-	import type { InsurancePolicy } from '$lib/types';
+	import { insuranceApi } from '#lib/services/insurance-api.ts';
+	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
+	import type { InsurancePolicy } from '#lib/types/index.ts';
 
 	interface Props {
 		vehicleId: string;

@@ -1,5 +1,5 @@
 import type { Component } from 'svelte';
-import type { PhotoCategory, CategorySetting } from '$lib/types';
+import type { PhotoCategory, CategorySetting } from '#lib/types/index.ts';
 
 export interface ProviderTypeOption {
 	id: string;

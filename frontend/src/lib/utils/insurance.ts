@@ -1,4 +1,4 @@
-import type { InsurancePolicy, InsuranceTerm } from '$lib/types';
+import type { InsurancePolicy, InsuranceTerm } from '#lib/types/index.ts';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

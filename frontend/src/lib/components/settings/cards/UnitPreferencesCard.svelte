@@ -1,14 +1,14 @@
 <script lang="ts">
 	import { Globe, Fuel, DollarSign } from '@lucide/svelte';
-	import { Label } from '$lib/components/ui/label';
-	import * as Select from '$lib/components/ui/select';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
 	import {
 		Card,
 		CardContent,
 		CardDescription,
 		CardHeader,
 		CardTitle
-	} from '$lib/components/ui/card';
+	} from '#lib/components/ui/card/index.ts';
 
 	interface Props {
 		distanceUnit: 'miles' | 'kilometers';

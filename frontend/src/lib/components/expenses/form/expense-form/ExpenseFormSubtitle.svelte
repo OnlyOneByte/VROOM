@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { onlineStatus } from '$lib/stores/offline.svelte';
-	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
-	import type { Vehicle } from '$lib/types';
+	import { onlineStatus } from '#lib/stores/offline.svelte.ts';
+	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
+	import type { Vehicle } from '#lib/types/index.ts';
 
 	interface Props {
 		isEditMode: boolean;

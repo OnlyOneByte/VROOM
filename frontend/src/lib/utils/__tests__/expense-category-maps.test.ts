@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { DollarSign } from '@lucide/svelte';
-import type { ExpenseCategory } from '$lib/types';
+import type { ExpenseCategory } from '#lib/types/index.ts';
 import { categoryLabels, getCategoryBadgeClasses, getCategoryIcon } from '../expense-helpers';
 
 const ALL_CATEGORIES: ExpenseCategory[] = [

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { calculatePayoffDateFromStart } from '$lib/utils/financing-calculations';
+import { calculatePayoffDateFromStart } from '#lib/utils/financing-calculations.ts';
 
 function payoff(start: Date, n: number): Date {
 	return calculatePayoffDateFromStart(start as unknown as string, n);

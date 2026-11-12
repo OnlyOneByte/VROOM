@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { syncConflicts, syncManager, type SyncConflict } from '$lib/utils/sync/sync-manager';
+	import { syncConflicts, syncManager, type SyncConflict } from '#lib/utils/sync/sync-manager.ts';
 	import { TriangleAlert, Check, X, Merge, LoaderCircle } from '@lucide/svelte';
 	import {
 		Dialog,
@@ -7,12 +7,12 @@
 		DialogDescription,
 		DialogHeader,
 		DialogTitle
-	} from '$lib/components/ui/dialog';
-	import { ScrollArea } from '$lib/components/ui/scroll-area';
-	import { Button } from '$lib/components/ui/button';
-	import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert';
-	import { formatCurrency, formatDate } from '$lib/utils/formatters';
-	import { getCategoryLabel } from '$lib/utils/chart-colors';
+	} from '#lib/components/ui/dialog/index.ts';
+	import { ScrollArea } from '#lib/components/ui/scroll-area/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Alert, AlertDescription, AlertTitle } from '#lib/components/ui/alert/index.ts';
+	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
+	import { getCategoryLabel } from '#lib/utils/chart-colors.ts';
 
 	let showModal = $state(false);
 	let currentConflict = $state<SyncConflict | null>(null);

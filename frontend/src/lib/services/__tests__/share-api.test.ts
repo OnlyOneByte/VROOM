@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ReceivedShare, VehicleShare } from '$lib/types';
+import type { ReceivedShare, VehicleShare } from '#lib/types/index.ts';
 
 vi.mock('../api-client', () => ({
 	apiClient: {

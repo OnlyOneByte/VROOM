@@ -1,5 +1,5 @@
-import type { LinkedAuthProvider, User } from '$lib/types';
-import { apiClient } from '$lib/services/api-client';
+import type { LinkedAuthProvider, User } from '#lib/types/index.ts';
+import { apiClient } from '#lib/services/api-client.ts';
 
 export const authApi = {
 	getProviders(): Promise<{ id: string; displayName: string }[]> {

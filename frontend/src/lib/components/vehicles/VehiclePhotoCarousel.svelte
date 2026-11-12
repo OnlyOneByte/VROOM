@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { Star, Trash2, Upload, ImagePlus, LoaderCircle } from '@lucide/svelte';
-	import * as Carousel from '$lib/components/ui/carousel';
-	import type { CarouselAPI } from '$lib/components/ui/carousel/context';
-	import { Button } from '$lib/components/ui/button';
-	import { Badge } from '$lib/components/ui/badge';
-	import * as Card from '$lib/components/ui/card';
-	import ConfirmDialog from '$lib/components/common/ConfirmDialog.svelte';
-	import { vehicleApi } from '$lib/services/vehicle-api';
-	import type { Photo } from '$lib/types';
+	import * as Carousel from '#lib/components/ui/carousel/index.ts';
+	import type { CarouselAPI } from '#lib/components/ui/carousel/context.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
+	import { vehicleApi } from '#lib/services/vehicle-api.ts';
+	import type { Photo } from '#lib/types/index.ts';
 
 	interface Props {
 		vehicleId: string;

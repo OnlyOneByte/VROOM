@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { onlineStatus, syncState, offlineExpenseQueue } from '$lib/stores/offline.svelte';
-	import { syncManager } from '$lib/utils/sync/sync-manager';
-	import { handleErrorWithNotification } from '$lib/utils/error-handling';
-	import { countPendingSync } from '$lib/utils/sync/pending-expenses';
+	import { onlineStatus, syncState, offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
+	import { syncManager } from '#lib/utils/sync/sync-manager.ts';
+	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
+	import { countPendingSync } from '#lib/utils/sync/pending-expenses.ts';
 	import { Wifi, WifiOff, RefreshCw, CircleCheck, CircleAlert } from '@lucide/svelte';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
 
 	let pendingCount = $derived(countPendingSync(offlineExpenseQueue.current));
 

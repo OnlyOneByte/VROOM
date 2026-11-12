@@ -1,4 +1,4 @@
-import type { OfflineExpense } from '$lib/utils/offline-storage';
+import type { OfflineExpense } from '#lib/utils/offline-storage.ts';
 
 export type QueuedExpenseInput = Omit<
 	OfflineExpense,

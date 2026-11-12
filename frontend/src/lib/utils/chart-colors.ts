@@ -1,4 +1,4 @@
-import type { ExpenseCategory } from '$lib/types';
+import type { ExpenseCategory } from '#lib/types/index.ts';
 
 export const CHART_COLORS = [
 	'var(--chart-1)',

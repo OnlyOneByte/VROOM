@@ -1,12 +1,12 @@
 import { describe, expect, test } from 'vitest';
 import fc from 'fast-check';
-import type { Expense, VehicleFinancing } from '$lib/types';
+import type { Expense, VehicleFinancing } from '#lib/types/index.ts';
 import {
 	calculateAmortizationSchedule,
 	calculateMinimumPayment,
 	calculatePayoffDate,
 	derivePaymentEntries
-} from '$lib/utils/financing-calculations';
+} from '#lib/utils/financing-calculations.ts';
 
 let expenseCounter = 0;
 

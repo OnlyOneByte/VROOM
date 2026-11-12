@@ -1,6 +1,6 @@
-import { browser } from '$app/environment';
-import { pushApi, type PushSubscribeInput } from '$lib/services/push-api';
-import { ApiError } from '$lib/utils/error-handling';
+import { browser } from '$app/env';
+import { pushApi, type PushSubscribeInput } from '#lib/services/push-api.ts';
+import { ApiError } from '#lib/utils/error-handling.ts';
 
 export type PushStatus = 'unsupported' | 'unconfigured' | 'denied' | 'subscribed' | 'off' | 'error';
 
@@ -37,7 +37,11 @@ export function pushStatusLabel(status: PushStatus): string {
 
 export type PushEnableOutcome =
 	| { ok: true }
-	| { ok: false; reason: 'unsupported' | 'unconfigured' | 'denied' | 'error'; message?: string };
+	| {
+			ok: false;
+			reason: 'unsupported' | 'unconfigured' | 'denied' | 'error';
+			message?: string;
+	  };
 
 export function isPushSupported(): boolean {
 	return (
@@ -90,6 +94,7 @@ export async function enablePush(): Promise<PushEnableOutcome> {
 		const { publicKey } = await pushApi.getVapidPublicKey();
 		const registration = await navigator.serviceWorker.ready;
 		const existing = await registration.pushManager.getSubscription();
+
 		const sub =
 			existing ??
 			(await registration.pushManager.subscribe({

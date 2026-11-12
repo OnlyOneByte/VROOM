@@ -11,22 +11,22 @@
 		Fuel,
 		Wrench
 	} from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import * as Select from '$lib/components/ui/select';
-	import { AppLineChart, AppPieChart } from '$lib/components/charts';
-	import StatCardGrid from '$lib/components/charts/StatCardGrid.svelte';
-	import { buildCategoryPieData, buildChartConfig } from '$lib/utils/chart-colors';
-	import { analyticsApi } from '$lib/services/analytics-api';
-	import type { YearEndResponse } from '$lib/types';
-	import { formatCurrency } from '$lib/utils/formatters';
-	import { formatDecimalAxis, parseMonthToDate } from '$lib/utils/chart-formatters';
-	import { settingsStore } from '$lib/stores/settings.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import { AppLineChart, AppPieChart } from '#lib/components/charts/index.ts';
+	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
+	import { buildCategoryPieData, buildChartConfig } from '#lib/utils/chart-colors.ts';
+	import { analyticsApi } from '#lib/services/analytics-api.ts';
+	import type { YearEndResponse } from '#lib/types/index.ts';
+	import { formatCurrency } from '#lib/utils/formatters.ts';
+	import { formatDecimalAxis, parseMonthToDate } from '#lib/utils/chart-formatters.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import {
 		getFuelEfficiencyLabel,
 		getDistanceUnitLabel,
 		getCostPerDistanceLabel
-	} from '$lib/utils/units';
+	} from '#lib/utils/units.ts';
 
 	const currentYear = new Date().getFullYear();
 	const years = Array.from({ length: 5 }, (_, i) => currentYear - i);

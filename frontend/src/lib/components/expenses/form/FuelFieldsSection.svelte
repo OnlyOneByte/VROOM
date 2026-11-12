@@ -1,5 +1,5 @@
 <script module lang="ts">
-	import { isElectricFuelType } from '$lib/utils/units';
+	import { isElectricFuelType } from '#lib/utils/units.ts';
 
 	export type EnergyMode = 'fuel' | 'charging';
 
@@ -67,20 +67,20 @@
 
 <script lang="ts">
 	import { Fuel, Gauge, Zap } from '@lucide/svelte';
-	import Input from '$lib/components/ui/input/input.svelte';
-	import Label from '$lib/components/ui/label/label.svelte';
-	import * as Select from '$lib/components/ui/select';
-	import { FormFieldError } from '$lib/components/ui/form-field';
-	import { Checkbox } from '$lib/components/ui/checkbox';
-	import { Button } from '$lib/components/ui/button';
+	import Input from '#lib/components/ui/input/input.svelte';
+	import Label from '#lib/components/ui/label/label.svelte';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
+	import { Checkbox } from '#lib/components/ui/checkbox/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
 	import {
 		getVolumeUnitLabel,
 		getChargeUnitLabel,
 		getFuelEfficiencyLabel,
 		getElectricEfficiencyLabel
-	} from '$lib/utils/units';
-	import { formatCurrency } from '$lib/utils/formatters';
-	import type { VolumeUnit, ChargeUnit, DistanceUnit } from '$lib/types';
+	} from '#lib/utils/units.ts';
+	import { formatCurrency } from '#lib/utils/formatters.ts';
+	import type { VolumeUnit, ChargeUnit, DistanceUnit } from '#lib/types/index.ts';
 
 	interface Props {
 		trackFuel: boolean;

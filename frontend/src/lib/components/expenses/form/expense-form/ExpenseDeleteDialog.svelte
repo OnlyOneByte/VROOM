@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { LoaderCircle, Save } from '@lucide/svelte';
-	import * as AlertDialog from '$lib/components/ui/alert-dialog';
-	import { formatCurrency } from '$lib/utils/formatters';
-	import type { Expense } from '$lib/types';
+	import * as AlertDialog from '#lib/components/ui/alert-dialog/index.ts';
+	import { formatCurrency } from '#lib/utils/formatters.ts';
+	import type { Expense } from '#lib/types/index.ts';
 
 	interface Props {
 		open: boolean;

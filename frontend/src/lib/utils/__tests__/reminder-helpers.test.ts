@@ -8,7 +8,7 @@ import {
 	RECURRING_TRIGGER_TS_KEY,
 	shouldTriggerRecurringExpenses
 } from '../reminder-helpers';
-import type { Reminder } from '$lib/types/reminder';
+import type { Reminder } from '#lib/types/reminder.ts';
 
 const NOW = Date.parse('2024-06-15T00:00:00.000Z');
 

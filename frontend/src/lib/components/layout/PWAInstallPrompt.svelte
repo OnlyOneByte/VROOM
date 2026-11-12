@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { initializePWA, promptInstall, pwaInstallState } from '$lib/utils/pwa';
+	import { initializePWA, promptInstall, pwaInstallState } from '#lib/utils/pwa.ts';
 	import { Download, X, LoaderCircle } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
 
 	let showPrompt = $state(false);
 	let installing = $state(false);

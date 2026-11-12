@@ -3,14 +3,14 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { authStore } from '$lib/stores/auth.svelte';
-	import { authApi } from '$lib/services/auth-api';
-	import { routes } from '$lib/routes';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
+	import { authStore } from '#lib/stores/auth.svelte.ts';
+	import { authApi } from '#lib/services/auth-api.ts';
+	import { routes } from '#lib/routes.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
 	import { LoaderCircle, ArrowLeft, LogIn, CircleAlert } from '@lucide/svelte';
-	import GoogleLogo from '$lib/components/icons/GoogleLogo.svelte';
-	import GitHubLogo from '$lib/components/icons/GitHubLogo.svelte';
+	import GoogleLogo from '#lib/components/icons/GoogleLogo.svelte';
+	import GitHubLogo from '#lib/components/icons/GitHubLogo.svelte';
 	import type { Component } from 'svelte';
 
 	const iconMap: Record<string, Component<{ class?: string }>> = {

@@ -1,14 +1,14 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { Inbox, Check, X, CircleAlert } from '@lucide/svelte';
-	import * as Card from '$lib/components/ui/card';
-	import { Button } from '$lib/components/ui/button';
-	import { Badge } from '$lib/components/ui/badge';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { toast } from 'svelte-sonner';
-	import { shareApi } from '$lib/services/share-api';
-	import { ApiError } from '$lib/utils/error-handling';
-	import { shareLevelLabel } from '$lib/utils/share-helpers';
-	import type { ReceivedShare } from '$lib/types';
+	import { shareApi } from '#lib/services/share-api.ts';
+	import { ApiError } from '#lib/utils/error-handling.ts';
+	import { shareLevelLabel } from '#lib/utils/share-helpers.ts';
+	import type { ReceivedShare } from '#lib/types/index.ts';
 
 	interface Props {
 		onAccepted?: () => void;

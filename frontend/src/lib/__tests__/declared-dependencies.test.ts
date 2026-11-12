@@ -8,7 +8,7 @@ const FRONTEND_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..
 const SCANNED_DIRS = ['src', 'e2e'];
 const SCANNED_EXTENSIONS = ['.ts', '.js', '.mjs', '.svelte'];
 
-const TOOLCHAIN_PREFIXES = ['$lib', '$app/', '$env/', '$service-worker', 'virtual:'];
+const TOOLCHAIN_PREFIXES = ['#lib', '$app/', 'virtual:'];
 const NODE_BUILTINS = new Set(builtinModules);
 
 function listFiles(dir: string): string[] {

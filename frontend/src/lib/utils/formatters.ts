@@ -1,4 +1,4 @@
-import { settingsStore } from '$lib/stores/settings.svelte';
+import { settingsStore } from '#lib/stores/settings.svelte.ts';
 
 export function formatCurrency(amount: number, currency?: string, fractionDigits?: number): string {
 	const currencyToUse = currency || settingsStore.settings?.currencyUnit || 'USD';

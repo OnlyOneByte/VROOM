@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { Gauge } from '@lucide/svelte';
-	import Input from '$lib/components/ui/input/input.svelte';
-	import Label from '$lib/components/ui/label/label.svelte';
-	import { FormFieldError } from '$lib/components/ui/form-field';
+	import Input from '#lib/components/ui/input/input.svelte';
+	import Label from '#lib/components/ui/label/label.svelte';
+	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
 
 	interface Props {
 		value?: string;

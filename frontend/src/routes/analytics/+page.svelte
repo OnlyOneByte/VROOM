@@ -9,15 +9,15 @@
 		Activity,
 		TrendingUp
 	} from '@lucide/svelte';
-	import * as Tabs from '$lib/components/ui/tabs';
-	import { Button } from '$lib/components/ui/button';
-	import StatCardGrid from '$lib/components/charts/StatCardGrid.svelte';
-	import FuelStatsTab from '$lib/components/analytics/fuel/FuelStatsTab.svelte';
-	import { analyticsApi, getDefaultDateRange } from '$lib/services/analytics-api';
-	import { formatCurrency } from '$lib/utils/formatters';
-	import { getFuelEfficiencyLabel } from '$lib/utils/units';
-	import { settingsStore } from '$lib/stores/settings.svelte';
-	import type { AnalyticsSummaryResponse } from '$lib/types';
+	import * as Tabs from '#lib/components/ui/tabs/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
+	import FuelStatsTab from '#lib/components/analytics/fuel/FuelStatsTab.svelte';
+	import { analyticsApi, getDefaultDateRange } from '#lib/services/analytics-api.ts';
+	import { formatCurrency } from '#lib/utils/formatters.ts';
+	import { getFuelEfficiencyLabel } from '#lib/utils/units.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
+	import type { AnalyticsSummaryResponse } from '#lib/types/index.ts';
 
 	let summary = $state<AnalyticsSummaryResponse | null>(null);
 	let isLoading = $state(true);
@@ -128,7 +128,7 @@
 			</Tabs.Content>
 		{:else if activeTab === 'cross-vehicle'}
 			<Tabs.Content value="cross-vehicle">
-				{#await import('$lib/components/analytics/CrossVehicleTab.svelte')}
+				{#await import('#lib/components/analytics/CrossVehicleTab.svelte')}
 					<div class="flex justify-center p-8">
 						<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
 					</div>
@@ -138,7 +138,7 @@
 			</Tabs.Content>
 		{:else if activeTab === 'per-vehicle'}
 			<Tabs.Content value="per-vehicle">
-				{#await import('$lib/components/analytics/PerVehicleTab.svelte')}
+				{#await import('#lib/components/analytics/PerVehicleTab.svelte')}
 					<div class="flex justify-center p-8">
 						<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
 					</div>
@@ -148,7 +148,7 @@
 			</Tabs.Content>
 		{:else if activeTab === 'year-end'}
 			<Tabs.Content value="year-end">
-				{#await import('$lib/components/analytics/YearEndTab.svelte')}
+				{#await import('#lib/components/analytics/YearEndTab.svelte')}
 					<div class="flex justify-center p-8">
 						<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
 					</div>

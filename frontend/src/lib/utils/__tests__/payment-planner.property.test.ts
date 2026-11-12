@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'vitest';
 import fc from 'fast-check';
-import type { VehicleFinancing } from '$lib/types';
-import { computePlannerState, canSave, buildSummary } from '$lib/utils/payment-planner';
-import { calculateMinimumPayment } from '$lib/utils/financing-calculations';
+import type { VehicleFinancing } from '#lib/types/index.ts';
+import { computePlannerState, canSave, buildSummary } from '#lib/utils/payment-planner.ts';
+import { calculateMinimumPayment } from '#lib/utils/financing-calculations.ts';
 
 function makeFinancing(overrides: Partial<VehicleFinancing> = {}): VehicleFinancing {
 	return {

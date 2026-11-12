@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { Sparkles, LoaderCircle } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as AlertDialog from '$lib/components/ui/alert-dialog';
-	import { vlmApi, type ReceiptDraft } from '$lib/services/vlm-api';
-	import { ApiError } from '$lib/utils/error-handling';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as AlertDialog from '#lib/components/ui/alert-dialog/index.ts';
+	import { vlmApi, type ReceiptDraft } from '#lib/services/vlm-api.ts';
+	import { ApiError } from '#lib/utils/error-handling.ts';
 
 	interface Props {
 		onDraft: (_draft: ReceiptDraft, _image: File) => void;

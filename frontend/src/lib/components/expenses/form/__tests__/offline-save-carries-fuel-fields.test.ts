@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { offlineExpenseToBackend, type OfflineExpense } from '$lib/utils/offline-storage';
+import { offlineExpenseToBackend, type OfflineExpense } from '#lib/utils/offline-storage.ts';
 import { toOfflineExpense, type ParsedExpenseForm } from '../offline-expense';
 
 const BASE: ParsedExpenseForm = {

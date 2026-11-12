@@ -1,18 +1,18 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { routes } from '$lib/routes';
+	import { routes } from '#lib/routes.ts';
 	import { Clock, ArrowRight } from '@lucide/svelte';
-	import * as Card from '$lib/components/ui/card';
-	import { Button } from '$lib/components/ui/button';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import EmptyState from '$lib/components/common/empty-state.svelte';
-	import { formatCurrency, formatRelativeTime } from '$lib/utils/formatters';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import { formatCurrency, formatRelativeTime } from '#lib/utils/formatters.ts';
 	import {
 		categoryLabels,
 		getCategoryBadgeClasses,
 		getCategoryIcon
-	} from '$lib/utils/expense-helpers';
-	import type { ExpenseCategory } from '$lib/types';
+	} from '#lib/utils/expense-helpers.ts';
+	import type { ExpenseCategory } from '#lib/types/index.ts';
 
 	interface RecentExpense {
 		id: string;

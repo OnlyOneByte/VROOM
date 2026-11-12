@@ -1,4 +1,4 @@
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 
 function findHiddenAncestor(el: HTMLElement): HTMLElement | null {
 	let current: HTMLElement | null = el;

@@ -1,20 +1,20 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import { Badge } from '$lib/components/ui/badge';
-	import * as Dialog from '$lib/components/ui/dialog';
-	import * as RadioGroup from '$lib/components/ui/radio-group';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
+	import * as RadioGroup from '#lib/components/ui/radio-group/index.ts';
 	import { LoaderCircle, Upload, ArrowLeft, Cloud, Database, ChevronDown } from '@lucide/svelte';
 	import {
 		Collapsible,
 		CollapsibleContent,
 		CollapsibleTrigger
-	} from '$lib/components/ui/collapsible';
-	import { settingsStore } from '$lib/stores/settings.svelte';
-	import { appStore } from '$lib/stores/app.svelte';
+	} from '#lib/components/ui/collapsible/index.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
 	import ProviderPicker from './RestoreProviderPicker.svelte';
-	import type { RestoreResult, RestoreProviderInfo, BackupFileInfo } from '$lib/types';
+	import type { RestoreResult, RestoreProviderInfo, BackupFileInfo } from '#lib/types/index.ts';
 
 	type FlowType = 'file' | 'provider';
 

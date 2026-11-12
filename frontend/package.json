@@ -9,6 +9,7 @@
 		"build": "vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
+		"sync": "svelte-kit sync",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --tsgo",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"test": "vitest --run",
@@ -23,7 +24,7 @@
 		"lint:fix": "eslint . --ext .js,.ts,.svelte --fix",
 		"format": "prettier --write .",
 		"format:check": "prettier --check .",
-		"type-check": "node scripts/type-check.mjs --threshold error",
+		"type-check": "node scripts/type-check.mjs --threshold error && tsc -p src/service-worker/tsconfig.json --noEmit",
 		"all:fix": "npm run lint:fix && npm run format ",
 		"validate": "npm run lint && npm run format:check && npm run type-check && npm run test",
 		"validate:local": "npm run type-check && npm run lint && npm run build && npm run test"
@@ -34,8 +35,8 @@
 		"@internationalized/date": "^3.12.4",
 		"@lucide/svelte": "^1.61.0",
 		"@playwright/test": "^1.64.1",
-		"@sveltejs/adapter-node": "^5.5.7",
-		"@sveltejs/kit": "^2.70.3",
+		"@sveltejs/adapter-node": "^6.0.0",
+		"@sveltejs/kit": "^3.1.1",
 		"@sveltejs/vite-plugin-svelte": "^7.3.1",
 		"@tailwindcss/forms": "^0.5.11",
 		"@tailwindcss/typography": "^0.5.20",
@@ -47,8 +48,8 @@
 		"@typescript-eslint/eslint-plugin": "^8.72.0",
 		"@typescript-eslint/parser": "^8.18.2",
 		"@typescript/native": "npm:typescript@7.0.2",
-		"@vite-pwa/assets-generator": "^1.0.2",
-		"@vite-pwa/sveltekit": "^1.1.0",
+		"@vite-pwa/assets-generator": "^2.0.0",
+		"@vite-pwa/sveltekit": "^2.0.2",
 		"@vitest/coverage-v8": "^5.1.0",
 		"@vitest/ui": "^5.1.0",
 		"autoprefixer": "^10.6.1",
@@ -90,5 +91,9 @@
 		"d3": "^7.9.0",
 		"sveltekit-superforms": "^3.1.0",
 		"zod": "^4.6.7"
+	},
+	"imports": {
+		"#lib": "./src/lib/index.js",
+		"#lib/*": "./src/lib/*"
 	}
 }

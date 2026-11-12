@@ -1,4 +1,4 @@
-import type { ShareLevel } from '$lib/types';
+import type { ShareLevel } from '#lib/types/index.ts';
 
 export const shareLevelLabels: Record<ShareLevel, string> = {
 	viewer: 'Viewer',

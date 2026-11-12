@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import type { Vehicle } from '$lib/types';
-import type { ExpenseImportResult } from '$lib/services/expense-api';
-import type { ImportMappingPreset } from '$lib/types/import-mapping';
+import type { Vehicle } from '#lib/types/index.ts';
+import type { ExpenseImportResult } from '#lib/services/expense-api.ts';
+import type { ImportMappingPreset } from '#lib/types/import-mapping.ts';
 import { ImportExpensesForm } from '../import-expenses-form.svelte';
 
 const mocks = vi.hoisted(() => ({
@@ -10,14 +10,14 @@ const mocks = vi.hoisted(() => ({
 	addNotification: vi.fn()
 }));
 
-vi.mock('$lib/services/expense-api', () => ({
+vi.mock('#lib/services/expense-api.ts', () => ({
 	expenseApi: {
 		detectImportSource: mocks.detectImportSource,
 		importExpensesCsv: mocks.importExpensesCsv
 	}
 }));
 
-vi.mock('$lib/stores/app.svelte', () => ({
+vi.mock('#lib/stores/app.svelte.ts', () => ({
 	appStore: { addNotification: mocks.addNotification }
 }));
 

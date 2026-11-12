@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'vitest';
-import type { VehicleFinancing } from '$lib/types';
+import type { VehicleFinancing } from '#lib/types/index.ts';
 import {
 	calculateNextPaymentDate,
 	calculateDaysUntil,
 	formatPaymentFrequency
-} from '$lib/utils/financing-calculations';
+} from '#lib/utils/financing-calculations.ts';
 
 function storedDate(year: number, month: number, day: number): string {
 	return new Date(year, month - 1, day, 12, 0, 0).toISOString();

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { CircleAlert, CircleCheck, FileText, LoaderCircle } from '@lucide/svelte';
-	import type { ExpenseImportResult } from '$lib/services/expense-api';
+	import type { ExpenseImportResult } from '#lib/services/expense-api.ts';
 
 	interface Props {
 		isPreviewing: boolean;

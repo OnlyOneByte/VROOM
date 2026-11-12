@@ -316,5 +316,5 @@
   "frontend/src/routes/profile/+page.svelte: Accounts section falls back to empty.",
   "frontend/src/routes/settings/+page.svelte: Leave the list empty; the page already renders its empty state.",
   "frontend/src/routes/vehicles/[id]/odometer/new/+page.svelte: The soft warning is optional; ignore failures.",
-  "frontend/src/service-worker.ts: No sync listener: the offline outbox lives in localStorage, which workers cannot read."
+  "frontend/src/service-worker/index.ts: No sync listener: the offline outbox lives in localStorage, which workers cannot read."
 ]

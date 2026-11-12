@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Plus } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
+	import { Button } from '#lib/components/ui/button/index.ts';
 
 	interface Props {
 		href?: string;

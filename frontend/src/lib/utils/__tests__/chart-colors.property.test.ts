@@ -8,7 +8,7 @@ import {
 	buildCategoryPieData,
 	getCategoryChartColor,
 	getCategoryLabel
-} from '$lib/utils/chart-colors';
+} from '#lib/utils/chart-colors.ts';
 
 const CATEGORY_ENUM = ['fuel', 'maintenance', 'financial', 'regulatory', 'enhancement', 'misc'];
 

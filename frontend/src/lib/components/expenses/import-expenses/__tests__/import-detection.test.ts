@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { detectionOutcome } from '../import-detection';
-import type { ImportMappingPreset } from '$lib/types/import-mapping';
+import type { ImportMappingPreset } from '#lib/types/import-mapping.ts';
 
 const fuellyPreset: ImportMappingPreset = {
 	id: 'fuelly',

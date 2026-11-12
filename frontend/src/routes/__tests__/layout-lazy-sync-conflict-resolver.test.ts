@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 const LAYOUT_SRC = readFileSync(`${process.cwd()}/src/routes/+layout.svelte`, 'utf8');
-const RESOLVER = '$lib/components/sync/SyncConflictResolver.svelte';
+const RESOLVER = '#lib/components/sync/SyncConflictResolver.svelte';
 
 describe('root layout loads the sync conflict resolver lazily', () => {
 	test('it is NOT statically imported (that is what put it on every route)', () => {
@@ -16,7 +16,7 @@ describe('root layout loads the sync conflict resolver lazily', () => {
 	});
 
 	test('the conflict signal comes from the lightweight sync-state module', () => {
-		expect(LAYOUT_SRC).toContain("from '$lib/utils/sync/sync-state.svelte'");
+		expect(LAYOUT_SRC).toContain("from '#lib/utils/sync/sync-state.svelte.ts'");
 	});
 
 	test('the loaded component is never unset — no destroy mid-close', () => {

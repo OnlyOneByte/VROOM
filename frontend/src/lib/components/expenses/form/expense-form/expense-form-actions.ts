@@ -1,11 +1,11 @@
-import { expenseApi } from '$lib/services/expense-api';
-import { appStore } from '$lib/stores/app.svelte';
-import { onlineStatus } from '$lib/stores/offline.svelte';
-import { addOfflineExpense } from '$lib/utils/offline-storage';
-import { classifySyncFailure } from '$lib/utils/sync/classify-failure';
-import { buildSplitConfig } from '$lib/utils/expense-helpers';
-import { gotoDynamic } from '$lib/utils/navigation';
-import type { ExpenseCategory } from '$lib/types';
+import { expenseApi } from '#lib/services/expense-api.ts';
+import { appStore } from '#lib/stores/app.svelte.ts';
+import { onlineStatus } from '#lib/stores/offline.svelte.ts';
+import { addOfflineExpense } from '#lib/utils/offline-storage.ts';
+import { classifySyncFailure } from '#lib/utils/sync/classify-failure.ts';
+import { buildSplitConfig } from '#lib/utils/expense-helpers.ts';
+import { gotoDynamic } from '#lib/utils/navigation.ts';
+import type { ExpenseCategory } from '#lib/types/index.ts';
 import { toOfflineExpense } from '../offline-expense';
 import { buildExpenseData } from './expense-payload';
 import {

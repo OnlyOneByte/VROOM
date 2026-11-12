@@ -63,22 +63,22 @@ let doubled = $derived(count * 2);
 
 ### Navigation
 
-Route strings live in `$lib/routes.ts` (`routes` for static, `paramRoutes` for parameterized). Never hardcode a path like `'/dashboard'` in a component. All navigation goes through `resolve()` from `$app/paths` so the app works under any base path; this also satisfies the `svelte/no-navigation-without-resolve` lint rule.
+Route strings live in `#lib/routes.ts` (`routes` for static, `paramRoutes` for parameterized). Never hardcode a path like `'/dashboard'` in a component. All navigation goes through `resolve()` from `$app/paths` so the app works under any base path; this also satisfies the `svelte/no-navigation-without-resolve` lint rule.
 
 - Static: `goto(resolve(routes.dashboard))`, `href={resolve(routes.dashboard)}`
 - Parameterized: `resolve(paramRoutes.vehicle, { id: vehicleId })` — params go in the object, never interpolated into the string
-- With query params: `gotoWithQuery(resolve(routes.expenseNew), { vehicleId })` from `$lib/utils/navigation`, or append to a resolved `href`. Never put a query string inside `resolve()`.
-- Runtime-only paths (e.g., a `returnTo` URL param): `gotoDynamic(returnTo)` from `$lib/utils/navigation`
+- With query params: `gotoWithQuery(resolve(routes.expenseNew), { vehicleId })` from `#lib/utils/navigation`, or append to a resolved `href`. Never put a query string inside `resolve()`.
+- Runtime-only paths (e.g., a `returnTo` URL param): `gotoDynamic(returnTo)` from `#lib/utils/navigation`
 
 ## UI Components
 
-- Compose from the existing kit — shadcn-svelte primitives in `$lib/components/ui/`, app patterns in `$lib/components/common/`. Check before building a custom component. (See `DesignSystem.md` for the inventory.)
+- Compose from the existing kit — shadcn-svelte primitives in `#lib/components/ui/`, app patterns in `#lib/components/common/`. Check before building a custom component. (See `DesignSystem.md` for the inventory.)
 - Charts use the shadcn-svelte chart components (built on layerchart). Do not add recharts.
 - Use semantic color tokens (`text-foreground`, `bg-background`, `text-muted-foreground`, `border-input`) instead of hardcoded Tailwind colors (`text-gray-900`, `bg-white`).
 - Loading spinners are `LoaderCircle` from `@lucide/svelte` with `animate-spin`. No custom CSS spinners.
 - Import icons from `@lucide/svelte` (the Svelte 5 package), not `lucide-svelte`. App code uses barrel imports — `import { Car, Fuel } from '@lucide/svelte'`; the `ui/` components' `@lucide/svelte/icons/*` deep imports are upstream code and fine as-is. Don't mix emoji strings with Lucide icons in the same UI.
-- Do not modify shadcn-svelte registry components (`$lib/components/ui/`) to fix warnings or lint issues. They are upstream-managed; diverging creates maintenance burden on registry updates. Tolerate warnings there (`eslint.config.js` already scopes the Svelte rules off for that directory).
-- Form and form-like pages (vehicle, expense, insurance, odometer, settings, profile, providers) must wrap their content in `<FormLayout>` from `$lib/components/common/form-layout.svelte`, which applies the shared centered `max-w-2xl`. Never use inline `max-w-*` on a form page wrapper.
+- Do not modify shadcn-svelte registry components (`#lib/components/ui/`) to fix warnings or lint issues. They are upstream-managed; diverging creates maintenance burden on registry updates. Tolerate warnings there (`eslint.config.js` already scopes the Svelte rules off for that directory).
+- Form and form-like pages (vehicle, expense, insurance, odometer, settings, profile, providers) must wrap their content in `<FormLayout>` from `#lib/components/common/form-layout.svelte`, which applies the shared centered `max-w-2xl`. Never use inline `max-w-*` on a form page wrapper.
 
 ## Frontend Architecture
 
@@ -98,10 +98,10 @@ Route strings live in `$lib/routes.ts` (`routes` for static, `paramRoutes` for p
 ### Rules
 
 - API calls: use the domain service (`vehicleApi`, `expenseApi`, `settingsApi`, …) when it has the method you need; fall back to `apiClient` only for endpoints no service covers. Never use raw `fetch()` in components, stores, or utils — `api-client.ts` is the only exception.
-- Types: define in `$lib/types/`. Avoid `any`; use proper types or `unknown` with type guards. Don't redefine a backend shape that `api-transformer.ts` already declares.
-- Utilities: reuse from `$lib/utils/` (and `$lib/constants/` for shared maps). Don't reimplement existing logic in components.
+- Types: define in `#lib/types/`. Avoid `any`; use proper types or `unknown` with type guards. Don't redefine a backend shape that `api-transformer.ts` already declares.
+- Utilities: reuse from `#lib/utils/` (and `#lib/constants/` for shared maps). Don't reimplement existing logic in components.
 
-Routes live in `frontend/src/routes/` under SvelteKit file-based routing; `$lib/routes.ts` is the canonical list.
+Routes live in `frontend/src/routes/` under SvelteKit file-based routing; `#lib/routes.ts` is the canonical list.
 
 ## Backend Architecture
 
@@ -137,7 +137,7 @@ All monetary values are stored AND computed as **integer cents** — the 14 mone
 - No comments in code. CLAUDE.md quality bar #6 states the rule and its narrow exceptions; rename or extract before reaching for a comment.
 - Floating action buttons paint with `bg-foreground` / `text-background`, as `common/floating-action-button.svelte` does — never `bg-gray-900 text-white`, and never a gradient stack with `!text-white` overrides.
 - Pages with a floating action button must add `pb-24` to the main content wrapper so the fixed FAB doesn't cover the last row. `fab-bottom-clearance.test.ts` enforces this.
-- Never access browser-only APIs (`window`, `document`, `PerformanceObserver`) at module top level or without a guard — including `window.location` inside event handlers, since SvelteKit may SSR the component. Guard with `browser` from `$app/environment` or initialize lazily.
+- Never access browser-only APIs (`window`, `document`, `PerformanceObserver`) at module top level or without a guard — including `window.location` inside event handlers, since SvelteKit may SSR the component. Guard with `browser` from `$app/env` or initialize lazily.
 - An array index access can yield `undefined` — guard (or narrow) before dereferencing. The frontend tsconfig sets `noUncheckedIndexedAccess` so the compiler says so there; `backend/tsconfig.json` does NOT, so on the backend `rows[0].id` type-checks and throws at runtime.
 - Memoization caches (`Map`-based) must have a max size to prevent memory leaks. Use LRU eviction or clear on navigation.
 - Stubbed or unimplemented API functions must not be called from UI — render a "coming soon" state (`common/coming-soon-card.svelte`) instead of catching a thrown error.

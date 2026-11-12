@@ -1,4 +1,4 @@
-import type { OfflineExpense } from '$lib/utils/offline-storage';
+import type { OfflineExpense } from '#lib/utils/offline-storage.ts';
 
 export function isPendingSync(expense: OfflineExpense): boolean {
 	return !expense.synced && !expense.needsAttention;

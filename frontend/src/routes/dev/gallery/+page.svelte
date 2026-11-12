@@ -1,18 +1,18 @@
 <script lang="ts">
-	import { dev } from '$app/environment';
-	import PageHeader from '$lib/components/common/page-header.svelte';
-	import EmptyState from '$lib/components/common/empty-state.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Alert, AlertTitle, AlertDescription } from '$lib/components/ui/alert';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import Input from '$lib/components/ui/input/input.svelte';
-	import { Label } from '$lib/components/ui/label';
-	import { FormFieldError } from '$lib/components/ui/form-field';
-	import * as Card from '$lib/components/ui/card';
-	import { AppLineChart } from '$lib/components/charts';
-	import StatCardGrid from '$lib/components/charts/StatCardGrid.svelte';
-	import ChartCard from '$lib/components/charts/ChartCard.svelte';
+	import { dev } from '$app/env';
+	import PageHeader from '#lib/components/common/page-header.svelte';
+	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { Alert, AlertTitle, AlertDescription } from '#lib/components/ui/alert/index.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import Input from '#lib/components/ui/input/input.svelte';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import { AppLineChart } from '#lib/components/charts/index.ts';
+	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
+	import ChartCard from '#lib/components/charts/ChartCard.svelte';
 	import { Inbox, DollarSign, TrendingUp, Car, Plus } from '@lucide/svelte';
 
 	const buttonVariants = [

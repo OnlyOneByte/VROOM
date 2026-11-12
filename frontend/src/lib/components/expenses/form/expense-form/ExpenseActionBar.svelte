@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Check, Copy, LoaderCircle, Trash2, X } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
+	import { Button } from '#lib/components/ui/button/index.ts';
 
 	interface Props {
 		isEditMode: boolean;

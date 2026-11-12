@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { LoaderCircle, Sparkles } from '@lucide/svelte';
-	import type { ImportMappingPreset } from '$lib/types/import-mapping';
-	import type { Vehicle } from '$lib/types';
+	import type { ImportMappingPreset } from '#lib/types/import-mapping.ts';
+	import type { Vehicle } from '#lib/types/index.ts';
 	import TargetVehiclePicker from './TargetVehiclePicker.svelte';
 
 	interface Props {

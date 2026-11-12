@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Expense, Vehicle } from '$lib/types';
+	import type { Expense, Vehicle } from '#lib/types/index.ts';
 	import ExpenseCategoryFilter from './ExpenseCategoryFilter.svelte';
 	import ExpenseSortButton from './ExpenseSortButton.svelte';
 	import CompactStandaloneRow from './CompactStandaloneRow.svelte';

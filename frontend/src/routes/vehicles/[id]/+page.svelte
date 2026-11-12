@@ -1,44 +1,44 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { routes, paramRoutes } from '$lib/routes';
-	import { parseMonthToDate } from '$lib/utils/chart-formatters';
+	import { routes, paramRoutes } from '#lib/routes.ts';
+	import { parseMonthToDate } from '#lib/utils/chart-formatters.ts';
 	import { onMount, type Component } from 'svelte';
 	import { Plus, FileText, Download, CircleAlert, Users } from '@lucide/svelte';
-	import FloatingActionButton from '$lib/components/common/floating-action-button.svelte';
-	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
-	import { Button } from '$lib/components/ui/button';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { Card, CardContent } from '$lib/components/ui/card';
-	import * as CardFull from '$lib/components/ui/card';
-	import ExpensesTable from '$lib/components/expenses/ExpensesTable.svelte';
-	import ExpenseSearchFilters from '$lib/components/expenses/ExpenseSearchFilters.svelte';
-	import ExpenseTrendChart from '$lib/components/charts/ExpenseTrendChart.svelte';
-	import FuelEfficiencyTrendChart from '$lib/components/charts/FuelEfficiencyTrendChart.svelte';
-	import { AppPieChart } from '$lib/components/charts';
-	import VehicleHeader from '$lib/components/vehicles/VehicleHeader.svelte';
-	import ShareVehicleDialog from '$lib/components/vehicles/ShareVehicleDialog.svelte';
-	import VehiclePhotoCarousel from '$lib/components/vehicles/VehiclePhotoCarousel.svelte';
-	import MediaCaptureDialog from '$lib/components/common/MediaCaptureDialog.svelte';
-	import VehicleInfoCard from '$lib/components/vehicles/VehicleInfoCard.svelte';
-	import ExpenseOverviewCard from '$lib/components/vehicles/ExpenseOverviewCard.svelte';
-	import FuelEfficiencyStatsCard from '$lib/components/vehicles/FuelEfficiencyStatsCard.svelte';
-	import PeriodSelector from '$lib/components/common/period-selector.svelte';
-	import EmptyState from '$lib/components/common/empty-state.svelte';
-	import FinanceTab from '$lib/components/vehicles/FinanceTab.svelte';
-	import OdometerTab from '$lib/components/vehicles/OdometerTab.svelte';
+	import FloatingActionButton from '#lib/components/common/floating-action-button.svelte';
+	import { Tabs, TabsContent, TabsList, TabsTrigger } from '#lib/components/ui/tabs/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import { Card, CardContent } from '#lib/components/ui/card/index.ts';
+	import * as CardFull from '#lib/components/ui/card/index.ts';
+	import ExpensesTable from '#lib/components/expenses/ExpensesTable.svelte';
+	import ExpenseSearchFilters from '#lib/components/expenses/ExpenseSearchFilters.svelte';
+	import ExpenseTrendChart from '#lib/components/charts/ExpenseTrendChart.svelte';
+	import FuelEfficiencyTrendChart from '#lib/components/charts/FuelEfficiencyTrendChart.svelte';
+	import { AppPieChart } from '#lib/components/charts/index.ts';
+	import VehicleHeader from '#lib/components/vehicles/VehicleHeader.svelte';
+	import ShareVehicleDialog from '#lib/components/vehicles/ShareVehicleDialog.svelte';
+	import VehiclePhotoCarousel from '#lib/components/vehicles/VehiclePhotoCarousel.svelte';
+	import MediaCaptureDialog from '#lib/components/common/MediaCaptureDialog.svelte';
+	import VehicleInfoCard from '#lib/components/vehicles/VehicleInfoCard.svelte';
+	import ExpenseOverviewCard from '#lib/components/vehicles/ExpenseOverviewCard.svelte';
+	import FuelEfficiencyStatsCard from '#lib/components/vehicles/FuelEfficiencyStatsCard.svelte';
+	import PeriodSelector from '#lib/components/common/period-selector.svelte';
+	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import FinanceTab from '#lib/components/vehicles/FinanceTab.svelte';
+	import OdometerTab from '#lib/components/vehicles/OdometerTab.svelte';
 	let InsuranceTab = $state<Component<{ vehicleId: string; readOnly?: boolean }> | null>(null);
 	let hasLoadedInsurance = $state(false);
-	import { categoryLabels } from '$lib/utils/expense-helpers';
-	import { getCategoryChartColor } from '$lib/utils/chart-colors';
-	import { hasActiveFilters as checkActiveFilters } from '$lib/utils/expense-filters';
-	import { COMMON_MESSAGES, VEHICLE_MESSAGES } from '$lib/constants/messages';
-	import { type TimePeriod } from '$lib/constants/time-periods';
-	import { SCROLL_HEIGHTS } from '$lib/constants/ui';
-	import { vehicleApi } from '$lib/services/vehicle-api';
-	import { expenseApi } from '$lib/services/expense-api';
-	import { analyticsApi } from '$lib/services/analytics-api';
-	import { handleErrorWithNotification } from '$lib/utils/error-handling';
+	import { categoryLabels } from '#lib/utils/expense-helpers.ts';
+	import { getCategoryChartColor } from '#lib/utils/chart-colors.ts';
+	import { hasActiveFilters as checkActiveFilters } from '#lib/utils/expense-filters.ts';
+	import { COMMON_MESSAGES, VEHICLE_MESSAGES } from '#lib/constants/messages.ts';
+	import { type TimePeriod } from '#lib/constants/time-periods.ts';
+	import { SCROLL_HEIGHTS } from '#lib/constants/ui.ts';
+	import { vehicleApi } from '#lib/services/vehicle-api.ts';
+	import { expenseApi } from '#lib/services/expense-api.ts';
+	import { analyticsApi } from '#lib/services/analytics-api.ts';
+	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
 	import type {
 		Vehicle,
 		Expense,
@@ -48,7 +48,7 @@
 		ExpenseSummary,
 		FuelEfficiencyPoint,
 		ExpenseCategory
-	} from '$lib/types';
+	} from '#lib/types/index.ts';
 	import { useExpenseListReload } from '../../expenses/expense-list-reload.svelte';
 	import type { PageData } from './$types';
 
@@ -145,7 +145,7 @@
 	$effect(() => {
 		if (!isLoading && !hasLoadedInsurance && activeTab === 'overview') {
 			hasLoadedInsurance = true;
-			import('$lib/components/insurance/InsuranceTab.svelte').then(m => {
+			import('#lib/components/insurance/InsuranceTab.svelte').then(m => {
 				InsuranceTab = m.default;
 			});
 		}

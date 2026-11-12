@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { GitBranch } from '@lucide/svelte';
 	import SplitConfigEditor from '../../split/SplitConfigEditor.svelte';
-	import type { Vehicle } from '$lib/types';
-	import type { SplitAllocationDraft } from '$lib/utils/expense-helpers';
+	import type { Vehicle } from '#lib/types/index.ts';
+	import type { SplitAllocationDraft } from '#lib/utils/expense-helpers.ts';
 	import type { SplitMethod } from './split-config';
 
 	interface Props {

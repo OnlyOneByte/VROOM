@@ -1,19 +1,19 @@
 <script lang="ts">
-	import * as Dialog from '$lib/components/ui/dialog';
-	import * as Select from '$lib/components/ui/select';
-	import * as AlertDialog from '$lib/components/ui/alert-dialog';
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import { Checkbox } from '$lib/components/ui/checkbox';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { dateOnlyToISO, toDateInputValue } from '$lib/utils/formatters';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import * as AlertDialog from '#lib/components/ui/alert-dialog/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { Checkbox } from '#lib/components/ui/checkbox/index.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import { dateOnlyToISO, toDateInputValue } from '#lib/utils/formatters.ts';
 	import { Images, LoaderCircle, CircleAlert, ImageOff } from '@lucide/svelte';
-	import { photosImportApi, type ReceiptDraftItem } from '$lib/services/photos-import-api';
-	import { appStore } from '$lib/stores/app.svelte';
-	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
-	import { categoryLabels } from '$lib/utils/expense-helpers';
-	import type { ExpenseCategory, Vehicle } from '$lib/types';
+	import { photosImportApi, type ReceiptDraftItem } from '#lib/services/photos-import-api.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
+	import { categoryLabels } from '#lib/utils/expense-helpers.ts';
+	import type { ExpenseCategory, Vehicle } from '#lib/types/index.ts';
 
 	interface Props {
 		open: boolean;

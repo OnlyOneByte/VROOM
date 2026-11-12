@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import type { Expense, Vehicle } from '$lib/types';
+import type { Expense, Vehicle } from '#lib/types/index.ts';
 import {
 	buildDisplayRows,
 	rowKey,

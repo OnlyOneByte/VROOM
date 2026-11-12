@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { themeStore } from '$lib/stores/theme.svelte';
+	import { themeStore } from '#lib/stores/theme.svelte.ts';
 	import { Toaster as Sonner, type ToasterProps as SonnerProps } from 'svelte-sonner';
 
 	let { ...restProps }: SonnerProps = $props();

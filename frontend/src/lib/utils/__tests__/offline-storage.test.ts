@@ -15,7 +15,7 @@ import {
 	offlineExpenseToBackend,
 	type OfflineExpense
 } from '../offline-storage';
-import { offlineExpenseQueue } from '$lib/stores/offline.svelte';
+import { offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
 
 const localStorageMock = window.localStorage as any;
 

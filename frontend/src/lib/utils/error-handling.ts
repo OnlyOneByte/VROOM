@@ -1,4 +1,4 @@
-import { appStore } from '$lib/stores/app.svelte';
+import { appStore } from '#lib/stores/app.svelte.ts';
 
 export function extractErrorMessage(error: unknown, fallback: string): string {
 	return error instanceof Error ? error.message : fallback;

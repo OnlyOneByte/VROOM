@@ -1,12 +1,12 @@
 import { describe, expect, test } from 'vitest';
 import fc from 'fast-check';
-import type { VehicleFinancing } from '$lib/types';
+import type { VehicleFinancing } from '#lib/types/index.ts';
 import {
 	calculateLeaseMetrics,
 	calculateLeaseOverage,
 	leaseTotalMileageAllowance,
 	resolveCurrentOdometer
-} from '$lib/utils/financing-calculations';
+} from '#lib/utils/financing-calculations.ts';
 
 function isoDaysFromNow(days: number): string {
 	const d = new Date();

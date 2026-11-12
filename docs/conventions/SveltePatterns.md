@@ -3,7 +3,7 @@
 Svelte 5 component mechanics for this project. Not repeated here — defer to:
 **MainSteering.md** "Svelte 5 Runes Mode" for runes, the no-`$effect`-for-async-data-loading rule,
 forbidden syntax (`$:`, `on:`, `|modifier`, `$app/stores`, directives on components) and
-"Navigation" for routing (`resolve()` / `$lib/routes`), then "UI Components" for icon imports;
+"Navigation" for routing (`resolve()` / `#lib/routes`), then "UI Components" for icon imports;
 **DesignSystem.md** for the component inventory, import paths, tokens and spacing;
 **UIQuality.md** for the four-states bar.
 
@@ -12,9 +12,9 @@ forbidden syntax (`$:`, `on:`, `|modifier`, `$app/stores`, directives on compone
 ```svelte
 <script lang="ts">
   // 1. Imports
-  import { Button } from '$lib/components/ui/button';
-  import { vehicleApi } from '$lib/services/vehicle-api';
-  import type { Vehicle } from '$lib/types';
+  import { Button } from '#lib/components/ui/button';
+  import { vehicleApi } from '#lib/services/vehicle-api';
+  import type { Vehicle } from '#lib/types';
 
   // 2. Props — declare an interface, then destructure
   interface Props {
@@ -76,8 +76,8 @@ A dialog owns an `open = $bindable()` prop and is opened by setting parent state
 
 ```svelte
 <script lang="ts">
-  import * as Dialog from '$lib/components/ui/dialog';
-  import { Button } from '$lib/components/ui/button';
+  import * as Dialog from '#lib/components/ui/dialog';
+  import { Button } from '#lib/components/ui/button';
 
   interface Props { open: boolean; onSync: () => void }
   let { open = $bindable(), onSync }: Props = $props();
@@ -129,7 +129,7 @@ Template: `{#if isLoading}` → `Skeleton`, `{:else if loadError}` → visible m
 
 One condition: a ternary in the class string
 (`class={isActive ? 'text-foreground' : 'text-muted-foreground'}`). Several: `cn()` from
-`$lib/utils` (clsx + tailwind-merge) — `cn('rounded-lg border p-4', isSelected &&
+`#lib/utils` (clsx + tailwind-merge) — `cn('rounded-lg border p-4', isSelected &&
 'border-primary', hasError && 'border-destructive')`.
 
 ## Common Mistakes to Avoid
@@ -137,4 +137,4 @@ One condition: a ternary in the class string
 - Don't use `export let` for props — use `$props()` destructuring.
 - Don't use `createEventDispatcher` — use callback props.
 - Don't use `<slot>` or `$$slots` — use `Snippet` props with `{@render}` (guard optional ones).
-- Don't use `goto` with `invalidateAll` for simple navigation — `goto` alone handles it.
+- Do not use `goto` with `refreshAll` for simple navigation — `goto` alone handles it.

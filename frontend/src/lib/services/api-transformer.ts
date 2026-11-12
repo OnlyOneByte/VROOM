@@ -1,5 +1,5 @@
-import type { BackendExpenseResponse, Expense, ExpenseCategory } from '$lib/types';
-import { isElectricFuelType } from '$lib/utils/units';
+import type { BackendExpenseResponse, Expense, ExpenseCategory } from '#lib/types/index.ts';
+import { isElectricFuelType } from '#lib/utils/units.ts';
 
 interface BackendExpenseRequest {
 	vehicleId: string;

@@ -1,34 +1,34 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, waitFor } from '@testing-library/svelte';
-import type { Expense, UserSettings, Vehicle } from '$lib/types';
+import type { Expense, UserSettings, Vehicle } from '#lib/types/index.ts';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
 let tableProps: Record<string, unknown> = {};
-vi.mock('$lib/components/expenses/ExpensesTable.svelte', () => ({
+vi.mock('#lib/components/expenses/ExpensesTable.svelte', () => ({
 	default: (_anchor: unknown, props: Record<string, unknown>) => {
 		tableProps = props;
 	}
 }));
-vi.mock('$lib/components/expenses/ImportFromPhotosDialog.svelte', () => ({ default: () => {} }));
+vi.mock('#lib/components/expenses/ImportFromPhotosDialog.svelte', () => ({ default: () => {} }));
 
 const getAllExpenses = vi.fn();
 const getExpenseSummary = vi.fn();
 const getVehicles = vi.fn();
 const getSettings = vi.fn();
 
-vi.mock('$lib/services/expense-api', () => ({
+vi.mock('#lib/services/expense-api.ts', () => ({
 	expenseApi: {
 		getAllExpenses: (...args: unknown[]) => getAllExpenses(...args),
 		getExpenseSummary: (...args: unknown[]) => getExpenseSummary(...args),
 		downloadExpensesCsv: () => Promise.resolve()
 	}
 }));
-vi.mock('$lib/services/vehicle-api', () => ({
+vi.mock('#lib/services/vehicle-api.ts', () => ({
 	vehicleApi: { getVehicles: (...args: unknown[]) => getVehicles(...args) }
 }));
-vi.mock('$lib/services/settings-api', () => ({
+vi.mock('#lib/services/settings-api.ts', () => ({
 	settingsApi: {
 		getSettings: (...args: unknown[]) => getSettings(...args),
 		updateSettings: () => Promise.resolve({})

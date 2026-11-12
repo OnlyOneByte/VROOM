@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { Card, CardContent } from '$lib/components/ui/card';
-	import { ScrollArea } from '$lib/components/ui/scroll-area';
-	import { Badge } from '$lib/components/ui/badge';
-	import { formatCurrency, formatDate } from '$lib/utils/formatters';
+	import { Card, CardContent } from '#lib/components/ui/card/index.ts';
+	import { ScrollArea } from '#lib/components/ui/scroll-area/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
 	import { Receipt, TrendingDown, DollarSign } from '@lucide/svelte';
-	import type { DerivedPaymentEntry, VehicleFinancing } from '$lib/types';
+	import type { DerivedPaymentEntry, VehicleFinancing } from '#lib/types/index.ts';
 
 	interface Props {
 		payments: DerivedPaymentEntry[];

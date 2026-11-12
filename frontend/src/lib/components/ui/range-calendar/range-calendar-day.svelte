@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { RangeCalendar as RangeCalendarPrimitive } from 'bits-ui';
-	import { cn } from '$lib/utils.js';
-	import { calendarDayBaseClass } from '$lib/components/ui/calendar/calendar-day-classes.js';
+	import { cn } from '#lib/utils.js';
+	import { calendarDayBaseClass } from '#lib/components/ui/calendar/calendar-day-classes.js';
 
 	let {
 		ref = $bindable(null),

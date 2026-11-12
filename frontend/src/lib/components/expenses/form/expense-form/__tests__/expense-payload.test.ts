@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { dateOnlyToISO } from '$lib/utils/formatters';
+import { dateOnlyToISO } from '#lib/utils/formatters.ts';
 import { createEmptyFormData, type ExpenseFormData } from '../expense-form-data';
 import { buildExpenseData } from '../expense-payload';
 

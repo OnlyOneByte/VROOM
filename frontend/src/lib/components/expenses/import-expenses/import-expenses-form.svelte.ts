@@ -5,12 +5,12 @@ import type {
 	NativeImportField,
 	Vehicle,
 	VolumeUnit
-} from '$lib/types';
-import type { ImportMappingPreset } from '$lib/types/import-mapping';
-import { expenseApi, type ExpenseImportResult } from '$lib/services/expense-api';
-import { appStore } from '$lib/stores/app.svelte';
-import { handleErrorWithNotification } from '$lib/utils/error-handling';
-import { parseCsvHeaders } from '$lib/utils/import-mapping-helpers';
+} from '#lib/types/index.ts';
+import type { ImportMappingPreset } from '#lib/types/import-mapping.ts';
+import { expenseApi, type ExpenseImportResult } from '#lib/services/expense-api.ts';
+import { appStore } from '#lib/stores/app.svelte.ts';
+import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
+import { parseCsvHeaders } from '#lib/utils/import-mapping-helpers.ts';
 import { detectionOutcome } from './import-detection';
 import { buildImportMapping, type ManualColumns } from './import-mapping';
 

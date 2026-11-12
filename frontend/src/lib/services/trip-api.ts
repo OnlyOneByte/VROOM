@@ -1,4 +1,4 @@
-import type { PaginatedResponse, Trip, TripPurpose, TripSummary } from '$lib/types';
+import type { PaginatedResponse, Trip, TripPurpose, TripSummary } from '#lib/types/index.ts';
 import { apiClient } from './api-client';
 import { buildQueryString } from './api-utils';
 

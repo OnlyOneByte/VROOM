@@ -2,17 +2,17 @@
 	import { onMount, tick } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { Bot, Send, LoaderCircle, CircleAlert, User } from '@lucide/svelte';
-	import { routes } from '$lib/routes';
-	import { Button } from '$lib/components/ui/button';
-	import { Textarea } from '$lib/components/ui/textarea';
-	import { Badge } from '$lib/components/ui/badge';
-	import * as AlertDialog from '$lib/components/ui/alert-dialog';
-	import EmptyState from '$lib/components/common/empty-state.svelte';
-	import PageHeader from '$lib/components/common/page-header.svelte';
-	import FormLayout from '$lib/components/common/form-layout.svelte';
-	import { providerApi } from '$lib/services/provider-api';
-	import { assistantApi, type AssistantTurn } from '$lib/services/assistant-api';
-	import { ApiError } from '$lib/utils/error-handling';
+	import { routes } from '#lib/routes.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Textarea } from '#lib/components/ui/textarea/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import * as AlertDialog from '#lib/components/ui/alert-dialog/index.ts';
+	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import PageHeader from '#lib/components/common/page-header.svelte';
+	import FormLayout from '#lib/components/common/form-layout.svelte';
+	import { providerApi } from '#lib/services/provider-api.ts';
+	import { assistantApi, type AssistantTurn } from '#lib/services/assistant-api.ts';
+	import { ApiError } from '#lib/utils/error-handling.ts';
 
 	const DISCLOSURE_KEY = 'vroom.llm.assistant-disclosed';
 	const MAX_HISTORY_TURNS = 12;

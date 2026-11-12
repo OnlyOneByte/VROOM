@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { Checkbox } from '$lib/components/ui/checkbox';
-	import { Label } from '$lib/components/ui/label';
-	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
-	import type { Vehicle } from '$lib/types';
+	import { Checkbox } from '#lib/components/ui/checkbox/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
+	import type { Vehicle } from '#lib/types/index.ts';
 
 	interface Props {
 		vehicles: Vehicle[];

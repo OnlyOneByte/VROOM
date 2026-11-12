@@ -3,14 +3,10 @@ import { authStore } from '../../stores/auth.svelte';
 import type { User } from '../../types/index.js';
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
+import { routes } from '#lib/routes.ts';
 
-vi.mock('$app/navigation', () => ({
-	goto: vi.fn()
-}));
-
-vi.mock('$app/paths', () => ({
-	resolve: (path: string) => path
-}));
+vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
+vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
 const mockUser: User = {
 	id: '1',
@@ -61,7 +57,7 @@ describe('ProtectedRoute Logic', () => {
 		expect(shouldRedirect).toBe(true);
 
 		if (shouldRedirect) {
-			goto(resolve('/auth'));
+			goto(resolve(routes.auth));
 		}
 
 		expect(goto).toHaveBeenCalledWith('/auth');

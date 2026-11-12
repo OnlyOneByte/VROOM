@@ -1,29 +1,29 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { routes } from '$lib/routes';
+	import { routes } from '#lib/routes.ts';
 	import { TrendingUp, ChartPie, CircleAlert, Fuel } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { gotoWithQuery } from '$lib/utils/navigation';
-	import FloatingActionButton from '$lib/components/common/floating-action-button.svelte';
-	import PageHeader from '$lib/components/common/page-header.svelte';
-	import DashboardStatsCards from '$lib/components/dashboard/DashboardStatsCards.svelte';
-	import ExpenseTrendChart from '$lib/components/charts/ExpenseTrendChart.svelte';
-	import { AppPieChart } from '$lib/components/charts';
-	import RecentActivityCard from '$lib/components/dashboard/RecentActivityCard.svelte';
-	import DueRemindersCard from '$lib/components/dashboard/DueRemindersCard.svelte';
-	import RecurringCostCard from '$lib/components/dashboard/RecurringCostCard.svelte';
-	import SharedWithMeCard from '$lib/components/dashboard/SharedWithMeCard.svelte';
-	import VehicleCarousel from '$lib/components/dashboard/VehicleCarousel.svelte';
-	import PeriodSelector from '$lib/components/common/period-selector.svelte';
-	import { handleErrorWithNotification } from '$lib/utils/error-handling';
-	import { categoryLabels } from '$lib/utils/expense-helpers';
-	import { getCategoryChartColor } from '$lib/utils/chart-colors';
-	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
-	import { parseMonthToDate } from '$lib/utils/chart-formatters';
-	import { vehicleApi } from '$lib/services/vehicle-api';
-	import { expenseApi } from '$lib/services/expense-api';
-	import { reminderApi } from '$lib/services/reminder-api';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { gotoWithQuery } from '#lib/utils/navigation.ts';
+	import FloatingActionButton from '#lib/components/common/floating-action-button.svelte';
+	import PageHeader from '#lib/components/common/page-header.svelte';
+	import DashboardStatsCards from '#lib/components/dashboard/DashboardStatsCards.svelte';
+	import ExpenseTrendChart from '#lib/components/charts/ExpenseTrendChart.svelte';
+	import { AppPieChart } from '#lib/components/charts/index.ts';
+	import RecentActivityCard from '#lib/components/dashboard/RecentActivityCard.svelte';
+	import DueRemindersCard from '#lib/components/dashboard/DueRemindersCard.svelte';
+	import RecurringCostCard from '#lib/components/dashboard/RecurringCostCard.svelte';
+	import SharedWithMeCard from '#lib/components/dashboard/SharedWithMeCard.svelte';
+	import VehicleCarousel from '#lib/components/dashboard/VehicleCarousel.svelte';
+	import PeriodSelector from '#lib/components/common/period-selector.svelte';
+	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
+	import { categoryLabels } from '#lib/utils/expense-helpers.ts';
+	import { getCategoryChartColor } from '#lib/utils/chart-colors.ts';
+	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
+	import { parseMonthToDate } from '#lib/utils/chart-formatters.ts';
+	import { vehicleApi } from '#lib/services/vehicle-api.ts';
+	import { expenseApi } from '#lib/services/expense-api.ts';
+	import { reminderApi } from '#lib/services/reminder-api.ts';
 	import type {
 		Vehicle,
 		Expense,
@@ -32,8 +32,8 @@
 		Photo,
 		RecurringCostSummary,
 		ReminderWithVehicles
-	} from '$lib/types';
-	import type { TimePeriod } from '$lib/constants/time-periods';
+	} from '#lib/types/index.ts';
+	import type { TimePeriod } from '#lib/constants/time-periods.ts';
 
 	const UPCOMING_WINDOW_DAYS = 14;
 

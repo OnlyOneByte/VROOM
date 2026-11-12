@@ -1,16 +1,16 @@
 <script lang="ts">
-	import '$lib/components/charts/bar-chart-animations.css';
-	import { formatDecimalAxis, parseMonthToDate } from '$lib/utils/chart-formatters';
-	import { AppBarChart } from '$lib/components/charts';
+	import '#lib/components/charts/bar-chart-animations.css';
+	import { formatDecimalAxis, parseMonthToDate } from '#lib/utils/chart-formatters.ts';
+	import { AppBarChart } from '#lib/components/charts/index.ts';
 	import {
 		CHART_COLORS,
 		CATEGORY_COLORS,
 		CATEGORY_LABELS,
 		buildChartConfig
-	} from '$lib/utils/chart-colors';
-	import type { FuelAdvancedResponse } from '$lib/types';
-	import { settingsStore } from '$lib/stores/settings.svelte';
-	import { getFuelEfficiencyLabel } from '$lib/utils/units';
+	} from '#lib/utils/chart-colors.ts';
+	import type { FuelAdvancedResponse } from '#lib/types/index.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
+	import { getFuelEfficiencyLabel } from '#lib/utils/units.ts';
 
 	interface Props {
 		fuelAdvanced: FuelAdvancedResponse;

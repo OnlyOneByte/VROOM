@@ -1,4 +1,4 @@
-import type { ExpenseCategory } from '$lib/types';
+import type { ExpenseCategory } from '#lib/types/index.ts';
 import { apiClient } from './api-client';
 
 export interface ReceiptDraft {

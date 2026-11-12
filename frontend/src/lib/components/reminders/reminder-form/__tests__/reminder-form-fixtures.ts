@@ -1,5 +1,5 @@
-import type { Vehicle } from '$lib/types';
-import type { Reminder, ReminderWithVehicles } from '$lib/types/reminder';
+import type { Vehicle } from '#lib/types/index.ts';
+import type { Reminder, ReminderWithVehicles } from '#lib/types/reminder.ts';
 import type { ReminderDraft } from '../reminder-form-model';
 import { emptyReminderDraft } from '../reminder-form-model';
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import * as Select from '$lib/components/ui/select';
+	import * as Select from '#lib/components/ui/select/index.ts';
 	import { FileText } from '@lucide/svelte';
 	import type {
 		ImportDateFormat,
@@ -7,8 +7,8 @@
 		NativeImportField,
 		Vehicle,
 		VolumeUnit
-	} from '$lib/types';
-	import { getDistanceUnitLabel, getVolumeUnitLabel } from '$lib/utils/units';
+	} from '#lib/types/index.ts';
+	import { getDistanceUnitLabel, getVolumeUnitLabel } from '#lib/utils/units.ts';
 	import TargetVehiclePicker from './TargetVehiclePicker.svelte';
 	import type { ImportExpensesForm } from './import-expenses-form.svelte';
 

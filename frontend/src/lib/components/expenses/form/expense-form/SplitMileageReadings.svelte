@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { Gauge } from '@lucide/svelte';
-	import Input from '$lib/components/ui/input/input.svelte';
-	import Label from '$lib/components/ui/label/label.svelte';
-	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
-	import type { Vehicle } from '$lib/types';
+	import Input from '#lib/components/ui/input/input.svelte';
+	import Label from '#lib/components/ui/label/label.svelte';
+	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
+	import type { Vehicle } from '#lib/types/index.ts';
 
 	interface Props {
 		vehicles: Vehicle[];

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import type { Expense } from '$lib/types';
-import { expenseApi } from '$lib/services/expense-api';
+import type { Expense } from '#lib/types/index.ts';
+import { expenseApi } from '#lib/services/expense-api.ts';
 import {
 	blockedReasonId,
 	deleteExpenseRecord,
@@ -9,7 +9,7 @@ import {
 	isInsuranceLinked
 } from '../expense-table-actions';
 
-vi.mock('$lib/services/expense-api', () => ({
+vi.mock('#lib/services/expense-api.ts', () => ({
 	expenseApi: {
 		deleteExpense: vi.fn(),
 		deleteSplitExpense: vi.fn()

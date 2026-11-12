@@ -11,8 +11,8 @@
 		Database,
 		HardDrive
 	} from '@lucide/svelte';
-	import * as Select from '$lib/components/ui/select';
-	import * as Collapsible from '$lib/components/ui/collapsible';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import * as Collapsible from '#lib/components/ui/collapsible/index.ts';
 	import {
 		AlertDialog,
 		AlertDialogAction,
@@ -22,9 +22,9 @@
 		AlertDialogFooter,
 		AlertDialogHeader,
 		AlertDialogTitle
-	} from '$lib/components/ui/alert-dialog';
-	import { providerApi } from '$lib/services/provider-api';
-	import type { PhotoCategory, StorageConfig, UserProviderInfo } from '$lib/types';
+	} from '#lib/components/ui/alert-dialog/index.ts';
+	import { providerApi } from '#lib/services/provider-api.ts';
+	import type { PhotoCategory, StorageConfig, UserProviderInfo } from '#lib/types/index.ts';
 
 	const CATEGORY_META: Record<PhotoCategory, { label: string; icon: typeof Camera }> = {
 		vehicle_photos: { label: 'Vehicle Photos', icon: Image },

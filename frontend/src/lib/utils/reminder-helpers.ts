@@ -1,4 +1,4 @@
-import type { Reminder } from '$lib/types/reminder';
+import type { Reminder } from '#lib/types/reminder.ts';
 import { capitalize } from './formatters';
 
 export function isReminderTimeDue(reminder: Reminder, now: number = Date.now()): boolean {

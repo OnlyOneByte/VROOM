@@ -1,5 +1,5 @@
-import { dateOnlyToISO } from '$lib/utils/formatters';
-import type { ExpenseCategory } from '$lib/types';
+import { dateOnlyToISO } from '#lib/utils/formatters.ts';
+import type { ExpenseCategory } from '#lib/types/index.ts';
 import type { ExpenseFormData } from './expense-form-data';
 
 export interface ExpensePayloadContext {

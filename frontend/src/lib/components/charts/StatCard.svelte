@@ -14,8 +14,8 @@
 </script>
 
 <script lang="ts">
-	import { Card, CardContent } from '$lib/components/ui/card';
-	import { Skeleton } from '$lib/components/ui/skeleton';
+	import { Card, CardContent } from '#lib/components/ui/card/index.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import type { AnyIcon } from './types';
 
 	// Tailwind only generates complete class names it can see; keep each class string literal.

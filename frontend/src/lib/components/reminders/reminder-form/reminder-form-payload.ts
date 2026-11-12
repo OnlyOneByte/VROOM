@@ -1,6 +1,6 @@
-import { buildSplitConfig } from '$lib/utils/expense-helpers';
-import { dateOnlyToISO } from '$lib/utils/formatters';
-import type { Reminder } from '$lib/types/reminder';
+import { buildSplitConfig } from '#lib/utils/expense-helpers.ts';
+import { dateOnlyToISO } from '#lib/utils/formatters.ts';
+import type { Reminder } from '#lib/types/reminder.ts';
 import {
 	hasMileageTrigger,
 	shouldShowSplitEditor,

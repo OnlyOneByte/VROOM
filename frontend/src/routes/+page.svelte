@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { authStore } from '$lib/stores/auth.svelte';
-	import { routes } from '$lib/routes';
+	import { authStore } from '#lib/stores/auth.svelte.ts';
+	import { routes } from '#lib/routes.ts';
 	import { onMount } from 'svelte';
-	import { Button } from '$lib/components/ui/button';
+	import { Button } from '#lib/components/ui/button/index.ts';
 	import {
 		Car,
 		ChartBar,

@@ -1,33 +1,33 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { gotoDynamic } from '$lib/utils/navigation';
-	import { resetSplitAllocations } from '$lib/utils/expense-helpers';
-	import { dateOnlyToISO, toDateInputValue } from '$lib/utils/formatters';
-	import { appStore } from '$lib/stores/app.svelte';
+	import { gotoDynamic } from '#lib/utils/navigation.ts';
+	import { resetSplitAllocations } from '#lib/utils/expense-helpers.ts';
+	import { dateOnlyToISO, toDateInputValue } from '#lib/utils/formatters.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { ArrowLeft, Check, LoaderCircle, X, FileText } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import { Textarea } from '$lib/components/ui/textarea';
-	import { Checkbox } from '$lib/components/ui/checkbox';
-	import * as Select from '$lib/components/ui/select';
-	import { FormFieldError } from '$lib/components/ui/form-field';
-	import DatePicker from '$lib/components/common/date-picker.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { Textarea } from '#lib/components/ui/textarea/index.ts';
+	import { Checkbox } from '#lib/components/ui/checkbox/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
+	import DatePicker from '#lib/components/common/date-picker.svelte';
 	import {
 		Card,
 		CardContent,
 		CardDescription,
 		CardHeader,
 		CardTitle
-	} from '$lib/components/ui/card';
-	import FormLayout from '$lib/components/common/form-layout.svelte';
-	import SplitConfigEditor from '$lib/components/expenses/split/SplitConfigEditor.svelte';
-	import { insuranceApi } from '$lib/services/insurance-api';
-	import { vehicleApi } from '$lib/services/vehicle-api';
-	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
-	import { prefillFromPreviousTerm } from '$lib/utils/insurance';
-	import { getCurrencySymbol } from '$lib/utils/formatters';
-	import type { InsurancePolicy, InsuranceTerm, Vehicle } from '$lib/types';
+	} from '#lib/components/ui/card/index.ts';
+	import FormLayout from '#lib/components/common/form-layout.svelte';
+	import SplitConfigEditor from '#lib/components/expenses/split/SplitConfigEditor.svelte';
+	import { insuranceApi } from '#lib/services/insurance-api.ts';
+	import { vehicleApi } from '#lib/services/vehicle-api.ts';
+	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
+	import { prefillFromPreviousTerm } from '#lib/utils/insurance.ts';
+	import { getCurrencySymbol } from '#lib/utils/formatters.ts';
+	import type { InsurancePolicy, InsuranceTerm, Vehicle } from '#lib/types/index.ts';
 
 	interface Props {
 		policyId: string;

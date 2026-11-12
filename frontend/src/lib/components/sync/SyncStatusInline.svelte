@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { syncState, onlineStatus, offlineExpenseQueue } from '$lib/stores/offline.svelte';
+	import { syncState, onlineStatus, offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
 	import {
 		syncManager,
 		lastBackupTime,
@@ -10,17 +10,17 @@
 		sheetsSyncEnabled,
 		syncConflicts,
 		fetchLastSyncTime
-	} from '$lib/utils/sync/sync-manager';
+	} from '#lib/utils/sync/sync-manager.ts';
 	import { RefreshCw, CircleAlert, Clock, Wifi, WifiOff, TriangleAlert } from '@lucide/svelte';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
-	import { formatCompactRelativeTime } from '$lib/utils/formatters';
-	import { getSyncStatusInfo } from '$lib/utils/sync/sync-status';
-	import { countParked, countPendingSync } from '$lib/utils/sync/pending-expenses';
-	import { routes } from '$lib/routes';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { formatCompactRelativeTime } from '#lib/utils/formatters.ts';
+	import { getSyncStatusInfo } from '#lib/utils/sync/sync-status.ts';
+	import { countParked, countPendingSync } from '#lib/utils/sync/pending-expenses.ts';
+	import { routes } from '#lib/routes.ts';
 	import { resolve } from '$app/paths';
-	import { appStore } from '$lib/stores/app.svelte';
-	import { handleErrorWithNotification } from '$lib/utils/error-handling';
+	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
 
 	let { isExpanded = true } = $props();
 

@@ -1,4 +1,4 @@
-import type { OdometerEntry, PaginatedResponse, Photo } from '$lib/types';
+import type { OdometerEntry, PaginatedResponse, Photo } from '#lib/types/index.ts';
 import { apiClient, withPagination } from './api-client';
 import { entityPhotos } from './photo-api';
 

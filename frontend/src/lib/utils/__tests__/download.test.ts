@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { triggerBlobDownload } from '$lib/utils/download';
+import { triggerBlobDownload } from '#lib/utils/download.ts';
 
 describe('triggerBlobDownload', () => {
 	let createObjectURL: ReturnType<typeof vi.fn>;

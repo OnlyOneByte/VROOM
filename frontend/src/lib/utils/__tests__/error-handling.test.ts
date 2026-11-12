@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 const addNotification = vi.fn();
-vi.mock('$lib/stores/app.svelte', () => ({
+vi.mock('#lib/stores/app.svelte.ts', () => ({
 	appStore: { addNotification }
 }));
 

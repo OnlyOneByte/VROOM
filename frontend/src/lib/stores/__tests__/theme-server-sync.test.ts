@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 const updateSettings = vi.fn(async (_updates: unknown) => ({}) as unknown);
-vi.mock('$lib/services/settings-api', () => ({
+vi.mock('#lib/services/settings-api.ts', () => ({
 	settingsApi: { updateSettings: (u: unknown) => updateSettings(u) }
 }));
 

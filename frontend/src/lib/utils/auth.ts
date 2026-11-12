@@ -1,6 +1,6 @@
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
-import { routes } from '$lib/routes';
+import { routes } from '#lib/routes.ts';
 
 export const publicRoutes = ['/', '/auth', '/privacypolicy', '/termsofservice'];
 

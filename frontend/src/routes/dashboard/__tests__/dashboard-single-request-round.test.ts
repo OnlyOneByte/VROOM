@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { render, waitFor } from '@testing-library/svelte';
-import type { Vehicle } from '$lib/types';
+import type { Vehicle } from '#lib/types/index.ts';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
-vi.mock('$lib/components/charts', () => ({ AppPieChart: () => {} }));
-vi.mock('$lib/components/charts/ExpenseTrendChart.svelte', () => ({ default: () => {} }));
-vi.mock('$lib/components/dashboard/VehicleCarousel.svelte', () => ({ default: () => {} }));
-vi.mock('$lib/components/dashboard/SharedWithMeCard.svelte', () => ({ default: () => {} }));
+vi.mock('#lib/components/charts/index.ts', () => ({ AppPieChart: () => {} }));
+vi.mock('#lib/components/charts/ExpenseTrendChart.svelte', () => ({ default: () => {} }));
+vi.mock('#lib/components/dashboard/VehicleCarousel.svelte', () => ({ default: () => {} }));
+vi.mock('#lib/components/dashboard/SharedWithMeCard.svelte', () => ({ default: () => {} }));
 
 const getVehicles = vi.fn();
 const getAllVehiclePhotos = vi.fn();
@@ -18,21 +18,21 @@ const getAllExpenses = vi.fn();
 const listReminders = vi.fn();
 const getRecurringCost = vi.fn();
 
-vi.mock('$lib/services/vehicle-api', () => ({
+vi.mock('#lib/services/vehicle-api.ts', () => ({
 	vehicleApi: {
 		getVehicles: (...args: unknown[]) => getVehicles(...args),
 		getAllVehiclePhotos: (...args: unknown[]) => getAllVehiclePhotos(...args),
 		getPhotoThumbnailUrl: () => ''
 	}
 }));
-vi.mock('$lib/services/expense-api', () => ({
+vi.mock('#lib/services/expense-api.ts', () => ({
 	expenseApi: {
 		getVehicleStats: (...args: unknown[]) => getVehicleStats(...args),
 		getExpenseSummary: (...args: unknown[]) => getExpenseSummary(...args),
 		getAllExpenses: (...args: unknown[]) => getAllExpenses(...args)
 	}
 }));
-vi.mock('$lib/services/reminder-api', () => ({
+vi.mock('#lib/services/reminder-api.ts', () => ({
 	reminderApi: {
 		list: (...args: unknown[]) => listReminders(...args),
 		getRecurringCost: (...args: unknown[]) => getRecurringCost(...args)

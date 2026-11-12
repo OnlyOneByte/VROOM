@@ -1,26 +1,26 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { Bot, Sparkles, Plus, LoaderCircle, Pencil, Trash2 } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import * as Select from '$lib/components/ui/select';
-	import * as Dialog from '$lib/components/ui/dialog';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
 	import {
 		Card,
 		CardContent,
 		CardDescription,
 		CardHeader,
 		CardTitle
-	} from '$lib/components/ui/card';
-	import { providerApi } from '$lib/services/provider-api';
-	import { appStore } from '$lib/stores/app.svelte';
+	} from '#lib/components/ui/card/index.ts';
+	import { providerApi } from '#lib/services/provider-api.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
 	import {
 		LLM_PROVIDER_TYPES,
 		VLM_PROVIDER_TYPES,
 		type ModelProviderTypeOption
-	} from '$lib/constants/providers';
-	import type { UserProviderInfo } from '$lib/types';
+	} from '#lib/constants/providers.ts';
+	import type { UserProviderInfo } from '#lib/types/index.ts';
 
 	type ModelDomain = 'vlm' | 'llm';
 

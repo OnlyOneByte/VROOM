@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { Shield, DollarSign } from '@lucide/svelte';
-	import * as Card from '$lib/components/ui/card';
-	import * as Chart from '$lib/components/ui/chart';
-	import { Badge } from '$lib/components/ui/badge';
-	import { AppLineChart, AppBarChart } from '$lib/components/charts';
-	import StatCardGrid from '$lib/components/charts/StatCardGrid.svelte';
-	import type { InsuranceResponse } from '$lib/types';
-	import { formatCurrency } from '$lib/utils/formatters';
-	import { parseMonthToDate } from '$lib/utils/chart-formatters';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import * as Chart from '#lib/components/ui/chart/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { AppLineChart, AppBarChart } from '#lib/components/charts/index.ts';
+	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
+	import type { InsuranceResponse } from '#lib/types/index.ts';
+	import { formatCurrency } from '#lib/utils/formatters.ts';
+	import { parseMonthToDate } from '#lib/utils/chart-formatters.ts';
 
 	let { insurance }: { insurance: InsuranceResponse } = $props();
 

@@ -1,12 +1,12 @@
 <script lang="ts">
-	import StatCardGrid from '$lib/components/charts/StatCardGrid.svelte';
+	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
 	import { Banknote, Calendar, TrendingUp, Hash, DollarSign, TriangleAlert } from '@lucide/svelte';
-	import { formatCurrency, formatDate } from '$lib/utils/formatters';
-	import { getDistanceUnitLabel } from '$lib/utils/units';
-	import { settingsStore } from '$lib/stores/settings.svelte';
-	import type { VehicleFinancing, UnitPreferences } from '$lib/types';
-	import { calculateLeaseOverage } from '$lib/utils/financing-calculations';
-	import type { AmortizationEntry } from '$lib/utils/financing-calculations';
+	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
+	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
+	import type { VehicleFinancing, UnitPreferences } from '#lib/types/index.ts';
+	import { calculateLeaseOverage } from '#lib/utils/financing-calculations.ts';
+	import type { AmortizationEntry } from '#lib/utils/financing-calculations.ts';
 
 	interface Props {
 		financing: VehicleFinancing;

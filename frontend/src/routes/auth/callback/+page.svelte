@@ -3,10 +3,10 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { authStore } from '$lib/stores/auth.svelte';
-	import { routes } from '$lib/routes';
+	import { authStore } from '#lib/stores/auth.svelte.ts';
+	import { routes } from '#lib/routes.ts';
 	import { LoaderCircle, Check, X } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
+	import { Button } from '#lib/components/ui/button/index.ts';
 
 	let status = $state('processing');
 	let error = $state('');

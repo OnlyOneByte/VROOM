@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render } from '@testing-library/svelte';
 import ExpensesTable from '../ExpensesTable.svelte';
-import type { Expense } from '$lib/types';
+import type { Expense } from '#lib/types/index.ts';
 
 const SPACING_PX = 4;
 const TAP_TARGET_FLOOR_PX = 40;

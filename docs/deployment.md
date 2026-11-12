@@ -89,6 +89,7 @@ These have defaults, but the defaults only suit localhost.
 |---|---|---|
 | `BACKEND_PORT` | `3001` | Host port in the example stacks |
 | `FRONTEND_PORT` | `3000` | Host port in the example stacks |
+| `ORIGIN` | unset (derived from the request) | Frontend container only. The public origin the server reports, e.g. `https://yourdomain.com`, instead of deriving it from the request headers. Read at startup, so a change needs a container restart, not a rebuild. Leave it unset unless header-derived origins are wrong behind your proxy; an empty value stops the frontend from starting |
 | `HOST` | `127.0.0.1` | Address the backend binds. The default is loopback only, so a direct install is not exposed until you say so; containers need `0.0.0.0` (both Dockerfiles and example stacks set it). The backend exits naming `HOST` if this machine has no such address |
 | `DATABASE_URL` | `./data/vroom.db` | SQLite file. Both Dockerfiles and example stacks set `/app/data/vroom.db` |
 | `DATA_PATH` | `./data` | Host directory bind-mounted at `/app/data` by `docker-compose.yml`. Must exist |

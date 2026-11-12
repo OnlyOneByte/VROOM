@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { paramRoutes } from '$lib/routes';
+	import { paramRoutes } from '#lib/routes.ts';
 	import InsuranceTermCard from './PolicyTermCard.svelte';
-	import { sortTermsByEndDateDesc } from '$lib/utils/insurance';
-	import type { InsuranceTerm, Vehicle, TermCoverageRow } from '$lib/types';
+	import { sortTermsByEndDateDesc } from '#lib/utils/insurance.ts';
+	import type { InsuranceTerm, Vehicle, TermCoverageRow } from '#lib/types/index.ts';
 
 	interface Props {
 		terms: InsuranceTerm[];

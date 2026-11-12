@@ -1,4 +1,4 @@
-import type { DistanceUnit, VolumeUnit, ChargeUnit } from '$lib/types';
+import type { DistanceUnit, VolumeUnit, ChargeUnit } from '#lib/types/index.ts';
 
 // Must match backend/src/db/types.ts, which routes charge vs volume by it; a parity test guards drift.
 export const ELECTRIC_FUEL_TYPES = [

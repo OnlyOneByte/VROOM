@@ -1,28 +1,28 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { routes, paramRoutes } from '$lib/routes';
+	import { routes, paramRoutes } from '#lib/routes.ts';
 	import { onMount } from 'svelte';
 	import { CreditCard, CircleAlert } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { Card, CardContent } from '$lib/components/ui/card';
-	import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert';
-	import EmptyState from '$lib/components/common/empty-state.svelte';
-	import PaymentMetricsGrid from '$lib/components/financing/PaymentMetricsGrid.svelte';
-	import FinancingCharts from '$lib/components/financing/FinancingCharts.svelte';
-	import PaymentPlannerDialog from '$lib/components/financing/PaymentPlannerDialog.svelte';
-	import PaymentHistory from '$lib/components/financing/PaymentHistory.svelte';
-	import NextPaymentCard from '$lib/components/financing/NextPaymentCard.svelte';
-	import LeaseMetricsCard from '$lib/components/financing/LeaseMetricsCard.svelte';
-	import { vehicleApi } from '$lib/services/vehicle-api';
-	import { expenseApi } from '$lib/services/expense-api';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import { Card, CardContent } from '#lib/components/ui/card/index.ts';
+	import { Alert, AlertDescription, AlertTitle } from '#lib/components/ui/alert/index.ts';
+	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import PaymentMetricsGrid from '#lib/components/financing/PaymentMetricsGrid.svelte';
+	import FinancingCharts from '#lib/components/financing/FinancingCharts.svelte';
+	import PaymentPlannerDialog from '#lib/components/financing/PaymentPlannerDialog.svelte';
+	import PaymentHistory from '#lib/components/financing/PaymentHistory.svelte';
+	import NextPaymentCard from '#lib/components/financing/NextPaymentCard.svelte';
+	import LeaseMetricsCard from '#lib/components/financing/LeaseMetricsCard.svelte';
+	import { vehicleApi } from '#lib/services/vehicle-api.ts';
+	import { expenseApi } from '#lib/services/expense-api.ts';
 	import {
 		calculateAmortizationSchedule,
 		calculatePayoffDate,
 		derivePaymentEntries,
 		resolveCurrentOdometer
-	} from '$lib/utils/financing-calculations';
-	import type { Vehicle, VehicleStats, DerivedPaymentEntry } from '$lib/types';
+	} from '#lib/utils/financing-calculations.ts';
+	import type { Vehicle, VehicleStats, DerivedPaymentEntry } from '#lib/types/index.ts';
 
 	interface Props {
 		vehicle: Vehicle;

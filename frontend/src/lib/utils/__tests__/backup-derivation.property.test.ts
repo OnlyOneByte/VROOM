@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import fc from 'fast-check';
-import type { BackupConfig, ProviderBackupSettings } from '$lib/types';
+import type { BackupConfig, ProviderBackupSettings } from '#lib/types/index.ts';
 
 function deriveSheetsSyncEnabled(backupConfig: BackupConfig): boolean {
 	return Object.values(backupConfig.providers).some(p => p.sheetsSyncEnabled === true);

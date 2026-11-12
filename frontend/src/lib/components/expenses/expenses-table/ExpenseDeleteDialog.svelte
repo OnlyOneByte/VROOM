@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { LoaderCircle, Trash2 } from '@lucide/svelte';
-	import { Badge } from '$lib/components/ui/badge';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import {
 		AlertDialog,
 		AlertDialogAction,
@@ -10,10 +10,10 @@
 		AlertDialogFooter,
 		AlertDialogHeader,
 		AlertDialogTitle
-	} from '$lib/components/ui/alert-dialog';
-	import type { Expense } from '$lib/types';
-	import { formatCurrency, formatDate } from '$lib/utils/formatters';
-	import { getCategoryBadgeClasses, getCategoryIcon } from '$lib/utils/expense-helpers';
+	} from '#lib/components/ui/alert-dialog/index.ts';
+	import type { Expense } from '#lib/types/index.ts';
+	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
+	import { getCategoryBadgeClasses, getCategoryIcon } from '#lib/utils/expense-helpers.ts';
 
 	interface Props {
 		open: boolean;

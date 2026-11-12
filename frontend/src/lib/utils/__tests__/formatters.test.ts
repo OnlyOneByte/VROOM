@@ -9,7 +9,7 @@ import {
 	formatRelativeTime,
 	getCurrencySymbol,
 	toDateInputValue
-} from '$lib/utils/formatters';
+} from '#lib/utils/formatters.ts';
 
 describe('formatCurrency', () => {
 	test('defaults to USD with 2 decimals', () => {

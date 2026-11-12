@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import { FormFieldError } from '$lib/components/ui/form-field';
-	import type { Vehicle } from '$lib/types';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
+	import type { Vehicle } from '#lib/types/index.ts';
 	import type { ReminderFormState } from './reminder-form-state.svelte';
 	import { mileageUnitLabel } from './reminder-form-model';
 

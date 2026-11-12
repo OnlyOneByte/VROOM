@@ -1,9 +1,9 @@
-import type { VehicleFinancing } from '$lib/types';
+import type { VehicleFinancing } from '#lib/types/index.ts';
 import {
 	calculateExtraPaymentImpact,
 	type ExtraPaymentImpact
-} from '$lib/utils/financing-calculations';
-import { formatCurrency } from '$lib/utils/formatters';
+} from '#lib/utils/financing-calculations.ts';
+import { formatCurrency } from '#lib/utils/formatters.ts';
 
 export interface SecondaryDelta {
 	monthsDelta: number;

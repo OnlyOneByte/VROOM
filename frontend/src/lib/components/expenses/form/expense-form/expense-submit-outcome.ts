@@ -1,5 +1,5 @@
-import type { SyncFailureKind } from '$lib/utils/sync/classify-failure';
-import { extractErrorMessage } from '$lib/utils/error-handling';
+import type { SyncFailureKind } from '#lib/utils/sync/classify-failure.ts';
+import { extractErrorMessage } from '#lib/utils/error-handling.ts';
 
 export const UNQUEUED_SAVE_MESSAGE =
 	'This device could not store the expense — storage is full or site data is blocked. ' +

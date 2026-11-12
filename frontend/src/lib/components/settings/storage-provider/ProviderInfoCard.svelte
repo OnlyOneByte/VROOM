@@ -11,17 +11,17 @@
 		RefreshCw,
 		LoaderCircle
 	} from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Card, CardContent, CardHeader } from '$lib/components/ui/card';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Separator } from '$lib/components/ui/separator';
-	import { Progress } from '$lib/components/ui/progress';
-	import { Switch } from '$lib/components/ui/switch';
-	import { Label } from '$lib/components/ui/label';
-	import { providerApi } from '$lib/services/provider-api';
-	import { appStore } from '$lib/stores/app.svelte';
-	import { PHOTO_CATEGORY_LABELS } from '$lib/constants/ui';
-	import type { PhotoCategory, CategorySetting, UserProviderInfo } from '$lib/types';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Card, CardContent, CardHeader } from '#lib/components/ui/card/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { Separator } from '#lib/components/ui/separator/index.ts';
+	import { Progress } from '#lib/components/ui/progress/index.ts';
+	import { Switch } from '#lib/components/ui/switch/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { providerApi } from '#lib/services/provider-api.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { PHOTO_CATEGORY_LABELS } from '#lib/constants/ui.ts';
+	import type { PhotoCategory, CategorySetting, UserProviderInfo } from '#lib/types/index.ts';
 
 	let {
 		provider,

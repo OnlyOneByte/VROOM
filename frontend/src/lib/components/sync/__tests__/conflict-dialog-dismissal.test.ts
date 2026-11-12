@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import type { SyncConflict } from '$lib/utils/sync/sync-state.svelte';
+import type { SyncConflict } from '#lib/utils/sync/sync-state.svelte.ts';
 
 const resolveConflict = vi.fn(async () => true);
-vi.mock('$lib/utils/sync/sync-manager', async () => {
-	const state = await import('$lib/utils/sync/sync-state.svelte');
+vi.mock('#lib/utils/sync/sync-manager.ts', async () => {
+	const state = await import('#lib/utils/sync/sync-state.svelte.ts');
 	return { syncConflicts: state.syncConflicts, syncManager: { resolveConflict } };
 });
 
-const { syncConflicts } = await import('$lib/utils/sync/sync-state.svelte');
+const { syncConflicts } = await import('#lib/utils/sync/sync-state.svelte.ts');
 const SyncConflictResolver = (await import('../SyncConflictResolver.svelte')).default;
 
 function conflict(id: string): SyncConflict {

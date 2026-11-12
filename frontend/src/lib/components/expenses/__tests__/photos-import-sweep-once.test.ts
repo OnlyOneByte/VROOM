@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { render } from '@testing-library/svelte';
-import type { ReceiptDraftItem } from '$lib/services/photos-import-api';
-import type { Vehicle } from '$lib/types';
+import type { ReceiptDraftItem } from '#lib/services/photos-import-api.ts';
+import type { Vehicle } from '#lib/types/index.ts';
 
 const CALL_BUDGET = 8;
 
@@ -13,7 +13,7 @@ const getReceiptDrafts = vi.fn(async () => {
 	return drafts;
 });
 const confirmDraft = vi.fn(async () => ({}));
-vi.mock('$lib/services/photos-import-api', () => ({
+vi.mock('#lib/services/photos-import-api.ts', () => ({
 	photosImportApi: { getReceiptDrafts, confirmDraft }
 }));
 

@@ -1,17 +1,17 @@
 <script lang="ts">
-	import '$lib/components/charts/pie-chart-animations.css';
-	import '$lib/components/charts/bar-chart-animations.css';
-	import { createVisibilityWatch } from '$lib/utils/visibility-watch.svelte';
+	import '#lib/components/charts/pie-chart-animations.css';
+	import '#lib/components/charts/bar-chart-animations.css';
+	import { createVisibilityWatch } from '#lib/utils/visibility-watch.svelte.ts';
 	import { PieChart } from 'layerchart';
 	import { CreditCard } from '@lucide/svelte';
-	import * as Card from '$lib/components/ui/card';
-	import * as Chart from '$lib/components/ui/chart';
-	import { Badge } from '$lib/components/ui/badge';
-	import { AppBarChart } from '$lib/components/charts';
-	import StatCardGrid from '$lib/components/charts/StatCardGrid.svelte';
-	import type { FinancingResponse } from '$lib/types';
-	import { capitalize, formatCurrency } from '$lib/utils/formatters';
-	import { parseMonthToDate } from '$lib/utils/chart-formatters';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import * as Chart from '#lib/components/ui/chart/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { AppBarChart } from '#lib/components/charts/index.ts';
+	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
+	import type { FinancingResponse } from '#lib/types/index.ts';
+	import { capitalize, formatCurrency } from '#lib/utils/formatters.ts';
+	import { parseMonthToDate } from '#lib/utils/chart-formatters.ts';
 
 	let { financing }: { financing: FinancingResponse } = $props();
 

@@ -1,10 +1,10 @@
-import type { Expense, ExpenseCategory, Vehicle } from '$lib/types';
+import type { Expense, ExpenseCategory, Vehicle } from '#lib/types/index.ts';
 import {
 	compareExpenseRows,
 	type SortDirection,
 	type SortableRow
-} from '$lib/utils/expense-helpers';
-import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
+} from '#lib/utils/expense-helpers.ts';
+import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 
 export interface ExpenseRow {
 	type: 'standalone';

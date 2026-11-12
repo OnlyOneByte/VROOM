@@ -11,10 +11,10 @@ import type {
 	VehicleExpensesResponse,
 	YearEndResponse,
 	AnalyticsSummaryResponse
-} from '$lib/types';
-import { ApiError } from '$lib/utils/error-handling';
+} from '#lib/types/index.ts';
+import { ApiError } from '#lib/utils/error-handling.ts';
 import { apiClient } from './api-client';
-import { NetworkError } from '$lib/utils/error-handling';
+import { NetworkError } from '#lib/utils/error-handling.ts';
 import { buildQueryString } from './api-utils';
 
 interface FuelEfficiencyParams {

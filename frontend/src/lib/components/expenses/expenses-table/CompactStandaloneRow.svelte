@@ -1,16 +1,16 @@
 <script lang="ts">
 	import { Pencil, Trash2 } from '@lucide/svelte';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
 	import RecurringExpenseBadge from '../RecurringExpenseBadge.svelte';
-	import type { Expense, Vehicle } from '$lib/types';
-	import { formatCurrency, formatDate } from '$lib/utils/formatters';
+	import type { Expense, Vehicle } from '#lib/types/index.ts';
+	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
 	import {
 		categoryLabels,
 		getCategoryBadgeClasses,
 		getCategoryIcon
-	} from '$lib/utils/expense-helpers';
-	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
+	} from '#lib/utils/expense-helpers.ts';
+	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 	import { expenseEditHref } from './expense-table-actions';
 	import {
 		MOBILE_ROW_ACTION_CLASS,

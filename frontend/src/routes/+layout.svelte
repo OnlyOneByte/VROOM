@@ -1,30 +1,30 @@
 <script lang="ts">
 	import { onMount, type Component } from 'svelte';
 	import { page } from '$app/state';
-	import { authStore } from '$lib/stores/auth.svelte';
-	import { appStore } from '$lib/stores/app.svelte';
-	import { handleRouteProtection } from '$lib/utils/auth.js';
-	import Navigation from '$lib/components/layout/Navigation.svelte';
-	import { Toaster } from '$lib/components/ui/sonner';
+	import { authStore } from '#lib/stores/auth.svelte.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { handleRouteProtection } from '#lib/utils/auth.js';
+	import Navigation from '#lib/components/layout/Navigation.svelte';
+	import { Toaster } from '#lib/components/ui/sonner/index.ts';
 	import { toast } from 'svelte-sonner';
-	import OfflineIndicator from '$lib/components/sync/OfflineIndicator.svelte';
-	import { NOTIFICATION_LIMITS } from '$lib/constants/limits';
-	import PWAInstallPrompt from '$lib/components/layout/PWAInstallPrompt.svelte';
-	import { syncConflicts } from '$lib/utils/sync/sync-state.svelte';
+	import OfflineIndicator from '#lib/components/sync/OfflineIndicator.svelte';
+	import { NOTIFICATION_LIMITS } from '#lib/constants/limits.ts';
+	import PWAInstallPrompt from '#lib/components/layout/PWAInstallPrompt.svelte';
+	import { syncConflicts } from '#lib/utils/sync/sync-state.svelte.ts';
 	import { pwaInfo } from 'virtual:pwa-info';
-	import { loadOfflineExpenses } from '$lib/utils/offline-storage';
-	import { offlineExpenseQueue } from '$lib/stores/offline.svelte';
+	import { loadOfflineExpenses } from '#lib/utils/offline-storage.ts';
+	import { offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
 	import '../app.css';
 	// Theme overrides must load after app.css, or non-default themes flash the default palette.
-	import '$lib/theme/themes.css';
+	import '#lib/theme/themes.css';
 
 	import { LoaderCircle } from '@lucide/svelte';
 
-	import { reminderApi } from '$lib/services/reminder-api';
-	import { maybeTriggerRecurringExpenses } from '$lib/utils/reminder-helpers';
-	import { onlineStatus } from '$lib/stores/offline.svelte';
-	import { themeStore } from '$lib/stores/theme.svelte';
-	import { settingsStore } from '$lib/stores/settings.svelte';
+	import { reminderApi } from '#lib/services/reminder-api.ts';
+	import { maybeTriggerRecurringExpenses } from '#lib/utils/reminder-helpers.ts';
+	import { onlineStatus } from '#lib/stores/offline.svelte.ts';
+	import { themeStore } from '#lib/stores/theme.svelte.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 
 	let { children } = $props();
 
@@ -97,7 +97,7 @@
 
 	$effect(() => {
 		if (SyncConflictResolver || syncConflicts.current.length === 0) return;
-		void import('$lib/components/sync/SyncConflictResolver.svelte').then(module => {
+		void import('#lib/components/sync/SyncConflictResolver.svelte').then(module => {
 			SyncConflictResolver = module.default;
 		});
 	});

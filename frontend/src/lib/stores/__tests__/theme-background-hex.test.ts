@@ -1,10 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { DEFAULT_THEME_ID, THEME_REGISTRY } from '$lib/theme/theme-registry';
-import { oklchToHex } from '$lib/theme/oklch-to-hex';
-import { generateThemeChromeModule } from '$lib/theme/themes-css';
+import { DEFAULT_THEME_ID, THEME_REGISTRY } from '#lib/theme/theme-registry.ts';
+import { oklchToHex } from '#lib/theme/oklch-to-hex.ts';
+import { generateThemeChromeModule } from '#lib/theme/themes-css.ts';
 
-vi.mock('$lib/services/settings-api', () => ({
+vi.mock('#lib/services/settings-api.ts', () => ({
 	settingsApi: { updateSettings: vi.fn(() => Promise.resolve()) }
 }));
 
@@ -27,7 +27,7 @@ describe('theme-chrome.ts is generated from the theme registry', () => {
 
 	test('the theme store reads the generated module, not the token registry', () => {
 		const storeSrc = readFileSync(`${CWD}/src/lib/stores/theme.svelte.ts`, 'utf8');
-		expect(storeSrc).toMatch(/from\s+['"]\$lib\/theme\/theme-chrome['"]/);
+		expect(storeSrc).toMatch(/from\s+['"]#lib\/theme\/theme-chrome\.ts['"]/);
 		expect(storeSrc).not.toMatch(/from\s+['"][^'"]*theme-registry['"]/);
 		expect(storeSrc).not.toMatch(/from\s+['"][^'"]*oklch-to-hex['"]/);
 	});

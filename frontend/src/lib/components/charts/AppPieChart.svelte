@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { PieChart } from 'layerchart';
-	import * as Chart from '$lib/components/ui/chart';
+	import * as Chart from '#lib/components/ui/chart/index.ts';
 	import ChartCard from './ChartCard.svelte';
-	import { createVisibilityWatch } from '$lib/utils/visibility-watch.svelte';
-	import { formatCurrency } from '$lib/utils/formatters';
+	import { createVisibilityWatch } from '#lib/utils/visibility-watch.svelte.ts';
+	import { formatCurrency } from '#lib/utils/formatters.ts';
 	import type { Snippet } from 'svelte';
 
 	interface PieDataItem {

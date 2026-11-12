@@ -5,8 +5,8 @@ import type {
 	Vehicle,
 	VehicleFinancing,
 	VehicleStats
-} from '$lib/types';
-import type { TimePeriod } from '$lib/constants/time-periods';
+} from '#lib/types/index.ts';
+import type { TimePeriod } from '#lib/constants/time-periods.ts';
 import { apiClient } from './api-client';
 import { photoCollection } from './photo-api';
 

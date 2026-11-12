@@ -1,4 +1,4 @@
-import { onlineStatus, syncState, offlineExpenseQueue } from '$lib/stores/offline.svelte';
+import { onlineStatus, syncState, offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
 import {
 	syncConfig,
 	syncConflicts,
@@ -23,12 +23,12 @@ import {
 	offlineExpenseToBackend,
 	type OfflineExpense
 } from '../offline-storage';
-import { extractErrorMessage } from '$lib/utils/error-handling';
+import { extractErrorMessage } from '#lib/utils/error-handling.ts';
 import { classifySyncFailure, type SyncFailureKind } from './classify-failure';
-import { apiClient } from '$lib/services/api-client';
-import { fromBackendExpense } from '$lib/services/api-transformer';
-import type { BackendExpenseResponse } from '$lib/types';
-import { browser } from '$app/environment';
+import { apiClient } from '#lib/services/api-client.ts';
+import { fromBackendExpense } from '#lib/services/api-transformer.ts';
+import type { BackendExpenseResponse } from '#lib/types/index.ts';
+import { browser } from '$app/env';
 
 export type { SyncConflict, SyncConfig };
 export {
@@ -260,6 +260,7 @@ class SyncManager {
 				`/api/v1/expenses?${filters.toString()}`
 			);
 			const expenseList = Array.isArray(rows) ? rows.map(fromBackendExpense) : [];
+
 			return (
 				expenseList.find(existing => expense.tags.some(tag => existing.tags?.includes(tag))) || null
 			);
@@ -290,14 +291,17 @@ class SyncManager {
 				markExpenseAsSynced(expense.id);
 				this.retryCount.delete(expense.id);
 				const currentExpenses = offlineExpenseQueue.current;
+
 				offlineExpenseQueue.current = currentExpenses.map(e =>
 					e.id === expense.id ? { ...e, synced: true } : e
 				);
 			} else if (result.conflict) {
 				this.retryCount.delete(expense.id);
+
 				const already = syncConflicts.current.some(
 					c => c.localExpense.id === result.conflict?.localExpense.id
 				);
+
 				if (!already) {
 					syncConflicts.current = [...syncConflicts.current, result.conflict];
 					syncState.current = 'error';

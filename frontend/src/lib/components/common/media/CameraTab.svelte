@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { browser } from '$app/environment';
+	import { browser } from '$app/env';
 	import { LoaderCircle, Upload, X, CircleAlert, SwitchCamera, Circle } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
+	import { Button } from '#lib/components/ui/button/index.ts';
 
 	interface Props {
 		uploadErrors: string[];

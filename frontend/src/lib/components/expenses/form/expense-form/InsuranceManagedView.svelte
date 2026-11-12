@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { ArrowLeft, Shield, Trash2 } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { categoryLabels } from '$lib/utils/expense-helpers';
-	import { formatCurrency, formatDate, dateOnlyToISO } from '$lib/utils/formatters';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { categoryLabels } from '#lib/utils/expense-helpers.ts';
+	import { formatCurrency, formatDate, dateOnlyToISO } from '#lib/utils/formatters.ts';
 	import ExpensePhotoSection from '../ExpensePhotoSection.svelte';
 	import ExpenseFormHeader from './ExpenseFormHeader.svelte';
 

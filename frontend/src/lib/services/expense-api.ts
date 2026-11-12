@@ -8,14 +8,14 @@ import type {
 	Photo,
 	SplitConfig,
 	SplitExpenseGroup
-} from '$lib/types';
-import type { ImportMappingPreset } from '$lib/types/import-mapping';
+} from '#lib/types/index.ts';
+import type { ImportMappingPreset } from '#lib/types/import-mapping.ts';
 import { fromBackendExpense, toBackendExpense } from './api-transformer';
 import { apiClient } from './api-client';
 import { buildQueryString } from './api-utils';
 import { entityPhotos } from './photo-api';
-import { toDateInputValue } from '$lib/utils/formatters';
-import { triggerBlobDownload } from '$lib/utils/download';
+import { toDateInputValue } from '#lib/utils/formatters.ts';
+import { triggerBlobDownload } from '#lib/utils/download.ts';
 
 type PaginatedExpenseResponse = PaginatedResponse<Expense>;
 

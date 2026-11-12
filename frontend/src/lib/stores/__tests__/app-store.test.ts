@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from 'vitest';
 import { appStore } from '../app.svelte';
-import type { Vehicle } from '$lib/types';
+import type { Vehicle } from '#lib/types/index.ts';
 
 function vehicle(id: string, over: Partial<Vehicle> = {}): Vehicle {
 	return { id, userId: 'u1', make: 'Toyota', model: 'Camry', year: 2022, ...over } as Vehicle;

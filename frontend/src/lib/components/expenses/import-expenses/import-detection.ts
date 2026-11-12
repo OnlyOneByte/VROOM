@@ -1,6 +1,6 @@
-import type { NativeImportField } from '$lib/types';
-import type { ImportMappingPreset } from '$lib/types/import-mapping';
-import { guessManualColumns, isNativeImportHeaders } from '$lib/utils/import-mapping-helpers';
+import type { NativeImportField } from '#lib/types/index.ts';
+import type { ImportMappingPreset } from '#lib/types/import-mapping.ts';
+import { guessManualColumns, isNativeImportHeaders } from '#lib/utils/import-mapping-helpers.ts';
 
 export interface DetectionOutcome {
 	targetVehicleId: string;

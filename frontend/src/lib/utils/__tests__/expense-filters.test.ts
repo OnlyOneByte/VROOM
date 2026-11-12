@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { hasActiveFilters, extractUniqueTags } from '../expense-filters';
-import type { Expense, ExpenseFilters } from '$lib/types';
+import type { Expense, ExpenseFilters } from '#lib/types/index.ts';
 
 const NO_FILTERS: ExpenseFilters = {};
 

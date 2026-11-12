@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { FormFieldError } from '$lib/components/ui/form-field';
-	import { Label } from '$lib/components/ui/label';
-	import { COMMON_EXPENSE_TAGS } from '$lib/types';
+	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { COMMON_EXPENSE_TAGS } from '#lib/types/index.ts';
 
 	interface Props {
 		tags: string[];

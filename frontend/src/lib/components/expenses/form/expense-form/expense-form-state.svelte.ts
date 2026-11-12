@@ -1,9 +1,9 @@
-import { settingsStore } from '$lib/stores/settings.svelte';
-import { COMMON_EXPENSE_TAGS } from '$lib/types';
-import type { Expense, ExpenseFormErrors, Vehicle } from '$lib/types';
-import { extractUniqueTags } from '$lib/utils/expense-filters';
-import { resetSplitAllocations, type SplitAllocationDraft } from '$lib/utils/expense-helpers';
-import { getDistanceUnitLabel, isElectricFuelType } from '$lib/utils/units';
+import { settingsStore } from '#lib/stores/settings.svelte.ts';
+import { COMMON_EXPENSE_TAGS } from '#lib/types/index.ts';
+import type { Expense, ExpenseFormErrors, Vehicle } from '#lib/types/index.ts';
+import { extractUniqueTags } from '#lib/utils/expense-filters.ts';
+import { resetSplitAllocations, type SplitAllocationDraft } from '#lib/utils/expense-helpers.ts';
+import { getDistanceUnitLabel, isElectricFuelType } from '#lib/utils/units.ts';
 import { validateExpenseField } from '../expense-form-validation';
 import { calculateMileageEfficiency } from './mileage-efficiency';
 import { createEmptyFormData, type ExpenseFormData } from './expense-form-data';

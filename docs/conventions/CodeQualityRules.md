@@ -57,7 +57,7 @@ with the route (e.g. `routes/reminders/__tests__/reminder-card-mobile-stack.test
 
 ## Chart colors
 
-- Series colors come from `CHART_COLORS` in `$lib/utils/chart-colors`. A category's color is
+- Series colors come from `CHART_COLORS` in `#lib/utils/chart-colors`. A category's color is
   assigned exactly once, in that module's `CATEGORY_COLOR_TOKENS`; every surface derives its own
   rendering from it — `getCategoryChartColor` (a CSS color value, for a chart fill or legend
   swatch) and `getCategoryBadgeClasses` in `expense-helpers` (a Tailwind `text-*`/`bg-*` pair, for

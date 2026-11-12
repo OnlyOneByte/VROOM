@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { SvelteSet } from 'svelte/reactivity';
-	import { appStore } from '$lib/stores/app.svelte';
-	import type { Expense, Vehicle } from '$lib/types';
-	import PaginationControls from '$lib/components/common/pagination-controls.svelte';
-	import { IsMobile } from '$lib/hooks/is-mobile.svelte';
+	import { appStore } from '#lib/stores/app.svelte.ts';
+	import type { Expense, Vehicle } from '#lib/types/index.ts';
+	import PaginationControls from '#lib/components/common/pagination-controls.svelte';
+	import { IsMobile } from '#lib/hooks/is-mobile.svelte.ts';
 	import ExpensesTableEmptyState from './expenses-table/ExpensesTableEmptyState.svelte';
 	import ExpensesCompactList from './expenses-table/ExpensesCompactList.svelte';
 	import ExpensesDesktopTable from './expenses-table/ExpensesDesktopTable.svelte';

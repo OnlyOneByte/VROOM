@@ -1,15 +1,15 @@
 <script lang="ts">
 	import { Search, X, Car, Tag } from '@lucide/svelte';
-	import Input from '$lib/components/ui/input/input.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Badge } from '$lib/components/ui/badge';
-	import * as CardNs from '$lib/components/ui/card';
-	import * as Select from '$lib/components/ui/select';
-	import DateRangePicker from '$lib/components/common/date-range-picker.svelte';
-	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
-	import { extractUniqueTags } from '$lib/utils/expense-filters';
-	import { COMMON_MESSAGES } from '$lib/constants/messages';
-	import type { Vehicle, Expense, ExpenseFilters } from '$lib/types';
+	import Input from '#lib/components/ui/input/input.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import * as CardNs from '#lib/components/ui/card/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import DateRangePicker from '#lib/components/common/date-range-picker.svelte';
+	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
+	import { extractUniqueTags } from '#lib/utils/expense-filters.ts';
+	import { COMMON_MESSAGES } from '#lib/constants/messages.ts';
+	import type { Vehicle, Expense, ExpenseFilters } from '#lib/types/index.ts';
 
 	interface Props {
 		searchTerm: string;

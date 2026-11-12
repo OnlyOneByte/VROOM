@@ -15,7 +15,7 @@ Every view that loads or mutates data MUST handle all four states — not just t
 
 1. **Loading** — a `Skeleton` or spinner while data is in flight. Never a blank flash or a
    layout that jumps when data arrives.
-2. **Empty** — a real `EmptyState` (`$lib/components/common/empty-state.svelte`) with an
+2. **Empty** — a real `EmptyState` (`#lib/components/common/empty-state.svelte`) with an
    icon, a one-line explanation, and a primary action — NOT a bare "No data". (See
    `/reminders` for the reference pattern.)
 3. **Error** — a visible, recoverable message, never a silent `catch {}` that leaves the
@@ -62,7 +62,7 @@ New screens must look like the app, not like a new app. Past the `DesignSystem.m
 inventory, two "don't reinvent" rules live here:
 - **Currency / dates** — `utils/formatters` (`formatCurrency`, `formatDate`), never inline
   `toFixed` / `toLocaleString`.
-- **Routes / links** — `$lib/routes` + `resolve()`, never a hardcoded path string.
+- **Routes / links** — `#lib/routes` + `resolve()`, never a hardcoded path string.
 
 ## Interaction quality
 

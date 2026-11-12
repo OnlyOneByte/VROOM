@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { routes } from '$lib/routes';
+	import { routes } from '#lib/routes.ts';
 	import {
 		Calendar,
 		DollarSign,
@@ -15,33 +15,33 @@
 		Upload,
 		Images
 	} from '@lucide/svelte';
-	import { offlineExpenseQueue } from '$lib/stores/offline.svelte';
-	import { removeOfflineExpense } from '$lib/utils/offline-storage';
-	import { settingsStore } from '$lib/stores/settings.svelte';
-	import { vehicleApi } from '$lib/services/vehicle-api';
-	import { expenseApi } from '$lib/services/expense-api';
-	import type { Expense, Vehicle, ExpenseSummary } from '$lib/types';
+	import { offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
+	import { removeOfflineExpense } from '#lib/utils/offline-storage.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
+	import { vehicleApi } from '#lib/services/vehicle-api.ts';
+	import { expenseApi } from '#lib/services/expense-api.ts';
+	import type { Expense, Vehicle, ExpenseSummary } from '#lib/types/index.ts';
 
 	type ExpenseWithVehicle = Expense & { vehicle?: Vehicle };
-	import { formatCurrency } from '$lib/utils/formatters';
-	import { handleErrorWithNotification } from '$lib/utils/error-handling';
-	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
-	import { extractUniqueTags } from '$lib/utils/expense-filters';
-	import { COMMON_MESSAGES, EXPENSE_MESSAGES } from '$lib/constants/messages';
-	import DateRangePicker from '$lib/components/common/date-range-picker.svelte';
-	import Input from '$lib/components/ui/input/input.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as CardNs from '$lib/components/ui/card';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import ExpensesTable from '$lib/components/expenses/ExpensesTable.svelte';
-	import FloatingActionButton from '$lib/components/common/floating-action-button.svelte';
-	import PageHeader from '$lib/components/common/page-header.svelte';
-	import ExpenseTagFilter from '$lib/components/expenses/ExpenseTagFilter.svelte';
-	import OfflineExpenseCards from '$lib/components/expenses/OfflineExpenseCards.svelte';
-	import ExpenseOverviewSection from '$lib/components/expenses/ExpenseOverviewSection.svelte';
-	import ImportExpensesDialog from '$lib/components/expenses/ImportExpensesDialog.svelte';
-	import ImportFromPhotosDialog from '$lib/components/expenses/ImportFromPhotosDialog.svelte';
-	import * as Select from '$lib/components/ui/select';
+	import { formatCurrency } from '#lib/utils/formatters.ts';
+	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
+	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
+	import { extractUniqueTags } from '#lib/utils/expense-filters.ts';
+	import { COMMON_MESSAGES, EXPENSE_MESSAGES } from '#lib/constants/messages.ts';
+	import DateRangePicker from '#lib/components/common/date-range-picker.svelte';
+	import Input from '#lib/components/ui/input/input.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as CardNs from '#lib/components/ui/card/index.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import ExpensesTable from '#lib/components/expenses/ExpensesTable.svelte';
+	import FloatingActionButton from '#lib/components/common/floating-action-button.svelte';
+	import PageHeader from '#lib/components/common/page-header.svelte';
+	import ExpenseTagFilter from '#lib/components/expenses/ExpenseTagFilter.svelte';
+	import OfflineExpenseCards from '#lib/components/expenses/OfflineExpenseCards.svelte';
+	import ExpenseOverviewSection from '#lib/components/expenses/ExpenseOverviewSection.svelte';
+	import ImportExpensesDialog from '#lib/components/expenses/ImportExpensesDialog.svelte';
+	import ImportFromPhotosDialog from '#lib/components/expenses/ImportFromPhotosDialog.svelte';
+	import * as Select from '#lib/components/ui/select/index.ts';
 	import { useExpenseListReload } from './expense-list-reload.svelte';
 
 	let isLoading = $state(true);

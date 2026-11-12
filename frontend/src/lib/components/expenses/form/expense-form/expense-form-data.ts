@@ -1,4 +1,4 @@
-import { toDateInputValue } from '$lib/utils/formatters';
+import { toDateInputValue } from '#lib/utils/formatters.ts';
 
 export interface ExpenseFormData {
 	vehicleId: string;

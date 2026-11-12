@@ -1,32 +1,32 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, waitFor } from '@testing-library/svelte';
-import type { Expense, Vehicle } from '$lib/types';
+import type { Expense, Vehicle } from '#lib/types/index.ts';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
 let tableProps: Record<string, unknown> = {};
-vi.mock('$lib/components/expenses/ExpensesTable.svelte', () => ({
+vi.mock('#lib/components/expenses/ExpensesTable.svelte', () => ({
 	default: (_anchor: unknown, props: Record<string, unknown>) => {
 		tableProps = props;
 	}
 }));
 
-vi.mock('$lib/components/charts', () => ({ AppPieChart: () => {} }));
-vi.mock('$lib/components/charts/ExpenseTrendChart.svelte', () => ({ default: () => {} }));
-vi.mock('$lib/components/charts/FuelEfficiencyTrendChart.svelte', () => ({ default: () => {} }));
-vi.mock('$lib/components/vehicles/VehiclePhotoCarousel.svelte', () => ({ default: () => {} }));
-vi.mock('$lib/components/vehicles/FinanceTab.svelte', () => ({ default: () => {} }));
-vi.mock('$lib/components/vehicles/OdometerTab.svelte', () => ({ default: () => {} }));
-vi.mock('$lib/components/vehicles/ShareVehicleDialog.svelte', () => ({ default: () => {} }));
-vi.mock('$lib/components/vehicles/FuelEfficiencyStatsCard.svelte', () => ({ default: () => {} }));
-vi.mock('$lib/components/common/MediaCaptureDialog.svelte', () => ({ default: () => {} }));
+vi.mock('#lib/components/charts/index.ts', () => ({ AppPieChart: () => {} }));
+vi.mock('#lib/components/charts/ExpenseTrendChart.svelte', () => ({ default: () => {} }));
+vi.mock('#lib/components/charts/FuelEfficiencyTrendChart.svelte', () => ({ default: () => {} }));
+vi.mock('#lib/components/vehicles/VehiclePhotoCarousel.svelte', () => ({ default: () => {} }));
+vi.mock('#lib/components/vehicles/FinanceTab.svelte', () => ({ default: () => {} }));
+vi.mock('#lib/components/vehicles/OdometerTab.svelte', () => ({ default: () => {} }));
+vi.mock('#lib/components/vehicles/ShareVehicleDialog.svelte', () => ({ default: () => {} }));
+vi.mock('#lib/components/vehicles/FuelEfficiencyStatsCard.svelte', () => ({ default: () => {} }));
+vi.mock('#lib/components/common/MediaCaptureDialog.svelte', () => ({ default: () => {} }));
 
 const getExpensesByVehicle = vi.fn();
 const getExpenseSummary = vi.fn();
 const downloadExpensesCsv = vi.fn((_params?: Record<string, unknown>) => Promise.resolve());
 
-vi.mock('$lib/services/expense-api', () => ({
+vi.mock('#lib/services/expense-api.ts', () => ({
 	expenseApi: {
 		getExpensesByVehicle: (...args: unknown[]) => getExpensesByVehicle(...args),
 		getExpenseSummary: (...args: unknown[]) => getExpenseSummary(...args),
@@ -51,7 +51,7 @@ const getVehicleStats = vi.fn();
 const getPhotos = vi.fn();
 const getFuelEfficiency = vi.fn();
 
-vi.mock('$lib/services/vehicle-api', () => ({
+vi.mock('#lib/services/vehicle-api.ts', () => ({
 	vehicleApi: {
 		getVehicle: (...args: unknown[]) => getVehicle(...args),
 		getVehicleStats: (...args: unknown[]) => getVehicleStats(...args),
@@ -63,7 +63,7 @@ vi.mock('$lib/services/vehicle-api', () => ({
 	}
 }));
 
-vi.mock('$lib/services/analytics-api', () => ({
+vi.mock('#lib/services/analytics-api.ts', () => ({
 	analyticsApi: { getFuelEfficiency: (...args: unknown[]) => getFuelEfficiency(...args) }
 }));
 

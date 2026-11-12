@@ -2,26 +2,26 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
-	import { appStore } from '$lib/stores/app.svelte';
-	import { routes } from '$lib/routes';
-	import { gotoDynamic } from '$lib/utils/navigation';
+	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { routes } from '#lib/routes.ts';
+	import { gotoDynamic } from '#lib/utils/navigation.ts';
 	import { ArrowLeft, Shield, Trash2, X, Check, LoaderCircle } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import { Textarea } from '$lib/components/ui/textarea';
-	import { Switch } from '$lib/components/ui/switch';
-	import { Checkbox } from '$lib/components/ui/checkbox';
-	import * as Select from '$lib/components/ui/select';
-	import { FormFieldError } from '$lib/components/ui/form-field';
-	import DatePicker from '$lib/components/common/date-picker.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { Textarea } from '#lib/components/ui/textarea/index.ts';
+	import { Switch } from '#lib/components/ui/switch/index.ts';
+	import { Checkbox } from '#lib/components/ui/checkbox/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
+	import DatePicker from '#lib/components/common/date-picker.svelte';
 	import {
 		Card,
 		CardContent,
 		CardDescription,
 		CardHeader,
 		CardTitle
-	} from '$lib/components/ui/card';
+	} from '#lib/components/ui/card/index.ts';
 	import {
 		AlertDialog,
 		AlertDialogAction,
@@ -31,13 +31,13 @@
 		AlertDialogFooter,
 		AlertDialogHeader,
 		AlertDialogTitle
-	} from '$lib/components/ui/alert-dialog';
-	import { insuranceApi } from '$lib/services/insurance-api';
-	import { vehicleApi } from '$lib/services/vehicle-api';
-	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
-	import { dateOnlyToISO, getCurrencySymbol } from '$lib/utils/formatters';
-	import type { InsurancePolicy, Vehicle, CreateTermRequest } from '$lib/types';
-	import FormLayout from '$lib/components/common/form-layout.svelte';
+	} from '#lib/components/ui/alert-dialog/index.ts';
+	import { insuranceApi } from '#lib/services/insurance-api.ts';
+	import { vehicleApi } from '#lib/services/vehicle-api.ts';
+	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
+	import { dateOnlyToISO, getCurrencySymbol } from '#lib/utils/formatters.ts';
+	import type { InsurancePolicy, Vehicle, CreateTermRequest } from '#lib/types/index.ts';
+	import FormLayout from '#lib/components/common/form-layout.svelte';
 
 	const currencySymbol = $derived(getCurrencySymbol());
 

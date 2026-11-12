@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { GitBranch } from '@lucide/svelte';
-	import * as Select from '$lib/components/ui/select';
-	import { Button } from '$lib/components/ui/button';
-	import { Label } from '$lib/components/ui/label';
-	import { FormFieldError } from '$lib/components/ui/form-field';
-	import type { Vehicle } from '$lib/types';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
+	import type { Vehicle } from '#lib/types/index.ts';
 
 	interface Props {
 		vehicles: Vehicle[];

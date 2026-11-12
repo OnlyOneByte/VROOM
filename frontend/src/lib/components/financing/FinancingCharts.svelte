@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
-	import { ChartContainer, ChartTooltip } from '$lib/components/ui/chart';
-	import type { ChartConfig } from '$lib/components/ui/chart';
+	import { Card, CardContent, CardHeader, CardTitle } from '#lib/components/ui/card/index.ts';
+	import { ChartContainer, ChartTooltip } from '#lib/components/ui/chart/index.ts';
+	import type { ChartConfig } from '#lib/components/ui/chart/index.ts';
 	import { BarChart } from 'layerchart';
-	import { createVisibilityWatch } from '$lib/utils/visibility-watch.svelte';
-	import type { VehicleFinancing } from '$lib/types';
-	import type { AmortizationEntry } from '$lib/utils/financing-calculations';
-	import { formatCurrencyAxis } from '$lib/utils/chart-formatters';
+	import { createVisibilityWatch } from '#lib/utils/visibility-watch.svelte.ts';
+	import type { VehicleFinancing } from '#lib/types/index.ts';
+	import type { AmortizationEntry } from '#lib/utils/financing-calculations.ts';
+	import { formatCurrencyAxis } from '#lib/utils/chart-formatters.ts';
 
 	interface Props {
 		financing: VehicleFinancing;

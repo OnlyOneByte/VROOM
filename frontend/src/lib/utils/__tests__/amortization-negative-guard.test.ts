@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import type { VehicleFinancing } from '$lib/types';
-import { calculateAmortizationSchedule } from '$lib/utils/financing-calculations';
+import type { VehicleFinancing } from '#lib/types/index.ts';
+import { calculateAmortizationSchedule } from '#lib/utils/financing-calculations.ts';
 
 function makeLoan(overrides: Partial<VehicleFinancing> = {}): VehicleFinancing {
 	return {

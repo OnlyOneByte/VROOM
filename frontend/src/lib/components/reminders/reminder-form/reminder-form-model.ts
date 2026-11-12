@@ -1,8 +1,8 @@
-import { toDateInputValue } from '$lib/utils/formatters';
-import { getDistanceUnitLabel } from '$lib/utils/units';
-import type { SplitAllocationDraft } from '$lib/utils/expense-helpers';
-import type { ExpenseCategory, ReminderWithVehicles, Vehicle } from '$lib/types';
-import type { TriggerMode } from '$lib/types/reminder';
+import { toDateInputValue } from '#lib/utils/formatters.ts';
+import { getDistanceUnitLabel } from '#lib/utils/units.ts';
+import type { SplitAllocationDraft } from '#lib/utils/expense-helpers.ts';
+import type { ExpenseCategory, ReminderWithVehicles, Vehicle } from '#lib/types/index.ts';
+import type { TriggerMode } from '#lib/types/reminder.ts';
 
 export const FREQUENCIES = ['weekly', 'monthly', 'yearly', 'custom'] as const;
 export const INTERVAL_UNITS = ['day', 'week', 'month', 'year'] as const;

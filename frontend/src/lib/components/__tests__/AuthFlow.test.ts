@@ -3,14 +3,10 @@ import { authStore } from '../../stores/auth.svelte';
 import type { User } from '../../types/index.js';
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
+import { routes } from '#lib/routes.ts';
 
-vi.mock('$app/navigation', () => ({
-	goto: vi.fn()
-}));
-
-vi.mock('$app/paths', () => ({
-	resolve: (path: string) => path
-}));
+vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
+vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
@@ -113,7 +109,7 @@ describe('Authentication Flow Integration', () => {
 		it('redirects unauthenticated users to login', () => {
 			authStore.clearUser();
 			if (!authStore.isAuthenticated && !authStore.isLoading) {
-				goto(resolve('/auth'));
+				goto(resolve(routes.auth));
 			}
 			expect(goto).toHaveBeenCalledWith('/auth');
 		});

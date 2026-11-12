@@ -1,9 +1,9 @@
 import { render, screen, waitFor } from '@testing-library/svelte';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import type { UserProviderInfo } from '$lib/types';
+import type { UserProviderInfo } from '#lib/types/index.ts';
 
 const getProviders = vi.fn((_domain?: string) => Promise.resolve([] as UserProviderInfo[]));
-vi.mock('$lib/services/provider-api', () => ({
+vi.mock('#lib/services/provider-api.ts', () => ({
 	providerApi: {
 		getProviders: (domain?: string) => getProviders(domain),
 		createProvider: vi.fn(),

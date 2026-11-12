@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import fc from 'fast-check';
 import { fromBackendExpense, toBackendExpense } from '../api-transformer';
-import { ELECTRIC_FUEL_TYPES, isElectricFuelType } from '$lib/utils/units';
+import { ELECTRIC_FUEL_TYPES, isElectricFuelType } from '#lib/utils/units.ts';
 
 const NON_ELECTRIC_FUEL_TYPES = [
 	'87 (Regular)',

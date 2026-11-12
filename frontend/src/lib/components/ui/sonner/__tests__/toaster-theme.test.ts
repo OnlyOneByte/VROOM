@@ -1,7 +1,7 @@
 import { render, waitFor } from '@testing-library/svelte';
 import { toast } from 'svelte-sonner';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { themeStore } from '$lib/stores/theme.svelte';
+import { themeStore } from '#lib/stores/theme.svelte.ts';
 import { Toaster } from '../index';
 
 // sonner mounts its themed list only once a toast exists.

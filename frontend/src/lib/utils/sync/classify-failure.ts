@@ -1,4 +1,4 @@
-import { ApiError } from '$lib/utils/error-handling';
+import { ApiError } from '#lib/utils/error-handling.ts';
 
 // Kept here, not in sync-manager, to avoid an offline-storage/sync-manager import cycle.
 export type SyncFailureKind = 'transient' | 'auth' | 'terminal';

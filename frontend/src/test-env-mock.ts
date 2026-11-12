@@ -1,1 +1,1 @@
-export const env: Record<string, string> = {};
+export const PUBLIC_API_URL = '';

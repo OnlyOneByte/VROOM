@@ -3,31 +3,31 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { HardDrive, Plus, LoaderCircle, Download, Upload, RefreshCw } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Label } from '$lib/components/ui/label';
-	import * as Select from '$lib/components/ui/select';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
 	import {
 		Card,
 		CardContent,
 		CardDescription,
 		CardHeader,
 		CardTitle
-	} from '$lib/components/ui/card';
-	import { Separator } from '$lib/components/ui/separator';
+	} from '#lib/components/ui/card/index.ts';
+	import { Separator } from '#lib/components/ui/separator/index.ts';
 	import DefaultPhotoSources from '../storage-provider/DefaultPhotoSources.svelte';
 	import ProviderCard from '../storage-provider/ProviderInfoCard.svelte';
-	import { providerApi } from '$lib/services/provider-api';
-	import { settingsApi } from '$lib/services/settings-api';
-	import { fetchLastSyncTime } from '$lib/utils/sync/sync-manager';
-	import { appStore } from '$lib/stores/app.svelte';
-	import { routes, paramRoutes } from '$lib/routes';
+	import { providerApi } from '#lib/services/provider-api.ts';
+	import { settingsApi } from '#lib/services/settings-api.ts';
+	import { fetchLastSyncTime } from '#lib/utils/sync/sync-manager.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { routes, paramRoutes } from '#lib/routes.ts';
 	import type {
 		PhotoCategory,
 		CategorySetting,
 		StorageConfig,
 		UserProviderInfo,
 		BackupConfig
-	} from '$lib/types';
+	} from '#lib/types/index.ts';
 
 	interface Props {
 		isBackingUp?: boolean;

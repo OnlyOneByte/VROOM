@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { browser } from '$app/environment';
+	import { browser } from '$app/env';
 	import { resolve } from '$app/paths';
 	import { CircleAlert, Upload, Camera, HardDrive } from '@lucide/svelte';
-	import * as Dialog from '$lib/components/ui/dialog';
-	import * as Tabs from '$lib/components/ui/tabs';
-	import { Button } from '$lib/components/ui/button';
-	import { routes } from '$lib/routes';
-	import { providerApi } from '$lib/services/provider-api';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
+	import * as Tabs from '#lib/components/ui/tabs/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { routes } from '#lib/routes.ts';
+	import { providerApi } from '#lib/services/provider-api.ts';
 	import UploadTab from './media/UploadTab.svelte';
 	import CameraTab from './media/CameraTab.svelte';
 

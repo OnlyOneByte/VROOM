@@ -1,10 +1,10 @@
 <script lang="ts">
-	import * as Select from '$lib/components/ui/select';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import { FormFieldError } from '$lib/components/ui/form-field';
-	import TagInput from '$lib/components/expenses/form/TagInput.svelte';
-	import { categoryLabels } from '$lib/utils/expense-helpers';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
+	import TagInput from '#lib/components/expenses/form/TagInput.svelte';
+	import { categoryLabels } from '#lib/utils/expense-helpers.ts';
 	import type { ReminderFormState } from './reminder-form-state.svelte';
 	import { EXPENSE_CATEGORIES } from './reminder-form-model';
 

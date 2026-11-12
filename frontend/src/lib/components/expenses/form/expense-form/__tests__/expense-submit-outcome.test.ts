@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { ApiError } from '$lib/utils/error-handling';
+import { ApiError } from '#lib/utils/error-handling.ts';
 import {
 	canQueueFailedSave,
 	offlineQueuedMessage,

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { toDateInputValue } from '$lib/utils/formatters';
+import { toDateInputValue } from '#lib/utils/formatters.ts';
 import { buildReminderPayload } from '../reminder-form-payload';
 import { validDraft } from './reminder-form-fixtures';
 

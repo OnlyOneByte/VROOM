@@ -4,8 +4,8 @@ import {
 	isNativeImportHeaders,
 	parseCsvHeaders,
 	presetImportMapping
-} from '$lib/utils/import-mapping-helpers';
-import type { ImportMappingPreset } from '$lib/types/import-mapping';
+} from '#lib/utils/import-mapping-helpers.ts';
+import type { ImportMappingPreset } from '#lib/types/import-mapping.ts';
 
 describe('parseCsvHeaders', () => {
 	test('splits the FIRST line on commas, trimming + de-quoting each cell', () => {

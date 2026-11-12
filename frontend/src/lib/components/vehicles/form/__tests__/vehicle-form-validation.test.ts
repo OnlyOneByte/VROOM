@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import type { VehicleFormData } from '$lib/types';
+import type { VehicleFormData } from '#lib/types/index.ts';
 import { validateFinancingFields, validateVehicleFields } from '../vehicle-form-validation';
 
 function vehicle(overrides: Partial<VehicleFormData> = {}): VehicleFormData {

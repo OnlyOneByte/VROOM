@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import type { Expense } from '$lib/types';
+import type { Expense } from '#lib/types/index.ts';
 import {
 	disableSplit,
 	enableSplit,

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import type { BackendExpenseResponse } from '$lib/types';
+import type { BackendExpenseResponse } from '#lib/types/index.ts';
 
 const get = vi.fn();
 const post = vi.fn();

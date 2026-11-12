@@ -97,7 +97,7 @@ Object.defineProperty(navigator, 'onLine', {
 
 global.fetch = vi.fn();
 
-vi.mock('$app/environment', () => ({
+vi.mock('$app/env', () => ({
 	browser: true,
 	dev: false,
 	building: false,

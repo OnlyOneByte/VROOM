@@ -1,5 +1,5 @@
-import type { ExpenseCategory, ImportColumnMapping, NativeImportField } from '$lib/types';
-import type { ImportMappingPreset } from '$lib/types/import-mapping';
+import type { ExpenseCategory, ImportColumnMapping, NativeImportField } from '#lib/types/index.ts';
+import type { ImportMappingPreset } from '#lib/types/import-mapping.ts';
 
 const NATIVE_HEADERS = ['date', 'vehicle', 'category', 'amount'] as const;
 

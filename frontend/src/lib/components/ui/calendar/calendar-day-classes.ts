@@ -1,5 +1,5 @@
-import { buttonVariants } from '$lib/components/ui/button/index.js';
-import { cn } from '$lib/utils.js';
+import { buttonVariants } from '#lib/components/ui/button/index.js';
+import { cn } from '#lib/utils.js';
 
 export const calendarDayBaseClass = cn(
 	buttonVariants({ variant: 'ghost' }),

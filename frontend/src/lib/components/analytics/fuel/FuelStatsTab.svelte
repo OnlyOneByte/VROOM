@@ -12,22 +12,22 @@
 		TrendingDown
 	} from '@lucide/svelte';
 	import { resolve } from '$app/paths';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import EmptyState from '$lib/components/common/empty-state.svelte';
-	import { routes } from '$lib/routes';
-	import { gotoWithQuery } from '$lib/utils/navigation';
-	import { analyticsApi, getDefaultDateRange } from '$lib/services/analytics-api';
-	import type { FuelStatsResponse, FuelAdvancedResponse } from '$lib/types';
-	import { formatCurrency } from '$lib/utils/formatters';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import { routes } from '#lib/routes.ts';
+	import { gotoWithQuery } from '#lib/utils/navigation.ts';
+	import { analyticsApi, getDefaultDateRange } from '#lib/services/analytics-api.ts';
+	import type { FuelStatsResponse, FuelAdvancedResponse } from '#lib/types/index.ts';
+	import { formatCurrency } from '#lib/utils/formatters.ts';
 	import {
 		getDistanceUnitLabel,
 		getVolumeUnitLabel,
 		getFuelEfficiencyLabel,
 		getCostPerDistanceLabel,
 		getLongFormLabel
-	} from '$lib/utils/units';
-	import { settingsStore } from '$lib/stores/settings.svelte';
+	} from '#lib/utils/units.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import FuelCharts from './FuelCharts.svelte';
 	import AdvancedCharts from './AdvancedCharts.svelte';
 

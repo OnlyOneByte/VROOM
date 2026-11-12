@@ -1,21 +1,21 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { paramRoutes } from '$lib/routes';
-	import { gotoDynamic } from '$lib/utils/navigation';
+	import { paramRoutes } from '#lib/routes.ts';
+	import { gotoDynamic } from '#lib/utils/navigation.ts';
 	import { ChevronDown, ChevronUp, Building2, Settings } from '@lucide/svelte';
-	import { Card, CardContent } from '$lib/components/ui/card';
-	import { Button } from '$lib/components/ui/button';
-	import { Badge } from '$lib/components/ui/badge';
+	import { Card, CardContent } from '#lib/components/ui/card/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import InsuranceTermCard from './PolicyTermCard.svelte';
 	import ExpirationAlert from './ExpirationAlert.svelte';
 	import TermHistory from './TermHistory.svelte';
 	import DocumentViewer from './DocumentViewer.svelte';
 	import ClaimsSection from './ClaimsSection.svelte';
-	import { getLatestTerm } from '$lib/utils/insurance';
-	import { insuranceApi } from '$lib/services/insurance-api';
-	import { handleErrorWithNotification } from '$lib/utils/error-handling';
-	import type { InsurancePolicy, Vehicle } from '$lib/types';
+	import { getLatestTerm } from '#lib/utils/insurance.ts';
+	import { insuranceApi } from '#lib/services/insurance-api.ts';
+	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
+	import type { InsurancePolicy, Vehicle } from '#lib/types/index.ts';
 
 	interface Props {
 		policy: InsurancePolicy;
@@ -40,7 +40,7 @@
 	let latestTerm = $derived(getLatestTerm(policy.terms));
 	let pastTerms = $derived(policy.terms.filter(t => t.id !== latestTerm?.id));
 
-	function handleEditTerm(term: import('$lib/types').InsuranceTerm) {
+	function handleEditTerm(term: import('#lib/types/index.ts').InsuranceTerm) {
 		goto(resolve(paramRoutes.insuranceTermEdit, { id: policy.id, termId: term.id }));
 	}
 
@@ -50,7 +50,7 @@
 		gotoDynamic(`${base}?renewFrom=${latestTerm.id}`);
 	}
 
-	async function handleDeleteTerm(term: import('$lib/types').InsuranceTerm) {
+	async function handleDeleteTerm(term: import('#lib/types/index.ts').InsuranceTerm) {
 		try {
 			await insuranceApi.deleteTerm(policy.id, term.id);
 			await onRefresh();

@@ -11,28 +11,28 @@
 		Save,
 		Trash2
 	} from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
+	import { Button } from '#lib/components/ui/button/index.ts';
 	import {
 		Card,
 		CardContent,
 		CardDescription,
 		CardHeader,
 		CardTitle
-	} from '$lib/components/ui/card';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import { Badge } from '$lib/components/ui/badge';
+	} from '#lib/components/ui/card/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import S3ProviderForm from './S3Form.svelte';
 	import GoogleDriveProviderForm from './GoogleDriveForm.svelte';
 	import ProviderFolderSettings from './PhotoFolderSection.svelte';
 	import BackupSection from './BackupSection.svelte';
 	import { useGoogleOAuth } from '../use-google-oauth.svelte';
-	import { providerApi } from '$lib/services/provider-api';
-	import { settingsApi } from '$lib/services/settings-api';
-	import { appStore } from '$lib/stores/app.svelte';
-	import FormLayout from '$lib/components/common/form-layout.svelte';
-	import { routes } from '$lib/routes';
-	import { DEFAULT_FOLDER_SETTINGS, type ProviderTypeOption } from '$lib/constants/providers';
+	import { providerApi } from '#lib/services/provider-api.ts';
+	import { settingsApi } from '#lib/services/settings-api.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
+	import FormLayout from '#lib/components/common/form-layout.svelte';
+	import { routes } from '#lib/routes.ts';
+	import { DEFAULT_FOLDER_SETTINGS, type ProviderTypeOption } from '#lib/constants/providers.ts';
 	import type {
 		PhotoCategory,
 		CategorySetting,
@@ -40,7 +40,7 @@
 		UserProviderInfo,
 		BackupConfig,
 		ProviderBackupSettings
-	} from '$lib/types';
+	} from '#lib/types/index.ts';
 	import { onMount } from 'svelte';
 
 	const PROVIDER_TYPES: ProviderTypeOption[] = [

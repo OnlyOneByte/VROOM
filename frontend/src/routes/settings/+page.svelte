@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { settingsStore } from '$lib/stores/settings.svelte';
-	import { appStore } from '$lib/stores/app.svelte';
-	import { authStore } from '$lib/stores/auth.svelte';
-	import { routes } from '$lib/routes';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { authStore } from '#lib/stores/auth.svelte.ts';
+	import { routes } from '#lib/routes.ts';
 	import {
 		Settings as SettingsIcon,
 		Save,
@@ -12,24 +12,24 @@
 		ChevronRight,
 		CircleAlert
 	} from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Card, CardContent } from '$lib/components/ui/card';
-	import { Avatar, AvatarFallback } from '$lib/components/ui/avatar';
-	import UnitPreferencesCard from '$lib/components/settings/cards/UnitPreferencesCard.svelte';
-	import ThemeCard from '$lib/components/settings/cards/ThemeCard.svelte';
-	import ThemePickerCard from '$lib/components/settings/cards/ThemePickerCard.svelte';
-	import PWAInstallCard from '$lib/components/settings/cards/PwaInstallCard.svelte';
-	import PushNotificationsCard from '$lib/components/settings/cards/PushNotificationsCard.svelte';
-	import BackupNowDialog from '$lib/components/settings/storage-provider/backup/BackupDialog.svelte';
-	import UnifiedRestoreDialog from '$lib/components/settings/storage-provider/backup/RestoreDialog.svelte';
-	import PhotoStorageSettings from '$lib/components/settings/cards/StorageProvidersCard.svelte';
-	import ModelProvidersCard from '$lib/components/settings/cards/ModelProvidersCard.svelte';
-	import MigrateFromTrackerCard from '$lib/components/settings/cards/MigrateFromTrackerCard.svelte';
-	import { fetchLastSyncTime } from '$lib/utils/sync/sync-manager';
-	import { providerApi } from '$lib/services/provider-api';
-	import FormLayout from '$lib/components/common/form-layout.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Card, CardContent } from '#lib/components/ui/card/index.ts';
+	import { Avatar, AvatarFallback } from '#lib/components/ui/avatar/index.ts';
+	import UnitPreferencesCard from '#lib/components/settings/cards/UnitPreferencesCard.svelte';
+	import ThemeCard from '#lib/components/settings/cards/ThemeCard.svelte';
+	import ThemePickerCard from '#lib/components/settings/cards/ThemePickerCard.svelte';
+	import PWAInstallCard from '#lib/components/settings/cards/PwaInstallCard.svelte';
+	import PushNotificationsCard from '#lib/components/settings/cards/PushNotificationsCard.svelte';
+	import BackupNowDialog from '#lib/components/settings/storage-provider/backup/BackupDialog.svelte';
+	import UnifiedRestoreDialog from '#lib/components/settings/storage-provider/backup/RestoreDialog.svelte';
+	import PhotoStorageSettings from '#lib/components/settings/cards/StorageProvidersCard.svelte';
+	import ModelProvidersCard from '#lib/components/settings/cards/ModelProvidersCard.svelte';
+	import MigrateFromTrackerCard from '#lib/components/settings/cards/MigrateFromTrackerCard.svelte';
+	import { fetchLastSyncTime } from '#lib/utils/sync/sync-manager.ts';
+	import { providerApi } from '#lib/services/provider-api.ts';
+	import FormLayout from '#lib/components/common/form-layout.svelte';
 	import { toast } from 'svelte-sonner';
-	import type { BackupConfig, RestoreResult, UserProviderInfo } from '$lib/types';
+	import type { BackupConfig, RestoreResult, UserProviderInfo } from '#lib/types/index.ts';
 
 	let user = $derived(authStore.user);
 

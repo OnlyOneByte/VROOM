@@ -1,6 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { initializePWA, promptInstall, pwaInstallState, getPlatformInfo } from '$lib/utils/pwa';
+	import {
+		initializePWA,
+		promptInstall,
+		pwaInstallState,
+		getPlatformInfo
+	} from '#lib/utils/pwa.ts';
 	import {
 		Download,
 		CircleCheck,
@@ -10,14 +15,14 @@
 		Plus,
 		LoaderCircle
 	} from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
+	import { Button } from '#lib/components/ui/button/index.ts';
 	import {
 		Card,
 		CardContent,
 		CardDescription,
 		CardHeader,
 		CardTitle
-	} from '$lib/components/ui/card';
+	} from '#lib/components/ui/card/index.ts';
 
 	let installing = $state(false);
 	let isStandalone = $state(false);

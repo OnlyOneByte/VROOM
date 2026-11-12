@@ -1,7 +1,7 @@
 <script lang="ts">
-	import Input from '$lib/components/ui/input/input.svelte';
-	import Label from '$lib/components/ui/label/label.svelte';
-	import { Textarea } from '$lib/components/ui/textarea';
+	import Input from '#lib/components/ui/input/input.svelte';
+	import Label from '#lib/components/ui/label/label.svelte';
+	import { Textarea } from '#lib/components/ui/textarea/index.ts';
 	import TagInput from '../TagInput.svelte';
 
 	interface Props {

@@ -1,7 +1,7 @@
 import { resolve } from '$app/paths';
-import { paramRoutes } from '$lib/routes';
-import { expenseApi } from '$lib/services/expense-api';
-import type { Expense } from '$lib/types';
+import { paramRoutes } from '#lib/routes.ts';
+import { expenseApi } from '#lib/services/expense-api.ts';
+import type { Expense } from '#lib/types/index.ts';
 
 // A title on a disabled control is unreachable, so the blocked reason must stay visible text.
 export const INSURANCE_DELETE_BLOCKED = 'Delete the insurance policy to remove this expense';

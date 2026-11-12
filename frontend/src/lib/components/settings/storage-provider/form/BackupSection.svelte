@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { FileSpreadsheet } from '@lucide/svelte';
-	import { Label } from '$lib/components/ui/label';
-	import { Checkbox } from '$lib/components/ui/checkbox';
-	import * as Select from '$lib/components/ui/select';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { Checkbox } from '#lib/components/ui/checkbox/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
 
 	let {
 		providerRootPrefix = '',

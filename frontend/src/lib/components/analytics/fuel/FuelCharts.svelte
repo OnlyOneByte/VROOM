@@ -1,21 +1,21 @@
 <script lang="ts">
-	import { AppLineChart, AppAreaChart, AppBarChart } from '$lib/components/charts';
-	import { CHART_COLORS, buildChartConfig } from '$lib/utils/chart-colors';
+	import { AppLineChart, AppAreaChart, AppBarChart } from '#lib/components/charts/index.ts';
+	import { CHART_COLORS, buildChartConfig } from '#lib/utils/chart-colors.ts';
 	import {
 		formatDecimalAxis,
 		formatCentsAxis,
 		formatDateTick,
 		getXTickCount,
 		parseMonthToDate
-	} from '$lib/utils/chart-formatters';
-	import * as Chart from '$lib/components/ui/chart';
-	import type { FuelStatsResponse, FuelAdvancedResponse, UnitsMetadata } from '$lib/types';
-	import { settingsStore } from '$lib/stores/settings.svelte';
+	} from '#lib/utils/chart-formatters.ts';
+	import * as Chart from '#lib/components/ui/chart/index.ts';
+	import type { FuelStatsResponse, FuelAdvancedResponse, UnitsMetadata } from '#lib/types/index.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import {
 		getFuelEfficiencyLabel,
 		getLongFormLabel,
 		getCostPerDistanceLabel
-	} from '$lib/utils/units';
+	} from '#lib/utils/units.ts';
 
 	interface Props {
 		fuelStats: FuelStatsResponse;

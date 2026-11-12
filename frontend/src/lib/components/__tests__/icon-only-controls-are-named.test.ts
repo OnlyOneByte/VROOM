@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 import { render } from '@testing-library/svelte';
 import OfflineExpenseCards from '../expenses/OfflineExpenseCards.svelte';
-import type { OfflineExpense } from '$lib/utils/offline-storage';
+import type { OfflineExpense } from '#lib/utils/offline-storage.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ODOMETER_TAB = join(HERE, '..', 'vehicles', 'OdometerTab.svelte');

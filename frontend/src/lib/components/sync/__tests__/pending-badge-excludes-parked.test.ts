@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
-import { offlineExpenseQueue, onlineStatus, syncState } from '$lib/stores/offline.svelte';
-import { appStore } from '$lib/stores/app.svelte';
-import type { OfflineExpense } from '$lib/utils/offline-storage';
+import { offlineExpenseQueue, onlineStatus, syncState } from '#lib/stores/offline.svelte.ts';
+import { appStore } from '#lib/stores/app.svelte.ts';
+import type { OfflineExpense } from '#lib/utils/offline-storage.ts';
 
 const setupAutoSync = vi.fn();
 type SyncResultStub = { synced: number; needsAttention: number };
 const syncAll = vi.fn(async () => ({ success: true, conflicts: [] }));
 const retryParked = vi.fn(async (): Promise<SyncResultStub> => ({ synced: 0, needsAttention: 0 }));
-vi.mock('$lib/utils/sync/sync-manager', () => {
+vi.mock('#lib/utils/sync/sync-manager.ts', () => {
 	const store = <T>(value: T) => ({
 		get current() {
 			return value;

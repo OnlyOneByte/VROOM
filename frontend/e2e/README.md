@@ -44,12 +44,12 @@ list, which covers `src/` only, so `frontend/tsconfig.e2e.json` extends the app'
 
 ## The two server targets
 
-|                           | default (`vite dev`, 5173)                  | `E2E_TARGET=preview` (`vite preview`, 4173) |
-| ------------------------- | ------------------------------------------- | ------------------------------------------- |
-| Build step                | none                                        | full `vite build` (~17s)                    |
-| Serves source             | always current                              | the bundle that ships                       |
-| Service worker + manifest | **no** (`SvelteKitPWA` has no `devOptions`) | yes                                         |
-| `reuseExistingServer`     | yes (locally)                               | never                                       |
+|                           | default (`vite dev`, 5173)             | `E2E_TARGET=preview` (`vite preview`, 4173) |
+| ------------------------- | -------------------------------------- | ------------------------------------------- |
+| Build step                | none                                   | full `vite build` (~17s)                    |
+| Serves source             | always current                         | the bundle that ships                       |
+| Service worker + manifest | **no** (`withPwa` has no `devOptions`) | yes                                         |
+| `reuseExistingServer`     | yes (locally)                          | never                                       |
 
 The dev server is the default: no build step, it recompiles from source so a reused server
 can never serve a stale bundle, and it needs neither the backend nor a database. Its one gap
@@ -187,7 +187,7 @@ right after `goto` the URL is still the requested one whether or not the app is 
   mobile ones. Prefer `.filter({ visible: true })` over `.first()` regardless, because the same
   figure can also appear in the page's summary card.
 - Offline behaviour is driven by dispatching the window `offline` / `online` events. That is the
-  real code path (`$lib/stores/offline.svelte` listens to them) and behaves the same on all five
+  real code path (`#lib/stores/offline.svelte.ts` listens to them) and behaves the same on all five
   engines, unlike `context.setOffline`. Dispatch inside `expect(...).toPass()`, because the
   listener is registered during hydration, which can finish after `goto` resolves.
 - Reconnecting arms TWO drain paths: the `Sync N` button and `syncManager`'s 2-second auto-sync. A

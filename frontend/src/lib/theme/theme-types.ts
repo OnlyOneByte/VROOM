@@ -1,4 +1,4 @@
-import type { ThemePreference } from '$lib/stores/theme.svelte';
+import type { ThemePreference } from '#lib/stores/theme.svelte.ts';
 
 export type ThemeMode = ThemePreference;
 

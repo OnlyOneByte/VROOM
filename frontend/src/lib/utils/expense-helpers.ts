@@ -1,10 +1,10 @@
-import type { ExpenseCategory, SplitConfig } from '$lib/types';
+import type { ExpenseCategory, SplitConfig } from '#lib/types/index.ts';
 import { Coffee, CreditCard, DollarSign, FileText, Fuel, Sparkles, Wrench } from '@lucide/svelte';
 import {
 	CATEGORY_LABELS,
 	mapCategoryColorTokens,
 	type CategoryColorToken
-} from '$lib/utils/chart-colors';
+} from '#lib/utils/chart-colors.ts';
 
 type LucideIcon = typeof Fuel;
 

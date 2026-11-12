@@ -14,26 +14,26 @@
 		History,
 		Receipt
 	} from '@lucide/svelte';
-	import { reminderApi } from '$lib/services/reminder-api';
-	import { vehicleApi } from '$lib/services/vehicle-api';
-	import type { ReminderNotification, ReminderWithVehicles, Vehicle } from '$lib/types';
-	import { formatCurrency, formatDate } from '$lib/utils/formatters';
-	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
+	import { reminderApi } from '#lib/services/reminder-api.ts';
+	import { vehicleApi } from '#lib/services/vehicle-api.ts';
+	import type { ReminderNotification, ReminderWithVehicles, Vehicle } from '#lib/types/index.ts';
+	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
+	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 	import {
 		isReminderTimeDue,
 		isMileageTracking as isMileageTrackingReminder,
 		frequencyLabel as reminderFrequencyLabel
-	} from '$lib/utils/reminder-helpers';
-	import { appStore } from '$lib/stores/app.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Badge } from '$lib/components/ui/badge';
-	import * as CardNs from '$lib/components/ui/card';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import EmptyState from '$lib/components/common/empty-state.svelte';
-	import PageHeader from '$lib/components/common/page-header.svelte';
-	import ReminderForm from '$lib/components/reminders/ReminderForm.svelte';
-	import MaterializedExpensesDialog from '$lib/components/reminders/MaterializedExpensesDialog.svelte';
-	import ConfirmDialog from '$lib/components/common/ConfirmDialog.svelte';
+	} from '#lib/utils/reminder-helpers.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import * as CardNs from '#lib/components/ui/card/index.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import PageHeader from '#lib/components/common/page-header.svelte';
+	import ReminderForm from '#lib/components/reminders/ReminderForm.svelte';
+	import MaterializedExpensesDialog from '#lib/components/reminders/MaterializedExpensesDialog.svelte';
+	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
 
 	let isLoading = $state(true);
 	let isTriggering = $state(false);

@@ -1,4 +1,4 @@
-import { isElectricFuelType } from '$lib/utils/units';
+import { isElectricFuelType } from '#lib/utils/units.ts';
 
 export interface MileageEfficiency {
 	calculatedMpg: number | null;

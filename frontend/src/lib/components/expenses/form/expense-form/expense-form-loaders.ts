@@ -1,8 +1,8 @@
-import { expenseApi } from '$lib/services/expense-api';
-import { vehicleApi } from '$lib/services/vehicle-api';
-import { appStore } from '$lib/stores/app.svelte';
-import { gotoDynamic } from '$lib/utils/navigation';
-import { toDateInputValue } from '$lib/utils/formatters';
+import { expenseApi } from '#lib/services/expense-api.ts';
+import { vehicleApi } from '#lib/services/vehicle-api.ts';
+import { appStore } from '#lib/stores/app.svelte.ts';
+import { gotoDynamic } from '#lib/utils/navigation.ts';
+import { toDateInputValue } from '#lib/utils/formatters.ts';
 import { parsePreselectedTags } from './expense-navigation';
 import { splitStateFromGroup } from './split-config';
 import type { ExpenseFormState } from './expense-form-state.svelte';

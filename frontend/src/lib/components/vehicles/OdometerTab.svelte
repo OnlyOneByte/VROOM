@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { paramRoutes } from '$lib/routes';
+	import { paramRoutes } from '#lib/routes.ts';
 	import {
 		Plus,
 		LoaderCircle,
@@ -11,17 +11,17 @@
 		Pencil,
 		Trash2
 	} from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import type { ChartConfig } from '$lib/components/ui/chart';
-	import * as Dialog from '$lib/components/ui/dialog';
-	import { AppLineChart } from '$lib/components/charts';
-	import EmptyState from '$lib/components/common/empty-state.svelte';
-	import { odometerApi } from '$lib/services/odometer-api';
-	import { formatDate, formatNumber } from '$lib/utils/formatters';
-	import { getDistanceUnitLabel } from '$lib/utils/units';
-	import { settingsStore } from '$lib/stores/settings.svelte';
-	import type { OdometerEntry, PaginatedResponse, UnitPreferences } from '$lib/types';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import type { ChartConfig } from '#lib/components/ui/chart/index.ts';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
+	import { AppLineChart } from '#lib/components/charts/index.ts';
+	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import { odometerApi } from '#lib/services/odometer-api.ts';
+	import { formatDate, formatNumber } from '#lib/utils/formatters.ts';
+	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
+	import type { OdometerEntry, PaginatedResponse, UnitPreferences } from '#lib/types/index.ts';
 
 	const PAGE_SIZE = 20;
 	const MIN_CHART_POINTS = 2;

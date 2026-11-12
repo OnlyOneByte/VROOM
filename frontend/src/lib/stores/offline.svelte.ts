@@ -1,5 +1,5 @@
-import { browser } from '$app/environment';
-import type { OfflineExpense } from '$lib/utils/offline-storage';
+import { browser } from '$app/env';
+import type { OfflineExpense } from '#lib/utils/offline-storage.ts';
 
 let _isOnline = $state(browser ? navigator.onLine : true);
 

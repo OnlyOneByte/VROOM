@@ -1,12 +1,12 @@
 <script lang="ts">
-	import * as Dialog from '$lib/components/ui/dialog';
-	import { Button } from '$lib/components/ui/button';
-	import { Label } from '$lib/components/ui/label';
-	import { Textarea } from '$lib/components/ui/textarea';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { Textarea } from '#lib/components/ui/textarea/index.ts';
 	import { LoaderCircle } from '@lucide/svelte';
-	import { reminderApi } from '$lib/services/reminder-api';
-	import { appStore } from '$lib/stores/app.svelte';
-	import type { ReminderWithVehicles, Vehicle } from '$lib/types';
+	import { reminderApi } from '#lib/services/reminder-api.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
+	import type { ReminderWithVehicles, Vehicle } from '#lib/types/index.ts';
 	import { ReminderFormState } from './reminder-form/reminder-form-state.svelte';
 	import ReminderBasicsFields from './reminder-form/ReminderBasicsFields.svelte';
 	import ReminderExpenseFields from './reminder-form/ReminderExpenseFields.svelte';

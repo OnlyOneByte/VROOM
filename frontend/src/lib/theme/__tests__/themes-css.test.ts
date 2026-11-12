@@ -94,7 +94,7 @@ describe('themes.css is wired into the app via the root layout', () => {
 	const LAYOUT = readFileSync(`${process.cwd()}/src/routes/+layout.svelte`, 'utf8');
 
 	test('+layout.svelte imports the generated themes.css', () => {
-		expect(LAYOUT).toMatch(/import\s+['"]\$lib\/theme\/themes\.css['"]/);
+		expect(LAYOUT).toMatch(/import\s+['"]#lib\/theme\/themes\.css['"]/);
 	});
 
 	test('+layout.svelte still imports app.css (the default look the bare :root serves)', () => {
@@ -107,7 +107,7 @@ describe('ThemePickerCard is mounted on the settings route', () => {
 
 	test('settings/+page.svelte imports ThemePickerCard', () => {
 		expect(SETTINGS).toMatch(
-			/import\s+ThemePickerCard\s+from\s+['"]\$lib\/components\/settings\/cards\/ThemePickerCard\.svelte['"]/
+			/import\s+ThemePickerCard\s+from\s+['"]#lib\/components\/settings\/cards\/ThemePickerCard\.svelte['"]/
 		);
 	});
 

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { fromBackendExpense, toBackendExpense } from '../api-transformer';
-import type { ExpenseCategory } from '$lib/types';
+import type { ExpenseCategory } from '#lib/types/index.ts';
 
 const base = { vehicleId: 'v1', category: 'misc' as ExpenseCategory, amount: 10 };
 

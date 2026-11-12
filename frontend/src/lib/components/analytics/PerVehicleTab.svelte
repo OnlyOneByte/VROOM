@@ -1,26 +1,26 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { routes } from '$lib/routes';
+	import { routes } from '#lib/routes.ts';
 	import { LoaderCircle, CircleAlert } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import * as Select from '$lib/components/ui/select';
-	import { Progress } from '$lib/components/ui/progress';
-	import { analyticsApi, getDefaultDateRange } from '$lib/services/analytics-api';
-	import { vehicleApi } from '$lib/services/vehicle-api';
-	import { AppPieChart } from '$lib/components/charts';
-	import StatCardGrid from '$lib/components/charts/StatCardGrid.svelte';
-	import { buildCategoryPieData } from '$lib/utils/chart-colors';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import { Progress } from '#lib/components/ui/progress/index.ts';
+	import { analyticsApi, getDefaultDateRange } from '#lib/services/analytics-api.ts';
+	import { vehicleApi } from '#lib/services/vehicle-api.ts';
+	import { AppPieChart } from '#lib/components/charts/index.ts';
+	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
+	import { buildCategoryPieData } from '#lib/utils/chart-colors.ts';
 	import type {
 		Vehicle,
 		VehicleHealthResponse,
 		VehicleTCOResponse,
 		VehicleExpensesResponse
-	} from '$lib/types';
-	import { formatCurrency } from '$lib/utils/formatters';
-	import { settingsStore } from '$lib/stores/settings.svelte';
-	import { getCostPerDistanceLabel, getDistanceUnitLabel } from '$lib/utils/units';
+	} from '#lib/types/index.ts';
+	import { formatCurrency } from '#lib/utils/formatters.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
+	import { getCostPerDistanceLabel, getDistanceUnitLabel } from '#lib/utils/units.ts';
 
 	let vehicles = $state<Vehicle[]>([]);
 	let selectedVehicleId = $state<string>('');

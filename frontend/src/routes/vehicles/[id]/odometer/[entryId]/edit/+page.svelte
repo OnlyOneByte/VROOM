@@ -1,17 +1,17 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { gotoDynamic } from '$lib/utils/navigation';
+	import { gotoDynamic } from '#lib/utils/navigation.ts';
 	import { onMount } from 'svelte';
 	import { z } from 'zod';
 	import { ArrowLeft, LoaderCircle, Trash2, TriangleAlert } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import { Textarea } from '$lib/components/ui/textarea';
-	import * as Dialog from '$lib/components/ui/dialog';
-	import { odometerApi } from '$lib/services/odometer-api';
-	import { dateOnlyToISO, toDateInputValue } from '$lib/utils/formatters';
-	import FormLayout from '$lib/components/common/form-layout.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { Textarea } from '#lib/components/ui/textarea/index.ts';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
+	import { odometerApi } from '#lib/services/odometer-api.ts';
+	import { dateOnlyToISO, toDateInputValue } from '#lib/utils/formatters.ts';
+	import FormLayout from '#lib/components/common/form-layout.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();

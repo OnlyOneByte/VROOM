@@ -9,7 +9,7 @@ an ad-hoc grey, a bespoke empty state. The rule:
 > gallery) — don't one-off it in a route.
 
 The live, rendered reference is the **component gallery** at `/dev/gallery` (gated on `dev`
-from `$app/environment`; a prod build renders a "dev-only" notice). It shows buttons, badges,
+from `$app/env`; a prod build renders a "dev-only" notice). It shows buttons, badges,
 alerts, a wired form field, the four states, StatCards and ChartCard.
 
 ## Design tokens (theme — never hardcode colors)
@@ -65,26 +65,26 @@ Match neighbors; don't invent values. The conventions in this codebase:
 
 ## Component inventory (import paths are real — use them)
 
-### Primitives — `$lib/components/ui/*` (barrel imports)
+### Primitives — `#lib/components/ui/*` (barrel imports)
 | Need | Import | Notes |
 |---|---|---|
-| Action | `import { Button } from '$lib/components/ui/button'` | variants: default/destructive/outline/secondary/ghost/link · sizes: default/sm/lg/icon/icon-sm/icon-lg · `href` renders an `<a>` |
-| Text input | `import { Input } from '$lib/components/ui/input'` | `bind:value`, `aria-invalid`, `aria-describedby` |
-| Multiline | `import { Textarea } from '$lib/components/ui/textarea'` | |
-| Toggle | `import { Switch } from '$lib/components/ui/switch'` / `{ Checkbox }` | `bind:checked`, or `checked` + `onCheckedChange` |
-| Dropdown | `import * as Select from '$lib/components/ui/select'` | compound; `Select.Root` takes `type="single"` + `onValueChange` |
-| Label | `import { Label } from '$lib/components/ui/label'` | `for=` ties to input id |
-| Field error | `import { FormFieldError } from '$lib/components/ui/form-field'` | renders `role="alert"`; wire via `aria-describedby` (`FormFieldDescription` for hints) |
-| Card | `import * as Card from '$lib/components/ui/card'` | Root/Header/Title/Description/Action/Content/Footer |
-| Badge | `import { Badge } from '$lib/components/ui/badge'` | variants: default/secondary/destructive/outline |
-| Alert | `import { Alert, AlertTitle, AlertDescription } from '$lib/components/ui/alert'` | use `default` / `destructive`; the local `warning` / `success` variants hardcode palette colors — see Design tokens |
-| Skeleton | `import { Skeleton } from '$lib/components/ui/skeleton'` | loading placeholder |
-| Tabs | `import * as Tabs from '$lib/components/ui/tabs'` | |
-| Dialog | `import * as Dialog from '$lib/components/ui/dialog'` / `* as AlertDialog` | AlertDialog backs destructive confirms — prefer `common/ConfirmDialog.svelte` |
-| Table | `import * as Table from '$lib/components/ui/table'` | |
-| Popover/Sheet | `import * as Popover from '$lib/components/ui/popover'` / `* as Sheet` | floating layers |
+| Action | `import { Button } from '#lib/components/ui/button'` | variants: default/destructive/outline/secondary/ghost/link · sizes: default/sm/lg/icon/icon-sm/icon-lg · `href` renders an `<a>` |
+| Text input | `import { Input } from '#lib/components/ui/input'` | `bind:value`, `aria-invalid`, `aria-describedby` |
+| Multiline | `import { Textarea } from '#lib/components/ui/textarea'` | |
+| Toggle | `import { Switch } from '#lib/components/ui/switch'` / `{ Checkbox }` | `bind:checked`, or `checked` + `onCheckedChange` |
+| Dropdown | `import * as Select from '#lib/components/ui/select'` | compound; `Select.Root` takes `type="single"` + `onValueChange` |
+| Label | `import { Label } from '#lib/components/ui/label'` | `for=` ties to input id |
+| Field error | `import { FormFieldError } from '#lib/components/ui/form-field'` | renders `role="alert"`; wire via `aria-describedby` (`FormFieldDescription` for hints) |
+| Card | `import * as Card from '#lib/components/ui/card'` | Root/Header/Title/Description/Action/Content/Footer |
+| Badge | `import { Badge } from '#lib/components/ui/badge'` | variants: default/secondary/destructive/outline |
+| Alert | `import { Alert, AlertTitle, AlertDescription } from '#lib/components/ui/alert'` | use `default` / `destructive`; the local `warning` / `success` variants hardcode palette colors — see Design tokens |
+| Skeleton | `import { Skeleton } from '#lib/components/ui/skeleton'` | loading placeholder |
+| Tabs | `import * as Tabs from '#lib/components/ui/tabs'` | |
+| Dialog | `import * as Dialog from '#lib/components/ui/dialog'` / `* as AlertDialog` | AlertDialog backs destructive confirms — prefer `common/ConfirmDialog.svelte` |
+| Table | `import * as Table from '#lib/components/ui/table'` | |
+| Popover/Sheet | `import * as Popover from '#lib/components/ui/popover'` / `* as Sheet` | floating layers |
 
-### App-level — `$lib/components/common/*` (direct `.svelte` imports)
+### App-level — `#lib/components/common/*` (direct `.svelte` imports)
 | Need | Import | Props |
 |---|---|---|
 | Page title + actions | `common/page-header.svelte` | `title`, `description?`, `actions?` (Snippet) |
@@ -98,12 +98,12 @@ Match neighbors; don't invent values. The conventions in this codebase:
 | Photo capture / upload | `common/MediaCaptureDialog.svelte` | `bind:open`, `onUpload`, `onClose` — camera + upload tabs |
 | Form page wrapper | `common/form-layout.svelte` | wraps form content centered |
 
-### Charts — `$lib/components/charts` (barrel) — ALWAYS 4-state
+### Charts — `#lib/components/charts` (barrel) — ALWAYS 4-state
 | Need | Import | Notes |
 |---|---|---|
-| Any chart | `import { AppLineChart, AppBarChart, AppPieChart, AppAreaChart } from '$lib/components/charts'` | all wrap `ChartCard` → loading/empty/error handled for you |
-| KPI tiles | `import { StatCard, StatCardGrid } from '$lib/components/charts'` | `iconColor` (`StatCardIconColor`): `primary` · `chart-1`…`chart-8` · `destructive` · `muted`. An unknown token still falls back to the primary tint, but warns under `import.meta.env.DEV`; `category-color-label-convergence.test.ts` fails if the map stops covering a theme token |
-| Custom chart container | `import ChartCard from '$lib/components/charts/ChartCard.svelte'` | not in the barrel; pass `isLoading`/`error`/`isEmpty`/`emptyTitle` — never render a raw chart in a bare div |
+| Any chart | `import { AppLineChart, AppBarChart, AppPieChart, AppAreaChart } from '#lib/components/charts'` | all wrap `ChartCard` → loading/empty/error handled for you |
+| KPI tiles | `import { StatCard, StatCardGrid } from '#lib/components/charts'` | `iconColor` (`StatCardIconColor`): `primary` · `chart-1`…`chart-8` · `destructive` · `muted`. An unknown token still falls back to the primary tint, but warns under `import.meta.env.DEV`; `category-color-label-convergence.test.ts` fails if the map stops covering a theme token |
+| Custom chart container | `import ChartCard from '#lib/components/charts/ChartCard.svelte'` | not in the barrel; pass `isLoading`/`error`/`isEmpty`/`emptyTitle` — never render a raw chart in a bare div |
 
 ## The Four-States contract (cross-ref UIQuality.md)
 
@@ -111,7 +111,7 @@ Any data view = loading (`Skeleton`) + empty (`EmptyState`) + error (visible mes
 populated. `ChartCard` encodes all four (`isLoading`/`isEmpty`/`error`); `StatCard` and
 `PaginationControls` take `isLoading` only, so you still own their empty/error states.
 
-`utils/formatters` for currency/dates and `$lib/routes` + `resolve()` for links are the other
+`utils/formatters` for currency/dates and `#lib/routes` + `resolve()` for links are the other
 two "don't reinvent" rules — see `UIQuality.md`.
 
 ## When you add a component

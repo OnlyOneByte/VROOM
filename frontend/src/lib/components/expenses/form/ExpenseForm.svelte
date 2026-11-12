@@ -1,19 +1,19 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { routes } from '$lib/routes';
-	import { gotoDynamic, gotoWithQuery } from '$lib/utils/navigation';
-	import { appStore } from '$lib/stores/app.svelte';
-	import { settingsStore } from '$lib/stores/settings.svelte';
+	import { routes } from '#lib/routes.ts';
+	import { gotoDynamic, gotoWithQuery } from '#lib/utils/navigation.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { LoaderCircle, CreditCard } from '@lucide/svelte';
-	import { FormFieldError } from '$lib/components/ui/form-field';
+	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
 	import CategorySelector from './CategorySelector.svelte';
 	import FuelFieldsSection from './FuelFieldsSection.svelte';
 	import ExpensePhotoSection from './ExpensePhotoSection.svelte';
 	import PendingPhotoPreview from './PendingPhotoPreview.svelte';
 	import ReceiptScanButton from './ReceiptScanButton.svelte';
-	import type { ReceiptDraft } from '$lib/services/vlm-api';
-	import FormLayout from '$lib/components/common/form-layout.svelte';
+	import type { ReceiptDraft } from '#lib/services/vlm-api.ts';
+	import FormLayout from '#lib/components/common/form-layout.svelte';
 	import {
 		ExpenseFormState,
 		type ExpenseFormContext

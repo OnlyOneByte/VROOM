@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/svelte';
-import type { UserProviderInfo } from '$lib/types';
+import type { UserProviderInfo } from '#lib/types/index.ts';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
-vi.mock('$app/environment', () => ({ browser: true }));
+vi.mock('$app/env', () => ({ browser: true }));
 vi.mock('$app/state', () => ({
 	page: { url: new URL('http://localhost/settings/providers/drive-1/edit') }
 }));
@@ -21,7 +21,7 @@ const updateProvider = vi.fn((_id: string, _data: ProviderPayload) =>
 const createProvider = vi.fn((data: ProviderPayload) =>
 	Promise.resolve({ id: 'drive-new', ...data } as unknown as UserProviderInfo)
 );
-vi.mock('$lib/services/provider-api', () => ({
+vi.mock('#lib/services/provider-api.ts', () => ({
 	providerApi: {
 		updateProvider: (id: string, data: ProviderPayload) => updateProvider(id, data),
 		createProvider: (data: ProviderPayload) => createProvider(data),
@@ -33,14 +33,14 @@ const getSettings = vi.fn(() => Promise.resolve({} as Record<string, unknown>));
 const updateSettings = vi.fn((_updates: Record<string, unknown>) =>
 	Promise.resolve({} as Record<string, unknown>)
 );
-vi.mock('$lib/services/settings-api', () => ({
+vi.mock('#lib/services/settings-api.ts', () => ({
 	settingsApi: {
 		getSettings: () => getSettings(),
 		updateSettings: (updates: Record<string, unknown>) => updateSettings(updates)
 	}
 }));
 
-const { appStore } = await import('$lib/stores/app.svelte');
+const { appStore } = await import('#lib/stores/app.svelte.ts');
 const ProviderForm = (await import('../ProviderForm.svelte')).default;
 
 const STORED_PROVIDER: UserProviderInfo = {

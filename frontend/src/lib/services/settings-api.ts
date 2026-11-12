@@ -5,7 +5,7 @@ import type {
 	RestoreProviderInfo,
 	RestoreResult,
 	UserSettings
-} from '$lib/types/settings';
+} from '#lib/types/settings.ts';
 import { apiClient } from './api-client';
 
 interface SyncResponse {

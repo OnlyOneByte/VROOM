@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { goto, invalidateAll } from '$app/navigation';
+	import { goto, refreshAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { routes, paramRoutes } from '$lib/routes';
-	import { appStore } from '$lib/stores/app.svelte';
-	import { settingsStore } from '$lib/stores/settings.svelte';
+	import { routes, paramRoutes } from '#lib/routes.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import {
 		ArrowLeft,
 		Car,
@@ -16,21 +16,21 @@
 		ChevronsUpDown,
 		Ruler
 	} from '@lucide/svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
-	import DatePicker from '$lib/components/common/date-picker.svelte';
-	import Input from '$lib/components/ui/input/input.svelte';
-	import Label from '$lib/components/ui/label/label.svelte';
-	import { Switch } from '$lib/components/ui/switch';
-	import * as Select from '$lib/components/ui/select';
-	import * as Collapsible from '$lib/components/ui/collapsible';
-	import { FormFieldError } from '$lib/components/ui/form-field';
+	import Button from '#lib/components/ui/button/button.svelte';
+	import DatePicker from '#lib/components/common/date-picker.svelte';
+	import Input from '#lib/components/ui/input/input.svelte';
+	import Label from '#lib/components/ui/label/label.svelte';
+	import { Switch } from '#lib/components/ui/switch/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import * as Collapsible from '#lib/components/ui/collapsible/index.ts';
+	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
 	import {
 		Card,
 		CardContent,
 		CardDescription,
 		CardHeader,
 		CardTitle
-	} from '$lib/components/ui/card';
+	} from '#lib/components/ui/card/index.ts';
 	import {
 		AlertDialog,
 		AlertDialogAction,
@@ -40,11 +40,11 @@
 		AlertDialogFooter,
 		AlertDialogHeader,
 		AlertDialogTitle
-	} from '$lib/components/ui/alert-dialog';
+	} from '#lib/components/ui/alert-dialog/index.ts';
 	import FinancingFormSection from './FinancingFormSection.svelte';
-	import { vehicleApi } from '$lib/services/vehicle-api';
-	import { getLongFormLabel } from '$lib/utils/units';
-	import { dateOnlyToISO, toDateInputValue } from '$lib/utils/formatters';
+	import { vehicleApi } from '#lib/services/vehicle-api.ts';
+	import { getLongFormLabel } from '#lib/utils/units.ts';
+	import { dateOnlyToISO, toDateInputValue } from '#lib/utils/formatters.ts';
 	import type {
 		Vehicle,
 		VehicleFinancing,
@@ -56,10 +56,10 @@
 		DistanceUnit,
 		VolumeUnit,
 		ChargeUnit
-	} from '$lib/types';
+	} from '#lib/types/index.ts';
 	import { validateVehicleFields, validateFinancingFields } from './vehicle-form-validation';
-	import { calculatePayoffDateFromStart } from '$lib/utils/financing-calculations';
-	import FormLayout from '$lib/components/common/form-layout.svelte';
+	import { calculatePayoffDateFromStart } from '#lib/utils/financing-calculations.ts';
+	import FormLayout from '#lib/components/common/form-layout.svelte';
 
 	interface Props {
 		vehicleId?: string;
@@ -422,7 +422,7 @@
 					type: 'success',
 					message: 'Vehicle updated successfully!'
 				});
-				await invalidateAll();
+				await refreshAll();
 				goto(resolve(paramRoutes.vehicle, { id: vehicleId! }));
 			} else {
 				appStore.addVehicle(savedVehicle);

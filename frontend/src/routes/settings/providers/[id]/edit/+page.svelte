@@ -5,11 +5,16 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { LoaderCircle } from '@lucide/svelte';
-	import ProviderForm from '$lib/components/settings/storage-provider/form/ProviderForm.svelte';
-	import { providerApi } from '$lib/services/provider-api';
-	import { settingsApi } from '$lib/services/settings-api';
-	import { routes } from '$lib/routes';
-	import type { PhotoCategory, CategorySetting, StorageConfig, UserProviderInfo } from '$lib/types';
+	import ProviderForm from '#lib/components/settings/storage-provider/form/ProviderForm.svelte';
+	import { providerApi } from '#lib/services/provider-api.ts';
+	import { settingsApi } from '#lib/services/settings-api.ts';
+	import { routes } from '#lib/routes.ts';
+	import type {
+		PhotoCategory,
+		CategorySetting,
+		StorageConfig,
+		UserProviderInfo
+	} from '#lib/types/index.ts';
 
 	const DEFAULT_CATEGORY_SETTINGS: Record<PhotoCategory, CategorySetting> = {
 		vehicle_photos: { enabled: false, folderPath: 'Vehicle' },

@@ -1,8 +1,8 @@
 import { goto } from '$app/navigation';
 import { page } from '$app/state';
-import { browser } from '$app/environment';
-import { apiClient, getApiBaseUrl } from '$lib/services/api-client';
-import { appStore } from '$lib/stores/app.svelte';
+import { browser } from '$app/env';
+import { apiClient, getApiBaseUrl } from '#lib/services/api-client.ts';
+import { appStore } from '#lib/stores/app.svelte.ts';
 
 interface GoogleOAuthOptions {
 	isEditMode: boolean;
@@ -105,7 +105,7 @@ export function useGoogleOAuth(getOptions: () => GoogleOAuthOptions): GoogleOAut
 			}
 
 			// eslint-disable-next-line svelte/no-navigation-without-resolve -- dynamic runtime path from current URL
-			goto(page.url.pathname, { replaceState: true });
+			goto(page.url.pathname, { replace: true });
 
 			return { restoredSelectedType, restoredDisplayName };
 		}
@@ -121,7 +121,7 @@ export function useGoogleOAuth(getOptions: () => GoogleOAuthOptions): GoogleOAut
 				errorMessages[providerError] ?? 'An error occurred connecting your Google account.'
 			);
 			// eslint-disable-next-line svelte/no-navigation-without-resolve -- dynamic runtime path from current URL
-			goto(page.url.pathname, { replaceState: true });
+			goto(page.url.pathname, { replace: true });
 		}
 
 		return {};

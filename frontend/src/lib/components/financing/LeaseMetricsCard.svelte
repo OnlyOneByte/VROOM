@@ -1,14 +1,14 @@
 <script lang="ts">
-	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
-	import { Progress } from '$lib/components/ui/progress';
+	import { Card, CardContent, CardHeader, CardTitle } from '#lib/components/ui/card/index.ts';
+	import { Progress } from '#lib/components/ui/progress/index.ts';
 	import { Gauge } from '@lucide/svelte';
 	import {
 		calculateLeaseMetrics,
 		leaseTotalMileageAllowance
-	} from '$lib/utils/financing-calculations';
-	import { getDistanceUnitLabel } from '$lib/utils/units';
-	import { settingsStore } from '$lib/stores/settings.svelte';
-	import type { VehicleFinancing, UnitPreferences } from '$lib/types';
+	} from '#lib/utils/financing-calculations.ts';
+	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
+	import type { VehicleFinancing, UnitPreferences } from '#lib/types/index.ts';
 
 	interface Props {
 		financing: VehicleFinancing;

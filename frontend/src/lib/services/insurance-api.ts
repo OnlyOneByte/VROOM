@@ -9,7 +9,7 @@ import type {
 	UpdateClaimRequest,
 	UpdatePolicyRequest,
 	UpdateTermRequest
-} from '$lib/types';
+} from '#lib/types/index.ts';
 import { apiClient } from './api-client';
 import { entityPhotos } from './photo-api';
 

@@ -8,7 +8,7 @@ import {
 	getXTickCount,
 	monthlyXAxisProps,
 	parseMonthToDate
-} from '$lib/utils/chart-formatters';
+} from '#lib/utils/chart-formatters.ts';
 
 describe('chart money axis formatters', () => {
 	test('formatCurrencyAxis renders compact currency with no decimals', () => {

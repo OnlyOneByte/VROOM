@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { render } from '@testing-library/svelte';
 import PaginationControls from '../pagination-controls.svelte';
 import ExpensesTable from '../../expenses/ExpensesTable.svelte';
-import type { Expense } from '$lib/types';
+import type { Expense } from '#lib/types/index.ts';
 
 describe('the pagination bar itself', () => {
 	test('never reports a page count below one', () => {

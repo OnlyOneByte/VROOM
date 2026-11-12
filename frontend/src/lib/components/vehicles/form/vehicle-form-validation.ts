@@ -1,4 +1,4 @@
-import type { VehicleFormData, VehicleFormErrors, FinancingFormErrors } from '$lib/types';
+import type { VehicleFormData, VehicleFormErrors, FinancingFormErrors } from '#lib/types/index.ts';
 
 interface FinancingFormData {
 	financingType: 'loan' | 'lease' | 'own';

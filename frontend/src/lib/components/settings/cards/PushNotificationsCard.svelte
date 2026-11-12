@@ -1,20 +1,20 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { Bell, LoaderCircle } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Switch } from '$lib/components/ui/switch';
-	import * as AlertDialog from '$lib/components/ui/alert-dialog';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Switch } from '#lib/components/ui/switch/index.ts';
+	import * as AlertDialog from '#lib/components/ui/alert-dialog/index.ts';
 	import {
 		Card,
 		CardContent,
 		CardDescription,
 		CardHeader,
 		CardTitle
-	} from '$lib/components/ui/card';
-	import * as pushUtil from '$lib/utils/push';
-	import { pushApi } from '$lib/services/push-api';
-	import { appStore } from '$lib/stores/app.svelte';
-	import { ApiError } from '$lib/utils/error-handling';
+	} from '#lib/components/ui/card/index.ts';
+	import * as pushUtil from '#lib/utils/push.ts';
+	import { pushApi } from '#lib/services/push-api.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { ApiError } from '#lib/utils/error-handling.ts';
 
 	const DISCLOSURE_KEY = 'vroom.push.disclosed';
 

@@ -1,4 +1,4 @@
-import type { TripPurpose } from '$lib/types';
+import type { TripPurpose } from '#lib/types/index.ts';
 
 export interface TripFormData {
 	vehicleId: string;

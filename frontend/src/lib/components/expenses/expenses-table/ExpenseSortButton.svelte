@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { ArrowUpDown } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
+	import { Button } from '#lib/components/ui/button/index.ts';
 	import type { SortField } from './expense-table-rows';
 
 	interface Props {

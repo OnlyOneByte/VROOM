@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import type { ImportColumnMapping } from '$lib/types';
+import type { ImportColumnMapping } from '#lib/types/index.ts';
 import type { ExpenseImportResult } from '../expense-api';
 
 const post = vi.fn();

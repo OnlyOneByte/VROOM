@@ -1,5 +1,5 @@
-import type { Expense } from '$lib/types';
-import type { SplitAllocationDraft } from '$lib/utils/expense-helpers';
+import type { Expense } from '#lib/types/index.ts';
+import type { SplitAllocationDraft } from '#lib/utils/expense-helpers.ts';
 
 export type SplitMethod = 'even' | 'absolute' | 'percentage';
 

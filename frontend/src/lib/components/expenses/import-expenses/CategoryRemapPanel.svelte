@@ -1,8 +1,8 @@
 <script lang="ts">
-	import * as Select from '$lib/components/ui/select';
+	import * as Select from '#lib/components/ui/select/index.ts';
 	import { CircleAlert } from '@lucide/svelte';
-	import type { ExpenseCategory } from '$lib/types';
-	import { categoryLabels } from '$lib/utils/expense-helpers';
+	import type { ExpenseCategory } from '#lib/types/index.ts';
+	import { categoryLabels } from '#lib/utils/expense-helpers.ts';
 
 	interface Props {
 		unmappedCategories: string[];

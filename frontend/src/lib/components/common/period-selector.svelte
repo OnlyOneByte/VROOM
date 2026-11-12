@@ -1,7 +1,7 @@
 <script lang="ts">
-	import * as Select from '$lib/components/ui/select';
+	import * as Select from '#lib/components/ui/select/index.ts';
 	import { LoaderCircle } from '@lucide/svelte';
-	import { PERIOD_OPTIONS, isValidPeriod, type TimePeriod } from '$lib/constants/time-periods';
+	import { PERIOD_OPTIONS, isValidPeriod, type TimePeriod } from '#lib/constants/time-periods.ts';
 
 	interface Props {
 		selectedPeriod: TimePeriod;

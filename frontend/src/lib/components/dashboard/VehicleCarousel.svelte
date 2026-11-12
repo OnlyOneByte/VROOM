@@ -1,15 +1,15 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { routes, paramRoutes } from '$lib/routes';
-	import { gotoWithQuery } from '$lib/utils/navigation';
+	import { routes, paramRoutes } from '#lib/routes.ts';
+	import { gotoWithQuery } from '#lib/utils/navigation.ts';
 	import { Car, Calendar, TrendingUp, DollarSign, Image as ImageIcon, Users } from '@lucide/svelte';
-	import * as Card from '$lib/components/ui/card';
-	import * as Carousel from '$lib/components/ui/carousel';
-	import { Button } from '$lib/components/ui/button';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import EmptyState from '$lib/components/common/empty-state.svelte';
-	import { formatCurrency, formatRelativeTime } from '$lib/utils/formatters';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import * as Carousel from '#lib/components/ui/carousel/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import { formatCurrency, formatRelativeTime } from '#lib/utils/formatters.ts';
 
 	interface VehicleOverview {
 		id: string;

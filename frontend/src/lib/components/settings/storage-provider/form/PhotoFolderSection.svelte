@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { FolderOpen, ChevronDown } from '@lucide/svelte';
-	import { Label } from '$lib/components/ui/label';
-	import { Checkbox } from '$lib/components/ui/checkbox';
-	import { Badge } from '$lib/components/ui/badge';
-	import * as Collapsible from '$lib/components/ui/collapsible';
-	import { PHOTO_CATEGORY_LABELS } from '$lib/constants/ui';
-	import type { PhotoCategory, CategorySetting } from '$lib/types';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { Checkbox } from '#lib/components/ui/checkbox/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import * as Collapsible from '#lib/components/ui/collapsible/index.ts';
+	import { PHOTO_CATEGORY_LABELS } from '#lib/constants/ui.ts';
+	import type { PhotoCategory, CategorySetting } from '#lib/types/index.ts';
 
 	const CATEGORIES: PhotoCategory[] = [
 		'vehicle_photos',

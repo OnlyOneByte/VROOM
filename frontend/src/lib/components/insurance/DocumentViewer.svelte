@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { Upload, Trash2, FileText, Download, LoaderCircle, ImagePlus } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import MediaCaptureDialog from '$lib/components/common/MediaCaptureDialog.svelte';
-	import ConfirmDialog from '$lib/components/common/ConfirmDialog.svelte';
-	import { insuranceApi } from '$lib/services/insurance-api';
-	import { handleErrorWithNotification } from '$lib/utils/error-handling';
-	import type { Photo } from '$lib/types';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import MediaCaptureDialog from '#lib/components/common/MediaCaptureDialog.svelte';
+	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
+	import { insuranceApi } from '#lib/services/insurance-api.ts';
+	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
+	import type { Photo } from '#lib/types/index.ts';
 
 	const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 	const ALLOWED_TYPES = [...IMAGE_TYPES, 'application/pdf'];

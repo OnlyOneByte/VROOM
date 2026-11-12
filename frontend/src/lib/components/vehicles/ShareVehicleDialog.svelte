@@ -1,17 +1,17 @@
 <script lang="ts">
-	import * as Dialog from '$lib/components/ui/dialog';
-	import * as Select from '$lib/components/ui/select';
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import EmptyState from '$lib/components/common/empty-state.svelte';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import { Users, CircleAlert, Trash2 } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
-	import { shareApi } from '$lib/services/share-api';
-	import { ApiError } from '$lib/utils/error-handling';
-	import { shareLevelLabel } from '$lib/utils/share-helpers';
-	import type { ShareLevel, VehicleShare } from '$lib/types';
+	import { shareApi } from '#lib/services/share-api.ts';
+	import { ApiError } from '#lib/utils/error-handling.ts';
+	import { shareLevelLabel } from '#lib/utils/share-helpers.ts';
+	import type { ShareLevel, VehicleShare } from '#lib/types/index.ts';
 
 	interface Props {
 		open: boolean;
