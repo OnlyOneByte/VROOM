@@ -134,7 +134,7 @@
 						value={selectedVehicleId ?? ''}
 						onValueChange={v => onVehicleChange?.(v === '' ? undefined : v)}
 					>
-						<Select.Trigger class="w-full">
+						<Select.Trigger aria-label="Vehicle filter" class="w-full">
 							<div class="flex items-center gap-2">
 								<Car class="h-4 w-4 text-muted-foreground flex-shrink-0" />
 								<span class="truncate">

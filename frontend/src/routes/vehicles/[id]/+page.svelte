@@ -613,6 +613,5 @@
 	<FloatingActionButton
 		href={`${resolve(routes.expenseNew)}?vehicleId=${vehicleId}&returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`}
 		label={COMMON_MESSAGES.ADD_EXPENSE}
-		ariaLabel="Add expense"
 	/>
 {/if}
