@@ -1,4 +1,9 @@
-import webpush, { WebPushError, type PushSubscription as WebPushSubscription } from 'web-push';
+import {
+  sendNotification,
+  setVapidDetails,
+  WebPushError,
+  type PushSubscription as WebPushSubscription,
+} from 'web-push';
 import { CONFIG } from '../../config';
 import type { PushSubscription } from '../../db/schema';
 import { logger } from '../../utils/logger';
@@ -26,7 +31,7 @@ function ensureVapidConfigured(): void {
   if (!(vapidSubject && vapidPublicKey && vapidPrivateKey)) {
     throw new Error('VAPID keypair is not configured');
   }
-  webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
+  setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
   vapidConfigured = true;
 }
 
@@ -44,7 +49,7 @@ export const webPushSender: PushSender = {
       keys: { p256dh: subscription.p256dh, auth: subscription.auth },
     };
     try {
-      await webpush.sendNotification(target, JSON.stringify(payload));
+      await sendNotification(target, JSON.stringify(payload));
       return { kind: 'ok' };
     } catch (err) {
       if (err instanceof WebPushError && (err.statusCode === 404 || err.statusCode === 410)) {
