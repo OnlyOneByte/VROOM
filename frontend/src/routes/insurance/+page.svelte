@@ -124,9 +124,5 @@
 		{/if}
 	</div>
 
-	<FloatingActionButton
-		onclick={handleAddPolicy}
-		label="New Policy"
-		ariaLabel="New insurance policy"
-	/>
+	<FloatingActionButton onclick={handleAddPolicy} label="New Policy" />
 {/if}

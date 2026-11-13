@@ -360,7 +360,7 @@
 							value={selectedVehicleId ?? ''}
 							onValueChange={handleVehicleChange}
 						>
-							<Select.Trigger class="w-full">
+							<Select.Trigger aria-label="Vehicle filter" class="w-full">
 								<div class="flex items-center gap-2">
 									<Car class="h-4 w-4 text-muted-foreground flex-shrink-0" />
 									<span class="truncate">
@@ -466,11 +466,7 @@
 		</CardNs.Root>
 	</div>
 
-	<FloatingActionButton
-		href={resolve(routes.expenseNew)}
-		label={COMMON_MESSAGES.ADD_EXPENSE}
-		ariaLabel="Add expense"
-	/>
+	<FloatingActionButton href={resolve(routes.expenseNew)} label={COMMON_MESSAGES.ADD_EXPENSE} />
 
 	<ImportExpensesDialog bind:open={importOpen} {vehicles} onImported={handleImported} />
 	<ImportFromPhotosDialog bind:open={photosImportOpen} {vehicles} onImported={handleImported} />

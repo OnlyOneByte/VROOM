@@ -34,7 +34,11 @@
 						value={categoryRemap[word] ?? ''}
 						onValueChange={v => onRemap(word, v as ExpenseCategory)}
 					>
-						<Select.Trigger class="h-8 flex-1 text-xs" data-testid="remap-category-{word}">
+						<Select.Trigger
+							aria-label="Category for {word}"
+							class="h-8 flex-1 text-xs"
+							data-testid="remap-category-{word}"
+						>
 							{categoryRemap[word] ? categoryLabels[categoryRemap[word]] : 'Map to… (Misc)'}
 						</Select.Trigger>
 						<Select.Content>
