@@ -31,6 +31,7 @@ palette class. Every token has a light and a dark variant.
 | `bg-accent` / `text-accent-foreground` | Hover/active surfaces |
 | `bg-destructive` / `text-destructive` | Errors, delete |
 | `text-warning` / `bg-warning/10` | "Attention" / due-now cues (reminders, offline state) |
+| `text-success` / `bg-success/10` | "All good" status text (synced, up to date) |
 | `border-border` / `border-input` / `ring-ring` | Borders, inputs, focus rings |
 | `text-chart-1`…`text-chart-8` | Categorical chart colors |
 
@@ -44,7 +45,11 @@ Notes:
   text-yellow-800`, and the green equivalent) in `ui/alert/alert.svelte`, so they ignore the theme
   and dark mode. `no-theme-clashing-colors.test.ts` does not catch them (its regex covers only
   white/black/gray/slate/zinc/neutral); `/dev/gallery` renders all four if you want to see the gap.
-  There is no `--success` token today, so a success surface needs one added before it can be themed.
+  `--success` is themed and AA-gated, but `Alert`'s `success` variant does not use it yet.
+- `text-chart-*` is for chart marks, not words: the chart gate is only 3:1. Status text uses
+  `text-success` / `text-warning` / `text-destructive`. `--primary` is gated at AA on
+  `--background`; a `bg-primary/10` tint (the active nav item) costs about 10% of that, which only
+  the axe e2e scans catch.
 - Chart colors come from `utils/chart-colors`: series `CHART_COLORS[i % CHART_COLORS.length]`
   (8 colors), category `getCategoryChartColor` (badges use `getCategoryBadgeClasses` from
   `utils/expense-helpers`; both derive from the one `CATEGORY_COLOR_TOKENS` assignment), chart

@@ -44,10 +44,10 @@ describe('getSyncStatusInfo — each branch in isolation', () => {
 		expect(info.text).toBe('Sync failed');
 	});
 
-	test('success → CircleCheck / chart-2 / "Synced"', () => {
+	test('success → CircleCheck / success / "Synced"', () => {
 		const info = getSyncStatusInfo(params({ syncStatus: 'success' }));
 		expect(info.icon).toBe(CircleCheck);
-		expect(info.color).toBe('text-chart-2');
+		expect(info.color).toBe('text-success');
 		expect(info.text).toBe('Synced');
 	});
 
@@ -58,10 +58,10 @@ describe('getSyncStatusInfo — each branch in isolation', () => {
 		expect(info.text).toBe('2 pending');
 	});
 
-	test('idle, online, nothing queued → Wifi / chart-2 / "Up to date"', () => {
+	test('idle, online, nothing queued → Wifi / success / "Up to date"', () => {
 		const info = getSyncStatusInfo(params());
 		expect(info.icon).toBe(Wifi);
-		expect(info.color).toBe('text-chart-2');
+		expect(info.color).toBe('text-success');
 		expect(info.text).toBe('Up to date');
 	});
 });
