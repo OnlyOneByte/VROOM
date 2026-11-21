@@ -16,6 +16,7 @@
 	interface Props {
 		financing: VehicleFinancing;
 		lastPayment?: DerivedPaymentEntry;
+		paymentsLoaded?: boolean;
 		recordPaymentHref?: string;
 		progressPercentage?: number;
 		onChangePayment?: () => void;
@@ -25,6 +26,7 @@
 	let {
 		financing,
 		lastPayment,
+		paymentsLoaded = true,
 		recordPaymentHref,
 		progressPercentage = 0,
 		onChangePayment,
@@ -36,7 +38,7 @@
 	let nextPaymentDate = $derived.by(() => {
 		try {
 			const lastPaymentDate = lastPayment ? new Date(lastPayment.expense.date) : undefined;
-			return calculateNextPaymentDate(financing, lastPaymentDate);
+			return calculateNextPaymentDate(financing, lastPaymentDate, !paymentsLoaded);
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Error calculating next payment date:', error);
 			return new Date();

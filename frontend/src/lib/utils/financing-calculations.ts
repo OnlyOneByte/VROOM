@@ -159,10 +159,9 @@ function scheduledDueDate(financing: VehicleFinancing, start: Date, index: numbe
 		}
 		default: {
 			const anchorDay = financing.paymentDayOfMonth ?? start.getDate();
-			const firstMonthOffset = anchorDay < start.getDate() ? 1 : 0;
 			const due = new Date(start);
 			due.setDate(1);
-			due.setMonth(due.getMonth() + index + firstMonthOffset);
+			due.setMonth(due.getMonth() + index);
 			const daysInMonth = new Date(due.getFullYear(), due.getMonth() + 1, 0).getDate();
 			due.setDate(Math.min(anchorDay, daysInMonth));
 			return due;
@@ -172,7 +171,8 @@ function scheduledDueDate(financing: VehicleFinancing, start: Date, index: numbe
 
 export function calculateNextPaymentDate(
 	financing: VehicleFinancing,
-	lastPaymentDate?: Date
+	lastPaymentDate?: Date,
+	assumeLastDuePaid = false
 ): Date {
 	try {
 		if (!financing || !financing.startDate) {
@@ -189,7 +189,7 @@ export function calculateNextPaymentDate(
 		}
 
 		const maxIterations = 1000;
-		let index = 0;
+		let index = 1;
 		while (index < maxIterations && scheduledDueDate(financing, start, index + 1) <= now) {
 			index++;
 		}
@@ -202,9 +202,11 @@ export function calculateNextPaymentDate(
 		const lastDue = scheduledDueDate(financing, start, index);
 		if (lastDue > now) return lastDue;
 
-		const previousDue = index > 0 ? scheduledDueDate(financing, start, index - 1) : undefined;
+		const previousDue = index > 1 ? scheduledDueDate(financing, start, index - 1) : undefined;
 		const lastDueIsPaid =
-			lastPaymentDate !== undefined && (previousDue === undefined || lastPaymentDate > previousDue);
+			assumeLastDuePaid ||
+			(lastPaymentDate !== undefined &&
+				(previousDue === undefined || lastPaymentDate > previousDue));
 		return lastDueIsPaid ? scheduledDueDate(financing, start, index + 1) : lastDue;
 	} catch (error) {
 		if (DEV) console.error('Error calculating next payment date:', error);
@@ -462,8 +464,9 @@ export function formatPaymentFrequency(frequency: string): string {
 
 export function calculateDaysUntil(targetDate: Date): number {
 	const now = new Date();
-	const diffTime = targetDate.getTime() - now.getTime();
-	return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+	const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+	const target = Date.UTC(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+	return Math.round((target - today) / (1000 * 60 * 60 * 24));
 }
 export function calculateMinimumPayment(financing: VehicleFinancing): number | null {
 	if (financing.financingType !== 'loan' || !financing.apr || financing.apr <= 0) {

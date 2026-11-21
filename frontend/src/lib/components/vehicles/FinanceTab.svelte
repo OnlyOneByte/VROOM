@@ -36,6 +36,7 @@
 	let { vehicle, vehicleId, vehicleStatsData, isOwner = true }: Props = $props();
 
 	let payments = $state<DerivedPaymentEntry[]>([]);
+	let paymentsLoaded = $state(false);
 	let isLoadingPayments = $state(false);
 	let paymentHistoryError = $state<string | null>(null);
 	let hasAttemptedPaymentLoad = $state(false);
@@ -126,6 +127,7 @@
 				e => e.sourceType === 'financing' && e.sourceId === financingId
 			);
 			payments = derivePaymentEntries(financingExpenses, vehicle.financing);
+			paymentsLoaded = true;
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Error loading payment history:', error);
 			paymentHistoryError = 'Failed to load payment history. Please try again.';
@@ -147,6 +149,7 @@
 			<NextPaymentCard
 				financing={vehicle.financing}
 				lastPayment={payments.at(-1)}
+				{paymentsLoaded}
 				{isOwner}
 				recordPaymentHref={`${resolve(routes.expenseNew)}?vehicleId=${vehicleId}&category=financial&financingId=${vehicle.financing.id}&amount=${vehicle.financing.paymentAmount}&returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`}
 				{progressPercentage}

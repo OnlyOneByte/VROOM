@@ -107,7 +107,7 @@ describe('FinanceTab payment history', () => {
 
 		render(FinanceTab, { props: { vehicle: VEHICLE, vehicleId: 'veh-1', vehicleStatsData: null } });
 
-		await waitFor(() => expect(screen.getByText(/Overdue by 4 days/)).toBeTruthy());
+		await waitFor(() => expect(screen.getByText(/Overdue by 5 days/)).toBeTruthy());
 	});
 
 	test('with the last due date paid, the next payment is due next month', async () => {
@@ -117,6 +117,18 @@ describe('FinanceTab payment history', () => {
 
 		render(FinanceTab, { props: { vehicle: VEHICLE, vehicleId: 'veh-1', vehicleStatsData: null } });
 
-		await waitFor(() => expect(screen.getByText(/Due in 26 days/)).toBeTruthy());
+		await waitFor(() => expect(screen.getByText(/Due in 25 days/)).toBeTruthy());
+	});
+
+	test('a payment history that fails to load never shows the loan as overdue', async () => {
+		getExpensesByVehicle.mockRejectedValueOnce(new Error('offline'));
+
+		render(FinanceTab, { props: { vehicle: VEHICLE, vehicleId: 'veh-1', vehicleStatsData: null } });
+
+		expect(
+			await screen.findByText('Failed to load payment history. Please try again.')
+		).toBeTruthy();
+		expect(screen.queryByText(/Overdue/)).toBeNull();
+		expect(screen.getByText(/Due in 25 days/)).toBeTruthy();
 	});
 });
