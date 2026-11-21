@@ -237,7 +237,10 @@
 
 	function validateFinancingForm(): boolean {
 		if (ownershipType === 'own') return true;
-		const financingErrors = validateFinancingFields(financingForm, ownershipType);
+		const financingErrors = validateFinancingFields(
+			{ ...financingForm, paymentAmount: paymentToSave },
+			ownershipType
+		);
 		errors = { ...errors, ...financingErrors };
 		return Object.keys(financingErrors).length === 0;
 	}
@@ -291,11 +294,22 @@
 		}
 	});
 
-	$effect(() => {
-		if (amortizationPreview && financingForm.financingType === 'loan') {
-			financingForm.paymentAmount = amortizationPreview.monthlyPayment;
-		}
+	let loanTermsChanged = $derived.by(() => {
+		const saved = vehicle?.financing;
+		if (!isEditMode || !saved?.isActive) return true;
+		return (
+			saved.financingType !== financingForm.financingType ||
+			saved.originalAmount !== Number(financingForm.originalAmount) ||
+			(saved.apr ?? 0) !== Number(financingForm.apr) ||
+			saved.termMonths !== Number(financingForm.termMonths)
+		);
 	});
+
+	let paymentToSave = $derived(
+		financingForm.financingType === 'loan' && amortizationPreview && loanTermsChanged
+			? amortizationPreview.monthlyPayment
+			: Number(financingForm.paymentAmount)
+	);
 
 	$effect(() => {
 		if (ownershipType === 'finance') {
@@ -384,7 +398,7 @@
 					originalAmount: Number(financingForm.originalAmount),
 					termMonths: Number(financingForm.termMonths),
 					startDate: dateOnlyToISO(financingForm.startDate),
-					paymentAmount: Number(financingForm.paymentAmount),
+					paymentAmount: paymentToSave,
 					paymentFrequency: financingForm.frequency,
 					paymentDayOfMonth: Number(financingForm.dayOfMonth)
 				};
@@ -811,7 +825,7 @@
 					{errors}
 					{isEditMode}
 					{vehicle}
-					{amortizationPreview}
+					amortizationPreview={loanTermsChanged ? amortizationPreview : null}
 				/>
 			</form>
 
