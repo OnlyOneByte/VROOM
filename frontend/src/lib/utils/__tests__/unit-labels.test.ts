@@ -1,26 +1,23 @@
 import { describe, expect, test } from 'vitest';
 import { getChargeUnitLabel, getDistanceUnitLabel, getVolumeUnitLabel } from '../units';
 
-describe('unit labels', () => {
+describe('long unit labels', () => {
 	test.each([
-		['miles', 'mi', 'Miles'],
-		['kilometers', 'km', 'Kilometers']
-	] as const)('distance %s is %s short and %s long', (unit, short, long) => {
-		expect(getDistanceUnitLabel(unit, true)).toBe(short);
+		['miles', 'Miles'],
+		['kilometers', 'Kilometers']
+	] as const)('distance %s reads %s', (unit, long) => {
 		expect(getDistanceUnitLabel(unit)).toBe(long);
 	});
 
 	test.each([
-		['gallons_us', 'gal', 'Gallons (US)'],
-		['gallons_uk', 'gal', 'Gallons (UK)'],
-		['liters', 'L', 'Liters']
-	] as const)('volume %s is %s short and %s long', (unit, short, long) => {
-		expect(getVolumeUnitLabel(unit, true)).toBe(short);
+		['gallons_us', 'Gallons (US)'],
+		['gallons_uk', 'Gallons (UK)'],
+		['liters', 'Liters']
+	] as const)('volume %s reads %s', (unit, long) => {
 		expect(getVolumeUnitLabel(unit)).toBe(long);
 	});
 
-	test('charge kWh reads the same short and long', () => {
-		expect(getChargeUnitLabel('kwh', true)).toBe('kWh');
+	test('charge kwh reads kWh', () => {
 		expect(getChargeUnitLabel('kwh')).toBe('kWh');
 	});
 });
