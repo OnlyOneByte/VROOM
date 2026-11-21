@@ -5,6 +5,7 @@ import {
 	getDaysRemaining,
 	getLatestTerm,
 	groupPoliciesByActive,
+	isPolicyInForce,
 	isExpiringSoon,
 	prefillFromPreviousTerm,
 	sortTermsByEndDateDesc
@@ -82,24 +83,26 @@ const arbInsurancePolicy: fc.Arbitrary<InsurancePolicy> = fc
 	});
 
 describe('Policy active/inactive grouping', () => {
-	test('active group contains only isActive===true policies', () => {
+	test('active group contains only in-force policies', () => {
 		fc.assert(
 			fc.property(fc.array(arbInsurancePolicy, { minLength: 0, maxLength: 20 }), policies => {
-				const { active } = groupPoliciesByActive(policies);
+				const now = new Date();
+				const { active } = groupPoliciesByActive(policies, now);
 				for (const policy of active) {
-					expect(policy.isActive).toBe(true);
+					expect(isPolicyInForce(policy, now)).toBe(true);
 				}
 			}),
 			{ numRuns: 100 }
 		);
 	});
 
-	test('inactive group contains only isActive===false policies', () => {
+	test('inactive group contains every deactivated or expired policy', () => {
 		fc.assert(
 			fc.property(fc.array(arbInsurancePolicy, { minLength: 0, maxLength: 20 }), policies => {
-				const { inactive } = groupPoliciesByActive(policies);
+				const now = new Date();
+				const { inactive } = groupPoliciesByActive(policies, now);
 				for (const policy of inactive) {
-					expect(policy.isActive).toBe(false);
+					expect(isPolicyInForce(policy, now)).toBe(false);
 				}
 			}),
 			{ numRuns: 100 }
