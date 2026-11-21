@@ -125,12 +125,13 @@
 					{/if}
 					{#if !readOnly}
 						<div
-							class="absolute inset-x-0 bottom-0 flex justify-end bg-gradient-to-t from-black/60 to-transparent p-1.5 opacity-0 transition-opacity group-hover:opacity-100"
+							class="absolute inset-x-0 bottom-0 flex justify-end bg-gradient-to-t from-black/60 to-transparent p-1.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
 						>
 							<Button
 								variant="destructive"
 								size="sm"
 								class="h-6 text-xs"
+								aria-label={`Delete ${doc.fileName}`}
 								onclick={() => requestDelete(doc.id)}
 							>
 								<Trash2 class="h-3 w-3" />
