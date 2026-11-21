@@ -643,6 +643,11 @@ routes.post('/import/detect', zValidator('json', detectSourceSchema), (c) => {
 routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
   const user = c.get('user');
   const { forceOverwrite, ...body } = c.req.valid('json');
+  if (forceOverwrite) {
+    throw new ValidationError(
+      'forceOverwrite is no longer supported. Overwrite the expense with PUT /api/v1/expenses/:id.'
+    );
+  }
   const expenseData = clearFuelFieldsIfNotFuel(body);
 
   const ownerId = await requireVehicleOwnerScope(expenseData.vehicleId, user.id, 'write');
@@ -661,14 +666,11 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
     expenseData.fuelType
   );
 
-  const createdExpense = await expenseRepository.createIdempotent(
-    {
-      ...expenseData,
-      userId: ownerId,
-      createdBy,
-    },
-    forceOverwrite ?? false
-  );
+  const createdExpense = await expenseRepository.createIdempotent({
+    ...expenseData,
+    userId: ownerId,
+    createdBy,
+  });
 
   if (createdExpense.mileage != null) {
     await reminderTriggerService.recheckMileageReminders(ownerId, createdExpense.vehicleId);
