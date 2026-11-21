@@ -36,11 +36,12 @@
 	let evenAmounts = $derived.by(() => {
 		const count = vehicles.length;
 		if (count === 0) return [];
-		const base = Math.floor((totalAmount / count) * 100) / 100;
-		const remainder = Math.round((totalAmount - base * count) * 100) / 100;
+		const totalCents = Math.round(totalAmount * 100);
+		const baseCents = Math.floor(totalCents / count);
+		const remainderCents = totalCents - baseCents * count;
 		return vehicles.map((v, i) => ({
 			vehicleId: v.id,
-			amount: i === 0 ? base + remainder : base
+			amount: (baseCents + (i < remainderCents ? 1 : 0)) / 100
 		}));
 	});
 
