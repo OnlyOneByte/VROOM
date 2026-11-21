@@ -29,7 +29,9 @@ describe('sign-in page', () => {
 		expect(await screen.findByRole('button', { name: 'Continue with Google' })).toBeInTheDocument();
 		expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
 		expect(authApi.getProviders).toHaveBeenCalledTimes(2);
-		expect(screen.getByRole('button', { name: 'Continue with Google' })).toHaveFocus();
+		await waitFor(() =>
+			expect(screen.getByRole('button', { name: 'Continue with Google' })).toHaveFocus()
+		);
 	});
 
 	test('a failed Retry announces the error and keeps focus on the new Retry', async () => {
