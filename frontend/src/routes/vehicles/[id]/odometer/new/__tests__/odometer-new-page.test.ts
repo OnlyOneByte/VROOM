@@ -106,6 +106,9 @@ describe('new odometer reading page defaults', () => {
 		expect(dateInput().value).toBe('2026-11-21');
 		expect(screen.getByText('0/500')).toBeInTheDocument();
 		expect(getEntries).toHaveBeenCalledWith('v1', { limit: 1, offset: 0 });
+		for (const name of ['Cancel', 'Save Reading']) {
+			expect(screen.getByRole('button', { name })).toHaveClass('h-10');
+		}
 	});
 
 	test('the note counter tracks the typed length', async () => {

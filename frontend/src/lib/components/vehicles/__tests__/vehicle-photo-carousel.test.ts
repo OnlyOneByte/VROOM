@@ -62,6 +62,9 @@ describe('VehiclePhotoCarousel: empty state', () => {
 		const { onUpload } = mount([]);
 
 		expect(screen.getByText('No photos yet')).toBeInTheDocument();
+		for (const name of ['Upload', 'Upload Photos']) {
+			expect(screen.getByRole('button', { name })).toHaveClass('h-10');
+		}
 		await fireEvent.click(screen.getByRole('button', { name: 'Upload Photos' }));
 
 		expect(onUpload).toHaveBeenCalledOnce();
@@ -117,6 +120,7 @@ describe('VehiclePhotoCarousel: cover photo', () => {
 		expect(screen.getAllByText('Cover')).toHaveLength(1);
 		const setCover = screen.getAllByRole('button', { name: 'Set as cover' });
 		expect(setCover).toHaveLength(1);
+		expect(setCover[0]).toHaveClass('h-10', 'lg:h-7');
 
 		await fireEvent.click(setCover[0] as HTMLElement);
 

@@ -57,7 +57,7 @@
 	<Card.Header class="flex flex-row items-center justify-between space-y-0 pb-3">
 		<Card.Title class="text-lg font-semibold">Photos</Card.Title>
 		{#if isOwner}
-			<Button variant="outline" size="sm" onclick={onUpload}>
+			<Button variant="outline" size="lg" onclick={onUpload}>
 				<Upload class="mr-2 h-4 w-4" />
 				Upload
 			</Button>
@@ -94,7 +94,7 @@
 											<Button
 												variant="secondary"
 												size="sm"
-												class="h-7 bg-background/80 text-xs backdrop-blur-sm"
+												class="h-10 bg-background/80 text-xs backdrop-blur-sm lg:h-7"
 												onclick={() => onSetCover(photo.id)}
 											>
 												<Star class="mr-1 h-3 w-3" />
@@ -104,7 +104,7 @@
 										<Button
 											variant="destructive"
 											size="sm"
-											class="h-7 text-xs"
+											class="h-10 text-xs lg:h-7"
 											disabled={deletingPhotoId === photo.id}
 											onclick={() => requestDelete(photo.id)}
 										>
@@ -155,7 +155,7 @@
 				</div>
 				<p class="text-sm text-muted-foreground">No photos yet</p>
 				{#if isOwner}
-					<Button variant="outline" size="sm" class="mt-3" onclick={onUpload}>
+					<Button variant="outline" size="lg" class="mt-3" onclick={onUpload}>
 						<Upload class="mr-2 h-4 w-4" />
 						Upload Photos
 					</Button>

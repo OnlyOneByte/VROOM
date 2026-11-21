@@ -263,6 +263,7 @@
 				<Button
 					type="button"
 					variant="destructive"
+					size="lg"
 					onclick={() => (deleteDialogOpen = true)}
 					class="flex-shrink-0"
 				>
@@ -273,12 +274,13 @@
 					<Button
 						type="button"
 						variant="outline"
+						size="lg"
 						onclick={() => gotoDynamic(returnTo)}
 						class="flex-1"
 					>
 						Cancel
 					</Button>
-					<Button type="submit" disabled={isSubmitting} class="flex-1">
+					<Button type="submit" size="lg" disabled={isSubmitting} class="flex-1">
 						{#if isSubmitting}
 							<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
 						{/if}
