@@ -33,7 +33,7 @@ const detail = offenders();
 
 ratchet({
 	name: 'no text below text-xs and no opacity on text tokens',
-	tolerated: ['lib/components/sync/SyncStatusInline.svelte'],
+	tolerated: [],
 	guidance:
 		'Text below 12px or a text token with an opacity modifier (UIQuality.md, Typography and ' +
 		'"Opacity eats contrast"). Use text-xs as the floor and the token as-is ' +
