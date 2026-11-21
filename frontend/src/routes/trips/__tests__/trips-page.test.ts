@@ -3,6 +3,11 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/sve
 import type { PaginatedResponse, Trip, TripSummary, Vehicle } from '#lib/types/index.ts';
 import type { TripListFilters } from '#lib/services/trip-api.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
+import {
+	ApiError,
+	SERVER_FAILURE_MESSAGE,
+	UNEXPECTED_FAILURE_MESSAGE
+} from '#lib/utils/error-handling.ts';
 
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
@@ -127,14 +132,20 @@ describe('trips page load states', () => {
 	});
 
 	test('a load failure shows the message, notifies, and Retry reloads', async () => {
-		list.mockRejectedValueOnce(new Error('Server unavailable'));
+		list.mockRejectedValueOnce(new ApiError('SQLITE_BUSY: database is locked', 500));
 		list.mockResolvedValueOnce(tripPage([trip()]));
 		render(Page);
 		await settle();
 
-		expect(screen.getByText('Failed to load trips')).toBeInTheDocument();
-		expect(screen.getByText('Server unavailable')).toBeInTheDocument();
-		expect(notify).toHaveBeenCalledWith({ type: 'error', message: 'Failed to load trips' });
+		expect(screen.getByText("Couldn't load trips")).toBeInTheDocument();
+		expect(screen.getByText(SERVER_FAILURE_MESSAGE)).toBeInTheDocument();
+		expect(screen.queryByText(/SQLITE_BUSY/)).toBeNull();
+		expect(notify).toHaveBeenCalledWith(
+			expect.objectContaining({
+				type: 'error',
+				message: `Couldn't load trips. ${SERVER_FAILURE_MESSAGE}`
+			})
+		);
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 		await settle();
@@ -148,7 +159,8 @@ describe('trips page load states', () => {
 		render(Page);
 		await settle();
 
-		expect(screen.getAllByText('Failed to load trips')).toHaveLength(2);
+		expect(screen.getByText("Couldn't load trips")).toBeInTheDocument();
+		expect(screen.getByText(UNEXPECTED_FAILURE_MESSAGE)).toBeInTheDocument();
 	});
 
 	test('no trips shows the empty state and Log Trip opens the form', async () => {
@@ -302,13 +314,18 @@ describe('trips page delete', () => {
 	});
 
 	test('a failed delete notifies and leaves the dialog open', async () => {
-		deleteTrip.mockRejectedValue(new Error('500'));
+		deleteTrip.mockRejectedValue(new ApiError('Trip not found', 404));
 		const dialog = await openDelete();
 
 		await fireEvent.click(within(dialog).getByRole('button', { name: 'Delete Trip' }));
 		await settle();
 
-		expect(notify).toHaveBeenCalledWith({ type: 'error', message: 'Failed to delete trip' });
+		expect(notify).toHaveBeenCalledWith(
+			expect.objectContaining({
+				type: 'error',
+				message: "Couldn't delete the trip. Trip not found."
+			})
+		);
 		expect(screen.getByRole('alertdialog')).toBeInTheDocument();
 		expect(list).toHaveBeenCalledTimes(1);
 	});

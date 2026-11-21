@@ -12,7 +12,7 @@
 	import FormLayout from '#lib/components/common/form-layout.svelte';
 	import { providerApi } from '#lib/services/provider-api.ts';
 	import { assistantApi, type AssistantTurn } from '#lib/services/assistant-api.ts';
-	import { ApiError } from '#lib/utils/error-handling.ts';
+	import { ApiError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 
 	const DISCLOSURE_KEY = 'vroom.llm.assistant-disclosed';
 	const MAX_HISTORY_TURNS = 12;
@@ -42,7 +42,7 @@
 			hasProvider = providers.length > 0;
 			loadError = null;
 		} catch (e) {
-			loadError = e instanceof Error ? e.message : 'Failed to check for an assistant provider';
+			loadError = userFacingErrorMessage(e);
 		} finally {
 			isLoading = false;
 		}
@@ -129,13 +129,10 @@
 	}
 
 	function errorMessageFor(err: unknown): string {
-		if (err instanceof ApiError && err.statusCode === 400) {
-			return 'No assistant provider is set up. Add one in Settings → Assistant.';
-		}
 		if (err instanceof ApiError && err.statusCode === 502) {
-			return 'The AI provider could not be reached. Check the key/model in Settings, then try again.';
+			return "The AI provider couldn't be reached. Check the key and model in Settings, then try again.";
 		}
-		return err instanceof Error ? err.message : 'Something went wrong. Please try again.';
+		return userFacingErrorMessage(err);
 	}
 
 	function onKeydown(e: KeyboardEvent) {
@@ -162,7 +159,7 @@
 		<div class="rounded-lg border bg-card p-6">
 			<div class="mb-4 flex items-center gap-3 text-destructive">
 				<CircleAlert class="h-5 w-5" />
-				<p class="font-medium">Could not load the assistant</p>
+				<p class="font-medium">Couldn't load the assistant</p>
 			</div>
 			<p class="mb-4 text-sm text-muted-foreground">{loadError}</p>
 			<Button onclick={loadProviders}>Retry</Button>
