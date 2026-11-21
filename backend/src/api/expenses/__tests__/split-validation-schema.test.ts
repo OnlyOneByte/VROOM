@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { createSplitExpenseSchema, splitConfigSchema, updateSplitSchema } from '../validation';
 
 const baseCreate = {
-  category: 'fuel',
+  category: 'maintenance',
   date: '2024-03-15T00:00:00.000Z',
   totalAmount: 100,
 };
