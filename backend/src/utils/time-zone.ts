@@ -57,7 +57,9 @@ export function zonedMidnight(
 ): Date {
   const wall = Date.UTC(year, monthIndex, day);
   const guess = wall - zoneOffsetMs(wall, timeZone);
-  return new Date(wall - zoneOffsetMs(guess, timeZone));
+  const settled = new Date(wall - zoneOffsetMs(guess, timeZone));
+  const requestedDay = new Date(wall).toISOString().slice(0, 10);
+  return calendarDayIn(settled, timeZone) === requestedDay ? settled : new Date(guess);
 }
 
 export function zonedDayWindow(instant: Date, timeZone: string): { dayStart: Date; nextDay: Date } {
