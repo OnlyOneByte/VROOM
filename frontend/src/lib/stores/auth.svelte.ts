@@ -116,7 +116,7 @@ function createAuthStore() {
 			try {
 				const result = await apiClient.get<{
 					user: User;
-					session: { id: string; expiresAt: string };
+					session: { expiresAt: string };
 				}>('/api/v1/auth/me');
 				signIn(result.user);
 			} catch (err) {

@@ -7,7 +7,7 @@ interface MeResponse {
   success: boolean;
   data: {
     user: { id: string; email: string; displayName: string; createdAt: string | null };
-    session: { id: string; expiresAt: string };
+    session: { expiresAt: string } & Record<string, unknown>;
   };
 }
 
@@ -32,6 +32,7 @@ describe('GET /api/v1/auth/me', () => {
     expect(body.data.user.createdAt).toBeTruthy();
     const parsed = new Date(body.data.user.createdAt as string);
     expect(Number.isNaN(parsed.getTime())).toBe(false);
+    expect(Object.keys(body.data.session)).toEqual(['expiresAt']);
   });
 });
 
@@ -51,7 +52,7 @@ describe('POST /api/v1/auth/refresh — success body shape', () => {
     expect(Number.isNaN(new Date(body.data.user.createdAt as string).getTime())).toBe(false);
     expect(body.data.user.updatedAt).toBeTruthy();
     expect(Number.isNaN(new Date(body.data.user.updatedAt as string).getTime())).toBe(false);
-    expect(body.data.session.id).toBeTruthy();
+    expect(Object.keys(body.data.session)).toEqual(['expiresAt']);
     expect(body.data.session.expiresAt).toBeTruthy();
   });
 });
