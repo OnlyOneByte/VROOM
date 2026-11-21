@@ -95,9 +95,18 @@ describe("an editor's photo on a shared vehicle belongs to the vehicle owner", (
        VALUES ('photo-legacy', ?, 'expense', 'exp-shared', 'old.png', 'image/png', 4)`,
       [editor.id]
     );
+    const stored = await storage.provider.upload({
+      fileName: 'old.png',
+      buffer: Buffer.from([137, 80, 78, 71]),
+      mimeType: 'image/png',
+      entityType: 'expense',
+      entityId: 'exp-shared',
+      pathHint: '',
+    });
     ctx.sqlite.run(
       `INSERT INTO photo_refs (id, photo_id, provider_id, storage_ref, status)
-       VALUES ('ref-legacy', 'photo-legacy', 'prov-editor', 'editor-file', 'active')`
+       VALUES ('ref-legacy', 'photo-legacy', 'prov-editor', ?, 'active')`,
+      [stored.externalId]
     );
     const secondEditor = await createInvitee(ctx, 'editor2');
     await secondEditor.acceptShare('veh-shared', 'editor');
@@ -111,6 +120,14 @@ describe("an editor's photo on a shared vehicle belongs to the vehicle owner", (
       ).rejects.toThrow('Photo');
     }
     expect(ctx.sqlite.query('SELECT id FROM photo_refs').all()).toEqual([{ id: 'ref-legacy' }]);
+
+    const ownView = await getPhotoThumbnailForEntity(
+      'expense',
+      'exp-shared',
+      'photo-legacy',
+      editor.id
+    );
+    expect(ownView.mimeType, 'the uploading editor can still open it').toBe('image/png');
   });
 
   test('an owner without photo storage gets a clear error, not a silent fallback', async () => {
