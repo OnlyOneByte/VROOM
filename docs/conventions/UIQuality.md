@@ -149,8 +149,10 @@ The inventory and import paths are in `DesignSystem.md`. The usage rules:
   and `aria-invalid`. Validate on submit and on blur, not on every keystroke.
 - After a failed submit, move focus to the first invalid field in DOM order, so keyboard and
   screen-reader users land on what needs fixing instead of staying on Save. Focusing the field
-  is enough: its wired error is announced with it. Existing forms adopt this one by one; a PR
-  that changes a form for another reason isn't blocked on it.
+  is enough: its wired error is announced with it. Move focus after the errors have rendered,
+  to the element that carries `aria-invalid` and `aria-describedby` (the trigger, for `Select`
+  and `DatePicker`). New forms do this; existing forms adopt it form by form, and a PR that
+  changes a form for another reason isn't blocked on it.
 - Use the right control: `DatePicker` for dates, `Select` for a short fixed list, a tile grid for
   a handful of illustrated choices (expense category), `Switch` for settings that apply
   instantly, `Checkbox` for choices saved with a form.
@@ -349,9 +351,9 @@ failed step; nits can be follow-up issues.
 - [ ] Every state handled (loading / empty / error / populated / success feedback).
 - [ ] No overflow at 375px; tap targets ≥ 40px; primary action in thumb reach.
 - [ ] Tokens only; AA contrast checked in Default plus two other theme families, light and dark.
-- [ ] Icon-only controls have `aria-label`; forms have labels + wired errors, and a failed
-      submit focuses the first invalid field; no nested interactive elements; keyboard and focus
-      work.
+- [ ] Icon-only controls have `aria-label`; forms have labels + wired errors, and a new form
+      focuses the first invalid field after a failed submit (existing forms: see *Forms*); no
+      nested interactive elements; keyboard and focus work.
 - [ ] Reuses the kit + formatters + routes (no hardcoded colours, paths, or number formatting).
 - [ ] Destructive actions confirmed; in-flight mutations disable + spinner.
 - [ ] Copy follows *Copy and voice*.
