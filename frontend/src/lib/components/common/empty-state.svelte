@@ -19,7 +19,7 @@
 		{#if icon}
 			{@render icon()}
 		{/if}
-		<svelte:element this={`h${level}`} class="text-lg font-semibold mb-2">
+		<svelte:element this={`h${level}`} class="text-lg font-semibold text-center mb-2">
 			{@render title()}
 		</svelte:element>
 		<p class="text-muted-foreground text-center mb-4">
