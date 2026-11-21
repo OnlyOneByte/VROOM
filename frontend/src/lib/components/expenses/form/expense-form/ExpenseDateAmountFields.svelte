@@ -3,6 +3,7 @@
 	import Input from '#lib/components/ui/input/input.svelte';
 	import Label from '#lib/components/ui/label/label.svelte';
 	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
+	import { getCurrencySymbol } from '#lib/utils/formatters.ts';
 
 	interface Props {
 		date: string;
@@ -19,6 +20,8 @@
 		amountError,
 		onAmountBlur
 	}: Props = $props();
+
+	const currencySymbol = $derived(getCurrencySymbol());
 </script>
 
 <div class="space-y-2">
@@ -39,7 +42,7 @@
 	<Label for="amount">Amount *</Label>
 	<div class="relative">
 		<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-			<span class="text-muted-foreground">$</span>
+			<span class="text-muted-foreground">{currencySymbol}</span>
 		</div>
 		<Input
 			id="amount"
@@ -48,7 +51,7 @@
 			min="0"
 			bind:value={amount}
 			placeholder="0.00"
-			class="pl-8"
+			class={currencySymbol.length > 1 ? 'pl-12' : 'pl-8'}
 			onblur={onAmountBlur}
 			aria-invalid={!!amountError}
 			aria-describedby={amountError ? 'amount-error' : undefined}

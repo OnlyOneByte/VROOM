@@ -5,6 +5,7 @@
 	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
 	import TagInput from '#lib/components/expenses/form/TagInput.svelte';
 	import { categoryLabels } from '#lib/utils/expense-helpers.ts';
+	import { getCurrencySymbol } from '#lib/utils/formatters.ts';
 	import type { ReminderFormState } from './reminder-form-state.svelte';
 	import { EXPENSE_CATEGORIES } from './reminder-form-model';
 
@@ -13,6 +14,8 @@
 	}
 
 	let { form }: Props = $props();
+
+	const currencySymbol = $derived(getCurrencySymbol());
 </script>
 
 <div class="grid grid-cols-2 gap-3">
@@ -33,7 +36,7 @@
 		<Label for="reminder-expense-amount">Amount *</Label>
 		<div class="relative">
 			<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-				<span class="text-muted-foreground">$</span>
+				<span class="text-muted-foreground">{currencySymbol}</span>
 			</div>
 			<Input
 				id="reminder-expense-amount"
@@ -42,7 +45,7 @@
 				min="0"
 				bind:value={form.values.expenseAmount}
 				placeholder="0.00"
-				class="pl-8"
+				class={currencySymbol.length > 1 ? 'pl-12' : 'pl-8'}
 				aria-invalid={!!form.errors['expenseAmount']}
 			/>
 		</div>
