@@ -362,7 +362,7 @@
 					</AppPieChart>
 				{:catch}
 					{@render chartPlaceholders(
-						'Charts could not be loaded. Check your connection and reload.'
+						"Charts couldn't be loaded. Check your connection and reload."
 					)}
 				{/await}
 			</div>

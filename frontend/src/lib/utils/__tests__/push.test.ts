@@ -247,6 +247,15 @@ describe('push browser integration', () => {
 		});
 	});
 
+	test('enablePush reports a browser that blocks the subscription as denied', async () => {
+		const env = installPushEnvironment({});
+		pushApiMock.getVapidPublicKey.mockResolvedValue({ publicKey: 'AQID' });
+		env.pushManager.subscribe.mockRejectedValue(
+			new DOMException('Registration failed - permission denied', 'NotAllowedError')
+		);
+		expect(await enablePush()).toEqual({ ok: false, reason: 'denied' });
+	});
+
 	test('enablePush passes an API reason through', async () => {
 		installPushEnvironment({});
 		pushApiMock.getVapidPublicKey.mockResolvedValue({ publicKey: 'AQID' });

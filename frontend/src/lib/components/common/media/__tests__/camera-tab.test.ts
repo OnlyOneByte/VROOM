@@ -105,8 +105,11 @@ describe('CameraTab: camera access errors', () => {
 	});
 
 	test.each([
-		['NotAllowedError', 'Camera access was denied. Please allow camera permissions and try again.'],
-		['NotFoundError', 'No camera found on this device.'],
+		[
+			'NotAllowedError',
+			'Camera access was denied. Allow it for this site in your browser settings, then try again.'
+		],
+		['NotFoundError', 'No camera found on this device. Upload a photo instead.'],
 		['AbortError', "Couldn't access the camera. Try again."]
 	])('a %s is reported as a readable message', async (name, message) => {
 		getUserMedia.mockRejectedValue(new DOMException('nope', name));

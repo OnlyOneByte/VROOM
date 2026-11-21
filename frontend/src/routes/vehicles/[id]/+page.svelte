@@ -84,7 +84,7 @@
 
 	const CATEGORY_CHART_TITLE = 'Expense by Category';
 	const CATEGORY_CHART_DESCRIPTION = 'Distribution across all vehicles';
-	const CHARTS_LOAD_ERROR = 'Charts could not be loaded. Check your connection and reload.';
+	const CHARTS_LOAD_ERROR = "Charts couldn't be loaded. Check your connection and reload.";
 	const chartsLoading = Promise.all([
 		import('#lib/components/charts/ExpenseTrendChart.svelte'),
 		import('#lib/components/charts/FuelEfficiencyTrendChart.svelte'),
