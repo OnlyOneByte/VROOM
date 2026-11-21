@@ -408,6 +408,15 @@ export async function countOrphanedPhotos(userId: string): Promise<number> {
   return (await photoRepository.findOrphanedByUser(userId)).length;
 }
 
+export async function removeOrphanedPhotos(userId: string): Promise<number> {
+  const orphanIds = (await photoRepository.findOrphanedByUser(userId)).map((p) => p.id);
+  if (orphanIds.length === 0) return 0;
+
+  await deletePhotoRowsAndObjects(orphanIds, userId);
+  await photoRepository.deleteByIds(orphanIds);
+  return orphanIds.length;
+}
+
 // Photos have no FK to their entity, so children must be deleted explicitly here.
 export async function deletePhotosForEntities(
   entityType: string,

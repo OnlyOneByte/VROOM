@@ -26,3 +26,13 @@ export function photoCollection(collectionPath: string) {
 export function entityPhotos(entityType: string, entityId: string) {
 	return photoCollection(`/api/v1/photos/${entityType}/${entityId}`);
 }
+
+export const orphanedPhotosApi = {
+	async count(): Promise<number> {
+		return (await apiClient.get<{ count: number }>('/api/v1/photos/orphans')).count;
+	},
+
+	async remove(): Promise<number> {
+		return (await apiClient.delete<{ removed: number }>('/api/v1/photos/orphans')).removed;
+	}
+};

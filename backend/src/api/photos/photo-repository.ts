@@ -151,6 +151,12 @@ export class PhotoRepository {
     await this.db.delete(photos).where(eq(photos.id, photoId));
   }
 
+  async deleteByIds(photoIds: string[]): Promise<void> {
+    for (const batch of chunk(photoIds)) {
+      await this.db.delete(photos).where(inArray(photos.id, batch));
+    }
+  }
+
   async deleteByEntity(entityType: string, entityId: string): Promise<void> {
     await this.db
       .delete(photos)

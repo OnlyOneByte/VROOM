@@ -13,6 +13,7 @@ import {
   ifNoneMatchSatisfies,
   listPhotosByEntityType,
   listPhotosForEntity,
+  removeOrphanedPhotos,
   uploadPhotoForEntity,
 } from './photo-service';
 
@@ -36,6 +37,12 @@ routes.get('/orphans', async (c) => {
   const user = c.get('user');
   const count = await countOrphanedPhotos(user.id);
   return c.json({ success: true, data: { count } });
+});
+
+routes.delete('/orphans', async (c) => {
+  const user = c.get('user');
+  const removed = await removeOrphanedPhotos(user.id);
+  return c.json({ success: true, data: { removed } });
 });
 
 routes.get('/:entityType/:entityId', zValidator('query', commonSchemas.pagination), async (c) => {
