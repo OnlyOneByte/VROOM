@@ -19,6 +19,8 @@ const BAD_DATES: unknown[] = [
   '0',
   '1800-01-01',
   '2999-01-01',
+  1,
+  1_706_788_800_000,
 ];
 
 describe('dateInput', () => {
@@ -26,12 +28,12 @@ describe('dateInput', () => {
     expect(dateInput.safeParse(value).success).toBe(false);
   });
 
-  test('accepts an ISO timestamp, a plain day and a positive epoch in milliseconds', () => {
+  test('accepts an ISO timestamp, a plain day and a Date', () => {
     expect(dateInput.parse('2024-02-01T12:00:00.000Z').toISOString()).toBe(
       '2024-02-01T12:00:00.000Z'
     );
     expect(dateInput.parse('2024-02-01').toISOString()).toBe('2024-02-01T00:00:00.000Z');
-    expect(dateInput.parse(1_706_788_800_000).toISOString()).toBe('2024-02-01T12:00:00.000Z');
+    expect(dateInput.parse(new Date('1995-06-01T00:00:00.000Z')).getUTCFullYear()).toBe(1995);
   });
 });
 

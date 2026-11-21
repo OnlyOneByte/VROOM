@@ -54,14 +54,9 @@ const ISO_DATE_PREFIX = /^\d{4}-\d{2}-\d{2}/;
 const INVALID_DATE_MESSAGE = 'Enter a valid date';
 
 export const dateInput = z
-  .union(
-    [
-      z.string().trim().regex(ISO_DATE_PREFIX, INVALID_DATE_MESSAGE),
-      z.number().positive(INVALID_DATE_MESSAGE),
-      z.date(),
-    ],
-    { error: INVALID_DATE_MESSAGE }
-  )
+  .union([z.string().trim().regex(ISO_DATE_PREFIX, INVALID_DATE_MESSAGE), z.date()], {
+    error: INVALID_DATE_MESSAGE,
+  })
   .pipe(z.coerce.date({ error: INVALID_DATE_MESSAGE }))
   .refine(
     (date) => {
