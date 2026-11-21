@@ -62,6 +62,10 @@ export const vehicleApi = {
 		});
 	},
 
+	async payOffFinancing(financingId: string): Promise<VehicleFinancing> {
+		return apiClient.put<VehicleFinancing>(`/api/v1/financing/${financingId}/payoff`);
+	},
+
 	getPhotos(
 		vehicleId: string,
 		params?: { limit?: number; offset?: number }
