@@ -38,7 +38,7 @@
 			expenses = await reminderApi.getMaterializedExpenses(id);
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to load materialized expenses:', error);
-			loadError = error instanceof Error ? error.message : 'Failed to load expenses';
+			loadError = 'Couldn’t load the expenses this reminder created. Please try again.';
 		} finally {
 			isLoading = false;
 		}

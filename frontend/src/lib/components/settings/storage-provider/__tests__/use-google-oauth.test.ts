@@ -182,6 +182,11 @@ describe('handleOAuthReturn', () => {
 		['exchange_failed', 'Failed to connect Google account. Please try again.'],
 		['no_refresh_token', 'Google did not grant offline access. Please try again.'],
 		['session_expired', 'Your session expired. Please log in and try again.'],
+		['invalid_state', 'The Google connection took too long. Please try again.'],
+		[
+			'session_mismatch',
+			'You were signed in as someone else when Google finished connecting. Sign in again and retry.'
+		],
 		['something_else', 'An error occurred connecting your Google account.']
 	])('provider_error=%s shows a specific message and cleans the URL', async (code, message) => {
 		setPageUrl(`https://app.example/settings/providers/new?provider_error=${code}`);
