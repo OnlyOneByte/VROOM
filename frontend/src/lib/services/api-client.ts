@@ -1,6 +1,7 @@
 import { browser } from '$app/env';
 import { PUBLIC_API_URL } from '$app/env/public';
 import { ApiError, isSessionExpiryError, NetworkError } from '#lib/utils/error-handling.ts';
+import { hasPendingSave } from '#lib/utils/pending-saves.ts';
 import { buildQueryString } from './api-utils';
 
 export function getApiBaseUrl(): string {
@@ -9,6 +10,9 @@ export function getApiBaseUrl(): string {
 
 const SELF_REPORTED_401_PATHS = ['/api/v1/auth/me', '/api/v1/auth/refresh'];
 const SESSION_EXPIRY_WINDOW_MS = 1000;
+export const SESSION_EXPIRED_MESSAGE = 'Your session has expired. Please sign in again.';
+export const UNSAVED_ON_EXPIRY_MESSAGE =
+	"Your session expired before your changes were saved, so they weren't kept. Sign in again, then re-enter them.";
 
 let sessionExpiry: Promise<void> | null = null;
 
@@ -26,6 +30,7 @@ function handleSessionExpiry(url: string): Promise<void> {
 }
 
 async function endSession(): Promise<void> {
+	const changesLost = hasPendingSave();
 	try {
 		// Dynamic import: the stores import this module, so a static import is circular.
 		const [{ authStore }, { appStore }] = await Promise.all([
@@ -33,11 +38,11 @@ async function endSession(): Promise<void> {
 			import('#lib/stores/app.svelte.ts')
 		]);
 		authStore.clearUser();
-		appStore.addNotification({
-			type: 'warning',
-			message: 'Your session has expired. Please sign in again.',
-			duration: 5000
-		});
+		appStore.addNotification(
+			changesLost
+				? { type: 'error', message: UNSAVED_ON_EXPIRY_MESSAGE, duration: 15000, urgent: true }
+				: { type: 'warning', message: SESSION_EXPIRED_MESSAGE, duration: 5000 }
+		);
 		appStore.muteErrors(SESSION_EXPIRY_WINDOW_MS);
 
 		const [{ goto }, { resolve }, { routes }] = await Promise.all([

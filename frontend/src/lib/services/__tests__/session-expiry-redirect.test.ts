@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { goto } from '$app/navigation';
-import { apiClient } from '../api-client';
+import { apiClient, UNSAVED_ON_EXPIRY_MESSAGE } from '../api-client';
+import { trackPendingSave } from '../../utils/pending-saves';
 import { authStore } from '../../stores/auth.svelte';
 import { appStore } from '../../stores/app.svelte';
 import { handleErrorWithNotification } from '../../utils/error-handling';
@@ -128,5 +129,19 @@ describe('api client — global session expiry on 401', () => {
 		const messages = appStore.notifications.map(n => n.message);
 		expect(messages).toContain('The expense was not saved.');
 		expect(messages).not.toContain('cascade');
+	});
+
+	it('says the changes were not kept when a save was in flight', async () => {
+		const stop = trackPendingSave(() => true);
+		try {
+			await expect(apiClient.put('/api/v1/vehicles/v1', {})).rejects.toThrow();
+		} finally {
+			stop();
+		}
+
+		const shown = appStore.notifications;
+		expect(shown).toHaveLength(1);
+		expect(shown[0]).toMatchObject({ message: UNSAVED_ON_EXPIRY_MESSAGE, urgent: true });
+		expect(expiryWarningShown()).toBe(false);
 	});
 });

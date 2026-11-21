@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { hasPendingSave } from '#lib/utils/pending-saves.ts';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
 import type { OdometerEntry, PaginatedResponse } from '#lib/types/index.ts';
 import type { odometerApi } from '#lib/services/odometer-api.ts';
@@ -439,5 +440,15 @@ describe('edit odometer reading delete', () => {
 		expect(
 			within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' })
 		).toBeDisabled();
+	});
+
+	test('a save in flight counts as unsaved changes', async () => {
+		update.mockReturnValue(new Promise(() => {}));
+		mount();
+		await settle();
+
+		await save();
+
+		expect(hasPendingSave()).toBe(true);
 	});
 });

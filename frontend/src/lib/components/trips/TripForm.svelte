@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import * as Dialog from '#lib/components/ui/dialog/index.ts';
 	import * as Select from '#lib/components/ui/select/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -10,6 +11,8 @@
 	import { LoaderCircle } from '@lucide/svelte';
 	import { tripApi } from '#lib/services/trip-api.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { capitalize, dateOnlyToISO, toDateInputValue } from '#lib/utils/formatters.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
@@ -43,6 +46,8 @@
 	let note = $state('');
 
 	let isSubmitting = $state(false);
+
+	onMount(() => trackPendingSave(() => isSubmitting));
 	let errors = $state<TripFormErrors>({});
 
 	let unitLabel = $derived.by(() => {
@@ -122,10 +127,9 @@
 			onSaved();
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to save trip:', error);
-			appStore.addNotification({
-				type: 'error',
-				message: trip ? 'Failed to update trip' : 'Failed to log trip'
-			});
+			appStore.showError(
+				`Couldn't ${trip ? 'update' : 'log'} the trip. ${userFacingErrorMessage(error)}`
+			);
 		} finally {
 			isSubmitting = false;
 		}

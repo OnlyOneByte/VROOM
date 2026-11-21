@@ -1,9 +1,10 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { goto, refreshAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { routes, paramRoutes } from '#lib/routes.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import {
 		ArrowLeft,
@@ -75,6 +76,8 @@
 
 	let isLoading = $state(untrack(() => !!vehicleId));
 	let isSubmitting = $state(false);
+
+	onMount(() => trackPendingSave(() => isSubmitting));
 	let isDeleting = $state(false);
 	let showDeleteConfirm = $state(false);
 	let showPayoffConfirm = $state(false);
