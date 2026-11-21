@@ -60,8 +60,18 @@ export function getTrendLineProps(dataLength: number) {
 	return TREND_LINE_PROPS;
 }
 
-export function singleValueSeriesKeys(data: Record<string, unknown>[], keys: string[]): string[] {
-	return keys.filter(key => data.filter(row => row[key] != null).length === 1);
+export function isolatedValueRows(
+	data: Record<string, unknown>[],
+	keys: string[]
+): { key: string; rows: Record<string, unknown>[] }[] {
+	return keys
+		.map(key => ({
+			key,
+			rows: data.filter(
+				(row, i) => row[key] != null && data[i - 1]?.[key] == null && data[i + 1]?.[key] == null
+			)
+		}))
+		.filter(series => series.rows.length > 0);
 }
 
 export function parseMonthToDate(month: string): Date {
