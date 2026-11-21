@@ -45,13 +45,12 @@ Notes:
   real text. `theme/__tests__/theme-contrast.test.ts` gates every theme's text pairs at AA
   (`warning` included) and the chart tokens at 3:1; `border`, `input` and `ring` are not gated
   yet (see `UIQuality.md`, *Colour and theme tokens*).
-- Status surfaces: use `Alert` with `default` or `destructive`, or a `bg-warning/10` +
-  `text-warning` tint, rather than a hand-tinted div. Do NOT reach for `Alert`'s `warning` or
-  `success` variants yet — both hardcode palette classes (`bg-yellow-50 border-yellow-200
-  text-yellow-800`, and the green equivalent) in `ui/alert/alert.svelte`, so they ignore the theme
-  and dark mode. `no-theme-clashing-colors.test.ts` does not catch them (its regex covers only
-  white/black/gray/slate/zinc/neutral); `/dev/gallery` renders all four if you want to see the gap.
-  `--success` is themed and AA-gated, but `Alert`'s `success` variant does not use it yet.
+- Status surfaces: use `Alert` (`default`, `destructive`, `warning` or `success`), or a
+  `bg-warning/10` + `text-warning` tint, rather than a hand-tinted div. The three status variants
+  paint `bg-card` with their status token as the text colour (AA-gated on `card`); `default` is
+  `bg-card text-card-foreground`. All four follow the theme and dark mode. Toasts (`app.css`,
+  sonner block) do the same: a `--card` surface with a `--destructive` / `--success` /
+  `--warning` / `--primary` border, text, close button and progress bar.
 - `text-chart-*` is for chart marks and icons, not words: chart tokens are gated at 3:1, on
   `card` and as an icon on their own `/10` tint over `card` and `background` (the category badges
   and `StatCard` chips). Put the label in `text-foreground` beside the tinted icon. Status text
@@ -87,7 +86,7 @@ These rules live in the UI design guide, `UIQuality.md` (*Layout and spacing*, *
 | Field error | `import { FormFieldError } from '#lib/components/ui/form-field'` | renders `role="alert"`; wire via `aria-describedby` (`FormFieldDescription` for hints) |
 | Card | `import * as Card from '#lib/components/ui/card'` | Root/Header/Title/Description/Action/Content/Footer |
 | Badge | `import { Badge } from '#lib/components/ui/badge'` | variants: default/secondary/destructive/outline |
-| Alert | `import { Alert, AlertTitle, AlertDescription } from '#lib/components/ui/alert'` | use `default` / `destructive`; the local `warning` / `success` variants hardcode palette colors — see Design tokens |
+| Alert | `import { Alert, AlertTitle, AlertDescription } from '#lib/components/ui/alert'` | `default` / `destructive` / `warning` / `success`, all themed |
 | Skeleton | `import { Skeleton } from '#lib/components/ui/skeleton'` | loading placeholder |
 | Tabs | `import * as Tabs from '#lib/components/ui/tabs'` | |
 | Dialog | `import * as Dialog from '#lib/components/ui/dialog'` / `* as AlertDialog` | AlertDialog backs destructive confirms — prefer `common/ConfirmDialog.svelte` |

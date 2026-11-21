@@ -36,6 +36,10 @@ const dateRangeQuerySchema = z.object({
   endDate: z.coerce.number().int().positive(),
 });
 
+const yearToDateQuerySchema = dateRangeQuerySchema.extend({
+  ytdStart: z.coerce.number().int().positive().optional(),
+});
+
 const dateRangeVehicleQuerySchema = z.object({
   startDate: z.coerce.number().int().positive(),
   endDate: z.coerce.number().int().positive(),
@@ -55,17 +59,25 @@ const yearVehicleQuerySchema = z.object({
 
 routes.use('*', requireAuth);
 
-routes.get('/summary', zValidator('query', dateRangeQuerySchema), async (c) => {
+routes.get('/summary', zValidator('query', yearToDateQuerySchema), async (c) => {
   const user = c.get('user');
-  const { startDate, endDate } = c.req.valid('query');
-  const data = await analyticsRepository.getSummary(user.id, { start: startDate, end: endDate });
+  const { startDate, endDate, ytdStart } = c.req.valid('query');
+  const data = await analyticsRepository.getSummary(
+    user.id,
+    { start: startDate, end: endDate },
+    ytdStart
+  );
   return c.json({ success: true, data: analyticsSummaryToApi(data) });
 });
 
-routes.get('/quick-stats', zValidator('query', dateRangeQuerySchema), async (c) => {
+routes.get('/quick-stats', zValidator('query', yearToDateQuerySchema), async (c) => {
   const user = c.get('user');
-  const { startDate, endDate } = c.req.valid('query');
-  const data = await analyticsRepository.getQuickStats(user.id, { start: startDate, end: endDate });
+  const { startDate, endDate, ytdStart } = c.req.valid('query');
+  const data = await analyticsRepository.getQuickStats(
+    user.id,
+    { start: startDate, end: endDate },
+    ytdStart
+  );
   return c.json({ success: true, data: quickStatsToApi(data) });
 });
 
@@ -153,7 +165,7 @@ routes.get(
 routes.get('/year-end', zValidator('query', yearQuerySchema), async (c) => {
   const user = c.get('user');
   const { year } = c.req.valid('query');
-  const currentYear = year ?? new Date().getFullYear();
+  const currentYear = year ?? new Date().getUTCFullYear();
   const data = await analyticsRepository.getYearEnd(user.id, currentYear);
   return c.json({ success: true, data: yearEndToApi(data) });
 });

@@ -68,11 +68,36 @@ export interface FuelStatsResponse {
 		vehicleName: string;
 		costPerDistance: number;
 	}>;
+	charging?: {
+		sessions: PeriodCounts;
+		energy: PeriodCounts;
+		efficiency: {
+			avgEfficiency: number | null;
+			bestEfficiency: number | null;
+			worstEfficiency: number | null;
+		};
+		sessionDetails: {
+			avgEnergy: number | null;
+			minEnergy: number | null;
+			maxEnergy: number | null;
+		};
+		averageCost: { perSession: number | null; perEnergyUnit: number | null };
+		priceHistory: Array<{ date: string; fuelType: string; pricePerVolume: number }>;
+	};
 	units?: UnitsMetadata;
+}
+
+export interface PeriodCounts {
+	currentYear: number;
+	previousYear: number;
+	currentMonth: number;
+	previousMonth: number;
 }
 
 export interface FuelAdvancedResponse {
 	maintenanceTimeline: Array<{
+		vehicleId: string;
+		vehicleName: string;
 		service: string;
 		lastServiceDate: string;
 		nextDueDate: string;

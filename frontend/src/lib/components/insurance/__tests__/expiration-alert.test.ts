@@ -3,16 +3,19 @@ import { cleanup, render } from '@testing-library/svelte';
 
 const ExpirationAlert = (await import('../ExpirationAlert.svelte')).default;
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-const NOW = new Date('2026-03-20T12:00:00.000Z');
+const NOW = new Date(2026, 2, 20, 15, 0, 0);
 
-function endInDays(days: number): string {
-	return new Date(NOW.getTime() + days * DAY_MS).toISOString();
+function localDay(daysFromToday: number, hour = 12, minute = 0): Date {
+	return new Date(2026, 2, 20 + daysFromToday, hour, minute, 0);
 }
 
-function badgeFor(days: number): HTMLElement | null {
-	const { container } = render(ExpirationAlert, { props: { latestTermEnd: endInDays(days) } });
+function badgeForEnd(end: string): HTMLElement | null {
+	const { container } = render(ExpirationAlert, { props: { latestTermEnd: end } });
 	return container.querySelector('[data-slot="badge"]');
+}
+
+function badgeFor(daysFromToday: number, hour = 12): HTMLElement | null {
+	return badgeForEnd(localDay(daysFromToday, hour).toISOString());
 }
 
 beforeEach(() => {
@@ -32,18 +35,32 @@ describe('ExpirationAlert thresholds', () => {
 		expect(badge).toHaveClass('text-destructive', 'border-destructive');
 	});
 
-	test('a term ending exactly now counts as expired', () => {
-		expect(badgeFor(0)).toHaveTextContent('Expired');
+	test('a term that ended late yesterday evening is expired, not due today', () => {
+		expect(badgeFor(-1, 23)).toHaveTextContent('Expired');
 	});
 
-	test('a term ending in one day reads "Expires tomorrow" and is urgent', () => {
-		const badge = badgeFor(1);
+	test('a term ending later today reads "Expires today" and is urgent', () => {
+		const badge = badgeFor(0, 18);
+		expect(badge).toHaveTextContent('Expires today');
+		expect(badge).toHaveClass('text-destructive');
+	});
+
+	test('a term whose end time already passed today still reads "Expires today"', () => {
+		expect(badgeFor(0, 9)).toHaveTextContent('Expires today');
+	});
+
+	test('a term ending just before midnight tonight is still today', () => {
+		expect(badgeForEnd(localDay(0, 23, 59).toISOString())).toHaveTextContent('Expires today');
+	});
+
+	test('a term ending just after midnight reads "Expires tomorrow" and is urgent', () => {
+		const badge = badgeForEnd(localDay(1, 0, 1).toISOString());
 		expect(badge).toHaveTextContent('Expires tomorrow');
 		expect(badge).toHaveClass('text-destructive');
 	});
 
-	test('a term ending early tomorrow morning reads "Expires tomorrow"', () => {
-		expect(badgeFor(0.75)).toHaveTextContent('Expires tomorrow');
+	test('a term ending tomorrow evening reads "Expires tomorrow"', () => {
+		expect(badgeFor(1, 20)).toHaveTextContent('Expires tomorrow');
 	});
 
 	test('seven days left is still urgent', () => {
@@ -67,9 +84,18 @@ describe('ExpirationAlert thresholds', () => {
 		expect(badgeFor(31)).toBeNull();
 	});
 
-	test('a date-only end string is evaluated against the current clock', () => {
-		vi.setSystemTime(new Date('2026-03-20T00:00:00.000Z'));
-		const { container } = render(ExpirationAlert, { props: { latestTermEnd: '2026-03-25' } });
-		expect(container.querySelector('[data-slot="badge"]')).toHaveTextContent('5 days left');
+	test('a date-only end string counts as that calendar day in local time', () => {
+		expect(badgeForEnd('2026-03-25')).toHaveTextContent('5 days left');
+		cleanup();
+		expect(badgeForEnd('2026-03-20')).toHaveTextContent('Expires today');
+		cleanup();
+		expect(badgeForEnd('2026-03-19')).toHaveTextContent('Expired');
+	});
+
+	test('counts calendar days across a month boundary', () => {
+		vi.setSystemTime(new Date(2026, 0, 31, 22, 0, 0));
+		expect(badgeForEnd(new Date(2026, 1, 1, 6, 0, 0).toISOString())).toHaveTextContent(
+			'Expires tomorrow'
+		);
 	});
 });

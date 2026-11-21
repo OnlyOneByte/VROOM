@@ -3,7 +3,7 @@ import { buildTCOMonthlyTrend } from '../analytics-charts';
 
 describe('buildTCOMonthlyTrend — (category, sourceType) bucketing', () => {
   test('routes each row to its category bucket; same-month rows co-accumulate', () => {
-    const jan = new Date(2024, 0, 15);
+    const jan = new Date(Date.UTC(2024, 0, 15));
     const trend = buildTCOMonthlyTrend([
       { category: 'financial', sourceType: 'financing', expenseAmount: 300, date: jan },
       { category: 'financial', sourceType: 'insurance_term', expenseAmount: 120, date: jan },
@@ -22,7 +22,7 @@ describe('buildTCOMonthlyTrend — (category, sourceType) bucketing', () => {
   });
 
   test('uncategorized rows contribute to no bucket', () => {
-    const jan = new Date(2024, 0, 10);
+    const jan = new Date(Date.UTC(2024, 0, 10));
     const trend = buildTCOMonthlyTrend([
       { category: 'financial', sourceType: 'reminder', expenseAmount: 999, date: jan },
       { category: 'financial', sourceType: null, expenseAmount: 50, date: jan },
@@ -37,7 +37,7 @@ describe('buildTCOMonthlyTrend — (category, sourceType) bucketing', () => {
   });
 
   test('financial rows are bucketed by sourceType', () => {
-    const jan = new Date(2024, 0, 1);
+    const jan = new Date(Date.UTC(2024, 0, 1));
     const trend = buildTCOMonthlyTrend([
       { category: 'financial', sourceType: 'financing', expenseAmount: 100, date: jan },
       { category: 'financial', sourceType: 'insurance_term', expenseAmount: 60, date: jan },
@@ -54,10 +54,30 @@ describe('buildTCOMonthlyTrend — (category, sourceType) bucketing', () => {
 
   test('groups across months and SORTS ascending by month key', () => {
     const trend = buildTCOMonthlyTrend([
-      { category: 'fuel', sourceType: null, expenseAmount: 30, date: new Date(2024, 2, 5) },
-      { category: 'fuel', sourceType: null, expenseAmount: 40, date: new Date(2024, 0, 5) },
-      { category: 'fuel', sourceType: null, expenseAmount: 50, date: new Date(2023, 11, 5) },
-      { category: 'fuel', sourceType: null, expenseAmount: 10, date: new Date(2024, 0, 20) },
+      {
+        category: 'fuel',
+        sourceType: null,
+        expenseAmount: 30,
+        date: new Date(Date.UTC(2024, 2, 5)),
+      },
+      {
+        category: 'fuel',
+        sourceType: null,
+        expenseAmount: 40,
+        date: new Date(Date.UTC(2024, 0, 5)),
+      },
+      {
+        category: 'fuel',
+        sourceType: null,
+        expenseAmount: 50,
+        date: new Date(Date.UTC(2023, 11, 5)),
+      },
+      {
+        category: 'fuel',
+        sourceType: null,
+        expenseAmount: 10,
+        date: new Date(Date.UTC(2024, 0, 20)),
+      },
     ]);
 
     expect(trend.map((t) => t.month)).toEqual(['2023-12', '2024-01', '2024-03']);
@@ -66,7 +86,12 @@ describe('buildTCOMonthlyTrend — (category, sourceType) bucketing', () => {
 
   test('a dateless row is dropped (no crash, no phantom month key)', () => {
     const trend = buildTCOMonthlyTrend([
-      { category: 'fuel', sourceType: null, expenseAmount: 25, date: new Date(2024, 0, 5) },
+      {
+        category: 'fuel',
+        sourceType: null,
+        expenseAmount: 25,
+        date: new Date(Date.UTC(2024, 0, 5)),
+      },
       { category: 'fuel', sourceType: null, expenseAmount: 999, date: null },
     ]);
     expect(trend).toHaveLength(1);

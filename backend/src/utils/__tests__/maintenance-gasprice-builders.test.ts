@@ -10,7 +10,7 @@ import {
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function d(year: number, month1to12: number, day: number): Date {
-  return new Date(year, month1to12 - 1, day);
+  return new Date(Date.UTC(year, month1to12 - 1, day));
 }
 
 function fuelRow(over: Partial<FuelExpenseRow> = {}): FuelExpenseRow {
@@ -111,9 +111,13 @@ describe('buildVehicleMaintenanceCosts', () => {
 
 describe('buildMaintenanceTimeline', () => {
   const now = d(2024, 7, 1);
+  const names = new Map([
+    ['v1', 'Civic'],
+    ['v2', 'Camry'],
+  ]);
 
   test('empty input returns []', () => {
-    expect(buildMaintenanceTimeline([], now)).toEqual([]);
+    expect(buildMaintenanceTimeline([], now, names)).toEqual([]);
   });
 
   test('groups by description (case-insensitive) — "Oil Change" and "oil change" are one service', () => {
@@ -122,35 +126,52 @@ describe('buildMaintenanceTimeline', () => {
         genRow({ description: 'Oil Change', date: d(2024, 1, 1) }),
         genRow({ description: 'oil change', date: d(2024, 4, 1) }),
       ],
-      now
+      now,
+      names
     );
     expect(out).toHaveLength(1);
     expect(out[0]?.service).toBe('oil change');
   });
 
   test('a null description groups under "general maintenance"', () => {
-    const out = buildMaintenanceTimeline([genRow({ description: null, date: d(2024, 3, 1) })], now);
+    const out = buildMaintenanceTimeline(
+      [genRow({ description: null, date: d(2024, 3, 1) })],
+      now,
+      names
+    );
     expect(out).toHaveLength(1);
     expect(out[0]?.service).toBe('general maintenance');
   });
 
   test('status is "warning" when the next service is ~10 days out (single-row interval=180)', () => {
     const lastDate = new Date(now.getTime() - 170 * DAY_MS);
-    const out = buildMaintenanceTimeline([genRow({ description: 'tires', date: lastDate })], now);
+    const out = buildMaintenanceTimeline(
+      [genRow({ description: 'tires', date: lastDate })],
+      now,
+      names
+    );
     expect(out[0]?.daysRemaining).toBe(10);
     expect(out[0]?.status).toBe('warning');
   });
 
   test('status is "overdue" when the next service date is in the past (daysRemaining < 0)', () => {
     const lastDate = new Date(now.getTime() - 185 * DAY_MS);
-    const out = buildMaintenanceTimeline([genRow({ description: 'brakes', date: lastDate })], now);
+    const out = buildMaintenanceTimeline(
+      [genRow({ description: 'brakes', date: lastDate })],
+      now,
+      names
+    );
     expect(out[0]?.daysRemaining).toBe(-5);
     expect(out[0]?.status).toBe('overdue');
   });
 
   test('status is "good" when the next service is well in the future (>=30 days)', () => {
     const lastDate = new Date(now.getTime() - 120 * DAY_MS);
-    const out = buildMaintenanceTimeline([genRow({ description: 'coolant', date: lastDate })], now);
+    const out = buildMaintenanceTimeline(
+      [genRow({ description: 'coolant', date: lastDate })],
+      now,
+      names
+    );
     expect(out[0]?.daysRemaining).toBe(60);
     expect(out[0]?.status).toBe('good');
   });
@@ -163,9 +184,29 @@ describe('buildMaintenanceTimeline', () => {
         genRow({ description: 'soon-service', date: soon }),
         genRow({ description: 'overdue-service', date: overdue }),
       ],
-      now
+      now,
+      names
     );
     expect(out.map((e) => e.service)).toEqual(['overdue-service', 'soon-service']);
     expect(out[0]?.daysRemaining).toBeLessThan(out[1]?.daysRemaining ?? 0);
+  });
+
+  test('the same service on two vehicles is tracked per vehicle, not merged', () => {
+    const out = buildMaintenanceTimeline(
+      [
+        genRow({ vehicleId: 'v1', description: 'Oil change', date: d(2024, 1, 1) }),
+        genRow({ vehicleId: 'v1', description: 'Oil change', date: d(2024, 4, 1) }),
+        genRow({ vehicleId: 'v2', description: 'Oil change', date: d(2024, 2, 15) }),
+      ],
+      now,
+      names
+    );
+    expect(out).toHaveLength(2);
+    const civic = out.find((e) => e.vehicleId === 'v1');
+    const camry = out.find((e) => e.vehicleId === 'v2');
+    expect(civic?.vehicleName).toBe('Civic');
+    expect(civic?.lastServiceDate).toBe(d(2024, 4, 1).toISOString());
+    expect(camry?.vehicleName).toBe('Camry');
+    expect(camry?.lastServiceDate).toBe(d(2024, 2, 15).toISOString());
   });
 });

@@ -26,6 +26,12 @@ Money columns are integer cents. A pre-2.0.0 backup stored dollar floats, so `pa
 `shimMoneyToCents` (`coerceRow` ×100s the `MONEY_CENTS_FIELDS` names) and upgrades `metadata.version`,
 since `validateBackupData` fail-closes on any version mismatch.
 
+A Sheets mirror records its version in a `Metadata` tab, written last on every sync.
+`restoreFromSheets` applies the same shim when that version is below 2.0.0. A mirror without the
+tab was last synced by an older build: it counts as 1.x dollars only when its Expenses header row
+is present and lacks `createdBy` (added in the same release as cents), and as cents otherwise.
+Never infer the unit from cell values: one hand-edited `45.50` would rescale every amount.
+
 ## Validation Pipeline
 
 1. `parseZipBackup` — compression-ratio and uncompressed-size guards, required-file check, CSV parse,

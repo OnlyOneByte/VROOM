@@ -86,14 +86,24 @@ function mergeStorageConfig(
   };
 }
 
-function mergeBackupConfig(
+const SERVER_OWNED_BACKUP_FIELDS = new Set(['lastBackupAt', 'sheetsSpreadsheetId']);
+
+function clientBackupConfigPatch(
   existing: BackupConfig | null | undefined,
   incoming: BackupConfigUpdate
-): BackupConfig {
-  const existingProviders = existing?.providers ?? {};
-  return {
-    providers: { ...existingProviders, ...incoming.providers },
-  };
+): Record<string, unknown> {
+  const providers: Record<string, Record<string, unknown>> = {};
+  for (const [providerId, settings] of Object.entries(incoming.providers)) {
+    const entry: Record<string, unknown> = {};
+    for (const key of Object.keys(existing?.providers?.[providerId] ?? {})) {
+      if (!SERVER_OWNED_BACKUP_FIELDS.has(key)) entry[key] = null;
+    }
+    for (const [key, value] of Object.entries(settings)) {
+      if (!SERVER_OWNED_BACKUP_FIELDS.has(key)) entry[key] = value;
+    }
+    providers[providerId] = entry;
+  }
+  return { providers };
 }
 
 const routes = new Hono();
@@ -162,18 +172,23 @@ routes.put('/', async (c) => {
     await validateStorageConfig(mergedStorageConfig, user.id);
   }
 
-  let mergedBackupConfig: BackupConfig | undefined;
   if (backupConfig) {
     await assertProvidersOwned(Object.keys(backupConfig.providers), user.id);
-    mergedBackupConfig = mergeBackupConfig(existingSettings.backupConfig, backupConfig);
   }
 
-  const updatedSettings = await preferencesRepository.update(user.id, {
+  let updatedSettings = await preferencesRepository.update(user.id, {
     ...restUpdates,
     ...(mergedUnitPreferences && { unitPreferences: mergedUnitPreferences }),
     ...(mergedStorageConfig && { storageConfig: mergedStorageConfig }),
-    ...(mergedBackupConfig && { backupConfig: mergedBackupConfig }),
   });
+  if (backupConfig) {
+    updatedSettings =
+      (await preferencesRepository.mergeJsonField(
+        user.id,
+        'backupConfig',
+        clientBackupConfigPatch(existingSettings.backupConfig, backupConfig)
+      )) ?? updatedSettings;
+  }
 
   return c.json({
     success: true,
