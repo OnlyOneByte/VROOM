@@ -75,7 +75,6 @@
 	let showUploadDialog = $state(false);
 
 	let shareOpen = $state(false);
-	let hasOpenedShare = $state(false);
 	let hasOpenedUpload = $state(false);
 
 	const CATEGORY_CHART_TITLE = 'Expense by Category';
@@ -478,10 +477,7 @@
 				<Button
 					variant="outline"
 					size="sm"
-					onclick={() => {
-						hasOpenedShare = true;
-						shareOpen = true;
-					}}
+					onclick={() => (shareOpen = true)}
 					class="h-10 shrink-0 sm:h-8"
 				>
 					<Users class="mr-2 h-4 w-4" />
@@ -489,7 +485,7 @@
 				</Button>
 			{/if}
 		</div>
-		{#if isOwner && hasOpenedShare}
+		{#if isOwner}
 			{#await import('#lib/components/vehicles/ShareVehicleDialog.svelte') then { default: ShareVehicleDialog }}
 				<ShareVehicleDialog bind:open={shareOpen} {vehicleId} vehicleName={vehicleDisplayName} />
 			{/await}
