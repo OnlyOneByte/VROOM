@@ -277,6 +277,8 @@ export function columnLetter(columnNumber: number): string {
   return letters;
 }
 
+const SHEET_READ_LAST_COLUMN = 'ZZ';
+
 // Order matters: the backup swap indexes each tab by position.
 export const SHEET_NAMES = Object.values(SHEET_TABS);
 
@@ -667,10 +669,7 @@ export class GoogleSheetsService {
       records[key] = absentOptionalTab
         ? []
         : this.parseSheetData(
-            await this.readSheetData(
-              spreadsheetId,
-              `${title}!A:${columnLetter(SHEET_HEADERS[key].length)}`
-            )
+            await this.readSheetData(spreadsheetId, `${title}!A:${SHEET_READ_LAST_COLUMN}`)
           );
     }
 
