@@ -1,0 +1,86 @@
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
+import type { UserProviderInfo } from '#lib/types/index.ts';
+import { ApiError } from '#lib/utils/error-handling.ts';
+
+const getSettings = vi.fn();
+const updateSettings = vi.fn();
+const showError = vi.fn();
+const providers = vi.fn(() => Promise.resolve<UserProviderInfo[]>([]));
+const deleteProvider = vi.fn((_id: string) => Promise.resolve());
+const DRIVE: UserProviderInfo = {
+	id: 'prov-1',
+	domain: 'storage',
+	providerType: 'google-drive',
+	displayName: 'Family Drive',
+	status: 'active',
+	config: { accountEmail: 'demo@example.com' },
+	createdAt: '2026-01-01T00:00:00.000Z'
+};
+
+vi.mock('#lib/services/photo-api.ts', () => ({
+	orphanedPhotosApi: { count: () => Promise.resolve(0), remove: vi.fn() }
+}));
+vi.mock('#lib/services/provider-api.ts', async importOriginal => {
+	const actual = await importOriginal<typeof import('#lib/services/provider-api.ts')>();
+	return {
+		...actual,
+		providerApi: {
+			getProviders: () => providers(),
+			deleteProvider: (id: string) => deleteProvider(id)
+		}
+	};
+});
+vi.mock('#lib/services/settings-api.ts', () => ({
+	settingsApi: {
+		getSettings: () => getSettings(),
+		updateSettings: (u: unknown) => updateSettings(u)
+	}
+}));
+vi.mock('#lib/utils/sync/sync-manager.ts', () => ({
+	fetchLastSyncTime: () => Promise.resolve(null)
+}));
+vi.mock('#lib/stores/app.svelte.ts', () => ({
+	appStore: { showSuccess: vi.fn(), showError: (m: string) => showError(m) }
+}));
+
+const StorageProvidersCard = (await import('../StorageProvidersCard.svelte')).default;
+const SETTINGS = { storageConfig: null, backupConfig: { providers: {} } };
+
+beforeEach(() => {
+	getSettings.mockReset();
+	updateSettings.mockReset();
+	showError.mockReset();
+	providers.mockReset();
+	providers.mockResolvedValue([]);
+	deleteProvider.mockReset();
+});
+
+describe('Storage Providers card errors read as plain sentences', () => {
+	test('a failed load names what failed, never shows the raw server text, and can be retried', async () => {
+		getSettings.mockRejectedValueOnce(new ApiError('boom', 500)).mockResolvedValueOnce(SETTINGS);
+		render(StorageProvidersCard, { props: {} });
+
+		expect(await screen.findByText("Couldn't load your storage providers")).toBeInTheDocument();
+		expect(screen.queryByText('boom')).toBeNull();
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+		expect(await screen.findByText('Providers')).toBeInTheDocument();
+		expect(screen.queryByText("Couldn't load your storage providers")).toBeNull();
+	});
+
+	test('a failed provider removal says what could not be done, with the reason', async () => {
+		getSettings.mockResolvedValue(SETTINGS);
+		providers.mockResolvedValue([DRIVE]);
+		deleteProvider.mockRejectedValue(new ApiError('boom', 500));
+		render(StorageProvidersCard, { props: {} });
+
+		await fireEvent.click(await screen.findByRole('button', { name: 'Delete Family Drive' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+
+		await waitFor(() => expect(showError).toHaveBeenCalled());
+		const message = showError.mock.calls[0]?.[0] as string;
+		expect(message).toMatch(/^Couldn't remove the provider\. /);
+		expect(message).not.toContain('boom');
+	});
+});

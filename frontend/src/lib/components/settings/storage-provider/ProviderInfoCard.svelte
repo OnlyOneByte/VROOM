@@ -20,6 +20,7 @@
 	import { Label } from '#lib/components/ui/label/index.ts';
 	import { providerApi } from '#lib/services/provider-api.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { PHOTO_CATEGORY_LABELS } from '#lib/constants/ui.ts';
 	import type { PhotoCategory, CategorySetting, UserProviderInfo } from '#lib/types/index.ts';
 
@@ -139,8 +140,8 @@
 				appStore.showSuccess('All photos already synced');
 			}
 			await loadSyncStatus();
-		} catch {
-			appStore.showError('Failed to start backfill');
+		} catch (e) {
+			appStore.showError(`Couldn't start syncing photos. ${userFacingErrorMessage(e)}`);
 		} finally {
 			isBackfilling = false;
 		}
