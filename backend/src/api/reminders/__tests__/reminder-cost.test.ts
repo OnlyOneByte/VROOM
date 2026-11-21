@@ -113,3 +113,26 @@ describe('recurringCostSummary — aggregate over a user set', () => {
     expect(recurringCostSummary([])).toEqual({ count: 0, monthlyTotal: 0 });
   });
 });
+
+describe('mileage-only expense reminders have no date schedule', () => {
+  test('add nothing to the monthly run rate, whatever frequency is stored', () => {
+    for (const frequency of ['weekly', 'monthly', 'yearly']) {
+      expect(monthlyRunRate(reminder({ triggerMode: 'mileage', frequency })), frequency).toBe(0);
+    }
+  });
+
+  test('a reminder on mileage and a time schedule still counts its schedule', () => {
+    expect(monthlyRunRate(reminder({ triggerMode: 'both', frequency: 'monthly' }))).toBeCloseTo(
+      100,
+      6
+    );
+  });
+
+  test('are left out of the recurring summary count and total', () => {
+    const summary = recurringCostSummary([
+      reminder({ id: 'time', frequency: 'monthly', expenseAmount: 100 }),
+      reminder({ id: 'miles', triggerMode: 'mileage', frequency: 'weekly', expenseAmount: 500 }),
+    ]);
+    expect(summary).toEqual({ count: 1, monthlyTotal: 100 });
+  });
+});
