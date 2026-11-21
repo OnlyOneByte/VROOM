@@ -1,13 +1,31 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { onlineStatus, syncState } from '../../../stores/offline.svelte';
 import { ApiError } from '../../error-handling';
-import {
-	loadOfflineExpenses,
-	type OfflineExpense,
-	saveOfflineExpenses
-} from '../../offline-storage';
+import type { OfflineExpense } from '../../offline-storage';
 import { classifySyncFailure } from '../classify-failure';
-import { syncConfig, syncManager } from '../sync-manager';
+
+vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
+vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
+vi.mock('#lib/stores/auth.svelte.ts', () => ({ authStore: { clearUser: vi.fn() } }));
+
+type SyncModule = typeof import('../sync-manager');
+type StorageModule = typeof import('../../offline-storage');
+type OfflineStoreModule = typeof import('../../../stores/offline.svelte');
+
+let syncManager: SyncModule['syncManager'];
+let syncConfig: SyncModule['syncConfig'];
+let loadOfflineExpenses: StorageModule['loadOfflineExpenses'];
+let saveOfflineExpenses: StorageModule['saveOfflineExpenses'];
+let onlineStatus: OfflineStoreModule['onlineStatus'];
+let syncState: OfflineStoreModule['syncState'];
+
+const MODULE_LOAD_TIMEOUT_MS = 60_000;
+
+beforeEach(async () => {
+	vi.resetModules();
+	({ syncManager, syncConfig } = await import('../sync-manager'));
+	({ loadOfflineExpenses, saveOfflineExpenses } = await import('../../offline-storage'));
+	({ onlineStatus, syncState } = await import('../../../stores/offline.svelte'));
+}, MODULE_LOAD_TIMEOUT_MS);
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
@@ -312,5 +330,29 @@ describe('SyncManager.retryParked', () => {
 
 		expect(mockFetch).not.toHaveBeenCalled();
 		expect(loadOfflineExpenses()[0]?.needsAttention).toBe(true);
+	});
+});
+
+describe('SyncManager test isolation', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		ls.clear();
+		onlineStatus.current = true;
+	});
+
+	it('leaves a sync in flight when its request never settles', () => {
+		saveOfflineExpenses([pending('stuck')]);
+		mockFetch.mockImplementation(() => new Promise(() => {}));
+
+		void syncManager.syncAll();
+
+		expect(syncState.current).toBe('syncing');
+	});
+
+	it('starts the next test with no sync in progress', async () => {
+		saveOfflineExpenses([pending('next')]);
+		mockFetch.mockImplementation(() => Promise.resolve(apiOk([])));
+
+		await expect(syncManager.syncAll()).resolves.toMatchObject({ synced: 1 });
 	});
 });
