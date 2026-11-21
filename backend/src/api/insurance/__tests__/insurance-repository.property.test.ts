@@ -7,7 +7,7 @@ import { applyMigration, loadMigrations } from '../../../db/__tests__/migration-
 import type { AppDatabase } from '../../../db/connection';
 import * as schema from '../../../db/schema';
 import { insuranceTerms, insuranceTermVehicles } from '../../../db/schema';
-import { NotFoundError } from '../../../errors';
+import { DatabaseError, NotFoundError } from '../../../errors';
 import { InsurancePolicyRepository } from '../repository';
 import { companyNameArb, validTermInputArb } from './insurance-test-generators';
 
@@ -58,6 +58,29 @@ afterEach(() => {
 const userVehicleIdsArb = fc
   .subarray(VEHICLE_IDS, { minLength: 1, maxLength: VEHICLE_IDS.length })
   .filter((arr) => arr.length > 0);
+
+describe('insurance write failures', () => {
+  test('a failed create raises a DatabaseError without the driver error attached', async () => {
+    const attempt = repo.create(
+      {
+        company: 'Dup Coverage',
+        terms: [
+          {
+            startDate: new Date('2024-01-01T00:00:00Z'),
+            endDate: new Date('2024-12-31T00:00:00Z'),
+            vehicleCoverage: { vehicleIds: ['v-1', 'v-1'] },
+          },
+        ],
+      },
+      USER_ID
+    );
+
+    const error = await attempt.catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(DatabaseError);
+    expect((error as DatabaseError).message).toBe('Failed to create insurance policy');
+    expect((error as DatabaseError).details).toBeUndefined();
+  });
+});
 
 describe('insurance term CRUD round-trip', () => {
   test('addTerm inserts a term row and junction rows retrievable via findById', async () => {
