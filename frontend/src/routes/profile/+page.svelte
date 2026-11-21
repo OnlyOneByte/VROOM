@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { page } from '$app/state';
 	import { browser } from '$app/env';
@@ -114,7 +115,7 @@
 			isEditingName = false;
 		} catch (err) {
 			if (import.meta.env.DEV) console.error('Failed to update display name:', err);
-			appStore.showError('Failed to update display name');
+			appStore.showError(`Couldn't update your display name. ${userFacingErrorMessage(err)}`);
 		} finally {
 			isSavingName = false;
 		}
@@ -175,9 +176,9 @@
 		} catch (err) {
 			const code = err instanceof Error && 'code' in err ? (err as { code: string }).code : '';
 			if (code === 'LAST_ACCOUNT') {
-				unlinkError = 'Cannot unlink your last sign-in method.';
+				unlinkError = "You can't unlink your last sign-in method.";
 			} else {
-				unlinkError = 'Failed to unlink account. Please try again.';
+				unlinkError = `Couldn't unlink the account. ${userFacingErrorMessage(err)}`;
 			}
 		} finally {
 			unlinkingId = null;
@@ -200,7 +201,7 @@
 			appStore.showSuccess('Data export downloaded');
 		} catch (err) {
 			if (import.meta.env.DEV) console.error('Failed to export data:', err);
-			appStore.showError('Failed to export data');
+			appStore.showError(`Couldn't export your data. ${userFacingErrorMessage(err)}`);
 		} finally {
 			isExporting = false;
 		}

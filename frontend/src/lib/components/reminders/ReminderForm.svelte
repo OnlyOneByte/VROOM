@@ -9,6 +9,7 @@
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import type { ReminderWithVehicles, Vehicle } from '#lib/types/index.ts';
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { ReminderFormState } from './reminder-form/reminder-form-state.svelte';
 	import {
 		SERVER_FIELD_ERRORS_TOAST,
@@ -66,7 +67,7 @@
 				type: 'error',
 				message: hasFieldErrors
 					? SERVER_FIELD_ERRORS_TOAST
-					: `Failed to ${isEdit ? 'update' : 'create'} reminder`
+					: `Couldn't ${isEdit ? 'update' : 'create'} the reminder. ${userFacingErrorMessage(error)}`
 			});
 		} finally {
 			form.isSubmitting = false;

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
+import { ApiError, SERVER_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 import { cleanup, render, screen } from '@testing-library/svelte';
 
 const { reminderApi } = vi.hoisted(() => ({
@@ -14,7 +15,7 @@ afterEach(() => cleanup());
 describe('MaterializedExpensesDialog load failure', () => {
 	test('shows a plain sentence, never the server text', async () => {
 		reminderApi.getMaterializedExpenses.mockRejectedValue(
-			new Error('Request failed with status 500')
+			new ApiError('Request failed with status 500', 500)
 		);
 		render(Dialog, {
 			open: true,
@@ -23,8 +24,9 @@ describe('MaterializedExpensesDialog load failure', () => {
 			vehicleNames: new Map()
 		});
 		expect(
-			await screen.findByText('Couldn’t load the expenses this reminder created. Please try again.')
+			await screen.findByText("Couldn't load the expenses this reminder created")
 		).toBeInTheDocument();
+		expect(screen.getByText(SERVER_FAILURE_MESSAGE)).toBeInTheDocument();
 		expect(screen.queryByText(/status 500/)).toBeNull();
 	});
 });

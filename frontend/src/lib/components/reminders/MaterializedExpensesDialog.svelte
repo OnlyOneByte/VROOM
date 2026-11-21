@@ -2,6 +2,7 @@
 	import * as Dialog from '#lib/components/ui/dialog/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import { Receipt, CircleAlert, Car } from '@lucide/svelte';
 	import { reminderApi } from '#lib/services/reminder-api.ts';
@@ -38,7 +39,7 @@
 			expenses = await reminderApi.getMaterializedExpenses(id);
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to load materialized expenses:', error);
-			loadError = 'Couldn’t load the expenses this reminder created. Please try again.';
+			loadError = userFacingErrorMessage(error);
 		} finally {
 			isLoading = false;
 		}
@@ -69,7 +70,7 @@
 			<div class="rounded-lg border bg-card p-4">
 				<div class="mb-3 flex items-center gap-2 text-destructive">
 					<CircleAlert class="h-5 w-5" />
-					<p class="font-medium">Failed to load expenses</p>
+					<p class="font-medium">Couldn't load the expenses this reminder created</p>
 				</div>
 				<p class="mb-3 text-sm text-muted-foreground">{loadError}</p>
 				{#if reminderId}

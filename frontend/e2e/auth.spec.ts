@@ -41,7 +41,7 @@ test.describe('Signed out', () => {
 
 		await page.goto('/auth');
 
-		await expect(page.getByText(/Failed to load sign-in options/i)).toBeVisible();
+		await expect(page.getByText(/Couldn't load the sign-in options/i)).toBeVisible();
 	});
 
 	test('choosing a provider hands off to the backend OAuth start endpoint', async ({ page }) => {
