@@ -17,6 +17,8 @@
 	import DefaultPhotoSources from '../storage-provider/DefaultPhotoSources.svelte';
 	import ProviderCard from '../storage-provider/ProviderInfoCard.svelte';
 	import { photosOnlyOnProvider, providerApi } from '#lib/services/provider-api.ts';
+	import { orphanedPhotosApi } from '#lib/services/photo-api.ts';
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
 	import { settingsApi } from '#lib/services/settings-api.ts';
 	import { fetchLastSyncTime } from '#lib/utils/sync/sync-manager.ts';
@@ -85,8 +87,43 @@
 		}
 	}
 
+	let orphanCount = $state(0);
+	let orphanConfirmOpen = $state(false);
+	const photosNoun = (n: number) => (n === 1 ? '1 photo' : `${n} photos`);
+	let orphanConfirmDescription = $derived(
+		orphanCount === 1
+			? "This photo belongs to a vehicle, expense, odometer reading or insurance record that was deleted. VROOM deletes it and its file in your storage providers. This can't be undone."
+			: "These photos belong to vehicles, expenses, odometer readings or insurance records that were deleted. VROOM deletes them and their files in your storage providers. This can't be undone."
+	);
+
+	async function loadOrphanCount() {
+		try {
+			orphanCount = await orphanedPhotosApi.count();
+		} catch (e) {
+			if (import.meta.env.DEV) console.error('Failed to count orphaned photos:', e);
+			orphanCount = 0;
+		}
+	}
+
+	async function removeOrphanedPhotos() {
+		try {
+			const { removed, failed } = await orphanedPhotosApi.remove();
+			if (removed > 0) appStore.showSuccess(`Removed ${photosNoun(removed)}`);
+			if (failed > 0) {
+				appStore.showError(
+					`Couldn't delete ${photosNoun(failed)} from your storage providers. ${failed === 1 ? 'It stays' : 'They stay'} listed here so you can try again later.`
+				);
+			}
+		} catch (e) {
+			appStore.showError(`Couldn't remove the photos. ${userFacingErrorMessage(e)}`);
+		} finally {
+			await loadOrphanCount();
+		}
+	}
+
 	onMount(() => {
 		loadData();
+		loadOrphanCount();
 	});
 
 	async function handleConfigUpdate(config: StorageConfig) {
@@ -294,6 +331,24 @@
 
 			<DefaultPhotoSources {storageConfig} {providers} onUpdate={handleConfigUpdate} />
 
+			{#if orphanCount > 0}
+				<div
+					class="mt-4 flex flex-col gap-3 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between"
+				>
+					<p class="text-sm">
+						{photosNoun(orphanCount)}
+						{orphanCount === 1 ? 'is' : 'are'} no longer attached to anything.
+					</p>
+					<Button
+						variant="outline"
+						class="h-10 shrink-0 sm:h-9"
+						onclick={() => (orphanConfirmOpen = true)}
+					>
+						{orphanCount === 1 ? 'Remove it' : 'Remove them'}
+					</Button>
+				</div>
+			{/if}
+
 			<Separator class="my-6" />
 
 			<div class="space-y-3">
@@ -365,4 +420,12 @@
 	onConfirm={async () => {
 		if (photoLossConfirm) await handleProviderDelete(photoLossConfirm.provider, true);
 	}}
+/>
+
+<ConfirmDialog
+	bind:open={orphanConfirmOpen}
+	title="Remove {photosNoun(orphanCount)}?"
+	description={orphanConfirmDescription}
+	confirmLabel="Remove"
+	onConfirm={removeOrphanedPhotos}
 />
