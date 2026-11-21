@@ -186,20 +186,6 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     }
   }
 
-  async mileageNotificationExists(reminderId: string, dueOdometer: number): Promise<boolean> {
-    const rows = await this.db
-      .select({ id: reminderNotifications.id })
-      .from(reminderNotifications)
-      .where(
-        and(
-          eq(reminderNotifications.reminderId, reminderId),
-          eq(reminderNotifications.dueOdometer, dueOdometer)
-        )
-      )
-      .limit(1);
-    return rows.length > 0;
-  }
-
   async createMileageNotification(
     reminderId: string,
     userId: string,

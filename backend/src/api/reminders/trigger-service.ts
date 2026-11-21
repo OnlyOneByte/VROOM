@@ -382,13 +382,7 @@ class ReminderTriggerService {
     }
 
     const mileageReminders = await reminderRepository.findMileageTracking(userId);
-    for (const { reminder, vehicleIds } of mileageReminders) {
-      try {
-        await this.processMileageReminder(reminder, vehicleIds, result);
-      } catch (error) {
-        pushReminderSkipError(result, reminder.id, error);
-      }
-    }
+    await this.processMileageReminders(mileageReminders, result);
 
     return result;
   }
@@ -406,37 +400,51 @@ class ReminderTriggerService {
       });
       return result;
     }
+    await this.processMileageReminders(
+      mileageReminders.filter(({ vehicleIds }) => vehicleIds.includes(vehicleId)),
+      result
+    );
+    return result;
+  }
+
+  private async processMileageReminders(
+    mileageReminders: ReminderWithVehicles[],
+    result: TriggerResult
+  ): Promise<void> {
+    const odometerByVehicle = new Map<string, Promise<number | null>>();
+    const currentOdometer = (vehicleId: string, userId: string): Promise<number | null> => {
+      let reading = odometerByVehicle.get(vehicleId);
+      if (!reading) {
+        reading = odometerRepository.getCurrentOdometer(vehicleId, userId);
+        odometerByVehicle.set(vehicleId, reading);
+      }
+      return reading;
+    };
+
     for (const { reminder, vehicleIds } of mileageReminders) {
-      if (!vehicleIds.includes(vehicleId)) continue;
       try {
-        await this.processMileageReminder(reminder, vehicleIds, result);
+        await this.processMileageReminder(reminder, vehicleIds, result, currentOdometer);
       } catch (error) {
         pushReminderSkipError(result, reminder.id, error);
       }
     }
-    return result;
   }
 
   private async processMileageReminder(
     reminder: Reminder,
     vehicleIds: string[],
-    result: TriggerResult
+    result: TriggerResult,
+    currentOdometer: (vehicleId: string, userId: string) => Promise<number | null>
   ): Promise<void> {
     if (reminder.nextDueOdometer === null) return;
-    if (vehicleIds.length !== 1) {
+    const [vehicleId] = vehicleIds;
+    if (vehicleId === undefined || vehicleIds.length !== 1) {
       result.skipped.push({ reminderId: reminder.id, reason: 'mileage_requires_single_vehicle' });
       return;
     }
 
-    const currentOdometer = await odometerRepository.getCurrentOdometer(
-      vehicleIds[0],
-      reminder.userId
-    );
-    if (currentOdometer === null || currentOdometer < reminder.nextDueOdometer) {
-      return;
-    }
-
-    if (await reminderRepository.mileageNotificationExists(reminder.id, reminder.nextDueOdometer)) {
+    const odometer = await currentOdometer(vehicleId, reminder.userId);
+    if (odometer === null || odometer < reminder.nextDueOdometer) {
       return;
     }
 

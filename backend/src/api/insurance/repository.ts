@@ -6,6 +6,7 @@ import type { InsurancePolicy, InsuranceTerm } from '../../db/schema';
 import { insurancePolicies, insuranceTerms, insuranceTermVehicles } from '../../db/schema';
 import type { DrizzleTransaction } from '../../db/types';
 import { DatabaseError, NotFoundError, ValidationError } from '../../errors';
+import { chunk } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
 import { assertVehiclesOwned } from '../../utils/vehicle-ownership';
 
@@ -63,11 +64,13 @@ export interface TermCoverageRow {
   vehicleId: string;
 }
 
-export type InsurancePolicyWithVehicles = InsurancePolicy & {
+type PolicyCoverage = {
   terms: InsuranceTerm[];
   termVehicleCoverage: TermCoverageRow[];
   vehicleIds: string[];
 };
+
+export type InsurancePolicyWithVehicles = InsurancePolicy & PolicyCoverage;
 
 // Owner-scoped lookups keep writes safe even if a caller skips the route ownership check.
 function ownedPolicy(policyId: string, userId: string) {
@@ -100,41 +103,70 @@ export class InsurancePolicyRepository {
     }
   }
 
-  private async fetchTermsAndCoverage(
+  private async fetchTermsAndCoverageByPolicy(
     handle: AppDatabase | DrizzleTransaction,
-    policyId: string
-  ): Promise<{
-    terms: InsuranceTerm[];
-    termVehicleCoverage: TermCoverageRow[];
-    vehicleIds: string[];
-  }> {
-    const terms = await handle
-      .select()
-      .from(insuranceTerms)
-      .where(eq(insuranceTerms.policyId, policyId))
-      .orderBy(desc(insuranceTerms.endDate));
+    policyIds: string[]
+  ): Promise<Map<string, PolicyCoverage>> {
+    const terms: InsuranceTerm[] = [];
+    for (const ids of chunk(policyIds)) {
+      terms.push(
+        ...(await handle
+          .select()
+          .from(insuranceTerms)
+          .where(inArray(insuranceTerms.policyId, ids))
+          .orderBy(desc(insuranceTerms.endDate)))
+      );
+    }
 
-    const termIds = terms.map((t) => t.id);
-    let termVehicleCoverage: TermCoverageRow[] = [];
-    if (termIds.length > 0) {
-      termVehicleCoverage = await handle
+    const coverageByTerm = new Map<string, TermCoverageRow[]>();
+    for (const ids of chunk(terms.map((t) => t.id))) {
+      const rows = await handle
         .select({
           termId: insuranceTermVehicles.termId,
           vehicleId: insuranceTermVehicles.vehicleId,
         })
         .from(insuranceTermVehicles)
-        .where(inArray(insuranceTermVehicles.termId, termIds));
+        .where(inArray(insuranceTermVehicles.termId, ids));
+      for (const row of rows) {
+        coverageByTerm.set(row.termId, [...(coverageByTerm.get(row.termId) ?? []), row]);
+      }
     }
 
-    const vehicleIds = [...new Set(termVehicleCoverage.map((tc) => tc.vehicleId))];
-    return { terms, termVehicleCoverage, vehicleIds };
+    const byPolicy = new Map<string, PolicyCoverage>(
+      policyIds.map((id) => [id, { terms: [], termVehicleCoverage: [], vehicleIds: [] }])
+    );
+    for (const term of terms) {
+      const coverage = byPolicy.get(term.policyId);
+      if (!coverage) continue;
+      coverage.terms.push(term);
+      coverage.termVehicleCoverage.push(...(coverageByTerm.get(term.id) ?? []));
+    }
+    for (const coverage of byPolicy.values()) {
+      coverage.vehicleIds = [...new Set(coverage.termVehicleCoverage.map((tc) => tc.vehicleId))];
+    }
+    return byPolicy;
+  }
+
+  private async fetchTermsAndCoverage(
+    handle: AppDatabase | DrizzleTransaction,
+    policyId: string
+  ): Promise<PolicyCoverage> {
+    const byPolicy = await this.fetchTermsAndCoverageByPolicy(handle, [policyId]);
+    return byPolicy.get(policyId) ?? { terms: [], termVehicleCoverage: [], vehicleIds: [] };
   }
 
   private async attachTermsAndCoverage(
-    policy: InsurancePolicy
-  ): Promise<InsurancePolicyWithVehicles> {
-    const coverage = await this.fetchTermsAndCoverage(this.db, policy.id);
-    return { ...policy, ...coverage };
+    policies: InsurancePolicy[]
+  ): Promise<InsurancePolicyWithVehicles[]> {
+    if (policies.length === 0) return [];
+    const byPolicy = await this.fetchTermsAndCoverageByPolicy(
+      this.db,
+      policies.map((p) => p.id)
+    );
+    return policies.map((policy) => ({
+      ...policy,
+      ...(byPolicy.get(policy.id) ?? { terms: [], termVehicleCoverage: [], vehicleIds: [] }),
+    }));
   }
 
   async create(data: CreatePolicyData, userId: string): Promise<InsurancePolicyWithVehicles> {
@@ -225,7 +257,8 @@ export class InsurancePolicyRepository {
     const policy = result[0];
     if (!policy) return null;
 
-    return this.attachTermsAndCoverage(policy);
+    const coverage = await this.fetchTermsAndCoverage(this.db, policy.id);
+    return { ...policy, ...coverage };
   }
 
   async findByUserId(userId: string): Promise<InsurancePolicyWithVehicles[]> {
@@ -235,7 +268,7 @@ export class InsurancePolicyRepository {
         .from(insurancePolicies)
         .where(eq(insurancePolicies.userId, userId));
 
-      return Promise.all(policies.map((p) => this.attachTermsAndCoverage(p)));
+      return this.attachTermsAndCoverage(policies);
     } catch (error) {
       logger.error('Error finding insurance policies for user', { error });
       throw new DatabaseError('Failed to find insurance policies for user', error);
@@ -253,7 +286,7 @@ export class InsurancePolicyRepository {
         .groupBy(insurancePolicies.id);
 
       const policies = result.map((r) => r.policy);
-      return Promise.all(policies.map((p) => this.attachTermsAndCoverage(p)));
+      return this.attachTermsAndCoverage(policies);
     } catch (error) {
       logger.error('Error finding insurance policies for vehicle', { vehicleId, error });
       throw new DatabaseError('Failed to find insurance policies for vehicle', error);
