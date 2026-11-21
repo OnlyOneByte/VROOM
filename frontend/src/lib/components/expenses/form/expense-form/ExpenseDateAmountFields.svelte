@@ -51,7 +51,7 @@
 			min="0"
 			bind:value={amount}
 			placeholder="0.00"
-			class={currencySymbol.length > 1 ? 'pl-12' : 'pl-8'}
+			class={currencySymbol.length > 1 ? 'pl-14' : 'pl-8'}
 			onblur={onAmountBlur}
 			aria-invalid={!!amountError}
 			aria-describedby={amountError ? 'amount-error' : undefined}

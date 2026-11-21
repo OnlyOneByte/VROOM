@@ -45,7 +45,7 @@
 				min="0"
 				bind:value={form.values.expenseAmount}
 				placeholder="0.00"
-				class={currencySymbol.length > 1 ? 'pl-12' : 'pl-8'}
+				class={currencySymbol.length > 1 ? 'pl-14' : 'pl-8'}
 				aria-invalid={!!form.errors['expenseAmount']}
 			/>
 		</div>
