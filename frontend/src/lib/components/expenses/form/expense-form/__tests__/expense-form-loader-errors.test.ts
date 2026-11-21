@@ -212,3 +212,54 @@ describe('switching vehicles keeps only the latest response', () => {
 		expect(addNotification).toHaveBeenCalledTimes(1);
 	});
 });
+
+describe('expense form loader failures from older requests and odd rejections', () => {
+	test("a late failure for an older vehicle's history keeps the newer history", async () => {
+		const first = deferred<{ data: Expense[] }>();
+		expenseApiMock.getExpensesByVehicle
+			.mockReturnValueOnce(first.promise)
+			.mockResolvedValueOnce({ data: [makeExpense('new')] });
+		const state = createState();
+		const p1 = loadAllVehicleExpenses(state);
+		await loadAllVehicleExpenses(state);
+		first.reject(new Error('stale'));
+		await expect(p1).resolves.toBeNull();
+		expect(state.allVehicleExpenses.map(e => e.id)).toEqual(['new']);
+	});
+
+	test("a late failure for an older vehicle's last fill-up keeps the newer fill-up", async () => {
+		const first = deferred<{ data: Expense[] }>();
+		expenseApiMock.getExpensesByVehicle
+			.mockReturnValueOnce(first.promise)
+			.mockResolvedValueOnce({ data: [makeExpense('new-fill')] });
+		const state = createState();
+		const p1 = loadLastFuelExpense(state);
+		await loadLastFuelExpense(state);
+		first.reject(new Error('stale'));
+		await expect(p1).resolves.toBeNull();
+		expect(state.lastFuelExpense?.id).toBe('new-fill');
+	});
+
+	test('a vehicle list rejection that is not an Error shows the generic message', async () => {
+		vehicleApiMock.getVehicles.mockRejectedValueOnce('offline');
+		const state = createState();
+		await loadVehicles(state);
+		expect(state.vehiclesError).toBe(UNEXPECTED_FAILURE_MESSAGE);
+	});
+
+	test('a vehicle list Error without a message shows the generic message', async () => {
+		vehicleApiMock.getVehicles.mockRejectedValueOnce(new Error(''));
+		const state = createState();
+		await loadVehicles(state);
+		expect(state.vehiclesError).toBe(UNEXPECTED_FAILURE_MESSAGE);
+	});
+
+	test('a vehicle rejection that is not an Error is wrapped as the generic sentence', async () => {
+		vehicleApiMock.getVehicle.mockRejectedValueOnce('503 Service Unavailable');
+		const state = createState();
+		const error = await loadVehicle(state);
+		expect(error).toBeInstanceOf(Error);
+		expect(error?.message).toBe(UNEXPECTED_FAILURE_MESSAGE);
+		expect(state.vehicle).toBeNull();
+	});
+});

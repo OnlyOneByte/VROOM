@@ -45,7 +45,7 @@
 	<div class="flex items-center gap-2 border-b px-3 py-2">
 		<ExpenseCategoryFilter density="compact" value={categoryFilter} onChange={onCategoryChange} />
 
-		<div class="ml-auto flex items-center gap-1">
+		<div class="ml-auto flex items-center gap-2">
 			<ExpenseSortButton
 				label="Date"
 				field="date"

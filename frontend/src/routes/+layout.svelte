@@ -171,7 +171,9 @@
 	</main>
 {/if}
 
-<OfflineIndicator />
+{#if !showNavigation}
+	<OfflineIndicator />
+{/if}
 
 <PWAInstallPrompt />
 
