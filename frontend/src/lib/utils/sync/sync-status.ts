@@ -1,4 +1,12 @@
-import { Wifi, WifiOff, RefreshCw, CircleCheck, CircleAlert, Clock } from '@lucide/svelte';
+import {
+	Wifi,
+	WifiOff,
+	RefreshCw,
+	CircleCheck,
+	CircleAlert,
+	Clock,
+	ServerOff
+} from '@lucide/svelte';
 
 type LucideIcon = typeof Wifi;
 
@@ -13,13 +21,18 @@ export interface SyncStatusParams {
 	syncStatus: 'idle' | 'syncing' | 'error' | 'success';
 	pendingCount: number;
 	conflictsCount: number;
+	serverReachable?: boolean;
 }
 
 export function getSyncStatusInfo(params: SyncStatusParams): SyncStatusInfo {
-	const { isOnline, syncStatus, pendingCount, conflictsCount } = params;
+	const { isOnline, syncStatus, pendingCount, conflictsCount, serverReachable = true } = params;
 
 	if (!isOnline) {
 		return { color: 'text-destructive', icon: WifiOff, text: 'Offline' };
+	}
+
+	if (!serverReachable) {
+		return { color: 'text-warning', icon: ServerOff, text: "Can't reach VROOM" };
 	}
 
 	if (conflictsCount > 0) {
