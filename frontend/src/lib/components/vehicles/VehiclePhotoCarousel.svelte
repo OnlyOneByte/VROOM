@@ -88,7 +88,7 @@
 
 								{#if isOwner}
 									<div
-										class="absolute inset-x-0 bottom-0 flex items-center justify-end gap-1 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-100 lg:opacity-0 transition-opacity lg:group-hover:opacity-100 lg:group-focus-within:opacity-100"
+										class="absolute inset-x-0 bottom-0 flex items-center justify-end gap-2 lg:gap-1 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-100 lg:opacity-0 transition-opacity lg:group-hover:opacity-100 lg:group-focus-within:opacity-100"
 									>
 										{#if !photo.isCover}
 											<Button
@@ -104,7 +104,8 @@
 										<Button
 											variant="destructive"
 											size="sm"
-											class="h-10 text-xs lg:h-7"
+											class="h-10 w-10 text-xs lg:h-7 lg:w-auto"
+											aria-label="Delete photo"
 											disabled={deletingPhotoId === photo.id}
 											onclick={() => requestDelete(photo.id)}
 										>

@@ -140,6 +140,8 @@ describe('VehiclePhotoCarousel: deleting', () => {
 	test('asks for confirmation before deleting a photo', async () => {
 		const { onDelete } = mount([photo('p1'), photo('p2')]);
 
+		expect(deleteButtonFor('p2.jpg')).toHaveAccessibleName('Delete photo');
+		expect(deleteButtonFor('p2.jpg')).toHaveClass('h-10', 'w-10', 'lg:h-7', 'lg:w-auto');
 		await fireEvent.click(deleteButtonFor('p2.jpg'));
 
 		expect(await screen.findByText('Delete photo?')).toBeInTheDocument();
