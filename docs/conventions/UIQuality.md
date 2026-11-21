@@ -216,7 +216,7 @@ Motion explains a change; it never decorates.
 
 Target: **WCAG 2.1 AA**, axe clean at `wcag2a`/`wcag2aa`/`wcag21a`/`wcag21aa`.
 
-`e2e/pwa.spec.ts` (`A11Y_ROUTES`) runs `@axe-core/playwright` over eleven routes, and
+`e2e/pwa.spec.ts` (`A11Y_ROUTES`) runs `@axe-core/playwright` over twelve routes, and
 `e2e/expenses-a11y.spec.ts` covers the expense table's interactive states. It is a ratchet, not a
 gate: each route carries a list of rule ids it already violates (all currently empty) and fails
 only on an id not on its list. A new route gets an `A11Y_ROUTES` entry. Everything else is yours to
