@@ -34,7 +34,13 @@ import {
 import { chunk, rowsPerInsert } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
 import { preferencesRepository } from '../settings/repository';
-import { backupService, coerceRow, isPreCentsBackup, storageProviderIdentity } from './backup';
+import {
+  backupService,
+  coerceRow,
+  isPreCentsBackup,
+  normalizeStorageIdentity,
+  storageProviderIdentity,
+} from './backup';
 
 type DrizzleTransaction = Parameters<Parameters<AppDatabase['transaction']>[0]>[0];
 
@@ -696,7 +702,9 @@ class RestoreService {
     const targetOf = (providerId: string): string | null | undefined => {
       if (ownedIds.has(providerId)) return providerId;
       const identity = backupProviders[providerId];
-      return identity ? ownedByIdentity.get(identity) : undefined;
+      return typeof identity === 'string'
+        ? ownedByIdentity.get(normalizeStorageIdentity(identity))
+        : undefined;
     };
     const seen = new Set<string>();
     const relinked: Record<string, unknown>[] = [];

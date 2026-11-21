@@ -69,13 +69,31 @@ export const MONEY_CENTS_FIELDS = new Set<string>([
   'groupTotal',
 ]);
 
+function normalizeEndpoint(endpoint: string): string {
+  const trimmed = endpoint.trim();
+  try {
+    const url = new URL(trimmed);
+    return `${url.protocol}//${url.host}${url.pathname.replace(/\/+$/, '')}`;
+  } catch {
+    return trimmed.replace(/\/+$/, '');
+  }
+}
+
+export function normalizeStorageIdentity(identity: string): string {
+  if (!identity.startsWith('s3:')) return identity;
+  const endpointAndBucket = identity.slice('s3:'.length);
+  const slash = endpointAndBucket.lastIndexOf('/');
+  if (slash === -1) return identity;
+  return `s3:${normalizeEndpoint(endpointAndBucket.slice(0, slash))}/${endpointAndBucket.slice(slash + 1)}`;
+}
+
 export function storageProviderIdentity(
   provider: Pick<UserProvider, 'providerType' | 'config'>
 ): string | null {
   const config = (provider.config ?? {}) as Record<string, unknown>;
   if (provider.providerType === 's3') {
     return config.endpoint && config.bucket
-      ? `s3:${String(config.endpoint)}/${String(config.bucket)}`
+      ? `s3:${normalizeEndpoint(String(config.endpoint))}/${String(config.bucket)}`
       : null;
   }
   return config.accountEmail ? `${provider.providerType}:${String(config.accountEmail)}` : null;

@@ -457,6 +457,111 @@ describe('restore after the account record is recreated (same person, new user i
     ]);
   });
 
+  function insertS3Provider(id: string, userId: string, endpoint: string): void {
+    ctx.sqlite.run(
+      `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
+       VALUES (?, ?, 'storage', 's3', 'S3', 'x', ?, 'active')`,
+      [id, userId, JSON.stringify({ endpoint, bucket: 'vroom-photos', region: 'auto' })]
+    );
+  }
+
+  test('S3 photo links re-attach when the endpoint differs only by case or a trailing slash', async () => {
+    const vehicleId = await seedOwnerData();
+    insertS3Provider('s3-before', ctx.user.id, 'https://S3.Example.com/');
+    ctx.sqlite.run(
+      `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
+       VALUES ('photo-s3', ?, 'vehicle', ?, 'car.jpg', 'image/jpeg', 1)`,
+      [ctx.user.id, vehicleId]
+    );
+    ctx.sqlite.run(
+      `INSERT INTO photo_refs (id, photo_id, provider_id, storage_ref, status)
+       VALUES ('ref-s3', 'photo-s3', 's3-before', 'vehicle/v/key.jpg', 'active')`
+    );
+    const { backupService } = await import('../backup');
+    const zip = await backupService.exportAsZip(ctx.user.id);
+    const newId = reinstallAsNewAccount();
+    insertS3Provider('s3-after', newId, 'https://s3.example.com');
+
+    const { restoreService } = await import('../restore');
+    const result = await restoreService.restoreFromBackup(newId, zip, 'replace');
+    expect(result.success, JSON.stringify(result)).toBe(true);
+    expect(photoRefRows()).toEqual([
+      { provider_id: 's3-after', storage_ref: 'vehicle/v/key.jpg', status: 'active' },
+    ]);
+  });
+
+  test('a backup made before endpoints were normalized still re-links its S3 photos', async () => {
+    const vehicleId = await seedOwnerData();
+    insertS3Provider('s3-old', ctx.user.id, 'https://s3.example.com');
+    ctx.sqlite.run(
+      `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
+       VALUES ('photo-old-s3', ?, 'vehicle', ?, 'car.jpg', 'image/jpeg', 1)`,
+      [ctx.user.id, vehicleId]
+    );
+    ctx.sqlite.run(
+      `INSERT INTO photo_refs (id, photo_id, provider_id, storage_ref, status)
+       VALUES ('ref-old-s3', 'photo-old-s3', 's3-old', 'vehicle/v/old.jpg', 'active')`
+    );
+    const { backupService } = await import('../backup');
+    const archive = new AdmZip(await backupService.exportAsZip(ctx.user.id));
+    const metadata = JSON.parse(archive.getEntry('metadata.json')?.getData().toString() ?? '{}');
+    metadata.storageProviders = { 's3-old': 's3:https://S3.Example.com//vroom-photos' };
+    archive.updateFile('metadata.json', Buffer.from(JSON.stringify(metadata), 'utf-8'));
+    const newId = reinstallAsNewAccount();
+    insertS3Provider('s3-new', newId, 'https://S3.Example.com/');
+
+    const { restoreService } = await import('../restore');
+    const result = await restoreService.restoreFromBackup(newId, archive.toBuffer(), 'replace');
+    expect(result.success, JSON.stringify(result)).toBe(true);
+    expect(photoRefRows().map((r) => r.provider_id)).toEqual(['s3-new']);
+  });
+
+  test('S3 endpoints differing only in path case stay distinct', async () => {
+    const { storageProviderIdentity } = await import('../backup');
+    const identity = (endpoint: string): string | null =>
+      storageProviderIdentity({
+        providerType: 's3',
+        config: { endpoint, bucket: 'b', region: 'auto' },
+      });
+    expect(identity('HTTPS://Host.Example.com/Store/')).toBe('s3:https://host.example.com/Store/b');
+    expect(identity('https://host.example.com/store')).not.toBe(
+      identity('https://host.example.com/Store')
+    );
+  });
+
+  test('refs from two old providers for the same account collapse to one link', async () => {
+    const zip = await backupWithDrivePhoto();
+    const archive = new AdmZip(zip);
+    const metadata = JSON.parse(archive.getEntry('metadata.json')?.getData().toString() ?? '{}');
+    metadata.storageProviders['prov-older'] = 'google-drive:owner@drive.test';
+    archive.updateFile('metadata.json', Buffer.from(JSON.stringify(metadata), 'utf-8'));
+    const refsCsv = archive.getEntry('photo_refs.csv')?.getData().toString('utf-8') ?? '';
+    const [header, row] = refsCsv.trim().split('\n');
+    const second = row
+      .replace('"ref-drive"', '"ref-drive-2"')
+      .replace('"prov-before"', '"prov-older"');
+    archive.updateFile('photo_refs.csv', Buffer.from(`${header}\n${row}\n${second}\n`, 'utf-8'));
+    const newId = reinstallAsNewAccount();
+    insertDriveProvider('prov-after', newId, 'owner@drive.test');
+
+    const { restoreService } = await import('../restore');
+    const result = await restoreService.restoreFromBackup(newId, archive.toBuffer(), 'replace');
+    expect(result.success, JSON.stringify(result)).toBe(true);
+    expect(photoRefRows().map((r) => r.provider_id)).toEqual(['prov-after']);
+  });
+
+  test('photo links are not re-attached when two reconnected providers match the account', async () => {
+    const zip = await backupWithDrivePhoto();
+    const newId = reinstallAsNewAccount();
+    insertDriveProvider('prov-after-1', newId, 'owner@drive.test');
+    insertDriveProvider('prov-after-2', newId, 'owner@drive.test');
+
+    const { restoreService } = await import('../restore');
+    const result = await restoreService.restoreFromBackup(newId, zip, 'replace');
+    expect(result.success, JSON.stringify(result)).toBe(true);
+    expect(photoRefRows()).toEqual([]);
+  });
+
   test('photo links are not attached to a provider for a different storage account', async () => {
     const zip = await backupWithDrivePhoto();
     const newId = reinstallAsNewAccount();

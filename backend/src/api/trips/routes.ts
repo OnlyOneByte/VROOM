@@ -172,7 +172,16 @@ routes.put(
             odometer: existing.endOdometer,
             recordedAt: existing.tripDate,
           });
-          await deletePhotosForEntities('odometer_entry', removedEntryIds, user.id);
+          await deletePhotosForEntities('odometer_entry', removedEntryIds, user.id).catch(
+            (error) => {
+              logger.warn('Trip-edit photo cleanup for the replaced odometer entry failed', {
+                tripId: id,
+                vehicleId: existing.vehicleId,
+                odometerEntryIds: removedEntryIds,
+                error: error instanceof Error ? error.message : String(error),
+              });
+            }
+          );
         }
         await odometerRepository.createFromTrip({
           vehicleId: existing.vehicleId,
