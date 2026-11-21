@@ -40,7 +40,7 @@ function rowCountForGroup(groupId: string): number {
 }
 
 describe('deleting a split sibling via DELETE /:id', () => {
-  test('single-row delete leaves the rest of the split ORPHANED (current behavior)', async () => {
+  test('single-row delete of a split leg is rejected and keeps the whole split', async () => {
     const v1 = await seedVehicle('Honda');
     const v2 = await seedVehicle('Toyota');
     const group = await createEvenSplit([v1, v2], 30);
@@ -48,9 +48,9 @@ describe('deleting a split sibling via DELETE /:id', () => {
     expect(rowCountForGroup(group.groupId)).toBe(2);
 
     const del = await ctx.authed('DELETE', `/api/v1/expenses/${group.siblings[0].id}`);
-    expect(del.status).toBe(200);
+    expect(del.status).toBe(400);
 
-    expect(rowCountForGroup(group.groupId)).toBe(1);
+    expect(rowCountForGroup(group.groupId)).toBe(2);
   });
 
   test('the group-delete route /split/:id removes EVERY sibling (the intended behavior)', async () => {
