@@ -60,28 +60,45 @@ function expandIpv6(address: string): number[] {
   return [...headParts, ...fill, ...tailParts].map((h) => Number.parseInt(h, 16));
 }
 
-function embeddedIpv4(groups: number[]): string {
-  const hi = groups[6] ?? 0;
-  const lo = groups[7] ?? 0;
+function ipv4FromGroups(hi = 0, lo = 0): string {
   return [hi >> 8, hi & 0xff, lo >> 8, lo & 0xff].join('.');
 }
 
+function startsWith(g: number[], prefix: readonly number[]): boolean {
+  return prefix.every((value, i) => g[i] === value);
+}
+
+function embeddedIpv4(g: number[]): string | null {
+  const tail = ipv4FromGroups(g[6], g[7]);
+  if (startsWith(g, [0, 0, 0, 0, 0, 0xffff])) return tail;
+  if (startsWith(g, [0, 0, 0, 0, 0xffff, 0])) return tail;
+  if (startsWith(g, [0, 0, 0, 0, 0, 0])) return tail;
+  if (startsWith(g, [0x64, 0xff9b, 0, 0, 0, 0])) return tail;
+  if (g[0] === 0x2002) return ipv4FromGroups(g[1], g[2]);
+  return null;
+}
+
+const IPV6_PREFIXES: readonly {
+  mask: number;
+  value: number;
+  kind: Exclude<AddressClass, 'public'>;
+}[] = [
+  { mask: 0xffc0, value: 0xfe80, kind: 'forbidden' },
+  { mask: 0xff00, value: 0xff00, kind: 'forbidden' },
+  { mask: 0xffc0, value: 0xfec0, kind: 'private' },
+  { mask: 0xfe00, value: 0xfc00, kind: 'private' },
+];
+
 function classifyIpv6(address: string): AddressClass {
   const g = expandIpv6(address);
+  if (g.every((x) => x === 0)) return 'forbidden';
+  if (startsWith(g, [0, 0, 0, 0, 0, 0, 0, 1])) return 'private';
+  const v4 = embeddedIpv4(g);
+  if (v4) return classifyIpv4(v4);
+  if (startsWith(g, [0x64, 0xff9b, 1])) return 'forbidden';
+  if (startsWith(g, [0xfd00, 0x0ec2])) return 'forbidden';
   const first = g[0] ?? 0;
-  const prefixZero = (n: number) => g.slice(0, n).every((x) => x === 0);
-  if (prefixZero(8)) return 'forbidden';
-  if (prefixZero(7) && g[7] === 1) return 'private';
-  if (prefixZero(5) && g[5] === 0xffff) return classifyIpv4(embeddedIpv4(g));
-  if (prefixZero(6)) return classifyIpv4(embeddedIpv4(g));
-  if (first === 0x64 && g[1] === 0xff9b && g.slice(2, 6).every((x) => x === 0)) {
-    return classifyIpv4(embeddedIpv4(g));
-  }
-  if (first === 0xfd00 && g[1] === 0x0ec2) return 'forbidden';
-  if ((first & 0xffc0) === 0xfe80) return 'forbidden';
-  if ((first & 0xff00) === 0xff00) return 'forbidden';
-  if ((first & 0xfe00) === 0xfc00) return 'private';
-  return 'public';
+  return IPV6_PREFIXES.find((p) => (first & p.mask) === p.value)?.kind ?? 'public';
 }
 
 export function classifyAddress(address: string): AddressClass {

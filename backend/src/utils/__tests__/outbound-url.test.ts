@@ -35,6 +35,13 @@ describe('classifyAddress', () => {
     ['fd00:ec2::254', 'forbidden'],
     ['::ffff:169.254.169.254', 'forbidden'],
     ['64:ff9b::a9fe:a9fe', 'forbidden'],
+    ['64:ff9b::808:808', 'public'],
+    ['64:ff9b:1::a9fe:a9fe', 'forbidden'],
+    ['::ffff:0:a9fe:a9fe', 'forbidden'],
+    ['2002:a9fe:a9fe::1', 'forbidden'],
+    ['2002:0a00:0001::1', 'private'],
+    ['2002:0808:0808::1', 'public'],
+    ['fec0::1', 'private'],
     ['224.0.0.1', 'forbidden'],
     ['not-an-ip', 'forbidden'],
   ])('%s is %s', (address, expected) => {

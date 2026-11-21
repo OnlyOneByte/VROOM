@@ -50,7 +50,8 @@ Examples in [`docs/examples/`](examples/):
 `backend/src/config.ts` is the authoritative list.
 
 The example stacks pass through only the variables in their backend `environment:` block. An
-optional variable from the tables below (GitHub login, web push, `TRUSTED_PROXY_IPS`) takes effect
+optional variable from the tables below (GitHub login, web push, `TRUSTED_PROXY_IPS`,
+`ALLOW_PRIVATE_PROVIDER_ENDPOINTS`) takes effect
 only after you add it to that block as well as to `.env`.
 
 ### Required in production
@@ -95,6 +96,7 @@ These have defaults, but the defaults only suit localhost.
 | `DATA_PATH` | `./data` | Host directory bind-mounted at `/app/data` by `docker-compose.yml`. Must exist |
 | `LOG_LEVEL` | `info` | `error`, `warn`, `info`, `debug` |
 | `TRUSTED_PROXY_IPS` | empty | Comma-separated proxy IPs whose `X-Forwarded-For` is honored. Left unset behind a reverse proxy, every anonymous request shares one rate-limit bucket keyed on the proxy's IP |
+| `ALLOW_PRIVATE_PROVIDER_ENDPOINTS` | off | Set to `1` to let S3 endpoints and model base URLs use `http://` and LAN or loopback hosts, for a self-hosted MinIO or Ollama. Off, they must be public `https://` hosts. Cloud metadata and link-local addresses are refused either way. Every signed-in user can then make the server reach its own network, so leave it off on an instance other people can sign up to |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | — | Set both to add a GitHub login button. Callback defaults to `http://localhost:3001/api/v1/auth/callback/github`; override with `GITHUB_REDIRECT_URI` |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | — | Web push. All three or the feature stays off. Generate with `bun run vapid:gen` |
 | `GOOGLE_PROVIDER_REDIRECT_URI` | derived from `GOOGLE_REDIRECT_URI` | Storage-connect callback. Override only if it must differ from the derived `.../callback/provider/google` |

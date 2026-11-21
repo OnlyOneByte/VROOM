@@ -49,16 +49,12 @@ export class S3CompatProvider implements StorageProvider {
     });
   }
 
-  private async assertSafeEndpoint(): Promise<void> {
-    await assertSafeOutboundTarget(this.endpoint, 'S3 endpoint');
-  }
-
   async upload(params: UploadParams): Promise<StorageRef> {
     const key = params.rawPath
       ? this.buildRawKey(params.rawPath, params.fileName)
       : this.buildKey(params.pathHint, params.entityType, params.entityId, params.fileName);
 
-    await this.assertSafeEndpoint();
+    await assertSafeOutboundTarget(this.endpoint, 'S3 endpoint');
     await this.client.send(
       new PutObjectCommand({
         Bucket: this.bucket,
@@ -75,7 +71,7 @@ export class S3CompatProvider implements StorageProvider {
   }
 
   async download(ref: StorageRef): Promise<Buffer> {
-    await this.assertSafeEndpoint();
+    await assertSafeOutboundTarget(this.endpoint, 'S3 endpoint');
     const response = await this.client.send(
       new GetObjectCommand({
         Bucket: this.bucket,
@@ -91,7 +87,7 @@ export class S3CompatProvider implements StorageProvider {
   }
 
   async delete(ref: StorageRef): Promise<void> {
-    await this.assertSafeEndpoint();
+    await assertSafeOutboundTarget(this.endpoint, 'S3 endpoint');
     await this.client.send(
       new DeleteObjectCommand({
         Bucket: this.bucket,
@@ -122,7 +118,7 @@ export class S3CompatProvider implements StorageProvider {
 
   async healthCheck(): Promise<boolean> {
     try {
-      await this.assertSafeEndpoint();
+      await assertSafeOutboundTarget(this.endpoint, 'S3 endpoint');
       await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
       return true;
     } catch (error) {
@@ -140,7 +136,7 @@ export class S3CompatProvider implements StorageProvider {
     let continuationToken: string | undefined;
 
     do {
-      await this.assertSafeEndpoint();
+      await assertSafeOutboundTarget(this.endpoint, 'S3 endpoint');
       const response = await this.client.send(
         new ListObjectsV2Command({
           Bucket: this.bucket,

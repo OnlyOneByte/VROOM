@@ -3,10 +3,11 @@ import { CONFIG } from '../config';
 
 export function allowPrivateProviderEndpoints(): void {
   const config = CONFIG as { allowPrivateProviderEndpoints: boolean };
+  const previous = config.allowPrivateProviderEndpoints;
   beforeAll(() => {
     config.allowPrivateProviderEndpoints = true;
   });
   afterAll(() => {
-    config.allowPrivateProviderEndpoints = false;
+    config.allowPrivateProviderEndpoints = previous;
   });
 }

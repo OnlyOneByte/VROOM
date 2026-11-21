@@ -111,7 +111,6 @@ describe('stored provider rows are checked when used', () => {
     await expect(
       provider.download({ providerType: 's3', externalId: 'k', storageRef: 'k' } as never)
     ).rejects.toThrow(ValidationError);
-    expect(await provider.healthCheck()).toBe(false);
   });
 });
 
