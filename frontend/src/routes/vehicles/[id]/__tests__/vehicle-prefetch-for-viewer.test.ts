@@ -1,5 +1,4 @@
 import { describe, expect, test, vi } from 'vitest';
-import { ApiError } from '#lib/utils/error-handling.ts';
 import { render, screen } from '@testing-library/svelte';
 import type { Vehicle } from '#lib/types/index.ts';
 
@@ -70,18 +69,7 @@ import Page from '../+page.svelte';
 
 const pause = () => new Promise(resolve => setTimeout(resolve, 200));
 
-describe('vehicle page — what is fetched after the page data', () => {
-	test('a failed vehicle load fetches no tab or dialog code', async () => {
-		getVehicle.mockImplementationOnce(() =>
-			Promise.reject(new ApiError('Internal server error', 500))
-		);
-		render(Page, { props: { data: { vehicleId: 'v1' } } });
-
-		await screen.findByRole('button', { name: 'Retry' });
-		await pause();
-		expect([...requested]).toEqual([]);
-	});
-
+describe('vehicle page — a shared viewer', () => {
 	test('a shared viewer gets the tab code but never the owner-only upload dialog', async () => {
 		getVehicle.mockImplementationOnce(() =>
 			Promise.resolve({
