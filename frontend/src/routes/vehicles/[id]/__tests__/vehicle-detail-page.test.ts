@@ -524,6 +524,7 @@ describe('vehicle detail page tabs', () => {
 		getVehicle.mockResolvedValue(EDITOR_VEHICLE);
 		await mount();
 		await openExpensesTable();
+		expect(await screen.findByText('All Expenses (1)')).toBeInTheDocument();
 
 		expect(screen.queryByRole('button', { name: /export csv/i })).toBeNull();
 		expect(captured['table']?.['canWrite']).toBe(true);

@@ -5,7 +5,7 @@
 | Layer | Framework | Runner | Location |
 |---|---|---|---|
 | Backend unit/integration | `bun:test` | `bun run test` (`bun test`, then the trips and odometer tests again under `TZ=Pacific/Auckland`) | `backend/src/**/__tests__/` |
-| Frontend unit/component | Vitest + `@testing-library/svelte` | `npm run test` (`vitest --run`) | `frontend/src/**/__tests__/` |
+| Frontend unit/component | Vitest + `@testing-library/svelte` | `npm run test` (`vitest --run`, then the date-sensitive suites again under `TZ=Pacific/Auckland`) | `frontend/src/**/__tests__/` |
 | Frontend e2e | Playwright | `npm run test:e2e` | `frontend/e2e/` (config `frontend/playwright.config.ts`) |
 
 Backend runs on `bun test` — never Vitest. Frontend runs on Vitest — never bun.
