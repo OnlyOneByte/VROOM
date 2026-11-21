@@ -94,6 +94,11 @@ export class ExpenseFormState {
 	isFinancingPayment = $derived(this.sourceType === 'financing' && !!this.sourceId);
 	showVolumeField = $derived(this.showFuelFields && !isElectricFuelType(this.formData.fuelType));
 	showChargeField = $derived(this.showFuelFields && isElectricFuelType(this.formData.fuelType));
+	hasSplitVehicles = $derived(
+		(!this.isEditMode || this.isGroupEditMode) && this.vehicles.length >= 2
+	);
+	canSplit = $derived(this.hasSplitVehicles && !this.showFuelFields);
+	showFuelSplitHint = $derived(this.hasSplitVehicles && this.showFuelFields && !this.isSplit);
 
 	constructor(ctx: ExpenseFormContext, initialLoading: boolean) {
 		this.ctx = ctx;
@@ -162,6 +167,10 @@ export class ExpenseFormState {
 		if (categoryValue !== 'financial') {
 			this.sourceType = null;
 			this.sourceId = null;
+		}
+
+		if (categoryValue === 'fuel' && this.isSplit && !this.isGroupEditMode) {
+			this.handleSplitToggle(false);
 		}
 
 		if (categoryValue !== 'fuel') {

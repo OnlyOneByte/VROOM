@@ -216,14 +216,21 @@
 						onRemoveSplit={() => form.handleSplitToggle(false)}
 					/>
 				{:else}
-					<VehicleSelectField
-						vehicles={form.vehicles}
-						value={form.formData.vehicleId}
-						error={form.touched['vehicleId'] ? form.errors['vehicleId'] : undefined}
-						canSplit={(!form.isEditMode || form.isGroupEditMode) && form.vehicles.length >= 2}
-						onSelect={form.handleVehicleSelect}
-						onSplit={() => form.handleSplitToggle(true)}
-					/>
+					<div class="space-y-2">
+						<VehicleSelectField
+							vehicles={form.vehicles}
+							value={form.formData.vehicleId}
+							error={form.touched['vehicleId'] ? form.errors['vehicleId'] : undefined}
+							canSplit={form.canSplit}
+							onSelect={form.handleVehicleSelect}
+							onSplit={() => form.handleSplitToggle(true)}
+						/>
+						{#if form.showFuelSplitHint}
+							<p class="text-xs text-muted-foreground" data-testid="fuel-split-hint">
+								Fill-ups can't be split across vehicles. Log each one on the vehicle you filled.
+							</p>
+						{/if}
+					</div>
 				{/if}
 
 				<CategorySelector
