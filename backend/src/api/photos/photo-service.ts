@@ -109,7 +109,7 @@ export async function uploadPhotoForEntity(
   const ownerId = await validateEntityOwnership(entityType, entityId, userId);
 
   if (!ALLOWED_MIME_TYPES.includes(file.type)) {
-    throw new AppError('Only JPEG, PNG, WebP images and PDF files are allowed', 400);
+    throw new ValidationError('Only JPEG, PNG, WebP images and PDF files are allowed');
   }
   if (file.size > MAX_FILE_SIZE) {
     throw new AppError('Photo must be under 10MB', 413);
@@ -117,7 +117,7 @@ export async function uploadPhotoForEntity(
 
   const category = ENTITY_TO_CATEGORY[entityType];
   if (!category) {
-    throw new AppError(`No photo category mapping for entity type: ${entityType}`, 400);
+    throw new ValidationError(`No photo category mapping for entity type: ${entityType}`);
   }
 
   const { provider, providerId, folderPath } = await ownerDefaultProvider(
@@ -128,9 +128,8 @@ export async function uploadPhotoForEntity(
 
   // Google Photos stores images only; fail here rather than with a vendor error mid-upload.
   if (!capabilitiesOf(provider).arbitraryFiles && !isImageMimeType(file.type)) {
-    throw new AppError(
-      `${provider.type} stores images only — choose a Google Drive or S3 provider for PDF documents.`,
-      400
+    throw new ValidationError(
+      `${provider.type} stores images only — choose a Google Drive or S3 provider for PDF documents.`
     );
   }
 
