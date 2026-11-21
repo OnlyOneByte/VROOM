@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { toDateInputValue } from '#lib/utils/formatters.ts';
 import { buildReminderPayload } from '../reminder-form-payload';
 import { validDraft } from './reminder-form-fixtures';
@@ -153,5 +153,34 @@ describe('buildReminderPayload', () => {
 			validDraft({ selectedVehicleIds: ['v1', 'v2'], splitMethod: 'even' })
 		);
 		expect(payload.expenseSplitConfig).toBeNull();
+	});
+});
+
+describe('buildReminderPayload time zone', () => {
+	afterEach(() => vi.restoreAllMocks());
+
+	function browserReports(zone: unknown): void {
+		vi.spyOn(Intl, 'DateTimeFormat').mockImplementation(
+			() => ({ resolvedOptions: () => ({ timeZone: zone }) }) as unknown as Intl.DateTimeFormat
+		);
+	}
+
+	test('omits timeZone when the browser does not resolve one', () => {
+		for (const zone of [undefined, '']) {
+			browserReports(zone);
+			expect(buildReminderPayload(validDraft())).not.toHaveProperty('timeZone');
+		}
+	});
+
+	test('omits timeZone when Intl throws', () => {
+		vi.spyOn(Intl, 'DateTimeFormat').mockImplementation(() => {
+			throw new RangeError('no Intl data');
+		});
+		expect(buildReminderPayload(validDraft())).not.toHaveProperty('timeZone');
+	});
+
+	test('sends the zone the browser resolves', () => {
+		browserReports('Pacific/Auckland');
+		expect(buildReminderPayload(validDraft()).timeZone).toBe('Pacific/Auckland');
 	});
 });
