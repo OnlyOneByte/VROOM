@@ -50,7 +50,7 @@ vi.mock('#lib/services/provider-api.ts', () => ({
 const ClaimsSection = (await import('../ClaimsSection.svelte')).default;
 
 function claimDateTrigger(): HTMLElement {
-	const field = document.querySelector('label[for="claim-date"]')?.parentElement;
+	const field = document.querySelector('label[for="claim-date-p1"]')?.parentElement;
 	return field?.querySelector('button') as HTMLElement;
 }
 
@@ -91,7 +91,7 @@ describe('ClaimsSection zero payout', () => {
 		await settle();
 		await fireEvent.click(screen.getByRole('button', { name: /file claim/i }));
 		await pickClaimDate('2026-03-10');
-		await fireEvent.input(document.getElementById('claim-payout') as HTMLInputElement, {
+		await fireEvent.input(document.getElementById('claim-payout-p1') as HTMLInputElement, {
 			target: { value: '0' }
 		});
 		await fireEvent.submit(document.querySelector('form') as HTMLFormElement);
@@ -107,7 +107,7 @@ describe('ClaimsSection zero payout', () => {
 		mount({ vehicles: VEHICLES });
 		await settle();
 		await fireEvent.click(screen.getByRole('button', { name: 'Edit claim' }));
-		await fireEvent.input(document.getElementById('claim-payout') as HTMLInputElement, {
+		await fireEvent.input(document.getElementById('claim-payout-p1') as HTMLInputElement, {
 			target: { value: '0' }
 		});
 		await fireEvent.submit(document.querySelector('form') as HTMLFormElement);

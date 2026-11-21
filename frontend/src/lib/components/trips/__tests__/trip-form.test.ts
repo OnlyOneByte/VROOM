@@ -194,6 +194,19 @@ describe('TripForm validation', () => {
 		expect(update).not.toHaveBeenCalled();
 	});
 
+	test('the trip date picker is marked invalid and described by its error', async () => {
+		mount({ trip: trip({ tripDate: new Date(2026, 10, 25, 12).toISOString() }) });
+		await settle();
+
+		await submit();
+
+		const picker = field('trip-date');
+		expect(picker.getAttribute('aria-invalid')).toBe('true');
+		expect(picker).toHaveAccessibleDescription(
+			'November 25, 2026 Trip date cannot be in the future'
+		);
+	});
+
 	test('over-long locations and notes are rejected', async () => {
 		mount({ vehicles: [CAMRY] });
 		await settle();
