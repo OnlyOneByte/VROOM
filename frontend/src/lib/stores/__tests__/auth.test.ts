@@ -119,7 +119,7 @@ describe('Auth Store', () => {
 			mockFetch.mockResolvedValueOnce(
 				mockApiResponse({
 					user: mockUser,
-					session: { id: 'sess-1', expiresAt: '2026-04-07T00:00:00Z' }
+					session: { expiresAt: '2026-04-07T00:00:00Z' }
 				})
 			);
 

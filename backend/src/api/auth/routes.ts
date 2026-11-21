@@ -455,7 +455,6 @@ routes.get('/me', async (c) => {
     data: {
       user: serializeSessionUser(user),
       session: {
-        id: session.id,
         expiresAt: session.expiresAt,
       },
     },
@@ -525,7 +524,6 @@ routes.post('/refresh', async (c) => {
     data: {
       user: serializeSessionUser(result.user),
       session: {
-        id: result.session.id,
         expiresAt: result.session.expiresAt,
       },
     },
