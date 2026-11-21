@@ -3,6 +3,7 @@ import { toDateInputValue } from '#lib/utils/formatters.ts';
 import type { Reminder } from '#lib/types/reminder.ts';
 import {
 	hasMileageTrigger,
+	hasTimeTrigger,
 	shouldShowSplitEditor,
 	type ReminderDraft
 } from './reminder-form-model';
@@ -22,6 +23,7 @@ export function buildReminderPayload(draft: ReminderDraft): ReminderPayload {
 	const isExpense = draft.kind === 'expense';
 	const mileage = hasMileageTrigger(draft.triggerMode);
 	const timeZone = browserTimeZone();
+	const customInterval = hasTimeTrigger(draft.triggerMode) && draft.frequency === 'custom';
 	return {
 		name: draft.name.trim(),
 		description: draft.description.trim() || null,
@@ -32,8 +34,8 @@ export function buildReminderPayload(draft: ReminderDraft): ReminderPayload {
 			? { lastServiceOdometer: parseInt(draft.lastServiceOdometer, 10) }
 			: {}),
 		frequency: draft.frequency,
-		intervalValue: draft.frequency === 'custom' ? parseInt(draft.intervalValue, 10) : null,
-		intervalUnit: draft.frequency === 'custom' ? draft.intervalUnit : null,
+		intervalValue: customInterval ? parseInt(draft.intervalValue, 10) : null,
+		intervalUnit: customInterval ? draft.intervalUnit : null,
 		startDate: draft.startDate || toDateInputValue(new Date()),
 		endDate: draft.endDate || null,
 		...(timeZone ? { timeZone } : {}),
