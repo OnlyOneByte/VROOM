@@ -174,14 +174,18 @@ describe('trips page load states', () => {
 		expect(formProps['trip']).toBeNull();
 	});
 
-	test('Log Trip is disabled when the user has no vehicles', async () => {
+	test('with no vehicles the empty state asks for a vehicle first and links to Add Vehicle', async () => {
 		getVehicles.mockResolvedValue([]);
 		render(Page);
 		await settle();
 
-		for (const button of screen.getAllByRole('button', { name: 'Log Trip' })) {
-			expect(button).toBeDisabled();
-		}
+		expect(screen.getByText('Add a vehicle first')).toBeInTheDocument();
+		expect(screen.getByRole('link', { name: 'Add Vehicle' })).toHaveAttribute(
+			'href',
+			'/vehicles/new'
+		);
+		expect(screen.queryByRole('button', { name: 'Log Trip' })).toBeNull();
+		expect(screen.queryByText('No trips yet')).toBeNull();
 	});
 });
 
