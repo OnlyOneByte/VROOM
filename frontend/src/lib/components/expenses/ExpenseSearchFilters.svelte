@@ -36,7 +36,6 @@
 	}: Props = $props();
 
 	let selectedTags = $state<string[]>([]);
-	let tagMatchMode = $state<'any' | 'all'>('any');
 	let tagSearchTerm = $state('');
 	let tagSearchFocused = $state(false);
 	let tagInputEl = $state<HTMLInputElement | null>(null);
@@ -168,32 +167,7 @@
 			<div class="flex items-center justify-between">
 				<p class="text-sm font-medium text-muted-foreground">Tags</p>
 				{#if selectedTags.length > 1}
-					<div
-						class="flex items-center rounded-md border text-xs"
-						role="radiogroup"
-						aria-label="Tag match mode"
-					>
-						<button
-							role="radio"
-							aria-checked={tagMatchMode === 'any'}
-							class="px-2.5 py-1 rounded-l-md transition-colors {tagMatchMode === 'any'
-								? 'bg-primary text-primary-foreground'
-								: 'text-muted-foreground hover:bg-muted'}"
-							onclick={() => (tagMatchMode = 'any')}
-						>
-							Any
-						</button>
-						<button
-							role="radio"
-							aria-checked={tagMatchMode === 'all'}
-							class="px-2.5 py-1 rounded-r-md transition-colors {tagMatchMode === 'all'
-								? 'bg-primary text-primary-foreground'
-								: 'text-muted-foreground hover:bg-muted'}"
-							onclick={() => (tagMatchMode = 'all')}
-						>
-							All
-						</button>
-					</div>
+					<p class="text-xs text-muted-foreground">Matching all selected tags</p>
 				{/if}
 			</div>
 			<div class="relative">
