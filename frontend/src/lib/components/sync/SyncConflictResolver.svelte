@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { syncConflicts, syncManager, type SyncConflict } from '#lib/utils/sync/sync-manager.ts';
-	import { TriangleAlert, Check, X, Merge, LoaderCircle } from '@lucide/svelte';
+	import { TriangleAlert, Check, X, LoaderCircle } from '@lucide/svelte';
 	import {
 		Dialog,
 		DialogContent,
@@ -28,7 +28,7 @@
 		}
 	});
 
-	async function resolveConflict(resolution: 'keep_local' | 'keep_server' | 'merge') {
+	async function resolveConflict(resolution: 'keep_local' | 'keep_server') {
 		if (!currentConflict) return;
 
 		resolving = true;
@@ -89,17 +89,10 @@
 				<div class="space-y-6 pr-4">
 					<Alert>
 						<TriangleAlert class="h-4 w-4" />
-						<AlertTitle>
-							{currentConflict.conflictType === 'duplicate'
-								? 'Duplicate Expense'
-								: 'Modified Expense'}
-						</AlertTitle>
+						<AlertTitle>Changed on the server</AlertTitle>
 						<AlertDescription>
-							{#if currentConflict.conflictType === 'duplicate'}
-								An expense with similar details already exists on the server.
-							{:else}
-								The expense has been modified both locally and on the server.
-							{/if}
+							This expense reached the server and was then edited there. Choose which version of it
+							to keep. Your other expenses are not affected.
 						</AlertDescription>
 					</Alert>
 
@@ -154,56 +147,53 @@
 							</div>
 						</div>
 
-						{#if currentConflict.serverExpense}
-							<div class="border border-chart-2/30 rounded-lg p-4">
-								<div class="flex items-center gap-2 mb-3">
-									<div class="w-3 h-3 bg-chart-2 rounded-full"></div>
-									<h4 class="font-medium">Server Version</h4>
-								</div>
-
-								<div class="space-y-2 text-sm">
-									<div class="flex justify-between">
-										<span class="text-muted-foreground">Category:</span>
-										<span class="font-medium">
-											{getCategoryLabel(currentConflict.serverExpense.category ?? '')}
-										</span>
-									</div>
-									<div class="flex justify-between">
-										<span class="text-muted-foreground">Tags:</span>
-										<span class="font-medium">{currentConflict.serverExpense.tags.join(', ')}</span>
-									</div>
-									<div class="flex justify-between">
-										<span class="text-muted-foreground">Amount:</span>
-										<span class="font-medium"
-											>{formatAmount(currentConflict.serverExpense.amount)}</span
-										>
-									</div>
-									<div class="flex justify-between">
-										<span class="text-muted-foreground">Date:</span>
-										<span class="font-medium">{formatDate(currentConflict.serverExpense.date)}</span
-										>
-									</div>
-									{#if currentConflict.serverExpense.description}
-										<div>
-											<span class="text-muted-foreground">Description:</span>
-											<p class="font-medium mt-1">{currentConflict.serverExpense.description}</p>
-										</div>
-									{/if}
-									{#if currentConflict.serverExpense.volume}
-										<div class="flex justify-between">
-											<span class="text-muted-foreground">Volume:</span>
-											<span class="font-medium">{currentConflict.serverExpense.volume}</span>
-										</div>
-									{/if}
-									{#if currentConflict.serverExpense.charge}
-										<div class="flex justify-between">
-											<span class="text-muted-foreground">Charge:</span>
-											<span class="font-medium">{currentConflict.serverExpense.charge}</span>
-										</div>
-									{/if}
-								</div>
+						<div class="border border-chart-2/30 rounded-lg p-4">
+							<div class="flex items-center gap-2 mb-3">
+								<div class="w-3 h-3 bg-chart-2 rounded-full"></div>
+								<h4 class="font-medium">Server Version</h4>
 							</div>
-						{/if}
+
+							<div class="space-y-2 text-sm">
+								<div class="flex justify-between">
+									<span class="text-muted-foreground">Category:</span>
+									<span class="font-medium">
+										{getCategoryLabel(currentConflict.serverExpense.category ?? '')}
+									</span>
+								</div>
+								<div class="flex justify-between">
+									<span class="text-muted-foreground">Tags:</span>
+									<span class="font-medium">{currentConflict.serverExpense.tags.join(', ')}</span>
+								</div>
+								<div class="flex justify-between">
+									<span class="text-muted-foreground">Amount:</span>
+									<span class="font-medium"
+										>{formatAmount(currentConflict.serverExpense.amount)}</span
+									>
+								</div>
+								<div class="flex justify-between">
+									<span class="text-muted-foreground">Date:</span>
+									<span class="font-medium">{formatDate(currentConflict.serverExpense.date)}</span>
+								</div>
+								{#if currentConflict.serverExpense.description}
+									<div>
+										<span class="text-muted-foreground">Description:</span>
+										<p class="font-medium mt-1">{currentConflict.serverExpense.description}</p>
+									</div>
+								{/if}
+								{#if currentConflict.serverExpense.volume}
+									<div class="flex justify-between">
+										<span class="text-muted-foreground">Volume:</span>
+										<span class="font-medium">{currentConflict.serverExpense.volume}</span>
+									</div>
+								{/if}
+								{#if currentConflict.serverExpense.charge}
+									<div class="flex justify-between">
+										<span class="text-muted-foreground">Charge:</span>
+										<span class="font-medium">{currentConflict.serverExpense.charge}</span>
+									</div>
+								{/if}
+							</div>
+						</div>
 					</div>
 				</div>
 			</ScrollArea>
@@ -214,26 +204,14 @@
 					Keep My Version
 				</Button>
 
-				{#if currentConflict.serverExpense}
-					<Button
-						variant="secondary"
-						onclick={() => resolveConflict('keep_server')}
-						disabled={resolving}
-						class="flex-1"
-					>
-						<Check class="h-4 w-4 mr-2" />
-						Keep Server Version
-					</Button>
-				{/if}
-
 				<Button
-					variant="outline"
-					onclick={() => resolveConflict('merge')}
+					variant="secondary"
+					onclick={() => resolveConflict('keep_server')}
 					disabled={resolving}
 					class="flex-1"
 				>
-					<Merge class="h-4 w-4 mr-2" />
-					Merge Both
+					<Check class="h-4 w-4 mr-2" />
+					Keep Server Version
 				</Button>
 
 				<Button variant="ghost" onclick={closeModal} disabled={resolving}>
