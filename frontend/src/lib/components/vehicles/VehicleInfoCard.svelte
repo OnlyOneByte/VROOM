@@ -67,7 +67,10 @@
 					<p class="text-sm font-medium text-muted-foreground">Initial Mileage</p>
 					<p class="text-base font-semibold">
 						{vehicle.initialMileage.toLocaleString()}
-						{getDistanceUnitLabel(settingsStore.unitPreferences.distanceUnit, true)}
+						{getDistanceUnitLabel(
+							(vehicle.unitPreferences ?? settingsStore.unitPreferences).distanceUnit,
+							true
+						)}
 					</p>
 				</div>
 			{/if}
