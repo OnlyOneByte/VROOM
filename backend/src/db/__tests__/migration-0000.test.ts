@@ -97,8 +97,8 @@ describe('Migration 0000: baseline schema', () => {
     db.close();
   });
 
-  test('the baseline is the only migration', () => {
-    expect(migrations.map((m) => m.tag)).toEqual(['0000_baseline']);
+  test('the baseline is the first migration', () => {
+    expect(migrations[0].tag).toBe('0000_baseline');
   });
 
   test('creates exactly the expected tables', () => {

@@ -55,6 +55,7 @@ const schemaShapes = new Map(
 // Frozen: the migrator replays entries whose `when` exceeds the newest recorded one, so shipped rows must not change.
 const SHIPPED_JOURNAL: readonly { idx: number; tag: string; when: number }[] = [
   { idx: 0, tag: '0000_baseline', when: 1794413530056 },
+  { idx: 1, tag: '0001_share_invited_email', when: 1795261762927 },
 ];
 
 describe('Migrations: General', () => {

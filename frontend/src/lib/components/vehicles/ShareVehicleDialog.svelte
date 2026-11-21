@@ -39,9 +39,9 @@
 	const personLabel = (share: GrantedShare) =>
 		personName(share) ?? `the invitation sent ${formatDate(share.createdAt)}`;
 	const revokeDescription = (share: GrantedShare) =>
-		personName(share)
+		share.status === 'accepted' && personName(share)
 			? `${personName(share)} will no longer see “${vehicleName}” or its expenses. You can invite them again later.`
-			: `The invitation sent ${formatDate(share.createdAt)} will be cancelled, so it can't be accepted. You can invite them again later.`;
+			: `The invitation ${personName(share) ? `to ${personName(share)}` : `sent ${formatDate(share.createdAt)}`} will be cancelled, so it can't be accepted. You can invite them again later.`;
 
 	let lastKey = $state('');
 	$effect(() => {
@@ -183,7 +183,8 @@
 									{personName(share) ?? 'Invited'}
 								</p>
 								<p class="truncate text-xs text-muted-foreground">
-									<span class="capitalize">{share.status}</span>{share.sharedWithEmail
+									<span class="capitalize">{share.status}</span>{share.status === 'accepted' &&
+									share.sharedWithEmail
 										? ` · ${share.sharedWithEmail}`
 										: ` · sent ${formatDate(share.createdAt)}`}
 								</p>

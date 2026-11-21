@@ -16,6 +16,7 @@ interface ShareRowDb {
   shared_with_id: string;
   level: string;
   status: string;
+  invited_email: string | null;
 }
 
 function shareRows(): ShareRowDb[] {
@@ -32,12 +33,13 @@ function seedShare(
   vehicleId: string,
   sharedWithId: string,
   status: string,
-  level = 'viewer'
+  level = 'viewer',
+  invitedEmail: string | null = null
 ): void {
   ctx.sqlite.run(
-    `INSERT INTO vehicle_shares (id, vehicle_id, owner_id, shared_with_id, level, status, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, 0, 0)`,
-    [id, vehicleId, ctx.user.id, sharedWithId, level, status]
+    `INSERT INTO vehicle_shares (id, vehicle_id, owner_id, shared_with_id, level, status, invited_email, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0)`,
+    [id, vehicleId, ctx.user.id, sharedWithId, level, status, invitedEmail]
   );
 }
 
@@ -45,7 +47,7 @@ describe('backup → restore round-trip preserves vehicle_shares', () => {
   test('an ACCEPTED grant survives export + restore with its fields intact', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const invitee = seedUser('invitee-rt', 'invitee-rt@test.com');
-    seedShare('share-1', vehicleId, invitee, 'accepted', 'editor');
+    seedShare('share-1', vehicleId, invitee, 'accepted', 'editor', 'Invitee-RT@test.com');
     expect(shareRows()).toHaveLength(1);
 
     const { backupService } = await import('../backup');
@@ -65,6 +67,7 @@ describe('backup → restore round-trip preserves vehicle_shares', () => {
     expect(rows[0].shared_with_id).toBe(invitee);
     expect(rows[0].level).toBe('editor');
     expect(rows[0].status).toBe('accepted');
+    expect(rows[0].invited_email).toBe('Invitee-RT@test.com');
   });
 
   test('only accepted grants are exported; pending, declined and revoked grants are not re-created', async () => {
