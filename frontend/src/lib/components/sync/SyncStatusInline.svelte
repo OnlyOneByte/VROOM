@@ -16,6 +16,7 @@
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { formatCompactRelativeTime } from '#lib/utils/formatters.ts';
 	import { getSyncStatusInfo } from '#lib/utils/sync/sync-status.ts';
+	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import { countParked, countPendingSync } from '#lib/utils/sync/pending-expenses.ts';
 	import { routes } from '#lib/routes.ts';
 	import { resolve } from '$app/paths';
@@ -37,7 +38,8 @@
 			isOnline: onlineStatus.current,
 			syncStatus: syncState.current,
 			pendingCount,
-			conflictsCount: syncConflicts.current.length
+			conflictsCount: syncConflicts.current.length,
+			serverReachable: !authStore.sessionUnverified
 		})
 	);
 
