@@ -7,7 +7,7 @@
 	interface Props {
 		title: string;
 		onBack: () => void;
-		subtitle: Snippet;
+		subtitle?: Snippet;
 	}
 
 	let { title, onBack, subtitle }: Props = $props();
