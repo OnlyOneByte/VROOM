@@ -25,32 +25,34 @@
 		<Badge variant="secondary" class="text-xs">
 			{isCurrent ? 'Current Term' : 'Past Term'}
 		</Badge>
-		<div class="flex items-center gap-0.5">
+		<div class="flex items-center gap-2">
 			{#if onEdit}
 				<Button
 					variant="ghost"
 					size="icon"
-					class="h-7 w-7"
+					class="size-10 sm:size-9"
 					onclick={() => onEdit(term)}
 					title="Edit term"
+					aria-label="Edit term"
 				>
-					<Pencil class="h-3 w-3" />
+					<Pencil />
 				</Button>
 			{/if}
 			{#if onDelete}
 				<Button
 					variant="ghost"
 					size="icon"
-					class="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+					class="size-10 sm:size-9 text-destructive hover:text-destructive hover:bg-destructive/10"
 					onclick={() => (confirmOpen = true)}
 					title="Delete term"
+					aria-label="Delete term"
 				>
-					<Trash2 class="h-3 w-3" />
+					<Trash2 />
 				</Button>
 			{/if}
 			{#if isCurrent && onRenew}
-				<Button variant="outline" size="sm" class="h-7 text-xs ml-1" onclick={onRenew}>
-					<RefreshCw class="mr-1 h-3 w-3" />
+				<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={onRenew}>
+					<RefreshCw />
 					Renew
 				</Button>
 			{/if}
