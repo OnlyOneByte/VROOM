@@ -82,7 +82,7 @@
 				<CircleAlert class="h-5 w-5 shrink-0" />
 				<span>{error}</span>
 			</div>
-			<Button variant="outline" size="sm" class="mt-3" onclick={loadData}>Try Again</Button>
+			<Button variant="outline" size="sm" class="mt-3" onclick={loadData}>Retry</Button>
 		</div>
 	</div>
 {:else}
