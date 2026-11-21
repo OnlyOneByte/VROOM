@@ -13,6 +13,7 @@ describe('app.css leaves the screen-reader utilities to Tailwind', () => {
 		'does not redefine .%s, which would outrank its responsive variants',
 		utility => {
 			expect(APP_CSS).not.toMatch(new RegExp(`(^|[\\s,}])\\.${utility}\\s*[{,]`, 'm'));
+			expect(APP_CSS).not.toMatch(new RegExp(`@utility\\s+${utility}\\s*\\{`));
 		}
 	);
 });
