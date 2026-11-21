@@ -159,13 +159,13 @@
 <Card>
 	<CardHeader class="pb-3">
 		<!-- min-w-0 is required: grid items default to min-width auto and overflow. -->
-		<div class="flex items-center justify-between gap-2 min-w-0">
+		<div class="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
 			<div class="flex items-center gap-3 min-w-0">
-				<div class="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
+				<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
 					<Icon class="h-5 w-5 text-muted-foreground" />
 				</div>
 				<div class="min-w-0">
-					<div class="flex items-center gap-2 min-w-0">
+					<div class="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0 sm:flex-nowrap">
 						<p class="text-sm font-semibold truncate min-w-0">{provider.displayName}</p>
 						<Badge variant={getStatusVariant(provider.status)} class="text-xs shrink-0">
 							{getStatusLabel(provider.status)}
@@ -179,11 +179,11 @@
 					</p>
 				</div>
 			</div>
-			<div class="flex items-center gap-1 shrink-0">
+			<div class="flex shrink-0 items-center gap-2 self-end sm:gap-1 sm:self-auto">
 				<Button
 					variant="ghost"
 					size="icon"
-					class="h-8 w-8"
+					class="size-10 sm:size-8"
 					aria-label="Edit {provider.displayName}"
 					onclick={() => onEdit(provider)}
 				>
@@ -192,7 +192,7 @@
 				<Button
 					variant="ghost"
 					size="icon"
-					class="h-8 w-8"
+					class="size-10 sm:size-8"
 					aria-label="Delete {provider.displayName}"
 					onclick={() => onDelete(provider)}
 				>
@@ -201,7 +201,7 @@
 				<Button
 					variant="ghost"
 					size="icon"
-					class="h-8 w-8"
+					class="size-10 sm:size-8"
 					aria-label={expanded ? 'Collapse provider details' : 'Expand provider details'}
 					aria-expanded={expanded}
 					onclick={() => (expanded = !expanded)}
@@ -293,7 +293,13 @@
 							>{(provider.config?.['photoRootPath'] as string) ?? 'Photos'}</span
 						>
 					</p>
-					<Button variant="outline" size="sm" onclick={handleBackfill} disabled={isBackfilling}>
+					<Button
+						variant="outline"
+						size="sm"
+						class="h-10 sm:h-8"
+						onclick={handleBackfill}
+						disabled={isBackfilling}
+					>
 						{#if isBackfilling}
 							<LoaderCircle class="h-3 w-3 animate-spin mr-1" />
 							Syncing...
