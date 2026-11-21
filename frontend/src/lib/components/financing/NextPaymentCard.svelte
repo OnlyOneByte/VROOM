@@ -208,7 +208,7 @@
 						</p>
 					</div>
 					<div>
-						<p class="text-xs text-muted-foreground">Paid</p>
+						<p class="text-xs text-muted-foreground">Principal paid</p>
 						<!-- text-foreground: chart-2 text fails WCAG AA on white. -->
 						<p class="text-sm sm:text-base font-semibold text-foreground">
 							{formatCurrency(amountPaid)}

@@ -5,7 +5,14 @@ import fc from 'fast-check';
 import { applyMigration, loadMigrations } from '../../../db/__tests__/migration-helpers';
 import type { AppDatabase } from '../../../db/connection';
 import * as schema from '../../../db/schema';
-import { FinancingRepository, isEligibleForPayoff, PAYOFF_BALANCE_THRESHOLD } from '../repository';
+import {
+  amortizedBalance,
+  type DatedPayment,
+  elapsedMonths,
+  FinancingRepository,
+  isEligibleForPayoff,
+  PAYOFF_BALANCE_THRESHOLD,
+} from '../repository';
 
 let sqliteDb: Database;
 let db: AppDatabase;
@@ -87,7 +94,7 @@ function clearFinancing(financingId: string): void {
 const sumCents = (amounts: number[]): number => amounts.reduce((sum, a) => sum + a, 0);
 
 describe('financing balance computation', () => {
-  test('balance = max(0, originalAmount - sum of financing payments), in exact cents', async () => {
+  test('a loan with no APR: balance = max(0, originalAmount - sum of payments), in exact cents', async () => {
     await fc.assert(
       fc.asyncProperty(
         originalAmountCentsArb,
@@ -268,5 +275,141 @@ describe('computeBalances (batch) equivalence', () => {
   test('non-existent financing id is omitted from the map', async () => {
     const batch = await repo.computeBalances(['non-existent-id']);
     expect(batch.has('non-existent-id')).toBe(false);
+  });
+});
+
+const LOAN_START = new Date('2024-01-15T12:00:00Z');
+
+function monthlyPayments(count: number, amount: number): DatedPayment[] {
+  return Array.from({ length: count }, (_, i) => ({
+    date: new Date(Date.UTC(2024, i + 1, 15, 12)),
+    amount,
+  }));
+}
+
+function closedFormBalance(principal: number, annualRate: number, payment: number, k: number) {
+  const r = annualRate / 100 / 12;
+  const growth = (1 + r) ** k;
+  return principal * growth - (payment * (growth - 1)) / r;
+}
+
+const loan = (originalAmount: number, apr: number | null) => ({
+  originalAmount,
+  apr,
+  startDate: LOAN_START,
+  financingType: 'loan',
+});
+
+describe('amortized loan balance', () => {
+  test('matches the $30,000 / 6% / 60-month amortization table', () => {
+    const terms = loan(3_000_000, 6);
+    expect(amortizedBalance(terms, monthlyPayments(30, 57_998))).toBe(1_612_025);
+    expect(amortizedBalance(terms, monthlyPayments(52, 57_998))).toBe(453_743);
+    expect(amortizedBalance(terms, monthlyPayments(60, 57_998))).toBe(29);
+  });
+
+  test('tracks the closed-form amortization balance to within a few cents', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 500_000, max: 10_000_000 }),
+        fc.integer({ min: 1, max: 2_500 }).map((bp) => bp / 100),
+        fc.integer({ min: 12, max: 84 }),
+        fc.integer({ min: 0, max: 50_000 }),
+        (principal, apr, term, extra) => {
+          const r = apr / 100 / 12;
+          const payment = Math.round((principal * r) / (1 - (1 + r) ** -term)) + extra;
+          for (const k of [1, 6, 12]) {
+            const expected = closedFormBalance(principal, apr, payment, k);
+            if (expected <= 0) continue;
+            const actual = amortizedBalance(loan(principal, apr), monthlyPayments(k, payment));
+            expect(Math.abs(actual - expected)).toBeLessThanOrEqual(k);
+          }
+        }
+      ),
+      { numRuns: 200 }
+    );
+  });
+
+  test('a recurring extra payment follows the accelerated amortization table', () => {
+    const terms = loan(3_000_000, 6);
+    const balance = amortizedBalance(terms, monthlyPayments(24, 67_998));
+    expect(Math.abs(balance - closedFormBalance(3_000_000, 6, 67_998, 24))).toBeLessThanOrEqual(24);
+    expect(balance).toBeLessThan(amortizedBalance(terms, monthlyPayments(24, 57_998)) - 240_000);
+  });
+
+  test('a lump-sum extra payment logged on a payment date is all principal', () => {
+    const terms = loan(3_000_000, 6);
+    const regular = monthlyPayments(12, 57_998);
+    const withLump = [...regular, { date: regular[11].date, amount: 100_000 }];
+    expect(amortizedBalance(terms, withLump)).toBe(amortizedBalance(terms, regular) - 100_000);
+  });
+
+  test('a missed month accrues two months of interest on the next payment', () => {
+    const terms = loan(1_200_000, 12);
+    const balance = amortizedBalance(terms, [
+      { date: new Date('2024-03-15T12:00:00Z'), amount: 50_000 },
+    ]);
+    expect(balance).toBe(1_200_000 + 2 * 12_000 - 50_000);
+  });
+
+  test('a payment smaller than the interest grows the balance', () => {
+    const terms = loan(1_000_000, 12);
+    expect(amortizedBalance(terms, monthlyPayments(1, 5_000))).toBe(1_005_000);
+  });
+
+  test('zero-interest loans and leases amortize as original minus payments', () => {
+    const payments = monthlyPayments(10, 100_000);
+    expect(amortizedBalance(loan(1_200_000, 0), payments)).toBe(200_000);
+    expect(amortizedBalance(loan(1_200_000, null), payments)).toBe(200_000);
+    expect(amortizedBalance({ ...loan(1_200_000, 6), financingType: 'lease' }, payments)).toBe(
+      200_000
+    );
+  });
+
+  test('payment order is by date, not insertion order', () => {
+    const terms = loan(3_000_000, 6);
+    const payments = monthlyPayments(12, 57_998);
+    expect(amortizedBalance(terms, [...payments].reverse())).toBe(
+      amortizedBalance(terms, payments)
+    );
+  });
+
+  test('computeBalance amortizes stored payments by date', async () => {
+    const id = 'fin-amortized';
+    sqliteDb.run(
+      `INSERT INTO vehicle_financing (id, vehicle_id, financing_type, provider, original_amount, apr, term_months, start_date, payment_amount, is_active)
+       VALUES (?, ?, 'loan', 'TestBank', 3000000, 6, 60, ?, 57998, 1)`,
+      [id, VEHICLE_ID, Math.floor(LOAN_START.getTime() / 1000)]
+    );
+    for (const payment of monthlyPayments(30, 57_998)) {
+      sqliteDb.run(
+        `INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount, source_type, source_id)
+         VALUES (?, ?, ?, 'financial', ?, ?, 'financing', ?)`,
+        [
+          `exp-am-${++expenseCounter}`,
+          VEHICLE_ID,
+          USER_ID,
+          Math.floor(payment.date.getTime() / 1000),
+          payment.amount,
+          id,
+        ]
+      );
+    }
+    expect(await repo.computeBalance(id)).toBe(1_612_025);
+  });
+});
+
+describe('elapsedMonths', () => {
+  test('counts whole calendar months and day-fractions, clamping month ends', () => {
+    expect(elapsedMonths(new Date('2024-01-15'), new Date('2024-03-15'))).toBe(2);
+    expect(elapsedMonths(new Date('2024-01-31'), new Date('2024-02-29'))).toBe(1);
+    expect(elapsedMonths(new Date('2024-01-15'), new Date('2024-01-30'))).toBeCloseTo(15 / 31);
+    expect(elapsedMonths(new Date('2024-01-15'), new Date('2023-12-01'))).toBe(0);
+  });
+
+  test('ignores the time of day so local-noon dates land on whole months', () => {
+    expect(elapsedMonths(new Date('2024-03-01T17:00:00Z'), new Date('2024-04-01T16:00:00Z'))).toBe(
+      1
+    );
   });
 });

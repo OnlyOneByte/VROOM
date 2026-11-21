@@ -5,7 +5,8 @@ import {
 	calculateAmortizationSchedule,
 	calculateMinimumPayment,
 	calculatePayoffDate,
-	derivePaymentEntries
+	derivePaymentEntries,
+	elapsedMonths
 } from '#lib/utils/financing-calculations.ts';
 
 let expenseCounter = 0;
@@ -93,7 +94,7 @@ describe('Payment Number Monotonicity and Remaining Balance', () => {
 		);
 	});
 
-	test('remainingBalance is non-increasing across sequential entries', () => {
+	test('remainingBalance is non-increasing across sequential entries of a zero-interest loan', () => {
 		fc.assert(
 			fc.property(
 				arbOriginalAmount,
@@ -101,7 +102,7 @@ describe('Payment Number Monotonicity and Remaining Balance', () => {
 				arbAmounts,
 				(originalAmount, paymentAmount, amounts) => {
 					const expenses = amounts.map((a, i) => makeExpense(a, i + 1));
-					const financing = makeFinancing({ originalAmount, paymentAmount });
+					const financing = makeFinancing({ originalAmount, paymentAmount, apr: 0 });
 
 					const entries = derivePaymentEntries(expenses, financing);
 
@@ -118,7 +119,7 @@ describe('Payment Number Monotonicity and Remaining Balance', () => {
 		);
 	});
 
-	test('remainingBalance equals max(0, originalAmount - cumulativeSum)', () => {
+	test('zero-interest loan: remainingBalance equals max(0, originalAmount - cumulativeSum)', () => {
 		fc.assert(
 			fc.property(
 				arbOriginalAmount,
@@ -126,7 +127,7 @@ describe('Payment Number Monotonicity and Remaining Balance', () => {
 				arbAmounts,
 				(originalAmount, paymentAmount, amounts) => {
 					const expenses = amounts.map((a, i) => makeExpense(a, i + 1));
-					const financing = makeFinancing({ originalAmount, paymentAmount });
+					const financing = makeFinancing({ originalAmount, paymentAmount, apr: 0 });
 
 					const entries = derivePaymentEntries(expenses, financing);
 
@@ -282,20 +283,18 @@ describe('Principal and Interest Derivation', () => {
 		);
 	});
 
-	test('loan with APR > 0: principalAmount and interestAmount match amortization schedule values', () => {
+	test('loan with APR > 0: on-schedule payments reconcile with the amortization schedule', () => {
 		fc.assert(
 			fc.property(
 				arbOriginalAmount,
-				arbPaymentAmount,
 				arbApr,
 				arbTermMonths,
-				arbAmounts,
-				(originalAmount, paymentAmount, apr, termMonths, amounts) => {
-					const monthlyRate = apr / 100 / 12;
-					const firstMonthInterest = originalAmount * monthlyRate;
-					if (paymentAmount <= firstMonthInterest) return;
-
-					const expenses = amounts.map((a, i) => makeExpense(a, i + 1));
+				fc.integer({ min: 1, max: 24 }),
+				(originalAmount, apr, termMonths, count) => {
+					const paymentAmount = calculateMinimumPayment(
+						makeFinancing({ originalAmount, apr, termMonths })
+					);
+					if (paymentAmount === null) return;
 					const financing = makeFinancing({
 						originalAmount,
 						paymentAmount,
@@ -303,20 +302,25 @@ describe('Principal and Interest Derivation', () => {
 						apr,
 						termMonths
 					});
+					const expenses = scheduledPayments(Math.min(count, termMonths - 1), paymentAmount);
 
 					const entries = derivePaymentEntries(expenses, financing);
-
 					const schedule = calculateAmortizationSchedule(financing, expenses.length);
 
-					for (let i = 0; i < entries.length; i++) {
-						const entry = entries[i];
+					entries.forEach((entry, i) => {
 						const scheduleEntry = schedule[i];
-
-						if (entry && scheduleEntry) {
-							expect(entry.principalAmount).toBe(scheduleEntry.principalAmount);
-							expect(entry.interestAmount).toBe(scheduleEntry.interestAmount);
-						}
-					}
+						if (!scheduleEntry) return;
+						const tolerance = 0.01 * (i + 1);
+						expect(
+							Math.abs(entry.interestAmount - scheduleEntry.interestAmount)
+						).toBeLessThanOrEqual(tolerance);
+						expect(
+							Math.abs(entry.principalAmount - scheduleEntry.principalAmount)
+						).toBeLessThanOrEqual(tolerance);
+						expect(
+							Math.abs(entry.remainingBalance - scheduleEntry.remainingBalance)
+						).toBeLessThanOrEqual(tolerance);
+					});
 				}
 			),
 			{ numRuns: 100 }
@@ -345,6 +349,77 @@ describe('Principal and Interest Derivation', () => {
 			expect(entry.principalAmount).toBe(entry.expense.amount);
 			expect(entry.remainingBalance).toBe(0);
 		}
+	});
+});
+
+function scheduledPayments(count: number, amount: number): Expense[] {
+	return Array.from({ length: count }, (_, i) => ({
+		...makeExpense(amount, 1),
+		date: new Date(Date.UTC(2024, i + 1, 1, 12)).toISOString()
+	}));
+}
+
+describe('amortized remaining balance', () => {
+	const loan = makeFinancing({
+		originalAmount: 30_000,
+		apr: 6,
+		termMonths: 60,
+		paymentAmount: 579.98,
+		startDate: '2024-01-01'
+	});
+
+	test('matches the $30,000 / 6% / 60-month amortization table', () => {
+		const at = (n: number) => derivePaymentEntries(scheduledPayments(n, 579.98), loan).at(-1);
+		expect(at(1)).toMatchObject({ interestAmount: 150, principalAmount: 429.98 });
+		expect(at(1)?.remainingBalance).toBe(29_570.02);
+		expect(at(30)?.remainingBalance).toBe(16_120.25);
+		expect(at(52)?.remainingBalance).toBe(4_537.43);
+	});
+
+	test('principal plus interest equals each payment', () => {
+		for (const entry of derivePaymentEntries(scheduledPayments(36, 650), loan)) {
+			expect(entry.principalAmount + entry.interestAmount).toBeCloseTo(entry.expense.amount, 2);
+		}
+	});
+
+	test('a lump-sum extra payment on a payment date is all principal', () => {
+		const regular = scheduledPayments(12, 579.98);
+		const lump = { ...makeExpense(1_000, 1), date: regular[11]!.date };
+		const entries = derivePaymentEntries([...regular, lump], loan);
+		const last = entries.at(-1)!;
+		expect(last.interestAmount).toBe(0);
+		expect(last.principalAmount).toBe(1_000);
+		expect(last.remainingBalance).toBeCloseTo(entries.at(-2)!.remainingBalance - 1_000, 2);
+	});
+
+	test('a recurring extra payment pays the loan down faster than the table', () => {
+		const regular = derivePaymentEntries(scheduledPayments(24, 579.98), loan).at(-1)!;
+		const extra = derivePaymentEntries(scheduledPayments(24, 679.98), loan).at(-1)!;
+		expect(regular.remainingBalance - extra.remainingBalance).toBeGreaterThan(2_400);
+		expect(extra.paymentType).toBe('extra');
+	});
+
+	test('zero-interest loan: balance is original minus payments', () => {
+		const zero = makeFinancing({ originalAmount: 12_000, apr: 0, paymentAmount: 1_000 });
+		const entries = derivePaymentEntries(scheduledPayments(10, 1_000), zero);
+		expect(entries.at(-1)?.remainingBalance).toBe(2_000);
+		expect(entries.every(e => e.interestAmount === 0)).toBe(true);
+	});
+
+	test('a payment smaller than the interest grows the balance and is all interest', () => {
+		const entry = derivePaymentEntries(scheduledPayments(1, 100), loan)[0]!;
+		expect(entry.interestAmount).toBe(100);
+		expect(entry.principalAmount).toBe(0);
+		expect(entry.remainingBalance).toBe(30_050);
+	});
+});
+
+describe('elapsedMonths', () => {
+	test('counts whole calendar months and day-fractions, clamping month ends', () => {
+		expect(elapsedMonths(new Date('2024-01-15'), new Date('2024-03-15'))).toBe(2);
+		expect(elapsedMonths(new Date('2024-01-31'), new Date('2024-02-29'))).toBe(1);
+		expect(elapsedMonths(new Date('2024-01-15'), new Date('2024-01-30'))).toBeCloseTo(15 / 31);
+		expect(elapsedMonths(new Date('2024-01-15'), new Date('2023-12-01'))).toBe(0);
 	});
 });
 
