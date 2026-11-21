@@ -10,7 +10,7 @@
 	import { Users, CircleAlert, Trash2 } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 	import { shareApi } from '#lib/services/share-api.ts';
-	import { ApiError } from '#lib/utils/error-handling.ts';
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { shareLevelLabel } from '#lib/utils/share-helpers.ts';
 	import { formatDate } from '#lib/utils/formatters.ts';
 	import type { GrantedShare, ShareLevel, VehicleShare } from '#lib/types/index.ts';
@@ -62,7 +62,7 @@
 			);
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to load shares:', error);
-			loadError = error instanceof Error ? error.message : 'Failed to load shares';
+			loadError = userFacingErrorMessage(error);
 		} finally {
 			isLoading = false;
 		}
@@ -79,9 +79,7 @@
 			level = 'viewer';
 			await load();
 		} catch (error) {
-			const msg =
-				error instanceof ApiError ? error.message : 'Could not send the invitation. Try again.';
-			toast.error(msg);
+			toast.error(`Couldn't send the invitation. ${userFacingErrorMessage(error)}`);
 		} finally {
 			inviting = false;
 		}
