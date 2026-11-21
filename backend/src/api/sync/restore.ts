@@ -29,7 +29,6 @@ import {
   ConflictError,
   isUniqueConstraintError,
   SyncError,
-  SyncErrorCode,
   ValidationError,
 } from '../../errors';
 import {
@@ -142,11 +141,7 @@ class RestoreService {
 
     const validation = backupService.validateBackupData(parsedBackup);
     if (!validation.valid) {
-      throw new SyncError(
-        SyncErrorCode.VALIDATION_ERROR,
-        'Backup validation failed',
-        validation.errors
-      );
+      throw new ValidationError('Backup validation failed', validation.errors);
     }
 
     return this.applyRestore(userId, parsedBackup, mode, skippedPhotos);
@@ -226,8 +221,7 @@ class RestoreService {
     if (mode !== 'replace') return;
     const totalRows = Object.values(summary).reduce((sum, n) => sum + n, 0);
     if (totalRows === 0) {
-      throw new SyncError(
-        SyncErrorCode.VALIDATION_ERROR,
+      throw new ValidationError(
         'Refusing to replace all data with an empty backup (0 rows): this would delete everything and restore nothing. The backup is likely truncated or corrupt.'
       );
     }
@@ -244,10 +238,7 @@ class RestoreService {
     const sheetsSpreadsheetId = providerConfig?.sheetsSpreadsheetId;
 
     if (!sheetsSpreadsheetId) {
-      throw new SyncError(
-        SyncErrorCode.VALIDATION_ERROR,
-        'No Google Sheets spreadsheet found for this provider'
-      );
+      throw new ValidationError('No Google Sheets spreadsheet found for this provider');
     }
 
     const { createSheetsServiceForProvider } = await import(
@@ -289,11 +280,7 @@ class RestoreService {
 
     const validation = backupService.validateBackupData(sheetData);
     if (!validation.valid) {
-      throw new SyncError(
-        SyncErrorCode.VALIDATION_ERROR,
-        'Sheet data validation failed',
-        validation.errors
-      );
+      throw new ValidationError('Sheet data validation failed', validation.errors);
     }
 
     return this.applyRestore(userId, sheetData, mode, skippedPhotos);

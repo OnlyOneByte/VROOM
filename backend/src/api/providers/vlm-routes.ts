@@ -46,7 +46,7 @@ routes.post('/parse', async (c) => {
   });
   const file = body.image;
   if (!file || !(file instanceof File)) {
-    throw new AppError('No image file provided', 400);
+    throw new ValidationError('No image file provided');
   }
   if (!ALLOWED_IMAGE_MIME.includes(file.type)) {
     throw new ValidationError(`Unsupported image type "${file.type}". Use JPEG, PNG, or WebP.`);

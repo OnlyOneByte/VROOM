@@ -73,6 +73,7 @@ describe('DELETE /auth/accounts/:id — unlink an auth provider', () => {
     );
     const res = await ctx.authed('DELETE', '/api/v1/auth/accounts/sp-1');
     expect(res.status).toBe(404);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe('NotFoundError');
     const sp = ctx.sqlite.query(`SELECT id FROM user_providers WHERE id = 'sp-1'`).get();
     expect(sp).not.toBeNull();
   });

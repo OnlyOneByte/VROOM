@@ -41,6 +41,12 @@ export class ConflictError extends AppError {
   }
 }
 
+export class UnprocessableEntityError extends AppError {
+  constructor(message: string) {
+    super(message, 422, true);
+  }
+}
+
 export class DatabaseError extends AppError {
   constructor(message: string, details?: unknown) {
     super(message, 500, true, details);
@@ -52,7 +58,6 @@ export enum SyncErrorCode {
   NETWORK_ERROR = 'NETWORK_ERROR',
   QUOTA_EXCEEDED = 'QUOTA_EXCEEDED',
   PERMISSION_DENIED = 'PERMISSION_DENIED',
-  VALIDATION_ERROR = 'VALIDATION_ERROR',
   CONFLICT_DETECTED = 'CONFLICT_DETECTED',
   SYNC_IN_PROGRESS = 'SYNC_IN_PROGRESS',
 }
@@ -131,10 +136,10 @@ const ERROR_STATUS_MAP: Record<string, number> = {
   AuthenticationError: 401,
   NotFoundError: 404,
   ConflictError: 409,
+  UnprocessableEntityError: 422,
   DatabaseError: 500,
   AppError: 500,
   [SyncErrorCode.AUTH_INVALID]: 401,
-  [SyncErrorCode.VALIDATION_ERROR]: 400,
   [SyncErrorCode.CONFLICT_DETECTED]: 409,
   [SyncErrorCode.PERMISSION_DENIED]: 403,
   [SyncErrorCode.QUOTA_EXCEEDED]: 429,

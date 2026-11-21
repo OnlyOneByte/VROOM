@@ -11,6 +11,7 @@ import {
   SyncErrorCode,
   ValidationError,
 } from '../../errors';
+import { zValidator } from '../../utils/validation';
 import { errorHandler } from '../error-handler';
 
 interface ErrorBody {
@@ -68,6 +69,36 @@ describe('errorHandler — application error branches', () => {
     expect(body.error.message).toBe('teapot');
   });
 
+  test('a malformed JSON body from the validator is a 400 ValidationError', async () => {
+    const res = await appThatThrows(
+      new HTTPException(400, { message: 'Malformed JSON in request body' })
+    ).request('/boom');
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as ErrorBody;
+    expect(body.error.code).toBe('ValidationError');
+    expect(body.error.message).toBe('Malformed request body');
+  });
+
+  test('malformed JSON sent to a zValidator route is a 400 ValidationError', async () => {
+    const app = new Hono();
+    app.onError(errorHandler);
+    app.post('/json', zValidator('json', z.object({ n: z.number() })), (c) => c.json({ ok: true }));
+    const res = await app.request('/json', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{not json',
+    });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as ErrorBody).error.code).toBe('ValidationError');
+  });
+
+  test('an HTTPException with no message gets a readable one', async () => {
+    const res = await appThatThrows(new HTTPException(403)).request('/boom');
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as ErrorBody;
+    expect(body.error.message).not.toBe('');
+  });
+
   test('an unknown (non-AppError) Error yields a generic 500', async () => {
     const res = await appThatThrows(new Error('raw internal detail')).request('/boom');
     expect(res.status).toBe(500);
@@ -113,7 +144,6 @@ describe('errorHandler — database errors outside development', () => {
 
 describe('errorHandler — SyncError convergence', () => {
   const EXPECTED_STATUS: Record<SyncErrorCode, number> = {
-    [SyncErrorCode.VALIDATION_ERROR]: 400,
     [SyncErrorCode.AUTH_INVALID]: 401,
     [SyncErrorCode.PERMISSION_DENIED]: 403,
     [SyncErrorCode.CONFLICT_DETECTED]: 409,
@@ -144,7 +174,7 @@ describe('errorHandler — SyncError convergence', () => {
 
   test('SyncError details are preserved in the envelope', async () => {
     const res = await appThatThrows(
-      new SyncError(SyncErrorCode.VALIDATION_ERROR, 'bad', { field: 'syncTypes' })
+      new SyncError(SyncErrorCode.CONFLICT_DETECTED, 'bad', { field: 'syncTypes' })
     ).request('/boom');
     const body = (await res.json()) as ErrorBody;
     expect(body.error.details).toEqual({ field: 'syncTypes' });
