@@ -295,7 +295,9 @@
 			? 'Overview of your vehicles'
 			: stats.totalVehicles > 0
 				? `Overview of your ${stats.totalVehicles} vehicle${stats.totalVehicles !== 1 ? 's' : ''}`
-				: 'Welcome! Get started by adding your first vehicle'}
+				: isLoading
+					? 'Overview of your vehicles'
+					: 'Welcome! Get started by adding your first vehicle'}
 	>
 		{#snippet actions()}
 			{#if canLogFillup}
