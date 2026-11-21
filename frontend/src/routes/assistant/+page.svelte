@@ -129,9 +129,6 @@
 	}
 
 	function errorMessageFor(err: unknown): string {
-		if (err instanceof ApiError && err.statusCode === 400) {
-			return 'No assistant provider is set up. Add one in Settings → Assistant.';
-		}
 		if (err instanceof ApiError && err.statusCode === 502) {
 			return "The AI provider couldn't be reached. Check the key and model in Settings, then try again.";
 		}

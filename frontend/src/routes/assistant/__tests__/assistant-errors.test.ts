@@ -62,6 +62,36 @@ describe('assistant page errors', () => {
 		).toBeInTheDocument();
 	});
 
+	test("a missing provider shows the server's reason", async () => {
+		sendMessage.mockRejectedValue(
+			new ApiError(
+				'No assistant (LLM) provider is configured. Add one in Settings to use the assistant.',
+				400
+			)
+		);
+		await ask('How much did I spend?');
+
+		expect(
+			await screen.findByText(
+				'No assistant (LLM) provider is configured. Add one in Settings to use the assistant.'
+			)
+		).toBeInTheDocument();
+	});
+
+	test('a message the server rejects as too long is not reported as a missing provider', async () => {
+		sendMessage.mockRejectedValue(
+			new ApiError('Invalid request data', 400, {
+				issues: [
+					{ path: ['message'], message: 'Too big: expected string to have <=2000 characters' }
+				]
+			})
+		);
+		await ask('How much did I spend?');
+
+		expect(await screen.findByText('Check the message, then try again.')).toBeInTheDocument();
+		expect(screen.queryByText(/provider/)).toBeNull();
+	});
+
 	test.each([
 		[new ApiError('TypeError: cannot read properties of undefined', 500), SERVER_FAILURE_MESSAGE],
 		['boom', UNEXPECTED_FAILURE_MESSAGE]
