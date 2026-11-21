@@ -276,9 +276,20 @@ describe('efficiency readout', () => {
 	});
 
 	test('a high MPG is called out as excellent', () => {
-		mount({ showMpgCalculation: true, calculatedMpg: 55, distanceUnit: 'kilometers' });
-		expect(screen.getByText(/Calculated: 55/)).toHaveTextContent('km/gal');
+		mount({ showMpgCalculation: true, calculatedMpg: 90, distanceUnit: 'kilometers' });
+		expect(screen.getByText(/Calculated: 90/)).toHaveTextContent('km/gal');
 		expect(screen.getByText(/Excellent fuel efficiency/)).toBeInTheDocument();
+	});
+
+	test('judges the verdict in the vehicle units, so an ordinary km/L figure gets none', () => {
+		const section = mount({
+			showMpgCalculation: true,
+			calculatedMpg: 12.5,
+			distanceUnit: 'kilometers',
+			volumeUnit: 'liters'
+		});
+		expect(screen.getByText(/Calculated: 12.5/)).toHaveTextContent('km/L');
+		expect(section.container).not.toHaveTextContent('Low fuel efficiency');
 	});
 
 	test('an ordinary MPG shows the figure without a verdict', () => {

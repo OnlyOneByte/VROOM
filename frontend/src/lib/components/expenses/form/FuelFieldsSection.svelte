@@ -81,6 +81,7 @@
 	} from '#lib/utils/units.ts';
 	import { formatCurrency } from '#lib/utils/formatters.ts';
 	import type { VolumeUnit, ChargeUnit, DistanceUnit } from '#lib/types/index.ts';
+	import { rateChargeEfficiency, rateFuelEfficiency } from './expense-form/mileage-efficiency';
 
 	interface Props {
 		trackFuel: boolean;
@@ -123,6 +124,12 @@
 	}: Props = $props();
 
 	let energyMode = $state<EnergyMode>('fuel');
+	let fuelRating = $derived(
+		calculatedMpg ? rateFuelEfficiency(calculatedMpg, distanceUnit, volumeUnit) : null
+	);
+	let chargeRating = $derived(
+		calculatedEfficiency ? rateChargeEfficiency(calculatedEfficiency, distanceUnit) : null
+	);
 	let seenCapabilities: EnergyCapabilities | null = null;
 
 	let showToggle = $derived(trackFuel && trackCharging);
@@ -349,11 +356,11 @@
 						{getFuelEfficiencyLabel(distanceUnit, volumeUnit)}
 					</span>
 				</div>
-				{#if calculatedMpg < 15}
+				{#if fuelRating === 'low'}
 					<p class="text-xs text-foreground mt-1">
 						⚠️ Low fuel efficiency - consider maintenance check
 					</p>
-				{:else if calculatedMpg > 50}
+				{:else if fuelRating === 'excellent'}
 					<p class="text-xs text-foreground mt-1">✅ Excellent fuel efficiency!</p>
 				{/if}
 			</div>
@@ -366,9 +373,9 @@
 						{getElectricEfficiencyLabel(distanceUnit, chargeUnit)}
 					</span>
 				</div>
-				{#if calculatedEfficiency < 2}
+				{#if chargeRating === 'low'}
 					<p class="text-xs text-foreground mt-1">⚠️ Low efficiency - check driving conditions</p>
-				{:else if calculatedEfficiency > 4}
+				{:else if chargeRating === 'excellent'}
 					<p class="text-xs text-foreground mt-1">✅ Excellent efficiency!</p>
 				{/if}
 			</div>

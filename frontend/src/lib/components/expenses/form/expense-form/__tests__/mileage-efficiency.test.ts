@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'vitest';
-import { calculateMileageEfficiency, type MileageEfficiencyInput } from '../mileage-efficiency';
+import {
+	calculateMileageEfficiency,
+	rateChargeEfficiency,
+	rateFuelEfficiency,
+	type MileageEfficiencyInput
+} from '../mileage-efficiency';
 
 const GAS_FILL: MileageEfficiencyInput = {
 	category: 'fuel',
@@ -56,6 +61,36 @@ describe('calculateMileageEfficiency', () => {
 		expect(calculateMileageEfficiency({ ...metric, mileage: '1500', volume: '2' })).toEqual(HIDDEN);
 	});
 
+	test('converts the vehicle units before applying the bounds', () => {
+		expect(
+			calculateMileageEfficiency({
+				...GAS_FILL,
+				distanceUnit: 'kilometers',
+				volumeUnit: 'liters',
+				mileage: '1400',
+				volume: '100'
+			})?.calculatedMpg
+		).toBe(4);
+		expect(
+			calculateMileageEfficiency({
+				...GAS_FILL,
+				volumeUnit: 'gallons_uk',
+				mileage: '1030',
+				volume: '6'
+			})
+		).toEqual(HIDDEN);
+		expect(
+			calculateMileageEfficiency({
+				...GAS_FILL,
+				fuelType: 'Electric',
+				volume: '',
+				distanceUnit: 'kilometers',
+				mileage: '1100',
+				charge: '95'
+			})
+		).toEqual(HIDDEN);
+	});
+
 	test('a charge outside 1 to 10 miles per kWh hides the calculation', () => {
 		const ev = { ...GAS_FILL, fuelType: 'Electric', volume: '' };
 		expect(calculateMileageEfficiency({ ...ev, charge: '400' })).toEqual(HIDDEN);
@@ -82,5 +117,28 @@ describe('calculateMileageEfficiency', () => {
 
 	test('an empty mileage leaves the existing figures alone', () => {
 		expect(calculateMileageEfficiency({ ...GAS_FILL, mileage: '' })).toBeNull();
+	});
+});
+
+describe('efficiency hints', () => {
+	test.each([
+		[14, 'miles', 'gallons_us', 'low'],
+		[30, 'miles', 'gallons_us', null],
+		[51, 'miles', 'gallons_us', 'excellent'],
+		[12.5, 'kilometers', 'liters', null],
+		[25, 'kilometers', 'liters', 'excellent'],
+		[5, 'kilometers', 'liters', 'low']
+	] as const)('%s per volume in %s and %s rates %s', (value, distance, volume, rating) => {
+		expect(rateFuelEfficiency(value, distance, volume)).toBe(rating);
+	});
+
+	test.each([
+		[1.5, 'miles', 'low'],
+		[3, 'miles', null],
+		[4.5, 'miles', 'excellent'],
+		[5, 'kilometers', null],
+		[3, 'kilometers', 'low']
+	] as const)('%s per kWh in %s rates %s', (value, distance, rating) => {
+		expect(rateChargeEfficiency(value, distance)).toBe(rating);
 	});
 });
