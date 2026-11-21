@@ -69,6 +69,7 @@ export interface RestoreResponse {
   success: boolean;
   preview?: ImportSummary;
   imported?: ImportSummary;
+  skipped?: { photos: number };
   conflicts?: Conflict[];
 }
 
@@ -118,7 +119,9 @@ class RestoreService {
     file: Buffer,
     mode: RestoreMode
   ): Promise<RestoreResponse> {
-    const parsedBackup = backupService.dropOrphanPhotos(await this.parseOrReject(file));
+    const { data: parsedBackup, skippedPhotos } = this.withoutOrphanPhotos(
+      await this.parseOrReject(file)
+    );
 
     const validation = backupService.validateBackupData(parsedBackup);
     if (!validation.valid) {
@@ -129,18 +132,31 @@ class RestoreService {
       );
     }
 
-    return this.applyRestore(userId, parsedBackup, mode);
+    return this.applyRestore(userId, parsedBackup, mode, skippedPhotos);
+  }
+
+  private withoutOrphanPhotos(data: ParsedBackupData): {
+    data: ParsedBackupData;
+    skippedPhotos: number;
+  } {
+    const cleaned = backupService.dropOrphanPhotos(data);
+    return {
+      data: cleaned,
+      skippedPhotos: (data.photos?.length ?? 0) - (cleaned.photos?.length ?? 0),
+    };
   }
 
   private async applyRestore(
     userId: string,
     data: ParsedBackupData,
-    mode: RestoreMode
+    mode: RestoreMode,
+    skippedPhotos: number
   ): Promise<RestoreResponse> {
     const summary = summarizeBackup(data);
+    const skipped = skippedPhotos > 0 ? { skipped: { photos: skippedPhotos } } : {};
 
     if (mode === 'preview') {
-      return { success: true, preview: summary };
+      return { success: true, preview: summary, ...skipped };
     }
 
     if (mode === 'merge') {
@@ -163,7 +179,7 @@ class RestoreService {
       this.insertBackupData(tx, data, userId, consented, currentPrefs);
     });
 
-    return { success: true, imported: summary };
+    return { success: true, imported: summary, ...skipped };
   }
 
   private async parseOrReject(file: Buffer): Promise<ParsedBackupData> {
@@ -215,7 +231,7 @@ class RestoreService {
     const sheetsService = await createSheetsServiceForProvider(providerId, userId);
     const sheet = await sheetsService.readSpreadsheetData(sheetsSpreadsheetId);
 
-    const sheetData: ParsedBackupData = backupService.dropOrphanPhotos({
+    const { data: sheetData, skippedPhotos } = this.withoutOrphanPhotos({
       ...sheet,
       metadata: { ...sheet.metadata, version: CONFIG.backup.currentVersion },
       vehicles: coerceRows(sheet.vehicles, TABLE_SCHEMA_MAP.vehicles),
@@ -252,7 +268,7 @@ class RestoreService {
       );
     }
 
-    return this.applyRestore(userId, sheetData, mode);
+    return this.applyRestore(userId, sheetData, mode, skippedPhotos);
   }
 
   private async detectConflicts(data: ParsedBackupData, userId: string): Promise<Conflict[]> {
