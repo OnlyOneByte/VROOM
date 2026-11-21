@@ -139,6 +139,29 @@ describe('Settings page loading', () => {
 		expect(screen.queryByRole('button', { name: /Save Settings/ })).toBeNull();
 	});
 
+	test('the cards mount once settings exist and stay mounted while settings reload', async () => {
+		let finish = () => {};
+		settingsStoreFake.load.mockImplementation(
+			() =>
+				new Promise<void>(resolve => {
+					finish = () => {
+						fakeSettingsState.settings = makeSettings();
+						resolve();
+					};
+				})
+		);
+		await mount();
+		expect(screen.queryByTestId('stub-model-llm')).toBeNull();
+
+		finish();
+		await settle();
+		const card = screen.getByTestId('stub-model-llm');
+
+		fakeSettingsState.isLoading = true;
+		await settle();
+		expect(screen.getByTestId('stub-model-llm')).toBe(card);
+	});
+
 	test('a load failure shows the error and retry reloads everything', async () => {
 		settingsStoreFake.load.mockImplementationOnce(async () => {
 			fakeSettingsState.error = SERVER_FAILURE_MESSAGE;

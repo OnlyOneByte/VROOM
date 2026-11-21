@@ -17,19 +17,17 @@ beforeEach(() => {
 });
 
 describe('pushApi.getVapidPublicKey', () => {
-	test('GETs the vapid-public-key endpoint and returns the key', async () => {
-		get.mockResolvedValue({ publicKey: 'BPk_test_key' });
+	test.each([
+		{ enabled: true, publicKey: 'BPk_test_key' },
+		{ enabled: false, publicKey: null }
+	])('GETs the vapid-public-key endpoint and returns %o', async status => {
+		get.mockResolvedValue(status);
 
 		const out = await pushApi.getVapidPublicKey();
 
 		expect(get).toHaveBeenCalledTimes(1);
 		expect(get.mock.calls[0]?.[0]).toBe('/api/v1/push/vapid-public-key');
-		expect(out).toEqual({ publicKey: 'BPk_test_key' });
-	});
-
-	test('propagates the 503 PUSH_NOT_CONFIGURED error from the client', async () => {
-		get.mockRejectedValue(new Error('PUSH_NOT_CONFIGURED'));
-		await expect(pushApi.getVapidPublicKey()).rejects.toThrow('PUSH_NOT_CONFIGURED');
+		expect(out).toEqual(status);
 	});
 });
 

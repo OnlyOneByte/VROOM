@@ -41,7 +41,6 @@
 	});
 
 	let settings = $derived(settingsStore.settings);
-	let isLoading = $derived(settingsStore.isLoading);
 	let loadError = $derived(settingsStore.error && !settings ? settingsStore.error : null);
 
 	let isSaving = $state(false);
@@ -218,11 +217,7 @@
 		<PageHeader title="Settings" description="Manage your preferences and data" />
 	</div>
 
-	{#if isLoading}
-		<div class="flex items-center justify-center py-12">
-			<LoaderCircle class="h-8 w-8 animate-spin text-primary" />
-		</div>
-	{:else if loadError}
+	{#if loadError}
 		<div class="rounded-lg border bg-card p-6">
 			<div class="mb-4 flex items-center gap-3 text-destructive">
 				<CircleAlert class="h-5 w-5" />
@@ -230,6 +225,10 @@
 			</div>
 			<p class="mb-4 text-sm text-muted-foreground">{loadError}</p>
 			<Button onclick={retryLoad}>Retry</Button>
+		</div>
+	{:else if !settings}
+		<div class="flex items-center justify-center py-12">
+			<LoaderCircle class="h-8 w-8 animate-spin text-primary" />
 		</div>
 	{:else}
 		<div class="space-y-6 pb-32 sm:pb-24">
@@ -272,7 +271,7 @@
 		</div>
 	{/if}
 
-	{#if !isLoading && !loadError}
+	{#if settings}
 		<Button
 			onclick={handleSave}
 			disabled={isSaving}
