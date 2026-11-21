@@ -12,7 +12,10 @@ vi.mock('#lib/services/expense-api.ts', () => ({
 }));
 vi.mock('#lib/stores/app.svelte.ts', () => ({ appStore: { addNotification: vi.fn() } }));
 vi.mock('#lib/utils/navigation.ts', () => ({ gotoDynamic: vi.fn(() => Promise.resolve()) }));
-vi.mock('#lib/utils/offline-storage.ts', () => ({ addOfflineExpense }));
+vi.mock('#lib/utils/offline-storage.ts', () => ({
+	addOfflineExpense,
+	currentOfflineQueueOwner: () => null
+}));
 vi.mock('#lib/stores/offline.svelte.ts', () => ({ onlineStatus: { current: true } }));
 vi.mock('#lib/utils/sync/sync-manager.ts', () => ({ syncManager: { requestAutoSync } }));
 
