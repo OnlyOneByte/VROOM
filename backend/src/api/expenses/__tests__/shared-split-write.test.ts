@@ -143,7 +143,7 @@ describe('shared split writes stamp the owner and createdBy', () => {
     expect(res.status, 'viewer split create denied').toBe(404);
   });
 
-  test('an EDITOR can PUT and DELETE a split group on the shared vehicle (owner-stamp preserved)', async () => {
+  test('an EDITOR can PUT and DELETE a split group on the shared vehicle (owner and author preserved)', async () => {
     const vehicleId = await shareAccepted('editor');
     const created = await ctx.authed('POST', '/api/v1/expenses/split', {
       splitConfig: { method: 'even', vehicleIds: [vehicleId] },
@@ -160,7 +160,9 @@ describe('shared split writes stamp the owner and createdBy', () => {
     expect(put.status, 'editor can update a shared split').toBe(200);
     for (const row of storedSiblings(gid)) {
       expect(row.user_id).toBe(ctx.user.id);
-      expect(row.created_by).toBe(bId);
+      expect(row.created_by, 'the owner created this leg, so the edit keeps it unattributed').toBe(
+        null
+      );
     }
 
     const del = await asB('DELETE', `/api/v1/expenses/split/${gid}`);
