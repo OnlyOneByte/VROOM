@@ -17,11 +17,8 @@
 	import ThemePickerCard from '#lib/components/settings/cards/ThemePickerCard.svelte';
 	import PWAInstallCard from '#lib/components/settings/cards/PwaInstallCard.svelte';
 	import PushNotificationsCard from '#lib/components/settings/cards/PushNotificationsCard.svelte';
-	import BackupNowDialog from '#lib/components/settings/storage-provider/backup/BackupDialog.svelte';
-	import UnifiedRestoreDialog from '#lib/components/settings/storage-provider/backup/RestoreDialog.svelte';
 	import PhotoStorageSettings from '#lib/components/settings/cards/StorageProvidersCard.svelte';
 	import ModelProvidersCard from '#lib/components/settings/cards/ModelProvidersCard.svelte';
-	import MigrateFromTrackerCard from '#lib/components/settings/cards/MigrateFromTrackerCard.svelte';
 	import { fetchLastSyncTime } from '#lib/utils/sync/sync-manager.ts';
 	import { providerApi } from '#lib/services/provider-api.ts';
 	import FormLayout from '#lib/components/common/form-layout.svelte';
@@ -78,6 +75,20 @@
 
 	let showBackupDialog = $state(false);
 	let showRestoreDialog = $state(false);
+
+	type BackupDialogModule =
+		typeof import('#lib/components/settings/storage-provider/backup/BackupDialog.svelte');
+	type RestoreDialogModule =
+		typeof import('#lib/components/settings/storage-provider/backup/RestoreDialog.svelte');
+	let backupDialog = $state<Promise<BackupDialogModule | null> | null>(null);
+	let restoreDialog = $state<Promise<RestoreDialogModule | null> | null>(null);
+
+	const migrateCard = import('#lib/components/settings/cards/MigrateFromTrackerCard.svelte');
+	migrateCard.catch(() => undefined);
+
+	function dialogLoadFailed(error: unknown) {
+		appStore.showError(`Couldn't open this dialog. ${userFacingErrorMessage(error)}`);
+	}
 
 	let isInitialized = $state(false);
 
@@ -146,6 +157,15 @@
 	}
 
 	function handleBackupNowClick() {
+		backupDialog ??=
+			import('#lib/components/settings/storage-provider/backup/BackupDialog.svelte').catch(
+				error => {
+					backupDialog = null;
+					showBackupDialog = false;
+					dialogLoadFailed(error);
+					return null;
+				}
+			);
 		showBackupDialog = true;
 	}
 
@@ -194,6 +214,15 @@
 	}
 
 	function handleRestoreClick() {
+		restoreDialog ??=
+			import('#lib/components/settings/storage-provider/backup/RestoreDialog.svelte').catch(
+				error => {
+					restoreDialog = null;
+					showRestoreDialog = false;
+					dialogLoadFailed(error);
+					return null;
+				}
+			);
 		showRestoreDialog = true;
 	}
 
@@ -267,7 +296,17 @@
 			/>
 			<ModelProvidersCard domain="vlm" />
 			<ModelProvidersCard domain="llm" />
-			<MigrateFromTrackerCard />
+			{#await migrateCard then { default: MigrateFromTrackerCard }}
+				<MigrateFromTrackerCard />
+			{:catch}
+				<p
+					class="rounded-lg border bg-card p-6 text-sm text-destructive"
+					role="alert"
+					data-testid="migrate-load-error"
+				>
+					Couldn't load the migration tool. Check your connection and reload.
+				</p>
+			{/await}
 		</div>
 	{/if}
 
@@ -287,17 +326,29 @@
 		</Button>
 	{/if}
 
-	<BackupNowDialog
-		bind:open={showBackupDialog}
-		{backupProvidersEnabled}
-		onSync={handleBackupExecute}
-	/>
+	{#if backupDialog}
+		{#await backupDialog then module}
+			{#if module}
+				<module.default
+					bind:open={showBackupDialog}
+					{backupProvidersEnabled}
+					onSync={handleBackupExecute}
+				/>
+			{/if}
+		{/await}
+	{/if}
 
-	<UnifiedRestoreDialog
-		bind:open={showRestoreDialog}
-		{backupProviders}
-		{sheetsSyncEnabled}
-		onRestore={handleRestoreComplete}
-		onClose={() => {}}
-	/>
+	{#if restoreDialog}
+		{#await restoreDialog then module}
+			{#if module}
+				<module.default
+					bind:open={showRestoreDialog}
+					{backupProviders}
+					{sheetsSyncEnabled}
+					onRestore={handleRestoreComplete}
+					onClose={() => {}}
+				/>
+			{/if}
+		{/await}
+	{/if}
 </FormLayout>
