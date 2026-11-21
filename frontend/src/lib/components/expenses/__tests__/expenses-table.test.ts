@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { UNEXPECTED_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import type { Expense, Vehicle } from '#lib/types/index.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
@@ -294,7 +295,7 @@ describe('ExpensesTable deleting', () => {
 		expect(deleteExpense).not.toHaveBeenCalled();
 	});
 
-	test('a failed delete reports the server message and does not notify the parent', async () => {
+	test('a failed delete reports the server reason as a sentence and does not notify the parent', async () => {
 		deleteExpense.mockRejectedValue(new Error('Expense is locked'));
 		const onDelete = vi.fn(async () => {});
 		mountTable({ onDelete });
@@ -302,7 +303,9 @@ describe('ExpensesTable deleting', () => {
 		await fireEvent.click(screen.getAllByRole('button', { name: 'Delete expense' })[0]!);
 		await confirmDeleteIn();
 
-		await waitFor(() => expect(notificationMessages()).toContain('Expense is locked'));
+		await waitFor(() =>
+			expect(notificationMessages()).toContain("Couldn't delete the expense. Expense is locked.")
+		);
 		expect(onDelete).not.toHaveBeenCalled();
 	});
 
@@ -313,7 +316,11 @@ describe('ExpensesTable deleting', () => {
 		await fireEvent.click(screen.getAllByRole('button', { name: 'Delete expense' })[0]!);
 		await confirmDeleteIn();
 
-		await waitFor(() => expect(notificationMessages()).toContain('Failed to delete expense'));
+		await waitFor(() =>
+			expect(notificationMessages()).toContain(
+				`Couldn't delete the expense. ${UNEXPECTED_FAILURE_MESSAGE}`
+			)
+		);
 	});
 
 	test('read-only viewers get no delete controls even when a handler is passed', () => {
