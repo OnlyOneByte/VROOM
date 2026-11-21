@@ -116,7 +116,7 @@ describe('CameraTab: camera access errors', () => {
 		mount();
 
 		expect(await screen.findByText(message)).toBeInTheDocument();
-		expect(screen.getByRole('button', { name: 'Try Again' })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
 	});
 
 	test('a non-DOM failure falls back to the generic message', async () => {
@@ -151,10 +151,10 @@ describe('CameraTab: camera access errors', () => {
 		expect(await screen.findByText("Couldn't access the camera. Try again.")).toBeInTheDocument();
 	});
 
-	test('Try Again reopens the camera after an error', async () => {
+	test('Retry reopens the camera after an error', async () => {
 		getUserMedia.mockRejectedValueOnce(new DOMException('nope', 'NotAllowedError'));
 		mount();
-		await fireEvent.click(await screen.findByRole('button', { name: 'Try Again' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
 
 		await waitForViewfinder();
 

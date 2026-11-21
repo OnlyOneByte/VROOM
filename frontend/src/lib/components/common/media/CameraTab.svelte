@@ -209,7 +209,7 @@
 	>
 		<CircleAlert class="h-8 w-8 text-destructive" />
 		<p class="text-sm text-destructive">{cameraError}</p>
-		<Button variant="outline" size="sm" onclick={startCamera}>Try Again</Button>
+		<Button variant="outline" size="sm" onclick={startCamera}>Retry</Button>
 	</div>
 {:else if capturedPreview}
 	<div class="relative overflow-hidden rounded-lg border border-border">
