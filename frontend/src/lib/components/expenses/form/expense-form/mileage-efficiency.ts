@@ -28,6 +28,10 @@ const MIN_VALID_MPG = 5;
 const MAX_VALID_MPG = 100;
 const MIN_VALID_MI_KWH = 1;
 const MAX_VALID_MI_KWH = 10;
+const LOW_MPG = 15;
+const EXCELLENT_MPG = 50;
+const LOW_MI_KWH = 2;
+const EXCELLENT_MI_KWH = 4;
 
 const MILES_PER_UNIT: Record<DistanceUnit, number> = {
 	miles: 1,
@@ -69,6 +73,30 @@ export function calculateMileageEfficiency(
 		};
 	}
 	return HIDDEN;
+}
+
+export type EfficiencyRating = 'low' | 'excellent' | null;
+
+export function rateFuelEfficiency(
+	distancePerVolume: number,
+	distanceUnit: DistanceUnit,
+	volumeUnit: VolumeUnit
+): EfficiencyRating {
+	const mpg = (distancePerVolume * MILES_PER_UNIT[distanceUnit]) / US_GALLONS_PER_UNIT[volumeUnit];
+	return rate(mpg, LOW_MPG, EXCELLENT_MPG);
+}
+
+export function rateChargeEfficiency(
+	distancePerKwh: number,
+	distanceUnit: DistanceUnit
+): EfficiencyRating {
+	return rate(distancePerKwh * MILES_PER_UNIT[distanceUnit], LOW_MI_KWH, EXCELLENT_MI_KWH);
+}
+
+function rate(value: number, low: number, excellent: number): EfficiencyRating {
+	if (value < low) return 'low';
+	if (value > excellent) return 'excellent';
+	return null;
 }
 
 function within(value: number, min: number, max: number): boolean {
