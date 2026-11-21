@@ -14,6 +14,7 @@ import { fromBackendExpense, toBackendExpense, type ExpenseInput } from './api-t
 import { apiClient } from './api-client';
 import { buildQueryString } from './api-utils';
 import { entityPhotos } from './photo-api';
+import { userTimeZone } from './analytics-api';
 import { toDateInputValue } from '#lib/utils/formatters.ts';
 import { triggerBlobDownload } from '#lib/utils/download.ts';
 
@@ -123,6 +124,7 @@ export const expenseApi = {
 		return apiClient.post<ExpenseImportResult>('/api/v1/expenses/import', {
 			csv,
 			dryRun,
+			timeZone: userTimeZone(),
 			...(mapping ? { mapping } : {})
 		});
 	},

@@ -565,7 +565,7 @@ function targetUnitsResolver(
 
 routes.post('/import', zValidator('json', importBodySchema), async (c) => {
   const user = c.get('user');
-  const { csv, dryRun, mapping } = c.req.valid('json');
+  const { csv, dryRun, mapping, timeZone } = c.req.valid('json');
 
   const vehicles = await vehicleRepository.findByUserId(user.id);
   if (vehicles.length === 0) {
@@ -584,11 +584,12 @@ routes.post('/import', zValidator('json', importBodySchema), async (c) => {
           targetVehicle: mapping.targetVehicle ?? '',
           targetUnits: targetUnitsFor(mapping.targetVehicle ?? ''),
           includeCosts: true,
+          timeZone,
         });
         importCsv = result.csv;
         unmappedCategories = result.unmappedCategories;
       } else {
-        const result = applyMapping(csv, mapping, targetUnitsFor);
+        const result = applyMapping(csv, mapping, targetUnitsFor, timeZone);
         importCsv = result.csv;
         unmappedCategories = result.unmappedCategories;
         rowErrors = result.rowErrors;
@@ -603,7 +604,7 @@ routes.post('/import', zValidator('json', importBodySchema), async (c) => {
 
   let plan: ReturnType<typeof buildImportPlan>;
   try {
-    plan = buildImportPlan(importCsv, vehicles, rowErrors);
+    plan = buildImportPlan(importCsv, vehicles, rowErrors, timeZone);
   } catch (err) {
     if (err instanceof CsvImportError) throw new ValidationError(err.message);
     throw err;

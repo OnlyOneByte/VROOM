@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from '../../db/types';
 import { DistanceUnit, VolumeUnit } from '../../types';
 import { convertDistance, convertVolume } from '../../utils/unit-conversions';
-import { buildCalendarDate, buildLocalDate } from './local-date';
+import { buildImportDate } from './local-date';
 
 export type NativeField =
   | 'date'
@@ -162,7 +162,11 @@ function epochToIso(n: number): string | null {
   return Number.isNaN(dt.getTime()) ? null : dt.toISOString();
 }
 
-export function normalizeForeignDate(raw: string, format: ImportDateFormat): string {
+export function normalizeForeignDate(
+  raw: string,
+  format: ImportDateFormat,
+  timeZone?: string
+): string {
   const s = raw.trim();
   if (!s) return '';
 
@@ -188,9 +192,7 @@ export function normalizeForeignDate(raw: string, format: ImportDateFormat): str
   const [hh = 0, mm = 0, ss = 0] = timePart.split(':').map((t) => Number.parseInt(t, 10) || 0);
 
   // new Date("YYYY-MM-DD") would shift the day; buildLocalDate keeps the calendar day.
-  const dt = timePart
-    ? buildLocalDate(year, month, day, hh, mm, ss)
-    : buildCalendarDate(year, month, day);
+  const dt = buildImportDate(year, month, day, timeZone, timePart ? [hh, mm, ss] : undefined);
   return dt ? dt.toISOString() : s;
 }
 
@@ -292,7 +294,8 @@ function ambiguityMessage(label: string, raw: string): string {
 export function applyMapping(
   foreignCsv: string,
   mapping: ColumnMapping,
-  targetUnitsFor: TargetUnitsResolver = () => ({})
+  targetUnitsFor: TargetUnitsResolver = () => ({}),
+  timeZone?: string
 ): ApplyMappingResult {
   let records: Record<string, string>[];
   try {
@@ -332,7 +335,7 @@ export function applyMapping(
     const vehicle = cols.vehicle ? read(rec, 'vehicle') : (mapping.targetVehicle ?? '');
     const target = targetUnitsFor(vehicle);
     return {
-      date: normalizeForeignDate(read(rec, 'date'), mapping.dateFormat),
+      date: normalizeForeignDate(read(rec, 'date'), mapping.dateFormat, timeZone),
       vehicle,
       category: category.value,
       amount: normalizeDecimal(read(rec, 'amount'), decimals.amount.decimal),
