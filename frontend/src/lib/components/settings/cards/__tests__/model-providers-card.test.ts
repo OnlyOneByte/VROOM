@@ -161,6 +161,21 @@ describe('ModelProvidersCard', () => {
 		).toBeInTheDocument();
 	});
 
+	test('a load failure offers a 40px Retry that reloads the list', async () => {
+		getProviders
+			.mockRejectedValueOnce(new ApiError('boom', 500))
+			.mockResolvedValueOnce([provider('llm', 'Work Claude')]);
+		render(ModelProvidersCard, { props: { domain: 'llm' } });
+
+		const retry = await screen.findByRole('button', { name: 'Retry' });
+		expect(retry.className).toMatch(/(^|\s)h-10(\s|$)/);
+		await fireEvent.click(retry);
+
+		expect(await screen.findByText('Work Claude')).toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+		expect(getProviders).toHaveBeenCalledTimes(2);
+	});
+
 	test('a server failure on load shows a plain sentence, not the raw server message', async () => {
 		getProviders.mockRejectedValue(new ApiError('boom', 500));
 		render(ModelProvidersCard, { props: { domain: 'llm' } });

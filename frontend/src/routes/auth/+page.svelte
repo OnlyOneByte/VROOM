@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -35,6 +35,7 @@
 	let isLoadingProviders = $state(true);
 	let fetchError = $state<string | null>(null);
 	let signingInProvider = $state<string | null>(null);
+	let optionsCard = $state<HTMLElement | null>(null);
 
 	const authError = $derived(page.url.searchParams.get('auth_error'));
 	const authErrorMessage = $derived(authError ? (authErrorMessages[authError] ?? null) : null);
@@ -60,6 +61,12 @@
 	}
 
 	onMount(loadProviders);
+
+	async function retryProviders() {
+		await loadProviders();
+		await tick();
+		optionsCard?.querySelector('button')?.focus();
+	}
 
 	function handleLogin(providerId: string) {
 		signingInProvider = providerId;
@@ -106,7 +113,7 @@
 		{/if}
 
 		<Card.Root class="border-2">
-			<Card.Content class="pt-6 space-y-4">
+			<Card.Content bind:ref={optionsCard} class="pt-6 space-y-4">
 				{#if isLoadingProviders}
 					<div class="flex items-center justify-center py-6">
 						<LoaderCircle class="h-6 w-6 animate-spin text-muted-foreground" />
@@ -114,8 +121,8 @@
 				{:else if fetchError}
 					<div class="text-center py-6 space-y-2">
 						<CircleAlert class="h-8 w-8 text-destructive mx-auto" />
-						<p class="text-sm text-destructive">{fetchError}</p>
-						<Button variant="outline" size="lg" onclick={loadProviders}>Retry</Button>
+						<p class="text-sm text-destructive" role="alert">{fetchError}</p>
+						<Button variant="outline" size="lg" onclick={retryProviders}>Retry</Button>
 					</div>
 				{:else if providers.length === 0}
 					<div class="text-center py-6">

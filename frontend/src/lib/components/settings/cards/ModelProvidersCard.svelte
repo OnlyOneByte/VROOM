@@ -212,7 +212,10 @@
 				<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
 			</div>
 		{:else if error}
-			<p class="text-sm text-destructive">{error}</p>
+			<div class="space-y-3" data-testid="{domain}-provider-error">
+				<p class="text-sm text-destructive">{error}</p>
+				<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={loadData}>Retry</Button>
+			</div>
 		{:else}
 			<div class="space-y-3">
 				<div class="flex items-center justify-between">
