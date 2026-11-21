@@ -14,6 +14,7 @@
 		onRefresh?: () => Promise<void>;
 		onDeleteTerm?: (_term: InsuranceTerm) => void;
 		readOnly?: boolean;
+		level?: 4 | 5;
 	}
 
 	let {
@@ -23,7 +24,8 @@
 		termVehicleCoverage = [],
 		onRefresh: _onRefresh,
 		onDeleteTerm,
-		readOnly = false
+		readOnly = false,
+		level = 4
 	}: Props = $props();
 
 	let sortedTerms = $derived(sortTermsByEndDateDesc(terms));
@@ -44,7 +46,9 @@
 </script>
 
 <div class="space-y-3">
-	<h5 class="text-sm font-medium text-foreground">Past Terms</h5>
+	<svelte:element this={`h${level}`} class="text-sm font-medium text-foreground"
+		>Past Terms</svelte:element
+	>
 
 	{#if sortedTerms.length === 0}
 		<p class="text-sm text-muted-foreground">No past terms.</p>

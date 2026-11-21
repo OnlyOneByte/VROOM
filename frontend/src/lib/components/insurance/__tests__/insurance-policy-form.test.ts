@@ -107,6 +107,18 @@ describe('InsurancePolicyForm create mode', () => {
 		expect(getPolicy).not.toHaveBeenCalled();
 	});
 
+	test('headings run h1, h2, h3 without skipping a level', async () => {
+		await mount();
+
+		const levels = screen.getAllByRole('heading').map(h => Number(h.tagName.slice(1)));
+		expect(levels[0]).toBe(1);
+		for (let i = 1; i < levels.length; i++) {
+			expect(levels[i], `heading ${i}`).toBeLessThanOrEqual((levels[i - 1] ?? 1) + 1);
+		}
+		expect(screen.getByRole('heading', { level: 2, name: 'Initial Term' })).toBeInTheDocument();
+		expect(screen.getByRole('heading', { level: 3, name: 'Policy Details' })).toBeInTheDocument();
+	});
+
 	test('shows the empty-vehicle hint when the user has no vehicles', async () => {
 		getVehicles.mockResolvedValue([]);
 		await mount();
