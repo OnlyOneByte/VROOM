@@ -149,6 +149,12 @@ function calculatePaymentDate(startDate: Date, paymentNumber: number, frequency:
 	}
 }
 
+function calendarDay(date: Date): number {
+	return Math.round(
+		Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / (1000 * 60 * 60 * 24)
+	);
+}
+
 function scheduledDueDate(financing: VehicleFinancing, start: Date, index: number): Date {
 	switch (financing.paymentFrequency) {
 		case 'bi-weekly':
@@ -202,12 +208,22 @@ export function calculateNextPaymentDate(
 		const lastDue = scheduledDueDate(financing, start, index);
 		if (lastDue > now) return lastDue;
 
-		const previousDue = index > 1 ? scheduledDueDate(financing, start, index - 1) : undefined;
-		const lastDueIsPaid =
-			assumeLastDuePaid ||
-			(lastPaymentDate !== undefined &&
-				(previousDue === undefined || lastPaymentDate > previousDue));
-		return lastDueIsPaid ? scheduledDueDate(financing, start, index + 1) : lastDue;
+		if (assumeLastDuePaid) return scheduledDueDate(financing, start, index + 1);
+		if (lastPaymentDate === undefined) return lastDue;
+
+		const paidDay = calendarDay(lastPaymentDate);
+		let paidIndex = 1;
+		let paidDistance = Math.abs(calendarDay(scheduledDueDate(financing, start, 1)) - paidDay);
+		for (let candidate = 2; candidate <= index + 1; candidate++) {
+			const distance = Math.abs(
+				calendarDay(scheduledDueDate(financing, start, candidate)) - paidDay
+			);
+			if (distance < paidDistance) {
+				paidIndex = candidate;
+				paidDistance = distance;
+			}
+		}
+		return scheduledDueDate(financing, start, paidIndex + 1);
 	} catch (error) {
 		if (DEV) console.error('Error calculating next payment date:', error);
 		return new Date();
@@ -463,10 +479,7 @@ export function formatPaymentFrequency(frequency: string): string {
 }
 
 export function calculateDaysUntil(targetDate: Date): number {
-	const now = new Date();
-	const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-	const target = Date.UTC(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
-	return Math.round((target - today) / (1000 * 60 * 60 * 24));
+	return calendarDay(targetDate) - calendarDay(new Date());
 }
 export function calculateMinimumPayment(financing: VehicleFinancing): number | null {
 	if (financing.financingType !== 'loan' || !financing.apr || financing.apr <= 0) {
