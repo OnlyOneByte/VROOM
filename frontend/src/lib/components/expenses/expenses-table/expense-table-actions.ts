@@ -30,3 +30,29 @@ export async function deleteExpenseRecord(expense: Expense): Promise<void> {
 export function deleteFailureMessage(error: unknown): string {
 	return `Couldn't delete the expense. ${userFacingErrorMessage(error)}`;
 }
+
+export const EXPENSE_DELETED_MESSAGE = 'Expense deleted successfully';
+export const REFRESH_AFTER_DELETE_FAILED =
+	"Expense deleted, but the list couldn't refresh. Reload the page to see the latest.";
+
+export interface DeleteNotice {
+	type: 'success' | 'warning' | 'error';
+	message: string;
+}
+
+export async function deleteAndRefresh(
+	expense: Expense,
+	refresh: (_expense: Expense) => Promise<void>
+): Promise<DeleteNotice> {
+	try {
+		await deleteExpenseRecord(expense);
+	} catch (error) {
+		return { type: 'error', message: deleteFailureMessage(error) };
+	}
+	try {
+		await refresh(expense);
+	} catch {
+		return { type: 'warning', message: REFRESH_AFTER_DELETE_FAILED };
+	}
+	return { type: 'success', message: EXPENSE_DELETED_MESSAGE };
+}

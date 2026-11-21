@@ -16,6 +16,7 @@
 		Bot
 	} from '@lucide/svelte';
 	import SyncStatusInline from '../sync/SyncStatusInline.svelte';
+	import OfflineIndicator from '../sync/OfflineIndicator.svelte';
 	import { syncState, onlineStatus, offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
 	import { syncConflicts } from '#lib/utils/sync/sync-manager.ts';
 	import { getSyncStatusInfo } from '#lib/utils/sync/sync-status.ts';
@@ -95,7 +96,8 @@
 			<span class="font-bold text-foreground">VROOM</span>
 		</div>
 
-		<div class="flex items-center gap-3">
+		<div class="flex items-center gap-2">
+			<OfflineIndicator floating={false} />
 			{#snippet mobileStatusIcon()}
 				{@const StatusIcon = syncStatusInfo.icon}
 				<div class="{syncStatusInfo.color} relative" role="status" aria-label="Sync status">
@@ -103,7 +105,7 @@
 					{#if pendingCount > 0}
 						<Badge
 							variant="secondary"
-							class="absolute -top-2 -right-3 text-xs font-bold h-4 min-w-4 px-0.5 py-0 flex items-center justify-center"
+							class="absolute -top-2 -right-2 text-xs font-bold h-4 min-w-4 px-0.5 py-0 flex items-center justify-center"
 							aria-label="{pendingCount} pending items"
 						>
 							{pendingCount > 9 ? '9+' : pendingCount}
