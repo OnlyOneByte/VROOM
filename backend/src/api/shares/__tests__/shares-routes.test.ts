@@ -119,6 +119,19 @@ describe('PUT and DELETE /api/v1/shares/:id', () => {
     expect(reinvite.status).toBe(201);
   });
 
+  test('PUT on a revoked share → 409 and the level is unchanged', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
+    const created = await json<DataEnvelope<Share>>(await invite(vehicleId, bEmail, 'viewer'));
+    await ctx.authed('DELETE', `/api/v1/shares/${created.data.id}`);
+
+    const res = await ctx.authed('PUT', `/api/v1/shares/${created.data.id}`, { level: 'editor' });
+
+    expect(res.status).toBe(409);
+    expect(
+      ctx.sqlite.query('SELECT level FROM vehicle_shares WHERE id = ?').get(created.data.id)
+    ).toEqual({ level: 'viewer' });
+  });
+
   test('PUT/DELETE on a nonexistent share → 404', async () => {
     expect((await ctx.authed('PUT', '/api/v1/shares/nope', { level: 'viewer' })).status).toBe(404);
     expect((await ctx.authed('DELETE', '/api/v1/shares/nope')).status).toBe(404);

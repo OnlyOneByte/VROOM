@@ -14,6 +14,7 @@ import { changeTracker, requireAuth } from '../../middleware';
 import { commonSchemas, validateVehicleOwnership, zValidator } from '../../utils/validation';
 import {
   type GrantedShare,
+  isActiveShareStatus,
   type ReceivedShare,
   toOwnerView,
   vehicleShareRepository,
@@ -104,6 +105,9 @@ routes.put(
     const share = await vehicleShareRepository.findByIdAndOwner(id, user.id);
     if (!share) {
       throw new NotFoundError('Share');
+    }
+    if (!isActiveShareStatus(share.status)) {
+      throw new ConflictError('This share is no longer active');
     }
 
     const updated = await vehicleShareRepository.update(id, { level, updatedAt: new Date() });

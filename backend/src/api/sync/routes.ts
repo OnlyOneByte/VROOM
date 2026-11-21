@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
 import { userProviders } from '../../db/schema';
-import { createErrorResponse, createSuccessResponse, SyncError, SyncErrorCode } from '../../errors';
+import { createErrorResponse, createSuccessResponse, ValidationError } from '../../errors';
 import { bodyLimit, idempotency, rateLimiter, requireAuth } from '../../middleware';
 import type { BackupConfig, ProviderBackupSettings } from '../../types';
 import { readJsonBody } from '../../utils/request-body';
@@ -54,16 +54,13 @@ routes.get('/health', async (c) => {
 
 function validateSyncTypes(syncTypes: unknown): string[] {
   if (!syncTypes || !Array.isArray(syncTypes) || syncTypes.length === 0) {
-    throw new SyncError(SyncErrorCode.VALIDATION_ERROR, 'syncTypes must be a non-empty array');
+    throw new ValidationError('syncTypes must be a non-empty array');
   }
 
   const validSyncTypes = ['backup'];
   const invalidTypes = syncTypes.filter((type: string) => !validSyncTypes.includes(type));
   if (invalidTypes.length > 0) {
-    throw new SyncError(
-      SyncErrorCode.VALIDATION_ERROR,
-      `Invalid sync types: ${invalidTypes.join(', ')}`
-    );
+    throw new ValidationError(`Invalid sync types: ${invalidTypes.join(', ')}`);
   }
 
   return syncTypes as string[];
@@ -181,7 +178,7 @@ routes.post(
       .limit(1);
 
     if (!providerRow[0]) {
-      throw new SyncError(SyncErrorCode.VALIDATION_ERROR, 'Provider not found or inactive');
+      throw new ValidationError('Provider not found or inactive');
     }
 
     let result: RestoreResponse;
@@ -217,22 +214,18 @@ routes.post(
   async (c) => {
     const user = c.get('user');
     const formData = await c.req.formData().catch(() => {
-      throw new SyncError(
-        SyncErrorCode.VALIDATION_ERROR,
-        'Upload the backup as multipart/form-data with a file field'
-      );
+      throw new ValidationError('Upload the backup as multipart/form-data with a file field');
     });
     const file = formData.get('file');
     const modeField = formData.get('mode');
     const mode = typeof modeField === 'string' && modeField ? modeField : 'preview';
 
     if (!(file instanceof File)) {
-      throw new SyncError(SyncErrorCode.VALIDATION_ERROR, 'No file provided');
+      throw new ValidationError('No file provided');
     }
 
     if (!CONFIG.backup.supportedModes.includes(mode as never)) {
-      throw new SyncError(
-        SyncErrorCode.VALIDATION_ERROR,
+      throw new ValidationError(
         `Invalid mode. Supported: ${CONFIG.backup.supportedModes.join(', ')}`
       );
     }
@@ -240,7 +233,7 @@ routes.post(
     const fileBuffer = Buffer.from(await file.arrayBuffer());
     const sizeValidation = backupService.validateFileSize(fileBuffer.length);
     if (!sizeValidation.valid) {
-      throw new SyncError(SyncErrorCode.VALIDATION_ERROR, sizeValidation.errors[0]);
+      throw new ValidationError(sizeValidation.errors[0]);
     }
 
     const result = await withTimeout(

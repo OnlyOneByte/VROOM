@@ -14,6 +14,15 @@ import {
 } from '../errors';
 import { logger } from '../utils/logger';
 
+const HTTP_FALLBACK_MESSAGES: Partial<Record<number, string>> = {
+  403: 'This request was refused because it did not come from the VROOM app',
+};
+
+const isBodyParseFailure = (err: HTTPException): boolean =>
+  err.status === 400 &&
+  (err.message === 'Malformed JSON in request body' ||
+    err.message.startsWith('Malformed FormData request'));
+
 export const errorHandler: ErrorHandler = (err, c) => {
   const isDevelopment = CONFIG.env === 'development';
 
@@ -29,7 +38,11 @@ export const errorHandler: ErrorHandler = (err, c) => {
   }
 
   if (err instanceof HTTPException) {
-    return c.json(createErrorResponse('HTTPException', err.message, err.cause), err.status);
+    if (isBodyParseFailure(err)) {
+      return c.json(createErrorResponse('ValidationError', 'Malformed request body'), 400);
+    }
+    const message = err.message || HTTP_FALLBACK_MESSAGES[err.status] || 'Request failed';
+    return c.json(createErrorResponse('HTTPException', message, err.cause), err.status);
   }
 
   if (isSyncError(err)) {
