@@ -255,14 +255,14 @@ describe('reminders HTTP routes', () => {
     expect(body.data.skipped).toHaveLength(0);
   });
 
-  test('POST /trigger accepts the user time zone and rejects an unknown one', async () => {
+  test('POST /trigger accepts the user time zone and falls back to server time on an unknown one', async () => {
     const ok = await ctx.authed('POST', '/api/v1/reminders/trigger?timeZone=Pacific%2FTongatapu');
     expect(ok.status).toBe(200);
-    const bad = await ctx.authed('POST', '/api/v1/reminders/trigger?timeZone=Mars%2FOlympus');
-    expect(bad.status).toBe(400);
+    const unknown = await ctx.authed('POST', '/api/v1/reminders/trigger?timeZone=Mars%2FOlympus');
+    expect(unknown.status).toBe(200);
   });
 
-  test('POST /:id/mark-serviced rejects an unknown time zone', async () => {
+  test('POST /:id/mark-serviced falls back to server time on an unknown time zone', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const created = await createNotificationReminder(vehicleId);
     const { data } = await json<DataEnvelope<ReminderWithJoins>>(created);
@@ -270,7 +270,30 @@ describe('reminders HTTP routes', () => {
       'POST',
       `/api/v1/reminders/${data.reminder.id}/mark-serviced?timeZone=Mars%2FOlympus`
     );
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
+  });
+
+  test('POST /:id/mark-serviced schedules the next due on the user calendar day', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    const timeZone = 'Pacific/Tongatapu';
+    const created = await ctx.authed('POST', '/api/v1/reminders', {
+      name: 'Month-end wash',
+      type: 'notification',
+      frequency: 'monthly',
+      startDate: '2099-01-31',
+      timeZone,
+      vehicleIds: [vehicleId],
+    });
+    const { data } = await json<DataEnvelope<ReminderWithJoins>>(created);
+    expect(created.status, JSON.stringify(data)).toBe(201);
+
+    const res = await ctx.authed(
+      'POST',
+      `/api/v1/reminders/${data.reminder.id}/mark-serviced?timeZone=${encodeURIComponent(timeZone)}`
+    );
+    const body = await json<DataEnvelope<{ nextDueDate: string }>>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.data.nextDueDate, '28 Feb 2099 at noon in Tonga').toBe('2099-02-27T23:00:00.000Z');
   });
 
   test('POST /trigger is unauthorized when anonymous', async () => {
