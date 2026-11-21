@@ -269,6 +269,14 @@ const REQUIRED_SHEET_TABS = new Set<SheetTableKey>([
   'financing',
 ]);
 
+export function columnLetter(columnNumber: number): string {
+  let letters = '';
+  for (let n = columnNumber; n > 0; n = Math.floor((n - 1) / 26)) {
+    letters = String.fromCharCode(65 + ((n - 1) % 26)) + letters;
+  }
+  return letters;
+}
+
 // Order matters: the backup swap indexes each tab by position.
 export const SHEET_NAMES = Object.values(SHEET_TABS);
 
@@ -619,7 +627,7 @@ export class GoogleSheetsService {
 
     await this.sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `${sheetName}!A1:${String.fromCharCode(64 + headers.length)}${data.length + 1}`,
+      range: `${sheetName}!A1:${columnLetter(headers.length)}${data.length + 1}`,
       // RAW, not USER_ENTERED: USER_ENTERED turns values like '=...' into formulas.
       valueInputOption: 'RAW',
       requestBody: { values },
@@ -658,7 +666,12 @@ export class GoogleSheetsService {
       const absentOptionalTab = !REQUIRED_SHEET_TABS.has(key) && !presentTabs.has(title);
       records[key] = absentOptionalTab
         ? []
-        : this.parseSheetData(await this.readSheetData(spreadsheetId, `${title}!A:Z`));
+        : this.parseSheetData(
+            await this.readSheetData(
+              spreadsheetId,
+              `${title}!A:${columnLetter(SHEET_HEADERS[key].length)}`
+            )
+          );
     }
 
     const userId = records.vehicles.length > 0 ? String(records.vehicles[0].userId) : '';

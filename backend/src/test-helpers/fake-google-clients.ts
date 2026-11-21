@@ -270,6 +270,21 @@ export function makeFakeDrive(store: FakeGoogleStore): drive_v3.Drive {
   return { files, permissions } as unknown as drive_v3.Drive;
 }
 
+function lastColumnOfRange(range: string): number | null {
+  const bang = range.lastIndexOf('!');
+  if (bang === -1) return null;
+  const end =
+    range
+      .slice(bang + 1)
+      .split(':')
+      .pop() ?? '';
+  const letters = end.replace(/\d+$/, '');
+  if (!/^[A-Z]+$/.test(letters)) {
+    throw googleApiError(400, `Unable to parse range: ${range}`);
+  }
+  return [...letters].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0);
+}
+
 function sheetTitleFromRange(range: string): string {
   const bang = range.lastIndexOf('!');
   return bang === -1 ? range : range.slice(0, bang);
@@ -408,6 +423,15 @@ export function makeFakeSheets(store: FakeGoogleStore): sheets_v4.Sheets {
         if (ss && params.range) {
           const title = sheetTitleFromRange(params.range);
           const values = (params.requestBody?.values ?? []) as (string | number | boolean)[][];
+          const width = lastColumnOfRange(params.range);
+          if (width !== null && values.some((row) => row.length > width)) {
+            return Promise.reject(
+              googleApiError(
+                400,
+                `Requested writing within range ${params.range}, but tried writing past it`
+              )
+            );
+          }
           ss.values.set(title, values);
           ss.valueInputOptions.set(title, params.valueInputOption ?? undefined);
         }
@@ -416,9 +440,16 @@ export function makeFakeSheets(store: FakeGoogleStore): sheets_v4.Sheets {
       get(params: sheets_v4.Params$Resource$Spreadsheets$Values$Get = {}) {
         store.maybeFail('spreadsheets.values.get');
         const ss = params.spreadsheetId ? store.spreadsheets.get(params.spreadsheetId) : undefined;
-        const values =
-          ss && params.range ? ss.values.get(sheetTitleFromRange(params.range)) : undefined;
-        return Promise.resolve({ data: { values: values ?? [] } });
+        if (!ss || !params.range) return Promise.resolve({ data: { values: [] } });
+        const title = sheetTitleFromRange(params.range);
+        if (!ss.sheets.some((s) => s.title === title)) {
+          return Promise.reject(googleApiError(400, `Unable to parse range: ${params.range}`));
+        }
+        const width = lastColumnOfRange(params.range);
+        const values = ss.values.get(title) ?? [];
+        return Promise.resolve({
+          data: { values: width === null ? values : values.map((row) => row.slice(0, width)) },
+        });
       },
     },
   };
