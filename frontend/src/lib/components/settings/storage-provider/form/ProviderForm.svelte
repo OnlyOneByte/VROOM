@@ -28,7 +28,8 @@
 	import ProviderFolderSettings from './PhotoFolderSection.svelte';
 	import BackupSection from './BackupSection.svelte';
 	import { useGoogleOAuth } from '../use-google-oauth.svelte';
-	import { providerApi } from '#lib/services/provider-api.ts';
+	import { photosOnlyOnProvider, providerApi } from '#lib/services/provider-api.ts';
+	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
 	import { settingsApi } from '#lib/services/settings-api.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import FormLayout from '#lib/components/common/form-layout.svelte';
@@ -354,14 +355,22 @@
 		}
 	}
 
-	async function handleDelete() {
+	let photoLossMessage = $state('');
+	let photoLossConfirmOpen = $state(false);
+
+	async function handleDelete(force = false) {
 		if (!providerId) return;
 		isDeleting = true;
 		try {
-			await providerApi.deleteProvider(providerId);
+			await providerApi.deleteProvider(providerId, { force });
 			appStore.showSuccess(`${displayName.trim()} removed`);
 			navigateBack();
-		} catch {
+		} catch (error) {
+			if (photosOnlyOnProvider(error) !== null && error instanceof Error) {
+				photoLossMessage = error.message;
+				photoLossConfirmOpen = true;
+				return;
+			}
 			appStore.showError('Failed to delete provider');
 		} finally {
 			isDeleting = false;
@@ -562,7 +571,7 @@
 						<CardDescription>Permanently remove this provider</CardDescription>
 					</CardHeader>
 					<CardContent>
-						<Button variant="destructive" onclick={handleDelete} disabled={isDeleting}>
+						<Button variant="destructive" onclick={() => handleDelete()} disabled={isDeleting}>
 							{#if isDeleting}
 								<LoaderCircle class="h-4 w-4 animate-spin mr-1" />
 								Deleting...
@@ -593,3 +602,11 @@
 		</Button>
 	{/if}
 </FormLayout>
+
+<ConfirmDialog
+	bind:open={photoLossConfirmOpen}
+	title="Delete {displayName.trim() || 'provider'}?"
+	description={photoLossMessage}
+	confirmLabel="Delete anyway"
+	onConfirm={() => handleDelete(true)}
+/>

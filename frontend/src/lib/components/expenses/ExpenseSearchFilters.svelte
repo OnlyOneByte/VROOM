@@ -35,7 +35,7 @@
 		onClearFilters
 	}: Props = $props();
 
-	let selectedTags = $state<string[]>([]);
+	let selectedTags = $derived(filters.tags ?? []);
 	let tagSearchTerm = $state('');
 	let tagSearchFocused = $state(false);
 	let tagInputEl = $state<HTMLInputElement | null>(null);
@@ -59,8 +59,7 @@
 
 	function addTag(tag: string): void {
 		if (!selectedTags.includes(tag)) {
-			selectedTags = [...selectedTags, tag];
-			filters = { ...filters, tags: selectedTags.length > 0 ? selectedTags : undefined };
+			filters = { ...filters, tags: [...selectedTags, tag] };
 		}
 		tagSearchTerm = '';
 		tagSearchFocused = true;
@@ -68,8 +67,8 @@
 	}
 
 	function removeTag(tag: string): void {
-		selectedTags = selectedTags.filter(t => t !== tag);
-		filters = { ...filters, tags: selectedTags.length > 0 ? selectedTags : undefined };
+		const remaining = selectedTags.filter(t => t !== tag);
+		filters = { ...filters, tags: remaining.length > 0 ? remaining : undefined };
 	}
 
 	function handleTagKeydown(e: KeyboardEvent): void {
