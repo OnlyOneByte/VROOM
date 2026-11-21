@@ -46,6 +46,7 @@ export interface ImportPlan {
   rows: ImportRowResult[];
   readyCount: number;
   errorCount: number;
+  fileCurrencies: string[];
 }
 
 export class CsvImportError extends Error {}
@@ -305,15 +306,32 @@ export function buildImportPlan(
     return { row: rowNum, status: 'ready' as const, expense: result.expense, raw };
   });
 
+  const fileCurrencies = [
+    ...new Set(
+      records.map((record) => denormalizeCsvCell((record.currency ?? '').trim()).toUpperCase())
+    ),
+  ].filter(Boolean);
+
   const readyCount = rows.filter((r) => r.status === 'ready').length;
-  return { rows, readyCount, errorCount: rows.length - readyCount };
+  return { rows, readyCount, errorCount: rows.length - readyCount, fileCurrencies };
 }
 
-export function summarizeImportPlan(plan: ImportPlan) {
+export function currencyMismatchWarning(
+  fileCurrencies: string[],
+  accountCurrency: string
+): string | undefined {
+  const foreign = fileCurrencies.filter((currency) => currency !== accountCurrency.toUpperCase());
+  if (foreign.length === 0) return undefined;
+  return `This file is in ${foreign.join(', ')}; amounts will be imported as ${accountCurrency} without conversion.`;
+}
+
+export function summarizeImportPlan(plan: ImportPlan, accountCurrency: string) {
+  const currencyWarning = currencyMismatchWarning(plan.fileCurrencies, accountCurrency);
   return {
     readyCount: plan.readyCount,
     errorCount: plan.errorCount,
     totalRows: plan.rows.length,
+    ...(currencyWarning ? { currencyWarning } : {}),
     rows: plan.rows.map((r) => ({
       row: r.row,
       status: r.status,

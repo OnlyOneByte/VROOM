@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { CircleAlert, CircleCheck, FileText, LoaderCircle } from '@lucide/svelte';
+	import { Alert, AlertDescription } from '#lib/components/ui/alert/index.ts';
 	import type { ExpenseImportResult } from '#lib/services/expense-api.ts';
 
 	interface Props {
@@ -35,6 +36,12 @@
 				</span>
 			{/if}
 		</div>
+
+		{#if preview.currencyWarning}
+			<Alert variant="warning" role="status" class="mt-3" data-testid="import-currency-warning">
+				<AlertDescription>{preview.currencyWarning}</AlertDescription>
+			</Alert>
+		{/if}
 
 		{#if errorRows.length > 0}
 			<div class="mt-3 max-h-40 space-y-1.5 overflow-y-auto border-t pt-3">

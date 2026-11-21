@@ -56,6 +56,7 @@ interface ImportResponse {
     errorCount: number;
     totalRows: number;
     rows: Array<{ row: number; status: string; message?: string }>;
+    currencyWarning?: string;
   };
 }
 
@@ -522,5 +523,53 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect(row?.mileage).toBe(30000);
     expect(row?.volume).toBe(10);
     expect(row?.fuel_type).toBe('regular');
+  });
+});
+
+describe('import currency check', () => {
+  const HEADER = 'date,vehicle,category,amount,currency,description';
+  const csvIn = (...currencies: string[]) =>
+    [
+      HEADER,
+      ...currencies.map((cur, i) => `2024-06-0${i + 1}T00:00:00.000Z,Daily Driver,misc,5,${cur},`),
+    ].join('\n');
+
+  test('a file in another currency gets a warning in the dry run and imports the amounts unconverted', async () => {
+    await seedCivic('Daily Driver');
+    await ctx.authed('PUT', '/api/v1/settings', { currencyUnit: 'JPY' });
+
+    const preview = await json<ImportResponse>(
+      await ctx.authed('POST', '/api/v1/expenses/import', {
+        csv: csvIn('EUR', 'eur'),
+        dryRun: true,
+      })
+    );
+    expect(preview.data.currencyWarning).toBe(
+      'This file is in EUR; amounts will be imported as JPY without conversion.'
+    );
+
+    const imported = await json<ImportResponse>(
+      await ctx.authed('POST', '/api/v1/expenses/import', { csv: csvIn('EUR', 'eur') })
+    );
+    expect(imported.data.imported).toBe(2);
+    expect((await listExpenses()).map((r) => r.expenseAmount)).toEqual([5, 5]);
+  });
+
+  test('no warning when the file matches the account currency or has no currency column', async () => {
+    await seedCivic('Daily Driver');
+
+    const same = await json<ImportResponse>(
+      await ctx.authed('POST', '/api/v1/expenses/import', { csv: csvIn('USD'), dryRun: true })
+    );
+    expect(same.data.currencyWarning).toBeUndefined();
+
+    const noColumn = await json<ImportResponse>(
+      await ctx.authed('POST', '/api/v1/expenses/import', {
+        csv: 'date,vehicle,category,amount\n2024-06-01T00:00:00.000Z,Daily Driver,misc,5',
+        dryRun: true,
+      })
+    );
+    expect(noColumn.data.readyCount).toBe(1);
+    expect(noColumn.data.currencyWarning).toBeUndefined();
   });
 });
