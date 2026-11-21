@@ -92,7 +92,7 @@ describe('PushNotificationsCard status', () => {
 	])('a VAPID error with %s marks push unconfigured', async (_label, failure) => {
 		getVapidPublicKey.mockRejectedValue(failure);
 		await mount();
-		expect(statusText()).toBe('Push notifications are not configured on this server.');
+		expect(statusText()).toBe("Push notifications aren't set up on this server.");
 		expect(screen.queryByTestId('push-toggle')).toBeNull();
 	});
 
@@ -179,8 +179,8 @@ describe('PushNotificationsCard enable and disable', () => {
 		[{ ok: false, reason: 'unsupported' } as const, /does not support push notifications/, null],
 		[
 			{ ok: false, reason: 'unconfigured' } as const,
-			/not configured on this server/,
-			'Push notifications are not configured on this server'
+			/aren't set up on this server/,
+			"Push notifications aren't set up on this server."
 		],
 		[
 			{ ok: false, reason: 'error', message: SERVER_FAILURE_MESSAGE } as const,

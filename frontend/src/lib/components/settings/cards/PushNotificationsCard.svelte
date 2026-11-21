@@ -106,7 +106,7 @@
 				status = 'unsupported';
 			} else if (outcome.reason === 'unconfigured') {
 				status = 'unconfigured';
-				appStore.showError('Push notifications are not configured on this server');
+				appStore.showError("Push notifications aren't set up on this server.");
 			} else {
 				appStore.showError(
 					`Couldn't turn on push notifications. ${outcome.message ?? UNEXPECTED_FAILURE_MESSAGE}`

@@ -91,6 +91,6 @@ describe('dashboard chart row', () => {
 
 		await waitFor(() => expect(pieRendered).toBe(true));
 		expect(trendRendered).toBe(true);
-		expect(screen.queryByText('Charts could not be loaded', { exact: false })).toBeNull();
+		expect(screen.queryByText("Charts couldn't be loaded", { exact: false })).toBeNull();
 	});
 });

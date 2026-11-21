@@ -261,7 +261,7 @@
 				<ChartCard title="Loading" isLoading>
 					<div></div>
 				</ChartCard>
-				<ChartCard title="Error" error="Failed to load chart data">
+				<ChartCard title="Error" error="Couldn't load the chart data.">
 					<div></div>
 				</ChartCard>
 			</div>
