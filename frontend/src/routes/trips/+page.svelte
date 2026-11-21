@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { resolve } from '$app/paths';
+	import { routes } from '#lib/routes.ts';
 	import { Car, CircleAlert, MapPin, Pencil, Plus, Route, Trash2 } from '@lucide/svelte';
 	import { tripApi } from '#lib/services/trip-api.ts';
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
@@ -139,6 +141,25 @@
 				onclick={load}>Retry</button
 			>
 		</div>
+	{:else if trips.length === 0 && vehicles.length === 0}
+		<EmptyState>
+			{#snippet icon()}
+				<Car class="h-12 w-12 text-muted-foreground mb-4" />
+			{/snippet}
+			{#snippet title()}
+				Add a vehicle first
+			{/snippet}
+			{#snippet description()}
+				Every trip belongs to a vehicle. Add your car, then log trips with their start and end
+				odometer.
+			{/snippet}
+			{#snippet action()}
+				<Button size="lg" href={resolve(routes.vehicleNew)}>
+					<Plus class="mr-2 h-4 w-4" />
+					Add Vehicle
+				</Button>
+			{/snippet}
+		</EmptyState>
 	{:else if trips.length === 0}
 		<EmptyState>
 			{#snippet icon()}
@@ -152,7 +173,7 @@
 				build a mileage-reimbursement report and feed your vehicle's odometer history.
 			{/snippet}
 			{#snippet action()}
-				<Button size="lg" onclick={openCreate} disabled={vehicles.length === 0}>
+				<Button size="lg" onclick={openCreate}>
 					<Plus class="mr-2 h-4 w-4" />
 					Log Trip
 				</Button>
