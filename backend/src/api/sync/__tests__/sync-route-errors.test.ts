@@ -14,19 +14,19 @@ interface ErrorBody {
 }
 
 describe('sync route error behavior', () => {
-  test('POST /sync with invalid syncTypes → 400 VALIDATION_ERROR (SyncError path)', async () => {
+  test('POST /sync with invalid syncTypes → 400 ValidationError', async () => {
     const res = await ctx.authed('POST', '/api/v1/sync', { syncTypes: [] });
     const body = (await json<ErrorBody>(res)) as ErrorBody;
     expect(res.status).toBe(400);
     expect(body.success).toBe(false);
-    expect(body.error.code).toBe('VALIDATION_ERROR');
+    expect(body.error.code).toBe('ValidationError');
   });
 
-  test('POST /sync with an unknown sync type → 400 VALIDATION_ERROR (SyncError path)', async () => {
+  test('POST /sync with an unknown sync type → 400 ValidationError', async () => {
     const res = await ctx.authed('POST', '/api/v1/sync', { syncTypes: ['not_a_real_type'] });
     const body = (await json<ErrorBody>(res)) as ErrorBody;
     expect(res.status).toBe(400);
-    expect(body.error.code).toBe('VALIDATION_ERROR');
+    expect(body.error.code).toBe('ValidationError');
     expect(body.error.message).toContain('Invalid sync types');
   });
 
@@ -39,7 +39,7 @@ describe('sync route error behavior', () => {
     });
     const body = (await json<ErrorBody>(res)) as ErrorBody;
     expect(res.status).toBe(400);
-    expect(body.error.code).toBe('VALIDATION_ERROR');
+    expect(body.error.code).toBe('ValidationError');
   });
 
   test('an unauthenticated sync request → 401 via the central handler (AppError keeps its status)', async () => {

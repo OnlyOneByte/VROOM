@@ -1,7 +1,6 @@
 import { describe, expect, setSystemTime, test } from 'bun:test';
 import { type Context, Hono } from 'hono';
 import type { AuthUser } from '../../api/auth/lucia';
-import { SyncErrorCode } from '../../errors';
 import { errorHandler } from '../error-handler';
 import { idempotency } from '../idempotency';
 
@@ -66,13 +65,13 @@ describe('idempotency middleware — method & key gating', () => {
     expect(getCount()).toBe(2);
   });
 
-  test('a missing key with required:true throws a 400 VALIDATION_ERROR', async () => {
+  test('a missing key with required:true throws a 400 ValidationError', async () => {
     const { app, getCount } = makeApp({ required: true });
     const res = await app.request('/op', { method: 'POST', headers: JSON_HEADERS });
     expect(res.status).toBe(400);
     const body = (await res.json()) as ErrorBody;
     expect(body.success).toBe(false);
-    expect(body.error.code).toBe(SyncErrorCode.VALIDATION_ERROR);
+    expect(body.error.code).toBe('ValidationError');
     expect(getCount()).toBe(0);
   });
 });
@@ -146,5 +145,67 @@ describe('idempotency middleware — caching contract', () => {
     } finally {
       setSystemTime();
     }
+  });
+});
+
+describe('idempotency middleware — key reuse and key length', () => {
+  test('reusing a key with a different body is a 422 and the handler does not run again', async () => {
+    const { app, getCount } = makeApp({ userId: 'u-reuse' });
+    const headers = { ...JSON_HEADERS, 'Idempotency-Key': 'k-reuse-body' };
+    await app.request('/op', { method: 'POST', headers, body: JSON.stringify({ a: 1 }) });
+
+    const res = await app.request('/op', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ a: 2 }),
+    });
+
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as ErrorBody).error.code).toBe('UnprocessableEntityError');
+    expect(getCount()).toBe(1);
+  });
+
+  test('the same body replays the first response', async () => {
+    const { app, getCount } = makeApp({ userId: 'u-replay' });
+    const headers = { ...JSON_HEADERS, 'Idempotency-Key': 'k-same-body' };
+    const body = JSON.stringify({ a: 1 });
+    await app.request('/op', { method: 'POST', headers, body });
+
+    const res = await app.request('/op', { method: 'POST', headers, body });
+
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as CountBody).count).toBe(1);
+    expect(getCount()).toBe(1);
+  });
+
+  test('a retried multipart upload replays even though its boundary changed', async () => {
+    const { app, getCount } = makeApp({ userId: 'u-multipart' });
+    const send = () => {
+      const form = new FormData();
+      form.append('mode', 'preview');
+      form.append('file', new File([new Uint8Array([1, 2, 3])], 'backup.zip'));
+      return app.request('/op', {
+        method: 'POST',
+        headers: { 'Idempotency-Key': 'k-multipart' },
+        body: form,
+      });
+    };
+    await send();
+
+    const res = await send();
+
+    expect(res.status).toBe(200);
+    expect(getCount()).toBe(1);
+  });
+
+  test('a key longer than 255 characters is a 400', async () => {
+    const { app, getCount } = makeApp();
+    const res = await app.request('/op', {
+      method: 'POST',
+      headers: { ...JSON_HEADERS, 'Idempotency-Key': 'k'.repeat(256) },
+    });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as ErrorBody).error.code).toBe('ValidationError');
+    expect(getCount()).toBe(0);
   });
 });

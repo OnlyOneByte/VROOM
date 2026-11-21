@@ -369,7 +369,7 @@ export class GoogleSheetsService {
       .filter(Boolean);
 
     if (segments.length === 0) {
-      throw new SyncError(SyncErrorCode.VALIDATION_ERROR, 'Backup folder path cannot be empty');
+      throw new ValidationError('Backup folder path cannot be empty');
     }
 
     let parentId = '';
@@ -417,10 +417,7 @@ export class GoogleSheetsService {
 
     const spreadsheet = response.data;
     if (!spreadsheet.spreadsheetId || !spreadsheet.properties?.title) {
-      throw new SyncError(
-        SyncErrorCode.VALIDATION_ERROR,
-        'Invalid spreadsheet data returned from Google Sheets'
-      );
+      throw new ValidationError('Invalid spreadsheet data returned from Google Sheets');
     }
 
     return {

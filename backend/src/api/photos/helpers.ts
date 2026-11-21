@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/connection';
 import { photos } from '../../db/schema';
-import { AppError, NotFoundError, ValidationError } from '../../errors';
+import { NotFoundError, ValidationError } from '../../errors';
 import { requireVehicleWrite, resolveVehicleOwnerId } from '../../utils/sharing';
 import { validateInsuranceOwnership, validateVehicleOwnership } from '../../utils/validation';
 import { expenseRepository } from '../expenses/repository';
@@ -63,7 +63,7 @@ export async function parseUploadedPhoto(c: Context): Promise<File> {
   });
   const file = body.photo;
   if (!file || !(file instanceof File)) {
-    throw new AppError('No photo file provided', 400);
+    throw new ValidationError('No photo file provided');
   }
   return file;
 }
