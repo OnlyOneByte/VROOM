@@ -8,6 +8,7 @@ function params(overrides: Partial<SyncStatusParams> = {}): SyncStatusParams {
 		syncStatus: 'idle',
 		pendingCount: 0,
 		conflictsCount: 0,
+		serverReachable: true,
 		...overrides
 	};
 }

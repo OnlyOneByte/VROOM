@@ -263,7 +263,8 @@
 					variant={isExpanded ? 'default' : 'ghost'}
 					onclick={handleManualSync}
 					disabled={syncState.current === 'syncing'}
-					aria-label={isExpanded ? undefined : `Sync ${pendingCount}`}
+					aria-label={isExpanded ? undefined : 'Sync Now'}
+					aria-busy={syncState.current === 'syncing'}
 					title={isExpanded
 						? undefined
 						: `Sync ${pendingCount} pending ${pendingCount === 1 ? 'expense' : 'expenses'}`}
