@@ -9,7 +9,7 @@ test.describe('Offline expense entry', () => {
 		await mockApi(page);
 	});
 
-	test('an expense saved offline shows on the list, and Add Expense opens again', async ({
+	test('an expense saved offline shows on the list, and Add Expense opens again with the cached vehicles', async ({
 		page
 	}) => {
 		await page.goto('/expenses');
@@ -40,6 +40,8 @@ test.describe('Offline expense entry', () => {
 		await page.getByRole('link', { name: /Add Expense/ }).click();
 		await expect(page.getByRole('heading', { name: 'Add Expense' })).toBeVisible();
 		await expect(page.getByText("This page couldn't load")).toHaveCount(0);
+		await expect(page.getByText(`${VEHICLE_CAMRY.year} Toyota Camry`)).toBeVisible();
+		await expect(page.getByText("Couldn't load your vehicles")).toHaveCount(0);
 	});
 });
 
