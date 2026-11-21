@@ -1,5 +1,6 @@
 import { isElectricFuelType } from '../db/types';
 import { averageConsecutiveMpg, calculateAverageMilesPerKwh, maxOf } from './calculations';
+import { NATIVE_SCALE, type UnitScale } from './unit-conversions';
 
 export interface FuelExpense {
   id: string;
@@ -29,7 +30,8 @@ export function calculateVehicleStats(
   fuelExpenses: FuelExpense[],
   initialMileage: number,
   trackFuel = true,
-  trackCharging = false
+  trackCharging = false,
+  scale: UnitScale = NATIVE_SCALE
 ): VehicleStats {
   const stats: VehicleStats = {
     totalMileage: 0,
@@ -80,12 +82,12 @@ export function calculateVehicleStats(
   if (trackFuel) {
     const fuelWithMileage = fuelGroup.filter((e) => e.mileage !== null && e.mileage !== undefined);
     if (stats.totalFuelConsumed > 0 && fuelWithMileage.length >= 2) {
-      stats.averageMpg = calculateAverageMpg(fuelWithMileage);
+      stats.averageMpg = calculateAverageMpg(fuelWithMileage, scale);
     }
   }
 
   if (trackCharging) {
-    stats.averageMilesPerKwh = calculateAverageMilesPerKwh(chargeGroup);
+    stats.averageMilesPerKwh = calculateAverageMilesPerKwh(chargeGroup, scale);
   }
 
   return stats;
@@ -117,7 +119,7 @@ function calculateMileageStats(
   }
 }
 
-function calculateAverageMpg(unorderedExpenses: FuelExpense[]): number | null {
+function calculateAverageMpg(unorderedExpenses: FuelExpense[], scale: UnitScale): number | null {
   const sorted = [...unorderedExpenses].sort((a, b) => a.date.getTime() - b.date.getTime());
-  return averageConsecutiveMpg(sorted);
+  return averageConsecutiveMpg(sorted, scale);
 }

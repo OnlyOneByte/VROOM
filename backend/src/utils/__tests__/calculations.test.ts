@@ -123,6 +123,25 @@ describe('averageConsecutiveMpg', () => {
     ).toBeCloseTo((500 / 20 + 600 / 20) / 2, 5);
   });
 
+  test('a km/L vehicle is banded in mpg: 4 km/L (about 9.4 mpg) is kept in its own unit', () => {
+    const kmPerLiter = { distance: 1 / 1.609344, volume: 1 / 3.785411784 };
+    expect(
+      averageConsecutiveMpg(
+        [
+          { mileage: 50_000, volume: 30 },
+          { mileage: 50_120, volume: 30 },
+        ],
+        kmPerLiter
+      )
+    ).toBeCloseTo(4, 9);
+    expect(
+      averageConsecutiveMpg([
+        { mileage: 50_000, volume: 30 },
+        { mileage: 50_120, volume: 30 },
+      ])
+    ).toBeNull();
+  });
+
   test('fewer than 2 rows (and an empty list) gives null', () => {
     expect(averageConsecutiveMpg([])).toBeNull();
     expect(averageConsecutiveMpg([{ mileage: 1000, volume: 20 }])).toBeNull();

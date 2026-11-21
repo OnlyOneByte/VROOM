@@ -4,6 +4,7 @@
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
 	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
+	import { hasTermEnded } from '#lib/utils/insurance.ts';
 	import type { InsuranceTerm } from '#lib/types/index.ts';
 
 	interface Props {
@@ -18,39 +19,43 @@
 	let { term, isCurrent = false, vehicleNames = [], onEdit, onDelete, onRenew }: Props = $props();
 
 	let confirmOpen = $state(false);
+	let ended = $derived(hasTermEnded(term));
+	let termLabel = $derived(isCurrent ? (ended ? 'Latest Term' : 'Current Term') : 'Past Term');
 </script>
 
 <div class="rounded-lg border p-3 space-y-2 {isCurrent ? 'bg-muted/30' : 'bg-background'}">
 	<div class="flex items-center justify-between">
 		<Badge variant="secondary" class="text-xs">
-			{isCurrent ? 'Current Term' : 'Past Term'}
+			{termLabel}
 		</Badge>
-		<div class="flex items-center gap-0.5">
+		<div class="flex items-center gap-2">
 			{#if onEdit}
 				<Button
 					variant="ghost"
 					size="icon"
-					class="h-7 w-7"
+					class="size-10 sm:size-9"
 					onclick={() => onEdit(term)}
 					title="Edit term"
+					aria-label="Edit term"
 				>
-					<Pencil class="h-3 w-3" />
+					<Pencil />
 				</Button>
 			{/if}
 			{#if onDelete}
 				<Button
 					variant="ghost"
 					size="icon"
-					class="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+					class="size-10 sm:size-9 text-destructive hover:text-destructive hover:bg-destructive/10"
 					onclick={() => (confirmOpen = true)}
 					title="Delete term"
+					aria-label="Delete term"
 				>
-					<Trash2 class="h-3 w-3" />
+					<Trash2 />
 				</Button>
 			{/if}
 			{#if isCurrent && onRenew}
-				<Button variant="outline" size="sm" class="h-7 text-xs ml-1" onclick={onRenew}>
-					<RefreshCw class="mr-1 h-3 w-3" />
+				<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={onRenew}>
+					<RefreshCw />
 					Renew
 				</Button>
 			{/if}
@@ -59,7 +64,7 @@
 
 	<div class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
 		{#if isCurrent}
-			<div class="text-muted-foreground">Expires</div>
+			<div class="text-muted-foreground">{ended ? 'Ended' : 'Expires'}</div>
 			<div class="font-medium text-foreground">{formatDate(term.endDate)}</div>
 		{:else}
 			<div class="text-muted-foreground">Start</div>
