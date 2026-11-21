@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import type { ReminderNotification, ReminderWithVehicles } from '#lib/types/index.ts';
+import { ApiError, SERVER_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 
 vi.mock('#lib/components/reminders/ReminderForm.svelte', () => ({ default: () => {} }));
 vi.mock('#lib/components/reminders/MaterializedExpensesDialog.svelte', () => ({
@@ -16,13 +17,16 @@ const api = vi.hoisted(() => ({
 	markServiced: vi.fn(),
 	delete: vi.fn()
 }));
-const { addNotification } = vi.hoisted(() => ({ addNotification: vi.fn() }));
+const { addNotification, showError } = vi.hoisted(() => ({
+	addNotification: vi.fn(),
+	showError: vi.fn()
+}));
 
 vi.mock('#lib/services/reminder-api.ts', () => ({ reminderApi: api }));
 vi.mock('#lib/services/vehicle-api.ts', () => ({
 	vehicleApi: { getVehicles: () => Promise.resolve([]) }
 }));
-vi.mock('#lib/stores/app.svelte.ts', () => ({ appStore: { addNotification } }));
+vi.mock('#lib/stores/app.svelte.ts', () => ({ appStore: { addNotification, showError } }));
 
 import Page from '../+page.svelte';
 
@@ -56,10 +60,12 @@ function notification(id: string): ReminderNotification {
 	} as unknown as ReminderNotification;
 }
 
-const failure = () => Promise.reject(new Error('Request failed with status 500'));
+const failure = () => Promise.reject(new ApiError('boom', 500));
 
-function expectToast(message: string) {
-	return waitFor(() => expect(addNotification).toHaveBeenCalledWith({ type: 'error', message }));
+function expectToast(action: string) {
+	return waitFor(() =>
+		expect(showError).toHaveBeenCalledWith(`${action} ${SERVER_FAILURE_MESSAGE}`)
+	);
 }
 
 beforeEach(() => {
@@ -69,49 +75,50 @@ beforeEach(() => {
 });
 
 describe('/reminders error copy', () => {
-	test('the load-error card title is in Title Case', async () => {
+	test('the load-error card says what failed and why, without the server text', async () => {
 		api.list.mockImplementation(failure);
 		render(Page);
 
-		await waitFor(() => expect(screen.getByText('Failed to Load Reminders')).toBeInTheDocument());
-		await expectToast('Failed to load reminders. Please try again.');
+		await waitFor(() => expect(screen.getByText("Couldn't load reminders")).toBeInTheDocument());
+		expect(screen.getByText(SERVER_FAILURE_MESSAGE)).toBeInTheDocument();
+		expect(screen.queryByText(/boom/)).toBeNull();
 	});
 
-	test('a failed Run Due Reminders tells the user to try again', async () => {
+	test('a failed Run Due Reminders says what failed and why', async () => {
 		api.trigger.mockImplementation(failure);
 		render(Page);
 
 		await fireEvent.click(await screen.findByRole('button', { name: 'Run Due Reminders' }));
-		await expectToast('Failed to run due reminders. Please try again.');
+		await expectToast("Couldn't run the due reminders.");
 	});
 
-	test('a failed Mark as read tells the user to try again', async () => {
+	test('a failed Mark as read says what failed and why', async () => {
 		api.getNotifications.mockResolvedValue([notification('n1')]);
 		api.markNotificationRead.mockImplementation(failure);
 		render(Page);
 
 		await fireEvent.click(await screen.findByRole('button', { name: 'Mark as read' }));
-		await expectToast('Failed to mark as read. Please try again.');
+		await expectToast("Couldn't mark the notification as read.");
 	});
 
-	test('a failed Mark All Read tells the user to try again', async () => {
+	test('a failed Mark All Read says what failed and why', async () => {
 		api.getNotifications.mockResolvedValue([notification('n1'), notification('n2')]);
 		api.markNotificationRead.mockImplementation(failure);
 		render(Page);
 
 		await fireEvent.click(await screen.findByRole('button', { name: 'Mark All Read' }));
-		await expectToast('Failed to mark all as read. Please try again.');
+		await expectToast("Couldn't mark the notifications as read.");
 	});
 
-	test('a failed Pause tells the user to try again', async () => {
+	test('a failed Pause says what failed and why', async () => {
 		api.update.mockImplementation(failure);
 		render(Page);
 
 		await fireEvent.click(await screen.findByRole('button', { name: 'Pause' }));
-		await expectToast('Failed to update reminder. Please try again.');
+		await expectToast("Couldn't pause the reminder.");
 	});
 
-	test('a failed Mark Serviced tells the user to try again', async () => {
+	test('a failed Mark Serviced says what failed and why', async () => {
 		api.list.mockResolvedValue([
 			reminder({
 				triggerMode: 'mileage',
@@ -124,16 +131,16 @@ describe('/reminders error copy', () => {
 		render(Page);
 
 		await fireEvent.click(await screen.findByRole('button', { name: 'Mark Serviced' }));
-		await expectToast('Failed to mark serviced. Please try again.');
+		await expectToast("Couldn't mark the reminder as serviced.");
 	});
 
-	test('a failed delete tells the user to try again', async () => {
+	test('a failed delete says what failed and why', async () => {
 		api.delete.mockImplementation(failure);
 		render(Page);
 
 		await fireEvent.click(await screen.findByRole('button', { name: 'Delete reminder' }));
 		const dialog = await screen.findByRole('alertdialog');
 		await fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
-		await expectToast('Failed to delete reminder. Please try again.');
+		await expectToast("Couldn't delete the reminder.");
 	});
 });

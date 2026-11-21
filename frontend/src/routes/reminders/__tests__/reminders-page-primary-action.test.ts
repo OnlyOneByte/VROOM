@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/svelte';
 import type { ReminderWithVehicles } from '#lib/types/index.ts';
+import { ApiError, SERVER_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 
 vi.mock('#lib/components/reminders/ReminderForm.svelte', () => ({ default: () => {} }));
 vi.mock('#lib/components/reminders/MaterializedExpensesDialog.svelte', () => ({
@@ -75,12 +76,13 @@ describe('/reminders primary action', () => {
 
 describe('/reminders load failure', () => {
 	test('the error card never shows the server text', async () => {
-		list.mockImplementation(() => Promise.reject(new Error('Request failed with status 500')));
+		list.mockImplementation(() =>
+			Promise.reject(new ApiError('Request failed with status 500', 500))
+		);
 		render(Page);
 
-		await waitFor(() =>
-			expect(screen.getByText('Check your connection, then select Retry.')).toBeInTheDocument()
-		);
+		await waitFor(() => expect(screen.getByText("Couldn't load reminders")).toBeInTheDocument());
+		expect(screen.getByText(SERVER_FAILURE_MESSAGE)).toBeInTheDocument();
 		expect(screen.queryByText(/status 500/)).toBeNull();
 		expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
 	});
