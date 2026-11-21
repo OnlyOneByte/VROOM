@@ -10,15 +10,13 @@ import type {
 import { settingsApi } from '#lib/services/settings-api.ts';
 import { themeStore } from '#lib/stores/theme.svelte.ts';
 import { triggerBlobDownload } from '#lib/utils/download.ts';
-import { extractErrorMessage } from '#lib/utils/error-handling.ts';
+import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 
 const DEFAULT_UNIT_PREFERENCES: UnitPreferences = {
 	distanceUnit: 'miles',
 	volumeUnit: 'gallons_us',
 	chargeUnit: 'kwh'
 };
-
-const UNEXPECTED_ERROR = 'An unexpected error occurred';
 
 function createSettingsStore() {
 	let settings = $state<UserSettings | null>(null);
@@ -48,7 +46,7 @@ function createSettingsStore() {
 				themeStore.reconcileServerTheme(settings.themePreference);
 				isLoading = false;
 			} catch (err) {
-				error = extractErrorMessage(err, UNEXPECTED_ERROR);
+				error = userFacingErrorMessage(err);
 				isLoading = false;
 			}
 		},
@@ -61,7 +59,7 @@ function createSettingsStore() {
 				isLoading = false;
 				return settings;
 			} catch (err) {
-				error = extractErrorMessage(err, UNEXPECTED_ERROR);
+				error = userFacingErrorMessage(err);
 				isLoading = false;
 				throw err;
 			}
@@ -78,7 +76,7 @@ function createSettingsStore() {
 					`vroom-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.zip`
 				);
 			} catch (err) {
-				error = extractErrorMessage(err, UNEXPECTED_ERROR);
+				error = userFacingErrorMessage(err);
 				throw err;
 			}
 		},
@@ -94,7 +92,7 @@ function createSettingsStore() {
 				}
 				return result;
 			} catch (err) {
-				error = extractErrorMessage(err, UNEXPECTED_ERROR);
+				error = userFacingErrorMessage(err);
 				throw err;
 			}
 		},
@@ -104,7 +102,7 @@ function createSettingsStore() {
 			try {
 				return await settingsApi.executeSync(syncTypes, force);
 			} catch (err) {
-				error = extractErrorMessage(err, UNEXPECTED_ERROR);
+				error = userFacingErrorMessage(err);
 				throw err;
 			}
 		},
@@ -114,7 +112,7 @@ function createSettingsStore() {
 			try {
 				return await settingsApi.listBackupsFromProvider(providerId);
 			} catch (err) {
-				error = extractErrorMessage(err, UNEXPECTED_ERROR);
+				error = userFacingErrorMessage(err);
 				throw err;
 			}
 		},
@@ -124,7 +122,7 @@ function createSettingsStore() {
 			try {
 				return await settingsApi.listAllBackups();
 			} catch (err) {
-				error = extractErrorMessage(err, UNEXPECTED_ERROR);
+				error = userFacingErrorMessage(err);
 				throw err;
 			}
 		},
@@ -144,7 +142,7 @@ function createSettingsStore() {
 				}
 				return result;
 			} catch (err) {
-				error = extractErrorMessage(err, UNEXPECTED_ERROR);
+				error = userFacingErrorMessage(err);
 				throw err;
 			}
 		},
@@ -159,7 +157,7 @@ function createSettingsStore() {
 				restoreProviders = await settingsApi.getRestoreProviders();
 				return restoreProviders;
 			} catch (err) {
-				error = extractErrorMessage(err, UNEXPECTED_ERROR);
+				error = userFacingErrorMessage(err);
 				throw err;
 			}
 		},

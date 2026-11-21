@@ -1,7 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { PushEnableOutcome } from '#lib/utils/push.ts';
-import { ApiError } from '#lib/utils/error-handling.ts';
+import {
+	ApiError,
+	NETWORK_FAILURE_MESSAGE,
+	NetworkError,
+	SERVER_FAILURE_MESSAGE,
+	UNEXPECTED_FAILURE_MESSAGE
+} from '#lib/utils/error-handling.ts';
 
 const { push, getVapidPublicKey, showError, showSuccess } = vi.hoisted(() => ({
 	push: {
@@ -111,9 +117,11 @@ describe('PushNotificationsCard status', () => {
 	});
 
 	test('an unexpected error shows the message and retry reloads the status', async () => {
-		getVapidPublicKey.mockRejectedValueOnce(new Error('Network down'));
+		getVapidPublicKey.mockRejectedValueOnce(new NetworkError(new TypeError('Failed to fetch')));
 		await mount();
-		expect(screen.getByTestId('push-error')).toHaveTextContent('Network down');
+		expect(screen.getByTestId('push-error')).toHaveTextContent(
+			`Couldn't check notification status. ${NETWORK_FAILURE_MESSAGE}`
+		);
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 		await settle();
@@ -125,7 +133,7 @@ describe('PushNotificationsCard status', () => {
 		push.getExistingSubscription.mockRejectedValue('boom');
 		await mount();
 		expect(screen.getByTestId('push-error')).toHaveTextContent(
-			'Failed to check notification status'
+			`Couldn't check notification status. ${UNEXPECTED_FAILURE_MESSAGE}`
 		);
 	});
 });
@@ -175,11 +183,15 @@ describe('PushNotificationsCard enable and disable', () => {
 			'Push notifications are not configured on this server'
 		],
 		[
-			{ ok: false, reason: 'error', message: 'Subscribe failed' } as const,
+			{ ok: false, reason: 'error', message: SERVER_FAILURE_MESSAGE } as const,
 			/^Off/,
-			'Subscribe failed'
+			`Couldn't turn on push notifications. ${SERVER_FAILURE_MESSAGE}`
 		],
-		[{ ok: false, reason: 'error' } as const, /^Off/, 'Could not enable push notifications']
+		[
+			{ ok: false, reason: 'error' } as const,
+			/^Off/,
+			`Couldn't turn on push notifications. ${UNEXPECTED_FAILURE_MESSAGE}`
+		]
 	])('an enable outcome of %o updates status and errors', async (outcome, status, error) => {
 		localStorage.setItem(DISCLOSURE_KEY, '1');
 		push.enablePush.mockResolvedValue(outcome);
@@ -213,11 +225,13 @@ describe('PushNotificationsCard enable and disable', () => {
 
 	test('a failed turn-off reports an error and stays on', async () => {
 		push.getExistingSubscription.mockResolvedValue({} as PushSubscription);
-		push.disablePush.mockRejectedValue(new Error('x'));
+		push.disablePush.mockRejectedValue(new ApiError('unsubscribe exploded', 500));
 		await mount();
 		await fireEvent.click(screen.getByTestId('push-toggle'));
 		await settle();
-		expect(showError).toHaveBeenCalledWith('Could not turn off push notifications');
+		expect(showError).toHaveBeenCalledWith(
+			`Couldn't turn off push notifications. ${SERVER_FAILURE_MESSAGE}`
+		);
 		expect(statusText()).toBe(ON);
 	});
 });

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { settingsStore } from '../settings.svelte';
 import { themeStore } from '../theme.svelte';
+import { SERVER_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
@@ -46,7 +47,7 @@ describe('settings store — state-management contracts', () => {
 	it('update() RE-THROWS on failure (and records the error) so the caller await rejects', async () => {
 		mockFetch.mockResolvedValueOnce(errJson(500, 'update failed'));
 		await expect(settingsStore.update({ currencyUnit: 'EUR' })).rejects.toBeDefined();
-		expect(settingsStore.error).toBeTruthy();
+		expect(settingsStore.error).toBe(SERVER_FAILURE_MESSAGE);
 	});
 
 	it('a non-preview restoreFromProvider REFRESHES state via load() (second fetch = the reload)', async () => {
