@@ -355,6 +355,7 @@
 		}
 	}
 
+	let deleteConfirmOpen = $state(false);
 	let photoLossMessage = $state('');
 	let photoLossConfirmOpen = $state(false);
 
@@ -571,7 +572,11 @@
 						<CardDescription>Permanently remove this provider</CardDescription>
 					</CardHeader>
 					<CardContent>
-						<Button variant="destructive" onclick={() => handleDelete()} disabled={isDeleting}>
+						<Button
+							variant="destructive"
+							onclick={() => (deleteConfirmOpen = true)}
+							disabled={isDeleting}
+						>
 							{#if isDeleting}
 								<LoaderCircle class="h-4 w-4 animate-spin mr-1" />
 								Deleting...
@@ -602,6 +607,13 @@
 		</Button>
 	{/if}
 </FormLayout>
+
+<ConfirmDialog
+	bind:open={deleteConfirmOpen}
+	title="Delete {displayName.trim() || 'provider'}?"
+	description="Backups to this provider stop and its settings are removed from VROOM. Your files stay in the provider itself."
+	onConfirm={() => handleDelete()}
+/>
 
 <ConfirmDialog
 	bind:open={photoLossConfirmOpen}
