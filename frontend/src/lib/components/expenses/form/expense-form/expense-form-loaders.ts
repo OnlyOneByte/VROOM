@@ -2,9 +2,14 @@ import { expenseApi } from '#lib/services/expense-api.ts';
 import { vehicleApi } from '#lib/services/vehicle-api.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
 import { gotoDynamic } from '#lib/utils/navigation.ts';
-import { onlineStatus } from '#lib/stores/offline.svelte.ts';
-import { cacheVehicles, loadCachedVehicles } from '#lib/utils/offline-storage.ts';
-import type { Vehicle } from '#lib/types/index.ts';
+import { offlineExpenseQueue, onlineStatus } from '#lib/stores/offline.svelte.ts';
+import {
+	cacheVehicleHistory,
+	cacheVehicles,
+	loadCachedVehicleHistory,
+	loadCachedVehicles
+} from '#lib/utils/offline-storage.ts';
+import type { Expense, Vehicle } from '#lib/types/index.ts';
 import {
 	ApiError,
 	handleErrorWithNotification,
@@ -185,26 +190,38 @@ export async function loadLastFuelExpense(state: ExpenseFormState): Promise<Erro
 export async function loadAllVehicleExpenses(state: ExpenseFormState): Promise<Error | null> {
 	const isCurrent = state.nextHistoryRequest();
 	try {
-		const result = await expenseApi.getExpensesByVehicle(state.formData.vehicleId, { limit: 100 });
+		const vehicleId = state.formData.vehicleId;
+		const result = await expenseApi.getExpensesByVehicle(vehicleId, { limit: 100 });
+		cacheVehicleHistory(vehicleId, result.data);
 		if (isCurrent()) state.allVehicleExpenses = result.data;
 		return null;
 	} catch (error) {
 		if (!isCurrent()) return null;
-		state.allVehicleExpenses = [];
-		return toError(error);
+		const cached = onlineStatus.current ? null : loadCachedVehicleHistory(state.formData.vehicleId);
+		state.allVehicleExpenses = cached ? [...cached, ...queuedExpensesFor(state)] : [];
+		return cached ? null : toError(error);
 	}
+}
+
+function queuedExpensesFor(state: ExpenseFormState): Expense[] {
+	return offlineExpenseQueue.current
+		.filter(queued => !queued.synced && queued.vehicleId === state.formData.vehicleId)
+		.map(queued => ({ ...queued, tags: queued.tags ?? [] }) as unknown as Expense);
 }
 
 export async function loadVehicleContext(state: ExpenseFormState): Promise<void> {
 	const isCurrent = state.nextContextRequest();
-	const failures = await Promise.all([
+	const [vehicleFailure, lastFuelFailure, historyFailure] = await Promise.all([
 		loadVehicle(state),
 		loadLastFuelExpense(state),
 		loadAllVehicleExpenses(state)
 	]);
-	const offlineWithVehicle = !onlineStatus.current && state.vehicle !== null;
-	const failure = offlineWithVehicle ? undefined : failures.find(error => error !== null);
 	if (!isCurrent()) return;
+	const offline = !onlineStatus.current;
+	if (offline && historyFailure) state.vehicle = null;
+	const failure = offline
+		? (vehicleFailure ?? historyFailure)
+		: (vehicleFailure ?? lastFuelFailure ?? historyFailure);
 	state.vehicleError = failure ? userFacingErrorMessage(failure) : null;
 	if (failure) handleErrorWithNotification(failure, "Couldn't load this vehicle's details");
 }

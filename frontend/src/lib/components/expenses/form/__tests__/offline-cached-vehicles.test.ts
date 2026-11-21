@@ -5,8 +5,10 @@ import type { Vehicle } from '#lib/types/index.ts';
 const { addNotification, getVehicles, getVehicle, getExpensesByVehicle } = vi.hoisted(() => ({
 	addNotification: vi.fn(),
 	getVehicles: vi.fn(),
-	getVehicle: vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))),
-	getExpensesByVehicle: vi.fn(() => Promise.reject(new TypeError('Failed to fetch')))
+	getVehicle: vi.fn<() => Promise<unknown>>(() => Promise.reject(new TypeError('Failed to fetch'))),
+	getExpensesByVehicle: vi.fn<() => Promise<unknown>>(() =>
+		Promise.reject(new TypeError('Failed to fetch'))
+	)
 }));
 
 vi.mock('$app/navigation', () => ({
@@ -25,6 +27,25 @@ vi.mock('#lib/services/expense-api.ts', () => ({ expenseApi: { getExpensesByVehi
 const { onlineStatus } = await import('#lib/stores/offline.svelte.ts');
 const { setOfflineQueueOwner } = await import('#lib/utils/offline-storage.ts');
 const ExpenseForm = (await import('../ExpenseForm.svelte')).default;
+const { offlineExpenseQueue } = await import('#lib/stores/offline.svelte.ts');
+const { loadVehicleContext } = await import('../expense-form/expense-form-loaders.ts');
+type FormState = import('../expense-form/expense-form-state.svelte').ExpenseFormState;
+
+function fakeState(vehicleId: string): FormState {
+	const always = () => () => true;
+	return {
+		formData: { vehicleId },
+		ctx: { expenseId: undefined },
+		vehicle: null,
+		vehicleError: null,
+		lastFuelExpense: null,
+		allVehicleExpenses: [],
+		nextContextRequest: always,
+		nextVehicleRequest: always,
+		nextLastFuelRequest: always,
+		nextHistoryRequest: always
+	} as unknown as FormState;
+}
 
 const CAMRY = {
 	id: 'v1',
@@ -63,12 +84,15 @@ afterEach(() => {
 describe('the expense form offline', () => {
 	test('opens with the vehicles cached on the last online load, without an error', async () => {
 		getVehicles.mockResolvedValueOnce([CAMRY]);
+		getVehicle.mockResolvedValueOnce(CAMRY);
+		getExpensesByVehicle.mockResolvedValue({ data: [] });
 		const online = render(ExpenseForm);
 		await screen.findByText(/2020 Toyota Camry/);
 		online.unmount();
 
 		onlineStatus.current = false;
 		getVehicles.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+		getExpensesByVehicle.mockRejectedValue(new TypeError('Failed to fetch'));
 		addNotification.mockClear();
 		render(ExpenseForm);
 
@@ -86,6 +110,48 @@ describe('the expense form offline', () => {
 		render(ExpenseForm);
 
 		expect(await screen.findByTestId('vehicles-load-error')).toBeInTheDocument();
+	});
+
+	test('offline, the mileage check uses the cached history plus queued fill-ups', async () => {
+		storage.set('vroom_offline_vehicles:u1', JSON.stringify([CAMRY]));
+		storage.set(
+			'vroom_offline_vehicle_history:v1:u1',
+			JSON.stringify([
+				{ id: 'e1', vehicleId: 'v1', date: '2024-03-01T12:00:00.000Z', mileage: 45000 }
+			])
+		);
+		offlineExpenseQueue.current = [
+			{
+				id: 'q1',
+				vehicleId: 'v1',
+				tags: [],
+				category: 'fuel',
+				amount: 40,
+				date: '2024-03-10',
+				mileage: 45500,
+				timestamp: 1,
+				synced: false
+			}
+		];
+		onlineStatus.current = false;
+		const state = fakeState('v1');
+
+		await loadVehicleContext(state);
+
+		expect(state.allVehicleExpenses.map(expense => expense.mileage)).toEqual([45000, 45500]);
+		expect(state.vehicleError).toBeNull();
+		offlineExpenseQueue.current = [];
+	});
+
+	test('offline without a cached history, the vehicle is held back so a fill-up stays blocked', async () => {
+		storage.set('vroom_offline_vehicles:u1', JSON.stringify([CAMRY]));
+		onlineStatus.current = false;
+		const state = fakeState('v1');
+
+		await loadVehicleContext(state);
+
+		expect(state.vehicle).toBeNull();
+		expect(state.vehicleError).not.toBeNull();
 	});
 
 	test("never reads another user's cached vehicles", async () => {
