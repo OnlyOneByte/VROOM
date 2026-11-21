@@ -4,7 +4,7 @@
 </script>
 
 <svelte:head>
-	<title>Privacy Policy — VROOM</title>
+	<title>Privacy Policy - VROOM Car Tracker</title>
 	<meta name="description" content="VROOM privacy policy — how we handle your data." />
 </svelte:head>
 

@@ -208,7 +208,7 @@
 </script>
 
 <svelte:head>
-	<title>Profile - VROOM</title>
+	<title>Profile - VROOM Car Tracker</title>
 	<meta name="description" content="Manage your profile and account" />
 </svelte:head>
 
