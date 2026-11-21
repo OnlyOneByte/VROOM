@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { routes } from '#lib/routes.ts';
 	import {
@@ -15,9 +15,11 @@
 		Upload,
 		Images,
 		Ellipsis,
-		LoaderCircle
+		LoaderCircle,
+		WifiOff
 	} from '@lucide/svelte';
-	import { offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
+	import { offlineExpenseQueue, onlineStatus } from '#lib/stores/offline.svelte.ts';
+	import { Alert, AlertDescription, AlertTitle } from '#lib/components/ui/alert/index.ts';
 	import { removeOfflineExpense } from '#lib/utils/offline-storage.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
@@ -118,21 +120,32 @@
 		reload: handleFilterChange
 	});
 
+	let offlineLoad = $state(false);
+
 	onMount(loadInitial);
+
+	$effect(() => {
+		if (offlineLoad && onlineStatus.current) untrack(loadInitial);
+	});
 
 	async function loadInitial() {
 		isLoading = true;
 		loadError = null;
+		offlineLoad = false;
 		try {
 			const [, loadedVehicles] = await Promise.all([
 				settingsStore.load(),
 				vehicleApi.getVehicles(),
-				fetchPageAndSummary()
+				fetchPageAndSummary(0, { throwOnFailure: true })
 			]);
 			vehicles = loadedVehicles;
 		} catch (error) {
-			loadError = userFacingErrorMessage(error);
-			handleErrorWithNotification(error, "Couldn't load expenses");
+			if (onlineStatus.current) {
+				loadError = userFacingErrorMessage(error);
+				handleErrorWithNotification(error, "Couldn't load expenses");
+			} else {
+				offlineLoad = true;
+			}
 		} finally {
 			isLoading = false;
 		}
@@ -178,7 +191,7 @@
 		handleErrorWithNotification(error, "Couldn't load expenses");
 	}
 
-	async function fetchPageAndSummary(offset = 0) {
+	async function fetchPageAndSummary(offset = 0, { throwOnFailure = false } = {}) {
 		const isCurrentList = nextListRequest();
 		const isCurrentSummary = nextSummaryRequest();
 		isLoadingPage = true;
@@ -187,7 +200,7 @@
 				expenseApi.getAllExpenses(buildListParams(offset)),
 				expenseApi.getExpenseSummary(buildSummaryParams())
 			]);
-			if (isLoading) {
+			if (throwOnFailure) {
 				if (pageResult.status === 'rejected') throw pageResult.reason;
 				if (summaryResult.status === 'rejected') throw summaryResult.reason;
 			}
@@ -357,6 +370,30 @@
 			<Button size="lg" onclick={loadInitial}>Retry</Button>
 		</div>
 	</div>
+{:else if offlineLoad}
+	<div class="space-y-6 pb-24">
+		<PageHeader
+			title="All Expenses"
+			description="Track and categorize expenses across all vehicles"
+		/>
+		<Alert variant="warning" role="status" data-testid="expenses-offline-notice">
+			<WifiOff class="h-4 w-4" />
+			<AlertTitle>You're offline</AlertTitle>
+			<AlertDescription>
+				Your expense history loads when you reconnect. Expenses you add now are saved on this device
+				and sync automatically.
+			</AlertDescription>
+		</Alert>
+		<OfflineExpenseCards
+			{pendingExpenses}
+			{needsAttentionExpenses}
+			{syncedExpenses}
+			onRemovePending={removeOfflineExpense}
+			onRemoveNeedsAttention={removeOfflineExpense}
+		/>
+	</div>
+
+	<FloatingActionButton href={resolve(routes.expenseNew)} label={COMMON_MESSAGES.ADD_EXPENSE} />
 {:else}
 	<div class="space-y-6 pb-24">
 		<PageHeader
