@@ -120,4 +120,12 @@ describe('RecentActivityCard', () => {
 			'/expenses'
 		);
 	});
+
+	test('View All Expenses is 40px tall below sm and 36px from sm up', () => {
+		render(RecentActivityCard, {
+			expenses: [{ id: 'e1', amount: 1, category: 'misc', date: daysAgo(2), vehicleName: 'Bike' }]
+		});
+
+		expect(screen.getByRole('link', { name: /View All Expenses/ })).toHaveClass('h-10', 'sm:h-9');
+	});
 });
