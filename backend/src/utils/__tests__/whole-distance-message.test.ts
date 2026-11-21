@@ -52,6 +52,35 @@ describe('a decimal distance gets a readable message', () => {
         vehicleIds: [id],
       }),
     ],
+    [
+      'reminder last service odometer',
+      'POST',
+      '/api/v1/reminders',
+      (id) => ({
+        name: 'Oil change',
+        type: 'notification',
+        frequency: 'monthly',
+        triggerMode: 'mileage',
+        intervalMileage: 5000,
+        lastServiceOdometer: 12345.6,
+        startDate: '2024-01-15T00:00:00.000Z',
+        vehicleIds: [id],
+      }),
+    ],
+    [
+      'lease mileage limit',
+      'POST',
+      '/api/v1/financing/vehicles/:vehicleId/financing',
+      () => ({
+        financingType: 'lease',
+        provider: 'TestBank',
+        originalAmount: 20000,
+        termMonths: 36,
+        startDate: '2024-01-01T00:00:00.000Z',
+        paymentAmount: 300,
+        mileageLimit: 12000.5,
+      }),
+    ],
   ];
 
   for (const [label, method, route, body] of cases) {
