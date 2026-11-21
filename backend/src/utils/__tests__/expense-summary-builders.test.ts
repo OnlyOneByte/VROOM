@@ -8,7 +8,7 @@ import {
 } from '../analytics-charts';
 
 function d(year: number, month1to12: number, day: number): Date {
-  return new Date(year, month1to12 - 1, day);
+  return new Date(Date.UTC(year, month1to12 - 1, day));
 }
 
 function genRow(over: Partial<GeneralExpenseRow> = {}): GeneralExpenseRow {

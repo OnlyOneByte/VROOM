@@ -42,13 +42,19 @@ function fuel(over: Partial<TestExpense> & Pick<TestExpense, 'id' | 'date'>): Te
 
 describe('PHEV charge sessions stay out of the gas-MPG averages', () => {
   beforeEach(() => {
-    seedExpense(testDb.sqlite, fuel({ id: 'g1', date: new Date(2024, 0, 1), mileage: 10_000 }));
-    seedExpense(testDb.sqlite, fuel({ id: 'g2', date: new Date(2024, 0, 8), mileage: 10_300 }));
+    seedExpense(
+      testDb.sqlite,
+      fuel({ id: 'g1', date: new Date(Date.UTC(2024, 0, 1)), mileage: 10_000 })
+    );
+    seedExpense(
+      testDb.sqlite,
+      fuel({ id: 'g2', date: new Date(Date.UTC(2024, 0, 8)), mileage: 10_300 })
+    );
     seedExpense(
       testDb.sqlite,
       fuel({
         id: 'c1',
-        date: new Date(2024, 0, 15),
+        date: new Date(Date.UTC(2024, 0, 15)),
         mileage: 10_360,
         volume: 15,
         fuelType: 'Level 2 (AC)',
@@ -71,7 +77,7 @@ describe('PHEV charge sessions stay out of the gas-MPG averages', () => {
 
 describe('a split fuel expense counts as one fill-up', () => {
   test('seasonal and day-of-week fill-up counts skip volume-null siblings', async () => {
-    const date = new Date(2024, 0, 10);
+    const date = new Date(Date.UTC(2024, 0, 10));
     seedExpense(testDb.sqlite, fuel({ id: 's1', date, volume: 10, expenseAmount: 20 }));
     seedExpense(testDb.sqlite, fuel({ id: 's2', date, volume: null, expenseAmount: 20 }));
 
@@ -89,23 +95,38 @@ describe('PHEV gas fill-ups pair with gas, and kWh stays out of fuel volume', ()
   const CHARGE = 'Level 2 (AC)';
 
   beforeEach(() => {
-    seedExpense(testDb.sqlite, fuel({ id: 'g1', date: new Date(2024, 0, 1), mileage: 10_000 }));
+    seedExpense(
+      testDb.sqlite,
+      fuel({ id: 'g1', date: new Date(Date.UTC(2024, 0, 1)), mileage: 10_000 })
+    );
     seedExpense(
       testDb.sqlite,
       fuel({
         id: 'c1',
-        date: new Date(2024, 0, 5),
+        date: new Date(Date.UTC(2024, 0, 5)),
         mileage: 10_250,
         volume: 15,
         expenseAmount: 9,
         fuelType: CHARGE,
       })
     );
-    seedExpense(testDb.sqlite, fuel({ id: 'g2', date: new Date(2024, 0, 8), mileage: 10_300 }));
-    seedExpense(testDb.sqlite, fuel({ id: 'p1', date: new Date(2023, 5, 1), mileage: 5_000 }));
     seedExpense(
       testDb.sqlite,
-      fuel({ id: 'pc', date: new Date(2023, 5, 5), mileage: 5_100, volume: 50, fuelType: CHARGE })
+      fuel({ id: 'g2', date: new Date(Date.UTC(2024, 0, 8)), mileage: 10_300 })
+    );
+    seedExpense(
+      testDb.sqlite,
+      fuel({ id: 'p1', date: new Date(Date.UTC(2023, 5, 1)), mileage: 5_000 })
+    );
+    seedExpense(
+      testDb.sqlite,
+      fuel({
+        id: 'pc',
+        date: new Date(Date.UTC(2023, 5, 5)),
+        mileage: 5_100,
+        volume: 50,
+        fuelType: CHARGE,
+      })
     );
   });
 

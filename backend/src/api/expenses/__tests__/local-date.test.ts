@@ -1,5 +1,5 @@
-import { describe, expect, test } from 'bun:test';
-import { buildLocalDate } from '../local-date';
+import { afterEach, describe, expect, test } from 'bun:test';
+import { buildCalendarDate, buildLocalDate } from '../local-date';
 
 describe('buildLocalDate', () => {
   test('builds a valid date from in-range parts (local calendar day preserved)', () => {
@@ -50,5 +50,27 @@ describe('buildLocalDate', () => {
     const d = buildLocalDate(2024, 3, 15, 12, 90, 0);
     expect(d).not.toBeNull();
     expect(d?.getDate()).toBe(15);
+  });
+});
+
+describe('buildCalendarDate — a date-only import keeps its calendar day in UTC on any server', () => {
+  const originalTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  afterEach(() => {
+    process.env.TZ = originalTz;
+  });
+
+  for (const tz of ['Europe/Berlin', 'Pacific/Auckland', 'America/Los_Angeles']) {
+    test(`2024-03-01 stays 2024-03-01 (a Friday) in UTC with TZ=${tz}`, () => {
+      process.env.TZ = tz;
+      const d = buildCalendarDate(2024, 3, 1);
+      expect(d?.toISOString()).toBe('2024-03-01T12:00:00.000Z');
+      expect(d?.getUTCDay()).toBe(5);
+    });
+  }
+
+  test('rejects impossible days instead of rolling over', () => {
+    expect(buildCalendarDate(2024, 2, 30)).toBeNull();
+    expect(buildCalendarDate(2023, 2, 29)).toBeNull();
+    expect(buildCalendarDate(2024, 13, 1)).toBeNull();
   });
 });
