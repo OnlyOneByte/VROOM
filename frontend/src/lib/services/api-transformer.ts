@@ -13,16 +13,21 @@ interface BackendExpenseRequest {
 	description?: string | null;
 	location?: string | null;
 	missedFillup?: boolean;
-	sourceType?: string;
-	sourceId?: string;
+	sourceType?: string | null;
+	sourceId?: string | null;
 }
 
 interface ToBackendOptions {
 	isEdit?: boolean;
 }
 
+export type ExpenseInput = Omit<Partial<Expense>, 'sourceType' | 'sourceId'> & {
+	sourceType?: string | null;
+	sourceId?: string | null;
+};
+
 export function toBackendExpense(
-	frontendExpense: Partial<Expense> & {
+	frontendExpense: ExpenseInput & {
 		vehicleId: string;
 		category: ExpenseCategory;
 		amount: number;
@@ -65,11 +70,12 @@ export function toBackendExpense(
 	} else if (options.isEdit) {
 		backendExpense.location = null;
 	}
-	if (frontendExpense.sourceType) {
+	if (frontendExpense.sourceType && frontendExpense.sourceId) {
 		backendExpense.sourceType = frontendExpense.sourceType;
-	}
-	if (frontendExpense.sourceId) {
 		backendExpense.sourceId = frontendExpense.sourceId;
+	} else if (options.isEdit && frontendExpense.sourceType === null) {
+		backendExpense.sourceType = null;
+		backendExpense.sourceId = null;
 	}
 	if (frontendExpense.missedFillup !== undefined) {
 		backendExpense.missedFillup = frontendExpense.missedFillup;

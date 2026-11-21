@@ -46,6 +46,10 @@ export async function loadExpense(state: ExpenseFormState): Promise<void> {
 		}
 
 		state.originalExpense = expense;
+		if (expense.sourceType === 'financing' && expense.sourceId) {
+			state.sourceType = expense.sourceType;
+			state.sourceId = expense.sourceId;
+		}
 
 		if (expense.groupId) {
 			state.groupId = expense.groupId;

@@ -126,14 +126,14 @@ const updateExpenseSchema = createExpenseSchemaBase
   .partial()
   .extend({
     tags: z.array(tagElementSchema).max(CONFIG.validation.expense.maxTags).optional(),
+    sourceType: z.literal('financing').nullable().optional(),
+    sourceId: z.string().min(1).nullable().optional(),
   })
   // Zod refinements do not survive .partial().
   .refine(
-    (data) => {
-      const hasType = data.sourceType !== undefined;
-      const hasId = data.sourceId !== undefined;
-      return hasType === hasId;
-    },
+    (data) =>
+      (data.sourceType === undefined) === (data.sourceId === undefined) &&
+      (data.sourceType === null) === (data.sourceId === null),
     {
       message: 'sourceType and sourceId must both be provided or both omitted',
       path: ['sourceType'],
@@ -176,8 +176,8 @@ function assertSingleExpenseEditAllowed(update: Record<string, unknown>, existin
 }
 
 async function assertFinancingSourceValid(
-  sourceType: string | undefined,
-  sourceId: string | undefined,
+  sourceType: string | null | undefined,
+  sourceId: string | null | undefined,
   vehicleId: string
 ): Promise<void> {
   if (sourceType !== 'financing') return;
@@ -716,6 +716,13 @@ routes.put(
     if (!existingExpense) throw new NotFoundError('Expense');
     await requireVehicleWrite(existingExpense.vehicleId, user.id);
     assertSingleExpenseEditAllowed(updateData, existingExpense);
+    if (
+      updateData.sourceType === null &&
+      existingExpense.sourceType !== null &&
+      existingExpense.sourceType !== 'financing'
+    ) {
+      throw new ValidationError('Only a financing link can be removed from an expense');
+    }
 
     if (updateData.vehicleId && updateData.vehicleId !== existingExpense.vehicleId) {
       await requireVehicleWrite(updateData.vehicleId, user.id);

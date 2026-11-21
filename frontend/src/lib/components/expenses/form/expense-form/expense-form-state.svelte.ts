@@ -94,6 +94,9 @@ export class ExpenseFormState {
 
 	showFuelFields = $derived(this.formData.category === 'fuel');
 	isFinancingPayment = $derived(this.sourceType === 'financing' && !!this.sourceId);
+	clearsFinancingLink = $derived(
+		this.isEditMode && this.originalExpense?.sourceType === 'financing' && !this.isFinancingPayment
+	);
 	showVolumeField = $derived(this.showFuelFields && !isElectricFuelType(this.formData.fuelType));
 	showChargeField = $derived(this.showFuelFields && isElectricFuelType(this.formData.fuelType));
 	hasSplitVehicles = $derived(
