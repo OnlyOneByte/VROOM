@@ -31,6 +31,7 @@ export class ExpenseFormState {
 	showDeleteConfirm = $state(false);
 	vehicles = $state<Vehicle[]>([]);
 	vehiclesError = $state<string | null>(null);
+	expenseError = $state<string | null>(null);
 	vehicleError = $state<string | null>(null);
 	errors = $state<ExpenseFormErrors>({});
 	submitError = $state<string | null>(null);

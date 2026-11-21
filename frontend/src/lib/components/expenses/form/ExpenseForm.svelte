@@ -149,6 +149,13 @@
 		}
 	}
 
+	async function reloadExpense() {
+		await loadExpense(form);
+		if (form.formData.vehicleId && !form.vehiclesError && !form.expenseError) {
+			await loadVehicleContext(form);
+		}
+	}
+
 	function handleReceiptDraft(draft: ReceiptDraft, image: File) {
 		if (draft.category) form.selectCategory(draft.category);
 		if (typeof draft.amount === 'number') form.formData.amount = String(draft.amount);
@@ -182,6 +189,18 @@
 	{#if form.isLoading}
 		<div class="flex items-center justify-center py-12">
 			<LoaderCircle class="h-8 w-8 animate-spin text-primary" />
+		</div>
+	{:else if form.expenseError}
+		<div class="space-y-6">
+			<ExpenseFormHeader title="Edit Expense" onBack={handleBack} />
+			<div class="rounded-lg border bg-card p-6" role="alert" data-testid="expense-load-error">
+				<div class="mb-4 flex items-center gap-3 text-destructive">
+					<CircleAlert class="h-5 w-5" />
+					<p class="font-medium">Couldn't load this expense</p>
+				</div>
+				<p class="mb-4 text-sm text-muted-foreground">{form.expenseError}</p>
+				<Button size="lg" disabled={isRetrying} onclick={() => retry(reloadExpense)}>Retry</Button>
+			</div>
 		</div>
 	{:else if form.isInsuranceManaged}
 		<InsuranceManagedView

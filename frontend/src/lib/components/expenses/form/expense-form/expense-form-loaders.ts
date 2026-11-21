@@ -3,6 +3,7 @@ import { vehicleApi } from '#lib/services/vehicle-api.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
 import { gotoDynamic } from '#lib/utils/navigation.ts';
 import {
+	ApiError,
 	handleErrorWithNotification,
 	toError,
 	userFacingErrorMessage
@@ -42,13 +43,28 @@ export function applyPreselections(state: ExpenseFormState, values: PreselectedV
 	if (values.tags) state.formData.tags = parsePreselectedTags(values.tags);
 }
 
+function leaveGoneRecord(state: ExpenseFormState, label: string): void {
+	appStore.addNotification({ type: 'error', message: `That ${label} no longer exists.` });
+	gotoDynamic(state.ctx.returnTo);
+}
+
+function reportExpenseLoadFailure(state: ExpenseFormState, error: unknown, label: string): void {
+	if (error instanceof ApiError && error.statusCode === 404) {
+		leaveGoneRecord(state, label);
+		return;
+	}
+	state.expenseError = userFacingErrorMessage(error);
+	handleErrorWithNotification(error, `Couldn't load this ${label}`);
+}
+
 export async function loadExpense(state: ExpenseFormState): Promise<void> {
-	const { expenseId, returnTo } = state.ctx;
+	const { expenseId } = state.ctx;
+	state.isLoading = true;
+	state.expenseError = null;
 	try {
 		const expense = await expenseApi.getExpense(expenseId!);
 		if (!expense) {
-			appStore.addNotification({ type: 'error', message: 'Expense not found' });
-			gotoDynamic(returnTo);
+			leaveGoneRecord(state, 'expense');
 			return;
 		}
 
@@ -63,7 +79,10 @@ export async function loadExpense(state: ExpenseFormState): Promise<void> {
 			try {
 				const splitGroup = await expenseApi.getSplitExpense(expense.groupId);
 				const first = splitGroup.siblings[0];
-				if (!first) throw new Error('Empty split group');
+				if (!first) {
+					leaveGoneRecord(state, 'split expense');
+					return;
+				}
 
 				const isInsurance = first.tags?.includes('insurance') ?? false;
 				if (isInsurance) {
@@ -89,12 +108,7 @@ export async function loadExpense(state: ExpenseFormState): Promise<void> {
 					splitStateFromGroup(splitGroup.splitMethod, splitGroup.groupTotal, splitGroup.siblings)
 				);
 			} catch (err) {
-				if (import.meta.env.DEV) console.error('Failed to load split group:', err);
-				appStore.addNotification({
-					type: 'error',
-					message: 'Failed to load split expense group'
-				});
-				gotoDynamic(returnTo);
+				reportExpenseLoadFailure(state, err, 'split expense');
 				return;
 			}
 			state.isLoading = false;
@@ -114,9 +128,7 @@ export async function loadExpense(state: ExpenseFormState): Promise<void> {
 		state.formData.location = expense.location || '';
 		state.formData.missedFillup = expense.missedFillup ?? false;
 	} catch (error) {
-		if (import.meta.env.DEV) console.error('Error loading expense:', error);
-		appStore.addNotification({ type: 'error', message: 'Error loading expense' });
-		gotoDynamic(returnTo);
+		reportExpenseLoadFailure(state, error, 'expense');
 	} finally {
 		state.isLoading = false;
 	}
