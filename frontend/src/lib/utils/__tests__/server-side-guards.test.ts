@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/env', () => ({ browser: false }));
 
@@ -33,6 +33,11 @@ describe('browser-only helpers during server rendering', () => {
 		vi.mocked(window.matchMedia).mockClear();
 	});
 
+	afterEach(() => {
+		setOfflineQueueOwner(null);
+		vi.restoreAllMocks();
+	});
+
 	it('reads no offline queue and refuses to save one', () => {
 		localStorage.setItem('vroom_offline_expenses', JSON.stringify([queued]));
 		vi.mocked(localStorage.getItem).mockClear();
@@ -51,10 +56,13 @@ describe('browser-only helpers during server rendering', () => {
 
 		expect(currentOfflineQueueOwner()).toBe('alice');
 		expect(localStorage.removeItem).not.toHaveBeenCalled();
-		setOfflineQueueOwner(null);
 	});
 
-	it('reports a plain desktop platform', () => {
+	it('reports a plain desktop platform without reading the user agent', () => {
+		vi.spyOn(window.navigator, 'userAgent', 'get').mockReturnValue(
+			'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/604.1'
+		);
+
 		expect(getPlatformInfo()).toEqual({
 			platform: 'desktop',
 			isIOS: false,
