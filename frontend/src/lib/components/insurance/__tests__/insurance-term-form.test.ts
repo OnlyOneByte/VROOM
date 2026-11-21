@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import { hasPendingSave } from '#lib/utils/pending-saves.ts';
 import type {
 	CreateTermRequest,
 	InsurancePolicy,
@@ -252,6 +253,19 @@ describe('InsuranceTermForm add mode', () => {
 		await clickSave();
 		expect(screen.getByRole('button', { name: /Saving/ })).toBeDisabled();
 		expect(screen.getByRole('button', { name: /Cancel/ })).toBeDisabled();
+	});
+
+	test('a save in flight counts as unsaved changes until the form closes', async () => {
+		addTerm.mockReturnValue(new Promise(() => {}));
+		const { unmount } = await mount();
+		await fillDatesAndVehicle();
+		expect(hasPendingSave()).toBe(false);
+
+		await clickSave();
+
+		expect(hasPendingSave()).toBe(true);
+		unmount();
+		expect(hasPendingSave()).toBe(false);
 	});
 
 	test('cancel and back return to the returnTo path without saving', async () => {

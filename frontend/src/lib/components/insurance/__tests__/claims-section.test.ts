@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
+import { hasPendingSave } from '#lib/utils/pending-saves.ts';
 import type {
 	CreateClaimRequest,
 	InsuranceClaim,
@@ -308,6 +309,22 @@ describe('ClaimsSection filing a claim', () => {
 		expect(submitButton).toBeDisabled();
 		expect(submitButton?.querySelector('.animate-spin')).not.toBeNull();
 		expect(screen.getAllByRole('button', { name: 'Cancel' })[1]).toBeDisabled();
+	});
+
+	test('a claim save in flight counts as unsaved changes until the section closes', async () => {
+		createClaim.mockReturnValue(new Promise(() => {}));
+		const { unmount } = mount();
+		await settle();
+		await fireEvent.click(screen.getByRole('button', { name: /file claim/i }));
+		await pickClaimDate('2026-03-10');
+		expect(hasPendingSave()).toBe(false);
+
+		await fireEvent.submit(document.querySelector('form') as HTMLFormElement);
+		await settle();
+
+		expect(hasPendingSave()).toBe(true);
+		unmount();
+		expect(hasPendingSave()).toBe(false);
 	});
 
 	test('a failed create notifies and keeps the form open', async () => {

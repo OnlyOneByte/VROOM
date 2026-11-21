@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { Plus, Trash2, Pencil, LoaderCircle, ShieldAlert, X, Paperclip } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -60,6 +61,8 @@
 	let showForm = $state(false);
 	let editingId = $state<string | null>(null);
 	let isSaving = $state(false);
+
+	onMount(() => trackPendingSave(() => isSaving));
 	let claimDate = $state('');
 	let vehicleId = $state('');
 	let claimType = $state<ClaimType>('collision');
