@@ -14,7 +14,8 @@
 		Download,
 		Upload,
 		Images,
-		Ellipsis
+		Ellipsis,
+		LoaderCircle
 	} from '@lucide/svelte';
 	import { offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
 	import { removeOfflineExpense } from '#lib/utils/offline-storage.ts';
@@ -356,7 +357,7 @@
 				<p class="font-medium">Failed to load expenses</p>
 			</div>
 			<p class="mb-4 text-sm text-muted-foreground">{loadError}</p>
-			<Button onclick={loadInitial}>Retry</Button>
+			<Button size="lg" onclick={loadInitial}>Retry</Button>
 		</div>
 	</div>
 {:else}
@@ -502,7 +503,14 @@
 							<p class="font-medium">Failed to load expenses</p>
 						</div>
 						<p class="mb-4 text-sm text-muted-foreground">{pageError.message}</p>
-						<Button onclick={retryPage} disabled={isLoadingPage}>Retry</Button>
+						<Button size="lg" onclick={retryPage} disabled={isLoadingPage}>
+							{#if isLoadingPage}
+								<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
+								Retrying…
+							{:else}
+								Retry
+							{/if}
+						</Button>
 					</div>
 				{:else}
 					<ExpensesTable
