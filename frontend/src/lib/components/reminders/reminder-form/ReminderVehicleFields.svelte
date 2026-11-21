@@ -20,23 +20,31 @@
 </script>
 
 <div class="space-y-2">
-	<Label>Vehicles *</Label>
+	<Label id="reminder-vehicles-label">Vehicles *</Label>
 	{#if vehicles.length === 0}
 		<p class="text-sm text-muted-foreground">Add a vehicle first to create a reminder.</p>
 	{:else}
-		<div class="rounded-md border border-input p-3 space-y-2 max-h-40 overflow-y-auto">
+		<div
+			role="group"
+			aria-labelledby="reminder-vehicles-label"
+			aria-describedby={form.errors['vehicleIds'] ? 'reminder-vehicles-error' : undefined}
+			class="rounded-md border border-input p-3 space-y-2 max-h-40 overflow-y-auto"
+		>
 			{#each vehicles as v (v.id)}
 				<label class="flex items-center gap-2 cursor-pointer">
 					<Checkbox
 						checked={form.values.selectedVehicleIds.includes(v.id)}
 						onCheckedChange={() => form.toggleVehicle(v.id)}
+						aria-invalid={!!form.errors['vehicleIds']}
 					/>
 					<span class="text-sm text-foreground">{getVehicleDisplayName(v)}</span>
 				</label>
 			{/each}
 		</div>
 	{/if}
-	{#if form.errors['vehicleIds']}<FormFieldError>{form.errors['vehicleIds']}</FormFieldError>{/if}
+	{#if form.errors['vehicleIds']}<FormFieldError id="reminder-vehicles-error"
+			>{form.errors['vehicleIds']}</FormFieldError
+		>{/if}
 </div>
 
 {#if form.showSplitEditor}
