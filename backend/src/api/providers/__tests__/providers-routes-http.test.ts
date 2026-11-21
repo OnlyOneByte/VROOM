@@ -1,10 +1,12 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import {
   createTestApp,
   type DataEnvelope,
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+
+const SYNC_STATUS_MAX_STATEMENTS = 7;
 
 let ctx: TestApp;
 
@@ -310,8 +312,12 @@ describe('GET /api/v1/providers/:id/sync-status — owned read + tenant isolatio
       );
     }
 
+    const prepare = spyOn(ctx.sqlite, 'prepare');
     const res = await ctx.authed('GET', `/api/v1/providers/${created.id}/sync-status`);
+    const statements = prepare.mock.calls.length;
+    prepare.mockRestore();
     expect(res.status).toBe(200);
+    expect(statements).toBeLessThanOrEqual(SYNC_STATUS_MAX_STATEMENTS);
     const data = (await json<DataEnvelope<Record<string, Record<string, number>>>>(res)).data;
     expect(data).toEqual({
       vehicle_photos: { total: 2, synced: 1, failed: 1 },
