@@ -22,6 +22,7 @@
 	import { routes } from '#lib/routes.ts';
 	import { gotoWithQuery } from '#lib/utils/navigation.ts';
 	import { analyticsApi, getDefaultDateRange } from '#lib/services/analytics-api.ts';
+	import { expenseApi } from '#lib/services/expense-api.ts';
 	import type { FuelStatsResponse, FuelAdvancedResponse, PeriodCounts } from '#lib/types/index.ts';
 	import { formatCurrency } from '#lib/utils/formatters.ts';
 	import {
@@ -84,6 +85,22 @@
 				fuelStats.distance.totalDistance > 0 ||
 				hasChargeData)
 	);
+
+	let hasOlderFuel = $state<boolean | null>(null);
+	let checkingFuelHistory = $derived(!!fuelStats && !hasFuelData && hasOlderFuel === null);
+
+	$effect(() => {
+		if (checkingFuelHistory) void checkFuelHistory();
+	});
+
+	async function checkFuelHistory() {
+		try {
+			const result = await expenseApi.getAllExpenses({ category: 'fuel', limit: 1 });
+			hasOlderFuel = result.pagination.totalCount > 0;
+		} catch {
+			hasOlderFuel = true;
+		}
+	}
 
 	function logFillup() {
 		gotoWithQuery(resolve(routes.expenseNew), { category: 'fuel', returnTo: routes.analytics });
@@ -177,7 +194,7 @@
 	</Card.Root>
 {/snippet}
 
-{#if isLoading}
+{#if isLoading || checkingFuelHistory}
 	<div class="flex justify-center p-12">
 		<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
 	</div>
@@ -197,16 +214,37 @@
 				<Fuel class="h-8 w-8 text-muted-foreground" />
 			</div>
 		{/snippet}
-		{#snippet title()}No fuel data yet{/snippet}
+		{#snippet title()}
+			{#if hasOlderFuel}
+				<span class="block text-center">No fill-ups in the last 12 months</span>
+			{:else}
+				No fuel data yet
+			{/if}
+		{/snippet}
 		{#snippet description()}
-			Log a fill-up to unlock fuel efficiency, cost, and consumption insights — your fill-up stats
-			and trend charts will appear here once you have data.
+			{#if hasOlderFuel}
+				Fuel and charging stats cover the last 12 months. Any older fill-ups or charging sessions
+				are still in your expenses.
+			{:else}
+				Log a fill-up to unlock fuel efficiency, cost, and consumption insights — your fill-up stats
+				and trend charts will appear here once you have data.
+			{/if}
 		{/snippet}
 		{#snippet action()}
-			<Button onclick={logFillup}>
-				<Fuel class="mr-2 h-4 w-4" />
-				Log a Fill-up
-			</Button>
+			{#if hasOlderFuel}
+				<div class="flex flex-col gap-3 sm:flex-row">
+					<Button variant="outline" size="lg" href={resolve(routes.expenses)}>View Expenses</Button>
+					<Button size="lg" onclick={logFillup}>
+						<Fuel class="mr-2 h-4 w-4" />
+						Log a Fill-up
+					</Button>
+				</div>
+			{:else}
+				<Button onclick={logFillup}>
+					<Fuel class="mr-2 h-4 w-4" />
+					Log a Fill-up
+				</Button>
+			{/if}
 		{/snippet}
 	</EmptyState>
 {:else if fuelStats}
