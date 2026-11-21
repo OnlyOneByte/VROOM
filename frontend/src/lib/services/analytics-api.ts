@@ -103,7 +103,7 @@ export const analyticsApi = {
 
 	async getVehicleHealth(vehicleId: string): Promise<VehicleHealthResponse> {
 		return apiClient.get<VehicleHealthResponse>(
-			`/api/v1/analytics/vehicle-health${buildQueryString({ vehicleId })}`
+			`/api/v1/analytics/vehicle-health${buildQueryString({ vehicleId, timeZone: userTimeZone() })}`
 		);
 	},
 

@@ -266,6 +266,25 @@ describe('getInsurance — only a term in force today counts toward the totals',
     expect(result.summary.totalMonthlyPremiums).toBeCloseTo(80, 2);
     expect(result.summary.activePoliciesCount).toBe(1);
   });
+
+  test('a term whose end date is today still counts, in totals and in vehicle coverage', async () => {
+    const today = new Date(now);
+    const startOfToday = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+    policy('p1', 'GEICO');
+    term({
+      id: 'ends-today',
+      policyId: 'p1',
+      startMs: startOfToday - 180 * MS_DAY,
+      endMs: startOfToday,
+      monthlyCost: 70,
+    });
+    seedInsuranceTermVehicle(testDb.sqlite, { termId: 'ends-today', vehicleId: 'veh-1' });
+
+    const result = await repo.getInsurance(USER);
+    expect(result.summary.totalMonthlyPremiums).toBeCloseTo(70, 2);
+    expect(result.summary.activePoliciesCount).toBe(1);
+    expect((await repo.getVehicleHealth(USER, 'veh-1')).insuranceCoverage).toBe(100);
+  });
 });
 
 describe('getInsurance — term-less active policies excluded from activePoliciesCount', () => {

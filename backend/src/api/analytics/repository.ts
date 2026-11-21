@@ -1083,7 +1083,8 @@ export class AnalyticsRepository {
     }>,
     junctionRows: Array<{ termId: string; vehicleId: string }>,
     vehicleNameMap: Map<string, string>,
-    calendar: Calendar
+    calendar: Calendar,
+    timeZone: string | undefined
   ): {
     vehicleDetails: InsuranceData['vehicleDetails'];
     totalMonthlyPremiums: number;
@@ -1120,7 +1121,7 @@ export class AnalyticsRepository {
         calendar
       );
 
-      const currentTerm = policyTerms.find((t) => isTermInForce(t, now));
+      const currentTerm = policyTerms.find((t) => isTermInForce(t, now, timeZone));
       if (!currentTerm) continue;
       currentPolicyIds.add(policy.id);
 
@@ -1329,7 +1330,7 @@ export class AnalyticsRepository {
       const avgEfficiency = this.computeAverageEfficiency(fuelRows, convert);
 
       const fleetHealthScore =
-        vehicleCount > 0 ? await this.computeFleetHealthScore(vehicleRows, userId) : 0;
+        vehicleCount > 0 ? await this.computeFleetHealthScore(vehicleRows, userId, timeZone) : 0;
 
       return {
         vehicleCount,
@@ -1351,7 +1352,8 @@ export class AnalyticsRepository {
 
   private async computeFleetHealthScore(
     vehicleRows: Array<{ id: string }>,
-    userId: string
+    userId: string,
+    timeZone: string | undefined
   ): Promise<number> {
     const vehicleIds = vehicleRows.map((v) => v.id);
 
@@ -1378,7 +1380,7 @@ export class AnalyticsRepository {
       arr.push({ date: row.date, mileage: row.mileage });
     }
 
-    const coveredVehicleIds = await this.queryCoveredVehicleIds(vehicleIds, userId);
+    const coveredVehicleIds = await this.queryCoveredVehicleIds(vehicleIds, userId, timeZone);
 
     let totalScore = 0;
     for (const v of vehicleRows) {
@@ -1393,7 +1395,11 @@ export class AnalyticsRepository {
     return Math.round(totalScore / vehicleRows.length);
   }
 
-  private async queryCoveredVehicleIds(vehicleIds: string[], userId: string): Promise<Set<string>> {
+  private async queryCoveredVehicleIds(
+    vehicleIds: string[],
+    userId: string,
+    timeZone: string | undefined
+  ): Promise<Set<string>> {
     if (vehicleIds.length === 0) return new Set();
     const now = new Date();
 
@@ -1407,7 +1413,7 @@ export class AnalyticsRepository {
           inArray(insuranceTermVehicles.vehicleId, vehicleIds),
           eq(insurancePolicies.isActive, true),
           eq(insurancePolicies.userId, userId),
-          termInForceAt(now)
+          termInForceAt(now, timeZone)
         )
       );
 
@@ -1879,7 +1885,8 @@ export class AnalyticsRepository {
         termRows,
         junctionRows,
         vehicleNameMap,
-        calendar
+        calendar,
+        timeZone
       );
 
       return {
@@ -1907,7 +1914,11 @@ export class AnalyticsRepository {
     }
   }
 
-  async getVehicleHealth(userId: string, vehicleId: string): Promise<VehicleHealthData> {
+  async getVehicleHealth(
+    userId: string,
+    vehicleId: string,
+    timeZone?: string
+  ): Promise<VehicleHealthData> {
     try {
       const [vehicleNameMap, maintenanceRows] = await Promise.all([
         this.queryVehicleNameMap(userId, vehicleId),
@@ -1920,7 +1931,7 @@ export class AnalyticsRepository {
 
       const vehicleName = vehicleNameMap.get(vehicleId) ?? 'Unknown';
 
-      const coveredVehicleIds = await this.queryCoveredVehicleIds([vehicleId], userId);
+      const coveredVehicleIds = await this.queryCoveredVehicleIds([vehicleId], userId, timeZone);
       const insuranceCoverage = coveredVehicleIds.has(vehicleId) ? 100 : 0;
 
       const maintenanceRegularity = computeRegularityScore(maintenanceRows);
@@ -2147,7 +2158,9 @@ export class AnalyticsRepository {
       const avgEfficiency = this.computeAverageEfficiency(fuelRows, convert);
       const ytdSpending = yearToDateSpending(allExpenses, range, ytdStart);
       const fleetHealthScore =
-        vehicleRows.length > 0 ? await this.computeFleetHealthScore(vehicleRows, userId) : 0;
+        vehicleRows.length > 0
+          ? await this.computeFleetHealthScore(vehicleRows, userId, timeZone)
+          : 0;
 
       const quickStats: QuickStatsData = {
         vehicleCount: vehicleRows.length,
