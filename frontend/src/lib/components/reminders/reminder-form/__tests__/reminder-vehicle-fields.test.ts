@@ -35,4 +35,24 @@ describe('ReminderVehicleFields', () => {
 			expect(box.getAttribute('aria-invalid')).toBe('true');
 		}
 	});
+
+	test('the even split preview lists vehicles in the order they were ticked, as the saved split does', async () => {
+		const vehicles = [
+			makeVehicle('v1', { nickname: 'First' }),
+			makeVehicle('v2', { nickname: 'Second' })
+		];
+		const form = new ReminderFormState();
+		form.load(null, vehicles);
+		form.values.kind = 'expense';
+		form.values.expenseAmount = '10.01';
+		form.toggleVehicle('v2');
+		form.toggleVehicle('v1');
+		render(ReminderVehicleFields, { props: { form, vehicles } });
+		await tick();
+
+		const rowText = (name: string) =>
+			screen.getAllByText(name).at(-1)?.parentElement?.textContent?.replace(/\s+/g, ' ').trim();
+		expect(rowText('Second')).toBe('Second $5.01');
+		expect(rowText('First')).toBe('First $5.00');
+	});
 });

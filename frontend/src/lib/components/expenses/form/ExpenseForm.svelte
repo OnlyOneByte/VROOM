@@ -375,7 +375,9 @@
 
 				{#if form.isSplit && form.selectedVehicleIds.length >= 2 && form.parsedTotalAmount > 0}
 					<ExpenseSplitBreakdown
-						vehicles={form.vehicles.filter(v => form.selectedVehicleIds.includes(v.id))}
+						vehicles={form.selectedVehicleIds.flatMap(
+							id => form.vehicles.find(v => v.id === id) ?? []
+						)}
 						totalAmount={form.parsedTotalAmount}
 						splitMethod={form.splitMethod}
 						allocations={form.splitAllocations}
