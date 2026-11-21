@@ -42,6 +42,12 @@ const clampedPaginationFields = {
   offset: z.coerce.number().int().min(0).optional(),
 } as const;
 
+const NOON_ANCHOR_LEEWAY_MS = 12 * 60 * 60 * 1000;
+
+export function noonAnchoredDateIsNotInTheFuture(date: Date): boolean {
+  return date.getTime() <= Date.now() + NOON_ANCHOR_LEEWAY_MS;
+}
+
 export const commonSchemas = {
   clampedPaginationFields,
 
