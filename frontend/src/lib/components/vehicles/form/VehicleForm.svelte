@@ -63,7 +63,7 @@
 	import FormLayout from '#lib/components/common/form-layout.svelte';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
-	import { ApiError } from '#lib/utils/error-handling.ts';
+	import { ApiError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 
 	interface Props {
 		vehicleId?: string;
@@ -211,10 +211,10 @@
 			}
 
 			populateForm();
-		} catch {
+		} catch (error) {
 			appStore.addNotification({
 				type: 'error',
-				message: 'Error loading vehicle'
+				message: `Couldn't load the vehicle. ${userFacingErrorMessage(error)}`
 			});
 			goto(resolve(routes.dashboard));
 		} finally {
@@ -420,10 +420,9 @@
 			const ended = await vehicleApi.payOffFinancing(financing.id);
 			if (vehicle) vehicle.financing = ended;
 		} catch (error) {
-			const message = error instanceof Error ? error.message : 'Unknown error';
 			appStore.addNotification({
 				type: 'error',
-				message: `Couldn't mark the ${financing.financingType === 'lease' ? 'lease as ended' : 'loan as paid off'}: ${message}`
+				message: `Couldn't mark the ${financing.financingType === 'lease' ? 'lease as ended' : 'loan as paid off'}. ${userFacingErrorMessage(error)}`
 			});
 			throw error;
 		}
@@ -514,11 +513,9 @@
 				try {
 					await vehicleApi.createFinancing(finalVehicleId, financingData);
 				} catch (financingError) {
-					const message =
-						financingError instanceof Error ? financingError.message : 'Unknown error';
 					appStore.addNotification({
 						type: 'warning',
-						message: `Vehicle saved but financing failed: ${message}`
+						message: `The vehicle was saved, but its financing couldn't be saved. ${userFacingErrorMessage(financingError)}`
 					});
 				}
 			}
@@ -547,7 +544,7 @@
 			if (import.meta.env.DEV) console.error('Error submitting vehicle:', error);
 			appStore.addNotification({
 				type: 'error',
-				message: `Error ${isEditMode ? 'updating' : 'adding'} vehicle. Please try again.`
+				message: `Couldn't ${isEditMode ? 'update' : 'add'} the vehicle. ${userFacingErrorMessage(error)}`
 			});
 		} finally {
 			isSubmitting = false;
@@ -571,10 +568,9 @@
 			});
 			goto(resolve(routes.dashboard));
 		} catch (error) {
-			const message = error instanceof Error ? error.message : 'Failed to delete vehicle';
 			appStore.addNotification({
 				type: 'error',
-				message
+				message: `Couldn't delete the vehicle. ${userFacingErrorMessage(error)}`
 			});
 		} finally {
 			isDeleting = false;

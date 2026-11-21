@@ -4,6 +4,7 @@ import type { VehicleFinancing } from '#lib/types/index.ts';
 import { calculateExtraPaymentImpact } from '#lib/utils/financing-calculations.ts';
 import { formatCurrency } from '#lib/utils/formatters.ts';
 import { makeLoan } from './financing-fixtures';
+import { ApiError, UNEXPECTED_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 
 const store = vi.hoisted(() => ({ currencyUnit: 'USD' }));
 
@@ -184,11 +185,13 @@ describe('PaymentPlannerDialog saving', () => {
 	});
 
 	test('shows the error message and stays open when saving fails', async () => {
-		mount(() => Promise.reject(new Error('Server rejected payment')));
+		mount(() => Promise.reject(new ApiError('Payment is below the minimum', 400)));
 		await screen.findByRole('dialog');
 		await enterPayment('500');
 		await fireEvent.click(saveButton());
-		expect(await screen.findByText('Server rejected payment')).toBeTruthy();
+		expect(
+			await screen.findByText("Couldn't save the payment amount. Payment is below the minimum.")
+		).toBeTruthy();
 		expect(screen.getByRole('dialog')).toBeTruthy();
 		expect(saveButton().disabled).toBe(false);
 	});
@@ -200,7 +203,7 @@ describe('PaymentPlannerDialog saving', () => {
 		await enterPayment('500');
 		await fireEvent.click(saveButton());
 		expect(
-			await screen.findByText('Failed to save payment amount. Please try again.')
+			await screen.findByText(`Couldn't save the payment amount. ${UNEXPECTED_FAILURE_MESSAGE}`)
 		).toBeTruthy();
 	});
 
