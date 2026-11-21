@@ -63,9 +63,21 @@ export function zonedMidnight(
     .map((probe) => wall - zoneOffsetMs(probe, timeZone))
     .filter((candidate) => wall - zoneOffsetMs(candidate, timeZone) === candidate);
   if (exact.length > 0) return new Date(Math.min(...exact));
-  const settled = new Date(wall - zoneOffsetMs(guess, timeZone));
+  return firstInstantOfDay(wall, timeZone);
+}
+
+const MAX_ZONE_OFFSET_MS = 15 * 3_600_000;
+
+function firstInstantOfDay(wall: number, timeZone: string): Date {
   const requestedDay = new Date(wall).toISOString().slice(0, 10);
-  return calendarDayIn(settled, timeZone) === requestedDay ? settled : new Date(guess);
+  let before = wall - MAX_ZONE_OFFSET_MS;
+  let onOrAfter = wall + MAX_ZONE_OFFSET_MS;
+  while (onOrAfter - before > 1000) {
+    const mid = before + Math.floor((onOrAfter - before) / 2000) * 1000;
+    if (calendarDayIn(new Date(mid), timeZone) < requestedDay) before = mid;
+    else onOrAfter = mid;
+  }
+  return new Date(onOrAfter);
 }
 
 export function zonedDayWindow(instant: Date, timeZone: string): { dayStart: Date; nextDay: Date } {
