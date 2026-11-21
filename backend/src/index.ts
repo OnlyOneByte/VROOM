@@ -1,3 +1,4 @@
+import { recalculateOvercountedMonthlyPremiums } from './api/insurance/hooks';
 import { startSyncWorker, stopSyncWorker } from './api/providers/sync-worker';
 import { app } from './app';
 import './api/sync/init';
@@ -35,6 +36,14 @@ try {
     message: extractErrorMessage(error),
   });
   process.exit(1);
+}
+
+try {
+  await recalculateOvercountedMonthlyPremiums();
+} catch (error) {
+  logger.error('Failed to recalculate monthly insurance premiums', {
+    message: extractErrorMessage(error),
+  });
 }
 
 const checkpointInterval = setInterval(
