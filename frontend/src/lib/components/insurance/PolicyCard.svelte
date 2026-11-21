@@ -76,7 +76,7 @@
 					{/if}
 				</div>
 			</div>
-			<div class="flex items-center gap-0.5 shrink-0">
+			<div class="flex items-center gap-2 shrink-0">
 				{#if !policy.isActive}
 					<Badge variant="secondary">Inactive</Badge>
 				{/if}
@@ -87,11 +87,12 @@
 					<Button
 						variant="ghost"
 						size="icon"
-						class="h-7 w-7"
+						class="size-10 sm:size-9"
 						onclick={() => onEdit(policy)}
 						title="Policy settings"
+						aria-label="Policy settings"
 					>
-						<Settings class="h-3.5 w-3.5" />
+						<Settings />
 					</Button>
 				{/if}
 			</div>
@@ -115,14 +116,15 @@
 				<Button
 					variant="ghost"
 					size="sm"
-					class="h-7 text-xs text-muted-foreground"
+					class="h-10 sm:h-8 text-muted-foreground"
+					aria-expanded={expanded}
 					onclick={() => (expanded = !expanded)}
 				>
 					{#if expanded}
-						<ChevronUp class="mr-1 h-3 w-3" />
+						<ChevronUp />
 						Hide History
 					{:else}
-						<ChevronDown class="mr-1 h-3 w-3" />
+						<ChevronDown />
 						{pastTerms.length} past term{pastTerms.length !== 1 ? 's' : ''}
 					{/if}
 				</Button>
