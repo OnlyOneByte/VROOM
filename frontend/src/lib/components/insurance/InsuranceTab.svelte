@@ -97,7 +97,7 @@
 		<div class="flex items-center justify-between">
 			<h3 class="text-lg font-semibold text-foreground">Insurance Policies</h3>
 			{#if !readOnly}
-				<Button variant="outline" size="sm" onclick={handleAddPolicy}>
+				<Button variant="outline" size="sm" class="h-10 sm:h-8" onclick={handleAddPolicy}>
 					<Plus class="mr-2 h-4 w-4" />
 					Add Policy
 				</Button>
