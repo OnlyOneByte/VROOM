@@ -155,9 +155,10 @@ export const expenseApi = {
 	},
 
 	async createExpense(
-		expense: Partial<Expense> & { vehicleId: string; category: ExpenseCategory; amount: number }
+		expense: Partial<Expense> & { vehicleId: string; category: ExpenseCategory; amount: number },
+		clientId?: string
 	): Promise<Expense> {
-		const backendExpense = toBackendExpense(expense);
+		const backendExpense = { ...toBackendExpense(expense), ...(clientId && { clientId }) };
 		const data = await apiClient.post<BackendExpenseResponse>('/api/v1/expenses', backendExpense);
 		return fromBackendExpense(data);
 	},
