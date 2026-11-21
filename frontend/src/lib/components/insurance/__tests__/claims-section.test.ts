@@ -159,7 +159,7 @@ describe('ClaimsSection claim rows', () => {
 		expect(screen.getByText('Hail damage on the roof')).toBeInTheDocument();
 	});
 
-	test('omits payout, fault, description and unknown vehicles when absent', async () => {
+	test('omits payout, fault and unknown vehicles when absent', async () => {
 		getClaims.mockResolvedValue([
 			claim({ status: 'denied', payoutAmount: null, faultDesignation: null, vehicleId: 'gone' })
 		]);

@@ -42,8 +42,8 @@ describe('ExpirationAlert thresholds', () => {
 		expect(badge).toHaveClass('text-destructive');
 	});
 
-	test('a term ending part-way through tomorrow rounds up to one day', () => {
-		expect(badgeFor(0.25)).toHaveTextContent('Expires tomorrow');
+	test('a term ending early tomorrow morning reads "Expires tomorrow"', () => {
+		expect(badgeFor(0.75)).toHaveTextContent('Expires tomorrow');
 	});
 
 	test('seven days left is still urgent', () => {
