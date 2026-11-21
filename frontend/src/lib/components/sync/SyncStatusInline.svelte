@@ -56,6 +56,16 @@
 	});
 
 	let isRetryingParked = $state(false);
+	let recheckingSession = $state(false);
+
+	async function handleRecheckSession() {
+		recheckingSession = true;
+		try {
+			await authStore.initialize();
+		} finally {
+			recheckingSession = false;
+		}
+	}
 
 	async function handleRetryParked() {
 		if (!onlineStatus.current || parkedCount === 0 || isRetryingParked) return;
@@ -194,6 +204,20 @@
 				</div>
 			{/if}
 
+			{#if onlineStatus.current && authStore.sessionUnverified}
+				<Button
+					size="sm"
+					variant="outline"
+					onclick={handleRecheckSession}
+					disabled={recheckingSession}
+					aria-busy={recheckingSession}
+					class="w-full h-7 text-xs"
+				>
+					<RefreshCw class="h-3 w-3 mr-1.5 {recheckingSession ? 'animate-spin' : ''}" />
+					{recheckingSession ? 'Checking...' : 'Retry connection'}
+				</Button>
+			{/if}
+
 			{#if onlineStatus.current && parkedCount > 0}
 				<Button
 					size="sm"
@@ -238,6 +262,20 @@
 					{/if}
 				</div>
 			</div>
+			{#if onlineStatus.current && authStore.sessionUnverified}
+				<div class="flex justify-center mt-2">
+					<Button
+						variant="ghost"
+						size="icon-lg"
+						onclick={handleRecheckSession}
+						disabled={recheckingSession}
+						aria-label="Retry connection"
+						title="Can't reach VROOM. Retry connection"
+					>
+						<RefreshCw class="h-4 w-4 {recheckingSession ? 'animate-spin' : ''}" />
+					</Button>
+				</div>
+			{/if}
 		{/snippet}
 		{@render collapsedIcon()}
 	{/if}

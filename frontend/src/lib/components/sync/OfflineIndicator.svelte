@@ -8,6 +8,8 @@
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 
+	let { floating = true }: { floating?: boolean } = $props();
+
 	let pendingCount = $derived(countPendingSync(offlineExpenseQueue.current));
 	let recheckingSession = $state(false);
 
@@ -34,9 +36,7 @@
 	}
 </script>
 
-<div
-	class="fixed top-[calc(0.75rem+env(safe-area-inset-top))] right-[5.75rem] z-50 lg:top-4 lg:right-4"
->
+<div class={floating ? 'fixed top-4 right-4 z-50' : 'flex items-center'}>
 	{#if !onlineStatus.current}
 		<Badge
 			variant="destructive"
