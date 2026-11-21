@@ -109,12 +109,13 @@
 						class="absolute inset-x-0 bottom-0 flex items-center justify-end bg-gradient-to-t from-black/60 to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100"
 					>
 						<Button
-							variant="destructive"
+							variant="outline"
 							size="sm"
 							class="h-7 text-xs"
+							aria-label="Delete {photo.fileName}"
 							onclick={() => requestDelete(photo.id)}
 						>
-							<Trash2 class="h-3 w-3" />
+							<Trash2 class="h-3 w-3 text-destructive" />
 						</Button>
 					</div>
 				</div>

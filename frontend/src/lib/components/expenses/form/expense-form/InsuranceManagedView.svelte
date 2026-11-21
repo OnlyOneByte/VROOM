@@ -97,8 +97,8 @@
 			<ArrowLeft class="mr-2 h-4 w-4" />
 			Back to Expenses
 		</Button>
-		<Button variant="destructive" onclick={onForceDelete} disabled={isDeleting}>
-			<Trash2 class="mr-2 h-4 w-4" />
+		<Button variant="outline" onclick={onForceDelete} disabled={isDeleting}>
+			<Trash2 class="mr-2 h-4 w-4 text-destructive" />
 			Force Delete
 		</Button>
 	</div>
