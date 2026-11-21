@@ -26,7 +26,7 @@
 	<button
 		type="button"
 		onclick={() => (open = !open)}
-		class="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+		class="flex min-h-10 items-center gap-1 text-sm text-muted-foreground hover:text-foreground sm:min-h-0"
 	>
 		<span class="text-xs">{open ? '▾' : '▸'}</span>
 		Add mileage readings (optional)
