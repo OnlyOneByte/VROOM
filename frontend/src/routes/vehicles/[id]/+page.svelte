@@ -401,8 +401,9 @@
 			{#if isOwner}
 				<Button
 					variant="outline"
+					size="sm"
 					onclick={() => (shareOpen = true)}
-					class="h-10 shrink-0 sm:h-8 sm:px-3"
+					class="h-10 shrink-0 sm:h-8"
 				>
 					<Users class="mr-2 h-4 w-4" />
 					Share

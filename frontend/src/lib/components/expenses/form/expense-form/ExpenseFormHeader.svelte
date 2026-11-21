@@ -14,7 +14,7 @@
 
 <div class="flex items-center gap-4">
 	<Button variant="ghost" size="icon-lg" aria-label="Go back" onclick={onBack} class="shrink-0">
-		<ArrowLeft class="h-5 w-5" />
+		<ArrowLeft class="size-5" />
 	</Button>
 
 	<div>
