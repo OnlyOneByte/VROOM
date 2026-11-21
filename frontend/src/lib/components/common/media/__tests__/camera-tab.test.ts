@@ -116,7 +116,7 @@ describe('CameraTab: camera access errors', () => {
 		mount();
 
 		expect(await screen.findByText(message)).toBeInTheDocument();
-		expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Retry' })).toHaveClass('h-10');
 	});
 
 	test('a non-DOM failure falls back to the generic message', async () => {
@@ -170,6 +170,15 @@ describe('CameraTab: capturing', () => {
 
 		expect(screen.getByRole('button', { name: 'Take photo' })).toBeDisabled();
 		expect(screen.getByRole('button', { name: 'Switch camera' })).toBeDisabled();
+	});
+
+	test('the camera controls meet the 40px tap target', () => {
+		getUserMedia.mockImplementation(() => new Promise(() => {}));
+		mount();
+
+		for (const name of ['Switch camera', 'Cancel']) {
+			expect(screen.getByRole('button', { name })).toHaveClass('size-10');
+		}
 	});
 
 	test('taking a photo shows the preview and stops the live stream', async () => {
