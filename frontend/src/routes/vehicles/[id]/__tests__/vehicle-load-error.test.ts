@@ -94,6 +94,7 @@ describe('vehicle page — a failed vehicle load', () => {
 
 		const retry = await screen.findByRole('button', { name: 'Retry' });
 		expect(screen.getByText('Failed to load vehicle')).toBeInTheDocument();
+		expect(screen.getByText('Check your connection and try again.')).toBeInTheDocument();
 		expect(goto).not.toHaveBeenCalled();
 
 		await fireEvent.click(retry);
