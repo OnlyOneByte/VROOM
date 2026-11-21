@@ -54,7 +54,7 @@
 									}
 								}}
 								placeholder="Current mileage"
-								class="pl-10 h-9 text-sm"
+								class="pl-10 text-sm"
 							/>
 						</div>
 					</div>
