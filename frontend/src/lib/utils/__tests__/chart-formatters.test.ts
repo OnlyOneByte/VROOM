@@ -5,7 +5,7 @@ import {
 	formatDateTick,
 	formatDecimalAxis,
 	getTrendLineProps,
-	singleValueSeriesKeys,
+	isolatedValueRows,
 	getXTickCount,
 	monthlyXAxisProps,
 	parseMonthToDate
@@ -105,23 +105,33 @@ describe('getTrendLineProps (single-point visibility branch)', () => {
 	});
 });
 
-describe('singleValueSeriesKeys (which series need a marker)', () => {
-	const rows = [
-		{ month: '2025-01', civic: 40, tesla: null, bike: 0 },
-		{ month: '2025-02', civic: 42, bike: 0 },
-		{ month: '2025-03', civic: 41, tesla: 12 }
-	];
+describe('isolatedValueRows (which values need a marker)', () => {
+	const months = (...cells: (number | null | undefined)[]) =>
+		cells.map((v, i) => (v === undefined ? { month: i } : { month: i, a: v }));
+	const marked = (rows: Record<string, unknown>[]) =>
+		isolatedValueRows(rows, ['a'])[0]?.rows.map(r => r['month']) ?? [];
 
-	test('names a series with exactly one non-null value among several rows', () => {
-		expect(singleValueSeriesKeys(rows, ['civic', 'tesla', 'bike'])).toEqual(['tesla']);
+	test('marks values with no value on either side, and leaves connected runs to the line', () => {
+		expect(marked(months(5, null, 7, 8, undefined, 9))).toEqual([0, 5]);
 	});
 
-	test('treats 0 as a value and a missing or null cell as no value', () => {
-		expect(singleValueSeriesKeys([{ a: 0 }, { a: null }, {}], ['a'])).toEqual(['a']);
+	test('a series with values two months apart gets both marked', () => {
+		expect(marked(months(undefined, 30, undefined, 32))).toEqual([1, 3]);
 	});
 
-	test('one row marks every series that has a value in it, and none for an empty series', () => {
-		expect(singleValueSeriesKeys([{ a: 1, b: 2, c: null }], ['a', 'b', 'c'])).toEqual(['a', 'b']);
-		expect(singleValueSeriesKeys([], ['a'])).toEqual([]);
+	test('a single value among many rows, and a one-row chart, are marked', () => {
+		expect(marked(months(null, null, 4, null))).toEqual([2]);
+		expect(marked(months(4))).toEqual([0]);
+	});
+
+	test('treats 0 as a value, and returns only series that have something to mark', () => {
+		expect(marked(months(0, null, 0))).toEqual([0, 2]);
+		const rows = [
+			{ civic: 40, tesla: null },
+			{ civic: 42, tesla: 12 },
+			{ civic: 41, tesla: null }
+		];
+		expect(isolatedValueRows(rows, ['civic', 'tesla']).map(s => s.key)).toEqual(['tesla']);
+		expect(isolatedValueRows([], ['a'])).toEqual([]);
 	});
 });

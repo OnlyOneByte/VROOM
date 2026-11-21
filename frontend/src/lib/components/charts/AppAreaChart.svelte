@@ -10,7 +10,7 @@
 		SMOOTH_CURVE,
 		monthlyXAxisProps,
 		SINGLE_POINT_PROPS,
-		singleValueSeriesKeys
+		isolatedValueRows
 	} from '#lib/utils/chart-formatters.ts';
 	import type { Snippet } from 'svelte';
 
@@ -58,8 +58,8 @@
 
 	let isEmpty = $derived(data.length === 0);
 	let resolvedXAxisProps = $derived(xAxisProps ?? monthlyXAxisProps(data.length));
-	let singleValueKeys = $derived(
-		singleValueSeriesKeys(
+	let isolatedValues = $derived(
+		isolatedValueRows(
 			data,
 			series.map(s => s.key)
 		)
@@ -92,10 +92,10 @@
 			}}
 		>
 			{#snippet points()}
-				{#each singleValueKeys as key (key)}
+				{#each isolatedValues as isolated (isolated.key)}
 					<Points
-						seriesKey={key}
-						data={data.filter(row => row[key] != null)}
+						seriesKey={isolated.key}
+						data={isolated.rows}
 						stroke="var(--color-surface-100, light-dark(white, black))"
 						{...SINGLE_POINT_PROPS}
 					/>
