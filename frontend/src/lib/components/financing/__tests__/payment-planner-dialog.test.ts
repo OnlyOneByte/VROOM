@@ -5,6 +5,7 @@ import { calculateExtraPaymentImpact } from '#lib/utils/financing-calculations.t
 import { formatCurrency } from '#lib/utils/formatters.ts';
 import { makeLoan } from './financing-fixtures';
 import { ApiError, UNEXPECTED_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
+import { hasPendingSave } from '#lib/utils/pending-saves.ts';
 
 const store = vi.hoisted(() => ({ currencyUnit: 'USD' }));
 
@@ -217,5 +218,18 @@ describe('PaymentPlannerDialog saving', () => {
 		expect(saveButton().disabled).toBe(true);
 		finish();
 		await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+	});
+
+	test('a save in flight is registered for the session-expiry warning', async () => {
+		const { unmount } = mount(() => new Promise<void>(() => {}));
+		await screen.findByRole('dialog');
+		expect(hasPendingSave()).toBe(false);
+
+		await enterPayment('500');
+		await fireEvent.click(saveButton());
+
+		expect(hasPendingSave()).toBe(true);
+		unmount();
+		expect(hasPendingSave()).toBe(false);
 	});
 });
