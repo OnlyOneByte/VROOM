@@ -1,6 +1,6 @@
 import { browser } from '$app/env';
 import { PUBLIC_API_URL } from '$app/env/public';
-import { ApiError, NetworkError } from '#lib/utils/error-handling.ts';
+import { ApiError, isSessionExpiryError, NetworkError } from '#lib/utils/error-handling.ts';
 import { buildQueryString } from './api-utils';
 
 export function getApiBaseUrl(): string {
@@ -8,18 +8,24 @@ export function getApiBaseUrl(): string {
 }
 
 const SELF_REPORTED_401_PATHS = ['/api/v1/auth/me', '/api/v1/auth/refresh'];
+const SESSION_EXPIRY_WINDOW_MS = 1000;
 
-let sessionExpiryHandled = false;
+let sessionExpiry: Promise<void> | null = null;
 
-async function handleSessionExpiry(url: string): Promise<void> {
-	if (!browser || sessionExpiryHandled) return;
-	if (SELF_REPORTED_401_PATHS.some(path => url.includes(path))) return;
+function handleSessionExpiry(url: string): Promise<void> {
+	if (!browser) return Promise.resolve();
+	if (SELF_REPORTED_401_PATHS.some(path => url.includes(path))) return Promise.resolve();
 
-	sessionExpiryHandled = true;
-	setTimeout(() => {
-		sessionExpiryHandled = false;
-	}, 1000);
+	if (!sessionExpiry) {
+		sessionExpiry = endSession();
+		setTimeout(() => {
+			sessionExpiry = null;
+		}, SESSION_EXPIRY_WINDOW_MS);
+	}
+	return sessionExpiry;
+}
 
+async function endSession(): Promise<void> {
 	try {
 		// Dynamic import: the stores import this module, so a static import is circular.
 		const [{ authStore }, { appStore }] = await Promise.all([
@@ -32,6 +38,7 @@ async function handleSessionExpiry(url: string): Promise<void> {
 			message: 'Your session has expired. Please sign in again.',
 			duration: 5000
 		});
+		appStore.muteErrors(SESSION_EXPIRY_WINDOW_MS);
 
 		const [{ goto }, { resolve }, { routes }] = await Promise.all([
 			import('$app/navigation'),
@@ -84,8 +91,6 @@ async function fetchOrThrow(url: string, options: ApiOptions): Promise<Response>
 	}
 
 	if (!response.ok) {
-		if (response.status === 401) await handleSessionExpiry(fullUrl);
-
 		let message = `Request failed with status ${response.status}`;
 		let code: string | undefined;
 		let details: Record<string, unknown> | undefined;
@@ -101,7 +106,9 @@ async function fetchOrThrow(url: string, options: ApiOptions): Promise<Response>
 		} catch {
 			// Non-JSON error body: keep the status-based message.
 		}
-		throw new ApiError(message, response.status, details, code);
+		const error = new ApiError(message, response.status, details, code);
+		if (isSessionExpiryError(error)) await handleSessionExpiry(fullUrl);
+		throw error;
 	}
 
 	return response;

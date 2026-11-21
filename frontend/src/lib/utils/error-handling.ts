@@ -42,6 +42,14 @@ export class ApiError extends VroomError {
 	}
 }
 
+const SESSION_EXPIRY_CODE = 'AuthenticationError';
+
+export function isSessionExpiryError(error: unknown): boolean {
+	return (
+		error instanceof ApiError && error.statusCode === 401 && error.code === SESSION_EXPIRY_CODE
+	);
+}
+
 export class NetworkError extends TypeError {
 	constructor(cause: unknown) {
 		super(cause instanceof Error ? cause.message : 'Network request failed', { cause });

@@ -172,7 +172,9 @@ describe('submitExpense — edit modes', () => {
 	});
 
 	test('an edit failure from an expired session asks the user to sign in', async () => {
-		expenseApiMock.updateExpense.mockRejectedValue(new ApiError('Unauthorized', 401));
+		expenseApiMock.updateExpense.mockRejectedValue(
+			new ApiError('Unauthorized', 401, undefined, 'AuthenticationError')
+		);
 		const state = createState('e1');
 		await submitExpense(state);
 		expect(state.submitError).toBe('Your session has expired. Please sign in again.');
@@ -283,7 +285,9 @@ describe('submitExpense — offline and failure queuing', () => {
 	});
 
 	test('an auth create failure is queued with a sign-in warning', async () => {
-		expenseApiMock.createExpense.mockRejectedValue(new ApiError('Unauthorized', 401));
+		expenseApiMock.createExpense.mockRejectedValue(
+			new ApiError('Unauthorized', 401, undefined, 'AuthenticationError')
+		);
 		const state = createState();
 		await submitExpense(state);
 		notified('warning', 'Signed out — saved on this device. Sign in to sync it.');

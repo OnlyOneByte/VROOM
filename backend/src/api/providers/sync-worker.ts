@@ -280,7 +280,6 @@ async function processSingleRef(
   } catch (error) {
     const errorMessage = extractErrorMessage(error);
 
-    // AUTH_INVALID is reserved for VROOM session expiry; provider auth errors must not reuse it.
     const isTerminalAuth =
       isSyncError(error) &&
       (error.code === SyncErrorCode.AUTH_INVALID || error.code === SyncErrorCode.PERMISSION_DENIED);

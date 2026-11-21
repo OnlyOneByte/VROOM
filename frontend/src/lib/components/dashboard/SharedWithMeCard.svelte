@@ -6,6 +6,7 @@
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { toast } from 'svelte-sonner';
 	import { shareApi } from '#lib/services/share-api.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { shareLevelLabel } from '#lib/utils/share-helpers.ts';
 	import type { ReceivedShare } from '#lib/types/index.ts';
@@ -45,7 +46,7 @@
 			pending = pending.filter(s => s.id !== share.id);
 			onAccepted?.();
 		} catch (error) {
-			toast.error(`Couldn't accept the invitation. ${userFacingErrorMessage(error)}`);
+			appStore.showError(`Couldn't accept the invitation. ${userFacingErrorMessage(error)}`);
 		} finally {
 			acting = null;
 		}
@@ -58,7 +59,7 @@
 			toast.success(`Declined the invitation to ${share.vehicleName}`);
 			pending = pending.filter(s => s.id !== share.id);
 		} catch (error) {
-			toast.error(`Couldn't decline the invitation. ${userFacingErrorMessage(error)}`);
+			appStore.showError(`Couldn't decline the invitation. ${userFacingErrorMessage(error)}`);
 		} finally {
 			acting = null;
 		}
