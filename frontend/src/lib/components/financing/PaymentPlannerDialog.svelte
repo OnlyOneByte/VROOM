@@ -1,5 +1,7 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
+	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import type { VehicleFinancing } from '#lib/types/index.ts';
 	import * as Dialog from '#lib/components/ui/dialog/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
@@ -56,6 +58,8 @@
 	let savedAmount = $state(0);
 	let isSaving = $state(false);
 	let saveError = $state('');
+
+	onMount(() => trackPendingSave(() => isSaving));
 
 	let inputAmount = $derived(parseFloat(inputValue) || 0);
 	let minimumPayment = $derived(calculateMinimumPayment(financing));
