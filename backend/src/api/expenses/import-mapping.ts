@@ -137,8 +137,9 @@ export function inferDecimalSeparator(values: string[]): DecimalSeparator | unde
   return seen.size === 1 ? [...seen][0] : undefined;
 }
 
-export function isAmbiguousNumber(raw: string): boolean {
-  return shapeOf(stripSpaceGrouping(raw)).kind === 'ambiguous';
+function ambiguousSeparator(raw: string): DecimalSeparator | undefined {
+  const shape = shapeOf(stripSpaceGrouping(raw));
+  return shape.kind === 'ambiguous' ? shape.sep : undefined;
 }
 
 export function normalizeDecimal(raw: string, decimal: DecimalSeparator = '.'): string {
@@ -253,18 +254,31 @@ const NUMERIC_FIELDS = [
 
 type NumericField = (typeof NUMERIC_FIELDS)[number]['field'];
 
+interface ColumnDecimal {
+  decimal: DecimalSeparator | undefined;
+  borrowed: boolean;
+}
+
 function columnDecimals(
   records: Record<string, string>[],
   read: (rec: Record<string, string>, field: NativeField) => string
-): Record<NumericField, DecimalSeparator | undefined> {
+): Record<NumericField, ColumnDecimal> {
   const values = (field: NumericField) => records.map((rec) => read(rec, field));
   const fileDecimal = inferDecimalSeparator(NUMERIC_FIELDS.flatMap(({ field }) => values(field)));
-  const decimals = {} as Record<NumericField, DecimalSeparator | undefined>;
+  const decimals = {} as Record<NumericField, ColumnDecimal>;
   for (const { field } of NUMERIC_FIELDS) {
     const hasOwnEvidence = values(field).some((v) => decimalEvidence(v));
-    decimals[field] = hasOwnEvidence ? inferDecimalSeparator(values(field)) : fileDecimal;
+    decimals[field] = hasOwnEvidence
+      ? { decimal: inferDecimalSeparator(values(field)), borrowed: false }
+      : { decimal: fileDecimal, borrowed: true };
   }
   return decimals;
+}
+
+function isUnresolved(raw: string, { decimal, borrowed }: ColumnDecimal): boolean {
+  const sep = ambiguousSeparator(raw);
+  if (!sep) return false;
+  return !decimal || (borrowed && sep === decimal);
 }
 
 function ambiguityMessage(label: string, raw: string): string {
@@ -309,28 +323,28 @@ export function applyMapping(
       mapping.defaultCategory
     );
     if (category.unmapped) unmapped.add(category.unmapped);
-    const ambiguous = NUMERIC_FIELDS.find(
-      ({ field }) => !decimals[field] && isAmbiguousNumber(read(rec, field))
-    );
-    if (ambiguous) rowErrors.set(i, ambiguityMessage(ambiguous.label, read(rec, ambiguous.field)));
+    const ambiguities = NUMERIC_FIELDS.filter(({ field }) =>
+      isUnresolved(read(rec, field), decimals[field])
+    ).map(({ field, label }) => ambiguityMessage(label, read(rec, field)));
+    if (ambiguities.length > 0) rowErrors.set(i, ambiguities.join(' '));
     const vehicle = cols.vehicle ? read(rec, 'vehicle') : (mapping.targetVehicle ?? '');
     const target = targetUnitsFor(vehicle);
     return {
       date: normalizeForeignDate(read(rec, 'date'), mapping.dateFormat),
       vehicle,
       category: category.value,
-      amount: normalizeDecimal(read(rec, 'amount'), decimals.amount),
+      amount: normalizeDecimal(read(rec, 'amount'), decimals.amount.decimal),
       mileage: mapMileage(
         read(rec, 'mileage'),
         mapping.distanceUnit,
         target.distanceUnit,
-        decimals.mileage
+        decimals.mileage.decimal
       ),
       volume: mapVolume(
         read(rec, 'volume'),
         mapping.volumeUnit,
         target.volumeUnit,
-        decimals.volume
+        decimals.volume.decimal
       ),
       fuelType: read(rec, 'fuelType'),
       description: read(rec, 'description'),

@@ -241,7 +241,7 @@ describe('applyMapping output imports through buildImportPlan', () => {
     ];
     const csv = [
       'Date,Odometer (km),Fuel (litres),Price,Type',
-      '15/03/2024,"160,9344","37,854","52,40",Gas',
+      '15/03/2024,"160,9344","37,8541","52,40",Gas',
     ].join('\n');
     const mapping: ColumnMapping = {
       source: 'fuelio',
@@ -408,6 +408,32 @@ describe('applyMapping — ambiguous numbers are flagged, never guessed', () => 
     expect(plan.readyCount).toBe(0);
     expect(plan.rows[0].status).toBe('error');
     expect(plan.rows[0].message).toContain('Amount "1,250" could mean 1250 or 1.25');
+  });
+
+  test.each([
+    {
+      name: 'an odometer borrowing a comma decimal from the amount column is not read as 45.12',
+      row: '2024-03-15,"12,50","45,120",misc',
+      message: 'Odometer "45,120" could mean 45120 or 45.12',
+    },
+    {
+      name: 'an amount borrowing a comma decimal from the odometer column is not read as 1.25',
+      row: '2024-03-15,"1,250","45.120,5",misc',
+      message: 'Amount "1,250" could mean 1250 or 1.25',
+    },
+  ])('$name', ({ row, message }) => {
+    const csv = ['date,amt,odo,cat', row].join('\n');
+    const result = applyMapping(csv, mapping);
+    const plan = buildImportPlan(result.csv, vehicles, result.rowErrors);
+    expect(plan.rows[0].status).toBe('error');
+    expect(plan.rows[0].message).toContain(message);
+  });
+
+  test('every ambiguous value in a row is named in its message', () => {
+    const csv = ['date,amt,odo,cat', '2024-03-15,"1,250","45,120",misc'].join('\n');
+    const message = applyMapping(csv, mapping).rowErrors.get(0) ?? '';
+    expect(message).toContain('Amount "1,250"');
+    expect(message).toContain('Odometer "45,120"');
   });
 
   test('only the rows holding an ambiguous value are flagged when the file has no evidence', () => {

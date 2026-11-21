@@ -38,7 +38,7 @@ interface ImportResponse {
 
 const FLAT_TRACKER_CSV = [
   'Data,Odo (km),Fuel (litres),Price,Type',
-  '15/03/2024,"160,9344","37,854","52,40",Gas',
+  '15/03/2024,"160,9344","37,8541","52,40",Gas',
 ].join('\n');
 
 const FLAT_TRACKER_MAPPING = {
@@ -256,7 +256,7 @@ describe('POST /import — mapped files with a vehicle column and locale numbers
     await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021, nickname: 'Daily Driver' });
     const csv = [
       'Date,Car,Odo,Litres,Price',
-      '2024-03-15,Daily Driver,"160,9344","37,854","1.250,00"',
+      '2024-03-15,Daily Driver,"160,9344","37,8541","1.250,00"',
     ].join('\n');
     const res = await ctx.authed('POST', '/api/v1/expenses/import', {
       csv,
