@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from 'bun:test';
+import { beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import {
   FakeGoogleStore,
   googleApiError,
@@ -201,7 +201,9 @@ describe('GoogleSheetsService.readSpreadsheetData', () => {
 
     const data = await svc.readSpreadsheetData(info.id);
     expect(data.trips).toHaveLength(1);
-    const trip = data.trips[0];
+    expect(data.trips[0].startOdometer, 'cells are read raw; coerceRow types them').toBe('24000');
+    const { coerceRow } = await import('../../../sync/backup');
+    const trip = coerceRow(data.trips[0], schema.trips);
     expect(trip.vehicleId).toBe(veh.id);
     expect(trip.startOdometer).toBe(24000);
     expect(trip.endOdometer).toBe(24135);
@@ -328,5 +330,132 @@ describe('GoogleSheetsService — atomic backup swap', () => {
     const secondTitles = (await svc.getSpreadsheetInfo(info.id)).sheets.map((s) => s.title);
     expect(secondTitles).toEqual(firstTitles);
     expect(secondTitles).toEqual([...SHEET_NAMES]);
+  });
+});
+
+describe('GoogleSheetsService.readSpreadsheetData — restore integrity', () => {
+  async function seedPolicyWithText(values: Record<string, string>): Promise<void> {
+    const { db } = await import('../../../../db/connection');
+    const schema = await import('../../../../db/schema');
+    const [vehicle] = await db
+      .insert(schema.vehicles)
+      .values({ userId: ctx.user.id, make: 'Toyota', model: 'Corolla', year: 2015 })
+      .returning();
+    const [policy] = await db
+      .insert(schema.insurancePolicies)
+      .values({ userId: ctx.user.id, company: 'Acme' })
+      .returning();
+    await db.insert(schema.insuranceTerms).values({
+      policyId: policy.id,
+      startDate: new Date('2026-01-01T00:00:00.000Z'),
+      endDate: new Date('2026-12-31T00:00:00.000Z'),
+      ...values,
+    });
+    await db.insert(schema.trips).values({
+      userId: ctx.user.id,
+      vehicleId: vehicle.id,
+      tripDate: new Date('2026-02-03T10:00:00.000Z'),
+      startOdometer: 100,
+      endOdometer: 150,
+      purpose: 'business',
+    });
+  }
+
+  async function restoreFromSheetsWith(
+    svc: InstanceType<GoogleSheetsServiceCtor>,
+    spreadsheetId: string,
+    mode: 'replace' | 'preview'
+  ): Promise<unknown> {
+    ctx.sqlite.run(
+      `INSERT OR IGNORE INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, status)
+       VALUES ('prov-sheets', ?, 'storage', 'google-drive', 'Drive', 'x', 'active')`,
+      [ctx.user.id]
+    );
+    ctx.sqlite.run(
+      'INSERT INTO user_preferences (user_id, backup_config) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET backup_config = excluded.backup_config',
+      [
+        ctx.user.id,
+        JSON.stringify({ providers: { 'prov-sheets': { sheetsSpreadsheetId: spreadsheetId } } }),
+      ]
+    );
+    const sheetsModule = await import('../google-sheets-service');
+    const spy = spyOn(sheetsModule, 'createSheetsServiceForProvider').mockResolvedValue(svc);
+    try {
+      const { restoreService } = await import('../../../sync/restore');
+      return await restoreService.restoreFromSheets(ctx.user.id, 'prov-sheets', mode);
+    } finally {
+      spy.mockRestore();
+    }
+  }
+
+  test('a transient read error on an optional tab fails the restore instead of wiping that table', async () => {
+    await seedPolicyWithText({ policyNumber: 'P-1' });
+    const svc = makeSvc();
+    const info = await svc.createOrUpdateVroomSpreadsheet(ctx.user.id, 'VROOM', 'Demo User');
+    const tripsBefore = ctx.sqlite.query('SELECT COUNT(*) AS n FROM trips').get() as { n: number };
+    expect(tripsBefore.n).toBe(1);
+
+    const realRead = svc.readSheetData.bind(svc);
+    spyOn(svc, 'readSheetData').mockImplementation((id: string, range: string) =>
+      range.startsWith('Trips!')
+        ? Promise.reject(googleApiError(429, 'Rate limit'))
+        : realRead(id, range)
+    );
+
+    await expect(svc.readSpreadsheetData(info.id)).rejects.toThrow('Rate limit');
+    await expect(restoreFromSheetsWith(svc, info.id, 'replace')).rejects.toThrow('Rate limit');
+
+    const tripsAfter = ctx.sqlite.query('SELECT COUNT(*) AS n FROM trips').get() as { n: number };
+    expect(tripsAfter.n, 'trips survive a failed Sheets restore').toBe(1);
+  });
+
+  test('an older spreadsheet without an optional tab still restores, with that table empty', async () => {
+    await seedPolicyWithText({ policyNumber: 'P-2' });
+    const svc = makeSvc();
+    const info = await svc.createOrUpdateVroomSpreadsheet(ctx.user.id, 'VROOM', 'Demo User');
+    const ss = store.spreadsheets.get(info.id);
+    if (!ss) throw new Error('spreadsheet missing');
+    ss.sheets = ss.sheets.filter((s) => s.title !== 'Trips' && s.title !== 'Vehicle Shares');
+    ss.values.delete('Trips');
+    ss.values.delete('Vehicle Shares');
+
+    const data = await svc.readSpreadsheetData(info.id);
+    expect(data.trips).toEqual([]);
+    expect(data.vehicleShares).toEqual([]);
+    expect(data.vehicles).toHaveLength(1);
+  });
+
+  test('numeric-looking text survives a Sheets backup and restore verbatim', async () => {
+    const text = {
+      policyNumber: '000123',
+      agentPhone: '0412345678',
+      agentName: '0x1A',
+      coverageDescription: '1e3',
+      agentEmail: '12345678901234567890',
+    };
+    await seedPolicyWithText(text);
+    const svc = makeSvc();
+    const info = await svc.createOrUpdateVroomSpreadsheet(ctx.user.id, 'VROOM', 'Demo User');
+
+    const result = (await restoreFromSheetsWith(svc, info.id, 'replace')) as { success: boolean };
+    expect(result.success, JSON.stringify(result)).toBe(true);
+
+    const row = ctx.sqlite
+      .query(
+        'SELECT policy_number, agent_phone, agent_name, coverage_description, agent_email FROM insurance_terms'
+      )
+      .get();
+    expect(row).toEqual({
+      policy_number: '000123',
+      agent_phone: '0412345678',
+      agent_name: '0x1A',
+      coverage_description: '1e3',
+      agent_email: '12345678901234567890',
+    });
+    const trip = ctx.sqlite
+      .query('SELECT trip_date, start_odometer, end_odometer FROM trips')
+      .get() as { trip_date: number; start_odometer: number; end_odometer: number };
+    expect(trip.start_odometer).toBe(100);
+    expect(trip.end_odometer).toBe(150);
   });
 });
