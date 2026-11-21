@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { onMount } from 'svelte';
 	import {
 		LoaderCircle,
@@ -105,7 +106,7 @@
 			localFuelStats = stats;
 			localFuelAdvanced = advanced;
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load fuel stats';
+			error = userFacingErrorMessage(e);
 		} finally {
 			internalLoading = false;
 		}
@@ -184,7 +185,7 @@
 	<div class="rounded-lg border bg-card p-6">
 		<div class="mb-4 flex items-center gap-3 text-destructive">
 			<CircleAlert class="h-5 w-5" />
-			<p class="font-medium">Failed to load fuel statistics</p>
+			<p class="font-medium">Couldn't load fuel statistics</p>
 		</div>
 		<p class="mb-4 text-sm text-muted-foreground">{error}</p>
 		<Button onclick={loadData}>Retry</Button>

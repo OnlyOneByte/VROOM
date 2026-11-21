@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { onMount } from 'svelte';
 	import { LoaderCircle, CircleAlert, Car, DollarSign, Activity, TrendingUp } from '@lucide/svelte';
 	import * as Tabs from '#lib/components/ui/tabs/index.ts';
@@ -23,7 +24,7 @@
 			error = null;
 			summary = await analyticsApi.getSummary(getDefaultDateRange());
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load analytics';
+			error = userFacingErrorMessage(e);
 		} finally {
 			isLoading = false;
 		}
@@ -93,7 +94,7 @@
 		<div class="rounded-lg border bg-card p-6">
 			<div class="mb-4 flex items-center gap-3 text-destructive">
 				<CircleAlert class="h-5 w-5" />
-				<p class="font-medium">Failed to load analytics</p>
+				<p class="font-medium">Couldn't load analytics</p>
 			</div>
 			<p class="mb-4 text-sm text-muted-foreground">{error}</p>
 			<Button onclick={loadSummary}>Retry</Button>
