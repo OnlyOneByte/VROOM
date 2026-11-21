@@ -388,15 +388,15 @@ describe('Sync Manager', () => {
 			};
 		}
 
-		it('keep_local: POSTs forceOverwrite + the idempotency clientId, returns true', async () => {
+		it('keep_local: overwrites the same server record and returns true', async () => {
 			mockFetch.mockResolvedValueOnce(apiOk({ id: 'server-1' }));
 
 			const result = await syncManager.resolveConflict(modifiedConflict(), 'keep_local');
 
 			expect(result).toBe(true);
 			const body = JSON.parse((mockFetch.mock.calls[0]![1] as { body: string }).body);
-			expect(body.forceOverwrite).toBe(true);
-			expect(body.clientId).toBe('cid-c-1');
+			expect(body.expenseAmount).toBe(50);
+			expect(body.forceOverwrite).toBeUndefined();
 		});
 
 		it('keep_local: a FAILED overwrite returns false (the edit survives to retry, not silently lost)', async () => {
@@ -436,17 +436,14 @@ describe('Sync Manager', () => {
 			expect(expenseApi.uploadPhoto).toHaveBeenCalledWith('expense', 'server-1', photo);
 		});
 
-		it('keep_local POSTs forceOverwrite and the local clientId to the create route', async () => {
+		it('keep_local PUTs the local copy onto the server record named in the conflict', async () => {
 			mockFetch.mockResolvedValueOnce(apiOk({ id: 'server-1' }));
 
 			await syncManager.resolveConflict(modifiedConflict(), 'keep_local');
 
 			const [url, init] = mockFetch.mock.calls[0] as [string, { method: string; body: string }];
-			expect(String(url)).toContain('/api/v1/expenses');
-			expect(init.method).toBe('POST');
-			const body = JSON.parse(init.body);
-			expect(body.clientId).toBe('cid-c-1');
-			expect(body.forceOverwrite).toBe(true);
+			expect(String(url)).toContain('/api/v1/expenses/server-1');
+			expect(init.method).toBe('PUT');
 		});
 	});
 

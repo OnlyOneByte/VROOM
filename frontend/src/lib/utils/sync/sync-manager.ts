@@ -295,7 +295,7 @@ class SyncManager {
 				if (serverCopy) {
 					serverId = serverCopy.id;
 				} else {
-					const saved = await this.postExpense(expense, false);
+					const saved = await this.postExpense(expense);
 					if (wasEditedOnServer(saved) && serverCopyDiffers(expense, saved)) {
 						return { success: false, conflict: conflictWith(expense, saved) };
 					}
@@ -350,11 +350,17 @@ class SyncManager {
 		}
 	}
 
-	private postExpense(expense: OfflineExpense, forceOverwrite: boolean) {
+	private postExpense(expense: OfflineExpense) {
 		return apiClient.post<BackendExpenseResponse>('/api/v1/expenses', {
-			...offlineExpenseToBackend(expense, { clearEmptyFields: forceOverwrite }),
-			clientId: expense.clientId,
-			...(forceOverwrite && { forceOverwrite })
+			...offlineExpenseToBackend(expense),
+			clientId: expense.clientId
+		});
+	}
+
+	private overwriteServerCopy(expense: OfflineExpense, serverId: string) {
+		return apiClient.put<BackendExpenseResponse>(`/api/v1/expenses/${serverId}`, {
+			...offlineExpenseToBackend(expense, { clearEmptyFields: true }),
+			...(!expense.sourceId && { sourceType: null, sourceId: null })
 		});
 	}
 
@@ -417,7 +423,7 @@ class SyncManager {
 		try {
 			const serverId =
 				resolution === 'keep_local'
-					? (await this.postExpense(local, true)).id
+					? (await this.overwriteServerCopy(local, conflict.serverExpense.id)).id
 					: conflict.serverExpense.id;
 			const delivered = await this.deliverQueuedPhotos(local, serverId);
 			if (delivered.success) {
