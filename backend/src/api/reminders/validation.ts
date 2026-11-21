@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { EXPENSE_CATEGORIES } from '../../db/types';
-import { moneyDollarsToCents } from '../../utils/money';
+import { expenseDollarsToCents } from '../../utils/money';
 import { isValidTimeZone, zoneOffsetMs } from '../../utils/time-zone';
 import {
   dateInput,
@@ -100,7 +100,7 @@ const reminderBaseSchema = z.object({
     .array(z.string().min(1).max(CONFIG.validation.reminder.tagMaxLength))
     .max(CONFIG.validation.reminder.maxTags)
     .nullish(),
-  expenseAmount: moneyDollarsToCents((n) =>
+  expenseAmount: expenseDollarsToCents((n) =>
     n.positive().max(CONFIG.validation.reminder.maxExpenseAmount)
   ).nullish(),
   expenseDescription: z.string().max(CONFIG.validation.reminder.descriptionMaxLength).nullish(),

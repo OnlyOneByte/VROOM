@@ -64,7 +64,7 @@ describe('hasAtMostTwoDecimals', () => {
   });
 
   test('rejects sub-cent amounts', () => {
-    for (const n of [0.005, 10.999, 1.001]) {
+    for (const n of [0.005, 10.999, 1.001, 1e-9, -1e-9]) {
       expect(hasAtMostTwoDecimals(n), String(n)).toBe(false);
     }
   });
@@ -130,6 +130,34 @@ describe('expense amounts', () => {
     expect(res.status, JSON.stringify(body)).toBe(200);
     expect(body.data.imported).toBe(1);
   });
+
+  test('bound the insurance costs and reminder amount that become expenses', async () => {
+    const term = (costs: Record<string, unknown>) => ({
+      company: 'Acme Mutual',
+      terms: [
+        {
+          startDate: '2024-01-01T00:00:00.000Z',
+          endDate: '2025-01-01T00:00:00.000Z',
+          vehicleCoverage: { vehicleIds: [vehicleId] },
+          ...costs,
+        },
+      ],
+    });
+    expect(await status('POST', '/api/v1/insurance', term({ totalCost: 1200 }))).toBe(201);
+    for (const costs of [
+      { totalCost: 2_000_000 },
+      { monthlyCost: 10.999 },
+      { paymentAmount: 1_000_001 },
+    ]) {
+      expect(await status('POST', '/api/v1/insurance', term(costs)), JSON.stringify(costs)).toBe(
+        400
+      );
+    }
+    const expenseReminder = (expenseAmount: number) =>
+      reminderBody({ type: 'expense', expenseCategory: 'maintenance', expenseAmount });
+    expect(await status('POST', '/api/v1/reminders', expenseReminder(49.99))).toBe(201);
+    expect(await status('POST', '/api/v1/reminders', expenseReminder(10.999))).toBe(400);
+  });
 });
 
 describe('odometer readings', () => {
@@ -178,6 +206,19 @@ describe('reminder intervals', () => {
     const id = await createReminder();
     expect(await status('PUT', `/api/v1/reminders/${id}`, { intervalValue: 101 })).toBe(400);
     expect(await status('PUT', `/api/v1/reminders/${id}`, { intervalValue: 100 })).toBe(200);
+  });
+
+  test('an update that sends only the unit is checked against the stored value', async () => {
+    const res = await ctx.authed(
+      'POST',
+      '/api/v1/reminders',
+      reminderBody({ intervalValue: 1200, intervalUnit: 'month' })
+    );
+    const body = await json<DataEnvelope<{ reminder: { id: string } }>>(res);
+    expect(res.status, JSON.stringify(body)).toBe(201);
+    const path = `/api/v1/reminders/${body.data.reminder.id}`;
+    expect(await status('PUT', path, { intervalUnit: 'year' })).toBe(400);
+    expect(await status('PUT', path, { intervalUnit: 'week' })).toBe(200);
   });
 
   test('a stored reminder already over the bounds can still be paused and renamed', async () => {

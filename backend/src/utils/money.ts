@@ -125,7 +125,8 @@ const CENT_TOLERANCE = 1e-6;
 const MAX_EXPENSE_AMOUNT = CONFIG.validation.expense.maxAmount;
 
 export function hasAtMostTwoDecimals(dollars: number): boolean {
-  return Math.abs(dollars * 100 - Math.round(dollars * 100)) < CENT_TOLERANCE;
+  const cents = Math.round(dollars * 100);
+  return Math.abs(dollars * 100 - cents) < CENT_TOLERANCE && (cents !== 0 || dollars === 0);
 }
 
 export function expenseDollarsToCents(build: (base: z.ZodNumber) => z.ZodNumber = (n) => n) {
