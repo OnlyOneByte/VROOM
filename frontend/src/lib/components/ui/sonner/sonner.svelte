@@ -2,8 +2,14 @@
 	import { themeStore } from '#lib/stores/theme.svelte.ts';
 	import { Toaster as Sonner, type ToasterProps as SonnerProps } from 'svelte-sonner';
 
-	let { ...restProps }: SonnerProps = $props();
+	const FLOATING_ACTION_CLEARANCE = '6.5rem';
+
+	let {
+		offset = { bottom: FLOATING_ACTION_CLEARANCE },
+		mobileOffset = { bottom: FLOATING_ACTION_CLEARANCE },
+		...restProps
+	}: SonnerProps = $props();
 </script>
 
 <!-- sonner takes its theme from the theme prop, not the .dark class. -->
-<Sonner theme={themeStore.current} class="toaster group" {...restProps} />
+<Sonner theme={themeStore.current} class="toaster group" {offset} {mobileOffset} {...restProps} />
