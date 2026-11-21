@@ -236,6 +236,16 @@ describe('ExpenseForm create mode', () => {
 		expect(createExpense).not.toHaveBeenCalled();
 	});
 
+	test('a fuel expense keeps its heading levels in order', async () => {
+		await renderCreate();
+		await fireEvent.click(categoryButton('Fuel'));
+
+		const levels = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6'), h =>
+			Number(h.tagName[1])
+		);
+		expect(levels).toEqual([1, 2, 2]);
+	});
+
 	test('switching from fuel to another category hides the fuel fields and drops the mileage', async () => {
 		await renderCreate();
 		await fireEvent.click(categoryButton('Fuel'));
