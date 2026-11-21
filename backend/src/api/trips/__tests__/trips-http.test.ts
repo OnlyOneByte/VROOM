@@ -449,6 +449,24 @@ describe('GET /api/v1/trips (list)', () => {
     expect(res.status).toBe(200);
     expect(body.data.some((t) => t.id === 't2')).toBe(false);
   });
+
+  test('filtering by a vehicle the user does not own is 404, like the other trip routes', async () => {
+    const { vehicleId } = seedForeignTrip();
+    const res = await ctx.authed('GET', `/api/v1/trips?vehicleId=${vehicleId}`);
+    expect(res.status).toBe(404);
+  });
+
+  test('filtering by an owned vehicle lists only its trips', async () => {
+    const v1 = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
+    const v2 = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
+    await ctx.authed('POST', '/api/v1/trips', VALID(v1));
+    await ctx.authed('POST', '/api/v1/trips', VALID(v2));
+
+    const res = await ctx.authed('GET', `/api/v1/trips?vehicleId=${v1}`);
+    const body = await json<{ data: { vehicleId: string }[] }>(res);
+    expect(res.status).toBe(200);
+    expect(body.data.map((t) => t.vehicleId)).toEqual([v1]);
+  });
 });
 
 describe('GET /api/v1/trips/:id', () => {
