@@ -2,9 +2,11 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
+import { DEFAULT_UNIT_PREFERENCES, parseUnitPreferences } from '../../types';
 import { logger } from '../../utils/logger';
 import { buildPaginatedResponse, clampPagination } from '../../utils/pagination';
 import { buildTripSummary } from '../../utils/trip-summary';
+import { convertDistance } from '../../utils/unit-conversions';
 import {
   commonSchemas,
   validateTripOwnership,
@@ -138,13 +140,17 @@ routes.get('/summary', zValidator('query', summaryQuerySchema), async (c) => {
     ? await tripRepository.findByVehicle(vehicleId, user.id)
     : await tripRepository.findByUserId(user.id);
 
-  let effectiveRate = rate;
-  if (effectiveRate === undefined) {
-    const prefs = await preferencesRepository.getOrCreate(user.id);
-    effectiveRate = prefs.businessMileageRate ?? 0;
-  }
+  const prefs = await preferencesRepository.getOrCreate(user.id);
+  const userUnit = (parseUnitPreferences(prefs.unitPreferences) ?? DEFAULT_UNIT_PREFERENCES)
+    .distanceUnit;
+  const vehicleUnits = await tripRepository.findVehicleDistanceUnits(user.id);
 
-  const summary = buildTripSummary(trips, effectiveRate);
+  const summary = buildTripSummary(
+    trips,
+    rate ?? prefs.businessMileageRate ?? 0,
+    (distance, tripVehicleId) =>
+      convertDistance(distance, vehicleUnits.get(tripVehicleId) ?? userUnit, userUnit)
+  );
   return c.json({ success: true, data: summary });
 });
 

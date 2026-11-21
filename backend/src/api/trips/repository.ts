@@ -2,7 +2,8 @@ import { and, count, desc, eq, gte, lt, ne } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { NewTrip, Trip } from '../../db/schema';
-import { trips } from '../../db/schema';
+import { trips, vehicles } from '../../db/schema';
+import { DEFAULT_UNIT_PREFERENCES, type DistanceUnit, parseUnitPreferences } from '../../types';
 import { BaseRepository } from '../../utils/repository';
 import { localDayWindow } from '../odometer/repository';
 
@@ -64,6 +65,19 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
       .from(trips)
       .where(and(...conditions))
       .orderBy(desc(trips.tripDate));
+  }
+
+  async findVehicleDistanceUnits(userId: string): Promise<Map<string, DistanceUnit>> {
+    const rows = await this.db
+      .select({ id: vehicles.id, unitPreferences: vehicles.unitPreferences })
+      .from(vehicles)
+      .where(eq(vehicles.userId, userId));
+    return new Map(
+      rows.map((row) => [
+        row.id,
+        (parseUnitPreferences(row.unitPreferences) ?? DEFAULT_UNIT_PREFERENCES).distanceUnit,
+      ])
+    );
   }
 
   async findByVehicle(vehicleId: string, userId: string): Promise<Trip[]> {
