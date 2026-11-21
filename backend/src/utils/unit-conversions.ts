@@ -40,3 +40,13 @@ export function convertEfficiency(
 
   return (value * distFactor) / volFactor;
 }
+
+export function canonicalScale(units: { distanceUnit: DistanceUnit; volumeUnit: VolumeUnit }): {
+  distance: number;
+  volume: number;
+} {
+  return {
+    distance: convertDistance(1, units.distanceUnit, DistanceUnit.MILES),
+    volume: convertVolume(1, units.volumeUnit, VolumeUnit.GALLONS_US),
+  };
+}
