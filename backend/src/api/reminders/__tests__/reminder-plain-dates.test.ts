@@ -78,6 +78,11 @@ describe('reminder dates as plain calendar dates', () => {
       });
       expect(warn.mock.calls.some(([message]) => String(message).includes('time zone'))).toBe(true);
 
+      for (const timeZone of [{ toString: 1 }, [{ toString: 1 }], 42, null]) {
+        const res = await create({ startDate: '2099-06-15', timeZone });
+        expect(res.status, `timeZone ${JSON.stringify(timeZone)}`).toBe(201);
+      }
+
       await put(id, { name: 'Renamed', startDate: '2099-06-15', timeZone: 'Not/AZone' });
       expect(stored(id).start, 'same day under the fallback: kept').toBe(
         Date.parse('2099-06-15T12:00:00.000Z')

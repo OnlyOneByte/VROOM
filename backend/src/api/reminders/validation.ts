@@ -70,7 +70,7 @@ function withZonedPlainDates(value: unknown): unknown {
   if (timeZone === undefined) return value;
   if (typeof timeZone !== 'string' || !isValidTimeZone(timeZone)) {
     logger.warn('Unknown reminder time zone; using the UTC-noon date rule', {
-      timeZone: String(timeZone).slice(0, 64),
+      timeZone: typeof timeZone === 'string' ? timeZone.slice(0, 64) : `<${typeof timeZone}>`,
     });
     const { timeZone: _unknown, ...withoutZone } = input;
     return withoutZone;
