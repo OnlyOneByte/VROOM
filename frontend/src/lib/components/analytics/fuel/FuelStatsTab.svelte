@@ -261,7 +261,7 @@
 		{/if}
 
 		{#if charging && hasChargeData}
-			<div class="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-4">
+			<div class="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 xl:grid-cols-4">
 				{@render periodCard('Charging Sessions', BatteryCharging, charging.sessions, 0)}
 				{@render periodCard(`Energy (${chargeLabel})`, Zap, charging.energy, 1)}
 
@@ -490,7 +490,11 @@
 			</Card.Root>
 		</div>
 
-		<FuelCharts {fuelStats} dayOfWeekPatterns={fuelAdvanced?.dayOfWeekPatterns} />
+		<FuelCharts
+			{fuelStats}
+			dayOfWeekPatterns={fuelAdvanced?.dayOfWeekPatterns}
+			showGasCharts={showGasCards}
+		/>
 
 		{#if fuelAdvanced}
 			<AdvancedCharts {fuelAdvanced} />
