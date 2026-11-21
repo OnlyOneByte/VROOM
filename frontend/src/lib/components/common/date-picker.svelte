@@ -65,10 +65,13 @@
 	let displayValue = $derived(
 		calendarValue ? df.format(calendarValue.toDate(getLocalTimeZone())) : placeholder
 	);
+
+	let valueId = $derived(id ? `${id}-value` : undefined);
+	let describedBy = $derived([valueId, ariaDescribedby].filter(Boolean).join(' ') || undefined);
 </script>
 
 <Popover.Root bind:open>
-	<Popover.Trigger {disabled}>
+	<Popover.Trigger {disabled} {id}>
 		{#snippet child({ props })}
 			<Button
 				variant="outline"
@@ -77,13 +80,12 @@
 					!value && 'text-muted-foreground',
 					className
 				)}
-				{id}
 				aria-invalid={ariaInvalid}
-				aria-describedby={ariaDescribedby}
+				aria-describedby={describedBy}
 				{...props}
 			>
 				<CalendarIcon class="mr-2 size-4" />
-				{displayValue}
+				<span id={valueId}>{displayValue}</span>
 			</Button>
 		{/snippet}
 	</Popover.Trigger>
