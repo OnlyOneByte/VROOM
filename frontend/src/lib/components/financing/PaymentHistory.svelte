@@ -94,7 +94,7 @@
 				<p class="text-xs sm:text-sm text-muted-foreground" aria-live="polite">
 					{sortedPayments.length} payment{sortedPayments.length !== 1 ? 's' : ''} recorded
 					{#if visibleRange.useVirtual}
-						<span class="text-xs text-muted-foreground/70">(optimized view for large history)</span>
+						<span class="text-xs">(optimized view for large history)</span>
 					{/if}
 				</p>
 			</div>

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, mock, test } from 'bun:test';
+import { afterEach, describe, expect, mock, spyOn, test } from 'bun:test';
 import type { NewPhotoRef, PhotoRef } from '../../../db/schema';
 import { PhotoRefRepository } from '../photo-ref-repository';
 
@@ -192,6 +192,7 @@ describe('PhotoRefRepository', () => {
     test('returns pending and failed refs with retries remaining', async () => {
       const db = createMockDb([[pendingRef, failedRef]]);
       const repo = new PhotoRefRepository(db as never);
+      spyOn(repo as never, 'findRevivedSinceProviderUpdate').mockResolvedValue([] as never);
 
       const results = await repo.findPendingOrFailed(10);
 
@@ -203,6 +204,7 @@ describe('PhotoRefRepository', () => {
     test('returns empty array when no pending/failed refs', async () => {
       const db = createMockDb([[]]);
       const repo = new PhotoRefRepository(db as never);
+      spyOn(repo as never, 'findRevivedSinceProviderUpdate').mockResolvedValue([] as never);
 
       const results = await repo.findPendingOrFailed(10);
 

@@ -18,13 +18,14 @@ contract.
 
 - Never put an `!important` (`!`) prefix on a Tailwind class handed to a shadcn `Button` — pass the
   class plainly or pick a `variant`. The `!` fights the component's own styles and breaks theming.
-- Validation error borders are `border-destructive`, never `border-red-*`. No source-scan guard
-  covers this one: `no-theme-clashing-colors` matches only white/black/gray/slate/zinc/neutral.
+- Validation error borders are `border-destructive`, never `border-red-*`. `no-theme-clashing-colors`
+  fails a `.svelte` file that uses a `bg-`/`text-`/`border-` palette class from any Tailwind colour
+  family.
 - A status or accent color is a theme token too, including in a plain `.ts` helper that returns
   class strings — `utils/sync/sync-status.ts` is the reference: `text-destructive` for
-  offline/failed, `text-chart-5` for pending/syncing, `text-chart-2` for synced. Never
-  `text-green-500` / `bg-blue-100` for a status pill or a financing/payment accent. Same gap as
-  above: the guard's regex sees no non-grey palette class, so nothing fails the build for you.
+  offline/failed, `text-warning` for pending/syncing/conflicts, `text-success` for synced. Never
+  `text-green-500` / `bg-blue-100` for a status pill or a financing/payment accent. The guard only
+  scans `.svelte` files, so a palette class returned from a `.ts` helper still passes the build.
 - Guard `console.error` in client error handlers (`hooks.client.ts` `handleError`) with
   `import.meta.env.DEV`. A production build must not dump raw error objects to the console.
 - Never switch an ESLint rule off globally in `eslint.config.js` to clear a warning. Scope the
@@ -40,7 +41,7 @@ working around a failure.
 
 | Guard | Fails on | Use instead |
 |---|---|---|
-| `no-theme-clashing-colors` | a bare `bg-`/`text-`/`border-` + `white`, `black`, `gray-N`, `slate-N`, `zinc-N`, `neutral-N` in a `.svelte` | a semantic theme token (a `dark:`-prefixed variant is fine; five fixed-contrast sites are allowlisted) |
+| `no-theme-clashing-colors` | a bare `bg-`/`text-`/`border-` + `white`, `black` or any Tailwind palette colour (`gray-N`, `yellow-N`, `green-N`…, read from `tailwindcss/theme.css`) in a `.svelte`; an `rgb()`/`hsl()`/hex literal in an `app.css` declaration | a semantic theme token or `var(--token)` (a `dark:`-prefixed variant is fine; five fixed-contrast sites are allowlisted) |
 | `no-hardcoded-currency` | a literal `($)` / `(€)` / `(£)` label suffix | `getCurrencySymbol` / `formatCurrency` (`utils/formatters`) |
 | `no-utc-date-input` | `.toISOString().split('T')[0]` or `.slice(0, 10)` as an `<input type="date">` value | `toDateInputValue` (`utils/formatters`) — date-only values persist at noon local, so the UTC date is off by a day |
 | `no-utc-month-parse` | `new Date(month + '-01')` | `parseMonthToDate` (`utils/chart-formatters`) |

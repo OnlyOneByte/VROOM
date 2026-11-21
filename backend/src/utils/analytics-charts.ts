@@ -8,6 +8,7 @@ import {
   minOf,
   termBillingMonths,
 } from './calculations';
+import { NATIVE_SCALE, type UnitScale } from './unit-conversions';
 
 const MAX_REASONABLE_MILES_BETWEEN_FILLUPS = 1000;
 const EPOCH_MILLISECONDS_THRESHOLD = 1e12;
@@ -97,6 +98,15 @@ interface VehicleMetrics {
   totalMileage: number;
 }
 
+const NATIVE_UNITS: RadarUnitConverters = {
+  efficiency: (value) => value,
+  distance: (value) => value,
+};
+
+function scaleOf(convert: RadarUnitConverters | undefined, vehicleId: string): UnitScale {
+  return convert?.scale?.(vehicleId) ?? NATIVE_SCALE;
+}
+
 function isRealisticEfficiency(efficiency: number, electric: boolean): boolean {
   if (electric) {
     return efficiency >= MIN_VALID_MI_KWH && efficiency <= MAX_VALID_MI_KWH;
@@ -106,17 +116,21 @@ function isRealisticEfficiency(efficiency: number, electric: boolean): boolean {
 
 export function computeEfficiencyPoint(
   current: FuelRow,
-  previous: FuelRow
+  previous: FuelRow,
+  scale: UnitScale = NATIVE_SCALE
 ): FuelEfficiencyPoint | null {
   if (current.missedFillup || previous.missedFillup) return null;
   if (!current.mileage || !previous.mileage) return null;
 
   const milesDriven = current.mileage - previous.mileage;
-  if (milesDriven <= 0 || milesDriven > MAX_REASONABLE_MILES_BETWEEN_FILLUPS) return null;
+  const miles = milesDriven * scale.distance;
+  if (milesDriven <= 0 || miles > MAX_REASONABLE_MILES_BETWEEN_FILLUPS) return null;
   if (!current.volume || current.volume <= 0) return null;
 
   const efficiency = milesDriven / current.volume;
-  if (!isRealisticEfficiency(efficiency, isElectricFuelType(current.fuelType))) return null;
+  const electric = isElectricFuelType(current.fuelType);
+  const canonicalVolume = electric ? current.volume : current.volume * scale.volume;
+  if (!isRealisticEfficiency(miles / canonicalVolume, electric)) return null;
 
   const normalized = normalizeDate(current.date);
   return {
@@ -128,10 +142,11 @@ export function computeEfficiencyPoint(
 
 export function gasEfficiencyPoint(
   current: FuelRow,
-  previous: FuelRow
+  previous: FuelRow,
+  scale: UnitScale = NATIVE_SCALE
 ): FuelEfficiencyPoint | null {
   if (isElectricFuelType(current.fuelType)) return null;
-  return computeEfficiencyPoint(current, previous);
+  return computeEfficiencyPoint(current, previous, scale);
 }
 
 export function toMonthKey(d: Date): string {
@@ -237,7 +252,10 @@ export function sortByVehicleThenDate<T extends { vehicleId: string; date: Date 
   });
 }
 
-export function computeMpgAndCostPerMile(rows: FuelExpenseRow[]): {
+export function computeMpgAndCostPerMile(
+  rows: FuelExpenseRow[],
+  convert: RadarUnitConverters = NATIVE_UNITS
+): {
   mpgValues: number[];
   costPerMileValues: number[];
 } {
@@ -245,15 +263,16 @@ export function computeMpgAndCostPerMile(rows: FuelExpenseRow[]): {
   const costPerMileValues: number[] = [];
 
   for (const [current, previous] of sameEnergyPairs(rows)) {
-    const point = computeEfficiencyPoint(current, previous);
+    const vId = current.vehicleId;
+    const point = computeEfficiencyPoint(current, previous, scaleOf(convert, vId));
     if (!point) continue;
 
-    if (gasEfficiencyPoint(current, previous)) {
-      mpgValues.push(point.efficiency);
+    if (!isElectricFuelType(current.fuelType)) {
+      mpgValues.push(convert.efficiency(point.efficiency, vId));
     }
     const milesDriven = (current.mileage ?? 0) - (previous.mileage ?? 0);
     if (milesDriven > 0 && current.expenseAmount > 0) {
-      costPerMileValues.push(current.expenseAmount / milesDriven);
+      costPerMileValues.push(current.expenseAmount / convert.distance(milesDriven, vId));
     }
   }
 
@@ -262,14 +281,15 @@ export function computeMpgAndCostPerMile(rows: FuelExpenseRow[]): {
 
 export function buildGasPriceHistory(
   rows: FuelExpenseRow[],
-  include: (r: FuelExpenseRow) => boolean = isFillup
+  include: (r: FuelExpenseRow) => boolean = isFillup,
+  toUserVolume: (value: number, vehicleId: string) => number = (value) => value
 ): Array<{ date: string; fuelType: string; pricePerVolume: number }> {
   return rows
     .filter((r) => include(r) && r.expenseAmount > 0 && r.date != null)
     .map((r) => ({
       date: r.date instanceof Date ? r.date.toISOString() : String(r.date),
       fuelType: r.fuelType ?? 'Regular',
-      pricePerVolume: r.expenseAmount / (r.volume as number),
+      pricePerVolume: r.expenseAmount / toUserVolume(r.volume as number, r.vehicleId),
     }))
     .slice(-100);
 }
@@ -348,24 +368,28 @@ export function computeAverageCosts(
 
 function validMilesBetween(
   current: { mileage: number | null; missedFillup: boolean },
-  previous: { mileage: number | null; missedFillup: boolean }
+  previous: { mileage: number | null; missedFillup: boolean },
+  scale: UnitScale = NATIVE_SCALE
 ): number | null {
   if (current.missedFillup || previous.missedFillup) return null;
   if (!current.mileage || !previous.mileage) return null;
   const miles = current.mileage - previous.mileage;
-  if (miles <= 0 || miles > MAX_REASONABLE_MILES_BETWEEN_FILLUPS) return null;
+  if (miles <= 0 || miles * scale.distance > MAX_REASONABLE_MILES_BETWEEN_FILLUPS) return null;
   return miles;
 }
 
 export function buildCostPerDistanceChart(
   rows: FuelExpenseRow[],
-  vehicleNameMap: Map<string, string>
+  vehicleNameMap: Map<string, string>,
+  convert: RadarUnitConverters = NATIVE_UNITS
 ): Array<{ month: string; vehicleId: string; vehicleName: string; costPerDistance: number }> {
   const map = new Map<string, { totalCost: number; totalMiles: number }>();
 
   forEachVehiclePair(rows, (current, previous) => {
-    const miles = validMilesBetween(current, previous);
-    if (miles === null) return;
+    const vId = current.vehicleId;
+    const nativeMiles = validMilesBetween(current, previous, scaleOf(convert, vId));
+    if (nativeMiles === null) return;
+    const miles = convert.distance(nativeMiles, vId);
     const d = normalizeDate(current.date);
     if (!d) return;
     const key = `${toMonthKey(d)}|${current.vehicleId}`;
@@ -446,33 +470,39 @@ function buildTimelineEntry(
 
 export function buildMaintenanceTimeline(
   maintenanceRows: GeneralExpenseRow[],
-  now: Date
+  now: Date,
+  vehicleNameMap: Map<string, string>
 ): Array<{
+  vehicleId: string;
+  vehicleName: string;
   service: string;
   lastServiceDate: string;
   nextDueDate: string;
   daysRemaining: number;
   status: 'good' | 'warning' | 'overdue';
 }> {
-  const serviceGroups = new Map<string, GeneralExpenseRow[]>();
+  const serviceGroups = new Map<
+    string,
+    { vehicleId: string; service: string; rows: GeneralExpenseRow[] }
+  >();
   for (const row of maintenanceRows) {
-    const key = (row.description ?? 'general maintenance').toLowerCase().trim();
-    const group = serviceGroups.get(key) ?? [];
-    group.push(row);
+    const service = (row.description ?? 'general maintenance').toLowerCase().trim();
+    const key = `${row.vehicleId}|${service}`;
+    const group = serviceGroups.get(key) ?? { vehicleId: row.vehicleId, service, rows: [] };
+    group.rows.push(row);
     serviceGroups.set(key, group);
   }
 
-  const timeline: Array<{
-    service: string;
-    lastServiceDate: string;
-    nextDueDate: string;
-    daysRemaining: number;
-    status: 'good' | 'warning' | 'overdue';
-  }> = [];
-  for (const [service, rows] of serviceGroups) {
-    if (rows.length === 0) continue;
+  const timeline: ReturnType<typeof buildMaintenanceTimeline> = [];
+  for (const { vehicleId, service, rows } of serviceGroups.values()) {
     const entry = buildTimelineEntry(service, rows, now);
-    if (entry) timeline.push(entry);
+    if (entry) {
+      timeline.push({
+        vehicleId,
+        vehicleName: vehicleNameMap.get(vehicleId) ?? 'Unknown',
+        ...entry,
+      });
+    }
   }
 
   return timeline.sort((a, b) => a.daysRemaining - b.daysRemaining).slice(0, 50);
@@ -505,11 +535,12 @@ function accumulateExpenseMetrics(
 
 function computePerVehicleFuelEfficiency(
   fuelRows: FuelExpenseRow[],
-  metrics: Map<string, VehicleMetrics>
+  metrics: Map<string, VehicleMetrics>,
+  convert?: RadarUnitConverters
 ): void {
   const totals = new Map<string, { sum: number; count: number }>();
   for (const [current, previous] of sameEnergyPairs(fuelRows)) {
-    const point = gasEfficiencyPoint(current, previous);
+    const point = gasEfficiencyPoint(current, previous, scaleOf(convert, current.vehicleId));
     if (!point) continue;
     const entry = totals.get(current.vehicleId) ?? { sum: 0, count: 0 };
     entry.sum += point.efficiency;
@@ -525,6 +556,7 @@ function computePerVehicleFuelEfficiency(
 export interface RadarUnitConverters {
   efficiency: (value: number, vehicleId: string) => number;
   distance: (value: number, vehicleId: string) => number;
+  scale?: (vehicleId: string) => UnitScale;
 }
 
 export function buildVehicleRadar(
@@ -556,7 +588,7 @@ export function buildVehicleRadar(
   }
 
   accumulateExpenseMetrics(allExpenses, metrics);
-  computePerVehicleFuelEfficiency(fuelRows, metrics);
+  computePerVehicleFuelEfficiency(fuelRows, metrics, convert);
 
   if (convert) {
     for (const [vId, m] of metrics) {
@@ -790,7 +822,8 @@ function accumulateFuelRow(
     { totalCost: number; totalGallons: number; totalMiles: number; count: number }
   >,
   row: GeneralExpenseRow,
-  prevRow: GeneralExpenseRow | undefined
+  prevRow: GeneralExpenseRow | undefined,
+  scale: UnitScale
 ): void {
   const d = normalizeDate(row.date);
   if (!d) return;
@@ -798,7 +831,7 @@ function accumulateFuelRow(
   const entry = monthData.get(key) ?? { totalCost: 0, totalGallons: 0, totalMiles: 0, count: 0 };
   entry.totalCost += row.expenseAmount;
 
-  const miles = prevRow ? validMilesBetween(row, prevRow) : null;
+  const miles = prevRow ? validMilesBetween(row, prevRow, scale) : null;
   if (miles !== null && row.volume != null && row.volume > 0) {
     entry.totalMiles += miles;
     entry.totalGallons += row.volume;
@@ -808,7 +841,8 @@ function accumulateFuelRow(
 }
 
 export function buildFuelEfficiencyAndCost(
-  fuelRows: GeneralExpenseRow[]
+  fuelRows: GeneralExpenseRow[],
+  scale: UnitScale = NATIVE_SCALE
 ): Array<{ month: string; efficiency: number | null; cost: number }> {
   const monthData = new Map<
     string,
@@ -825,10 +859,10 @@ export function buildFuelEfficiencyAndCost(
   let previousFillup: GeneralExpenseRow | undefined;
   for (const row of sorted) {
     if (isElectricFuelType(row.fuelType)) {
-      accumulateFuelRow(monthData, row, undefined);
+      accumulateFuelRow(monthData, row, undefined, scale);
       continue;
     }
-    accumulateFuelRow(monthData, row, previousFillup);
+    accumulateFuelRow(monthData, row, previousFillup, scale);
     previousFillup = row;
   }
 

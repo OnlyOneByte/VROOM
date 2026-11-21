@@ -1,30 +1,40 @@
-import type { VehicleFinancing } from '../../db/schema';
+import { and, eq } from 'drizzle-orm';
+import { getDb } from '../../db/connection';
+import { expenses, type VehicleFinancing, vehicleFinancing } from '../../db/schema';
+import { NotFoundError } from '../../errors';
 import { logger } from '../../utils/logger';
-import { expenseRepository } from '../expenses/repository';
-import { financingRepository } from './repository';
 
 export async function deactivateFinancing(
   financingId: string,
   userId: string
 ): Promise<VehicleFinancing> {
-  const updated = await financingRepository.update(financingId, {
-    isActive: false,
-    endDate: new Date(),
-  });
-  await onFinancingDeactivated(financingId, userId);
-  return updated;
-}
-
-async function onFinancingDeactivated(financingId: string, userId: string): Promise<void> {
-  try {
-    const cleared = await expenseRepository.clearSource('financing', financingId, userId);
-    if (cleared > 0) {
-      logger.info('Cleared financing source on expenses', { financingId, cleared });
+  const now = new Date();
+  const { updated, cleared } = getDb().transaction((tx) => {
+    const row = tx
+      .update(vehicleFinancing)
+      .set({ isActive: false, endDate: now, updatedAt: now })
+      .where(eq(vehicleFinancing.id, financingId))
+      .returning()
+      .get();
+    if (!row) {
+      throw new NotFoundError('Resource');
     }
-  } catch (error) {
-    logger.error('Failed to clear financing source on expenses', {
-      financingId,
-      error: error instanceof Error ? error.message : String(error),
-    });
+    const detached = tx
+      .update(expenses)
+      .set({ sourceType: null, sourceId: null })
+      .where(
+        and(
+          eq(expenses.sourceType, 'financing'),
+          eq(expenses.sourceId, financingId),
+          eq(expenses.userId, userId)
+        )
+      )
+      .returning({ id: expenses.id })
+      .all();
+    return { updated: row, cleared: detached.length };
+  });
+  if (cleared > 0) {
+    logger.info('Cleared financing source on expenses', { financingId, cleared });
   }
+  return updated;
 }

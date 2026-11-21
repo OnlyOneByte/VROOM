@@ -16,7 +16,7 @@ import {
 import type { ApiResponse } from '../../errors';
 import { ConflictError, NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
-import type { UnitPreferences } from '../../types';
+import { DEFAULT_UNIT_PREFERENCES, parseUnitPreferences, type UnitPreferences } from '../../types';
 import { getPeriodStartDate, sortExpensesByDate } from '../../utils/calculations';
 import { chunk } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
@@ -26,6 +26,7 @@ import {
   resolveVehicleAccess,
   resolveVehicleOwnerId,
 } from '../../utils/sharing';
+import { canonicalScale } from '../../utils/unit-conversions';
 import {
   mergeUnitPreferences,
   partialUnitPreferencesSchema,
@@ -495,7 +496,8 @@ routes.get(
       sortedExpenses,
       periodBaselineMileage(fuelExpenses, startDate, vehicle.initialMileage || 0),
       vehicle.trackFuel,
-      vehicle.trackCharging
+      vehicle.trackCharging,
+      canonicalScale(parseUnitPreferences(vehicle.unitPreferences) ?? DEFAULT_UNIT_PREFERENCES)
     );
 
     const currentOdometer = await odometerRepository.getCurrentOdometer(id, ownerId);
