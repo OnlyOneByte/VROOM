@@ -23,3 +23,21 @@ describe('DatePicker disabled state', () => {
 		expect(await screen.findByRole('grid')).toBeInTheDocument();
 	});
 });
+
+describe('DatePicker id', () => {
+	test('the trigger button carries the id the caller passed', () => {
+		render(DatePicker, { props: { value: '2026-05-10', id: 'trip-date' } });
+		expect(document.getElementById('trip-date')).toBe(
+			screen.getByRole('button', { name: /May 10, 2026/ })
+		);
+	});
+
+	test('a labelled picker still announces its date, ahead of any error', () => {
+		render(DatePicker, {
+			props: { value: '2026-05-10', id: 'trip-date', 'aria-describedby': 'trip-date-error' }
+		});
+		const trigger = document.getElementById('trip-date');
+		expect(trigger?.getAttribute('aria-describedby')).toBe('trip-date-value trip-date-error');
+		expect(document.getElementById('trip-date-value')?.textContent).toBe('May 10, 2026');
+	});
+});
