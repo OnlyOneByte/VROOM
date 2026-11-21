@@ -26,7 +26,8 @@ function toolMessage(name: string, id: string, content: string): ChatMessage {
 async function runOneToolCall(
   call: ToolCall,
   userId: string,
-  nowMs: number
+  nowMs: number,
+  timeZone?: string
 ): Promise<{ message: ChatMessage; ran: boolean }> {
   const tool = ASSISTANT_TOOLS[call.name];
   if (!tool) {
@@ -51,7 +52,7 @@ async function runOneToolCall(
   }
 
   try {
-    const out = await tool.run(valid.data, userId, nowMs);
+    const out = await tool.run(valid.data, userId, nowMs, timeZone);
     return { message: toolMessage(call.name, call.id, JSON.stringify(out)), ran: true };
   } catch (err) {
     const m = err instanceof Error ? err.message : 'tool error';
@@ -69,11 +70,12 @@ async function appendToolTurn(
   text: string,
   batch: ToolCall[],
   userId: string,
-  nowMs: number
+  nowMs: number,
+  timeZone?: string
 ): Promise<void> {
   messages.push({ role: 'assistant', content: text, toolCalls: batch });
   for (const call of batch) {
-    const { message, ran } = await runOneToolCall(call, userId, nowMs);
+    const { message, ran } = await runOneToolCall(call, userId, nowMs, timeZone);
     if (ran) toolsUsed.push(call.name);
     messages.push(message);
   }
@@ -89,7 +91,8 @@ export async function runAssistant(
   userId: string,
   message: string,
   history: ChatMessage[],
-  nowMs: number
+  nowMs: number,
+  timeZone?: string
 ): Promise<AssistantChatResult> {
   const tools = toolDefinitions();
   const messages: ChatMessage[] = [
@@ -113,7 +116,7 @@ export async function runAssistant(
     if (batch.length === 0) break;
     toolCallBudget -= batch.length;
 
-    await appendToolTurn(messages, toolsUsed, result.text ?? '', batch, userId, nowMs);
+    await appendToolTurn(messages, toolsUsed, result.text ?? '', batch, userId, nowMs, timeZone);
   }
 
   return {
