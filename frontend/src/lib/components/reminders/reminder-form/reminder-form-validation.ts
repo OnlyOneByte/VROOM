@@ -1,5 +1,8 @@
+import { ApiError } from '#lib/utils/error-handling.ts';
 import {
+	FUEL_SPLIT_ERROR,
 	hasMileageTrigger,
+	isFuelAllowed,
 	hasTimeTrigger,
 	shouldShowSplitEditor,
 	type ReminderDraft
@@ -31,6 +34,9 @@ export function validateReminderDraft(draft: ReminderDraft): Record<string, stri
 		e['endDate'] = 'End date must be after the start date';
 	}
 	if (draft.kind === 'expense') {
+		if (draft.expenseCategory === 'fuel' && !isFuelAllowed(draft)) {
+			e['expenseCategory'] = FUEL_SPLIT_ERROR;
+		}
 		const amt = parseFloat(draft.expenseAmount);
 		if (!(amt > 0)) e['expenseAmount'] = 'Enter an amount greater than 0';
 		const showSplit = shouldShowSplitEditor(draft);
@@ -44,4 +50,19 @@ export function validateReminderDraft(draft: ReminderDraft): Record<string, stri
 		}
 	}
 	return e;
+}
+
+const SERVER_FIELD_TO_FORM_FIELD: Record<string, string> = { expenseSplitConfig: 'split' };
+
+export function serverFieldErrors(error: unknown): Record<string, string> {
+	const issues = error instanceof ApiError ? error.details?.['issues'] : undefined;
+	if (!Array.isArray(issues)) return {};
+	const errors: Record<string, string> = {};
+	for (const issue of issues as Array<{ path?: unknown[]; message?: unknown }>) {
+		const field = issue.path?.[0];
+		if (typeof field !== 'string' || typeof issue.message !== 'string') continue;
+		const key = SERVER_FIELD_TO_FORM_FIELD[field] ?? field;
+		errors[key] ??= issue.message;
+	}
+	return errors;
 }
