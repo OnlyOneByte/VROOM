@@ -66,7 +66,13 @@ import {
 } from '../../utils/analytics-charts';
 import { maxOf, minOf, termBillingMonths } from '../../utils/calculations';
 import { logger } from '../../utils/logger';
-import { convertDistance, convertEfficiency, convertVolume } from '../../utils/unit-conversions';
+import {
+  canonicalScale,
+  convertDistance,
+  convertEfficiency,
+  convertVolume,
+  type UnitScale,
+} from '../../utils/unit-conversions';
 import { FinancingRepository } from '../financing/repository';
 
 export type { FuelEfficiencyPoint } from '../../utils/analytics-charts';
@@ -88,20 +94,31 @@ export function toDate(value: Date | number | string): Date {
   return value instanceof Date ? value : new Date(value);
 }
 
+export function yearToDateSpending(
+  rows: Array<{ date: Date | number | null; expenseAmount: number }>,
+  range: DateRange,
+  ytdStart?: number
+): number {
+  const lastInstant = new Date(range.end * 1000 - 1);
+  const yearStart =
+    ytdStart != null ? ytdStart * 1000 : Date.UTC(lastInstant.getUTCFullYear(), 0, 1);
+  let total = 0;
+  for (const row of rows) {
+    if (row.date != null && toDate(row.date).getTime() >= yearStart) total += row.expenseAmount;
+  }
+  return total;
+}
+
 export function calendarYearRange(year: number): { start: Date; end: Date } {
   return { start: new Date(Date.UTC(year, 0, 1)), end: new Date(Date.UTC(year + 1, 0, 1)) };
 }
 
 interface FleetUnitConverter extends RadarUnitConverters {
   volume: (value: number, vehicleId: string) => number;
+  scale: (vehicleId: string) => UnitScale;
 }
 
 const identity = (value: number) => value;
-const IDENTITY_CONVERTER: FleetUnitConverter = {
-  efficiency: identity,
-  distance: identity,
-  volume: identity,
-};
 
 export interface QuickStatsData {
   vehicleCount: number;
@@ -199,6 +216,8 @@ export interface FuelStatsData {
 
 export interface FuelAdvancedData {
   maintenanceTimeline: Array<{
+    vehicleId: string;
+    vehicleName: string;
     service: string;
     lastServiceDate: string;
     nextDueDate: string;
@@ -466,8 +485,13 @@ export class AnalyticsRepository {
     vehicleUnitsMap: Map<string, UnitPreferences>,
     userUnits: UnitPreferences
   ): FleetUnitConverter {
-    if (this.allVehiclesMatchUnits(vehicleUnitsMap, userUnits)) return IDENTITY_CONVERTER;
+    const scale = (vehicleId: string) =>
+      canonicalScale(this.vehicleUnitsFor(vehicleUnitsMap, vehicleId));
+    if (this.allVehiclesMatchUnits(vehicleUnitsMap, userUnits)) {
+      return { efficiency: identity, distance: identity, volume: identity, scale };
+    }
     return {
+      scale,
       efficiency: (value, vehicleId) => {
         const v = this.vehicleUnitsFor(vehicleUnitsMap, vehicleId);
         return convertEfficiency(
@@ -498,7 +522,7 @@ export class AnalyticsRepository {
     convert: FleetUnitConverter
   ): Generator<{ vehicleId: string; efficiency: number; date: string }> {
     for (const [current, previous] of sameEnergyPairs(fuelRows)) {
-      const point = gasEfficiencyPoint(current, previous);
+      const point = gasEfficiencyPoint(current, previous, convert.scale(current.vehicleId));
       if (!point) continue;
       yield {
         vehicleId: current.vehicleId,
@@ -1211,9 +1235,11 @@ export class AnalyticsRepository {
         .where(and(...conditions))
         .orderBy(asc(expenses.vehicleId), asc(expenses.date));
       if (rows.length < 2) return [];
+      const vehicleUnitsMap = await this.getAllVehicleUnits(userId);
       const points: FuelEfficiencyPoint[] = [];
       for (const [current, previous] of sameEnergyPairs(rows)) {
-        const point = gasEfficiencyPoint(current as FuelRow, previous as FuelRow);
+        const scale = canonicalScale(this.vehicleUnitsFor(vehicleUnitsMap, current.vehicleId));
+        const point = gasEfficiencyPoint(current as FuelRow, previous as FuelRow, scale);
         if (point) points.push(point);
       }
       return points;
@@ -1227,7 +1253,11 @@ export class AnalyticsRepository {
     }
   }
 
-  async getQuickStats(userId: string, range: DateRange): Promise<QuickStatsData> {
+  async getQuickStats(
+    userId: string,
+    range: DateRange,
+    ytdStart?: number
+  ): Promise<QuickStatsData> {
     try {
       const vehicleRows = await this.db
         .select({
@@ -1245,7 +1275,7 @@ export class AnalyticsRepository {
         this.getAllVehicleUnits(userId),
       ]);
 
-      const ytdSpending = allExpenses.reduce((sum, e) => sum + e.expenseAmount, 0);
+      const ytdSpending = yearToDateSpending(allExpenses, range, ytdStart);
       const convert = this.fleetUnitConverter(vehicleUnitsMap, userUnits);
       const avgEfficiency = this.computeAverageEfficiency(fuelRows, convert);
 
@@ -1410,7 +1440,7 @@ export class AnalyticsRepository {
     const currentMonthGallons = sumGallons(fuelRows.filter(inCurrentMonth));
     const prevMonthGallons = sumGallons(fuelRows.filter(inPrevMonth));
 
-    const { mpgValues, costPerMileValues } = computeMpgAndCostPerMile(fuelRowsByVehicle);
+    const { mpgValues, costPerMileValues } = computeMpgAndCostPerMile(fuelRowsByVehicle, convert);
     const fuelConsumption = computeFuelConsumptionMetrics(mpgValues);
 
     const volumes = fuelRows.filter(isFillup).map((r) => this.rowVolume(r, convert));
@@ -1460,10 +1490,10 @@ export class AnalyticsRepository {
       averageCost,
       distance,
       monthlyConsumption: this.buildMonthlyConsumption(fuelRowsByVehicle, convert),
-      gasPriceHistory: buildGasPriceHistory(fuelRows),
+      gasPriceHistory: buildGasPriceHistory(fuelRows, isFillup, convert.volume),
       fillupCostByVehicle: buildFillupCostByVehicle(fuelRows, vehicleNameMap),
       odometerProgression: this.buildOdometerProgression(fuelRows, vehicleNameMap),
-      costPerDistance: buildCostPerDistanceChart(fuelRowsByVehicle, vehicleNameMap),
+      costPerDistance: buildCostPerDistanceChart(fuelRowsByVehicle, vehicleNameMap, convert),
       charging: this.buildChargingStats(fuelRows, fuelRowsByVehicle, prevYearAgg, convert, {
         inCurrentMonth,
         inPrevMonth,
@@ -1489,7 +1519,7 @@ export class AnalyticsRepository {
     const efficiencyValues: number[] = [];
     for (const [current, previous] of sameEnergyPairs(fuelRowsByVehicle)) {
       if (!isChargeSession(current)) continue;
-      const point = computeEfficiencyPoint(current, previous);
+      const point = computeEfficiencyPoint(current, previous, convert.scale(current.vehicleId));
       if (point) efficiencyValues.push(convert.distance(point.efficiency, current.vehicleId));
     }
 
@@ -1564,7 +1594,7 @@ export class AnalyticsRepository {
   ): FuelAdvancedData {
     const maintenanceRows = allExpenses.filter((e) => e.category === 'maintenance');
     return {
-      maintenanceTimeline: buildMaintenanceTimeline(maintenanceRows, new Date()),
+      maintenanceTimeline: buildMaintenanceTimeline(maintenanceRows, new Date(), vehicleNameMap),
       seasonalEfficiency: this.buildSeasonalEfficiency(fuelRowsByVehicle, convert),
       vehicleRadar: buildVehicleRadar(allExpenses, fuelRowsByVehicle, vehicleNameMap, convert),
       dayOfWeekPatterns: this.buildDayOfWeekPatterns(fuelRows, convert),
@@ -1921,11 +1951,15 @@ export class AnalyticsRepository {
     range: DateRange
   ): Promise<VehicleExpensesData> {
     try {
-      const allExpenses = await this.queryAllExpenses(userId, range, vehicleId);
+      const [allExpenses, vehicleUnitsMap] = await Promise.all([
+        this.queryAllExpenses(userId, range, vehicleId),
+        this.getAllVehicleUnits(userId),
+      ]);
       const fuelRows = allExpenses.filter((e) => e.category === 'fuel');
+      const scale = canonicalScale(this.vehicleUnitsFor(vehicleUnitsMap, vehicleId));
       return {
         maintenanceCosts: buildVehicleMaintenanceCosts(allExpenses),
-        fuelEfficiencyAndCost: buildFuelEfficiencyAndCost(fuelRows),
+        fuelEfficiencyAndCost: buildFuelEfficiencyAndCost(fuelRows, scale),
         expenseBreakdown: buildVehicleExpenseBreakdown(allExpenses),
       };
     } catch (error) {
@@ -1986,7 +2020,11 @@ export class AnalyticsRepository {
     }
   }
 
-  async getSummary(userId: string, range: DateRange): Promise<AnalyticsSummaryData> {
+  async getSummary(
+    userId: string,
+    range: DateRange,
+    ytdStart?: number
+  ): Promise<AnalyticsSummaryData> {
     try {
       const prevRange: DateRange = {
         start: range.start - (range.end - range.start),
@@ -2020,7 +2058,7 @@ export class AnalyticsRepository {
 
       const convert = this.fleetUnitConverter(vehicleUnitsMap, userUnits);
       const avgEfficiency = this.computeAverageEfficiency(fuelRows, convert);
-      const ytdSpending = allExpenses.reduce((sum, e) => sum + e.expenseAmount, 0);
+      const ytdSpending = yearToDateSpending(allExpenses, range, ytdStart);
       const fleetHealthScore =
         vehicleRows.length > 0 ? await this.computeFleetHealthScore(vehicleRows, userId) : 0;
 

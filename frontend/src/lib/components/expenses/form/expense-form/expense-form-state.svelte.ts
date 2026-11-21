@@ -82,6 +82,8 @@ export class ExpenseFormState {
 	effectiveDistanceUnit = $derived(
 		this.vehicle?.unitPreferences?.distanceUnit ?? this.distanceUnit
 	);
+	effectiveVolumeUnit = $derived(this.vehicle?.unitPreferences?.volumeUnit ?? this.volumeUnit);
+	effectiveChargeUnit = $derived(this.vehicle?.unitPreferences?.chargeUnit ?? this.chargeUnit);
 	distLabel = $derived(getDistanceUnitLabel(this.effectiveDistanceUnit, false));
 
 	previousFuelHint = $derived(
@@ -94,6 +96,11 @@ export class ExpenseFormState {
 	isFinancingPayment = $derived(this.sourceType === 'financing' && !!this.sourceId);
 	showVolumeField = $derived(this.showFuelFields && !isElectricFuelType(this.formData.fuelType));
 	showChargeField = $derived(this.showFuelFields && isElectricFuelType(this.formData.fuelType));
+	hasSplitVehicles = $derived(
+		(!this.isEditMode || this.isGroupEditMode) && this.vehicles.length >= 2
+	);
+	canSplit = $derived(this.hasSplitVehicles && !this.showFuelFields);
+	showFuelSplitHint = $derived(this.hasSplitVehicles && this.showFuelFields && !this.isSplit);
 
 	constructor(ctx: ExpenseFormContext, initialLoading: boolean) {
 		this.ctx = ctx;
@@ -104,8 +111,8 @@ export class ExpenseFormState {
 		return {
 			category: this.formData.category,
 			vehicle: this.vehicle,
-			volumeUnit: this.volumeUnit,
-			chargeUnit: this.chargeUnit,
+			volumeUnit: this.effectiveVolumeUnit,
+			chargeUnit: this.effectiveChargeUnit,
 			allVehicleExpenses: this.allVehicleExpenses,
 			expenseId: this.ctx.expenseId,
 			formData: this.formData as unknown as Record<string, string | string[]>
@@ -162,6 +169,10 @@ export class ExpenseFormState {
 		if (categoryValue !== 'financial') {
 			this.sourceType = null;
 			this.sourceId = null;
+		}
+
+		if (categoryValue === 'fuel' && this.isSplit && !this.isGroupEditMode) {
+			this.handleSplitToggle(false);
 		}
 
 		if (categoryValue !== 'fuel') {

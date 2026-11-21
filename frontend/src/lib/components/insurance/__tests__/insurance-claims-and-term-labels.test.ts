@@ -22,6 +22,7 @@ vi.mock('#lib/services/provider-api.ts', () => ({
 
 const ClaimsSection = (await import('../ClaimsSection.svelte')).default;
 const PolicyTermCard = (await import('../PolicyTermCard.svelte')).default;
+const DocumentViewer = (await import('../DocumentViewer.svelte')).default;
 
 function classes(element: HTMLElement): string[] {
 	return element.className.split(/\s+/);
@@ -62,6 +63,17 @@ describe('claim action buttons', () => {
 			'aria-expanded',
 			'false'
 		);
+	});
+});
+
+describe('document upload button', () => {
+	test('Upload is 40px tall on touch and not text-xs', async () => {
+		render(DocumentViewer, { props: { entityType: 'insurance_policy', entityId: 'p1' } });
+		await settle();
+
+		const upload = screen.getByRole('button', { name: 'Upload' });
+		expect(classes(upload)).toContain('h-10');
+		expect(classes(upload)).not.toContain('text-xs');
 	});
 });
 

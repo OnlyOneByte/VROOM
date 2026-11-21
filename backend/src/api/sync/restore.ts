@@ -34,7 +34,7 @@ import {
 import { chunk, rowsPerInsert } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
 import { preferencesRepository } from '../settings/repository';
-import { backupService, coerceRow, storageProviderIdentity } from './backup';
+import { backupService, coerceRow, isPreCentsBackup, storageProviderIdentity } from './backup';
 
 type DrizzleTransaction = Parameters<Parameters<AppDatabase['transaction']>[0]>[0];
 
@@ -107,8 +107,12 @@ function summarizeBackup(data: ParsedBackupData): ImportSummary {
   };
 }
 
-function coerceRows(rows: Record<string, unknown>[], table: Table): Record<string, unknown>[] {
-  return rows.map((row) => coerceRow(row, table));
+function coerceRows(
+  rows: Record<string, unknown>[],
+  table: Table,
+  options?: { shimMoneyToCents?: boolean }
+): Record<string, unknown>[] {
+  return rows.map((row) => coerceRow(row, table, options));
 }
 
 class RestoreService {
@@ -230,33 +234,36 @@ class RestoreService {
     );
     const sheetsService = await createSheetsServiceForProvider(providerId, userId);
     const sheet = await sheetsService.readSpreadsheetData(sheetsSpreadsheetId);
+    const shim = { shimMoneyToCents: isPreCentsBackup(sheet.metadata.version) };
 
     const { data: sheetData, skippedPhotos } = this.withoutOrphanPhotos({
       ...sheet,
       metadata: { ...sheet.metadata, version: CONFIG.backup.currentVersion },
-      vehicles: coerceRows(sheet.vehicles, TABLE_SCHEMA_MAP.vehicles),
-      expenses: coerceRows(sheet.expenses, TABLE_SCHEMA_MAP.expenses),
-      financing: coerceRows(sheet.financing, TABLE_SCHEMA_MAP.financing),
-      insurance: coerceRows(sheet.insurance, TABLE_SCHEMA_MAP.insurance),
-      insuranceTerms: coerceRows(sheet.insuranceTerms, TABLE_SCHEMA_MAP.insuranceTerms),
+      vehicles: coerceRows(sheet.vehicles, TABLE_SCHEMA_MAP.vehicles, shim),
+      expenses: coerceRows(sheet.expenses, TABLE_SCHEMA_MAP.expenses, shim),
+      financing: coerceRows(sheet.financing, TABLE_SCHEMA_MAP.financing, shim),
+      insurance: coerceRows(sheet.insurance, TABLE_SCHEMA_MAP.insurance, shim),
+      insuranceTerms: coerceRows(sheet.insuranceTerms, TABLE_SCHEMA_MAP.insuranceTerms, shim),
       insuranceTermVehicles: coerceRows(
         sheet.insuranceTermVehicles,
-        TABLE_SCHEMA_MAP.insuranceTermVehicles
+        TABLE_SCHEMA_MAP.insuranceTermVehicles,
+        shim
       ),
-      insuranceClaims: coerceRows(sheet.insuranceClaims, TABLE_SCHEMA_MAP.insuranceClaims),
-      photos: coerceRows(sheet.photos, TABLE_SCHEMA_MAP.photos),
-      odometer: coerceRows(sheet.odometer, TABLE_SCHEMA_MAP.odometer),
-      photoRefs: coerceRows(sheet.photoRefs, TABLE_SCHEMA_MAP.photoRefs),
-      userPreferences: coerceRows(sheet.userPreferences, TABLE_SCHEMA_MAP.userPreferences),
-      syncState: coerceRows(sheet.syncState, TABLE_SCHEMA_MAP.syncState),
-      reminders: coerceRows(sheet.reminders, TABLE_SCHEMA_MAP.reminders),
-      reminderVehicles: coerceRows(sheet.reminderVehicles, TABLE_SCHEMA_MAP.reminderVehicles),
+      insuranceClaims: coerceRows(sheet.insuranceClaims, TABLE_SCHEMA_MAP.insuranceClaims, shim),
+      photos: coerceRows(sheet.photos, TABLE_SCHEMA_MAP.photos, shim),
+      odometer: coerceRows(sheet.odometer, TABLE_SCHEMA_MAP.odometer, shim),
+      photoRefs: coerceRows(sheet.photoRefs, TABLE_SCHEMA_MAP.photoRefs, shim),
+      userPreferences: coerceRows(sheet.userPreferences, TABLE_SCHEMA_MAP.userPreferences, shim),
+      syncState: coerceRows(sheet.syncState, TABLE_SCHEMA_MAP.syncState, shim),
+      reminders: coerceRows(sheet.reminders, TABLE_SCHEMA_MAP.reminders, shim),
+      reminderVehicles: coerceRows(sheet.reminderVehicles, TABLE_SCHEMA_MAP.reminderVehicles, shim),
       reminderNotifications: coerceRows(
         sheet.reminderNotifications,
-        TABLE_SCHEMA_MAP.reminderNotifications
+        TABLE_SCHEMA_MAP.reminderNotifications,
+        shim
       ),
-      trips: coerceRows(sheet.trips, TABLE_SCHEMA_MAP.trips),
-      vehicleShares: coerceRows(sheet.vehicleShares, TABLE_SCHEMA_MAP.vehicleShares),
+      trips: coerceRows(sheet.trips, TABLE_SCHEMA_MAP.trips, shim),
+      vehicleShares: coerceRows(sheet.vehicleShares, TABLE_SCHEMA_MAP.vehicleShares, shim),
     });
 
     const validation = backupService.validateBackupData(sheetData);

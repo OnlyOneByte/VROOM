@@ -96,6 +96,8 @@ export interface PeriodCounts {
 
 export interface FuelAdvancedResponse {
 	maintenanceTimeline: Array<{
+		vehicleId: string;
+		vehicleName: string;
 		service: string;
 		lastServiceDate: string;
 		nextDueDate: string;

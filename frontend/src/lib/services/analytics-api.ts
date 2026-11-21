@@ -25,14 +25,18 @@ interface FuelEfficiencyResponse {
 	fuelEfficiencyTrend: FuelEfficiencyPoint[];
 }
 
-export function getDefaultDateRange(): { startDate: number; endDate: number } {
-	const now = new Date();
+export function getDefaultDateRange(now: Date = new Date()): {
+	startDate: number;
+	endDate: number;
+	ytdStart: number;
+} {
 	const year = now.getFullYear();
 	const month = now.getMonth();
 	const day = now.getDate();
 	const start = Math.floor(new Date(year - 1, month, day).getTime() / 1000);
 	const end = Math.floor(new Date(year, month, day + 1).getTime() / 1000);
-	return { startDate: start, endDate: end };
+	const ytdStart = Math.floor(new Date(year, 0, 1).getTime() / 1000);
+	return { startDate: start, endDate: end, ytdStart };
 }
 
 export const analyticsApi = {
@@ -42,9 +46,13 @@ export const analyticsApi = {
 		);
 	},
 
-	async getQuickStats(params: { startDate: number; endDate: number }): Promise<QuickStatsResponse> {
+	async getQuickStats(params: {
+		startDate: number;
+		endDate: number;
+		ytdStart?: number;
+	}): Promise<QuickStatsResponse> {
 		return apiClient.get<QuickStatsResponse>(
-			`/api/v1/analytics/quick-stats${buildQueryString({ startDate: params.startDate, endDate: params.endDate })}`
+			`/api/v1/analytics/quick-stats${buildQueryString({ startDate: params.startDate, endDate: params.endDate, ytdStart: params.ytdStart })}`
 		);
 	},
 
@@ -115,10 +123,11 @@ export const analyticsApi = {
 	async getSummary(params: {
 		startDate: number;
 		endDate: number;
+		ytdStart?: number;
 	}): Promise<AnalyticsSummaryResponse> {
 		try {
 			return await apiClient.get<AnalyticsSummaryResponse>(
-				`/api/v1/analytics/summary${buildQueryString({ startDate: params.startDate, endDate: params.endDate })}`
+				`/api/v1/analytics/summary${buildQueryString({ startDate: params.startDate, endDate: params.endDate, ytdStart: params.ytdStart })}`
 			);
 		} catch (error: unknown) {
 			const is404 = error instanceof ApiError && error.statusCode === 404;
