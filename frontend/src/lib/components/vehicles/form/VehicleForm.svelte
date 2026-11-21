@@ -109,13 +109,18 @@
 			['fuel volume', saved.volumeUnit, volumeUnit],
 			['charge', saved.chargeUnit, chargeUnit]
 		] as const;
-		const summary = changes
-			.filter(([, from, to]) => from !== to)
+		const changed = changes.filter(([, from, to]) => from !== to);
+		const summary = changed
 			.map(
 				([name, from, to]) => `${name} from ${getLongFormLabel(from)} to ${getLongFormLabel(to)}`
 			)
 			.join(' and ');
-		return `You're changing ${summary}. Readings already saved for this vehicle, such as its initial mileage, odometer entries, trips and fill-ups, are not converted: each number stays the same and is shown in the new units, so 45,000 miles would read 45,000 kilometers. Only change units if they were set wrong.`;
+		const [, fromUnit, toUnit] = changed[0] ?? [];
+		const example =
+			fromUnit && toUnit
+				? ` For example, a saved 100 ${getLongFormLabel(fromUnit).toLowerCase()} would read 100 ${getLongFormLabel(toUnit).toLowerCase()}.`
+				: '';
+		return `You're changing ${summary}. Readings already saved for this vehicle, such as its initial mileage, odometer entries, trips and fill-ups, are not converted: each number stays the same and is shown in the new units.${example} Only change units if they were set wrong.`;
 	});
 
 	function needsUnitChangeConfirmation(error: unknown): boolean {
@@ -1018,7 +1023,7 @@
 			bind:open={showUnitChangeConfirm}
 			title="Change units for this vehicle?"
 			description={unitChangeDescription}
-			confirmLabel="Change units"
+			confirmLabel="Change Units"
 			destructive={false}
 			onConfirm={() => saveVehicle(true)}
 		/>

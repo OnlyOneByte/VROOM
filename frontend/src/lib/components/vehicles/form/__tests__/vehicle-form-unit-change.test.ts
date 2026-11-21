@@ -81,6 +81,7 @@ describe('VehicleForm unit change on a vehicle with saved readings', () => {
 		expect(dialog.textContent).toContain('Change units for this vehicle?');
 		expect(dialog.textContent).toContain('distance from Miles to Kilometers');
 		expect(dialog.textContent).toContain('are not converted');
+		expect(dialog.textContent).toContain('a saved 100 miles would read 100 kilometers');
 		expect(updateVehicle).toHaveBeenCalledTimes(1);
 		expect(updateVehicle.mock.calls[0]?.[1].confirmUnitChange).toBeUndefined();
 		expect(appStore.notifications.filter(n => n.type === 'error')).toHaveLength(0);
@@ -94,7 +95,7 @@ describe('VehicleForm unit change on a vehicle with saved readings', () => {
 		});
 
 		await renderEditAndSwitchToKilometers();
-		await fireEvent.click(await screen.findByRole('button', { name: 'Change units' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'Change Units' }));
 
 		await waitFor(() => expect(updateVehicle).toHaveBeenCalledTimes(2));
 		const resent = updateVehicle.mock.calls[1]?.[1];
