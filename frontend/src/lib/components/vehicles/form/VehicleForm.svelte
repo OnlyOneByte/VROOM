@@ -513,11 +513,9 @@
 				try {
 					await vehicleApi.createFinancing(finalVehicleId, financingData);
 				} catch (financingError) {
-					const message =
-						financingError instanceof Error ? financingError.message : 'Unknown error';
 					appStore.addNotification({
 						type: 'warning',
-						message: `Vehicle saved but financing failed: ${message}`
+						message: `The vehicle was saved, but its financing couldn't be saved. ${userFacingErrorMessage(financingError)}`
 					});
 				}
 			}
