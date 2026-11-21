@@ -9,6 +9,10 @@
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import BrandMark from '#lib/components/common/BrandMark.svelte';
 
+	const SIGN_IN_DECLINED = 'Sign-in was cancelled or declined. Please try again.';
+	const SIGN_IN_INCOMPLETE = 'Sign-in didn’t finish. Please try again.';
+	const SIGN_IN_FAILED = 'We couldn’t sign you in. Please try again.';
+
 	let status = $state('processing');
 	let error = $state('');
 
@@ -21,18 +25,17 @@
 
 			const errorParam = urlParams.get('error');
 
-			if (errorParam) {
-				throw new Error(`OAuth error: ${errorParam}`);
-			}
-
-			if (!code) {
-				throw new Error('No authorization code received');
+			if (errorParam || !code) {
+				status = 'error';
+				error = errorParam ? SIGN_IN_DECLINED : SIGN_IN_INCOMPLETE;
+				return;
 			}
 
 			await authStore.initialize();
 		} catch (err) {
+			if (import.meta.env.DEV) console.error('Sign-in callback failed:', err);
 			status = 'error';
-			error = err instanceof Error ? err.message : 'Authentication failed';
+			error = SIGN_IN_FAILED;
 		}
 	});
 
@@ -45,7 +48,7 @@
 				}, 1000);
 			} else if (status === 'processing') {
 				status = 'error';
-				error = authState.error || 'Authentication failed';
+				error = SIGN_IN_FAILED;
 			}
 		}
 	});

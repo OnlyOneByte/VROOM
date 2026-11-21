@@ -56,7 +56,14 @@
 	const linkErrorMessages: Record<string, string> = {
 		account_conflict: 'This account is already linked to a different user.',
 		already_linked: 'This account is already linked to your profile.',
-		cancelled: 'Linking was cancelled.'
+		cancelled: 'Linking was cancelled.',
+		invalid_state: 'The linking session expired. Please try again.',
+		session_mismatch:
+			'You were signed in as someone else when linking finished. Sign in again and retry.',
+		unknown_provider: 'This sign-in method is not supported.',
+		no_email:
+			"We couldn't retrieve your email from this provider. Please check your provider's privacy settings.",
+		provider_unavailable: 'The sign-in provider is temporarily unavailable. Please try again.'
 	};
 
 	const successMessages: Record<string, string> = {
