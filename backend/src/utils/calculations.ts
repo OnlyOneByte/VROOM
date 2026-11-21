@@ -1,3 +1,5 @@
+import { NATIVE_SCALE, type UnitScale } from './unit-conversions';
+
 interface EfficiencyExpense {
   mileage: number | null;
   volume: number | null;
@@ -24,16 +26,9 @@ interface MpgPairRow {
   missedFillup?: boolean;
 }
 
-export interface CanonicalScale {
-  distance: number;
-  volume: number;
-}
-
-const NATIVE_UNIT_SCALE: CanonicalScale = { distance: 1, volume: 1 };
-
 export function averageConsecutiveMpg(
   sortedExpenses: MpgPairRow[],
-  scale: CanonicalScale = NATIVE_UNIT_SCALE
+  scale: UnitScale = NATIVE_SCALE
 ): number | null {
   const mpgValues: number[] = [];
 
@@ -70,7 +65,7 @@ function calculateMilesPerKwh(miles: number, kwh: number): number {
 
 export function calculateAverageMilesPerKwh(
   chargeExpenses: EfficiencyExpense[],
-  scale: CanonicalScale = NATIVE_UNIT_SCALE
+  scale: UnitScale = NATIVE_SCALE
 ): number | null {
   if (chargeExpenses.length < 2) {
     return null;

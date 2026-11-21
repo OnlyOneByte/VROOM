@@ -8,6 +8,7 @@ import {
   minOf,
   termBillingMonths,
 } from './calculations';
+import { NATIVE_SCALE, type UnitScale } from './unit-conversions';
 
 const MAX_REASONABLE_MILES_BETWEEN_FILLUPS = 1000;
 const EPOCH_MILLISECONDS_THRESHOLD = 1e12;
@@ -96,13 +97,6 @@ interface VehicleMetrics {
   annualCost: number;
   totalMileage: number;
 }
-
-export interface UnitScale {
-  distance: number;
-  volume: number;
-}
-
-export const NATIVE_SCALE: UnitScale = { distance: 1, volume: 1 };
 
 const NATIVE_UNITS: RadarUnitConverters = {
   efficiency: (value) => value,

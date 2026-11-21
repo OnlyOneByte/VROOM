@@ -63,7 +63,6 @@ import {
   sameEnergyPairs,
   sortByVehicleThenDate,
   toMonthKey,
-  type UnitScale,
 } from '../../utils/analytics-charts';
 import { maxOf, minOf, termBillingMonths } from '../../utils/calculations';
 import { logger } from '../../utils/logger';
@@ -72,6 +71,7 @@ import {
   convertDistance,
   convertEfficiency,
   convertVolume,
+  type UnitScale,
 } from '../../utils/unit-conversions';
 import { FinancingRepository } from '../financing/repository';
 
