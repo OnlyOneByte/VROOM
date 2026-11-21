@@ -58,7 +58,7 @@
 		"d3-scale": "^4.0.2",
 		"d3-shape": "^3.2.0",
 		"embla-carousel-svelte": "^8.6.0",
-		"eslint": "^10.13.0",
+		"eslint": "^10.15.0",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^3.23.1",
 		"fast-check": "^4.10.2",
@@ -87,7 +87,10 @@
 		"runed": {
 			"@sveltejs/kit": "$@sveltejs/kit"
 		},
-		"serialize-javascript": "^7.1.4"
+		"serialize-javascript": "^7.1.4",
+		"@typescript-eslint/typescript-estree": {
+			"minimatch": "^11.0.1"
+		}
 	},
 	"dependencies": {
 		"@tailwindcss/postcss": "^4.3.3",
