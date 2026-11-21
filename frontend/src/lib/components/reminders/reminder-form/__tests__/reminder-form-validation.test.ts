@@ -134,4 +134,14 @@ describe('validateReminderDraft', () => {
 		);
 		expect(errors['split']).toBeUndefined();
 	});
+
+	test('a mileage-only reminder is not blocked by its hidden start and end dates', () => {
+		const hiddenDates = { startDate: '2026-03-10', endDate: '2026-03-01', intervalMileage: '5000' };
+		expect(validateReminderDraft(validDraft({ ...hiddenDates, triggerMode: 'mileage' }))).toEqual(
+			{}
+		);
+		expect(
+			validateReminderDraft(validDraft({ ...hiddenDates, triggerMode: 'both' }))['endDate']
+		).toBe('End date must be after the start date');
+	});
 });

@@ -23,7 +23,8 @@ export function buildReminderPayload(draft: ReminderDraft): ReminderPayload {
 	const isExpense = draft.kind === 'expense';
 	const mileage = hasMileageTrigger(draft.triggerMode);
 	const timeZone = browserTimeZone();
-	const customInterval = hasTimeTrigger(draft.triggerMode) && draft.frequency === 'custom';
+	const timeAxis = hasTimeTrigger(draft.triggerMode);
+	const customInterval = timeAxis && draft.frequency === 'custom';
 	return {
 		name: draft.name.trim(),
 		description: draft.description.trim() || null,
@@ -37,7 +38,7 @@ export function buildReminderPayload(draft: ReminderDraft): ReminderPayload {
 		intervalValue: customInterval ? parseInt(draft.intervalValue, 10) : null,
 		intervalUnit: customInterval ? draft.intervalUnit : null,
 		startDate: draft.startDate || toDateInputValue(new Date()),
-		endDate: draft.endDate || null,
+		endDate: timeAxis ? draft.endDate || null : null,
 		...(timeZone ? { timeZone } : {}),
 		vehicleIds: draft.selectedVehicleIds,
 		expenseCategory: isExpense ? draft.expenseCategory : null,

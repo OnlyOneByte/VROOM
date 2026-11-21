@@ -30,7 +30,13 @@ export function validateReminderDraft(draft: ReminderDraft): Record<string, stri
 			}
 		}
 	}
-	if (draft.endDate && draft.startDate && new Date(draft.endDate) <= new Date(draft.startDate)) {
+	const timeAxis = hasTimeTrigger(draft.triggerMode);
+	if (
+		timeAxis &&
+		draft.endDate &&
+		draft.startDate &&
+		new Date(draft.endDate) <= new Date(draft.startDate)
+	) {
 		e['endDate'] = 'End date must be after the start date';
 	}
 	if (draft.kind === 'expense') {
