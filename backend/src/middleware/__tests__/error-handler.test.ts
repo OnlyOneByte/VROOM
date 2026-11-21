@@ -5,6 +5,7 @@ import { z } from 'zod';
 import {
   AuthenticationError,
   ConflictError,
+  DatabaseError,
   NotFoundError,
   SyncError,
   SyncErrorCode,
@@ -73,6 +74,40 @@ describe('errorHandler — application error branches', () => {
     const body = (await res.json()) as ErrorBody;
     expect(body.success).toBe(false);
     expect(body.error.code).toBe('InternalServerError');
+  });
+});
+
+describe('errorHandler — database errors outside development', () => {
+  test('a 5xx AppError keeps its message but drops driver details', async () => {
+    const res = await appThatThrows(
+      new DatabaseError('Failed to create insurance policy', {
+        code: 'SQLITE_CONSTRAINT',
+        errno: 19,
+      })
+    ).request('/boom');
+    expect(res.status).toBe(500);
+    const body = (await res.json()) as ErrorBody;
+    expect(body.error.message).toBe('Failed to create insurance policy');
+    expect(body.error.details).toBeUndefined();
+  });
+
+  test('a 4xx AppError keeps its details', async () => {
+    const res = await appThatThrows(new ValidationError('bad input', [{ path: ['name'] }])).request(
+      '/boom'
+    );
+    const body = (await res.json()) as ErrorBody;
+    expect(body.error.details).toEqual([{ path: ['name'] }]);
+  });
+
+  test('a raw driver error is mapped by its code and never echoes the driver text', async () => {
+    const driverError = Object.assign(new Error('UNIQUE constraint failed: vehicles.id'), {
+      code: 'SQLITE_CONSTRAINT_PRIMARYKEY',
+    });
+    const res = await appThatThrows(driverError).request('/boom');
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as ErrorBody;
+    expect(body.error.code).toBe('ConflictError');
+    expect(JSON.stringify(body)).not.toContain('vehicles.id');
   });
 });
 
