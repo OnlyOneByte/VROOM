@@ -104,7 +104,7 @@ test.describe('Analytics', () => {
 
 		await page.goto('/analytics');
 
-		await expect(page.getByText('Failed to load analytics')).toBeVisible();
+		await expect(page.getByText("Couldn't load analytics")).toBeVisible();
 		const retry = page.getByRole('button', { name: 'Retry' });
 		await expect(retry).toBeVisible();
 		await page.mouse.move(640, 600);
