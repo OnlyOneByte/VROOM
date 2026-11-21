@@ -2,7 +2,7 @@ import { generateCodeVerifier, generateState } from 'arctic';
 import { and, eq } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { Hono } from 'hono';
-import { getCookie } from 'hono/cookie';
+import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { HTTPException } from 'hono/http-exception';
 import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
@@ -75,6 +75,30 @@ const cleanupExpiredStates = () => {
   }
 };
 
+const LOGIN_STATE_COOKIE = 'oauth_login_state';
+
+function loginStateCookieOptions() {
+  return {
+    path: '/',
+    secure: CONFIG.env === 'production',
+    httpOnly: true,
+    sameSite: 'Lax' as const,
+  };
+}
+
+function setLoginStateCookie(c: Context, state: string): void {
+  setCookie(c, LOGIN_STATE_COOKIE, state, {
+    ...loginStateCookieOptions(),
+    maxAge: Math.floor(CONFIG.auth.oauthStateExpiry / 1000),
+  });
+}
+
+function takeLoginStateCookie(c: Context): string | undefined {
+  const value = getCookie(c, LOGIN_STATE_COOKIE);
+  if (value !== undefined) deleteCookie(c, LOGIN_STATE_COOKIE, loginStateCookieOptions());
+  return value;
+}
+
 const authRateLimiter = rateLimiter({
   ...CONFIG.rateLimit.auth,
   // Key on the trusted client IP; a raw X-Forwarded-For header is spoofable.
@@ -107,6 +131,7 @@ routes.get('/login/:authProvider', authRateLimiter, async (c) => {
 
   const url = providerConfig.createAuthorizationURL(state, codeVerifier);
   cleanupExpiredStates();
+  setLoginStateCookie(c, state);
   return c.redirect(url.toString());
 });
 
@@ -254,9 +279,11 @@ function validateLinkState(stateParam: string | null) {
 }
 
 // A link or provider state must never be accepted as a login state.
-function validateLoginState(stateParam: string | null) {
+function validateLoginState(stateParam: string | null, stateCookie: string | undefined) {
   const storedData = consumeOAuthState(oauthStateStore, stateParam, undefined);
-  return storedData ? { data: storedData } : { error: 'invalid_state' as const };
+  return storedData && stateCookie === stateParam
+    ? { data: storedData }
+    : { error: 'invalid_state' as const };
 }
 
 // Account takeover: an identity bound to another user must never be re-linked.
@@ -366,13 +393,14 @@ routes.get('/callback/:authProvider', authRateLimiter, async (c) => {
   const code = url.searchParams.get('code');
   const stateParam = url.searchParams.get('state');
   const authRedirect = (params: string) => `${CONFIG.frontend.url}/auth?${params}`;
+  const stateCookie = takeLoginStateCookie(c);
 
   if (!code) {
     if (stateParam) oauthStateStore.delete(stateParam);
     return c.redirect(authRedirect('auth_error=cancelled'));
   }
 
-  const stateResult = validateLoginState(stateParam);
+  const stateResult = validateLoginState(stateParam, stateCookie);
   if ('error' in stateResult) return c.redirect(authRedirect('auth_error=invalid_state'));
 
   const providerConfig = getProvider(authProviderId);
