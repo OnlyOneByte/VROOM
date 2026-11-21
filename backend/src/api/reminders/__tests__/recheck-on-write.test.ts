@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import {
   createTestApp,
   type DataEnvelope,
@@ -6,6 +6,7 @@ import {
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
+import { odometerRepository } from '../../odometer/repository';
 import { addOdometerReading, seedMileageReminder } from './_helpers';
 
 let ctx: TestApp;
@@ -148,5 +149,21 @@ describe('deleting an odometer reading', () => {
 
     await ctx.authed('POST', '/api/v1/reminders/trigger');
     expect(mileageNotifCount('rd1')).toBe(1);
+  });
+});
+
+describe('mileage trigger reads each vehicle’s odometer once', () => {
+  test('three due reminders on one vehicle cost one odometer lookup and all fire', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'RAV4', year: 2022 });
+    await addOdometerReading(ctx, vehicleId, 36000);
+    for (const id of ['ro1', 'ro2', 'ro3']) seedMileageReminder(ctx, id, vehicleId, 35000);
+
+    const lookup = spyOn(odometerRepository, 'getCurrentOdometer');
+    const res = await ctx.authed('POST', '/api/v1/reminders/trigger');
+    expect(res.status, await res.text()).toBe(200);
+    expect(lookup).toHaveBeenCalledTimes(1);
+    lookup.mockRestore();
+
+    for (const id of ['ro1', 'ro2', 'ro3']) expect(mileageNotifCount(id)).toBe(1);
   });
 });
