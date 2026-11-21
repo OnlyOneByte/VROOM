@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { EXPENSE_CATEGORIES, type SplitConfig } from '../../db/types';
 import { dollarsToCents } from '../../utils/money';
+import { dateInput } from '../../utils/validation';
 
 export const FUEL_SPLIT_MESSAGE = 'Fuel expenses cannot be split. Log the fill-up on one vehicle.';
 
@@ -124,7 +125,7 @@ export const createSplitExpenseSchema = z
       message: FUEL_SPLIT_MESSAGE,
     }),
     tags: z.array(tagElementSchema).max(CONFIG.validation.expense.maxTags).optional(),
-    date: z.coerce.date(),
+    date: dateInput,
     description: z
       .string()
       .max(
