@@ -24,14 +24,14 @@ export function getSyncStatusInfo(params: SyncStatusParams): SyncStatusInfo {
 
 	if (conflictsCount > 0) {
 		return {
-			color: 'text-chart-5',
+			color: 'text-warning',
 			icon: CircleAlert,
 			text: `${conflictsCount} conflict${conflictsCount > 1 ? 's' : ''}`
 		};
 	}
 
 	if (syncStatus === 'syncing') {
-		return { color: 'text-chart-5', icon: RefreshCw, text: 'Syncing...' };
+		return { color: 'text-warning', icon: RefreshCw, text: 'Syncing...' };
 	}
 
 	if (syncStatus === 'error') {
@@ -44,7 +44,7 @@ export function getSyncStatusInfo(params: SyncStatusParams): SyncStatusInfo {
 
 	if (pendingCount > 0) {
 		return {
-			color: 'text-chart-5',
+			color: 'text-warning',
 			icon: Clock,
 			text: `${pendingCount} pending`
 		};

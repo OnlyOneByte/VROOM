@@ -20,10 +20,10 @@ describe('getSyncStatusInfo — each branch in isolation', () => {
 		expect(info.text).toBe('Offline');
 	});
 
-	test('one conflict → CircleAlert / chart-5 / singular "1 conflict"', () => {
+	test('one conflict → CircleAlert / warning / singular "1 conflict"', () => {
 		const info = getSyncStatusInfo(params({ conflictsCount: 1 }));
 		expect(info.icon).toBe(CircleAlert);
-		expect(info.color).toBe('text-chart-5');
+		expect(info.color).toBe('text-warning');
 		expect(info.text).toBe('1 conflict');
 	});
 
@@ -31,9 +31,10 @@ describe('getSyncStatusInfo — each branch in isolation', () => {
 		expect(getSyncStatusInfo(params({ conflictsCount: 3 })).text).toBe('3 conflicts');
 	});
 
-	test('syncing → RefreshCw / chart-5 / "Syncing..."', () => {
+	test('syncing → RefreshCw / warning / "Syncing..."', () => {
 		const info = getSyncStatusInfo(params({ syncStatus: 'syncing' }));
 		expect(info.icon).toBe(RefreshCw);
+		expect(info.color).toBe('text-warning');
 		expect(info.text).toBe('Syncing...');
 	});
 
@@ -51,10 +52,10 @@ describe('getSyncStatusInfo — each branch in isolation', () => {
 		expect(info.text).toBe('Synced');
 	});
 
-	test('pending only (idle, no conflicts) → Clock / chart-5 / "N pending"', () => {
+	test('pending only (idle, no conflicts) → Clock / warning / "N pending"', () => {
 		const info = getSyncStatusInfo(params({ pendingCount: 2 }));
 		expect(info.icon).toBe(Clock);
-		expect(info.color).toBe('text-chart-5');
+		expect(info.color).toBe('text-warning');
 		expect(info.text).toBe('2 pending');
 	});
 

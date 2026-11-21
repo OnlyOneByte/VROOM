@@ -174,6 +174,23 @@ describe('every built-in theme clears WCAG 3:1 on chart series vs card (graphica
 	});
 });
 
+describe('every built-in theme clears WCAG 3:1 on a chart-coloured icon over its own /10 tint', () => {
+	describe.each(allThemes)('theme "$id"', theme => {
+		describe.each(['light', 'dark'] as const)('%s variant', variant => {
+			const tokens = theme[variant] as ThemeTokens;
+			describe.each(['card', 'background'] as const)('over %s', surface => {
+				test.each(CHART_KEYS)('%s icon on its /10 tint ≥ 3:1', chart => {
+					const ratio = tintContrast(tokens[chart], tokens[surface]);
+					expect(
+						ratio,
+						`${theme.id}.${variant}: ${chart} icon on ${chart}/10 over ${surface} = ${ratio.toFixed(2)}:1 (need ≥ ${AA_GRAPHICAL})`
+					).toBeGreaterThanOrEqual(AA_GRAPHICAL);
+				});
+			});
+		});
+	});
+});
+
 describe('hand-rolled bg-destructive fills name their foreground', () => {
 	const SRC_ROOT = join(import.meta.dirname, '..', '..', '..');
 
