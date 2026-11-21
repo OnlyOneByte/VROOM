@@ -97,7 +97,7 @@
 				<button
 					type="button"
 					onclick={() => addTag(suggestion)}
-					class="w-full text-left px-3 py-2 hover:bg-accent text-sm"
+					class="w-full min-h-10 text-left px-3 py-2 hover:bg-accent text-sm sm:min-h-0"
 				>
 					{suggestion}
 				</button>

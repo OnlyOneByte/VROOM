@@ -196,7 +196,7 @@
 			<Button
 				variant={energyMode === 'fuel' ? 'default' : 'ghost'}
 				size="sm"
-				class="flex-1 gap-1.5"
+				class="h-10 flex-1 gap-1.5 sm:h-8"
 				onclick={() => handleModeSwitch('fuel')}
 			>
 				<Fuel class="h-4 w-4" />
@@ -205,7 +205,7 @@
 			<Button
 				variant={energyMode === 'charging' ? 'default' : 'ghost'}
 				size="sm"
-				class="flex-1 gap-1.5"
+				class="h-10 flex-1 gap-1.5 sm:h-8"
 				onclick={() => handleModeSwitch('charging')}
 			>
 				<Zap class="h-4 w-4" />
