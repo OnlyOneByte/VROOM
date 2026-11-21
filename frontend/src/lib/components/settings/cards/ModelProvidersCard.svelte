@@ -255,10 +255,11 @@
 										{/if}
 									</p>
 								</div>
-								<div class="flex items-center gap-1 shrink-0">
+								<div class="flex items-center gap-2 shrink-0">
 									<Button
 										variant="ghost"
 										size="icon"
+										class="size-10 sm:size-9"
 										aria-label="Edit {provider.displayName}"
 										onclick={() => openEdit(provider)}
 									>
@@ -267,6 +268,7 @@
 									<Button
 										variant="ghost"
 										size="icon"
+										class="size-10 sm:size-9"
 										aria-label="Delete {provider.displayName}"
 										onclick={() => confirmDelete(provider)}
 									>
