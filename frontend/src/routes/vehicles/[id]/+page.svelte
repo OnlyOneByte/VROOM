@@ -410,7 +410,7 @@
 			<p class="font-medium">Failed to load vehicle</p>
 		</div>
 		<p class="mb-4 text-sm text-muted-foreground">{vehicleLoadError}</p>
-		<Button onclick={loadPage}>Retry</Button>
+		<Button size="lg" onclick={loadPage}>Retry</Button>
 	</div>
 {:else if vehicle}
 	<div class="space-y-6 pb-24">
