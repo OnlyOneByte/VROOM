@@ -81,7 +81,13 @@ export default defineConfig({
 				'src/test-env-mock.ts',
 				'src/test-utils/**',
 				'src/lib/components/ui/**'
-			]
+			],
+			thresholds: {
+				lines: 76,
+				statements: 74,
+				functions: 74,
+				branches: 70
+			}
 		},
 		alias: {
 			'$app/env/public': new URL('./src/test-env-mock.ts', import.meta.url).pathname
