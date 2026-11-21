@@ -18,7 +18,7 @@
 	let vehicleId = $derived(data.vehicleId);
 	let returnTo = $derived(page.url.searchParams.get('returnTo') || `/vehicles/${vehicleId}`);
 
-	let odometer = $state('');
+	let odometer = $state<string | number | null>('');
 	let date = $state(toDateInputValue(new Date()));
 	let note = $state('');
 	let pendingFiles = $state<File[]>([]);
@@ -30,14 +30,18 @@
 
 	let showWarning = $derived.by(() => {
 		if (latestOdometer === null) return false;
-		const val = Number(odometer);
-		if (Number.isNaN(val) || odometer === '') return false;
+		const val = enteredOdometer();
+		if (val === undefined || Number.isNaN(val)) return false;
 		return val < latestOdometer;
 	});
 
+	function enteredOdometer(): number | undefined {
+		return odometer === '' || odometer === null ? undefined : Number(odometer);
+	}
+
 	const formSchema = z.object({
 		odometer: z
-			.number()
+			.number({ error: 'Odometer reading is required' })
 			.int('Odometer must be a whole number')
 			.min(0, 'Odometer must be 0 or greater'),
 		date: z.string().min(1, 'Date is required'),
@@ -58,7 +62,7 @@
 
 	function validate(): boolean {
 		fieldErrors = {};
-		const odometerNum = odometer === '' ? undefined : Number(odometer);
+		const odometerNum = enteredOdometer();
 
 		const result = formSchema.safeParse({
 			odometer: odometerNum,
