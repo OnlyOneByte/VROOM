@@ -860,8 +860,7 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
       );
 
       const listed = await ctx.authed('GET', `/api/v1/trips?vehicleId=${vid}`);
-      expect(listed.status, 'the user-scoped list accepts any vehicleId filter').toBe(200);
-      expect((await json<PaginatedEnvelope<unknown>>(listed)).data).toHaveLength(0);
+      expect(listed.status, 'filtering the list by a foreign vehicle is 404').toBe(404);
 
       const stillThere = await asB('GET', `/api/v1/trips/${tid}`);
       expect(stillThere.status).toBe(200);

@@ -120,6 +120,9 @@ routes.get('/', zValidator('query', listQuerySchema), async (c) => {
   const query = c.req.valid('query');
   const { limit, offset } = clampPagination(query);
 
+  if (query.vehicleId) {
+    await validateVehicleOwnership(query.vehicleId, user.id);
+  }
   const { data, totalCount } = await tripRepository.findByUserIdPaginated(user.id, limit, offset, {
     vehicleId: query.vehicleId,
     purpose: query.purpose,
