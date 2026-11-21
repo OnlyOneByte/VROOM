@@ -47,8 +47,8 @@ const InsuranceTermForm = (await import('../form/InsuranceTermForm.svelte')).def
 
 const FULL_TERM = makeTerm({
 	id: 't1',
-	startDate: '2025-06-01T12:00:00.000Z',
-	endDate: '2026-06-01T12:00:00.000Z',
+	startDate: dateOnlyToISO('2025-06-01'),
+	endDate: dateOnlyToISO('2026-06-01'),
 	policyNumber: 'POL-1',
 	coverageDescription: 'Comprehensive',
 	deductibleAmount: 500,
@@ -311,8 +311,8 @@ describe('InsuranceTermForm edit mode', () => {
 				terms: [
 					makeTerm({
 						id: 't1',
-						startDate: '2025-06-01T12:00:00.000Z',
-						endDate: '2026-06-01T12:00:00.000Z',
+						startDate: dateOnlyToISO('2025-06-01'),
+						endDate: dateOnlyToISO('2026-06-01'),
 						policyNumber: 'POL-1'
 					})
 				],

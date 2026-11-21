@@ -37,7 +37,7 @@ const EXISTING: Vehicle = {
 	vin: '1HGBH41JXMN109186',
 	initialMileage: 42000,
 	purchasePrice: 18500,
-	purchaseDate: '2024-03-15T12:00:00.000Z',
+	purchaseDate: dateOnlyToISO('2024-03-15'),
 	unitPreferences: { distanceUnit: 'kilometers', volumeUnit: 'liters', chargeUnit: 'kwh' },
 	createdAt: '2024-03-15T12:00:00.000Z',
 	updatedAt: '2024-03-15T12:00:00.000Z'
