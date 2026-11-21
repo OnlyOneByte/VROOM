@@ -5,7 +5,7 @@ export interface VehicleShare {
 	id: string;
 	vehicleId: string;
 	ownerId: string;
-	sharedWithId: string;
+	sharedWithId: string | null;
 	level: ShareLevel;
 	status: ShareStatus;
 	createdAt: string;
