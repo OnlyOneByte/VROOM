@@ -18,6 +18,7 @@
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import PageHeader from '#lib/components/common/page-header.svelte';
+	import FloatingActionButton from '#lib/components/common/floating-action-button.svelte';
 	import TripForm from '#lib/components/trips/TripForm.svelte';
 
 	let isLoading = $state(true);
@@ -112,15 +113,8 @@
 	<meta name="description" content="Track and manage your vehicle trips" />
 </svelte:head>
 
-<div class="space-y-6">
-	<PageHeader title="Trips" description="Track mileage and trips across your vehicles">
-		{#snippet actions()}
-			<Button onclick={openCreate} disabled={vehicles.length === 0}>
-				<Plus class="mr-2 h-4 w-4" />
-				Log Trip
-			</Button>
-		{/snippet}
-	</PageHeader>
+<div class="space-y-6 pb-24">
+	<PageHeader title="Trips" description="Track mileage and trips across your vehicles" />
 
 	{#if isLoading}
 		<div class="space-y-3">
@@ -154,7 +148,7 @@
 				build a mileage-reimbursement report and feed your vehicle's odometer history.
 			{/snippet}
 			{#snippet action()}
-				<Button onclick={openCreate} disabled={vehicles.length === 0}>
+				<Button size="lg" onclick={openCreate} disabled={vehicles.length === 0}>
 					<Plus class="mr-2 h-4 w-4" />
 					Log Trip
 				</Button>
@@ -263,6 +257,10 @@
 				Showing {trips.length.toLocaleString()} of {totalCount.toLocaleString()} trips
 			</p>
 		{/if}
+	{/if}
+
+	{#if !isLoading && !loadError && trips.length > 0 && vehicles.length > 0}
+		<FloatingActionButton label="Log Trip" onclick={openCreate} />
 	{/if}
 
 	<TripForm bind:open={formOpen} {vehicles} trip={editingTrip} onSaved={load} />

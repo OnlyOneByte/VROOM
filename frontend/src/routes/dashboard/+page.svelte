@@ -254,7 +254,7 @@
 	>
 		{#snippet actions()}
 			{#if !loadError && stats.totalVehicles > 0}
-				<Button onclick={handleLogFillup}>
+				<Button size="lg" onclick={handleLogFillup}>
 					<Fuel class="mr-2 h-4 w-4" />
 					Log Fill-up
 				</Button>
