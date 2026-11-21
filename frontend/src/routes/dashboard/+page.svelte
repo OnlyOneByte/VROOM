@@ -15,7 +15,10 @@
 	import SharedWithMeCard from '#lib/components/dashboard/SharedWithMeCard.svelte';
 	import VehicleCarousel from '#lib/components/dashboard/VehicleCarousel.svelte';
 	import PeriodSelector from '#lib/components/common/period-selector.svelte';
-	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
+	import {
+		handleErrorWithNotification,
+		userFacingErrorMessage
+	} from '#lib/utils/error-handling.ts';
 	import { latest } from '#lib/utils/latest-request.ts';
 	import { categoryLabels } from '#lib/utils/expense-helpers.ts';
 	import { getCategoryChartColor } from '#lib/utils/chart-colors.ts';
@@ -220,8 +223,8 @@
 			vehicleStatsMap = statsMap;
 			hasLoaded = true;
 		} catch (error) {
-			loadError = error instanceof Error ? error.message : 'Failed to load dashboard data';
-			handleErrorWithNotification(error, 'Failed to load dashboard data');
+			loadError = userFacingErrorMessage(error);
+			handleErrorWithNotification(error, "Couldn't load the dashboard");
 		} finally {
 			isLoading = false;
 		}
@@ -246,7 +249,7 @@
 				if (isCurrent()) periodSummary = summary;
 			}
 		} catch (error) {
-			if (isCurrent()) handleErrorWithNotification(error, 'Failed to load expense summary');
+			if (isCurrent()) handleErrorWithNotification(error, "Couldn't load the expense summary");
 		}
 	}
 </script>
@@ -308,7 +311,7 @@
 		<div class="rounded-lg border bg-card p-6">
 			<div class="mb-4 flex items-center gap-3 text-destructive">
 				<CircleAlert class="h-5 w-5" />
-				<p class="font-medium">Failed to load dashboard data</p>
+				<p class="font-medium">Couldn't load the dashboard</p>
 			</div>
 			<p class="mb-4 text-sm text-muted-foreground">{loadError}</p>
 			<Button size="lg" onclick={loadDashboardData}>Retry</Button>
