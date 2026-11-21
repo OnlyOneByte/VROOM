@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import {
   createTestApp,
   type DataEnvelope,
@@ -63,8 +63,28 @@ describe('reminder dates as plain calendar dates', () => {
     expect(stored(newYork).start).toBe(Date.parse('2099-03-08T16:00:00.000Z'));
   });
 
-  test('an unknown time zone is rejected', async () => {
-    expect((await create({ startDate: '2099-06-15', timeZone: 'Mars/Olympus' })).status).toBe(400);
+  test('an unknown time zone falls back to the UTC-noon rule and logs a warning', async () => {
+    const { logger } = await import('../../../utils/logger');
+    const warn = spyOn(logger, 'warn');
+    try {
+      const id = await createId({
+        startDate: '2099-06-15',
+        endDate: '2100-01-15',
+        timeZone: 'Mars/Olympus',
+      });
+      expect(stored(id)).toMatchObject({
+        start: Date.parse('2099-06-15T12:00:00.000Z'),
+        end: Date.parse('2100-01-15T12:00:00.000Z'),
+      });
+      expect(warn.mock.calls.some(([message]) => String(message).includes('time zone'))).toBe(true);
+
+      await put(id, { name: 'Renamed', startDate: '2099-06-15', timeZone: 'Not/AZone' });
+      expect(stored(id).start, 'same day under the fallback: kept').toBe(
+        Date.parse('2099-06-15T12:00:00.000Z')
+      );
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   test('with the submitter time zone, a DST-day start stored near midnight compares by its local day', async () => {
@@ -93,8 +113,17 @@ describe('reminder dates as plain calendar dates', () => {
     expect(stored(id).start).toBe(Date.parse('2099-06-15T03:00:00.000Z'));
   });
 
-  test('a plain date that is not a real day is rejected', async () => {
-    expect((await create({ startDate: '2099-02-30' })).status).toBe(400);
+  test('a plain date that is not a real day is rejected with a clear message', async () => {
+    for (const timeZone of [undefined, 'America/New_York']) {
+      const res = await create({ startDate: '2099-02-30', ...(timeZone ? { timeZone } : {}) });
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as {
+        error: { details: { issues: { path: string[]; message: string }[] } };
+      };
+      expect(body.error.details.issues).toContainEqual(
+        expect.objectContaining({ path: ['startDate'], message: 'Invalid date' })
+      );
+    }
   });
 
   test('resending the stored days as plain dates keeps both stored timestamps and the due date', async () => {

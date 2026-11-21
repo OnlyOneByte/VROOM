@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { EXPENSE_CATEGORIES } from '../../db/types';
+import { logger } from '../../utils/logger';
 import { moneyDollarsToCents } from '../../utils/money';
 import { buildCalendarDate } from '../expenses/local-date';
 import {
@@ -59,14 +60,21 @@ function plainDateToInstant(value: string, timeZone: string | undefined): Date |
 
 const reminderDateSchema = z.preprocess(
   (value) => (typeof value === 'string' ? (plainDateToInstant(value, undefined) ?? value) : value),
-  z.coerce.date()
+  z.coerce.date({ error: 'Invalid date' })
 );
 
 function withZonedPlainDates(value: unknown): unknown {
   if (!value || typeof value !== 'object') return value;
   const input = value as Record<string, unknown>;
   const timeZone = input.timeZone;
-  if (typeof timeZone !== 'string' || !isValidTimeZone(timeZone)) return value;
+  if (timeZone === undefined) return value;
+  if (typeof timeZone !== 'string' || !isValidTimeZone(timeZone)) {
+    logger.warn('Unknown reminder time zone; using the UTC-noon date rule', {
+      timeZone: String(timeZone).slice(0, 64),
+    });
+    const { timeZone: _unknown, ...withoutZone } = input;
+    return withoutZone;
+  }
   const zoned = { ...input };
   for (const field of REMINDER_DATE_FIELDS) {
     const raw = input[field];
@@ -102,7 +110,7 @@ const reminderBaseSchema = z.object({
   endDate: reminderDateSchema.nullish(),
   // Zod strips unlisted keys: isActive must stay listed or the pause toggle silently no-ops.
   isActive: z.boolean().optional(),
-  timeZone: z.string().max(64).refine(isValidTimeZone, 'Unknown time zone').optional(),
+  timeZone: z.string().refine(isValidTimeZone, 'Unknown time zone').optional(),
   vehicleIds: z.array(z.string().min(1)).min(1),
   expenseCategory: z.enum(EXPENSE_CATEGORIES).nullish(),
   expenseTags: z
