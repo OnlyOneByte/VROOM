@@ -34,9 +34,9 @@ let processingSince: number | null = null;
 
 const BATCH_WATCHDOG_MS = 3 * OPERATION_TIMEOUTS.DOWNLOAD;
 
-const inFlightRefs = new Map<string, number>();
+const IN_FLIGHT_TTL_MS = 2 * BATCH_WATCHDOG_MS;
 
-const IN_FLIGHT_TTL_MS = 5 * 60 * 1000;
+const inFlightRefs = new Map<string, number>();
 
 const MAX_IN_FLIGHT_ENTRIES = 500;
 
@@ -114,16 +114,17 @@ export async function processBatch(deps: SyncWorkerDeps = defaultDeps): Promise<
     if (pendingRefs.length === 0) return;
 
     logger.debug(`Sync worker: processing ${pendingRefs.length} pending refs`);
-    const now = new Date();
-    const nowMs = now.getTime();
+    const nowMs = Date.now();
+    const now = new Date(nowMs);
     const providerCache = new Map<string, StorageProvider>();
 
     evictStaleInFlightRefs(nowMs);
 
     for (const ref of pendingRefs) {
+      if (processingSince !== startedAt) break;
       if (!shouldProcessRef(ref, now)) continue;
 
-      inFlightRefs.set(ref.id, nowMs);
+      inFlightRefs.set(ref.id, Date.now());
       try {
         await processSingleRef(ref, providerCache, deps);
       } catch (error) {

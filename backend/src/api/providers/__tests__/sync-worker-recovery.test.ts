@@ -42,12 +42,12 @@ describe('photo refs that ran out of retries come back after a reconnect', () =>
   });
 
   test('reconnecting the target provider puts it back in the queue', async () => {
-    ctx.sqlite.run("UPDATE user_providers SET updated_at = 3000 WHERE id = 'prov-target'");
+    ctx.sqlite.run("UPDATE user_providers SET updated_at = 3100 WHERE id = 'prov-target'");
     expect(await queuedIds()).toEqual(['ref-dead']);
   });
 
   test('reconnecting the provider holding the source copy puts it back in the queue', async () => {
-    ctx.sqlite.run("UPDATE user_providers SET updated_at = 3000 WHERE id = 'prov-source'");
+    ctx.sqlite.run("UPDATE user_providers SET updated_at = 3200 WHERE id = 'prov-source'");
     expect(await queuedIds()).toEqual(['ref-dead']);
   });
 
@@ -121,6 +121,52 @@ describe('photo sync worker liveness', () => {
     expect(updates).toEqual([
       expect.objectContaining({ status: 'failed', errorMessage: 'Photo sync download timed out' }),
     ]);
+  });
+
+  test('a batch superseded by the watchdog stops instead of syncing refs the new batch took', async () => {
+    const clock = spyOn(Date, 'now').mockReturnValue(5_000_000);
+    const two = (): PhotoRef[] => [ref(), { ...ref(), id: 'ref-y', photoId: 'photo-y' }];
+    let releaseFirstDownload: () => void = () => {};
+    let downloads = 0;
+    const uploads: string[] = [];
+    const sharedDeps = deps({
+      findPending: () => Promise.resolve(two()),
+      download: () => {
+        downloads++;
+        return downloads === 1
+          ? new Promise<Buffer>((resolve) => {
+              releaseFirstDownload = () => resolve(Buffer.from('late'));
+            })
+          : Promise.resolve(Buffer.from('x'));
+      },
+    });
+    const registry = sharedDeps.registry as unknown as {
+      getProviderInternal: () => Promise<{ upload: (input: { entityId?: string }) => unknown }>;
+    };
+    const provider = await registry.getProviderInternal();
+    const originalUpload = provider.upload;
+    provider.upload = (input) => {
+      uploads.push(String((input as { fileName?: string }).fileName ?? 'file'));
+      return originalUpload(input);
+    };
+    registry.getProviderInternal = () => Promise.resolve(provider);
+    try {
+      const first = processBatch(sharedDeps);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      const { OPERATION_TIMEOUTS } = await import('../../../utils/timeout');
+      clock.mockReturnValue(5_000_000 + 3 * OPERATION_TIMEOUTS.DOWNLOAD + 1);
+      await processBatch(sharedDeps);
+      expect(uploads, 'the new batch skips the in-flight ref and syncs the other').toHaveLength(1);
+
+      releaseFirstDownload();
+      await first;
+      expect(uploads, 'the superseded batch finishes its ref but syncs nothing more').toHaveLength(
+        2
+      );
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   test('a batch stuck past the watchdog does not block the next one forever', async () => {
