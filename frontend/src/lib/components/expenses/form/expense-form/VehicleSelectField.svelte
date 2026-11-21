@@ -10,12 +10,17 @@
 		vehicles: Vehicle[];
 		value: string;
 		error?: string;
+		describedBy?: string;
 		canSplit: boolean;
 		onSelect: (_vehicleId: string) => void;
 		onSplit: () => void;
 	}
 
-	let { vehicles, value, error, canSplit, onSelect, onSplit }: Props = $props();
+	let { vehicles, value, error, describedBy, canSplit, onSelect, onSplit }: Props = $props();
+
+	const ariaDescribedBy = $derived(
+		[error ? 'vehicleId-error' : undefined, describedBy].filter(Boolean).join(' ') || undefined
+	);
 </script>
 
 <div class="space-y-2">
@@ -30,17 +35,19 @@
 		>
 			<Select.Trigger
 				id="vehicle"
-				class="w-full {error ? 'border-destructive' : ''}"
+				class="w-full min-w-0 {error ? 'border-destructive' : ''}"
 				aria-invalid={!!error}
-				aria-describedby={error ? 'vehicleId-error' : undefined}
+				aria-describedby={ariaDescribedBy}
 			>
 				{#if value}
 					{@const selectedVehicle = vehicles.find(v => v.id === value)}
 					{#if selectedVehicle}
-						{selectedVehicle.year}
-						{selectedVehicle.make}
-						{selectedVehicle.model}
-						{#if selectedVehicle.nickname}({selectedVehicle.nickname}){/if}
+						<span class="truncate">
+							{selectedVehicle.year}
+							{selectedVehicle.make}
+							{selectedVehicle.model}
+							{#if selectedVehicle.nickname}({selectedVehicle.nickname}){/if}
+						</span>
 					{:else}
 						Select a vehicle
 					{/if}
@@ -63,7 +70,7 @@
 			<Button
 				type="button"
 				variant="outline"
-				size="icon"
+				size="icon-lg"
 				class="shrink-0"
 				onclick={onSplit}
 				aria-label="Split cost across vehicles"
