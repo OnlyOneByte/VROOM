@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { Readable } from 'node:stream';
 import type { UserProvider } from '../../../db/schema';
 import { ValidationError } from '../../../errors';
 import {
@@ -12,7 +13,7 @@ import { encrypt } from '../../../utils/encryption';
 import { outboundResolver, urlForAddress } from '../../../utils/outbound-url';
 import { resolveModelSettings } from '../domains/model/model-registry';
 import { postModelJson } from '../domains/model/model-transport';
-import { S3CompatProvider } from '../domains/storage/s3-compat-provider';
+import { s3RequestHandler } from '../domains/storage/s3-compat-provider';
 
 let ctx: TestApp;
 const stubLookup = outboundResolver.lookup;
@@ -47,6 +48,26 @@ function modelBody(baseUrl: string) {
     credentials: { apiKey: 'sk-test' },
     config: { model: 'gpt-4o-mini', baseUrl },
   };
+}
+
+function sendS3(request: Record<string, unknown>) {
+  const handler = s3RequestHandler as unknown as {
+    handle: (request: unknown) => Promise<{
+      response: {
+        statusCode: number;
+        headers: Record<string, string>;
+        body: NodeJS.ReadableStream;
+      };
+    }>;
+  };
+  return handler.handle({
+    protocol: 'https:',
+    hostname: 'files.example.com',
+    path: '/photos/k',
+    method: 'GET',
+    headers: {},
+    ...request,
+  });
 }
 
 function insertStoredS3Provider(endpoint: string): string {
@@ -142,13 +163,7 @@ describe('provider endpoints with private endpoints blocked', () => {
 
   test('an S3 provider whose host resolves to a private address never sends', async () => {
     outboundResolver.lookup = async () => ['10.0.0.9'];
-    const provider = new S3CompatProvider(
-      { accessKeyId: 'a', secretAccessKey: 'b' },
-      { endpoint: 'https://files.example.com', bucket: 'photos', region: 'us-east-1' }
-    );
-    await expect(
-      provider.download({ providerType: 's3', externalId: 'k', storageRef: 'k' } as never)
-    ).rejects.toThrow(ValidationError);
+    await expect(sendS3({})).rejects.toThrow(ValidationError);
   });
 });
 
@@ -161,13 +176,7 @@ describe('stored provider rows are checked when used', () => {
 
   test('an S3 provider whose host resolves to a link-local address never sends', async () => {
     outboundResolver.lookup = async () => ['169.254.169.254'];
-    const provider = new S3CompatProvider(
-      { accessKeyId: 'a', secretAccessKey: 'b' },
-      { endpoint: 'https://files.example.com', bucket: 'photos', region: 'us-east-1' }
-    );
-    await expect(
-      provider.download({ providerType: 's3', externalId: 'k', storageRef: 'k' } as never)
-    ).rejects.toThrow(ValidationError);
+    await expect(sendS3({})).rejects.toThrow(ValidationError);
   });
 });
 
@@ -310,7 +319,9 @@ describe('outbound requests connect to the validated address', () => {
 
   test('S3 requests reach the validated address and keep the original host', async () => {
     const server = startLoopbackServer((req) =>
-      req.method === 'GET' ? new Response('photo-bytes') : new Response(null, { status: 200 })
+      req.method === 'GET'
+        ? new Response('photo-bytes', { headers: { etag: '"abc"' } })
+        : new Response(null, { status: 200 })
     );
     let lookups = 0;
     outboundResolver.lookup = async () => {
@@ -318,29 +329,35 @@ describe('outbound requests connect to the validated address', () => {
       return ['127.0.0.1'];
     };
     outboundResolver.connectUrl = urlForAddress;
+    const target = { protocol: 'http:', hostname: 'minio.pinned.test', port: server.port };
     try {
-      const provider = new S3CompatProvider(
-        { accessKeyId: 'a', secretAccessKey: 'b' },
-        {
-          endpoint: `http://minio.pinned.test:${server.port}`,
-          bucket: 'photos',
-          region: 'us-east-1',
-        }
-      );
-      const ref = await provider.upload({
-        buffer: Buffer.from('uploaded'),
-        fileName: 'a b.jpg',
-        mimeType: 'image/jpeg',
-        entityType: 'vehicle',
-        entityId: 'v1',
-        pathHint: 'VROOM',
+      const put = await sendS3({
+        ...target,
+        method: 'PUT',
+        path: '/photos/a%20b.jpg',
+        headers: { 'content-type': 'image/jpeg' },
+        body: Buffer.from('uploaded'),
       });
-      const bytes = await provider.download(ref);
-      expect(bytes.toString()).toBe('photo-bytes');
+      expect(put.response.statusCode).toBe(200);
+
+      const get = await sendS3({
+        ...target,
+        path: '/photos',
+        query: { 'list-type': '2', prefix: "VROOM/it's (1)*", uploads: null },
+      });
+      expect(get.response.statusCode).toBe(200);
+      expect(get.response.headers.etag).toBe('"abc"');
+      expect(get.response.body).toBeInstanceOf(Readable);
+      const chunks: Buffer[] = [];
+      for await (const chunk of get.response.body) chunks.push(Buffer.from(chunk));
+      expect(Buffer.concat(chunks).toString()).toBe('photo-bytes');
+
       expect(server.seen.map((r) => r.method)).toEqual(['PUT', 'GET']);
       expect(server.seen.every((r) => r.host === `minio.pinned.test:${server.port}`)).toBe(true);
-      expect(server.seen[0]?.path.startsWith('/photos/')).toBe(true);
       expect(server.seen[0]?.body).toBe('uploaded');
+      expect(server.seen[1]?.path).toBe(
+        '/photos?list-type=2&prefix=VROOM%2Fit%27s%20%281%29%2A&uploads'
+      );
       expect(lookups).toBe(2);
     } finally {
       server.stop();

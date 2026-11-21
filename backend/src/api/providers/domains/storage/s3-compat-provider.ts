@@ -82,7 +82,7 @@ function requestBody(body: unknown): { body?: RequestInit['body']; duplex?: 'hal
   return { body: body as RequestInit['body'] };
 }
 
-const pinnedRequestHandler = {
+export const s3RequestHandler = {
   async handle(request: S3WireRequest, options?: { abortSignal?: unknown }) {
     const port = request.port ? `:${request.port}` : '';
     const url = `${request.protocol}//${request.hostname}${port}${request.path}${buildQuery(request.query)}`;
@@ -124,7 +124,7 @@ export class S3CompatProvider implements StorageProvider {
         secretAccessKey: credentials.secretAccessKey,
       },
       forcePathStyle: true,
-      requestHandler: pinnedRequestHandler,
+      requestHandler: s3RequestHandler,
     });
   }
 
