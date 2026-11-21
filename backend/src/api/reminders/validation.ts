@@ -1,9 +1,9 @@
 import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { EXPENSE_CATEGORIES } from '../../db/types';
-import { logger } from '../../utils/logger';
 import { moneyDollarsToCents } from '../../utils/money';
 import { isValidTimeZone, zoneOffsetMs } from '../../utils/time-zone';
+import { WHOLE_DISTANCE_MESSAGE } from '../../utils/validation';
 import { buildCalendarDate } from '../expenses/local-date';
 import {
   FUEL_SPLIT_MESSAGE,
@@ -34,14 +34,7 @@ function withZonedPlainDates(value: unknown): unknown {
   if (!value || typeof value !== 'object') return value;
   const input = value as Record<string, unknown>;
   const timeZone = input.timeZone;
-  if (timeZone === undefined) return value;
-  if (typeof timeZone !== 'string' || !isValidTimeZone(timeZone)) {
-    logger.warn('Unknown reminder time zone; using the UTC-noon date rule', {
-      timeZone: typeof timeZone === 'string' ? timeZone.slice(0, 64) : `<${typeof timeZone}>`,
-    });
-    const { timeZone: _unknown, ...withoutZone } = input;
-    return withoutZone;
-  }
+  if (typeof timeZone !== 'string' || !isValidTimeZone(timeZone)) return value;
   const zoned = { ...input };
   for (const field of REMINDER_DATE_FIELDS) {
     const raw = input[field];
@@ -68,16 +61,16 @@ const reminderBaseSchema = z.object({
   triggerMode: triggerModeSchema.optional(),
   intervalMileage: z
     .number()
-    .int()
+    .int(WHOLE_DISTANCE_MESSAGE)
     .positive()
     .max(CONFIG.validation.reminder.maxIntervalMileage)
     .nullish(),
-  lastServiceOdometer: z.number().int().min(0).nullish(),
+  lastServiceOdometer: z.number().int(WHOLE_DISTANCE_MESSAGE).min(0).nullish(),
   startDate: reminderDateSchema,
   endDate: reminderDateSchema.nullish(),
   // Zod strips unlisted keys: isActive must stay listed or the pause toggle silently no-ops.
   isActive: z.boolean().optional(),
-  timeZone: z.string().refine(isValidTimeZone, 'Unknown time zone').optional(),
+  timeZone: z.string().max(64).refine(isValidTimeZone, 'Unknown time zone').optional(),
   vehicleIds: z.array(z.string().min(1)).min(1),
   expenseCategory: z.enum(EXPENSE_CATEGORIES).nullish(),
   expenseTags: z

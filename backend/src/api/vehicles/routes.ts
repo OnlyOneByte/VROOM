@@ -33,7 +33,12 @@ import {
   partialUnitPreferencesSchema,
   unitPreferencesSchema,
 } from '../../utils/unit-preferences-schema';
-import { commonSchemas, validateVehicleOwnership, zValidator } from '../../utils/validation';
+import {
+  commonSchemas,
+  validateVehicleOwnership,
+  WHOLE_DISTANCE_MESSAGE,
+  zValidator,
+} from '../../utils/validation';
 import { calculateVehicleStats } from '../../utils/vehicle-stats';
 import { expenseRepository } from '../expenses/repository';
 import { financingRepository, withComputedBalance } from '../financing/repository';
@@ -84,7 +89,11 @@ const baseVehicleSchema = createInsertSchema(vehiclesTable, {
       `Nickname must be ${CONFIG.validation.vehicle.nicknameMaxLength} characters or less`
     )
     .optional(),
-  initialMileage: z.number().int().min(0, 'Initial mileage cannot be negative').optional(),
+  initialMileage: z
+    .number()
+    .int(WHOLE_DISTANCE_MESSAGE)
+    .min(0, 'Initial mileage cannot be negative')
+    .optional(),
   purchasePrice: moneyDollarsToCents((n) =>
     n.min(0, 'Purchase price cannot be negative')
   ).optional(),

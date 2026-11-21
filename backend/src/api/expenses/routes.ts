@@ -30,6 +30,7 @@ import {
   commonSchemas,
   dateInput,
   validateFuelExpenseData,
+  WHOLE_DISTANCE_MESSAGE,
   zValidator,
 } from '../../utils/validation';
 import { financingRepository } from '../financing/repository';
@@ -79,7 +80,12 @@ const baseExpenseSchema = createInsertSchema(expensesTable, {
   expenseAmount: moneyDollarsToCents((n) => n.positive('Expense amount must be positive')),
   volume: z.number().positive('Volume must be positive').nullable().optional(),
   date: dateInput,
-  mileage: z.number().int().min(0, 'Mileage cannot be negative').nullable().optional(),
+  mileage: z
+    .number()
+    .int(WHOLE_DISTANCE_MESSAGE)
+    .min(0, 'Mileage cannot be negative')
+    .nullable()
+    .optional(),
   description: z
     .string()
     .max(
