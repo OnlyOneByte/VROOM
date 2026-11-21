@@ -85,8 +85,8 @@ export interface BackendExpenseResponse {
 	description?: string | null;
 	location?: string | null;
 	missedFillup?: boolean;
-	sourceType?: string;
-	sourceId?: string;
+	sourceType?: string | null;
+	sourceId?: string | null;
 	groupId?: string;
 	groupTotal?: number;
 	splitMethod?: string;
