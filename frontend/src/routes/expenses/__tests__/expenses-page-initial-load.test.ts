@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { fireEvent, render, waitFor } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { Expense, UserSettings, Vehicle } from '#lib/types/index.ts';
+import { ApiError, SERVER_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
@@ -97,6 +98,17 @@ function rowsGivenToTable(): Array<Expense & { vehicle?: Vehicle }> {
 }
 
 describe('/expenses initial load', () => {
+	test('a failed load says what failed without the raw error text', async () => {
+		getVehicles.mockRejectedValue(new ApiError('SQLITE_BUSY: database is locked', 500));
+
+		render(Page);
+
+		const heading = await screen.findByText("Couldn't load expenses");
+		const card = heading.closest('div.rounded-lg') as HTMLElement;
+		expect(card).toHaveTextContent(SERVER_FAILURE_MESSAGE);
+		expect(card).not.toHaveTextContent('SQLITE_BUSY');
+	});
+
 	test('the expense page is requested WITHOUT waiting for settings or the vehicle list', async () => {
 		getSettings.mockImplementation(() => new Promise<never>(() => {}));
 		getVehicles.mockImplementation(() => new Promise<never>(() => {}));

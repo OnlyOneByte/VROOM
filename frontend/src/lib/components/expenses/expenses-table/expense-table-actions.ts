@@ -2,6 +2,7 @@ import { resolve } from '$app/paths';
 import { paramRoutes } from '#lib/routes.ts';
 import { expenseApi } from '#lib/services/expense-api.ts';
 import type { Expense } from '#lib/types/index.ts';
+import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 
 // A title on a disabled control is unreachable, so the blocked reason must stay visible text.
 export const INSURANCE_DELETE_BLOCKED = 'Delete the insurance policy to remove this expense';
@@ -27,5 +28,5 @@ export async function deleteExpenseRecord(expense: Expense): Promise<void> {
 }
 
 export function deleteFailureMessage(error: unknown): string {
-	return error instanceof Error ? error.message : 'Failed to delete expense';
+	return `Couldn't delete the expense. ${userFacingErrorMessage(error)}`;
 }

@@ -2,6 +2,11 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type { Expense } from '#lib/types/index.ts';
 import { expenseApi } from '#lib/services/expense-api.ts';
 import {
+	ApiError,
+	SERVER_FAILURE_MESSAGE,
+	UNEXPECTED_FAILURE_MESSAGE
+} from '#lib/utils/error-handling.ts';
+import {
 	blockedReasonId,
 	deleteExpenseRecord,
 	deleteFailureMessage,
@@ -83,12 +88,26 @@ describe('deleteExpenseRecord', () => {
 });
 
 describe('deleteFailureMessage', () => {
-	test('surfaces the message of an Error', () => {
-		expect(deleteFailureMessage(new Error('Conflict'))).toBe('Conflict');
+	test('a server failure says what failed without the raw error text', () => {
+		const message = deleteFailureMessage(new ApiError('SQLITE_BUSY: database is locked', 500));
+		expect(message).toBe(`Couldn't delete the expense. ${SERVER_FAILURE_MESSAGE}`);
+		expect(message).not.toContain('SQLITE_BUSY');
 	});
 
-	test('falls back to a generic message for anything else', () => {
-		expect(deleteFailureMessage('boom')).toBe('Failed to delete expense');
-		expect(deleteFailureMessage(undefined)).toBe('Failed to delete expense');
+	test('an unexpected error never shows its own text', () => {
+		const message = deleteFailureMessage(
+			new TypeError("Cannot read properties of undefined (reading 'id')")
+		);
+		expect(message).toBe(`Couldn't delete the expense. ${UNEXPECTED_FAILURE_MESSAGE}`);
+		expect(message).not.toContain('Cannot read properties');
+	});
+
+	test('falls back to the generic sentence for anything else', () => {
+		expect(deleteFailureMessage('boom')).toBe(
+			`Couldn't delete the expense. ${UNEXPECTED_FAILURE_MESSAGE}`
+		);
+		expect(deleteFailureMessage(undefined)).toBe(
+			`Couldn't delete the expense. ${UNEXPECTED_FAILURE_MESSAGE}`
+		);
 	});
 });
