@@ -43,6 +43,10 @@ vi.mock('#lib/utils/error-handling.ts', () => ({
 		handleErrorWithNotification(error, context)
 }));
 
+const showError = vi.fn((_message: string) => {});
+vi.mock('#lib/stores/app.svelte.ts', () => ({
+	appStore: { showError: (message: string) => showError(message), addNotification: vi.fn() }
+}));
 vi.mock('#lib/services/provider-api.ts', () => ({
 	providerApi: { getProviders: vi.fn(() => Promise.resolve([])) }
 }));
@@ -213,10 +217,8 @@ describe('ClaimsSection filing a claim', () => {
 		expect(screen.queryByText('No claims filed.')).toBeNull();
 		await fireEvent.submit(document.querySelector('form') as HTMLFormElement);
 		await settle();
-		expect(handleErrorWithNotification).toHaveBeenCalledWith(
-			expect.objectContaining({ message: 'Claim date is required' }),
-			'Claim date is required'
-		);
+		expect(showError).toHaveBeenCalledWith('Enter a claim date.');
+		expect(handleErrorWithNotification).not.toHaveBeenCalled();
 		expect(createClaim).not.toHaveBeenCalled();
 	});
 
