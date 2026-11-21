@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { createTestApp, json, type TestApp } from '../../../test-helpers/http-client';
 
 let ctx: TestApp;
@@ -202,5 +202,57 @@ describe('GET /api/v1/sync/backups/providers — list backups', () => {
     expect(res.status, JSON.stringify(body)).toBe(200);
     expect(body.success).toBe(true);
     expect(body.data).toEqual([]);
+  });
+});
+
+describe('backupService.listAllBackups', () => {
+  function seedProvider(id: string, displayName: string): void {
+    ctx.sqlite.run(
+      `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, status)
+       VALUES (?, ?, 'storage', 's3', ?, 'enc', 'active')`,
+      [id, ctx.user.id, displayName]
+    );
+  }
+
+  async function listWith(providerIds: string[]) {
+    const { backupService } = await import('../backup');
+    const providers = Object.fromEntries(providerIds.map((id) => [id, { enabled: true }]));
+    const config = spyOn(backupService, 'loadBackupConfig').mockResolvedValue({
+      providers,
+    } as never);
+    const list = spyOn(backupService, 'listBackups').mockImplementation(async (_u, providerId) => {
+      if (providerId === 'p-broken') throw new Error('listing failed');
+      return [];
+    });
+    const prepare = spyOn(ctx.sqlite, 'prepare');
+    try {
+      const results = await backupService.listAllBackups(ctx.user.id);
+      return { results, statements: prepare.mock.calls.length };
+    } finally {
+      prepare.mockRestore();
+      list.mockRestore();
+      config.mockRestore();
+    }
+  }
+
+  test('loads provider rows in one query however many providers back up', async () => {
+    seedProvider('p-1', 'One');
+    seedProvider('p-2', 'Two');
+    seedProvider('p-3', 'Three');
+    const one = await listWith(['p-1']);
+    const three = await listWith(['p-1', 'p-2', 'p-3']);
+    expect(three.statements).toBe(one.statements);
+    expect(three.results.map((r) => r.providerName)).toEqual(['One', 'Two', 'Three']);
+  });
+
+  test('a missing provider row falls back to Unknown and a failing listing gets its own error entry', async () => {
+    seedProvider('p-broken', 'Broken');
+    const { results } = await listWith(['p-gone', 'p-broken']);
+    expect(results[0]).toMatchObject({
+      providerId: 'p-gone',
+      providerName: 'Unknown',
+      backups: [],
+    });
+    expect(results[1]).toMatchObject({ providerId: 'p-broken', error: 'listing failed' });
   });
 });
