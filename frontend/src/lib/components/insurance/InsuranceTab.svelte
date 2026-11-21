@@ -8,7 +8,10 @@
 	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import PolicyList from './PolicyList.svelte';
 	import { insuranceApi } from '#lib/services/insurance-api.ts';
-	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
+	import {
+		handleErrorWithNotification,
+		userFacingErrorMessage
+	} from '#lib/utils/error-handling.ts';
 	import type { InsurancePolicy } from '#lib/types/index.ts';
 
 	interface Props {
@@ -32,9 +35,8 @@
 		try {
 			policies = await insuranceApi.getPoliciesForVehicle(vehicleId);
 		} catch (err) {
-			const message = err instanceof Error ? err.message : 'Failed to load insurance policies';
-			error = message;
-			handleErrorWithNotification(err, 'Failed to load insurance policies');
+			error = userFacingErrorMessage(err);
+			handleErrorWithNotification(err, "Couldn't load insurance policies");
 		} finally {
 			isLoading = false;
 		}

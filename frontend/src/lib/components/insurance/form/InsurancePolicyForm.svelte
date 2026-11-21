@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { goto } from '$app/navigation';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { resolve } from '$app/paths';
@@ -218,8 +219,9 @@
 				goto(resolve(routes.insurance));
 			}
 		} catch (err) {
-			const message = err instanceof Error ? err.message : 'Unknown error';
-			appStore.showError(`Failed to ${isEditMode ? 'update' : 'create'} policy: ${message}`);
+			appStore.showError(
+				`Couldn't ${isEditMode ? 'update' : 'create'} the policy. ${userFacingErrorMessage(err)}`
+			);
 		} finally {
 			isSubmitting = false;
 		}
@@ -237,8 +239,7 @@
 			appStore.showSuccess('Policy deleted successfully');
 			goto(resolve(routes.insurance));
 		} catch (err) {
-			const message = err instanceof Error ? err.message : 'Failed to delete policy';
-			appStore.showError(message);
+			appStore.showError(`Couldn't delete the policy. ${userFacingErrorMessage(err)}`);
 		} finally {
 			isDeleting = false;
 			showDeleteConfirm = false;

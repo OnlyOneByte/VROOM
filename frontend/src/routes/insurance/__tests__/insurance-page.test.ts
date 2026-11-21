@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import type { InsurancePolicy, Vehicle } from '#lib/types/index.ts';
+import {
+	ApiError,
+	SERVER_FAILURE_MESSAGE,
+	UNEXPECTED_FAILURE_MESSAGE
+} from '#lib/utils/error-handling.ts';
 
 interface PolicyListProps {
 	policies: InsurancePolicy[];
@@ -102,12 +107,13 @@ describe('insurance page loading and errors', () => {
 	});
 
 	test('a load failure shows the message, notifies, and Try Again recovers', async () => {
-		const error = new Error('Gateway timeout');
+		const error = new ApiError('Gateway timeout', 504);
 		getAllPolicies.mockRejectedValueOnce(error);
 		await mount();
 
-		expect(screen.getByText('Gateway timeout')).toBeInTheDocument();
-		expect(notifyError).toHaveBeenCalledWith(error, 'Failed to load insurance data');
+		expect(screen.getByText(SERVER_FAILURE_MESSAGE)).toBeInTheDocument();
+		expect(screen.queryByText('Gateway timeout')).toBeNull();
+		expect(notifyError).toHaveBeenCalledWith(error, "Couldn't load insurance data");
 		expect(screen.queryByRole('button', { name: 'New Policy' })).toBeNull();
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Try Again' }));
@@ -119,15 +125,15 @@ describe('insurance page loading and errors', () => {
 	});
 
 	test('a failed vehicle load also shows the error state', async () => {
-		getVehicles.mockRejectedValueOnce(new Error('Vehicles unavailable'));
+		getVehicles.mockRejectedValueOnce(new ApiError('Vehicles unavailable', 503));
 		await mount();
-		expect(screen.getByText('Vehicles unavailable')).toBeInTheDocument();
+		expect(screen.getByText(SERVER_FAILURE_MESSAGE)).toBeInTheDocument();
 	});
 
 	test('a non-Error rejection shows a generic message', async () => {
 		getAllPolicies.mockRejectedValueOnce('nope');
 		await mount();
-		expect(screen.getByText('Failed to load insurance data')).toBeInTheDocument();
+		expect(screen.getByText(UNEXPECTED_FAILURE_MESSAGE)).toBeInTheDocument();
 	});
 });
 
