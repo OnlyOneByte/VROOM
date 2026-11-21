@@ -6,6 +6,7 @@ import { userProviders } from '../../db/schema';
 import { AppError, ValidationError } from '../../errors';
 import { requireAuth } from '../../middleware';
 import { logger } from '../../utils/logger';
+import { isValidTimeZone } from '../../utils/time-zone';
 import { zValidator } from '../../utils/validation';
 import type { ChatMessage } from '../providers/domains/llm/llm-provider';
 import { runAssistant } from '../providers/domains/llm/orchestrator';
@@ -30,6 +31,7 @@ const chatBodySchema = z.object({
     )
     .max(MAX_HISTORY_TURNS)
     .optional(),
+  timeZone: z.string().max(64).refine(isValidTimeZone, 'Unknown time zone').optional(),
 });
 
 routes.post('/chat', zValidator('json', chatBodySchema), async (c) => {
@@ -66,7 +68,8 @@ routes.post('/chat', zValidator('json', chatBodySchema), async (c) => {
       user.id,
       body.message,
       history,
-      Date.now()
+      Date.now(),
+      body.timeZone
     );
     return c.json({ success: true, data: { reply, toolsUsed } });
   } catch (err) {

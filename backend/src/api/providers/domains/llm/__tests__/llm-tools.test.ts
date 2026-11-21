@@ -192,4 +192,36 @@ describe('resolveRange maps range values to unix-second windows', () => {
     expect(ytd.start).toBeLessThan(end);
     expect(ytd.start).toBeGreaterThan(0);
   });
+
+  test('ytd starts at local Jan 1 in the given time zone, and UTC Jan 1 without one', () => {
+    const jan1NoonAuckland = Date.parse('2024-12-31T23:00:00.000Z');
+    expect(tools.resolveRange('ytd', jan1NoonAuckland, 'Pacific/Auckland').start).toBe(
+      Date.parse('2024-12-31T11:00:00.000Z') / 1000
+    );
+    expect(tools.resolveRange('ytd', jan1NoonAuckland).start).toBe(
+      Date.parse('2024-01-01T00:00:00.000Z') / 1000
+    );
+  });
+
+  test('getAnalyticsSummary counts year-to-date spending from local Jan 1 in the given zone', async () => {
+    seedVehicle('veh-nz', ctx.user.id);
+    ctx.sqlite.run(
+      `INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount)
+       VALUES ('jan-1-auckland', 'veh-nz', ?, 'maintenance', ?, 5000)`,
+      [ctx.user.id, Math.floor(Date.parse('2024-12-31T11:30:00.000Z') / 1000)]
+    );
+    const nowMs = Date.parse('2025-03-01T00:00:00.000Z');
+    const ytdSpending = async (timeZone?: string) =>
+      (
+        (await tools.ASSISTANT_TOOLS.getAnalyticsSummary.run(
+          { range: 'all' },
+          ctx.user.id,
+          nowMs,
+          timeZone
+        )) as { quickStats: { ytdSpending: number } }
+      ).quickStats.ytdSpending;
+
+    expect(await ytdSpending('Pacific/Auckland')).toBe(50);
+    expect(await ytdSpending()).toBe(0);
+  });
 });
