@@ -119,4 +119,28 @@ describe('/expenses paging', () => {
 		expect(shownIds()).toEqual(['e20']);
 		expect(tableProps['currentOffset']).toBe(20);
 	});
+
+	test('Retry shows progress and is disabled while the retry is in flight', async () => {
+		let resolveRetry: (v: ReturnType<typeof pageAt>) => void = () => {};
+		getAllExpenses.mockImplementation((params: { offset: number }) => {
+			const attempts = getAllExpenses.mock.calls.filter(c => offsetOf(c) === 20).length;
+			if (params.offset === 20 && attempts === 1) return Promise.reject(new Error('Network down'));
+			if (params.offset === 20) return new Promise(resolve => (resolveRetry = resolve));
+			return Promise.resolve(pageAt(params.offset));
+		});
+		render(Page);
+		await waitFor(() => expect(shownIds()).toEqual(['e0']));
+
+		goToPage(20);
+		await screen.findByTestId('expenses-page-error');
+		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+		const retrying = await screen.findByRole('button', { name: 'Retrying…' });
+		expect(retrying).toBeDisabled();
+		expect(retrying.querySelector('.animate-spin')).not.toBeNull();
+
+		resolveRetry(pageAt(20));
+		await waitFor(() => expect(screen.queryByTestId('expenses-page-error')).toBeNull());
+		expect(shownIds()).toEqual(['e20']);
+	});
 });
