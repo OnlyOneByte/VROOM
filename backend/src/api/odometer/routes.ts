@@ -8,22 +8,26 @@ import {
   requireVehicleRead,
   requireVehicleWrite,
 } from '../../utils/sharing';
-import { commonSchemas, zValidator } from '../../utils/validation';
+import {
+  commonSchemas,
+  noonAnchoredDateIsNotInTheFuture,
+  zValidator,
+} from '../../utils/validation';
 import { deleteAllPhotosForEntity } from '../photos/photo-service';
 import { reminderTriggerService } from '../reminders/trigger-service';
 import { odometerRepository } from './repository';
 
 const routes = new Hono();
 
-const createSchema = z.object({
+export const odometerCreateSchema = z.object({
   odometer: z.number().int().min(0, 'Odometer must be a non-negative integer'),
   recordedAt: z.coerce
     .date()
-    .refine((d) => d <= new Date(), { message: 'Date cannot be in the future' }),
+    .refine(noonAnchoredDateIsNotInTheFuture, { message: 'Date cannot be in the future' }),
   note: z.string().max(500).optional(),
 });
 
-const updateSchema = createSchema.partial();
+const updateSchema = odometerCreateSchema.partial();
 
 const listQuerySchema = z.object({
   ...commonSchemas.clampedPaginationFields,
@@ -92,7 +96,7 @@ routes.get('/entry/:id', zValidator('param', commonSchemas.idParam), async (c) =
 routes.post(
   '/:vehicleId',
   zValidator('param', commonSchemas.vehicleIdParam),
-  zValidator('json', createSchema),
+  zValidator('json', odometerCreateSchema),
   async (c) => {
     const user = c.get('user');
     const { vehicleId } = c.req.valid('param');

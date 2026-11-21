@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { noonAnchoredDateIsNotInTheFuture } from '../../utils/validation';
 
 // The mileage summary buckets miles by these values: a new purpose needs a bucket there too.
 export const TRIP_PURPOSES = ['business', 'personal', 'commute', 'other'] as const;
@@ -14,13 +15,6 @@ const REFINE_MSG = {
   path: ['endOdometer'],
 };
 
-// Compare by local calendar day: clients anchor trip dates at local noon.
-const notFutureLocalDay = (d: Date): boolean => {
-  const now = new Date();
-  const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-  return d.getTime() <= endOfToday.getTime();
-};
-
 const FUTURE_MSG = { message: 'tripDate cannot be in the future' };
 
 // Zod refined schemas cannot be .extend()ed, so vehicleId is declared here; the route checks ownership.
@@ -30,7 +24,7 @@ export const createTripSchema = z
     startOdometer: z.number().int().min(0, 'startOdometer must be a non-negative integer'),
     endOdometer: z.number().int().min(0, 'endOdometer must be a non-negative integer'),
     purpose: z.enum(TRIP_PURPOSES),
-    tripDate: z.coerce.date().refine(notFutureLocalDay, FUTURE_MSG),
+    tripDate: z.coerce.date().refine(noonAnchoredDateIsNotInTheFuture, FUTURE_MSG),
     startLocation: z.string().max(200).optional(),
     endLocation: z.string().max(200).optional(),
     note: z.string().max(500).optional(),
@@ -42,7 +36,7 @@ export const updateTripSchema = z
     startOdometer: z.number().int().min(0).optional(),
     endOdometer: z.number().int().min(0).optional(),
     purpose: z.enum(TRIP_PURPOSES).optional(),
-    tripDate: z.coerce.date().refine(notFutureLocalDay, FUTURE_MSG).optional(),
+    tripDate: z.coerce.date().refine(noonAnchoredDateIsNotInTheFuture, FUTURE_MSG).optional(),
     startLocation: z.string().max(200).nullish(),
     endLocation: z.string().max(200).nullish(),
     note: z.string().max(500).nullish(),

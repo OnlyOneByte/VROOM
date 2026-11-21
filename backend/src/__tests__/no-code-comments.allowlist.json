@@ -169,7 +169,6 @@
   "backend/src/api/trips/routes.ts: Register before /:id, or the literal 'summary' segment is captured as a trip id.",
   "backend/src/api/trips/routes.ts: The schema refine sees both odometers only when the body sends both, so check the merged pair here.",
   "backend/src/api/trips/routes.ts: z.coerce.boolean treats any non-empty string as true, so parse the enum instead.",
-  "backend/src/api/trips/validation.ts: Compare by local calendar day: clients anchor trip dates at local noon.",
   "backend/src/api/trips/validation.ts: The mileage summary buckets miles by these values: a new purpose needs a bucket there too.",
   "backend/src/api/trips/validation.ts: Zod refined schemas cannot be .extend()ed, so vehicleId is declared here; the route checks ownership.",
   "backend/src/api/vehicles/__tests__/delete-vehicle-split-group.test.ts: createTestApp() must run before any DB-bound import: import only the harness and bun:test.",
