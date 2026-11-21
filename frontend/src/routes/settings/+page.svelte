@@ -1,17 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { resolve } from '$app/paths';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import { routes } from '#lib/routes.ts';
-	import {
-		Settings as SettingsIcon,
-		Save,
-		LoaderCircle,
-		ChevronRight,
-		CircleAlert
-	} from '@lucide/svelte';
+	import { Save, LoaderCircle, ChevronRight, CircleAlert } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Card, CardContent } from '#lib/components/ui/card/index.ts';
 	import { Avatar, AvatarFallback } from '#lib/components/ui/avatar/index.ts';
@@ -220,10 +215,7 @@
 
 <FormLayout>
 	<div class="mb-6">
-		<h1 class="text-3xl font-bold text-foreground flex items-center gap-3">
-			<SettingsIcon class="h-8 w-8 text-primary" />Settings
-		</h1>
-		<p class="text-muted-foreground mt-2">Manage your preferences and data</p>
+		<PageHeader title="Settings" description="Manage your preferences and data" />
 	</div>
 
 	{#if isLoading}

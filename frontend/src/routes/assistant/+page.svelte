@@ -221,7 +221,7 @@
 								{#if message.role === 'assistant' && message.toolsUsed && message.toolsUsed.length > 0}
 									<div class="flex flex-wrap gap-1" data-testid="assistant-tools-used">
 										{#each message.toolsUsed as tool (tool)}
-											<Badge variant="secondary" class="text-[10px] font-normal">{tool}</Badge>
+											<Badge variant="secondary" class="text-xs font-normal">{tool}</Badge>
 										{/each}
 									</div>
 								{/if}

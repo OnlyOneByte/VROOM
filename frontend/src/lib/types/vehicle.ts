@@ -39,6 +39,7 @@ export interface UpdateVehicleRequest {
 	purchasePrice?: number | null;
 	purchaseDate?: string | null;
 	unitPreferences?: UnitPreferences;
+	confirmUnitChange?: boolean;
 }
 
 export interface VehicleFinancing {

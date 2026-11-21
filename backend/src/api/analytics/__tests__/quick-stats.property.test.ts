@@ -7,6 +7,7 @@ import {
   expenseListArb,
   seedExpense,
   seedInsurancePolicy,
+  seedInsuranceTermVehicle,
   seedUser,
   seedVehicle,
   type TestDb,
@@ -315,5 +316,51 @@ describe('YTD spending counts only the year the range ends in', () => {
     };
     const akl = await repo.getSummary('user-1', aucklandJan1, seconds('2024-12-31T11:00:00.000Z'));
     expect(akl.quickStats.ytdSpending).toBe(800);
+  });
+});
+
+describe('fleet health counts insurance only while a covering term is current', () => {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+
+  function seedCoveredVehicle(termStart: number, termEnd: number): void {
+    seedUser(testDb.sqlite, { id: 'user-1', email: 'test@test.com', displayName: 'Test' });
+    seedVehicle(testDb.sqlite, {
+      id: 'veh-1',
+      userId: 'user-1',
+      make: 'Toyota',
+      model: 'Camry',
+      year: 2022,
+    });
+    seedInsurancePolicy(testDb.sqlite, {
+      id: 'pol-1',
+      userId: 'user-1',
+      company: 'State Farm',
+      isActive: true,
+    });
+    testDb.sqlite.run(
+      'INSERT INTO insurance_terms (id, policy_id, start_date, end_date) VALUES (?, ?, ?, ?)',
+      ['term-1', 'pol-1', Math.floor(termStart / 1000), Math.floor(termEnd / 1000)]
+    );
+    seedInsuranceTermVehicle(testDb.sqlite, { termId: 'term-1', vehicleId: 'veh-1' });
+  }
+
+  test('a current term adds the 25-point insurance share', async () => {
+    testDb.sqlite.close();
+    testDb = createTestDb();
+    repo = new AnalyticsRepository(testDb.drizzle);
+    seedCoveredVehicle(Date.now() - 30 * DAY_MS, Date.now() + 150 * DAY_MS);
+
+    const result = await repo.getQuickStats('user-1', yearToRange(2024));
+    expect(result.fleetHealthScore).toBe(63);
+  });
+
+  test('an expired term on a policy still flagged active adds nothing', async () => {
+    testDb.sqlite.close();
+    testDb = createTestDb();
+    repo = new AnalyticsRepository(testDb.drizzle);
+    seedCoveredVehicle(Date.UTC(2024, 0, 1), Date.UTC(2024, 5, 30));
+
+    const result = await repo.getQuickStats('user-1', yearToRange(2024));
+    expect(result.fleetHealthScore).toBe(38);
   });
 });

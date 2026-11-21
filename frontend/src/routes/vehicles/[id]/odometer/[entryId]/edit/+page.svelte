@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { gotoDynamic } from '#lib/utils/navigation.ts';
 	import { onMount } from 'svelte';
 	import { z } from 'zod';
@@ -19,7 +20,7 @@
 	let entryId = $derived(data.entryId);
 	let returnTo = $derived(page.url.searchParams.get('returnTo') || `/vehicles/${vehicleId}`);
 
-	let odometer = $state('');
+	let odometer = $state<string | number | null>('');
 	let date = $state('');
 	let note = $state('');
 
@@ -35,14 +36,18 @@
 
 	let showWarning = $derived.by(() => {
 		if (latestOdometer === null) return false;
-		const val = Number(odometer);
-		if (Number.isNaN(val) || odometer === '') return false;
+		const val = enteredOdometer();
+		if (val === undefined || Number.isNaN(val)) return false;
 		return val < latestOdometer;
 	});
 
+	function enteredOdometer(): number | undefined {
+		return odometer === '' || odometer === null ? undefined : Number(odometer);
+	}
+
 	const formSchema = z.object({
 		odometer: z
-			.number()
+			.number({ error: 'Odometer reading is required' })
 			.int('Odometer must be a whole number')
 			.min(0, 'Odometer must be 0 or greater'),
 		date: z.string().min(1, 'Date is required'),
@@ -78,7 +83,7 @@
 
 	function validate(): boolean {
 		fieldErrors = {};
-		const odometerNum = odometer === '' ? undefined : Number(odometer);
+		const odometerNum = enteredOdometer();
 
 		const result = formSchema.safeParse({
 			odometer: odometerNum,
@@ -141,11 +146,20 @@
 </svelte:head>
 
 <FormLayout>
-	<div class="mb-6 flex items-center gap-3">
-		<Button variant="ghost" size="icon" aria-label="Back" onclick={() => gotoDynamic(returnTo)}>
-			<ArrowLeft class="h-5 w-5" />
-		</Button>
-		<h1 class="text-2xl font-bold text-foreground">Edit Odometer Reading</h1>
+	<div class="mb-6">
+		<PageHeader title="Edit Odometer Reading">
+			{#snippet back()}
+				<Button
+					variant="ghost"
+					size="icon-lg"
+					class="shrink-0"
+					aria-label="Back"
+					onclick={() => gotoDynamic(returnTo)}
+				>
+					<ArrowLeft class="size-5" />
+				</Button>
+			{/snippet}
+		</PageHeader>
 	</div>
 
 	{#if isLoadingEntry}

@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { routes } from '#lib/routes.ts';
-	import { TrendingUp, ChartPie, CircleAlert, Fuel } from '@lucide/svelte';
+	import { TrendingUp, ChartPie, CircleAlert, Car } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { gotoWithQuery } from '#lib/utils/navigation.ts';
 	import FloatingActionButton from '#lib/components/common/floating-action-button.svelte';
@@ -86,6 +86,9 @@
 	});
 
 	let ownedVehicles = $derived(vehicles.filter(v => !v.sharedAccess));
+	let hasLoaded = $state(false);
+	let showFab = $derived(hasLoaded && !loadError);
+	let canLogFillup = $derived(showFab && ownedVehicles.length > 0);
 
 	let stats = $derived.by(() => ({
 		totalVehicles: ownedVehicles.length,
@@ -215,6 +218,7 @@
 			}
 			vehiclePhotosMap = photosMap;
 			vehicleStatsMap = statsMap;
+			hasLoaded = true;
 		} catch (error) {
 			loadError = error instanceof Error ? error.message : 'Failed to load dashboard data';
 			handleErrorWithNotification(error, 'Failed to load dashboard data');
@@ -291,10 +295,10 @@
 				: 'Welcome! Get started by adding your first vehicle'}
 	>
 		{#snippet actions()}
-			{#if !loadError && stats.totalVehicles > 0}
-				<Button size="lg" onclick={handleLogFillup}>
-					<Fuel class="mr-2 h-4 w-4" />
-					Log Fill-up
+			{#if canLogFillup}
+				<Button variant="outline" size="lg" href={resolve(routes.vehicleNew)}>
+					<Car class="mr-2 h-4 w-4" />
+					Add Vehicle
 				</Button>
 			{/if}
 		{/snippet}
@@ -307,7 +311,7 @@
 				<p class="font-medium">Failed to load dashboard data</p>
 			</div>
 			<p class="mb-4 text-sm text-muted-foreground">{loadError}</p>
-			<Button onclick={loadDashboardData}>Retry</Button>
+			<Button size="lg" onclick={loadDashboardData}>Retry</Button>
 		</div>
 	{:else}
 		<DashboardStatsCards
@@ -374,4 +378,8 @@
 	{/if}
 </div>
 
-<FloatingActionButton href={resolve(routes.vehicleNew)} label="Add Vehicle" />
+{#if canLogFillup}
+	<FloatingActionButton label="Log Fill-up" onclick={handleLogFillup} />
+{:else if showFab}
+	<FloatingActionButton href={resolve(routes.vehicleNew)} label="Add Vehicle" />
+{/if}

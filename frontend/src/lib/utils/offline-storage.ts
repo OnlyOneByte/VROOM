@@ -4,7 +4,6 @@ import { browser } from '$app/env';
 import type { ExpenseCategory } from '#lib/types/index.ts';
 
 const OFFLINE_STORAGE_KEY = 'vroom_offline_expenses';
-const CORRUPT_STORAGE_KEY = 'vroom_offline_expenses.corrupt';
 const OFFLINE_STORAGE_VERSION = '3.0';
 const PHOTO_DB_NAME = 'vroom_offline_photos';
 const PHOTO_STORE = 'photos';
@@ -65,11 +64,44 @@ export function isIncompleteFuelExpense(expense: OfflineExpense): boolean {
 export const INCOMPLETE_FUEL_REASON =
 	'Fuel expenses require volume/charge and mileage data. Please edit the expense and add the missing information.';
 
-export function loadOfflineExpenses(): OfflineExpense[] {
+let queueOwner: string | null = null;
+
+function queueStorageKey(owner: string | null = queueOwner): string {
+	return owner ? `${OFFLINE_STORAGE_KEY}:${owner}` : OFFLINE_STORAGE_KEY;
+}
+
+export function setOfflineQueueOwner(userId: string | null): void {
+	if (userId === queueOwner) return;
+	queueOwner = userId;
+	if (userId) adoptUnscopedQueue();
+	offlineExpenseQueue.current = loadOfflineExpenses();
+}
+
+function adoptUnscopedQueue(): void {
+	if (!browser) return;
+	try {
+		const unscoped = localStorage.getItem(OFFLINE_STORAGE_KEY);
+		if (!unscoped) return;
+		const adopted: OfflineExpense[] = JSON.parse(unscoped);
+		const owned = loadOfflineExpenses();
+		const ownedIds = new Set(owned.map(expense => expense.id));
+		const merged = [...owned, ...adopted.filter(expense => !ownedIds.has(expense.id))];
+		localStorage.setItem(queueStorageKey(), JSON.stringify(merged));
+		localStorage.removeItem(OFFLINE_STORAGE_KEY);
+	} catch (error) {
+		if (import.meta.env.DEV) console.error('Failed to adopt the unscoped offline queue:', error);
+	}
+}
+
+export function currentOfflineQueueOwner(): string | null {
+	return queueOwner;
+}
+
+export function loadOfflineExpenses(owner: string | null = queueOwner): OfflineExpense[] {
 	if (!browser) return [];
 
 	try {
-		const stored = localStorage.getItem(OFFLINE_STORAGE_KEY);
+		const stored = localStorage.getItem(queueStorageKey(owner));
 		if (!stored) return [];
 
 		const expenses: OfflineExpense[] = JSON.parse(stored);
@@ -86,39 +118,43 @@ export function loadOfflineExpenses(): OfflineExpense[] {
 		});
 	} catch (error) {
 		if (import.meta.env.DEV) console.error('Failed to load offline expenses:', error);
-		stashCorruptedBlob();
+		stashCorruptedBlob(owner);
 		return [];
 	}
 }
 
-function stashCorruptedBlob(): void {
+function stashCorruptedBlob(owner: string | null): void {
 	try {
-		const raw = localStorage.getItem(OFFLINE_STORAGE_KEY);
-		if (raw) localStorage.setItem(CORRUPT_STORAGE_KEY, raw);
+		const raw = localStorage.getItem(queueStorageKey(owner));
+		if (raw) localStorage.setItem(`${queueStorageKey(owner)}.corrupt`, raw);
 	} catch {
 		// Best-effort: a failed stash must not block startup.
 	}
 }
 
-export function saveOfflineExpenses(expenses: OfflineExpense[]): boolean {
+export function saveOfflineExpenses(
+	expenses: OfflineExpense[],
+	owner: string | null = queueOwner
+): boolean {
 	if (!browser) return false;
 
 	try {
-		localStorage.setItem(OFFLINE_STORAGE_KEY, JSON.stringify(expenses));
+		localStorage.setItem(queueStorageKey(owner), JSON.stringify(expenses));
 	} catch (error) {
 		if (import.meta.env.DEV) console.error('Failed to save offline expenses:', error);
 		return false;
 	}
 
-	offlineExpenseQueue.current = expenses;
+	if (owner === queueOwner) offlineExpenseQueue.current = expenses;
 	return true;
 }
 
 export async function addOfflineExpense(
 	expense: Omit<OfflineExpense, 'id' | 'clientId' | 'timestamp' | 'synced' | 'version'>,
-	photos: File[] = []
+	photos: File[] = [],
+	clientId: string = crypto.randomUUID(),
+	owner: string | null = queueOwner
 ): Promise<boolean> {
-	const clientId = crypto.randomUUID();
 	const offlineExpense: OfflineExpense = {
 		...expense,
 		id: `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -130,8 +166,8 @@ export async function addOfflineExpense(
 
 	if (!(await savePendingPhotos(clientId, photos))) return false;
 
-	const currentExpenses = loadOfflineExpenses();
-	const queued = saveOfflineExpenses([...currentExpenses, offlineExpense]);
+	const currentExpenses = loadOfflineExpenses(owner);
+	const queued = saveOfflineExpenses([...currentExpenses, offlineExpense], owner);
 	if (!queued && photos.length > 0) await deletePendingPhotos(clientId).catch(() => undefined);
 	return queued;
 }

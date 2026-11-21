@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { page } from '$app/state';
 	import { browser } from '$app/env';
 	import { authStore } from '#lib/stores/auth.svelte.ts';
@@ -203,10 +204,7 @@
 
 <FormLayout>
 	<div class="space-y-6">
-		<div>
-			<h1 class="text-2xl font-bold tracking-tight">Profile</h1>
-			<p class="text-muted-foreground">Manage your account and personal preferences</p>
-		</div>
+		<PageHeader title="Profile" description="Manage your account and personal preferences" />
 
 		<Card>
 			<CardHeader>

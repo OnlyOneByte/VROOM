@@ -10,6 +10,7 @@
 		amount: string;
 		dateError?: string;
 		amountError?: string;
+		dateDisabled?: boolean;
 		onAmountBlur: () => void;
 	}
 
@@ -18,6 +19,7 @@
 		amount = $bindable(),
 		dateError,
 		amountError,
+		dateDisabled = false,
 		onAmountBlur
 	}: Props = $props();
 
@@ -30,6 +32,7 @@
 		id="date"
 		bind:value={date}
 		placeholder="Select date"
+		disabled={dateDisabled}
 		aria-invalid={!!dateError}
 		aria-describedby={dateError ? 'date-error' : undefined}
 	/>

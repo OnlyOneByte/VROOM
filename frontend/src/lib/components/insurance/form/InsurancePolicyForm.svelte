@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
 	import { appStore } from '#lib/stores/app.svelte.ts';
@@ -256,23 +257,24 @@
 		</div>
 	{:else}
 		<div class="space-y-6">
-			<div class="flex items-center gap-4">
-				<Button variant="outline" size="icon" aria-label="Go back" onclick={handleBack}>
-					<ArrowLeft class="h-4 w-4" />
-				</Button>
-				<div>
-					<h1 class="text-3xl font-bold tracking-tight">
-						{isEditMode ? 'Edit Policy' : 'New Insurance Policy'}
-					</h1>
-					{#if isEditMode && company}
-						<p class="text-muted-foreground mt-1">{company}</p>
-					{:else if !isEditMode}
-						<p class="text-muted-foreground mt-1">
-							Add a new insurance policy with an initial term
-						</p>
-					{/if}
-				</div>
-			</div>
+			<PageHeader
+				title={isEditMode ? 'Edit Policy' : 'New Insurance Policy'}
+				description={isEditMode
+					? company || undefined
+					: 'Add a new insurance policy with an initial term'}
+			>
+				{#snippet back()}
+					<Button
+						variant="ghost"
+						size="icon-lg"
+						class="shrink-0"
+						aria-label="Go back"
+						onclick={handleBack}
+					>
+						<ArrowLeft class="size-5" />
+					</Button>
+				{/snippet}
+			</PageHeader>
 
 			<form onsubmit={handleSubmit} class="space-y-6 pb-32 sm:pb-24">
 				<Card>
