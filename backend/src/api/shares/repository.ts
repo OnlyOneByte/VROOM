@@ -15,6 +15,11 @@ export interface AcceptedShareAccess {
   ownerName: string;
 }
 
+export interface GrantedShare extends VehicleShare {
+  sharedWithEmail: string | null;
+  sharedWithName: string | null;
+}
+
 export interface ReceivedShare extends VehicleShare {
   vehicleName: string;
   sharedBy: string;
@@ -47,12 +52,26 @@ export class VehicleShareRepository extends BaseRepository<VehicleShare, NewVehi
     return rows.find((r) => isActiveShareStatus(r.status)) ?? null;
   }
 
-  async findByOwner(ownerId: string): Promise<VehicleShare[]> {
-    return this.db
-      .select()
+  async findByOwner(ownerId: string): Promise<GrantedShare[]> {
+    const rows = await this.db
+      .select({
+        share: vehicleShares,
+        sharedWithEmail: users.email,
+        sharedWithName: users.displayName,
+      })
       .from(vehicleShares)
+      .innerJoin(users, eq(users.id, vehicleShares.sharedWithId))
       .where(eq(vehicleShares.ownerId, ownerId))
       .orderBy(vehicleShares.createdAt);
+    return rows.map((r) => {
+      // Only an accept proves the invitee agreed to be identified; a restored backup can plant pending rows for any user id.
+      const identified = r.share.status === 'accepted';
+      return {
+        ...r.share,
+        sharedWithEmail: identified ? r.sharedWithEmail : null,
+        sharedWithName: identified ? r.sharedWithName : null,
+      };
+    });
   }
 
   async findByIdAndOwner(id: string, ownerId: string): Promise<VehicleShare | null> {

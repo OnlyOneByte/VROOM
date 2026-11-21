@@ -12,7 +12,8 @@
 	import { shareApi } from '#lib/services/share-api.ts';
 	import { ApiError } from '#lib/utils/error-handling.ts';
 	import { shareLevelLabel } from '#lib/utils/share-helpers.ts';
-	import type { ShareLevel, VehicleShare } from '#lib/types/index.ts';
+	import { formatDate } from '#lib/utils/formatters.ts';
+	import type { GrantedShare, ShareLevel, VehicleShare } from '#lib/types/index.ts';
 
 	interface Props {
 		open: boolean;
@@ -28,10 +29,18 @@
 
 	let isLoading = $state(false);
 	let loadError = $state<string | null>(null);
-	let shares = $state<VehicleShare[]>([]);
+	let shares = $state<GrantedShare[]>([]);
 	const SHARE_STATUSES_WITH_ACCESS: VehicleShare['status'][] = ['pending', 'accepted'];
 	let revokeConfirmOpen = $state(false);
-	let revokingShare = $state<VehicleShare | null>(null);
+	let revokingShare = $state<GrantedShare | null>(null);
+	const personName = (share: GrantedShare) =>
+		share.sharedWithName?.trim() || share.sharedWithEmail || null;
+	const personLabel = (share: GrantedShare) =>
+		personName(share) ?? `the invitation sent ${formatDate(share.createdAt)}`;
+	const revokeDescription = (share: GrantedShare) =>
+		personName(share)
+			? `${personName(share)} will no longer see “${vehicleName}” or its expenses. You can invite them again later.`
+			: `The invitation sent ${formatDate(share.createdAt)} will be cancelled, so it can't be accepted. You can invite them again later.`;
 
 	let lastKey = $state('');
 	$effect(() => {
@@ -89,7 +98,7 @@
 		}
 	}
 
-	function confirmRevoke(share: VehicleShare) {
+	function confirmRevoke(share: GrantedShare) {
 		revokingShare = share;
 		revokeConfirmOpen = true;
 	}
@@ -171,8 +180,14 @@
 					{#each shares as share (share.id)}
 						<div class="flex items-center justify-between gap-3 px-3 py-2.5">
 							<div class="min-w-0">
-								<p class="truncate text-sm font-medium">{share.sharedWithId}</p>
-								<p class="text-xs text-muted-foreground capitalize">{share.status}</p>
+								<p class="truncate text-sm font-medium">
+									{personName(share) ?? 'Invited'}
+								</p>
+								<p class="truncate text-xs text-muted-foreground">
+									<span class="capitalize">{share.status}</span>{share.sharedWithEmail
+										? ` · ${share.sharedWithEmail}`
+										: ` · sent ${formatDate(share.createdAt)}`}
+								</p>
 							</div>
 							<div class="flex items-center gap-2">
 								<Select.Root
@@ -181,8 +196,8 @@
 									onValueChange={v => changeLevel(share, v as ShareLevel)}
 								>
 									<Select.Trigger
-										class="h-8 w-[110px]"
-										aria-label="Change access level for {share.sharedWithId}"
+										class="w-[110px] data-[size=default]:h-10 sm:data-[size=default]:h-9"
+										aria-label="Change access level for {personLabel(share)}"
 									>
 										{shareLevelLabel(share.level)}
 									</Select.Trigger>
@@ -193,9 +208,10 @@
 								</Select.Root>
 								<Button
 									variant="ghost"
-									size="icon"
+									size="icon-lg"
+									class="sm:size-9"
 									onclick={() => confirmRevoke(share)}
-									aria-label="Revoke access for {share.sharedWithId}"
+									aria-label="Revoke access for {personLabel(share)}"
 								>
 									<Trash2 class="h-4 w-4 text-destructive" />
 								</Button>
@@ -223,9 +239,7 @@
 <ConfirmDialog
 	bind:open={revokeConfirmOpen}
 	title="Revoke access?"
-	description={revokingShare
-		? `${revokingShare.sharedWithId} will no longer see “${vehicleName}” or its expenses. You can invite them again later.`
-		: ''}
+	description={revokingShare ? revokeDescription(revokingShare) : ''}
 	confirmLabel="Revoke"
 	onConfirm={revoke}
 />

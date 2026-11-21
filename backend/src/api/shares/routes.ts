@@ -7,7 +7,7 @@ import type { ApiResponse } from '../../errors';
 import { ConflictError, NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { commonSchemas, validateVehicleOwnership, zValidator } from '../../utils/validation';
-import { type ReceivedShare, vehicleShareRepository } from './repository';
+import { type GrantedShare, type ReceivedShare, vehicleShareRepository } from './repository';
 
 // Non-owners and non-invitees get 404, not 403, so share existence is not revealed.
 
@@ -70,7 +70,7 @@ routes.post('/', zValidator('json', inviteSchema), async (c) => {
 routes.get('/granted', async (c) => {
   const user = c.get('user');
   const shares = await vehicleShareRepository.findByOwner(user.id);
-  const response: ApiResponse<VehicleShare[]> = {
+  const response: ApiResponse<GrantedShare[]> = {
     success: true,
     data: shares,
     message: `Found ${shares.length} share${shares.length !== 1 ? 's' : ''}`,

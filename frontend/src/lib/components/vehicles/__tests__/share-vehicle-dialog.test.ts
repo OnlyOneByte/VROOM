@@ -1,9 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
-import type { CreateShareRequest, ShareLevel, VehicleShare } from '#lib/types/index.ts';
+import type {
+	CreateShareRequest,
+	GrantedShare,
+	ShareLevel,
+	VehicleShare
+} from '#lib/types/index.ts';
 import { ApiError } from '#lib/utils/error-handling.ts';
 
-const listGranted = vi.fn<() => Promise<VehicleShare[]>>();
+const listGranted = vi.fn<() => Promise<GrantedShare[]>>();
 const invite = vi.fn<(data: CreateShareRequest) => Promise<VehicleShare>>();
 const changeLevel = vi.fn<(id: string, level: ShareLevel) => Promise<VehicleShare>>();
 const revoke = vi.fn<(id: string) => Promise<void>>();
@@ -28,12 +33,14 @@ vi.mock('svelte-sonner', () => ({
 
 import ShareVehicleDialog from '../ShareVehicleDialog.svelte';
 
-function share(overrides: Partial<VehicleShare> = {}): VehicleShare {
+function share(overrides: Partial<GrantedShare> = {}): GrantedShare {
 	return {
 		id: 's1',
 		vehicleId: 'v1',
 		ownerId: 'owner',
-		sharedWithId: 'friend@example.com',
+		sharedWithId: 'u-friend',
+		sharedWithEmail: 'friend@example.com',
+		sharedWithName: '',
 		level: 'viewer',
 		status: 'pending',
 		createdAt: '2026-01-01T00:00:00.000Z',
@@ -117,8 +124,8 @@ describe('ShareVehicleDialog loading the share list', () => {
 
 	test('shows only shares for this vehicle', async () => {
 		listGranted.mockResolvedValue([
-			share({ id: 's1', sharedWithId: 'friend@example.com', status: 'accepted' }),
-			share({ id: 's2', vehicleId: 'other', sharedWithId: 'stranger@example.com' })
+			share({ id: 's1', sharedWithEmail: 'friend@example.com', status: 'accepted' }),
+			share({ id: 's2', vehicleId: 'other', sharedWithEmail: 'stranger@example.com' })
 		]);
 		mount();
 		await settle();
