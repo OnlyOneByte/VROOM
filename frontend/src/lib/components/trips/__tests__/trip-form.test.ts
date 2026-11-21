@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { hasPendingSave } from '#lib/utils/pending-saves.ts';
+import { ApiError, SERVER_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import type { Trip, Vehicle } from '#lib/types/index.ts';
 import type { CreateTripRequest, UpdateTripRequest } from '#lib/services/trip-api.ts';
@@ -248,14 +250,19 @@ describe('TripForm create submit', () => {
 	});
 
 	test('a failed create keeps the dialog open and reports the failure', async () => {
-		create.mockRejectedValue(new Error('500'));
+		create.mockRejectedValue(new ApiError('SQLITE_BUSY', 500));
 		mount({ vehicles: [CAMRY] });
 		await settle();
 
 		await typeOdometers('10', '20');
 		await submit();
 
-		expect(notify).toHaveBeenCalledWith({ type: 'error', message: 'Failed to log trip' });
+		expect(notify).toHaveBeenCalledWith(
+			expect.objectContaining({
+				type: 'error',
+				message: `Couldn't log the trip. ${SERVER_FAILURE_MESSAGE}`
+			})
+		);
 		expect(onSaved).not.toHaveBeenCalled();
 		expect(screen.getByRole('dialog')).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: 'Log Trip' })).toBeEnabled();
@@ -360,13 +367,18 @@ describe('TripForm edit mode', () => {
 	});
 
 	test('a failed update reports the update failure', async () => {
-		update.mockRejectedValue(new Error('500'));
+		update.mockRejectedValue(new ApiError('Odometer must increase', 400));
 		mount({ trip: trip() });
 		await settle();
 
 		await submit();
 
-		expect(notify).toHaveBeenCalledWith({ type: 'error', message: 'Failed to update trip' });
+		expect(notify).toHaveBeenCalledWith(
+			expect.objectContaining({
+				type: 'error',
+				message: "Couldn't update the trip. Odometer must increase."
+			})
+		);
 		expect(onSaved).not.toHaveBeenCalled();
 	});
 
@@ -378,5 +390,19 @@ describe('TripForm edit mode', () => {
 		await submit();
 
 		expect(screen.getByRole('button', { name: /Saving/ })).toBeDisabled();
+	});
+
+	test('a save in flight counts as unsaved changes until the form closes', async () => {
+		create.mockReturnValue(new Promise(() => {}));
+		const { unmount } = mount({ vehicles: [CAMRY] });
+		await settle();
+		expect(hasPendingSave()).toBe(false);
+
+		await typeOdometers('10', '20');
+		await submit();
+
+		expect(hasPendingSave()).toBe(true);
+		unmount();
+		expect(hasPendingSave()).toBe(false);
 	});
 });

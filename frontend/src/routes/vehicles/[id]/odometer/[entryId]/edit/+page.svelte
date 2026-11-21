@@ -3,6 +3,7 @@
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { gotoDynamic } from '#lib/utils/navigation.ts';
 	import { onMount } from 'svelte';
+	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import { z } from 'zod';
 	import { ArrowLeft, LoaderCircle, Trash2, TriangleAlert } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -27,6 +28,8 @@
 
 	let isLoadingEntry = $state(true);
 	let isSubmitting = $state(false);
+
+	onMount(() => trackPendingSave(() => isSubmitting));
 	let isDeleting = $state(false);
 	let loadError = $state<string | null>(null);
 	let fieldErrors = $state<{ odometer?: string; date?: string; note?: string }>({});

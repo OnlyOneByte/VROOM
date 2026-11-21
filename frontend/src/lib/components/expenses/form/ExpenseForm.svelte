@@ -4,6 +4,7 @@
 	import { routes } from '#lib/routes.ts';
 	import { gotoDynamic, gotoWithQuery } from '#lib/utils/navigation.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { LoaderCircle, CreditCard, Info, CircleAlert } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -93,6 +94,14 @@
 			}
 		}
 	});
+
+	onMount(() =>
+		trackPendingSave(
+			() =>
+				form.isSubmitting &&
+				(form.isEditMode || (form.isSplit && form.selectedVehicleIds.length >= 2))
+		)
+	);
 
 	onMount(async () => {
 		await settingsStore.load();

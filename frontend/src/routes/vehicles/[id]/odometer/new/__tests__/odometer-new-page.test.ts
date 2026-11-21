@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { hasPendingSave } from '#lib/utils/pending-saves.ts';
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import type { OdometerEntry, PaginatedResponse } from '#lib/types/index.ts';
 import type { odometerApi } from '#lib/services/odometer-api.ts';
@@ -459,5 +460,16 @@ describe('new odometer reading navigation', () => {
 		await fireEvent.click(screen.getByRole('button', { name: 'Back' }));
 
 		expect(goto).toHaveBeenCalledWith('/dashboard');
+	});
+
+	test('a save in flight counts as unsaved changes', async () => {
+		create.mockReturnValue(new Promise(() => {}));
+		mount();
+		await settle();
+		await fireEvent.input(odometerInput(), { target: { value: '12345' } });
+
+		await save();
+
+		expect(hasPendingSave()).toBe(true);
 	});
 });

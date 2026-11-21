@@ -461,7 +461,7 @@
 	<div class="rounded-lg border bg-card p-6">
 		<div class="mb-4 flex items-center gap-3 text-destructive">
 			<CircleAlert class="h-5 w-5" />
-			<p class="font-medium">This tab could not be loaded</p>
+			<p class="font-medium">Couldn't load this tab</p>
 		</div>
 		<p class="text-sm text-muted-foreground">Check your connection and reload the page.</p>
 	</div>
