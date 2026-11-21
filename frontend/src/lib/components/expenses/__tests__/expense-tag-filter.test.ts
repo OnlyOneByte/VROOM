@@ -4,17 +4,14 @@ import ExpenseTagFilter from '../ExpenseTagFilter.svelte';
 
 const ALL_TAGS = ['Commute', 'parking', 'road-trip', 'tolls'];
 
-function renderTagFilter(selectedTags: string[] = [], tagMatchMode: 'any' | 'all' = 'any') {
+function renderTagFilter(selectedTags: string[] = []) {
 	const onTagsChange = vi.fn();
-	const onMatchModeChange = vi.fn();
 	const view = render(ExpenseTagFilter, {
 		allTags: ALL_TAGS,
 		selectedTags,
-		tagMatchMode,
-		onTagsChange,
-		onMatchModeChange
+		onTagsChange
 	});
-	return { ...view, onTagsChange, onMatchModeChange };
+	return { ...view, onTagsChange };
 }
 
 function tagInput(): HTMLInputElement {
@@ -155,24 +152,14 @@ describe('ExpenseTagFilter: adding and removing', () => {
 });
 
 describe('ExpenseTagFilter: match mode', () => {
-	test('is offered only when two or more tags are selected', async () => {
+	test('offers no Any/All switch, because the list always requires every selected tag', async () => {
 		const { rerender } = renderTagFilter(['tolls']);
-		expect(screen.queryByRole('radiogroup')).toBeNull();
+		expect(screen.queryByText('Matching all selected tags')).toBeNull();
 
 		await rerender({ selectedTags: ['tolls', 'parking'] });
 
-		expect(screen.getByRole('radiogroup', { name: 'Tag match mode' })).toBeInTheDocument();
-	});
-
-	test('reflects the current mode and reports changes', async () => {
-		const { onMatchModeChange } = renderTagFilter(['tolls', 'parking'], 'all');
-
-		expect(screen.getByRole('radio', { name: 'All' })).toHaveAttribute('aria-checked', 'true');
-		expect(screen.getByRole('radio', { name: 'Any' })).toHaveAttribute('aria-checked', 'false');
-
-		await fireEvent.click(screen.getByRole('radio', { name: 'Any' }));
-		await fireEvent.click(screen.getByRole('radio', { name: 'All' }));
-
-		expect(onMatchModeChange.mock.calls).toEqual([['any'], ['all']]);
+		expect(screen.queryByRole('radiogroup')).toBeNull();
+		expect(screen.queryByRole('radio', { name: 'Any' })).toBeNull();
+		expect(screen.getByText('Matching all selected tags')).toBeInTheDocument();
 	});
 });

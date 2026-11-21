@@ -5,12 +5,10 @@
 	interface Props {
 		allTags: string[];
 		selectedTags: string[];
-		tagMatchMode: 'any' | 'all';
 		onTagsChange: (_tags: string[]) => void;
-		onMatchModeChange: (_mode: 'any' | 'all') => void;
 	}
 
-	let { allTags, selectedTags, tagMatchMode, onTagsChange, onMatchModeChange }: Props = $props();
+	let { allTags, selectedTags, onTagsChange }: Props = $props();
 
 	let tagSearchTerm = $state('');
 	let tagSearchFocused = $state(false);
@@ -61,36 +59,7 @@
 	<div class="flex items-center justify-between">
 		<p class="text-sm font-medium text-muted-foreground">Tags</p>
 		{#if selectedTags.length > 1}
-			<div
-				class="flex items-center rounded-md border text-xs"
-				role="radiogroup"
-				aria-label="Tag match mode"
-			>
-				<button
-					role="radio"
-					aria-checked={tagMatchMode === 'any'}
-					class="px-2.5 py-1 rounded-l-md transition-colors {tagMatchMode === 'any'
-						? 'bg-primary text-primary-foreground'
-						: 'text-muted-foreground hover:bg-muted'}"
-					onclick={() => {
-						onMatchModeChange('any');
-					}}
-				>
-					Any
-				</button>
-				<button
-					role="radio"
-					aria-checked={tagMatchMode === 'all'}
-					class="px-2.5 py-1 rounded-r-md transition-colors {tagMatchMode === 'all'
-						? 'bg-primary text-primary-foreground'
-						: 'text-muted-foreground hover:bg-muted'}"
-					onclick={() => {
-						onMatchModeChange('all');
-					}}
-				>
-					All
-				</button>
-			</div>
+			<p class="text-xs text-muted-foreground">Matching all selected tags</p>
 		{/if}
 	</div>
 	<div class="relative">

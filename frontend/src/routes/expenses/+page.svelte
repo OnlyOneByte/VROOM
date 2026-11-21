@@ -64,7 +64,6 @@
 	let endDate = $state<string | undefined>(undefined);
 
 	let selectedTags = $state<string[]>([]);
-	let tagMatchMode = $state<'any' | 'all'>('any');
 
 	let sortBy = $state<'date' | 'amount'>('date');
 	let sortDir = $state<'asc' | 'desc'>('desc');
@@ -250,7 +249,6 @@
 
 	function clearFilters() {
 		searchTerm = '';
-		tagMatchMode = 'any';
 		selectedVehicleId = undefined;
 		selectedTags = [];
 		startDate = undefined;
@@ -297,10 +295,6 @@
 	function handleTagsChange(tags: string[]) {
 		selectedTags = tags;
 		handleFilterChange();
-	}
-
-	function handleMatchModeChange(mode: 'any' | 'all') {
-		tagMatchMode = mode;
 	}
 
 	async function handleDeleteExpense(_deletedExpense: ExpenseWithVehicle) {
@@ -453,13 +447,7 @@
 					</div>
 				</div>
 
-				<ExpenseTagFilter
-					{allTags}
-					{selectedTags}
-					{tagMatchMode}
-					onTagsChange={handleTagsChange}
-					onMatchModeChange={handleMatchModeChange}
-				/>
+				<ExpenseTagFilter {allTags} {selectedTags} onTagsChange={handleTagsChange} />
 
 				{#if searchTerm || selectedVehicleId || selectedTags.length > 0 || startDate || endDate || categoryFilter}
 					<div class="flex justify-end pt-2">
