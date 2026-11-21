@@ -297,6 +297,8 @@
 									id="start-date"
 									bind:value={startDate}
 									class={errors.startDate ? 'border-destructive' : ''}
+									aria-invalid={!!errors.startDate}
+									aria-describedby={errors.startDate ? 'start-date-error' : undefined}
 									placeholder="Pick start date"
 								/>
 								{#if errors.startDate}
@@ -309,6 +311,8 @@
 									id="end-date"
 									bind:value={endDate}
 									class={errors.endDate ? 'border-destructive' : ''}
+									aria-invalid={!!errors.endDate}
+									aria-describedby={errors.endDate ? 'end-date-error' : undefined}
 									placeholder="Pick end date"
 								/>
 								{#if errors.endDate}

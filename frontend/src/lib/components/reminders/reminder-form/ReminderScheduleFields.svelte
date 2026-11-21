@@ -78,6 +78,14 @@
 
 <div class="space-y-2">
 	<Label for="reminder-end">End date (optional)</Label>
-	<DatePicker id="reminder-end" bind:value={form.values.endDate} placeholder="No end date" />
-	{#if form.errors['endDate']}<FormFieldError>{form.errors['endDate']}</FormFieldError>{/if}
+	<DatePicker
+		id="reminder-end"
+		bind:value={form.values.endDate}
+		placeholder="No end date"
+		aria-invalid={!!form.errors['endDate']}
+		aria-describedby={form.errors['endDate'] ? 'reminder-end-error' : undefined}
+	/>
+	{#if form.errors['endDate']}<FormFieldError id="reminder-end-error"
+			>{form.errors['endDate']}</FormFieldError
+		>{/if}
 </div>

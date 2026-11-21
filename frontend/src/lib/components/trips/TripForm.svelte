@@ -238,8 +238,16 @@
 				</div>
 				<div class="space-y-2">
 					<Label for="trip-date">Date *</Label>
-					<DatePicker id="trip-date" bind:value={tripDate} placeholder="Select date" />
-					{#if errors.tripDate}<FormFieldError>{errors.tripDate}</FormFieldError>{/if}
+					<DatePicker
+						id="trip-date"
+						bind:value={tripDate}
+						placeholder="Select date"
+						aria-invalid={!!errors.tripDate}
+						aria-describedby={errors.tripDate ? 'trip-date-error' : undefined}
+					/>
+					{#if errors.tripDate}<FormFieldError id="trip-date-error"
+							>{errors.tripDate}</FormFieldError
+						>{/if}
 				</div>
 			</div>
 
