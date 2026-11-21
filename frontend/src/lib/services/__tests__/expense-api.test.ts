@@ -204,15 +204,16 @@ describe('expenseApi query and photo wiring', () => {
 		});
 	});
 
-	test('getExpenseSummary omits empty filters and encodes provided ones', async () => {
+	test('getExpenseSummary omits empty filters, encodes provided ones and sends the time zone', async () => {
 		get.mockResolvedValue({});
+		const zone = encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone);
 		await expenseApi.getExpenseSummary();
 		await expenseApi.getExpenseSummary({ vehicleId: '', period: '' });
 		await expenseApi.getExpenseSummary({ vehicleId: 'v1', period: '30d' });
 		expect(get.mock.calls.map(c => c[0])).toEqual([
-			'/api/v1/expenses/summary',
-			'/api/v1/expenses/summary',
-			'/api/v1/expenses/summary?vehicleId=v1&period=30d'
+			`/api/v1/expenses/summary?timeZone=${zone}`,
+			`/api/v1/expenses/summary?timeZone=${zone}`,
+			`/api/v1/expenses/summary?vehicleId=v1&period=30d&timeZone=${zone}`
 		]);
 	});
 

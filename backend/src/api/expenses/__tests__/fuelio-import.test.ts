@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { DistanceUnit, VolumeUnit } from '../../../types';
+import { calendarDayIn } from '../../../utils/time-zone';
 import { convertDistance, convertVolume } from '../../../utils/unit-conversions';
 import { isFuelioExport, parseFuelioExport } from '../fuelio-import';
 import { buildImportPlan, type ImportableExpense, type ImportVehicle } from '../import-csv';
@@ -284,5 +285,21 @@ describe('re-importing the same export dedups', () => {
       return buildImportPlan(r.csv, VEHICLES).rows.map((row) => row.expense?.clientId);
     };
     expect(ids()).toEqual(ids());
+  });
+});
+
+describe('parseFuelioExport with a time zone', () => {
+  test('log and cost rows land on their own calendar day for a UTC+14 user', () => {
+    const zone = 'Pacific/Kiritimati';
+    const { csv } = parseFuelioExport(FUELIO_CSV, {
+      targetVehicle: TARGET_VEHICLE,
+      targetUnits: TARGET_UNITS,
+      includeCosts: true,
+      timeZone: zone,
+    });
+    const days = buildImportPlan(csv, VEHICLES, new Map(), zone)
+      .rows.map((r) => (r.expense ? calendarDayIn(r.expense.date, zone) : null))
+      .sort();
+    expect(days).toEqual(['2024-01-05', '2024-01-10', '2024-01-19', '2024-02-01']);
   });
 });

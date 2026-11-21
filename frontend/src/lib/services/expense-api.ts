@@ -138,7 +138,8 @@ export const expenseApi = {
 	async getExpenseSummary(params?: ExpenseSummaryParams): Promise<ExpenseSummary> {
 		const qs = buildQueryString({
 			vehicleId: params?.vehicleId || undefined,
-			period: params?.period || undefined
+			period: params?.period || undefined,
+			timeZone: userTimeZone()
 		});
 		return apiClient.get<ExpenseSummary>(`/api/v1/expenses/summary${qs}`);
 	},

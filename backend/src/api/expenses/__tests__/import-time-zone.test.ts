@@ -34,6 +34,12 @@ describe('buildZonedDate', () => {
     expect(calendarDayIn(after as Date, AUCKLAND)).toBe('2024-04-08');
   });
 
+  test('a wall time skipped by a midnight daylight-saving change still lands on that day', () => {
+    const d = buildZonedDate(2024, 10, 6, 'America/Asuncion', 0, 30, 0);
+    expect(d).not.toBeNull();
+    expect(calendarDayIn(d as Date, 'America/Asuncion')).toBe('2024-10-06');
+  });
+
   test('rejects a day that does not exist', () => {
     expect(buildZonedDate(2023, 2, 29, FAR_EAST)).toBeNull();
     expect(buildZonedDate(2024, 13, 1, FAR_EAST)).toBeNull();
@@ -41,6 +47,11 @@ describe('buildZonedDate', () => {
 });
 
 describe('normalizeForeignDate with a time zone', () => {
+  test('a day-first row at a skipped midnight hour is not re-read as another month', () => {
+    const iso = normalizeForeignDate('06/10/2024 00:30', 'dmy', 'America/Asuncion');
+    expect(calendarDayIn(new Date(iso), 'America/Asuncion')).toBe('2024-10-06');
+  });
+
   test('a date-only foreign row is noon on that day in the user zone', () => {
     const iso = normalizeForeignDate('15/03/2024', 'dmy', FAR_EAST);
     expect(calendarDayIn(new Date(iso), FAR_EAST)).toBe('2024-03-15');
@@ -121,5 +132,40 @@ describe('POST /api/v1/expenses/import with the user time zone', () => {
     const text = await res.text();
     expect(res.status, text).toBe(400);
     expect(text).toContain('Unknown time zone');
+  });
+});
+
+describe('GET /api/v1/expenses/summary with the user time zone', () => {
+  async function seedFirstOfMonthExpense(): Promise<void> {
+    await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021, nickname: 'Daily' });
+    const csv = ['date,vehicle,category,amount', '2024-03-01,Daily,misc,40.00'].join('\n');
+    const res = await ctx.authed('POST', '/api/v1/expenses/import', { csv, timeZone: FAR_EAST });
+    expect(res.status, await res.text()).toBe(200);
+  }
+
+  async function trend(query: string): Promise<Array<{ period: string; amount: number }>> {
+    const res = await ctx.authed('GET', `/api/v1/expenses/summary${query}`);
+    const body = await json<{ data: { monthlyTrend: Array<{ period: string; amount: number }> } }>(
+      res
+    );
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    return body.data.monthlyTrend;
+  }
+
+  test('an expense on the 1st is in that month for a UTC+14 user', async () => {
+    await seedFirstOfMonthExpense();
+    const months = await trend(`?timeZone=${encodeURIComponent(FAR_EAST)}`);
+    expect(months.map((m) => m.period)).toEqual(['2024-03']);
+    expect(months[0]?.amount).toBe(40);
+  });
+
+  test('without a time zone the trend keeps grouping by UTC month', async () => {
+    await seedFirstOfMonthExpense();
+    expect((await trend('')).map((m) => m.period)).toEqual(['2024-02']);
+  });
+
+  test('an unknown time zone is rejected', async () => {
+    const res = await ctx.authed('GET', '/api/v1/expenses/summary?timeZone=Mars%2FOlympus_Mons');
+    expect(res.status, await res.text()).toBe(400);
   });
 });

@@ -25,6 +25,7 @@ import {
   requireVehicleWrite,
   resolveVehicleOwnerId,
 } from '../../utils/sharing';
+import { isValidTimeZone } from '../../utils/time-zone';
 import { commonSchemas, validateFuelExpenseData, zValidator } from '../../utils/validation';
 import { financingRepository } from '../financing/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
@@ -425,11 +426,12 @@ routes.get(
 const summaryQuerySchema = z.object({
   vehicleId: z.string().optional(),
   period: z.enum(['7d', '30d', '90d', '1y', 'all']).optional().default('all'),
+  timeZone: z.string().max(64).refine(isValidTimeZone, 'Unknown time zone').optional(),
 });
 
 routes.get('/summary', zValidator('query', summaryQuerySchema), async (c) => {
   const user = c.get('user');
-  const { vehicleId, period } = c.req.valid('query');
+  const { vehicleId, period, timeZone } = c.req.valid('query');
 
   let summaryUserId = user.id;
   if (vehicleId) {
@@ -441,6 +443,7 @@ routes.get('/summary', zValidator('query', summaryQuerySchema), async (c) => {
     userId: summaryUserId,
     vehicleId,
     period,
+    timeZone,
   });
 
   return c.json({ success: true, data: expenseSummaryToApi(summary) });

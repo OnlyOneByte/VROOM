@@ -191,7 +191,7 @@ export function normalizeForeignDate(
 
   const [hh = 0, mm = 0, ss = 0] = timePart.split(':').map((t) => Number.parseInt(t, 10) || 0);
 
-  // new Date("YYYY-MM-DD") would shift the day; buildLocalDate keeps the calendar day.
+  // new Date("YYYY-MM-DD") would shift the day; buildImportDate keeps the calendar day.
   const dt = buildImportDate(year, month, day, timeZone, timePart ? [hh, mm, ss] : undefined);
   return dt ? dt.toISOString() : s;
 }

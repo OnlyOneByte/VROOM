@@ -26,9 +26,12 @@ export function buildZonedDate(
   const wall = Date.UTC(year, month - 1, day, hh, mm, ss);
   if (Number.isNaN(wall)) return null;
   const guess = wall - zoneOffsetMs(wall, timeZone);
-  const dt = new Date(wall - zoneOffsetMs(guess, timeZone));
-  const p = zonedParts(dt, timeZone);
-  return p.year === year && p.month === month && p.day === day ? dt : null;
+  const candidates = [wall - zoneOffsetMs(guess, timeZone), guess];
+  for (const ms of candidates) {
+    const p = zonedParts(new Date(ms), timeZone);
+    if (p.year === year && p.month === month && p.day === day) return new Date(ms);
+  }
+  return null;
 }
 
 export type ClockTime = [hours: number, minutes: number, seconds: number];

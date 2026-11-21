@@ -33,7 +33,7 @@
   "backend/src/api/expenses/fuelio-import.ts: Fuelio's numeric fuel-type codes have no reliable VROOM mapping, so the field stays blank.",
   "backend/src/api/expenses/import-csv.ts: Only the apostrophe the export adds to formula-like cells is stripped, so a genuine leading apostrophe survives.",
   "backend/src/api/expenses/import-csv.ts: new Date(\"YYYY-MM-DD\") parses as UTC and would shift the day west of UTC.",
-  "backend/src/api/expenses/import-mapping.ts: new Date(\"YYYY-MM-DD\") would shift the day; buildLocalDate keeps the calendar day.",
+  "backend/src/api/expenses/import-mapping.ts: new Date(\"YYYY-MM-DD\") would shift the day; buildImportDate keeps the calendar day.",
   "backend/src/api/expenses/repository.ts: Sort columns are looked up here, never interpolated into SQL.",
   "backend/src/api/expenses/repository.ts: bun:sqlite transactions must stay synchronous; an async callback autocommits each insert alone.",
   "backend/src/api/expenses/repository.ts: photo-service imports this module, so receipt file removal has to stay with the caller.",
