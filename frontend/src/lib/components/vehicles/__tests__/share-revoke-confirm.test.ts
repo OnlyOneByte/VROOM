@@ -1,17 +1,19 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import type { VehicleShare } from '#lib/types/index.ts';
+import type { GrantedShare } from '#lib/types/index.ts';
 
 const SHARE = {
 	id: 's1',
 	vehicleId: 'v1',
 	ownerId: 'u1',
-	sharedWithId: 'friend@example.com',
+	sharedWithId: 'u-friend',
+	sharedWithEmail: 'friend@example.com',
+	sharedWithName: '',
 	level: 'viewer',
 	status: 'accepted',
 	createdAt: '2026-01-01T00:00:00.000Z',
 	updatedAt: '2026-01-01T00:00:00.000Z'
-} as unknown as VehicleShare;
+} as unknown as GrantedShare;
 
 const listGranted = vi.fn(() => Promise.resolve([SHARE]));
 const revoke = vi.fn((_id: string) => Promise.resolve());
