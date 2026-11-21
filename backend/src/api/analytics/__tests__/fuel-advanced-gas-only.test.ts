@@ -120,6 +120,39 @@ describe('PHEV gas fill-ups pair with gas, and kWh stays out of fuel volume', ()
     expect(stats.gasPriceHistory.map((g) => g.pricePerVolume)).toEqual([4, 4]);
   });
 
+  test('fuel stats report charging separately in kWh', async () => {
+    seedExpense(
+      testDb.sqlite,
+      fuel({
+        id: 'c2',
+        date: new Date(2024, 0, 20),
+        mileage: 10_310,
+        volume: 15,
+        expenseAmount: 6,
+        fuelType: CHARGE,
+      })
+    );
+    seedExpense(
+      testDb.sqlite,
+      fuel({
+        id: 'c3',
+        date: new Date(2024, 0, 27),
+        mileage: 10_370,
+        volume: 15,
+        expenseAmount: 6,
+        fuelType: CHARGE,
+      })
+    );
+    const { charging } = await repo.getFuelStats(USER.id, yearToRange(2024));
+    expect(charging.sessions.currentYear).toBe(3);
+    expect(charging.sessions.previousYear).toBe(1);
+    expect(charging.energy.currentYear).toBeCloseTo(45, 9);
+    expect(charging.energy.previousYear).toBeCloseTo(50, 9);
+    expect(charging.efficiency.avgEfficiency).toBeCloseTo(4, 9);
+    expect(charging.averageCost.perSession).toBeCloseTo(7, 9);
+    expect(charging.averageCost.perEnergyUnit).toBeCloseTo(21 / 45, 9);
+  });
+
   test('the vehicle fuel-efficiency trend uses the gas-to-gas interval', async () => {
     const points = await repo.getFuelEfficiencyTrend(USER.id, VEHICLE.id);
     expect(points.map((p) => p.efficiency)).toEqual([30]);

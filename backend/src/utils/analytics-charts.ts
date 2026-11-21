@@ -72,6 +72,9 @@ export interface FuelExpenseRow {
 export const isFillup = (r: Pick<FuelExpenseRow, 'volume' | 'fuelType'>): boolean =>
   r.volume != null && r.volume > 0 && !isElectricFuelType(r.fuelType);
 
+export const isChargeSession = (r: Pick<FuelExpenseRow, 'volume' | 'fuelType'>): boolean =>
+  r.volume != null && r.volume > 0 && isElectricFuelType(r.fuelType);
+
 export interface GeneralExpenseRow {
   id: string;
   vehicleId: string;

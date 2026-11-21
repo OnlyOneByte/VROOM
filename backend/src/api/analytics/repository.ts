@@ -41,6 +41,7 @@ import {
   buildVehicleMaintenanceCosts,
   buildVehicleRadar,
   computeAverageCosts,
+  computeEfficiencyPoint,
   computeFuelConsumptionMetrics,
   computeMileageScore,
   computeMpgAndCostPerMile,
@@ -54,6 +55,7 @@ import {
   findBiggestExpense,
   type GeneralExpenseRow,
   gasEfficiencyPoint,
+  isChargeSession,
   isFillup,
   monthKeysInRange,
   normalizeDate,
@@ -108,6 +110,20 @@ export interface QuickStatsData {
   units: { distanceUnit: string; volumeUnit: string; chargeUnit: string };
 }
 
+interface PeriodCounts {
+  currentYear: number;
+  previousYear: number;
+  currentMonth: number;
+  previousMonth: number;
+}
+
+interface FuelAggregates {
+  count: number;
+  volumeByVehicle: Map<string, number>;
+  chargeCount: number;
+  chargeEnergy: number;
+}
+
 export interface FuelStatsData {
   fillups: {
     currentYear: number;
@@ -156,6 +172,16 @@ export interface FuelStatsData {
     vehicleName: string;
     mileage: number;
   }>;
+  charging: {
+    sessions: PeriodCounts;
+    energy: PeriodCounts;
+    efficiency: {
+      avgEfficiency: number | null;
+      bestEfficiency: number | null;
+      worstEfficiency: number | null;
+    };
+    averageCost: { perSession: number | null; perEnergyUnit: number | null };
+  };
   costPerDistance: Array<{
     month: string;
     vehicleId: string;
@@ -762,31 +788,43 @@ export class AnalyticsRepository {
     userId: string,
     range: DateRange,
     vehicleId?: string
-  ): Promise<{ count: number; volumeByVehicle: Map<string, number> }> {
+  ): Promise<FuelAggregates> {
     const conditions = [
       eq(expenses.userId, userId),
       eq(expenses.category, 'fuel'),
       gte(expenses.date, new Date(range.start * 1000)),
       lt(expenses.date, new Date(range.end * 1000)),
-      or(isNull(expenses.fuelType), notInArray(expenses.fuelType, [...ELECTRIC_FUEL_TYPES])),
     ];
     if (vehicleId) conditions.push(eq(expenses.vehicleId, vehicleId));
+    const isCharge = inArray(expenses.fuelType, [...ELECTRIC_FUEL_TYPES]);
+    const isGas = or(
+      isNull(expenses.fuelType),
+      notInArray(expenses.fuelType, [...ELECTRIC_FUEL_TYPES])
+    );
     const rows = await this.db
       .select({
         vehicleId: expenses.vehicleId,
-        count: sql<number>`COUNT(CASE WHEN ${expenses.volume} > 0 THEN 1 END)`,
-        totalGallons: sql<number>`COALESCE(SUM(${expenses.volume}), 0)`,
+        count: sql<number>`COUNT(CASE WHEN ${expenses.volume} > 0 AND ${isGas} THEN 1 END)`,
+        totalGallons: sql<number>`COALESCE(SUM(CASE WHEN ${isGas} THEN ${expenses.volume} END), 0)`,
+        chargeCount: sql<number>`COUNT(CASE WHEN ${expenses.volume} > 0 AND ${isCharge} THEN 1 END)`,
+        chargeEnergy: sql<number>`COALESCE(SUM(CASE WHEN ${isCharge} THEN ${expenses.volume} END), 0)`,
       })
       .from(expenses)
       .where(and(...conditions))
       .groupBy(expenses.vehicleId);
-    let count = 0;
-    const volumeByVehicle = new Map<string, number>();
+    const agg: FuelAggregates = {
+      count: 0,
+      volumeByVehicle: new Map(),
+      chargeCount: 0,
+      chargeEnergy: 0,
+    };
     for (const r of rows) {
-      count += r.count;
-      if (r.totalGallons > 0) volumeByVehicle.set(r.vehicleId, r.totalGallons);
+      agg.count += r.count;
+      agg.chargeCount += r.chargeCount;
+      agg.chargeEnergy += r.chargeEnergy;
+      if (r.totalGallons > 0) agg.volumeByVehicle.set(r.vehicleId, r.totalGallons);
     }
-    return { count, volumeByVehicle };
+    return agg;
   }
 
   private buildOdometerProgression(
@@ -1326,7 +1364,7 @@ export class AnalyticsRepository {
     fuelRowsByVehicle: FuelExpenseRow[],
     vehicleNameMap: Map<string, string>,
     range: DateRange,
-    prevYearAgg: { count: number; volumeByVehicle: Map<string, number> },
+    prevYearAgg: FuelAggregates,
     convert: FleetUnitConverter
   ): FuelStatsData {
     const now = new Date();
@@ -1414,6 +1452,53 @@ export class AnalyticsRepository {
       fillupCostByVehicle: buildFillupCostByVehicle(fuelRows, vehicleNameMap),
       odometerProgression: this.buildOdometerProgression(fuelRows, vehicleNameMap),
       costPerDistance: buildCostPerDistanceChart(fuelRowsByVehicle, vehicleNameMap),
+      charging: this.buildChargingStats(fuelRows, fuelRowsByVehicle, prevYearAgg, convert, {
+        inCurrentMonth,
+        inPrevMonth,
+      }),
+    };
+  }
+
+  private buildChargingStats(
+    fuelRows: FuelExpenseRow[],
+    fuelRowsByVehicle: FuelExpenseRow[],
+    prevYearAgg: FuelAggregates,
+    convert: FleetUnitConverter,
+    months: {
+      inCurrentMonth: (r: FuelExpenseRow) => boolean;
+      inPrevMonth: (r: FuelExpenseRow) => boolean;
+    }
+  ): FuelStatsData['charging'] {
+    const sessions = fuelRows.filter(isChargeSession);
+    const energyOf = (rows: FuelExpenseRow[]) => rows.reduce((s, r) => s + (r.volume ?? 0), 0);
+    const totalEnergy = energyOf(sessions);
+    const totalCost = sessions.reduce((s, r) => s + r.expenseAmount, 0);
+
+    const efficiencyValues: number[] = [];
+    for (const [current, previous] of sameEnergyPairs(fuelRowsByVehicle)) {
+      if (!isChargeSession(current)) continue;
+      const point = computeEfficiencyPoint(current, previous);
+      if (point) efficiencyValues.push(convert.distance(point.efficiency, current.vehicleId));
+    }
+
+    return {
+      sessions: {
+        currentYear: sessions.length,
+        previousYear: prevYearAgg.chargeCount,
+        currentMonth: sessions.filter(months.inCurrentMonth).length,
+        previousMonth: sessions.filter(months.inPrevMonth).length,
+      },
+      energy: {
+        currentYear: totalEnergy,
+        previousYear: prevYearAgg.chargeEnergy,
+        currentMonth: energyOf(sessions.filter(months.inCurrentMonth)),
+        previousMonth: energyOf(sessions.filter(months.inPrevMonth)),
+      },
+      efficiency: computeFuelConsumptionMetrics(efficiencyValues),
+      averageCost: {
+        perSession: sessions.length > 0 ? totalCost / sessions.length : null,
+        perEnergyUnit: totalEnergy > 0 ? totalCost / totalEnergy : null,
+      },
     };
   }
 

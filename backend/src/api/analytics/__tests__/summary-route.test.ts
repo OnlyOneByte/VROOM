@@ -41,6 +41,12 @@ const MOCK_SUMMARY: AnalyticsSummaryData = {
     fillupCostByVehicle: [],
     odometerProgression: [],
     costPerDistance: [],
+    charging: {
+      sessions: { currentYear: 0, previousYear: 0, currentMonth: 0, previousMonth: 0 },
+      energy: { currentYear: 0, previousYear: 0, currentMonth: 0, previousMonth: 0 },
+      efficiency: { avgEfficiency: null, bestEfficiency: null, worstEfficiency: null },
+      averageCost: { perSession: null, perEnergyUnit: null },
+    },
   },
   fuelAdvanced: {
     maintenanceTimeline: [],
