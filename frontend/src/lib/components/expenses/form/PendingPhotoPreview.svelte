@@ -34,7 +34,7 @@
 
 <div class="space-y-3">
 	<div class="flex items-center justify-between">
-		<h3 class="text-sm font-medium text-foreground">Photos & Receipts</h3>
+		<h2 class="text-sm font-medium text-foreground">Photos & Receipts</h2>
 		<Button
 			variant="outline"
 			size="sm"

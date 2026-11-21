@@ -323,7 +323,7 @@ function mountSection(caps: EnergyCapabilities, loaded: Partial<BoundForm> = {})
 
 	return {
 		form: state,
-		heading: () => container.querySelector('h3')?.textContent?.trim() ?? '',
+		heading: () => container.querySelector('h2')?.textContent?.trim() ?? '',
 		visibleEnergyField: () => energyInput().id as 'volume' | 'charge',
 		visibleEnergyValue: () => energyInput().value,
 		fuelTypeTrigger: () => container.querySelector('#fuelType')?.textContent?.trim() ?? '',
