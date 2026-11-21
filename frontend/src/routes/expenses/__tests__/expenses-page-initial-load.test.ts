@@ -38,6 +38,9 @@ vi.mock('#lib/services/settings-api.ts', () => ({
 
 import Page from '../+page.svelte';
 import { settingsStore } from '#lib/stores/settings.svelte.ts';
+import { appStore } from '#lib/stores/app.svelte.ts';
+import { offlineExpenseQueue, onlineStatus } from '#lib/stores/offline.svelte.ts';
+import type { OfflineExpense } from '#lib/utils/offline-storage.ts';
 
 const VEHICLE: Vehicle = {
 	id: 'v1',
@@ -71,10 +74,26 @@ const SETTINGS = {
 	unitPreferences: { distanceUnit: 'miles', volumeUnit: 'gallons_us', chargeUnit: 'kwh' }
 } as unknown as UserSettings;
 
+const QUEUED: OfflineExpense = {
+	id: 'queued-1',
+	clientId: 'queued-1',
+	vehicleId: 'v1',
+	tags: [],
+	category: 'misc',
+	amount: 12.34,
+	date: '2024-03-20',
+	description: 'Queued oil top-up',
+	timestamp: 1,
+	synced: false
+};
+
 beforeEach(() => {
 	settingsStore.reset();
 	vi.clearAllMocks();
 	tableProps = {};
+	onlineStatus.current = true;
+	offlineExpenseQueue.current = [];
+	appStore.clearNotifications();
 	getSettings.mockImplementation(() => Promise.resolve(SETTINGS));
 	getVehicles.mockImplementation(() => Promise.resolve([VEHICLE]));
 	getAllExpenses.mockImplementation(() =>
@@ -145,6 +164,57 @@ describe('/expenses initial load', () => {
 		await waitFor(() => expect(rowsGivenToTable()).toHaveLength(1));
 		expect(rowsGivenToTable()[0]?.id).toBe('orphan');
 		expect(rowsGivenToTable()[0]?.vehicle).toBeUndefined();
+	});
+
+	test('a failed load toasts once even when the list fails after the vehicles', async () => {
+		getVehicles.mockRejectedValue(new ApiError('boom', 500));
+		let failList: (reason: unknown) => void = () => {};
+		getAllExpenses.mockImplementation(
+			() =>
+				new Promise((_resolve, reject) => {
+					failList = reject;
+				})
+		);
+
+		render(Page);
+		await screen.findByText("Couldn't load expenses");
+		failList(new ApiError('boom', 500));
+		await new Promise(resolve => setTimeout(resolve, 0));
+
+		const errors = appStore.notifications.filter(n => n.type === 'error');
+		expect(errors).toHaveLength(1);
+	});
+
+	test('offline, a failed load shows the offline notice and the queued expenses without error toasts', async () => {
+		onlineStatus.current = false;
+		offlineExpenseQueue.current = [QUEUED];
+		const offline = new TypeError('Failed to fetch');
+		getVehicles.mockRejectedValue(offline);
+		getAllExpenses.mockRejectedValue(offline);
+		getExpenseSummary.mockRejectedValue(offline);
+
+		render(Page);
+
+		expect(await screen.findByText("You're offline")).toBeInTheDocument();
+		expect(screen.queryByText("Couldn't load expenses")).not.toBeInTheDocument();
+		expect(screen.getByText(/Queued oil top-up/)).toBeInTheDocument();
+		expect(screen.getByRole('link', { name: /Add Expense/ })).toHaveAttribute(
+			'href',
+			'/expenses/new'
+		);
+		expect(appStore.notifications.filter(n => n.type === 'error')).toHaveLength(0);
+	});
+
+	test('coming back online reloads the list', async () => {
+		onlineStatus.current = false;
+		getVehicles.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+		render(Page);
+		await screen.findByText("You're offline");
+		onlineStatus.current = true;
+
+		await waitFor(() => expect(rowsGivenToTable()).toHaveLength(1));
+		expect(screen.queryByText("You're offline")).not.toBeInTheDocument();
 	});
 
 	test('the search box keeps its accessible name once the user has typed', async () => {
