@@ -263,7 +263,7 @@
 						class="self-start text-xs underline hover:text-foreground"
 						onclick={retry}
 					>
-						Try again
+						Retry
 					</button>
 				</div>
 			{/if}
