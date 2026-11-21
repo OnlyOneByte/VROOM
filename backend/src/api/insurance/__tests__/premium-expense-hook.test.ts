@@ -6,6 +6,7 @@ import {
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { seedVehicle as seedVehicleShared } from '../../../test-helpers/seed';
+import { effectiveTermCost, termBillingMonths } from '../hooks';
 
 let ctx: TestApp;
 
@@ -45,14 +46,16 @@ async function createPolicy(
 
 async function createMonthlyPolicy(
   vehicleIds: string[],
-  monthlyCost: number
+  monthlyCost: number,
+  startDate = '2024-01-01T00:00:00.000Z',
+  endDate = '2025-01-01T00:00:00.000Z'
 ): Promise<{ policyId: string; termId: string }> {
   const res = await ctx.authed('POST', '/api/v1/insurance', {
     company: 'Acme Mutual',
     terms: [
       {
-        startDate: '2024-01-01T00:00:00.000Z',
-        endDate: '2025-01-01T00:00:00.000Z',
+        startDate,
+        endDate,
         policyNumber: 'POL-M',
         monthlyCost,
         vehicleCoverage: { vehicleIds },
@@ -119,16 +122,30 @@ describe('insurance premium → expense hook lifecycle', () => {
     expect(new Set(rows.map((r) => r.vehicle_id))).toEqual(new Set([v1, v2, v3]));
   });
 
-  test('a monthly-only term materializes monthlyCost times its months', async () => {
+  test('a monthly-only term materializes monthlyCost times its billed months', async () => {
     const v1 = await seedVehicle('Honda');
     const { termId } = await createMonthlyPolicy([v1], 100);
 
     const rows = autoExpensesForTerm(termId);
     expect(rows).toHaveLength(1);
-    expect(rows[0].expense_amount).toBe(130000);
+    expect(rows[0].expense_amount).toBe(120000);
     expect(rows[0].category).toBe('financial');
     expect(rows[0].tags ?? '').toContain('insurance');
     expect(rows[0].source_type).toBe('insurance_term');
+  });
+
+  test('a six-month mid-month term is charged six months, not seven', async () => {
+    const v1 = await seedVehicle('Honda');
+    const { termId } = await createMonthlyPolicy(
+      [v1],
+      100,
+      '2026-03-15T12:00:00.000Z',
+      '2026-09-15T12:00:00.000Z'
+    );
+
+    const rows = autoExpensesForTerm(termId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].expense_amount).toBe(60000);
   });
 
   test('an explicit totalCost takes precedence over monthlyCost', async () => {
@@ -194,5 +211,45 @@ describe('insurance premium → expense hook lifecycle', () => {
     expect(res.status, await res.text()).toBeLessThan(300);
 
     expect(autoExpensesForTerm(termId)).toHaveLength(0);
+  });
+});
+
+const utcNoon = (iso: string): Date => new Date(`${iso}T12:00:00.000Z`);
+
+describe('termBillingMonths: start inclusive, end exclusive, one month per started billing period', () => {
+  test.each([
+    ['2024-01-01', '2025-01-01', 12],
+    ['2026-03-15', '2026-09-15', 6],
+    ['2026-03-15', '2026-04-15', 1],
+    ['2026-03-15', '2026-04-14', 1],
+    ['2026-03-15', '2026-04-16', 2],
+    ['2026-01-15', '2026-03-20', 3],
+    ['2026-01-31', '2026-02-28', 1],
+    ['2026-01-31', '2026-03-31', 2],
+    ['2026-01-31', '2026-03-01', 2],
+    ['2024-01-31', '2024-02-29', 1],
+    ['2024-01-31', '2024-03-01', 2],
+    ['2024-02-29', '2025-02-28', 12],
+    ['2024-02-29', '2025-03-01', 13],
+    ['2023-02-28', '2024-02-28', 12],
+    ['2023-02-28', '2024-02-29', 13],
+    ['2025-12-01', '2026-01-01', 1],
+    ['2025-11-30', '2026-05-30', 6],
+    ['2026-03-15', '2026-03-16', 1],
+    ['2026-03-15', '2026-03-15', 1],
+  ])('%s -> %s is %i months', (start, end, months) => {
+    expect(termBillingMonths(utcNoon(start), utcNoon(end))).toBe(months);
+  });
+
+  test('time of day within the end date does not add a month', () => {
+    expect(
+      termBillingMonths(new Date('2026-03-15T23:30:00.000Z'), new Date('2026-09-15T00:30:00.000Z'))
+    ).toBe(6);
+  });
+
+  test('effectiveTermCost charges nothing for a monthly term with no end date', () => {
+    expect(
+      effectiveTermCost({ totalCost: 0, monthlyCost: 100, startDate: utcNoon('2026-03-15') })
+    ).toBe(0);
   });
 });

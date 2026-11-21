@@ -1,5 +1,4 @@
 import { AppError } from '../../errors';
-import { monthKeysInRange } from '../../utils/analytics-charts';
 import { logger } from '../../utils/logger';
 import { expenseRepository } from '../expenses/repository';
 import { deletePhotosForEntities } from '../photos/photo-service';
@@ -23,6 +22,26 @@ interface TermExpenseParams {
   userId: string;
 }
 
+function utcDayClampedToMonth(year: number, month: number, day: number): number {
+  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  return Date.UTC(year, month, Math.min(day, daysInMonth));
+}
+
+export function termBillingMonths(startDate: Date, endDate: Date): number {
+  const startYear = startDate.getUTCFullYear();
+  const startMonth = startDate.getUTCMonth();
+  const endDay = Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth(), endDate.getUTCDate());
+  const wholeCalendarMonths =
+    (endDate.getUTCFullYear() - startYear) * 12 + (endDate.getUTCMonth() - startMonth);
+  const lastBillingDay = utcDayClampedToMonth(
+    startYear,
+    startMonth + wholeCalendarMonths,
+    startDate.getUTCDate()
+  );
+  const months = wholeCalendarMonths + (lastBillingDay < endDay ? 1 : 0);
+  return Math.max(1, months);
+}
+
 export function effectiveTermCost(params: {
   totalCost: number;
   monthlyCost?: number | null;
@@ -30,9 +49,8 @@ export function effectiveTermCost(params: {
   endDate?: Date | null;
 }): number {
   if (params.totalCost > 0) return params.totalCost;
-  if (params.monthlyCost != null && params.monthlyCost > 0) {
-    const months = monthKeysInRange(params.startDate, params.endDate ?? null).length;
-    return params.monthlyCost * months;
+  if (params.monthlyCost != null && params.monthlyCost > 0 && params.endDate) {
+    return params.monthlyCost * termBillingMonths(params.startDate, params.endDate);
   }
   return 0;
 }
