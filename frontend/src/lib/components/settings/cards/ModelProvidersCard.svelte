@@ -16,6 +16,7 @@
 	} from '#lib/components/ui/card/index.ts';
 	import { providerApi } from '#lib/services/provider-api.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import {
 		LLM_PROVIDER_TYPES,
 		VLM_PROVIDER_TYPES,
@@ -39,7 +40,7 @@
 				'The API key is stored encrypted and never shown again. Your receipt image is sent only to this provider when you scan.',
 			namePlaceholder: 'My receipt parser',
 			feature: 'Receipt scanning',
-			loadError: 'Failed to load receipt-parsing providers',
+			loadError: "Couldn't load your receipt-parsing providers.",
 			types: VLM_PROVIDER_TYPES
 		},
 		llm: {
@@ -53,7 +54,7 @@
 				'The API key is stored encrypted and never shown again. Your questions are sent only to this provider when you chat.',
 			namePlaceholder: 'My assistant',
 			feature: 'The assistant',
-			loadError: 'Failed to load assistant providers',
+			loadError: "Couldn't load your assistant providers.",
 			types: LLM_PROVIDER_TYPES
 		}
 	} as const;
@@ -93,7 +94,7 @@
 			providers = await providerApi.getProviders(domain);
 			error = null;
 		} catch (e) {
-			error = e instanceof Error ? e.message : copy.loadError;
+			error = `${copy.loadError} ${userFacingErrorMessage(e)}`;
 		} finally {
 			isLoading = false;
 		}
@@ -165,7 +166,7 @@
 			dialogOpen = false;
 			await loadData();
 		} catch (e) {
-			appStore.showError(e instanceof Error ? e.message : 'Failed to save provider');
+			appStore.showError(`Couldn't save the provider. ${userFacingErrorMessage(e)}`);
 		} finally {
 			isSaving = false;
 		}
@@ -183,7 +184,7 @@
 			await providerApi.deleteProvider(p.id);
 			appStore.showSuccess(`${p.displayName} removed`);
 		} catch (error) {
-			appStore.showError('Failed to delete provider');
+			appStore.showError(`Couldn't delete the provider. ${userFacingErrorMessage(error)}`);
 			throw error;
 		}
 		await loadData();

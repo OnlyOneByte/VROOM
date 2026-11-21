@@ -1,6 +1,11 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { UserProviderInfo } from '#lib/types/index.ts';
+import {
+	ApiError,
+	SERVER_FAILURE_MESSAGE,
+	UNEXPECTED_FAILURE_MESSAGE
+} from '#lib/utils/error-handling.ts';
 
 const getProviders = vi.fn((_domain?: string) => Promise.resolve([] as UserProviderInfo[]));
 const createProvider = vi.fn((_data: Record<string, unknown>) =>
@@ -128,14 +133,21 @@ describe('ModelProvidersCard', () => {
 		getProviders.mockRejectedValue('boom');
 		render(ModelProvidersCard, { props: { domain: 'vlm' } });
 
-		expect(await screen.findByText('Failed to load receipt-parsing providers')).toBeInTheDocument();
+		expect(
+			await screen.findByText(
+				`Couldn't load your receipt-parsing providers. ${UNEXPECTED_FAILURE_MESSAGE}`
+			)
+		).toBeInTheDocument();
 	});
 
-	test('a load failure with an Error shows its message', async () => {
-		getProviders.mockRejectedValue(new Error('Server unavailable'));
+	test('a server failure on load shows a plain sentence, not the raw server message', async () => {
+		getProviders.mockRejectedValue(new ApiError('boom', 500));
 		render(ModelProvidersCard, { props: { domain: 'llm' } });
 
-		expect(await screen.findByText('Server unavailable')).toBeInTheDocument();
+		expect(
+			await screen.findByText(`Couldn't load your assistant providers. ${SERVER_FAILURE_MESSAGE}`)
+		).toBeInTheDocument();
+		expect(screen.queryByText(/boom/)).toBeNull();
 	});
 });
 
@@ -188,13 +200,13 @@ describe('ModelProvidersCard add provider', () => {
 	});
 
 	test('a create failure reports the error and keeps the dialog open', async () => {
-		createProvider.mockRejectedValueOnce(new Error('Invalid API key'));
+		createProvider.mockRejectedValueOnce(new ApiError('Invalid API key', 400));
 		await openCreate('llm');
 		await type('llm-name', 'Bad');
 		await type('llm-key', 'sk-bad');
 		await fireEvent.click(saveButton('llm'));
 		await settle();
-		expect(showError).toHaveBeenCalledWith('Invalid API key');
+		expect(showError).toHaveBeenCalledWith("Couldn't save the provider. Invalid API key.");
 		expect(screen.getByText('Add assistant provider')).toBeInTheDocument();
 		expect(saveButton('llm')).not.toBeDisabled();
 	});
@@ -206,7 +218,9 @@ describe('ModelProvidersCard add provider', () => {
 		await type('llm-key', 'sk-bad');
 		await fireEvent.click(saveButton('llm'));
 		await settle();
-		expect(showError).toHaveBeenCalledWith('Failed to save provider');
+		expect(showError).toHaveBeenCalledWith(
+			`Couldn't save the provider. ${UNEXPECTED_FAILURE_MESSAGE}`
+		);
 	});
 
 	test('the save button shows a saving state while the request is pending', async () => {
@@ -328,7 +342,7 @@ describe('ModelProvidersCard edit and delete', () => {
 
 	test('a delete failure reports an error and keeps the provider', async () => {
 		getProviders.mockResolvedValue([provider('llm', 'Work Claude')]);
-		deleteProvider.mockRejectedValueOnce(new Error('x'));
+		deleteProvider.mockRejectedValueOnce(new ApiError('SQLITE_BUSY', 500));
 		render(ModelProvidersCard, { props: { domain: 'llm' } });
 		await settle();
 		await fireEvent.click(screen.getByRole('button', { name: 'Delete Work Claude' }));
@@ -336,7 +350,9 @@ describe('ModelProvidersCard edit and delete', () => {
 			within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Delete' })
 		);
 		await settle();
-		expect(showError).toHaveBeenCalledWith('Failed to delete provider');
+		expect(showError).toHaveBeenCalledWith(
+			`Couldn't delete the provider. ${SERVER_FAILURE_MESSAGE}`
+		);
 		expect(screen.getByText('Work Claude')).toBeInTheDocument();
 	});
 });
