@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
-import { type NewPhotoRef, type PhotoRef, photoRefs } from '../../db/schema';
+import { type NewPhotoRef, type PhotoRef, photoRefs, userProviders } from '../../db/schema';
 import { chunk } from '../../utils/chunk';
 
 export interface UpdateStatusOptions {
@@ -60,8 +60,10 @@ export class PhotoRefRepository {
     await this.db.update(photoRefs).set(updates).where(eq(photoRefs.id, id));
   }
 
+  private providersSeenUpdatedAt: number | null = null;
+
   async findPendingOrFailed(limit: number): Promise<PhotoRef[]> {
-    return this.db
+    const queued = await this.db
       .select()
       .from(photoRefs)
       .where(
@@ -69,6 +71,44 @@ export class PhotoRefRepository {
       )
       .orderBy(asc(photoRefs.createdAt))
       .limit(limit);
+    if (queued.length >= limit) return queued;
+    return [...queued, ...(await this.findRevivedSinceProviderUpdate(limit - queued.length))];
+  }
+
+  private async findRevivedSinceProviderUpdate(limit: number): Promise<PhotoRef[]> {
+    const [{ latest }] = await this.db
+      .select({ latest: sql<number | null>`max(${userProviders.updatedAt})` })
+      .from(userProviders)
+      .where(eq(userProviders.domain, 'storage'));
+    if (latest === null || latest === this.providersSeenUpdatedAt) return [];
+
+    const revived = await this.db
+      .select()
+      .from(photoRefs)
+      .where(
+        and(
+          eq(photoRefs.status, 'failed'),
+          sql`${photoRefs.retryCount} >= 3`,
+          sql`EXISTS (
+            SELECT 1 FROM photo_refs AS involved
+            JOIN user_providers AS provider ON provider.id = involved.provider_id
+            WHERE (involved.id = ${photoRefs.id}
+                OR (involved.photo_id = ${photoRefs.photoId} AND involved.status = 'active'))
+              AND provider.updated_at > COALESCE(${photoRefs.syncedAt}, ${photoRefs.createdAt}, 0)
+          )`
+        )
+      )
+      .orderBy(asc(photoRefs.createdAt))
+      .limit(limit);
+    if (revived.length === 0) this.providersSeenUpdatedAt = latest;
+    return revived;
+  }
+
+  async resetFailedForProvider(providerId: string): Promise<void> {
+    await this.db
+      .update(photoRefs)
+      .set({ status: 'pending', retryCount: 0, errorMessage: null })
+      .where(and(eq(photoRefs.providerId, providerId), eq(photoRefs.status, 'failed')));
   }
 
   async deleteByProvider(providerId: string): Promise<void> {
