@@ -37,7 +37,7 @@
 		{#snippet action()}
 			<div class="flex flex-col sm:flex-row gap-3">
 				{#if !notFound}
-					<Button variant="outline" size="lg" onclick={() => location.reload()}>Try Again</Button>
+					<Button variant="outline" size="lg" onclick={() => location.reload()}>Retry</Button>
 				{/if}
 				<Button size="lg" href={resolve(routes.dashboard)}>Go to Dashboard</Button>
 			</div>
