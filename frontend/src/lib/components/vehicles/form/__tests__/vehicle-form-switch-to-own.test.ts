@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import type { UpdateVehicleRequest, Vehicle, VehicleFinancing } from '#lib/types/index.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
+import { ApiError, SERVER_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 
 const goto = vi.fn(() => Promise.resolve());
 vi.mock('$app/navigation', () => ({
@@ -121,14 +122,14 @@ describe('VehicleForm switching a financed vehicle to Own', () => {
 	});
 
 	test('a failed payoff reports it, saves nothing and keeps the dialog open to retry', async () => {
-		payOffFinancing.mockRejectedValueOnce(new Error('Network down'));
+		payOffFinancing.mockRejectedValueOnce(new ApiError('Internal server error', 500));
 		await renderEditAndSwitchToOwn();
 		const dialog = await screen.findByRole('alertdialog');
 		await fireEvent.click(within(dialog).getByRole('button', { name: 'Mark Paid Off' }));
 
 		await waitFor(() =>
 			expect(appStore.notifications.map(n => n.message)).toContain(
-				"Couldn't mark the loan as paid off: Network down"
+				`Couldn't mark the loan as paid off. ${SERVER_FAILURE_MESSAGE}`
 			)
 		);
 		expect(updateVehicle).not.toHaveBeenCalled();

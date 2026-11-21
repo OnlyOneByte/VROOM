@@ -189,7 +189,7 @@ describe('VehicleForm unit change on a vehicle with saved readings', () => {
 
 		await waitFor(() =>
 			expect(appStore.notifications.map(n => n.message)).toContain(
-				'Error updating vehicle. Please try again.'
+				"Couldn't update the vehicle. Invalid VIN."
 			)
 		);
 		expect(screen.queryByRole('alertdialog')).toBeNull();
