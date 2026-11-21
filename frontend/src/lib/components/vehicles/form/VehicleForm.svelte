@@ -299,6 +299,7 @@
 			ownershipType !== 'finance' ||
 			financingForm.financingType !== 'loan' ||
 			financingForm.originalAmount <= 0 ||
+			!Number.isFinite(financingForm.apr) ||
 			financingForm.apr < 0 ||
 			financingForm.termMonths <= 0
 		) {
