@@ -245,16 +245,19 @@ describe('analytics date range and year parameters', () => {
     }
   });
 
+  const rangeRoutes = ['/api/v1/analytics/summary', '/api/v1/analytics/fuel-stats'];
+
   test.each([
-    ['milliseconds', `startDate=${JAN_2025 * 1000}&endDate=${JAN_2026 * 1000}`],
-    ['a reversed range', `startDate=${JAN_2026}&endDate=${JAN_2025}`],
+    ['milliseconds', `startDate=${JAN_2025 * 1000}&endDate=${JAN_2026 * 1000}`, rangeRoutes],
+    ['a reversed range', `startDate=${JAN_2026}&endDate=${JAN_2025}`, rangeRoutes],
+    ['an empty range', `startDate=${JAN_2025}&endDate=${JAN_2025}`, rangeRoutes],
     [
       'a millisecond ytdStart',
       `startDate=${JAN_2025}&endDate=${JAN_2026}&ytdStart=${JAN_2026 * 1000}`,
+      ['/api/v1/analytics/summary'],
     ],
-  ])('%s is a 400', async (_label, query) => {
-    for (const path of ['/api/v1/analytics/summary', '/api/v1/analytics/fuel-stats']) {
-      if (path.endsWith('fuel-stats') && query.includes('ytdStart')) continue;
+  ])('%s is a 400', async (_label, query, paths) => {
+    for (const path of paths) {
       const res = await ctx.authed('GET', `${path}?${query}`);
       expect(res.status, `${path}?${query}: ${await res.text()}`).toBe(400);
     }

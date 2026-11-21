@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { CONFIG } from '../../config';
 import { requireAuth } from '../../middleware';
 import { calendarParts, zonedCalendar } from '../../utils/analytics-charts';
 import { requireVehicleOwnerScope } from '../../utils/sharing';
@@ -28,27 +29,37 @@ const fuelEfficiencyQuerySchema = z.object({
   vehicleId: z.string().optional(),
 });
 
-const MIN_YEAR = 1900;
-const MAX_EPOCH_SECONDS = Date.UTC(2101, 0, 1) / 1000;
+const MIN_YEAR = CONFIG.validation.vehicle.minYear;
+
+function latestAllowedYear(): number {
+  return new Date().getUTCFullYear() + 1;
+}
+
+function endOfLatestAllowedYearSeconds(): number {
+  return Date.UTC(latestAllowedYear() + 1, 0, 1) / 1000;
+}
 
 const epochSeconds = z.coerce
   .number()
   .int()
   .positive()
-  .max(MAX_EPOCH_SECONDS, 'Dates are epoch seconds, not milliseconds');
+  .refine(
+    (seconds) => seconds <= endOfLatestAllowedYearSeconds(),
+    'Dates are epoch seconds, not milliseconds'
+  );
 
 const year = z.coerce
   .number()
   .int()
   .min(MIN_YEAR, `Year must be ${MIN_YEAR} or later`)
-  .refine((y) => y <= new Date().getUTCFullYear() + 1, 'Year is too far in the future')
+  .refine((y) => y <= latestAllowedYear(), 'Year is too far in the future')
   .optional();
 
-function startNotAfterEnd(range: { startDate: number; endDate: number }): boolean {
-  return range.startDate <= range.endDate;
+function startBeforeEnd(range: { startDate: number; endDate: number }): boolean {
+  return range.startDate < range.endDate;
 }
 
-const RANGE_ORDER_ERROR = { message: 'startDate must not be after endDate', path: ['endDate'] };
+const RANGE_ORDER_ERROR = { message: 'startDate must be before endDate', path: ['endDate'] };
 
 const yearQuerySchema = z.object({
   year,
@@ -66,19 +77,19 @@ const dateRangeFields = {
   timeZone,
 };
 
-const dateRangeQuerySchema = z.object(dateRangeFields).refine(startNotAfterEnd, RANGE_ORDER_ERROR);
+const dateRangeQuerySchema = z.object(dateRangeFields).refine(startBeforeEnd, RANGE_ORDER_ERROR);
 
 const yearToDateQuerySchema = z
   .object({ ...dateRangeFields, ytdStart: epochSeconds.optional() })
-  .refine(startNotAfterEnd, RANGE_ORDER_ERROR);
+  .refine(startBeforeEnd, RANGE_ORDER_ERROR);
 
 const dateRangeVehicleQuerySchema = z
   .object({ ...dateRangeFields, vehicleId: z.string().optional() })
-  .refine(startNotAfterEnd, RANGE_ORDER_ERROR);
+  .refine(startBeforeEnd, RANGE_ORDER_ERROR);
 
 const dateRangeRequiredVehicleQuerySchema = z
   .object({ ...dateRangeFields, vehicleId: z.string() })
-  .refine(startNotAfterEnd, RANGE_ORDER_ERROR);
+  .refine(startBeforeEnd, RANGE_ORDER_ERROR);
 
 const yearVehicleQuerySchema = z.object({
   year,
