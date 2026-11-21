@@ -37,6 +37,7 @@
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 	import { dateOnlyToISO, getCurrencySymbol } from '#lib/utils/formatters.ts';
+	import { enteredAmount } from '#lib/utils/insurance.ts';
 	import type { InsurancePolicy, Vehicle, CreateTermRequest } from '#lib/types/index.ts';
 	import FormLayout from '#lib/components/common/form-layout.svelte';
 
@@ -146,13 +147,16 @@
 			if (startDate && endDate && new Date(startDate) >= new Date(endDate)) {
 				newErrors.endDate = 'End date must be after start date';
 			}
-			if (deductibleAmount && Number(deductibleAmount) <= 0) {
+			const deductible = enteredAmount(deductibleAmount);
+			const limit = enteredAmount(coverageLimit);
+			const cost = enteredAmount(totalCost);
+			if (deductible !== undefined && deductible <= 0) {
 				newErrors.deductibleAmount = 'Must be positive';
 			}
-			if (coverageLimit && Number(coverageLimit) <= 0) {
+			if (limit !== undefined && limit <= 0) {
 				newErrors.coverageLimit = 'Must be positive';
 			}
-			if (totalCost && Number(totalCost) < 0) {
+			if (cost !== undefined && cost < 0) {
 				newErrors.totalCost = 'Must be non-negative';
 			}
 		}
@@ -178,18 +182,22 @@
 				gotoDynamic(returnTo);
 			} else {
 				const termData: Record<string, unknown> = {};
+				const amount = (key: string, raw: string) => {
+					const value = enteredAmount(raw);
+					if (value !== undefined) termData[key] = value;
+				};
 				if (policyNumber.trim()) termData['policyNumber'] = policyNumber.trim();
 				if (coverageDescription.trim())
 					termData['coverageDescription'] = coverageDescription.trim();
-				if (deductibleAmount) termData['deductibleAmount'] = Number(deductibleAmount);
-				if (coverageLimit) termData['coverageLimit'] = Number(coverageLimit);
+				amount('deductibleAmount', deductibleAmount);
+				amount('coverageLimit', coverageLimit);
 				if (agentName.trim()) termData['agentName'] = agentName.trim();
 				if (agentPhone.trim()) termData['agentPhone'] = agentPhone.trim();
 				if (agentEmail.trim()) termData['agentEmail'] = agentEmail.trim();
-				if (totalCost) termData['totalCost'] = Number(totalCost);
-				if (monthlyCost) termData['monthlyCost'] = Number(monthlyCost);
+				amount('totalCost', totalCost);
+				amount('monthlyCost', monthlyCost);
 				if (premiumFrequency) termData['premiumFrequency'] = premiumFrequency;
-				if (paymentAmount) termData['paymentAmount'] = Number(paymentAmount);
+				amount('paymentAmount', paymentAmount);
 
 				await insuranceApi.createPolicy({
 					company: company.trim(),
