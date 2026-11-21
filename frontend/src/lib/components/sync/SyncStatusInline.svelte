@@ -117,7 +117,7 @@
 			<div class="flex items-center justify-between">
 				{#snippet statusHeader()}
 					{@const StatusIcon = statusInfo.icon}
-					<div class="flex items-center gap-2 {statusInfo.color}">
+					<div class="flex items-center gap-2 {statusInfo.color}" role="status">
 						<StatusIcon class="h-4 w-4 {syncState.current === 'syncing' ? 'animate-spin' : ''}" />
 						<span class="text-xs font-medium">{statusInfo.text}</span>
 					</div>
@@ -201,24 +201,10 @@
 					onclick={handleRetryParked}
 					disabled={isRetryingParked || syncState.current === 'syncing'}
 					aria-busy={isRetryingParked}
-					class="w-full h-7 text-xs"
+					class="w-full h-7 text-xs max-lg:h-10"
 				>
 					<RefreshCw class="h-3 w-3 mr-1.5 {isRetryingParked ? 'animate-spin' : ''}" />
 					{isRetryingParked ? 'Retrying...' : `Retry ${parkedCount} needing attention`}
-				</Button>
-			{/if}
-
-			{#if onlineStatus.current && pendingCount > 0}
-				<Button
-					size="sm"
-					onclick={handleManualSync}
-					disabled={syncState.current === 'syncing'}
-					class="w-full h-7 text-xs"
-				>
-					<RefreshCw
-						class="h-3 w-3 mr-1.5 {syncState.current === 'syncing' ? 'animate-spin' : ''}"
-					/>
-					{syncState.current === 'syncing' ? 'Syncing...' : 'Sync Now'}
 				</Button>
 			{/if}
 		</div>
@@ -226,7 +212,12 @@
 		{#snippet collapsedIcon()}
 			{@const StatusIcon = statusInfo.icon}
 			<div class="flex justify-center px-3">
-				<div class="{statusInfo.color} relative" title={statusInfo.text}>
+				<div
+					class="{statusInfo.color} relative"
+					title={statusInfo.text}
+					role="status"
+					aria-label="Sync status: {statusInfo.text}"
+				>
 					<StatusIcon class="h-5 w-5 {syncState.current === 'syncing' ? 'animate-spin' : ''}" />
 					{#if pendingCount > 0}
 						<Badge
@@ -240,5 +231,54 @@
 			</div>
 		{/snippet}
 		{@render collapsedIcon()}
+	{/if}
+
+	{#if onlineStatus.current && (authStore.sessionUnverified || pendingCount > 0)}
+		<div class={isExpanded ? 'px-3 space-y-2' : 'flex flex-col items-center gap-2'}>
+			{#if authStore.sessionUnverified}
+				<Button
+					size={isExpanded ? 'sm' : 'icon-lg'}
+					variant={isExpanded ? 'outline' : 'ghost'}
+					onclick={() => authStore.recheckSession()}
+					disabled={authStore.recheckingSession}
+					aria-busy={authStore.recheckingSession}
+					aria-label={isExpanded ? undefined : 'Retry connection'}
+					title={isExpanded ? undefined : "Can't reach VROOM. Retry connection"}
+					class={isExpanded ? 'w-full h-7 text-xs max-lg:h-10' : ''}
+				>
+					<RefreshCw
+						class="{isExpanded ? 'h-3 w-3 mr-1.5' : 'h-4 w-4'} {authStore.recheckingSession
+							? 'animate-spin'
+							: ''}"
+					/>
+					{#if isExpanded}
+						{authStore.recheckingSession ? 'Checking...' : 'Retry connection'}
+					{/if}
+				</Button>
+			{/if}
+
+			{#if pendingCount > 0}
+				<Button
+					size={isExpanded ? 'sm' : 'icon-lg'}
+					variant={isExpanded ? 'default' : 'ghost'}
+					onclick={handleManualSync}
+					disabled={syncState.current === 'syncing'}
+					aria-label={isExpanded ? undefined : `Sync ${pendingCount}`}
+					title={isExpanded
+						? undefined
+						: `Sync ${pendingCount} pending ${pendingCount === 1 ? 'expense' : 'expenses'}`}
+					class={isExpanded ? 'w-full h-7 text-xs max-lg:h-10' : ''}
+				>
+					<RefreshCw
+						class="{isExpanded ? 'h-3 w-3 mr-1.5' : 'h-4 w-4'} {syncState.current === 'syncing'
+							? 'animate-spin'
+							: ''}"
+					/>
+					{#if isExpanded}
+						{syncState.current === 'syncing' ? 'Syncing...' : 'Sync Now'}
+					{/if}
+				</Button>
+			{/if}
+		</div>
 	{/if}
 </div>
