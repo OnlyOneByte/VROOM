@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "1dc7e4e5-4ef7-4529-95cd-1fd3754248a8",
+  "id": "fef1cec8-3738-48f4-9ba4-a33932bb84fb",
   "prevId": "aef9ff99-9d99-4d41-95b4-81b88a1703a3",
   "tables": {
     "expenses": {
@@ -2418,6 +2418,15 @@
           ],
           "isUnique": true,
           "where": "status in ('pending','accepted')"
+        },
+        "vehicle_shares_pending_invite_idx": {
+          "name": "vehicle_shares_pending_invite_idx",
+          "columns": [
+            "vehicle_id",
+            "invited_email"
+          ],
+          "isUnique": true,
+          "where": "shared_with_id is null and status = 'pending'"
         },
         "vehicle_shares_shared_with_idx": {
           "name": "vehicle_shares_shared_with_idx",

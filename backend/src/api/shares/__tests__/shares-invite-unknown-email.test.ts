@@ -107,9 +107,26 @@ describe('POST /api/v1/shares answers the same way for every email', () => {
 });
 
 describe('a pending invite attaches when that email signs up', () => {
-  test('the new account receives the invite', async () => {
+  test('two concurrent invites to the same new email leave one pending invite', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
+
+    const results = await Promise.all([
+      invite(vehicleId, 'race@example.com'),
+      invite(vehicleId, 'race@example.com'),
+    ]);
+
+    expect(results.map((r) => r.status).sort()).toEqual([201, 409]);
+    expect(
+      ctx.sqlite
+        .query("SELECT count(*) AS n FROM vehicle_shares WHERE invited_email = 'race@example.com'")
+        .get()
+    ).toEqual({ n: 1 });
+  });
+
+  test('the new account receives the invite and the owner sees no change', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const { body } = await invite(vehicleId, 'later@example.com');
+    const grantedBefore = await (await ctx.authed('GET', '/api/v1/shares/granted')).text();
 
     const { resolveNewUser } = await import('../../auth/routes');
     const result = await resolveNewUser('google', {
@@ -120,5 +137,6 @@ describe('a pending invite attaches when that email signs up', () => {
     if (!('userId' in result)) throw new Error('expected a new user');
 
     expect(shareRow(body.data.id).shared_with_id).toBe(result.userId);
+    expect(await (await ctx.authed('GET', '/api/v1/shares/granted')).text()).toBe(grantedBefore);
   });
 });

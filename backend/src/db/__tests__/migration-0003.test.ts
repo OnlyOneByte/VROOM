@@ -58,6 +58,7 @@ describe('Migration 0003: vehicle_shares.shared_with_id becomes nullable', () =>
     expect(getIndexNames(db, 'vehicle_shares')).toEqual(
       expect.arrayContaining([
         'vehicle_shares_active_idx',
+        'vehicle_shares_pending_invite_idx',
         'vehicle_shares_shared_with_idx',
         'vehicle_shares_owner_idx',
       ])

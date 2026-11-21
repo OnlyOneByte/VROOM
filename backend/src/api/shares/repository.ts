@@ -57,7 +57,7 @@ export function attachPendingInvites(
   email: string
 ): void {
   tx.update(vehicleShares)
-    .set({ sharedWithId: userId, updatedAt: new Date() })
+    .set({ sharedWithId: userId })
     .where(
       and(
         isNull(vehicleShares.sharedWithId),

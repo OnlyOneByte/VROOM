@@ -4,7 +4,12 @@ import { z } from 'zod';
 import { getDb } from '../../db/connection';
 import { users } from '../../db/schema';
 import type { ApiResponse } from '../../errors';
-import { ConflictError, NotFoundError, ValidationError } from '../../errors';
+import {
+  ConflictError,
+  isUniqueConstraintError,
+  NotFoundError,
+  ValidationError,
+} from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { commonSchemas, validateVehicleOwnership, zValidator } from '../../utils/validation';
 import {
@@ -49,28 +54,29 @@ routes.post('/', zValidator('json', inviteSchema), async (c) => {
     .where(sql`lower(${users.email}) = ${email}`)
     .limit(1);
 
-  const existing = await vehicleShareRepository.findActiveInvite(
-    vehicleId,
-    email,
-    invitee?.id ?? null
-  );
-  if (existing) {
-    throw new ConflictError('This vehicle is already shared with that email');
+  const alreadyShared = new ConflictError('This vehicle is already shared with that email');
+  if (await vehicleShareRepository.findActiveInvite(vehicleId, email, invitee?.id ?? null)) {
+    throw alreadyShared;
   }
 
-  const created = await vehicleShareRepository.create({
-    vehicleId,
-    ownerId: user.id,
-    sharedWithId: invitee?.id ?? null,
-    level,
-    status: 'pending',
-    invitedEmail: email,
-  });
+  const created = await vehicleShareRepository
+    .create({
+      vehicleId,
+      ownerId: user.id,
+      sharedWithId: invitee?.id ?? null,
+      level,
+      status: 'pending',
+      invitedEmail: email,
+    })
+    .catch((error: unknown) => {
+      if (isUniqueConstraintError(error)) throw alreadyShared;
+      throw error;
+    });
 
   const response: ApiResponse<GrantedShare> = {
     success: true,
     data: toOwnerView(created),
-    message: "Invitation sent. If that email has a VROOM account, they'll see the invite.",
+    message: 'Invitation sent. They will see it when they sign in to VROOM with that email.',
   };
   return c.json(response, 201);
 });

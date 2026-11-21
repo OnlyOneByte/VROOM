@@ -19,5 +19,6 @@ DROP TABLE `vehicle_shares`;--> statement-breakpoint
 ALTER TABLE `__new_vehicle_shares` RENAME TO `vehicle_shares`;--> statement-breakpoint
 PRAGMA foreign_keys=ON;--> statement-breakpoint
 CREATE UNIQUE INDEX `vehicle_shares_active_idx` ON `vehicle_shares` (`vehicle_id`,`shared_with_id`) WHERE status in ('pending','accepted');--> statement-breakpoint
+CREATE UNIQUE INDEX `vehicle_shares_pending_invite_idx` ON `vehicle_shares` (`vehicle_id`,`invited_email`) WHERE shared_with_id is null and status = 'pending';--> statement-breakpoint
 CREATE INDEX `vehicle_shares_shared_with_idx` ON `vehicle_shares` (`shared_with_id`,`status`);--> statement-breakpoint
 CREATE INDEX `vehicle_shares_owner_idx` ON `vehicle_shares` (`owner_id`);
