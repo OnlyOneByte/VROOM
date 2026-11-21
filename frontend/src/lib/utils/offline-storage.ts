@@ -1,9 +1,10 @@
 import { offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
 import { toBackendExpense } from '#lib/services/api-transformer.ts';
 import { browser } from '$app/env';
-import type { ExpenseCategory } from '#lib/types/index.ts';
+import type { ExpenseCategory, Vehicle } from '#lib/types/index.ts';
 
 const OFFLINE_STORAGE_KEY = 'vroom_offline_expenses';
+const VEHICLE_CACHE_KEY = 'vroom_offline_vehicles';
 const OFFLINE_STORAGE_VERSION = '3.0';
 const PHOTO_DB_NAME = 'vroom_offline_photos';
 const PHOTO_STORE = 'photos';
@@ -106,6 +107,30 @@ function adoptUnscopedQueue(): void {
 
 export function currentOfflineQueueOwner(): string | null {
 	return queueOwner;
+}
+
+function vehicleCacheKey(owner: string): string {
+	return `${VEHICLE_CACHE_KEY}:${owner}`;
+}
+
+export function cacheVehicles(vehicles: Vehicle[]): void {
+	if (!browser || !queueOwner) return;
+	try {
+		localStorage.setItem(vehicleCacheKey(queueOwner), JSON.stringify(vehicles));
+	} catch (error) {
+		if (import.meta.env.DEV) console.error('Failed to cache vehicles for offline use:', error);
+	}
+}
+
+export function loadCachedVehicles(): Vehicle[] {
+	if (!browser || !queueOwner) return [];
+	try {
+		const stored = localStorage.getItem(vehicleCacheKey(queueOwner));
+		return stored ? (JSON.parse(stored) as Vehicle[]) : [];
+	} catch (error) {
+		if (import.meta.env.DEV) console.error('Failed to read cached vehicles:', error);
+		return [];
+	}
 }
 
 export function loadOfflineExpenses(owner: string | null = queueOwner): OfflineExpense[] {

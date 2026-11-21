@@ -2,6 +2,9 @@ import { expenseApi } from '#lib/services/expense-api.ts';
 import { vehicleApi } from '#lib/services/vehicle-api.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
 import { gotoDynamic } from '#lib/utils/navigation.ts';
+import { onlineStatus } from '#lib/stores/offline.svelte.ts';
+import { cacheVehicles, loadCachedVehicles } from '#lib/utils/offline-storage.ts';
+import type { Vehicle } from '#lib/types/index.ts';
 import {
 	ApiError,
 	handleErrorWithNotification,
@@ -21,15 +24,26 @@ export interface PreselectedValues {
 	tags: string | null;
 }
 
+function useVehicles(state: ExpenseFormState, vehicles: Vehicle[]): void {
+	state.vehicles = vehicles;
+	state.vehiclesError = null;
+	if (!state.isEditMode && vehicles.length > 0 && !state.formData.vehicleId) {
+		const firstVehicle = vehicles[0];
+		if (firstVehicle) state.formData.vehicleId = firstVehicle.id;
+	}
+}
+
 export async function loadVehicles(state: ExpenseFormState): Promise<void> {
 	try {
-		state.vehicles = await vehicleApi.getVehicles();
-		state.vehiclesError = null;
-		if (!state.isEditMode && state.vehicles.length > 0 && !state.formData.vehicleId) {
-			const firstVehicle = state.vehicles[0];
-			if (firstVehicle) state.formData.vehicleId = firstVehicle.id;
-		}
+		const vehicles = await vehicleApi.getVehicles();
+		cacheVehicles(vehicles);
+		useVehicles(state, vehicles);
 	} catch (error) {
+		const cached = loadCachedVehicles();
+		if (!onlineStatus.current && cached.length > 0) {
+			useVehicles(state, cached);
+			return;
+		}
 		state.vehiclesError = userFacingErrorMessage(error);
 		handleErrorWithNotification(error, "Couldn't load your vehicles");
 	}
@@ -142,8 +156,11 @@ export async function loadVehicle(state: ExpenseFormState): Promise<Error | null
 		return null;
 	} catch (error) {
 		if (!isCurrent()) return null;
-		state.vehicle = null;
-		return toError(error);
+		const cached = onlineStatus.current
+			? undefined
+			: loadCachedVehicles().find(vehicle => vehicle.id === state.formData.vehicleId);
+		state.vehicle = cached ?? null;
+		return cached ? null : toError(error);
 	}
 }
 
@@ -185,7 +202,8 @@ export async function loadVehicleContext(state: ExpenseFormState): Promise<void>
 		loadLastFuelExpense(state),
 		loadAllVehicleExpenses(state)
 	]);
-	const failure = failures.find(error => error !== null);
+	const offlineWithVehicle = !onlineStatus.current && state.vehicle !== null;
+	const failure = offlineWithVehicle ? undefined : failures.find(error => error !== null);
 	if (!isCurrent()) return;
 	state.vehicleError = failure ? userFacingErrorMessage(failure) : null;
 	if (failure) handleErrorWithNotification(failure, "Couldn't load this vehicle's details");
