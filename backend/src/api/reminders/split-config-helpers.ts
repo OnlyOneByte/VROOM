@@ -27,3 +27,13 @@ export function pruneVehicleFromSplitConfig(
       : remaining.map((a) => ({ vehicleId: a.vehicleId, percentage: 100 / remaining.length }));
   return { method: 'percentage', allocations: rescaled };
 }
+
+export function absoluteTotalAfterPrune(
+  config: SplitConfig,
+  deletedVehicleId: string
+): number | null {
+  if (config.method !== 'absolute') return null;
+  return config.allocations
+    .filter((a) => a.vehicleId !== deletedVehicleId)
+    .reduce((acc, a) => acc + a.amount, 0);
+}

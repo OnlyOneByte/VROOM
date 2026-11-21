@@ -8,7 +8,7 @@ import type { DrizzleTransaction } from '../../db/types';
 import { DatabaseError, isUniqueConstraintError, NotFoundError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { BaseRepository } from '../../utils/repository';
-import { pruneVehicleFromSplitConfig } from './split-config-helpers';
+import { absoluteTotalAfterPrune, pruneVehicleFromSplitConfig } from './split-config-helpers';
 
 export interface ReminderWithVehicles {
   reminder: Reminder;
@@ -361,9 +361,14 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
       if (!config) continue;
       const pruned = pruneVehicleFromSplitConfig(config, deletedVehicleId);
       if (pruned === config) continue;
+      const absoluteTotal = absoluteTotalAfterPrune(config, deletedVehicleId);
       await this.db
         .update(reminders)
-        .set({ expenseSplitConfig: pruned, updatedAt: new Date() })
+        .set({
+          expenseSplitConfig: pruned,
+          ...(absoluteTotal === null ? {} : { expenseAmount: absoluteTotal }),
+          updatedAt: new Date(),
+        })
         .where(and(eq(reminders.id, row.id), eq(reminders.userId, userId)));
       changed++;
     }
