@@ -1,7 +1,23 @@
-import { describe, expect, test } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
 import type { FuelAdvancedResponse, FuelStatsResponse } from '#lib/types/index.ts';
+import { ApiError } from '#lib/utils/error-handling.ts';
+
+const getAllExpenses = vi.fn();
+vi.mock('#lib/services/expense-api.ts', () => ({
+	expenseApi: { getAllExpenses: (...args: unknown[]) => getAllExpenses(...args) }
+}));
+
 import FuelStatsTab from '../FuelStatsTab.svelte';
+
+function fuelExpenseCount(totalCount: number) {
+	getAllExpenses.mockResolvedValue({ data: [], pagination: { totalCount } });
+}
+
+beforeEach(() => {
+	getAllExpenses.mockReset();
+	fuelExpenseCount(0);
+});
 
 const zero = { currentYear: 0, previousYear: 0, currentMonth: 0, previousMonth: 0 };
 
@@ -47,15 +63,43 @@ const charging: NonNullable<FuelStatsResponse['charging']> = {
 };
 
 describe('FuelStatsTab with nothing in the window', () => {
-	test('says the window is 12 months and points to the expenses that are still there', () => {
+	test('with older fill-ups, says the window is 12 months and points to the expenses that are still there', async () => {
+		fuelExpenseCount(3);
 		render(FuelStatsTab, { fuelStats: stats({}), fuelAdvanced: advanced });
-		expect(screen.getByText('No fill-ups in the last 12 months')).toBeTruthy();
+		expect(await screen.findByText('No fill-ups in the last 12 months')).toBeTruthy();
+		expect(getAllExpenses).toHaveBeenCalledWith({ category: 'fuel', limit: 1 });
 		expect(screen.queryByText(/No fuel data yet/)).toBeNull();
 		expect(screen.getByRole('link', { name: 'View Expenses' })).toHaveAttribute(
 			'href',
 			'/expenses'
 		);
 		expect(screen.getByRole('button', { name: 'Log a Fill-up' })).toBeTruthy();
+	});
+
+	test('with no fill-up ever logged, keeps the first-run empty state', async () => {
+		render(FuelStatsTab, { fuelStats: stats({}), fuelAdvanced: advanced });
+		expect(await screen.findByText('No fuel data yet')).toBeTruthy();
+		expect(screen.queryByText('No fill-ups in the last 12 months')).toBeNull();
+		expect(screen.queryByRole('heading', { name: /fill-ups/i })).toBeNull();
+		expect(screen.queryByRole('link', { name: 'View Expenses' })).toBeNull();
+		expect(screen.getByRole('button', { name: 'Log a Fill-up' })).toBeTruthy();
+	});
+
+	test('when the history check fails, falls back to the 12-month wording, which is always true', async () => {
+		getAllExpenses.mockRejectedValue(new ApiError('boom', 500));
+		render(FuelStatsTab, { fuelStats: stats({}), fuelAdvanced: advanced });
+		expect(await screen.findByText('No fill-ups in the last 12 months')).toBeTruthy();
+	});
+
+	test('a fleet with fuel data in the window never asks for its history', () => {
+		render(FuelStatsTab, {
+			fuelStats: stats({
+				fillups: { currentYear: 4, previousYear: 0, currentMonth: 0, previousMonth: 0 }
+			}),
+			fuelAdvanced: advanced
+		});
+		expect(screen.getByText('Fill-ups')).toBeTruthy();
+		expect(getAllExpenses).not.toHaveBeenCalled();
 	});
 });
 
