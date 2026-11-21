@@ -239,7 +239,10 @@
 					/>
 				{/if}
 
-				<fieldset disabled={form.isGroupEditMode} class="min-w-0">
+				<fieldset
+					disabled={form.isGroupEditMode}
+					class="min-w-0 disabled:[&_button]:cursor-not-allowed disabled:[&_button]:opacity-50"
+				>
 					<CategorySelector
 						value={form.formData.category}
 						error={form.errors['category']}
@@ -277,7 +280,10 @@
 					/>
 				{/if}
 
-				<fieldset disabled={form.isGroupEditMode} class="min-w-0 space-y-6">
+				<fieldset
+					disabled={form.isGroupEditMode}
+					class="min-w-0 space-y-6 disabled:[&_button]:cursor-not-allowed disabled:[&_button]:opacity-50"
+				>
 					{#if form.isSplit && form.selectedVehicleIds.length >= 2}
 						<SplitMileageReadings
 							vehicles={form.vehicles}
