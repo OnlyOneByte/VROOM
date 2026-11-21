@@ -410,12 +410,28 @@ describe('VehicleForm edit mode', () => {
 		expect(input('nickname').value).toBe('');
 	});
 
-	test('a vehicle that fails to load is reported and the user is sent to the dashboard', async () => {
+	test('a vehicle that no longer exists is reported and the user is sent to the dashboard', async () => {
 		getVehicle.mockRejectedValue(new ApiError('Vehicle not found', 404));
 		render(VehicleForm, { props: { vehicleId: 'gone' } });
 
 		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/dashboard'));
-		expect(notificationMessages()).toContain("Couldn't load the vehicle. Vehicle not found.");
+		expect(notificationMessages()).toContain('That vehicle no longer exists.');
+	});
+
+	test('a server failure keeps the user on the page with a Retry that reloads the vehicle', async () => {
+		getVehicle.mockRejectedValueOnce(new ApiError('Internal server error', 500));
+		getVehicle.mockResolvedValueOnce(EXISTING);
+		render(VehicleForm, { props: { vehicleId: EXISTING.id } });
+
+		await screen.findByText("Couldn't load this vehicle");
+		expect(screen.getByText(SERVER_FAILURE_MESSAGE)).toBeTruthy();
+		expect(goto).not.toHaveBeenCalled();
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+		await screen.findByRole('heading', { name: 'Edit Vehicle' });
+		expect(getVehicle).toHaveBeenCalledTimes(2);
+		expect(input('make').value).toBe('Honda');
 	});
 
 	test('update sends edited fields and nulls for optionals the user emptied', async () => {
