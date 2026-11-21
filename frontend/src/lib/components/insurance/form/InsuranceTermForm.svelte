@@ -443,7 +443,7 @@
 						{#if vehicles.length > 0}
 							<div class="rounded-md border border-input p-3 space-y-2">
 								{#each vehicles as v (v.id)}
-									<label class="flex items-center gap-2 cursor-pointer">
+									<label class="flex min-h-10 items-center gap-2 cursor-pointer">
 										<Checkbox
 											checked={selectedVehicleIds.includes(v.id)}
 											onCheckedChange={() => toggleVehicle(v.id)}
