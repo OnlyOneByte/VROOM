@@ -155,7 +155,7 @@ describe('ShareVehicleDialog loading the share list', () => {
 		mount();
 		await settle();
 
-		expect(screen.getByText('Failed to load shares')).toBeInTheDocument();
+		expect(screen.getByText("Couldn't load who has access")).toBeInTheDocument();
 		expect(screen.getByText(SERVER_FAILURE_MESSAGE)).toBeInTheDocument();
 		expect(screen.queryByText('Server unavailable')).toBeNull();
 
@@ -171,7 +171,7 @@ describe('ShareVehicleDialog loading the share list', () => {
 		mount();
 		await settle();
 
-		expect(screen.getAllByText('Failed to load shares')).toHaveLength(1);
+		expect(screen.getAllByText("Couldn't load who has access")).toHaveLength(1);
 		expect(screen.getByText(UNEXPECTED_FAILURE_MESSAGE)).toBeInTheDocument();
 	});
 });
