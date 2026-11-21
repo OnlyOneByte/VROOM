@@ -82,7 +82,7 @@ describe('FuelStatsTab with nothing in the window', () => {
 		expect(screen.queryByText('No fill-ups in the last 12 months')).toBeNull();
 		expect(screen.queryByRole('heading', { name: /fill-ups/i })).toBeNull();
 		expect(screen.queryByRole('link', { name: 'View Expenses' })).toBeNull();
-		expect(screen.getByRole('button', { name: 'Log a Fill-up' })).toBeTruthy();
+		expect(screen.getByRole('button', { name: 'Log a Fill-up' })).toHaveClass('h-10');
 	});
 
 	test('shows neither empty state until the history check answers', async () => {

@@ -240,7 +240,7 @@
 					</Button>
 				</div>
 			{:else}
-				<Button onclick={logFillup}>
+				<Button size="lg" onclick={logFillup}>
 					<Fuel class="mr-2 h-4 w-4" />
 					Log a Fill-up
 				</Button>
