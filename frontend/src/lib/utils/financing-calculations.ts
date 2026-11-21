@@ -149,6 +149,10 @@ function calculatePaymentDate(startDate: Date, paymentNumber: number, frequency:
 	}
 }
 
+export function remainingBalance(financing: VehicleFinancing): number {
+	return financing.computedBalance ?? financing.originalAmount;
+}
+
 function calendarDay(date: Date): number {
 	return Math.round(
 		Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / (1000 * 60 * 60 * 24)
@@ -237,7 +241,7 @@ export function calculatePayoffDate(financing: VehicleFinancing): Date {
 			return new Date();
 		}
 
-		if ((financing.computedBalance ?? 0) <= 0) {
+		if (remainingBalance(financing) <= 0) {
 			return new Date();
 		}
 
@@ -255,14 +259,12 @@ export function calculatePayoffDate(financing: VehicleFinancing): Date {
 		}
 
 		if (!financing.apr || financing.apr <= 0) {
-			const paymentsRemaining = Math.ceil(
-				(financing.computedBalance ?? 0) / financing.paymentAmount
-			);
+			const paymentsRemaining = Math.ceil(remainingBalance(financing) / financing.paymentAmount);
 			return calculatePaymentDate(new Date(), paymentsRemaining, financing.paymentFrequency);
 		}
 
 		const monthlyRate = financing.apr / 100 / 12;
-		let balance = financing.computedBalance ?? 0;
+		let balance = remainingBalance(financing);
 		let paymentsRemaining = 0;
 
 		while (balance > 0 && paymentsRemaining < financing.termMonths * 2) {
@@ -334,7 +336,7 @@ function calculateExtraPaymentImpactImpl(
 
 		const monthlyRate = financing.apr && financing.apr > 0 ? financing.apr / 100 / 12 : 0;
 		const newPaymentAmount = financing.paymentAmount + extraPaymentAmount;
-		const balance = financing.computedBalance ?? 0;
+		const balance = remainingBalance(financing);
 		const maxMonths = financing.termMonths * 2;
 
 		const original = simulateAmortization(balance, monthlyRate, financing.paymentAmount, maxMonths);

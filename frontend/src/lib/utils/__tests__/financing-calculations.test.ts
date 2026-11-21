@@ -244,10 +244,13 @@ describe('calculatePayoffDate', () => {
 		expect(calculatePayoffDate(null as unknown as VehicleFinancing).getTime()).toBe(NOW.getTime());
 	});
 
-	test('returns now when the balance is already paid off or missing', () => {
+	test('returns now when the balance is already paid off', () => {
 		expect(calculatePayoffDate(makeLoan({ computedBalance: 0 })).getTime()).toBe(NOW.getTime());
-		expect(calculatePayoffDate(makeLoan({ computedBalance: undefined })).getTime()).toBe(
-			NOW.getTime()
+	});
+
+	test('a missing balance is estimated from the original amount, not reported as paid off', () => {
+		expect(calculatePayoffDate(makeLoan({ computedBalance: undefined }))).toEqual(
+			calculatePayoffDate(makeLoan({ computedBalance: 10_000 }))
 		);
 	});
 

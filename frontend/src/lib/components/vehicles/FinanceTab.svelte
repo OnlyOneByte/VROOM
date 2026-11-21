@@ -20,6 +20,7 @@
 		calculateAmortizationSchedule,
 		calculatePayoffDate,
 		derivePaymentEntries,
+		remainingBalance,
 		resolveCurrentOdometer
 	} from '#lib/utils/financing-calculations.ts';
 	import type { Expense, Vehicle, VehicleStats, DerivedPaymentEntry } from '#lib/types/index.ts';
@@ -47,7 +48,7 @@
 			if (!vehicle?.financing?.isActive) return 0;
 			const financing = vehicle.financing;
 			if (!financing.originalAmount || financing.originalAmount <= 0) return 0;
-			const balance = financing.computedBalance ?? financing.originalAmount;
+			const balance = remainingBalance(financing);
 			return Math.min(
 				100,
 				Math.max(0, ((financing.originalAmount - balance) / financing.originalAmount) * 100)
