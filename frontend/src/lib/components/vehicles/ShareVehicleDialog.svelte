@@ -10,6 +10,7 @@
 	import { Users, CircleAlert, Trash2 } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 	import { shareApi } from '#lib/services/share-api.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { shareLevelLabel } from '#lib/utils/share-helpers.ts';
 	import { formatDate } from '#lib/utils/formatters.ts';
@@ -79,7 +80,7 @@
 			level = 'viewer';
 			await load();
 		} catch (error) {
-			toast.error(`Couldn't send the invitation. ${userFacingErrorMessage(error)}`);
+			appStore.showError(`Couldn't send the invitation. ${userFacingErrorMessage(error)}`);
 		} finally {
 			inviting = false;
 		}

@@ -42,6 +42,13 @@ export class ApiError extends VroomError {
 	}
 }
 
+// requireAuth's code. Other 401s (a storage provider's AUTH_INVALID) leave the VROOM session alone.
+export function isSessionExpiryError(error: unknown): boolean {
+	return (
+		error instanceof ApiError && error.statusCode === 401 && error.code === 'AuthenticationError'
+	);
+}
+
 export class NetworkError extends TypeError {
 	constructor(cause: unknown) {
 		super(cause instanceof Error ? cause.message : 'Network request failed', { cause });

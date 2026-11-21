@@ -1,6 +1,6 @@
 import { browser } from '$app/env';
 import { PUBLIC_API_URL } from '$app/env/public';
-import { ApiError, NetworkError } from '#lib/utils/error-handling.ts';
+import { ApiError, isSessionExpiryError, NetworkError } from '#lib/utils/error-handling.ts';
 import { buildQueryString } from './api-utils';
 
 export function getApiBaseUrl(): string {
@@ -8,8 +8,6 @@ export function getApiBaseUrl(): string {
 }
 
 const SELF_REPORTED_401_PATHS = ['/api/v1/auth/me', '/api/v1/auth/refresh'];
-// Other 401 codes (a storage provider's AUTH_INVALID) are not about the VROOM session.
-const SESSION_401_CODE = 'AuthenticationError';
 const SESSION_EXPIRY_WINDOW_MS = 1000;
 
 let sessionExpiry: Promise<void> | null = null;
@@ -109,8 +107,10 @@ async function fetchOrThrow(url: string, options: ApiOptions): Promise<Response>
 		} catch {
 			// Non-JSON error body: keep the status-based message.
 		}
-		if (response.status === 401 && code === SESSION_401_CODE) await handleSessionExpiry(fullUrl);
-		throw new ApiError(message, response.status, details, code);
+		const error = new ApiError(message, response.status, details, code);
+		// shortcut: a 401 without a JSON code (e.g. from a proxy) is not treated as a session end; no VROOM route sends one.
+		if (isSessionExpiryError(error)) await handleSessionExpiry(fullUrl);
+		throw error;
 	}
 
 	return response;

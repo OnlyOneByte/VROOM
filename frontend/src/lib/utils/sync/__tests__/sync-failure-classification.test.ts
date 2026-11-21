@@ -38,7 +38,8 @@ function apiOk(data: unknown = { id: 'server-1' }): Response {
 }
 
 function apiError(status: number, message: string): Response {
-	return new Response(JSON.stringify({ error: { message } }), {
+	const code = status === 401 ? 'AuthenticationError' : undefined;
+	return new Response(JSON.stringify({ error: { code, message } }), {
 		status,
 		headers: { 'content-type': 'application/json' }
 	});
@@ -86,7 +87,12 @@ describe('classifySyncFailure', () => {
 		expect(classifySyncFailure(new ApiError('conflict', 409))).toBe('terminal');
 		expect(classifySyncFailure(new ApiError('unprocessable', 422))).toBe('terminal');
 
-		expect(classifySyncFailure(new ApiError('session expired', 401))).toBe('auth');
+		expect(
+			classifySyncFailure(new ApiError('session expired', 401, undefined, 'AuthenticationError'))
+		).toBe('auth');
+		expect(
+			classifySyncFailure(new ApiError('provider token rejected', 401, undefined, 'AUTH_INVALID'))
+		).toBe('terminal');
 
 		expect(classifySyncFailure(new ApiError('timeout', 408))).toBe('transient');
 		expect(classifySyncFailure(new ApiError('slow down', 429))).toBe('transient');
