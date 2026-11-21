@@ -1,3 +1,16 @@
+<script module lang="ts">
+	import { parseMonthToDate } from '#lib/utils/chart-formatters.ts';
+	import type { FuelStatsResponse } from '#lib/types/index.ts';
+
+	export function consumptionChartRows(monthly: FuelStatsResponse['monthlyConsumption']) {
+		return monthly.map(d => ({
+			...d,
+			efficiency: d.efficiency ?? undefined,
+			date: parseMonthToDate(d.month)
+		}));
+	}
+</script>
+
 <script lang="ts">
 	import { AppLineChart, AppAreaChart, AppBarChart } from '#lib/components/charts/index.ts';
 	import { CHART_COLORS, buildChartConfig } from '#lib/utils/chart-colors.ts';
@@ -5,11 +18,10 @@
 		formatDecimalAxis,
 		formatCentsAxis,
 		formatDateTick,
-		getXTickCount,
-		parseMonthToDate
+		getXTickCount
 	} from '#lib/utils/chart-formatters.ts';
 	import * as Chart from '#lib/components/ui/chart/index.ts';
-	import type { FuelStatsResponse, FuelAdvancedResponse, UnitsMetadata } from '#lib/types/index.ts';
+	import type { FuelAdvancedResponse, UnitsMetadata } from '#lib/types/index.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import {
 		getFuelEfficiencyLabel,
@@ -35,9 +47,7 @@
 		`Price per ${getLongFormLabel(units.volumeUnit).toLowerCase()} by fuel type over time`
 	);
 
-	let consumptionData = $derived(
-		fuelStats.monthlyConsumption.map(d => ({ ...d, date: parseMonthToDate(d.month) }))
-	);
+	let consumptionData = $derived(consumptionChartRows(fuelStats.monthlyConsumption));
 
 	let consumptionSeries = $derived([
 		{ key: 'efficiency', label: efficiencyLabel, color: CHART_COLORS[0] as string },

@@ -48,7 +48,7 @@ export interface FuelStatsResponse {
 		avgPerDay: number | null;
 		avgPerMonth: number | null;
 	};
-	monthlyConsumption: Array<{ month: string; efficiency: number; volume: number }>;
+	monthlyConsumption: Array<{ month: string; efficiency: number | null; volume: number }>;
 	gasPriceHistory: Array<{ date: string; fuelType: string; pricePerVolume: number }>;
 	fillupCostByVehicle: Array<{
 		month: string;
